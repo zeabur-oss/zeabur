@@ -22,6 +22,7 @@ wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/talker -
 wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/editor --timeout=180s
 wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/keeper --timeout=180s
 wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/distroless --timeout=180s
+wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/noshell --timeout=180s
 pod=$(kubectl -n "$namespace" get pods -l app=talker -o jsonpath='{.items[0].metadata.name}')
 # The crashing Deployment must have crashed a few times before the Overview test looks for it.
 # Between restarts the kubelet reports the container as `waiting: CrashLoopBackOff`,
@@ -59,4 +60,5 @@ fi
 cd "$root/web"
 ZEABUR_E2E_URL="$url" ZEABUR_E2E_NAMESPACE="$namespace" ZEABUR_E2E_POD="$pod" \
   ZEABUR_E2E_ADOPT="$namespace-adopt" \
+  ZEABUR_E2E_UNCHECKED=Deployment/talker ZEABUR_E2E_NO_SHELL="$namespace-files/noshell" \
   bunx playwright test --reporter=line --output="$out/results"

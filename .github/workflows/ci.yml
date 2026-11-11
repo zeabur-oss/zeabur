@@ -1,8 +1,11 @@
 name: CI
 
 # Each job runs scripts/ci/<job>.sh in the Nix dev shell, the same as locally. Pull requests and
-# pushes run lint, test and ui. The merge queue runs every job on the commit about to land, and the
-# nightly run keeps main's caches for the merge queue's jobs.
+# pushes run lint, test and ui. The merge queue runs the jobs that gate a merge on the commit about
+# to land. The nightly run runs everything, also fuzz and the canary, which are not in the merge
+# queue, and keeps main's caches for the merge queue's jobs. A failed nightly-only job (fuzz,
+# canary, e2e-full) opens or updates one issue (scripts/nightly-issues.sh), and closes it when the
+# job passes again.
 on:
   push:
     branches: [main]
@@ -68,9 +71,9 @@ jobs:
       - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/ui.sh
 
-  # Four to six minutes each, set up included: only in the merge queue, with the cluster jobs.
+  # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
   fuzz:
-    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-26.04-arm
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -154,6 +157,53 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
+  # The specs the default cluster skips (Git, upload and database deploys, which need Zeabur Builder
+  # and the database operators): nightly and by hand.
+  e2e-full:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+        with:
+          rust-cache: true
+      - uses: ./.github/actions/catalog-release
+      - run: nix develop -c scripts/ci/e2e-full.sh
+
+  # Zeabur Proxy against the real VictoriaLogs: nightly and by hand.
+  canary:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+        with:
+          rust-cache: true
+      - uses: ./.github/actions/catalog-release
+      - run: nix develop -c scripts/ci/canary.sh
+
+  # One issue for each failing nightly job, opened or updated while it fails, closed when it passes.
+  nightly-issues:
+    if: always() && github.event_name == 'schedule'
+    needs: [fuzz, canary, e2e-full]
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      issues: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          RESULTS: ${{ toJSON(needs) }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: scripts/nightly-issues.sh
+
   zizmor:
     uses: zeabur-oss/.github/.github/workflows/zizmor.yml@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
 
@@ -161,7 +211,7 @@ jobs:
   ok:
     name: ci / ok
     if: always()
-    needs: [lint, test, ui, fuzz, no-ui, wording, cluster, e2e, zizmor]
+    needs: [lint, test, ui, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, zizmor]
     runs-on: ubuntu-slim
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

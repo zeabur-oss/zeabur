@@ -29,7 +29,7 @@ use zeabur_core::problem::{Denied, FieldCause, KubernetesStatus, StatusDetails};
 use crate::objects::{self, AccessRules, ResourceRef, ServedResource};
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
-    ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects,
+    ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects, RawList,
     SecretSummary, ServicePort, TerminalSize, Unreadable, WriteRequest, Written,
 };
 use crate::{UserClient, names, wide};
@@ -102,6 +102,19 @@ where
     }
 }
 
+/// Lists one kind as the JSON values the objects are, read straight from the answer.
+async fn list_values(
+    client: &kube::Client,
+    resource: &ResourceRef,
+    namespace: &str,
+    name: &str,
+) -> Result<Listed<serde_json::Value>, ClusterError> {
+    match objects::list_raw(client, resource, Some(namespace)).await {
+        Ok(list) => list.typed().map(Listed::Items),
+        Err(error) => refused(error, name),
+    }
+}
+
 /// Lists only the metadata of one kind, for counting and labels.
 async fn list_metadata<T>(api: Api<T>, resource: &str) -> Result<Listed<ObjectMeta>, ClusterError>
 where
@@ -116,7 +129,10 @@ where
 }
 
 fn refusal<T>(error: kube::Error, resource: &str) -> Result<Listed<T>, ClusterError> {
-    let error = ClusterError::from(error);
+    refused(ClusterError::from(error), resource)
+}
+
+fn refused<T>(error: ClusterError, resource: &str) -> Result<Listed<T>, ClusterError> {
     if error.is_not_found() {
         return Ok(Listed::Items(Vec::new()));
     }
@@ -206,62 +222,77 @@ async fn secret_summaries(
     )
     .body(Vec::new())
     .map_err(|e| ClusterError::Transport(e.to_string()))?;
-    match client.request::<serde_json::Value>(request).await {
-        Ok(table) => parse_secret_table(&table).map(Listed::Items),
+    match client.request_text(request).await {
+        Ok(table) => parse_secret_table(table.as_bytes()).map(Listed::Items),
         Err(error) => refusal(error, "secrets"),
     }
+}
+
+/// The parts of a `meta.k8s.io/v1` Table that a Secret summary needs.
+#[derive(serde::Deserialize)]
+struct SecretTable {
+    #[serde(rename = "columnDefinitions")]
+    columns: Option<Vec<TableColumn>>,
+    rows: Option<Vec<TableRow>>,
+}
+
+#[derive(serde::Deserialize)]
+struct TableColumn {
+    #[serde(default)]
+    name: String,
+}
+
+#[derive(serde::Deserialize)]
+struct TableRow {
+    cells: Option<Vec<serde_json::Value>>,
+    object: Option<RowObject>,
+}
+
+#[derive(serde::Deserialize)]
+struct RowObject {
+    #[serde(default)]
+    metadata: ObjectMeta,
 }
 
 /// Reads a `meta.k8s.io/v1` Table of Secrets: the `Type` and `Data` columns and each row's
 /// metadata, with the last-applied annotation hidden ([`crate::objects`]), since it may hold
 /// the values. Anything else in the answer is ignored.
-fn parse_secret_table(table: &serde_json::Value) -> Result<Vec<SecretSummary>, ClusterError> {
-    let columns: Vec<&str> = table
-        .get("columnDefinitions")
-        .and_then(serde_json::Value::as_array)
-        .ok_or_else(|| ClusterError::Decode("secret table has no columns".to_owned()))?
-        .iter()
-        .map(|c| {
-            c.get("name")
-                .and_then(serde_json::Value::as_str)
-                .unwrap_or_default()
-        })
-        .collect();
-    let column = |name: &str| columns.iter().position(|c| *c == name);
+fn parse_secret_table(body: &[u8]) -> Result<Vec<SecretSummary>, ClusterError> {
+    let table: SecretTable =
+        serde_json::from_slice(body).map_err(|e| ClusterError::Decode(e.to_string()))?;
+    let columns = table
+        .columns
+        .ok_or_else(|| ClusterError::Decode("secret table has no columns".to_owned()))?;
+    let column = |name: &str| columns.iter().position(|c| c.name == name);
     let (type_column, data_column) = (column("Type"), column("Data"));
-    let rows = table
-        .get("rows")
-        .and_then(serde_json::Value::as_array)
-        .map_or(&[][..], Vec::as_slice);
-    rows.iter()
+    Ok(table
+        .rows
+        .unwrap_or_default()
+        .into_iter()
         .map(|row| {
-            let cells = row.get("cells").and_then(serde_json::Value::as_array);
-            let cell = |index: Option<usize>| cells.zip(index).and_then(|(c, i)| c.get(i));
-            let mut metadata: ObjectMeta = row
-                .pointer("/object/metadata")
-                .cloned()
-                .map(serde_json::from_value)
-                .transpose()
-                .map_err(|e| ClusterError::Decode(e.to_string()))?
+            let cells = row.cells.unwrap_or_default();
+            let cell = |index: Option<usize>| index.and_then(|i| cells.get(i));
+            let type_ = cell(type_column)
+                .and_then(serde_json::Value::as_str)
+                .map(str::to_owned);
+            let key_count = cell(data_column)
+                .and_then(serde_json::Value::as_u64)
+                .and_then(|n| usize::try_from(n).ok())
                 .unwrap_or_default();
+            let mut metadata = row.object.map_or_else(ObjectMeta::default, |o| o.metadata);
             // `kubectl apply` keeps a copy of the whole Secret, values included, in an
             // annotation that the metadata carries.
             objects::hide_last_applied(&mut metadata);
-            Ok(SecretSummary {
+            SecretSummary {
                 secret: Secret {
                     metadata,
-                    type_: cell(type_column)
-                        .and_then(serde_json::Value::as_str)
-                        .map(str::to_owned),
+                    type_,
                     ..Secret::default()
                 },
-                key_count: cell(data_column)
-                    .and_then(serde_json::Value::as_u64)
-                    .and_then(|n| usize::try_from(n).ok())
-                    .unwrap_or_default(),
-            })
+                key_count,
+            }
         })
-        .collect()
+        .collect())
 }
 
 fn log_params(options: &LogOptions, follow: bool) -> LogParams {
@@ -359,7 +390,8 @@ impl Cluster for UserClient {
             names::namespace(namespace)?;
             let client = self.kube();
             let ns = |c: &kube::Client| c.clone();
-            let http_routes = dynamic("gateway.networking.k8s.io", "v1", "HTTPRoute", "httproutes");
+            let http_routes =
+                ResourceRef::new("gateway.networking.k8s.io", "v1", "httproutes", "HTTPRoute");
             let (workloads, services, config_maps, secrets, claims, ingresses, routes) = futures_util::try_join!(
                 workloads(client, namespace),
                 list_kind(
@@ -379,8 +411,10 @@ impl Cluster for UserClient {
                     Api::<Ingress>::namespaced(ns(client), namespace),
                     "ingresses.networking.k8s.io"
                 ),
-                list_kind(
-                    Api::<DynamicObject>::namespaced_with(ns(client), namespace, &http_routes),
+                list_values(
+                    client,
+                    &http_routes,
+                    namespace,
                     "httproutes.gateway.networking.k8s.io"
                 ),
             )?;
@@ -392,13 +426,7 @@ impl Cluster for UserClient {
             readable += take(secrets, &mut objects.secrets, u);
             readable += take(claims, &mut objects.persistent_volume_claims, u);
             readable += take(ingresses, &mut objects.ingresses, u);
-            let mut route_objects = Vec::new();
-            readable += take(routes, &mut route_objects, u);
-            objects.http_routes = route_objects
-                .into_iter()
-                .map(serde_json::to_value)
-                .collect::<Result<_, _>>()
-                .map_err(|e| ClusterError::Decode(e.to_string()))?;
+            readable += take(routes, &mut objects.http_routes, u);
             all_refused(objects, readable)
         })
     }
@@ -774,14 +802,14 @@ impl Cluster for UserClient {
         Box::pin(async move { objects::review_access(self.kube(), request).await })
     }
 
-    fn list_kind<'a>(
+    fn list_raw<'a>(
         &'a self,
         resource: &'a ResourceRef,
         namespace: Option<&'a str>,
-    ) -> Answer<'a, Vec<DynamicObject>> {
+    ) -> Answer<'a, RawList> {
         Box::pin(async move {
             names::optional_namespace(namespace)?;
-            objects::list_kind(self.kube(), resource, namespace).await
+            objects::list_raw(self.kube(), resource, namespace).await
         })
     }
 
@@ -1117,13 +1145,24 @@ mod tests {
                                         "labels": {"app": "db"}}}
             }]
         });
-        let secrets = parse_secret_table(&table).unwrap();
+        let secrets = parse_secret_table(&serde_json::to_vec(&table).unwrap()).unwrap();
         assert_eq!(secrets.len(), 1);
         let summary = &secrets[0];
         assert_eq!(summary.secret.metadata.name.as_deref(), Some("db"));
         assert_eq!(summary.secret.type_.as_deref(), Some("Opaque"));
         assert_eq!(summary.key_count, 2);
         assert!(summary.secret.data.is_none() && summary.secret.string_data.is_none());
+    }
+
+    #[test]
+    fn a_secret_table_with_null_rows_or_cells_is_empty_or_unreadable_per_row() {
+        let null_rows = br#"{"columnDefinitions":[{"name":"Type"}],"rows":null}"#;
+        assert_eq!(parse_secret_table(null_rows).unwrap().len(), 0);
+        let null_cells = br#"{"columnDefinitions":[{"name":"Type"}],"rows":[{"cells":null,
+            "object":{"metadata":{"name":"db"}}}]}"#;
+        let secrets = parse_secret_table(null_cells).unwrap();
+        assert_eq!(secrets[0].secret.metadata.name.as_deref(), Some("db"));
+        assert_eq!(secrets[0].key_count, 0);
     }
 
     #[test]
@@ -1141,7 +1180,7 @@ mod tests {
                            }}}
             }]
         });
-        let secrets = parse_secret_table(&table).unwrap();
+        let secrets = parse_secret_table(&serde_json::to_vec(&table).unwrap()).unwrap();
         let text = serde_json::to_string(&secrets[0].secret).unwrap();
         assert!(!text.contains("aHVudGVyMg=="), "{text}");
         assert_eq!(

@@ -111,6 +111,30 @@ Zeabur 登录 Identity、读取镜像、读取对象存储中的备份、连接 
 
 `issuer.caBundle` 和 `builds.caBundle` 由 zeabur-installer 设置，分别指向签发 Identity 证书的本地 CA 和 Zot 的 CA。Zeabur 会同时信任这两个 CA 和 `extraTrustedCA`，无需自行配置。
 
+## 让对外连接经过代理
+
+集群只能通过代理连到互联网时，开启 `outboundProxy`。Zeabur 自己发出的请求会改走这个代理，包括从镜像仓库读取镜像、读取对象存储中的备份，以及连接 GitHub。
+
+```sh
+helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
+  --version <version> \
+  --namespace zeabur --reset-then-reuse-values \
+  --set outboundProxy.enabled=true \
+  --set outboundProxy.httpsProxy=http://proxy.corp.example:3128
+```
+
+HTTPS 目标设置 `outboundProxy.httpsProxy`，HTTP 目标设置 `outboundProxy.httpProxy`，也可以两个都设。地址必须以 `http://` 开头。Zeabur 用 `CONNECT` 隧道经由代理连接 HTTPS 目标。代理需要用户名和密码时，写在地址里（`http://user:password@proxy.corp.example:3128`）。
+
+下列目标不会经过代理。
+
+- 本机地址，例如 `localhost` 和 `127.0.0.1`。
+- 以 `.svc` 或 `.cluster.local` 结尾的名称，以及集群的 Pod 和 Service 网段。网段默认是 k3s 和 RKE2 的 `10.42.0.0/16` 和 `10.43.0.0/16`，你的集群使用其他网段时，设置 `outboundProxy.clusterNetwork`。
+- 你加入 `outboundProxy.noProxy` 的内容，可以写域名后缀（`.corp.example`）、地址或 CIDR 网段。
+
+Zeabur 拒绝连接的目标与没有代理时相同。镜像仓库或备份地址指向这台机器、链路本地地址或云元数据地址时，即使代理能连上也会被拒绝。Zeabur 会自己检查地址，再请代理连接那个地址，所以代理的 DNS 应答无法把请求带到别处。代理本身的地址可以在私有网络内。
+
+这个设置不影响提供日志和指标的 Zeabur Proxy（`proxy.*`）。通过 Identity 登录和调用 Kubernetes API 都不经过代理。如果代理会检查 TLS，还需要信任它的 CA，见[信任私有 CA](#信任私有-ca)。
+
 ## 常见失败
 
 | 情况 | 检查位置 |

@@ -25,6 +25,11 @@
       {
         "paths": [
           {
+            "name": "@tanstack/react-query",
+            "importNames": ["useQueryClient"],
+            "message": "A query key is built only in web/src/api. Use the query options and helpers of web/src/api/queries.ts (`refresh`, `refreshProject`, `cached`)."
+          },
+          {
             "name": "zod",
             "message": "Import zod/mini. The full zod compiles parsers with `new Function`, which the Content Security Policy refuses."
           },
@@ -50,5 +55,13 @@
         ]
       }
     ]
-  }
+  },
+  "overrides": [
+    {
+      "files": ["src/api/**", "**/*.test.ts", "**/*.test.tsx"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }

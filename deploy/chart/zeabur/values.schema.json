@@ -151,6 +151,25 @@
         "required": ["configMap", "secret"]
       }
     },
+    "outboundProxy": {
+      "description": "A proxy for Zeabur's own outbound HTTP and HTTPS. Not the Zeabur Proxy of proxy.*.",
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "httpProxy": { "type": "string", "pattern": "^(http://[^\\s]+)?$" },
+        "httpsProxy": { "type": "string", "pattern": "^(http://[^\\s]+)?$" },
+        "noProxy": { "type": "array", "items": { "type": "string", "pattern": "^[^\\s,]+$" } },
+        "clusterNetwork": { "type": "array", "items": { "type": "string", "pattern": "^[^\\s,]+$" } }
+      },
+      "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
+      "then": {
+        "anyOf": [
+          { "properties": { "httpProxy": { "minLength": 1 } }, "required": ["httpProxy"] },
+          { "properties": { "httpsProxy": { "minLength": 1 } }, "required": ["httpsProxy"] }
+        ]
+      }
+    },
     "telemetry": {
       "type": "object",
       "additionalProperties": false,

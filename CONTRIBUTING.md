@@ -72,8 +72,11 @@ Each CI job in `.github/workflows/ci.yml` runs `nix develop -c scripts/ci/<job>.
 `wording`); the workflow only checks out, installs Nix and restores caches. So a job runs the same
 on any Linux machine with Nix, and Docker for the cluster jobs: `nix develop -c scripts/ci/lint.sh`.
 A pull request runs `lint` (format, clippy, docs, cargo-deny, unsafe-report, levels and chart in a
-row), `test` and `ui`. The merge queue, a tag, the nightly run and a manual run add `fuzz`,
-`no-ui`, `wording`, `cluster` and `e2e`.
+row), `test` and `ui`. The merge queue, the nightly run and a manual run add `no-ui`, `wording`,
+`cluster` and `e2e`. The nightly run and a manual run also add `fuzz`, `canary` (Zeabur Proxy
+against VictoriaLogs) and `e2e-full` (the browser specs that need Zeabur Builder and the database
+operators). A nightly-only job (`fuzz`, `canary`, `e2e-full`) that fails opens or updates the issue
+"Nightly <job> failing" and closes it when the job passes again.
 `scripts/ci-local.sh [job…]` runs several (all by default), each in its own copy of the checkout,
 and prints one result line per job; use a disposable machine or VM for the cluster jobs.
 

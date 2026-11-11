@@ -47,7 +47,7 @@ function policyFix(gap: Gap, project: Project, t: Translate, side: "from" | "to"
   if (!object || !from || !to) return undefined
   return {
     title: t("reach.planAllowFrom", from.name, to.name),
-    changes: [{ op: "create" as const, object: JSON.parse(object) as Record<string, never> }],
+    changes: [{ op: "create" as const, object: JSON.parse(object) as Record<string, unknown> }],
     service: workloadOf(side === "from" ? from : to),
   }
 }
@@ -88,7 +88,7 @@ export const fixTemplates: Record<string, FixTemplate> = {
   "networkPolicy.isolateProject": (gap, project, t) => {
     const objects = gap.fix.params?.objects
     if (!objects) return undefined
-    const changes = (JSON.parse(objects) as Record<string, never>[]).map((object) => ({
+    const changes = (JSON.parse(objects) as Record<string, unknown>[]).map((object) => ({
       op: "create" as const,
       object,
     }))
