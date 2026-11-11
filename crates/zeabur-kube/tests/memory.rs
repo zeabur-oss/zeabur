@@ -86,7 +86,7 @@ mod tests {
             .access_rules(NAMESPACE)
             .await
             .expect("review");
-        assert!(rules.rules.is_empty());
+        assert_eq!(rules.rules, Vec::new());
     }
 
     #[tokio::test]
