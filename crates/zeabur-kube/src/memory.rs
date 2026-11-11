@@ -1283,6 +1283,8 @@ impl Cluster for MemoryCluster {
                 None
             } else if target.kind == "Namespace" {
                 Some(target.name.as_str())
+            } else if target.namespace.is_empty() {
+                None
             } else {
                 Some(target.namespace.as_str())
             };

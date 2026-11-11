@@ -7,7 +7,7 @@ mod contract;
 #[cfg(test)]
 mod tests {
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{AccessRule, AccessRules};
+    use zeabur_kube::{AccessRule, AccessRules, Cluster as _};
 
     use super::contract;
 
@@ -48,6 +48,33 @@ mod tests {
     #[tokio::test]
     async fn the_rules_decide_reviews_writes_and_dry_runs_alike() {
         contract::the_rules_decide_reviews_writes_and_dry_runs_alike(&bound(), NAMESPACE).await;
+    }
+
+    #[tokio::test]
+    async fn a_cluster_scoped_write_follows_the_cluster_wide_rules() {
+        let node = zeabur_kube::ObjectTarget {
+            api_version: "v1".to_owned(),
+            kind: "Node".to_owned(),
+            plural: "nodes".to_owned(),
+            namespace: String::new(),
+            name: "vps-1".to_owned(),
+        };
+        let request = zeabur_kube::WriteRequest {
+            target: node,
+            body: zeabur_kube::WriteBody::JsonPatch(serde_json::json!([])),
+            dry_run: true,
+        };
+        // Bound in the namespace only: the node is out of reach, even for a dry run.
+        let error = bound().write(&request).await.expect_err("refused");
+        assert_eq!(error.code(), Some(403));
+        // Bound cluster-wide: the node is reachable, and only missing.
+        let mut state = State::default();
+        state.bind(NAMESPACE, AccessRules::default());
+        let error = MemoryCluster::new(state)
+            .write(&request)
+            .await
+            .expect_err("missing");
+        assert_eq!(error.code(), Some(404));
     }
 
     #[tokio::test]
