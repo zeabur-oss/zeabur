@@ -1872,7 +1872,8 @@ export const en = {
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `Remove ${host}`,
   "yaml.edit": "Edit",
-  "yaml.editSecret": "Values under data are base64. To enter plain text, put it under stringData.",
+  "yaml.editSecret":
+    "Values under data are base64-encoded. To enter plain text, put it under stringData.",
   "yaml.notEditable": "Kubernetes manages this kind itself; edit the object that owns it.",
   "title.editYaml": (name: string) => `Edit ${name}`,
   "title.delete": (kind: string, name: string) => `Delete ${kind} ${name}`,
