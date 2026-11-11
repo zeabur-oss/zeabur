@@ -137,7 +137,7 @@ enum Missed {
     /// Zeabur Proxy could not reach the store, which may not be installed yet; its words.
     ProxyBackendDown(String),
     /// The state it means, the right that is missing, and the words.
-    Failed(StoreState, Option<UnreadableView>, String),
+    Failed(StoreState, Option<Box<UnreadableView>>, String),
 }
 
 /// The right Zeabur Proxy checks, named for the interface.
@@ -166,7 +166,7 @@ async fn fetch(source: Source<'_>, path: &str, encoded: &str) -> Result<Value, M
                     let refusal = (state == StoreState::Unreadable)
                         .then_some(status)
                         .flatten()
-                        .map(|status| proxy_refusal(service, status));
+                        .map(|status| Box::new(proxy_refusal(service, status)));
                     Err(Missed::Failed(state, refusal, message))
                 }
             }
@@ -195,7 +195,7 @@ async fn fetch(source: Source<'_>, path: &str, encoded: &str) -> Result<Value, M
                     let message = detail(&answer.body);
                     Err(Missed::Failed(
                         StoreState::Unreadable,
-                        Some(proxy_refused(project, message.clone())),
+                        Some(Box::new(proxy_refused(project, message.clone()))),
                         message,
                     ))
                 }
@@ -366,7 +366,7 @@ pub(crate) async fn get(
         Err(Missed::Failed(state, refusal, message)) => {
             history.state = state;
             history.message = Some(message);
-            history.unreadable.extend(refusal);
+            history.unreadable.extend(refusal.map(|r| *r));
             return Ok(Json(history));
         }
         Err(Missed::NoProxyBackend | Missed::ProxyBackendDown(_)) => {
