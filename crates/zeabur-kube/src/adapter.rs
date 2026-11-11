@@ -279,7 +279,7 @@ fn parse_secret_table(body: &[u8]) -> Result<Vec<SecretSummary>, ClusterError> {
                 .and_then(serde_json::Value::as_u64)
                 .and_then(|n| usize::try_from(n).ok())
                 .unwrap_or_default();
-            let mut metadata = row.object.map(|o| o.metadata).unwrap_or_default();
+            let mut metadata = row.object.map_or_else(ObjectMeta::default, |o| o.metadata);
             // `kubectl apply` keeps a copy of the whole Secret, values included, in an
             // annotation that the metadata carries.
             objects::hide_last_applied(&mut metadata);

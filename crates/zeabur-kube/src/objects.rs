@@ -16,11 +16,11 @@
 //! # Secret values stay here
 //!
 //! Only [`Cluster::reveal_secret`](crate::Cluster::reveal_secret) returns a Secret's values. A
-//! Secret read through this path has every `data` and `stringData` value replaced by an empty
-//! string (its keys stay), and its `kubectl.kubernetes.io/last-applied-configuration`
-//! annotation, which `kubectl apply` fills with the whole object including the values
-//! [kubectl-apply], replaced by a mark. Metadata-only lists of Secrets get the same treatment of
-//! the annotation.
+//! Secret read through this path is decoded from the response bytes by a decoder that skips
+//! every `data` and `stringData` value (the keys stay, each with an empty string), and its
+//! `kubectl.kubernetes.io/last-applied-configuration` annotation, which `kubectl apply` fills with
+//! the whole object including the values [kubectl-apply], replaced by a mark. Metadata-only lists
+//! of Secrets get the same treatment of the annotation.
 //!
 //! # Listing every kind of a namespace
 //!
@@ -43,11 +43,12 @@
 //! [kubectl-apply]: https://kubernetes.io/docs/tasks/manage-kubernetes-objects/declarative-config/#how-apply-calculates-differences-and-merges-changes
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use kube::api::{Api, DynamicObject, ListParams};
+use kube::api::{Api, DynamicObject, GetParams, ListParams};
 use kube::core::{ApiResource, GroupVersionKind, Request, Resource as _};
 use kube::discovery::{Discovery, Scope};
 
 use crate::port::{ClusterError, RawList};
+use crate::secrets;
 use crate::wide::serves;
 
 /// The annotation `kubectl apply` writes the last applied object into.
@@ -168,23 +169,6 @@ impl ResourceRef {
             &GroupVersionKind::gvk(&self.group, &self.version, &self.kind),
             &self.resource,
         )
-    }
-}
-
-/// Hides a Secret's values in an object read through the generic path (see the module
-/// documentation). Other kinds are left as they are.
-pub(crate) fn hide_secret_values(object: &mut DynamicObject) {
-    hide_last_applied(&mut object.metadata);
-    for field in ["data", "stringData"] {
-        if let Some(map) = object
-            .data
-            .get_mut(field)
-            .and_then(serde_json::Value::as_object_mut)
-        {
-            for value in map.values_mut() {
-                *value = serde_json::Value::String(String::new());
-            }
-        }
     }
 }
 
@@ -553,13 +537,12 @@ pub(crate) async fn get_object(
     namespace: Option<&str>,
     name: &str,
 ) -> Result<Option<DynamicObject>, ClusterError> {
-    match api(client, resource, namespace).get(name).await {
-        Ok(mut object) => {
-            if resource.is_secret() {
-                hide_secret_values(&mut object);
-            }
-            Ok(Some(object))
-        }
+    match request_object(client, resource, namespace, name).await {
+        Ok(body) => Ok(Some(if resource.is_secret() {
+            secrets::one(&body)?
+        } else {
+            serde_json::from_slice(&body).map_err(|e| ClusterError::Decode(e.to_string()))?
+        })),
         Err(error) => match ClusterError::from(error) {
             error if error.is_refused() || error.is_not_found() => {
                 not_installed(client, resource, error).await
@@ -569,31 +552,23 @@ pub(crate) async fn get_object(
     }
 }
 
+/// The bytes kube-apiserver sent for one object.
+async fn request_object(
+    client: &kube::Client,
+    resource: &ResourceRef,
+    namespace: Option<&str>,
+    name: &str,
+) -> Result<Vec<u8>, kube::Error> {
+    let path = DynamicObject::url_path(&resource.api_resource(), namespace);
+    let request = Request::new(path)
+        .get(name, &GetParams::default())
+        .map_err(kube::Error::BuildRequest)?;
+    Ok(client.request_text(request).await?.into_bytes())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    #[test]
-    fn a_secret_read_generically_keeps_its_keys_and_loses_its_values() {
-        let mut object: DynamicObject = serde_json::from_value(serde_json::json!({
-            "apiVersion": "v1", "kind": "Secret",
-            "metadata": {"name": "db", "namespace": "shop", "annotations": {
-                LAST_APPLIED: "{\"data\":{\"password\":\"aHVudGVyMg==\"}}",
-                "team": "data"
-            }},
-            "data": {"password": "aHVudGVyMg=="},
-            "stringData": {"token": "s3cr3t"}
-        }))
-        .unwrap();
-        hide_secret_values(&mut object);
-        let text = serde_json::to_string(&object).unwrap();
-        assert!(!text.contains("aHVudGVyMg==") && !text.contains("s3cr3t"));
-        assert_eq!(object.data["data"]["password"], "");
-        assert_eq!(object.data["stringData"]["token"], "");
-        let annotations = object.metadata.annotations.unwrap();
-        assert_eq!(annotations[LAST_APPLIED], HIDDEN);
-        assert_eq!(annotations["team"], "data");
-    }
 
     #[test]
     fn access_rules_hint_which_kinds_may_be_listed() {

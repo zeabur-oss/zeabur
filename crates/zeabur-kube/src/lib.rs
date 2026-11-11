@@ -38,6 +38,7 @@ pub mod objects;
 pub mod port;
 #[cfg(feature = "memory")]
 pub mod recording;
+mod secrets;
 mod wide;
 mod write;
 

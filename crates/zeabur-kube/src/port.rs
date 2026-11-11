@@ -395,9 +395,11 @@ pub trait ClusterExt: Cluster {
 
 impl<C: Cluster + ?Sized> ClusterExt for C {}
 
-/// The answer to a LIST as kube-apiserver sent it, decoded when it is read. Decoding straight
-/// from these bytes into the type a caller wants keeps each object from being parsed into an
-/// intermediate tree first.
+/// The answer to a LIST as kube-apiserver sent it, decoded when it is read.
+///
+/// Decoding straight from these bytes into the type a caller wants keeps each object from being
+/// parsed into an intermediate tree first. Secrets are decoded without their values
+/// ([`crate::objects`]).
 #[derive(Debug, Clone)]
 pub struct RawList {
     secrets: bool,
@@ -419,13 +421,10 @@ impl RawList {
     /// # Errors
     /// [`ClusterError::Decode`] when the body is not a list of objects.
     pub fn objects(&self) -> Result<Vec<DynamicObject>, ClusterError> {
-        let mut items = decode::<DynamicObject>(&self.body)?;
         if self.secrets {
-            for object in &mut items {
-                crate::objects::hide_secret_values(object);
-            }
+            return crate::secrets::list(&self.body);
         }
-        Ok(items)
+        decode(&self.body)
     }
 
     /// The body of a LIST of `objects`, as the in-memory cluster answers.
