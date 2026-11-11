@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { askerOf, gate, neededRole, rightOfResource, ruleOf, unknownRights } from "@/model/rights"
+import { askerOf, gate, neededRole, rowGate, ruleOf, unknownRights } from "@/model/rights"
 
 const member = askerOf({ username: "zeabur:bob" })
 const admin = askerOf({ username: "zeabur:alice" })
@@ -39,11 +39,17 @@ describe("closing an action by the person's rights", () => {
     expect(ruleOf("readSecrets")).toBe("get secrets")
   })
 
-  test("an object's YAML is closed by the right for its kind, and any other kind is left open", () => {
-    expect(rightOfResource("deployments", "edit")).toBe("changeServices")
-    expect(rightOfResource("statefulsets", "delete")).toBe("deleteServices")
-    expect(rightOfResource("secrets", "delete")).toBe("changeSecrets")
-    expect(rightOfResource("httproutes", "edit")).toBe("changeDomains")
-    expect(rightOfResource("widgets", "edit")).toBeUndefined()
+  test("an object is closed by what the rules say about its name, naming the rule", () => {
+    expect(rowGate("patch", "deployments.apps", "allowed", kubeconfig)).toStrictEqual({
+      open: true,
+    })
+    expect(rowGate("patch", "deployments.apps", "unknown", kubeconfig)).toStrictEqual({
+      open: true,
+    })
+    expect(rowGate("delete", "secrets", "denied", kubeconfig)).toMatchObject({
+      open: false,
+      rule: "delete secrets",
+      member: false,
+    })
   })
 })

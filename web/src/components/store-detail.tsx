@@ -161,6 +161,7 @@ export function ObjectYaml({ project, address }: { project: string; address: Obj
       address={address}
       yaml={object.data.yaml}
       managedBy={object.data.provenance.tool}
+      can={object.data.can}
     />
   )
 }

@@ -95,6 +95,7 @@ export function ObjectSheet({
                   yaml={object.data.yaml}
                   managedBy={object.data.provenance.tool}
                   kind={kind}
+                  can={object.data.can}
                   onDeleted={onClose}
                 />
               }

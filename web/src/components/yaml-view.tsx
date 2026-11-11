@@ -3,7 +3,7 @@ import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import TrashIcon from "~icons/ph/trash"
 
 import type { ObjectAddress } from "@/api/queries"
-import { GateTip, useGates } from "@/components/gate"
+import { GateTip, useAsker } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
@@ -11,14 +11,14 @@ import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
-import { rightOfResource, type Gate } from "@/model/rights"
+import type { Schemas } from "@/api/client"
+import { rowGate } from "@/model/rights"
 
 const YamlEditor = lazy(() =>
   import("@/components/yaml-editor").then((m) => ({ default: m.YamlEditor })),
 )
 
 /** Kinds Kubernetes makes on its own or that a plan cannot edit as a whole. */
-const open: Gate = { open: true }
 const readOnlyResources = new Set(["pods", "events", "replicasets", "controllerrevisions"])
 
 /** Recreated when deleted; the server refuses one a tool or a controller would make again. */
@@ -36,6 +36,7 @@ export function YamlView({
   yaml,
   managedBy,
   kind,
+  can,
   onDeleted,
 }: {
   project: string
@@ -43,6 +44,8 @@ export function YamlView({
   yaml: string
   managedBy?: string | null
   kind?: string
+  /** What the rules say about this object. */
+  can?: Schemas.RowRights
   /** Offers Delete when given. */
   onDeleted?: () => void
 }) {
@@ -51,13 +54,10 @@ export function YamlView({
   const planner = usePlanner(project, () => setDraft(null))
   const deleter = usePlanner(project, onDeleted)
   const label = t("yaml.label", address.name)
-  const gates = useGates(project)
-  const gateOf = (change: "edit" | "delete") => {
-    const right = rightOfResource(address.resource, change)
-    return right ? gates(right) : open
-  }
-  const editGate = gateOf("edit")
-  const deleteGate = gateOf("delete")
+  const asker = useAsker()
+  const what = address.group ? `${address.resource}.${address.group}` : address.resource
+  const editGate = rowGate("patch", what, can?.change, asker)
+  const deleteGate = rowGate("delete", what, can?.delete, asker)
   const blocked = managedBy
     ? t("common.managedByDetail", managedBy)
     : readOnlyResources.has(address.resource)

@@ -50,6 +50,7 @@ use zeabur_model::{Origin, Provenance};
 use crate::error::{ApiError, get_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::Person;
+use crate::projects::rights::RowRights;
 use crate::views::UnreadableView;
 
 /// How many kinds are listed at the same time.
@@ -220,6 +221,8 @@ pub struct ObjectDocument {
     pub origin: Origin,
     /// The tool that manages it, if any.
     pub provenance: Provenance,
+    /// What the person may do with this object.
+    pub can: RowRights,
 }
 
 const fn segment(group: &str) -> &str {
@@ -465,6 +468,12 @@ pub(crate) async fn get(
         }
     };
     let provenance = zeabur_graph::provenance(&object.metadata);
+    let can = cluster
+        .access_rules(&project)
+        .await
+        .map_or(RowRights::unknown(), |rules| {
+            RowRights::of(&rules, &reference, &name)
+        });
     let mut value = serde_json::to_value(&object)
         .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e.to_string())))?;
     if let Some(top) = value.as_object_mut() {
@@ -493,5 +502,6 @@ pub(crate) async fn get(
             &name,
         ),
         provenance,
+        can,
     }))
 }

@@ -21,7 +21,7 @@ import {
 
 type Permission = Schemas.Permission
 
-function useAsker() {
+export function useAsker() {
   return askerOf(useQuery(whoamiQuery).data)
 }
 

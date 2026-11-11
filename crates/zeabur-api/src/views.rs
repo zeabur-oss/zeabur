@@ -280,6 +280,9 @@ pub struct ProjectDocument {
     pub unreadable: Vec<UnreadableView>,
     /// What the integrations add, by module; a module whose API is not served adds nothing.
     pub extensions: ProjectExtensions,
+    /// What the person may do with each service, by its `id`; every one is `unknown` when the
+    /// rules could not be read.
+    pub rights: BTreeMap<String, crate::projects::rights::RowRights>,
 }
 
 /// What integrations add to a project document, one member per module.

@@ -7225,9 +7225,24 @@ export type NotificationsPlanRequest =
 export type ObjectDocumentStatus = { [key: string]: unknown } | null
 
 /**
+ * What the person may do with one object, decided with its name: a rule limited to names
+ * (`resourceNames`) allows only the objects it lists [rbac-resource-names].
+ *
+ * [rbac-resource-names]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
+ */
+export type RowRights = {
+  /** Change it: `patch`. */
+  change: Permission
+  /** Delete it: `delete`. */
+  delete: Permission
+}
+
+/**
  * One object as YAML.
  */
 export type ObjectDocument = {
+  /** What the person may do with this object. */
+  can: RowRights
   /** `projects/<p>/objects/<group>/<version>/<resource>/<name>`. */
   id: string
   /** The object. */
@@ -8332,6 +8347,12 @@ export type ProjectDetails = {
 }
 
 /**
+ * What the person may do with each service, by its `id`; every one is `unknown` when the
+ * rules could not be read.
+ */
+export type ProjectDocumentRights = { [key: string]: RowRights }
+
+/**
  * What integrations add to a project document, one member per module.
  */
 export type ProjectExtensions = {
@@ -8349,6 +8370,11 @@ export type ProjectDocument = Project & {
   extensions: ProjectExtensions
   /** `projects/<name>`. */
   id: string
+  /**
+   * What the person may do with each service, by its `id`; every one is `unknown` when the
+   * rules could not be read.
+   */
+  rights: ProjectDocumentRights
   /** Kinds the person could not list; the projection is missing what they hide. */
   unreadable: UnreadableView[]
 }
@@ -8558,18 +8584,6 @@ export type ProjectRights = {
 }
 
 /**
- * Whether the person may patch the workloads of one kind.
- */
-export type WorkloadPatch = {
-  /** Every one of them. */
-  all: Permission
-  /** `Deployment`, `StatefulSet` or `DaemonSet`. */
-  kind: string
-  /** The ones a rule limited to names (`resourceNames`) allows. */
-  names: string[]
-}
-
-/**
  * A project's Namespace.
  */
 export type ProjectNamespace = ProjectDetails &
@@ -8617,11 +8631,6 @@ export type ProjectNamespace = ProjectDetails &
     role?: AccountRole | null
     /** Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
     system: boolean
-    /**
-     * Which Deployments, StatefulSets and DaemonSets the person may patch (change their
-     * variables).
-     */
-    workloadPatch: WorkloadPatch[]
   }
 
 /**

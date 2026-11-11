@@ -223,10 +223,6 @@ mod tests {
         );
         // The rules hold no `pods/log`, as for a Viewer.
         assert_eq!(guarded["can"]["readLogs"], "denied");
-        assert_eq!(
-            guarded["workloadPatch"][0],
-            json!({"kind": "Deployment", "all": "denied", "names": []})
-        );
         let (_, open) = send(
             &TestApi::new(&cluster)
                 .with_settings(with_roles(false))
@@ -260,31 +256,6 @@ mod tests {
         )
         .await;
         assert_eq!(manager["canAdopt"], "allowed");
-
-        // A rule limited to names allows patching only those.
-        cluster.update(|s| {
-            let mut named = developer_rules();
-            named.rules.push(AccessRule {
-                verbs: vec!["patch".to_owned()],
-                groups: vec!["apps".to_owned()],
-                resources: vec!["deployments".to_owned()],
-                names: vec!["web".to_owned()],
-            });
-            s.bind("shop", named);
-        });
-        let (_, named) = send(
-            &TestApi::new(&cluster)
-                .with_settings(with_roles(true))
-                .router(),
-            "GET",
-            uri,
-            None,
-        )
-        .await;
-        assert_eq!(
-            named["workloadPatch"][0],
-            json!({"kind": "Deployment", "all": "denied", "names": ["web"]})
-        );
     }
 
     fn node(name: &str, memory: &str, cpu: &str) -> zeabur_kube::k8s_openapi::api::core::v1::Node {

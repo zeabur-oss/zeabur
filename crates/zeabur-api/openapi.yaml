@@ -11943,7 +11943,11 @@ components:
       - yaml
       - origin
       - provenance
+      - can
       properties:
+        can:
+          $ref: "#/components/schemas/RowRights"
+          description: What the person may do with this object.
         id:
           type: string
           description: "`projects/<p>/objects/<group>/<version>/<resource>/<name>`."
@@ -13978,6 +13982,7 @@ components:
         - id
         - unreadable
         - extensions
+        - rights
         properties:
           extensions:
             $ref: "#/components/schemas/ProjectExtensions"
@@ -13987,6 +13992,15 @@ components:
           id:
             type: string
             description: "`projects/<name>`."
+          rights:
+            type: object
+            description: |-
+              What the person may do with each service, by its `id`; every one is `unknown` when the
+              rules could not be read.
+            additionalProperties:
+              $ref: "#/components/schemas/RowRights"
+            propertyNames:
+              type: string
           unreadable:
             type: array
             items:
@@ -14159,7 +14173,6 @@ components:
         - canAdopt
         - can
         - labelsGuarded
-        - workloadPatch
         properties:
           adopted:
             type: boolean
@@ -14229,13 +14242,6 @@ components:
           system:
             type: boolean
             description: Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted.
-          workloadPatch:
-            type: array
-            items:
-              $ref: "#/components/schemas/WorkloadPatch"
-            description: |-
-              Which Deployments, StatefulSets and DaemonSets the person may patch (change their
-              variables).
       description: A project's Namespace.
     ProjectObjectStorage:
       type: object
@@ -15481,6 +15487,23 @@ components:
       description: >-
         One address's way, and the plan that fixes where it stops when Zeabur can write
         one.
+    RowRights:
+      type: object
+      description: |-
+        What the person may do with one object, decided with its name: a rule limited to names
+        (`resourceNames`) allows only the objects it lists [rbac-resource-names].
+        
+        [rbac-resource-names]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
+      required:
+      - change
+      - delete
+      properties:
+        change:
+          $ref: "#/components/schemas/Permission"
+          description: "Change it: `patch`."
+        delete:
+          $ref: "#/components/schemas/Permission"
+          description: "Delete it: `delete`."
     RunAs:
       type: object
       description: |-
@@ -18074,25 +18097,6 @@ components:
       - Deployment
       - Job
       - StatefulSet
-    WorkloadPatch:
-      type: object
-      description: Whether the person may patch the workloads of one kind.
-      required:
-      - kind
-      - all
-      - names
-      properties:
-        all:
-          $ref: "#/components/schemas/Permission"
-          description: Every one of them.
-        kind:
-          type: string
-          description: "`Deployment`, `StatefulSet` or `DaemonSet`."
-        names:
-          type: array
-          items:
-            type: string
-          description: The ones a rule limited to names (`resourceNames`) allows.
     WorkloadRef:
       type: object
       description: |-

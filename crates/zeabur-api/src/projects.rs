@@ -248,9 +248,10 @@ pub(crate) struct ProjectRead {
 }
 
 pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectRead, ApiError> {
-    let (objects, events) = futures_util::future::join(
+    let (objects, events, rules) = futures_util::future::join3(
         cluster.namespace_objects(project),
         cluster.list::<Event>(Some(project)),
+        cluster.access_rules(project),
     )
     .await;
     let objects = objects
@@ -284,8 +285,25 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
         network_policy: network_policy::extension(cluster, &snapshot, &projection, &mut unreadable)
             .await?,
     };
+    let rights = projection
+        .services
+        .iter()
+        .map(|service| {
+            let rights = rules
+                .as_ref()
+                .map_or(rights::RowRights::unknown(), |rules| {
+                    rights::RowRights::of_workload(
+                        rules,
+                        service.workload.kind,
+                        &service.workload.name,
+                    )
+                });
+            (service.id.clone(), rights)
+        })
+        .collect();
     Ok(ProjectRead {
         document: ProjectDocument {
+            rights,
             id: id::project(project),
             project: projection,
             unreadable,

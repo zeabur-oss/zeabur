@@ -9,8 +9,64 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::Denied;
 use zeabur_kube::{AccessRules, Attributes, Cluster};
+use zeabur_model::WorkloadKind;
 
 use super::namespace::Permission;
+
+/// What the person may do with one object, decided with its name: a rule limited to names
+/// (`resourceNames`) allows only the objects it lists [rbac-resource-names].
+///
+/// [rbac-resource-names]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct RowRights {
+    /// Change it: `patch`.
+    pub change: Permission,
+    /// Delete it: `delete`.
+    pub delete: Permission,
+}
+
+impl RowRights {
+    /// Nothing is known, as when the rules could not be read.
+    #[must_use]
+    pub const fn unknown() -> Self {
+        Self {
+            change: Permission::Unknown,
+            delete: Permission::Unknown,
+        }
+    }
+
+    /// The rights over the object `name` of `resource`.
+    #[must_use]
+    pub fn of(rules: &AccessRules, resource: &zeabur_kube::ResourceRef, name: &str) -> Self {
+        let decide = |verb| {
+            rules
+                .decide(&Attributes::of(verb, resource).named(name))
+                .into()
+        };
+        Self {
+            change: decide("patch"),
+            delete: decide("delete"),
+        }
+    }
+
+    /// The rights over the workload `name` of `kind`.
+    #[must_use]
+    pub fn of_workload(rules: &AccessRules, kind: WorkloadKind, name: &str) -> Self {
+        let (group, version, plural) = match kind {
+            WorkloadKind::CronJob => ("batch", "v1", "cronjobs"),
+            WorkloadKind::DaemonSet => ("apps", "v1", "daemonsets"),
+            WorkloadKind::Deployment => ("apps", "v1", "deployments"),
+            WorkloadKind::Job => ("batch", "v1", "jobs"),
+            WorkloadKind::StatefulSet => ("apps", "v1", "statefulsets"),
+        };
+        Self::of(
+            rules,
+            &zeabur_kube::ResourceRef::new(group, version, plural, kind.as_str()),
+            name,
+        )
+    }
+}
 
 /// What the person may change in one project.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]

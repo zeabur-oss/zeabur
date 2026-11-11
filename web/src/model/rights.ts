@@ -14,6 +14,8 @@ type PageRight =
   | "restoreBackups"
   | "createServices"
   | "changeBuildLimits"
+  | "changeObject"
+  | "deleteObject"
 export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
 type Permission = Schemas.Permission
 
@@ -59,6 +61,8 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   changeS3Destinations: { role: "admin", rule: "create secrets -n zeabur-s3-destinations" },
   changeGitHubApp: { role: "admin", rule: "create secrets -n builder-system" },
   changeBuildLimits: { role: "admin", rule: "patch and zeabur-manage namespaces" },
+  changeObject: { role: "developer", rule: "patch" },
+  deleteObject: { role: "developer", rule: "delete" },
 }
 
 export const neededRole = (right: Right): NeededRole => rules[right].role
@@ -115,31 +119,19 @@ const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
   restoreBackups: true,
   createServices: true,
   changeBuildLimits: true,
+  changeObject: true,
+  deleteObject: true,
 }
 
-const workloads = ["deployments", "statefulsets", "daemonsets"]
-
-/** The right that changes (or deletes) objects of `resource`, when one covers it; any other kind
- * is left to the plan's dry run. */
-export function rightOfResource(
-  resource: string,
-  change: "edit" | "delete",
-): keyof ProjectRights | undefined {
-  if (workloads.includes(resource)) return change === "delete" ? "deleteServices" : "changeServices"
-  const rights: Record<string, keyof ProjectRights> = {
-    secrets: "changeSecrets",
-    configmaps: "changeConfig",
-    ingresses: "changeDomains",
-    httproutes: "changeDomains",
-    persistentvolumeclaims: "changeStorage",
-    networkpolicies: "changeNetworkPolicies",
-    clusters: "changeDatabases",
-    perconaservermongodbs: "changeDatabases",
-    mysqlclusters: "changeDatabases",
-    mariadbs: "changeDatabases",
-    dragonflies: "changeDatabases",
-    seaweeds: "changeObjectStorage",
-    buckets: "changeObjectStorage",
-  }
-  return rights[resource]
+/** The gate of one object, from what the rules say about its name; `what` is the resource the
+ * rule would name, such as `deployments.apps`. */
+export function rowGate(
+  verb: "patch" | "delete",
+  what: string,
+  permission: Permission | undefined,
+  asker: Asker,
+): Gate {
+  if (permission !== "denied") return open
+  const right = verb === "patch" ? "changeObject" : "deleteObject"
+  return { open: false, right, ...rules[right], rule: `${verb} ${what}`, member: asker.member }
 }

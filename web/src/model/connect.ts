@@ -221,12 +221,13 @@ export function connectChanges(
 }
 
 /** Workloads whose variables can be set; the database's own and other tools' are left out. */
-export function candidates(services: Service[], rights: Schemas.WorkloadPatch[]): Service[] {
-  return services.filter((s) => {
-    if (s.dataStore || s.provenance.tool) return false
-    const right = rights.find((r) => r.kind === s.kind)
-    return !!right && (right.all !== "denied" || right.names.includes(s.name))
-  })
+export function candidates(
+  services: Service[],
+  rights: Record<string, Schemas.RowRights>,
+): Service[] {
+  return services.filter(
+    (s) => !s.dataStore && !s.provenance.tool && rights[s.id]?.change !== "denied",
+  )
 }
 
 const references = (env: Env) =>

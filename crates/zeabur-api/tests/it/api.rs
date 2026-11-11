@@ -19,7 +19,9 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::events::v1::Event;
     use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{Identity, NamespaceObjects, SecretSummary, ServedResource};
+    use zeabur_kube::{
+        AccessRule, AccessRules, Identity, NamespaceObjects, SecretSummary, ServedResource,
+    };
 
     use crate::common::app;
     use crate::support::TestApi;
@@ -218,6 +220,79 @@ mod tests {
         assert!(items[1].get("health").is_none(), "not adopted: no counts");
         assert_eq!(names(&list), ["shop", "default"]);
         assert!(list.get("totalSize").is_none() && list.get("nextPageToken").is_none());
+    }
+
+    fn rule(verbs: &[&str], group: &str, resource: &str, names: &[&str]) -> AccessRule {
+        AccessRule {
+            verbs: verbs.iter().map(|v| (*v).to_owned()).collect(),
+            groups: vec![group.to_owned()],
+            resources: vec![resource.to_owned()],
+            names: names.iter().map(|n| (*n).to_owned()).collect(),
+        }
+    }
+
+    fn bound(rules: Vec<AccessRule>) -> AccessRules {
+        AccessRules {
+            rules,
+            incomplete: false,
+        }
+    }
+
+    /// A rule limited to names opens only those workloads, and a person who may only read
+    /// closes every change.
+    #[tokio::test]
+    async fn the_project_says_what_the_person_may_do_with_each_service() {
+        let cluster = cluster();
+        let web = "projects/shop/services/deployment/web";
+        cluster.update(|s| {
+            s.bind(
+                "shop",
+                bound(vec![
+                    rule(&["get", "list"], "*", "*", &[]),
+                    rule(&["patch"], "apps", "deployments", &["other"]),
+                ]),
+            );
+        });
+        let project = get(&cluster, "/api/v1/projects/shop").await;
+        assert_eq!(
+            project["rights"][web],
+            json!({"change": "denied", "delete": "denied"})
+        );
+
+        cluster.update(|s| {
+            s.bind(
+                "shop",
+                bound(vec![
+                    rule(&["get", "list"], "*", "*", &[]),
+                    rule(&["patch"], "apps", "deployments", &["web"]),
+                ]),
+            );
+        });
+        let project = get(&cluster, "/api/v1/projects/shop").await;
+        assert_eq!(
+            project["rights"][web],
+            json!({"change": "allowed", "delete": "denied"})
+        );
+    }
+
+    #[tokio::test]
+    async fn an_object_says_what_the_person_may_do_with_it() {
+        let cluster = cluster();
+        let uri = "/api/v1/projects/shop/objects/apps/v1/deployments/web";
+        cluster.update(|s| {
+            s.bind(
+                "shop",
+                bound(vec![
+                    rule(&["get", "list"], "*", "*", &[]),
+                    rule(&["delete"], "apps", "deployments", &["web"]),
+                ]),
+            );
+        });
+        let object = get(&cluster, uri).await;
+        assert_eq!(
+            object["can"],
+            json!({"change": "denied", "delete": "allowed"})
+        );
     }
 
     #[tokio::test]
