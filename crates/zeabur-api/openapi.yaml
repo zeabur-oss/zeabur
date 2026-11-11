@@ -17281,17 +17281,39 @@ components:
       - unexpected
     UnreadableView:
       type: object
-      description: A kind the person could not read, and kube-apiserver's answer.
+      description: |-
+        What the person could not read, as the attributes of the refused request, and
+        kube-apiserver's answer.
       required:
+      - verb
+      - group
       - resource
       - kubernetes
       properties:
+        group:
+          type: string
+          description: The API group; empty for the core group.
         kubernetes:
           $ref: "#/components/schemas/KubernetesStatus"
           description: kube-apiserver's answer.
+        name:
+          type:
+          - string
+          - "null"
+          description: The object, when the refusal was of one.
+        namespace:
+          type:
+          - string
+          - "null"
+          description: The namespace, when the refusal was in one.
         resource:
           type: string
-          description: The resource (`secrets`, `deployments.apps`, …).
+          description: >-
+            The plural resource (`secrets`, `deployments`), with its subresource when it
+            was one.
+        verb:
+          type: string
+          description: The verb that was refused, such as `list`.
     UpgradeExtensions:
       type: object
       description: What integrations add to the cluster's upgrades, one member per module.

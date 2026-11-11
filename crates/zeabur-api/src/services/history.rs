@@ -143,7 +143,11 @@ enum Missed {
 /// The right Zeabur Proxy checks, named for the interface.
 fn proxy_refused(project: &str, message: String) -> UnreadableView {
     UnreadableView {
-        resource: format!("metrics.proxy.zeabur.com ({project})"),
+        verb: "get".to_owned(),
+        group: "proxy.zeabur.com".to_owned(),
+        resource: "metrics".to_owned(),
+        namespace: Some(project.to_owned()),
+        name: None,
         kubernetes: KubernetesStatus::new(403, "Forbidden", message),
     }
 }

@@ -141,15 +141,23 @@ mod tests {
         });
         let body = storage(&cluster).await;
         assert_eq!(body["classes"], json!([]));
-        let refused: Vec<&str> = body["unreadable"]
+        let refused: Vec<(&str, &str)> = body["unreadable"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|u| u["resource"].as_str().unwrap())
+            .map(|u| {
+                (
+                    u["resource"].as_str().unwrap(),
+                    u["group"].as_str().unwrap(),
+                )
+            })
             .collect();
         assert_eq!(
             refused,
-            ["storageclasses.storage.k8s.io", "persistentvolumes"]
+            [
+                ("storageclasses", "storage.k8s.io"),
+                ("persistentvolumes", "")
+            ]
         );
         let claims = body["claims"].as_array().unwrap();
         assert_eq!(claims.len(), 2);

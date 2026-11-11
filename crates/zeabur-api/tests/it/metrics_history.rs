@@ -173,10 +173,9 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["state"], "unreadable", "{body}");
         assert_eq!(body["source"]["via"], "zeabur-proxy");
-        assert_eq!(
-            body["unreadable"][0]["resource"],
-            "metrics.proxy.zeabur.com (bank)"
-        );
+        assert_eq!(body["unreadable"][0]["resource"], "metrics");
+        assert_eq!(body["unreadable"][0]["group"], "proxy.zeabur.com");
+        assert_eq!(body["unreadable"][0]["namespace"], "bank");
         assert_eq!(body["cpu"], json!([]));
         assert_eq!(body["memory"], json!([]));
         assert_eq!(store.inspect(|s| s.proxy_requests.len()), Some(0));
@@ -189,9 +188,11 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["state"], "unreadable", "{body}");
         assert_eq!(body["source"]["via"], "service-proxy");
+        assert_eq!(body["unreadable"][0]["resource"], "services/proxy");
+        assert_eq!(body["unreadable"][0]["namespace"], "observability");
         assert_eq!(
-            body["unreadable"][0]["resource"],
-            "services/proxy (observability/vmsingle-vm-victoria-metrics-k8s-stack)"
+            body["unreadable"][0]["name"],
+            "vmsingle-vm-victoria-metrics-k8s-stack"
         );
         assert!(store.inspect(|s| s.proxy_requests.len()) > Some(0));
     }

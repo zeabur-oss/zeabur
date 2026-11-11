@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query"
 import { storageQuery } from "@/api/queries"
 import { AmountInput } from "@/components/amount-input"
 import { FormField } from "@/components/form-field"
-import { permission, Refused } from "@/components/refused"
+import { permission, Refused, refusedKey } from "@/components/refused"
 import { useT, type Translate } from "@/i18n"
 import {
   canGrow,
@@ -20,7 +20,7 @@ const CLASSES = "storageclasses.storage.k8s.io"
 export const useStorage = (project: string) => useQuery(storageQuery(project)).data
 
 const classesRefused = (storage: ProjectStorage | undefined) =>
-  storage?.unreadable.some((u) => u.resource === CLASSES) ?? false
+  storage?.unreadable.some((u) => refusedKey(u) === CLASSES) ?? false
 
 export function kindWord(t: Translate, c: StorageClass): string {
   if (c.kind === "local") return t("storage.kind.local")

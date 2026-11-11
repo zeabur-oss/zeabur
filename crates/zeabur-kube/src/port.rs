@@ -645,10 +645,52 @@ pub struct NamespaceObjects {
 /// A kind the person could not list.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Unreadable {
-    /// The resource, as `group/resource` (`deployments.apps`, `secrets`).
+    /// What was refused: `list` for a kind, `get` for one object.
+    pub verb: String,
+    /// The API group; empty for the core group.
+    pub group: String,
+    /// The plural resource, with its subresource when it was one (`services/proxy`).
     pub resource: String,
+    /// The namespace, when the refusal was in one.
+    pub namespace: Option<String>,
+    /// The object, when the refusal was of one.
+    pub name: Option<String>,
     /// kube-apiserver's answer.
     pub status: KubernetesStatus,
+}
+
+impl Unreadable {
+    /// A refused list of `key`, as RBAC names it (`resource.group`, or `resource` for the core
+    /// group).
+    #[must_use]
+    pub fn listing(key: &str, status: KubernetesStatus) -> Self {
+        let (resource, group) = key.split_once('.').unwrap_or((key, ""));
+        Self {
+            verb: "list".to_owned(),
+            group: group.to_owned(),
+            resource: resource.to_owned(),
+            namespace: None,
+            name: None,
+            status,
+        }
+    }
+
+    /// The same refusal for another verb.
+    #[must_use]
+    pub fn verb(mut self, verb: &str) -> Self {
+        verb.clone_into(&mut self.verb);
+        self
+    }
+
+    /// `resource.group`, or `resource` for the core group, as RBAC names it.
+    #[must_use]
+    pub fn key(&self) -> String {
+        if self.group.is_empty() {
+            self.resource.clone()
+        } else {
+            format!("{}.{}", self.resource, self.group)
+        }
+    }
 }
 
 /// Facts about the whole cluster, for capability detection.
@@ -751,10 +793,9 @@ impl ClusterError {
     /// `self`, when it is not a refusal.
     pub fn into_unreadable(self, resource: &str) -> Result<Unreadable, Self> {
         match self {
-            Self::Status(status) if status.is_refusal() => Ok(Unreadable {
-                resource: resource.to_owned(),
-                status,
-            }),
+            Self::Status(status) if status.is_refusal() => {
+                Ok(Unreadable::listing(resource, status))
+            }
             other @ (Self::Status(_)
             | Self::Transport(_)
             | Self::Decode(_)

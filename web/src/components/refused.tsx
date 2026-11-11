@@ -20,6 +20,18 @@ type Unreadable = Schemas.UnreadableView
 
 export { isRefusal }
 
+/** `resource.group`, or `resource` for the core group: how a refused kind is named. */
+export const refusedKey = (u: Pick<Unreadable, "group" | "resource">): string =>
+  u.group ? `${u.resource}.${u.group}` : u.resource
+
+/** What was refused as the rule that allows it, such as `list secrets` or
+ * `get services/proxy/vm in observability`. */
+export function refusedRule(u: Unreadable): string {
+  const name = u.name ? `/${u.name}` : ""
+  const namespace = u.namespace ? ` in ${u.namespace}` : ""
+  return `${permission(u.verb, u.resource, u.group)}${name}${namespace}`
+}
+
 export function permission(verb: string, resource: string, group = ""): string {
   return `${verb} ${group ? `${resource}.${group}` : resource}`
 }
@@ -133,25 +145,25 @@ const resourceNames: Record<string, string> = {
 }
 
 export function refusedAmong(unreadable: Unreadable[], resources: readonly string[]): Unreadable[] {
-  return unreadable.filter((u) => resources.includes(u.resource))
+  return unreadable.filter((u) => resources.includes(refusedKey(u)))
 }
 
 export function refusedElsewhere(
   unreadable: Unreadable[],
   placed: readonly string[],
 ): Unreadable[] {
-  return unreadable.filter((u) => !placed.includes(u.resource))
+  return unreadable.filter((u) => !placed.includes(refusedKey(u)))
 }
 
 export function RefusedKinds({ unreadable, line }: { unreadable: Unreadable[]; line?: boolean }) {
   const t = useT()
   if (unreadable.length === 0) return null
-  const names = unreadable.map((u) => resourceNames[u.resource] ?? u.resource)
+  const names = unreadable.map((u) => resourceNames[refusedKey(u)] ?? refusedKey(u))
   return (
     <Refused
       refusal="unreadable"
       what={t("refused.see", t("common.list", names))}
-      missing={unreadable.map((u) => permission("list", u.resource))}
+      missing={unreadable.map(refusedRule)}
       line={line}
     >
       <KubernetesAnswers unreadable={unreadable} />
@@ -166,7 +178,7 @@ export function RefusedSome({ unreadable }: { unreadable: Unreadable[] }) {
     <Refused
       refusal="unreadable"
       what={t("refused.some")}
-      missing={unreadable.map((u) => permission("list", u.resource))}
+      missing={unreadable.map(refusedRule)}
       line
     >
       <KubernetesAnswers unreadable={unreadable} />
@@ -178,7 +190,7 @@ function KubernetesAnswers({ unreadable }: { unreadable: Unreadable[] }) {
   return (
     <ul className="flex flex-col gap-1 font-mono text-xs text-muted-foreground">
       {unreadable.map((u) => (
-        <li key={u.resource} className="break-words">
+        <li key={refusedRule(u)} className="break-words">
           {u.kubernetes.code} {u.kubernetes.reason}: {u.kubernetes.message}
         </li>
       ))}

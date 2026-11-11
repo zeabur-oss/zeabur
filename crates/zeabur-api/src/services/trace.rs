@@ -127,7 +127,7 @@ pub(crate) async fn of_service(
             Some(Vec::new())
         }
     };
-    let certificate_refused = unreadable.iter().any(|u| u.resource == resource.key());
+    let certificate_refused = unreadable.iter().any(|u| u.refuses(&resource.key()));
     let certificates = match &listed {
         _ if certificate_refused => Certificates::Unreadable,
         Some(listed) => Certificates::Listed(listed),
@@ -155,13 +155,7 @@ pub(crate) async fn of_service(
             }
         }
     }
-    let readable = |resource: &str| {
-        !read
-            .document
-            .unreadable
-            .iter()
-            .any(|u| u.resource == resource)
-    };
+    let readable = |resource: &str| !read.document.unreadable.iter().any(|u| u.refuses(resource));
     let mut input = TraceInput {
         snapshot: &read.snapshot,
         http_routes: &read.http_routes,

@@ -228,7 +228,8 @@ mod tests {
             "trace.address.elsewhere"
         );
         assert_eq!(domain["hops"][2]["status"], "unknown");
-        assert_eq!(trace["unreadable"][0]["resource"], "deployments.apps");
+        assert_eq!(trace["unreadable"][0]["resource"], "deployments");
+        assert_eq!(trace["unreadable"][0]["group"], "apps");
     }
 
     #[tokio::test]

@@ -201,7 +201,7 @@ function Notes({ data }: { data: ClusterUsage }) {
   if (data.metrics !== "available") lines.push(t(`clusterUsage.unknown.${data.metrics}`))
   if (data.podScan === "partial") lines.push(t("cluster.partialPods", data.podsScanned))
   const metricsRefused = data.metrics === "unreadable"
-  const namespacesRefused = data.unreadable.some((u) => u.resource === "namespaces")
+  const namespacesRefused = data.unreadable.some((u) => u.resource === "namespaces" && !u.group)
   return (
     <>
       {lines.length > 0 ? (

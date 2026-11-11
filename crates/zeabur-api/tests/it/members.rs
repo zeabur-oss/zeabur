@@ -390,10 +390,8 @@ mod tests {
         let (status, body) = call(&cluster, "GET", "/api/v1/members", None).await;
         assert_eq!(status, StatusCode::OK, "{body}");
         assert_eq!(body["items"][1].get("projects"), None);
-        assert_eq!(
-            body["unreadable"][0]["resource"],
-            "rolebindings.rbac.authorization.k8s.io"
-        );
+        assert_eq!(body["unreadable"][0]["resource"], "rolebindings");
+        assert_eq!(body["unreadable"][0]["group"], "rbac.authorization.k8s.io");
     }
 
     fn dynamic(cluster: &MemoryCluster, namespace: &str, name: &str) -> DynamicObject {

@@ -738,10 +738,9 @@ fn zeabur_identity_issuer_trust() -> Check {
 /// The reads a response names in `unreadable`, as findings.
 fn unreadable(check: &mut Check, answer: &Value) {
     for refused in list(answer, "unreadable") {
-        check.findings.push(format!(
-            "partly checked: needs list {}",
-            text(refused, "resource")
-        ));
+        check
+            .findings
+            .push(format!("partly checked: needs {}", rule(refused)));
     }
 }
 
@@ -899,10 +898,10 @@ mod tests {
 
     fn refuse_capabilities(cluster: &MemoryCluster) {
         cluster.update(|s| {
-            s.facts.unreadable.push(Unreadable {
-                resource: "customresourcedefinitions.apiextensions.k8s.io".to_owned(),
-                status: KubernetesStatus::new(403, "Forbidden", "forbidden"),
-            });
+            s.facts.unreadable.push(Unreadable::listing(
+                "customresourcedefinitions.apiextensions.k8s.io",
+                KubernetesStatus::new(403, "Forbidden", "forbidden"),
+            ));
         });
     }
 

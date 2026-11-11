@@ -122,7 +122,7 @@ pub(crate) async fn project(
     let http_routes = objects.http_routes.clone();
     let (snapshot, mut unreadable) = crate::projects::snapshot(objects);
     // A refused list leaves `snapshot.services` empty; it says nothing about which exist.
-    let services_readable = !unreadable.iter().any(|u| u.resource == "services");
+    let services_readable = !unreadable.iter().any(|u| u.refuses("services"));
     let projection = zeabur_graph::project(&snapshot);
     let found = module_findings(
         cluster,

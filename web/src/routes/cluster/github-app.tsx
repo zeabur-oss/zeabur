@@ -80,7 +80,7 @@ function GitHubAppSection({ project }: { project?: string }) {
 function NoApp({ data, gate, project }: { data: Schemas.GitHubApp; gate: Gate; project?: string }) {
   const t = useT()
   const [creating, setCreating] = useState(gate.open && project !== undefined)
-  if (data.unreadable.some((u) => u.resource === "secrets"))
+  if (data.unreadable.some((u) => u.resource === "secrets" && !u.group))
     return (
       <Refused
         refusal="unreadable"

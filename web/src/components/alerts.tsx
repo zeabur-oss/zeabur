@@ -5,7 +5,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 
 import type { Schemas } from "@/api/client"
 import { Ago } from "@/components/bits"
-import { permission, Refused } from "@/components/refused"
+import { Refused, refusedRule } from "@/components/refused"
 import { StatusDot } from "@/components/status"
 import {
   Collapsible,
@@ -91,7 +91,7 @@ export function AlertsRefused({ data }: { data: Schemas.RuntimeAlerts }) {
     <Refused
       refusal="unreadable"
       what={t("alerts.seeing")}
-      missing={data.unreadable.map((u) => permission("list", u.resource))}
+      missing={data.unreadable.map(refusedRule)}
       line
     />
   )

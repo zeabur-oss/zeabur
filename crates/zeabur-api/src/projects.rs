@@ -265,16 +265,14 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
     let events: Vec<zeabur_gaps::Event> = match events {
         Ok(events) => events.iter().map(zeabur_gaps::Event::from_kube).collect(),
         Err(zeabur_kube::ClusterError::Status(status)) => {
-            unreadable.push(UnreadableView {
-                resource: "events.events.k8s.io".to_owned(),
-                kubernetes: status,
-            });
+            unreadable
+                .push(zeabur_kube::Unreadable::listing("events.events.k8s.io", status).into());
             Vec::new()
         }
         Err(_) => Vec::new(),
     };
     // A refused list leaves `snapshot.services` empty; it says nothing about which exist.
-    let services_readable = !unreadable.iter().any(|u| u.resource == "services");
+    let services_readable = !unreadable.iter().any(|u| u.refuses("services"));
     let namespace = zeabur_gaps::Namespace::new(&snapshot, &events, &http_routes)
         .services_readable(services_readable);
     for service in &mut projection.services {

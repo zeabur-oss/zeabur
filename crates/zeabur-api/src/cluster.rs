@@ -85,7 +85,7 @@ use zeabur_kube::{ClusterError, ClusterExt as _, DynamicObject};
 use zeabur_model::Origin;
 use zeabur_modules::Reading;
 
-use crate::error::{ApiError, list_read, list_read_of_key};
+use crate::error::{ApiError, list_read};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::projects::events::{EventKey, event_key, event_view, last_seen, newest_first};
@@ -220,7 +220,7 @@ pub(crate) async fn capabilities(
                  reads the whole cluster to see what is installed.",
             )
         };
-        problem.deny(list_read_of_key(&refused.resource));
+        problem.deny(list_read(&refused.group, &refused.resource, None));
         return Err(ApiError::from(problem));
     }
     let mut capabilities = zeabur_catalog::detect(&state.catalogue, &facts);

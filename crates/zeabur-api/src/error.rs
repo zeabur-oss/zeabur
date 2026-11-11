@@ -91,18 +91,12 @@ pub(crate) fn project_read(project: &str) -> Denied {
     list_read("apps", "deployments", Some(project))
 }
 
-/// The cluster-wide `list` an unreadable kind names, from its key (`deployments.apps`, `nodes`).
-pub(crate) fn list_read_of_key(key: &str) -> Denied {
-    let (resource, group) = key.split_once('.').unwrap_or((key, ""));
-    list_read(group, resource, None)
-}
-
 #[cfg(test)]
 mod tests {
     use zeabur_core::problem::{Denied, Kind, KubernetesStatus};
     use zeabur_kube::ClusterError;
 
-    use super::{get_read, list_read, list_read_of_key, read_problem};
+    use super::{get_read, list_read, read_problem};
 
     fn forbidden() -> ClusterError {
         ClusterError::Status(KubernetesStatus::new(403, "Forbidden", "no"))
@@ -156,16 +150,6 @@ mod tests {
                 None
             )),
             expected
-        );
-        assert_eq!(
-            denied(list_read_of_key(
-                "customresourcedefinitions.apiextensions.k8s.io"
-            )),
-            expected
-        );
-        assert_eq!(
-            denied(list_read_of_key("nodes")).map(|d| (d.group, d.resource)),
-            Some((String::new(), "nodes".to_owned()))
         );
     }
 

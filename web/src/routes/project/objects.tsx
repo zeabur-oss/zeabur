@@ -16,7 +16,7 @@ import { Ago } from "@/components/bits"
 import { UpdatedAt } from "@/components/freshness"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
-import { permission, Refused, RefusedSome } from "@/components/refused"
+import { permission, Refused, refusedKey, RefusedSome } from "@/components/refused"
 import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
@@ -95,7 +95,8 @@ export function ObjectsPage() {
   for (const answer of [base, ...reads]) {
     for (const kind of answer.data?.items ?? [])
       if (kind.listed || !kinds.has(kindKey(kind))) kinds.set(kindKey(kind), kind)
-    for (const refused of answer.data?.unreadable ?? []) unreadable.set(refused.resource, refused)
+    for (const refused of answer.data?.unreadable ?? [])
+      unreadable.set(refusedKey(refused), refused)
   }
   const loading = new Set(
     [
@@ -203,7 +204,7 @@ function ObjectList({
   const needle = query.trim().toLowerCase()
   const folded = kinds.filter((k) => k.generated)
   const emptyKinds = kinds.filter((k) => k.listed && k.items.length === 0)
-  const refusedBy = new Map(unreadable.map((u) => [u.resource, u]))
+  const refusedBy = new Map(unreadable.map((u) => [refusedKey(u), u]))
   const isPinned = (k: Kind) => pins.includes(kindKey(k))
   const order = (k: Kind) => (isPinned(k) ? 0 : k.listed || refusedBy.has(resourceKey(k)) ? 1 : 2)
   const shown = kinds
@@ -230,7 +231,7 @@ function ObjectList({
     if (refused) rows.push({ type: "refused", kind, refused })
     for (const object of matching) rows.push({ type: "object", kind, object })
   }
-  const placed = new Set(rows.flatMap((r) => (r.type === "refused" ? [r.refused.resource] : [])))
+  const placed = new Set(rows.flatMap((r) => (r.type === "refused" ? [refusedKey(r.refused)] : [])))
   const total = kinds.reduce((n, k) => n + k.items.length, 0)
 
   // oxlint-disable-next-line react/incompatible-library -- the virtualizer returns new functions each render
@@ -289,7 +290,7 @@ function ObjectList({
           </Button>
         </span>
       </div>
-      <RefusedSome unreadable={unreadable.filter((u) => !placed.has(u.resource))} />
+      <RefusedSome unreadable={unreadable.filter((u) => !placed.has(refusedKey(u)))} />
       {rows.length === 0 ? (
         <Empty size="sm">
           <EmptyHeader>

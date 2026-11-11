@@ -719,14 +719,10 @@ impl Cluster for MemoryCluster {
                     // Not part of a namespace's objects: refused where it is read.
                     _ => continue,
                 }
-                objects.unreadable.push(Unreadable {
-                    resource: resource.clone(),
-                    status: KubernetesStatus::new(
-                        403,
-                        "Forbidden",
-                        format!("{resource} is forbidden"),
-                    ),
-                });
+                objects.unreadable.push(Unreadable::listing(
+                    resource,
+                    KubernetesStatus::new(403, "Forbidden", format!("{resource} is forbidden")),
+                ));
             }
             drop(state);
             Ok(objects)

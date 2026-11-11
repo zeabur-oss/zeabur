@@ -433,7 +433,10 @@ pub(crate) mod store {
             },
             Err(error) => Stored {
                 object: None,
-                unreadable: error.into_unreadable("configmaps").ok().map(Into::into),
+                unreadable: error
+                    .into_unreadable("configmaps")
+                    .ok()
+                    .map(|u| u.verb("get").into()),
             },
         }
     }
@@ -627,7 +630,11 @@ pub(crate) mod store {
     /// A refused proxy read, as an unreadable entry naming the Service.
     pub(crate) fn proxy_refusal(service: &ServicePort, status: KubernetesStatus) -> UnreadableView {
         UnreadableView::from(Unreadable {
-            resource: format!("services/proxy ({}/{})", service.namespace, service.name),
+            verb: "get".to_owned(),
+            group: String::new(),
+            resource: "services/proxy".to_owned(),
+            namespace: Some(service.namespace.clone()),
+            name: Some(service.name.clone()),
             status,
         })
     }

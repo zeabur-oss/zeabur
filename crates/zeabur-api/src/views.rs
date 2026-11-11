@@ -30,20 +30,49 @@ use zeabur_model::{
     Endpoint, Health, Origin, Project, ProjectDetails, ProjectHealth, Route, Service, WorkloadKind,
 };
 
-/// A kind the person could not read, and kube-apiserver's answer.
+/// What the person could not read, as the attributes of the refused request, and
+/// kube-apiserver's answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnreadableView {
-    /// The resource (`secrets`, `deployments.apps`, …).
+    /// The verb that was refused, such as `list`.
+    pub verb: String,
+    /// The API group; empty for the core group.
+    pub group: String,
+    /// The plural resource (`secrets`, `deployments`), with its subresource when it was one.
     pub resource: String,
+    /// The namespace, when the refusal was in one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+    /// The object, when the refusal was of one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
     /// kube-apiserver's answer.
     pub kubernetes: KubernetesStatus,
+}
+
+impl UnreadableView {
+    /// Whether this refuses `resource.group` (`deployments.apps`, or `secrets` for the core
+    /// group).
+    #[must_use]
+    pub fn refuses(&self, key: &str) -> bool {
+        let this = if self.group.is_empty() {
+            self.resource.clone()
+        } else {
+            format!("{}.{}", self.resource, self.group)
+        };
+        this == key
+    }
 }
 
 impl From<Unreadable> for UnreadableView {
     fn from(u: Unreadable) -> Self {
         Self {
+            verb: u.verb,
+            group: u.group,
             resource: u.resource,
+            namespace: u.namespace,
+            name: u.name,
             kubernetes: u.status,
         }
     }

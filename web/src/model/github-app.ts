@@ -56,7 +56,7 @@ export function connectStep(
   if (!data) return undefined
   if (data.canChange === "denied") return { step: "ask" }
   if (!data.app)
-    return data.unreadable.some((u) => u.resource === "secrets")
+    return data.unreadable.some((u) => u.resource === "secrets" && !u.group)
       ? { step: "ask" }
       : { step: "create" }
   if (!data.installations) return { step: "problem" }

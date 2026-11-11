@@ -1432,10 +1432,9 @@ mod tests {
         let history_uri = format!("/api/v1/projects/{ns}/services/deployment/web/history");
         let history = until(&app, &history_uri, 30, |h| h["state"] != "unavailable").await;
         assert_eq!(history["state"], "unreadable", "{history}");
-        assert_eq!(
-            history["unreadable"][0]["resource"],
-            format!("services/proxy ({ns}/vm)")
-        );
+        assert_eq!(history["unreadable"][0]["resource"], "services/proxy");
+        assert_eq!(history["unreadable"][0]["name"], "vm");
+        assert_eq!(history["unreadable"][0]["namespace"], ns.as_str());
 
         create(
             &Api::<Role>::namespaced(admin.clone(), &ns),

@@ -116,7 +116,8 @@ mod tests {
         });
         let usage = get(&cluster, "/api/v1/projects/shop/usage").await;
         assert_eq!(usage["state"], "unreadable");
-        assert_eq!(usage["unreadable"][0]["resource"], "pods.metrics.k8s.io");
+        assert_eq!(usage["unreadable"][0]["resource"], "pods");
+        assert_eq!(usage["unreadable"][0]["group"], "metrics.k8s.io");
         assert_eq!(usage["unreadable"][0]["kubernetes"]["code"], 403);
     }
 
@@ -303,7 +304,8 @@ mod tests {
         });
         let usage = get(&cluster, "/api/v1/cluster/usage").await;
         assert_eq!(usage["metrics"], "unreadable");
-        assert_eq!(usage["unreadable"][0]["resource"], "pods.metrics.k8s.io");
+        assert_eq!(usage["unreadable"][0]["resource"], "pods");
+        assert_eq!(usage["unreadable"][0]["group"], "metrics.k8s.io");
         assert_eq!(item(&usage, "shop")["requests"]["cpuMillicores"], 350);
         assert!(item(&usage, "shop").get("usage").is_none());
     }
@@ -463,9 +465,11 @@ mod tests {
         });
         let history = get(&cluster, HISTORY).await;
         assert_eq!(history["state"], "unreadable");
+        assert_eq!(history["unreadable"][0]["resource"], "services/proxy");
+        assert_eq!(history["unreadable"][0]["namespace"], "observability");
         assert_eq!(
-            history["unreadable"][0]["resource"],
-            "services/proxy (observability/vmsingle-vm-victoria-metrics-k8s-stack)"
+            history["unreadable"][0]["name"],
+            "vmsingle-vm-victoria-metrics-k8s-stack"
         );
         assert_eq!(history["cpu"], json!([]));
 
@@ -711,9 +715,11 @@ mod tests {
         });
         let volumes = get(&cluster, "/api/v1/projects/shop/volumes").await;
         assert_eq!(volumes["state"], "unreadable");
+        assert_eq!(volumes["unreadable"][0]["resource"], "services/proxy");
+        assert_eq!(volumes["unreadable"][0]["namespace"], "observability");
         assert_eq!(
-            volumes["unreadable"][0]["resource"],
-            "services/proxy (observability/vmsingle-vm-victoria-metrics-k8s-stack)"
+            volumes["unreadable"][0]["name"],
+            "vmsingle-vm-victoria-metrics-k8s-stack"
         );
         let nodes = get(&cluster, "/api/v1/cluster/nodes").await;
         assert_eq!(nodes["disk"], "unreadable");

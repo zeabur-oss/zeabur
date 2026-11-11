@@ -2547,13 +2547,28 @@ export type KubernetesStatus = {
 }
 
 /**
- * A kind the person could not read, and kube-apiserver's answer.
+ * What the person could not read, as the attributes of the refused request, and
+ * kube-apiserver's answer.
  */
 export type UnreadableView = {
+  /** The API group; empty for the core group. */
+  group: string
   /** kube-apiserver's answer. */
   kubernetes: KubernetesStatus
-  /** The resource (`secrets`, `deployments.apps`, …). */
+  /**
+   * The object, when the refusal was of one.
+   * @nullable
+   */
+  name?: string | null
+  /**
+   * The namespace, when the refusal was in one.
+   * @nullable
+   */
+  namespace?: string | null
+  /** The plural resource (`secrets`, `deployments`), with its subresource when it was one. */
   resource: string
+  /** The verb that was refused, such as `list`. */
+  verb: string
 }
 
 /**

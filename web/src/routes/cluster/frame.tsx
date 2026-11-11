@@ -61,7 +61,9 @@ function Heading() {
   const badge = useUpgradeBadge(upgrades.data)
   const data = upgrades.data
   // Without readable Plans newer versions are unknown.
-  const plansRefused = data?.unreadable?.some((u) => u.resource === "plans.upgrade.cattle.io")
+  const plansRefused = data?.unreadable?.some(
+    (u) => u.resource === "plans" && u.group === "upgrade.cattle.io",
+  )
   const name = useReachability().name
   const version = cluster.data?.kubernetesVersion
   return (

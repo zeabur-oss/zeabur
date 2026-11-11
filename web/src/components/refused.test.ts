@@ -6,7 +6,13 @@ import { renderToStaticMarkup } from "react-dom/server"
 
 import type { Problem as ProblemBody, Schemas } from "@/api/client"
 import { Problem } from "@/components/problem"
-import { Refused, refusedAmong, refusedElsewhere, RefusedKinds } from "@/components/refused"
+import {
+  Refused,
+  refusedAmong,
+  refusedElsewhere,
+  refusedKey,
+  RefusedKinds,
+} from "@/components/refused"
 import { inServiceTabs, refusedPlaces } from "@/routes/project/data"
 
 const kubernetes = { code: 403, reason: "Forbidden", message: "nodes is forbidden" }
@@ -29,9 +35,11 @@ function render(element: ReactElement): string {
   return renderToStaticMarkup(createElement(QueryClientProvider, { client }, element))
 }
 
-const unreadable = (resource: string): Schemas.UnreadableView => ({
-  resource,
-  kubernetes: { ...kubernetes, message: `${resource} is forbidden` },
+const unreadable = (key: string): Schemas.UnreadableView => ({
+  verb: "list",
+  resource: key.split(".")[0] ?? key,
+  group: key.split(".").slice(1).join("."),
+  kubernetes: { ...kubernetes, message: `${key} is forbidden` },
 })
 
 describe("A refusal", () => {
@@ -123,9 +131,9 @@ describe("Unreadable kinds on the service page", () => {
 
   test("show in their tab, and only the rest under the header", () => {
     const all = [...kinds, "leases.coordination.k8s.io"].map(unreadable)
-    const variables = refusedAmong(all, refusedPlaces.config).map((u) => u.resource)
+    const variables = refusedAmong(all, refusedPlaces.config).map(refusedKey)
     expect(variables).toStrictEqual(["secrets", "configmaps"])
-    const header = refusedElsewhere(all, inServiceTabs).map((u) => u.resource)
+    const header = refusedElsewhere(all, inServiceTabs).map(refusedKey)
     expect(header).toStrictEqual([...refusedPlaces.services, "leases.coordination.k8s.io"])
     expect(!header.includes("secrets")).toBeTruthy()
     expect(!header.includes("httproutes.gateway.networking.k8s.io")).toBeTruthy()

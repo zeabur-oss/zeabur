@@ -183,6 +183,7 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{list}");
         assert_eq!(list["items"].as_array().unwrap().len(), 1);
         assert_eq!(list["unreadable"][0]["resource"], "nodes");
+        assert_eq!(list["unreadable"][0]["group"], "");
     }
 
     #[tokio::test]

@@ -666,7 +666,8 @@ mod tests {
         assert_eq!(state("k8up"), "installed");
         assert_eq!(state("velero"), "refused");
         assert_eq!(state("cloudnative-pg"), "not-installed");
-        assert_eq!(backups["unreadable"][0]["resource"], "schedules.velero.io");
+        assert_eq!(backups["unreadable"][0]["resource"], "schedules");
+        assert_eq!(backups["unreadable"][0]["group"], "velero.io");
     }
 
     #[tokio::test]
@@ -721,10 +722,8 @@ mod tests {
         let alerts = get(&cluster, "/api/v1/projects/shop/alerts").await;
         assert_eq!(alerts["state"], "refused");
         assert_eq!(alerts["items"], json!([]));
-        assert_eq!(
-            alerts["unreadable"][0]["resource"],
-            "policyreports.wgpolicyk8s.io"
-        );
+        assert_eq!(alerts["unreadable"][0]["resource"], "policyreports");
+        assert_eq!(alerts["unreadable"][0]["group"], "wgpolicyk8s.io");
         let cluster_alerts = get(&cluster, "/api/v1/cluster/alerts").await;
         assert_eq!(cluster_alerts["state"], "refused");
     }
@@ -916,11 +915,13 @@ mod tests {
         });
         let project = get(&cluster, "/api/v1/projects/shop").await;
         assert_eq!(project["unreadable"][0]["resource"], "secrets");
+        assert_eq!(project["unreadable"][0]["group"], "");
         assert_eq!(project["unreadable"][0]["kubernetes"]["code"], 403);
         assert_ne!(project["services"], json!([]), "the rest is served");
 
         let list = get(&cluster, "/api/v1/projects/shop/objects").await;
         assert_eq!(list["unreadable"][0]["resource"], "secrets");
+        assert_eq!(list["unreadable"][0]["group"], "");
         assert_eq!(kind_of(&list, "Secret").unwrap()["access"], "denied");
         assert_eq!(kind_of(&list, "ConfigMap").unwrap()["listed"], true);
     }
@@ -1152,10 +1153,10 @@ mod tests {
         });
 
         cluster.update(|s| {
-            s.facts.unreadable.push(zeabur_kube::Unreadable {
-                resource: "customresourcedefinitions.apiextensions.k8s.io".to_owned(),
-                status: KubernetesStatus::new(403, "Forbidden", "forbidden"),
-            });
+            s.facts.unreadable.push(zeabur_kube::Unreadable::listing(
+                "customresourcedefinitions.apiextensions.k8s.io",
+                KubernetesStatus::new(403, "Forbidden", "forbidden"),
+            ));
         });
         let (status, _, body) = call(app(&cluster), "GET", "/api/v1/cluster/capabilities").await;
         assert_eq!(status, StatusCode::FORBIDDEN);
@@ -1244,6 +1245,7 @@ mod tests {
         assert_eq!(list["podScan"], "unreadable");
         assert!(list["items"][0].get("requests").is_none());
         assert_eq!(list["unreadable"][0]["resource"], "pods");
+        assert_eq!(list["unreadable"][0]["group"], "");
 
         cluster.update(|s| {
             s.forbidden_resources
@@ -1349,6 +1351,7 @@ mod tests {
         });
         let upgrades = get(&cluster, "/api/v1/cluster/upgrades").await;
         assert_eq!(upgrades["unreadable"][0]["resource"], "nodes");
+        assert_eq!(upgrades["unreadable"][0]["group"], "");
         assert_eq!(upgrades["kubernetesVersion"], "v1.34.10+k3s1");
     }
 
@@ -1370,10 +1373,8 @@ mod tests {
         // Installed but refused: say which permission is missing.
         cluster.update(|s| s.served.push(plans_served()));
         let upgrades = get(&cluster, "/api/v1/cluster/upgrades").await;
-        assert_eq!(
-            upgrades["unreadable"][0]["resource"],
-            "plans.upgrade.cattle.io"
-        );
+        assert_eq!(upgrades["unreadable"][0]["resource"], "plans");
+        assert_eq!(upgrades["unreadable"][0]["group"], "upgrade.cattle.io");
         assert!(upgrades.get("patch").is_none());
     }
 
