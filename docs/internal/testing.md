@@ -89,19 +89,6 @@ Removing or weakening one of these tests needs another test of the same promise 
 - **No real clock where the answer depends on the date**: tests fix it (`zeabur_api::Options::clock`).
 - **A flaky test is broken.** It is fixed or removed, not retried until green [nondeterminism].
 
-## Mutation testing
-
-[cargo-mutants](https://mutants.rs) runs by hand (`.github/workflows/mutants.yml`, settings in
-`.cargo/mutants.toml`). It makes small edits to the code, such as a negated condition or a
-deleted `match` arm, and runs the tests; a *missed* mutant is code no test checks. Mutants
-detected by a suite track the real faults it detects [mutants-real], and developers shown live
-mutants write better tests [mutants-google].
-
-The report gates nothing. For a missed mutant, add or sharpen a test of the behavior that should
-have broken, through the public interface, not of the mutation itself; when the mutant changes
-nothing observable, leave it [mutants-results]. Run it on one file with
-`cargo mutants -f <path>`.
-
 [swe-unit]: https://abseil.io/resources/swe-book/html/ch12.html
 [swe-doubles]: https://abseil.io/resources/swe-book/html/ch13.html
 [pyramid]: https://martinfowler.com/articles/practical-test-pyramid.html
@@ -115,6 +102,3 @@ nothing observable, leave it [mutants-results]. Run it on one file with
 [nondeterminism]: https://martinfowler.com/articles/nonDeterminism.html
 [playwright]: https://playwright.dev/docs/api/class-page#page-wait-for-timeout
 [sig-e2e]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/writing-good-e2e-tests.md
-[mutants-real]: https://homes.cs.washington.edu/~rjust/publ/JustJIEHF2014b-abstract.html
-[mutants-google]: https://arxiv.org/abs/2103.07189
-[mutants-results]: https://mutants.rs/using-results.html

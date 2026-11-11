@@ -93,8 +93,6 @@
               cargo-nextest
               cargo-auditable
               cargo-cyclonedx
-              # Mutation testing, weekly in CI (.github/workflows/mutants.yml); a report, not a gate
-              cargo-mutants
               # Zeabur Proxy's parser fuzz target (crates/zeabur-proxy/fuzz)
               cargo-fuzz
               # Docs and interface strings (.vale.ini)

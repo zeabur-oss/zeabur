@@ -1,7 +1,6 @@
 // Templates of Zeabur Catalog deployed into a project. The server renders a template's objects
 // from a `template` change; the browser generates the values the template marks `generate:
 // random` and creates their Secrets in the same plan, as the database forms do.
-import { objectBody } from "@/api/object-body"
 import type { Schemas } from "@/api/client"
 import { hostProblem } from "@/model/image-service"
 
@@ -148,7 +147,7 @@ export function templateChanges(
         type: "Opaque",
         stringData,
       }
-      return { op: "create", object: objectBody(secret) }
+      return { op: "create", object: { ...secret } }
     }),
     {
       op: "template",

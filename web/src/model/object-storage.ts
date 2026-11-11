@@ -1,7 +1,6 @@
 // Object storage the SeaweedFS Operator runs: a `Seaweed` with an S3 gateway, its `Bucket`s, and
 // one IAM user (`S3Identity`, `S3Credentials`, `S3Policy`, `S3PolicyBinding`) that services use.
 // https://github.com/seaweedfs/seaweedfs-operator/tree/seaweedfs-operator-0.1.43/api/v1
-import { objectBody } from "@/api/object-body"
 import type { Schemas } from "@/api/client"
 import type { Connectable } from "@/model/connect"
 import type { Event } from "@/model/service"
@@ -54,7 +53,7 @@ const secured = { podSecurityContext: restrictedPod, containerSecurityContext: r
 
 const create = (object: Record<string, unknown>): Change => ({
   op: "create",
-  object: objectBody(object),
+  object: { ...object },
 })
 
 const persisted = (storageClass?: string) => ({

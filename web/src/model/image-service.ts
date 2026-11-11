@@ -1,7 +1,6 @@
 // A service from a container image: the objects the "Docker image" form creates, each one `create`
 // change of one plan (docs/design: basic create). No `app.kubernetes.io/managed-by`: a plan
 // refuses to change an object another tool manages.
-import { objectBody } from "@/api/object-body"
 import type { Schemas } from "@/api/client"
 import { templateSecurity, type Profile } from "@/model/pod-security"
 
@@ -379,7 +378,7 @@ export function imageObjects(form: ImageService, domains: DomainSettings): Manif
 export const createImageService = (form: ImageService, domains: DomainSettings): Change[] =>
   imageObjects(form, domains).map((object): Change => ({
     op: "create",
-    object: objectBody(object),
+    object: { ...object },
   }))
 
 /** What a person may create, by kind, as the creatable list hints; absent kinds are unknown. */

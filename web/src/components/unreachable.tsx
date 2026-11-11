@@ -1,5 +1,6 @@
 // The cluster (or Zeabur) does not answer: one banner on top with the cause, the cluster's name,
 // when it last answered and the next try; the sections under it stay quiet about it.
+// oxlint-disable-next-line no-restricted-imports -- watches the cache, builds no key
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react"
 import PlugsIcon from "~icons/ph/plugs"

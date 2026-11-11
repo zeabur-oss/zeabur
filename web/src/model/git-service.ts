@@ -1,7 +1,6 @@
 // A service from a Git repository: Zeabur Builder's Build, and the objects of an image service
 // whose image is the Build's (docs/design: basic create). The Deployment names the Build's
 // repository with a tag no build makes, and Keel moves it to each image the Build pushes.
-import { objectBody } from "@/api/object-body"
 import type { Schemas } from "@/api/client"
 import { KEEL_WEBHOOK, type Build } from "@/model/builds"
 import {
@@ -411,7 +410,7 @@ export function createGitService(
 ): Change[] {
   const changes: Change[] = gitObjects(form, project, registry, domains).map((object) => ({
     op: "create",
-    object: objectBody(object),
+    object: { ...object },
   }))
   if (form.access === "deployKey" && form.sealedKey)
     changes.push({ op: "deployKey", name: credentialsName(form.name), key: form.sealedKey })

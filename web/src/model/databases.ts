@@ -21,7 +21,6 @@
 // Dragonfly is a Dragonfly Operator `Dragonfly`; it snapshots to a volume, or to a bucket when
 // `spec.snapshot.dir` is `s3://…`.
 // https://www.dragonflydb.io/docs/managing-dragonfly/backups
-import { objectBody } from "@/api/object-body"
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
 import type { Translate } from "@/i18n"
@@ -292,7 +291,7 @@ export function nameProblem(name: string, taken: string[]): NameProblem | undefi
 
 const create = (object: Manifest): Change => ({
   op: "create",
-  object: objectBody(object),
+  object: { ...object },
 })
 
 /** Every object Zeabur makes for a database carries this label with the database's name, so

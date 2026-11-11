@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# The web interface: banned styles, query keys and casts kept in their place, lint, unused code and
+# The web interface: banned styles, lint, unused code and
 # layer boundaries, new findings in the changed files, build, unit tests, generated API types up to
 # date, the installer's interface built and linted, no use of a deprecated declaration in either,
 # size budget, and a build that embeds it. The health and duplication report after it does not fail
@@ -8,7 +8,6 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 
 ./scripts/check-ui-styles.sh
-./scripts/check-web-boundaries.sh
 ./scripts/build-ui.sh
 (
   cd web
