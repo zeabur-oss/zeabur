@@ -220,13 +220,20 @@ export function connectChanges(
   }))
 }
 
+/** Kinds whose pod template can be patched; a Job's is immutable. */
+const patchable = new Set(["Deployment", "StatefulSet", "DaemonSet"])
+
 /** Workloads whose variables can be set; the database's own and other tools' are left out. */
 export function candidates(
   services: Service[],
   rights: Record<string, Schemas.RowRights>,
 ): Service[] {
   return services.filter(
-    (s) => !s.dataStore && !s.provenance.tool && rights[s.id]?.change !== "denied",
+    (s) =>
+      patchable.has(s.kind) &&
+      !s.dataStore &&
+      !s.provenance.tool &&
+      rights[s.id]?.change !== "denied",
   )
 }
 

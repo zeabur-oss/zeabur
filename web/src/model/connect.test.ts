@@ -253,6 +253,7 @@ describe("connecting a database to a service", () => {
       service("web"),
       service("api"),
       service("mongo-rs0", { kind: "StatefulSet", dataStore: {} as Service["dataStore"] }),
+      service("migrate", { kind: "Job" }),
       service("chart", {
         provenance: { warnBeforeEdit: true, tool: "Helm" } as Service["provenance"],
       }),
