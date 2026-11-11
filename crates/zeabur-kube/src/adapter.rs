@@ -1157,7 +1157,7 @@ mod tests {
     #[test]
     fn a_secret_table_with_null_rows_or_cells_is_empty_or_unreadable_per_row() {
         let null_rows = br#"{"columnDefinitions":[{"name":"Type"}],"rows":null}"#;
-        assert!(parse_secret_table(null_rows).unwrap().is_empty());
+        assert_eq!(parse_secret_table(null_rows).unwrap().len(), 0);
         let null_cells = br#"{"columnDefinitions":[{"name":"Type"}],"rows":[{"cells":null,
             "object":{"metadata":{"name":"db"}}}]}"#;
         let secrets = parse_secret_table(null_cells).unwrap();
