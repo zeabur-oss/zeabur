@@ -3062,6 +3062,7 @@ dependencies = [
 name = "zeabur-graph"
 version = "0.2.0"
 dependencies = [
+ "datatest-stable",
  "k8s-openapi",
  "proptest",
  "serde",

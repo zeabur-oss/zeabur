@@ -89,7 +89,7 @@ export function UnreachableBanner() {
   const text = problemText(t, locale, problem)
   const cause = text.why ?? problem.detail
   return (
-    <Alert variant="problem">
+    <Alert variant="problem" role="alert">
       <PlugsIcon aria-hidden="true" />
       <AlertTitle>
         {local

@@ -112,11 +112,10 @@ object), so the operator's server-side-apply rules (`mutation.ownedFields`,
 crates under test run the cases of their area; `zeabur-test-support`'s test checks that every
 case parses and names a known operation.
 
-`zeabur-plan`, `zeabur-gaps` and `zeabur-modules` run each case as a test of its own
-(`datatest-stable`), so a failing or slow case is named in the test run. Each of their operations
-reads `params` as a typed value: a misspelt, extra or wrongly typed parameter, nested ones
-included, fails when the case loads. A parameter documented as optional has its documented
+`zeabur-plan`, `zeabur-graph`, `zeabur-gaps` and `zeabur-modules` run each case as a test of its
+own (`datatest-stable`), so a failing or slow case is named in the test run. Each of their
+operations reads `params` as a typed value: a misspelt, extra or wrongly typed parameter, nested
+ones included, fails when the case loads. A parameter documented as optional has its documented
 default, and every other parameter is required. `gateways` and `storageClasses` tell absent (none)
 from `null` (could not be listed). The operations live in each crate's `tests/ops`, shared by the
-case runner and the crate's test of rejected parameters. `zeabur-graph` still runs its cases in
-one test.
+case runner and the crate's tests of rejected parameters.
