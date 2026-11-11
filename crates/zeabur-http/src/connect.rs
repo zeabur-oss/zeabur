@@ -194,35 +194,61 @@ impl Connector {
             Ok(ip) => vec![SocketAddr::new(ip, proxy_port)],
             Err(_) => (self.resolve)(proxy_host.to_owned(), proxy_port).await?,
         };
-        let authority = match self.reach {
+        let authorities: Vec<String> = match self.reach {
             Reach::Public => self
                 .targets(host, port)
                 .await?
-                .first()
+                .iter()
                 .map(ToString::to_string)
-                .ok_or_else(|| io::Error::other("no address to tunnel to"))?,
-            Reach::Any => host.parse::<IpAddr>().map_or_else(
+                .collect(),
+            Reach::Any => vec![host.parse::<IpAddr>().map_or_else(
                 |_| format!("{host}:{port}"),
                 |ip| SocketAddr::new(ip, port).to_string(),
-            ),
+            )],
         };
-        let mut stream = first(hop).await?;
-        let mut head = format!("CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\n");
-        if let Some(authorization) = proxy.basic_auth().and_then(|v| v.to_str().ok()) {
-            head.push_str("Proxy-Authorization: ");
-            head.push_str(authorization);
-            head.push_str("\r\n");
+        // Each checked address gets its share of the deadline, so one the proxy cannot reach
+        // does not use it all.
+        let share = DEADLINE / u32::try_from(authorities.len().max(1)).unwrap_or(1);
+        let mut last = None;
+        for authority in &authorities {
+            let attempt = tokio::time::timeout(share, open_tunnel(proxy, &hop, authority)).await;
+            match attempt {
+                Ok(Ok(stream)) => return Ok(stream),
+                Ok(Err(error)) => last = Some(error),
+                Err(_elapsed) => {
+                    last = Some(io::Error::new(
+                        io::ErrorKind::TimedOut,
+                        format!("the proxy did not open a tunnel to {authority} in time"),
+                    ));
+                }
+            }
         }
-        head.push_str("\r\n");
-        stream.write_all(head.as_bytes()).await?;
-        let status = read_status(&mut stream).await?;
-        if !(200..300).contains(&status) {
-            return Err(io::Error::other(format!(
-                "the proxy refused the tunnel to {authority} with status {status}"
-            )));
-        }
-        Ok(stream)
+        Err(last.unwrap_or_else(|| io::Error::other("no address to tunnel to")))
     }
+}
+
+/// One `CONNECT` to `authority` through the proxy at `hop`.
+async fn open_tunnel(
+    proxy: &Intercept,
+    hop: &[SocketAddr],
+    authority: &str,
+) -> io::Result<TcpStream> {
+    let mut stream = first(hop.to_vec()).await?;
+    let mut head = format!("CONNECT {authority} HTTP/1.1\r\nHost: {authority}\r\n");
+    if let Some(authorization) = proxy.basic_auth().and_then(|v| v.to_str().ok()) {
+        head.push_str("Proxy-Authorization: ");
+        head.push_str(authorization);
+        head.push_str("\r\n");
+    }
+    head.push_str("\r\n");
+    stream.write_all(head.as_bytes()).await?;
+    let status = read_status(&mut stream).await?;
+    if !(200..300).contains(&status) {
+        return Err(io::Error::other(format!(
+            "the proxy refused the tunnel to {authority} with status {status}"
+        )));
+    }
+    Ok(stream)
 }
 
 /// The status of a proxy's answer to `CONNECT`. The head is read byte by byte, so nothing the

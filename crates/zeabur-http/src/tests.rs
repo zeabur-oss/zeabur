@@ -353,3 +353,66 @@ async fn the_next_address_is_tried_when_the_first_one_does_not_connect() {
     let (status, _) = get(&https, "http://registry.test/").await.unwrap();
     assert_eq!(status, 200);
 }
+
+#[tokio::test]
+async fn the_next_checked_address_is_asked_of_the_proxy_when_the_first_is_refused() {
+    let target = zeabur_test_support::tls::serve().await;
+    let (proxy, seen) = fake_proxy_refusing_first(target).await;
+    let tls = tls(Some(zeabur_test_support::tls::ca_a().as_bytes())).unwrap();
+    let resolve: connect::Resolver = Arc::new(|_host, port| {
+        Box::pin(async move {
+            Ok(vec![
+                SocketAddr::new("203.0.113.7".parse().unwrap(), port),
+                SocketAddr::new("203.0.113.8".parse().unwrap(), port),
+            ])
+        })
+    });
+    let connector = connector_with(Reach::Public, &tls, through(proxy, "")).resolving(resolve);
+    let https = Https {
+        client: pooled(connector, IDLE),
+        reach: Reach::Public,
+    };
+    let (status, _) = get(&https, "https://registry.test/").await.unwrap();
+    assert_eq!(status, 200);
+    let heads = seen.lock().unwrap().clone();
+    assert!(heads[0].starts_with("CONNECT 203.0.113.7:443"), "{heads:?}");
+    assert!(heads[1].starts_with("CONNECT 203.0.113.8:443"), "{heads:?}");
+}
+
+/// A proxy that refuses the first `CONNECT` it gets and tunnels the rest to `onward`.
+async fn fake_proxy_refusing_first(onward: SocketAddr) -> (SocketAddr, Seen) {
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let address = listener.local_addr().unwrap();
+    let seen: Seen = Arc::default();
+    let log = Arc::clone(&seen);
+    tokio::spawn(async move {
+        loop {
+            let (mut client, _) = listener.accept().await.unwrap();
+            let mut head = Vec::new();
+            while !head.ends_with(b"\r\n\r\n") {
+                head.push(client.read_u8().await.unwrap());
+            }
+            let first = {
+                let mut log = log.lock().unwrap();
+                log.push(String::from_utf8(head).unwrap());
+                log.len() == 1
+            };
+            if first {
+                client
+                    .write_all(b"HTTP/1.1 502 Bad Gateway\r\ncontent-length: 0\r\n\r\n")
+                    .await
+                    .unwrap();
+                continue;
+            }
+            client
+                .write_all(b"HTTP/1.1 200 Connection established\r\n\r\n")
+                .await
+                .unwrap();
+            tokio::spawn(async move {
+                let mut upstream = tokio::net::TcpStream::connect(onward).await.unwrap();
+                let _copied = tokio::io::copy_bidirectional(&mut client, &mut upstream).await;
+            });
+        }
+    });
+    (address, seen)
+}
