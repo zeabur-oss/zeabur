@@ -29,8 +29,7 @@ use hyper_util::rt::TokioExecutor;
 use secrecy::{ExposeSecret as _, SecretString};
 use serde_json::json;
 use sha2::{Digest as _, Sha256};
-
-use crate::images::https::{Connector, Reach, Tls, connector, describe, refuse_named};
+use zeabur_http::{Connector, Reach, Tls, connector, describe, refuse_named};
 
 /// The largest compressed folder, as Zeabur Builder's download allows.
 pub(crate) const MAX_LAYER: u64 = 256 * 1024 * 1024;

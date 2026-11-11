@@ -82,6 +82,20 @@ spec:
             - name: ZEABUR_EXTRA_CA_FILE
               value: /etc/zeabur/extra-ca/{{ .Values.extraTrustedCA.key }}
             {{- end }}
+            {{- with .Values.outboundProxy }}
+            {{- if .enabled }}
+            {{- if .httpProxy }}
+            - name: HTTP_PROXY
+              value: {{ .httpProxy | quote }}
+            {{- end }}
+            {{- if .httpsProxy }}
+            - name: HTTPS_PROXY
+              value: {{ .httpsProxy | quote }}
+            {{- end }}
+            - name: NO_PROXY
+              value: {{ concat (list "localhost" ".svc" ".cluster.local") .clusterNetwork .noProxy | join "," | quote }}
+            {{- end }}
+            {{- end }}
             - name: ZEABUR_ISSUER_URL
               value: {{ required "issuer.url is required" $issuer.url | quote }}
             - name: ZEABUR_CLIENT_ID

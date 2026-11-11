@@ -9,8 +9,8 @@ use std::time::{Duration, SystemTime};
 use axum::http::{self, HeaderMap, HeaderValue, Request};
 use semver::Version;
 use serde::Deserialize;
+use zeabur_http::Https;
 
-use crate::images::https::Https;
 use crate::views::{ZeaburNewer, ZeaburRelease};
 
 /// Zeabur's releases, newest first. One page is enough.
