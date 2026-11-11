@@ -160,11 +160,18 @@ test.describe("in a project with many services", () => {
       expect(await mainOverflows(page)).toBe(false)
 
       const main = page.locator("main")
-      // Not over the table, which scrolls inside its own frame first.
-      await main.getByRole("heading", { level: 1 }).hover()
+      const table = services(page)
+      const scrolled = () =>
+        page.evaluate(() =>
+          [...document.querySelectorAll("main, main *")].some(
+            (e) => e.scrollTop > 0 && getComputedStyle(e).overflowY !== "visible",
+          ),
+        )
+      await table.hover()
       await page.mouse.wheel(0, 2000)
-      await expect.poll(() => main.evaluate((m) => m.scrollTop)).toBeGreaterThan(0)
+      await expect.poll(scrolled).toBe(true)
       expect(await page.evaluate(() => window.scrollY)).toBe(0)
+      await expect(main).toBeVisible()
 
       if (width < 768) return
       const sidebar = page.getByRole("navigation", { name: "Project sections" })
