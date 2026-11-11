@@ -3,5 +3,6 @@
 result
 result-*
 .DS_Store
+!/.claude/
 .claude/settings.local.json
 /node_modules
