@@ -13,7 +13,7 @@ const entry = /^ {2}("(?:[^"\\]|\\.)*"|'(?:[^']|'')*'|[^\s"'][^:]*):(?: (.*))?$/
 
 /** Each key of the Secret's `data` and its value in base64. */
 export function secretData(yaml: string): Record<string, string> {
-  const data: Record<string, string> = {}
+  const data: Record<string, string> = Object.create(null)
   let inData = false
   for (const line of yaml.split("\n")) {
     if (/^data:\s*$/.test(line)) inData = true
@@ -42,7 +42,7 @@ export function decodeSecretValue(base64: string): SecretValue | undefined {
   }
   const bytes = Uint8Array.from(binary, (c) => c.charCodeAt(0))
   try {
-    return { bytes, text: new TextDecoder("utf-8", { fatal: true }).decode(bytes) }
+    return { bytes, text: new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(bytes) }
   } catch {
     return { bytes, text: undefined }
   }

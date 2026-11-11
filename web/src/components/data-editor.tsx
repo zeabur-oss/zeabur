@@ -56,8 +56,8 @@ export function secretKeys(yaml: string): {
   text: Record<string, string>
   binary: Record<string, Uint8Array<ArrayBuffer>>
 } {
-  const text: Record<string, string> = {}
-  const binary: Record<string, Uint8Array<ArrayBuffer>> = {}
+  const text: Record<string, string> = Object.create(null)
+  const binary: Record<string, Uint8Array<ArrayBuffer>> = Object.create(null)
   for (const [key, base64] of Object.entries(secretData(yaml))) {
     const value = decodeSecretValue(base64)
     if (value?.text === undefined) binary[key] = value?.bytes ?? new Uint8Array()
@@ -376,7 +376,7 @@ export function DataEditor({
                         bytes={secret.binary[key]}
                         hidden={kind === "Secret" && !visible.has(key)}
                         secret={kind === "Secret"}
-                        edit={edits[key]}
+                        edit={Object.hasOwn(edits, key) ? edits[key] : undefined}
                         locked={locked}
                         highlight={hit}
                         rowRef={hit ? scrollTo : undefined}

@@ -19,6 +19,13 @@ describe("the key editor", () => {
     expect([...(binary.cert ?? [])]).toEqual([0xff, 0x00, 0x80])
   })
 
+  test("a text key named constructor is text, not binary", () => {
+    const { text, binary } = secretKeys("data:\n  constructor: YQ==\n")
+    expect(text["constructor"]).toBe("a")
+    expect(Object.hasOwn(binary, "constructor")).toBe(false)
+    expect(binary["constructor"]).toBeUndefined()
+  })
+
   test("typing then clearing a hidden value sends no edit", () => {
     expect(editAfterTyping("hunter2", "a", true)).toEqual({ op: "set", value: "a" })
     expect(editAfterTyping("hunter2", "", true)).toBeUndefined()

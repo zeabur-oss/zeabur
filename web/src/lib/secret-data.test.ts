@@ -48,6 +48,16 @@ describe("a secret's data from its YAML", () => {
     expect([...(value?.bytes ?? [])]).toEqual([0xff, 0x00, 0x80])
   })
 
+  test("keys named like object properties are kept as keys", () => {
+    const data = secretData("data:\n  __proto__: YQ==\n  constructor: Yg==\n")
+    expect(Object.keys(data)).toEqual(["__proto__", "constructor"])
+    expect(data["__proto__"]).toBe("YQ==")
+  })
+
+  test("a leading byte order mark stays in the text", () => {
+    expect(decodeSecretValue("77u/cGFzc3dvcmQ=")?.text).toBe("\uFEFFpassword")
+  })
+
   test("a value that is not base64 is not decoded", () => {
     expect(decodeSecretValue("not base64!")).toBeUndefined()
   })
