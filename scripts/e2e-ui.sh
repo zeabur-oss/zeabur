@@ -18,17 +18,17 @@ wait_for "$namespace" kubectl delete namespace "$namespace" "$namespace-adopt" "
 kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \
   -f "$root/web/e2e/manifests/second-project.yaml" \
   -f "$root/web/e2e/manifests/files.yaml" >/dev/null
-# A project with 40 services for the layout test; none runs a pod.
+# A project with 40 services for the layout test, each a pause container.
 kubectl create namespace "$namespace-crowded" >/dev/null
 kubectl label namespace "$namespace-crowded" zeabur.com/project=true >/dev/null
 for i in $(seq -w 1 40); do
-  kubectl -n "$namespace-crowded" create deployment "service-$i" --image=registry.k8s.io/pause:3.10 \
-    --replicas=0 >/dev/null
+  kubectl -n "$namespace-crowded" create deployment "service-$i" --image=registry.k8s.io/pause:3.10 >/dev/null
 done
 wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/talker --timeout=180s
 wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/editor --timeout=180s
 wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/keeper --timeout=180s
 wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/distroless --timeout=180s
+wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/noshell --timeout=180s
 pod=$(kubectl -n "$namespace" get pods -l app=talker -o jsonpath='{.items[0].metadata.name}')
 # The crashing Deployment must have crashed a few times before the Overview test looks for it.
 # Between restarts the kubelet reports the container as `waiting: CrashLoopBackOff`,
@@ -66,5 +66,5 @@ fi
 cd "$root/web"
 ZEABUR_E2E_URL="$url" ZEABUR_E2E_NAMESPACE="$namespace" ZEABUR_E2E_POD="$pod" \
   ZEABUR_E2E_ADOPT="$namespace-adopt" ZEABUR_E2E_CROWDED="$namespace-crowded" \
-  ZEABUR_E2E_UNCHECKED=Deployment/talker ZEABUR_E2E_NO_SHELL="$namespace-files/distroless" \
+  ZEABUR_E2E_UNCHECKED=Deployment/talker ZEABUR_E2E_NO_SHELL="$namespace-files/noshell" \
   bunx playwright test --reporter=line --output="$out/results"

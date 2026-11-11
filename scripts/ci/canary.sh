@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Zeabur Proxy's canary (scripts/e2e-proxy.sh) against the real VictoriaLogs, on the development
-# cluster: the catalog's VictoriaMetrics operator and VictoriaLogs go in as the Helm commands
-# Zeabur Catalog gives. The cluster is deleted at the end; ZEABUR_CI_KEEP=1 keeps it.
+# cluster: cert-manager, the catalog's VictoriaMetrics operator and VictoriaLogs go in as the Helm
+# commands Zeabur Catalog gives. The cluster is deleted at the end; ZEABUR_CI_KEEP=1 keeps it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -20,6 +20,8 @@ if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
 fi
 ./scripts/dev-cluster.sh up --profile bare
 export KUBECONFIG="$PWD/target/dev-cluster/kubeconfig"
+# The operator takes its webhook certificate from cert-manager.
+install certificates/cert-manager cert-manager
 install observability-operator/victoria-metrics-operator observability
 install logs/victoria-logs observability
 # The log store and its collector report operational once they are up.
