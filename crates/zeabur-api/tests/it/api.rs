@@ -904,7 +904,7 @@ mod tests {
                 .insert("blob".to_owned(), binary.clone());
         });
         let secret = get(&cluster, "/api/v1/projects/shop/objects/core/v1/secrets/db").await;
-        assert!(secret.get("status").is_none(), "{secret}");
+        assert!(secret.get("status").is_none(), "a Secret has no status");
         let yaml = secret["yaml"].as_str().unwrap();
         let value = |key: &str| {
             let line = yaml
