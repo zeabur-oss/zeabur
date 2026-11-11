@@ -164,7 +164,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_secret_yaml_without_values_changes_no_key() {
+    async fn a_secret_yaml_without_data_changes_no_key() {
         let cluster = cluster();
         let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, labels: {tier: data}}\ntype: Opaque\n";
         let (_planned, writes) = plan_and_apply(
@@ -180,7 +180,7 @@ mod tests {
         assert!(text.contains("/metadata/labels"), "{text}");
         assert!(
             !text.contains("/data") && !text.contains("/stringData"),
-            "a YAML edit without values neither sets nor removes a key: {text}"
+            "a YAML edit without data neither sets nor removes a key: {text}"
         );
     }
 

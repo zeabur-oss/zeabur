@@ -506,11 +506,10 @@ mod tests {
                 "workload",
                 vec![field("metadata"), field("labels"), field("team")],
             ),
-            // A Secret's YAML as the YAML view shows it, without its values.
+            // A Secret's YAML as the YAML view shows it, with its values.
             16 => {
                 let mut edited = zeabur_plan::edit::editable(&w.objects()["secret"]);
                 edited["type"] = json!("example.com/token");
-                edited.as_object_mut().unwrap().remove("data");
                 (
                     w.clone(),
                     Change::Edit {

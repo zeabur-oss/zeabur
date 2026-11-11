@@ -17,8 +17,9 @@
 //!
 //! # What is hidden
 //!
-//! A Secret's `data` and `stringData` keep their keys and show [`HIDDEN`] for every value.
-//! Values are never part of the text, whatever reached this function.
+//! [`clean`] also hides a Secret's values: its `data` and `stringData` keep their keys and show
+//! [`HIDDEN`] for every value. [`to_yaml`] writes what it is given, values included, so a caller
+//! that copies a Secret into a plan, a log or an error passes it through [`clean`] first.
 //!
 //! # Quoting
 //!
@@ -73,6 +74,25 @@ fn is_secret(object: &Value) -> bool {
 /// documentation).
 #[must_use]
 pub fn clean(object: &Value) -> Value {
+    let mut out = trim(object);
+    if is_secret(object)
+        && let Some(top) = out.as_object_mut()
+    {
+        for field in ["data", "stringData"] {
+            if let Some(values) = top.get_mut(field).and_then(Value::as_object_mut) {
+                for value in values.values_mut() {
+                    *value = Value::String(HIDDEN.to_owned());
+                }
+            }
+        }
+    }
+    out
+}
+
+/// The object without server bookkeeping; a Secret keeps its values (see the module
+/// documentation).
+#[must_use]
+pub fn trim(object: &Value) -> Value {
     let mut out = object.clone();
     let secret = is_secret(object);
     let Some(top) = out.as_object_mut() else {
@@ -101,15 +121,6 @@ pub fn clean(object: &Value) -> Value {
             .is_some_and(Map::is_empty)
         {
             metadata.remove("annotations");
-        }
-    }
-    if secret {
-        for field in ["data", "stringData"] {
-            if let Some(values) = top.get_mut(field).and_then(Value::as_object_mut) {
-                for value in values.values_mut() {
-                    *value = Value::String(HIDDEN.to_owned());
-                }
-            }
         }
     }
     out
@@ -173,13 +184,13 @@ impl Serialize for Ordered<'_> {
     }
 }
 
-/// The object as YAML, cleaned and in a fixed order (see the module documentation).
+/// The object as YAML, [`trim`]med and in a fixed order (see the module documentation).
 ///
 /// # Errors
 ///
 /// When the YAML writer fails, which a JSON value should never make it do.
 pub fn to_yaml(object: &Value) -> Result<String, String> {
-    let cleaned = clean(object);
+    let cleaned = trim(object);
     match &cleaned {
         Value::Object(map) => serde_saphyr::to_string(&Ordered {
             map,
@@ -238,7 +249,7 @@ mod tests {
     }
 
     #[test]
-    fn a_secret_never_shows_a_value() {
+    fn a_cleaned_secret_never_shows_a_value() {
         let secret = json!({
             "apiVersion": "v1", "kind": "Secret",
             "metadata": {"name": "db", "namespace": "shop", "annotations": {
@@ -248,13 +259,20 @@ mod tests {
             "data": {"password": "aHVudGVyMg==", "user": "YWRtaW4="},
             "stringData": {"token": "s3cr3t"}
         });
-        let yaml = to_yaml(&secret).unwrap();
+        let yaml = to_yaml(&clean(&secret)).unwrap();
         for value in ["aHVudGVyMg==", "YWRtaW4=", "s3cr3t", "hunter2"] {
             assert!(!yaml.contains(value), "{value} in\n{yaml}");
         }
         assert!(yaml.contains("password: (hidden)"), "{yaml}");
         assert!(yaml.contains("token: (hidden)"), "{yaml}");
         assert!(yaml.contains(LAST_APPLIED), "{yaml}");
+
+        let raw = to_yaml(&secret).unwrap();
+        assert!(raw.contains("password: aHVudGVyMg=="), "{raw}");
+        assert!(
+            raw.contains(&format!("{LAST_APPLIED}: (hidden)")),
+            "the last-applied copy stays hidden: {raw}"
+        );
     }
 
     #[test]

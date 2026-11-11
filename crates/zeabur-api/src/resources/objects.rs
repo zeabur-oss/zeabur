@@ -39,6 +39,8 @@
 use std::collections::BTreeSet;
 
 use axum::extract::RawQuery;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use futures_util::StreamExt as _;
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -209,12 +211,9 @@ pub struct ObjectDocument {
     pub id: String,
     /// The plural resource name.
     pub resource: String,
-    /// The object as YAML, without the server's bookkeeping; a Secret has no `data` or
-    /// `stringData`, its keys are in `keys`.
+    /// The object as YAML, without the server's bookkeeping; a Secret with its `data` as the
+    /// cluster stores it (base64).
     pub yaml: String,
-    /// A Secret's keys, sorted; absent for any other object.
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub keys: Option<Vec<String>>,
     /// The object's `status` as the cluster reports it; absent when it has none, and never for a
     /// Secret.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -228,19 +227,6 @@ pub struct ObjectDocument {
 
 const fn segment(group: &str) -> &str {
     if group.is_empty() { CORE } else { group }
-}
-
-/// Takes a Secret's `data` and `stringData` out of `object` and returns their keys, sorted.
-fn secret_keys(object: &mut serde_json::Value) -> Vec<String> {
-    let mut keys = BTreeSet::new();
-    if let Some(top) = object.as_object_mut() {
-        for field in ["data", "stringData"] {
-            if let Some(serde_json::Value::Object(values)) = top.remove(field) {
-                keys.extend(values.into_iter().map(|(key, _)| key));
-            }
-        }
-    }
-    keys.into_iter().collect()
 }
 
 fn object_id(project: &str, resource: &ResourceRef, name: &str) -> String {
@@ -442,15 +428,17 @@ fn not_found(project: &str, what: &str) -> ApiError {
     ))
 }
 
-/// One object of a project as YAML, without the server's bookkeeping and with a Secret's values
-/// hidden; any namespaced kind the cluster serves (`core` names the empty group).
+/// One object of a project as YAML, without the server's bookkeeping; any namespaced kind the
+/// cluster serves (`core` names the empty group). A Secret comes with its values, read with the
+/// person's own credential.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/objects/{group}/{version}/{resource}/{name}", tag = "resources", operation_id = "getObject",
     params(("project" = String, Path),
            ("group" = String, Path, description = "The API group; `core` for the core group"),
            ("version" = String, Path),
            ("resource" = String, Path, description = "The plural resource name, such as `deployments`"),
            ("name" = String, Path)),
-    responses((status = 200, body = ObjectDocument), (status = 404, body = Problem, content_type = PROBLEM)))]
+    responses((status = 200, body = ObjectDocument), (status = 403, body = Problem, content_type = PROBLEM),
+               (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
     Person(cluster): Person,
     Path((project, group, version, resource, name)): Path<(String, String, String, String, String)>,
@@ -486,8 +474,30 @@ pub(crate) async fn get(
         top.insert("apiVersion".to_owned(), reference.api_version().into());
         top.insert("kind".to_owned(), reference.kind.clone().into());
     }
-    let is_secret = reference.group.is_empty() && reference.resource == "secrets";
-    let keys = is_secret.then(|| secret_keys(&mut value));
+    let is_secret = reference.is_secret();
+    if is_secret {
+        let values = cluster
+            .reveal_secret(&project, &name)
+            .await
+            .map_err(|error| {
+                if error.is_not_found() {
+                    not_found(&project, &what)
+                } else {
+                    read_problem(error, &what, get_read("", "secrets", Some(&project), &name))
+                }
+            })?;
+        if let Some(top) = value.as_object_mut() {
+            top.remove("stringData");
+            top.remove("data");
+            if !values.is_empty() {
+                let data: serde_json::Map<String, serde_json::Value> = values
+                    .iter()
+                    .map(|(key, bytes)| (key.clone(), STANDARD.encode(bytes).into()))
+                    .collect();
+                top.insert("data".to_owned(), data.into());
+            }
+        }
+    }
     let yaml = zeabur_graph::manifest::to_yaml(&value)
         .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e)))?;
     let status = if is_secret {
@@ -502,7 +512,6 @@ pub(crate) async fn get(
         id: object_id(&project, &reference, &name),
         resource: reference.resource.clone(),
         yaml,
-        keys,
         status,
         origin: Origin::complete(
             &reference.api_version(),

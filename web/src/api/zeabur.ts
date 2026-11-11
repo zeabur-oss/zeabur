@@ -7230,11 +7230,6 @@ export type ObjectDocumentStatus = { [key: string]: unknown } | null
 export type ObjectDocument = {
   /** `projects/<p>/objects/<group>/<version>/<resource>/<name>`. */
   id: string
-  /**
-   * A Secret's keys, sorted; absent for any other object.
-   * @nullable
-   */
-  keys?: string[] | null
   /** The object. */
   origin: Origin
   /** The tool that manages it, if any. */
@@ -7248,8 +7243,8 @@ export type ObjectDocument = {
    */
   status?: ObjectDocumentStatus
   /**
-   * The object as YAML, without the server's bookkeeping; a Secret has no `data` or
-   * `stringData`, its keys are in `keys`.
+   * The object as YAML, without the server's bookkeeping; a Secret with its `data` as the
+   * cluster stores it (base64).
    */
   yaml: string
 }
@@ -12407,8 +12402,9 @@ export const getGetObjectUrl = (
 }
 
 /**
- * @summary One object of a project as YAML, without the server's bookkeeping and with a Secret's values
-hidden; any namespaced kind the cluster serves (`core` names the empty group).
+ * @summary One object of a project as YAML, without the server's bookkeeping; any namespaced kind the
+cluster serves (`core` names the empty group). A Secret comes with its values, read with the
+person's own credential.
  */
 export const getObject = async (
   project: string,

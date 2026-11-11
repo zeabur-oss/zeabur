@@ -2449,8 +2449,9 @@ paths:
       tags:
       - resources
       summary: |-
-        One object of a project as YAML, without the server's bookkeeping and with a Secret's values
-        hidden; any namespaced kind the cluster serves (`core` names the empty group).
+        One object of a project as YAML, without the server's bookkeeping; any namespaced kind the
+        cluster serves (`core` names the empty group). A Secret comes with its values, read with the
+        person's own credential.
       operationId: getObject
       parameters:
       - name: project
@@ -2486,6 +2487,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ObjectDocument"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
         "404":
           content:
             application/problem+json:
@@ -11947,13 +11953,6 @@ components:
         id:
           type: string
           description: "`projects/<p>/objects/<group>/<version>/<resource>/<name>`."
-        keys:
-          type:
-          - array
-          - "null"
-          items:
-            type: string
-          description: A Secret's keys, sorted; absent for any other object.
         origin:
           $ref: "#/components/schemas/Origin"
           description: The object.
@@ -11973,8 +11972,8 @@ components:
         yaml:
           type: string
           description: |-
-            The object as YAML, without the server's bookkeeping; a Secret has no `data` or
-            `stringData`, its keys are in `keys`.
+            The object as YAML, without the server's bookkeeping; a Secret with its `data` as the
+            cluster stores it (base64).
     ObjectKind:
       type: object
       description: The objects of one kind.

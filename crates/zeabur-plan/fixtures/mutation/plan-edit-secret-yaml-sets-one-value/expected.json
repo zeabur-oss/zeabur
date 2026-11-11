@@ -1,0 +1,38 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "(hidden)",
+          "before": "(hidden)",
+          "path": "data.password"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "13",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "name": "web-secret",
+        "plural": "secrets"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "13"
+          },
+          {
+            "op": "add",
+            "path": "/data/password",
+            "value": "aHVudGVyMw=="
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

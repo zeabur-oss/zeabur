@@ -1021,7 +1021,7 @@ impl<'a> Planner<'a> {
             metadata.insert("namespace".to_owned(), json!(namespace));
         }
         // A ConfigMap's or Secret's keys change one by one, without the values left as they
-        // are or shown masked; the rest of it as any other object, and kube-apiserver's dry run
+        // are; the rest of it as any other object, and kube-apiserver's dry run
         // refuses what it does not allow to change. The keys compare with the object as read.
         let key_edits = match keys {
             Some(data_kind) => {
@@ -1062,8 +1062,9 @@ impl<'a> Planner<'a> {
 
     /// The key changes of a ConfigMap's or Secret's YAML edit, `None` when there are none.
     ///
-    /// A Secret value equal to the one the person could read is left as it is. A key the edited
-    /// copy leaves out is not removed; keys are removed with a `data` change.
+    /// A Secret's YAML edit sets each key whose value differs from the one the person could
+    /// read, and removes a key the person could read only when the edited copy has a `data` map
+    /// and the key is in neither `data` nor `stringData`.
     fn key_edits(
         &self,
         kind: DataKind,
@@ -1134,6 +1135,19 @@ impl<'a> Planner<'a> {
                 }
                 for (key, text) in &plain {
                     edits.push(set(key, text.clone()));
+                }
+                if let Some(known) = known
+                    && edited.get("data").is_some_and(Value::is_object)
+                {
+                    for key in known.keys() {
+                        if !data.contains_key(key) && !plain.contains_key(key) {
+                            edits.push(DataEdit {
+                                op: "remove".to_owned(),
+                                key: key.clone(),
+                                value: None,
+                            });
+                        }
+                    }
                 }
             }
         }

@@ -4,13 +4,8 @@
     {
       "changes": [
         {
-          "after": "(hidden)",
-          "path": "data.api-key"
-        },
-        {
-          "after": "(hidden)",
           "before": "(hidden)",
-          "path": "data.user"
+          "path": "data.old"
         }
       ],
       "owners": [],
@@ -29,14 +24,8 @@
             "value": "13"
           },
           {
-            "op": "add",
-            "path": "/data/user",
-            "value": "YWxpY2U="
-          },
-          {
-            "op": "add",
-            "path": "/data/api-key",
-            "value": "bmV3LWtleQ=="
+            "op": "remove",
+            "path": "/data/old"
           }
         ],
         "type": "patch"

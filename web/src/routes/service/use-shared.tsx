@@ -7,6 +7,7 @@ import { FormField } from "@/components/form-field"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { useT, type Translate } from "@/i18n"
+import { secretData } from "@/lib/secret-data"
 import type { Service } from "@/model/service"
 import { ContainerField } from "@/routes/service/container-field"
 import { Input } from "@zeabur-oss/design-system/components/input"
@@ -28,7 +29,7 @@ function useKeys(project: string, kind: Kind, name: string, wanted: boolean): st
     ...objectQuery(project, { group: "", version: "v1", resource: "secrets", name }),
     enabled: wanted && kind === "Secret",
   })
-  if (kind === "Secret") return secret.data?.keys ?? []
+  if (kind === "Secret") return Object.keys(secretData(secret.data?.yaml ?? ""))
   return Object.keys(configMaps.data?.items.find((c) => c.origin.name === name)?.data ?? {})
 }
 

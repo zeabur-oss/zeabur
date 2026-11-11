@@ -1455,7 +1455,6 @@ export const en = {
   "create.cleanupTitle": (n: number) =>
     n === 1 ? "Delete the object just created" : `Delete the ${n} objects just created`,
   "tab.yaml": "YAML",
-  "yaml.hidden": "Secret values are hidden.",
   "yaml.intro": (name: string) =>
     `This is how ${name} is set up in the cluster now. A change is written as you make it.`,
   "yaml.label": (name: string) => `YAML of ${name}`,
@@ -1873,7 +1872,7 @@ export const en = {
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `Remove ${host}`,
   "yaml.edit": "Edit",
-  "yaml.editSecret": "Values are not in this YAML. Change them under the secret's keys.",
+  "yaml.editSecret": "Values under data are base64. To enter plain text, put it under stringData.",
   "yaml.notEditable": "Kubernetes manages this kind itself; edit the object that owns it.",
   "title.editYaml": (name: string) => `Edit ${name}`,
   "title.delete": (kind: string, name: string) => `Delete ${kind} ${name}`,
@@ -2014,7 +2013,10 @@ export const en = {
     `Its annotations also name ${names}, which restart it whether this is on or not.`,
   "reload.unknown": "With your rights, Zeabur can't see whether Reloader runs in this cluster.",
   "reload.running": "Reloader runs in this cluster.",
-  "data.reveal": "Reveal values",
+  "data.show": (key: string) => `Show the value of ${key}`,
+  "data.hide": (key: string) => `Hide the value of ${key}`,
+  "data.bytes": (n: number) => (n === 1 ? "1 byte" : `${n} bytes`),
+  "data.download": (key: string) => `Download ${key}`,
   "data.binary": "Binary",
   "data.noChanges": "No changes.",
   "net.addDomain": "Add domain",

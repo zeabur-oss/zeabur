@@ -30,6 +30,7 @@ mod tests {
     use axum::Router;
     use axum::body::Body;
     use axum::http::{Request, StatusCode};
+    use base64::Engine as _;
     use http_body_util::BodyExt as _;
     use kube::Client;
     use kube::api::{Api, DeleteParams};
@@ -379,7 +380,7 @@ mod tests {
     /// Releases and the second set of writes as the person: the releases a Deployment's
     /// ReplicaSets hold, a rollback, a claim that cannot grow on k3s's `local-path` class, a new
     /// volume, a probe with scaling and resources, a YAML edit of a NetworkPolicy, and a Secret
-    /// edited as YAML that keeps its masked values.
+    /// edited from the YAML the object route gives, values included.
     #[tokio::test]
     #[ignore = "needs a disposable cluster"]
     #[expect(clippy::too_many_lines, reason = "one scenario, read top to bottom")]
@@ -586,8 +587,24 @@ mod tests {
             Some(&json!(["Ingress", "Egress"]))
         );
 
-        // A Secret edited as YAML, which holds no values: the stored key stays, the new key lands.
-        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web}\ntype: Opaque\nstringData:\n  token: abc\n";
+        // A Secret edited from the YAML the object route gives, with its values: the stored key
+        // stays, the new key lands.
+        let (status, body) = call(
+            &app,
+            "GET",
+            &format!("/api/v1/projects/{ns}/objects/core/v1/secrets/web"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let shown: Value = serde_json::from_str(&body).unwrap();
+        let yaml = format!(
+            "{}stringData:\n  token: abc\n",
+            shown["yaml"].as_str().unwrap()
+        );
+        assert!(
+            yaml.contains("password: aHVudGVyMg=="),
+            "the YAML has the value"
+        );
         let (status, body) = plan_and_apply(&app, &ns, json!([{"op": "edit",
             "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web", "yaml": yaml}])).await;
         assert_eq!(status, StatusCode::OK, "{body}");
@@ -643,15 +660,18 @@ mod tests {
             // Not even the key, nor its value base64-encoded as a Secret stores it.
             assert!(!body.contains("password"), "{name}: {body}");
         }
-        // The Secret itself is readable through its own route, with its values hidden.
+        // The Secret itself is readable through its own route, with its values.
         let (status, body) = call(
             &app,
             "GET",
             &format!("/api/v1/projects/{ns}/objects/core/v1/secrets/db"),
         )
         .await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        assert!(!body.contains(SECRET_VALUE), "{body}");
+        assert_eq!(status, StatusCode::OK);
+        assert!(
+            body.contains(&base64::engine::general_purpose::STANDARD.encode(SECRET_VALUE)),
+            "the YAML has the value in base64"
+        );
     }
 
     /// An admin's handle on one kind of object in `ns`.
@@ -677,6 +697,7 @@ mod tests {
     /// [k8s-rbac-secrets]: https://kubernetes.io/docs/concepts/security/rbac-good-practices/#listing-secrets
     #[tokio::test]
     #[ignore = "needs a disposable cluster"]
+    #[expect(clippy::too_many_lines, reason = "one scenario, read top to bottom")]
     async fn editing_one_key_keeps_the_others_without_reading_the_values() {
         let (sandbox, app) = project_as(
             "zeabur-keys",
@@ -742,7 +763,17 @@ mod tests {
         let settings = config_maps.get("settings").await.unwrap();
         assert_eq!(settings.data["data"], json!({"MODE": "new", "LEVEL": "3"}));
 
-        // The Secret's YAML, which holds no values: a label lands and no key changes.
+        // The person cannot read the Secret, so the object route refuses it as kube-apiserver
+        // does; a YAML without `data`, as such a person sends it, lands a label and changes no
+        // key.
+        let (status, body) = call(
+            &app,
+            "GET",
+            &format!("/api/v1/projects/{ns}/objects/core/v1/secrets/db"),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert!(!body.contains("YWRtaW4="), "a refusal carries no value");
         let yaml = |kind: &str| {
             format!(
                 "apiVersion: v1\nkind: Secret\nmetadata: {{name: db, labels: {{tier: data}}}}\n\
