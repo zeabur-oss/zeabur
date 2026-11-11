@@ -1,0 +1,3 @@
+description: "A Secret's YAML with two binary values and a text one, one binary value changed in base64: the patch writes that base64 as it is, and the untouched keys are not sent."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web-secret", "yaml": "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, namespace: demo}\ntype: Opaque\ndata:\n  blob: AQL/\n  cert: /wCB\n  password: aHVudGVyMg==\n"}]}, "secretValues": {"web-secret": {"blob": [1, 2, 255], "cert": [255, 0, 128], "password": "hunter2"}}}

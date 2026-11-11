@@ -467,7 +467,7 @@ impl<'a> Planner<'a> {
                 kind,
                 name,
                 changes,
-            } => self.data(*kind, name, changes),
+            } => self.data(*kind, name, changes, false),
             Change::AddDomain(add) => self.add_domain(add),
             Change::Certificate(change) => {
                 self.certificate(&change.route, &change.hostname, &change.certificate)
@@ -894,12 +894,15 @@ impl<'a> Planner<'a> {
         true
     }
 
+    /// Plans `edits` to the keys of ConfigMap or Secret `name`. With `encoded`, a Secret's set
+    /// values are base64 already and are written as they are.
     #[expect(clippy::too_many_lines, reason = "one change kind, read top to bottom")]
     pub(crate) fn data(
         &mut self,
         kind: DataKind,
         name: &str,
         edits: &[DataEdit],
+        encoded: bool,
     ) -> Result<(), PlanError> {
         if edits.is_empty() {
             return Err(error(
@@ -977,13 +980,15 @@ impl<'a> Planner<'a> {
                 &[Step::field("data"), Step::field(&edit.key)],
                 &format!("key {}", edit.key),
             )?;
-            let encoded = |value: &str| match kind {
-                DataKind::ConfigMap => json!(value),
-                DataKind::Secret => json!(base64::engine::general_purpose::STANDARD.encode(value)),
+            let stored = |value: &str| match kind {
+                DataKind::Secret if !encoded => {
+                    json!(base64::engine::general_purpose::STANDARD.encode(value))
+                }
+                DataKind::ConfigMap | DataKind::Secret => json!(value),
             };
             match edit.op.as_str() {
                 "set" => {
-                    let value = encoded(edit.value.as_deref().unwrap_or_default());
+                    let value = stored(edit.value.as_deref().unwrap_or_default());
                     if !known_keys {
                         // The Secret's `data` could not be read: adding the whole map would
                         // replace the keys it holds, so add the key alone (kube-apiserver

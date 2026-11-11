@@ -35,6 +35,7 @@
 use std::collections::BTreeMap;
 
 use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use k8s_openapi::api::core::v1::{Container, PersistentVolumeClaim};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Map, Value, json};
@@ -1023,19 +1024,16 @@ impl<'a> Planner<'a> {
         // A ConfigMap's or Secret's keys change one by one, without the values left as they
         // are; the rest of it as any other object, and kube-apiserver's dry run
         // refuses what it does not allow to change. The keys compare with the object as read.
-        let key_edits = match keys {
-            Some(data_kind) => {
-                let edits = self.key_edits(data_kind, name, &object, &edited)?;
-                for side in [&mut current, &mut wanted] {
-                    if let Some(map) = side.as_object_mut() {
-                        map.remove("data");
-                        map.remove("stringData");
-                    }
+        let key_edits = keys.and_then(|data_kind| {
+            for side in [&mut current, &mut wanted] {
+                if let Some(map) = side.as_object_mut() {
+                    map.remove("data");
+                    map.remove("stringData");
                 }
-                edits.map(|edits| (data_kind, edits))
             }
-            None => None,
-        };
+            self.key_edits(data_kind, name, &object, &edited)
+                .map(|edits| (data_kind, edits))
+        });
         let operations = edit_operations(&current, &wanted);
         if operations.is_empty() && key_edits.is_none() {
             return Err(error(
@@ -1049,7 +1047,7 @@ impl<'a> Planner<'a> {
             self.patch(index, operation.operations)?;
         }
         if let Some((data_kind, edits)) = key_edits {
-            self.data(data_kind, name, &edits)?;
+            self.data(data_kind, name, &edits, true)?;
         }
         if let Some(workload) = WorkloadKind::parse(&kind) {
             self.impact.insert(WorkloadRef {
@@ -1062,16 +1060,17 @@ impl<'a> Planner<'a> {
 
     /// The key changes of a ConfigMap's or Secret's YAML edit, `None` when there are none.
     ///
-    /// A Secret's YAML edit sets each key whose value differs from the one the person could
-    /// read, and removes a key the person could read only when the edited copy has a `data` map
-    /// and the key is in neither `data` nor `stringData`.
+    /// A Secret's YAML edit sets each `data` key whose base64 string differs from the one the
+    /// person could read, as written, and each `stringData` key, encoded; it removes a key the
+    /// person could read only when the edited copy has a `data` map and the key is in neither
+    /// `data` nor `stringData`. A Secret's values come back in base64.
     fn key_edits(
         &self,
         kind: DataKind,
         name: &str,
         current: &Value,
         edited: &Value,
-    ) -> Result<Option<Vec<DataEdit>>, PlanError> {
+    ) -> Option<Vec<DataEdit>> {
         let strings = |object: &Value, field: &str| -> BTreeMap<String, String> {
             object
                 .get(field)
@@ -1109,32 +1108,13 @@ impl<'a> Planner<'a> {
                 let data = strings(edited, "data");
                 let plain = strings(edited, "stringData");
                 for (key, encoded) in &data {
-                    let bytes = base64::engine::general_purpose::STANDARD
-                        .decode(encoded)
-                        .map_err(|_decode| {
-                            error(
-                                ErrorKind::BadRequest,
-                                "invalid_base64",
-                                format!(
-                                    "The value of {key} under data is not base64; put plain \
-                                     text under stringData instead."
-                                ),
-                            )
-                        })?;
-                    if known.and_then(|k| k.get(key)) == Some(&bytes) {
-                        continue;
+                    let read = known.and_then(|k| k.get(key)).map(|v| STANDARD.encode(v));
+                    if read.as_ref() != Some(encoded) {
+                        edits.push(set(key, encoded.clone()));
                     }
-                    let text = String::from_utf8(bytes).map_err(|_utf8| {
-                        error(
-                            ErrorKind::Invalid,
-                            "binary_secret_value",
-                            format!("{key} is binary; it cannot be edited here."),
-                        )
-                    })?;
-                    edits.push(set(key, text));
                 }
                 for (key, text) in &plain {
-                    edits.push(set(key, text.clone()));
+                    edits.push(set(key, STANDARD.encode(text)));
                 }
                 if let Some(known) = known
                     && edited.get("data").is_some_and(Value::is_object)
@@ -1151,7 +1131,7 @@ impl<'a> Planner<'a> {
                 }
             }
         }
-        Ok((!edits.is_empty()).then_some(edits))
+        (!edits.is_empty()).then_some(edits)
     }
 }
 
