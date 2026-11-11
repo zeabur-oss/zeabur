@@ -1,8 +1,8 @@
-import { queryOptions, useQuery } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useEffect, useRef, type ReactNode } from "react"
 
-import * as zeabur from "@/api/zeabur"
+import { s3DestinationsQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { useT } from "@/i18n"
 import type { Frequency, TargetProblem } from "@/model/databases"
@@ -12,13 +12,6 @@ import { Select } from "@zeabur-oss/design-system/components/select"
 
 type S3 = S3Target
 type Field = Exclude<keyof S3, "destination">
-
-/** The cluster's S3 destinations, without their keys. */
-export const s3DestinationsQuery = queryOptions({
-  queryKey: ["cluster", "s3-destinations"],
-  queryFn: async ({ signal }) => await zeabur.getS3Destinations({ signal }),
-  retryOnMount: false,
-})
 
 const MANUAL = "\u0000manual"
 

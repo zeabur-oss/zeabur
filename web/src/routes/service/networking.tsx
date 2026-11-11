@@ -1,3 +1,4 @@
+import { objectBody } from "@/api/object-body"
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 import { Fragment, lazy, Suspense, useState, type ReactElement, type ReactNode } from "react"
@@ -744,7 +745,7 @@ function privateAsk(
     changes: [
       {
         op: "create",
-        object: privateService(service, selector, port) as unknown as Record<string, never>,
+        object: objectBody(privateService(service, selector, port)),
       },
     ],
     notes: [t("net.privateWillBe", privateAddress(service, port))],

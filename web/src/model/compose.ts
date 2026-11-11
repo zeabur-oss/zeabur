@@ -1,5 +1,6 @@
 // A Docker Compose file, as the server reads it (`POST /projects/{p}/compose`), turned into the
 // objects the "Docker image" and database forms create, in one plan.
+import { objectBody } from "@/api/object-body"
 import type { Schemas } from "@/api/client"
 import { pendingDatabase, variablesFor, type Connectable } from "@/model/connect"
 import {
@@ -277,7 +278,7 @@ export function composeChanges(
     changes.push(
       ...imageObjects(form, context.domains).map((object): Change => ({
         op: "create",
-        object: object as Record<string, never>,
+        object: objectBody(object),
       })),
     )
   }

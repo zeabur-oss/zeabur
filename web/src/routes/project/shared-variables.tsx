@@ -196,7 +196,7 @@ function AddDrawer({
             kind,
             metadata: { name, labels: { [SHARED_LABEL]: "true" } },
             ...(kind === "Secret" ? { type: "Opaque", stringData: values } : { data: values }),
-          } as unknown as Record<string, never>,
+          },
         },
       ],
     })

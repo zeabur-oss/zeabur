@@ -2,6 +2,7 @@
 // password, the claim labelled for selection, and a `Schedule` that backs up that claim alone and
 // prunes by its retention.
 // https://docs.k8up.io/k8up/2.16/references/api-reference.html
+import { objectBody } from "@/api/object-body"
 import type { Schemas } from "@/api/client"
 import {
   backupName,
@@ -113,7 +114,7 @@ const repository = (target: VolumeTarget, project: string, claim: string) =>
 
 const create = (object: Record<string, unknown>): Change => ({
   op: "create",
-  object: object as Record<string, never>,
+  object: objectBody(object),
 })
 
 /** The writes that back `claim` up on a schedule, to `target`, as `as`. */

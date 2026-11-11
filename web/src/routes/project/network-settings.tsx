@@ -1,3 +1,4 @@
+import { objectBody } from "@/api/object-body"
 import { useQuery } from "@tanstack/react-query"
 import { useState } from "react"
 
@@ -13,7 +14,7 @@ import { Card, CardRow, SectionLabel } from "@zeabur-oss/design-system/component
 import { Select } from "@zeabur-oss/design-system/components/select"
 
 // A plan's `create` takes any object.
-const asObject = (object: object) => object as Record<string, never>
+const asObject = (object: object) => objectBody(object)
 
 type Planner = ReturnType<typeof usePlanner>
 type Allowed = Schemas.NetworkPolicyAllowedNamespace

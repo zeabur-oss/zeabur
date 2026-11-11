@@ -57,7 +57,7 @@ export function keysSecret(
     return {
       op: "copyS3Keys",
       destination: target.destination,
-      object: { ...object, stringData: more } as unknown as Record<string, never>,
+      object: { ...object, stringData: more },
       ...keys,
     }
   return {
@@ -69,7 +69,7 @@ export function keysSecret(
         [keys.secretAccessKey]: target.secretKey.trim(),
         ...more,
       },
-    } as unknown as Record<string, never>,
+    },
   }
 }
 

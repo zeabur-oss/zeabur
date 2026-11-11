@@ -1,6 +1,7 @@
 // Restoring a backup into a new database, and moving services between the two. The new database
 // copies the original's spec and starts from the backup; the original is not changed. The
 // `zeabur.com/restored-*` annotations tie the two together for the pages.
+import { objectBody } from "@/api/object-body"
 import type { Schemas } from "@/api/client"
 import { databaseOfEnv, type Target } from "@/model/connect"
 import {
@@ -94,7 +95,7 @@ aws s3 cp $endpoint --recursive --exclude '*' --include "\${latest%-summary.dfs}
 type Spec = Manifest
 type Store = NonNullable<Database["backups"]["store"]>
 
-const create = (body: Manifest): Change => ({ op: "create", object: body as Record<string, never> })
+const create = (body: Manifest): Change => ({ op: "create", object: objectBody(body) })
 
 /** What one engine adds to the copy: it edits `spec` in place and returns the writes. */
 interface Restoring {
