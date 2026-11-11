@@ -659,6 +659,7 @@ mod tests {
         let sandbox = Sandbox::new(
             "zeabur-matcher",
             json!([
+                {"apiGroups": [""], "resources": ["secrets"], "verbs": ["list"]},
                 {"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["app"],
                  "verbs": ["get", "update", "create"]},
                 {"apiGroups": [""], "resources": ["pods/exec"], "resourceNames": ["web-0"],
@@ -754,6 +755,7 @@ mod tests {
         let sandbox = Sandbox::new(
             "zeabur-matcher-names",
             json!([
+                {"apiGroups": [""], "resources": ["secrets"], "verbs": ["list"]},
                 {"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["app"],
                  "verbs": ["get", "update", "create"]},
                 {"apiGroups": [""], "resources": ["pods/exec"], "resourceNames": ["web-0"],
