@@ -15,6 +15,10 @@ issuer:
   accountUrl: https://identity.example.test:8443/account
 extraTrustedCA:
   secret: corp-ca
+outboundProxy:
+  enabled: true
+  httpsProxy: http://proxy.example.test:3128
+  noProxy: [.corp.example.test]
 domains:
   suffixes: [apps.example.test, example.test]
   clusterIssuer: letsencrypt

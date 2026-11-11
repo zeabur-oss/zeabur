@@ -111,6 +111,30 @@ Zeabur 登入 Identity、讀取映像檔、讀取物件儲存裡的備份、連�
 
 `issuer.caBundle` 和 `builds.caBundle` 由 zeabur-installer 設定，分別指向簽發 Identity 憑證的本機 CA 和 Zot 的 CA。Zeabur 會同時信任這兩個 CA 和 `extraTrustedCA`，不需要自己設定。
 
+## 讓對外連線經過代理
+
+叢集只能經由代理連到網際網路時，開啟 `outboundProxy`。Zeabur 自己發出的請求會改走這個代理，包括向映像檔倉庫讀取映像檔、讀取物件儲存裡的備份，以及連線 GitHub。
+
+```sh
+helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
+  --version <version> \
+  --namespace zeabur --reset-then-reuse-values \
+  --set outboundProxy.enabled=true \
+  --set outboundProxy.httpsProxy=http://proxy.corp.example:3128
+```
+
+HTTPS 目的地設定 `outboundProxy.httpsProxy`，HTTP 目的地設定 `outboundProxy.httpProxy`，也可以兩個都設。位址必須以 `http://` 開頭。Zeabur 用 `CONNECT` 通道經由代理連到 HTTPS 目的地。代理需要帳號密碼時，寫在位址裡（`http://user:password@proxy.corp.example:3128`）。
+
+下列目的地不會經過代理。
+
+- 本機位址，例如 `localhost` 和 `127.0.0.1`。
+- 以 `.svc` 或 `.cluster.local` 結尾的名稱，以及叢集的 Pod 與 Service 網段。網段預設是 k3s 與 RKE2 的 `10.42.0.0/16` 和 `10.43.0.0/16`，你的叢集使用其他網段時，設定 `outboundProxy.clusterNetwork`。
+- 你加進 `outboundProxy.noProxy` 的項目，可以寫網域後綴（`.corp.example`）、位址或 CIDR 網段。
+
+Zeabur 拒絕連線的目標和沒有代理時相同。映像檔倉庫或備份位址指向這台機器、連結本地位址或雲端中繼資料位址時，即使代理連得到也會被拒絕。Zeabur 會自己檢查位址，再請代理連到那個位址，所以代理的 DNS 回答無法把請求帶到別處。代理本身的位址可以在私有網路內。
+
+這個設定不影響提供記錄與指標的 Zeabur Proxy（`proxy.*`）。以 Identity 登入和呼叫 Kubernetes API 都不經過代理。如果代理會檢查 TLS，也要信任它的 CA，見[信任私有 CA](#信任私有-ca)。
+
 ## 常見失敗
 
 | 情況 | 檢查位置 |

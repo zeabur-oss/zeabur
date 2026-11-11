@@ -1078,6 +1078,7 @@ version = "0.1.21"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ddc03d96684f9226b8a787cdb71488417b53ab5ea8fdb1dac946cb9431cc8bff"
 dependencies = [
+ "base64 0.23.1",
  "bytes",
  "futures-channel",
  "futures-util",
@@ -1085,7 +1086,9 @@ dependencies = [
  "http-body",
  "httparse",
  "hyper",
+ "ipnet",
  "libc",
+ "percent-encoding",
  "pin-project-lite",
  "socket2",
  "tokio",
@@ -1113,6 +1116,12 @@ checksum = "3b5cf4372d022092674a83b8febf5865f7a573cc0c5baec5e49c879b6a20978f"
 dependencies = [
  "hybrid-array",
 ]
+
+[[package]]
+name = "ipnet"
+version = "2.12.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "791930b43c0d5973160d90a8f3894509f2b273430f5c5c73b668636d0287c5c0"
 
 [[package]]
 name = "is_terminal_polyfill"
@@ -2926,6 +2935,7 @@ dependencies = [
  "zeabur-api",
  "zeabur-auth",
  "zeabur-core",
+ "zeabur-http",
  "zeabur-kube",
  "zeabur-plan",
  "zeabur-telemetry",
@@ -2945,12 +2955,10 @@ dependencies = [
  "futures-util",
  "hex",
  "http-body-util",
- "hyper-rustls",
  "hyper-util",
  "kube",
  "pastey",
  "rustls",
- "rustls-platform-verifier",
  "secrecy",
  "semver",
  "serde",
@@ -2972,6 +2980,7 @@ dependencies = [
  "zeabur-core",
  "zeabur-gaps",
  "zeabur-graph",
+ "zeabur-http",
  "zeabur-kube",
  "zeabur-model",
  "zeabur-modules",
@@ -3066,6 +3075,24 @@ dependencies = [
  "serde-saphyr 2.0.0",
  "serde_json",
  "zeabur-model",
+ "zeabur-test-support",
+]
+
+[[package]]
+name = "zeabur-http"
+version = "0.2.0"
+dependencies = [
+ "bytes",
+ "http",
+ "http-body",
+ "http-body-util",
+ "hyper",
+ "hyper-util",
+ "rustls",
+ "rustls-platform-verifier",
+ "tokio",
+ "tokio-rustls",
+ "tower",
  "zeabur-test-support",
 ]
 
@@ -3294,6 +3321,7 @@ dependencies = [
  "zeabur-api",
  "zeabur-catalog",
  "zeabur-core",
+ "zeabur-http",
  "zeabur-kube",
  "zeabur-telemetry",
  "zeabur-ui",

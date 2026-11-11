@@ -18,6 +18,7 @@ publish = false
 # (Levels order crates; the product layers L0-L4 in docs/reference/architecture.mdx are a different thing.)
 [workspace.metadata.levels]
 zeabur-core = 1
+zeabur-http = 1
 zeabur-model = 0
 zeabur-embed = 0
 zeabur-telemetry = 0
@@ -64,6 +65,7 @@ crates = [
 [workspace.dependencies]
 # Workspace crates, levelled from the bottom up.
 zeabur-core = { path = "crates/zeabur-core" }
+zeabur-http = { path = "crates/zeabur-http" }
 zeabur-model = { path = "crates/zeabur-model" }
 zeabur-kube = { path = "crates/zeabur-kube" }
 zeabur-graph = { path = "crates/zeabur-graph" }

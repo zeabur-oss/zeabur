@@ -18,6 +18,7 @@ ui = ["dep:zeabur-ui", "zeabur-ui/interface"]
 zeabur-api.workspace = true
 zeabur-auth.workspace = true
 zeabur-core.workspace = true
+zeabur-http.workspace = true
 zeabur-kube.workspace = true
 zeabur-plan.workspace = true
 zeabur-telemetry.workspace = true
