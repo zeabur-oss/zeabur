@@ -232,7 +232,7 @@ function Footer({
 
 const ReadError = ({ error }: { error: Error | null }) =>
   error ? (
-    <Alert variant="destructive">
+    <Alert variant="destructive" role="alert">
       <AlertDescription>{toProblem(error).detail}</AlertDescription>
     </Alert>
   ) : null
