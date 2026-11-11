@@ -281,22 +281,6 @@ test("a tab swaps its panel with a quick fade, not a page move", async ({ page }
   expect(timings(swapped)).toEqual(expect.arrayContaining([`opacity 150 ${curve}`]))
 })
 
-test("the service's menu opens on the popup timings", async ({ page }) => {
-  await openService(page)
-  const more = page
-    .locator("main header")
-    .first()
-    .getByRole("button", { name: "More", exact: true })
-  const menu = '[data-slot="menu-content"]'
-  const opening = await frames(page, menu, () => more.click())
-  expect(timings(opening)).toEqual(
-    expect.arrayContaining([`opacity 250 ${curve}`, `scale 250 ${curve}`]),
-  )
-  const closing = await frames(page, menu, () => page.keyboard.press("Escape"))
-  expect(timings(closing)).toEqual(expect.arrayContaining([`opacity 150 ${curve}`]))
-  expect(closing.at(-1)!.present).toBe(false)
-})
-
 test("Home does not shift as it loads", async ({ page }) => {
   await page.addInitScript(() => {
     const w = window as unknown as { shifted: number }

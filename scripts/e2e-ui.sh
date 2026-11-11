@@ -14,10 +14,17 @@ source "$root/scripts/wait.sh"
 # The write tests start from the manifest as applied: what an earlier run added (a variable, a
 # volume, a policy) goes with the namespace.
 wait_for "$namespace" kubectl delete namespace "$namespace" "$namespace-adopt" "$namespace-files" \
-  --ignore-not-found --wait --timeout=180s
+  "$namespace-crowded" --ignore-not-found --wait --timeout=180s
 kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \
   -f "$root/web/e2e/manifests/second-project.yaml" \
   -f "$root/web/e2e/manifests/files.yaml" >/dev/null
+# A project with 40 services for the layout test; none runs a pod.
+kubectl create namespace "$namespace-crowded" >/dev/null
+kubectl label namespace "$namespace-crowded" zeabur.com/project=true >/dev/null
+for i in $(seq -w 1 40); do
+  kubectl -n "$namespace-crowded" create deployment "service-$i" --image=registry.k8s.io/pause:3.10 \
+    --replicas=0 >/dev/null
+done
 wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/talker --timeout=180s
 wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/editor --timeout=180s
 wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/keeper --timeout=180s
@@ -58,5 +65,6 @@ fi
 
 cd "$root/web"
 ZEABUR_E2E_URL="$url" ZEABUR_E2E_NAMESPACE="$namespace" ZEABUR_E2E_POD="$pod" \
-  ZEABUR_E2E_ADOPT="$namespace-adopt" \
+  ZEABUR_E2E_ADOPT="$namespace-adopt" ZEABUR_E2E_CROWDED="$namespace-crowded" \
+  ZEABUR_E2E_UNCHECKED=Deployment/talker ZEABUR_E2E_NO_SHELL="$namespace-files/distroless" \
   bunx playwright test --reporter=line --output="$out/results"
