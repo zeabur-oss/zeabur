@@ -1196,7 +1196,7 @@ export type DataEdit = {
   /** `set` or `remove`. */
   op: string
   /**
-   * The value, for `set`; for a Secret, the plain value (Zeabur encodes it).
+   * The value, for `set`; for a Secret, the plain text (Zeabur encodes it).
    * @nullable
    */
   value?: string | null
@@ -3061,11 +3061,6 @@ export type PlanWarning =
     }
   | {
       code: "nodeCapacityUnknown"
-    }
-  | {
-      code: "secretValuesUnknown"
-      /** The Secret. */
-      name: string
     }
   | {
       code: "configNotRolledBack"

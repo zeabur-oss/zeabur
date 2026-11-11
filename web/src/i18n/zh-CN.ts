@@ -1462,7 +1462,6 @@ export const zhCN: Messages = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的证书不是由 cert-manager 签发的，请到生成证书的地方加入 ${host}`,
   "warn.nodeCapacityUnknown": "无法读取节点：构建上限没有和最大的节点比对",
-  "warn.secretValuesUnknown": (name: string) => `无法读取 ${name} 的值：差异只列出键名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 读取配置文件或机密变量：回滚不会改动这些内容`,
   "warn.storageClassUnknown": (claim: string) =>

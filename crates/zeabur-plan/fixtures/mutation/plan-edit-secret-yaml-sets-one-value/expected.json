@@ -25,7 +25,12 @@
             "value": "13"
           },
           {
-            "op": "add",
+            "op": "test",
+            "path": "/data/password",
+            "value": "aHVudGVyMg=="
+          },
+          {
+            "op": "replace",
             "path": "/data/password",
             "value": "aHVudGVyMw=="
           }

@@ -1,3 +1,0 @@
-description: "An environment variable can be set to (hidden) or a run of bullets on purpose; the patch writes those strings."
-operation: mutation.plan
-params: {"request": {"changes": [{"op": "env", "workload": {"kind": "Deployment", "name": "web"}, "container": "app", "changes": [{"op": "set", "name": "NOTE", "value": "(hidden)"}, {"op": "set", "name": "DOTS", "value": "••••"}]}]}}

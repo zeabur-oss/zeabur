@@ -41,10 +41,17 @@ describe("project deletion", () => {
       toolsNamespace: "zeabur-terminals",
       toolsPods: [],
     }
-    expect(projectDeletionOf([{ code: "secretValuesUnknown", name: "db" }, deletion])).toBe(
-      deletion,
-    )
-    expect(projectDeletionOf([{ code: "secretValuesUnknown", name: "db" }])).toBeUndefined()
+    expect(
+      projectDeletionOf([
+        { code: "configNotRolledBack", workload: { kind: "Deployment", name: "web" } },
+        deletion,
+      ]),
+    ).toBe(deletion)
+    expect(
+      projectDeletionOf([
+        { code: "configNotRolledBack", workload: { kind: "Deployment", name: "web" } },
+      ]),
+    ).toBeUndefined()
   })
 
   test("the commands show the namespace, then each held object by resource and group", () => {

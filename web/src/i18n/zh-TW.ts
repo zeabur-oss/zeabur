@@ -1465,7 +1465,6 @@ export const zhTW: Messages = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的憑證不是 cert-manager 簽發的，請到產生憑證的地方加入 ${host}`,
   "warn.nodeCapacityUnknown": "無法讀取節點：建置上限沒有和最大的節點比對",
-  "warn.secretValuesUnknown": (name: string) => `無法讀取 ${name} 的值：差異只列出鍵名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 讀取設定檔或機密變數：回滾不會改動這些內容`,
   "warn.storageClassUnknown": (claim: string) =>

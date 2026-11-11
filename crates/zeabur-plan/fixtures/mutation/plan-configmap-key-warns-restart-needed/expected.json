@@ -8,7 +8,6 @@
         "name": "settings"
       },
       "write": {
-        "type": "patch",
         "operations": [
           {
             "op": "test",
@@ -16,17 +15,23 @@
             "value": "7"
           },
           {
-            "op": "add",
+            "op": "test",
+            "path": "/data/MODE",
+            "value": "production"
+          },
+          {
+            "op": "replace",
             "path": "/data/MODE",
             "value": "maintenance"
           }
-        ]
+        ],
+        "type": "patch"
       },
       "changes": [
         {
-          "path": "data.MODE",
+          "after": "maintenance",
           "before": "production",
-          "after": "maintenance"
+          "path": "data.MODE"
         }
       ]
     }

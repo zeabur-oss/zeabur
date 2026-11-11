@@ -7565,7 +7565,7 @@ components:
           type:
           - string
           - "null"
-          description: The value, for `set`; for a Secret, the plain value (Zeabur encodes it).
+          description: The value, for `set`; for a Secret, the plain text (Zeabur encodes it).
     DataKind:
       type: string
       description: A ConfigMap or a Secret.
@@ -12528,19 +12528,6 @@ components:
             type: string
             enum:
             - nodeCapacityUnknown
-      - type: object
-        description: The Secret's values could not be read, so its diff shows only which keys change.
-        required:
-        - name
-        - code
-        properties:
-          code:
-            type: string
-            enum:
-            - secretValuesUnknown
-          name:
-            type: string
-            description: The Secret.
       - type: object
         description: |-
           A rollback returns the pod template only; the ConfigMaps and Secrets the workload reads

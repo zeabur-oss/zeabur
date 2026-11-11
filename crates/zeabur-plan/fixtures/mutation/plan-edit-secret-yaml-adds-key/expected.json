@@ -5,7 +5,7 @@
       "changes": [
         {
           "after": "(hidden)",
-          "path": "data.api-key"
+          "path": "stringData.api-key"
         }
       ],
       "owners": [],
@@ -25,8 +25,10 @@
           },
           {
             "op": "add",
-            "path": "/data/api-key",
-            "value": "bmV3LWtleQ=="
+            "path": "/stringData",
+            "value": {
+              "api-key": "new-key"
+            }
           }
         ],
         "type": "patch"

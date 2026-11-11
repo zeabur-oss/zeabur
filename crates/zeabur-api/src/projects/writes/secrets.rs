@@ -1,13 +1,17 @@
-//! What a plan reads before it changes a Secret: its values, where the person may read them.
+//! What a plan reads before it changes a Secret: its values, read as the person.
 
 use std::collections::BTreeMap;
 
 use zeabur_kube::Cluster;
 use zeabur_plan::{Change, DataKind, PlanRequest};
 
-use crate::error::ApiError;
+use crate::error::{ApiError, get_read, read_problem};
 
-/// The values of the Secrets `request` changes, where the person may read them.
+/// The values of the Secrets `request` changes.
+///
+/// # Errors
+///
+/// When the person may not read one: the plan compares an edit with the Secret as read.
 pub(super) async fn secret_values(
     cluster: &dyn Cluster,
     project: &str,
@@ -37,10 +41,12 @@ pub(super) async fn secret_values(
                 Ok(values) => {
                     secret_values.insert(name.clone(), values);
                 }
-                Err(error) if error.is_refused() || error.is_not_found() => {}
+                Err(error) if error.is_not_found() => {}
                 Err(other) => {
-                    return Err(ApiError::from(
-                        other.into_problem(&format!("Secret {name}")),
+                    return Err(read_problem(
+                        other,
+                        &format!("Secret {name}"),
+                        get_read("", "secrets", Some(project), name),
                     ));
                 }
             }

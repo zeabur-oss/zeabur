@@ -536,7 +536,7 @@ mod tests {
             ),
             _ => {
                 let mut edited = zeabur_plan::edit::editable(&w.objects()["configmap"]);
-                edited["data"][&w.key] = json!("2");
+                edited["data"][&w.key] = json!("3");
                 (
                     w.clone(),
                     Change::Edit {

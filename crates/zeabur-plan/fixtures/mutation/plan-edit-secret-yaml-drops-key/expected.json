@@ -24,6 +24,11 @@
             "value": "13"
           },
           {
+            "op": "test",
+            "path": "/data/old",
+            "value": "eA=="
+          },
+          {
             "op": "remove",
             "path": "/data/old"
           }

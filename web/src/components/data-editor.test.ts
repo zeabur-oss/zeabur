@@ -44,12 +44,4 @@ describe("the key editor", () => {
       { key: "password", op: "set", value: "new" },
     ])
   })
-
-  test.each(["(hidden)", "••••••••"])("%s can be set on purpose", (value) => {
-    const edit = editAfterTyping("old", value, false)
-    expect(edit).toEqual({ op: "set", value })
-    expect(dataChangesOf({ edits: { k: edit! }, added: [] })).toEqual([
-      { key: "k", op: "set", value },
-    ])
-  })
 })

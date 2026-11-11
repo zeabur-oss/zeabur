@@ -1,3 +1,0 @@
-description: "A ConfigMap key can be set to (hidden) or a run of bullets on purpose; the patch writes those strings and touches no other key."
-operation: mutation.plan
-params: {"request": {"changes": [{"op": "data", "kind": "ConfigMap", "name": "settings", "changes": [{"op": "set", "key": "MODE", "value": "(hidden)"}, {"op": "set", "key": "NOTE", "value": "••••••••"}]}]}, "reloader": false}

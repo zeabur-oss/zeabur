@@ -2,18 +2,26 @@
   "objects": [
     {
       "after": {
+        "apiVersion": "v1",
         "data": {
-          "password": "(hidden)"
-        }
+          "password": "(hidden)",
+          "user": "(hidden)"
+        },
+        "kind": "Secret",
+        "metadata": {
+          "name": "db",
+          "namespace": "demo"
+        },
+        "type": "Opaque"
       },
       "changes": [
         {
-          "path": "data.password",
-          "after": "(hidden)"
+          "after": "(hidden)",
+          "before": "(hidden)",
+          "path": "data.password"
         }
       ],
       "write": {
-        "type": "patch",
         "operations": [
           {
             "op": "test",
@@ -21,18 +29,19 @@
             "value": "5"
           },
           {
-            "op": "add",
+            "op": "test",
+            "path": "/data/password",
+            "value": "aHVudGVyMQ=="
+          },
+          {
+            "op": "replace",
             "path": "/data/password",
             "value": "aHVudGVyMg=="
           }
-        ]
+        ],
+        "type": "patch"
       }
     }
   ],
-  "warnings": [
-    {
-      "code": "secretValuesUnknown",
-      "name": "db"
-    }
-  ]
+  "warnings": []
 }

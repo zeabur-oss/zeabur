@@ -870,7 +870,7 @@ pub struct DataEdit {
     pub op: String,
     /// The key.
     pub key: String,
-    /// The value, for `set`; for a Secret, the plain value (Zeabur encodes it).
+    /// The value, for `set`; for a Secret, the plain text (Zeabur encodes it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
 }
@@ -1192,12 +1192,6 @@ pub enum Warning {
     },
     /// The nodes could not be read, so a build limit was not checked against the largest node.
     NodeCapacityUnknown,
-    /// The Secret's values could not be read, so its diff shows only which keys change.
-    #[serde(rename_all = "camelCase")]
-    SecretValuesUnknown {
-        /// The Secret.
-        name: String,
-    },
     /// A rollback returns the pod template only; the ConfigMaps and Secrets the workload reads
     /// keep their current contents.
     #[serde(rename_all = "camelCase")]

@@ -3,8 +3,8 @@
 //! version and the API server's readiness readable by anyone signed in, backup providers not
 //! installed, the first request after their RoleBinding is deleted answered with `403`, and
 //! writes through plan and apply (Helm's fields kept, one winner of 64 concurrent applies, a write
-//! outside the role refused before anything is written, the other keys of a Secret the person
-//! cannot read kept, and the object stored being the one the plan showed), and usage and history
+//! outside the role refused before anything is written, a Secret the person cannot read refused
+//! with its keys kept, and the object stored being the one the plan showed), and usage and history
 //! read as a person with `view` (and, for history, `services/proxy`).
 //!
 //! Needs a disposable cluster where the current kubeconfig context is cluster admin
@@ -614,6 +614,31 @@ mod tests {
             Some(&json!("aHVudGVyMg=="))
         );
         assert_eq!(secret.data.pointer("/data/token"), Some(&json!("YWJj")));
+        // A Secret's type cannot change [k8s-secret-types]: the plan has it, kube-apiserver's
+        // dry run refuses it, and its answer names the field.
+        //
+        // [k8s-secret-types]: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
+        let (_, body) = call(
+            &app,
+            "GET",
+            &format!("/api/v1/projects/{ns}/objects/core/v1/secrets/web"),
+        )
+        .await;
+        let shown: Value = serde_json::from_str(&body).unwrap();
+        let yaml = shown["yaml"]
+            .as_str()
+            .unwrap()
+            .replace("type: Opaque", "type: example.com/token");
+        let (status, body) = plan_and_apply(&app, &ns, json!([{"op": "edit",
+            "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web", "yaml": yaml}])).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
+        assert_eq!(body["kubernetes"]["code"], json!(422), "{body}");
+        assert!(
+            body["kubernetes"]["message"]
+                .as_str()
+                .is_some_and(|m| m.contains("type")),
+            "{body}"
+        );
     }
 
     /// A namespace whose person has the Role `rules`, the API as that person, and the admin
@@ -682,23 +707,20 @@ mod tests {
         Api::namespaced_with(admin.clone(), ns, &resource)
     }
 
-    /// Editing one key of a Secret whose values the person cannot read keeps its other keys and
-    /// their values; so does editing one key of a ConfigMap. Losing them was a bug once: without
-    /// the values, the plan must add the key alone, never the whole `data` map. The Secret's
-    /// labels edited as YAML need no values either, and a change of its type is refused by
-    /// kube-apiserver, not by Zeabur.
+    /// A Secret whose values the person cannot read cannot be changed through Zeabur, by key or
+    /// as YAML: the plan compares the edit with the Secret as read, and is refused with the
+    /// denied `get`, so no key is lost. Losing them was a bug once. A ConfigMap's keys can be
+    /// edited with `list` and `patch`, and its other keys stay.
     ///
     /// Kubernetes has no right to see a Secret's keys without its values: `list` and `watch`
     /// return the values as `get` does [k8s-rbac-secrets]. Zeabur reads values only with `get`
-    /// (when a person reveals them or plans a Secret edit) and lists Secrets as a table without
-    /// them, so a Role with `list` and `patch` but not `get` is the person who plans such an edit
-    /// without the values.
+    /// and lists Secrets as a table without them, so a Role with `list` and `patch` but not `get`
+    /// is the person who cannot read them.
     ///
     /// [k8s-rbac-secrets]: https://kubernetes.io/docs/concepts/security/rbac-good-practices/#listing-secrets
     #[tokio::test]
     #[ignore = "needs a disposable cluster"]
-    #[expect(clippy::too_many_lines, reason = "one scenario, read top to bottom")]
-    async fn editing_one_key_keeps_the_others_without_reading_the_values() {
+    async fn a_secret_the_person_cannot_read_keeps_its_keys() {
         let (sandbox, app) = project_as(
             "zeabur-keys",
             json!([{"apiGroups": [""], "resources": ["secrets", "configmaps"],
@@ -721,51 +743,24 @@ mod tests {
         )
         .await;
 
-        let edit = |kind: &str, name: &str, key: &str| {
+        let key_edit = |kind: &str, name: &str| {
             json!({"changes": [{"op": "data", "kind": kind, "name": name,
-                "changes": [{"op": "set", "key": key, "value": "new"}]}]})
+                "changes": [{"op": "set", "key": "MODE", "value": "new"}]}]})
         };
-        let (status, plan) = post(
-            &app,
-            &format!("/api/v1/projects/{ns}/plan"),
-            &edit("Secret", "db", "password"),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{plan}");
-        assert!(
-            plan["warnings"].to_string().contains("secretValuesUnknown"),
-            "the plan could not read the values: {plan}"
-        );
-        let (status, body) = post(
-            &app,
-            &format!("/api/v1/projects/{ns}/apply"),
-            &json!({"token": plan["token"]}),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        // A new key, the same way.
-        let (status, body) =
-            plan_and_apply(&app, &ns, edit("Secret", "db", "token")["changes"].clone()).await;
-        assert_eq!(status, StatusCode::OK, "{body}");
+        let yaml_edit = json!({"changes": [{"op": "edit",
+            "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "db",
+            "yaml": "apiVersion: v1\nkind: Secret\nmetadata: {name: db, labels: {tier: data}}\n\
+                     type: Opaque\ndata:\n  password: bmV3\n"}]});
+        for request in [key_edit("Secret", "db"), yaml_edit] {
+            let (status, body) = post(&app, &format!("/api/v1/projects/{ns}/plan"), &request).await;
+            assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
+            assert_eq!(body["denied"]["verb"], json!("get"), "{body}");
+        }
         let secret = secrets.get("db").await.unwrap();
         assert_eq!(
             secret.data["data"],
-            json!({"password": "bmV3", "user": "YWRtaW4=", "token": "bmV3"})
+            json!({"password": "aHVudGVyMg==", "user": "YWRtaW4="})
         );
-
-        let (status, body) = plan_and_apply(
-            &app,
-            &ns,
-            edit("ConfigMap", "settings", "MODE")["changes"].clone(),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{body}");
-        let settings = config_maps.get("settings").await.unwrap();
-        assert_eq!(settings.data["data"], json!({"MODE": "new", "LEVEL": "3"}));
-
-        // The person cannot read the Secret, so the object route refuses it as kube-apiserver
-        // does; a YAML without `data`, as such a person sends it, lands a label and changes no
-        // key.
         let (status, body) = call(
             &app,
             "GET",
@@ -774,49 +769,16 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::FORBIDDEN);
         assert!(!body.contains("YWRtaW4="), "a refusal carries no value");
-        let yaml = |kind: &str| {
-            format!(
-                "apiVersion: v1\nkind: Secret\nmetadata: {{name: db, labels: {{tier: data}}}}\n\
-                 type: {kind}\n"
-            )
-        };
-        let edit = |kind: &str| {
-            json!([{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"},
-                    "name": "db", "yaml": yaml(kind)}])
-        };
-        let (status, body) = plan_and_apply(&app, &ns, edit("Opaque")).await;
+
+        let (status, body) = plan_and_apply(
+            &app,
+            &ns,
+            key_edit("ConfigMap", "settings")["changes"].clone(),
+        )
+        .await;
         assert_eq!(status, StatusCode::OK, "{body}");
-        let secret = secrets.get("db").await.unwrap();
-        assert_eq!(
-            secret
-                .metadata
-                .labels
-                .as_ref()
-                .and_then(|labels| labels.get("tier"))
-                .map(String::as_str),
-            Some("data")
-        );
-        assert_eq!(
-            secret.data["data"],
-            json!({"password": "bmV3", "user": "YWRtaW4=", "token": "bmV3"})
-        );
-        // A Secret's type cannot change [k8s-secret-types]: the plan has it, kube-apiserver's
-        // dry run refuses it, and its answer names the field.
-        //
-        // [k8s-secret-types]: https://kubernetes.io/docs/concepts/configuration/secret/#secret-types
-        let (status, body) = plan_and_apply(&app, &ns, edit("example.com/token")).await;
-        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{body}");
-        assert_eq!(body["kubernetes"]["code"], json!(422), "{body}");
-        assert!(
-            body["kubernetes"]["message"]
-                .as_str()
-                .is_some_and(|m| m.contains("type")),
-            "{body}"
-        );
-        assert_eq!(
-            secrets.get("db").await.unwrap().data["type"],
-            json!("Opaque")
-        );
+        let settings = config_maps.get("settings").await.unwrap();
+        assert_eq!(settings.data["data"], json!({"MODE": "new", "LEVEL": "3"}));
     }
 
     /// The object as the person sees it in a plan or on its page

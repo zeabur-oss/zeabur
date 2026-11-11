@@ -1582,8 +1582,6 @@ export const en = {
     `${host} is HTTP only: ${route}'s certificates don't come from cert-manager, so add ${host} where they're made`,
   "warn.nodeCapacityUnknown":
     "Unable to read the nodes: the build limits were not checked against the largest node",
-  "warn.secretValuesUnknown": (name: string) =>
-    `Unable to read ${name}'s values: the diff shows keys only`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} reads config files or secrets: a rollback leaves their contents as they are`,
   "warn.storageClassUnknown": (claim: string) =>

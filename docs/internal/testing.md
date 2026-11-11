@@ -74,8 +74,8 @@ Removing or weakening one of these tests needs another test of the same promise 
   plan, exactly one wins.
 - A plan token is refused when altered, expired, or used for another project.
 - A refusal by RBAC is told apart from a component that is not installed.
-- Data-loss bugs found before stay fixed (editing one key of a Secret the person cannot read
-  keeps the other keys).
+- Data-loss bugs found before stay fixed (a key edit of a Secret the person cannot read is
+  refused, so its other keys stay).
 - The interface keeps its size budget and its Content Security Policy.
 
 ## Waiting and isolation

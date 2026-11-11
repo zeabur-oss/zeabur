@@ -1,0 +1,10 @@
+description: "A key change of a Secret whose values were not read is refused, so no other key is lost."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: data
+        kind: Secret
+        name: db
+        changes:
+          - {op: set, key: password, value: hunter2}

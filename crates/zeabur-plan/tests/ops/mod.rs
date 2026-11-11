@@ -324,14 +324,6 @@ fn now() -> String {
 
 struct Plan;
 
-/// A value the person could read: plain text, or bytes for a binary one.
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum SecretValue {
-    Text(String),
-    Bytes(Vec<u8>),
-}
-
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields, rename_all = "camelCase")]
 struct PlanParams {
@@ -352,7 +344,7 @@ struct PlanParams {
     #[serde(default)]
     storage_classes: Listed<Vec<StorageClassParam>>,
     #[serde(default)]
-    secret_values: BTreeMap<String, BTreeMap<String, SecretValue>>,
+    secret_values: BTreeMap<String, BTreeMap<String, String>>,
     #[serde(default)]
     reclaim_policies: BTreeMap<String, String>,
     #[serde(default)]
@@ -433,13 +425,7 @@ impl FixtureOp for Plan {
             .map(|(name, keys)| {
                 let keys = keys
                     .iter()
-                    .map(|(key, value)| {
-                        let bytes = match value {
-                            SecretValue::Text(text) => text.as_bytes().to_vec(),
-                            SecretValue::Bytes(bytes) => bytes.clone(),
-                        };
-                        (key.clone(), bytes)
-                    })
+                    .map(|(key, value)| (key.clone(), value.as_bytes().to_vec()))
                     .collect();
                 (name.clone(), keys)
             })

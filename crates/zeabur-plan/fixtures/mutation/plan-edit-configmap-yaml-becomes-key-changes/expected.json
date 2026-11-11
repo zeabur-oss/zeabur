@@ -34,13 +34,23 @@
             "value": "12"
           },
           {
-            "op": "add",
-            "path": "/data/greeting",
-            "value": "hi"
+            "op": "test",
+            "path": "/data/colour",
+            "value": "blue"
           },
           {
             "op": "remove",
             "path": "/data/colour"
+          },
+          {
+            "op": "test",
+            "path": "/data/greeting",
+            "value": "hello"
+          },
+          {
+            "op": "replace",
+            "path": "/data/greeting",
+            "value": "hi"
           }
         ],
         "type": "patch"

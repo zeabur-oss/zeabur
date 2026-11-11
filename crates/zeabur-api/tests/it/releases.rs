@@ -163,31 +163,14 @@ mod tests {
         assert!(matches!(&writes[1], WriteBody::JsonPatch(_)));
     }
 
+    /// The plan of a Secret's YAML edit shows no value: neither the one written nor the one its
+    /// `test` operation compares.
     #[tokio::test]
-    async fn a_secret_yaml_without_data_changes_no_key() {
+    async fn a_secret_yaml_edit_shows_no_value_in_the_plan() {
         let cluster = cluster();
-        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, labels: {tier: data}}\ntype: Opaque\n";
-        let (_planned, writes) = plan_and_apply(
-            &cluster,
-            json!([{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"},
-                    "name": "web-secret", "yaml": yaml}]),
-        )
-        .await;
-        let [WriteBody::JsonPatch(operations)] = writes.as_slice() else {
-            panic!("one patch: {writes:?}");
-        };
-        let text = operations.to_string();
-        assert!(text.contains("/metadata/labels"), "{text}");
-        assert!(
-            !text.contains("/data") && !text.contains("/stringData"),
-            "a YAML edit without data neither sets nor removes a key: {text}"
-        );
-    }
-
-    #[tokio::test]
-    async fn a_secret_yaml_writes_the_values_it_lists_as_typed() {
-        let cluster = cluster();
-        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret}\ntype: Opaque\nstringData:\n  token: plain-typed-value\n  note: (hidden)\n";
+        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret}\ntype: Opaque\n\
+                    data:\n  password: aHVudGVyMw==\n  user: YWRtaW4=\n\
+                    stringData:\n  token: plain-typed-value\n";
         let (planned, writes) = plan_and_apply(
             &cluster,
             json!([{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"},
@@ -198,12 +181,16 @@ mod tests {
             panic!("one patch: {writes:?}");
         };
         let text = operations.to_string();
-        assert!(text.contains("/data/note"), "{text}");
-        assert!(text.contains("/data/token"), "{text}");
-        assert!(
-            !planned.to_string().contains("plain-typed-value"),
-            "the plan shows no Secret value"
-        );
+        assert!(text.contains("aHVudGVyMw=="), "{text}");
+        let shown = planned.to_string();
+        for value in [
+            "aHVudGVyMg==",
+            "aHVudGVyMw==",
+            "plain-typed-value",
+            "hunter",
+        ] {
+            assert!(!shown.contains(value), "the plan shows a Secret value");
+        }
     }
 
     /// A plan the planner refuses because the object cannot take the change answers `422` with a
