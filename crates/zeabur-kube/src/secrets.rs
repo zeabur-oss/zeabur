@@ -103,10 +103,16 @@ pub(crate) fn list(body: &[u8]) -> Result<Vec<DynamicObject>, ClusterError> {
     #[derive(Deserialize)]
     struct Items {
         #[serde(default)]
-        items: Vec<SlimSecret>,
+        items: Option<Vec<SlimSecret>>,
     }
     serde_json::from_slice::<Items>(body)
-        .map(|list| list.items.into_iter().map(DynamicObject::from).collect())
+        .map(|list| {
+            list.items
+                .unwrap_or_default()
+                .into_iter()
+                .map(DynamicObject::from)
+                .collect()
+        })
         .map_err(|e| ClusterError::Decode(e.to_string()))
 }
 
@@ -119,6 +125,15 @@ pub(crate) fn one(body: &[u8]) -> Result<DynamicObject, ClusterError> {
 
 #[cfg(test)]
 mod tests {
+    #[test]
+    fn a_list_with_null_items_is_an_empty_list() {
+        assert_eq!(list(br#"{"items": null}"#).unwrap().len(), 0);
+        assert_eq!(list(b"{}").unwrap().len(), 0);
+        let pods = crate::ResourceRef::new("", "v1", "pods", "Pod");
+        let plain = crate::port::RawList::new(&pods, br#"{"items": null}"#.to_vec());
+        assert_eq!(plain.objects().unwrap().len(), 0);
+    }
+
     use super::*;
     use crate::objects::{HIDDEN, LAST_APPLIED};
 

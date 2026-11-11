@@ -461,11 +461,10 @@ impl RawList {
 fn decode<T: DeserializeOwned>(body: &[u8]) -> Result<Vec<T>, ClusterError> {
     #[derive(serde::Deserialize)]
     struct Items<T> {
-        #[serde(default = "Vec::new")]
-        items: Vec<T>,
+        items: Option<Vec<T>>,
     }
     serde_json::from_slice::<Items<T>>(body)
-        .map(|list| list.items)
+        .map(|list| list.items.unwrap_or_default())
         .map_err(|e| ClusterError::Decode(e.to_string()))
 }
 
