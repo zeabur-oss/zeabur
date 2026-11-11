@@ -33,23 +33,20 @@ const undeletableResources = new Set([
 export function YamlView({
   project,
   address,
-  yaml,
-  managedBy,
+  object,
   kind,
-  can,
   onDeleted,
 }: {
   project: string
   address: ObjectAddress
-  yaml: string
-  managedBy?: string | null
+  object: Pick<Schemas.ObjectDocument, "yaml" | "can" | "provenance">
   kind?: string
-  /** What the rules say about this object. */
-  can?: Schemas.RowRights
   /** Offers Delete when given. */
   onDeleted?: () => void
 }) {
   const t = useT()
+  const { yaml, can } = object
+  const managedBy = object.provenance.tool
   const [draft, setDraft] = useState<string | null>(null)
   const planner = usePlanner(project, () => setDraft(null))
   const deleter = usePlanner(project, onDeleted)

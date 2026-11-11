@@ -92,10 +92,8 @@ export function ObjectSheet({
                 <YamlView
                   project={project}
                   address={address}
-                  yaml={object.data.yaml}
-                  managedBy={object.data.provenance.tool}
+                  object={object.data}
                   kind={kind}
-                  can={object.data.can}
                   onDeleted={onClose}
                 />
               }

@@ -155,15 +155,7 @@ export function ObjectYaml({ project, address }: { project: string; address: Obj
   const object = useQuery(objectQuery(project, address))
   if (object.isPending) return <LoadingRows label={t("common.loading")} rows={8} />
   if (object.isError) return <Problem error={object.error} />
-  return (
-    <YamlView
-      project={project}
-      address={address}
-      yaml={object.data.yaml}
-      managedBy={object.data.provenance.tool}
-      can={object.data.can}
-    />
-  )
+  return <YamlView project={project} address={address} object={object.data} />
 }
 
 /** An outline button that opens a form, closed when the person's role cannot use it. */
