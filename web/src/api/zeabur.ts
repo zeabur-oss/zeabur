@@ -7230,6 +7230,11 @@ export type ObjectDocumentStatus = { [key: string]: unknown } | null
 export type ObjectDocument = {
   /** `projects/<p>/objects/<group>/<version>/<resource>/<name>`. */
   id: string
+  /**
+   * A Secret's keys, sorted; absent for any other object.
+   * @nullable
+   */
+  keys?: string[] | null
   /** The object. */
   origin: Origin
   /** The tool that manages it, if any. */
@@ -7242,7 +7247,10 @@ export type ObjectDocument = {
    * @nullable
    */
   status?: ObjectDocumentStatus
-  /** The object as YAML, without the server's bookkeeping; a Secret's values hidden. */
+  /**
+   * The object as YAML, without the server's bookkeeping; a Secret has no `data` or
+   * `stringData`, its keys are in `keys`.
+   */
   yaml: string
 }
 

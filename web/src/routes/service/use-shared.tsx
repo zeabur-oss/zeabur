@@ -3,7 +3,6 @@ import { useState } from "react"
 
 import type { Schemas } from "@/api/client"
 import { configMapsQuery, objectQuery, projectQuery } from "@/api/queries"
-import { secretKeys } from "@/components/data-editor"
 import { FormField } from "@/components/form-field"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
@@ -29,7 +28,7 @@ function useKeys(project: string, kind: Kind, name: string, wanted: boolean): st
     ...objectQuery(project, { group: "", version: "v1", resource: "secrets", name }),
     enabled: wanted && kind === "Secret",
   })
-  if (kind === "Secret") return secretKeys(secret.data?.yaml ?? "")
+  if (kind === "Secret") return secret.data?.keys ?? []
   return Object.keys(configMaps.data?.items.find((c) => c.origin.name === name)?.data ?? {})
 }
 

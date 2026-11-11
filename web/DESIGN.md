@@ -365,10 +365,11 @@ more selector.
 Values are never fetched with the page. "Reveal db-credentials" fetches one Secret on request
 (`POST …/reveal`, `no-store`); values live in the tab's component state only and disappear on
 leaving the tab or the service (the service route remounts its page for each service). YAML
-(the Objects panel, a service's YAML tab, a plan's diff) never holds a value: the server writes
-`(hidden)`. The Secret editor reveals on request the same way; a new value may be typed without
-revealing the old one. In an edited YAML copy, a value left as `(hidden)` is kept as it is; the
-server never writes the mask.
+(the Objects panel, a service's YAML tab) has no `data` or `stringData` for a Secret; the keys
+come beside it as `keys` and a plan's diff shows `(hidden)`. Values are edited in the key editor,
+which reveals on request the same way; a new value may be typed without revealing the old one.
+An edit of a Secret's YAML never removes or changes a key it does not list, and any string,
+`(hidden)` included, can be set.
 
 ## Navigation and state
 

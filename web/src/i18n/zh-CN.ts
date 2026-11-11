@@ -1714,7 +1714,7 @@ export const zhCN: Messages = {
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `移除 ${host}`,
   "yaml.edit": "编辑",
-  "yaml.editSecret": "保留 (hidden) 的值不会改变。",
+  "yaml.editSecret": "这份 YAML 不含值。要改值，请到机密变量的键修改。",
   "yaml.notEditable": "这类对象由 Kubernetes 自行管理，要修改请编辑拥有它的对象。",
   "title.editYaml": (name: string) => `编辑 ${name}`,
   "title.delete": (kind: string, name: string) => `删除 ${kind} ${name}`,

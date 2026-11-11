@@ -586,8 +586,8 @@ mod tests {
             Some(&json!(["Ingress", "Egress"]))
         );
 
-        // A Secret edited as YAML: the masked value stays, the new key lands.
-        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web}\ntype: Opaque\ndata:\n  password: (hidden)\nstringData:\n  token: abc\n";
+        // A Secret edited as YAML, which holds no values: the stored key stays, the new key lands.
+        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web}\ntype: Opaque\nstringData:\n  token: abc\n";
         let (status, body) = plan_and_apply(&app, &ns, json!([{"op": "edit",
             "resource": {"group": "", "version": "v1", "resource": "secrets"}, "name": "web", "yaml": yaml}])).await;
         assert_eq!(status, StatusCode::OK, "{body}");
@@ -742,12 +742,11 @@ mod tests {
         let settings = config_maps.get("settings").await.unwrap();
         assert_eq!(settings.data["data"], json!({"MODE": "new", "LEVEL": "3"}));
 
-        // The Secret's YAML, its values masked as the YAML view shows them: a label lands and
-        // no value is written.
+        // The Secret's YAML, which holds no values: a label lands and no key changes.
         let yaml = |kind: &str| {
             format!(
                 "apiVersion: v1\nkind: Secret\nmetadata: {{name: db, labels: {{tier: data}}}}\n\
-                 type: {kind}\ndata:\n  password: (hidden)\n  user: (hidden)\n  token: (hidden)\n"
+                 type: {kind}\n"
             )
         };
         let edit = |kind: &str| {

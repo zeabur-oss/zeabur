@@ -44,7 +44,12 @@ interface Draft {
 
 const blank: Draft = { edits: {}, added: [] }
 
-function changesOf({ edits, added }: Draft): Schemas.DataEdit[] {
+/** What typing `value` into a key's input changes; an unrevealed Secret key reads as empty. */
+export function editAfterTyping(current: string | undefined, value: string): Edit | undefined {
+  return value === (current ?? "") ? undefined : { op: "set", value }
+}
+
+export function changesOf({ edits, added }: Draft): Schemas.DataEdit[] {
   return [
     ...Object.entries(edits).map(([key, edit]): Schemas.DataEdit =>
       edit.op === "set" ? { key, op: "set", value: edit.value } : { key, op: "remove" },
@@ -53,21 +58,6 @@ function changesOf({ edits, added }: Draft): Schemas.DataEdit[] {
       .filter((row) => row.key.trim())
       .map((row): Schemas.DataEdit => ({ key: row.key.trim(), op: "set", value: row.value })),
   ]
-}
-
-/** From its YAML, whose values the server hides. */
-export function secretKeys(yaml: string): string[] {
-  const keys: string[] = []
-  let inData = false
-  for (const line of yaml.split("\n")) {
-    if (/^(data|stringData):\s*$/.test(line)) inData = true
-    else if (/^\S/.test(line)) inData = false
-    else if (inData) {
-      const match = line.match(/^ {2}("?)([^":]+)\1:/)
-      if (match?.[2]) keys.push(match[2])
-    }
-  }
-  return [...new Set(keys)]
 }
 
 export function DataEditor({
@@ -116,9 +106,7 @@ export function DataEditor({
   const values: Record<string, string | undefined> =
     kind === "ConfigMap"
       ? (configMap?.data ?? {})
-      : Object.fromEntries(
-          secretKeys(secretYaml.data?.yaml ?? "").map((key) => [key, revealed?.[key]]),
-        )
+      : Object.fromEntries((secretYaml.data?.keys ?? []).map((key) => [key, revealed?.[key]]))
   const binary = kind === "ConfigMap" ? (configMap?.binaryKeys ?? []) : []
   const keys = Object.keys(values).toSorted()
   const pending = kind === "ConfigMap" ? configMaps.isPending : secretYaml.isPending
@@ -277,9 +265,7 @@ export function DataEditor({
                             disabled={locked || removed}
                             onChange={(event) => {
                               const value = event.target.value
-                              f.handleChange(
-                                withEdit(value === current ? undefined : { op: "set", value }),
-                              )
+                              f.handleChange(withEdit(editAfterTyping(current, value)))
                             }}
                           />
                         </FormField>

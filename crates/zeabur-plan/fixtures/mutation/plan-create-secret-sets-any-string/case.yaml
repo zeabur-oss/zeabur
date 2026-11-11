@@ -1,0 +1,8 @@
+description: "A Secret can be created with (hidden) or a run of bullets as a value on purpose; the create body carries those strings."
+operation: mutation.plan
+params:
+  kinds:
+    - {group: "", kind: Secret, plural: secrets, namespaced: true}
+  request:
+    changes:
+      - {"op": "create", "yaml": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: api-env\nstringData:\n  TOKEN: (hidden)\n  DOTS: \"••••\"\n"}

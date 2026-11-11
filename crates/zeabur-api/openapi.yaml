@@ -11947,6 +11947,13 @@ components:
         id:
           type: string
           description: "`projects/<p>/objects/<group>/<version>/<resource>/<name>`."
+        keys:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+          description: A Secret's keys, sorted; absent for any other object.
         origin:
           $ref: "#/components/schemas/Origin"
           description: The object.
@@ -11965,7 +11972,9 @@ components:
             Secret.
         yaml:
           type: string
-          description: The object as YAML, without the server's bookkeeping; a Secret's values hidden.
+          description: |-
+            The object as YAML, without the server's bookkeeping; a Secret has no `data` or
+            `stringData`, its keys are in `keys`.
     ObjectKind:
       type: object
       description: The objects of one kind.

@@ -1,0 +1,14 @@
+{
+  "objects": [
+    {
+      "write": {
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "7"},
+          {"op": "add", "path": "/data/MODE", "value": "(hidden)"},
+          {"op": "add", "path": "/data/NOTE", "value": "••••••••"}
+        ],
+        "type": "patch"
+      }
+    }
+  ]
+}

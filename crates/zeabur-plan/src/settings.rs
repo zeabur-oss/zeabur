@@ -56,7 +56,7 @@ use crate::plan::{
     workload_target,
 };
 use crate::project::{set_key, shown, steps};
-use crate::rules::{REDACTED, Refusal};
+use crate::rules::Refusal;
 
 /// A container of a workload: its name, position and spec.
 pub(crate) struct Found {
@@ -71,12 +71,6 @@ pub(crate) struct Found {
 )]
 fn bad(refusal: Refusal, detail: &str) -> PlanError {
     error(ErrorKind::BadRequest, &refusal.0, detail)
-}
-
-/// Whether a Secret value in an edited copy is a mask a person was shown: the YAML view's
-/// [`REDACTED`] or a run of `•`.
-fn is_mask(value: &str) -> bool {
-    value == REDACTED || (!value.is_empty() && value.chars().all(|c| c == '\u{2022}'))
 }
 
 #[expect(
@@ -1068,9 +1062,8 @@ impl<'a> Planner<'a> {
 
     /// The key changes of a ConfigMap's or Secret's YAML edit, `None` when there are none.
     ///
-    /// A Secret value shown masked ([`is_mask`]) is left as it is, and so is one equal to the
-    /// value the person could read; a Secret's keys are removed only when its values were read,
-    /// so a key the edited copy leaves out is known to exist.
+    /// A Secret value equal to the one the person could read is left as it is. A key the edited
+    /// copy leaves out is not removed; keys are removed with a `data` change.
     fn key_edits(
         &self,
         kind: DataKind,
@@ -1115,9 +1108,6 @@ impl<'a> Planner<'a> {
                 let data = strings(edited, "data");
                 let plain = strings(edited, "stringData");
                 for (key, encoded) in &data {
-                    if is_mask(encoded) {
-                        continue;
-                    }
                     let bytes = base64::engine::general_purpose::STANDARD
                         .decode(encoded)
                         .map_err(|_decode| {
@@ -1142,19 +1132,8 @@ impl<'a> Planner<'a> {
                     })?;
                     edits.push(set(key, text));
                 }
-                for (key, text) in plain.iter().filter(|(_, text)| !is_mask(text)) {
+                for (key, text) in &plain {
                     edits.push(set(key, text.clone()));
-                }
-                if let Some(known) = known {
-                    for key in known.keys() {
-                        if !data.contains_key(key) && !plain.contains_key(key) {
-                            edits.push(DataEdit {
-                                op: "remove".to_owned(),
-                                key: key.clone(),
-                                value: None,
-                            });
-                        }
-                    }
                 }
             }
         }

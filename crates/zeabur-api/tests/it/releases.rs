@@ -164,9 +164,30 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_secret_edit_never_writes_the_mask() {
+    async fn a_secret_yaml_without_values_changes_no_key() {
         let cluster = cluster();
-        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, labels: {tier: data}}\ntype: Opaque\ndata:\n  password: (hidden)\n  user: \u{2022}\u{2022}\u{2022}\u{2022}\nstringData:\n  token: plain-typed-value\n  note: (hidden)\n";
+        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, labels: {tier: data}}\ntype: Opaque\n";
+        let (_planned, writes) = plan_and_apply(
+            &cluster,
+            json!([{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"},
+                    "name": "web-secret", "yaml": yaml}]),
+        )
+        .await;
+        let [WriteBody::JsonPatch(operations)] = writes.as_slice() else {
+            panic!("one patch: {writes:?}");
+        };
+        let text = operations.to_string();
+        assert!(text.contains("/metadata/labels"), "{text}");
+        assert!(
+            !text.contains("/data") && !text.contains("/stringData"),
+            "a YAML edit without values neither sets nor removes a key: {text}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_secret_yaml_writes_the_values_it_lists_as_typed() {
+        let cluster = cluster();
+        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret}\ntype: Opaque\nstringData:\n  token: plain-typed-value\n  note: (hidden)\n";
         let (planned, writes) = plan_and_apply(
             &cluster,
             json!([{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"},
@@ -177,24 +198,10 @@ mod tests {
             panic!("one patch: {writes:?}");
         };
         let text = operations.to_string();
-        assert!(
-            !text.contains("(hidden)") && !text.contains('\u{2022}'),
-            "{text}"
-        );
-        assert!(
-            !text.contains("/data/password") && !text.contains("/data/user"),
-            "{text}"
-        );
+        assert!(text.contains("/data/note"), "{text}");
         assert!(text.contains("/data/token"), "{text}");
-        // The label changes with the keys, in the same patch.
-        assert!(text.contains("/metadata/labels"), "{text}");
-        // The token is random bytes in base64: leave it out of the search for the value.
-        let mut shown = planned;
-        if let Some(fields) = shown.as_object_mut() {
-            fields.remove("token");
-        }
         assert!(
-            !shown.to_string().contains("plain-typed-value"),
+            !planned.to_string().contains("plain-typed-value"),
             "the plan shows no Secret value"
         );
     }

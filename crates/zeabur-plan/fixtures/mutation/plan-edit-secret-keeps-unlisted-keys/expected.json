@@ -8,10 +8,6 @@
           "path": "data.api-key"
         },
         {
-          "before": "(hidden)",
-          "path": "data.old"
-        },
-        {
           "after": "(hidden)",
           "before": "(hidden)",
           "path": "data.user"
@@ -41,10 +37,6 @@
             "op": "add",
             "path": "/data/api-key",
             "value": "bmV3LWtleQ=="
-          },
-          {
-            "op": "remove",
-            "path": "/data/old"
           }
         ],
         "type": "patch"

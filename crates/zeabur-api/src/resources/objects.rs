@@ -209,8 +209,12 @@ pub struct ObjectDocument {
     pub id: String,
     /// The plural resource name.
     pub resource: String,
-    /// The object as YAML, without the server's bookkeeping; a Secret's values hidden.
+    /// The object as YAML, without the server's bookkeeping; a Secret has no `data` or
+    /// `stringData`, its keys are in `keys`.
     pub yaml: String,
+    /// A Secret's keys, sorted; absent for any other object.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub keys: Option<Vec<String>>,
     /// The object's `status` as the cluster reports it; absent when it has none, and never for a
     /// Secret.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -224,6 +228,19 @@ pub struct ObjectDocument {
 
 const fn segment(group: &str) -> &str {
     if group.is_empty() { CORE } else { group }
+}
+
+/// Takes a Secret's `data` and `stringData` out of `object` and returns their keys, sorted.
+fn secret_keys(object: &mut serde_json::Value) -> Vec<String> {
+    let mut keys = BTreeSet::new();
+    if let Some(top) = object.as_object_mut() {
+        for field in ["data", "stringData"] {
+            if let Some(serde_json::Value::Object(values)) = top.remove(field) {
+                keys.extend(values.into_iter().map(|(key, _)| key));
+            }
+        }
+    }
+    keys.into_iter().collect()
 }
 
 fn object_id(project: &str, resource: &ResourceRef, name: &str) -> String {
@@ -469,9 +486,11 @@ pub(crate) async fn get(
         top.insert("apiVersion".to_owned(), reference.api_version().into());
         top.insert("kind".to_owned(), reference.kind.clone().into());
     }
+    let is_secret = reference.group.is_empty() && reference.resource == "secrets";
+    let keys = is_secret.then(|| secret_keys(&mut value));
     let yaml = zeabur_graph::manifest::to_yaml(&value)
         .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e)))?;
-    let status = if reference.group.is_empty() && reference.resource == "secrets" {
+    let status = if is_secret {
         None
     } else {
         value
@@ -483,6 +502,7 @@ pub(crate) async fn get(
         id: object_id(&project, &reference, &name),
         resource: reference.resource.clone(),
         yaml,
+        keys,
         status,
         origin: Origin::complete(
             &reference.api_version(),
