@@ -16,8 +16,12 @@ use hyper_util::rt::TokioIo;
 use rustls::pki_types::ServerName;
 use tokio::io::{AsyncRead, AsyncReadExt as _, AsyncWrite, AsyncWriteExt as _};
 use tokio::net::TcpStream;
+use tokio::task::JoinSet;
 
 use crate::{DEADLINE, Reach, allowed};
+
+/// How long an address has to connect before the next one is tried alongside it.
+const STAGGER: std::time::Duration = std::time::Duration::from_millis(250);
 
 /// How much of a proxy's answer to `CONNECT` is read before giving up.
 const PROXY_HEAD_LIMIT: usize = 16 * 1024;
@@ -239,12 +243,27 @@ async fn read_status(stream: &mut TcpStream) -> io::Result<u16> {
         .ok_or_else(|| io::Error::other("the proxy did not answer with an HTTP status"))
 }
 
+/// The first connection to succeed. The next address is tried when the one before it fails or
+/// has not answered within [`STAGGER`], and the earlier attempts keep going, so an address that
+/// silently drops packets does not hold up the others.
 async fn first(addresses: Vec<SocketAddr>) -> io::Result<TcpStream> {
+    let mut remaining = addresses.into_iter();
+    let mut attempts = JoinSet::new();
     let mut last = None;
-    for address in addresses {
-        match TcpStream::connect(address).await {
-            Ok(stream) => return Ok(stream),
-            Err(error) => last = Some(error),
+    loop {
+        if let Some(address) = remaining.next() {
+            attempts.spawn(TcpStream::connect(address));
+        } else if attempts.is_empty() {
+            break;
+        }
+        let Ok(finished) = tokio::time::timeout(STAGGER, attempts.join_next()).await else {
+            continue;
+        };
+        match finished {
+            Some(Ok(Ok(stream))) => return Ok(stream),
+            Some(Ok(Err(error))) => last = Some(error),
+            Some(Err(error)) => last = Some(io::Error::other(error)),
+            None => {}
         }
     }
     Err(last.unwrap_or_else(|| io::Error::other("no address to connect to")))

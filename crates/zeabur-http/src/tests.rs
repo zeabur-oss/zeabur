@@ -324,3 +324,32 @@ async fn forbidden_literal_targets_are_refused_before_the_proxy_is_asked() {
     }
     assert!(seen.lock().unwrap().is_empty(), "the proxy was not asked");
 }
+
+#[tokio::test]
+async fn the_next_address_is_tried_when_the_first_one_does_not_connect() {
+    let closed = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let closed_port = closed.local_addr().unwrap().port();
+    drop(closed);
+    let live = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let live_address = live.local_addr().unwrap();
+    tokio::spawn(async move {
+        let (mut socket, _) = live.accept().await.unwrap();
+        let mut buffer = [0; 1024];
+        let _read = socket.read(&mut buffer).await.unwrap();
+        socket
+            .write_all(b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\n\r\nok")
+            .await
+            .unwrap();
+    });
+    let addresses = vec![
+        SocketAddr::from(([127, 0, 0, 1], closed_port)),
+        live_address,
+    ];
+    let resolve: connect::Resolver = Arc::new(move |_host, _port| {
+        let addresses = addresses.clone();
+        Box::pin(async move { Ok(addresses) })
+    });
+    let https = client(Reach::Any, Proxies::none(), resolve);
+    let (status, _) = get(&https, "http://registry.test/").await.unwrap();
+    assert_eq!(status, 200);
+}
