@@ -112,6 +112,8 @@ hyper-rustls = { version = "0.27", default-features = false, features = ["http1"
 hyper-util = { version = "0.1", default-features = false, features = ["client-legacy", "http1", "server-graceful", "tokio"] }
 # The read and write timeouts of kube-rs's default client (zeabur-kube).
 hyper-timeout = "0.5"
+# Counts the bytes a test body allocates (zeabur-test-support); a dev tool, never in a binary.
+allocation-counter = "0.8"
 # Certificates for the TLS tests (zeabur-test-support).
 rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs", "pem"] }
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }

@@ -36,6 +36,8 @@ pub mod memory;
 mod names;
 pub mod objects;
 pub mod port;
+#[cfg(feature = "memory")]
+pub mod recording;
 mod wide;
 mod write;
 
