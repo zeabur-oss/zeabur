@@ -7,7 +7,8 @@
 
 use serde::Serialize;
 use utoipa::ToSchema;
-use zeabur_kube::{AccessRules, ResourceRef};
+use zeabur_core::problem::Denied;
+use zeabur_kube::{AccessRules, Attributes, Cluster};
 
 use super::namespace::Permission;
 
@@ -96,7 +97,7 @@ struct Ask<'a>(&'a AccessRules);
 impl Ask<'_> {
     fn can(&self, verb: &str, group: &str, resource: &str) -> Permission {
         self.0
-            .allows(verb, &ResourceRef::new(group, "v1", resource, ""), "")
+            .decide(&Attributes::new(verb, group, resource))
             .into()
     }
 
@@ -213,21 +214,40 @@ impl ProjectRights {
 }
 
 impl ClusterRights {
-    /// The rights `rules`, reviewed in `kube-system`, give. A `ClusterRoleBinding`'s rules are in
-    /// every namespace's review, so cluster-scoped kinds such as nodes are answered too.
-    #[must_use]
-    pub fn of(rules: Option<&AccessRules>) -> Self {
-        let Some(rules) = rules else {
-            return Self {
-                change_nodes: Permission::Unknown,
-                change_backups: Permission::Unknown,
-            };
-        };
-        let ask = Ask(rules);
+    /// The rights the person has in the cluster, each from its own `SelfSubjectAccessReview`
+    /// without a namespace. A review of a namespace cannot tell a cluster-wide binding from a
+    /// RoleBinding that grants a ClusterRole in that namespace only (see
+    /// [`zeabur_kube::rbac`]). A review that fails is `unknown`.
+    pub async fn review(cluster: &dyn Cluster) -> Self {
+        let (change_nodes, change_backups) = futures_util::future::join(
+            cluster_wide(cluster, "patch", "", "nodes"),
+            cluster_wide(cluster, "create", "velero.io", "schedules"),
+        )
+        .await;
         Self {
-            change_nodes: ask.can("patch", "", "nodes"),
-            change_backups: ask.can("create", "velero.io", "schedules"),
+            change_nodes,
+            change_backups,
         }
+    }
+}
+
+async fn cluster_wide(
+    cluster: &dyn Cluster,
+    verb: &str,
+    group: &str,
+    resource: &str,
+) -> Permission {
+    let request = Denied {
+        verb: verb.to_owned(),
+        group: group.to_owned(),
+        resource: resource.to_owned(),
+        name: None,
+        namespace: None,
+    };
+    match cluster.review_access(&request).await {
+        Ok(true) => Permission::Allowed,
+        Ok(false) => Permission::Denied,
+        Err(_) => Permission::Unknown,
     }
 }
 
@@ -291,9 +311,6 @@ mod tests {
         for (right, answer) in admin.as_object().unwrap() {
             assert_eq!(answer, "allowed", "{right}");
         }
-        let cluster = ClusterRights::of(Some(&AccessRules::everything()));
-        assert_eq!(cluster.change_nodes, Permission::Allowed);
-        assert_eq!(cluster.change_backups, Permission::Allowed);
     }
 
     #[test]
@@ -304,7 +321,6 @@ mod tests {
         assert_eq!(viewer.deploy, Permission::Unknown);
         assert_eq!(viewer.read_logs, Permission::Unknown);
         assert_eq!(ProjectRights::unknown().change_members, Permission::Unknown);
-        assert_eq!(ClusterRights::of(None).change_nodes, Permission::Unknown);
     }
 
     #[test]
@@ -331,18 +347,5 @@ mod tests {
         assert_eq!(some.change_services, Permission::Allowed);
         assert_eq!(some.delete_services, Permission::Denied);
         assert_eq!(some.change_domains, Permission::Allowed);
-    }
-
-    #[test]
-    fn the_member_roles_change_no_nodes_or_backups() {
-        for role in [ProjectRole::Developer, ProjectRole::Viewer] {
-            let mut rules = roles()[role.cluster_role()].clone();
-            rules
-                .rules
-                .extend(roles()[crate::members::access::BASELINE_ROLE].rules.clone());
-            let cluster = ClusterRights::of(Some(&rules));
-            assert_eq!(cluster.change_nodes, Permission::Denied, "{role:?}");
-            assert_eq!(cluster.change_backups, Permission::Denied, "{role:?}");
-        }
     }
 }

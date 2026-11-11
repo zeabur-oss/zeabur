@@ -501,7 +501,10 @@ pub(crate) async fn can_manage(cluster: &dyn Cluster, namespace: &str) -> Permis
         .await
         .map_or(Permission::Unknown, |rules| {
             rules
-                .allows("create", &IdentityKind::Invitation.resource(), "")
+                .decide(&zeabur_kube::Attributes::of(
+                    "create",
+                    &IdentityKind::Invitation.resource(),
+                ))
                 .into()
         })
 }

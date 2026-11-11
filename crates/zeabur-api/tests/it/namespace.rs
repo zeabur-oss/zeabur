@@ -438,8 +438,9 @@ mod tests {
         assert_eq!(failed["can"]["changeMembers"], "unknown");
     }
 
-    /// The cluster says whether the person may install components, from a review in
-    /// `kube-system`.
+    /// The cluster says whether the person may change nodes and backups, from reviews without a
+    /// namespace. Rules that a RoleBinding in `kube-system` gives show in that namespace's review
+    /// too, and must not open a cluster action.
     #[tokio::test]
     async fn the_cluster_says_whether_the_person_may_change_nodes_and_backups() {
         let cluster = cluster();
@@ -451,17 +452,13 @@ mod tests {
             json!({"changeNodes": "allowed", "changeBackups": "allowed"})
         );
         cluster.update(|s| {
-            s.access_rules.insert(
-                "kube-system".to_owned(),
-                Some(AccessRules {
-                    rules: vec![rule(&["get", "list"], "", &["nodes", "namespaces"])],
-                    incomplete: false,
-                }),
-            );
+            s.access_rules
+                .insert("kube-system".to_owned(), Some(AccessRules::everything()));
+            s.cluster_wide_denied = true;
         });
-        let (_, member) = send(&app, "GET", "/api/v1/cluster", None).await;
+        let (_, bound_in_kube_system) = send(&app, "GET", "/api/v1/cluster", None).await;
         assert_eq!(
-            member["can"],
+            bound_in_kube_system["can"],
             json!({"changeNodes": "denied", "changeBackups": "denied"})
         );
     }

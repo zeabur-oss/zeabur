@@ -36,6 +36,7 @@ pub mod memory;
 mod names;
 pub mod objects;
 pub mod port;
+pub mod rbac;
 mod wide;
 mod write;
 
@@ -51,6 +52,7 @@ pub use port::{
     Preconditions, Resize, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody,
     WriteRequest, Written,
 };
+pub use rbac::Attributes;
 use secrecy::{ExposeSecret as _, SecretString};
 
 /// Where kube-apiserver is and how to verify it. Holds no credential.

@@ -124,9 +124,9 @@ fn core(resource: &str) -> ResourceRef {
 #[must_use]
 pub fn role(rules: &AccessRules) -> AccountRole {
     let all = |checks: &[(&str, ResourceRef)]| {
-        checks
-            .iter()
-            .all(|(verb, resource)| rules.allows(verb, resource, "") == Access::Allowed)
+        checks.iter().all(|(verb, resource)| {
+            rules.decide(&zeabur_kube::Attributes::of(verb, resource)) == Access::Allowed
+        })
     };
     let viewer = all(&[("get", core("pods")), ("list", core("pods"))]);
     let developer = viewer

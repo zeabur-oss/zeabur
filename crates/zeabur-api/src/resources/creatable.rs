@@ -96,7 +96,9 @@ pub(crate) async fn list(
             resource: s.resource.clone(),
             kind: s.kind.clone(),
             custom: custom(&s.group),
-            access: rules.allows("create", &s.as_ref(), "").into(),
+            access: rules
+                .decide(&zeabur_kube::Attributes::of("create", &s.as_ref()))
+                .into(),
         })
         .collect();
     items.sort_by(|a, b| (&a.group, &a.kind).cmp(&(&b.group, &b.kind)));

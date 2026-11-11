@@ -48,6 +48,7 @@ use kube::core::{ApiResource, GroupVersionKind};
 use kube::discovery::{Discovery, Scope};
 
 use crate::port::ClusterError;
+use crate::rbac::Attributes;
 use crate::wide::serves;
 
 /// The annotation `kubectl apply` writes the last applied object into.
@@ -438,35 +439,15 @@ impl AccessRules {
         }
     }
 
-    /// Whether these rules let the person list `resource`.
+    /// Whether these rules allow the request. Not allowed is [`Access::Denied`] when the review
+    /// is complete and [`Access::Unknown`] when it is not. A malformed request is
+    /// [`Access::Denied`].
     #[must_use]
-    pub fn list(&self, resource: &ResourceRef) -> Access {
-        let has = |values: &[String], wanted: &str| values.iter().any(|v| v == "*" || v == wanted);
-        let allowed = self.rules.iter().any(|rule| {
-            rule.names.is_empty()
-                && has(&rule.verbs, "list")
-                && has(&rule.groups, &resource.group)
-                && has(&rule.resources, &resource.resource)
-        });
-        self.answer(allowed)
-    }
-
-    /// Whether these rules let the person `verb` the object `name` of `resource`: a rule limited
-    /// to names (`resourceNames`) allows it when it names `name`.
-    #[must_use]
-    pub fn allows(&self, verb: &str, resource: &ResourceRef, name: &str) -> Access {
-        let has = |values: &[String], wanted: &str| values.iter().any(|v| v == "*" || v == wanted);
-        let allowed = self.rules.iter().any(|rule| {
-            (rule.names.is_empty() || rule.names.iter().any(|n| n == name))
-                && has(&rule.verbs, verb)
-                && has(&rule.groups, &resource.group)
-                && has(&rule.resources, &resource.resource)
-        });
-        self.answer(allowed)
-    }
-
-    const fn answer(&self, allowed: bool) -> Access {
-        if allowed {
+    pub fn decide(&self, request: &Attributes) -> Access {
+        if !request.is_well_formed() {
+            return Access::Denied;
+        }
+        if self.rules.iter().any(|rule| request.allowed_by(rule)) {
             Access::Allowed
         } else if self.incomplete {
             Access::Unknown
@@ -597,43 +578,6 @@ mod tests {
         let annotations = object.metadata.annotations.unwrap();
         assert_eq!(annotations[LAST_APPLIED], HIDDEN);
         assert_eq!(annotations["team"], "data");
-    }
-
-    #[test]
-    fn access_rules_hint_which_kinds_may_be_listed() {
-        let deployments = ResourceRef::new("apps", "v1", "deployments", "Deployment");
-        let secrets = ResourceRef::new("", "v1", "secrets", "Secret");
-        let rules = AccessRules {
-            rules: vec![
-                AccessRule {
-                    verbs: vec!["get".into(), "list".into()],
-                    groups: vec!["apps".into()],
-                    resources: vec!["*".into()],
-                    names: Vec::new(),
-                },
-                // A rule limited to names never allows a list.
-                AccessRule {
-                    verbs: vec!["*".into()],
-                    groups: vec![String::new()],
-                    resources: vec!["secrets".into()],
-                    names: vec!["one".into()],
-                },
-            ],
-            incomplete: false,
-        };
-        assert_eq!(rules.list(&deployments), Access::Allowed);
-        assert_eq!(rules.list(&secrets), Access::Denied);
-        // A rule limited to names allows a verb on the objects it names.
-        assert_eq!(rules.allows("patch", &secrets, "one"), Access::Allowed);
-        assert_eq!(rules.allows("patch", &secrets, "two"), Access::Denied);
-        assert_eq!(rules.allows("patch", &deployments, "web"), Access::Denied);
-        assert_eq!(rules.allows("get", &deployments, "web"), Access::Allowed);
-        let partial = AccessRules {
-            incomplete: true,
-            ..rules
-        };
-        assert_eq!(partial.list(&secrets), Access::Unknown);
-        assert_eq!(AccessRules::everything().list(&secrets), Access::Allowed);
     }
 
     #[test]

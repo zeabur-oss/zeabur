@@ -10367,7 +10367,7 @@ export const getGetClusterUrl = () => {
 /**
  * @summary The cluster: its name and where that comes from, kube-apiserver's version and distribution.
 Readable by every signed-in person; the name may come from the nodes when they may list them.
-`can` is one `SelfSubjectRulesReview` in `kube-system`.
+`can` is one cluster-wide `SelfSubjectAccessReview` per right.
  */
 export const getCluster = async (options?: Parameters<typeof zeaburFetch>[1]): Promise<Cluster> => {
   return zeaburFetch<Cluster>(getGetClusterUrl(), {

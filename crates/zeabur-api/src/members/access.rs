@@ -454,7 +454,7 @@ pub(crate) mod tests {
 
     fn allows(rules: &AccessRules, verb: &str, resource: &str) -> bool {
         let (resource, group) = resource.split_once('.').unwrap_or((resource, ""));
-        rules.allows(verb, &ResourceRef::new(group, "v1", resource, ""), "")
+        rules.decide(&zeabur_kube::Attributes::new(verb, group, resource))
             == zeabur_kube::Access::Allowed
     }
 

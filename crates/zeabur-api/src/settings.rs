@@ -485,7 +485,9 @@ pub(crate) mod store {
             .access_rules(namespace)
             .await
             .map_or(Permission::Unknown, |rules| {
-                rules.allows(verb, &resource, name).into()
+                rules
+                    .decide(&zeabur_kube::Attributes::of(verb, &resource).named(name))
+                    .into()
             })
     }
 

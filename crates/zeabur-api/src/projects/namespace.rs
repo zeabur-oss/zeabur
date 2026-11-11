@@ -174,7 +174,9 @@ fn workload_patch(rules: Option<&AccessRules>) -> Vec<WorkloadPatch> {
             .collect();
         WorkloadPatch {
             kind: kind.to_owned(),
-            all: rules.allows("patch", &resource, "").into(),
+            all: rules
+                .decide(&zeabur_kube::Attributes::of("patch", &resource))
+                .into(),
             names,
         }
     })
@@ -220,9 +222,13 @@ pub(crate) async fn get(
         });
     let (can_change, can_adopt) =
         rules.map_or((Permission::Unknown, Permission::Unknown), |rules| {
-            let patch = Permission::from(rules.allows("patch", &resource, &project));
+            let patch = Permission::from(
+                rules.decide(&zeabur_kube::Attributes::of("patch", &resource).named(&project)),
+            );
             let manage = if guarded {
-                rules.allows(MANAGE_VERB, &resource, &project).into()
+                rules
+                    .decide(&zeabur_kube::Attributes::of(MANAGE_VERB, &resource).named(&project))
+                    .into()
             } else {
                 Permission::Allowed
             };

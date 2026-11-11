@@ -347,7 +347,9 @@ pub(crate) async fn list(
                 kind: s.kind.clone(),
                 generated: GENERATED.contains(&pair),
                 curated: CURATED.contains(&pair),
-                access: rules.list(&reference).into(),
+                access: rules
+                    .decide(&zeabur_kube::Attributes::of("list", &reference))
+                    .into(),
                 listed: false,
                 items: Vec::new(),
             };

@@ -141,8 +141,14 @@ mod tests {
             .access_rules(sandbox.namespace())
             .await
             .expect("rules review");
-        assert_eq!(rules.list(&resource), zeabur_kube::Access::Allowed);
-        assert_ne!(rules.list(&secrets), zeabur_kube::Access::Allowed);
+        assert_eq!(
+            rules.decide(&zeabur_kube::Attributes::of("list", &resource)),
+            zeabur_kube::Access::Allowed
+        );
+        assert_ne!(
+            rules.decide(&zeabur_kube::Attributes::of("list", &secrets)),
+            zeabur_kube::Access::Allowed
+        );
     }
 
     /// The ConfigMap `name` of the sandbox, as a write addresses it.
@@ -641,5 +647,158 @@ mod tests {
     async fn contract_a_deletion_keeps_to_its_preconditions() {
         let sandbox = Sandbox::new("zeabur-contract", rules()).await;
         contract::a_deletion_keeps_to_its_preconditions(sandbox.user(), sandbox.namespace()).await;
+    }
+
+    /// The matcher agrees with kube-apiserver on what a namespace review shows, and a role bound
+    /// in one namespace never opens a cluster-wide action.
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
+    async fn the_matcher_agrees_with_the_authorizer() {
+        use zeabur_kube::{Access, Attributes};
+
+        let sandbox = Sandbox::new(
+            "zeabur-matcher",
+            json!([
+                {"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["app"],
+                 "verbs": ["get", "update", "create"]},
+                {"apiGroups": [""], "resources": ["pods/exec"], "resourceNames": ["web-0"],
+                 "verbs": ["create"]},
+                {"apiGroups": [""], "resources": ["*/log"], "verbs": ["get"]}
+            ]),
+        )
+        .await;
+        let user = sandbox.user();
+        let namespace = sandbox.namespace();
+        let admin_role = format!("{namespace}-everything");
+        sandbox.delete_cluster_role(&admin_role);
+        let pp = PostParams::default();
+        Api::<ClusterRole>::all(sandbox.admin().clone())
+            .create(
+                &pp,
+                &serde_json::from_value(json!({
+                    "metadata": {"name": admin_role},
+                    "rules": [{"apiGroups": ["*"], "resources": ["*"], "verbs": ["*"]}]
+                }))
+                .unwrap(),
+            )
+            .await
+            .expect("cluster role");
+        // Only a RoleBinding, in the person's own namespace.
+        Api::<RoleBinding>::namespaced(sandbox.admin().clone(), namespace)
+            .create(
+                &pp,
+                &serde_json::from_value(json!({
+                    "metadata": {"name": "everything"},
+                    "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole", "name": admin_role},
+                    "subjects": [{"kind": "ServiceAccount", "name": PERSON, "namespace": namespace}]
+                }))
+                .unwrap(),
+            )
+            .await
+            .expect("role binding");
+
+        let request = |verb: &str, group: &str, resource: &str, name: Option<&str>, ns| {
+            zeabur_core::problem::Denied {
+                verb: verb.to_owned(),
+                group: group.to_owned(),
+                resource: resource.to_owned(),
+                name: name.map(str::to_owned),
+                namespace: ns,
+            }
+        };
+        let in_namespace = Some(namespace.to_owned());
+        let deadline = Instant::now() + Duration::from_secs(10);
+        loop {
+            let allowed = user
+                .review_access(&request(
+                    "create",
+                    "",
+                    "pods/exec",
+                    None,
+                    in_namespace.clone(),
+                ))
+                .await
+                .expect("review");
+            if allowed {
+                break;
+            }
+            assert!(Instant::now() < deadline, "the binding never took effect");
+            tokio::time::sleep(Duration::from_millis(100)).await;
+        }
+
+        let rules = user.access_rules(namespace).await.expect("rules review");
+        // The review of the namespace shows the cluster role, so it looks as if nodes could be
+        // patched; the cluster-wide review says they cannot.
+        let patch_nodes = Attributes::new("patch", "", "nodes");
+        assert_eq!(rules.decide(&patch_nodes), Access::Allowed);
+        assert!(
+            !user
+                .review_access(&request("patch", "", "nodes", None, None))
+                .await
+                .expect("review")
+        );
+        assert!(
+            user.review_access(&request("patch", "", "configmaps", Some("x"), in_namespace))
+                .await
+                .expect("review")
+        );
+    }
+
+    /// Without the cluster role: named rules, subresources and wildcards give the same answers
+    /// from the matcher and from kube-apiserver.
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
+    async fn named_rules_and_subresources_are_matched_as_the_authorizer_does() {
+        use zeabur_kube::{Access, Attributes};
+
+        let sandbox = Sandbox::new(
+            "zeabur-matcher-names",
+            json!([
+                {"apiGroups": [""], "resources": ["configmaps"], "resourceNames": ["app"],
+                 "verbs": ["get", "update", "create"]},
+                {"apiGroups": [""], "resources": ["pods/exec"], "resourceNames": ["web-0"],
+                 "verbs": ["create"]},
+                {"apiGroups": [""], "resources": ["*/log"], "verbs": ["get"]}
+            ]),
+        )
+        .await;
+        let user = sandbox.user();
+        let namespace = sandbox.namespace();
+        let rules = user.access_rules(namespace).await.expect("rules review");
+        let cases = [
+            ("update", "configmaps", Some("app")),
+            ("update", "configmaps", Some("other")),
+            ("create", "configmaps", None),
+            ("get", "configmaps", Some("app")),
+            ("create", "pods/exec", Some("web-0")),
+            ("create", "pods/exec", Some("web-1")),
+            ("get", "pods/log", Some("web-0")),
+            ("get", "nodes/log", None),
+            ("get", "pods", Some("web-0")),
+            ("get", "pods/exec", Some("web-0")),
+        ];
+        let deadline = Instant::now() + Duration::from_secs(10);
+        for (verb, resource, name) in cases {
+            let attributes = name.map_or_else(
+                || Attributes::new(verb, "", resource),
+                |name| Attributes::new(verb, "", resource).named(name),
+            );
+            let expected = rules.decide(&attributes) == Access::Allowed;
+            let ask = zeabur_core::problem::Denied {
+                verb: verb.to_owned(),
+                group: String::new(),
+                resource: resource.to_owned(),
+                name: name.map(str::to_owned),
+                namespace: Some(namespace.to_owned()),
+            };
+            loop {
+                let answer = user.review_access(&ask).await.expect("review");
+                if answer == expected || Instant::now() > deadline {
+                    assert_eq!(answer, expected, "{verb} {resource} {name:?}");
+                    break;
+                }
+                tokio::time::sleep(Duration::from_millis(100)).await;
+            }
+        }
     }
 }
