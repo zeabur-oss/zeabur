@@ -233,8 +233,7 @@ async fn secret_summaries(
 struct SecretTable {
     #[serde(rename = "columnDefinitions")]
     columns: Option<Vec<TableColumn>>,
-    #[serde(default)]
-    rows: Vec<TableRow>,
+    rows: Option<Vec<TableRow>>,
 }
 
 #[derive(serde::Deserialize)]
@@ -245,8 +244,7 @@ struct TableColumn {
 
 #[derive(serde::Deserialize)]
 struct TableRow {
-    #[serde(default)]
-    cells: Vec<serde_json::Value>,
+    cells: Option<Vec<serde_json::Value>>,
     object: Option<RowObject>,
 }
 
@@ -269,9 +267,11 @@ fn parse_secret_table(body: &[u8]) -> Result<Vec<SecretSummary>, ClusterError> {
     let (type_column, data_column) = (column("Type"), column("Data"));
     Ok(table
         .rows
+        .unwrap_or_default()
         .into_iter()
         .map(|row| {
-            let cell = |index: Option<usize>| index.and_then(|i| row.cells.get(i));
+            let cells = row.cells.unwrap_or_default();
+            let cell = |index: Option<usize>| index.and_then(|i| cells.get(i));
             let type_ = cell(type_column)
                 .and_then(serde_json::Value::as_str)
                 .map(str::to_owned);
@@ -1152,6 +1152,17 @@ mod tests {
         assert_eq!(summary.secret.type_.as_deref(), Some("Opaque"));
         assert_eq!(summary.key_count, 2);
         assert!(summary.secret.data.is_none() && summary.secret.string_data.is_none());
+    }
+
+    #[test]
+    fn a_secret_table_with_null_rows_or_cells_is_empty_or_unreadable_per_row() {
+        let null_rows = br#"{"columnDefinitions":[{"name":"Type"}],"rows":null}"#;
+        assert!(parse_secret_table(null_rows).unwrap().is_empty());
+        let null_cells = br#"{"columnDefinitions":[{"name":"Type"}],"rows":[{"cells":null,
+            "object":{"metadata":{"name":"db"}}}]}"#;
+        let secrets = parse_secret_table(null_cells).unwrap();
+        assert_eq!(secrets[0].secret.metadata.name.as_deref(), Some("db"));
+        assert_eq!(secrets[0].key_count, 0);
     }
 
     #[test]
