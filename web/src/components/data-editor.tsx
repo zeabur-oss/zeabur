@@ -49,7 +49,7 @@ export function editAfterTyping(current: string | undefined, value: string): Edi
   return value === (current ?? "") ? undefined : { op: "set", value }
 }
 
-export function changesOf({ edits, added }: Draft): Schemas.DataEdit[] {
+export function dataChangesOf({ edits, added }: Draft): Schemas.DataEdit[] {
   return [
     ...Object.entries(edits).map(([key, edit]): Schemas.DataEdit =>
       edit.op === "set" ? { key, op: "set", value: edit.value } : { key, op: "remove" },
@@ -94,7 +94,7 @@ export function DataEditor({
     onSubmit: ({ value }) => {
       const staged = planner.plan({
         title: t("title.data", kindName(t, kind), name),
-        changes: [{ op: "data", kind, name, changes: changesOf(value) }],
+        changes: [{ op: "data", kind, name, changes: dataChangesOf(value) }],
         service,
       })
       if (staged) onClose()
@@ -343,7 +343,7 @@ export function DataEditor({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 border-t px-6 py-3">
-          <form.Subscribe selector={(s) => changesOf(s.values).length}>
+          <form.Subscribe selector={(s) => dataChangesOf(s.values).length}>
             {(count) => (
               <span className="ml-auto flex items-center gap-2">
                 {count === 0 ? (

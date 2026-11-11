@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { changesOf, editAfterTyping } from "@/components/data-editor"
+import { dataChangesOf, editAfterTyping } from "@/components/data-editor"
 
 describe("the key editor", () => {
   test("typing then clearing an unrevealed secret key sends no edit", () => {
@@ -14,7 +14,7 @@ describe("the key editor", () => {
   })
 
   test("changing one key sends only that key", () => {
-    expect(changesOf({ edits: { b: { op: "set", value: "2" } }, added: [] })).toEqual([
+    expect(dataChangesOf({ edits: { b: { op: "set", value: "2" } }, added: [] })).toEqual([
       { key: "b", op: "set", value: "2" },
     ])
   })
@@ -22,6 +22,8 @@ describe("the key editor", () => {
   test.each(["(hidden)", "••••••••"])("%s can be set on purpose", (value) => {
     const edit = editAfterTyping("old", value)
     expect(edit).toEqual({ op: "set", value })
-    expect(changesOf({ edits: { k: edit! }, added: [] })).toEqual([{ key: "k", op: "set", value }])
+    expect(dataChangesOf({ edits: { k: edit! }, added: [] })).toEqual([
+      { key: "k", op: "set", value },
+    ])
   })
 })
