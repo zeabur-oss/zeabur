@@ -25,7 +25,7 @@ mode, one cluster-admin person):
 | File | Why |
 |---|---|
 | `ui.spec.ts` | the journeys through the pages: reading, writing through a plan, masked values, keyboard use |
-| `layout.spec.ts` | the page's frame and edges: nothing but the sidebar and main scrolls, at a phone and a desktop width, also with 40 services |
+| `layout.spec.ts` | the page's frame and edges: nothing but the sidebar and main scrolls, at a phone and a desktop width, also with 40 services when `ZEABUR_E2E_CROWDED` names such a project (no job sets it yet) |
 | `motion.spec.ts` | the promised motion: the design system's timings, reduced motion, no layout shift on Home, the system's theme from the first frame |
 | `click-feedback.spec.ts` | a click answers before its data or code arrives |
 | `dock.spec.ts` | the terminal dock under every page |

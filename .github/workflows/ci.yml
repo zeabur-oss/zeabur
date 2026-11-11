@@ -3,8 +3,9 @@ name: CI
 # Each job runs scripts/ci/<job>.sh in the Nix dev shell, the same as locally. Pull requests and
 # pushes run lint, test and ui. The merge queue runs the jobs that gate a merge on the commit about
 # to land. The nightly run runs everything, also fuzz and the canary, which are not in the merge
-# queue, and keeps main's caches for the merge queue's jobs. A failed nightly job opens or updates
-# one issue (scripts/nightly-issue.sh), and closes it when the job passes again.
+# queue, and keeps main's caches for the merge queue's jobs. A failed nightly-only job (fuzz,
+# canary, e2e-full) opens or updates one issue (scripts/nightly-issues.sh), and closes it when the
+# job passes again.
 on:
   push:
     branches: [main]
@@ -188,7 +189,7 @@ jobs:
   # One issue for each failing nightly job, opened or updated while it fails, closed when it passes.
   nightly-issues:
     if: always() && github.event_name == 'schedule'
-    needs: [lint, test, ui, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full]
+    needs: [fuzz, canary, e2e-full]
     runs-on: ubuntu-slim
     permissions:
       contents: read

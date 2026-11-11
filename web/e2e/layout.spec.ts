@@ -160,18 +160,10 @@ test.describe("in a project with many services", () => {
       expect(await mainOverflows(page)).toBe(false)
 
       const main = page.locator("main")
-      const table = services(page)
-      const scrolled = () =>
-        page.evaluate(() =>
-          [...document.querySelectorAll("main, main *")].some(
-            (e) => e.scrollTop > 0 && getComputedStyle(e).overflowY !== "visible",
-          ),
-        )
-      await table.hover()
+      await main.hover()
       await page.mouse.wheel(0, 2000)
-      await expect.poll(scrolled).toBe(true)
+      await expect.poll(() => main.evaluate((m) => m.scrollTop)).toBeGreaterThan(0)
       expect(await page.evaluate(() => window.scrollY)).toBe(0)
-      await expect(main).toBeVisible()
 
       if (width < 768) return
       const sidebar = page.getByRole("navigation", { name: "Project sections" })
