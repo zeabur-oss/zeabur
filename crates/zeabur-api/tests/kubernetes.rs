@@ -600,7 +600,7 @@ mod tests {
         let yaml = shown["yaml"]
             .as_str()
             .unwrap()
-            .replace("data:\n", "data:\n  token: YWJj\n");
+            .replace("\ndata:\n", "\ndata:\n  token: YWJj\n");
         assert!(
             yaml.contains("password: aHVudGVyMg=="),
             "the YAML has the value"
@@ -643,6 +643,7 @@ mod tests {
                 .is_some_and(|m| m.contains("type")),
             "{body}"
         );
+        assert!(!body.to_string().contains("aHVudGVyMg=="), "{body}");
     }
 
     /// A namespace whose person has the Role `rules`, the API as that person, and the admin

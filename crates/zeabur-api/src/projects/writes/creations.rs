@@ -149,17 +149,15 @@ pub(super) async fn dry_run(
     Ok(())
 }
 
-/// `problem` without any value a Secret in `plan` is written with, as written or base64: a
-/// message from kube-apiserver or a policy may quote the object.
+/// `problem` without any value a Secret in `plan` has once written, as written or base64: a
+/// message from kube-apiserver or a policy may quote the object, as a `422` to a patch does.
 pub(super) fn without_secret_values(problem: Problem, plan: &Plan) -> Problem {
     let mut values: Vec<String> = Vec::new();
     for object in &plan.objects {
-        let (true, Write::Create { body }) = (
-            object.target.api_version == "v1" && object.target.kind == "Secret",
-            &object.write,
-        ) else {
+        if !(object.target.api_version == "v1" && object.target.kind == "Secret") {
             continue;
-        };
+        }
+        let body = &object.raw_after;
         for key in ["data", "stringData"] {
             for value in body
                 .get(key)
@@ -259,25 +257,32 @@ mod tests {
 
     #[test]
     fn a_problem_never_quotes_a_secret_value() {
-        let plan: Plan = serde_json::from_value(json!({
-            "objects": [{
-                "target": {"apiVersion": "v1", "kind": "Secret", "plural": "secrets", "name": "env"},
-                "changes": [], "owners": [],
-                "write": {"type": "create", "body": {
-                    "stringData": {"TOKEN": "hunter22"}, "data": {"B": "c2VjcmV0LWI="}
-                }}
-            }],
+        let secret = |name: &str, write: Value| {
+            json!({
+                "target": {"apiVersion": "v1", "kind": "Secret", "plural": "secrets", "name": name},
+                "changes": [], "owners": [], "write": write
+            })
+        };
+        let created = json!({"stringData": {"TOKEN": "hunter22"}, "data": {"B": "c2VjcmV0LWI="}});
+        let mut plan: Plan = serde_json::from_value(json!({
+            "objects": [
+                secret("env", json!({"type": "create", "body": created})),
+                secret("db", json!({"type": "mergePatch",
+                    "body": {"data": {"password": "aHVudGVyMw=="}}})),
+            ],
             "impact": [], "warnings": []
         }))
         .unwrap();
+        plan.objects[0].raw_after = created;
+        plan.objects[1].raw_after = json!({"data": {"password": "aHVudGVyMw=="}});
         let problem = Problem::new(
             Kind::PolicyDenied,
-            "TOKEN is hunter22 (aHVudGVyMjI=); B is secret-b",
+            "TOKEN is hunter22 (aHVudGVyMjI=); B is secret-b; password is aHVudGVyMw==",
         );
         let problem = without_secret_values(problem, &plan);
         assert_eq!(
             problem.detail,
-            "TOKEN is (hidden) ((hidden)); B is (hidden)"
+            "TOKEN is (hidden) ((hidden)); B is (hidden); password is (hidden)"
         );
     }
 }
