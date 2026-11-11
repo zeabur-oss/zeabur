@@ -15,7 +15,7 @@ use zeabur_core::problem::Denied;
 use crate::objects::{AccessRules, ResourceRef, ServedResource};
 use crate::port::{
     Answer, Cluster, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest, ExecSession,
-    ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects, ServicePort,
+    ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects, RawList, ServicePort,
     WriteRequest, Written,
 };
 
@@ -225,13 +225,13 @@ impl<C: Cluster> Cluster for Recording<C> {
         self.inner.review_access(request)
     }
 
-    fn list_kind<'a>(
+    fn list_raw<'a>(
         &'a self,
         resource: &'a ResourceRef,
         namespace: Option<&'a str>,
-    ) -> Answer<'a, Vec<DynamicObject>> {
-        self.note(scoped("list_kind", resource, namespace));
-        self.inner.list_kind(resource, namespace)
+    ) -> Answer<'a, RawList> {
+        self.note(scoped("list", resource, namespace));
+        self.inner.list_raw(resource, namespace)
     }
 
     fn list_labelled<'a>(

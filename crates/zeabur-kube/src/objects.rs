@@ -44,10 +44,10 @@
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use kube::api::{Api, DynamicObject, ListParams};
-use kube::core::{ApiResource, GroupVersionKind};
+use kube::core::{ApiResource, GroupVersionKind, Request, Resource as _};
 use kube::discovery::{Discovery, Scope};
 
-use crate::port::ClusterError;
+use crate::port::{ClusterError, RawList};
 use crate::wide::serves;
 
 /// The annotation `kubectl apply` writes the last applied object into.
@@ -173,10 +173,7 @@ impl ResourceRef {
 
 /// Hides a Secret's values in an object read through the generic path (see the module
 /// documentation). Other kinds are left as they are.
-pub(crate) fn hide_secret_values(resource: &ResourceRef, object: &mut DynamicObject) {
-    if !resource.is_secret() {
-        return;
-    }
+pub(crate) fn hide_secret_values(object: &mut DynamicObject) {
     hide_last_applied(&mut object.metadata);
     for field in ["data", "stringData"] {
         if let Some(map) = object
@@ -282,41 +279,39 @@ async fn not_installed<T>(
     }
 }
 
+/// The LIST of `resource` as kube-apiserver sent it.
+async fn request_list(
+    client: &kube::Client,
+    resource: &ResourceRef,
+    namespace: Option<&str>,
+) -> Result<RawList, kube::Error> {
+    let path = DynamicObject::url_path(&resource.api_resource(), namespace);
+    let request = Request::new(path)
+        .list(&ListParams::default())
+        .map_err(kube::Error::BuildRequest)?;
+    let body = client.request_text(request).await?.into_bytes();
+    Ok(RawList::new(resource, body))
+}
+
 pub(crate) async fn list_objects(
     client: &kube::Client,
     resource: &ResourceRef,
     namespace: Option<&str>,
 ) -> Result<Option<Vec<DynamicObject>>, ClusterError> {
-    match api(client, resource, namespace)
-        .list(&ListParams::default())
-        .await
-    {
-        Ok(list) => {
-            let mut items = list.items;
-            for object in &mut items {
-                hide_secret_values(resource, object);
-            }
-            Ok(Some(items))
-        }
+    match request_list(client, resource, namespace).await {
+        Ok(list) => Ok(Some(list.objects()?)),
         Err(error) => absent_or_not_installed(client, resource, error).await,
     }
 }
 
 /// Every object of a built-in kind, without asking discovery first (see
-/// [`Cluster::list_kind`](crate::Cluster::list_kind)).
-pub(crate) async fn list_kind(
+/// [`Cluster::list_raw`](crate::Cluster::list_raw)).
+pub(crate) async fn list_raw(
     client: &kube::Client,
     resource: &ResourceRef,
     namespace: Option<&str>,
-) -> Result<Vec<DynamicObject>, ClusterError> {
-    let mut items = api(client, resource, namespace)
-        .list(&ListParams::default())
-        .await?
-        .items;
-    for object in &mut items {
-        hide_secret_values(resource, object);
-    }
-    Ok(items)
+) -> Result<RawList, ClusterError> {
+    Ok(request_list(client, resource, namespace).await?)
 }
 
 /// The metadata of the objects of a built-in kind that carry `key=value` (see
@@ -560,7 +555,9 @@ pub(crate) async fn get_object(
 ) -> Result<Option<DynamicObject>, ClusterError> {
     match api(client, resource, namespace).get(name).await {
         Ok(mut object) => {
-            hide_secret_values(resource, &mut object);
+            if resource.is_secret() {
+                hide_secret_values(&mut object);
+            }
             Ok(Some(object))
         }
         Err(error) => match ClusterError::from(error) {
@@ -578,7 +575,6 @@ mod tests {
 
     #[test]
     fn a_secret_read_generically_keeps_its_keys_and_loses_its_values() {
-        let secret = ResourceRef::new("", "v1", "secrets", "Secret");
         let mut object: DynamicObject = serde_json::from_value(serde_json::json!({
             "apiVersion": "v1", "kind": "Secret",
             "metadata": {"name": "db", "namespace": "shop", "annotations": {
@@ -589,7 +585,7 @@ mod tests {
             "stringData": {"token": "s3cr3t"}
         }))
         .unwrap();
-        hide_secret_values(&secret, &mut object);
+        hide_secret_values(&mut object);
         let text = serde_json::to_string(&object).unwrap();
         assert!(!text.contains("aHVudGVyMg==") && !text.contains("s3cr3t"));
         assert_eq!(object.data["data"]["password"], "");
@@ -634,19 +630,5 @@ mod tests {
         };
         assert_eq!(partial.list(&secrets), Access::Unknown);
         assert_eq!(AccessRules::everything().list(&secrets), Access::Allowed);
-    }
-
-    #[test]
-    fn other_kinds_are_left_alone() {
-        let config = ResourceRef::new("", "v1", "configmaps", "ConfigMap");
-        let mut object: DynamicObject = serde_json::from_value(serde_json::json!({
-            "apiVersion": "v1", "kind": "ConfigMap",
-            "metadata": {"name": "app", "annotations": {LAST_APPLIED: "{}"}},
-            "data": {"mode": "fast"}
-        }))
-        .unwrap();
-        hide_secret_values(&config, &mut object);
-        assert_eq!(object.data["data"]["mode"], "fast");
-        assert_eq!(object.metadata.annotations.unwrap()[LAST_APPLIED], "{}");
     }
 }

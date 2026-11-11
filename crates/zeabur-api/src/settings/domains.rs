@@ -20,7 +20,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{Cluster, ResourceRef};
+use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
 use zeabur_model::{DnsState, Origin};
 
 use super::{

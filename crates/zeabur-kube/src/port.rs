@@ -263,14 +263,15 @@ pub trait Cluster: Send + Sync {
     fn review_access<'a>(&'a self, request: &'a Denied) -> Answer<'a, bool>;
 
     /// The objects of a built-in kind, which kube-apiserver always serves, in `namespace` (every
-    /// namespace, or a cluster-scoped kind, when `None`): no discovery check first, and a refusal
-    /// is an error. A Secret's values are hidden ([`crate::objects`]). Read it typed with
-    /// [`ClusterExt::list`].
-    fn list_kind<'a>(
+    /// namespace, or a cluster-scoped kind, when `None`), as kube-apiserver sent them: no
+    /// discovery check first, and a refusal is an error. Read them typed with
+    /// [`ClusterExt::list`], or as they are with [`ClusterExt::list_kind`]; either way a Secret's
+    /// values are hidden ([`crate::objects`]).
+    fn list_raw<'a>(
         &'a self,
         resource: &'a ResourceRef,
         namespace: Option<&'a str>,
-    ) -> Answer<'a, Vec<DynamicObject>>;
+    ) -> Answer<'a, RawList>;
 
     /// Only the metadata of the objects of a built-in kind in `namespace` (every namespace when
     /// `None`) that carry the label `key` with `value`: one list with a label selector, no
@@ -324,7 +325,8 @@ pub trait Cluster: Send + Sync {
 /// The typed reads built on [`Cluster`], for every implementation and for `dyn Cluster`.
 pub trait ClusterExt: Cluster {
     /// Every object of the built-in kind `K` in `namespace` (every namespace, or a
-    /// cluster-scoped kind, when `None`), as [`Cluster::list_kind`] reads them.
+    /// cluster-scoped kind, when `None`), as [`Cluster::list_raw`] reads them, decoded once from
+    /// the bytes kube-apiserver sent.
     fn list<K>(
         &self,
         namespace: Option<&str>,
@@ -333,17 +335,16 @@ pub trait ClusterExt: Cluster {
         K: k8s_openapi::Resource + DeserializeOwned,
     {
         let resource = ResourceRef::of::<K>();
-        async move {
-            self.list_kind(&resource, namespace)
-                .await?
-                .into_iter()
-                .map(|object| {
-                    serde_json::to_value(object)
-                        .and_then(serde_json::from_value)
-                        .map_err(|e| ClusterError::Decode(e.to_string()))
-                })
-                .collect()
-        }
+        async move { self.list_raw(&resource, namespace).await?.typed() }
+    }
+
+    /// The objects of a built-in kind as [`DynamicObject`]s, as [`Cluster::list_raw`] reads them.
+    fn list_kind(
+        &self,
+        resource: &ResourceRef,
+        namespace: Option<&str>,
+    ) -> impl Future<Output = Result<Vec<DynamicObject>, ClusterError>> + Send {
+        async move { self.list_raw(resource, namespace).await?.objects() }
     }
 
     /// [`Cluster::get_object`], with an object that does not exist as `None`.
@@ -393,6 +394,81 @@ pub trait ClusterExt: Cluster {
 }
 
 impl<C: Cluster + ?Sized> ClusterExt for C {}
+
+/// The answer to a LIST as kube-apiserver sent it, decoded when it is read. Decoding straight
+/// from these bytes into the type a caller wants keeps each object from being parsed into an
+/// intermediate tree first.
+#[derive(Debug, Clone)]
+pub struct RawList {
+    secrets: bool,
+    body: Vec<u8>,
+}
+
+impl RawList {
+    /// The body of a LIST of `resource`.
+    #[must_use]
+    pub fn new(resource: &ResourceRef, body: Vec<u8>) -> Self {
+        Self {
+            secrets: resource.is_secret(),
+            body,
+        }
+    }
+
+    /// The objects as [`DynamicObject`]s. A Secret's values are hidden.
+    ///
+    /// # Errors
+    /// [`ClusterError::Decode`] when the body is not a list of objects.
+    pub fn objects(&self) -> Result<Vec<DynamicObject>, ClusterError> {
+        let mut items = decode::<DynamicObject>(&self.body)?;
+        if self.secrets {
+            for object in &mut items {
+                crate::objects::hide_secret_values(object);
+            }
+        }
+        Ok(items)
+    }
+
+    /// The body of a LIST of `objects`, as the in-memory cluster answers.
+    ///
+    /// # Errors
+    /// [`ClusterError::Decode`] when an object cannot be written out.
+    #[cfg(feature = "memory")]
+    pub fn of(resource: &ResourceRef, objects: &[DynamicObject]) -> Result<Self, ClusterError> {
+        let body = serde_json::to_vec(&serde_json::json!({ "items": objects }))
+            .map_err(|e| ClusterError::Decode(e.to_string()))?;
+        Ok(Self::new(resource, body))
+    }
+
+    /// The objects as `K`.
+    ///
+    /// # Errors
+    /// [`ClusterError::Decode`] when the body is not a list of `K`.
+    pub fn typed<K: DeserializeOwned>(&self) -> Result<Vec<K>, ClusterError> {
+        if self.secrets {
+            return self
+                .objects()?
+                .into_iter()
+                .map(|object| {
+                    serde_json::to_value(object)
+                        .and_then(serde_json::from_value)
+                        .map_err(|e| ClusterError::Decode(e.to_string()))
+                })
+                .collect();
+        }
+        decode(&self.body)
+    }
+}
+
+fn decode<T: DeserializeOwned>(body: &[u8]) -> Result<Vec<T>, ClusterError> {
+    #[derive(serde::Deserialize)]
+    struct Items<T> {
+        #[serde(default = "Vec::new")]
+        items: Vec<T>,
+    }
+    serde_json::from_slice::<Items<T>>(body)
+        .map(|list| list.items)
+        .map_err(|e| ClusterError::Decode(e.to_string()))
+}
 
 /// A port of a Service, as the service proxy names it: `namespace/name:port`, the port by number
 /// or by name.

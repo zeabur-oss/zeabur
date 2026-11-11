@@ -27,14 +27,12 @@ mod files;
 
 pub use files::{MemoryFiles, MemoryNode};
 
-use crate::objects::{
-    AccessRule, AccessRules, ResourceRef, ServedResource, hide_metadata, hide_secret_values,
-};
+use crate::objects::{AccessRule, AccessRules, ResourceRef, ServedResource, hide_metadata};
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
     ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects,
-    ObjectTarget, Preconditions, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody,
-    WriteRequest, Written,
+    ObjectTarget, Preconditions, RawList, SecretSummary, ServicePort, TerminalSize, Unreadable,
+    WriteBody, WriteRequest, Written,
 };
 
 /// What the in-memory cluster holds.
@@ -1048,13 +1046,10 @@ impl Cluster for MemoryCluster {
             if hangs {
                 std::future::pending::<()>().await;
             }
-            let mut items = self
+            let items = self
                 .readable(resource, namespace)?
                 .objects_of(resource, namespace)?;
-            for object in &mut items {
-                hide_secret_values(resource, object);
-            }
-            Ok(Some(items))
+            Ok(Some(RawList::of(resource, &items)?.objects()?))
         })
     }
 
@@ -1125,14 +1120,14 @@ impl Cluster for MemoryCluster {
         })
     }
 
-    fn list_kind<'a>(
+    fn list_raw<'a>(
         &'a self,
         resource: &'a ResourceRef,
         namespace: Option<&'a str>,
-    ) -> Answer<'a, Vec<DynamicObject>> {
+    ) -> Answer<'a, RawList> {
         Box::pin(async move {
             let state = self.readable(resource, namespace)?;
-            let mut items = match (resource.group.as_str(), resource.resource.as_str()) {
+            let items = match (resource.group.as_str(), resource.resource.as_str()) {
                 ("apps", "replicasets") => in_namespace(&state.replica_sets, namespace)?,
                 ("apps", "controllerrevisions") => {
                     in_namespace(&state.controller_revisions, namespace)?
@@ -1145,10 +1140,7 @@ impl Cluster for MemoryCluster {
                 _ => state.objects_of(resource, namespace)?,
             };
             drop(state);
-            for object in &mut items {
-                hide_secret_values(resource, object);
-            }
-            Ok(items)
+            RawList::of(resource, &items)
         })
     }
 
@@ -1161,8 +1153,9 @@ impl Cluster for MemoryCluster {
     ) -> Answer<'a, Vec<ObjectMeta>> {
         Box::pin(async move {
             Ok(self
-                .list_kind(resource, namespace)
+                .list_raw(resource, namespace)
                 .await?
+                .objects()?
                 .into_iter()
                 .filter(|o| {
                     o.metadata
