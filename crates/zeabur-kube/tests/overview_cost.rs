@@ -1,5 +1,5 @@
-//! What reading a project's overview costs, run by hand (`scripts/overview-cost.sh`, or the
-//! "Overview cost" workflow) and never in a pull request's checks.
+//! What reading a project's overview costs, run by hand (see the `zeabur-overview-cost` skill)
+//! and never in a pull request's checks.
 //!
 //! # The request set
 //!

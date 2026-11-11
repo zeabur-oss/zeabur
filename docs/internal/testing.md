@@ -91,12 +91,9 @@ Removing or weakening one of these tests needs another test of the same promise 
 
 ## Cost runs
 
-What a read costs is measured by hand, never asserted. The "Overview cost" workflow
-(`.github/workflows/overview-cost.yml`, `workflow_dispatch`) prints the bytes allocated by one
-project overview read at a baseline layout and at ten times it, in the run's summary. The layout,
-request set and allocation scope are in `crates/zeabur-kube/tests/overview_cost.rs`. Nothing
-compares the numbers with `main` and no pull request runs it; a change that claims to save work
-runs it before and after and puts both in the pull request.
+What a read costs is measured by hand, never asserted. The `zeabur-overview-cost` skill says how
+to measure the project overview read; a change that claims to save work measures before and after
+and puts both in the pull request.
 
 [swe-unit]: https://abseil.io/resources/swe-book/html/ch12.html
 [swe-doubles]: https://abseil.io/resources/swe-book/html/ch13.html

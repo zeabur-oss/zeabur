@@ -1,4 +1,4 @@
-//! What a piece of code allocates, for the manual cost runs (`scripts/overview-cost.sh`).
+//! What a piece of code allocates, for the manual cost runs (the `zeabur-overview-cost` skill).
 //!
 //! Linking this module makes the test binary's allocator a counting one. Only the thread that
 //! runs [`measure`] is counted, so a server running on another thread in the same test does not
