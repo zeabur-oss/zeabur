@@ -879,9 +879,9 @@ mod tests {
         let secret = get(&cluster, "/api/v1/projects/shop/objects/core/v1/secrets/db").await;
         assert!(secret.get("status").is_none(), "{secret}");
         let yaml = secret["yaml"].as_str().unwrap();
-        assert!(!yaml.contains("password"), "{secret}");
-        assert!(!yaml.contains("\ndata:"), "{secret}");
-        assert_eq!(secret["keys"], json!(["password"]), "{secret}");
+        assert!(!yaml.contains("password"), "the YAML names no key");
+        assert!(!yaml.contains("\ndata:"), "the YAML has no data");
+        assert_eq!(secret["keys"], json!(["password"]));
         for missing in [
             "/api/v1/projects/shop/objects/core/v1/secrets/nope",
             "/api/v1/projects/shop/objects/example.com/v1/widgets/a",
