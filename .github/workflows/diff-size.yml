@@ -1,0 +1,40 @@
+name: Diff size
+
+# A comment on each pull request with the lines it adds and removes in each area against main
+# (scripts/diff-size.sh). It is a number for the reviewer and gates nothing. A pull request from a
+# fork has a read-only token and gets no comment.
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comment:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-slim
+    permissions:
+      contents: read
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - env:
+          GH_TOKEN: ${{ github.token }}
+          BASE: origin/${{ github.base_ref }}
+          PULL_REQUEST: ${{ github.event.pull_request.number }}
+        run: |
+          scripts/diff-size.sh "$BASE" >diff-size.md
+          comment=$(gh api "repos/$GITHUB_REPOSITORY/issues/$PULL_REQUEST/comments" --paginate \
+            --jq 'map(select(.body | startswith("<!-- diff-size -->"))) | first | .id // empty')
+          if [[ -n "$comment" ]]; then
+            gh api --method PATCH "repos/$GITHUB_REPOSITORY/issues/comments/$comment" -F body=@diff-size.md
+          else
+            gh pr comment "$PULL_REQUEST" --body-file diff-size.md
+          fi
