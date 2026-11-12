@@ -27,7 +27,6 @@ import { ConnectServices } from "@/components/connect"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
 import { CopyText } from "@/components/copy-text"
 import { useBackups } from "@/components/backups"
-import { secretKeys } from "@/components/data-editor"
 import { DocsLink } from "@/components/docs-link"
 import { DatabaseState } from "@/components/databases"
 import {
@@ -50,6 +49,7 @@ import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { openDatabaseShell } from "@/lib/dock"
 import type { Icon } from "@/lib/icon"
+import { secretData } from "@/lib/secret-data"
 import { partsOf } from "@/model/database-parts"
 import {
   addPerThreadCaches,
@@ -872,7 +872,8 @@ function BackupForm({
     retry: false,
   }).data
   const keysExist = saved !== undefined
-  const regionSaved = saved !== undefined && holdsRegion(database, secretKeys(saved.yaml))
+  const regionSaved =
+    saved !== undefined && holdsRegion(database, Object.keys(secretData(saved.yaml)))
   const problems = targetProblems(target, keysExist)
   const review = () => {
     setTried(true)
