@@ -1,8 +1,11 @@
 //! Proof of concept: the Zeabur desktop app. It lists every context of every kubeconfig source and
 //! opens Zeabur's web interface for the ones the person picks.
 
+// A Windows release build is a GUI program, with no console window beside it.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 mod chrome;
-#[cfg(any(target_os = "linux", test))]
+#[cfg(any(target_os = "linux", windows, test))]
 mod keys;
 mod menu;
 mod probe;
@@ -185,9 +188,10 @@ async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
     results
 }
 
-/// Opens Zeabur's web interface for one context in its own window.
+/// Opens Zeabur's web interface for one context in its own window. Async, because building a window
+/// in a synchronous command deadlocks on Windows (`WebviewWindowBuilder::build`).
 #[tauri::command]
-fn open_cluster(
+async fn open_cluster(
     handle: tauri::AppHandle,
     app: State<'_, App>,
     key: String,

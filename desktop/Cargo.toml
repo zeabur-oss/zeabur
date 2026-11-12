@@ -31,6 +31,12 @@ tauri-build = "2"
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
 
+# The shortcuts, through WebView2's accelerator key event, and the AppUserModelID; the same versions
+# as wry's.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
+
 # The README screenshots: a snapshot of the WKWebView itself (no screen recording permission needed).
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

@@ -60,8 +60,12 @@ a TCP connection.
   uses to find the desktop entry[^xdg-shell]. `desktop/run.sh` writes that entry, so the Dock and
   Alt+Tab show Zeabur and its icon. GNOME maximizes a new window that is nearly the size of the
   screen.
-- Windows: WebView2 handles Ctrl+R and F5, and Ctrl++, Ctrl+- and Ctrl+0 zoom. Alt+F4 closes the
-  window. Ctrl+W is not handled yet.
+- Windows: Ctrl+W closes the window and Ctrl+N shows the chooser[^win-keys], through WebView2's
+  `AcceleratorKeyPressed` event, so the page never sees them. WebView2 handles Ctrl+R and F5, and
+  Ctrl++, Ctrl+- and Ctrl+0 zoom. Alt+F4 closes the window. The process sets the AppUserModelID
+  `com.zeabur.desktop-poc` before the first window[^win-appid], so the taskbar keeps every window
+  under one Zeabur button. A window is placed inside the work area, title bar included, and a cluster
+  window can be made 500 effective pixels wide, the most Snap layouts allows for a minimum[^win-snap].
 
 ## Icon
 
@@ -167,17 +171,38 @@ Differs on purpose:
 
 ## Windows
 
-Checked by reading code and config, not by running on Windows:
+Build for Windows from macOS or Linux with [cargo-xwin](https://github.com/rust-cross/cargo-xwin),
+which downloads the MSVC CRT and Windows SDK on first use (needs `clang`, `lld` and `llvm`):
+
+```
+cd desktop
+cargo xwin build --release --target aarch64-pc-windows-msvc   # or x86_64-pc-windows-msvc
+```
+
+Copy `target/<target>/release/zeabur-desktop.exe` to a Windows 11 machine and run it; WebView2 ships
+with Windows 11. A release build is a GUI program with no console window; a debug build keeps the
+console for its log.
+
+Run on Windows 11 ARM64 (build 26200) at 100%, 150% and 200% scaling, light and dark:
+
+- Windows open inside the work area and come back maximized or at their last size and place.
+- Ctrl+W closes the focused window, and the process exits with the last one. Ctrl+N brings the
+  chooser forward.
+- The title bars and pages follow a switch between light and dark while open. A change of scaling
+  while open redraws the window sharp at the new size.
+- Hovering the maximize button shows Snap layouts. The taskbar shows one Zeabur button with the
+  icon, and its jump list names Zeabur.
+
+From code and unit tests only:
 
 - `KUBECONFIG` is split with `std::env::split_paths`, which uses `;` on Windows; a unit test covers
   `C:\Users\a\.kube\config;D:\kube\team.yaml;` on Windows and the `:` form elsewhere.
 - The default path is `home_dir()\.kube\config`, which is `%USERPROFILE%\.kube\config`.
 - Exec plugins are also looked up as `.exe`, `.cmd` and `.bat`; the login shell lookup is skipped.
-- Tauri 2 on Windows uses WebView2, which ships with Windows 11; `tauri.conf.json` has no
-  Windows-specific settings, and `icons/icon.ico` is there for the executable's icon.
 - The screenshot hook is macOS only.
 
-See the bottom of this file for what was built on Windows.
+Not done: an installer and Start menu shortcut, Mica behind the page, the accent colour on title
+bars, and high contrast themes.
 
 [^k8s]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
 [^apta-zero]: https://aptakube.com/zero-config
@@ -195,3 +220,6 @@ See the bottom of this file for what was built on Windows.
 [^k9s-cfg]: https://k9scli.io/topics/config/
 [^gnome-keys]: https://developer.gnome.org/hig/reference/keyboard.html
 [^xdg-shell]: https://wayland.app/protocols/xdg-shell#xdg_toplevel:request:set_app_id
+[^win-keys]: https://learn.microsoft.com/en-us/windows/apps/develop/input/keyboard-accelerators
+[^win-appid]: https://learn.microsoft.com/en-us/windows/win32/shell/appids
+[^win-snap]: https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/ui/apply-snap-layout-menu

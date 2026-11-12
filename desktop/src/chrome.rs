@@ -13,7 +13,23 @@ pub const CHOOSER: &str = "main";
 
 /// Below this width the web interface hides its sidebar, and the traffic lights would sit on the
 /// page.
+#[cfg(target_os = "macos")]
 const CLUSTER_MIN: (f64, f64) = (800.0, 560.0);
+
+/// Snap layouts need a minimum width of at most 500 effective pixels
+/// (<https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/ui/apply-snap-layout-menu>),
+/// so two cluster windows fit side by side. Without traffic lights the web interface may hide its
+/// sidebar.
+#[cfg(not(target_os = "macos"))]
+const CLUSTER_MIN: (f64, f64) = (500.0, 560.0);
+
+/// Room for the system title bar above a window's content: 32 px on Windows
+/// (<https://learn.microsoft.com/en-us/windows/apps/design/basics/titlebar-design>). The macOS title
+/// bar is drawn over the page.
+#[cfg(target_os = "macos")]
+const FRAME_TOP: f64 = 0.0;
+#[cfg(not(target_os = "macos"))]
+const FRAME_TOP: f64 = 32.0;
 
 /// The height of the macOS title bar in points. The page leaves this much room at the top, in CSS
 /// pixels divided by the page's zoom (`--zeabur-title-bar`).
@@ -155,12 +171,27 @@ pub fn set_app_id(identifier: &str) {
     gtk::glib::set_prgname(Some(identifier));
 }
 
-#[cfg(not(target_os = "linux"))]
+/// On Windows the AppUserModelID groups the app's windows under one taskbar button and names its
+/// jump list. It must be set before any window is shown
+/// (<https://learn.microsoft.com/en-us/windows/win32/shell/appids>). It is the identifier, which
+/// Tauri's installers also give the Start menu shortcut.
+#[cfg(windows)]
+pub fn set_app_id(identifier: &str) {
+    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
+    use windows::core::HSTRING;
+
+    // SAFETY: the string outlives the call, and the system copies it.
+    if let Err(err) = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(identifier)) }
+    {
+        eprintln!("zeabur-desktop: cannot set the AppUserModelID: {err}");
+    }
+}
+
+#[cfg(target_os = "macos")]
 pub fn set_app_id(_identifier: &str) {}
 
-/// A new window's size: `want`, or 90 % of the screen's work area where that is smaller. A 1080p
-/// screen at 150 % is 1280 × 720 points, smaller than a cluster window.
-fn fit_to_screen(app: &AppHandle, want: (f64, f64)) -> (f64, f64) {
+/// The primary screen's work area (without the taskbar or Dock) in points: place and size.
+fn work_area(app: &AppHandle) -> Option<Area> {
     let mut monitor = app.primary_monitor().ok().flatten();
     if monitor.is_none() {
         monitor = app
@@ -168,26 +199,57 @@ fn fit_to_screen(app: &AppHandle, want: (f64, f64)) -> (f64, f64) {
             .ok()
             .and_then(|all| all.into_iter().next());
     }
-    let Some(monitor) = monitor else {
-        return want;
+    let monitor = monitor?;
+    let area = monitor.work_area();
+    let place = area.position.to_logical::<f64>(monitor.scale_factor());
+    let size = area.size.to_logical::<f64>(monitor.scale_factor());
+    Some(Area {
+        x: place.x,
+        y: place.y,
+        width: size.width,
+        height: size.height,
+    })
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct Area {
+    x: f64,
+    y: f64,
+    width: f64,
+    height: f64,
+}
+
+/// A new window's size: `want`, or 90 % of the work area where that is smaller. A 1080p screen at
+/// 150 % is 1280 × 720 points, smaller than a cluster window.
+fn fit(want: (f64, f64), area: Area) -> (f64, f64) {
+    (want.0.min(area.width * 0.9), want.1.min(area.height * 0.9))
+}
+
+/// Where a new window of content `size` goes: `offset` from the work area's corner, or centred
+/// when there is none, then moved up and left until the whole window, title bar included, is inside
+/// the work area. Windows' guidance: "adjust the initial location so that the entire window is
+/// visible within the target monitor"
+/// (<https://learn.microsoft.com/en-us/windows/win32/uxguide/win-window-mgt>).
+fn place(offset: Option<(f64, f64)>, size: (f64, f64), area: Area) -> (f64, f64) {
+    let outer = (size.0, size.1 + FRAME_TOP);
+    let (x, y) = match offset {
+        Some((dx, dy)) => (area.x + dx, area.y + dy),
+        None => (
+            area.x + (area.width - outer.0) / 2.0,
+            area.y + (area.height - outer.1) / 2.0,
+        ),
     };
-    let area = monitor
-        .work_area()
-        .size
-        .to_logical::<f64>(monitor.scale_factor());
-    fit(want, (area.width, area.height))
+    let x = x.min(area.x + area.width - outer.0).max(area.x);
+    let y = y.min(area.y + area.height - outer.1).max(area.y);
+    (x, y)
 }
 
-fn fit(want: (f64, f64), area: (f64, f64)) -> (f64, f64) {
-    (want.0.min(area.0 * 0.9), want.1.min(area.1 * 0.9))
-}
-
-/// What every window shares on Windows and Linux. Windows: WebView2's own Ctrl++, Ctrl+- and Ctrl+0
-/// zoom (reload with Ctrl+R and F5 is on by default). Linux: the shortcuts in `keys.rs`.
+/// What every window shares on Windows and Linux: the shortcuts in `keys.rs`. Windows also gets
+/// WebView2's own Ctrl++, Ctrl+- and Ctrl+0 zoom (reload with Ctrl+R and F5 is on by default).
 fn platform_window(window: &tauri::WebviewWindow) {
-    #[cfg(target_os = "linux")]
+    #[cfg(any(target_os = "linux", windows))]
     crate::keys::attach(window);
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
     let _ = window;
 }
 
@@ -212,11 +274,16 @@ pub fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
         window.show()?;
         return window.set_focus();
     }
-    let (width, height) = fit_to_screen(app, (1040.0, 680.0));
-    let builder = WebviewWindowBuilder::new(app, CHOOSER, WebviewUrl::App("desktop.html".into()))
-        .title("Zeabur")
-        .inner_size(width, height)
-        .min_inner_size(720.0, 480.0);
+    let mut builder =
+        WebviewWindowBuilder::new(app, CHOOSER, WebviewUrl::App("desktop.html".into()))
+            .title("Zeabur")
+            .inner_size(1040.0, 680.0)
+            .min_inner_size(720.0, 480.0);
+    if let Some(area) = work_area(app) {
+        let size = fit((1040.0, 680.0), area);
+        let (x, y) = place(None, size, area);
+        builder = builder.inner_size(size.0, size.1).position(x, y);
+    }
     let window = zoom_keys(title_bar(shots::apply_theme(builder))).build()?;
     platform_window(&window);
     if shots::wants("main") {
@@ -239,11 +306,14 @@ pub fn cluster_window<'a>(
         }
     }
     let step = 24.0 * open;
-    let (width, height) = fit_to_screen(app, (1280.0, 800.0));
-    let builder = builder
-        .inner_size(width, height)
-        .min_inner_size(CLUSTER_MIN.0, CLUSTER_MIN.1)
-        .position(120.0 + step, 80.0 + step);
+    let mut builder = builder
+        .inner_size(1280.0, 800.0)
+        .min_inner_size(CLUSTER_MIN.0, CLUSTER_MIN.1);
+    if let Some(area) = work_area(app) {
+        let size = fit((1280.0, 800.0), area);
+        let (x, y) = place(Some((120.0 + step, 80.0 + step)), size, area);
+        builder = builder.inner_size(size.0, size.1).position(x, y);
+    }
     zoom_keys(title_bar(builder))
 }
 
@@ -290,12 +360,51 @@ pub fn on_run_event(app: &AppHandle, event: RunEvent) {
 
 #[cfg(test)]
 mod tests {
-    use super::{fit, next_zoom};
+    use super::{Area, FRAME_TOP, fit, next_zoom, place};
+
+    fn area(x: f64, y: f64, width: f64, height: f64) -> Area {
+        Area {
+            x,
+            y,
+            width,
+            height,
+        }
+    }
 
     #[test]
     fn a_window_larger_than_the_screen_shrinks_to_fit() {
-        assert_eq!(fit((1280.0, 800.0), (1280.0, 720.0)), (1152.0, 648.0));
-        assert_eq!(fit((1280.0, 800.0), (2560.0, 1400.0)), (1280.0, 800.0));
+        let small = area(0.0, 0.0, 1280.0, 720.0);
+        assert_eq!(fit((1280.0, 800.0), small), (1152.0, 648.0));
+        let large = area(0.0, 0.0, 2560.0, 1400.0);
+        assert_eq!(fit((1280.0, 800.0), large), (1280.0, 800.0));
+    }
+
+    #[test]
+    fn a_window_without_an_offset_is_centred_title_bar_included() {
+        let screen = area(0.0, 0.0, 1512.0, 808.0);
+        let (x, y) = place(None, (1040.0, 680.0), screen);
+        assert_eq!(x, 236.0);
+        assert_eq!(y * 2.0 + 680.0 + FRAME_TOP, 808.0);
+    }
+
+    #[test]
+    fn a_cascaded_window_moves_back_inside_the_work_area() {
+        // 1512 × 808 points is a 3024 × 1712 screen at 200 % with the taskbar at the bottom.
+        let screen = area(0.0, 0.0, 1512.0, 808.0);
+        let size = fit((1280.0, 800.0), screen);
+        let (x, y) = place(Some((120.0, 80.0)), size, screen);
+        assert!(x + size.0 <= 1512.0);
+        assert!(y + FRAME_TOP + size.1 <= 808.0);
+        assert_eq!(x, 120.0);
+    }
+
+    #[test]
+    fn an_offset_counts_from_the_work_area_corner() {
+        let below_a_top_bar = area(0.0, 40.0, 1920.0, 1040.0);
+        assert_eq!(
+            place(Some((120.0, 80.0)), (1280.0, 800.0), below_a_top_bar),
+            (120.0, 120.0)
+        );
     }
 
     #[test]
