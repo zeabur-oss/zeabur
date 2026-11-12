@@ -5,7 +5,7 @@ name: Desktop
 # rest. A pull request that changes the packaging builds them unsigned.
 #
 # The packages build outside the Nix shell, with the runner's own compiler, linker and system
-# libraries, so the app loads nothing from /nix/store (scripts/check-desktop-bundle.sh checks
+# libraries, so the app loads nothing from /nix/store (scripts/check-portable.sh checks
 # each). prepare makes what the build needs from the dev shell: the web pages, the catalog and the
 # toolchain versions. Signing runs only for main and v* tags, whose environments hold the
 # credentials; anywhere else the files are unsigned and the updater job is skipped.
@@ -36,8 +36,8 @@ on:
       - .github/workflows/desktop.yml
       - desktop/Cargo.toml
       - desktop/tauri.conf.json
-      - scripts/desktop-bundle.sh
-      - scripts/check-desktop-bundle.sh
+      - scripts/package-desktop.sh
+      - scripts/check-portable.sh
       - scripts/desktop-release.ts
 
 permissions:
@@ -123,7 +123,7 @@ jobs:
           rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
           cargo install tauri-cli --version "=$TAURI_CLI" --locked
       - name: Build
-        run: scripts/desktop-bundle.sh compile "$VERSION" "$OS" "$ARCH" dist
+        run: scripts/package-desktop.sh compile "$VERSION" "$OS" "$ARCH" dist
       # Signing logs in right before packaging, so the short-lived token is still valid.
       - if: matrix.os == 'windows' && vars.AZURE_CLIENT_ID != ''
         uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
@@ -141,7 +141,7 @@ jobs:
           AZURE_SIGNING_ENDPOINT: ${{ matrix.os == 'windows' && vars.AZURE_CLIENT_ID != '' && vars.AZURE_SIGNING_ENDPOINT || '' }}
           AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
           AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
-        run: scripts/desktop-bundle.sh package "$VERSION" "$OS" "$ARCH" dist
+        run: scripts/package-desktop.sh package "$VERSION" "$OS" "$ARCH" dist
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: desktop-${{ matrix.os }}-${{ matrix.arch }}

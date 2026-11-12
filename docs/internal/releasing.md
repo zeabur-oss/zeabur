@@ -47,7 +47,7 @@ differs from the root `Cargo.toml`.
 | Job | Where | Does |
 |---|---|---|
 | `prepare` | Linux arm64, in the dev shell | Builds `web/dist` and `desktop/web/dist`, copies the catalog, and names the dev shell's nightly and `tauri-cli` (`scripts/ci/desktop-inputs.sh`). |
-| `build` | macOS arm64, Windows amd64, Linux amd64 and arm64 (Ubuntu 24.04, for its older glibc) | Outside the Nix shell, with the runner's compiler, linker and libraries, the same nightly through rustup and `tauri-cli` from crates.io: compiles the app, then packages and signs it in a step of its own (`scripts/desktop-bundle.sh`). Every Mach-O in the app and every ELF in the `.deb`, `.rpm` and `.AppImage` must load only system libraries and the package's own (`scripts/check-desktop-bundle.sh`). |
+| `build` | macOS arm64, Windows amd64, Linux amd64 and arm64 (Ubuntu 24.04, for its older glibc) | Outside the Nix shell, with the runner's compiler, linker and libraries, the same nightly through rustup and `tauri-cli` from crates.io: compiles the app, then packages and signs it in a step of its own (`scripts/package-desktop.sh`). Every Mach-O in the app and every ELF in the `.deb`, `.rpm` and `.AppImage` must load only system libraries and the package's own (`scripts/check-portable.sh`, on the app and on each package unpacked). |
 | `updater` | Linux arm64, `main` and tags, once the app has an updater key | Signs the `.app.tar.gz`, the `-setup.exe` and the `.AppImage` with the updater key, checks each signature against `desktop/tauri.conf.json`'s public key and writes `latest.json` with the `CHANGELOG.md` section as its notes (`scripts/desktop-release.ts`). |
 
 | Platform | Files | The updater installs |
@@ -64,11 +64,11 @@ platform in `latest.json` but cannot replace itself; the app offers the release 
 desktop file like the others.
 
 On macOS, the Tauri bundler signs the app with the Developer ID and the hardened runtime and no
-entitlements, then notarizes and staples it; `desktop-bundle.sh` signs, notarizes and staples the
+entitlements, then notarizes and staples it; `package-desktop.sh` signs, notarizes and staples the
 `.dmg`. On Windows, signtool signs the portable `.exe` and, as the bundler's `signCommand`, the app and
 the installer, through Microsoft's
 Artifact Signing plug-in (the `Microsoft.ArtifactSigning.Client` NuGet package, pinned by version
-and SHA-256 in `desktop-bundle.sh`), after `azure/login` with OIDC. Linux packages are not signed
+and SHA-256 in `package-desktop.sh`), after `azure/login` with OIDC. Linux packages are not signed
 on their own; the signed `SHA256SUMS` and the attestation cover them.
 
 Rehearsals and pull requests that change the packaging build every platform unsigned: the

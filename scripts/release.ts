@@ -653,13 +653,11 @@ async function verify(
     } else console.log("zeaburctl is not signed with a Developer ID");
     if (said !== `zeaburctl ${version.plain}`) fail(`zeaburctl says '${said}'`);
 
-    // Zeabur Desktop's .dmg, notarized and stapled when it has a Developer ID, and the app in it
-    // loading nothing from outside macOS and the app.
+    // Zeabur Desktop's .dmg, notarized and stapled when it has a Developer ID.
     const dmg = join(
       downloaded,
       `zeabur-desktop-${version.tag}-${os}-${arch}.dmg`,
     );
-    await $`${scripts}/check-desktop-bundle.sh ${dmg}`;
     const dmgSignature = await $`/usr/bin/codesign -dvv ${dmg}`
       .nothrow()
       .quiet();

@@ -32,7 +32,7 @@ on macOS the script points it at `/usr/lib/libiconv.2.dylib` before the bundler 
 Nix lacks. CI's `desktop-bundle` job does the same on macOS. On Linux the check fails for now: a
 binary built in the Nix shell uses the Nix store's dynamic loader, glibc and WebKitGTK, so a
 `.deb` or AppImage of it would not run on other distributions. Release packages build outside the
-Nix shell with `scripts/desktop-bundle.sh`, on every platform
+Nix shell with `scripts/package-desktop.sh`, on every platform
 ([Releasing](../docs/internal/releasing.md#zeabur-desktop)). With
 `APPLE_SIGNING_IDENTITY` set to a Developer ID Application identity the bundler signs with the
 hardened runtime; with `APPLE_API_ISSUER`, `APPLE_API_KEY` and `APPLE_API_KEY_PATH` (or

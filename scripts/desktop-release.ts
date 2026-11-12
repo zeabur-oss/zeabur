@@ -11,7 +11,7 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseVersion, type Version } from "./versions";
 
-// One build of the app: what scripts/desktop-bundle.sh leaves for it, and which file the updater
+// One build of the app: what scripts/package-desktop.sh leaves for it, and which file the updater
 // installs there.
 type Build = {
   os: "darwin" | "windows" | "linux";

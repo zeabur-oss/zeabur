@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# What scripts/desktop-bundle.sh needs from the dev shell, for a runner that builds outside it
+# What scripts/package-desktop.sh needs from the dev shell, for a runner that builds outside it
 # (.github/workflows/desktop.yml): web/dist, desktop/web/dist and the catalog in
 # target/desktop-inputs/catalog. Prints the step outputs: the version (VERSION, or the app's), the
 # shell's nightly and tauri-cli, the catalog commit and whether the app has an updater key. Runs in

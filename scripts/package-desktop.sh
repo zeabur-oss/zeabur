@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Builds Zeabur Desktop's release packages for this machine and copies them into <out> with their
 # release names (scripts/desktop-release.ts), signed when the signing variables are set.
-#   scripts/desktop-bundle.sh compile <version> <os> <arch> <out>   # v0.3.0 darwin arm64 dist
-#   scripts/desktop-bundle.sh package <version> <os> <arch> <out>
+#   scripts/package-desktop.sh compile <version> <os> <arch> <out>   # v0.3.0 darwin arm64 dist
+#   scripts/package-desktop.sh package <version> <os> <arch> <out>
 # compile builds the app and package bundles and signs it, so no build script of a dependency runs
 # with the signing variables set.
 #
@@ -67,6 +67,19 @@ work=$(mktemp -d)
 cleanup=""
 trap 'eval "$cleanup"; rm -rf "$work"' EXIT
 
+# Fails if a package loads anything from outside the system and itself (scripts/check-portable.sh).
+portable() {
+  local dir
+  dir="$work/unpacked-$(basename "$1")"
+  mkdir "$dir"
+  case "$1" in
+    *.deb) dpkg-deb -x "$1" "$dir" ;;
+    *.rpm) (cd "$dir" && rpm2cpio "$1" | cpio -idm --quiet) ;;
+    *.AppImage) (cd "$dir" && "$1" --appimage-extract >/dev/null) ;;
+  esac
+  "$root/scripts/check-portable.sh" "$dir"
+}
+
 # The single file a bundle step left, by pattern.
 one() {
   local found
@@ -125,7 +138,7 @@ case "$os" in
     else
       echo "::warning::no Developer ID certificate: the app is signed ad hoc and not notarized"
     fi
-    "$root/scripts/check-desktop-bundle.sh" "$app"
+    "$root/scripts/check-portable.sh" "$app"
     # The updater replaces the whole app with the one in this archive; without the build machine's
     # extended attributes.
     tar --no-xattrs --no-mac-metadata -czf "$out/$name.app.tar.gz" -C "$(dirname "$app")" "$(basename "$app")"
@@ -183,7 +196,7 @@ case "$os" in
     rpm=$(one "$bundle/rpm" '*.rpm')
     appimage=$(one "$bundle/appimage" '*.AppImage')
     for file in "$deb" "$rpm" "$appimage"; do
-      "$root/scripts/check-desktop-bundle.sh" "$file"
+      portable "$file"
     done
     cp "$deb" "$out/$name.deb"
     cp "$rpm" "$out/$name.rpm"
