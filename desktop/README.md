@@ -45,7 +45,9 @@ a TCP connection.
 - macOS: the title bar is drawn over the page, as in Finder and Notes. The page leaves 28 pt at the
   top (`data-titlebar` and `--zeabur-title-bar`, set by `desktop/src/chrome.rs`) and a strip there
   moves the window. The menu bar (`desktop/src/menu.rs`) uses the `desktop.menu.*` strings and
-  changes with the language picker. The app stays open with no windows; a click on the Dock icon
+  changes with the language picker. The items macOS adds itself (Fill, Center, Move & Resize, Writing
+  Tools, …) follow the system language, in English, Traditional or Simplified Chinese
+  (`desktop/Info.plist`), not the picker. The app stays open with no windows; a click on the Dock icon
   or File > New Cluster Window shows the chooser again.
 - Windows and Linux: the system title bar, no menu bar, and the app quits when the last window
   closes.
