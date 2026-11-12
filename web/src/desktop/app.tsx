@@ -111,6 +111,26 @@ export function App() {
   const [dropping, setDropping] = useState(false)
   const nameRef = useRef<HTMLInputElement>(null)
 
+  useEffect(() => {
+    void api.setMenuLabels({
+      clusters: t("desktop.menuClusters"),
+      edit: t("desktop.menuEdit"),
+      undo: t("desktop.menuUndo"),
+      redo: t("desktop.menuRedo"),
+      cut: t("desktop.menuCut"),
+      copy: t("desktop.menuCopy"),
+      paste: t("desktop.menuPaste"),
+      selectAll: t("desktop.menuSelectAll"),
+      window: t("desktop.menuWindow"),
+      minimize: t("desktop.menuMinimize"),
+      close: t("desktop.menuClose"),
+      hide: t("desktop.menuHide"),
+      hideOthers: t("desktop.menuHideOthers"),
+      showAll: t("desktop.menuShowAll"),
+      quit: t("desktop.menuQuit"),
+    })
+  }, [t])
+
   async function reload() {
     const next = await api.snapshot()
     setSnap(next)
@@ -415,12 +435,7 @@ export function App() {
             </span>
           ) : null}
         </div>
-        <Button
-          variant="secondary"
-          size="xs"
-          disabled={isBlocked}
-          onClick={() => openCluster(c)}
-        >
+        <Button variant="secondary" size="xs" disabled={isBlocked} onClick={() => openCluster(c)}>
           {t("desktop.open")}
         </Button>
       </li>

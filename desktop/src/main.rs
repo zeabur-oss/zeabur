@@ -1,6 +1,7 @@
 //! Proof of concept: the Zeabur desktop app. It lists every context of every kubeconfig source and
 //! opens Zeabur's web interface for the ones the person picks.
 
+mod menu;
 mod probe;
 mod shots;
 mod sources;
@@ -9,9 +10,8 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
-
 use sources::{AddedSource, ContextView, SearchPaths, SourceKind, SourceRef, SourceView};
+use tauri::{AppHandle, Manager, RunEvent, State, WebviewUrl, WebviewWindowBuilder};
 
 /// What the app remembers between launches. It never writes to a kubeconfig file.
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -167,10 +167,7 @@ struct ProbeResult {
 async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
     let mut handles = Vec::new();
     for (key, server) in targets {
-        handles.push(std::thread::spawn(move || ProbeResult {
-            reach: probe::probe(server.as_deref()),
-            key,
-        }));
+        handles.push(std::thread::spawn(move || ProbeResult { reach: probe::probe(server.as_deref()), key }));
     }
     let mut results = Vec::new();
     for handle in handles {
@@ -223,6 +220,43 @@ fn open_cluster(
     Ok(())
 }
 
+/// Shows and focuses the chooser window, creating it when it was closed.
+fn show_chooser(handle: &AppHandle) -> tauri::Result<()> {
+    let existing = handle.get_webview_window("main");
+    let state = match &existing {
+        Some(window) => Some(menu::ChooserState { minimized: window.is_minimized()? }),
+        None => None,
+    };
+    match (menu::chooser_action(state), existing) {
+        (menu::ChooserAction::Show { unminimize }, Some(window)) => {
+            if unminimize {
+                window.unminimize()?;
+            }
+            window.show()?;
+            window.set_focus()
+        }
+        _ => {
+            let builder = WebviewWindowBuilder::new(handle, "main", WebviewUrl::App("desktop.html".into()))
+                .title("Zeabur")
+                .inner_size(1040.0, 680.0)
+                .min_inner_size(720.0, 480.0);
+            let window = shots::apply_theme(builder).build()?;
+            if shots::wants("main") {
+                shots::capture(window);
+            }
+            Ok(())
+        }
+    }
+}
+
+/// Rebuilds the menu in the words the chooser page sends for the current language.
+#[tauri::command]
+fn set_menu_labels(handle: AppHandle, labels: menu::Labels) -> Result<(), String> {
+    let menu = menu::build(&handle, &labels).map_err(|e| e.to_string())?;
+    handle.set_menu(menu).map_err(|e| e.to_string())?;
+    Ok(())
+}
+
 /// PATH from the login shell, so exec plugins installed by Homebrew, asdf or mise are found when
 /// the app starts from Finder or the Dock.
 fn login_shell_path() -> Vec<PathBuf> {
@@ -254,9 +288,8 @@ fn main() {
                 .ok()
                 .and_then(|bytes| serde_json::from_slice(&bytes).ok())
                 .unwrap_or_default();
-            let app_path: Vec<PathBuf> = std::env::var_os("PATH")
-                .map(|p| std::env::split_paths(&p).collect())
-                .unwrap_or_default();
+            let app_path: Vec<PathBuf> =
+                std::env::var_os("PATH").map(|p| std::env::split_paths(&p).collect()).unwrap_or_default();
             let mut shell = Vec::new();
             if std::env::var_os("ZEABUR_DESKTOP_NO_SHELL_PATH").is_none() {
                 for dir in login_shell_path() {
@@ -272,16 +305,15 @@ fn main() {
                 web_url: std::env::var("ZEABUR_DESKTOP_WEB").unwrap_or_else(|_| "http://localhost:5173/".into()),
             });
 
-            let mut builder = WebviewWindowBuilder::new(tauri_app, "main", WebviewUrl::App("desktop.html".into()))
-                .title("Zeabur")
-                .inner_size(1040.0, 680.0)
-                .min_inner_size(720.0, 480.0);
-            builder = shots::apply_theme(builder);
-            let window = builder.build()?;
-            if shots::wants("main") {
-                shots::capture(window);
-            }
+            let labels = menu::Labels::default();
+            tauri_app.set_menu(menu::build(tauri_app.handle(), &labels)?)?;
+            show_chooser(tauri_app.handle())?;
             Ok(())
+        })
+        .on_menu_event(|handle, event| {
+            if event.id() == menu::CLUSTERS_ID {
+                let _ = show_chooser(handle);
+            }
         })
         .invoke_handler(tauri::generate_handler![
             snapshot,
@@ -291,11 +323,24 @@ fn main() {
             toggle_favourite,
             probe,
             open_cluster,
+            set_menu_labels,
             scenario
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .unwrap_or_else(|err| {
             eprintln!("zeabur-desktop: {err}");
             std::process::exit(1);
+        })
+        .run(|handle, event| match event {
+            // On macOS the app stays in the Dock after its last window closes.
+            #[cfg(target_os = "macos")]
+            RunEvent::ExitRequested { code: None, api, .. } => api.prevent_exit(),
+            #[cfg(target_os = "macos")]
+            RunEvent::Reopen { has_visible_windows: false, .. } => {
+                let _ = show_chooser(handle);
+            }
+            _ => {
+                let _ = handle;
+            }
         });
 }

@@ -4539,6 +4539,21 @@ export const en = {
   "desktop.pasteEmpty": "This kubeconfig has no contexts.",
   "desktop.cancel": "Cancel",
   "desktop.language": "Language",
+  "desktop.menuClusters": "Clusters",
+  "desktop.menuEdit": "Edit",
+  "desktop.menuUndo": "Undo",
+  "desktop.menuRedo": "Redo",
+  "desktop.menuCut": "Cut",
+  "desktop.menuCopy": "Copy",
+  "desktop.menuPaste": "Paste",
+  "desktop.menuSelectAll": "Select All",
+  "desktop.menuWindow": "Window",
+  "desktop.menuMinimize": "Minimize",
+  "desktop.menuClose": "Close Window",
+  "desktop.menuHide": "Hide Zeabur",
+  "desktop.menuHideOthers": "Hide Others",
+  "desktop.menuShowAll": "Show All",
+  "desktop.menuQuit": "Quit Zeabur",
   // desktop:end
 }
 

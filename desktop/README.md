@@ -28,6 +28,10 @@ port 5173, and the app. The chooser is `web/desktop.html` with `web/src/desktop/
   be opened. An exec plugin found only on the login shell's PATH is shown in amber and can be opened.
 - Search over name, server, user and file; filter by source; favourites (star, sorted first);
   the last five opened as "Recently opened". One cluster opens at a time, in its own window.
+- A menu bar with Edit and Window menus. Window > Clusters (Cmd/Ctrl+Shift+L) shows the chooser from any window
+  and creates it again if it was closed. On macOS the app stays running after its last window closes, and a Dock
+  click with no window open shows the chooser. The chooser page sends the menu words from the catalogues to Rust
+  after each language change.
 - English, Traditional Chinese and Simplified Chinese from the web interface's own
   catalogues (`web/src/i18n`, keys starting with `desktop.`). The first language comes from the system; the picker in the sidebar
   switches it live.

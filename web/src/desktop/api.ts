@@ -48,7 +48,26 @@ export interface Snapshot {
   shellPathUsed: boolean
 }
 
+export interface MenuLabels {
+  clusters: string
+  edit: string
+  undo: string
+  redo: string
+  cut: string
+  copy: string
+  paste: string
+  selectAll: string
+  window: string
+  minimize: string
+  close: string
+  hide: string
+  hideOthers: string
+  showAll: string
+  quit: string
+}
+
 export const api = {
+  setMenuLabels: (labels: MenuLabels) => invoke<void>("set_menu_labels", { labels }),
   snapshot: () => invoke<Snapshot>("snapshot"),
   addPaths: (paths: string[]) => invoke<void>("add_paths", { paths }),
   addPasted: (name: string, yaml: string) => invoke<void>("add_pasted", { name, yaml }),
@@ -63,5 +82,7 @@ export const api = {
 
 /** Broken entries are shown but cannot be opened. */
 export function blocked(auth: Auth): boolean {
-  return auth.state === "pluginMissing" || auth.state === "missingEntry" || auth.state === "fileMissing"
+  return (
+    auth.state === "pluginMissing" || auth.state === "missingEntry" || auth.state === "fileMissing"
+  )
 }
