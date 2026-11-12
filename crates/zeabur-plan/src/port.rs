@@ -19,14 +19,16 @@
 
 use k8s_openapi::api::core::v1::Container;
 use serde_json::{Value, json};
+use zeabur_graph::Workload;
 use zeabur_model::WorkloadRef;
 
 use crate::change::{DataEdit, DataKind, Warning};
 use crate::fields::Step;
-use crate::json::{add, remove, replace, test};
-use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
+use crate::json::{add, pointer, remove, replace, test};
+use crate::plan::{ErrorKind, PlanError, Planner, error, to_json, workload_target};
 use crate::public_port::service_target;
 use crate::rules::EnvEdit;
+use crate::settings::Found;
 
 const PROBES: [&str; 3] = ["livenessProbe", "readinessProbe", "startupProbe"];
 const HANDLERS: [&str; 3] = ["httpGet", "tcpSocket", "grpc"];
@@ -53,7 +55,7 @@ impl Planner<'_> {
         let found = self.editable_workload(reference)?;
         let target = Self::container(found, reference, container)?;
         let name = target.name.clone();
-        let source = self.port_source(&target.spec);
+        let source = self.port_source(&self.working_container(found, &target));
         if let Some((kind, data)) = &source {
             let edit = DataEdit {
                 op: "set".to_owned(),
@@ -105,6 +107,34 @@ impl Planner<'_> {
             self.env(reference, Some(&name), &[port])?;
         }
         self.move_target_ports(reference, from, to, &names)
+    }
+
+    /// The container as the earlier changes of this request left it, so that a `PORT` set before
+    /// the move is the one that moves. Reading it does not add the workload to the plan, so the
+    /// import is still written first.
+    fn working_container(&self, found: Workload<'_>, container: &Found) -> Container {
+        let target = workload_target(found);
+        let mut tokens: Vec<String> = Vec::new();
+        for token in found.kind().pod_template_path() {
+            tokens.push((*token).to_owned());
+        }
+        tokens.extend([
+            "spec".to_owned(),
+            "containers".to_owned(),
+            container.position.to_string(),
+        ]);
+        let refs: Vec<&str> = tokens.iter().map(String::as_str).collect();
+        let at = pointer(&refs);
+        for working in &self.objects {
+            if working.target != target {
+                continue;
+            }
+            let current = working.current.pointer(&at).cloned();
+            if let Some(Ok(spec)) = current.map(serde_json::from_value) {
+                return spec;
+            }
+        }
+        container.spec.clone()
     }
 
     /// The last Secret or ConfigMap `container` imports whole that holds `PORT`, unless it sets
