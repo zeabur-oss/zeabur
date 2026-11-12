@@ -1,13 +1,15 @@
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Input } from "@zeabur-oss/design-system/components/input"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import StarIcon from "~icons/ph/star"
 import StarFillIcon from "~icons/ph/star-fill"
+import WarningIcon from "~icons/ph/warning"
 
 import { useI18n } from "@/i18n"
 
-import { blocked, type Context, type Reach } from "./api"
+import { blocked, type Context, type Reach, type ShellRead } from "./api"
 import { authText, fileLabel, reachView } from "./model"
 
 function ReachBadge({ reach }: { reach: Reach | undefined }) {
@@ -90,9 +92,17 @@ function ContextServer({ context }: { context: Context }) {
   )
 }
 
-function ContextStatus({ context, reach }: { context: Context; reach: Reach | undefined }) {
+function ContextStatus({
+  context,
+  reach,
+  shell,
+}: {
+  context: Context
+  reach: Reach | undefined
+  shell: ShellRead
+}) {
   const { t } = useI18n()
-  const problem = authText(context.auth, t)
+  const problem = authText(context.auth, shell, t)
   const tone = blocked(context.auth) ? "text-fail-strong" : "text-warn-strong"
   return (
     <div className="flex min-w-0 flex-col items-start gap-1 @max-2xl:col-start-3 @max-2xl:row-span-2 @max-2xl:row-start-1">
@@ -115,10 +125,11 @@ interface RowProps {
   context: Context
   favourite: boolean
   reach: Reach | undefined
+  shell: ShellRead
   actions: RowActions
 }
 
-function ContextRow({ context, favourite, reach, actions }: RowProps) {
+function ContextRow({ context, favourite, reach, shell, actions }: RowProps) {
   const { t } = useI18n()
   return (
     <li className="grid grid-cols-desktop-row items-center gap-x-3 gap-y-1 border-b border-v2-separator px-4 py-2.5 last:border-b-0 @max-2xl:grid-cols-desktop-row-narrow">
@@ -127,7 +138,7 @@ function ContextRow({ context, favourite, reach, actions }: RowProps) {
       </div>
       <ContextName context={context} />
       <ContextServer context={context} />
-      <ContextStatus context={context} reach={reach} />
+      <ContextStatus context={context} reach={reach} shell={shell} />
       <Button
         variant="secondary"
         size="xs"
@@ -145,10 +156,11 @@ interface ListProps {
   contexts: Context[]
   favourites: Set<string>
   reach: Record<string, Reach>
+  shell: ShellRead
   actions: RowActions
 }
 
-function ContextList({ contexts, favourites, reach, actions }: ListProps) {
+function ContextList({ contexts, favourites, reach, shell, actions }: ListProps) {
   return (
     <ul className="@container rounded-lg border border-v2-border bg-surface">
       {contexts.map((c) => (
@@ -157,10 +169,26 @@ function ContextList({ contexts, favourites, reach, actions }: ListProps) {
           context={c}
           favourite={favourites.has(c.key)}
           reach={reach[c.key]}
+          shell={shell}
           actions={actions}
         />
       ))}
     </ul>
+  )
+}
+
+function ShellAlert({ shell }: { shell: ShellRead }) {
+  const { t } = useI18n()
+  if (shell.state !== "failed") return null
+  const title = shell.timedOut
+    ? t("desktop.shellTimeout", shell.shell)
+    : t("desktop.shellFailed", shell.shell)
+  return (
+    <Alert variant="warn" className="mb-4" title={shell.detail || undefined}>
+      <WarningIcon aria-hidden="true" />
+      <AlertTitle>{title}</AlertTitle>
+      <AlertDescription>{t("desktop.shellFix")}</AlertDescription>
+    </Alert>
   )
 }
 
@@ -199,6 +227,7 @@ export function ContextPane({ visible, recents, query, setQuery, ...list }: Pane
         />
       </header>
       <div className="flex-1 overflow-y-auto px-5 py-4">
+        <ShellAlert shell={list.shell} />
         <Recents contexts={recents} {...list} />
         {visible.length === 0 ? (
           <p className="py-10 text-center type-body text-secondary">

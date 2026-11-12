@@ -4155,7 +4155,7 @@ export const zhTW: Messages = {
   "desktop.reachRefused": "連線被拒絕",
   "desktop.reachTimeout": "沒有回應",
   "desktop.reachNone": "沒有伺服器位址",
-  "desktop.authShellPath": (command: string) => `會用你 shell PATH 裡的 ${command}`,
+  "desktop.authLooking": (command: string) => `正在找 ${command}…`,
   "desktop.authPluginMissing": (command: string) => `還沒安裝 ${command}`,
   "desktop.authMissingUser": (name: string) => `這個檔案裡沒有使用者 ${name}`,
   "desktop.authMissingCluster": (name: string) => `這個檔案裡沒有叢集 ${name}`,
@@ -4172,5 +4172,11 @@ export const zhTW: Messages = {
   "desktop.pasteEmpty": "這份 kubeconfig 裡沒有任何 context。",
   "desktop.cancel": "取消",
   "desktop.language": "語言",
+  "desktop.shellFailed": (shell: string) =>
+    `Zeabur 讀不到 ${shell} 的設定，在 shell 設定檔裡裝的程式可能會找不到。`,
+  "desktop.shellTimeout": (shell: string) =>
+    `${shell} 超過 10 秒還沒啟動完，在 shell 設定檔裡裝的程式可能會找不到。`,
+  "desktop.shellFix":
+    "如果 context 顯示 exec plugin 還沒安裝，請在 kubeconfig 裡寫上 plugin 的完整路徑，例如 /opt/homebrew/bin/aws。",
   // desktop:end
 }

@@ -4143,7 +4143,7 @@ export const zhCN: Messages = {
   "desktop.reachRefused": "连接被拒绝",
   "desktop.reachTimeout": "没有响应",
   "desktop.reachNone": "没有服务器地址",
-  "desktop.authShellPath": (command: string) => `会用你 shell PATH 里的 ${command}`,
+  "desktop.authLooking": (command: string) => `正在找 ${command}…`,
   "desktop.authPluginMissing": (command: string) => `还没安装 ${command}`,
   "desktop.authMissingUser": (name: string) => `这个文件里没有用户 ${name}`,
   "desktop.authMissingCluster": (name: string) => `这个文件里没有集群 ${name}`,
@@ -4160,5 +4160,11 @@ export const zhCN: Messages = {
   "desktop.pasteEmpty": "这份 kubeconfig 里没有任何 context。",
   "desktop.cancel": "取消",
   "desktop.language": "语言",
+  "desktop.shellFailed": (shell: string) =>
+    `Zeabur 读不到 ${shell} 的设置，在 shell 配置文件里装的程序可能会找不到。`,
+  "desktop.shellTimeout": (shell: string) =>
+    `${shell} 超过 10 秒还没启动完，在 shell 配置文件里装的程序可能会找不到。`,
+  "desktop.shellFix":
+    "如果 context 显示 exec plugin 还没安装，请在 kubeconfig 里写上 plugin 的完整路径，例如 /opt/homebrew/bin/aws。",
   // desktop:end
 }

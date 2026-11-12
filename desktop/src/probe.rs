@@ -26,7 +26,10 @@ fn host_port(server: &str) -> Option<(String, u16)> {
     }
     .ok()?;
     // An IPv6 host comes in brackets.
-    let host = url.host_str()?.trim_start_matches('[').trim_end_matches(']');
+    let host = url
+        .host_str()?
+        .trim_start_matches('[')
+        .trim_end_matches(']');
     Some((host.to_owned(), url.port_or_known_default()?))
 }
 
@@ -49,7 +52,11 @@ pub fn probe(server: Option<&str>) -> Reach {
             Err(_) => {}
         }
     }
-    if refused { Reach::Refused } else { Reach::TimedOut }
+    if refused {
+        Reach::Refused
+    } else {
+        Reach::TimedOut
+    }
 }
 
 #[cfg(test)]
@@ -58,10 +65,25 @@ mod tests {
 
     #[test]
     fn server_urls_give_host_and_port() {
-        assert_eq!(host_port("https://10.0.0.12:6443"), Some(("10.0.0.12".into(), 6443)));
-        assert_eq!(host_port("https://api.example.com/k8s"), Some(("api.example.com".into(), 443)));
-        assert_eq!(host_port("https://[fd00::1]:6443"), Some(("fd00::1".into(), 6443)));
-        assert_eq!(host_port("http://127.0.0.1"), Some(("127.0.0.1".into(), 80)));
-        assert_eq!(host_port("10.0.0.12:6443"), Some(("10.0.0.12".into(), 6443)));
+        assert_eq!(
+            host_port("https://10.0.0.12:6443"),
+            Some(("10.0.0.12".into(), 6443))
+        );
+        assert_eq!(
+            host_port("https://api.example.com/k8s"),
+            Some(("api.example.com".into(), 443))
+        );
+        assert_eq!(
+            host_port("https://[fd00::1]:6443"),
+            Some(("fd00::1".into(), 6443))
+        );
+        assert_eq!(
+            host_port("http://127.0.0.1"),
+            Some(("127.0.0.1".into(), 80))
+        );
+        assert_eq!(
+            host_port("10.0.0.12:6443"),
+            Some(("10.0.0.12".into(), 6443))
+        );
     }
 }
