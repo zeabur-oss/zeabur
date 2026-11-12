@@ -1,6 +1,6 @@
 import type { Translate } from "@/i18n"
 
-import type { Auth, Context, Reach, Snapshot, SourceKind } from "./api"
+import type { Auth, Context, Reach, ShellRead, Snapshot, SourceKind } from "./api"
 
 export function baseName(path: string): string {
   const parts = path.split(/[\\/]/).filter(Boolean)
@@ -41,22 +41,33 @@ export function reachView(reach: Reach | undefined, t: Translate): ReachView {
 }
 
 type AuthMessages = {
-  [S in Auth["state"]]: (auth: Extract<Auth, { state: S }>, t: Translate) => string | null
+  [S in Auth["state"]]: (
+    auth: Extract<Auth, { state: S }>,
+    shell: ShellRead,
+    t: Translate,
+  ) => string | null
 }
 
 const authMessages: AuthMessages = {
   ok: () => null,
-  shellPathOnly: (auth, t) => t("desktop.authShellPath", auth.command),
-  pluginMissing: (auth, t) => t("desktop.authPluginMissing", auth.command),
-  missingEntry: (auth, t) =>
+  pluginMissing: (auth, shell, t) =>
+    t(
+      shell.state === "pending" ? "desktop.authLooking" : "desktop.authPluginMissing",
+      auth.command,
+    ),
+  missingEntry: (auth, _, t) =>
     t(auth.what === "user" ? "desktop.authMissingUser" : "desktop.authMissingCluster", auth.name),
-  fileMissing: (auth, t) => t("desktop.authFileMissing", fileLabel(auth.path)),
+  fileMissing: (auth, _, t) => t("desktop.authFileMissing", fileLabel(auth.path)),
 }
 
 /** What is wrong with a context's sign-in, or null when nothing is. */
-export function authText(auth: Auth, t: Translate): string | null {
-  const message = authMessages[auth.state] as (auth: Auth, t: Translate) => string | null
-  return message(auth, t)
+export function authText(auth: Auth, shell: ShellRead, t: Translate): string | null {
+  const message = authMessages[auth.state] as (
+    auth: Auth,
+    shell: ShellRead,
+    t: Translate,
+  ) => string | null
+  return message(auth, shell, t)
 }
 
 /** A screenshot scenario such as `lang=en;q=prod`. */

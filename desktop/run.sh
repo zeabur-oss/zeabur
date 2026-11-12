@@ -9,13 +9,13 @@ if [[ "${1:-}" == "--fixtures" ]]; then
   state=$(mktemp -d)
   export ZEABUR_DESKTOP_STATE=$state
   export KUBECONFIG=$root/desktop/fixtures/home/.kube/config
-  printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$root/desktop/fixtures/team" > "$state/state.json"
+  printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$root/desktop/fixtures/team" > "$state/settings.json"
 fi
 
 # GNOME takes a window's name and icon from the desktop entry named after its app ID (the
 # identifier in tauri.conf.json), and the icon by name from the hicolor theme. The entry starts
 # only the debug binary, which needs the servers below, so it is removed again on exit.
-id=com.zeabur.desktop-poc
+id=com.zeabur.oss.desktop
 data=${XDG_DATA_HOME:-$HOME/.local/share}
 installed=()
 if [[ "$(uname -s)" == Linux ]]; then
