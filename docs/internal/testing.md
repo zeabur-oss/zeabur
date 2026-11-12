@@ -14,8 +14,43 @@ that level cannot see: wiring, a real kube-apiserver, a real browser [pyramid].
 | Unit, property and fixture tests | the pure crates (`zeabur-graph`, `-plan`, `-gaps`, `-modules`, `-recommend`, …) and [`fixtures/`](../../fixtures/README.md) | the rules: projection, plans, diagnoses, gaps. Properties where an invariant exists (a planned change projects back to exactly what was asked) [quickcheck]; examples for known edges and past bugs, which random inputs rarely reach [proptest-limits] |
 | API tests over the in-memory cluster | `crates/zeabur-api/tests/it`, one test binary (helpers shared with the cluster tests in `tests/common`) | the HTTP API end to end: routes, status codes, problems, what leaves the server |
 | Cluster tests on k3s | `crates/*/tests/kubernetes.rs`, `#[ignore]`d ([CONTRIBUTING](../../CONTRIBUTING.md#tests)); each test's namespace and person come from `zeabur-test-support`'s `sandbox` | what only kube-apiserver decides: acting as the person, RBAC refusals, `test` preconditions, field managers, concurrent writes. The in-memory cluster is a fake; what it claims about kube-apiserver is checked here, by one suite of write behaviors run against both (`crates/zeabur-kube/tests/contract`) [swe-doubles] |
-| Browser tests (Playwright) | `web/e2e` (local mode, `scripts/e2e-ui.sh`) and `web/e2e/full` (in a cluster with Zeabur Identity, `scripts/e2e.sh`) | user journeys and what only a browser shows: the CSP, masked values on screen, keyboard use, passkey sign-in. Logic in the interface is tested with `bun test` [e2e-good] |
-| Zeabur Proxy's canary | `scripts/e2e-proxy.sh` (`cargo xtask e2e-proxy`), in a cluster with VictoriaLogs and `proxy.enabled` (and VictoriaMetrics for the metrics part) | that a person reads no other namespace's log lines or series, however the request is put. A check that fails for a known reason outside Zeabur prints `skip` with the reason and the run goes on. The proxy's attack table, property and fuzz target cover its parser in `cargo test` and the `fuzz` job (merge queue) |
+| Browser tests (Playwright) | `web/e2e` (local mode, `scripts/e2e-ui.sh`) and `web/e2e/full` (in a cluster with Zeabur Identity, `scripts/e2e.sh`; the specs that need Zeabur Builder or the database operators run in the nightly `e2e-full` job) | user journeys and what only a browser shows: the CSP, masked values on screen, keyboard use, passkey sign-in. Logic in the interface is tested with `bun test` [e2e-good] |
+| Zeabur Proxy's canary | `scripts/e2e-proxy.sh` (`cargo xtask e2e-proxy`), in a cluster with VictoriaLogs and `proxy.enabled` (and VictoriaMetrics for the metrics part) | that a person reads no other namespace's log lines or series, however the request is put. A check that fails for a known reason outside Zeabur prints `skip` with the reason and the run goes on. The proxy's attack table, property and fuzz target cover its parser in `cargo test` and the `fuzz` job (nightly). It runs in the `canary` job, nightly; a failure opens or updates the issue "Nightly canary failing" |
+
+### Browser test files
+
+Each file says why it exists, so a deletion can name the coverage it keeps. In `web/e2e` (local
+mode, one cluster-admin person):
+
+| File | Why |
+|---|---|
+| `ui.spec.ts` | the journeys through the pages: reading, writing through a plan, masked values, keyboard use |
+| `layout.spec.ts` | the page's frame and edges: nothing but the sidebar and main scrolls, at a phone and a desktop width, also with 40 services when `ZEABUR_E2E_CROWDED` names such a project (no job sets it yet) |
+| `motion.spec.ts` | the promised motion: the design system's timings, reduced motion, no layout shift on Home, the system's theme from the first frame |
+| `click-feedback.spec.ts` | a click answers before its data or code arrives |
+| `dock.spec.ts` | the terminal dock under every page |
+| `files.spec.ts` | the Files tab, also of an image with no shell |
+| `log-history.spec.ts` | the states of log history, with Zeabur Proxy stubbed (local mode runs without it) |
+| `problems.spec.ts` | the states a test cluster does not reach on its own, stubbed |
+| `usage.spec.ts` | the usage and history pages in every state, stubbed |
+
+In `web/e2e/full` (a cluster with Zeabur Identity, real people and roles):
+
+| File | Why |
+|---|---|
+| `signin.spec.ts` | the first admin enrols a passkey and signs in; a terminal asks for the passkey again |
+| `roles.spec.ts` | an admin invites a Developer and a Viewer, who each see what their role allows |
+| `account.spec.ts` | a member manages their passkeys |
+| `terminal.spec.ts` | a person cannot reach another person's tools pod |
+| `usage.spec.ts` | a Viewer who may not list every pod is told it needs more rights |
+| `image.spec.ts` | deploying an image and deleting it leaves none of what it made |
+| `databases.spec.ts` | a Developer creates and backs up a database; a Viewer cannot back it up or read its password |
+| `git.spec.ts`, `upload.spec.ts` | deploying from Git and from an uploaded folder reach a running service |
+| `git-private.spec.ts` | a deploy key opens a private repository and taking it off is reported (needs `E2E_PRIVATE_GIT_REPO`) |
+
+A case that needs a variable the run does not set skips; `scripts/e2e-ui.sh` sets every variable
+the local specs read except `ZEABUR_E2E_SHOTS`, which saves screenshots rather than checking
+anything.
 
 ## What we do not test
 
@@ -31,8 +66,8 @@ that level cannot see: wiring, a real kube-apiserver, a real browser [pyramid].
 
 Removing or weakening one of these tests needs another test of the same promise first.
 
-- Secret values never leave the server: not in YAML, lists, `last-applied-configuration` or
-  plans, and a masked value is never written back.
+- Secret values leave the server only for one Secret the person may `get` (its YAML, a reveal):
+  never in lists, `last-applied-configuration` or plans.
 - Every read and write acts as the person, with their credential; nothing is impersonated.
 - A write never takes over a field Helm, Argo CD or Flux owns.
 - A plan's JSON Patch `test` operations refuse a stale write (`409`); of concurrent applies of one
@@ -54,18 +89,11 @@ Removing or weakening one of these tests needs another test of the same promise 
 - **No real clock where the answer depends on the date**: tests fix it (`zeabur_api::Options::clock`).
 - **A flaky test is broken.** It is fixed or removed, not retried until green [nondeterminism].
 
-## Mutation testing
+## Cost runs
 
-[cargo-mutants](https://mutants.rs) runs weekly (`.github/workflows/mutants.yml`, settings in
-`.cargo/mutants.toml`). It makes small edits to the code, such as a negated condition or a
-deleted `match` arm, and runs the tests; a *missed* mutant is code no test checks. Mutants
-detected by a suite track the real faults it detects [mutants-real], and developers shown live
-mutants write better tests [mutants-google].
-
-The report gates nothing. For a missed mutant, add or sharpen a test of the behavior that should
-have broken, through the public interface, not of the mutation itself; when the mutant changes
-nothing observable, leave it [mutants-results]. Run it on one file with
-`cargo mutants -f <path>`.
+What a read costs is measured by hand, never asserted. The `zeabur-overview-cost` skill says how
+to measure the project overview read; a change that claims to save work measures before and after
+and puts both in the pull request.
 
 [swe-unit]: https://abseil.io/resources/swe-book/html/ch12.html
 [swe-doubles]: https://abseil.io/resources/swe-book/html/ch13.html
@@ -80,6 +108,3 @@ nothing observable, leave it [mutants-results]. Run it on one file with
 [nondeterminism]: https://martinfowler.com/articles/nonDeterminism.html
 [playwright]: https://playwright.dev/docs/api/class-page#page-wait-for-timeout
 [sig-e2e]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-testing/writing-good-e2e-tests.md
-[mutants-real]: https://homes.cs.washington.edu/~rjust/publ/JustJIEHF2014b-abstract.html
-[mutants-google]: https://arxiv.org/abs/2103.07189
-[mutants-results]: https://mutants.rs/using-results.html

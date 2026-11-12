@@ -1,0 +1,26 @@
+name: Catalog release
+description: >-
+  Restores the dev shell's ZEABUR_CATALOG_RELEASE (the catalog tool builds it from Go source) from
+  the cache that main's runs keep, keyed on the lock file. Run it after Nix is installed and
+  before the first `nix develop`. Without a cache the shell builds it, as it does locally.
+
+runs:
+  using: composite
+  steps:
+    - id: restore
+      uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/catalog-release-store
+        key: catalog-release-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
+    # Root trusts the unsigned local store.
+    - if: steps.restore.outputs.cache-hit == 'true'
+      shell: bash
+      run: sudo "$(command -v nix)" copy --no-check-sigs --from "file://$HOME/.cache/catalog-release-store" --all
+    - if: github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'
+      shell: bash
+      run: nix copy --to "file://$HOME/.cache/catalog-release-store" "$(nix build --inputs-from . catalog#release --no-link --print-out-paths)"
+    - if: github.ref == 'refs/heads/main' && steps.restore.outputs.cache-hit != 'true'
+      uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+      with:
+        path: ~/.cache/catalog-release-store
+        key: catalog-release-${{ runner.arch }}-${{ hashFiles('flake.lock') }}

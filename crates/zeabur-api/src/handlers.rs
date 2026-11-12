@@ -44,7 +44,7 @@ pub struct AppState {
     /// Reads images' configurations from their registries (see [`crate::images`]).
     pub images: Arc<crate::images::Inspector>,
     /// The client of GitHub's API; `None` when TLS could not be set up.
-    pub github: Option<crate::images::https::Https>,
+    pub github: Option<zeabur_http::Https>,
     /// Zeabur's releases as GitHub listed them last (see [`crate::cluster::update`]).
     pub releases: Arc<crate::cluster::update::Releases>,
     /// Pushes uploaded folders to the registry (see [`crate::projects::source_upload`]).
@@ -54,6 +54,8 @@ pub struct AppState {
     /// Zeabur's own service account, which may use pods in the terminal namespace only (see
     /// [`crate::tools`]); `None` where there is none (local mode).
     pub terminals: Option<Arc<dyn Cluster>>,
+    /// Receives each feature a successful write used (see [`crate::used`]).
+    pub used: Option<crate::used::Used>,
 }
 
 impl std::fmt::Debug for AppState {

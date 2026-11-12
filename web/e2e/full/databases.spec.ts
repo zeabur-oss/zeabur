@@ -130,7 +130,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       const drawer = developer.getByRole("dialog", { name: "New database" })
       await drawer.getByRole("textbox", { name: "Name" }).fill(db.name)
       await drawer.getByRole("textbox", { name: "Storage per instance" }).fill("1Gi")
-      await expect(drawer.getByRole("alert")).toContainText("nothing takes over")
+      await expect(drawer.getByRole("note")).toContainText("nothing takes over")
       await drawer.getByRole("button", { name: "Review changes", exact: true }).click()
       await apply(developer, `Create database ${db.name}`)
 

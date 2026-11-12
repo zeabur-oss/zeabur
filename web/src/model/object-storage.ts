@@ -53,7 +53,7 @@ const secured = { podSecurityContext: restrictedPod, containerSecurityContext: r
 
 const create = (object: Record<string, unknown>): Change => ({
   op: "create",
-  object: object as Record<string, never>,
+  object: { ...object },
 })
 
 const persisted = (storageClass?: string) => ({

@@ -108,36 +108,16 @@
         ]
       },
       "locked": {
-        "lastModified": 1793633888,
-        "narHash": "sha256-sU+MYwhvoOk1qX1itJ/y/6qPRBkxUe2OMmTZOiaRwYs=",
+        "lastModified": 1794462949,
+        "narHash": "sha256-2Sxj81nKFq8ka1p8gJLQgfLvJI/RPsScfoVyqOn2lw8=",
         "owner": "zeabur-oss",
         "repo": ".github",
-        "rev": "6ab106525ce16169ab0ecfebe4b0248e096797fa",
+        "rev": "c811a342a6d03ba1c9103d800476bc95285c0648",
         "type": "github"
       },
       "original": {
         "owner": "zeabur-oss",
         "repo": ".github",
-        "type": "github"
-      }
-    },
-    "oss-skills": {
-      "inputs": {
-        "nixpkgs": [
-          "nixpkgs"
-        ]
-      },
-      "locked": {
-        "lastModified": 1793633868,
-        "narHash": "sha256-qODxdDNXxZWg3vnVU1aIGy/7lqTLacwewp9SGqDqOBA=",
-        "owner": "zeabur-oss",
-        "repo": "skills",
-        "rev": "0d35b57004c8082ff6f612d91096d608c03f70c1",
-        "type": "github"
-      },
-      "original": {
-        "owner": "zeabur-oss",
-        "repo": "skills",
         "type": "github"
       }
     },
@@ -146,7 +126,6 @@
         "catalog": "catalog",
         "nixpkgs": "nixpkgs",
         "oss": "oss",
-        "oss-skills": "oss-skills",
         "rust-overlay": "rust-overlay",
         "zhtw-mcp": "zhtw-mcp"
       }

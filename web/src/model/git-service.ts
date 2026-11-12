@@ -410,7 +410,7 @@ export function createGitService(
 ): Change[] {
   const changes: Change[] = gitObjects(form, project, registry, domains).map((object) => ({
     op: "create",
-    object: object as Record<string, never>,
+    object: { ...object },
   }))
   if (form.access === "deployKey" && form.sealedKey)
     changes.push({ op: "deployKey", name: credentialsName(form.name), key: form.sealedKey })
@@ -485,7 +485,7 @@ export function buildOptionsChanges(build: Build, options: BuildOptions): Change
         metadata: { name: secret, labels: { "app.kubernetes.io/name": build.name } },
         type: "Opaque",
         stringData: Object.fromEntries(options.set.map((v) => [v.name, v.value])),
-      } as unknown as Record<string, never>,
+      },
     })
   return changes
 }

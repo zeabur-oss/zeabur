@@ -113,7 +113,7 @@ const repository = (target: VolumeTarget, project: string, claim: string) =>
 
 const create = (object: Record<string, unknown>): Change => ({
   op: "create",
-  object: object as Record<string, never>,
+  object: { ...object },
 })
 
 /** The writes that back `claim` up on a schedule, to `target`, as `as`. */

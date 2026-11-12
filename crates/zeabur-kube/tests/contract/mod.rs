@@ -4,15 +4,18 @@
 //! suite is what makes that trust checked rather than assumed [swe-doubles].
 //!
 //! Each behaviour takes a [`Cluster`] acting as a person who may get, create and patch
-//! ConfigMaps and Deployments, and delete ConfigMaps, in `namespace`, which starts empty.
+//! ConfigMaps and Deployments, and delete ConfigMaps, in `namespace`, which starts empty. The
+//! Secret behaviour also needs `get`, `list` and `create` on Secrets.
 //!
 //! [swe-doubles]: https://abseil.io/resources/swe-book/html/ch13.html
 
+use base64::Engine as _;
 use serde_json::{Value, json};
 use zeabur_core::json_patch::apply_patch;
 use zeabur_core::problem::KubernetesStatus;
 use zeabur_kube::{
-    Cluster, ClusterError, ClusterExt as _, ObjectTarget, Preconditions, WriteBody, WriteRequest,
+    Cluster, ClusterError, ClusterExt as _, ObjectTarget, Preconditions, ResourceRef, WriteBody,
+    WriteRequest,
 };
 
 fn target(
@@ -423,4 +426,76 @@ pub(crate) async fn a_deletion_keeps_to_its_preconditions(cluster: &impl Cluster
     assert_eq!(read(cluster, &settings).await, Ok(None));
     let again = status(cluster.write(&delete(&uid, &version, false)).await);
     assert_eq!(again.0, 404, "{again:?}");
+}
+
+/// Given a Secret with a type and two keys, when it is read as any other object (a list, a get
+/// and a typed list), then its type and keys are there and no value is, in plain text or in the
+/// base64 kube-apiserver stores; the person's explicit request for its values returns them.
+pub(crate) async fn a_secret_read_generically_keeps_its_keys_but_not_its_values(
+    cluster: &impl Cluster,
+    namespace: &str,
+) {
+    let secret = target(namespace, "v1", "Secret", "secrets", "db");
+    let body = json!({"apiVersion": "v1", "kind": "Secret", "type": "Opaque",
+        "metadata": {"name": "db"},
+        "stringData": {"password": "hunter2-value", "user": "admin-value"}});
+    cluster
+        .write(&write(&secret, WriteBody::Create(body), false))
+        .await
+        .expect("create the Secret");
+
+    let resource = ResourceRef::new("", "v1", "secrets", "Secret");
+    let listed = cluster
+        .list_objects(&resource, Some(namespace))
+        .await
+        .expect("list the Secrets")
+        .expect("Secrets are served");
+    let got = cluster
+        .get_object(&resource, Some(namespace), "db")
+        .await
+        .expect("get the Secret")
+        .expect("Secrets are served");
+    let typed = cluster
+        .list::<k8s_openapi::api::core::v1::Secret>(Some(namespace))
+        .await
+        .expect("list the Secrets as Secrets");
+
+    let texts = [
+        serde_json::to_string(&listed).unwrap(),
+        serde_json::to_string(&got).unwrap(),
+        serde_json::to_string(&typed).unwrap(),
+    ];
+    for value in ["hunter2-value", "admin-value"] {
+        let encoded = base64::engine::general_purpose::STANDARD.encode(value);
+        for text in &texts {
+            assert!(!text.contains(value) && !text.contains(&encoded), "{text}");
+        }
+    }
+    let [only] = listed.as_slice() else {
+        panic!("{listed:?}")
+    };
+    assert_eq!(only.data["type"], "Opaque");
+    let keys = |object: &zeabur_kube::DynamicObject| -> Vec<String> {
+        object.data["data"]
+            .as_object()
+            .unwrap()
+            .keys()
+            .cloned()
+            .collect()
+    };
+    assert_eq!(keys(only), ["password", "user"]);
+    assert_eq!(keys(&got), ["password", "user"]);
+    assert_eq!(typed.len(), 1);
+    assert_eq!(typed[0].type_.as_deref(), Some("Opaque"));
+    assert_eq!(
+        typed[0].data.as_ref().map(std::collections::BTreeMap::len),
+        Some(2)
+    );
+
+    let revealed = cluster
+        .reveal_secret(namespace, "db")
+        .await
+        .expect("reveal the Secret");
+    assert_eq!(revealed["password"], b"hunter2-value");
+    assert_eq!(revealed["user"], b"admin-value");
 }

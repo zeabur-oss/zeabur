@@ -16,8 +16,7 @@ use bytes::Bytes;
 use http_body_util::Full;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-
-use crate::images::https::Https;
+use zeabur_http::Https;
 
 /// The most a GitHub answer may be.
 const LIMIT: usize = 4 * 1024 * 1024;

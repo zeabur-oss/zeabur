@@ -1,11 +1,14 @@
 //! The experience program (docs/reference/telemetry.mdx): one event the first time each person
-//! uses Zeabur's web interface in a UTC day.
+//! uses Zeabur's web interface in a UTC day, and one the first time each feature with its values
+//! is used.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
 
 use zeabur_core::crypto;
-use zeabur_telemetry::{Day, Event, InstallationId, Mode, Sender, Switch, ZeaburActive};
+use zeabur_telemetry::{
+    Day, Event, Feature, FeatureUsed, InstallationId, Mode, Sender, Switch, ZeaburActive,
+};
 
 /// The people seen in the current UTC day, in memory only. A restart forgets them, but the
 /// hash sent for a person stays the same all day, so they are counted once.
@@ -20,6 +23,7 @@ struct State {
     key: [u8; 32],
     day: Day,
     seen: HashSet<[u8; 16]>,
+    features: HashSet<Feature>,
 }
 
 impl Daily {
@@ -29,6 +33,7 @@ impl Daily {
                 key,
                 day: Day::from_unix(0),
                 seen: HashSet::new(),
+                features: HashSet::new(),
             }),
         }
     }
@@ -37,16 +42,32 @@ impl Daily {
     /// `person` is seen in that day.
     fn first(&self, person: &str, now: i64) -> Option<(Day, [u8; 16])> {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        let day = Day::from_unix(now);
-        if day != state.day {
-            state.day = day;
-            state.seen.clear();
-        }
+        let day = state.today(now);
         let mut input = day.since_epoch().to_be_bytes().to_vec();
         input.extend_from_slice(person.as_bytes());
         let mut hash = [0_u8; 16];
         hash.copy_from_slice(&crypto::hmac_sha256(&state.key, &input)[..16]);
         state.seen.insert(hash).then_some((day, hash))
+    }
+
+    /// The day of `now`, when it is the first time `feature` is used in that day.
+    fn first_use(&self, feature: Feature, now: i64) -> Option<Day> {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        let day = state.today(now);
+        state.features.insert(feature).then_some(day)
+    }
+}
+
+impl State {
+    /// The day of `now`; a new day forgets what was seen in the last.
+    fn today(&mut self, now: i64) -> Day {
+        let day = Day::from_unix(now);
+        if day != self.day {
+            self.day = day;
+            self.seen.clear();
+            self.features.clear();
+        }
+        day
     }
 }
 
@@ -79,6 +100,11 @@ impl Telemetry {
         Self { on }
     }
 
+    /// Whether anything is sent.
+    pub(crate) const fn is_on(&self) -> bool {
+        self.on.is_some()
+    }
+
     #[cfg(test)]
     pub(crate) const fn off() -> Self {
         Self { on: None }
@@ -104,6 +130,26 @@ impl Telemetry {
             sender.send(&id, &event);
         }));
     }
+
+    /// Sends `feature` in the background the first time in a UTC day that it is used, with
+    /// these values. Called after the API call that used it succeeded.
+    pub(crate) fn used(&self, feature: Feature, now: i64) {
+        let Some((daily, sender, id)) = &self.on else {
+            return;
+        };
+        let Some(day) = daily.first_use(feature, now) else {
+            return;
+        };
+        let event = Event::FeatureUsed(FeatureUsed {
+            zeabur_version: env!("CARGO_PKG_VERSION"),
+            day,
+            feature,
+        });
+        let (sender, id) = (Arc::clone(sender), id.clone());
+        drop(tokio::task::spawn_blocking(move || {
+            sender.send(&id, &event);
+        }));
+    }
 }
 
 impl std::fmt::Debug for Telemetry {
@@ -116,6 +162,8 @@ impl std::fmt::Debug for Telemetry {
 
 #[cfg(test)]
 mod tests {
+    use zeabur_telemetry::Source;
+
     use super::*;
 
     const DAY: i64 = 86_400;
@@ -151,6 +199,21 @@ mod tests {
         let next = daily.first("alice", midnight).unwrap();
         assert_eq!(next.0, Day::from_unix(midnight));
         assert_ne!(late.1, next.1);
+    }
+
+    #[test]
+    fn a_feature_is_reported_once_a_day_for_each_of_its_values() {
+        let daily = daily();
+        let wordpress = Feature::ServiceCreated(Source::Template("wordpress"));
+        let ghost = Feature::ServiceCreated(Source::Template("ghost"));
+        assert_eq!(daily.first_use(wordpress, NOW), Some(Day::from_unix(NOW)));
+        assert_eq!(daily.first_use(wordpress, NOW + 5), None);
+        assert!(daily.first_use(ghost, NOW + 6).is_some());
+        let tomorrow = NOW - NOW.rem_euclid(DAY) + DAY;
+        assert_eq!(
+            daily.first_use(wordpress, tomorrow),
+            Some(Day::from_unix(tomorrow))
+        );
     }
 
     #[test]

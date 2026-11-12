@@ -70,7 +70,7 @@ function Failure({
   // The problem's type names a page that explains its rule (RFC 9457, section 3.1.1).
   const page = isKind(body.kind) && body.type.startsWith("/problems/") ? body.type : undefined
   return (
-    <Alert variant="problem">
+    <Alert variant="problem" role="alert">
       <WarningCircleIcon aria-hidden="true" />
       <AlertTitle>{text.headline}</AlertTitle>
       <AlertDescription>

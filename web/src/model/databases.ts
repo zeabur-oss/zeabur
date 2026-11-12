@@ -291,7 +291,7 @@ export function nameProblem(name: string, taken: string[]): NameProblem | undefi
 
 const create = (object: Manifest): Change => ({
   op: "create",
-  object: object as Record<string, never>,
+  object: { ...object },
 })
 
 /** Every object Zeabur makes for a database carries this label with the database's name, so

@@ -3,7 +3,7 @@ import { queryOptions } from "@tanstack/react-query"
 
 import { isStatus, type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
-import { queryClient } from "@/api/queries"
+import { refresh, reviewOnce } from "@/api/queries"
 
 export type ClusterToolsPlan = Schemas.ClusterToolsPlan
 
@@ -14,13 +14,15 @@ export const clusterToolsQuery = queryOptions({
 })
 
 export function refreshClusterTools() {
-  void queryClient.invalidateQueries({ queryKey: clusterToolsQuery.queryKey })
+  void refresh(clusterToolsQuery)
 }
 
 /** Writes nothing. */
-export async function planClusterTools(signal?: AbortSignal) {
-  return await zeabur.planClusterTools({ signal })
-}
+export const clusterToolsPlanQuery = queryOptions({
+  queryKey: ["cluster-tools-plan"],
+  queryFn: async ({ signal }) => await zeabur.planClusterTools({ signal }),
+  ...reviewOnce,
+})
 
 export async function applyClusterTools(token: string) {
   return await zeabur.applyClusterTools({ token })

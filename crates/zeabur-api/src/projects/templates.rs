@@ -13,7 +13,7 @@ use zeabur_plan::{Change, ErrorPageHtml, PlanRequest, TemplateChange};
 use crate::error::ApiError;
 
 /// The template a `pageServer` change deploys.
-const PAGE_SERVER_TEMPLATE: &str = "error-pages";
+pub(crate) const PAGE_SERVER_TEMPLATE: &str = "error-pages";
 
 /// `request` with each `template` and `pageServer` change opened into the `create` of each object
 /// of its template; the request as it is when it has none.

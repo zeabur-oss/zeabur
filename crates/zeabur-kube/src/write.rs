@@ -141,6 +141,15 @@ pub(crate) async fn write(
             "application/json-patch+json",
             operations,
         ),
+        WriteBody::MergePatch(body) => (
+            http::Request::patch(format!(
+                "{}?{}",
+                object_path(&request.target),
+                query(request)
+            )),
+            "application/merge-patch+json",
+            body,
+        ),
         WriteBody::EphemeralContainers(operations) => (
             http::Request::patch(format!(
                 "{}/ephemeralcontainers?{}",

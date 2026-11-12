@@ -152,6 +152,7 @@ async fn compute(
     project: &str,
     request: &PlanRequest,
     now: &str,
+    read_at: Timestamp,
     cluster_issuer: Option<&str>,
     build_registry: Option<&str>,
 ) -> Result<Plan, ApiError> {
@@ -163,7 +164,7 @@ async fn compute(
         .await
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(project)))?;
     let routes = objects.http_routes.clone();
-    let (snapshot, _) = snapshot(objects);
+    let (snapshot, _) = snapshot(objects, read_at);
     let wants_gateways = request
         .changes
         .iter()
@@ -245,13 +246,15 @@ async fn compute(
     Ok(plan)
 }
 
-/// [`compute`], or [`terminal::compute`] for a terminal's change.
+/// [`compute`], or [`terminal::compute`] for a terminal's change. `now` is when the plan was
+/// made; `read_at` is the server's clock as the cluster is read.
 async fn compute_any(
     planner: &terminal::Planner<'_>,
     cluster: &dyn Cluster,
     project: &str,
     request: &PlanRequest,
     now: &str,
+    read_at: Timestamp,
     settings: &Settings,
 ) -> Result<Plan, ApiError> {
     if request.changes.iter().any(Change::is_terminal_change) {
@@ -263,6 +266,7 @@ async fn compute_any(
             project,
             request,
             now,
+            read_at,
             project_deletion::zeabur_namespaces(settings),
         )
         .await
@@ -272,6 +276,7 @@ async fn compute_any(
             project,
             request,
             now,
+            read_at,
             settings.domains.cluster_issuer.as_deref(),
             settings.builds.registry.as_deref(),
         )
@@ -322,6 +327,7 @@ pub(crate) async fn plan(
         &project,
         &opened,
         &made_at,
+        now,
         &state.settings,
     )
     .await?;
@@ -449,6 +455,7 @@ pub(crate) async fn apply(
         &project,
         &opened,
         &claims.made_at,
+        (state.clock)(),
         &state.settings,
     )
     .await?;
@@ -492,6 +499,15 @@ pub(crate) async fn apply(
                 return Err(ApiError::from(refusal(problem, &plan, &target, &applied)));
             }
         }
+    }
+    if let Some(used) = &state.used {
+        crate::used::report(
+            used,
+            cluster.as_ref(),
+            &state.settings,
+            &claims.request.changes,
+        )
+        .await;
     }
     Ok(Json(ApplyResponse { applied }))
 }
@@ -613,6 +629,7 @@ pub(crate) fn write_request(
             Write::Patch { operations } => {
                 WriteBody::JsonPatch(serde_json::Value::Array(operations.clone()))
             }
+            Write::MergePatch { body } => WriteBody::MergePatch(body.clone()),
             Write::EphemeralContainers { operations } => {
                 WriteBody::EphemeralContainers(serde_json::Value::Array(operations.clone()))
             }
@@ -679,6 +696,12 @@ mod tests {
                 ),
                 object("Secret", patch.clone()),
                 object(
+                    "Secret",
+                    Write::MergePatch {
+                        body: json!({"data": {"id": "aWQ=", "gone": null}}),
+                    },
+                ),
+                object(
                     "ConfigMap",
                     Write::Create {
                         body: body("ConfigMap"),
@@ -691,12 +714,13 @@ mod tests {
         }
         .without_secret_values();
         let secret_values = ["hunter2", "hunter3", "aWQ=", "bmV3"];
-        let shown = serde_json::to_string(&plan.objects[..2]).unwrap();
+        let shown = serde_json::to_string(&plan.objects[..3]).unwrap();
         for value in secret_values {
             assert!(!shown.contains(value), "{value} in {shown}");
         }
         assert!(shown.contains("\"7\"") && shown.contains("kept"), "{shown}");
-        let kept = serde_json::to_string(&plan.objects[2..]).unwrap();
+        assert!(shown.contains("\"gone\":null"), "{shown}");
+        let kept = serde_json::to_string(&plan.objects[3..]).unwrap();
         for value in secret_values {
             assert!(kept.contains(value), "{value} in {kept}");
         }

@@ -8,7 +8,7 @@ import CaretDownIcon from "~icons/ph/caret-down"
 import GithubLogoIcon from "~icons/ph/github-logo"
 
 import type { Schemas } from "@/api/client"
-import { gitHubAppQuery, planGrant } from "@/api/github-app"
+import { gitHubAppQuery, grantPlanQuery } from "@/api/github-app"
 import { GitHubAppPlanDialog } from "@/components/github-app-plan"
 import { useT } from "@/i18n"
 import { adding } from "@/lib/adding"
@@ -37,16 +37,10 @@ export function GitHubConnect({ project }: { project: string }) {
         <GitHubAppPlanDialog
           title={t("add.githubGrant", granting.account, project)}
           action={t("plan.apply")}
-          queryKey={["github-app-grant", granting.id, project]}
-          plan={(signal) =>
-            planGrant(
-              {
-                installationId: granting.id,
-                namespaces: withProject(granting.namespaces, project),
-              },
-              signal,
-            )
-          }
+          plan={grantPlanQuery({
+            installationId: granting.id,
+            namespaces: withProject(granting.namespaces, project),
+          })}
           onDone={() => setGranting(undefined)}
           onClose={() => setGranting(undefined)}
         />

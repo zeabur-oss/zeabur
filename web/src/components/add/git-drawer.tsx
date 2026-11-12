@@ -287,7 +287,7 @@ function DeployKeyFields({
         </div>
       )}
       {makeKey.isError ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <AlertDescription>{toProblem(makeKey.error).detail}</AlertDescription>
         </Alert>
       ) : null}

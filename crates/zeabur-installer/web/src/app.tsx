@@ -256,7 +256,7 @@ export function App() {
             current={shownSteps.indexOf(step)}
           />
           {loadError ? (
-            <Alert variant="destructive">
+            <Alert variant="destructive" role="alert">
               <AlertTitle>{t("common.error")}</AlertTitle>
               <AlertDescription>{loadError}</AlertDescription>
             </Alert>

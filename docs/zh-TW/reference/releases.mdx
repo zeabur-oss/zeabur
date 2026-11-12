@@ -1,7 +1,6 @@
 ---
 title: 發行檔與驗證
 description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章與建置來源後再執行。
-source: "3896a0a6cfe9"
 ---
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為 zeabur-oss 共用的 release workflow，且是為本 repository 該版本 tag 執行的那一次，通過了才解壓縮、執行。
@@ -72,17 +71,33 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 
 checksum 不符時，重新下載那個檔案。簽署者、issuer 或 attestation 不符時，不要執行檔案，先核對 release、檔名、workflow 身分、repository 和 tag，也不要為了通過而放寬驗證參數。
 
-用 macOS 瀏覽器下載的檔案會帶 quarantine 標記。驗證通過後，對解出的檔案執行：
+macOS 版本以 Developer ID 簽署，並經過 Apple 公證，所以用瀏覽器下載、帶有 quarantine 標記的檔案，macOS 也會讓它執行。要確認的話，執行：
 
 ```sh
-xattr -d com.apple.quarantine zeaburctl
+spctl --assess -vvv --type open --context context:primary-signature ./zeaburctl
 ```
 
-用 `gh release download` 下載就不會有這個標記。macOS 版本有 Sigstore 簽章，但沒有經過 Apple notarization。
+輸出必須是下面兩種之一，不是的話請不要開啟這個檔案。
+
+v0.2.0 起用 Zeabur 的憑證簽署：
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: ZEABUR PTE. LTD. (6T873K59LQ)
+```
+
+v0.2.0 之前用 Yi-Jyun Pan 的帳號簽署：
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
+```
 
 ## 驗證映像檔與 chart
 
-發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照，Zeabur Proxy 的那幾行以 `proxy` 開頭：
+發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照，Zeabur Proxy 的那幾行以 `proxy` 開頭。`debug` 和 `tools` 兩行是 Zeabur 為除錯容器和終端機使用的其他專案映像檔，Zeabur 不為它們簽章，cosign 只驗證其餘的映像檔：
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
@@ -91,6 +106,8 @@ index  ghcr.io/zeabur-oss/zeabur@sha256:...
 proxy linux/amd64  ghcr.io/zeabur-oss/proxy@sha256:...
 proxy linux/arm64  ghcr.io/zeabur-oss/proxy@sha256:...
 proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
+debug index  docker.io/library/busybox:...@sha256:...
+tools index  docker.io/alpine/k8s:...@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 
@@ -118,6 +135,16 @@ cosign verify \
 ```
 
 角括號換成 `digests.txt` 裡的值。在既有叢集安裝 chart 的步驟見[在既有叢集安裝](../install/existing-cluster.mdx)。
+
+## 把映像檔複製到自己的 registry
+
+要把映像檔複製到私有 registry，或依名稱放行，就以 `digests.txt` 為清單。清單列出 Zeabur 與 chart 會用到的映像檔，包含 `debug` 和 `tools`。印出各映像檔的 image index：
+
+```sh
+awk '$(NF-1) == "index" { print $NF }' digests.txt
+```
+
+用你慣用的工具逐一複製，並保留 digest，chart 和簽章才對得上。Zeabur Catalog 元件的映像檔不在這個檔案裡。
 
 ## 發行流程
 

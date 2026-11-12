@@ -32,4 +32,10 @@ utoipa = { workspace = true, optional = true }
 
 [dev-dependencies]
 zeabur-test-support.workspace = true
+datatest-stable.workspace = true
 proptest.workspace = true
+
+# One test per fixture case (datatest-stable runs them).
+[[test]]
+name = "fixtures"
+harness = false

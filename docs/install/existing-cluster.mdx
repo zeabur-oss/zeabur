@@ -111,6 +111,30 @@ Zeabur trusts these certificates in addition to the built-in Mozilla CA bundle w
 
 zeabur-installer sets `issuer.caBundle` and `builds.caBundle` to reference the local CA that signs Identity's certificate and Zot's CA, respectively. Zeabur trusts them alongside `extraTrustedCA`, so you don't need to set them yourself.
 
+## Send outbound traffic through a proxy
+
+If the cluster can only reach the internet through a proxy, turn on `outboundProxy`. Zeabur then sends the requests it makes itself through that proxy, which are reading images from registries, reading backups from object storage, and connecting to GitHub.
+
+```sh
+helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
+  --version <version> \
+  --namespace zeabur --reset-then-reuse-values \
+  --set outboundProxy.enabled=true \
+  --set outboundProxy.httpsProxy=http://proxy.corp.example:3128
+```
+
+Set `outboundProxy.httpsProxy` for HTTPS destinations, `outboundProxy.httpProxy` for HTTP ones, or both. The address must start with `http://`. Zeabur reaches an HTTPS destination through the proxy with a `CONNECT` tunnel. If the proxy needs a user name and password, write them in the address (`http://user:password@proxy.corp.example:3128`).
+
+Some destinations never go through the proxy.
+
+- Local addresses, such as `localhost` and `127.0.0.1`.
+- Names ending in `.svc` or `.cluster.local`, and the cluster's pod and Service ranges. They default to `10.42.0.0/16` and `10.43.0.0/16`, the k3s and RKE2 defaults. If your cluster uses other ranges, set `outboundProxy.clusterNetwork`.
+- Anything you add to `outboundProxy.noProxy`, as domain suffixes (`.corp.example`), addresses, or CIDR ranges.
+
+Zeabur still refuses the same targets as without a proxy. A registry or backup address that points to this machine, a link-local address, or a cloud metadata address is refused even when the proxy could reach it. Zeabur checks the address itself and asks the proxy to connect to that address, so the proxy's DNS answer cannot send the request somewhere else. The proxy's own address can be on a private network.
+
+This setting does not change Zeabur Proxy (`proxy.*`), which serves logs and metrics. Signing in with Identity and requests to the Kubernetes API don't use the proxy. If the proxy inspects TLS, also trust its CA. See [Trust a private CA](#trust-a-private-ca).
+
 ## Common failures
 
 | Situation | What to check |

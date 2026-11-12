@@ -11,8 +11,8 @@ import { isStatus, type Schemas } from "@/api/client"
 import {
   applyNotifications,
   notificationsQuery,
-  planNotifications,
-  queryClient,
+  notificationsPlanQuery,
+  refresh as refreshQuery,
 } from "@/api/queries"
 import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { FormField } from "@/components/form-field"
@@ -544,15 +544,8 @@ function PlanDialog({
   onClose: () => void
 }) {
   const t = useT()
-  const key = notificationsQuery(project).queryKey
-  const refresh = () => void queryClient.invalidateQueries({ queryKey: key })
-  const plan = useQuery({
-    queryKey: [...key, "plan", request],
-    queryFn: ({ signal }) => planNotifications(project, request, signal),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-  })
+  const refresh = () => void refreshQuery(notificationsQuery(project))
+  const plan = useQuery(notificationsPlanQuery(project, request))
   const apply = useMutation({
     mutationFn: (token: string) => applyNotifications(project, token),
     onSuccess: () => {

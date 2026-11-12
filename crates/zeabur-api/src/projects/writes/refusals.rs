@@ -161,7 +161,8 @@ pub(super) fn write_problem(
 }
 
 /// `write` as kube-apiserver's authorizers see it [k8s-authz]: a creation is a `create` of the
-/// collection, which names no object; a JSON Patch is a `patch` of the object, a deletion a
+/// collection, which names no object; a JSON Patch or a merge patch is a `patch` of the
+/// object, a deletion a
 /// `delete` of it, and a debug container a `patch` of the pod's `ephemeralcontainers`
 /// subresource. A cluster-scoped object (the project's Namespace) names no namespace.
 ///
@@ -170,7 +171,9 @@ pub(super) fn denied(write: &WriteRequest) -> Denied {
     let target = &write.target;
     let (verb, name, subresource) = match write.body {
         WriteBody::Create(_) => ("create", None, ""),
-        WriteBody::JsonPatch(_) => ("patch", Some(target.name.clone()), ""),
+        WriteBody::JsonPatch(_) | WriteBody::MergePatch(_) => {
+            ("patch", Some(target.name.clone()), "")
+        }
         WriteBody::EphemeralContainers(_) => {
             ("patch", Some(target.name.clone()), "/ephemeralcontainers")
         }

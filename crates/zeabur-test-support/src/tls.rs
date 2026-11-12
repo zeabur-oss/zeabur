@@ -1,9 +1,9 @@
 //! Certificates made for this test run and a loopback HTTPS server, to test which certificates a
 //! client trusts.
 //!
-//! Two unrelated CAs, [`ca_a`] and [`ca_b`], and a leaf for `localhost` and `127.0.0.1` that CA A
-//! signed. Each is valid from an hour ago for a day, so none can expire under a checked-in test.
-//! The server presents the leaf.
+//! Two unrelated CAs, [`ca_a`] and [`ca_b`], and a leaf for `localhost`, `127.0.0.1`,
+//! `registry.test` and `10.43.0.10` that CA A signed. Each is valid from an hour ago for a day, so
+//! none can expire under a checked-in test. The server presents the leaf.
 
 use std::net::SocketAddr;
 use std::sync::{Arc, LazyLock};
@@ -46,8 +46,13 @@ static CERTIFICATES: LazyLock<Certificates> = LazyLock::new(|| {
     let (ca_a, issuer) = ca("Zeabur test CA A");
     let (ca_b, _) = ca("Zeabur test CA B");
 
-    let mut params = CertificateParams::new(["localhost".to_owned(), "127.0.0.1".to_owned()])
-        .expect("leaf names");
+    let mut params = CertificateParams::new([
+        "localhost".to_owned(),
+        "127.0.0.1".to_owned(),
+        "registry.test".to_owned(),
+        "10.43.0.10".to_owned(),
+    ])
+    .expect("leaf names");
     valid(&mut params);
     params
         .distinguished_name

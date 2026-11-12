@@ -40,8 +40,9 @@ import {
 } from "@zeabur-oss/release";
 import { $ } from "bun";
 import { existsSync } from "node:fs";
-import { cp, mkdir, readdir, rm } from "node:fs/promises";
+import { appendFile, cp, mkdir, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
+import { readDefaultImages, type DefaultImage } from "./default-images";
 import { parseVersion, pinTag, type Version } from "./versions";
 
 const root = resolve(import.meta.dir, "..");
@@ -105,6 +106,30 @@ function assetSources(version: Version, artifacts: string): [string, string][] {
       [`zeabur-installer-${v}-linux-${arch}.tar.gz`, `finish-linux-${arch}`],
     );
   return files.map(([file, dir]) => [file, join(artifacts, dir, file)]);
+}
+
+// The images Zeabur runs by default and does not publish, as the code pins them: each is an index
+// that the registry still serves for both platforms. digests.txt lists them for mirroring; they
+// are neither signed nor attested.
+async function defaultsOf(): Promise<DefaultImage[]> {
+  let found: DefaultImage[];
+  try {
+    found = readDefaultImages(
+      await Bun.file(join(root, "crates/zeabur-api/src/settings.rs")).text(),
+    );
+  } catch (e) {
+    return fail((e as Error).message);
+  }
+  for (const { ref } of found) {
+    const manifest = await $`crane manifest ${ref}`.json();
+    const platforms: string[] = (manifest.manifests ?? []).map(
+      (m: { platform: { os: string; architecture: string } }) =>
+        `${m.platform.os}/${m.platform.architecture}`,
+    );
+    for (const want of ["linux/amd64", "linux/arm64"])
+      if (!platforms.includes(want)) fail(`${ref} has no ${want} image`);
+  }
+  return found;
 }
 
 // Every image the chart runs, with each optional workload on.
@@ -445,6 +470,7 @@ async function publish(version: Version, artifacts: string, out: string) {
     ...images.map(({ name }) => `ghcr.io/${owner}/${name}:${plain}`),
     `${charts}/zeabur:${plain}`,
   );
+  const defaults = await defaultsOf();
 
   const chart = join(dir, "chart");
   await cp(chartDir, chart, { recursive: true });
@@ -467,6 +493,8 @@ async function publish(version: Version, artifacts: string, out: string) {
     values = pinDigest(values, key, index.digest);
   }
   await Bun.write(valuesFile, values);
+  for (const { label, ref } of defaults)
+    await appendFile(join(out, "digests.txt"), `${label} index  ${ref}\n`);
   // The chart runs each image pinned to its index, and no other.
   const pinned = await chartImages(chart);
   if (pinned !== indexes.sort().join(", "))
@@ -555,6 +583,11 @@ async function verify(
         await verifyImage(digests, label, ["linux/amd64", "linux/arm64"])
       ).toString(),
     );
+  // The images Zeabur runs by default are listed as the code pins them.
+  const entries = await readDigests(digests);
+  for (const { label, ref } of await defaultsOf())
+    if (recorded(entries, `${label} index`).toString() !== ref)
+      fail(`digests.txt does not list ${ref} as the ${label} image`);
   const chartRef = await verifyChart(digests, chart);
   // The chart runs those images and no other.
   const pinned = await chartImages(chart);

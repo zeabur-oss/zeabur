@@ -5,9 +5,8 @@ description: Implement or change a security- or protocol-relevant behaviour in Z
 
 # Specification-driven work
 
-Follow `zeabur-oss-spec-work` (install: `npx skills add zeabur-oss/skills --skill
-zeabur-oss-spec-work`; `skills-lock.json` pins it): read the source, cite it in rustdoc, fail
-closed, test the attack. In Zeabur also:
+Follow `zeabur-oss-spec-work` (copied from zeabur-oss/.github by the Update workflow): read the
+source, cite it in rustdoc, fail closed, test the attack. In Zeabur also:
 
 1. **Plans.** A plan is applied only against the resource versions it was computed from;
    anything changed in between is refused. Test tampered plan tokens, replays and concurrent

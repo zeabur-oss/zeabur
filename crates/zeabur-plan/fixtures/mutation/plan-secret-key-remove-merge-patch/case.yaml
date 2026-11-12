@@ -1,0 +1,10 @@
+description: "Removing a Secret key is a merge patch that sets the key to null, so the other keys stay although their values were not read."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: data
+        kind: Secret
+        name: db
+        changes:
+          - {op: remove, key: password}

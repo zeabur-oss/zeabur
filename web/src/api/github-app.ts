@@ -1,12 +1,12 @@
 // The cluster's GitHub App (`/api/v1/cluster/github-app`) and the installations granted to a
 // project (`/api/v1/projects/{project}/github-app`).
-import { queryOptions } from "@tanstack/react-query"
+import { queryOptions, type QueryKey } from "@tanstack/react-query"
 
 import { type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
-import { queryClient } from "@/api/queries"
+import { queryClient, reviewOnce } from "@/api/queries"
 
-export type GitHubAppPlan = Schemas.GitHubAppPlan
+type GitHubAppPlan = Schemas.GitHubAppPlan
 
 export const gitHubAppQuery = queryOptions({
   queryKey: ["cluster", "github-app"],
@@ -32,21 +32,27 @@ export async function startManifest(body: Schemas.GitHubManifestRequest): Promis
   return (await zeabur.startGitHubAppManifest(body)).formUrl
 }
 
+const planning = (key: QueryKey, plan: (signal: AbortSignal) => Promise<GitHubAppPlan>) =>
+  queryOptions({
+    queryKey: key,
+    queryFn: async ({ signal }) => await plan(signal),
+    ...reviewOnce,
+    refetchOnWindowFocus: false,
+  })
+
+export type GitHubAppPlanQuery = ReturnType<typeof planning>
+
 /** Turns the code GitHub sent back into the App, and plans storing it; writes nothing. */
-export async function convertCode(
-  body: Schemas.GitHubConversionRequest,
-  signal?: AbortSignal,
-): Promise<GitHubAppPlan> {
-  return await zeabur.convertGitHubApp(body, { signal })
-}
+export const conversionPlanQuery = (body: Schemas.GitHubConversionRequest) =>
+  planning(["github-app-conversion", body.code], (signal) =>
+    zeabur.convertGitHubApp(body, { signal }),
+  )
 
 /** What granting an installation to projects writes; writes nothing. */
-export async function planGrant(
-  body: Schemas.GitHubGrantRequest,
-  signal?: AbortSignal,
-): Promise<GitHubAppPlan> {
-  return await zeabur.planGitHubApp(body, { signal })
-}
+export const grantPlanQuery = (body: Schemas.GitHubGrantRequest) =>
+  planning(["github-app-grant", body.installationId, body.namespaces], (signal) =>
+    zeabur.planGitHubApp(body, { signal }),
+  )
 
 export async function applyGitHubApp(token: string): Promise<Schemas.GitHubAppApplied> {
   return await zeabur.applyGitHubApp({ token })

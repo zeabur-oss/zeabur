@@ -465,7 +465,7 @@ async fn credentials(
     Ok((issuer, key, api.unwrap_or_else(|| default_api.to_owned())))
 }
 
-fn client(state: &AppState) -> Result<&crate::images::https::Https, ApiError> {
+fn client(state: &AppState) -> Result<&zeabur_http::Https, ApiError> {
     state.github.as_ref().ok_or_else(|| {
         problem(
             Kind::Internal,

@@ -1,7 +1,6 @@
 ---
 title: 发行文件与验证
 description: 按操作系统选择 Zeabur 发行文件，验证校验和、签名和构建来源后再运行。
-source: "3896a0a6cfe9"
 ---
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 选好版本，下载对应的压缩包、`SHA256SUMS` 和签名。验证时，将签名者限定为 zeabur-oss 共用的 release workflow，且是为本仓库该版本 tag 运行的那一次，验证通过后再解压、运行。
@@ -72,17 +71,33 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 
 校验和不匹配时，重新下载该文件。签名者、issuer 或 attestation 不匹配时，不要运行文件，先核对 release、文件名、workflow 身份、仓库和 tag，也不要放宽验证参数来让验证通过。
 
-通过 macOS 浏览器下载的文件会带有 quarantine 标记。验证通过后，对解压出的文件运行：
+macOS 版本使用 Developer ID 签名，并经过 Apple 公证，所以通过浏览器下载、带有 quarantine 标记的文件，macOS 也会允许它运行。要确认的话，运行：
 
 ```sh
-xattr -d com.apple.quarantine zeaburctl
+spctl --assess -vvv --type open --context context:primary-signature ./zeaburctl
 ```
 
-用 `gh release download` 下载的文件不会带有这个标记。macOS 版本有 Sigstore 签名，但未经过 Apple 公证。
+输出必须是下面两种之一，不是的话请不要打开这个文件。
+
+v0.2.0 起使用 Zeabur 的证书签名：
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: ZEABUR PTE. LTD. (6T873K59LQ)
+```
+
+v0.2.0 之前使用 Yi-Jyun Pan 的账号签名：
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
+```
 
 ## 验证镜像与 chart
 
-发行说明只写这一版改了什么，不列出摘要。`digests.txt` 每行一条，列出各平台镜像、镜像索引和 chart 的完整 registry 引用，Zeabur Proxy 的几行以 `proxy` 开头：
+发行说明只写这一版改了什么，不列出摘要。`digests.txt` 每行一条，列出各平台镜像、镜像索引和 chart 的完整 registry 引用，Zeabur Proxy 的几行以 `proxy` 开头。`debug` 和 `tools` 两行是 Zeabur 为调试容器和终端使用的其他项目的镜像，Zeabur 不为它们签名，所以下面的 cosign 只验证其余的镜像：
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
@@ -91,6 +106,8 @@ index  ghcr.io/zeabur-oss/zeabur@sha256:...
 proxy linux/amd64  ghcr.io/zeabur-oss/proxy@sha256:...
 proxy linux/arm64  ghcr.io/zeabur-oss/proxy@sha256:...
 proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
+debug index  docker.io/library/busybox:...@sha256:...
+tools index  docker.io/alpine/k8s:...@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 
@@ -118,6 +135,16 @@ cosign verify \
 ```
 
 将尖括号部分替换为 `digests.txt` 中的值。在已有集群中安装 chart 的步骤见[在已有集群中安装](../install/existing-cluster.mdx)。
+
+## 把镜像复制到自己的 registry
+
+要把镜像复制到私有 registry，或按名称放行，就以 `digests.txt` 为清单。里面列出 Zeabur 和它的 chart 会用到的镜像，包含 `debug` 和 `tools`。打印各镜像的镜像索引：
+
+```sh
+awk '$(NF-1) == "index" { print $NF }' digests.txt
+```
+
+用你惯用的工具逐一复制，并保留 digest，chart 和签名才对得上。Zeabur Catalog 组件的镜像不在这个文件里。
 
 ## 发布流程
 

@@ -1347,7 +1347,6 @@ export const zhCN: Messages = {
   "object.moreStatus": (fields: string) => `其他字段：${fields}`,
   "object.statusLabel": (name: string) => `${name} 的状态`,
   "tab.yaml": "YAML",
-  "yaml.hidden": "机密变量的值已隐藏。",
   "yaml.intro": (name: string) => `这份是目前 ${name} 在集群里的配置，改了会照原样写入。`,
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
@@ -1463,7 +1462,6 @@ export const zhCN: Messages = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的证书不是由 cert-manager 签发的，请到生成证书的地方加入 ${host}`,
   "warn.nodeCapacityUnknown": "无法读取节点：构建上限没有和最大的节点比对",
-  "warn.secretValuesUnknown": (name: string) => `无法读取 ${name} 的值：差异只列出键名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 读取配置文件或机密变量：回滚不会改动这些内容`,
   "warn.storageClassUnknown": (claim: string) =>
@@ -1714,7 +1712,8 @@ export const zhCN: Messages = {
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `移除 ${host}`,
   "yaml.edit": "编辑",
-  "yaml.editSecret": "保留 (hidden) 的值不会改变。",
+  "yaml.editSecret":
+    "data 下的值都用 base64 编码，不接受 stringData。想直接输入文字，请从服务的变量编辑这个机密变量。",
   "yaml.notEditable": "这类对象由 Kubernetes 自行管理，要修改请编辑拥有它的对象。",
   "title.editYaml": (name: string) => `编辑 ${name}`,
   "title.delete": (kind: string, name: string) => `删除 ${kind} ${name}`,
@@ -1851,7 +1850,10 @@ export const zhCN: Messages = {
     `服务的注解也指定了 ${names}，不论这里是否开启，这些项目变更时服务都会重启。`,
   "reload.unknown": "以你的权限，Zeabur 看不到这个集群是否运行着 Reloader。",
   "reload.running": "这个集群运行着 Reloader。",
-  "data.reveal": "显示值",
+  "data.show": (key) => `显示 ${key} 的值`,
+  "data.hide": (key) => `隐藏 ${key} 的值`,
+  "data.bytes": (n) => `${n} 字节`,
+  "data.download": (key) => `下载 ${key}`,
   "data.binary": "二进制",
   "data.noChanges": "没有变更。",
   "net.addDomain": "添加域名",
@@ -2532,7 +2534,7 @@ export const zhCN: Messages = {
   "add.keyscan": "在你的电脑上运行",
   "add.keyscanHint":
     "在你信任的网络上运行。创建后会列出每把密钥的指纹，请和主机管理员公布的指纹对照。",
-  "add.knownHosts": "主机密变量钥（known_hosts）",
+  "add.knownHosts": "主机密钥（known_hosts）",
   "add.knownHostsHint": "粘贴命令输出的内容。Zeabur Builder 只连接持有这些密钥的主机。",
   "add.hostKeys": "Zeabur Builder 信任的主机密变量钥",
   "add.hostKeysCheck": "和 Git 主机管理员公布的指纹对照，一致后再添加公钥。",

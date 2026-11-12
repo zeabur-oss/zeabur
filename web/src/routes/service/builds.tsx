@@ -263,7 +263,7 @@ function Refused({
         </a>
       ) : null}
       {show.isError ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <AlertDescription>{toProblem(show.error).detail}</AlertDescription>
         </Alert>
       ) : null}

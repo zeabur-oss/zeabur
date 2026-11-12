@@ -1,7 +1,6 @@
 ---
 title: 新增與維護節點
 description: 用 zeabur-installer 加入新節點，停止排程，用 kubectl 移走副本與移除節點，並在需要時安全地開啟節點終端機。
-source: "cdb7a13a9dd3"
 ---
 
 到**叢集** → **概覽**的**節點**查看每台主機的狀況。要多一台主機執行服務，見[加入節點](#加入節點)。主機要停機維護時，在該節點的操作選單選**停止排程**，需要移走副本時再用 kubectl 的 `drain`。
@@ -19,7 +18,7 @@ source: "cdb7a13a9dd3"
 
 | 方向 | K3s | RKE2 |
 | --- | --- | --- |
-| 連到伺服器 | TCP 6443 | TCP 9345、6443 |
+| 連到伺服器 | TCP 6443（[限制來源](../reference/security.mdx#kubernetes-api)） | TCP 9345、6443 |
 | 所有節點之間 | TCP 10250，UDP 4789（Calico VXLAN） | TCP 10250、9099，UDP 8472（Canal VXLAN） |
 | 伺服器之間 | 不用 | TCP 2379–2381 |
 

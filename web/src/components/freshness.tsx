@@ -1,7 +1,7 @@
-import { useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 
+import { refreshProject } from "@/api/queries"
 import { StatusDot } from "@/components/status"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
@@ -49,17 +49,13 @@ export function Freshness({
   failed: boolean
 }) {
   const t = useT()
-  const client = useQueryClient()
   const [refreshing, setRefreshing] = useState(false)
   if (!updatedAt) return null
   const refresh = async () => {
     setRefreshing(true)
     const started = Date.now()
     try {
-      await client.invalidateQueries({
-        queryKey: ["project", project],
-        predicate: (query) => query.queryKey[2] !== "logs",
-      })
+      await refreshProject(project, { logs: false })
     } finally {
       const left = spinAtLeast - (Date.now() - started)
       if (left > 0) await new Promise((resolve) => window.setTimeout(resolve, left))

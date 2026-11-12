@@ -1,0 +1,31 @@
+{
+  "objects": [
+    {
+      "after": {
+        "apiVersion": "v1",
+        "data": {},
+        "kind": "Secret",
+        "metadata": {
+          "name": "db",
+          "namespace": "demo"
+        },
+        "type": "Opaque"
+      },
+      "changes": [
+        {
+          "before": "(hidden)",
+          "path": "data.password"
+        }
+      ],
+      "write": {
+        "body": {
+          "data": {
+            "password": null
+          }
+        },
+        "type": "mergePatch"
+      }
+    }
+  ],
+  "warnings": []
+}
