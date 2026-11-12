@@ -29,7 +29,7 @@ port 5173, and the app. The chooser is `web/desktop.html` with `web/src/desktop/
 - Search over name, server, user and file; filter by source; favourites (star, sorted first);
   the last five opened as "Recently opened"; select several and open them together. Each cluster
   opens in its own window.
-- English, Traditional Chinese, Simplified Chinese and Japanese (draft) from Fluent files in
+- English, Traditional Chinese and Simplified Chinese from Fluent files in
   `web/src/desktop/locales/`. The first language comes from the system; the picker in the sidebar
   switches it live.
 
@@ -128,10 +128,7 @@ Differs on purpose:
 5. **Updates and signing.** Tauri's updater needs a signed update feed; macOS needs a Developer ID
    certificate and notarization; Windows needs a code signing certificate to avoid SmartScreen
    warnings. None of this is set up.
-6. **The word "context" in Chinese.** zh-TW and zh-CN keep "context" (kubectl's word); ja uses
-   コンテキスト. The web interface has no Japanese yet, so a Japanese desktop opens it in the
-   system language or English.
-7. **Japanese copy** is a draft and needs a native reviewer.
+6. **The word "context" in Chinese.** zh-TW and zh-CN keep "context" (kubectl's word).
 
 ## Windows
 

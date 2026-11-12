@@ -2,14 +2,14 @@
 # Screenshots of every screen (macOS). Needs the demo API and the web dev server running, and a
 # built app (`cargo build` in desktop/).
 #   desktop/shots.sh desktop/shots [screens...]
-# LANGS and THEMES narrow the set, e.g. LANGS=ja THEMES=dark.
+# LANGS and THEMES narrow the set, e.g. LANGS=zh-TW THEMES=dark.
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 out=$1; shift
 screens=${*:-first list search paste select drop cluster}
 home=$D/fixtures/home/.kube/config
 mkdir -p "$out"
-for lang in ${LANGS:-en zh-TW zh-CN ja}; do
+for lang in ${LANGS:-en zh-TW zh-CN}; do
  for theme in ${THEMES:-light dark}; do
   for screen in $screens; do
     st=$(mktemp -d)

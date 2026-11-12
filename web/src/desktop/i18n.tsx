@@ -2,20 +2,18 @@ import { FluentBundle, FluentResource, type FluentVariable } from "@fluent/bundl
 import { createContext, useContext, useMemo, useState, type ReactNode } from "react"
 
 import en from "./locales/en.ftl?raw"
-import ja from "./locales/ja.ftl?raw"
 import zhCN from "./locales/zh-CN.ftl?raw"
 import zhTW from "./locales/zh-TW.ftl?raw"
 
-export type Lang = "en" | "zh-TW" | "zh-CN" | "ja"
+export type Lang = "en" | "zh-TW" | "zh-CN"
 
 export const languages: readonly { value: Lang; label: string }[] = [
   { value: "en", label: "English" },
   { value: "zh-TW", label: "繁體中文" },
   { value: "zh-CN", label: "简体中文" },
-  { value: "ja", label: "日本語" },
 ]
 
-const sources: Record<Lang, string> = { en, "zh-TW": zhTW, "zh-CN": zhCN, ja }
+const sources: Record<Lang, string> = { en, "zh-TW": zhTW, "zh-CN": zhCN }
 
 function bundle(lang: Lang): FluentBundle {
   const b = new FluentBundle(lang)
@@ -38,11 +36,10 @@ function translator(lang: Lang): T {
   }
 }
 
-/** The system language first, English when none of the four match. */
+/** The system language first, English when none of the three match. */
 export function systemLang(): Lang {
   for (const tag of navigator.languages) {
     const lower = tag.toLowerCase()
-    if (lower.startsWith("ja")) return "ja"
     if (lower.startsWith("zh")) {
       return /-(tw|hk|mo|hant)/.test(lower) ? "zh-TW" : "zh-CN"
     }
