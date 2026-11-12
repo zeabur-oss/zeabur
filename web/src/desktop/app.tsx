@@ -7,6 +7,7 @@ import { api, type Context, type Snapshot } from "./api"
 import { DropOverlay, FirstRun, type AddActions } from "./chrome"
 import { ContextPane, type RowActions } from "./contexts"
 import { useDropTarget, useScenario, useSnapshot } from "./hooks"
+import { useMenuBar } from "./menu"
 import { recentContexts, visibleContexts } from "./model"
 import { PasteDialog, type Paste } from "./paste-dialog"
 import { pasteSample } from "./shots"
@@ -60,6 +61,7 @@ export function App() {
   const [only, setOnly] = useState<string | null>(null)
   const [paste, setPaste] = useState<Paste | null>(null)
   const { dropping, setDropping } = useDropTarget(reload)
+  useMenuBar()
 
   useScenario(reload, {
     locale,
@@ -98,7 +100,7 @@ export function App() {
   )
 
   return (
-    <div className="flex h-dvh bg-surface-page text-main">
+    <div data-titlebar-inset className="flex h-dvh bg-surface-page text-main select-none">
       {snap.sources.length === 0 ? <FirstRun actions={add} /> : browser}
       <PasteDialog paste={paste} setPaste={setPaste} reload={reload} />
       <DropOverlay dropping={dropping} />

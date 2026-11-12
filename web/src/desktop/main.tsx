@@ -7,9 +7,11 @@ import { followSystemTheme } from "@/theme"
 import { I18nProvider, prepareI18n } from "@/i18n"
 
 import { App } from "./app"
+import { keepContextMenuForText } from "./menu"
 
 followSystemTheme()
-document.documentElement.classList.add("bg-surface-page")
+document.documentElement.classList.add("bg-surface-page", "overscroll-none")
+keepContextMenuForText()
 
 const root = document.getElementById("root")
 if (root) {

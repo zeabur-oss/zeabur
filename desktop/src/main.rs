@@ -1,6 +1,8 @@
 //! Proof of concept: the Zeabur desktop app. It lists every context of every kubeconfig source and
 //! opens Zeabur's web interface for the ones the person picks.
 
+mod chrome;
+mod menu;
 mod probe;
 mod shots;
 mod sources;
@@ -213,9 +215,8 @@ fn open_cluster(
     }
     let builder = WebviewWindowBuilder::new(&handle, label, WebviewUrl::External(url))
         .title(format!("{name} - Zeabur"))
-        .inner_size(1280.0, 800.0)
-        .position(120.0, 80.0)
         .initialization_script(&script);
+    let builder = chrome::cluster_window(&handle, builder);
     let window = shots::apply_theme(builder).build().map_err(|e| e.to_string())?;
     if shots::wants("cluster") {
         shots::capture(window);
@@ -245,6 +246,8 @@ fn login_shell_path() -> Vec<PathBuf> {
 fn main() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(chrome::window_state())
+        .on_menu_event(menu::on_menu_event)
         .setup(|tauri_app| {
             let state_dir = match std::env::var_os("ZEABUR_DESKTOP_STATE") {
                 Some(dir) => PathBuf::from(dir),
@@ -272,15 +275,9 @@ fn main() {
                 web_url: std::env::var("ZEABUR_DESKTOP_WEB").unwrap_or_else(|_| "http://localhost:5173/".into()),
             });
 
-            let mut builder = WebviewWindowBuilder::new(tauri_app, "main", WebviewUrl::App("desktop.html".into()))
-                .title("Zeabur")
-                .inner_size(1040.0, 680.0)
-                .min_inner_size(720.0, 480.0);
-            builder = shots::apply_theme(builder);
-            let window = builder.build()?;
-            if shots::wants("main") {
-                shots::capture(window);
-            }
+            let web_url = tauri_app.state::<App>().web_url.parse::<tauri::Url>()?;
+            chrome::allow_title_bar(tauri_app.handle(), &web_url)?;
+            chrome::show_chooser(tauri_app.handle())?;
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -291,11 +288,13 @@ fn main() {
             toggle_favourite,
             probe,
             open_cluster,
-            scenario
+            scenario,
+            menu::set_menu
         ])
-        .run(tauri::generate_context!())
+        .build(tauri::generate_context!())
         .unwrap_or_else(|err| {
             eprintln!("zeabur-desktop: {err}");
             std::process::exit(1);
-        });
+        })
+        .run(chrome::on_run_event);
 }

@@ -17,6 +17,7 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 tauri = "2"
 tauri-plugin-dialog = "2"
+tauri-plugin-window-state = "2"
 
 # Set for a build that embeds web/dist instead of loading the dev server (`--features custom-protocol`).
 [features]

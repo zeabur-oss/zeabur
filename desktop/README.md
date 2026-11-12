@@ -37,6 +37,19 @@ against the demo API, so every window shows the demo cluster. A real app would s
 backend for the chosen context. Signing in to the cluster is not attempted; reachability is only
 a TCP connection.
 
+## Windows and menus
+
+- Every cluster is its own window. A new one is placed a little below and right of the last; each
+  window's size, place and maximized state are kept between launches (`window-state.json`, in
+  `ZEABUR_DESKTOP_STATE` when set).
+- macOS: the title bar is drawn over the page, as in Finder and Notes. The page leaves 28 pt at the
+  top (`data-titlebar` and `--zeabur-title-bar`, set by `desktop/src/chrome.rs`) and a strip there
+  moves the window. The menu bar (`desktop/src/menu.rs`) uses the `desktop.menu.*` strings and
+  changes with the language picker. The app stays open with no windows; a click on the Dock icon
+  or File > New Cluster Window shows the chooser again.
+- Windows and Linux: the system title bar, no menu bar, and the app quits when the last window
+  closes.
+
 ## Screenshots
 
 `desktop/shots/<lang>-<screen>-<theme>.png` (made by `desktop/shots.sh`), 4 languages × light and dark, taken from the running
