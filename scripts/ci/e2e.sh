@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # Zeabur in a cluster with Zeabur Identity, from their images and Zeabur's chart, through a browser:
 # passkey sign-in, terminal, rights, memory, removal. ZEABUR_CI_KEEP=1 keeps the cluster.
+# Arguments go to scripts/e2e.sh.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 
@@ -18,6 +19,6 @@ report() {
 }
 
 status=0
-ZEABUR_E2E_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e.sh || status=$?
+ZEABUR_E2E_KEEP="${ZEABUR_CI_KEEP:-}" ./scripts/e2e.sh "$@" || status=$?
 report
 exit "$status"

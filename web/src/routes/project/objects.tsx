@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { useVirtualizer } from "@tanstack/react-virtual"
 import { getRouteApi, Link } from "@tanstack/react-router"
 import { lazy, Suspense, useRef, useState, type ReactNode } from "react"
@@ -11,7 +11,7 @@ import PushPinIcon from "~icons/ph/push-pin"
 import PushPinFillIcon from "~icons/ph/push-pin-fill"
 
 import type { Schemas } from "@/api/client"
-import { objectsQuery } from "@/api/queries"
+import { objectsQuery, refreshObjects } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { UpdatedAt } from "@/components/freshness"
 import { LoadingRows } from "@/components/page"
@@ -71,7 +71,6 @@ export function ObjectsPage() {
   const { project } = route.useParams()
   const search = route.useSearch()
   const navigate = route.useNavigate()
-  const client = useQueryClient()
   const pins = pinnedKinds.useValue()
   const [query, setQuery] = useState(search.q ?? "")
 
@@ -143,9 +142,7 @@ export function ObjectsPage() {
             onGenerated={(value) => set({ generated: value || undefined })}
             empty={search.empty ?? false}
             onEmpty={(value) => set({ empty: value || undefined })}
-            onRefresh={() =>
-              void client.invalidateQueries({ queryKey: ["project", project, "objects"] })
-            }
+            onRefresh={() => void refreshObjects(project)}
             onOpen={(key) => set({ object: key })}
           />
         )}

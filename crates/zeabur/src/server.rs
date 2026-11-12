@@ -140,7 +140,7 @@ pub(crate) fn app(
                 Arc::new(move |feature| telemetry.used(feature, clock()));
             used
         }),
-        reach: zeabur_api::images::https::Reach::Public,
+        reach: zeabur_http::Reach::Public,
         ..zeabur_api::Options::default()
     };
     let api = zeabur_api::router_with(access, options)

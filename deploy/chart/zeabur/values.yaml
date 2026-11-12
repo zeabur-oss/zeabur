@@ -77,6 +77,20 @@ extraTrustedCA:
   secret: ""
   key: ca.crt
 
+# A proxy for Zeabur's own outbound HTTP and HTTPS (reading images from registries, backups from
+# object stores, GitHub), for a network that only lets a proxy out. It does not touch `proxy.*`,
+# which is Zeabur Proxy for logs and metrics, and it is not used for the Kubernetes API, the issuer
+# or the other Zeabur components. Zeabur tunnels HTTPS through an `http://` proxy with CONNECT and
+# never sends a local address to it. `noProxy` is added to the built-in bypass list, which holds
+# localhost, `.svc`, `.cluster.local` and `clusterNetwork`. Off: no proxy, nothing changes.
+outboundProxy:
+  enabled: false
+  httpProxy: ""
+  httpsProxy: ""
+  noProxy: []
+  # The pod and Service ranges of the cluster (k3s and RKE2 defaults), reached directly.
+  clusterNetwork: [10.42.0.0/16, 10.43.0.0/16]
+
 # Members who are not admins: the ClusterRoles zeabur-member (node names and status, every
 # project's name), zeabur-project-developer and zeabur-project-viewer (files/member-roles.yaml).
 # Zeabur binds them per member when an admin invites or edits one. With them, the

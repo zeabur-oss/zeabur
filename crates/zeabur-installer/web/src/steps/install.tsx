@@ -170,7 +170,7 @@ export function InstallStep({ wizard }: { wizard: Wizard }) {
       next={failed ? <Button onClick={wizard.install}>{t("install.again")}</Button> : undefined}
     >
       {cause ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <WarningCircleIcon aria-hidden="true" />
           <AlertTitle>
             {cause === "memory"

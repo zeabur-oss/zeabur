@@ -3,7 +3,7 @@ import { queryOptions } from "@tanstack/react-query"
 
 import { type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
-import { queryClient } from "@/api/queries"
+import { queryClient, reviewOnce } from "@/api/queries"
 
 export const accountQuery = queryOptions({
   queryKey: ["account"],
@@ -22,15 +22,16 @@ export function refreshMembers() {
 export type SetupLink = Schemas.SetupLinkView
 
 export type MemberChange = Schemas.MemberChange
-export type MemberPlan = Schemas.MemberPlan
+type MemberPlan = Schemas.MemberPlan
 
 /** The objects a change to the members writes, and the token that applies them; writes nothing. */
-export async function planMemberChange(
-  change: MemberChange,
-  signal?: AbortSignal,
-): Promise<MemberPlan> {
-  return await zeabur.planMemberChange(change, { signal })
-}
+export const memberPlanQuery = (change: MemberChange) =>
+  queryOptions({
+    queryKey: ["member-plan", change],
+    queryFn: async ({ signal }): Promise<MemberPlan> =>
+      await zeabur.planMemberChange(change, { signal }),
+    ...reviewOnce,
+  })
 
 export async function applyMemberChange(token: string): Promise<Schemas.MemberApplied> {
   return await zeabur.applyMemberChange({ token })

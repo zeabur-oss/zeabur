@@ -1,7 +1,6 @@
 ---
 title: 发行文件与验证
 description: 按操作系统选择 Zeabur 发行文件，验证校验和、签名和构建来源后再运行。
-source: "3896a0a6cfe9"
 ---
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 选好版本，下载对应的压缩包、`SHA256SUMS` 和签名。验证时，将签名者限定为 zeabur-oss 共用的 release workflow，且是为本仓库该版本 tag 运行的那一次，验证通过后再解压、运行。
@@ -72,13 +71,29 @@ tar -xzf "$binary-v$version-$platform.tar.gz" "$binary"
 
 校验和不匹配时，重新下载该文件。签名者、issuer 或 attestation 不匹配时，不要运行文件，先核对 release、文件名、workflow 身份、仓库和 tag，也不要放宽验证参数来让验证通过。
 
-通过 macOS 浏览器下载的文件会带有 quarantine 标记。验证通过后，对解压出的文件运行：
+macOS 版本使用 Developer ID 签名，并经过 Apple 公证，所以通过浏览器下载、带有 quarantine 标记的文件，macOS 也会允许它运行。要确认的话，运行：
 
 ```sh
-xattr -d com.apple.quarantine zeaburctl
+spctl --assess -vvv --type open --context context:primary-signature ./zeaburctl
 ```
 
-用 `gh release download` 下载的文件不会带有这个标记。macOS 版本有 Sigstore 签名，但未经过 Apple 公证。
+输出必须是下面两种之一，不是的话请不要打开这个文件。
+
+v0.2.0 起使用 Zeabur 的证书签名：
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: ZEABUR PTE. LTD. (6T873K59LQ)
+```
+
+v0.2.0 之前使用 Yi-Jyun Pan 的账号签名：
+
+```text
+./zeaburctl: accepted
+source=Notarized Developer ID
+origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
+```
 
 ## 验证镜像与 chart
 

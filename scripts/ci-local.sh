@@ -32,7 +32,7 @@ min_free_gb="${CI_LOCAL_MIN_FREE_GB:-25}"
 mkdir -p "$out"
 
 # In this order, which puts the cluster jobs last.
-all=(lint test ui fuzz no-ui wording cluster e2e)
+all=(lint test ui fuzz no-ui wording cluster e2e e2e-full canary)
 for t in "$@"; do
   [[ " ${all[*]} " == *" $t "* ]] || { echo "error: no job named $t" >&2; exit 1; }
 done
@@ -40,7 +40,7 @@ targets=()
 for t in "${all[@]}"; do
   [[ $# -gt 0 && " $* " != *" $t "* ]] || targets+=("$t")
 done
-is_cluster() { [[ "$1" == cluster || "$1" == e2e ]]; }
+is_cluster() { [[ "$1" == cluster || "$1" == e2e || "$1" == e2e-full || "$1" == canary ]]; }
 
 dirs=("$out")
 for t in "${targets[@]}"; do

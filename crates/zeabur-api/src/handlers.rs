@@ -44,7 +44,7 @@ pub struct AppState {
     /// Reads images' configurations from their registries (see [`crate::images`]).
     pub images: Arc<crate::images::Inspector>,
     /// The client of GitHub's API; `None` when TLS could not be set up.
-    pub github: Option<crate::images::https::Https>,
+    pub github: Option<zeabur_http::Https>,
     /// Zeabur's releases as GitHub listed them last (see [`crate::cluster::update`]).
     pub releases: Arc<crate::cluster::update::Releases>,
     /// Pushes uploaded folders to the registry (see [`crate::projects::source_upload`]).

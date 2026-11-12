@@ -121,3 +121,24 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: distroless-data
+---
+# No shell and no volume: the debug terminal test attaches its debug container, which the files
+# tests' `distroless` may already have.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: noshell
+  namespace: zeabur-e2e-files
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: noshell
+  template:
+    metadata:
+      labels:
+        app: noshell
+    spec:
+      containers:
+        - name: noshell
+          image: registry.k8s.io/pause:3.10

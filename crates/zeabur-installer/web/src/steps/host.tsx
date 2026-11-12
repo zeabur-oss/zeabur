@@ -227,7 +227,7 @@ export function HostStep({ wizard }: { wizard: Wizard }) {
       </Panel>
 
       {server.catalogError ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <AlertTitle>{t("host.catalog")}</AlertTitle>
           <AlertDescription>{server.catalogError}</AlertDescription>
         </Alert>

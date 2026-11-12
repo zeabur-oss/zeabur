@@ -4,7 +4,7 @@ import CaretLeftIcon from "~icons/ph/caret-left"
 import type { Schemas } from "@/api/client"
 import {
   applyMemberChange,
-  planMemberChange,
+  memberPlanQuery,
   refreshMembers,
   type MemberChange,
 } from "@/api/members"
@@ -48,13 +48,7 @@ export function MemberPlan({
 }) {
   const t = useT()
   // Planning writes nothing, so it is a query.
-  const plan = useQuery({
-    queryKey: ["member-plan", change],
-    queryFn: ({ signal }) => planMemberChange(change, signal),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-  })
+  const plan = useQuery(memberPlanQuery(change))
   const apply = useMutation({
     mutationFn: (token: string) => applyMemberChange(token),
     onSuccess: (applied) => {

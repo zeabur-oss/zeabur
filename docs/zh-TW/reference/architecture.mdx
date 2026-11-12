@@ -1,7 +1,6 @@
 ---
 title: 架構
 description: 了解 Zeabur 如何從 Kubernetes 物件呈現專案、以使用者權限套用變更並沿用既有控制器。
-source: "faf843625478"
 ---
 
 Zeabur 顯示的內容讀自叢集裡的 Kubernetes 物件：用 kubectl 改了副本數，Zeabur 下次讀取就顯示新的數字。服務、網域、磁碟區和備份設定都存在 Kubernetes 物件裡，移除 Zeabur 後，原本的控制器照樣管理這些物件。

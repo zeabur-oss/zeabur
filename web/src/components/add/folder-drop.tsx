@@ -147,7 +147,7 @@ export function FolderDrop({ folder, missing }: { folder: Folder; missing?: bool
         <DropBody folder={folder} over={over} />
       </div>
       {state.phase === "failed" ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <AlertDescription>{state.message}</AlertDescription>
         </Alert>
       ) : null}

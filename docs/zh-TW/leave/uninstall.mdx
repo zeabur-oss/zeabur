@@ -1,7 +1,6 @@
 ---
 title: 移除 Zeabur，保留服務
 description: 移除 Zeabur 管理介面，保留應用程式、資料與仍在使用的 Kubernetes 元件。
-source: "4ad7bec6c913"
 ---
 
 只移除 Zeabur 的 chart 或執行 `zeabur-installer uninstall zeabur`，既有服務會留在 Kubernetes，繼續由原生控制器與 operator 執行。保留 ingress、憑證、儲存與備份等相依元件，就能改用 kubectl、Helm 或原本的 GitOps 工具管理服務。

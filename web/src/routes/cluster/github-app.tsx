@@ -8,7 +8,12 @@ import GithubLogoIcon from "~icons/ph/github-logo"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
-import { convertCode, gitHubAppQuery, planGrant, startManifest } from "@/api/github-app"
+import {
+  conversionPlanQuery,
+  gitHubAppQuery,
+  grantPlanQuery,
+  startManifest,
+} from "@/api/github-app"
 import { clusterQuery, projectsQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { GateTip, useHintGate } from "@/components/gate"
@@ -233,13 +238,10 @@ function AppDetails({ data, gate }: { data: Schemas.GitHubApp; gate: Gate }) {
         <GitHubAppPlanDialog
           title={t("githubApp.plan.grant", grant.installation.account)}
           action={t("plan.apply")}
-          queryKey={["github-app-grant", grant.installation.id, grant.namespaces]}
-          plan={(signal) =>
-            planGrant(
-              { installationId: grant.installation.id, namespaces: grant.namespaces },
-              signal,
-            )
-          }
+          plan={grantPlanQuery({
+            installationId: grant.installation.id,
+            namespaces: grant.namespaces,
+          })}
           onDone={() => setGrant(undefined)}
           onClose={() => setGrant(undefined)}
         />
@@ -438,8 +440,7 @@ function Callback({ code, state, project }: { code?: string; state?: string; pro
     <GitHubAppPlanDialog
       title={t("githubApp.plan.save")}
       action={t("githubApp.plan.save")}
-      queryKey={["github-app-conversion", code]}
-      plan={(signal) => convertCode({ code, state }, signal)}
+      plan={conversionPlanQuery({ code, state })}
       onDone={back}
       onClose={back}
     />

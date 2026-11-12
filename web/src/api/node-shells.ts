@@ -3,7 +3,7 @@ import { queryOptions } from "@tanstack/react-query"
 
 import { type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
-import { queryClient } from "@/api/queries"
+import { refresh, reviewOnce } from "@/api/queries"
 
 export type NodeShell = Schemas.NodeShellView
 export type NodeShellPlan = Schemas.NodeShellPlan
@@ -19,13 +19,16 @@ export const nodeShellsQuery = queryOptions({
 })
 
 export function refreshNodeShells() {
-  void queryClient.invalidateQueries({ queryKey: nodeShellsQuery.queryKey })
+  void refresh(nodeShellsQuery)
 }
 
 /** Writes nothing. */
-export async function planNodeShell(request: NodeShellRequest, signal?: AbortSignal) {
-  return await zeabur.planNodeShell(request, { signal })
-}
+export const nodeShellPlanQuery = (request: NodeShellRequest) =>
+  queryOptions({
+    queryKey: ["node-shell-plan", request],
+    queryFn: async ({ signal }) => await zeabur.planNodeShell(request, { signal }),
+    ...reviewOnce,
+  })
 
 export async function applyNodeShell(token: string) {
   return await zeabur.applyNodeShell({ token })

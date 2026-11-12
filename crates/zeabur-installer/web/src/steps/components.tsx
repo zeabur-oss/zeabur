@@ -111,7 +111,7 @@ export function ComponentsStep({ wizard }: { wizard: Wizard }) {
       }
     >
       {planned && "error" in planned && !incomplete.length ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <AlertTitle>{t("common.error")}</AlertTitle>
           <AlertDescription>{planned.error}</AlertDescription>
         </Alert>

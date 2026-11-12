@@ -1,8 +1,9 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Cargo crates, web/ packages and the release scripts' package.json (bun.lock), action digests other than zeabur-oss/.github's (the Update workflow moves those) and the Zeabur Identity release tag; the k3s test version, which follows K3s's stable channel, and the schedule, sign-off, the github actions, cargo (non-major) and kubernetes crates groups come from the shared preset github>zeabur-oss/.github. Lock file maintenance updates flake.lock: the Rust nightly and the Zeabur Catalog commit that zeabur-catalog embeds. scripts/bump-rke2.sh updates the pinned RKE2 release and its digests.",
+  "description": "Cargo crates, web/ packages and the release scripts' package.json (bun.lock), action digests other than zeabur-oss/.github's (the Update workflow moves those) and the Zeabur Identity release tag; the schedule, sign-off, no publish delay for zeabur-oss's own releases, and the github actions, cargo (non-major) and kubernetes crates groups come from the shared preset github>zeabur-oss/.github, and the k3s test version and documented release, which follow K3s's stable channel, from github>zeabur-oss/.github:k3s. Lock file maintenance updates flake.lock: the Rust nightly and the Zeabur Catalog commit that zeabur-catalog embeds. scripts/bump-rke2.sh updates the pinned RKE2 release and its digests.",
   "extends": [
-    "github>zeabur-oss/.github"
+    "github>zeabur-oss/.github",
+    "github>zeabur-oss/.github:k3s"
   ],
   "enabledManagers": [
     "cargo",
@@ -26,13 +27,6 @@
         "patch"
       ],
       "groupName": "web (non-major)"
-    },
-    {
-      "description": "Zeabur's own repositories: no publish delay.",
-      "matchPackageNames": [
-        "/zeabur-oss/"
-      ],
-      "minimumReleaseAge": null
     }
   ],
   "customManagers": [
