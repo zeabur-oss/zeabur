@@ -1216,8 +1216,9 @@ impl Cluster for MemoryCluster {
     ///   a `uid` when it is new), and the next `generation` when its `spec` changed
     ///   [k8s-generation], and the write is recorded in [`State::writes`].
     ///
-    /// A Secret's values are held apart ([`State::secret_values`]), so a patch of a Secret has
-    /// its `test` operations on `metadata` checked and is otherwise only recorded.
+    /// A Secret's values are held apart ([`State::secret_values`]), so a JSON Patch of a Secret
+    /// has its `test` operations on `metadata` checked and is otherwise only recorded, as is a
+    /// merge patch of one.
     ///
     /// [k8s-validation]: https://kubernetes.io/docs/reference/using-api/api-concepts/#field-validation
     /// [k8s-generation]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -1272,11 +1273,25 @@ impl Cluster for MemoryCluster {
                         "the server could not find the requested resource",
                     ));
                 }
-                (WriteBody::JsonPatch(_) | WriteBody::EphemeralContainers(_), None) => {
+                (
+                    WriteBody::JsonPatch(_)
+                    | WriteBody::MergePatch(_)
+                    | WriteBody::EphemeralContainers(_),
+                    None,
+                ) => {
                     return Err(not_found(&format!("{} \"{}\"", target.plural, target.name)));
                 }
                 (WriteBody::JsonPatch(operations), Some(current)) => {
                     patched(target, current, operations)?
+                }
+                // The values are not here to change.
+                (WriteBody::MergePatch(_), Some(current)) if target.kind == "Secret" => {
+                    current.clone()
+                }
+                (WriteBody::MergePatch(body), Some(current)) => {
+                    let mut object = current.clone();
+                    merge(&mut object, body);
+                    object
                 }
                 (WriteBody::EphemeralContainers(operations), Some(current)) => {
                     with_ephemeral_containers(current, operations)?
@@ -1550,6 +1565,28 @@ fn patched(
         *generation = Value::from(value.saturating_add(1));
     }
     Ok(object)
+}
+
+/// `patch` merged into `target` as RFC 7386 says: an object merges field by field, `null`
+/// removes a field, anything else replaces it.
+fn merge(target: &mut Value, patch: &Value) {
+    let Some(fields) = patch.as_object() else {
+        *target = patch.clone();
+        return;
+    };
+    if !target.is_object() {
+        *target = Value::Object(serde_json::Map::new());
+    }
+    let Some(object) = target.as_object_mut() else {
+        return;
+    };
+    for (name, value) in fields {
+        if value.is_null() {
+            object.remove(name);
+        } else {
+            merge(object.entry(name.clone()).or_insert(Value::Null), value);
+        }
+    }
 }
 
 /// `current` with the ephemeral containers the JSON Patch `operations` make, as the

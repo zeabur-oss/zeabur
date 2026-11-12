@@ -1455,7 +1455,6 @@ export const en = {
   "create.cleanupTitle": (n: number) =>
     n === 1 ? "Delete the object just created" : `Delete the ${n} objects just created`,
   "tab.yaml": "YAML",
-  "yaml.hidden": "Secret values are hidden.",
   "yaml.intro": (name: string) =>
     `This is how ${name} is set up in the cluster now. A change is written as you make it.`,
   "yaml.label": (name: string) => `YAML of ${name}`,
@@ -1583,8 +1582,6 @@ export const en = {
     `${host} is HTTP only: ${route}'s certificates don't come from cert-manager, so add ${host} where they're made`,
   "warn.nodeCapacityUnknown":
     "Unable to read the nodes: the build limits were not checked against the largest node",
-  "warn.secretValuesUnknown": (name: string) =>
-    `Unable to read ${name}'s values: the diff shows keys only`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} reads config files or secrets: a rollback leaves their contents as they are`,
   "warn.storageClassUnknown": (claim: string) =>
@@ -1873,7 +1870,8 @@ export const en = {
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `Remove ${host}`,
   "yaml.edit": "Edit",
-  "yaml.editSecret": "Values left as (hidden) are kept.",
+  "yaml.editSecret":
+    "Values under data are base64-encoded, and stringData is not accepted. To type plain text, edit the secret from a service's variables.",
   "yaml.notEditable": "Kubernetes manages this kind itself; edit the object that owns it.",
   "title.editYaml": (name: string) => `Edit ${name}`,
   "title.delete": (kind: string, name: string) => `Delete ${kind} ${name}`,
@@ -2014,7 +2012,10 @@ export const en = {
     `Its annotations also name ${names}, which restart it whether this is on or not.`,
   "reload.unknown": "With your rights, Zeabur can't see whether Reloader runs in this cluster.",
   "reload.running": "Reloader runs in this cluster.",
-  "data.reveal": "Reveal values",
+  "data.show": (key: string) => `Show the value of ${key}`,
+  "data.hide": (key: string) => `Hide the value of ${key}`,
+  "data.bytes": (n: number) => (n === 1 ? "1 byte" : `${n} bytes`),
+  "data.download": (key: string) => `Download ${key}`,
   "data.binary": "Binary",
   "data.noChanges": "No changes.",
   "net.addDomain": "Add domain",

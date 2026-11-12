@@ -4,17 +4,8 @@
     {
       "changes": [
         {
-          "after": "(hidden)",
-          "path": "data.api-key"
-        },
-        {
           "before": "(hidden)",
           "path": "data.old"
-        },
-        {
-          "after": "(hidden)",
-          "before": "(hidden)",
-          "path": "data.user"
         }
       ],
       "owners": [],
@@ -33,14 +24,9 @@
             "value": "13"
           },
           {
-            "op": "add",
-            "path": "/data/user",
-            "value": "YWxpY2U="
-          },
-          {
-            "op": "add",
-            "path": "/data/api-key",
-            "value": "bmV3LWtleQ=="
+            "op": "test",
+            "path": "/data/old",
+            "value": "eA=="
           },
           {
             "op": "remove",

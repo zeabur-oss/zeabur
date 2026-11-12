@@ -613,6 +613,7 @@ pub(crate) fn write_request(
             Write::Patch { operations } => {
                 WriteBody::JsonPatch(serde_json::Value::Array(operations.clone()))
             }
+            Write::MergePatch { body } => WriteBody::MergePatch(body.clone()),
             Write::EphemeralContainers { operations } => {
                 WriteBody::EphemeralContainers(serde_json::Value::Array(operations.clone()))
             }
@@ -679,6 +680,12 @@ mod tests {
                 ),
                 object("Secret", patch.clone()),
                 object(
+                    "Secret",
+                    Write::MergePatch {
+                        body: json!({"data": {"id": "aWQ=", "gone": null}}),
+                    },
+                ),
+                object(
                     "ConfigMap",
                     Write::Create {
                         body: body("ConfigMap"),
@@ -691,12 +698,13 @@ mod tests {
         }
         .without_secret_values();
         let secret_values = ["hunter2", "hunter3", "aWQ=", "bmV3"];
-        let shown = serde_json::to_string(&plan.objects[..2]).unwrap();
+        let shown = serde_json::to_string(&plan.objects[..3]).unwrap();
         for value in secret_values {
             assert!(!shown.contains(value), "{value} in {shown}");
         }
         assert!(shown.contains("\"7\"") && shown.contains("kept"), "{shown}");
-        let kept = serde_json::to_string(&plan.objects[2..]).unwrap();
+        assert!(shown.contains("\"gone\":null"), "{shown}");
+        let kept = serde_json::to_string(&plan.objects[3..]).unwrap();
         for value in secret_values {
             assert!(kept.contains(value), "{value} in {kept}");
         }

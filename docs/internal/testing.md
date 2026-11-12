@@ -66,8 +66,8 @@ anything.
 
 Removing or weakening one of these tests needs another test of the same promise first.
 
-- Secret values never leave the server: not in YAML, lists, `last-applied-configuration` or
-  plans, and a masked value is never written back.
+- Secret values leave the server only for one Secret the person may `get` (its YAML, a reveal):
+  never in lists, `last-applied-configuration` or plans.
 - Every read and write acts as the person, with their credential; nothing is impersonated.
 - A write never takes over a field Helm, Argo CD or Flux owns.
 - A plan's JSON Patch `test` operations refuse a stale write (`409`); of concurrent applies of one

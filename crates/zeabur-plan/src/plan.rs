@@ -54,6 +54,7 @@ use crate::change::{
 };
 use crate::checks::ResourceRef;
 use crate::create::ServedKind;
+use crate::edit::edit_operations;
 use crate::error_pages::shows_maintenance;
 use crate::fields::{Step, owners, reapplying_tool};
 use crate::json::{add, apply_patch, pointer, remove, replace, test};
@@ -166,7 +167,8 @@ pub struct Input<'a> {
     /// The Gateways with listeners that accept an `HTTPRoute` from the project's namespace;
     /// `None` when they could not be read.
     pub gateways: Option<&'a [Attachable]>,
-    /// The values of the Secrets the request edits, by name, where the person could read them.
+    /// The values of the Secrets the request edits as YAML, by name, where the person could read
+    /// them.
     pub secret_values: &'a BTreeMap<String, BTreeMap<String, Vec<u8>>>,
     /// The time the plan is made, RFC 3339; the restart annotation's value.
     pub now: &'a str,
@@ -365,6 +367,9 @@ pub(crate) struct Planner<'a> {
     pub(crate) created: Vec<(Target, usize)>,
     /// The objects the request's `create` changes give, read before any change is planned.
     pub(crate) requested: Vec<Value>,
+    /// The `data` keys key edits set (base64) or remove (`null`) in a Secret, by object index:
+    /// written as a merge patch.
+    pub(crate) merges: BTreeMap<usize, serde_json::Map<String, Value>>,
 }
 
 /// The plan for `request` against `input`.
@@ -441,6 +446,7 @@ pub fn plan_with(
             .filter_map(crate::create::created_object)
             .filter_map(Result::ok)
             .collect(),
+        merges: BTreeMap::new(),
     };
     for index in crate::create::order(&request.changes) {
         let Some(change) = request.changes.get(index) else {
@@ -871,11 +877,22 @@ impl<'a> Planner<'a> {
 
     // ── ConfigMap and Secret keys ────────────────────────────────────────────────────────────
 
-    /// Puts the values of Secret `name` the person could read into `object`'s `data`, encoded;
-    /// `false` when they could not read them.
-    pub(crate) fn with_secret_values(&self, name: &str, object: &mut Value) -> bool {
+    /// Puts the values of Secret `name` the person read into `object`'s `data`, encoded.
+    ///
+    /// # Errors
+    ///
+    /// When they were not read: the edit would be compared with an object without its keys.
+    pub(crate) fn with_secret_values(
+        &self,
+        name: &str,
+        object: &mut Value,
+    ) -> Result<(), PlanError> {
         let Some(values) = self.input.secret_values.get(name) else {
-            return false;
+            return Err(error(
+                ErrorKind::BadRequest,
+                "secret_not_read",
+                format!("Secret {name} was not read, so it cannot be changed."),
+            ));
         };
         let data: serde_json::Map<String, Value> = values
             .iter()
@@ -891,9 +908,13 @@ impl<'a> Planner<'a> {
         {
             map.insert("data".to_owned(), Value::Object(data));
         }
-        true
+        Ok(())
     }
 
+    /// Plans `edits` to the keys of ConfigMap or Secret `name`. A ConfigMap is the object as read
+    /// with the keys changed, compared as a YAML edit is. A Secret's keys go as a merge patch,
+    /// which needs no read of its values: the last write to a key wins. A Secret's set value is
+    /// plain text.
     #[expect(clippy::too_many_lines, reason = "one change kind, read top to bottom")]
     pub(crate) fn data(
         &mut self,
@@ -933,10 +954,19 @@ impl<'a> Planner<'a> {
         };
         Self::refuse_managed(&meta, kind_name, name)?;
         let mut json_object = json_object?;
-        if kind == DataKind::Secret && !self.with_secret_values(name, &mut json_object) {
-            self.warnings.push(Warning::SecretValuesUnknown {
-                name: name.to_owned(),
-            });
+        if kind == DataKind::Secret {
+            // The keys of a Secret are not read; a key to remove is shown as there before.
+            for edit in edits {
+                if edit.op == "remove"
+                    && let Some(object) = json_object.as_object_mut()
+                    && let Some(data) = object
+                        .entry("data")
+                        .or_insert_with(|| Value::Object(serde_json::Map::new()))
+                        .as_object_mut()
+                {
+                    data.entry(edit.key.clone()).or_insert_with(|| json!(""));
+                }
+            }
         }
         let target = Target {
             api_version: "v1".to_owned(),
@@ -945,7 +975,9 @@ impl<'a> Planner<'a> {
             name: name.to_owned(),
         };
         let index = self.working(target, json_object);
-        let known_keys = kind == DataKind::ConfigMap || self.input.secret_values.contains_key(name);
+        let current = self.current(index);
+        let mut edited = current.clone();
+        let mut merge = serde_json::Map::new();
         for edit in edits {
             if edit.key.is_empty()
                 || !edit
@@ -959,7 +991,6 @@ impl<'a> Planner<'a> {
                     format!("{:?} is not a valid key.", edit.key),
                 ));
             }
-            let current = self.current(index);
             if current
                 .pointer(&pointer(&["binaryData", &edit.key]))
                 .is_some()
@@ -970,60 +1001,33 @@ impl<'a> Planner<'a> {
                     format!("{} holds binary data; edit it as YAML.", edit.key),
                 ));
             }
-            let key_pointer = pointer(&["data", &edit.key]);
-            let exists = current.pointer(&key_pointer).is_some();
-            self.claim(
-                index,
-                &[Step::field("data"), Step::field(&edit.key)],
-                &format!("key {}", edit.key),
-            )?;
-            let encoded = |value: &str| match kind {
-                DataKind::ConfigMap => json!(value),
-                DataKind::Secret => json!(base64::engine::general_purpose::STANDARD.encode(value)),
+            let Some(object) = edited.as_object_mut() else {
+                continue;
+            };
+            let data = object
+                .entry("data")
+                .or_insert_with(|| Value::Object(serde_json::Map::new()));
+            let Some(data) = data.as_object_mut() else {
+                continue;
             };
             match edit.op.as_str() {
                 "set" => {
-                    let value = encoded(edit.value.as_deref().unwrap_or_default());
-                    if !known_keys {
-                        // The Secret's `data` could not be read: adding the whole map would
-                        // replace the keys it holds, so add the key alone (kube-apiserver
-                        // refuses it if the Secret has no `data` at all).
-                        if let Some(working) = self.objects.get_mut(index) {
-                            working.operations.push(add(&key_pointer, value.clone()));
-                            if let Some(object) = working.current.as_object_mut() {
-                                let data = object
-                                    .entry("data")
-                                    .or_insert_with(|| Value::Object(serde_json::Map::new()));
-                                if let Some(data) = data.as_object_mut() {
-                                    data.insert(edit.key.clone(), value);
-                                }
-                            }
-                        }
-                        continue;
-                    }
-                    let operation = if current.get("data").is_some_and(Value::is_object) {
-                        add(&key_pointer, value)
-                    } else {
-                        add("/data", json!({ edit.key.clone(): value }))
+                    let value = edit.value.as_deref().unwrap_or_default();
+                    let stored = match kind {
+                        DataKind::ConfigMap => value.to_owned(),
+                        DataKind::Secret => base64::engine::general_purpose::STANDARD.encode(value),
                     };
-                    self.patch(index, vec![operation])?;
+                    data.insert(edit.key.clone(), json!(stored));
+                    merge.insert(edit.key.clone(), json!(stored));
                 }
                 "remove" => {
-                    if known_keys && !exists {
+                    merge.insert(edit.key.clone(), Value::Null);
+                    if data.remove(&edit.key).is_none() {
                         return Err(error(
                             ErrorKind::NotFound,
                             "unknown_key",
                             format!("{name} has no key {}.", edit.key),
                         ));
-                    }
-                    if kind == DataKind::Secret && !known_keys {
-                        // The key's presence is unknown here; kube-apiserver refuses the patch
-                        // if it is missing. Record the removal in the working copy only.
-                        if let Some(working) = self.objects.get_mut(index) {
-                            working.operations.push(remove(&key_pointer));
-                        }
-                    } else {
-                        self.patch(index, vec![remove(&key_pointer)])?;
                     }
                 }
                 _ => {
@@ -1035,7 +1039,29 @@ impl<'a> Planner<'a> {
                 }
             }
         }
-        // Who reads it.
+        for operation in edit_operations(&current, &edited) {
+            self.claim(index, &operation.field, &operation.shown)?;
+            if kind == DataKind::ConfigMap {
+                self.patch(index, operation.operations)?;
+            }
+        }
+        if kind == DataKind::Secret {
+            if let Some(working) = self.objects.get_mut(index) {
+                working.current = edited;
+            }
+            self.merges.entry(index).or_default().extend(merge);
+        }
+        self.readers(kind, name);
+        Ok(())
+    }
+
+    /// Notes the workloads that read ConfigMap or Secret `name`, and the restarts its new keys
+    /// need.
+    pub(crate) fn readers(&mut self, kind: DataKind, name: &str) {
+        let kind_name = match kind {
+            DataKind::ConfigMap => "ConfigMap",
+            DataKind::Secret => "Secret",
+        };
         let resource_kind = match kind {
             DataKind::ConfigMap => SourceKind::ConfigMap,
             DataKind::Secret => SourceKind::Secret,
@@ -1094,7 +1120,6 @@ impl<'a> Planner<'a> {
                 workloads: env_readers.into_iter().collect(),
             });
         }
-        Ok(())
     }
 
     // ── Domains ──────────────────────────────────────────────────────────────────────────────
@@ -1769,7 +1794,18 @@ impl<'a> Planner<'a> {
             self.restart(&reference)?;
         }
         let mut objects = Vec::new();
-        for working in self.objects {
+        for (index, working) in self.objects.into_iter().enumerate() {
+            let merge = self.merges.remove(&index);
+            if merge.is_some() && (working.deleted || !working.operations.is_empty()) {
+                return Err(error(
+                    ErrorKind::BadRequest,
+                    "secret_changed_twice",
+                    format!(
+                        "Secret {} has key changes and another change; plan them apart.",
+                        working.target.name
+                    ),
+                ));
+            }
             let resource_version = working
                 .original
                 .as_ref()
@@ -1780,7 +1816,11 @@ impl<'a> Planner<'a> {
                 objects.push(crate::delete::deletion(working)?);
                 continue;
             }
-            let write = if working.original.is_none() {
+            let write = if let Some(data) = merge {
+                Write::MergePatch {
+                    body: json!({ "data": data }),
+                }
+            } else if working.original.is_none() {
                 Write::Create {
                     body: working.current.clone(),
                 }
@@ -1987,7 +2027,7 @@ pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
                     (op.get("path")?.as_str()? == "/metadata/uid")
                         .then(|| format!("/metadata/uid={value}"))
                 }),
-                Write::Create { .. } => None,
+                Write::Create { .. } | Write::MergePatch { .. } => None,
             };
             pin.map(|pin| (format!("{}/{}", o.target.kind, o.target.name), pin))
         })

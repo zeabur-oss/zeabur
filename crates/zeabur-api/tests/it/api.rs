@@ -876,15 +876,6 @@ mod tests {
             "the status comes beside the YAML"
         );
 
-        let secret = get(&cluster, "/api/v1/projects/shop/objects/core/v1/secrets/db").await;
-        assert!(secret.get("status").is_none(), "{secret}");
-        assert!(
-            secret["yaml"]
-                .as_str()
-                .unwrap()
-                .contains("password: (hidden)"),
-            "{secret}"
-        );
         for missing in [
             "/api/v1/projects/shop/objects/core/v1/secrets/nope",
             "/api/v1/projects/shop/objects/example.com/v1/widgets/a",
@@ -902,7 +893,58 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn secret_values_appear_only_when_revealed_and_are_never_cached() {
+    async fn a_secret_yaml_has_its_values_in_base64_for_a_person_who_may_read_them() {
+        use base64::Engine as _;
+        let cluster = cluster();
+        let binary = vec![0xFF, 0x00, 0x80, b'\n'];
+        cluster.update(|s| {
+            s.secret_values
+                .get_mut("shop/db")
+                .unwrap()
+                .insert("blob".to_owned(), binary.clone());
+        });
+        let secret = get(&cluster, "/api/v1/projects/shop/objects/core/v1/secrets/db").await;
+        assert!(secret.get("status").is_none(), "a Secret has no status");
+        let yaml = secret["yaml"].as_str().unwrap();
+        let value = |key: &str| {
+            let line = yaml
+                .lines()
+                .find_map(|l| l.strip_prefix(&format!("  {key}: ")))
+                .unwrap_or_else(|| panic!("no {key} under data"));
+            base64::engine::general_purpose::STANDARD
+                .decode(line.trim_matches('"'))
+                .unwrap()
+        };
+        assert!(yaml.contains("\ndata:\n"), "the YAML has data");
+        assert_eq!(value("password"), SECRET_VALUE.as_bytes());
+        assert_eq!(value("blob"), binary);
+        assert!(
+            !yaml.contains("stringData"),
+            "the cluster never returns stringData"
+        );
+
+        cluster.update(|s| {
+            s.forbidden_in_namespaces.insert("secrets".to_owned());
+        });
+        let (status, cache, body) = call(
+            app(&cluster),
+            "GET",
+            "/api/v1/projects/shop/objects/core/v1/secrets/db",
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(cache.as_deref(), Some("no-store"));
+        let problem = json(&body);
+        assert_eq!(problem["kind"], "forbidden");
+        assert_eq!(
+            problem["denied"],
+            json!({"verb": "get", "group": "", "resource": "secrets", "namespace": "shop", "name": "db"})
+        );
+        assert!(!body.contains("yaml"), "a refusal is not an empty object");
+    }
+
+    #[tokio::test]
+    async fn secret_values_stay_out_of_lists_and_pages_and_are_never_cached() {
         let cluster = cluster();
         for uri in [
             "/api/v1/projects",
@@ -910,7 +952,6 @@ mod tests {
             "/api/v1/projects/shop/services/deployment/web",
             "/api/v1/projects/shop/configmaps",
             "/api/v1/projects/shop/objects",
-            "/api/v1/projects/shop/objects/core/v1/secrets/db",
         ] {
             let (_, _, body) = call(app(&cluster), "GET", uri).await;
             assert!(!body.contains(SECRET_VALUE), "{uri} leaked the value");

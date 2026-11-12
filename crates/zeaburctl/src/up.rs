@@ -796,9 +796,10 @@ mod tests {
             .iter()
             .filter_map(|w| match &w.body {
                 WriteBody::JsonPatch(operations) => Some(operations.to_string()),
-                WriteBody::Create(_) | WriteBody::EphemeralContainers(_) | WriteBody::Delete(_) => {
-                    None
-                }
+                WriteBody::Create(_)
+                | WriteBody::MergePatch(_)
+                | WriteBody::EphemeralContainers(_)
+                | WriteBody::Delete(_) => None,
             })
             .collect()
     }
@@ -813,6 +814,7 @@ mod tests {
                 }
                 WriteBody::Create(_)
                 | WriteBody::JsonPatch(_)
+                | WriteBody::MergePatch(_)
                 | WriteBody::EphemeralContainers(_)
                 | WriteBody::Delete(_) => None,
             })

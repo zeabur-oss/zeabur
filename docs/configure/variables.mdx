@@ -56,7 +56,7 @@ Before applying, click **Discard** to discard the draft changes. To undo changes
 
 ## Edit values from config files or secrets
 
-**From config files and secrets** lists the source of each variable. Click a source name to open its editor. For a secret, click **Reveal values** to read the current values. You can also enter new values without revealing the old ones. Use YAML to edit config file data marked **Binary**.
+**From config files and secrets** lists the source of each variable. Click a source name to open its editor. For a secret, each value stays hidden until you click its eye icon, and the copy button copies a value without showing it. For a binary value, the editor shows its size and a download button. You can also enter new values without showing the old ones. Use YAML to edit config file data marked **Binary**.
 
 First, check **Read by** at the top of the editor. For example, if both `web` and `worker` read `app-config`, changing its values from the editor opened in `web` changes the source for both services. The list also includes services that mount the source as a file.
 
