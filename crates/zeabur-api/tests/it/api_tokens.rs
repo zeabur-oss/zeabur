@@ -425,4 +425,108 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
     }
+
+    /// Applies the plan token `token` through `app` once on each of `times` tasks that start
+    /// together: the answers that succeeded.
+    async fn apply_together(app: &axum::Router, token: &Value, times: usize) -> Vec<Value> {
+        let barrier = std::sync::Arc::new(tokio::sync::Barrier::new(times));
+        let mut tasks = Vec::new();
+        for _ in 0..times {
+            let app = app.clone();
+            let barrier = std::sync::Arc::clone(&barrier);
+            let body = json!({"token": token});
+            tasks.push(tokio::spawn(async move {
+                barrier.wait().await;
+                let (status, answer) =
+                    send(&app, "POST", "/api/v1/members/apply", Some(&body)).await;
+                (status == StatusCode::OK).then_some(answer)
+            }));
+        }
+        let mut applied = Vec::new();
+        for task in tasks {
+            if let Some(answer) = task.await.unwrap() {
+                applied.push(answer);
+            }
+        }
+        applied
+    }
+
+    #[tokio::test(flavor = "multi_thread", worker_threads = 4)]
+    async fn of_concurrent_applies_of_one_create_plan_one_issues_a_token() {
+        let cluster = signed_in("zeabur:ada");
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
+        let (status, plan) = send(
+            &app,
+            "POST",
+            "/api/v1/members/plan",
+            Some(&create(
+                "ci",
+                &json!([{"project": "shop", "role": "developer"}]),
+                3600,
+            )),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        let applied = apply_together(&app, &plan["token"], 64).await;
+        let [won] = applied.as_slice() else {
+            panic!("not exactly one apply won: {applied:?}");
+        };
+        assert!(won["issued"]["token"].is_string(), "{won}");
+        let asked = cluster.inspect(|s| s.issued_tokens.clone()).unwrap();
+        assert_eq!(asked, [(format!("{TOKENS}/ci"), 3600)]);
+    }
+
+    #[tokio::test]
+    async fn a_renew_plan_applied_again_issues_no_second_token() {
+        let cluster = signed_in("zeabur:ada");
+        let (status, ..) = change(&cluster, create("ci", &json!([]), 3600)).await;
+        assert_eq!(status, StatusCode::OK);
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
+        let (status, plan) = send(
+            &app,
+            "POST",
+            "/api/v1/members/plan",
+            Some(&json!({"op": "renewToken", "name": "ci", "expirationSeconds": 7200})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        let body = json!({"token": plan["token"]});
+        let (status, first) = send(&app, "POST", "/api/v1/members/apply", Some(&body)).await;
+        assert_eq!(status, StatusCode::OK, "{first}");
+        let before = cluster.inspect(|s| s.issued_tokens.clone()).unwrap();
+        let (status, again) = send(&app, "POST", "/api/v1/members/apply", Some(&body)).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{again}");
+        assert!(again.get("issued").is_none(), "{again}");
+        assert_eq!(
+            cluster.inspect(|s| s.issued_tokens.clone()).unwrap(),
+            before
+        );
+    }
+
+    #[tokio::test]
+    async fn an_issued_token_is_kept_in_no_object_and_in_no_later_answer() {
+        let cluster = signed_in("zeabur:ada");
+        let projects = json!([{"project": "shop", "role": "developer"}]);
+        let (status, applied, _) = change(&cluster, create("ci", &projects, 3600)).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let token = applied["issued"]["token"].as_str().unwrap().to_owned();
+        let stored = cluster.inspect(|s| s.dynamic.clone()).unwrap();
+        for object in &stored {
+            let text = serde_json::to_string(object).unwrap();
+            assert!(!text.contains(&token), "{text}");
+        }
+        let app = TestApi::new(&cluster).with_settings(settings()).router();
+        let (status, members) = send(&app, "GET", "/api/v1/members", None).await;
+        assert_eq!(status, StatusCode::OK, "{members}");
+        assert!(!members.to_string().contains(&token), "{members}");
+        let (status, plan) = send(
+            &app,
+            "POST",
+            "/api/v1/members/plan",
+            Some(&json!({"op": "deleteToken", "name": "ci"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert!(!plan.to_string().contains(&token), "{plan}");
+    }
 }
