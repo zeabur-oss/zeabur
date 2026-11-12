@@ -1,30 +1,25 @@
-import { lazy, Suspense, useState } from "react";
-import PencilSimpleIcon from "~icons/ph/pencil-simple";
-import TrashIcon from "~icons/ph/trash";
+import { lazy, Suspense, useState } from "react"
+import PencilSimpleIcon from "~icons/ph/pencil-simple"
+import TrashIcon from "~icons/ph/trash"
 
-import type { ObjectAddress } from "@/api/queries";
-import { GateTip, useGates } from "@/components/gate";
-import { usePlanner } from "@/components/plan/planner";
-import { Button } from "@zeabur-oss/design-system/components/button";
-import { Skeleton } from "@zeabur-oss/design-system/components/skeleton";
-import { Tooltip } from "@zeabur-oss/design-system/components/tooltip";
-import { YamlBlock } from "@/components/yaml";
-import { useT } from "@/i18n";
-import { kindName } from "@/i18n/kind-name";
-import { rightOfResource, type Gate } from "@/model/rights";
+import type { ObjectAddress } from "@/api/queries"
+import { GateTip, useGates } from "@/components/gate"
+import { usePlanner } from "@/components/plan/planner"
+import { Button } from "@zeabur-oss/design-system/components/button"
+import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
+import { YamlBlock } from "@/components/yaml"
+import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
+import { rightOfResource, type Gate } from "@/model/rights"
 
 const YamlEditor = lazy(() =>
   import("@/components/yaml-editor").then((m) => ({ default: m.YamlEditor })),
-);
+)
 
 /** Kinds Kubernetes makes on its own or that a plan cannot edit as a whole. */
-const open: Gate = { open: true };
-const readOnlyResources = new Set([
-  "pods",
-  "events",
-  "replicasets",
-  "controllerrevisions",
-]);
+const open: Gate = { open: true }
+const readOnlyResources = new Set(["pods", "events", "replicasets", "controllerrevisions"])
 
 /** Recreated when deleted; the server refuses one a tool or a controller would make again. */
 const undeletableResources = new Set([
@@ -33,16 +28,16 @@ const undeletableResources = new Set([
   "controllerrevisions",
   "endpoints",
   "endpointslices",
-]);
+])
 
 function Intro({ address, note }: { address: ObjectAddress; note?: string }) {
-  const t = useT();
+  const t = useT()
   return (
     <p className="min-w-0 basis-full type-meta text-muted-foreground sm:basis-0 sm:flex-1">
       {t("yaml.intro", address.name)}
       {note ? ` ${note}` : ""}
     </p>
-  );
+  )
 }
 
 /** A Delete or Edit button: disabled with the reason when blocked, else behind its gate. */
@@ -53,11 +48,11 @@ function YamlAction({
   gate,
   onClick,
 }: {
-  icon: typeof TrashIcon;
-  text: string;
-  blocked?: string;
-  gate: Gate;
-  onClick: () => void;
+  icon: typeof TrashIcon
+  text: string
+  blocked?: string
+  gate: Gate
+  onClick: () => void
 }) {
   if (blocked)
     return (
@@ -69,7 +64,7 @@ function YamlAction({
           </Button>
         </span>
       </Tooltip>
-    );
+    )
   return (
     <GateTip gate={gate}>
       <Button variant="outline" size="xs" onClick={onClick}>
@@ -77,7 +72,7 @@ function YamlAction({
         {text}
       </Button>
     </GateTip>
-  );
+  )
 }
 
 export function YamlView({
@@ -89,45 +84,41 @@ export function YamlView({
   note,
   onDeleted,
 }: {
-  project: string;
-  address: ObjectAddress;
-  yaml: string;
-  managedBy?: string | null;
-  kind?: string;
+  project: string
+  address: ObjectAddress
+  yaml: string
+  managedBy?: string | null
+  kind?: string
   /** Follows the intro. */
-  note?: string;
+  note?: string
   /** Offers Delete when given. */
-  onDeleted?: () => void;
+  onDeleted?: () => void
 }) {
-  const t = useT();
-  const [draft, setDraft] = useState<string | null>(null);
-  const planner = usePlanner(project, () => setDraft(null));
-  const deleter = usePlanner(project, onDeleted);
-  const label = t("yaml.label", address.name);
-  const gates = useGates(project);
+  const t = useT()
+  const [draft, setDraft] = useState<string | null>(null)
+  const planner = usePlanner(project, () => setDraft(null))
+  const deleter = usePlanner(project, onDeleted)
+  const label = t("yaml.label", address.name)
+  const gates = useGates(project)
   const gateOf = (change: "edit" | "delete") => {
-    const right = rightOfResource(address.resource, change);
-    return right ? gates(right) : open;
-  };
-  const editGate = gateOf("edit");
-  const deleteGate = gateOf("delete");
+    const right = rightOfResource(address.resource, change)
+    return right ? gates(right) : open
+  }
+  const editGate = gateOf("edit")
+  const deleteGate = gateOf("delete")
   const blocked = managedBy
     ? t("common.managedByDetail", managedBy)
     : readOnlyResources.has(address.resource)
       ? t("yaml.notEditable")
-      : undefined;
+      : undefined
   const undeletable = managedBy
     ? t("common.managedByDetail", managedBy)
     : undeletableResources.has(address.resource)
       ? t("yaml.notDeletable")
-      : undefined;
+      : undefined
   const planDeletion = () =>
     deleter.plan({
-      title: t(
-        "title.delete",
-        kind ? kindName(t, kind) : address.resource,
-        address.name,
-      ),
+      title: t("title.delete", kind ? kindName(t, kind) : address.resource, address.name),
       changes: [
         {
           op: "delete",
@@ -139,7 +130,7 @@ export function YamlView({
           name: address.name,
         },
       ],
-    });
+    })
 
   if (draft === null)
     return (
@@ -168,15 +159,13 @@ export function YamlView({
         <YamlBlock yaml={yaml} label={label} />
         {deleter.dialog}
       </div>
-    );
+    )
 
   return (
     <div className="flex flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         {address.resource === "secrets" ? (
-          <p className="type-meta text-muted-foreground">
-            {t("yaml.editSecret")}
-          </p>
+          <p className="type-meta text-muted-foreground">{t("yaml.editSecret")}</p>
         ) : null}
         <span className="ml-auto flex gap-1.5">
           <Button variant="ghost" size="xs" onClick={() => setDraft(null)}>
@@ -212,5 +201,5 @@ export function YamlView({
       </Suspense>
       {planner.dialog}
     </div>
-  );
+  )
 }
