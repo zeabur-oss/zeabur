@@ -1936,7 +1936,8 @@ pub(crate) fn pod_spec_steps(kind: WorkloadKind) -> Vec<Step> {
 /// (the patch's first `test`), so a status write between plan and apply does not make the plan
 /// stale. The pin of a deletion is its `resourceVersion`, the precondition kube-apiserver checks
 /// (it has none on the generation). A patch that tests `metadata.finalizers` also pins them: a
-/// controller can remove a finalizer without a new generation.
+/// controller can remove a finalizer without a new generation. Each object is keyed by its
+/// `apiVersion`, kind and name, as two API groups can serve the same kind.
 #[must_use]
 pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
     plan.objects
@@ -1970,7 +1971,13 @@ pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
                 }),
                 Write::Create { .. } | Write::MergePatch { .. } => None,
             };
-            pin.map(|pin| (format!("{}/{}", o.target.kind, o.target.name), pin))
+            pin.map(|pin| {
+                let key = format!(
+                    "{}/{}/{}",
+                    o.target.api_version, o.target.kind, o.target.name
+                );
+                (key, pin)
+            })
         })
         .collect()
 }

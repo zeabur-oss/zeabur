@@ -371,6 +371,44 @@ mod tests {
         );
     }
 
+    /// A `Backup` named `nightly` in each of two API groups, held by `finalizers[i]`.
+    fn backups(finalizers: [&[&str]; 2]) -> Vec<ProjectObject> {
+        let mut out = Vec::new();
+        for (group, finalizers) in [
+            ("postgresql.cnpg.io", finalizers[0]),
+            ("velero.io", finalizers[1]),
+        ] {
+            out.push(ProjectObject {
+                resource: ResourceRef {
+                    group: group.to_owned(),
+                    version: "v1".to_owned(),
+                    resource: "backups".to_owned(),
+                },
+                object: json!({"apiVersion": format!("{group}/v1"), "kind": "Backup",
+                    "metadata": {"name": "nightly", "namespace": "shop", "uid": format!("{group}-uid"),
+                        "resourceVersion": "40", "generation": 2, "finalizers": finalizers,
+                        "deletionTimestamp": "2026-10-26T00:00:00Z"}}),
+            });
+        }
+        out
+    }
+
+    #[test]
+    fn a_finalizer_gone_from_either_of_two_objects_of_one_kind_and_name_changes_the_pins() {
+        let reviewed = forced(&terminating(), backups([&["a", "b"], &["a", "b"]])).unwrap();
+        for changed in [
+            backups([&["a"], &["a", "b"]]),
+            backups([&["a", "b"], &["a"]]),
+        ] {
+            let now = forced(&terminating(), changed).unwrap();
+            assert_ne!(
+                zeabur_plan::versions(&reviewed),
+                zeabur_plan::versions(&now),
+                "{now:?}"
+            );
+        }
+    }
+
     #[test]
     fn a_force_deletion_is_refused_where_a_deletion_is_and_where_nothing_is_held() {
         let mut zeabur = namespace("zeabur", &json!({"zeabur.com/project": "true"}));
