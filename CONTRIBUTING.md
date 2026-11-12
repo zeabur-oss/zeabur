@@ -179,6 +179,8 @@ cannot format.
 - [RustSec](https://rustsec.org/) advisories and yanked versions fail the check. Every ignored
   advisory carries its reason in `deny.toml`.
 
+`k8s-openapi` is built for Kubernetes 1.34 (`v1_34`), the oldest version Zeabur supports.
+
 Web packages follow the same licence rule, with one exception: `caniuse-lite`, the browser
 support data that Babel's `browserslist` reads while svgr builds the icons, is CC-BY-4.0 (a data
 licence, not OSI-approved). It is a development dependency only and never ships in the interface.
@@ -188,8 +190,10 @@ Cargo does not pick a release younger than seven days unless it is already in th
 catch a compromised release. An urgent security update overrides it for one command:
 `CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE="0 days" cargo update -p <crate>`.
 
-[Renovate](https://docs.renovatebot.com/) (`renovate.json`) opens the weekly crate, action digest
-and k3s updates under the same seven-day delay; compatible crate updates share one pull request.
+[Renovate](https://docs.renovatebot.com/) (`renovate.json`) opens the crate, web package and
+action digest updates under the same seven-day delay; compatible crate updates share one pull
+request. Our own releases (`@zeabur-oss/design-system`, the Zeabur Identity tag) and K3s, which
+follows its stable channel, move without the delay.
 A crate update that brings in new `unsafe` or native code fails `unsafe-report` until the
 allowlist entry below is added and reviewed, so those pull requests are never merged unread.
 
@@ -197,9 +201,15 @@ allowlist entry below is added and reviewed, so those pull requests are never me
 
 The web interface's packages are managed with Bun: `web/package.json` pins exact versions,
 `web/bun.lock` is committed, and CI installs with `bun ci`, which fails if the two disagree.
-`web/bunfig.toml` sets `minimumReleaseAge` to seven days, the same delay as Cargo's. No package
-is listed in `trustedDependencies`, so no install script runs. Renovate updates `bun.lock` under
-the same delay.
+`web/bunfig.toml` sets `minimumReleaseAge` to seven days, the same delay as Cargo's, and exempts
+`@zeabur-oss/design-system`, our own package; `crates/zeabur-installer/web` has the same settings.
+No package is listed in `trustedDependencies`, so no install script runs. Add a package with
+`bun add` from `web/`.
+
+Icons are Phosphor's, from `@iconify-json/ph`, built in by unplugin-icons with svgr. Components
+come from the shadcn registry (`bunx --bun shadcn@latest add <component>`), on Base UI. After
+adding a runtime package, check the first-load size: `./scripts/build-ui.sh &&
+./scripts/ui-budget.sh`.
 
 ### Shipped `unsafe` and native code
 
@@ -288,17 +298,13 @@ cargo run -p zeabur-api --example demo
 The example's documentation (`crates/zeabur-api/examples/demo.rs`) lists the variables that
 refuse reads or offer admin rights, to see those states.
 
-Components, tokens and fonts come from
-[zeabur-oss/design-system](https://github.com/zeabur-oss/design-system), a Git dependency pinned to a
-commit in `web/package.json`. It ships its sources, which Vite compiles like the interface's own
-(`web/vite.config.ts`). To change a component, change it there, then move the pin:
-
-```sh
-(cd web && bun add 'github:zeabur-oss/design-system#<commit>')
-```
-
-To try a design-system change here before it is pushed, link a checkout next to this one with
-`bun link` (see its README), and run `bun install` afterwards to return to the pin.
+Components, tokens and fonts come from `@zeabur-oss/design-system` on npm, at the exact version
+in `web/package.json`, published from
+[zeabur-oss/design-system](https://github.com/zeabur-oss/design-system)'s version tags. It ships
+its sources, which Vite compiles like the interface's own (`web/vite.config.ts`). To change a
+component, change it there; Renovate moves the version once it is released. To try an unreleased
+change here, point the dependency at a tarball of it (the design system's `design-system-change`
+skill) and never commit that `package.json` or `bun.lock`.
 
 A release binary embeds the built interface; see the `zeabur-ui` crate documentation.
 
