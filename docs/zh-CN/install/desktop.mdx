@@ -1,0 +1,36 @@
+---
+title: Zeabur Desktop：在自己的电脑上打开集群
+description: 在 macOS、Windows 或 Linux 上安装 Zeabur Desktop，为 kubeconfig 里的任何集群打开 Zeabur，并保持最新版本。
+---
+
+Zeabur Desktop 会列出你电脑上 kubeconfig 文件里的 context，你选哪一个，它就在新窗口里为那个集群打开 Zeabur。它做的事和 `zeaburctl ui` 一样，只是不用打开终端。
+
+## 下载
+
+在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 选择一个版本，下载适合你电脑的文件：
+
+| 电脑 | 文件 |
+|---|---|
+| Apple 芯片的 Mac | `zeabur-desktop-v<version>-darwin-arm64.dmg` |
+| x64 的 Windows | `zeabur-desktop-v<version>-windows-amd64-setup.exe`；不想安装就用 `-portable.exe` |
+| Debian 或 Ubuntu | `zeabur-desktop-v<version>-linux-<arch>.deb` |
+| Fedora、RHEL 或 openSUSE | `zeabur-desktop-v<version>-linux-<arch>.rpm` |
+| 其他 Linux | `zeabur-desktop-v<version>-linux-<arch>.AppImage` |
+
+Linux 的 `<arch>` 是 `amd64` 或 `arm64`。没有 Intel Mac 和 Arm 版 Windows 的版本。每个版本的 `SHA256SUMS` 也包含这些文件，验证方法见[发行文件与验证](../reference/releases.mdx)。
+
+## 安装
+
+- **macOS**：打开 `.dmg`，把 Zeabur 拖进“应用程序”。
+- **Windows**：运行 `-setup.exe`。它只为你的账户安装，不需要管理员权限。
+- **Debian 或 Ubuntu**：`sudo apt install ./zeabur-desktop-v<version>-linux-<arch>.deb`
+- **Fedora、RHEL 或 openSUSE**：`sudo dnf install ./zeabur-desktop-v<version>-linux-<arch>.rpm`，openSUSE 用 `zypper install`。
+- **AppImage**：用 `chmod +x` 让文件可以运行，再运行它。
+
+## 更新
+
+Zeabur Desktop 每次启动都会检查有没有新版本。有的话，侧边栏会显示“有新版本”和版本号。想自己检查时，点击侧边栏的“检查更新”；在 macOS 上也可以选择“Zeabur > 检查更新…”。
+
+更新会先列出更新内容，你点击“更新并重启”后才会安装。接着 Zeabur 会关闭窗口，以新版本重新启动。预发布版本不会出现在更新里。
+
+macOS 的 App、用 Windows 安装程序装的 Zeabur 和 AppImage 都能自行更新。`.deb`、`.rpm` 和免安装的 `.exe` 不行：Zeabur 会告诉你有新版本，请到发布页面下载，用第一次安装的方式再装一次。

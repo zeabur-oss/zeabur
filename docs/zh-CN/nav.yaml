@@ -11,6 +11,7 @@
     config-file: 使用配置文件和命令安装
     personal: 个人使用：在小型服务器上安装
     existing-cluster: 将 Zeabur 安装到已有集群
+    desktop: Zeabur Desktop：在自己的电脑上打开集群
 - group: upgrade
   label: 升级
   pages:

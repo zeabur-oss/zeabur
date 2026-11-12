@@ -2,6 +2,7 @@
 [package]
 versioned_files = [
   "Cargo.toml",
+  "desktop/Cargo.toml",
 ]
 changelog = "CHANGELOG.md"
 # The update check looks for ### Security in the release notes (docs/reference/telemetry.mdx).

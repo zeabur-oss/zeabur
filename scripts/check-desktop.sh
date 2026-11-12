@@ -1,8 +1,9 @@
 #!/usr/bin/env bash
 # Fails if desktop/, a Cargo workspace of its own, drifts from the main workspace's rules: the
-# fields of [workspace.package], the lints of [workspace.lints] (desktop/ denies unsafe_code where
-# the main workspace forbids it), [profile.release], the modules that may use unsafe, and the
-# workspace crates it depends on. See docs/internal/crates.md, "Apps outside the workspace".
+# fields of [workspace.package] (the version too: the desktop app is released with Zeabur), the
+# lints of [workspace.lints] (desktop/ denies unsafe_code where the main workspace forbids it),
+# [profile.release], the modules that may use unsafe, and the workspace crates it depends on. See
+# docs/internal/crates.md, "Apps outside the workspace".
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -16,7 +17,7 @@ toml() {
 }
 
 failed=0
-fields='{"edition": .edition, "rust-version": .["rust-version"], "license": .license, "repository": .repository, "publish": .publish}'
+fields='{"version": .version, "edition": .edition, "rust-version": .["rust-version"], "license": .license, "repository": .repository, "publish": .publish}'
 if ! diff -u <(toml ".workspace.package | $fields" Cargo.toml) <(toml ".package | $fields" desktop/Cargo.toml) >&2; then
   echo "error: desktop/Cargo.toml [package] differs from [workspace.package] in Cargo.toml" >&2
   failed=1

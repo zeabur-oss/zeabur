@@ -16,6 +16,10 @@ fn main() {
         "back_to_chooser",
         "scenario",
         "set_menu",
+        "found_update",
+        "check_update",
+        "install_update",
+        "open_releases",
     ]);
     let attributes = tauri_build::Attributes::new()
         .codegen(tauri_build::CodegenContext::new())

@@ -15,6 +15,7 @@ mod probe;
 mod shots;
 mod sources;
 mod store;
+mod update;
 #[cfg(target_os = "macos")]
 mod webkit;
 #[cfg(windows)]
@@ -398,7 +399,9 @@ fn main() -> ExitCode {
     chrome::set_app_id(&context.config().identifier);
     let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(chrome::window_state());
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(chrome::window_state())
+        .manage(update::Updates::default());
     #[cfg(target_os = "macos")]
     let builder = builder.on_menu_event(menu::on_menu_event);
     let app = builder
@@ -451,6 +454,7 @@ fn main() -> ExitCode {
                 tauri_app.state::<App>().dev_web.as_ref(),
             )?;
             chrome::show_chooser(tauri_app.handle())?;
+            update::check_on_start(tauri_app.handle());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -464,7 +468,11 @@ fn main() -> ExitCode {
             start_cluster,
             back_to_chooser,
             scenario,
-            menu::set_menu
+            menu::set_menu,
+            update::found_update,
+            update::check_update,
+            update::install_update,
+            update::open_releases
         ])
         .build(context);
     match app {
