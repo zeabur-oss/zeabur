@@ -61,7 +61,6 @@
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
-use axum::body::Body;
 use axum::extract::{Request, State};
 use axum::http::{HeaderMap, HeaderValue, Method, StatusCode, header};
 use axum::middleware::Next;
@@ -232,6 +231,7 @@ fn problem(kind: Kind, detail: &str) -> Response {
 #[cfg(test)]
 mod tests {
     use axum::Router;
+    use axum::body::Body;
     use axum::routing::{get, post};
     use tower::ServiceExt as _;
 
