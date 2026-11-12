@@ -7,7 +7,7 @@ import { api, type Context, type Snapshot } from "./api"
 import { DropOverlay, FirstRun, type AddActions } from "./chrome"
 import { ContextPane, type RowActions } from "./contexts"
 import { useDropTarget, useScenario, useSnapshot } from "./hooks"
-import { recentContexts, visibleContexts } from "./model"
+import { recentContexts, sourceFilter, visibleContexts } from "./model"
 import { PasteDialog, type Paste } from "./paste-dialog"
 import { pasteSample } from "./shots"
 import { Sidebar } from "./sources"
@@ -23,8 +23,18 @@ interface BrowserProps {
   reload: () => Promise<unknown>
 }
 
-function Browser({ snap, reach, query, setQuery, only, setOnly, add, reload }: BrowserProps) {
+function Browser({
+  snap,
+  reach,
+  query,
+  setQuery,
+  only: chosen,
+  setOnly,
+  add,
+  reload,
+}: BrowserProps) {
   const { locale } = useI18n()
+  const only = sourceFilter(snap, chosen)
   const visible = useMemo(() => visibleContexts(snap, query, only), [snap, query, only])
   const rows: RowActions = {
     open: (c: Context) => void api.open(c.key, c.name, locale).then(reload),

@@ -145,19 +145,13 @@ fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), Str
     if slug.is_empty() {
         slug.push_str("pasted");
     }
-    let path = store::write_private(
-        &app.kubeconfigs_dir,
-        &format!("{slug}.yaml"),
-        yaml.as_bytes(),
-    )
-    .map_err(|e| e.to_string())?;
+    let path = store::write_new_private(&app.kubeconfigs_dir, &slug, yaml.as_bytes())
+        .map_err(|e| e.to_string())?;
     let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
-    if !saved.added.iter().any(|a| a.path == path) {
-        saved.added.push(AddedSource {
-            kind: SourceKind::Pasted,
-            path,
-        });
-    }
+    saved.added.push(AddedSource {
+        kind: SourceKind::Pasted,
+        path,
+    });
     app.save(&saved)
 }
 
@@ -195,19 +189,19 @@ struct ProbeResult {
     reach: probe::Reach,
 }
 
-/// Probes every server at once, one thread each.
+/// Probes every server at once on the blocking thread pool, so the async workers stay free.
 #[tauri::command]
 async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
-    let mut handles = Vec::new();
+    let mut tasks = Vec::new();
     for (key, server) in targets {
-        handles.push(std::thread::spawn(move || ProbeResult {
+        tasks.push(tauri::async_runtime::spawn_blocking(move || ProbeResult {
             reach: probe::probe(server.as_deref()),
             key,
         }));
     }
     let mut results = Vec::new();
-    for handle in handles {
-        if let Ok(result) = handle.join() {
+    for task in tasks {
+        if let Ok(result) = task.await {
             results.push(result);
         }
     }

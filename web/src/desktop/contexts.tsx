@@ -15,7 +15,11 @@ import { authText, fileLabel, reachView } from "./model"
 function ReachBadge({ reach }: { reach: Reach | undefined }) {
   const { t } = useI18n()
   const view = reachView(reach, t)
-  return <Badge variant={view.variant}>{view.text}</Badge>
+  return (
+    <Badge variant={view.variant} className="max-w-full" title={view.text}>
+      <span className="truncate">{view.text}</span>
+    </Badge>
+  )
 }
 
 function FavouriteToggle({ on, onToggle }: { on: boolean; onToggle: () => void }) {
@@ -38,7 +42,10 @@ function SameName({ count }: { count: number }) {
   const { t } = useI18n()
   if (count === 0) return null
   return (
-    <span className="min-w-0 truncate text-warn-strong" title={t("desktop.sameName", count)}>
+    <span
+      className="max-w-1/2 shrink-0 truncate text-warn-strong"
+      title={t("desktop.sameName", count)}
+    >
       {t("desktop.sameName", count)}
     </span>
   )
@@ -59,7 +66,7 @@ function ContextName({ context }: { context: Context }) {
         {context.current ? <Badge variant="secondary">{t("desktop.current")}</Badge> : null}
       </div>
       <div className="flex min-w-0 items-center gap-2 type-meta text-tertiary">
-        <span className="shrink-0" title={context.file} translate="no">
+        <span className="min-w-0 truncate" title={context.file} translate="no">
           {fileLabel(context.file)}
         </span>
         <SameName count={context.sameNameElsewhere} />
@@ -78,7 +85,7 @@ function Cell({ value, className }: { value: string | null; className: string })
 
 function ContextServer({ context }: { context: Context }) {
   return (
-    <div className="min-w-0">
+    <div className="min-w-0 @max-2xl:col-start-2 @max-2xl:row-start-2">
       <Cell value={context.server} className="truncate type-mono type-meta text-secondary" />
       <Cell value={context.user} className="truncate type-meta text-tertiary" />
     </div>
@@ -98,7 +105,7 @@ function ContextStatus({
   const problem = authText(context.auth, shell, t)
   const tone = blocked(context.auth) ? "text-fail-strong" : "text-warn-strong"
   return (
-    <div className="flex min-w-0 flex-col items-start gap-1">
+    <div className="flex min-w-0 flex-col items-start gap-1 @max-2xl:col-start-3 @max-2xl:row-span-2 @max-2xl:row-start-1">
       <ReachBadge reach={reach} />
       {problem ? (
         <span className={`max-w-full truncate type-meta ${tone}`} title={problem}>
@@ -125,14 +132,17 @@ interface RowProps {
 function ContextRow({ context, favourite, reach, shell, actions }: RowProps) {
   const { t } = useI18n()
   return (
-    <li className="grid grid-cols-desktop-row items-center gap-3 border-b border-v2-separator px-4 py-2.5 last:border-b-0">
-      <FavouriteToggle on={favourite} onToggle={() => actions.toggleFavourite(context)} />
+    <li className="grid grid-cols-desktop-row items-center gap-x-3 gap-y-1 border-b border-v2-separator px-4 py-2.5 last:border-b-0 @max-2xl:grid-cols-desktop-row-narrow">
+      <div className="@max-2xl:row-span-2">
+        <FavouriteToggle on={favourite} onToggle={() => actions.toggleFavourite(context)} />
+      </div>
       <ContextName context={context} />
       <ContextServer context={context} />
       <ContextStatus context={context} reach={reach} shell={shell} />
       <Button
         variant="secondary"
         size="xs"
+        className="@max-2xl:col-start-4 @max-2xl:row-span-2 @max-2xl:row-start-1"
         disabled={blocked(context.auth)}
         onClick={() => actions.open(context)}
       >
@@ -152,7 +162,7 @@ interface ListProps {
 
 function ContextList({ contexts, favourites, reach, shell, actions }: ListProps) {
   return (
-    <ul className="rounded-lg border border-v2-border bg-surface">
+    <ul className="@container rounded-lg border border-v2-border bg-surface">
       {contexts.map((c) => (
         <ContextRow
           key={c.key}

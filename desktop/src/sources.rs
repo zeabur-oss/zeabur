@@ -187,11 +187,23 @@ fn check_auth(info: &AuthInfo, env: &ChildEnv) -> Auth {
             hint: exec.install_hint.clone(),
         };
     }
-    for path in [&info.client_certificate, &info.client_key, &info.token_file]
-        .into_iter()
-        .flatten()
-    {
-        if !Path::new(path).is_file() {
+    // Inline data and a token win over the file that names the same credential, as in kube-rs
+    // (`kube_client::config::file_config`); such a file is not needed.
+    let files = [
+        (
+            &info.client_certificate,
+            info.client_certificate_data.is_some(),
+        ),
+        (&info.client_key, info.client_key_data.is_some()),
+        (&info.token_file, info.token.is_some()),
+    ];
+    for (file, inline) in files {
+        if inline {
+            continue;
+        }
+        if let Some(path) = file
+            && !Path::new(path).is_file()
+        {
             return Auth::FileMissing { path: path.clone() };
         }
     }
@@ -391,6 +403,38 @@ mod tests {
         );
         assert!(find_command("kubelogin", &env));
         assert!(!find_command("kubelogin", &ChildEnv::default()));
+    }
+
+    #[test]
+    fn inline_credentials_need_no_referenced_file() {
+        let gone = "/nonexistent/zeabur-desktop/client.pem".to_owned();
+        let inline = AuthInfo {
+            client_certificate: Some(gone.clone()),
+            client_certificate_data: Some("Y2VydA==".into()),
+            client_key: Some(gone.clone()),
+            client_key_data: Some("a2V5".to_owned().into()),
+            ..AuthInfo::default()
+        };
+        assert!(matches!(
+            check_auth(&inline, &ChildEnv::default()),
+            Auth::Ok { .. }
+        ));
+        let token = AuthInfo {
+            token: Some("abc".to_owned().into()),
+            token_file: Some(gone.clone()),
+            ..AuthInfo::default()
+        };
+        assert!(matches!(
+            check_auth(&token, &ChildEnv::default()),
+            Auth::Ok { .. }
+        ));
+        let file_only = AuthInfo {
+            client_key: Some(gone.clone()),
+            ..AuthInfo::default()
+        };
+        assert!(
+            matches!(check_auth(&file_only, &ChildEnv::default()), Auth::FileMissing { path } if path == gone)
+        );
     }
 
     #[test]

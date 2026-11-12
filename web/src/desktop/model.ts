@@ -80,6 +80,11 @@ function matchesQuery(c: Context, query: string): boolean {
   return [c.name, c.server, c.user, c.file, c.cluster].some((v) => v?.toLowerCase().includes(query))
 }
 
+/** The chosen source, or null once that source is no longer in the snapshot. */
+export function sourceFilter(snap: Snapshot, only: string | null): string | null {
+  return snap.sources.some((s) => s.id === only) ? only : null
+}
+
 /** Contexts of the chosen source that match the search, favourites first. */
 export function visibleContexts(snap: Snapshot, query: string, only: string | null): Context[] {
   const q = query.trim().toLowerCase()
