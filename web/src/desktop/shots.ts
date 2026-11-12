@@ -1,0 +1,17 @@
+/** Filled into the paste dialog by the `paste` screenshot scenario. */
+export const pasteSample = `apiVersion: v1
+kind: Config
+clusters:
+  - name: homelab
+    cluster:
+      server: https://homelab.local:6443
+users:
+  - name: homelab-admin
+    user:
+      token: not-a-real-token
+contexts:
+  - name: homelab
+    context:
+      cluster: homelab
+      user: homelab-admin
+`

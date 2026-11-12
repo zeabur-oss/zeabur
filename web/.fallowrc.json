@@ -54,6 +54,7 @@
       { "name": "modules", "patterns": ["src/modules/**"] },
       { "name": "routes", "patterns": ["src/routes/**"] },
       { "name": "app", "patterns": ["src/main.tsx", "src/router.tsx"] },
+      { "name": "desktop", "patterns": ["src/desktop/**"] },
       { "name": "test-support", "patterns": ["src/test/**"] }
     ],
     "rules": [
@@ -83,6 +84,10 @@
           "i18n"
         ]
       },
+      {
+        "from": "desktop",
+        "allow": ["components", "model", "auth", "session", "api", "lib", "i18n"]
+      },
       { "from": "test-support", "allow": [] }
     ],
     "coverage": {
@@ -92,6 +97,7 @@
         "scripts/**",
         "*.config.ts",
         "index.html",
+        "desktop.html",
         "src/styles/**",
         "src/**/*.d.ts"
       ]

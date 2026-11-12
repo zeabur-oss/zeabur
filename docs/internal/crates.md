@@ -69,6 +69,29 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 
 Every crate has a README that is also its crate-level documentation (`cargo doc --open`).
 
+## Apps outside the workspace
+
+[`desktop/`](../../desktop) (the Tauri desktop app) is a Cargo workspace of its own, with its own
+lock file, so the server's dependency graph never has Tauri, GTK or WebKit in it. It follows the
+main workspace's rules:
+
+- **Shared files.** Cargo, clippy and rustfmt read `.cargo/config.toml` (the `cargo lint` alias,
+  rustflags, the publish age), `clippy.toml` and `rustfmt.toml` from the parent folders, and
+  `cargo deny --config deny.toml` checks it with the same policy for the desktop platforms. The
+  toolchain is the dev shell's (`nix develop .#desktop`, which adds GTK and WebKitGTK on Linux).
+- **Copied tables.** Cargo reads `[workspace.lints]`, `[workspace.package]` and
+  `[profile.release]` only from the root of a workspace, so `desktop/Cargo.toml` has a copy. `scripts/check-desktop.sh` fails CI when the copy
+  differs. The one difference is `unsafe_code`: `deny`, not `forbid`, so that the two modules the
+  script lists (`webkit.rs`, `win32.rs`) can wrap the system calls that have no safe binding,
+  each with `#![expect(unsafe_code, reason = "…")]`. A new module that names `unsafe_code` fails
+  the script.
+- **One dependency edge.** Of the workspace crates, `desktop/` may depend only on `zeabur-local`
+  (checked by the same script); nothing in the workspace depends on `desktop/`.
+
+CI's `desktop` job (`scripts/ci/desktop.sh`) runs the script, `cargo fmt`, `cargo lint`, the tests
+and `cargo deny` for `desktop/` on Linux. The macOS and Windows code is linted on a Mac
+(`cargo lint`, and `cargo xwin clippy` for Windows, see `desktop/README.md`).
+
 ## Web interface
 
 The interface's sources live in [`web/`](../../web) (React, TanStack Router and Query, shadcn/ui on
