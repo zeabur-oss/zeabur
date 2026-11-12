@@ -24,7 +24,8 @@ const TITLE_BAR: f64 = 28.0;
 #[cfg(target_os = "macos")]
 const ZOOM_STEPS: [f64; 11] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0];
 
-/// The zoom of each window by label; WebKit has no call to read it back.
+/// The zoom of each open window by label; WebKit has no call to read it back. A window that
+/// closes leaves the map, so a new window with the same label starts at 1.0, as its web view does.
 #[cfg(target_os = "macos")]
 static ZOOM: std::sync::Mutex<Option<std::collections::HashMap<String, f64>>> =
     std::sync::Mutex::new(None);
@@ -72,11 +73,26 @@ fn title_bar<'a, M: Manager<Wry>>(
 
 #[cfg(target_os = "macos")]
 fn zoom_of(window: &tauri::WebviewWindow) -> f64 {
+    stored_zoom(window.label())
+}
+
+#[cfg(target_os = "macos")]
+fn stored_zoom(label: &str) -> f64 {
     let zooms = ZOOM.lock().unwrap_or_else(|e| e.into_inner());
     zooms
         .as_ref()
-        .and_then(|z| z.get(window.label()).copied())
+        .and_then(|z| z.get(label).copied())
         .unwrap_or(1.0)
+}
+
+#[cfg(target_os = "macos")]
+fn store_zoom(label: &str, zoom: Option<f64>) {
+    let mut zooms = ZOOM.lock().unwrap_or_else(|e| e.into_inner());
+    let zooms = zooms.get_or_insert_with(Default::default);
+    match zoom {
+        Some(zoom) => zooms.insert(label.to_owned(), zoom),
+        None => zooms.remove(label),
+    };
 }
 
 /// A zoomed page has larger CSS pixels, but the traffic lights keep their size.
@@ -96,11 +112,7 @@ pub fn zoom(window: &tauri::WebviewWindow, up: Option<bool>) {
         None => 1.0,
     };
     if window.set_zoom(next).is_ok() {
-        let mut zooms = ZOOM.lock().unwrap_or_else(|e| e.into_inner());
-        zooms
-            .get_or_insert_with(Default::default)
-            .insert(window.label().to_owned(), next);
-        drop(zooms);
+        store_zoom(window.label(), Some(next));
         fit_title_bar(window, next);
     }
 }
@@ -211,6 +223,12 @@ pub fn on_run_event(app: &AppHandle, event: RunEvent) {
                 eprintln!("zeabur-desktop: cannot open the chooser: {err}");
             }
         }
+        #[cfg(target_os = "macos")]
+        RunEvent::WindowEvent {
+            label,
+            event: tauri::WindowEvent::Destroyed,
+            ..
+        } => store_zoom(&label, None),
         _ => {
             let _ = app;
         }
@@ -219,7 +237,15 @@ pub fn on_run_event(app: &AppHandle, event: RunEvent) {
 
 #[cfg(all(test, target_os = "macos"))]
 mod tests {
-    use super::next_zoom;
+    use super::{next_zoom, store_zoom, stored_zoom};
+
+    #[test]
+    fn a_closed_window_forgets_its_zoom() {
+        store_zoom("cluster-test", Some(2.0));
+        assert_eq!(stored_zoom("cluster-test"), 2.0);
+        store_zoom("cluster-test", None);
+        assert_eq!(stored_zoom("cluster-test"), 1.0);
+    }
 
     #[test]
     fn zoom_moves_one_step_and_stops_at_the_ends() {
