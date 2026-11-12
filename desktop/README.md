@@ -57,8 +57,8 @@ a TCP connection.
 - Linux (GNOME): the window handles the standard shortcuts before the page sees them[^gnome-keys].
   Ctrl+W closes the window, Ctrl+Q quits, Ctrl+N shows the chooser, Ctrl+R reloads, and Ctrl++,
   Ctrl+- and Ctrl+0 zoom. The program name is the app ID (`com.zeabur.desktop-poc`), which Wayland
-  uses to find the desktop entry[^xdg-shell]. `desktop/run.sh` writes that entry, so the Dock and
-  Alt+Tab show Zeabur and its icon. GNOME maximizes a new window that is nearly the size of the
+  uses to find the desktop entry[^xdg-shell]. `desktop/run.sh` writes that entry and the icon (`hicolor`
+  theme, 32 to 512 px) while it runs, so the Dock and Alt+Tab show Zeabur and its icon. GNOME maximizes a new window that is nearly the size of the
   screen.
 - Windows: WebView2 handles Ctrl+R and F5, and Ctrl++, Ctrl+- and Ctrl+0 zoom. Alt+F4 closes the
   window. Ctrl+W is not handled yet.
