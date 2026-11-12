@@ -10,5 +10,7 @@
 		<string>zh-TW</string>
 		<string>zh-CN</string>
 	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Zeabur connects to the Kubernetes clusters in your kubeconfig, including the ones on your local network.</string>
 </dict>
 </plist>

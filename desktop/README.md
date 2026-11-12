@@ -104,6 +104,9 @@ for a plugin name without one.
 - If the service cannot start (the kubeconfig cannot sign in, the cluster does not answer who you
   are), the window shows the reason with "Try again" and "Choose another cluster".
 - Closing the window stops its service. Quitting the app stops them all.
+- On macOS a cluster on the local network (a homelab, a VM) needs the Local Network permission.
+  macOS asks on the first connection, with the reason in `desktop/Info.plist`; until it is
+  allowed the connection fails with "No route to host".
 - The chooser's reachability badge is still only a TCP connection; signing in happens on open.
 - `ZEABUR_DESKTOP_WEB=<url>`, for development only, makes every cluster window load that address
   (such as the web dev server with the demo API) instead of starting a service.
