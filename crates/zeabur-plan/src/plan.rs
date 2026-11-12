@@ -953,21 +953,7 @@ impl<'a> Planner<'a> {
             ));
         };
         Self::refuse_managed(&meta, kind_name, name)?;
-        let mut json_object = json_object?;
-        if kind == DataKind::Secret {
-            // The keys of a Secret are not read; a key to remove is shown as there before.
-            for edit in edits {
-                if edit.op == "remove"
-                    && let Some(object) = json_object.as_object_mut()
-                    && let Some(data) = object
-                        .entry("data")
-                        .or_insert_with(|| Value::Object(serde_json::Map::new()))
-                        .as_object_mut()
-                {
-                    data.entry(edit.key.clone()).or_insert_with(|| json!(""));
-                }
-            }
-        }
+        let json_object = json_object?;
         let target = Target {
             api_version: "v1".to_owned(),
             kind: kind_name.to_owned(),
@@ -975,6 +961,20 @@ impl<'a> Planner<'a> {
             name: name.to_owned(),
         };
         let index = self.working(target, json_object);
+        if kind == DataKind::Secret
+            && let Some(working) = self.objects.get_mut(index)
+        {
+            // The keys of a Secret are not read; a key to remove is shown as there before, also
+            // when an earlier change of this plan already made the working copy.
+            for edit in edits {
+                if edit.op == "remove" {
+                    if let Some(original) = working.original.as_mut() {
+                        show_key(original, &edit.key);
+                    }
+                    show_key(&mut working.current, &edit.key);
+                }
+            }
+        }
         let current = self.current(index);
         let mut edited = current.clone();
         let mut merge = serde_json::Map::new();
@@ -1039,13 +1039,21 @@ impl<'a> Planner<'a> {
                 }
             }
         }
-        for operation in edit_operations(&current, &edited) {
-            self.claim(index, &operation.field, &operation.shown)?;
-            if kind == DataKind::ConfigMap {
+        if kind == DataKind::ConfigMap {
+            for operation in edit_operations(&current, &edited) {
+                self.claim(index, &operation.field, &operation.shown)?;
                 self.patch(index, operation.operations)?;
             }
-        }
-        if kind == DataKind::Secret {
+        } else {
+            // The merge patch writes every key in it, so each one is checked, also when the
+            // shown before and after are the same.
+            for key in merge.keys() {
+                self.claim(
+                    index,
+                    &[Step::field("data"), Step::field(key)],
+                    &format!("data.{key}"),
+                )?;
+            }
             if let Some(working) = self.objects.get_mut(index) {
                 working.current = edited;
             }
@@ -1857,6 +1865,19 @@ impl<'a> Planner<'a> {
             impact: self.impact.into_iter().collect(),
             warnings: self.warnings,
         })
+    }
+}
+
+/// Puts an empty `data.<key>` in `object` when it has none, for a Secret key that was not read.
+fn show_key(object: &mut Value, key: &str) {
+    let Some(object) = object.as_object_mut() else {
+        return;
+    };
+    let data = object
+        .entry("data")
+        .or_insert_with(|| Value::Object(serde_json::Map::new()));
+    if let Some(data) = data.as_object_mut() {
+        data.entry(key.to_owned()).or_insert_with(|| json!(""));
     }
 }
 

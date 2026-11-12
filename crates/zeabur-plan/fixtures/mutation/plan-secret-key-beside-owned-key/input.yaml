@@ -1,0 +1,18 @@
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db
+  namespace: demo
+  resourceVersion: "5"
+  managedFields:
+    - manager: helm
+      operation: Update
+      apiVersion: v1
+      fieldsType: FieldsV1
+      fieldsV1:
+        f:data:
+          f:token: {}
+type: Opaque
+data:
+  password: aHVudGVyMQ==
+  token: dDBr
