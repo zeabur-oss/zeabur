@@ -262,6 +262,67 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn typing_other_keys_into_a_copy_keeps_a_rotation_from_replacing_them() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        copied_twice(&app).await;
+        let typed = json!({"changes": [{"op": "data", "kind": "Secret",
+            "name": "db-backups-s3", "changes": [
+                {"op": "set", "key": "ACCESS_KEY_ID", "value": "mine"},
+                {"op": "set", "key": "ACCESS_SECRET_KEY", "value": "my-secret"}]}]});
+        applied(&app, "/api/v1/projects/shop", &typed).await;
+        let ops = last_patch(&cluster);
+        let encoded = |text: &str| json!(base64::engine::general_purpose::STANDARD.encode(text));
+        assert_eq!(ops["/data/ACCESS_KEY_ID"], encoded("mine"), "{ops:?}");
+        assert_eq!(
+            ops["/data/ACCESS_SECRET_KEY"],
+            encoded("my-secret"),
+            "{ops:?}"
+        );
+        assert_eq!(
+            ops["/metadata/labels/zeabur.com~1s3-destination"],
+            Value::Null,
+            "{ops:?}"
+        );
+        assert_eq!(ops["/metadata/annotations"], Value::Null, "{ops:?}");
+    }
+
+    fn last_patch(cluster: &MemoryCluster) -> BTreeMap<String, Value> {
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        let Some(WriteBody::JsonPatch(ops)) = writes.last().map(|w| &w.body) else {
+            panic!("no patch of the Secret: {writes:?}");
+        };
+        ops.as_array()
+            .unwrap()
+            .iter()
+            .filter(|op| op["op"] != "test")
+            .map(|op| (op["path"].as_str().unwrap().to_owned(), op["value"].clone()))
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn choosing_the_same_destination_again_leaves_the_other_changes_planned() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        register(&app).await;
+        applied(&app, "/api/v1/projects/shop", &copy("db-backups-s3")).await;
+        let mut request = copy("db-backups-s3");
+        request["changes"].as_array_mut().unwrap().push(json!({
+            "op": "data", "kind": "Secret", "name": "db-backups-s3",
+            "changes": [{"op": "set", "key": "REGION", "value": "eu-west-1"}]}));
+        let (planned, _) = applied(&app, "/api/v1/projects/shop", &request).await;
+        assert!(!planned.to_string().contains(SECRET_KEY), "{planned}");
+        let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
+        let Some(WriteBody::MergePatch(patch)) = writes.last().map(|w| &w.body) else {
+            panic!("no merge patch of the Secret: {writes:?}");
+        };
+        assert_eq!(
+            patch,
+            &json!({"data": {"REGION": base64::engine::general_purpose::STANDARD.encode("eu-west-1")}})
+        );
+    }
+
+    #[tokio::test]
     async fn a_plan_names_the_copies_it_cannot_change() {
         let cluster = cluster();
         let app = app(&cluster);
