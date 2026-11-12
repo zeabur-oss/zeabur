@@ -28,6 +28,7 @@
 //! [kubectl-rollout-status]: https://github.com/kubernetes/kubectl/blob/master/pkg/polymorphichelpers/rollout_status.go
 //! [k8s-deployment-failed]: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#failed-deployment
 
+use axum::extract::State;
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -38,7 +39,7 @@ use zeabur_plan::{Change, PlanRequest, Release};
 
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::projects::not_found;
 use crate::timeline::history;
 use crate::views::UnreadableView;
@@ -311,6 +312,7 @@ pub(crate) fn progress(
     responses((status = 200, body = RolloutProgress), (status = 400, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn rollout(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path((project, kind, name)): Path<(String, String, String)>,
 ) -> Result<Json<RolloutProgress>, ApiError> {
@@ -324,7 +326,7 @@ pub(crate) async fn rollout(
         )));
     }
     let cluster = cluster.as_ref();
-    let read = crate::projects::read(cluster, &project).await?;
+    let read = crate::projects::read(cluster, &project, (state.clock)()).await?;
     let workload = zeabur_graph::workloads(&read.snapshot)
         .into_iter()
         .find(|w| w.kind() == workload_kind && w.name() == name)

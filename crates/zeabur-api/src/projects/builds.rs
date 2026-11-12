@@ -6,6 +6,7 @@
 //! ten minutes after it finishes). It also names the workloads that ask Keel to update them
 //! (`keel.sh/policy`), for the automatic-update switch.
 
+use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -19,7 +20,7 @@ use zeabur_modules::zeabur_builder::{
 
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::projects::backups::ProviderState;
 use crate::views::UnreadableView;
 
@@ -71,10 +72,11 @@ pub struct ProjectBuilds {
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectBuilds), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectBuilds>, ApiError> {
-    read(cluster.as_ref(), &project)
+    read(cluster.as_ref(), &project, (state.clock)())
         .await
         .map(Json)
         .map_err(|e| ApiError::from(e.into_problem(&format!("builds of {project}"))))
@@ -87,6 +89,7 @@ pub(crate) async fn built_images(
     cluster: &dyn Cluster,
     project: &str,
     services: &mut [zeabur_model::Service],
+    now: Timestamp,
 ) {
     if services.is_empty() {
         return;
@@ -96,7 +99,7 @@ pub(crate) async fn built_images(
     else {
         return;
     };
-    let builds = zeabur_builder::builds(&builds, Some(Timestamp::now()));
+    let builds = zeabur_builder::builds(&builds, Some(now));
     if builds.is_empty() {
         return;
     }
@@ -109,7 +112,11 @@ pub(crate) async fn built_images(
     }
 }
 
-async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectBuilds, ClusterError> {
+async fn read(
+    cluster: &dyn Cluster,
+    project: &str,
+    now: Timestamp,
+) -> Result<ProjectBuilds, ClusterError> {
     let mut unreadable = Vec::new();
     let answer = |state| ProjectBuilds {
         state,
@@ -182,7 +189,7 @@ async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectBuilds, Clu
     };
     Ok(ProjectBuilds {
         state: ProviderState::Installed,
-        builds: zeabur_builder::builds(&builds, Some(Timestamp::now())),
+        builds: zeabur_builder::builds(&builds, Some(now)),
         runs,
         keel,
         unreadable,
