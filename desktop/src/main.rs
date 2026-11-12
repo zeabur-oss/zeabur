@@ -307,7 +307,7 @@ fn main() {
             scenario,
             menu::set_menu
         ])
-        .build(tauri::generate_context!())
+        .build(tauri::tauri_build_context!())
         .unwrap_or_else(|err| {
             eprintln!("zeabur-desktop: {err}");
             std::process::exit(1);

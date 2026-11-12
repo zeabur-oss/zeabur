@@ -24,7 +24,7 @@ tauri-plugin-window-state = "2"
 custom-protocol = ["tauri/custom-protocol"]
 
 [build-dependencies]
-tauri-build = "2"
+tauri-build = { version = "2", features = ["codegen"] }
 
 # The README screenshots: a snapshot of the WKWebView itself (no screen recording permission needed).
 [target.'cfg(target_os = "macos")'.dependencies]
