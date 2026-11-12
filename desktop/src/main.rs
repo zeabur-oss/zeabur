@@ -181,20 +181,19 @@ async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
     results
 }
 
-/// Opens one window per context with Zeabur's web interface.
+/// Opens Zeabur's web interface for one context in its own window.
 #[tauri::command]
-fn open_clusters(
+fn open_cluster(
     handle: tauri::AppHandle,
     app: State<'_, App>,
-    contexts: Vec<(String, String)>,
+    key: String,
+    name: String,
     lang: String,
 ) -> Result<(), String> {
     {
         let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
-        for (key, _) in &contexts {
-            saved.recents.retain(|k| k != key);
-            saved.recents.insert(0, key.clone());
-        }
+        saved.recents.retain(|k| *k != key);
+        saved.recents.insert(0, key.clone());
         saved.recents.truncate(5);
         app.save(&saved)?;
     }
@@ -207,22 +206,19 @@ fn open_clusters(
         "localStorage.removeItem('zeabur.locale')".to_owned()
     };
     let script = format!("try {{ {locale} }} catch {{}}");
-    for (index, (key, name)) in contexts.iter().enumerate() {
-        let label = format!("cluster-{}", shots::label_hash(key));
-        if let Some(window) = handle.get_webview_window(&label) {
-            let _ = window.set_focus();
-            continue;
-        }
-        let offset = f64::from(u32::try_from(index).unwrap_or(0)) * 28.0;
-        let builder = WebviewWindowBuilder::new(&handle, label, WebviewUrl::External(url.clone()))
-            .title(format!("{name} - Zeabur"))
-            .inner_size(1280.0, 800.0)
-            .position(120.0 + offset, 80.0 + offset)
-            .initialization_script(&script);
-        let window = shots::apply_theme(builder).build().map_err(|e| e.to_string())?;
-        if shots::wants("cluster") {
-            shots::capture(window);
-        }
+    let label = format!("cluster-{}", shots::label_hash(&key));
+    if let Some(window) = handle.get_webview_window(&label) {
+        let _ = window.set_focus();
+        return Ok(());
+    }
+    let builder = WebviewWindowBuilder::new(&handle, label, WebviewUrl::External(url))
+        .title(format!("{name} - Zeabur"))
+        .inner_size(1280.0, 800.0)
+        .position(120.0, 80.0)
+        .initialization_script(&script);
+    let window = shots::apply_theme(builder).build().map_err(|e| e.to_string())?;
+    if shots::wants("cluster") {
+        shots::capture(window);
     }
     Ok(())
 }
@@ -294,7 +290,7 @@ fn main() {
             remove_source,
             toggle_favourite,
             probe,
-            open_clusters,
+            open_cluster,
             scenario
         ])
         .run(tauri::generate_context!())

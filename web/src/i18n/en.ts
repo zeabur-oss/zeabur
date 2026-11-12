@@ -4529,9 +4529,6 @@ export const en = {
   "desktop.reachNote":
     "Reachable means the server's address answers. Signing in happens when you open it.",
   "desktop.open": "Open",
-  "desktop.openN": (n: number) => (n === 1 ? "Open 1 cluster" : `Open ${n} clusters`),
-  "desktop.selected": (n: number) => `${n} selected`,
-  "desktop.clear": "Clear",
   "desktop.favouriteAdd": "Add to favourites",
   "desktop.favouriteRemove": "Remove from favourites",
   "desktop.pasteTitle": "Paste a kubeconfig",

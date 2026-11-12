@@ -6,7 +6,7 @@
 set -u
 D=$(cd "$(dirname "$0")" && pwd)
 out=$1; shift
-screens=${*:-first list search paste select drop cluster}
+screens=${*:-first list search paste drop cluster}
 home=$D/fixtures/home/.kube/config
 mkdir -p "$out"
 for lang in ${LANGS:-en zh-TW zh-CN}; do
@@ -19,7 +19,6 @@ for lang in ${LANGS:-en zh-TW zh-CN}; do
       list) printf '{"added":[{"kind":"folder","path":"%s"}],"favourites":["%s"],"recents":["%s"]}\n' "$D/fixtures/team" "$D/fixtures/team/eks.yaml#prod-tokyo" "$home#zeabur-demo" > "$st/state.json" ;;
       search) scen="$scen;q=staging" ;;
       paste) scen="$scen;paste=1" ;;
-      select) scen="$scen;select=zeabur-demo,prod-tokyo" ;;
       drop) scen="$scen;drop=1" ;;
       cluster) scen="$scen;open=zeabur-demo"; target=cluster; delay=8000 ;;
     esac

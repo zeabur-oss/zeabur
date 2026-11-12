@@ -56,8 +56,8 @@ export const api = {
   toggleFavourite: (key: string) => invoke<void>("toggle_favourite", { key }),
   probe: (targets: [string, string | null][]) =>
     invoke<{ key: string; reach: Reach }[]>("probe", { targets }),
-  open: (contexts: [string, string][], lang: string) =>
-    invoke<void>("open_clusters", { contexts, lang }),
+  open: (key: string, name: string, lang: string) =>
+    invoke<void>("open_cluster", { key, name, lang }),
   scenario: () => invoke<string | null>("scenario"),
 }
 

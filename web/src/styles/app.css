@@ -12,7 +12,7 @@
 @theme {
   --container-content: 60rem;
   --grid-template-columns-settings: 12rem 1fr;
-  --grid-template-columns-desktop-row: auto auto minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.2fr) auto;
+  --grid-template-columns-desktop-row: auto minmax(0, 1.4fr) minmax(0, 1.4fr) minmax(0, 1.2fr) auto;
   --grid-template-columns-pairs: auto 1fr;
   --grid-template-columns-event: 0.75rem minmax(0, 1fr) auto;
   --grid-template-columns-variable: minmax(10rem, 14rem) 1fr;

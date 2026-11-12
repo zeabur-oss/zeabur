@@ -2,7 +2,6 @@ import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { open as pick } from "@tauri-apps/plugin-dialog"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
 import { Button } from "@zeabur-oss/design-system/components/button"
-import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
 import {
   Dialog,
   DialogClose,
@@ -29,7 +28,6 @@ import ClipboardIcon from "~icons/ph/clipboard-text"
 import FileIcon from "~icons/ph/file-text"
 import FolderIcon from "~icons/ph/folder"
 import HouseIcon from "~icons/ph/house"
-import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import PlusIcon from "~icons/ph/plus"
 import StarIcon from "~icons/ph/star"
 import StarFillIcon from "~icons/ph/star-fill"
@@ -107,7 +105,6 @@ export function App() {
   const [reach, setReach] = useState<Record<string, Reach>>({})
   const [query, setQuery] = useState("")
   const [only, setOnly] = useState<string | null>(null)
-  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set())
   const [paste, setPaste] = useState<{ name: string; yaml: string; error: string | null } | null>(
     null,
   )
@@ -135,20 +132,8 @@ export function App() {
       if (s.paste) setPaste({ name: "homelab", yaml: pasteSample, error: null })
       if (s.drop) setDropping(true)
       if (s.only) setOnly(loaded.sources[Number(s.only)]?.id ?? null)
-      if (s.select) {
-        const names = s.select.split(",")
-        setSelected(
-          new Set(loaded.contexts.filter((c) => names.includes(c.name)).map((c) => c.key)),
-        )
-      }
-      if (s.open) {
-        const names = s.open.split(",")
-        const picked = loaded.contexts.filter((c) => names.includes(c.name))
-        void api.open(
-          picked.map((c) => [c.key, c.name]),
-          s.lang ?? locale,
-        )
-      }
+      const picked = loaded.contexts.find((c) => c.name === s.open)
+      if (picked) void api.open(picked.key, picked.name, s.lang ?? locale)
     })()
     const unlisten = getCurrentWebview().onDragDropEvent((event) => {
       const kind = event.payload.type
@@ -276,7 +261,7 @@ export function App() {
               id="paste-yaml"
               rows={12}
               spellCheck={false}
-              className="type-mono"
+              mono
               value={paste.yaml}
               onChange={(e) => setPaste({ ...paste, yaml: e.target.value, error: null })}
             />
@@ -351,21 +336,8 @@ export function App() {
   const recents = query || only ? [] : snap.recents.flatMap((k) => byKey.get(k) ?? [])
   const favourites = new Set(snap.favourites)
 
-  function toggle(key: string) {
-    const next = new Set(selected)
-    if (next.has(key)) next.delete(key)
-    else next.add(key)
-    setSelected(next)
-  }
-
-  function openKeys(keys: readonly string[]) {
-    const picked = keys.flatMap((k) => byKey.get(k) ?? [])
-    void api
-      .open(
-        picked.map((c) => [c.key, c.name]),
-        locale,
-      )
-      .then(reload)
+  function openCluster(c: Context) {
+    void api.open(c.key, c.name, locale).then(reload)
   }
 
   const row = (c: Context) => {
@@ -377,12 +349,6 @@ export function App() {
         key={c.key}
         className="grid grid-cols-desktop-row items-center gap-3 border-b border-v2-separator px-4 py-2.5 last:border-b-0"
       >
-        <Checkbox
-          checked={selected.has(c.key)}
-          disabled={isBlocked}
-          onCheckedChange={() => toggle(c.key)}
-          aria-label={c.name}
-        />
         <Tooltip content={fav ? t("desktop.favouriteRemove") : t("desktop.favouriteAdd")}>
           <Button
             variant="ghost"
@@ -453,7 +419,7 @@ export function App() {
           variant="secondary"
           size="xs"
           disabled={isBlocked}
-          onClick={() => openKeys([c.key])}
+          onClick={() => openCluster(c)}
         >
           {t("desktop.open")}
         </Button>
@@ -543,33 +509,13 @@ export function App() {
           <div className="flex items-center gap-3">
             <h1 className="type-title">{t("desktop.title")}</h1>
             <span className="type-meta text-tertiary">{t("desktop.count", visible.length)}</span>
-            {selected.size > 0 ? (
-              <div className="ml-auto flex items-center gap-2">
-                <span className="type-meta text-secondary">
-                  {t("desktop.selected", selected.size)}
-                </span>
-                <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
-                  {t("desktop.clear")}
-                </Button>
-                <Button size="sm" onClick={() => openKeys([...selected])}>
-                  {t("desktop.openN", selected.size)}
-                </Button>
-              </div>
-            ) : null}
           </div>
-          <div className="relative">
-            <MagnifyingGlassIcon
-              className="pointer-events-none absolute top-1/2 left-3 size-3.5 -translate-y-1/2 text-tertiary"
-              aria-hidden="true"
-            />
-            <Input
-              className="pl-8"
-              placeholder={t("desktop.search")}
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              aria-label={t("desktop.search")}
-            />
-          </div>
+          <Input
+            placeholder={t("desktop.search")}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            aria-label={t("desktop.search")}
+          />
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {recents.length > 0 ? (

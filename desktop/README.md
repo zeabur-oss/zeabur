@@ -27,8 +27,7 @@ port 5173, and the app. The chooser is `web/desktop.html` with `web/src/desktop/
   certificate file is missing, or whose exec plugin is not installed are shown in red and cannot
   be opened. An exec plugin found only on the login shell's PATH is shown in amber and can be opened.
 - Search over name, server, user and file; filter by source; favourites (star, sorted first);
-  the last five opened as "Recently opened"; select several and open them together. Each cluster
-  opens in its own window.
+  the last five opened as "Recently opened". One cluster opens at a time, in its own window.
 - English, Traditional Chinese and Simplified Chinese from the web interface's own
   catalogues (`web/src/i18n`, keys starting with `desktop.`). The first language comes from the system; the picker in the sidebar
   switches it live.
@@ -49,7 +48,6 @@ app (a WKWebView snapshot of the window, no screen recording):
 | `list`    | Two sources, a favourite, recently opened, every kind of problem      |
 | `search`  | "staging" found in two files                                           |
 | `paste`   | The paste dialog with a sample kubeconfig                              |
-| `select`  | Two contexts selected, "Open 2 clusters"                               |
 | `drop`    | A file dragged over the window                                         |
 | `cluster` | The window opened for `zeabur-demo`                                    |
 

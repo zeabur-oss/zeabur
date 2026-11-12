@@ -224,6 +224,12 @@ why. Add a row before introducing a new concept.
 | Compatible (security that lets a container run as root) | 相容 | 兼容 | Pod Security `baseline`, which a new project enforces |
 | raw error (the folded raw answer under an error or a diagnosis) | 原始錯誤 | 原始错误 | Holds the API's own code, reason and message, the replica and exit code, and the link to the problem type's page. Sections have no Kubernetes-details disclosure |
 
+## Catalogues
+
+UI strings live in typed TypeScript catalogues. `web/src/i18n/en.ts` is the source. The other
+locales are typed as `Messages`, so `tsc` fails when a key is missing. There is no second
+translation format, no JSON or PO files.
+
 ## Server sentences
 
 Diagnoses, gaps, traces and incidents (`diagnosis.*`, `gap.*`, `trace.*`, `incident.*`) arrive
