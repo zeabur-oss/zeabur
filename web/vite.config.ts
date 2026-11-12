@@ -54,12 +54,6 @@ export default defineConfig({
     // Fonts and images stay files (served with their own cache headers), never data: URLs.
     assetsInlineLimit: 0,
     sourcemap: false,
-    rollupOptions: {
-      input: {
-        main: resolve(import.meta.dirname, "index.html"),
-        desktop: resolve(import.meta.dirname, "desktop.html"),
-      },
-    },
   },
   // Not pre-bundled: the pre-bundler runs no plugins, so it cannot resolve `~icons/…`.
   optimizeDeps: {

@@ -5,10 +5,13 @@ use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
 
 use axum::Router;
+/// A kubeconfig file, read with `Kubeconfig::read_from`, for [`start_from`].
+pub use kube::config::Kubeconfig;
 use tokio::net::TcpListener;
 use tokio::sync::oneshot;
 use tokio::task::JoinHandle;
-use zeabur_api::Settings;
+/// What the caller decides for the service ([`start`]).
+pub use zeabur_api::Settings;
 use zeabur_api::access::SingleCluster;
 use zeabur_api::local::{Access, guard};
 use zeabur_core::crypto::RandomError;
@@ -85,6 +88,23 @@ impl Running {
 /// loopback port is available.
 pub async fn start(context: Option<&str>, settings: Settings) -> Result<Running, ServiceError> {
     let cluster = UserClient::from_kubeconfig(context).await?;
+    start_with(Arc::new(cluster), settings).await
+}
+
+/// Starts the local service for the context `context` of `kubeconfig`, a file the caller has
+/// read itself rather than the merged `KUBECONFIG`.
+///
+/// Call it inside a Tokio runtime. The service runs on a task of that runtime.
+///
+/// # Errors
+///
+/// As [`start`].
+pub async fn start_from(
+    kubeconfig: Kubeconfig,
+    context: &str,
+    settings: Settings,
+) -> Result<Running, ServiceError> {
+    let cluster = UserClient::from_kubeconfig_with(kubeconfig, context).await?;
     start_with(Arc::new(cluster), settings).await
 }
 
@@ -213,5 +233,17 @@ mod tests {
 
         running.stop().await.unwrap();
         assert!(TcpStream::connect(&authority).await.is_err());
+    }
+
+    #[tokio::test]
+    async fn a_context_missing_from_the_file_is_a_kubeconfig_error() {
+        let kubeconfig = Kubeconfig::from_yaml(
+            "apiVersion: v1\nkind: Config\ncontexts:\n- name: lab\n  context:\n    cluster: lab\n",
+        )
+        .unwrap();
+        let error = start_from(kubeconfig, "prod", Settings::default())
+            .await
+            .unwrap_err();
+        assert!(matches!(error, ServiceError::Kubeconfig(_)), "{error}");
     }
 }

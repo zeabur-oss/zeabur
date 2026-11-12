@@ -3189,6 +3189,7 @@ name = "zeabur-local"
 version = "0.2.0"
 dependencies = [
  "axum",
+ "kube",
  "thiserror",
  "tokio",
  "zeabur-api",

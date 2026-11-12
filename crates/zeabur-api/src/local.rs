@@ -1,4 +1,5 @@
-//! Who may use the interface `zeaburctl ui` serves on this machine (local mode).
+//! Who may use the interface that the local service (`zeaburctl ui` or a Zeabur Desktop window)
+//! serves on this machine (local mode).
 //!
 //! The server acts with the person's kubeconfig, so anything that can talk to it can act as
 //! them. Four checks keep it to the person who started it:
@@ -151,7 +152,7 @@ pub async fn guard(State(access): State<Arc<Access>>, request: Request, next: Ne
     if !access.has_session(headers) {
         return problem(
             Kind::Unauthenticated,
-            "Open the link `zeaburctl ui` printed to use this interface.",
+            "Open this interface from Zeabur Desktop, or with the link `zeaburctl ui` printed.",
         );
     }
     match guard::check(&access.origins, request.method(), headers) {
@@ -176,10 +177,14 @@ fn link_refused(headers: &HeaderMap) -> Response {
     let lang = Lang::of(headers);
     let text = match lang {
         Lang::En => {
-            "This link was already used or is not valid. Run <code>zeaburctl ui</code> again to get a new one."
+            "This link was already used or is not valid. Open the cluster again in Zeabur Desktop, or run <code>zeaburctl ui</code> again, to get a new one."
         }
-        Lang::ZhTw => "這個連結已經用過或無效。再執行一次 <code>zeaburctl ui</code> 取得新連結。",
-        Lang::ZhCn => "这个链接已经用过或无效。再运行一次 <code>zeaburctl ui</code> 获取新链接。",
+        Lang::ZhTw => {
+            "這個連結已經用過或無效。在 Zeabur Desktop 重新開啟叢集，或再執行一次 <code>zeaburctl ui</code>，就能取得新連結。"
+        }
+        Lang::ZhCn => {
+            "这个链接已经用过或无效。在 Zeabur Desktop 重新打开集群，或再运行一次 <code>zeaburctl ui</code>，就能获取新链接。"
+        }
     };
     page::html(
         StatusCode::FORBIDDEN,

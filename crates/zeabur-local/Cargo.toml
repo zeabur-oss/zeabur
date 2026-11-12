@@ -20,6 +20,7 @@ zeabur-core.workspace = true
 zeabur-kube.workspace = true
 zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
+kube.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 

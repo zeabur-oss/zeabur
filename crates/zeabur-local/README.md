@@ -1,7 +1,8 @@
 # zeabur-local
 
 The local service: the API, acting with a person's kubeconfig, and the web interface, on a
-loopback port of this machine. `zeaburctl ui` starts it with [`start`].
+loopback port of this machine. `zeaburctl ui` starts it with [`start`]; the desktop app starts one per cluster window with
+[`start_from`], from the kubeconfig file the person picked.
 
 ## Hides
 
