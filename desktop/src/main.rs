@@ -178,19 +178,19 @@ struct ProbeResult {
     reach: probe::Reach,
 }
 
-/// Probes every server at once, one thread each.
+/// Probes every server at once on the blocking thread pool, so the async workers stay free.
 #[tauri::command]
 async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
-    let mut handles = Vec::new();
+    let mut tasks = Vec::new();
     for (key, server) in targets {
-        handles.push(std::thread::spawn(move || ProbeResult {
+        tasks.push(tauri::async_runtime::spawn_blocking(move || ProbeResult {
             reach: probe::probe(server.as_deref()),
             key,
         }));
     }
     let mut results = Vec::new();
-    for handle in handles {
-        if let Ok(result) = handle.join() {
+    for task in tasks {
+        if let Ok(result) = task.await {
             results.push(result);
         }
     }
