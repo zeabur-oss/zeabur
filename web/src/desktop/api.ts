@@ -14,7 +14,6 @@ export interface Source {
 
 export type Auth =
   | { state: "ok"; method: string }
-  | { state: "shellPathOnly"; command: string }
   | { state: "pluginMissing"; command: string; hint: string | null }
   | { state: "missingEntry"; what: string; name: string }
   | { state: "fileMissing"; path: string }
@@ -40,12 +39,18 @@ export type Reach =
   | { state: "refused" }
   | { state: "timedOut" }
 
+export type ShellRead =
+  | { state: "pending" }
+  | { state: "done" }
+  | { state: "skipped" }
+  | { state: "failed"; shell: string; timedOut: boolean; detail: string }
+
 export interface Snapshot {
   sources: Source[]
   contexts: Context[]
   favourites: string[]
   recents: string[]
-  shellPathUsed: boolean
+  shell: ShellRead
 }
 
 export const api = {

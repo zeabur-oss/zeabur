@@ -1,3 +1,4 @@
+import { listen } from "@tauri-apps/api/event"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { useEffect, useState } from "react"
 
@@ -22,6 +23,16 @@ export function useSnapshot() {
     }
     return next
   }
+
+  useEffect(() => {
+    // The login shell's environment arrives after the first snapshot and can find more plugins.
+    const unlisten = listen("shell-env", () => void reload())
+    return () => {
+      void unlisten.then((stop) => stop())
+    }
+    // Runs once: the listener belongs to the window.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return { snap, reach, reload }
 }

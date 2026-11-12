@@ -32,6 +32,10 @@ tauri-build = { version = "2", features = ["codegen"] }
 gtk = "0.18"
 
 # The README screenshots: a snapshot of the WKWebView itself (no screen recording permission needed).
+# The login shell from the passwd entry.
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", default-features = false, features = ["user"] }
+
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"
 block2 = "0.6"

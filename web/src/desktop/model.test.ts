@@ -1,6 +1,6 @@
 import { describe, expect, it } from "bun:test"
 
-import type { Auth, Context, Snapshot } from "./api"
+import type { Auth, Context, ShellRead, Snapshot } from "./api"
 import {
   authText,
   baseName,
@@ -13,6 +13,8 @@ import {
 } from "./model"
 
 const t = ((key: string, ...args: unknown[]) => [key, ...args].join(" ")) as never
+
+const done: ShellRead = { state: "done" }
 
 const context = (name: string, extra: Partial<Context> = {}): Context => ({
   key: name,
@@ -34,7 +36,7 @@ const snapshot = (contexts: Context[], extra: Partial<Snapshot> = {}): Snapshot 
   contexts,
   favourites: [],
   recents: [],
-  shellPathUsed: false,
+  shell: { state: "done" },
   ...extra,
 })
 
@@ -56,18 +58,17 @@ describe("desktop model", () => {
 
   it("explains each sign-in problem and stays silent when sign-in works", () => {
     const missing: Auth = { state: "missingEntry", what: "user", name: "bob" }
-    expect(authText({ state: "ok", method: "token" }, t)).toBeNull()
-    expect(authText(missing, t)).toBe("desktop.authMissingUser bob")
-    expect(authText({ ...missing, what: "cluster" }, t)).toBe("desktop.authMissingCluster bob")
-    expect(authText({ state: "fileMissing", path: "/a/b/c.pem" }, t)).toBe(
+    expect(authText({ state: "ok", method: "token" }, done, t)).toBeNull()
+    expect(authText(missing, done, t)).toBe("desktop.authMissingUser bob")
+    expect(authText({ ...missing, what: "cluster" }, done, t)).toBe(
+      "desktop.authMissingCluster bob",
+    )
+    expect(authText({ state: "fileMissing", path: "/a/b/c.pem" }, done, t)).toBe(
       "desktop.authFileMissing b/c.pem",
     )
-    expect(authText({ state: "pluginMissing", command: "aws", hint: null }, t)).toBe(
-      "desktop.authPluginMissing aws",
-    )
-    expect(authText({ state: "shellPathOnly", command: "aws" }, t)).toBe(
-      "desktop.authShellPath aws",
-    )
+    const plugin: Auth = { state: "pluginMissing", command: "aws", hint: null }
+    expect(authText(plugin, done, t)).toBe("desktop.authPluginMissing aws")
+    expect(authText(plugin, { state: "pending" }, t)).toBe("desktop.authLooking aws")
   })
 
   it("reads a scenario and skips empty keys", () => {

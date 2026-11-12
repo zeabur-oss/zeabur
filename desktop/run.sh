@@ -9,7 +9,7 @@ if [[ "${1:-}" == "--fixtures" ]]; then
   state=$(mktemp -d)
   export ZEABUR_DESKTOP_STATE=$state
   export KUBECONFIG=$root/desktop/fixtures/home/.kube/config
-  printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$root/desktop/fixtures/team" > "$state/state.json"
+  printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$root/desktop/fixtures/team" > "$state/settings.json"
 fi
 
 # GNOME takes a window's name and icon from the desktop entry named after its app ID (the

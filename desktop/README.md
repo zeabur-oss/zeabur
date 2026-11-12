@@ -14,23 +14,64 @@ port 5173, and the app. The chooser is `web/desktop.html` with `web/src/desktop/
 
 ## What it does
 
-- Reads `KUBECONFIG` (`:` between paths, `;` on Windows) or `~/.kube/config`
-  (`%USERPROFILE%\.kube\config` on Windows) with the same rules as kubectl, through
-  `std::env::split_paths` and kube-rs `Kubeconfig::read_from`.
+- Default kubeconfig: the app's own `KUBECONFIG`, else the login shell's `KUBECONFIG`, else
+  `~/.kube/config` (`%USERPROFILE%\.kube\config` on Windows). `KUBECONFIG` is a list (`:` between
+  paths, `;` on Windows), split with `std::env::split_paths` and read with kube-rs
+  `Kubeconfig::read_from`.
 - Sources: the default paths, plus files, folders (every non-hidden file in it), drag and drop, and
-  pasted YAML. Pasted YAML is checked, then saved under the app's data folder. Any source can be
-  removed; removing a default only hides it. The app never writes to a kubeconfig.
+  pasted YAML. Files and folders are read in place and stored as absolute paths. Pasted YAML is
+  checked, then copied into the app's `kubeconfigs` folder. Any source can be removed; removing a
+  default only hides it. The app never writes to a kubeconfig.
 - Each file is parsed on its own. A context name used in two files shows twice, each with its
   file, and says how many others share the name.
 - Each row: name, file, server, user, a reachability badge (a TCP connect to the server, 1.5 s
   timeout, run in parallel) and an auth check. Contexts whose user or cluster is missing, whose
   certificate file is missing, or whose exec plugin is not installed are shown in red and cannot
-  be opened. An exec plugin found only on the login shell's PATH is shown in amber and can be opened.
+  be opened.
 - Search over name, server, user and file; filter by source; favourites (star, sorted first);
   the last five opened as "Recently opened". One cluster opens at a time, in its own window.
 - English, Traditional Chinese and Simplified Chinese from the web interface's own
   catalogues (`web/src/i18n`, keys starting with `desktop.`). The first language comes from the system; the picker in the sidebar
   switches it live.
+
+## Folders
+
+The identifier is `com.zeabur.oss.desktop`. Every folder comes from Tauri's `PathResolver`, which
+adds the identifier:[^tauri-path]
+
+| What | API | macOS | Linux | Windows |
+| --- | --- | --- | --- | --- |
+| `settings.json`: added sources, hidden defaults, favourites, recently opened | `app_config_dir` | `~/Library/Application Support/` | `$XDG_CONFIG_HOME` or `~/.config/` | `%APPDATA%\` |
+| Pasted kubeconfigs | `app_local_data_dir/kubeconfigs` | `~/Library/Application Support/` | `$XDG_DATA_HOME` or `~/.local/share/` | `%LOCALAPPDATA%\` |
+
+Pasted kubeconfigs hold credentials: they stay out of the roaming folder on Windows, and on macOS
+and Linux the folder is `0700` and each file `0600`. `ZEABUR_DESKTOP_STATE` puts both in one
+folder; `run.sh --fixtures` and `shots.sh` use it.
+
+## Exec plugins and the login shell
+
+An app started from Finder, the Dock or a desktop launcher does not get the variables set in shell
+files, so `aws`, `gcloud` or `kubelogin` installed through `~/.zshrc` are not on its `PATH`. On
+macOS and Linux the app reads the login shell's environment once, in the background, and the
+window reloads when it is done:
+
+- The shell is the passwd entry's, else `$SHELL`, else `/bin/zsh` on macOS and `/bin/sh` on Linux.
+- zsh, bash and sh run with `-l -i -c` (zsh reads `~/.zshrc` only when interactive), fish with
+  `-l -c`. The command prints a marker, `/usr/bin/env -0` and the marker again, so text that shell
+  files print before or after is ignored. `DISABLE_AUTO_UPDATE=true` stops Oh My Zsh from asking
+  about updates; stdin is empty; the timeout is 10 seconds.
+- The result is one environment for child processes: the app's own variables win, except `PATH`,
+  which lists the shell's directories first and then the app's, each once. It is passed with
+  `Command::envs` every time; `std::env::set_var` is not used, as it is unsound in a
+  multi-threaded program.[^set-var] On Unix, `Command` looks the program up on the `PATH` it is
+  given.[^command]
+- The "is the exec plugin installed?" check uses the same environment, so a context that the list
+  shows as ready finds its plugin when it runs.
+- If the shell fails or times out, the window says so and suggests an absolute path for the exec
+  command in the kubeconfig.
+
+On Windows the app uses its own environment, with no shell, and tries each extension in `PATHEXT`
+for a plugin name without one.
 
 What is mocked: every "Open" loads the same web URL (`ZEABUR_DESKTOP_WEB`, default the dev server)
 against the demo API, so every window shows the demo cluster. A real app would start a Zeabur
@@ -145,25 +186,21 @@ Differs on purpose:
 - Broken contexts are listed and marked instead of failing on open, with the reason in the row.
 - Several clusters open as separate windows, not one merged table. Zeabur's web interface is one
   cluster per page today.
-- Exec plugins found only on the login shell's PATH are marked, so the person knows why it would
-  fail from Finder before opening it.
+- A failed login shell read is shown in the window with what to do, as Freelens now does, instead
+  of only in a log.
 
 ## Decisions for the owner
 
 1. **Sources.** Keep the sidebar list (default, files, folders, pasted) with a Merge Files toggle,
    or follow kubectl and merge everything? The PoC reads each file alone.
-2. **Exec plugins and PATH.** A Finder or Dock launch gets `/usr/bin:/bin:/usr/sbin:/sbin`. The PoC
-   runs `$SHELL -l -c 'printf %s "$PATH"'` once at start and searches both. Options: keep that,
-   add a PATH setting, or ask for absolute paths. Login shells can be slow or print to stdout;
-   a timeout is not in the PoC.
-3. **One window or several.** The PoC opens one window per cluster (Aptakube merges them into one
+2. **One window or several.** The PoC opens one window per cluster (Aptakube merges them into one
    table). Several windows match the web interface today but mean several backends.
-4. **What "Open" starts.** Embed the Zeabur backend in the app and run one per context, or point at
+3. **What "Open" starts.** Embed the Zeabur backend in the app and run one per context, or point at
    a backend already running in the cluster. Decides install size and how sign-in works.
-5. **Updates and signing.** Tauri's updater needs a signed update feed; macOS needs a Developer ID
+4. **Updates and signing.** Tauri's updater needs a signed update feed; macOS needs a Developer ID
    certificate and notarization; Windows needs a code signing certificate to avoid SmartScreen
    warnings. None of this is set up.
-6. **The word "context" in Chinese.** zh-TW and zh-CN keep "context" (kubectl's word).
+5. **The word "context" in Chinese.** zh-TW and zh-CN keep "context" (kubectl's word).
 
 ## Windows
 
@@ -172,13 +209,17 @@ Checked by reading code and config, not by running on Windows:
 - `KUBECONFIG` is split with `std::env::split_paths`, which uses `;` on Windows; a unit test covers
   `C:\Users\a\.kube\config;D:\kube\team.yaml;` on Windows and the `:` form elsewhere.
 - The default path is `home_dir()\.kube\config`, which is `%USERPROFILE%\.kube\config`.
-- Exec plugins are also looked up as `.exe`, `.cmd` and `.bat`; the login shell lookup is skipped.
+- Exec plugins are also looked up with each extension in `PATHEXT` (`.COM;.EXE;.BAT;.CMD` when it
+  is unset); the login shell read is skipped.
 - Tauri 2 on Windows uses WebView2, which ships with Windows 11; `tauri.conf.json` has no
   Windows-specific settings, and `icons/icon.ico` is there for the executable's icon.
 - The screenshot hook is macOS only.
 
 See the bottom of this file for what was built on Windows.
 
+[^tauri-path]: https://docs.rs/tauri/latest/tauri/path/struct.PathResolver.html
+[^set-var]: https://doc.rust-lang.org/std/env/fn.set_var.html
+[^command]: https://doc.rust-lang.org/std/process/struct.Command.html
 [^k8s]: https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/
 [^apta-zero]: https://aptakube.com/zero-config
 [^apta-multi]: https://aptakube.com/multi-cluster

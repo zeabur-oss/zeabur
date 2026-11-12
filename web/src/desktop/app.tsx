@@ -56,6 +56,7 @@ function Browser({
         recents={recentContexts(snap, query, only)}
         favourites={new Set(snap.favourites)}
         reach={reach}
+        shell={snap.shell}
         actions={rows}
         query={query}
         setQuery={setQuery}

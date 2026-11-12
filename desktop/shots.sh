@@ -16,14 +16,14 @@ for lang in ${LANGS:-en zh-TW zh-CN}; do
     kc=$home; scen="lang=$lang"; target=main; delay=6000
     case $screen in
       first) kc=$D/fixtures/none ;;
-      list) printf '{"added":[{"kind":"folder","path":"%s"}],"favourites":["%s"],"recents":["%s"]}\n' "$D/fixtures/team" "$D/fixtures/team/eks.yaml#prod-tokyo" "$home#zeabur-demo" > "$st/state.json" ;;
+      list) printf '{"added":[{"kind":"folder","path":"%s"}],"favourites":["%s"],"recents":["%s"]}\n' "$D/fixtures/team" "$D/fixtures/team/eks.yaml#prod-tokyo" "$home#zeabur-demo" > "$st/settings.json" ;;
       search) scen="$scen;q=staging" ;;
       paste) scen="$scen;paste=1" ;;
       drop) scen="$scen;drop=1" ;;
       cluster) scen="$scen;open=zeabur-demo"; target=cluster; delay=8000 ;;
     esac
     if [[ $screen != list && $screen != first ]]; then
-      printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$D/fixtures/team" > "$st/state.json"
+      printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$D/fixtures/team" > "$st/settings.json"
     fi
     timeout 40 env -i HOME="$HOME" USER="$USER" SHELL="$SHELL" TMPDIR="$TMPDIR" \
       PATH=/usr/bin:/bin:/usr/sbin:/sbin \
