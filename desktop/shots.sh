@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
-# Screenshots of every screen (macOS). Needs the demo API and the web dev server running, and a
-# built app (`cargo build` in desktop/).
+# Screenshots of every screen (macOS). Needs the dev server of desktop/web running and a built app
+# (`ZEABUR_UI_DIST=$PWD/../web/dist cargo build` in desktop/). The `cluster` screen opens the
+# fixtures' `zeabur-demo` context, which has no cluster behind it, so it shows the error page.
 #   desktop/shots.sh desktop/shots [screens...]
 # LANGS and THEMES narrow the set, e.g. LANGS=zh-TW THEMES=dark.
 set -u

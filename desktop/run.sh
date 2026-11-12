@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
-# Starts the demo API, the web dev server and the desktop app. Run from anywhere:
+# Starts the dev server of the app's own pages (desktop/web) and the app, whose cluster windows run
+# the local service with the web interface in web/dist (built first when missing). Run from
+# anywhere:
 #   nix develop .#desktop -c desktop/run.sh             # your own kubeconfig
 #   nix develop .#desktop -c desktop/run.sh --fixtures  # the sample kubeconfigs in desktop/fixtures
 set -euo pipefail
@@ -14,7 +16,7 @@ fi
 
 # GNOME takes a window's name and icon from the desktop entry named after its app ID (the
 # identifier in tauri.conf.json), and the icon by name from the hicolor theme. The entry starts
-# only the debug binary, which needs the servers below, so it is removed again on exit.
+# only the debug binary, which needs the dev server below, so it is removed again on exit.
 id=com.zeabur.oss.desktop
 data=${XDG_DATA_HOME:-$HOME/.local/share}
 installed=()
@@ -43,9 +45,10 @@ fi
 
 pids=()
 trap 'kill "${pids[@]}" 2>/dev/null || true; rm -f "${installed[@]}"' EXIT
-(cd "$root" && cargo run -q -p zeabur-api --example demo) &
+if [[ ! -f "$root/web/dist/manifest.tsv" ]]; then
+  "$root/scripts/build-ui.sh"
+fi
+(cd "$root/desktop/web" && bun install --frozen-lockfile >/dev/null && bun run dev) &
 pids+=($!)
-(cd "$root/web" && bun install --frozen-lockfile >/dev/null && bun run dev --strictPort) &
-pids+=($!)
-until curl -sf -o /dev/null http://localhost:5173/desktop.html; do sleep 1; done
-cd "$root/desktop" && cargo run
+until curl -sf -o /dev/null http://localhost:5174/; do sleep 1; done
+cd "$root/desktop" && ZEABUR_UI_DIST="$root/web/dist" cargo run

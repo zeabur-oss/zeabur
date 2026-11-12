@@ -37,7 +37,8 @@ ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeabur -p zeabu
 ```
 
 The desktop app (`desktop/`) is a Cargo workspace of its own with the same rules
-([crates](docs/internal/crates.md#apps-outside-the-workspace)): `nix develop .#desktop -c scripts/ci/desktop.sh`.
+([crates](docs/internal/crates.md#apps-outside-the-workspace)): `nix develop .#desktop -c scripts/ci/desktop.sh`
+checks it and `nix develop .#desktop -c scripts/build-desktop.sh` builds the app.
 
 `bun run fallow` runs [fallow](https://github.com/fallow-rs/fallow) at the version pinned in
 `web/package.json`. `fallow dead-code` finds unused files, exports and dependencies in `web/` and

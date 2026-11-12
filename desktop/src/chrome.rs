@@ -165,12 +165,17 @@ fn next_zoom(current: f64, up: bool) -> f64 {
 }
 
 /// Lets the strip move the window, and zoom it on a double click. Cluster windows load the web
-/// interface from `web_url`, which gets these two permissions and nothing else.
+/// interface from their local service on `127.0.0.1` (or from `dev_web`), which gets these two
+/// permissions and nothing else.
 #[cfg(target_os = "macos")]
-pub(crate) fn allow_title_bar(app: &AppHandle, web_url: &tauri::Url) -> tauri::Result<()> {
-    let capability = tauri::ipc::CapabilityBuilder::new("title-bar")
+pub(crate) fn allow_title_bar(app: &AppHandle, dev_web: Option<&tauri::Url>) -> tauri::Result<()> {
+    let mut capability = tauri::ipc::CapabilityBuilder::new("title-bar")
         .windows([CHOOSER, "cluster-*"])
-        .remote(format!("{}/*", web_url.origin().ascii_serialization()))
+        .remote("http://127.0.0.1:*/*".to_owned());
+    if let Some(url) = dev_web {
+        capability = capability.remote(format!("{}/*", url.origin().ascii_serialization()));
+    }
+    let capability = capability
         .permission("core:window:allow-start-dragging")
         .permission("core:window:allow-internal-toggle-maximize");
     app.add_capability(capability)
@@ -289,7 +294,7 @@ pub(crate) fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
         return window.set_focus();
     }
     let mut builder =
-        WebviewWindowBuilder::new(app, CHOOSER, WebviewUrl::App("desktop.html".into()))
+        WebviewWindowBuilder::new(app, CHOOSER, WebviewUrl::App("index.html".into()))
             .title("Zeabur")
             .inner_size(1040.0, 680.0)
             .min_inner_size(720.0, 480.0);

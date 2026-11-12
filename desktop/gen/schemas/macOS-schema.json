@@ -177,6 +177,138 @@
       "description": "Permission identifier",
       "oneOf": [
         {
+          "description": "Enables the add_pasted command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-add-pasted",
+          "markdownDescription": "Enables the add_pasted command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the add_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-add-paths",
+          "markdownDescription": "Enables the add_paths command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the back_to_chooser command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-back-to-chooser",
+          "markdownDescription": "Enables the back_to_chooser command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the open_cluster command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-open-cluster",
+          "markdownDescription": "Enables the open_cluster command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the probe command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-probe",
+          "markdownDescription": "Enables the probe command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the remove_source command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-remove-source",
+          "markdownDescription": "Enables the remove_source command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the scenario command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-scenario",
+          "markdownDescription": "Enables the scenario command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the set_menu command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-set-menu",
+          "markdownDescription": "Enables the set_menu command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the snapshot command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-snapshot",
+          "markdownDescription": "Enables the snapshot command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the start_cluster command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-start-cluster",
+          "markdownDescription": "Enables the start_cluster command without any pre-configured scope."
+        },
+        {
+          "description": "Enables the toggle_favourite command without any pre-configured scope.",
+          "type": "string",
+          "const": "allow-toggle-favourite",
+          "markdownDescription": "Enables the toggle_favourite command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the add_pasted command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-add-pasted",
+          "markdownDescription": "Denies the add_pasted command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the add_paths command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-add-paths",
+          "markdownDescription": "Denies the add_paths command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the back_to_chooser command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-back-to-chooser",
+          "markdownDescription": "Denies the back_to_chooser command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the open_cluster command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-open-cluster",
+          "markdownDescription": "Denies the open_cluster command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the probe command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-probe",
+          "markdownDescription": "Denies the probe command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the remove_source command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-remove-source",
+          "markdownDescription": "Denies the remove_source command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the scenario command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-scenario",
+          "markdownDescription": "Denies the scenario command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the set_menu command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-set-menu",
+          "markdownDescription": "Denies the set_menu command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the snapshot command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-snapshot",
+          "markdownDescription": "Denies the snapshot command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the start_cluster command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-start-cluster",
+          "markdownDescription": "Denies the start_cluster command without any pre-configured scope."
+        },
+        {
+          "description": "Denies the toggle_favourite command without any pre-configured scope.",
+          "type": "string",
+          "const": "deny-toggle-favourite",
+          "markdownDescription": "Denies the toggle_favourite command without any pre-configured scope."
+        },
+        {
           "description": "Default core plugins set.\n#### This default permission set includes:\n\n- `core:path:default`\n- `core:event:default`\n- `core:window:default`\n- `core:webview:default`\n- `core:app:default`\n- `core:image:default`\n- `core:resources:default`\n- `core:menu:default`\n- `core:tray:default`",
           "type": "string",
           "const": "core:default",

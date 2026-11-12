@@ -1,0 +1,11 @@
+# Automatically generated - DO NOT EDIT!
+
+[[permission]]
+identifier = "allow-add-pasted"
+description = "Enables the add_pasted command without any pre-configured scope."
+commands.allow = ["add_pasted"]
+
+[[permission]]
+identifier = "deny-add-pasted"
+description = "Denies the add_pasted command without any pre-configured scope."
+commands.deny = ["add_pasted"]

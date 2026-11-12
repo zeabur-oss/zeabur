@@ -1,10 +1,11 @@
-//! Proof of concept: the Zeabur desktop app. It lists every context of every kubeconfig source and
-//! opens Zeabur's web interface for the ones the person picks.
+//! Zeabur Desktop. It lists every context of every kubeconfig source and opens Zeabur for the ones
+//! the person picks, each in its own window with its own local service (`cluster.rs`).
 
 // A Windows release build is a GUI program, with no console window beside it.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 mod chrome;
+mod cluster;
 mod env;
 #[cfg(any(target_os = "linux", windows, test))]
 mod keys;
@@ -49,7 +50,10 @@ struct App {
     /// The app's own environment until the login shell's has been read, then the merged one.
     env: RwLock<ChildEnv>,
     shell: Mutex<ShellRead>,
-    web_url: String,
+    /// `ZEABUR_DESKTOP_WEB`, for development: cluster windows load this address (the web dev
+    /// server) instead of starting a local service.
+    dev_web: Option<tauri::Url>,
+    clusters: cluster::Clusters,
 }
 
 impl App {
@@ -106,6 +110,10 @@ fn source_list(saved: &Saved, env: &ChildEnv) -> Vec<(String, SourceKind, PathBu
     reason = "Tauri passes a command's arguments by value"
 )]
 fn snapshot(app: State<'_, App>) -> Snapshot {
+    read_snapshot(&app)
+}
+
+fn read_snapshot(app: &App) -> Snapshot {
     let env = app
         .env
         .read()
@@ -269,8 +277,9 @@ async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
     results
 }
 
-/// Opens Zeabur's web interface for one context in its own window. Async, because building a window
-/// in a synchronous command deadlocks on Windows (`WebviewWindowBuilder::build`).
+/// Opens a window for one context. The window starts the context's local service from
+/// `cluster.html` (`start_cluster`). Async, because building a window in a synchronous command
+/// deadlocks on Windows (`WebviewWindowBuilder::build`).
 #[tauri::command]
 async fn open_cluster(
     handle: tauri::AppHandle,
@@ -279,15 +288,36 @@ async fn open_cluster(
     name: String,
     lang: String,
 ) -> Result<(), String> {
+    let label = format!("cluster-{}", shots::label_hash(&key));
+    if let Some(window) = handle.get_webview_window(&label) {
+        return window.set_focus().map_err(|e| e.to_string());
+    }
+    let context = read_snapshot(&app)
+        .contexts
+        .into_iter()
+        .find(|c| c.key == key)
+        .ok_or_else(|| format!("{name} is no longer in the kubeconfig"))?;
     app.update(|saved| {
         saved.recents.retain(|k| *k != key);
         saved.recents.insert(0, key.clone());
         saved.recents.truncate(5);
     })?;
-    let url = app
-        .web_url
-        .parse::<tauri::Url>()
-        .map_err(|e| e.to_string())?;
+    let url = if let Some(dev) = &app.dev_web {
+        WebviewUrl::External(dev.clone())
+    } else {
+        let mut page = "tauri://localhost/cluster.html"
+            .parse::<tauri::Url>()
+            .map_err(|e| e.to_string())?;
+        page.query_pairs_mut().append_pair("name", &name);
+        WebviewUrl::App(format!("cluster.html?{}", page.query().unwrap_or_default()).into())
+    };
+    app.clusters.set_target(
+        &label,
+        cluster::Target {
+            file: PathBuf::from(&context.file),
+            context: context.name,
+        },
+    );
     // The web interface keeps its language under `zeabur.locale` and has no Japanese yet; without
     // a match it follows the system languages.
     let locale = if ["en", "zh-TW", "zh-CN"].contains(&lang.as_str()) {
@@ -296,11 +326,7 @@ async fn open_cluster(
         "localStorage.removeItem('zeabur.locale')".to_owned()
     };
     let script = format!("try {{ {locale} }} catch {{}}");
-    let label = format!("cluster-{}", shots::label_hash(&key));
-    if let Some(window) = handle.get_webview_window(&label) {
-        return window.set_focus().map_err(|e| e.to_string());
-    }
-    let builder = WebviewWindowBuilder::new(&handle, label, WebviewUrl::External(url))
+    let builder = WebviewWindowBuilder::new(&handle, label, url)
         .title(format!("{name} - Zeabur"))
         .initialization_script(&script);
     let builder = chrome::cluster_window(&handle, builder);
@@ -312,6 +338,31 @@ async fn open_cluster(
         shots::capture(window);
     }
     Ok(())
+}
+
+/// Starts the local service of the calling cluster window and returns the link to load.
+#[tauri::command]
+async fn start_cluster(
+    window: tauri::WebviewWindow,
+    app: State<'_, App>,
+) -> Result<String, String> {
+    let env = app
+        .env
+        .read()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    app.clusters.start(window.label(), &env).await
+}
+
+/// Closes the calling cluster window and shows the chooser.
+#[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
+fn back_to_chooser(window: tauri::WebviewWindow) -> Result<(), String> {
+    chrome::show_chooser(window.app_handle()).map_err(|e| e.to_string())?;
+    window.close().map_err(|e| e.to_string())
 }
 
 /// The app's config, icons and assets, which `build.rs` generates with `tauri-build`.
@@ -370,8 +421,11 @@ fn main() -> ExitCode {
                 saved: Mutex::new(saved),
                 env: RwLock::new(ChildEnv::from_process()),
                 shell: Mutex::new(ShellRead::Pending),
-                web_url: std::env::var("ZEABUR_DESKTOP_WEB")
-                    .unwrap_or_else(|_| "http://localhost:5173/".into()),
+                dev_web: match std::env::var("ZEABUR_DESKTOP_WEB") {
+                    Ok(url) => Some(url.parse::<tauri::Url>()?),
+                    Err(_) => None,
+                },
+                clusters: cluster::Clusters::default(),
             });
 
             // A login shell can take seconds; the window opens without waiting and reloads on the
@@ -388,10 +442,10 @@ fn main() -> ExitCode {
             });
 
             #[cfg(target_os = "macos")]
-            {
-                let web_url = tauri_app.state::<App>().web_url.parse::<tauri::Url>()?;
-                chrome::allow_title_bar(tauri_app.handle(), &web_url)?;
-            }
+            chrome::allow_title_bar(
+                tauri_app.handle(),
+                tauri_app.state::<App>().dev_web.as_ref(),
+            )?;
             chrome::show_chooser(tauri_app.handle())?;
             Ok(())
         })
@@ -403,13 +457,25 @@ fn main() -> ExitCode {
             toggle_favourite,
             probe,
             open_cluster,
+            start_cluster,
+            back_to_chooser,
             scenario,
             menu::set_menu
         ])
         .build(context);
     match app {
         Ok(app) => {
-            app.run(chrome::on_run_event);
+            app.run(|handle, event| {
+                if let tauri::RunEvent::WindowEvent {
+                    label,
+                    event: tauri::WindowEvent::Destroyed,
+                    ..
+                } = &event
+                {
+                    handle.state::<App>().clusters.closed(label);
+                }
+                chrome::on_run_event(handle, event);
+            });
             ExitCode::SUCCESS
         }
         Err(err) => {

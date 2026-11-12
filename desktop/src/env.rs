@@ -1,14 +1,13 @@
-//! The environment the app gives to every child process, and the login shell read that fills it.
+//! The environment the app gives to exec credential plugins, and the login shell read that fills it.
 //!
 //! An app started from Finder, the Dock or a desktop launcher does not get the variables set in
 //! the person's shell files. The app reads the login shell's environment once and merges it with
-//! its own. The same merged environment decides if an exec plugin is found and is passed to every
-//! child process with `Command::envs`; the app never calls `std::env::set_var`
-//! (<https://doc.rust-lang.org/std/env/fn.set_var.html>).
+//! its own. The same merged environment decides if an exec plugin is found and is given to the
+//! plugin through the kubeconfig's exec `env` when a cluster opens; the app never calls
+//! `std::env::set_var` (<https://doc.rust-lang.org/std/env/fn.set_var.html>).
 
 use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
-use std::process::Command;
 
 use serde::Serialize;
 
@@ -92,21 +91,25 @@ impl ChildEnv {
             .map_or_else(Vec::new, |path| std::env::split_paths(path).collect())
     }
 
-    /// A command that runs with exactly this environment. On Unix, `Command` also looks the
-    /// program up on this `PATH` (<https://doc.rust-lang.org/std/process/struct.Command.html>).
-    #[cfg_attr(
-        not(test),
-        expect(
-            dead_code,
-            reason = "the Zeabur backend started by Open runs through it"
-        )
-    )]
-    pub(crate) fn command(&self, program: impl AsRef<OsStr>) -> Command {
-        let mut command = Command::new(program);
-        command
-            .env_clear()
-            .envs(self.vars.iter().map(|(k, v)| (k, v)));
-        command
+    /// The variables that differ from `own` (the app's own environment), for a kubeconfig's exec
+    /// credential plugin: kube-rs starts it with the app's environment plus the exec entry's `env`.
+    /// On Unix, `Command` looks the plugin up on the `PATH` it is given
+    /// (<https://doc.rust-lang.org/std/process/struct.Command.html>). Names or values that are not
+    /// UTF-8 are left out, as a kubeconfig cannot hold them.
+    pub(crate) fn changed_from(&self, own: &[(OsString, OsString)]) -> Vec<(String, String)> {
+        let mut changed = Vec::new();
+        for (name, value) in &self.vars {
+            let same = own
+                .iter()
+                .any(|(k, v)| same_name(k, name) && v == value);
+            if same {
+                continue;
+            }
+            if let (Some(name), Some(value)) = (name.to_str(), value.to_str()) {
+                changed.push((name.to_owned(), value.to_owned()));
+            }
+        }
+        changed
     }
 }
 
@@ -344,21 +347,14 @@ mod tests {
     }
 
     #[test]
-    fn a_command_gets_exactly_the_merged_environment() {
-        let env = ChildEnv::merge(vars(&[("A", "1")]), &vars(&[("B", "2")]));
-        let command = env.command("kubectl");
-        let mut got: Vec<(String, Option<String>)> = Vec::new();
-        for (k, v) in command.get_envs() {
-            got.push((
-                k.to_string_lossy().into_owned(),
-                v.map(|v| v.to_string_lossy().into_owned()),
-            ));
-        }
+    fn an_exec_plugin_gets_only_what_the_shell_added() {
+        let own = vars(&[("A", "1"), ("PATH", "/usr/bin")]);
+        let env = ChildEnv::merge(own.clone(), &vars(&[("B", "2"), ("PATH", "/opt/bin")]));
         assert_eq!(
-            got,
+            env.changed_from(&own),
             vec![
-                ("A".into(), Some("1".into())),
-                ("B".into(), Some("2".into()))
+                ("PATH".to_owned(), joined(&["/opt/bin", "/usr/bin"])),
+                ("B".to_owned(), "2".to_owned()),
             ]
         );
     }

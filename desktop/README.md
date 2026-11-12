@@ -1,8 +1,9 @@
-# Zeabur desktop app (proof of concept)
+# Zeabur Desktop
 
-A Tauri 2 app that lists every context of every kubeconfig on the machine and opens Zeabur's web
-interface for the ones you pick. Throwaway code to answer product questions. It is a Cargo
-workspace of its own with the main workspace's rules
+A Tauri 2 app that lists every context of every kubeconfig on the machine and opens Zeabur for the
+ones you pick. Each cluster window runs its own local service (`zeabur-local`, the same one
+`zeaburctl ui` runs) on `127.0.0.1` and loads it, so the app needs no other program and no
+environment variables. It is a Cargo workspace of its own with the main workspace's rules
 ([crates](../docs/internal/crates.md#apps-outside-the-workspace)); CI's `desktop` job lints and
 tests it on Linux.
 
@@ -11,9 +12,24 @@ nix develop .#desktop -c desktop/run.sh             # your own kubeconfig
 nix develop .#desktop -c desktop/run.sh --fixtures  # the sample kubeconfigs in desktop/fixtures
 ```
 
-`run.sh` starts the demo API (`cargo run -p zeabur-api --example demo`), the web dev server on
-port 5173, and the app. The chooser is `web/desktop.html` with `web/src/desktop/`; the Rust side is
-`desktop/src/`.
+`run.sh` builds the web interface into `web/dist` when it is missing, starts the dev server of the
+app's own pages on port 5174, and the app. The app's own pages are in `desktop/web/` (Vite): the
+chooser (`index.html`, `src/chooser/`) and the page a cluster window shows while its service
+starts or when it cannot (`cluster.html`, `src/cluster/`). The Rust side is `desktop/src/`.
+
+## Build the app
+
+```sh
+nix develop .#desktop -c scripts/build-desktop.sh
+```
+
+It builds `web/dist` (embedded in the local service), `desktop/web/dist` (bundled into the app),
+then `cargo tauri build`: on macOS `Zeabur.app` and `Zeabur_<version>_<arch>.dmg` under
+`target/desktop/release/bundle/`. The version is `web/package.json`'s. With
+`APPLE_SIGNING_IDENTITY` set to a Developer ID Application identity the bundler signs with the
+hardened runtime; with `APPLE_API_ISSUER`, `APPLE_API_KEY` and `APPLE_API_KEY_PATH` (or
+`APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID`) it also notarizes. Without them the app is signed
+ad hoc, and macOS asks before the first launch of a downloaded copy.
 
 ## What it does
 
@@ -33,9 +49,9 @@ port 5173, and the app. The chooser is `web/desktop.html` with `web/src/desktop/
   be opened.
 - Search over name, server, user and file; filter by source; favourites (star, sorted first);
   the last five opened as "Recently opened". One cluster opens at a time, in its own window.
-- English, Traditional Chinese and Simplified Chinese from the web interface's own
-  catalogues (`web/src/i18n`, keys starting with `desktop.`). The first language comes from the system; the picker in the sidebar
-  switches it live.
+- English, Traditional Chinese and Simplified Chinese (`desktop/web/src/i18n`). The first
+  language comes from the system; the picker in the sidebar switches it live, and a cluster window
+  opens in the same language.
 
 ## Folders
 
@@ -76,10 +92,31 @@ window reloads when it is done:
 On Windows the app uses its own environment, with no shell, and tries each extension in `PATHEXT`
 for a plugin name without one.
 
-What is mocked: every "Open" loads the same web URL (`ZEABUR_DESKTOP_WEB`, default the dev server)
-against the demo API, so every window shows the demo cluster. A real app would start a Zeabur
-backend for the chosen context. Signing in to the cluster is not attempted; reachability is only
-a TCP connection.
+## Opening a cluster
+
+- "Open" makes a window for the context and loads `cluster.html`, which asks the app to start the
+  local service for that file and context (`zeabur_local::start_from`). The service signs in with
+  the kubeconfig, listens on `127.0.0.1` on a port the system picks, and the window loads its
+  one-time link. Only that window's first request gets a session (`zeabur_api::local`).
+- An exec credential plugin gets the login shell's variables (`PATH` first) through the
+  kubeconfig's exec `env`, unless the entry sets them itself. The file is read again on every
+  open, and the app never writes it.
+- If the service cannot start (the kubeconfig cannot sign in, the cluster does not answer who you
+  are), the window shows the reason with "Try again" and "Choose another cluster".
+- Closing the window stops its service. Quitting the app stops them all.
+- The chooser's reachability badge is still only a TCP connection; signing in happens on open.
+- `ZEABUR_DESKTOP_WEB=<url>`, for development only, makes every cluster window load that address
+  (such as the web dev server with the demo API) instead of starting a service.
+
+## Security
+
+- The app's own pages run under a strict content security policy (`tauri.conf.json`): scripts and
+  styles from the app only (inline styles allowed, as in the web interface), no network but the
+  app's IPC.
+- Every command needs a permission (`build.rs`, `capabilities/`). The chooser may call the
+  chooser's commands; a cluster window's own page may call `start_cluster` and
+  `back_to_chooser`. The web interface on `127.0.0.1` is a remote page and may only move and
+  zoom the window on macOS (`chrome.rs`).
 
 ## Windows and menus
 
@@ -134,7 +171,7 @@ app (a WKWebView snapshot of the window, no screen recording):
 | `search`  | "staging" found in two files                                           |
 | `paste`   | The paste dialog with a sample kubeconfig                              |
 | `drop`    | A file dragged over the window                                         |
-| `cluster` | The window opened for `zeabur-demo`                                    |
+| `cluster` | The window opened for `zeabur-demo`, which cannot sign in: the error page |
 
 The shots run with the fixtures and a Finder-like environment (`PATH=/usr/bin:/bin:/usr/sbin:/sbin`,
 no shell variables), so `aws` is found only through the login shell. Every capture has a 28 pt band
@@ -178,7 +215,7 @@ PowerShell,[^hl-desk] and has an open report of an exec-based cluster that works
 but not from Finder or the Dock.[^hl-1716] k9s switches with `:ctx` and keeps a per-context
 `readOnly` setting.[^k9s-cmd][^k9s-cfg]
 
-### Where this PoC follows Aptakube and where it does not
+### Where the app follows Aptakube and where it does not
 
 Follows: every context from every source on the first screen with no setup; sources as files,
 folders and paths; never writing to kubeconfig; favourites; status per context; opening several.
@@ -199,15 +236,13 @@ Differs on purpose:
 ## Decisions for the owner
 
 1. **Sources.** Keep the sidebar list (default, files, folders, pasted) with a Merge Files toggle,
-   or follow kubectl and merge everything? The PoC reads each file alone.
-2. **One window or several.** The PoC opens one window per cluster (Aptakube merges them into one
+   or follow kubectl and merge everything? The app reads each file alone.
+2. **One window or several.** The app opens one window per cluster (Aptakube merges them into one
    table). Several windows match the web interface today but mean several backends.
-3. **What "Open" starts.** Embed the Zeabur backend in the app and run one per context, or point at
-   a backend already running in the cluster. Decides install size and how sign-in works.
-4. **Updates and signing.** Tauri's updater needs a signed update feed; macOS needs a Developer ID
-   certificate and notarization; Windows needs a code signing certificate to avoid SmartScreen
-   warnings. None of this is set up.
-5. **The word "context" in Chinese.** zh-TW and zh-CN keep "context" (kubectl's word).
+3. **Updates and signing.** Tauri's updater needs a signed update feed, and Windows needs a code
+   signing certificate to avoid SmartScreen warnings. Neither is set up. `scripts/build-desktop.sh`
+   signs and notarizes the macOS app when the signing variables are set; no CI job does it.
+4. **The word "context" in Chinese.** zh-TW and zh-CN keep "context" (kubectl's word).
 
 ## Windows
 

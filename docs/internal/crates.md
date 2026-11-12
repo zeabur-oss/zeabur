@@ -89,10 +89,15 @@ main workspace's rules:
   each with `#![expect(unsafe_code, reason = "…")]`. A new module that names `unsafe_code` fails
   the script.
 - **One dependency edge.** Of the workspace crates, `desktop/` may depend only on `zeabur-local`
-  (checked by the same script); nothing in the workspace depends on `desktop/`.
+  (checked by the same script), which each cluster window starts; nothing in the workspace depends
+  on `desktop/`.
+- **Its own pages.** The chooser and the cluster window's start page are `desktop/web/`, a Vite
+  project with its own `package.json` and `bun.lock` under the same package policy as `web/`. The
+  app bundles their build; the cluster's web interface is `web/dist`, embedded in `zeabur-local`.
 
-CI's `desktop` job (`scripts/ci/desktop.sh`) runs the script, `cargo fmt`, `cargo lint`, the tests
-and `cargo deny` for `desktop/` on Linux. The macOS and Windows code is linted on a Mac
+CI's `desktop` job (`scripts/ci/desktop.sh`) runs the script, the checks and build of
+`desktop/web`, `cargo fmt`, `cargo lint`, the tests and `cargo deny` for `desktop/` on Linux.
+`scripts/build-desktop.sh` bundles the app (`cargo tauri build`). The macOS and Windows code is linted on a Mac
 (`cargo lint`, and `cargo xwin clippy` for Windows, see `desktop/README.md`).
 
 ## Web interface

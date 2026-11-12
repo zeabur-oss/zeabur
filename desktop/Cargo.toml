@@ -1,6 +1,6 @@
 [package]
 name = "zeabur-desktop"
-description = "Proof of concept: the Zeabur desktop app (Tauri 2) that lists kubeconfig contexts and opens Zeabur"
+description = "Zeabur Desktop (Tauri 2): lists kubeconfig contexts and opens Zeabur for each with its local service"
 version = "0.0.0"
 edition = "2024"
 rust-version = "1.99"
@@ -21,11 +21,16 @@ serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
 # All default features are in use: dynamic-acl for add_capability, x11 and dbus (the dark theme) on
 # Linux, common-controls-v6 for the Windows dialogs, compression for the embedded web interface.
-tauri = "2"
+tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
 tauri-plugin-window-state = "2"
+# The local service each cluster window runs, with the web interface embedded (`ZEABUR_UI_DIST`,
+# required by a release build). The one workspace crate desktop/ may depend on
+# (scripts/check-desktop.sh).
+zeabur-local = { path = "../crates/zeabur-local", features = ["ui"] }
 
-# Set for a build that embeds web/dist instead of loading the dev server (`--features custom-protocol`).
+# Set for a build that embeds desktop/web/dist instead of loading the dev server
+# (`--features custom-protocol`; `cargo tauri build` sets it).
 [features]
 custom-protocol = ["tauri/custom-protocol"]
 

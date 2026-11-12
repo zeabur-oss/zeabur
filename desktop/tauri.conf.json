@@ -4,17 +4,28 @@
   "version": "../web/package.json",
   "identifier": "com.zeabur.oss.desktop",
   "build": {
-    "devUrl": "http://localhost:5173",
-    "frontendDist": "../web/dist"
+    "devUrl": "http://localhost:5174",
+    "frontendDist": "web/dist"
   },
   "app": {
     "windows": [],
     "security": {
-      "csp": null
+      "csp": {
+        "default-src": "'none'",
+        "script-src": "'self'",
+        "style-src": "'self' 'unsafe-inline'",
+        "img-src": "'self' data:",
+        "font-src": "'self'",
+        "connect-src": "ipc: http://ipc.localhost",
+        "base-uri": "'none'",
+        "form-action": "'none'",
+        "frame-ancestors": "'none'",
+        "object-src": "'none'"
+      }
     }
   },
   "bundle": {
-    "active": false,
+    "active": true,
     "icon": [
       "icons/icon.png",
       "icons/32x32.png",
@@ -22,6 +33,9 @@
       "icons/128x128@2x.png",
       "icons/icon.icns",
       "icons/icon.ico"
-    ]
+    ],
+    "targets": "all",
+    "category": "DeveloperTool",
+    "shortDescription": "Zeabur for the clusters in your kubeconfig"
   }
 }
