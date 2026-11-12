@@ -785,8 +785,6 @@ function warningSentence(
       return t("warn.httpsCertificate", warning.hostname, warning.issuer)
     case "httpOnly":
       return httpOnlySentence(t, warning)
-    case "secretValuesUnknown":
-      return t("warn.secretValuesUnknown", warning.name)
     case "configNotRolledBack":
       return t("warn.configNotRolledBack", warning.workload.name)
     case "storageClassUnknown":

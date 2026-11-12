@@ -1,0 +1,15 @@
+description: "A key removal in a later change of the same Secret is written although an earlier change already set another key."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: data
+        kind: Secret
+        name: db
+        changes:
+          - {op: set, key: password, value: hunter2}
+      - op: data
+        kind: Secret
+        name: db
+        changes:
+          - {op: remove, key: token}

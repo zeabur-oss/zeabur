@@ -126,7 +126,7 @@ The project's **Objects** page lists all objects in the namespace by kind. Use *
 
 Click an object to see its status, **Conditions**, and YAML. To view a service's YAML, open the service's **Settings** and switch from **Settings** to **YAML** at the top.
 
-Secret values appear as `(hidden)` in the YAML.
+A secret's YAML shows its values under `data` in base64, as Kubernetes stores them. To read a value as text, click the secret's name under **From config files and secrets** in the service's variables. See [Variables](./variables.mdx). The review screen shows secret values as `(hidden)`.
 
 ## Edit an object's YAML
 
@@ -135,7 +135,7 @@ Secret values appear as `(hidden)` in the YAML.
 
 ### Edit
 
-Click **Edit** in the YAML view. The editor shows the current configuration in the cluster, and changes are written as entered. Leave secret values as `(hidden)` to keep them unchanged, or enter new values to change them.
+Click **Edit** in the YAML view. The editor shows the current configuration in the cluster, and changes are written as entered. In a secret, values under `data` are base64-encoded. `stringData` is not supported, so enter each value under `data` in base64. A key you delete from `data` is removed from the secret, and deleting the whole `data` block removes all its keys. To edit a secret's YAML, you need permission to read it.
 
 </Step>
 <Step>

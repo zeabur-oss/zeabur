@@ -97,7 +97,7 @@ origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
 
 ## Verify the image and chart
 
-The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each image's platform images and index, and the chart, one per line. Zeabur Proxy's lines start with `proxy`:
+The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each image's platform images and index, and the chart, one per line. Zeabur Proxy's lines start with `proxy`. The `debug` and `tools` lines are images from other projects that Zeabur runs for debug containers and terminals; Zeabur doesn't sign them, so cosign below checks only the others:
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
@@ -106,6 +106,8 @@ index  ghcr.io/zeabur-oss/zeabur@sha256:...
 proxy linux/amd64  ghcr.io/zeabur-oss/proxy@sha256:...
 proxy linux/arm64  ghcr.io/zeabur-oss/proxy@sha256:...
 proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
+debug index  docker.io/library/busybox:...@sha256:...
+tools index  docker.io/alpine/k8s:...@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 
@@ -133,6 +135,16 @@ cosign verify \
 ```
 
 Replace the placeholders in angle brackets with the values from `digests.txt`. For chart installation steps, see [Install on an existing cluster](../install/existing-cluster.mdx).
+
+## Mirror the images
+
+To copy the images into a private registry, or to admit them by name, `digests.txt` is the list. It names the images Zeabur and its chart run, including `debug` and `tools`. Print the image indexes:
+
+```sh
+awk '$(NF-1) == "index" { print $NF }' digests.txt
+```
+
+Copy each reference with the tool you mirror with, and keep its digest so the chart and the signatures still match. Components from the Zeabur catalog are not in this file.
 
 ## Release process
 

@@ -1,6 +1,7 @@
 //! A service's releases: the pod templates its workload has run, for the Releases tab and
 //! rollbacks ([`zeabur_plan::releases`]).
 
+use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -9,7 +10,7 @@ use zeabur_plan::Release;
 
 use crate::error::{ApiError, project_read, read_problem};
 use crate::extract::{Json, Path};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::projects::snapshot;
 use crate::projects::writes::releases::History;
 
@@ -30,6 +31,7 @@ pub struct ReleaseList {
            ("name" = String, Path)),
     responses((status = 200, body = ReleaseList), (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn releases(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path((project, kind, name)): Path<(String, String, String)>,
 ) -> Result<Json<ReleaseList>, ApiError> {
@@ -44,7 +46,7 @@ pub(crate) async fn releases(
         .namespace_workloads(&project)
         .await
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(&project)))?;
-    let (snapshot, _) = snapshot(objects);
+    let (snapshot, _) = snapshot(objects, (state.clock)());
     let workload = zeabur_graph::workloads(&snapshot)
         .into_iter()
         .find(|w| w.kind() == workload_kind && w.name() == name)

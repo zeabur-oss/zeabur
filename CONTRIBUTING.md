@@ -50,7 +50,7 @@ for each rule or term it relaxes. Any warning fails the check. The term chosen f
 and how each interface element reads are in [docs/internal/wording.md](docs/internal/wording.md);
 the general writing rules for all three locales are in the `zeabur-writing` skill
 (`.claude/skills/zeabur-writing/`, copied from
-[zeabur-oss/skills](https://github.com/zeabur-oss/skills) by `.github/workflows/update.yml`), and
+[zeabur-oss/.github](https://github.com/zeabur-oss/.github/tree/main/skills) by `.github/workflows/update.yml`), and
 Vale checks docs and catalogs against them: `nix develop -c vale docs README.md web/src/i18n`
 (`.vale.ini`). A rule that is wrong for one passage is silenced there with a Vale comment that
 says why.

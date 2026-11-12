@@ -1,0 +1,11 @@
+description: "Removing a Secret key that Helm owns and setting it to an empty value is refused: the merge patch would write the key."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: data
+        kind: Secret
+        name: db
+        changes:
+          - {op: remove, key: token}
+          - {op: set, key: token, value: ""}

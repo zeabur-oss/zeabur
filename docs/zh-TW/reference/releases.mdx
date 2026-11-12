@@ -97,7 +97,7 @@ origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
 
 ## 驗證映像檔與 chart
 
-發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照，Zeabur Proxy 的那幾行以 `proxy` 開頭：
+發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照，Zeabur Proxy 的那幾行以 `proxy` 開頭。`debug` 和 `tools` 兩行是 Zeabur 為除錯容器和終端機使用的其他專案映像檔，Zeabur 不為它們簽章，cosign 只驗證其餘的映像檔：
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
@@ -106,6 +106,8 @@ index  ghcr.io/zeabur-oss/zeabur@sha256:...
 proxy linux/amd64  ghcr.io/zeabur-oss/proxy@sha256:...
 proxy linux/arm64  ghcr.io/zeabur-oss/proxy@sha256:...
 proxy index  ghcr.io/zeabur-oss/proxy@sha256:...
+debug index  docker.io/library/busybox:...@sha256:...
+tools index  docker.io/alpine/k8s:...@sha256:...
 chart  ghcr.io/zeabur-oss/charts/zeabur@sha256:...
 ```
 
@@ -133,6 +135,16 @@ cosign verify \
 ```
 
 角括號換成 `digests.txt` 裡的值。在既有叢集安裝 chart 的步驟見[在既有叢集安裝](../install/existing-cluster.mdx)。
+
+## 把映像檔複製到自己的 registry
+
+要把映像檔複製到私有 registry，或依名稱放行，就以 `digests.txt` 為清單。清單列出 Zeabur 與 chart 會用到的映像檔，包含 `debug` 和 `tools`。印出各映像檔的 image index：
+
+```sh
+awk '$(NF-1) == "index" { print $NF }' digests.txt
+```
+
+用你慣用的工具逐一複製，並保留 digest，chart 和簽章才對得上。Zeabur Catalog 元件的映像檔不在這個檔案裡。
 
 ## 發行流程
 

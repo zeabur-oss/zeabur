@@ -5,11 +5,10 @@ description: Run Zeabur's Kubernetes integration and end-to-end tests on a dispo
 
 # Cluster tests
 
-Follow `zeabur-oss-cluster-tests` (install: `npx skills add zeabur-oss/skills --skill
-zeabur-oss-cluster-tests`; `skills-lock.json` pins it): a disposable cluster on a Linux machine
-or VM, a snapshot restored after every run, assertions through a person, and the common failures.
-Sync with `rsync -a --delete --exclude target --exclude node_modules --exclude web/dist ./
-host:zeabur/`.
+Follow `zeabur-oss-cluster-tests` (copied from zeabur-oss/.github by the Update workflow): a
+disposable cluster on a Linux machine or VM, a snapshot restored after every run, assertions through
+a person, and the common failures. Sync with `rsync -a --delete --exclude target --exclude
+node_modules --exclude web/dist ./ host:zeabur/`.
 
 ## Cluster
 ```sh

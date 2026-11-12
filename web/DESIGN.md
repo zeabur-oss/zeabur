@@ -362,13 +362,17 @@ more selector.
 
 ## Secrets
 
-Values are never fetched with the page. "Reveal db-credentials" fetches one Secret on request
-(`POST …/reveal`, `no-store`); values live in the tab's component state only and disappear on
-leaving the tab or the service (the service route remounts its page for each service). YAML
-(the Objects panel, a service's YAML tab, a plan's diff) never holds a value: the server writes
-`(hidden)`. The Secret editor reveals on request the same way; a new value may be typed without
-revealing the old one. In an edited YAML copy, a value left as `(hidden)` is kept as it is; the
-server never writes the mask.
+Lists and service pages never carry a value. On a service's Variables tab, "Reveal db-credentials"
+fetches one Secret on request (`POST …/reveal`, `no-store`); values live in the tab's component
+state only and disappear on leaving the tab or the service (the service route remounts its page
+for each service). The YAML of one Secret (the Objects panel, a service's YAML tab) is the object
+as the cluster gives it to the person, `data` in base64; a plan's diff shows `(hidden)` and the
+`last-applied-configuration` copy stays hidden. The key editor reads the same YAML: one row per
+key, the value masked until its eye is pressed (no second request), a copy button for the decoded
+value, and a binary value as its size with a download, never in a text box. It sends only the keys
+changed; typing then clearing a masked value is no change. Those keys go as one merge patch that
+reads nothing, so `patch` on the Secret is enough and the last write to a key wins. The plan
+compares a YAML edit with the Secret as read, as for any other object, so it needs `get`.
 
 ## Navigation and state
 

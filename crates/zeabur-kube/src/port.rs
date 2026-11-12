@@ -599,6 +599,11 @@ pub enum WriteBody {
     ///
     /// [rfc6902]: https://www.rfc-editor.org/rfc/rfc6902
     JsonPatch(serde_json::Value),
+    /// An RFC 7386 JSON Merge Patch [rfc7386]: the fields it names are set, a `null` removes one,
+    /// and nothing is tested against what was read.
+    ///
+    /// [rfc7386]: https://www.rfc-editor.org/rfc/rfc7386
+    MergePatch(serde_json::Value),
     /// An RFC 6902 JSON Patch of a Pod's `ephemeralcontainers` subresource
     /// [k8s-ephemeral]: kube-apiserver keeps only the change to `spec.ephemeralContainers` and
     /// refuses one that changes or removes a container already there. RBAC sees a `patch` of

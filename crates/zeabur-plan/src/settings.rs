@@ -34,7 +34,6 @@
 
 use std::collections::BTreeMap;
 
-use base64::Engine as _;
 use k8s_openapi::api::core::v1::{Container, PersistentVolumeClaim};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Map, Value, json};
@@ -42,7 +41,7 @@ use zeabur_graph::Workload;
 use zeabur_model::kernel::quantity;
 use zeabur_model::{SourceKind, WorkloadKind, WorkloadRef};
 
-use crate::change::{DataEdit, DataKind, ProbeKind, Target, Warning};
+use crate::change::{DataKind, ProbeKind, Target, Warning};
 use crate::checks::{
     AccessMode, COMPUTE, ProbeRequest, ResourceRef, VolumeRequest, owned_by_stateful_set,
     probe_config, reconcile_identity, resource_allowed, validate_mount_path, validate_resources,
@@ -56,7 +55,7 @@ use crate::plan::{
     workload_target,
 };
 use crate::project::{set_key, shown, steps};
-use crate::rules::{REDACTED, Refusal};
+use crate::rules::Refusal;
 
 /// A container of a workload: its name, position and spec.
 pub(crate) struct Found {
@@ -71,12 +70,6 @@ pub(crate) struct Found {
 )]
 fn bad(refusal: Refusal, detail: &str) -> PlanError {
     error(ErrorKind::BadRequest, &refusal.0, detail)
-}
-
-/// Whether a Secret value in an edited copy is a mask a person was shown: the YAML view's
-/// [`REDACTED`] or a run of `•`.
-fn is_mask(value: &str) -> bool {
-    value == REDACTED || (!value.is_empty() && value.chars().all(|c| c == '\u{2022}'))
 }
 
 #[expect(
@@ -953,6 +946,15 @@ impl<'a> Planner<'a> {
                 format!("Unable to read the YAML: {e}"),
             )
         })?;
+        // kube-apiserver folds `stringData` into `data` and never stores it, so it has no
+        // counterpart in the object as read to compare with, nor an owner to check.
+        if edited.get("stringData").is_some() {
+            return Err(error(
+                ErrorKind::Invalid,
+                "string_data",
+                "stringData is not stored; put the value under data, in base64.",
+            ));
+        }
         let allowed = resource_allowed(resource);
         if let Some(reason) = allowed.reason {
             return Err(error(
@@ -1009,7 +1011,7 @@ impl<'a> Planner<'a> {
             .unwrap_or_default();
         Self::refuse_managed(&meta, &kind, name)?;
         if keys == Some(DataKind::Secret) {
-            self.with_secret_values(name, &mut object);
+            self.with_secret_values(name, &mut object)?;
         }
         let index = self.working(
             Target {
@@ -1020,42 +1022,33 @@ impl<'a> Planner<'a> {
             },
             object.clone(),
         );
-        let mut current = editable(&self.current(index));
+        let current = editable(&self.current(index));
         let mut wanted = editable(&edited);
         // The namespace is the project's, said or not.
         if let Some(metadata) = wanted.get_mut("metadata").and_then(Value::as_object_mut) {
             metadata.insert("namespace".to_owned(), json!(namespace));
         }
-        // A ConfigMap's or Secret's keys change one by one, without the values left as they
-        // are or shown masked; the rest of it as any other object, and kube-apiserver's dry run
-        // refuses what it does not allow to change. The keys compare with the object as read.
-        let key_edits = match keys {
-            Some(data_kind) => {
-                let edits = self.key_edits(data_kind, name, &object, &edited)?;
-                for side in [&mut current, &mut wanted] {
-                    if let Some(map) = side.as_object_mut() {
-                        map.remove("data");
-                        map.remove("stringData");
-                    }
-                }
-                edits.map(|edits| (data_kind, edits))
-            }
-            None => None,
-        };
         let operations = edit_operations(&current, &wanted);
-        if operations.is_empty() && key_edits.is_none() {
+        if operations.is_empty() {
             return Err(error(
                 ErrorKind::BadRequest,
                 "no_changes",
                 "The edited copy is the same as the object.",
             ));
         }
+        let changes_keys = operations.iter().any(|operation| {
+            ["data", "stringData", "binaryData"]
+                .iter()
+                .any(|field| operation.field.first() == Some(&Step::field(field)))
+        });
         for operation in operations {
             self.claim(index, &operation.field, &operation.shown)?;
             self.patch(index, operation.operations)?;
         }
-        if let Some((data_kind, edits)) = key_edits {
-            self.data(data_kind, name, &edits)?;
+        if let Some(data_kind) = keys
+            && changes_keys
+        {
+            self.readers(data_kind, name);
         }
         if let Some(workload) = WorkloadKind::parse(&kind) {
             self.impact.insert(WorkloadRef {
@@ -1064,101 +1057,6 @@ impl<'a> Planner<'a> {
             });
         }
         Ok(())
-    }
-
-    /// The key changes of a ConfigMap's or Secret's YAML edit, `None` when there are none.
-    ///
-    /// A Secret value shown masked ([`is_mask`]) is left as it is, and so is one equal to the
-    /// value the person could read; a Secret's keys are removed only when its values were read,
-    /// so a key the edited copy leaves out is known to exist.
-    fn key_edits(
-        &self,
-        kind: DataKind,
-        name: &str,
-        current: &Value,
-        edited: &Value,
-    ) -> Result<Option<Vec<DataEdit>>, PlanError> {
-        let strings = |object: &Value, field: &str| -> BTreeMap<String, String> {
-            object
-                .get(field)
-                .and_then(Value::as_object)
-                .into_iter()
-                .flatten()
-                .map(|(k, v)| (k.clone(), v.as_str().unwrap_or_default().to_owned()))
-                .collect()
-        };
-        let set = |key: &str, value: String| DataEdit {
-            op: "set".to_owned(),
-            key: key.to_owned(),
-            value: Some(value),
-        };
-        let mut edits = Vec::new();
-        match kind {
-            DataKind::ConfigMap => {
-                let before = strings(current, "data");
-                let after = strings(edited, "data");
-                for (key, value) in &after {
-                    if before.get(key) != Some(value) {
-                        edits.push(set(key, value.clone()));
-                    }
-                }
-                for key in before.keys().filter(|k| !after.contains_key(*k)) {
-                    edits.push(DataEdit {
-                        op: "remove".to_owned(),
-                        key: key.clone(),
-                        value: None,
-                    });
-                }
-            }
-            DataKind::Secret => {
-                let known = self.input.secret_values.get(name);
-                let data = strings(edited, "data");
-                let plain = strings(edited, "stringData");
-                for (key, encoded) in &data {
-                    if is_mask(encoded) {
-                        continue;
-                    }
-                    let bytes = base64::engine::general_purpose::STANDARD
-                        .decode(encoded)
-                        .map_err(|_decode| {
-                            error(
-                                ErrorKind::BadRequest,
-                                "invalid_base64",
-                                format!(
-                                    "The value of {key} under data is not base64; put plain \
-                                     text under stringData instead."
-                                ),
-                            )
-                        })?;
-                    if known.and_then(|k| k.get(key)) == Some(&bytes) {
-                        continue;
-                    }
-                    let text = String::from_utf8(bytes).map_err(|_utf8| {
-                        error(
-                            ErrorKind::Invalid,
-                            "binary_secret_value",
-                            format!("{key} is binary; it cannot be edited here."),
-                        )
-                    })?;
-                    edits.push(set(key, text));
-                }
-                for (key, text) in plain.iter().filter(|(_, text)| !is_mask(text)) {
-                    edits.push(set(key, text.clone()));
-                }
-                if let Some(known) = known {
-                    for key in known.keys() {
-                        if !data.contains_key(key) && !plain.contains_key(key) {
-                            edits.push(DataEdit {
-                                op: "remove".to_owned(),
-                                key: key.clone(),
-                                value: None,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-        Ok((!edits.is_empty()).then_some(edits))
     }
 }
 

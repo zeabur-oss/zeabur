@@ -1,4 +1,4 @@
-description: "A Secret key change shows which key changes but never a value, and is written as base64; with the values unread, only that key is added, so the others stay."
+description: "Setting a Secret key is allowed when Helm owns only another key of the Secret."
 operation: mutation.plan
 params:
   request:

@@ -163,10 +163,13 @@ mod tests {
         assert!(matches!(&writes[1], WriteBody::JsonPatch(_)));
     }
 
+    /// The plan of a Secret's YAML edit shows no value: neither the one written nor the one its
+    /// `test` operation compares.
     #[tokio::test]
-    async fn a_secret_edit_never_writes_the_mask() {
+    async fn a_secret_yaml_edit_shows_no_value_in_the_plan() {
         let cluster = cluster();
-        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret, labels: {tier: data}}\ntype: Opaque\ndata:\n  password: (hidden)\n  user: \u{2022}\u{2022}\u{2022}\u{2022}\nstringData:\n  token: plain-typed-value\n  note: (hidden)\n";
+        let yaml = "apiVersion: v1\nkind: Secret\nmetadata: {name: web-secret}\ntype: Opaque\n\
+                    data:\n  password: aHVudGVyMw==\n  user: YWRtaW4=\n";
         let (planned, writes) = plan_and_apply(
             &cluster,
             json!([{"op": "edit", "resource": {"group": "", "version": "v1", "resource": "secrets"},
@@ -177,26 +180,41 @@ mod tests {
             panic!("one patch: {writes:?}");
         };
         let text = operations.to_string();
-        assert!(
-            !text.contains("(hidden)") && !text.contains('\u{2022}'),
-            "{text}"
-        );
-        assert!(
-            !text.contains("/data/password") && !text.contains("/data/user"),
-            "{text}"
-        );
-        assert!(text.contains("/data/token"), "{text}");
-        // The label changes with the keys, in the same patch.
-        assert!(text.contains("/metadata/labels"), "{text}");
-        // The token is random bytes in base64: leave it out of the search for the value.
-        let mut shown = planned;
-        if let Some(fields) = shown.as_object_mut() {
-            fields.remove("token");
+        assert!(text.contains("aHVudGVyMw=="), "{text}");
+        let shown = planned.to_string();
+        for value in [
+            "aHVudGVyMg==",
+            "aHVudGVyMw==",
+            "plain-typed-value",
+            "hunter",
+        ] {
+            assert!(!shown.contains(value), "the plan shows a Secret value");
         }
-        assert!(
-            !shown.to_string().contains("plain-typed-value"),
-            "the plan shows no Secret value"
+    }
+
+    /// A Secret's key changes are one merge patch of those keys: the Secret's values are not
+    /// read, and the plan shows none.
+    #[tokio::test]
+    async fn a_secret_key_edit_is_a_merge_patch_that_reads_no_value() {
+        let cluster = cluster();
+        let (planned, writes) = plan_and_apply(
+            &cluster,
+            json!([{"op": "data", "kind": "Secret", "name": "web-secret", "changes": [
+                {"op": "set", "key": "password", "value": "hunter3"},
+                {"op": "remove", "key": "user"}]}]),
+        )
+        .await;
+        assert_eq!(
+            writes,
+            [WriteBody::MergePatch(
+                json!({"data": {"password": "aHVudGVyMw==", "user": null}})
+            )]
         );
+        assert_eq!(cluster.inspect(|s| s.secret_reads).unwrap(), 0);
+        let shown = planned.to_string();
+        for value in ["aHVudGVyMw==", "hunter"] {
+            assert!(!shown.contains(value), "the plan shows a Secret value");
+        }
     }
 
     /// A plan the planner refuses because the object cannot take the change answers `422` with a

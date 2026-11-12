@@ -2449,8 +2449,9 @@ paths:
       tags:
       - resources
       summary: |-
-        One object of a project as YAML, without the server's bookkeeping and with a Secret's values
-        hidden; any namespaced kind the cluster serves (`core` names the empty group).
+        One object of a project as YAML, without the server's bookkeeping; any namespaced kind the
+        cluster serves (`core` names the empty group). A Secret comes with its values, read with the
+        person's own credential.
       operationId: getObject
       parameters:
       - name: project
@@ -2486,6 +2487,11 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ObjectDocument"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
         "404":
           content:
             application/problem+json:
@@ -7564,7 +7570,7 @@ components:
           type:
           - string
           - "null"
-          description: The value, for `set`; for a Secret, the plain value (Zeabur encodes it).
+          description: The value, for `set`; for a Secret, the plain text (Zeabur encodes it).
     DataKind:
       type: string
       description: A ConfigMap or a Secret.
@@ -11970,7 +11976,9 @@ components:
             Secret.
         yaml:
           type: string
-          description: The object as YAML, without the server's bookkeeping; a Secret's values hidden.
+          description: |-
+            The object as YAML, without the server's bookkeeping; a Secret with its `data` as the
+            cluster stores it (base64).
     ObjectKind:
       type: object
       description: The objects of one kind.
@@ -12525,19 +12533,6 @@ components:
             type: string
             enum:
             - nodeCapacityUnknown
-      - type: object
-        description: The Secret's values could not be read, so its diff shows only which keys change.
-        required:
-        - name
-        - code
-        properties:
-          code:
-            type: string
-            enum:
-            - secretValuesUnknown
-          name:
-            type: string
-            description: The Secret.
       - type: object
         description: |-
           A rollback returns the pod template only; the ConfigMaps and Secrets the workload reads
@@ -13181,6 +13176,21 @@ components:
             type: string
             enum:
             - patch
+      - type: object
+        description: |-
+          An RFC 7386 JSON Merge Patch that sets or removes keys of a Secret's `data` without
+          reading the Secret: it tests nothing, so the last write to a key wins.
+        required:
+        - body
+        - type
+        properties:
+          body:
+            type: object
+            description: "The patch, `{\"data\": {key: base64 or null}}`."
+          type:
+            type: string
+            enum:
+            - mergePatch
       - type: object
         description: |-
           A `DELETE` with background propagation, refused (`409`) unless the object still has this
