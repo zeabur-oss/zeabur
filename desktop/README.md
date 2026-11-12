@@ -24,8 +24,13 @@ nix develop .#desktop -c scripts/build-desktop.sh
 ```
 
 It builds `web/dist` (embedded in the local service), `desktop/web/dist` (bundled into the app),
-then `cargo tauri build`: on macOS `Zeabur.app` and `Zeabur_<version>_<arch>.dmg` under
-`target/desktop/release/bundle/`. The version is `web/package.json`'s. With
+the binary, then the bundles: on macOS `Zeabur.app` and `Zeabur_<version>_<arch>.dmg` under
+`target/desktop/release/bundle/`. The version is `web/package.json`'s. A binary built in the Nix
+shell links the Nix store's libiconv; on macOS the script points it at `/usr/lib/libiconv.2.dylib`
+before the bundler signs it, and `scripts/check-portable.sh` then fails if anything in the app
+links a library that a Mac without Nix lacks. CI's `desktop-bundle` job does the same on macOS.
+On Linux the check fails for now: a binary built in the Nix shell uses the Nix store's dynamic
+loader, glibc and WebKitGTK, so a `.deb` or AppImage of it would not run on other distributions. With
 `APPLE_SIGNING_IDENTITY` set to a Developer ID Application identity the bundler signs with the
 hardened runtime; with `APPLE_API_ISSUER`, `APPLE_API_KEY` and `APPLE_API_KEY_PATH` (or
 `APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID`) it also notarizes. Without them the app is signed

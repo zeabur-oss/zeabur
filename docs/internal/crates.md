@@ -97,7 +97,8 @@ main workspace's rules:
 
 CI's `desktop` job (`scripts/ci/desktop.sh`) runs the script, the checks and build of
 `desktop/web`, `cargo fmt`, `cargo lint`, the tests and `cargo deny` for `desktop/` on Linux.
-`scripts/build-desktop.sh` bundles the app (`cargo tauri build`). The macOS and Windows code is linted on a Mac
+`scripts/build-desktop.sh` bundles the app, and CI's `desktop-bundle` job builds the macOS app and checks it links
+nothing from the Nix store (`scripts/check-portable.sh`). The macOS and Windows code is linted on a Mac
 (`cargo lint`, and `cargo xwin clippy` for Windows, see `desktop/README.md`).
 
 ## Web interface
