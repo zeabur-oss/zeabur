@@ -5,11 +5,10 @@ description: Day-to-day development loop for the Zeabur repository — environme
 
 # Zeabur development loop
 
-Follow the shared skills (install: `npx skills add zeabur-oss/skills --skill <name>`;
-`skills-lock.json` pins them): `zeabur-oss-rust` (Nix toolchain, workspace, lints, common
-checks), `zeabur-oss-standards` (with [`STANDARDS.md`](STANDARDS.md) here),
-`zeabur-oss-workflow` (commits and pull requests; Zeabur's part in `zeabur-workflow`). This skill
-adds what is Zeabur's own.
+Follow the shared skills (copied from zeabur-oss/.github by the Update workflow): `zeabur-oss-rust`
+(Nix toolchain, workspace, lints, common checks), `zeabur-oss-standards` (with
+[`STANDARDS.md`](STANDARDS.md) here), `zeabur-oss-workflow` (commits and pull requests; Zeabur's
+part in `zeabur-workflow`). This skill adds what is Zeabur's own.
 
 ## Crates and binaries
 - Each crate has a level in `Cargo.toml` `[workspace.metadata.levels]` (table in

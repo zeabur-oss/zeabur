@@ -1,7 +1,7 @@
 name: Update
 
 # Moves every pin of zeabur-oss/.github to its main and copies the shared skills again from
-# zeabur-oss/skills, in one pull request: Monday 02:30 in Asia/Taipei, or by hand.
+# that commit, in one pull request: Monday 02:30 in Asia/Taipei, or by hand.
 on:
   schedule:
     - cron: "30 18 * * 0"

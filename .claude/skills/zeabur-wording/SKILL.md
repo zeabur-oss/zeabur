@@ -5,9 +5,9 @@ description: Zeabur's own terms and steps for any text people read in Zeabur —
 
 # Wording
 
-Follow `zeabur-writing` (`skills-lock.json` pins it) for how text reads in English, zh-TW and
-zh-CN. This skill adds Zeabur's terms and conventions; `docs/internal/wording.md` is the
-rulebook, and its term beats anything in `zeabur-writing`.
+Follow `zeabur-writing` (copied from zeabur-oss/.github by the Update workflow) for how text reads
+in English, zh-TW and zh-CN. This skill adds Zeabur's terms and conventions;
+`docs/internal/wording.md` is the rulebook, and its term beats anything in `zeabur-writing`.
 
 1. **Name the thing by its plain term first**; the Kubernetes term follows as secondary text only
    where a professional needs it (`docs/internal/wording.md`, "Terms"). Never invent a term; use the

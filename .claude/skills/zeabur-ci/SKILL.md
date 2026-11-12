@@ -5,10 +5,9 @@ description: Investigate a failed or flaky CI or release run of Zeabur (GitHub A
 
 # When CI fails
 
-Follow `zeabur-oss-ci` (install: `npx skills add zeabur-oss/skills --skill zeabur-oss-ci`;
-`skills-lock.json` pins it): how CI runs `scripts/ci/<job>.sh`, reading the log,
-finding the cause, reproducing, fixing, and its release recovery notes. This skill adds Zeabur's
-jobs and tools.
+Follow `zeabur-oss-ci` (copied from zeabur-oss/.github by the Update workflow): how CI runs
+`scripts/ci/<job>.sh`, reading the log, finding the cause, reproducing, fixing, and its release
+recovery notes. This skill adds Zeabur's jobs and tools.
 
 ## Jobs
 
