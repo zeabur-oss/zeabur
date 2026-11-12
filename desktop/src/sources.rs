@@ -72,7 +72,10 @@ pub enum Auth {
     /// The exec plugin is not on the app's PATH but is on the login shell's PATH.
     ShellPathOnly { command: String },
     /// The exec plugin is not found at all.
-    PluginMissing { command: String, hint: Option<String> },
+    PluginMissing {
+        command: String,
+        hint: Option<String>,
+    },
     /// The context names a user or cluster the file does not define.
     MissingEntry { what: String, name: String },
     /// A file the user entry points to does not exist.
@@ -152,14 +155,22 @@ fn check_auth(info: &AuthInfo, search: &SearchPaths) -> Auth {
     if let Some(exec) = &info.exec {
         let command = exec.command.clone().unwrap_or_default();
         if find_command(&command, &search.app) {
-            return Auth::Ok { method: format!("exec {command}") };
+            return Auth::Ok {
+                method: format!("exec {command}"),
+            };
         }
         if find_command(&command, &search.shell) {
             return Auth::ShellPathOnly { command };
         }
-        return Auth::PluginMissing { command, hint: exec.install_hint.clone() };
+        return Auth::PluginMissing {
+            command,
+            hint: exec.install_hint.clone(),
+        };
     }
-    for path in [&info.client_certificate, &info.client_key, &info.token_file].into_iter().flatten() {
+    for path in [&info.client_certificate, &info.client_key, &info.token_file]
+        .into_iter()
+        .flatten()
+    {
         if !Path::new(path).is_file() {
             return Auth::FileMissing { path: path.clone() };
         }
@@ -169,15 +180,22 @@ fn check_auth(info: &AuthInfo, search: &SearchPaths) -> Auth {
     } else if info.client_certificate.is_some() || info.client_certificate_data.is_some() {
         "client certificate"
     } else if let Some(provider) = &info.auth_provider {
-        return Auth::Ok { method: format!("auth-provider {}", provider.name) };
+        return Auth::Ok {
+            method: format!("auth-provider {}", provider.name),
+        };
     } else {
         "none"
     };
-    Auth::Ok { method: method.to_owned() }
+    Auth::Ok {
+        method: method.to_owned(),
+    }
 }
 
 /// Reads every source and returns the sources with counts and the contexts of every file.
-pub fn read_all(sources: &[SourceRef<'_>], search: &SearchPaths) -> (Vec<SourceView>, Vec<ContextView>) {
+pub fn read_all(
+    sources: &[SourceRef<'_>],
+    search: &SearchPaths,
+) -> (Vec<SourceView>, Vec<ContextView>) {
     let mut views = Vec::new();
     let mut contexts = Vec::new();
     for source in sources {
@@ -197,7 +215,10 @@ pub fn read_all(sources: &[SourceRef<'_>], search: &SearchPaths) -> (Vec<SourceV
         let files = match files_of(source.kind, source.path) {
             Ok(files) => files,
             Err(err) => {
-                view.errors.push(FileError { file: view.path.clone(), reason: err.to_string() });
+                view.errors.push(FileError {
+                    file: view.path.clone(),
+                    reason: err.to_string(),
+                });
                 views.push(view);
                 continue;
             }
@@ -207,7 +228,10 @@ pub fn read_all(sources: &[SourceRef<'_>], search: &SearchPaths) -> (Vec<SourceV
             let config = match Kubeconfig::read_from(&file) {
                 Ok(config) => config,
                 Err(err) => {
-                    view.errors.push(FileError { file: file.display().to_string(), reason: err.to_string() });
+                    view.errors.push(FileError {
+                        file: file.display().to_string(),
+                        reason: err.to_string(),
+                    });
                     continue;
                 }
             };
@@ -239,14 +263,24 @@ fn context_view(
     let file_text = file.display().to_string();
     let context = named.context.clone().unwrap_or_default();
     let cluster = config.clusters.iter().find(|c| c.name == context.cluster);
-    let server = cluster.and_then(|c| c.cluster.as_ref()).and_then(|c| c.server.clone());
+    let server = cluster
+        .and_then(|c| c.cluster.as_ref())
+        .and_then(|c| c.server.clone());
     let auth = if cluster.is_none() {
-        Auth::MissingEntry { what: "cluster".into(), name: context.cluster.clone() }
+        Auth::MissingEntry {
+            what: "cluster".into(),
+            name: context.cluster.clone(),
+        }
     } else {
         match &context.user {
-            None => Auth::Ok { method: "none".into() },
+            None => Auth::Ok {
+                method: "none".into(),
+            },
             Some(user) => match config.auth_infos.iter().find(|a| &a.name == user) {
-                None => Auth::MissingEntry { what: "user".into(), name: user.clone() },
+                None => Auth::MissingEntry {
+                    what: "user".into(),
+                    name: user.clone(),
+                },
                 Some(entry) => check_auth(&entry.auth_info.clone().unwrap_or_default(), search),
             },
         }
@@ -279,7 +313,10 @@ mod tests {
         let value = OsString::from("/home/a/.kube/config:/srv/kube/team.yaml:");
         let paths = default_paths(Some(value), home.clone());
         assert_eq!(paths.len(), 2);
-        assert_eq!(default_paths(Some(OsString::new()), home.clone()), vec![PathBuf::from("/home/a/.kube/config")]);
+        assert_eq!(
+            default_paths(Some(OsString::new()), home.clone()),
+            vec![PathBuf::from("/home/a/.kube/config")]
+        );
         assert_eq!(default_paths(None, None), Vec::<PathBuf>::new());
     }
 
@@ -289,8 +326,16 @@ mod tests {
         let home = fixtures.join("home/.kube/config");
         let team = fixtures.join("team");
         let sources = [
-            SourceRef { id: "default".into(), kind: SourceKind::Default, path: &home },
-            SourceRef { id: "team".into(), kind: SourceKind::Folder, path: &team },
+            SourceRef {
+                id: "default".into(),
+                kind: SourceKind::Default,
+                path: &home,
+            },
+            SourceRef {
+                id: "team".into(),
+                kind: SourceKind::Folder,
+                path: &team,
+            },
         ];
         let (views, contexts) = read_all(&sources, &SearchPaths::default());
         assert_eq!(views[1].files, 3);

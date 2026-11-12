@@ -4,15 +4,16 @@
 use tauri::{WebviewWindow, WebviewWindowBuilder, Wry};
 
 pub fn label_hash(key: &str) -> String {
-    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    let mut hash: u64 = 0xCBF2_9CE4_8422_2325;
     for byte in key.bytes() {
         hash ^= u64::from(byte);
-        hash = hash.wrapping_mul(0x0100_0000_01b3);
+        hash = hash.wrapping_mul(0x0100_0000_01B3);
     }
     format!("{hash:016x}")
 }
 
-/// `ZEABUR_DESKTOP_THEME=light|dark` fixes the window's appearance; otherwise it follows the system.
+/// `ZEABUR_DESKTOP_THEME=light|dark` fixes the window's appearance; otherwise it follows the
+/// system.
 pub fn apply_theme<'a, M: tauri::Manager<Wry>>(
     builder: WebviewWindowBuilder<'a, Wry, M>,
 ) -> WebviewWindowBuilder<'a, Wry, M> {
@@ -26,7 +27,10 @@ pub fn apply_theme<'a, M: tauri::Manager<Wry>>(
 /// Whether a window of this kind (`main` or `cluster`) is the one to capture.
 pub fn wants(kind: &str) -> bool {
     std::env::var_os("ZEABUR_DESKTOP_SHOT").is_some()
-        && std::env::var("ZEABUR_DESKTOP_SHOT_TARGET").as_deref().unwrap_or("main") == kind
+        && std::env::var("ZEABUR_DESKTOP_SHOT_TARGET")
+            .as_deref()
+            .unwrap_or("main")
+            == kind
 }
 
 /// With `ZEABUR_DESKTOP_SHOT=<file.png>`, waits `ZEABUR_DESKTOP_SHOT_DELAY` milliseconds (3000),
@@ -55,7 +59,10 @@ pub fn capture(window: WebviewWindow) {
                     let rep = NSBitmapImageRep::imageRepWithData(&tiff)?;
                     // SAFETY: an empty property dictionary is valid for PNG.
                     unsafe {
-                        rep.representationUsingType_properties(NSBitmapImageFileType::PNG, &NSDictionary::new())
+                        rep.representationUsingType_properties(
+                            NSBitmapImageFileType::PNG,
+                            &NSDictionary::new(),
+                        )
                     }
                 });
                 match png {

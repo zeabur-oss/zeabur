@@ -9,9 +9,8 @@ use std::path::PathBuf;
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
-use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
-
 use sources::{AddedSource, ContextView, SearchPaths, SourceKind, SourceRef, SourceView};
+use tauri::{Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 /// What the app remembers between launches. It never writes to a kubeconfig file.
 #[derive(Debug, Default, Serialize, Deserialize)]
@@ -56,11 +55,19 @@ fn source_list(saved: &Saved) -> Vec<(String, SourceKind, PathBuf)> {
     let defaults = sources::default_paths(std::env::var_os("KUBECONFIG"), std::env::home_dir());
     for path in defaults {
         if !saved.hidden_defaults.contains(&path) && path.exists() {
-            list.push((format!("default:{}", path.display()), SourceKind::Default, path));
+            list.push((
+                format!("default:{}", path.display()),
+                SourceKind::Default,
+                path,
+            ));
         }
     }
     for added in &saved.added {
-        list.push((format!("added:{}", added.path.display()), added.kind, added.path.clone()));
+        list.push((
+            format!("added:{}", added.path.display()),
+            added.kind,
+            added.path.clone(),
+        ));
     }
     list
 }
@@ -71,7 +78,11 @@ fn snapshot(app: State<'_, App>) -> Snapshot {
     let list = source_list(&saved);
     let mut refs = Vec::new();
     for (id, kind, path) in &list {
-        refs.push(SourceRef { id: id.clone(), kind: *kind, path });
+        refs.push(SourceRef {
+            id: id.clone(),
+            kind: *kind,
+            path,
+        });
     }
     let (sources, contexts) = sources::read_all(&refs, &app.search);
     Snapshot {
@@ -94,7 +105,11 @@ fn scenario() -> Option<String> {
 fn add_paths(app: State<'_, App>, paths: Vec<PathBuf>) -> Result<(), String> {
     let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
     for path in paths {
-        let kind = if path.is_dir() { SourceKind::Folder } else { SourceKind::File };
+        let kind = if path.is_dir() {
+            SourceKind::Folder
+        } else {
+            SourceKind::File
+        };
         saved.hidden_defaults.retain(|p| p != &path);
         if !saved.added.iter().any(|a| a.path == path) {
             saved.added.push(AddedSource { kind, path });
@@ -112,7 +127,11 @@ fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), Str
     }
     let mut slug = String::new();
     for c in name.trim().chars() {
-        slug.push(if c.is_alphanumeric() || c == '-' { c } else { '-' });
+        slug.push(if c.is_alphanumeric() || c == '-' {
+            c
+        } else {
+            '-'
+        });
     }
     if slug.is_empty() {
         slug.push_str("pasted");
@@ -123,7 +142,10 @@ fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), Str
     std::fs::write(&path, yaml).map_err(|e| e.to_string())?;
     let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
     if !saved.added.iter().any(|a| a.path == path) {
-        saved.added.push(AddedSource { kind: SourceKind::Pasted, path });
+        saved.added.push(AddedSource {
+            kind: SourceKind::Pasted,
+            path,
+        });
     }
     app.save(&saved)
 }
@@ -197,7 +219,10 @@ fn open_cluster(
         saved.recents.truncate(5);
         app.save(&saved)?;
     }
-    let url = app.web_url.parse::<tauri::Url>().map_err(|e| e.to_string())?;
+    let url = app
+        .web_url
+        .parse::<tauri::Url>()
+        .map_err(|e| e.to_string())?;
     // The web interface keeps its language under `zeabur.locale` and has no Japanese yet; without
     // a match it follows the system languages.
     let locale = if ["en", "zh-TW", "zh-CN"].contains(&lang.as_str()) {
@@ -216,7 +241,9 @@ fn open_cluster(
         .inner_size(1280.0, 800.0)
         .position(120.0, 80.0)
         .initialization_script(&script);
-    let window = shots::apply_theme(builder).build().map_err(|e| e.to_string())?;
+    let window = shots::apply_theme(builder)
+        .build()
+        .map_err(|e| e.to_string())?;
     if shots::wants("cluster") {
         shots::capture(window);
     }
@@ -268,14 +295,22 @@ fn main() {
             tauri_app.manage(App {
                 state_dir,
                 saved: Mutex::new(saved),
-                search: SearchPaths { app: app_path, shell },
-                web_url: std::env::var("ZEABUR_DESKTOP_WEB").unwrap_or_else(|_| "http://localhost:5173/".into()),
+                search: SearchPaths {
+                    app: app_path,
+                    shell,
+                },
+                web_url: std::env::var("ZEABUR_DESKTOP_WEB")
+                    .unwrap_or_else(|_| "http://localhost:5173/".into()),
             });
 
-            let mut builder = WebviewWindowBuilder::new(tauri_app, "main", WebviewUrl::App("desktop.html".into()))
-                .title("Zeabur")
-                .inner_size(1040.0, 680.0)
-                .min_inner_size(720.0, 480.0);
+            let mut builder = WebviewWindowBuilder::new(
+                tauri_app,
+                "main",
+                WebviewUrl::App("desktop.html".into()),
+            )
+            .title("Zeabur")
+            .inner_size(1040.0, 680.0)
+            .min_inner_size(720.0, 480.0);
             builder = shots::apply_theme(builder);
             let window = builder.build()?;
             if shots::wants("main") {

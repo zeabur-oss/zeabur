@@ -22,7 +22,10 @@ fn host_port(server: &str) -> Option<(String, u16)> {
     let authority = rest.split('/').next()?;
     if let Some(stripped) = authority.strip_prefix('[') {
         let (host, after) = stripped.split_once(']')?;
-        let port = after.strip_prefix(':').and_then(|p| p.parse().ok()).unwrap_or(443);
+        let port = after
+            .strip_prefix(':')
+            .and_then(|p| p.parse().ok())
+            .unwrap_or(443);
         return Some((host.to_owned(), port));
     }
     match authority.rsplit_once(':') {
@@ -50,7 +53,11 @@ pub fn probe(server: Option<&str>) -> Reach {
             Err(_) => {}
         }
     }
-    if refused { Reach::Refused } else { Reach::TimedOut }
+    if refused {
+        Reach::Refused
+    } else {
+        Reach::TimedOut
+    }
 }
 
 #[cfg(test)]
@@ -59,8 +66,17 @@ mod tests {
 
     #[test]
     fn server_urls_give_host_and_port() {
-        assert_eq!(host_port("https://10.0.0.12:6443"), Some(("10.0.0.12".into(), 6443)));
-        assert_eq!(host_port("https://api.example.com/k8s"), Some(("api.example.com".into(), 443)));
-        assert_eq!(host_port("https://[fd00::1]:6443"), Some(("fd00::1".into(), 6443)));
+        assert_eq!(
+            host_port("https://10.0.0.12:6443"),
+            Some(("10.0.0.12".into(), 6443))
+        );
+        assert_eq!(
+            host_port("https://api.example.com/k8s"),
+            Some(("api.example.com".into(), 443))
+        );
+        assert_eq!(
+            host_port("https://[fd00::1]:6443"),
+            Some(("fd00::1".into(), 6443))
+        );
     }
 }
