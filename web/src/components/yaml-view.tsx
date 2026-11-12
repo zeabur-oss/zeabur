@@ -35,7 +35,6 @@ function Intro({ address, note }: { address: ObjectAddress; note?: string }) {
   return (
     <p className="min-w-0 basis-full type-meta text-muted-foreground sm:basis-0 sm:flex-1">
       {t("yaml.intro", address.name)}
-      {address.resource === "secrets" ? ` ${t("yaml.hidden")}` : ""}
       {note ? ` ${note}` : ""}
     </p>
   )

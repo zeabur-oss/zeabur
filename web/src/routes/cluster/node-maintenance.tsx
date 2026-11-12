@@ -6,7 +6,12 @@ import PauseCircleIcon from "~icons/ph/pause-circle"
 import PlayCircleIcon from "~icons/ph/play-circle"
 
 import type { Schemas } from "@/api/client"
-import { applyNodeMaintenance, nodesQuery, planNodeMaintenance, queryClient } from "@/api/queries"
+import {
+  applyNodeMaintenance,
+  nodeMaintenancePlanQuery,
+  nodesQuery,
+  refresh as refreshQuery,
+} from "@/api/queries"
 import { useClusterGate } from "@/components/gate"
 import { Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
@@ -21,7 +26,7 @@ type NodeView = Schemas.NodeView
 type NodeAction = Schemas.NodeAction
 
 const refresh = () => {
-  void queryClient.invalidateQueries({ queryKey: nodesQuery.queryKey })
+  void refreshQuery(nodesQuery)
 }
 
 interface Item {
@@ -95,13 +100,7 @@ function MaintenanceDialog({
   onClose: () => void
 }) {
   const t = useT()
-  const plan = useQuery({
-    queryKey: ["node-maintenance-plan", node, action],
-    queryFn: ({ signal }) => planNodeMaintenance(node, action, signal),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-  })
+  const plan = useQuery(nodeMaintenancePlanQuery(node, action))
   const apply = useMutation({
     mutationFn: (token: string) => applyNodeMaintenance(node, { token }),
     onSuccess: () => {

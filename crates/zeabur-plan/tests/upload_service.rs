@@ -72,9 +72,10 @@ mod tests {
             .find(|o| o.target.kind == kind)
             .map(|o| match &o.write {
                 Write::Create { body } => body.clone(),
-                Write::Patch { .. } | Write::Delete { .. } | Write::EphemeralContainers { .. } => {
-                    panic!("{kind} is created")
-                }
+                Write::Patch { .. }
+                | Write::MergePatch { .. }
+                | Write::Delete { .. }
+                | Write::EphemeralContainers { .. } => panic!("{kind} is created"),
             })
     }
 

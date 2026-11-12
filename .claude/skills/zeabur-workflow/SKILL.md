@@ -5,10 +5,9 @@ description: How work moves through the Zeabur repository — branches, commits,
 
 # Workflow
 
-Follow `zeabur-oss-workflow` (install: `npx skills add zeabur-oss/skills --skill
-zeabur-oss-workflow`; `skills-lock.json` pins it): branches, signed-off Conventional Commits,
-pull requests, `gh pr checks --watch`, squash merging, issues and the text rules. This skill adds
-what is Zeabur's own.
+Follow `zeabur-oss-workflow` (copied from zeabur-oss/.github by the Update workflow): branches,
+signed-off Conventional Commits, pull requests, `gh pr checks --watch`, squash merging, issues and
+the text rules. This skill adds what is Zeabur's own.
 
 ## Pull requests
 

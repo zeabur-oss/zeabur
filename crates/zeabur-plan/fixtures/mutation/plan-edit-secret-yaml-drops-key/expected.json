@@ -1,0 +1,41 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "changes": [
+        {
+          "before": "(hidden)",
+          "path": "data.old"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "13",
+      "target": {
+        "apiVersion": "v1",
+        "kind": "Secret",
+        "name": "web-secret",
+        "plural": "secrets"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "13"
+          },
+          {
+            "op": "test",
+            "path": "/data/old",
+            "value": "eA=="
+          },
+          {
+            "op": "remove",
+            "path": "/data/old"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

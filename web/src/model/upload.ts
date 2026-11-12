@@ -6,7 +6,7 @@ import { toast } from "sonner"
 
 import { ApiError, localProblem, toProblem, type Problem, type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
-import { buildsQuery, queryClient } from "@/api/queries"
+import { buildsQuery, refresh, refreshProject } from "@/api/queries"
 import { sendSource } from "@/api/source"
 import type { Translate } from "@/i18n"
 import { store } from "@/lib/stores"
@@ -106,8 +106,8 @@ export async function startUpload({ project, build, blob, request: asked, t }: U
     running(total)
     await planAndApply(project, [{ op: "archiveDigest", build, digest }])
     change(key, { phase: "done" })
-    void queryClient.invalidateQueries({ queryKey: buildsQuery(project).queryKey })
-    void queryClient.invalidateQueries({ queryKey: ["project", project] })
+    void refresh(buildsQuery(project))
+    void refreshProject(project)
     toast.success(t("upload.sent", build))
   } catch (error) {
     change(key, { phase: "failed", stage, problem: toProblem(error) }, blob)

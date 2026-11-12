@@ -147,7 +147,7 @@ export function templateChanges(
         type: "Opaque",
         stringData,
       }
-      return { op: "create", object: secret as Record<string, never> }
+      return { op: "create", object: { ...secret } }
     }),
     {
       op: "template",

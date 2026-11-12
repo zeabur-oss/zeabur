@@ -1,6 +1,6 @@
 // One database an operator runs, with a service's tabs: how it is and how to reach it, its
 // members' logs, backups, events, and its settings with the operator's object as YAML.
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
 import ArchiveIcon from "~icons/ph/archive"
@@ -14,7 +14,13 @@ import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
-import { capabilitiesQuery, databasesQuery, objectsQuery, projectQuery } from "@/api/queries"
+import {
+  capabilitiesQuery,
+  databasesQuery,
+  objectsQuery,
+  projectQuery,
+  queryClient,
+} from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { ConnectServices } from "@/components/connect"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
@@ -190,7 +196,6 @@ function Body({
   const events = eventsOf(useProjectEvents(project), database)
   const shell = (pod?: string) => openDatabaseShell(project, database, pod)
   const terminalGate = gates("openTerminal")
-  const queryClient = useQueryClient()
   // What Zeabur made for the database goes with it, found by its label.
   const planDelete = async () => {
     const label = `${DATABASE_LABEL}=${database.name}`

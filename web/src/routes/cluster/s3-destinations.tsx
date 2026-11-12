@@ -4,11 +4,14 @@ import WarningIcon from "~icons/ph/warning"
 
 import { type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
-import { queryClient } from "@/api/queries"
+import {
+  refresh as refreshQuery,
+  s3DestinationsPlanQuery,
+  s3DestinationsQuery,
+} from "@/api/queries"
 import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { FormField } from "@/components/form-field"
 import { GateTip, useHintGate } from "@/components/gate"
-import { s3DestinationsQuery } from "@/components/s3-fields"
 import { useT } from "@/i18n"
 import type { Gate } from "@/model/rights"
 import {
@@ -28,7 +31,7 @@ type Request = Schemas.S3DestinationsPlanRequest
 type Planned = { request: Request; title: string; destructive?: boolean }
 
 const refresh = () => {
-  void queryClient.invalidateQueries({ queryKey: s3DestinationsQuery.queryKey })
+  void refreshQuery(s3DestinationsQuery)
 }
 
 /** The S3 destinations backup forms offer. Each is a ConfigMap and a Secret of its own
@@ -240,13 +243,7 @@ const writeText = {
 
 function DestinationsPlan({ planned, onClose }: { planned: Planned; onClose: () => void }) {
   const t = useT()
-  const plan = useQuery({
-    queryKey: ["s3-destinations-plan", planned.request],
-    queryFn: async ({ signal }) => await zeabur.planS3Destinations(planned.request, { signal }),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-  })
+  const plan = useQuery(s3DestinationsPlanQuery(planned.request))
   const apply = useMutation({
     mutationFn: async (token: string) => await zeabur.applyS3Destinations({ token }),
     onSuccess: () => {

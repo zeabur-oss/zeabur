@@ -1,0 +1,26 @@
+{
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "(hidden)",
+          "path": "data.password"
+        },
+        {
+          "before": "(hidden)",
+          "path": "data.token"
+        }
+      ],
+      "write": {
+        "body": {
+          "data": {
+            "password": "aHVudGVyMg==",
+            "token": null
+          }
+        },
+        "type": "mergePatch"
+      }
+    }
+  ],
+  "warnings": []
+}

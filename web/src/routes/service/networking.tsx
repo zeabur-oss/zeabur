@@ -744,7 +744,7 @@ function privateAsk(
     changes: [
       {
         op: "create",
-        object: privateService(service, selector, port) as unknown as Record<string, never>,
+        object: { ...privateService(service, selector, port) },
       },
     ],
     notes: [t("net.privateWillBe", privateAddress(service, port))],

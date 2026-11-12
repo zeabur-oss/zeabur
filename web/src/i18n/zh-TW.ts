@@ -1351,7 +1351,6 @@ export const zhTW: Messages = {
   "object.moreStatus": (fields: string) => `其他欄位：${fields}`,
   "object.statusLabel": (name: string) => `${name} 的狀態`,
   "tab.yaml": "YAML",
-  "yaml.hidden": "機密變數的值已隱藏。",
   "yaml.intro": (name: string) => `這份是目前 ${name} 在叢集裡的設定，改了會照原樣寫入。`,
   "yaml.podReplaced": (owner: string) => `刪除這個副本後，${owner} 會建立新的副本。`,
   "yaml.label": (name: string) => `${name} 的 YAML`,
@@ -1468,7 +1467,6 @@ export const zhTW: Messages = {
   "warn.httpOnlyElsewhere": (host: string, route: string) =>
     `${host} 只有 HTTP：${route} 的憑證不是 cert-manager 簽發的，請到產生憑證的地方加入 ${host}`,
   "warn.nodeCapacityUnknown": "無法讀取節點：建置上限沒有和最大的節點比對",
-  "warn.secretValuesUnknown": (name: string) => `無法讀取 ${name} 的值：差異只列出鍵名`,
   "warn.configNotRolledBack": (workload: string) =>
     `${workload} 讀取設定檔或機密變數：回滾不會改動這些內容`,
   "warn.storageClassUnknown": (claim: string) =>
@@ -1719,7 +1717,8 @@ export const zhTW: Messages = {
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
   "title.removeDomain": (host: string) => `移除 ${host}`,
   "yaml.edit": "編輯",
-  "yaml.editSecret": "保留 (hidden) 的值不會改變。",
+  "yaml.editSecret":
+    "data 底下的值都用 base64 編碼，不接受 stringData。想直接輸入文字，請從服務的變數編輯這個機密變數。",
   "yaml.notEditable": "這類物件由 Kubernetes 自行管理，要修改請編輯擁有它的物件。",
   "title.editYaml": (name: string) => `編輯 ${name}`,
   "title.delete": (kind: string, name: string) => `刪除 ${kind} ${name}`,
@@ -1856,7 +1855,10 @@ export const zhTW: Messages = {
     `服務的註解也指定了 ${names}，不論這裡是否開啟，這些項目變更時服務都會重新啟動。`,
   "reload.unknown": "以你的權限，Zeabur 看不到這個叢集有沒有執行 Reloader。",
   "reload.running": "這個叢集有執行 Reloader。",
-  "data.reveal": "顯示值",
+  "data.show": (key) => `顯示 ${key} 的值`,
+  "data.hide": (key) => `隱藏 ${key} 的值`,
+  "data.bytes": (n) => `${n} 位元組`,
+  "data.download": (key) => `下載 ${key}`,
   "data.binary": "二進位",
   "data.noChanges": "沒有變更。",
   "net.addDomain": "新增網域",

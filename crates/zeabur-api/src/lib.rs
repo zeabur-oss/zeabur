@@ -146,6 +146,7 @@ pub mod services;
 pub mod settings;
 pub mod timeline;
 pub mod tools;
+pub mod used;
 pub mod views;
 
 use std::sync::Arc;
@@ -420,9 +421,12 @@ pub struct Options {
     /// What a template uses when idle.
     pub template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
     /// Which addresses registries, buckets and GitHub may be reached at.
-    pub reach: images::https::Reach,
+    pub reach: zeabur_http::Reach,
     /// Zeabur's own service account in the terminal namespace (see [`tools`]).
     pub terminals: Option<Arc<dyn zeabur_kube::Cluster>>,
+    /// Receives each feature a successful write used, for the experience program; `None` when
+    /// the program is off, so nothing is classified.
+    pub used: Option<used::Used>,
 }
 
 impl Default for Options {
@@ -437,8 +441,9 @@ impl Default for Options {
             zeabur_proxy: None,
             images: None,
             template_idle: zeabur_catalog::template_idle,
-            reach: images::https::Reach::Any,
+            reach: zeabur_http::Reach::Any,
             terminals: None,
+            used: None,
         }
     }
 }
@@ -470,14 +475,15 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         template_idle,
         reach,
         terminals,
+        used,
     } = options;
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
-    let tls = images::https::tls(settings.trusted_ca.as_deref());
+    let tls = zeabur_http::tls(settings.trusted_ca.as_deref());
     let images = images.unwrap_or_else(|| Arc::new(images::Inspector::connected(reach, &tls)));
     let github = tls
         .as_ref()
         .ok()
-        .map(|tls| images::https::Https::new(reach, tls));
+        .map(|tls| zeabur_http::Https::new(reach, tls));
     let state = AppState {
         access,
         catalogue,
@@ -496,6 +502,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         github,
         releases: Arc::new(cluster::update::Releases::default()),
         terminals,
+        used,
     };
     routes()
         .method_not_allowed_fallback(handlers::method_not_allowed)

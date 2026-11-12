@@ -378,7 +378,7 @@ export function imageObjects(form: ImageService, domains: DomainSettings): Manif
 export const createImageService = (form: ImageService, domains: DomainSettings): Change[] =>
   imageObjects(form, domains).map((object): Change => ({
     op: "create",
-    object: object as Record<string, never>,
+    object: { ...object },
   }))
 
 /** What a person may create, by kind, as the creatable list hints; absent kinds are unknown. */

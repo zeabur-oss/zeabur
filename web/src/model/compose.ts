@@ -277,7 +277,7 @@ export function composeChanges(
     changes.push(
       ...imageObjects(form, context.domains).map((object): Change => ({
         op: "create",
-        object: object as Record<string, never>,
+        object: { ...object },
       })),
     )
   }

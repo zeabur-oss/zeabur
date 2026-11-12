@@ -27,14 +27,12 @@ mod files;
 
 pub use files::{MemoryFiles, MemoryNode};
 
-use crate::objects::{
-    AccessRule, AccessRules, ResourceRef, ServedResource, hide_metadata, hide_secret_values,
-};
+use crate::objects::{AccessRule, AccessRules, ResourceRef, ServedResource, hide_metadata};
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
     ExecSession, ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects,
-    ObjectTarget, Preconditions, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteBody,
-    WriteRequest, Written,
+    ObjectTarget, Preconditions, RawList, SecretSummary, ServicePort, TerminalSize, Unreadable,
+    WriteBody, WriteRequest, Written,
 };
 
 /// What the in-memory cluster holds.
@@ -74,6 +72,8 @@ pub struct State {
     pub hanging: BTreeSet<String>,
     /// Namespaces whose objects are refused with `403 Forbidden`.
     pub forbidden_namespaces: BTreeSet<String>,
+    /// How many single objects were read by name.
+    pub object_reads: usize,
     /// How many times a Secret's values were read.
     pub secret_reads: usize,
     /// Nodes.
@@ -1048,13 +1048,10 @@ impl Cluster for MemoryCluster {
             if hangs {
                 std::future::pending::<()>().await;
             }
-            let mut items = self
+            let items = self
                 .readable(resource, namespace)?
                 .objects_of(resource, namespace)?;
-            for object in &mut items {
-                hide_secret_values(resource, object);
-            }
-            Ok(Some(items))
+            Ok(Some(RawList::of(resource, &items)?.objects()?))
         })
     }
 
@@ -1125,14 +1122,14 @@ impl Cluster for MemoryCluster {
         })
     }
 
-    fn list_kind<'a>(
+    fn list_raw<'a>(
         &'a self,
         resource: &'a ResourceRef,
         namespace: Option<&'a str>,
-    ) -> Answer<'a, Vec<DynamicObject>> {
+    ) -> Answer<'a, RawList> {
         Box::pin(async move {
             let state = self.readable(resource, namespace)?;
-            let mut items = match (resource.group.as_str(), resource.resource.as_str()) {
+            let items = match (resource.group.as_str(), resource.resource.as_str()) {
                 ("apps", "replicasets") => in_namespace(&state.replica_sets, namespace)?,
                 ("apps", "controllerrevisions") => {
                     in_namespace(&state.controller_revisions, namespace)?
@@ -1145,10 +1142,7 @@ impl Cluster for MemoryCluster {
                 _ => state.objects_of(resource, namespace)?,
             };
             drop(state);
-            for object in &mut items {
-                hide_secret_values(resource, object);
-            }
-            Ok(items)
+            RawList::of(resource, &items)
         })
     }
 
@@ -1161,8 +1155,9 @@ impl Cluster for MemoryCluster {
     ) -> Answer<'a, Vec<ObjectMeta>> {
         Box::pin(async move {
             Ok(self
-                .list_kind(resource, namespace)
+                .list_raw(resource, namespace)
                 .await?
+                .objects()?
                 .into_iter()
                 .filter(|o| {
                     o.metadata
@@ -1194,6 +1189,7 @@ impl Cluster for MemoryCluster {
                     .kind_of(&resource.api_version(), &resource.resource);
             }
             let resource = &resource;
+            self.lock()?.object_reads += 1;
             let Some(items) = self.list_objects(resource, namespace).await? else {
                 return Ok(None);
             };
@@ -1223,8 +1219,9 @@ impl Cluster for MemoryCluster {
     ///   a `uid` when it is new), and the next `generation` when its `spec` changed
     ///   [k8s-generation], and the write is recorded in [`State::writes`].
     ///
-    /// A Secret's values are held apart ([`State::secret_values`]), so a patch of a Secret has
-    /// its `test` operations on `metadata` checked and is otherwise only recorded.
+    /// A Secret's values are held apart ([`State::secret_values`]), so a JSON Patch of a Secret
+    /// has its `test` operations on `metadata` checked and is otherwise only recorded, as is a
+    /// merge patch of one.
     ///
     /// [k8s-validation]: https://kubernetes.io/docs/reference/using-api/api-concepts/#field-validation
     /// [k8s-generation]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
@@ -1279,11 +1276,25 @@ impl Cluster for MemoryCluster {
                         "the server could not find the requested resource",
                     ));
                 }
-                (WriteBody::JsonPatch(_) | WriteBody::EphemeralContainers(_), None) => {
+                (
+                    WriteBody::JsonPatch(_)
+                    | WriteBody::MergePatch(_)
+                    | WriteBody::EphemeralContainers(_),
+                    None,
+                ) => {
                     return Err(not_found(&format!("{} \"{}\"", target.plural, target.name)));
                 }
                 (WriteBody::JsonPatch(operations), Some(current)) => {
                     patched(target, current, operations)?
+                }
+                // The values are not here to change.
+                (WriteBody::MergePatch(_), Some(current)) if target.kind == "Secret" => {
+                    current.clone()
+                }
+                (WriteBody::MergePatch(body), Some(current)) => {
+                    let mut object = current.clone();
+                    merge(&mut object, body);
+                    object
                 }
                 (WriteBody::EphemeralContainers(operations), Some(current)) => {
                     with_ephemeral_containers(current, operations)?
@@ -1557,6 +1568,28 @@ fn patched(
         *generation = Value::from(value.saturating_add(1));
     }
     Ok(object)
+}
+
+/// `patch` merged into `target` as RFC 7386 says: an object merges field by field, `null`
+/// removes a field, anything else replaces it.
+fn merge(target: &mut Value, patch: &Value) {
+    let Some(fields) = patch.as_object() else {
+        *target = patch.clone();
+        return;
+    };
+    if !target.is_object() {
+        *target = Value::Object(serde_json::Map::new());
+    }
+    let Some(object) = target.as_object_mut() else {
+        return;
+    };
+    for (name, value) in fields {
+        if value.is_null() {
+            object.remove(name);
+        } else {
+            merge(object.entry(name.clone()).or_insert(Value::Null), value);
+        }
+    }
 }
 
 /// `current` with the ephemeral containers the JSON Patch `operations` make, as the

@@ -1,7 +1,6 @@
 ---
 title: 設定 DNS 紀錄
 description: 用一筆萬用字元紀錄讓所有產生網址連到叢集，並在 Cloudflare、Route 53 或註冊商的 DNS 新增紀錄。
-source: "320eed08f87d"
 ---
 
 應用程式網域是產生網址共用的網域，只要替這個網域設定一次萬用字元紀錄，之後每個新服務的網址都會解析到叢集。例如應用程式網域是 `apps.example.com`，就新增一筆 `*.apps.example.com` 的 A 紀錄，指向伺服器的 IPv4 位址。伺服器有 IPv6 位址時，再加一筆 AAAA 紀錄。之後 `web-shop.apps.example.com` 這類新網址不用再新增紀錄。

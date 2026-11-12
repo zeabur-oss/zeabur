@@ -558,13 +558,12 @@ test("Objects reads every served kind when it opens", async ({ page }) => {
   await expect(list.getByRole("button", { name: /^editor-config/ })).toBeVisible()
 })
 
-test("YAML never shows a Secret's values", async ({ page }) => {
+test("a Secret's YAML has its values in base64; a workload's YAML has none", async ({ page }) => {
   await page.goto(`${project}/objects?object=core/v1/secrets/${secret}`)
   await page.getByRole("button", { name: "YAML", exact: true }).click()
   const yaml = page.getByRole("figure", { name: `YAML of ${secret}` })
   await expect(yaml).toContainText("kind: Secret")
-  await expect(yaml).toContainText("greeting")
-  await expect(yaml).not.toContainText(secretValue)
+  await expect(yaml).toContainText(`greeting: ${btoa(secretValue)}`)
 
   await page.goto(`${project}/services/Deployment/${healthy}?tab=settings&mode=yaml`)
   const workload = page.getByRole("figure", { name: `YAML of ${healthy}` })
@@ -699,6 +698,24 @@ test("leaving with unsaved variables asks first", async ({ page }) => {
   await expect(ask).toBeVisible()
   await ask.getByRole("button", { name: "Stay" }).click()
   await expect(panel.getByRole("textbox", { name: "Value of NOTE" })).toHaveValue("unsaved")
+})
+
+test("a Secret's key editor hides each value until its eye is pressed", async ({ page }) => {
+  await page.goto(`${project}/services/Deployment/${healthy}?tab=variables`)
+  const panel = page.getByRole("tabpanel", { name: "Variables" })
+  await panel.getByRole("button", { name: `greeting in secret ${secret}` }).click()
+  const sheet = page.getByRole("dialog").filter({ hasText: secret })
+  const value = sheet.getByRole("textbox", { name: "greeting", exact: true })
+  await expect(value).toHaveValue("")
+  await expect(sheet).not.toContainText(secretValue)
+  await sheet.getByRole("button", { name: "Show the value of greeting" }).click()
+  await expect(value).toHaveValue(secretValue)
+  await sheet.getByRole("button", { name: "Hide the value of greeting" }).click()
+  await expect(value).toHaveValue("")
+  await value.fill("x")
+  await value.fill("")
+  await expect(sheet.getByText("No changes.")).toBeVisible()
+  await page.keyboard.press("Escape")
 })
 
 test("a ConfigMap value is edited where it lives, its key highlighted", async ({ page }) => {
@@ -932,11 +949,15 @@ test("a component is installed from the server, not from the panel", async ({ pa
   await expect(sheet.getByRole("button", { name: /install/i })).toHaveCount(0)
 })
 
+// `<namespace>/<name>` of a Deployment whose container has no shell.
 const noShell = env("ZEABUR_E2E_NO_SHELL")
 
 test("a service without a shell opens a debug terminal through a plan", async ({ page }) => {
   test.skip(!noShell, "ZEABUR_E2E_NO_SHELL is not set")
-  await page.goto(`${project}/services/Deployment/${noShell}?tab=logs`)
+  const [noShellNamespace, noShellName] = noShell.split("/")
+  await page.goto(
+    `/projects/${encodeURIComponent(noShellNamespace)}/services/Deployment/${noShellName}?tab=logs`,
+  )
   await page
     .getByRole("tabpanel", { name: "Logs" })
     .getByRole("button", { name: "Terminal", exact: true })

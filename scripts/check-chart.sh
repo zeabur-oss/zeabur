@@ -122,8 +122,10 @@ for values in "$chart"/ci/*-values.yaml; do
     /api/healthz,/api/healthz
   # The secrets reach the process as files, never as environment values.
   expect "$name" "$out" "[$container | .env[] | select(.valueFrom.secretKeyRef)] | length" 0
-  # Every variable the chart sets is one Zeabur reads (crates/zeabur/src/config.rs).
+  # Every variable the chart sets is one Zeabur reads (crates/zeabur/src/config.rs), except the
+  # proxy variables, which crates/zeabur-http reads (Proxies::from_env).
   for env in $(query "$out" "$container | .env[].name"); do
+    case "$env" in HTTP_PROXY | HTTPS_PROXY | NO_PROXY) continue ;; esac
     grep -q "env = \"$env\"" "$root/crates/zeabur/src/config.rs" ||
       fail "$name: Zeabur does not read $env"
   done
@@ -194,6 +196,16 @@ expect full "$(render -f "$chart/ci/full-values.yaml")" "$extra_ca" "/etc/zeabur
 expect configMap "$(render -f "$chart/ci/minimal-values.yaml" --set extraTrustedCA.configMap=corp-ca)" \
   "$extra_ca" "/etc/zeabur/extra-ca/ca.crt,corp-ca"
 
+# The outbound proxy reaches Zeabur only when enabled, with the cluster's own names and ranges
+# bypassed, and leaves Zeabur Proxy alone.
+outbound_env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env | map(select(.name == "HTTP_PROXY" or .name == "HTTPS_PROXY" or .name == "NO_PROXY") | .name + "=" + .value) | join(" ")'
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$outbound_env" ""
+expect "outboundProxy off" "$(render -f "$chart/ci/minimal-values.yaml" --set outboundProxy.httpsProxy=http://p.example.test:3128)" "$outbound_env" ""
+expect full "$(render -f "$chart/ci/full-values.yaml")" "$outbound_env" \
+  "HTTPS_PROXY=http://proxy.example.test:3128 NO_PROXY=localhost,.svc,.cluster.local,10.42.0.0/16,10.43.0.0/16,.corp.example.test"
+expect "outboundProxy leaves proxy.*" "$(render -f "$chart/ci/full-values.yaml" --set proxy.enabled=false)" \
+  '[select(.metadata.name | test("proxy"))] | map(.kind) | join(",")' ClusterRole,ClusterRole
+
 # Zeabur Proxy: off unless asked for; on, a locked-down pod with no token that only Zeabur reaches,
 # over TLS whose CA (and only the CA) Zeabur trusts.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
@@ -255,6 +267,8 @@ refuse "no client secret" --set issuer.clientSecret.existingSecret=
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm
 refuse "an unknown value" --set replicas=2
+refuse "an outbound proxy with no address" --set outboundProxy.enabled=true
+refuse "an outbound proxy over https" --set outboundProxy.enabled=true --set outboundProxy.httpsProxy=https://p.example.test
 refuse "an extra CA from both a ConfigMap and a Secret" --set extraTrustedCA.configMap=a --set extraTrustedCA.secret=b
 refuse "a cluster name longer than 63 characters" --set clusterName="$(printf 'x%.0s' {1..64})"
 refuse "a cluster name on two lines" --set-json 'clusterName="a\nb"'

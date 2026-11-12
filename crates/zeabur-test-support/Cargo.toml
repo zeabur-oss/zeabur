@@ -19,6 +19,9 @@ sandbox = [
   "dep:tokio",
 ]
 
+# Bytes and calls a piece of code allocates, for the manual cost runs.
+allocations = ["dep:allocation-counter", "dep:tokio"]
+
 # A loopback HTTPS server with certificates made when the tests start.
 tls = [
   "dep:rcgen",
@@ -29,6 +32,7 @@ tls = [
 ]
 
 [dependencies]
+allocation-counter = { workspace = true, optional = true }
 zeabur-core = { workspace = true, optional = true }
 zeabur-kube = { workspace = true, optional = true }
 kube = { workspace = true, optional = true }
@@ -36,6 +40,7 @@ rcgen = { workspace = true, optional = true }
 rustls = { workspace = true, optional = true }
 serde.workspace = true
 serde-saphyr.workspace = true
+serde_ignored.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
 time = { workspace = true, optional = true }

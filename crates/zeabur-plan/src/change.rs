@@ -870,7 +870,7 @@ pub struct DataEdit {
     pub op: String,
     /// The key.
     pub key: String,
-    /// The value, for `set`; for a Secret, the plain value (Zeabur encodes it).
+    /// The value, for `set`; for a Secret, the plain text (Zeabur encodes it).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value: Option<String>,
 }
@@ -1046,6 +1046,14 @@ pub enum Write {
         #[cfg_attr(feature = "openapi", schema(value_type = Vec<Object>))]
         operations: Vec<Value>,
     },
+    /// An RFC 7386 JSON Merge Patch that sets or removes keys of a Secret's `data` without
+    /// reading the Secret: it tests nothing, so the last write to a key wins.
+    #[serde(rename_all = "camelCase")]
+    MergePatch {
+        /// The patch, `{"data": {key: base64 or null}}`.
+        #[cfg_attr(feature = "openapi", schema(value_type = Object))]
+        body: Value,
+    },
     /// A `DELETE` with background propagation, refused (`409`) unless the object still has this
     /// `uid` and `resourceVersion`.
     #[serde(rename_all = "camelCase")]
@@ -1192,12 +1200,6 @@ pub enum Warning {
     },
     /// The nodes could not be read, so a build limit was not checked against the largest node.
     NodeCapacityUnknown,
-    /// The Secret's values could not be read, so its diff shows only which keys change.
-    #[serde(rename_all = "camelCase")]
-    SecretValuesUnknown {
-        /// The Secret.
-        name: String,
-    },
     /// A rollback returns the pod template only; the ConfigMaps and Secrets the workload reads
     /// keep their current contents.
     #[serde(rename_all = "camelCase")]

@@ -4,6 +4,4 @@ result
 result-*
 .DS_Store
 .claude/settings.local.json
-# cargo mutants reports (rotated to mutants.out.old)
-/mutants.out*
 /node_modules

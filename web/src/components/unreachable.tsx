@@ -1,11 +1,12 @@
 // The cluster (or Zeabur) does not answer: one banner on top with the cause, the cluster's name,
 // when it last answered and the next try; the sections under it stay quiet about it.
+// oxlint-disable-next-line no-restricted-imports -- watches the cache, builds no key
 import { useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useRef, useSyncExternalStore } from "react"
 import PlugsIcon from "~icons/ph/plugs"
 
 import { isUnreachable, toProblem } from "@/api/client"
-import { clusterQuery } from "@/api/queries"
+import { clusterQuery, errorOf, isEventOf } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { useI18n, useT } from "@/i18n"
 import { lastKnown, rememberKnown } from "@/lib/last-known"
@@ -31,10 +32,9 @@ const readSettled = () => settled
 function watch(queryClient: QueryClient) {
   if (watched === queryClient) return
   watched = queryClient
-  settled = queryClient.getQueryState(clusterQuery.queryKey)?.error ?? null
+  settled = errorOf(queryClient, clusterQuery)
   queryClient.getQueryCache().subscribe((event) => {
-    if (event.type !== "updated" || event.query.queryHash !== JSON.stringify(clusterQuery.queryKey))
-      return
+    if (event.type !== "updated" || !isEventOf(event, clusterQuery)) return
     if (event.action.type === "error") settled = event.action.error
     else if (event.action.type === "success") settled = null
     else return
@@ -89,7 +89,7 @@ export function UnreachableBanner() {
   const text = problemText(t, locale, problem)
   const cause = text.why ?? problem.detail
   return (
-    <Alert variant="problem">
+    <Alert variant="problem" role="alert">
       <PlugsIcon aria-hidden="true" />
       <AlertTitle>
         {local

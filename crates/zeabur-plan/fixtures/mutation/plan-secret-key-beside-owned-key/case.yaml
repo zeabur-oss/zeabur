@@ -1,0 +1,10 @@
+description: "Setting a Secret key is allowed when Helm owns only another key of the Secret."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: data
+        kind: Secret
+        name: db
+        changes:
+          - {op: set, key: password, value: hunter2}

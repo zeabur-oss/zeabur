@@ -1,4 +1,4 @@
-import { QueryClient, queryOptions } from "@tanstack/react-query"
+import { QueryClient, queryOptions, type DataTag, type QueryKey } from "@tanstack/react-query"
 
 import { ApiError, type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
@@ -30,6 +30,58 @@ export const queryClient = new QueryClient({
     },
   },
 })
+
+/** The query cache's own view of one query, for a banner that outlives a refetch. */
+export const errorOf = (client: QueryClient, query: { queryKey: QueryKey }) =>
+  client.getQueryState(query.queryKey)?.error ?? null
+
+/** Whether a cache event is about this query. */
+export const isEventOf = (event: { query: { queryHash: string } }, query: { queryKey: QueryKey }) =>
+  event.query.queryHash === JSON.stringify(query.queryKey)
+
+/** What every plan query shares: a plan writes nothing, is read once, and is dropped with its dialog. */
+export const reviewOnce = { retry: false, staleTime: Infinity, gcTime: 0 } as const
+
+/** Marks the query as out of date, so a page showing it reads it again. */
+export const refresh = (query: { queryKey: QueryKey }, exact = false) =>
+  queryClient.invalidateQueries({ queryKey: query.queryKey, exact })
+
+/** What a query holds now, without asking the server. */
+export const cached = <T>(query: { queryKey: DataTag<QueryKey, T, Error> }) =>
+  queryClient.getQueryData<T>(query.queryKey)
+
+/** Puts the server's answer to a write in place of what the query holds. */
+export const setQueryData = <T>(query: { queryKey: DataTag<QueryKey, T, Error> }, data: T) =>
+  queryClient.setQueryData(query.queryKey, data)
+
+/** Everything read of a project (its logs excepted when `logs` is false). */
+export const refreshProject = (project: string, { logs = true } = {}) =>
+  queryClient.invalidateQueries({
+    queryKey: ["project", project],
+    predicate: logs ? undefined : (query) => query.queryKey[2] !== "logs",
+  })
+
+/** The project list: how a project is named and described. */
+export const refreshProjects = () => queryClient.invalidateQueries({ queryKey: ["projects"] })
+
+/** The objects lists of a project. */
+export const refreshObjects = (project: string) =>
+  queryClient.invalidateQueries({ queryKey: ["project", project, "objects"] })
+
+/** Every history read from the metrics store. */
+export const refreshHistories = () =>
+  queryClient.invalidateQueries({
+    predicate: (query) => query.queryKey[0] === "project" && query.queryKey[2] === "history",
+  })
+
+/** The plan of a change to a project; writes nothing. */
+export const projectPlanQuery = (project: string, ask: { changes: Schemas.Change[] }) =>
+  queryOptions({
+    queryKey: ["plan", project, ask],
+    queryFn: async ({ signal }) =>
+      await zeabur.planProject(project, { changes: ask.changes }, { signal }),
+    ...reviewOnce,
+  })
 
 const POLL = 5_000
 
@@ -210,6 +262,21 @@ export const zeaburQuery = queryOptions({
   retryOnMount: false,
 })
 
+/** How often a page left open asks whether a newer Zeabur is out. */
+const UPDATE_EVERY = 60 * 60_000
+
+/** Whether a newer Zeabur is out. A page asks the server when it opens, and again every hour
+ * while it stays open. The server asks GitHub at most once an hour. */
+export const updateQuery = (enabled: boolean) =>
+  queryOptions({
+    queryKey: ["cluster", "zeabur", "update"],
+    queryFn: ({ signal }) => zeabur.getZeaburUpdate({ signal }),
+    enabled,
+    staleTime: UPDATE_EVERY,
+    refetchInterval: UPDATE_EVERY,
+    retry: false,
+  })
+
 export const clusterQuery = queryOptions({
   queryKey: ["cluster"],
   queryFn: async ({ signal }) => await zeabur.getCluster({ signal }),
@@ -255,12 +322,12 @@ export const clusterBackupsQuery = queryOptions({
 })
 
 /** What a change to Velero's location or schedule writes, and the token; writes nothing. */
-export async function planClusterBackups(
-  request: Schemas.BackupsPlanRequest,
-  signal?: AbortSignal,
-) {
-  return await zeabur.planClusterBackups(request, { signal })
-}
+export const clusterBackupsPlanQuery = (request: Schemas.BackupsPlanRequest) =>
+  queryOptions({
+    queryKey: ["cluster-backups-plan", request],
+    queryFn: async ({ signal }) => await zeabur.planClusterBackups(request, { signal }),
+    ...reviewOnce,
+  })
 
 /** The projects a backup holds that no longer exist; reading them downloads the backup's lists. */
 export const deletedBackupProjectsQuery = (backup: string) =>
@@ -274,6 +341,21 @@ export const deletedBackupProjectsQuery = (backup: string) =>
 export async function applyClusterBackups(token: string) {
   return await zeabur.applyClusterBackups({ token })
 }
+
+/** The cluster's S3 destinations, without their keys. */
+export const s3DestinationsQuery = queryOptions({
+  queryKey: ["cluster", "s3-destinations"],
+  queryFn: async ({ signal }) => await zeabur.getS3Destinations({ signal }),
+  retryOnMount: false,
+})
+
+/** What a change to the S3 destinations writes; writes nothing. */
+export const s3DestinationsPlanQuery = (request: Schemas.S3DestinationsPlanRequest) =>
+  queryOptions({
+    queryKey: ["s3-destinations-plan", request],
+    queryFn: async ({ signal }) => await zeabur.planS3Destinations(request, { signal }),
+    ...reviewOnce,
+  })
 
 export const clusterIssuersQuery = queryOptions({
   queryKey: ["cluster", "issuers"],
@@ -312,15 +394,18 @@ export const notificationsQuery = (project?: string) =>
   })
 
 /** What adding, changing, testing or removing a channel writes, and the token; writes nothing. */
-export async function planNotifications(
+export const notificationsPlanQuery = (
   project: string | undefined,
   request: Schemas.NotificationsPlanRequest,
-  signal?: AbortSignal,
-) {
-  return project
-    ? await zeabur.planProjectNotifications(project, request, { signal })
-    : await zeabur.planClusterNotifications(request, { signal })
-}
+) =>
+  queryOptions({
+    queryKey: [...notificationsQuery(project).queryKey, "plan", request],
+    queryFn: async ({ signal }) =>
+      project
+        ? await zeabur.planProjectNotifications(project, request, { signal })
+        : await zeabur.planClusterNotifications(request, { signal }),
+    ...reviewOnce,
+  })
 
 export async function applyNotifications(project: string | undefined, token: string) {
   return project
@@ -329,13 +414,12 @@ export async function applyNotifications(project: string | undefined, token: str
 }
 
 /** What stopping or resuming scheduling does to a node; writes nothing. */
-export async function planNodeMaintenance(
-  node: string,
-  action: Schemas.NodeAction,
-  signal?: AbortSignal,
-) {
-  return await zeabur.planNodeMaintenance(node, { action }, { signal })
-}
+export const nodeMaintenancePlanQuery = (node: string, action: Schemas.NodeAction) =>
+  queryOptions({
+    queryKey: ["node-maintenance-plan", node, action],
+    queryFn: async ({ signal }) => await zeabur.planNodeMaintenance(node, { action }, { signal }),
+    ...reviewOnce,
+  })
 
 export async function applyNodeMaintenance(node: string, body: Schemas.MaintenanceApply) {
   return await zeabur.applyNodeMaintenance(node, body)

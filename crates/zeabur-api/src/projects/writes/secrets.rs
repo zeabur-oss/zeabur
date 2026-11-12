@@ -1,13 +1,18 @@
-//! What a plan reads before it changes a Secret: its values, where the person may read them.
+//! What a plan reads before it edits a Secret as YAML: its values, read as the person.
 
 use std::collections::BTreeMap;
 
 use zeabur_kube::Cluster;
-use zeabur_plan::{Change, DataKind, PlanRequest};
+use zeabur_plan::{Change, PlanRequest};
 
-use crate::error::ApiError;
+use crate::error::{ApiError, get_read, read_problem};
 
-/// The values of the Secrets `request` changes, where the person may read them.
+/// The values of the Secrets `request` edits as YAML. A key edit reads none: it is sent as a
+/// merge patch.
+///
+/// # Errors
+///
+/// When the person may not read one: the plan compares a YAML edit with the Secret as read.
 pub(super) async fn secret_values(
     cluster: &dyn Cluster,
     project: &str,
@@ -15,32 +20,21 @@ pub(super) async fn secret_values(
 ) -> Result<BTreeMap<String, BTreeMap<String, Vec<u8>>>, ApiError> {
     let mut secret_values = BTreeMap::new();
     for change in &request.changes {
-        let secret = if let Change::Data {
-            kind: DataKind::Secret,
-            name,
-            ..
-        } = change
-        {
-            Some(name)
-        } else if let Change::Edit { resource, name, .. } = change
+        if let Change::Edit { resource, name, .. } = change
             && resource.group.is_empty()
             && resource.resource == "secrets"
-        {
-            Some(name)
-        } else {
-            None
-        };
-        if let Some(name) = secret
             && !secret_values.contains_key(name)
         {
             match cluster.reveal_secret(project, name).await {
                 Ok(values) => {
                     secret_values.insert(name.clone(), values);
                 }
-                Err(error) if error.is_refused() || error.is_not_found() => {}
+                Err(error) if error.is_not_found() => {}
                 Err(other) => {
-                    return Err(ApiError::from(
-                        other.into_problem(&format!("Secret {name}")),
+                    return Err(read_problem(
+                        other,
+                        &format!("Secret {name}"),
+                        get_read("", "secrets", Some(project), name),
                     ));
                 }
             }

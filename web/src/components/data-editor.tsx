@@ -1,20 +1,22 @@
 import { useForm } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
-import { useState } from "react"
+import { useState, type Ref } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
+import DownloadSimpleIcon from "~icons/ph/download-simple"
 import EyeIcon from "~icons/ph/eye"
+import EyeSlashIcon from "~icons/ph/eye-slash"
 import GitBranchIcon from "~icons/ph/git-branch"
 import PlusIcon from "~icons/ph/plus"
 import TrashIcon from "~icons/ph/trash"
 import XIcon from "~icons/ph/x"
 
 import { ReviewWord } from "@/components/plan/draft"
-import { toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
-import * as zeabur from "@/api/zeabur"
+import type { Schemas } from "@/api/client"
 import { configMapsQuery, objectQuery, projectQuery } from "@/api/queries"
+import { CopyButton } from "@/components/bits"
 import { FormField } from "@/components/form-field"
 import { LoadingRows } from "@/components/page"
-import { GateNote, GateTip, useGates } from "@/components/gate"
+import { GateNote, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
@@ -26,12 +28,12 @@ import {
   DialogTitle,
 } from "@zeabur-oss/design-system/components/dialog"
 import { Input } from "@zeabur-oss/design-system/components/input"
-import { Spinner } from "@zeabur-oss/design-system/components/spinner"
 import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
 import { useScrollOnce } from "@/lib/in-view"
 import { addressOf } from "@/lib/objects"
+import { decodeSecretValue, secretData } from "@/lib/secret-data"
 import { cn } from "@/lib/utils"
 
 type Kind = "ConfigMap" | "Secret"
@@ -44,7 +46,36 @@ interface Draft {
 
 const blank: Draft = { edits: {}, added: [] }
 
-function changesOf({ edits, added }: Draft): Schemas.DataEdit[] {
+/** What typing `value` into a key's input changes; clearing the input of a hidden value is none. */
+export function editAfterTyping(current: string, value: string, hidden: boolean): Edit | undefined {
+  return value === current || (hidden && value === "") ? undefined : { op: "set", value }
+}
+
+/** A Secret's keys from its YAML: text values decoded, the rest as bytes. */
+export function secretKeys(yaml: string): {
+  text: Record<string, string>
+  binary: Record<string, Uint8Array<ArrayBuffer>>
+} {
+  const text: Record<string, string> = Object.create(null)
+  const binary: Record<string, Uint8Array<ArrayBuffer>> = Object.create(null)
+  for (const [key, base64] of Object.entries(secretData(yaml))) {
+    const value = decodeSecretValue(base64)
+    if (value?.text === undefined) binary[key] = value?.bytes ?? new Uint8Array()
+    else text[key] = value.text
+  }
+  return { text, binary }
+}
+
+function download(name: string, bytes: Uint8Array<ArrayBuffer>) {
+  const href = URL.createObjectURL(new Blob([bytes], { type: "application/octet-stream" }))
+  const link = document.createElement("a")
+  link.href = href
+  link.download = name
+  link.click()
+  window.setTimeout(() => URL.revokeObjectURL(href), 1000)
+}
+
+export function dataChangesOf({ edits, added }: Draft): Schemas.DataEdit[] {
   return [
     ...Object.entries(edits).map(([key, edit]): Schemas.DataEdit =>
       edit.op === "set" ? { key, op: "set", value: edit.value } : { key, op: "remove" },
@@ -55,19 +86,164 @@ function changesOf({ edits, added }: Draft): Schemas.DataEdit[] {
   ]
 }
 
-/** From its YAML, whose values the server hides. */
-export function secretKeys(yaml: string): string[] {
-  const keys: string[] = []
-  let inData = false
-  for (const line of yaml.split("\n")) {
-    if (/^(data|stringData):\s*$/.test(line)) inData = true
-    else if (/^\S/.test(line)) inData = false
-    else if (inData) {
-      const match = line.match(/^ {2}("?)([^":]+)\1:/)
-      if (match?.[2]) keys.push(match[2])
-    }
-  }
-  return [...new Set(keys)]
+function ValueActions({
+  name,
+  current,
+  bytes,
+  hidden,
+  secret,
+  onToggle,
+}: {
+  name: string
+  current: string
+  bytes: Uint8Array<ArrayBuffer> | undefined
+  hidden: boolean
+  secret: boolean
+  onToggle: () => void
+}) {
+  const t = useT()
+  if (bytes)
+    return (
+      <>
+        <span className="type-meta text-muted-foreground">{t("data.bytes", bytes.length)}</span>
+        <Button
+          variant="muted"
+          size="icon-xs"
+          aria-label={t("data.download", name)}
+          title={t("data.download", name)}
+          onClick={() => download(name, bytes)}
+        >
+          <DownloadSimpleIcon aria-hidden="true" />
+        </Button>
+      </>
+    )
+  if (!secret) return null
+  const label = hidden ? t("data.show", name) : t("data.hide", name)
+  return (
+    <>
+      <Button variant="muted" size="icon-xs" aria-label={label} title={label} onClick={onToggle}>
+        {hidden ? <EyeIcon aria-hidden="true" /> : <EyeSlashIcon aria-hidden="true" />}
+      </Button>
+      <CopyButton value={current} />
+    </>
+  )
+}
+
+function RemoveButton({
+  name,
+  removed,
+  locked,
+  onClick,
+}: {
+  name: string
+  removed: boolean
+  locked: boolean
+  onClick: () => void
+}) {
+  const t = useT()
+  const label = removed ? t("edit.undo", name) : t("edit.remove", name)
+  return (
+    <Button
+      variant="muted"
+      size="icon-xs"
+      disabled={locked}
+      aria-label={label}
+      title={label}
+      onClick={onClick}
+    >
+      {removed ? (
+        <ArrowCounterClockwiseIcon aria-hidden="true" />
+      ) : (
+        <TrashIcon aria-hidden="true" />
+      )}
+    </Button>
+  )
+}
+
+function ValueInput({
+  name,
+  current,
+  edit,
+  hidden,
+  disabled,
+  onEdit,
+}: {
+  name: string
+  current: string
+  edit: Edit | undefined
+  hidden: boolean
+  disabled: boolean
+  onEdit: (next: Edit | undefined) => void
+}) {
+  const typed = edit?.op === "set" ? edit.value : undefined
+  const shown = typed ?? (hidden ? "" : current)
+  return (
+    <FormField label={name} hideLabel>
+      <Textarea
+        size="sm"
+        mono
+        rows={Math.min(6, Math.max(1, shown.split("\n").length))}
+        value={shown}
+        placeholder={hidden && !edit ? "••••••••" : undefined}
+        disabled={disabled}
+        onChange={(event) => onEdit(editAfterTyping(current, event.target.value, hidden))}
+      />
+    </FormField>
+  )
+}
+
+interface KeyRowProps {
+  name: string
+  current: string
+  bytes: Uint8Array<ArrayBuffer> | undefined
+  hidden: boolean
+  secret: boolean
+  edit: Edit | undefined
+  locked: boolean
+  highlight: boolean
+  rowRef: Ref<HTMLLIElement> | undefined
+  onToggle: () => void
+  onEdit: (next: Edit | undefined) => void
+}
+
+function KeyRow({ name, bytes, edit, locked, highlight, rowRef, onEdit, ...value }: KeyRowProps) {
+  const removed = edit?.op === "remove"
+  return (
+    <li
+      ref={rowRef}
+      data-highlight={highlight ? "" : undefined}
+      className={cn("flex flex-col gap-1.5 px-3 py-2.5", highlight && "bg-brand-soft")}
+    >
+      <span className="flex items-center gap-2">
+        <span
+          className={cn(
+            "min-w-0 flex-1 truncate font-mono text-xs font-medium",
+            removed && "line-through opacity-60",
+          )}
+          translate="no"
+        >
+          {name}
+        </span>
+        <ValueActions name={name} bytes={bytes} {...value} />
+        <RemoveButton
+          name={name}
+          removed={removed}
+          locked={locked}
+          onClick={() => onEdit(removed ? undefined : { op: "remove" })}
+        />
+      </span>
+      {bytes ? null : (
+        <ValueInput
+          name={name}
+          current={value.current}
+          edit={edit}
+          hidden={value.hidden}
+          disabled={locked || removed}
+          onEdit={onEdit}
+        />
+      )}
+    </li>
+  )
 }
 
 export function DataEditor({
@@ -96,15 +272,14 @@ export function DataEditor({
     ),
     enabled: kind === "Secret",
   })
-  const [revealed, setRevealed] = useState<Record<string, string>>()
-  const [revealing, setRevealing] = useState<{ pending?: boolean; problem?: ProblemBody }>({})
+  const [visible, setVisible] = useState<ReadonlySet<string>>(new Set())
   const planner = usePlanner(project, onClose)
   const form = useForm({
     defaultValues: blank,
     onSubmit: ({ value }) => {
       const staged = planner.plan({
         title: t("title.data", kindName(t, kind), name),
-        changes: [{ op: "data", kind, name, changes: changesOf(value) }],
+        changes: [{ op: "data", kind, name, changes: dataChangesOf(value) }],
         service,
       })
       if (staged) onClose()
@@ -113,14 +288,11 @@ export function DataEditor({
   const scrollTo = useScrollOnce<HTMLLIElement>()
 
   const configMap = configMaps.data?.items.find((c) => c.origin.name === name)
-  const values: Record<string, string | undefined> =
-    kind === "ConfigMap"
-      ? (configMap?.data ?? {})
-      : Object.fromEntries(
-          secretKeys(secretYaml.data?.yaml ?? "").map((key) => [key, revealed?.[key]]),
-        )
+  const secret = secretKeys(kind === "Secret" ? (secretYaml.data?.yaml ?? "") : "")
+  const values: Record<string, string> =
+    kind === "ConfigMap" ? (configMap?.data ?? {}) : secret.text
   const binary = kind === "ConfigMap" ? (configMap?.binaryKeys ?? []) : []
-  const keys = Object.keys(values).toSorted()
+  const keys = [...Object.keys(values), ...Object.keys(secret.binary)].toSorted()
   const pending = kind === "ConfigMap" ? configMaps.isPending : secretYaml.isPending
   const error = kind === "ConfigMap" ? configMaps.error : secretYaml.error
   const managed = resource?.provenance.tool ?? undefined
@@ -129,16 +301,12 @@ export function DataEditor({
   const locked = Boolean(managed) || !gate.open
   const readers = resource?.attribution.owners ?? []
 
-  const reveal = async () => {
-    setRevealing({ pending: true })
-    try {
-      const answer = await zeabur.revealSecret(project, name, { cache: "no-store" })
-      setRevealed(Object.fromEntries(Object.entries(answer.values).map(([k, v]) => [k, v.value])))
-      setRevealing({})
-    } catch (failure) {
-      setRevealing({ problem: toProblem(failure) })
-    }
-  }
+  const toggle = (key: string) =>
+    setVisible((shown) => {
+      const next = new Set(shown)
+      if (!next.delete(key)) next.add(key)
+      return next
+    })
 
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
@@ -189,27 +357,6 @@ export function DataEditor({
           ) : (
             <GateNote gate={gate} />
           )}
-          {kind === "Secret" && !revealed ? (
-            <div className="flex items-center gap-2">
-              <GateTip gate={gates("readSecrets")}>
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => void reveal()}
-                  disabled={revealing.pending}
-                >
-                  {revealing.pending ? (
-                    <Spinner data-icon="inline-start" />
-                  ) : (
-                    <EyeIcon aria-hidden="true" data-icon="inline-start" />
-                  )}
-                  {t("data.reveal")}
-                </Button>
-              </GateTip>
-              <span className="type-meta text-muted-foreground">{t("yaml.hidden")}</span>
-            </div>
-          ) : null}
-          {revealing.problem ? <Problem problem={revealing.problem} /> : null}
           {pending ? (
             <LoadingRows label={t("common.loading")} rows={4} />
           ) : error ? (
@@ -220,70 +367,25 @@ export function DataEditor({
                 {(f) =>
                   keys.map((key) => {
                     const edits = f.state.value
-                    const edit = edits[key]
-                    const removed = edit?.op === "remove"
-                    const current = values[key]
-                    const shown = edit?.op === "set" ? edit.value : (current ?? "")
                     const hit = key === highlight
-                    const withEdit = (next: Edit | undefined) => {
-                      const { [key]: _dropped, ...rest } = edits
-                      return next ? { ...rest, [key]: next } : rest
-                    }
                     return (
-                      <li
+                      <KeyRow
                         key={key}
-                        ref={hit ? scrollTo : undefined}
-                        data-highlight={hit ? "" : undefined}
-                        className={cn("flex flex-col gap-1.5 px-3 py-2.5", hit && "bg-brand-soft")}
-                      >
-                        <span className="flex items-center gap-2">
-                          <span
-                            className={cn(
-                              "min-w-0 flex-1 truncate font-mono text-xs font-medium",
-                              removed && "line-through opacity-60",
-                            )}
-                            translate="no"
-                          >
-                            {key}
-                          </span>
-                          <Button
-                            variant="muted"
-                            size="icon-xs"
-                            disabled={locked}
-                            aria-label={removed ? t("edit.undo", key) : t("edit.remove", key)}
-                            title={removed ? t("edit.undo", key) : t("edit.remove", key)}
-                            onClick={() =>
-                              f.handleChange(withEdit(removed ? undefined : { op: "remove" }))
-                            }
-                          >
-                            {removed ? (
-                              <ArrowCounterClockwiseIcon aria-hidden="true" />
-                            ) : (
-                              <TrashIcon aria-hidden="true" />
-                            )}
-                          </Button>
-                        </span>
-                        <FormField label={key} hideLabel>
-                          <Textarea
-                            size="sm"
-                            mono
-                            rows={Math.min(6, Math.max(1, shown.split("\n").length))}
-                            value={shown}
-                            placeholder={
-                              kind === "Secret" && current === undefined && !edit
-                                ? "••••••••"
-                                : undefined
-                            }
-                            disabled={locked || removed}
-                            onChange={(event) => {
-                              const value = event.target.value
-                              f.handleChange(
-                                withEdit(value === current ? undefined : { op: "set", value }),
-                              )
-                            }}
-                          />
-                        </FormField>
-                      </li>
+                        name={key}
+                        current={values[key] ?? ""}
+                        bytes={secret.binary[key]}
+                        hidden={kind === "Secret" && !visible.has(key)}
+                        secret={kind === "Secret"}
+                        edit={Object.hasOwn(edits, key) ? edits[key] : undefined}
+                        locked={locked}
+                        highlight={hit}
+                        rowRef={hit ? scrollTo : undefined}
+                        onToggle={() => toggle(key)}
+                        onEdit={(next) => {
+                          const { [key]: _dropped, ...rest } = edits
+                          f.handleChange(next ? { ...rest, [key]: next } : rest)
+                        }}
+                      />
                     )
                   })
                 }
@@ -357,7 +459,7 @@ export function DataEditor({
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-3 border-t px-6 py-3">
-          <form.Subscribe selector={(s) => changesOf(s.values).length}>
+          <form.Subscribe selector={(s) => dataChangesOf(s.values).length}>
             {(count) => (
               <span className="ml-auto flex items-center gap-2">
                 {count === 0 ? (

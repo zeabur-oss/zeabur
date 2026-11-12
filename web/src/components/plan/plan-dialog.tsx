@@ -9,8 +9,7 @@ import WarningFillIcon from "~icons/ph/warning-fill"
 import XIcon from "~icons/ph/x"
 
 import { toProblem, type Problem as ProblemBody, type Schemas } from "@/api/client"
-import * as zeabur from "@/api/zeabur"
-import { projectQuery } from "@/api/queries"
+import { projectPlanQuery, projectQuery } from "@/api/queries"
 import { LoadingRows } from "@/components/page"
 import {
   actionOf,
@@ -97,14 +96,7 @@ function usePlan(
   const { locale } = useI18n()
   const navigate = useNavigate()
   // Planning writes nothing, so it is a query.
-  const plan = useQuery({
-    queryKey: ["plan", project, ask],
-    queryFn: async ({ signal }) =>
-      await zeabur.planProject(project, { changes: ask.changes }, { signal }),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-  })
+  const plan = useQuery(projectPlanQuery(project, ask))
   const document = useQuery({ ...projectQuery(project, { poll: false }), enabled: false })
   const serviceOf = (workload: Schemas.WorkloadRef) =>
     document.data?.services.find((s) => s.kind === workload.kind && s.name === workload.name)
@@ -793,8 +785,6 @@ function warningSentence(
       return t("warn.httpsCertificate", warning.hostname, warning.issuer)
     case "httpOnly":
       return httpOnlySentence(t, warning)
-    case "secretValuesUnknown":
-      return t("warn.secretValuesUnknown", warning.name)
     case "configNotRolledBack":
       return t("warn.configNotRolledBack", warning.workload.name)
     case "storageClassUnknown":
