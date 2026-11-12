@@ -12,7 +12,7 @@ workspace = true
 
 [features]
 default = ["ui"]
-ui = ["dep:zeabur-ui", "zeabur-ui/interface"]
+ui = ["zeabur-local/ui"]
 
 [dependencies]
 zeabur-api.workspace = true
@@ -20,8 +20,8 @@ zeabur-catalog.workspace = true
 zeabur-core.workspace = true
 zeabur-http.workspace = true
 zeabur-kube.workspace = true
+zeabur-local.workspace = true
 zeabur-telemetry.workspace = true
-zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
 bytes.workspace = true
 clap.workspace = true

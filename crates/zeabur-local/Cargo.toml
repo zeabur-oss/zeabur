@@ -1,0 +1,27 @@
+[package]
+name = "zeabur-local"
+description = "zeabur: the local service, the API with a person's kubeconfig and the web interface on a loopback port"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Serve Zeabur's web interface next to the API (`zeabur-ui` with its `interface` feature).
+ui = ["dep:zeabur-ui", "zeabur-ui/interface"]
+
+[dependencies]
+zeabur-api.workspace = true
+zeabur-core.workspace = true
+zeabur-kube.workspace = true
+zeabur-ui = { workspace = true, optional = true }
+axum.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+
+[dev-dependencies]
+zeabur-kube = { workspace = true, features = ["memory"] }
