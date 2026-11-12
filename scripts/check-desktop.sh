@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Fails if desktop/, a Cargo workspace of its own, drifts from the main workspace's rules: the
 # fields of [workspace.package], the lints of [workspace.lints] (desktop/ denies unsafe_code where
-# the main workspace forbids it), the modules that may use unsafe, and the workspace crates it
-# depends on. See docs/internal/crates.md, "Apps outside the workspace".
+# the main workspace forbids it), [profile.release], the modules that may use unsafe, and the
+# workspace crates it depends on. See docs/internal/crates.md, "Apps outside the workspace".
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
@@ -23,6 +23,10 @@ if ! diff -u <(toml ".workspace.package | $fields" Cargo.toml) <(toml ".package 
 fi
 if ! diff -u <(toml '.workspace.lints | .rust.unsafe_code = "deny"' Cargo.toml) <(toml '.lints' desktop/Cargo.toml) >&2; then
   echo "error: desktop/Cargo.toml [lints] differs from [workspace.lints] in Cargo.toml" >&2
+  failed=1
+fi
+if ! diff -u <(toml ".profile.release" Cargo.toml) <(toml ".profile.release" desktop/Cargo.toml) >&2; then
+  echo "error: desktop/Cargo.toml [profile.release] differs from Cargo.toml" >&2
   failed=1
 fi
 
@@ -46,4 +50,4 @@ done
 if [[ $failed -ne 0 ]]; then
   exit 1
 fi
-echo "desktop package fields, lints, unsafe modules and workspace crates: ok"
+echo "desktop package fields, lints, release profile, unsafe modules and workspace crates: ok"

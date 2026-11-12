@@ -79,8 +79,8 @@ main workspace's rules:
   rustflags, the publish age), `clippy.toml` and `rustfmt.toml` from the parent folders, and
   `cargo deny --config deny.toml` checks it with the same policy for the desktop platforms. The
   toolchain is the dev shell's (`nix develop .#desktop`, which adds GTK and WebKitGTK on Linux).
-- **Copied tables.** Cargo reads `[workspace.lints]` and `[workspace.package]` only inside one
-  workspace, so `desktop/Cargo.toml` has a copy. `scripts/check-desktop.sh` fails CI when the copy
+- **Copied tables.** Cargo reads `[workspace.lints]`, `[workspace.package]` and
+  `[profile.release]` only from the root of a workspace, so `desktop/Cargo.toml` has a copy. `scripts/check-desktop.sh` fails CI when the copy
   differs. The one difference is `unsafe_code`: `deny`, not `forbid`, so that the two modules the
   script lists (`webkit.rs`, `win32.rs`) can wrap the system calls that have no safe binding,
   each with `#![expect(unsafe_code, reason = "…")]`. A new module that names `unsafe_code` fails

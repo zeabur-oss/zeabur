@@ -9,8 +9,8 @@ repository = "https://github.com/zeabur-oss/zeabur"
 publish = false
 
 # Its own workspace and lock file, with the main workspace's rules (docs/internal/crates.md, "Apps
-# outside the workspace"). scripts/check-desktop.sh fails when the package fields or the lints
-# below differ from the root Cargo.toml.
+# outside the workspace"). scripts/check-desktop.sh fails when the package fields, the lints or
+# the release profile below differ from the root Cargo.toml.
 [workspace]
 
 [dependencies]
@@ -19,6 +19,8 @@ kube = { version = "4.2", default-features = false, features = ["config"] }
 k8s-openapi = { version = "0.28", default-features = false, features = ["v1_34"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+# All default features are in use: dynamic-acl for add_capability, x11 and dbus (the dark theme) on
+# Linux, common-controls-v6 for the Windows dialogs, compression for the embedded web interface.
 tauri = "2"
 tauri-plugin-dialog = "2"
 tauri-plugin-window-state = "2"
@@ -134,3 +136,9 @@ unneeded_field_pattern = "warn"
 unseparated_literal_suffix = "warn"
 verbose_file_reads = "warn"
 
+
+# A copy of the root [profile.release] (scripts/check-desktop.sh).
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = true
