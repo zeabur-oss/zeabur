@@ -32,6 +32,8 @@
 use std::collections::BTreeMap;
 
 use axum::extract::State;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -503,7 +505,8 @@ pub(crate) fn set(object: &mut Value, path: &[&str], value: String) {
 }
 
 /// The `create` of the Secret, or, when it exists, an `edit` that sets the copied keys and the
-/// marks and keeps its other keys: their values go as the mask an edit keeps.
+/// marks and keeps its other keys as read. The edit compares the Secret as read, values included,
+/// so only the copied keys and the marks are written.
 async fn copy_into(
     cluster: &dyn Cluster,
     namespace: &str,
@@ -536,10 +539,19 @@ async fn copy_into(
             format!("Zeabur could not read Secret {name}: {e}"),
         ))
     })?;
-    if let Some(data) = edited.get_mut("data").and_then(Value::as_object_mut) {
-        for value in data.values_mut() {
-            *value = Value::String(HIDDEN.to_owned());
-        }
+    let values = cluster.reveal_secret(namespace, &name).await.map_err(|e| {
+        read_problem(
+            e,
+            &format!("Secret {name} in {namespace}"),
+            get_read("", "secrets", Some(namespace), &name),
+        )
+    })?;
+    let mut data = serde_json::Map::new();
+    for (key, bytes) in values {
+        data.insert(key, Value::String(BASE64.encode(bytes)));
+    }
+    if let Some(map) = edited.as_object_mut() {
+        map.insert("data".to_owned(), Value::Object(data));
     }
     for field in ["labels", "annotations"] {
         let marks = object
@@ -553,8 +565,12 @@ async fn copy_into(
             }
         }
     }
-    if let (Some(map), Some(keys)) = (edited.as_object_mut(), object.get("stringData")) {
-        map.insert("stringData".to_owned(), keys.clone());
+    if let Some(keys) = object.get("stringData").and_then(Value::as_object) {
+        for (key, value) in keys {
+            if let Some(value) = value.as_str() {
+                set(&mut edited, &["data", key], BASE64.encode(value));
+            }
+        }
     }
     Ok(Change::Edit {
         resource: zeabur_plan::ResourceRef {
