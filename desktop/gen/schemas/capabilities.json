@@ -1,0 +1,1 @@
+{"default":{"identifier":"default","description":"The cluster picker window. Cluster windows load Zeabur's own web interface and get no IPC.","local":true,"windows":["main"],"permissions":["core:default","dialog:allow-open"]}}

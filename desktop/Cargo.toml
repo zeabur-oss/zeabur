@@ -1,0 +1,34 @@
+[package]
+name = "zeabur-desktop"
+description = "Proof of concept: the Zeabur desktop app (Tauri 2) that lists kubeconfig contexts and opens Zeabur"
+version = "0.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Kept out of the main workspace while it is a proof of concept: its own lock file and lints.
+[workspace]
+
+[dependencies]
+kube = { version = "4.2", default-features = false, features = ["config"] }
+# kube needs a Kubernetes version chosen; the same one as the workspace.
+k8s-openapi = { version = "0.28", default-features = false, features = ["v1_34"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+tauri = "2"
+tauri-plugin-dialog = "2"
+
+# Set for a build that embeds web/dist instead of loading the dev server (`--features custom-protocol`).
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = "2"
+
+# The README screenshots: a snapshot of the WKWebView itself (no screen recording permission needed).
+[target.'cfg(target_os = "macos")'.dependencies]
+objc2 = "0.6"
+block2 = "0.6"
+objc2-foundation = { version = "0.3", features = ["NSData", "NSDictionary", "NSError", "NSString"] }
+objc2-app-kit = { version = "0.3", features = ["NSImage", "NSImageRep", "NSBitmapImageRep"] }
+objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }

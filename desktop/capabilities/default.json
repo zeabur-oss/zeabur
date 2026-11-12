@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The cluster picker window. Cluster windows load Zeabur's own web interface and get no IPC.",
+  "windows": ["main"],
+  "permissions": ["core:default", "dialog:allow-open"]
+}
