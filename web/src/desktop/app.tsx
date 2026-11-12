@@ -1,5 +1,7 @@
+import { listen } from "@tauri-apps/api/event"
 import { getCurrentWebview } from "@tauri-apps/api/webview"
 import { open as pick } from "@tauri-apps/plugin-dialog"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import {
@@ -31,6 +33,7 @@ import HouseIcon from "~icons/ph/house"
 import PlusIcon from "~icons/ph/plus"
 import StarIcon from "~icons/ph/star"
 import StarFillIcon from "~icons/ph/star-fill"
+import WarningIcon from "~icons/ph/warning"
 import XIcon from "~icons/ph/x"
 
 import { api, blocked, type Context, type Reach, type Snapshot, type Source } from "./api"
@@ -71,15 +74,15 @@ function ReachBadge({ reach, t }: { reach: Reach | undefined; t: Translate }) {
   }
 }
 
-function authText(context: Context, t: Translate): string | null {
+function authText(context: Context, shell: Snapshot["shell"], t: Translate): string | null {
   const auth = context.auth
   switch (auth.state) {
     case "ok":
       return null
-    case "shellPathOnly":
-      return t("desktop.authShellPath", auth.command)
     case "pluginMissing":
-      return t("desktop.authPluginMissing", auth.command)
+      return shell.state === "pending"
+        ? t("desktop.authLooking", auth.command)
+        : t("desktop.authPluginMissing", auth.command)
     case "missingEntry":
       return t(
         auth.what === "user" ? "desktop.authMissingUser" : "desktop.authMissingCluster",
@@ -135,6 +138,8 @@ export function App() {
       const picked = loaded.contexts.find((c) => c.name === s.open)
       if (picked) void api.open(picked.key, picked.name, s.lang ?? locale)
     })()
+    // The login shell's environment arrives after the first snapshot and can find more plugins.
+    const unlistenShell = listen("shell-env", () => void reload())
     const unlisten = getCurrentWebview().onDragDropEvent((event) => {
       const kind = event.payload.type
       if (kind === "enter" || kind === "over") setDropping(true)
@@ -146,6 +151,7 @@ export function App() {
     })
     return () => {
       void unlisten.then((stop) => stop())
+      void unlistenShell.then((stop) => stop())
     }
     // Runs once: the scenario and the drop listener belong to the window.
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -341,7 +347,7 @@ export function App() {
   }
 
   const row = (c: Context) => {
-    const problem = authText(c, t)
+    const problem = authText(c, snap.shell, t)
     const isBlocked = blocked(c.auth)
     const fav = favourites.has(c.key)
     return (
@@ -415,12 +421,7 @@ export function App() {
             </span>
           ) : null}
         </div>
-        <Button
-          variant="secondary"
-          size="xs"
-          disabled={isBlocked}
-          onClick={() => openCluster(c)}
-        >
+        <Button variant="secondary" size="xs" disabled={isBlocked} onClick={() => openCluster(c)}>
           {t("desktop.open")}
         </Button>
       </li>
@@ -518,6 +519,17 @@ export function App() {
           />
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4">
+          {snap.shell.state === "failed" ? (
+            <Alert variant="warn" className="mb-4" title={snap.shell.detail || undefined}>
+              <WarningIcon aria-hidden="true" />
+              <AlertTitle>
+                {snap.shell.timedOut
+                  ? t("desktop.shellTimeout", snap.shell.shell)
+                  : t("desktop.shellFailed", snap.shell.shell)}
+              </AlertTitle>
+              <AlertDescription>{t("desktop.shellFix")}</AlertDescription>
+            </Alert>
+          ) : null}
           {recents.length > 0 ? (
             <section className="mb-5">
               <p className="mb-2 type-label text-tertiary">{t("desktop.recent")}</p>

@@ -4521,7 +4521,7 @@ export const en = {
   "desktop.reachRefused": "Connection refused",
   "desktop.reachTimeout": "No answer",
   "desktop.reachNone": "No server address",
-  "desktop.authShellPath": (command: string) => `Uses ${command} from your shell's PATH`,
+  "desktop.authLooking": (command: string) => `Looking for ${command}…`,
   "desktop.authPluginMissing": (command: string) => `${command} isn't installed`,
   "desktop.authMissingUser": (name: string) => `User ${name} isn't in this file`,
   "desktop.authMissingCluster": (name: string) => `Cluster ${name} isn't in this file`,
@@ -4539,6 +4539,12 @@ export const en = {
   "desktop.pasteEmpty": "This kubeconfig has no contexts.",
   "desktop.cancel": "Cancel",
   "desktop.language": "Language",
+  "desktop.shellFailed": (shell: string) =>
+    `Zeabur couldn't read the settings of ${shell}, so programs installed from your shell files may not be found.`,
+  "desktop.shellTimeout": (shell: string) =>
+    `${shell} took more than 10 seconds to start, so programs installed from your shell files may not be found.`,
+  "desktop.shellFix":
+    "If a context says its exec plugin isn't installed, put the plugin's full path in the kubeconfig, such as /opt/homebrew/bin/aws.",
   // desktop:end
 }
 

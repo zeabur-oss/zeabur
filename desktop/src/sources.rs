@@ -8,6 +8,8 @@ use std::path::{Path, PathBuf};
 use kube::config::{AuthInfo, Kubeconfig};
 use serde::{Deserialize, Serialize};
 
+use crate::env::ChildEnv;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum SourceKind {
@@ -27,7 +29,10 @@ pub struct AddedSource {
 }
 
 /// The default sources: each path in `KUBECONFIG` (`:` between paths, `;` on Windows), or
-/// `~/.kube/config` (`%USERPROFILE%\.kube\config` on Windows) when it is unset or empty.
+/// `~/.kube/config` (`%USERPROFILE%\.kube\config` on Windows) when it is unset or empty
+/// (<https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/>).
+/// The caller passes `KUBECONFIG` from the child environment: the app's own value, else the login
+/// shell's.
 pub fn default_paths(kubeconfig_env: Option<OsString>, home: Option<PathBuf>) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     if let Some(value) = kubeconfig_env.filter(|v| !v.is_empty()) {
@@ -69,8 +74,6 @@ pub struct FileError {
 pub enum Auth {
     /// Nothing the app can check is wrong.
     Ok { method: String },
-    /// The exec plugin is not on the app's PATH but is on the login shell's PATH.
-    ShellPathOnly { command: String },
     /// The exec plugin is not found at all.
     PluginMissing {
         command: String,
@@ -106,14 +109,6 @@ pub struct SourceRef<'a> {
     pub path: &'a Path,
 }
 
-/// Where to look for exec plugins: the app's own PATH and, on macOS and Linux, the login
-/// shell's PATH (a Finder or Dock launch gets only `/usr/bin:/bin:/usr/sbin:/sbin`).
-#[derive(Debug, Default)]
-pub struct SearchPaths {
-    pub app: Vec<PathBuf>,
-    pub shell: Vec<PathBuf>,
-}
-
 fn files_of(kind: SourceKind, path: &Path) -> std::io::Result<Vec<PathBuf>> {
     if kind != SourceKind::Folder {
         return Ok(vec![path.to_path_buf()]);
@@ -131,36 +126,61 @@ fn files_of(kind: SourceKind, path: &Path) -> std::io::Result<Vec<PathBuf>> {
     Ok(files)
 }
 
-fn find_command(command: &str, dirs: &[PathBuf]) -> bool {
-    let path = Path::new(command);
-    if path.is_absolute() {
-        return path.is_file();
+/// The file names to try for a command. On Windows a name without an extension is tried with each
+/// extension in `PATHEXT`.
+fn file_names(command: &str, pathext: Option<&str>) -> Vec<String> {
+    let Some(pathext) = pathext else {
+        return vec![command.to_owned()];
+    };
+    if Path::new(command).extension().is_some() {
+        return vec![command.to_owned()];
     }
-    for dir in dirs {
-        if dir.join(command).is_file() {
-            return true;
+    let mut names = Vec::new();
+    for ext in pathext.split(';') {
+        if !ext.is_empty() {
+            names.push(format!("{command}{ext}"));
         }
-        if cfg!(windows) {
-            for ext in ["exe", "cmd", "bat"] {
-                if dir.join(format!("{command}.{ext}")).is_file() {
-                    return true;
-                }
+    }
+    names
+}
+
+/// Whether the exec plugin exists: an absolute path as it is, a name on the child environment's
+/// `PATH`, which is the `PATH` the plugin runs with.
+fn find_command(command: &str, env: &ChildEnv) -> bool {
+    let pathext = if cfg!(windows) {
+        let value = env
+            .get(std::ffi::OsStr::new("PATHEXT"))
+            .map(|v| v.to_string_lossy().into_owned());
+        Some(value.unwrap_or_else(|| ".COM;.EXE;.BAT;.CMD".to_owned()))
+    } else {
+        None
+    };
+    let names = file_names(command, pathext.as_deref());
+    if Path::new(command).is_absolute() {
+        for name in &names {
+            if Path::new(name).is_file() {
+                return true;
+            }
+        }
+        return false;
+    }
+    for dir in env.path_dirs() {
+        for name in &names {
+            if dir.join(name).is_file() {
+                return true;
             }
         }
     }
     false
 }
 
-fn check_auth(info: &AuthInfo, search: &SearchPaths) -> Auth {
+fn check_auth(info: &AuthInfo, env: &ChildEnv) -> Auth {
     if let Some(exec) = &info.exec {
         let command = exec.command.clone().unwrap_or_default();
-        if find_command(&command, &search.app) {
+        if find_command(&command, env) {
             return Auth::Ok {
                 method: format!("exec {command}"),
             };
-        }
-        if find_command(&command, &search.shell) {
-            return Auth::ShellPathOnly { command };
         }
         return Auth::PluginMissing {
             command,
@@ -192,10 +212,7 @@ fn check_auth(info: &AuthInfo, search: &SearchPaths) -> Auth {
 }
 
 /// Reads every source and returns the sources with counts and the contexts of every file.
-pub fn read_all(
-    sources: &[SourceRef<'_>],
-    search: &SearchPaths,
-) -> (Vec<SourceView>, Vec<ContextView>) {
+pub fn read_all(sources: &[SourceRef<'_>], env: &ChildEnv) -> (Vec<SourceView>, Vec<ContextView>) {
     let mut views = Vec::new();
     let mut contexts = Vec::new();
     for source in sources {
@@ -237,7 +254,7 @@ pub fn read_all(
             };
             for named in &config.contexts {
                 view.contexts += 1;
-                contexts.push(context_view(&source.id, &file, &config, named, search));
+                contexts.push(context_view(&source.id, &file, &config, named, env));
             }
         }
         views.push(view);
@@ -258,7 +275,7 @@ fn context_view(
     file: &Path,
     config: &Kubeconfig,
     named: &kube::config::NamedContext,
-    search: &SearchPaths,
+    env: &ChildEnv,
 ) -> ContextView {
     let file_text = file.display().to_string();
     let context = named.context.clone().unwrap_or_default();
@@ -281,7 +298,7 @@ fn context_view(
                     what: "user".into(),
                     name: user.clone(),
                 },
-                Some(entry) => check_auth(&entry.auth_info.clone().unwrap_or_default(), search),
+                Some(entry) => check_auth(&entry.auth_info.clone().unwrap_or_default(), env),
             },
         }
     };
@@ -321,6 +338,62 @@ mod tests {
     }
 
     #[test]
+    fn kubeconfig_comes_from_the_app_then_the_login_shell_then_home() {
+        let home = Some(PathBuf::from("/home/a"));
+        let shell = [(
+            OsString::from("KUBECONFIG"),
+            OsString::from("/shell/config"),
+        )];
+        let from = |own: Vec<(OsString, OsString)>| {
+            let env = ChildEnv::merge(own, &shell);
+            default_paths(
+                env.get(std::ffi::OsStr::new("KUBECONFIG"))
+                    .map(OsString::from),
+                home.clone(),
+            )
+        };
+        let own = vec![(OsString::from("KUBECONFIG"), OsString::from("/app/config"))];
+        assert_eq!(from(own), vec![PathBuf::from("/app/config")]);
+        assert_eq!(from(Vec::new()), vec![PathBuf::from("/shell/config")]);
+        let env = ChildEnv::merge(Vec::new(), &[]);
+        let fallback = default_paths(
+            env.get(std::ffi::OsStr::new("KUBECONFIG"))
+                .map(OsString::from),
+            home.clone(),
+        );
+        assert_eq!(fallback, vec![PathBuf::from("/home/a/.kube/config")]);
+    }
+
+    #[test]
+    fn windows_names_without_an_extension_try_each_pathext_entry() {
+        assert_eq!(
+            file_names("aws", Some(".COM;.EXE;")),
+            ["aws.COM", "aws.EXE"]
+        );
+        assert_eq!(file_names("aws.cmd", Some(".COM;.EXE")), ["aws.cmd"]);
+        assert_eq!(file_names("aws", None), ["aws"]);
+    }
+
+    #[test]
+    fn a_plugin_is_found_on_the_child_path() {
+        let dir =
+            std::env::temp_dir().join(format!("zeabur-desktop-plugin-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let name = if cfg!(windows) {
+            "kubelogin.EXE"
+        } else {
+            "kubelogin"
+        };
+        std::fs::write(dir.join(name), "").unwrap();
+        let env = ChildEnv::merge(
+            Vec::new(),
+            &[(OsString::from("PATH"), dir.clone().into_os_string())],
+        );
+        assert!(find_command("kubelogin", &env));
+        assert!(!find_command("kubelogin", &ChildEnv::default()));
+    }
+
+    #[test]
     fn same_context_names_in_two_files_stay_apart() {
         let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures");
         let home = fixtures.join("home/.kube/config");
@@ -337,7 +410,7 @@ mod tests {
                 path: &team,
             },
         ];
-        let (views, contexts) = read_all(&sources, &SearchPaths::default());
+        let (views, contexts) = read_all(&sources, &ChildEnv::default());
         assert_eq!(views[1].files, 3);
         let staging: Vec<_> = contexts.iter().filter(|c| c.name == "staging").collect();
         assert_eq!(staging.len(), 2);

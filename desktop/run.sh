@@ -9,7 +9,7 @@ if [[ "${1:-}" == "--fixtures" ]]; then
   state=$(mktemp -d)
   export ZEABUR_DESKTOP_STATE=$state
   export KUBECONFIG=$root/desktop/fixtures/home/.kube/config
-  printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$root/desktop/fixtures/team" > "$state/state.json"
+  printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$root/desktop/fixtures/team" > "$state/settings.json"
 fi
 
 pids=()
