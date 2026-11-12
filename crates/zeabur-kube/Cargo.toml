@@ -32,6 +32,8 @@ kube.workspace = true
 secrecy.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+# Already in the binary through zeabur-api: the header blocks of the file manager's archives.
+tar.workspace = true
 thiserror.workspace = true
 tower = { workspace = true, features = ["retry"] }
 tower-http.workspace = true

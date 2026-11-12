@@ -226,22 +226,15 @@ impl MemoryFiles {
                     format!("{parent}/{name}")
                 };
                 let (flag, data) = match self.node(&path) {
-                    Some(MemoryNode::File(data)) => (b'0', data.clone()),
-                    Some(MemoryNode::Directory) => (b'5', Vec::new()),
-                    Some(MemoryNode::Link(_)) => (b'2', Vec::new()),
+                    Some(MemoryNode::File(data)) => (tar::EntryType::Regular, data.clone()),
+                    Some(MemoryNode::Directory) => (tar::EntryType::Directory, Vec::new()),
+                    Some(MemoryNode::Link(_)) => (tar::EntryType::Symlink, Vec::new()),
                     None => {
                         return fail(format!("tar: {member}: No such file or directory"));
                     }
                 };
                 let size = data.len() as u64;
-                let mut out = files::file_header(member, size, 0);
-                if let Some(byte) = out
-                    .len()
-                    .checked_sub(512)
-                    .and_then(|start| out.get_mut(start + 156))
-                {
-                    *byte = flag;
-                }
+                let mut out = files::entry_header(member, flag, size, 0);
                 out.extend_from_slice(&data);
                 out.extend(files::archive_end(size));
                 ok(out)

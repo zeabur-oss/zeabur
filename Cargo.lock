@@ -3174,6 +3174,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "tar",
  "thiserror",
  "tokio",
  "tower",
