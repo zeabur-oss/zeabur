@@ -39,7 +39,8 @@ flowchart BT
   recommend[zeabur-catalog] --> kube
   api[zeabur-api] --> kube & gaps & plan & recommend & modules
   zeabur([zeabur]) --> api & ui & auth
-  zeaburctl([zeaburctl]) --> api & ui
+  local[zeabur-local] --> api & ui
+  zeaburctl([zeaburctl]) --> local
 ```
 
 Arrows point from a crate to what it may depend on (transitive edges omitted).
@@ -60,7 +61,9 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 3 | [`zeabur-plan`](../../crates/zeabur-plan) | change plans, minimal apply bodies, impact |
 | 3 | [`zeabur-catalog`](../../crates/zeabur-catalog) | the recommendations bundle and install suggestions |
 | 4 | [`zeabur-api`](../../crates/zeabur-api) | the HTTP API and its OpenAPI document |
-| 5 | [`zeabur`](../../crates/zeabur), [`zeaburctl`](../../crates/zeaburctl) | **binaries** |
+| 5 | [`zeabur-local`](../../crates/zeabur-local) | the local service: the API with a person's kubeconfig and the web interface on a loopback port, as `zeaburctl ui` starts it |
+| 5 | [`zeabur`](../../crates/zeabur) | **binary**: the in-cluster server |
+| 6 | [`zeaburctl`](../../crates/zeaburctl) | **binary**: the command-line tool |
 | 6 | [`zeabur-test-support`](../../crates/zeabur-test-support) | test helpers: loading the fixture cases, the cluster tests' sandbox |
 | 0 | [`zeabur-installer-plan`](../../crates/zeabur-installer-plan) | the installer's configuration, component selection and install plan; no I/O |
 | 1 | [`zeabur-installer-host`](../../crates/zeabur-installer-host) | what the installer does to a host: facts, preflight, downloads, files, systemd, `kubectl` |

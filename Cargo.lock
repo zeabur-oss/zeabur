@@ -3185,6 +3185,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "zeabur-local"
+version = "0.2.0"
+dependencies = [
+ "axum",
+ "thiserror",
+ "tokio",
+ "zeabur-api",
+ "zeabur-core",
+ "zeabur-kube",
+ "zeabur-ui",
+]
+
+[[package]]
 name = "zeabur-model"
 version = "0.2.0"
 dependencies = [
@@ -3335,8 +3348,8 @@ dependencies = [
  "zeabur-core",
  "zeabur-http",
  "zeabur-kube",
+ "zeabur-local",
  "zeabur-telemetry",
- "zeabur-ui",
 ]
 
 [[package]]
