@@ -23,9 +23,11 @@
 //!
 //! # Quoting
 //!
-//! Strings are quoted as `kubectl get -o yaml` quotes them, so that `1:20`, `2024-01-01` or `yes`
-//! stay strings for a YAML 1.1 reader too (go-yaml's rules, in `manifest/scalar.rs`). Other values
-//! print as serde-saphyr writes them.
+//! serde-saphyr quotes every string that a YAML 1.1 reader would take for another type, as
+//! `kubectl get -o yaml` does: booleans and nulls such as `yes`, numbers such as `0755` or `1:20`,
+//! and timestamps such as `2024-01-01` ([`serde_saphyr::SerializerOptions`], `yaml_12` off). So
+//! the text stays the same strings for go-yaml and other YAML 1.1 readers. The quote style can
+//! differ from kubectl's.
 //!
 //! # Order
 //!
@@ -38,10 +40,6 @@
 
 use serde::ser::{Serialize, SerializeMap, Serializer};
 use serde_json::{Map, Value};
-
-use self::scalar::Scalar;
-
-mod scalar;
 
 /// The annotation `kubectl apply` writes the last applied object into.
 pub const LAST_APPLIED: &str = "kubectl.kubernetes.io/last-applied-configuration";
@@ -126,22 +124,6 @@ pub fn trim(object: &Value) -> Value {
     out
 }
 
-/// A value whose strings are quoted as kubectl quotes them.
-struct Node<'a>(&'a Value);
-
-impl Serialize for Node<'_> {
-    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
-        match self.0 {
-            Value::String(text) => Scalar(text).serialize(serializer),
-            Value::Array(items) => serializer.collect_seq(items.iter().map(Node)),
-            Value::Object(map) => {
-                serializer.collect_map(map.iter().map(|(key, value)| (Scalar(key), Node(value))))
-            }
-            Value::Null | Value::Bool(_) | Value::Number(_) => self.0.serialize(serializer),
-        }
-    }
-}
-
 /// A map whose first keys come in a given order, the rest alphabetically.
 struct Ordered<'a> {
     map: &'a Map<String, Value>,
@@ -164,7 +146,7 @@ impl Serialize for Ordered<'_> {
             match value {
                 Value::Object(inner) if self.metadata && key == "metadata" => {
                     out.serialize_entry(
-                        &Scalar(key),
+                        key,
                         &Ordered {
                             map: inner,
                             first: &METADATA_ORDER,
@@ -177,7 +159,7 @@ impl Serialize for Ordered<'_> {
                 | Value::Number(_)
                 | Value::String(_)
                 | Value::Array(_)
-                | Value::Object(_) => out.serialize_entry(&Scalar(key), &Node(value))?,
+                | Value::Object(_) => out.serialize_entry(key, value)?,
             }
         }
         out.end()
@@ -198,7 +180,7 @@ pub fn to_yaml(object: &Value) -> Result<String, String> {
             metadata: true,
         }),
         Value::Null | Value::Bool(_) | Value::Number(_) | Value::String(_) | Value::Array(_) => {
-            serde_saphyr::to_string(&Node(&cleaned))
+            serde_saphyr::to_string(&cleaned)
         }
     }
     .map_err(|e| e.to_string())
@@ -285,11 +267,11 @@ mod tests {
     }
 
     #[test]
-    fn strings_are_quoted_as_kubectl_quotes_them_everywhere_in_the_object() {
+    fn strings_kubectl_quotes_are_quoted_everywhere_in_the_object() {
         // People copy this YAML into tools on go-yaml, a YAML 1.1 reader, which takes `yes`,
         // `1:20` or `2024-01-01` for a boolean, a number or a timestamp
         // (https://yaml.org/type/bool.html, float.html, timestamp.html). The full table is in
-        // `scalar`.
+        // `strings_kubectl_quotes_are_quoted`.
         let object = json!({
             "apiVersion": "v1", "kind": "ConfigMap",
             "metadata": {"name": "app", "labels": {"on": "yes"}},
@@ -300,10 +282,168 @@ mod tests {
         assert_eq!(
             yaml,
             "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: app\n  labels:\n    \"on\": \"yes\"\n\
-             data:\n  duration: \"1:20\"\n  mode: \"0755\"\n  since: \"2024-01-01\"\n  who: '@here'\n\
-             list:\n- \"no\"\n- '*'\n- nginx:1.27\n- 3\n- true\n- null\n"
+             data:\n  duration: \"1:20\"\n  mode: \"0755\"\n  since: \"2024-01-01\"\n  who: \"@here\"\n\
+             list:\n- \"no\"\n- \"*\"\n- nginx:1.27\n- 3\n- true\n- null\n"
         );
         let back: Value = serde_saphyr::from_str(&yaml).unwrap();
         assert_eq!(back, object);
+    }
+
+    /// Each value as `kubectl create configmap x --from-literal=k=<value> --dry-run=client -o
+    /// yaml` writes it (kubectl v1.37.1). Where kubectl quotes, the value is quoted here too,
+    /// maybe in the other style.
+    #[test]
+    fn strings_kubectl_quotes_are_quoted() {
+        #[rustfmt::skip]
+        let table: &[(&str, &str)] = &[
+            // YAML 1.1 booleans, in the spellings go-yaml reads; others stay bare.
+            ("true", r#""true""#), ("True", r#""True""#), ("FALSE", r#""FALSE""#),
+            ("yes", r#""yes""#), ("Yes", r#""Yes""#), ("NO", r#""NO""#),
+            ("y", r#""y""#), ("N", r#""N""#), ("on", r#""on""#),
+            ("OFF", r#""OFF""#),
+            // Nulls.
+            ("", r#""""#), ("~", r#""~""#), ("null", r#""null""#), ("NULL", r#""NULL""#),
+            // Sexagesimal numbers.
+            ("1:20", r#""1:20""#), ("190:20:30", r#""190:20:30""#),
+            ("190:20:30.15", r#""190:20:30.15""#), ("-1:20", r#""-1:20""#),
+            ("1_0:20", r#""1_0:20""#), ("1:60", "1:60"), ("1:2_0", "1:2_0"),
+            // Timestamps.
+            ("2024-01-01", r#""2024-01-01""#), ("2024-1-1", r#""2024-1-1""#),
+            ("2001-12-14t21:59:43.10-05:00", r#""2001-12-14t21:59:43.10-05:00""#),
+            ("2001-12-14T21:59:43.10Z", r#""2001-12-14T21:59:43.10Z""#),
+            ("2001-12-14 21:59:43.10", r#""2001-12-14 21:59:43.10""#),
+            ("2024-01-01  10:00:00", r#""2024-01-01  10:00:00""#),
+            ("2024-01-01 10:00:00,5", r#""2024-01-01 10:00:00,5""#),
+            ("2024-01-01T10:00:00+24:00", r#""2024-01-01T10:00:00+24:00""#),
+            ("2024-01-01T10:00:00+05:60", r#""2024-01-01T10:00:00+05:60""#),
+            ("2024-02-29", r#""2024-02-29""#), ("2000-02-29", r#""2000-02-29""#),
+            ("2024-01-01T10:00:00+0530", "2024-01-01T10:00:00+0530"),
+            ("2024-01-01 10:00", "2024-01-01 10:00"),
+            ("2024-001-01", "2024-001-01"), ("12024-01-01", "12024-01-01"),
+            // Integers in YAML 1.1 and Go spellings.
+            ("0x1F", r#""0x1F""#), ("+0x1F", r#""+0x1F""#), ("0X1f", r#""0X1f""#),
+            ("0o17", r#""0o17""#), ("0O17", r#""0O17""#), ("017", r#""017""#),
+            ("08", r#""08""#), ("0b1010", r#""0b1010""#), ("-0b11", r#""-0b11""#),
+            ("1_000", r#""1_000""#), ("1__0", r#""1__0""#), ("1_", r#""1_""#),
+            ("0x_1F", r#""0x_1F""#), ("-1", r#""-1""#), ("+1", r#""+1""#),
+            ("0xFFFFFFFFFFFFFFFF", r#""0xFFFFFFFFFFFFFFFF""#),
+            ("-0x8000000000000000", r#""-0x8000000000000000""#),
+            ("99999999999999999999", r#""99999999999999999999""#),
+            ("0x", "0x"), ("0b2", "0b2"), ("0x1p3", "0x1p3"),
+            // Floats.
+            (".inf", r#"".inf""#), ("-.Inf", r#""-.Inf""#), (".NaN", r#"".NaN""#),
+            ("1e3", r#""1e3""#), ("1E3", r#""1E3""#), ("1.", r#""1.""#), (".5", r#"".5""#),
+            ("+.5", r#""+.5""#), ("1.e5", r#""1.e5""#), ("6.8523015e+5", r#""6.8523015e+5""#),
+            (".5_0", r#"".5_0""#), ("1_0.5", r#""1_0.5""#), ("1e-400", r#""1e-400""#),
+            // Strings that would break the syntax bare.
+            ("@here", "'@here'"), ("%x", "'%x'"), ("-", "'-'"), ("- item", "'- item'"),
+            ("? x", "'? x'"), ("a: b", "'a: b'"), ("ends:", "'ends:'"),
+            (" leading", "' leading'"), ("trailing ", "'trailing '"),
+            ("#comment", "'#comment'"), ("a #b", "'a #b'"), ("*", "'*'"),
+            ("&anchor", "'&anchor'"), ("!tag", "'!tag'"), ("|x", "'|x'"), (">x", "'>x'"),
+            ("'q", "'''q'"), ("\"q", "'\"q'"), ("`q", "'`q'"), (",x", "',x'"),
+            ("[x", "'[x'"), ("{x", "'{x'"), ("--- x", "'--- x'"), ("...", "'...'"),
+            ("a\tb", r#""a\tb""#),
+            // Ordinary strings stay bare.
+            ("-x", "-x"), ("?x", "?x"), ("nginx:1.27", "nginx:1.27"),
+            ("/data", "/data"), ("100m", "100m"), ("v1.2.3", "v1.2.3"),
+            ("https://example.com/a", "https://example.com/a"),
+        ];
+        for (value, kubectl) in table {
+            let yaml = to_yaml(&json!({ "k": value })).unwrap();
+            let written = yaml.strip_prefix("k: ").unwrap_or_default();
+            if kubectl.starts_with(['"', '\'']) {
+                assert!(written.starts_with(['"', '\'']), "{value:?} => {yaml:?}");
+            }
+            let back: Value = serde_saphyr::from_str(&yaml).unwrap();
+            assert_eq!(back["k"], *value, "{value:?} => {yaml:?}");
+        }
+    }
+
+    /// Whatever the quoting, the text reads back as the same string.
+    #[test]
+    fn what_is_written_reads_back_the_same() {
+        for value in [
+            "yes",
+            "no",
+            "on",
+            "off",
+            "y",
+            "n",
+            "true",
+            "null",
+            "~",
+            "",
+            "0123",
+            "0",
+            "00",
+            "1e3",
+            "1E3",
+            "0x1F",
+            "1_000",
+            ".5",
+            "-1",
+            "+1",
+            "1.0",
+            "1.2.3",
+            "1:20",
+            ":",
+            "a:b",
+            "a: b",
+            "ends:",
+            ":x",
+            "#",
+            "a#b",
+            "a #b",
+            "#a",
+            "-",
+            "- a",
+            "?",
+            "? a",
+            "&a",
+            "*a",
+            "!a",
+            "%a",
+            "@a",
+            "'a'",
+            "\"a\"",
+            "a'b",
+            "a\"b",
+            " a",
+            "a ",
+            "a\tb",
+            "a\nb",
+            "a\n",
+            "\n",
+            "[a]",
+            "{a}",
+            "a,b",
+            "|",
+            ">",
+            "<<",
+            "=",
+            "inf",
+            ".inf",
+            "nan",
+            ".nan",
+            "2024-01-01",
+            "2024-01-01T10:00:00Z",
+            "12:30",
+            "v1.27",
+            "1.27",
+            "nginx:1.27",
+            "https://example.com/a#b",
+            "false ",
+            "Yes",
+            "NO",
+            "Null",
+            "NULL",
+            "é",
+            "日本語",
+        ] {
+            let yaml = to_yaml(&json!({ "k": value })).unwrap();
+            let back: Value = serde_saphyr::from_str(&yaml).unwrap();
+            assert_eq!(back["k"], value, "{value:?} => {yaml:?}");
+        }
     }
 }
