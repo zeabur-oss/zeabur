@@ -493,6 +493,15 @@ pub(crate) async fn apply(
             }
         }
     }
+    if let Some(used) = &state.used {
+        crate::used::report(
+            used,
+            cluster.as_ref(),
+            &state.settings,
+            &claims.request.changes,
+        )
+        .await;
+    }
     Ok(Json(ApplyResponse { applied }))
 }
 

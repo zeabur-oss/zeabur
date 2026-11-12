@@ -18,7 +18,9 @@ pub mod versions;
 
 pub use installed::{ComponentUpgrade, InstallSource, Installation};
 pub use measured::{IdleUse, template_idle};
-pub use templates::{RenderError, RenderOptions, Template, render, template, templates};
+pub use templates::{
+    RenderError, RenderOptions, Template, render, template, template_id, templates,
+};
 
 /// The commit of Zeabur Catalog this build carries.
 pub const CATALOGUE_COMMIT: &str = env!("ZEABUR_CATALOG_COMMIT");

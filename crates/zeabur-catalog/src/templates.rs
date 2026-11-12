@@ -370,6 +370,13 @@ pub fn template(id: &str) -> Result<Template, RenderError> {
     read(id, file, manifests)
 }
 
+/// The ID of the template `id` as the embedded catalogue spells it; `None` for a name it does not
+/// carry.
+#[must_use]
+pub fn template_id(id: &str) -> Option<&'static str> {
+    find(id).ok().map(|(id, ..)| *id)
+}
+
 fn find(id: &str) -> Result<&'static (&'static str, &'static str, &'static str), RenderError> {
     bundle::TEMPLATES
         .iter()

@@ -72,6 +72,8 @@ pub struct State {
     pub hanging: BTreeSet<String>,
     /// Namespaces whose objects are refused with `403 Forbidden`.
     pub forbidden_namespaces: BTreeSet<String>,
+    /// How many single objects were read by name.
+    pub object_reads: usize,
     /// How many times a Secret's values were read.
     pub secret_reads: usize,
     /// Nodes.
@@ -1187,6 +1189,7 @@ impl Cluster for MemoryCluster {
                     .kind_of(&resource.api_version(), &resource.resource);
             }
             let resource = &resource;
+            self.lock()?.object_reads += 1;
             let Some(items) = self.list_objects(resource, namespace).await? else {
                 return Ok(None);
             };
