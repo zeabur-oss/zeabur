@@ -225,7 +225,7 @@ mod tests {
         assert_eq!(status, 401);
 
         let (status, answer) = get(&authority, &launch, None).await;
-        assert_eq!(status, 303);
+        assert_eq!(status, 200);
         let cookie = session_cookie(&answer).to_owned();
         let (status, answer) = get(&authority, "/api/v1/whoami", Some(&cookie)).await;
         assert_eq!(status, 200);
