@@ -20,12 +20,7 @@ import {
 import { Illustration } from "@zeabur-oss/design-system/components/illustration"
 import { Input } from "@zeabur-oss/design-system/components/input"
 import { Label } from "@zeabur-oss/design-system/components/label"
-import {
-  Menu,
-  MenuContent,
-  MenuItem,
-  MenuTrigger,
-} from "@zeabur-oss/design-system/components/menu"
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur-oss/design-system/components/menu"
 import { Select } from "@zeabur-oss/design-system/components/select"
 import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
@@ -41,7 +36,7 @@ import StarFillIcon from "~icons/ph/star-fill"
 import XIcon from "~icons/ph/x"
 
 import { api, blocked, type Context, type Reach, type Snapshot, type Source } from "./api"
-import { languages, useI18n, type Lang, type T } from "./i18n"
+import { localeNames, locales, useI18n, type Locale, type Translate } from "@/i18n"
 import { pasteSample } from "./shots"
 
 function baseName(path: string): string {
@@ -62,37 +57,38 @@ function sourceIcon(kind: Source["kind"]) {
   return <FileIcon className="size-3.5 shrink-0" aria-hidden="true" />
 }
 
-function ReachBadge({ reach, t }: { reach: Reach | undefined; t: T }) {
-  if (!reach) return <Badge variant="idle">{t("reach-checking")}</Badge>
+function ReachBadge({ reach, t }: { reach: Reach | undefined; t: Translate }) {
+  if (!reach) return <Badge variant="idle">{t("desktop.reachChecking")}</Badge>
   switch (reach.state) {
     case "reachable":
-      return <Badge variant="ok">{`${t("reach-ok")} ${reach.millis} ms`}</Badge>
+      return <Badge variant="ok">{`${t("desktop.reachOk")} ${reach.millis} ms`}</Badge>
     case "unresolved":
-      return <Badge variant="fail">{t("reach-unresolved")}</Badge>
+      return <Badge variant="fail">{t("desktop.reachUnresolved")}</Badge>
     case "refused":
-      return <Badge variant="fail">{t("reach-refused")}</Badge>
+      return <Badge variant="fail">{t("desktop.reachRefused")}</Badge>
     case "timedOut":
-      return <Badge variant="warn">{t("reach-timeout")}</Badge>
+      return <Badge variant="warn">{t("desktop.reachTimeout")}</Badge>
     case "noAddress":
-      return <Badge variant="fail">{t("reach-none")}</Badge>
+      return <Badge variant="fail">{t("desktop.reachNone")}</Badge>
   }
 }
 
-function authText(context: Context, t: T): string | null {
+function authText(context: Context, t: Translate): string | null {
   const auth = context.auth
   switch (auth.state) {
     case "ok":
       return null
     case "shellPathOnly":
-      return t("auth-shell-path", { command: auth.command })
+      return t("desktop.authShellPath", auth.command)
     case "pluginMissing":
-      return t("auth-plugin-missing", { command: auth.command })
+      return t("desktop.authPluginMissing", auth.command)
     case "missingEntry":
-      return t(auth.what === "user" ? "auth-missing-user" : "auth-missing-cluster", {
-        name: auth.name,
-      })
+      return t(
+        auth.what === "user" ? "desktop.authMissingUser" : "desktop.authMissingCluster",
+        auth.name,
+      )
     case "fileMissing":
-      return t("auth-file-missing", { path: fileLabel(auth.path) })
+      return t("desktop.authFileMissing", fileLabel(auth.path))
   }
 }
 
@@ -106,7 +102,7 @@ function parseScenario(text: string | null): Record<string, string> {
 }
 
 export function App() {
-  const { t, lang, setLang } = useI18n()
+  const { t, locale, setLocale } = useI18n()
   const [snap, setSnap] = useState<Snapshot | null>(null)
   const [reach, setReach] = useState<Record<string, Reach>>({})
   const [query, setQuery] = useState("")
@@ -134,21 +130,23 @@ export function App() {
     void (async () => {
       const loaded = await reload()
       const s = parseScenario(await api.scenario())
-      if (s.lang) setLang(s.lang as Lang)
+      if (s.lang) setLocale(s.lang as Locale)
       if (s.q) setQuery(s.q)
       if (s.paste) setPaste({ name: "homelab", yaml: pasteSample, error: null })
       if (s.drop) setDropping(true)
       if (s.only) setOnly(loaded.sources[Number(s.only)]?.id ?? null)
       if (s.select) {
         const names = s.select.split(",")
-        setSelected(new Set(loaded.contexts.filter((c) => names.includes(c.name)).map((c) => c.key)))
+        setSelected(
+          new Set(loaded.contexts.filter((c) => names.includes(c.name)).map((c) => c.key)),
+        )
       }
       if (s.open) {
         const names = s.open.split(",")
         const picked = loaded.contexts.filter((c) => names.includes(c.name))
         void api.open(
           picked.map((c) => [c.key, c.name]),
-          s.lang ?? lang,
+          s.lang ?? locale,
         )
       }
     })()
@@ -197,22 +195,22 @@ export function App() {
         render={
           <Button variant="secondary" size="sm" className="w-full">
             <PlusIcon aria-hidden="true" />
-            {t("add-source")}
+            {t("desktop.addSource")}
           </Button>
         }
       />
       <MenuContent>
         <MenuItem onClick={() => void addFiles(false)}>
           <FileIcon aria-hidden="true" />
-          {t("add-files")}
+          {t("desktop.addFiles")}
         </MenuItem>
         <MenuItem onClick={() => void addFiles(true)}>
           <FolderIcon aria-hidden="true" />
-          {t("add-folder")}
+          {t("desktop.addFolder")}
         </MenuItem>
         <MenuItem onClick={() => setPaste({ name: "", yaml: "", error: null })}>
           <ClipboardIcon aria-hidden="true" />
-          {t("add-paste")}
+          {t("desktop.addPaste")}
         </MenuItem>
       </MenuContent>
     </Menu>
@@ -221,10 +219,10 @@ export function App() {
   const languageSelect = (
     <Select
       size="sm"
-      aria-label={t("language")}
-      items={languages.map((l) => ({ value: l.value, label: l.label, lang: l.value }))}
-      value={lang}
-      onValueChange={setLang}
+      aria-label={t("desktop.language")}
+      items={locales.map((l) => ({ value: l, label: localeNames[l], lang: l }))}
+      value={locale}
+      onValueChange={setLocale}
     />
   )
 
@@ -233,10 +231,10 @@ export function App() {
       <DialogContent initialFocus={nameRef}>
         <div className="flex items-center gap-2 border-b px-5 py-3">
           <div className="min-w-0 flex-1 truncate">
-            <DialogTitle>{t("paste-title")}</DialogTitle>
+            <DialogTitle>{t("desktop.pasteTitle")}</DialogTitle>
           </div>
           <DialogClose
-            render={<Button variant="ghost" size="icon-sm" aria-label={t("cancel")} />}
+            render={<Button variant="ghost" size="icon-sm" aria-label={t("desktop.cancel")} />}
           >
             <XIcon aria-hidden="true" />
           </DialogClose>
@@ -256,13 +254,15 @@ export function App() {
                 setPaste({
                   ...paste,
                   error:
-                    reason === "no-contexts" ? t("paste-empty") : t("paste-error", { reason }),
+                    reason === "no-contexts"
+                      ? t("desktop.pasteEmpty")
+                      : t("desktop.pasteError", reason),
                 })
               })
           }}
         >
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="paste-name">{t("paste-name")}</Label>
+            <Label htmlFor="paste-name">{t("desktop.pasteName")}</Label>
             <Input
               id="paste-name"
               ref={nameRef}
@@ -271,7 +271,7 @@ export function App() {
             />
           </div>
           <div className="flex flex-col gap-1.5">
-            <Label htmlFor="paste-yaml">{t("paste-yaml")}</Label>
+            <Label htmlFor="paste-yaml">{t("desktop.pasteYaml")}</Label>
             <Textarea
               id="paste-yaml"
               rows={12}
@@ -284,10 +284,10 @@ export function App() {
           </div>
           <div className="flex justify-end gap-2">
             <Button type="button" variant="secondary" onClick={() => setPaste(null)}>
-              {t("cancel")}
+              {t("desktop.cancel")}
             </Button>
             <Button type="submit" disabled={!paste.yaml.trim()}>
-              {t("paste-add")}
+              {t("desktop.pasteAdd")}
             </Button>
           </div>
         </form>
@@ -297,7 +297,7 @@ export function App() {
 
   const dropOverlay = dropping ? (
     <div className="pointer-events-none fixed inset-3 z-50 flex items-center justify-center rounded-xl border-2 border-dashed border-primary bg-surface-page/90">
-      <p className="type-heading text-main">{t("drop")}</p>
+      <p className="type-heading text-main">{t("desktop.drop")}</p>
     </div>
   ) : null
 
@@ -310,30 +310,35 @@ export function App() {
             <EmptyMedia>
               <Illustration kind="empty" />
             </EmptyMedia>
-            <EmptyTitle>{t("first-title")}</EmptyTitle>
+            <EmptyTitle>{t("desktop.firstTitle")}</EmptyTitle>
             <EmptyDescription>
-              {t("first-body", { path: navigator.userAgent.includes("Windows") ? "%USERPROFILE%\\.kube\\config" : "~/.kube/config" })}
+              {t(
+                "desktop.firstBody",
+                navigator.userAgent.includes("Windows")
+                  ? "%USERPROFILE%\\.kube\\config"
+                  : "~/.kube/config",
+              )}
             </EmptyDescription>
           </EmptyHeader>
           <EmptyContent>
             <div className="flex flex-wrap justify-center gap-2">
               <Button onClick={() => void addFiles(false)}>
                 <FileIcon aria-hidden="true" />
-                {t("add-files")}
+                {t("desktop.addFiles")}
               </Button>
               <Button variant="secondary" onClick={() => void addFiles(true)}>
                 <FolderIcon aria-hidden="true" />
-                {t("add-folder")}
+                {t("desktop.addFolder")}
               </Button>
               <Button
                 variant="secondary"
                 onClick={() => setPaste({ name: "", yaml: "", error: null })}
               >
                 <ClipboardIcon aria-hidden="true" />
-                {t("add-paste")}
+                {t("desktop.addPaste")}
               </Button>
             </div>
-            <p className="type-meta text-tertiary">{t("first-drop")}</p>
+            <p className="type-meta text-tertiary">{t("desktop.firstDrop")}</p>
           </EmptyContent>
         </Empty>
         {pasteDialog}
@@ -355,10 +360,12 @@ export function App() {
 
   function openKeys(keys: readonly string[]) {
     const picked = keys.flatMap((k) => byKey.get(k) ?? [])
-    void api.open(
-      picked.map((c) => [c.key, c.name]),
-      lang,
-    ).then(reload)
+    void api
+      .open(
+        picked.map((c) => [c.key, c.name]),
+        locale,
+      )
+      .then(reload)
   }
 
   const row = (c: Context) => {
@@ -376,11 +383,11 @@ export function App() {
           onCheckedChange={() => toggle(c.key)}
           aria-label={c.name}
         />
-        <Tooltip content={fav ? t("favourite-remove") : t("favourite-add")}>
+        <Tooltip content={fav ? t("desktop.favouriteRemove") : t("desktop.favouriteAdd")}>
           <Button
             variant="ghost"
             size="icon-xs"
-            aria-label={fav ? t("favourite-remove") : t("favourite-add")}
+            aria-label={fav ? t("desktop.favouriteRemove") : t("desktop.favouriteAdd")}
             onClick={() => void api.toggleFavourite(c.key).then(reload)}
           >
             {fav ? (
@@ -392,10 +399,14 @@ export function App() {
         </Tooltip>
         <div className="min-w-0">
           <div className="flex min-w-0 items-center gap-2">
-            <span className="truncate type-body font-medium text-main" title={c.name} translate="no">
+            <span
+              className="truncate type-body font-medium text-main"
+              title={c.name}
+              translate="no"
+            >
               {c.name}
             </span>
-            {c.current ? <Badge variant="secondary">{t("current")}</Badge> : null}
+            {c.current ? <Badge variant="secondary">{t("desktop.current")}</Badge> : null}
           </div>
           <div className="flex min-w-0 items-center gap-2 type-meta text-tertiary">
             <span className="shrink-0" title={c.file} translate="no">
@@ -404,15 +415,19 @@ export function App() {
             {c.sameNameElsewhere > 0 ? (
               <span
                 className="min-w-0 truncate text-warn-strong"
-                title={t("same-name", { n: c.sameNameElsewhere })}
+                title={t("desktop.sameName", c.sameNameElsewhere)}
               >
-                {t("same-name", { n: c.sameNameElsewhere })}
+                {t("desktop.sameName", c.sameNameElsewhere)}
               </span>
             ) : null}
           </div>
         </div>
         <div className="min-w-0">
-          <div className="truncate type-mono type-meta text-secondary" title={c.server ?? ""} translate="no">
+          <div
+            className="truncate type-mono type-meta text-secondary"
+            title={c.server ?? ""}
+            translate="no"
+          >
             {c.server ?? "-"}
           </div>
           <div className="truncate type-meta text-tertiary" title={c.user ?? ""} translate="no">
@@ -434,8 +449,13 @@ export function App() {
             </span>
           ) : null}
         </div>
-        <Button variant="secondary" size="xs" disabled={isBlocked} onClick={() => openKeys([c.key])}>
-          {t("open")}
+        <Button
+          variant="secondary"
+          size="xs"
+          disabled={isBlocked}
+          onClick={() => openKeys([c.key])}
+        >
+          {t("desktop.open")}
         </Button>
       </li>
     )
@@ -444,7 +464,7 @@ export function App() {
   return (
     <div className="flex h-dvh bg-surface-page text-main">
       <aside className="flex w-64 shrink-0 flex-col gap-3 border-r border-v2-border bg-sidebar p-3">
-        <p className="px-2 pt-1 type-label text-tertiary">{t("sources")}</p>
+        <p className="px-2 pt-1 type-label text-tertiary">{t("desktop.sources")}</p>
         <nav className="flex flex-col gap-0.5">
           <button
             type="button"
@@ -455,7 +475,7 @@ export function App() {
             }
             onClick={() => setOnly(null)}
           >
-            <span className="flex-1 truncate">{t("source-all")}</span>
+            <span className="flex-1 truncate">{t("desktop.sourceAll")}</span>
             <span className="type-meta text-tertiary">{snap.contexts.length}</span>
           </button>
           {snap.sources.map((s) => (
@@ -480,22 +500,24 @@ export function App() {
                   </span>
                   <span className="block truncate type-meta text-tertiary">
                     {s.kind === "default"
-                      ? t("source-default")
+                      ? t("desktop.sourceDefault")
                       : s.kind === "folder"
-                        ? t("source-folder")
+                        ? t("desktop.sourceFolder")
                         : s.kind === "pasted"
-                          ? t("source-pasted")
-                          : t("source-file")}
+                          ? t("desktop.sourcePasted")
+                          : t("desktop.sourceFile")}
                   </span>
                   {s.missing ? (
-                    <span className="block type-meta text-fail-strong">{t("source-missing")}</span>
+                    <span className="block type-meta text-fail-strong">
+                      {t("desktop.sourceMissing")}
+                    </span>
                   ) : null}
                   {s.errors.length > 0 ? (
                     <span
                       className="block type-meta text-warn-strong"
                       title={s.errors.map((e) => `${e.file}: ${e.reason}`).join("\n")}
                     >
-                      {t("source-errors", { n: s.errors.length })}
+                      {t("desktop.sourceErrors", s.errors.length)}
                     </span>
                   ) : null}
                 </span>
@@ -504,7 +526,7 @@ export function App() {
               <Button
                 variant="ghost"
                 size="icon-xs"
-                aria-label={t("source-remove", { name: baseName(s.path) })}
+                aria-label={t("desktop.sourceRemove", baseName(s.path))}
                 onClick={() => void api.removeSource(s.id).then(reload)}
               >
                 <XIcon aria-hidden="true" />
@@ -519,16 +541,18 @@ export function App() {
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex flex-col gap-3 border-b border-v2-border px-5 pt-4 pb-3">
           <div className="flex items-center gap-3">
-            <h1 className="type-title">{t("title")}</h1>
-            <span className="type-meta text-tertiary">{t("count", { n: visible.length })}</span>
+            <h1 className="type-title">{t("desktop.title")}</h1>
+            <span className="type-meta text-tertiary">{t("desktop.count", visible.length)}</span>
             {selected.size > 0 ? (
               <div className="ml-auto flex items-center gap-2">
-                <span className="type-meta text-secondary">{t("selected", { n: selected.size })}</span>
+                <span className="type-meta text-secondary">
+                  {t("desktop.selected", selected.size)}
+                </span>
                 <Button variant="ghost" size="sm" onClick={() => setSelected(new Set())}>
-                  {t("clear")}
+                  {t("desktop.clear")}
                 </Button>
                 <Button size="sm" onClick={() => openKeys([...selected])}>
-                  {t("open-n", { n: selected.size })}
+                  {t("desktop.openN", selected.size)}
                 </Button>
               </div>
             ) : null}
@@ -540,26 +564,28 @@ export function App() {
             />
             <Input
               className="pl-8"
-              placeholder={t("search")}
+              placeholder={t("desktop.search")}
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              aria-label={t("search")}
+              aria-label={t("desktop.search")}
             />
           </div>
         </header>
         <div className="flex-1 overflow-y-auto px-5 py-4">
           {recents.length > 0 ? (
             <section className="mb-5">
-              <p className="mb-2 type-label text-tertiary">{t("recent")}</p>
+              <p className="mb-2 type-label text-tertiary">{t("desktop.recent")}</p>
               <ul className="rounded-lg border border-v2-border bg-surface">{recents.map(row)}</ul>
             </section>
           ) : null}
           {visible.length === 0 ? (
-            <p className="py-10 text-center type-body text-secondary">{t("no-results", { q: query })}</p>
+            <p className="py-10 text-center type-body text-secondary">
+              {t("desktop.noResults", query)}
+            </p>
           ) : (
             <ul className="rounded-lg border border-v2-border bg-surface">{visible.map(row)}</ul>
           )}
-          <p className="mt-3 type-meta text-tertiary">{t("reach-note")}</p>
+          <p className="mt-3 type-meta text-tertiary">{t("desktop.reachNote")}</p>
         </div>
       </main>
       {pasteDialog}

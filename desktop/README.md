@@ -29,8 +29,8 @@ port 5173, and the app. The chooser is `web/desktop.html` with `web/src/desktop/
 - Search over name, server, user and file; filter by source; favourites (star, sorted first);
   the last five opened as "Recently opened"; select several and open them together. Each cluster
   opens in its own window.
-- English, Traditional Chinese and Simplified Chinese from Fluent files in
-  `web/src/desktop/locales/`. The first language comes from the system; the picker in the sidebar
+- English, Traditional Chinese and Simplified Chinese from the web interface's own
+  catalogues (`web/src/i18n`, keys starting with `desktop.`). The first language comes from the system; the picker in the sidebar
   switches it live.
 
 What is mocked: every "Open" loads the same web URL (`ZEABUR_DESKTOP_WEB`, default the dev server)
