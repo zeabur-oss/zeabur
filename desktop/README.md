@@ -54,6 +54,17 @@ a TCP connection.
 - Windows and Linux: the system title bar, no menu bar, and the app quits when the last window
   closes.
 
+## Icon
+
+`icons/logo-for-dark-bg.svg` is the mark from Zeabur's logo pack, unchanged. `icons/icon.svg` puts it,
+504 px wide, on the 824 px rounded square of Apple's 1024 px macOS icon grid, in the logo's own dark
+(`#141216`). A white square loses the dark stroke of the Z when macOS shows icons in its dark style.
+The other files in `icons/` come from it:
+
+```sh
+cargo tauri icon desktop/icons/icon.svg -o desktop/icons  # then delete android/, ios/, 64x64.png, Square*.png, StoreLogo.png
+```
+
 ## Screenshots
 
 `desktop/shots/<lang>-<screen>-<theme>.png` (made by `desktop/shots.sh`), 4 languages × light and dark, taken from the running
