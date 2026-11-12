@@ -13,9 +13,9 @@ use std::io::IsTerminal as _;
 use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
-use zeabur_api::images::https::{Https, Reach, tls};
 use zeabur_api::releases::{self, Answer, RELEASES_URL};
 use zeabur_api::views::ZeaburNewer;
+use zeabur_http::{Https, Reach, tls};
 
 use crate::output;
 

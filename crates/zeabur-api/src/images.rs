@@ -9,9 +9,9 @@
 //! A registry that cannot be read is an answer, not an error: deploying never waits on it.
 //! Answers are kept for a few minutes, per credential.
 
-pub mod https;
 mod reference;
 pub mod registry;
+mod transport;
 
 use std::collections::{BTreeMap, HashMap};
 use std::future::Future;
@@ -49,7 +49,7 @@ pub struct Inspector {
     insecure: Vec<String>,
     kept: Mutex<HashMap<String, (Instant, Inspected)>>,
     /// Which addresses the server may connect to.
-    reach: https::Reach,
+    reach: zeabur_http::Reach,
 }
 
 impl std::fmt::Debug for Inspector {
@@ -68,26 +68,29 @@ impl Inspector {
             transport,
             insecure,
             kept: Mutex::new(HashMap::new()),
-            reach: https::Reach::Any,
+            reach: zeabur_http::Reach::Any,
         }
     }
 
     /// Which addresses the server may connect to.
     #[must_use]
-    pub const fn reach(&self) -> https::Reach {
+    pub const fn reach(&self) -> zeabur_http::Reach {
         self.reach
     }
 
-    /// Through [`https::Https`] reaching `reach`, trusting what `tls` trusts (see
-    /// [`https::tls`]); the registry of Zeabur Builder is read over HTTPS like any other.
+    /// Through [`zeabur_http::Https`] reaching `reach`, trusting what `tls` trusts (see
+    /// [`zeabur_http::tls`]); the registry of Zeabur Builder is read over HTTPS like any other.
     #[must_use]
-    pub fn connected(reach: https::Reach, tls: &Result<Arc<rustls::ClientConfig>, String>) -> Self {
+    pub fn connected(
+        reach: zeabur_http::Reach,
+        tls: &Result<Arc<rustls::ClientConfig>, String>,
+    ) -> Self {
         let transport: Arc<dyn Transport> = match tls {
-            Ok(tls) => Arc::new(https::Https::new(reach, tls)),
+            Ok(tls) => Arc::new(zeabur_http::Https::new(reach, tls)),
             Err(error) => Arc::new(Broken(error.clone())),
         };
         let mut insecure: Vec<String> = Vec::new();
-        if reach == https::Reach::Any {
+        if reach == zeabur_http::Reach::Any {
             insecure.extend(["localhost".to_owned(), "127.0.0.1".to_owned()]);
         }
         Self {

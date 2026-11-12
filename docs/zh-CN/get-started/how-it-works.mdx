@@ -1,7 +1,6 @@
 ---
 title: Zeabur 如何管理服务
 description: 用四个场景说明 Zeabur 和 Kubernetes 如何分工：已有部署、他人同时修改、权限不足、移除 Zeabur。
-source: "2fc105250420"
 ---
 
 Zeabur 没有自己的数据库。你在 Zeabur 看到的项目、服务、域名，都直接从 Kubernetes 读取。你在 Zeabur 做的修改，也直接写回 Kubernetes 对象。下面四个场景说明这在日常操作中意味着什么。

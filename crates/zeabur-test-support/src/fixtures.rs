@@ -1,7 +1,8 @@
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use serde::Deserialize;
+use serde::de::DeserializeOwned;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 
 /// Loads every case of an area from the calling crate's own `fixtures/` directory, sorted by
@@ -110,6 +111,20 @@ pub fn load_from(root: &Path, area: &str) -> Result<Vec<Fixture>, LoadError> {
     dirs.iter().map(|d| load_case(area, d)).collect()
 }
 
+/// Loads the case whose `case.yaml` is `file`, in the directory `<area>/<case>`.
+///
+/// # Errors
+///
+/// When a file of the case cannot be read or parsed.
+pub fn load_case_file(file: &Path) -> Result<Fixture, LoadError> {
+    let dir = file.parent().unwrap_or_else(|| Path::new(""));
+    let area = dir.parent().and_then(Path::file_name);
+    load_case(
+        &area.map_or_else(String::new, |n| n.to_string_lossy().into_owned()),
+        dir,
+    )
+}
+
 fn load_case(area: &str, dir: &Path) -> Result<Fixture, LoadError> {
     let file = dir.file_name().map(|n| n.to_string_lossy().into_owned());
     let name = format!("{area}/{}", file.unwrap_or_default());
@@ -137,7 +152,7 @@ fn load_case(area: &str, dir: &Path) -> Result<Fixture, LoadError> {
     })
 }
 
-fn parse_yaml<T: serde::de::DeserializeOwned>(path: &Path) -> Result<T, LoadError> {
+fn parse_yaml<T: DeserializeOwned>(path: &Path) -> Result<T, LoadError> {
     serde_saphyr::from_str(&read(path)?).map_err(|e| parse_error(path, &e))
 }
 
@@ -152,6 +167,123 @@ fn parse_error(path: &Path, error: &dyn std::fmt::Display) -> LoadError {
     LoadError::Parse {
         path: path.to_path_buf(),
         message: error.to_string(),
+    }
+}
+
+/// One operation of a fixture area, with the type of its parameters.
+///
+/// A case runs through [`run_op`], which reads `params` as [`FixtureOp::Params`]; a misspelt,
+/// extra or wrongly typed parameter fails when the case loads.
+pub trait FixtureOp {
+    /// The operation name in `case.yaml`, `<area>.<name>`.
+    const NAME: &'static str;
+    /// The parameters. Derive `Deserialize` with `deny_unknown_fields`.
+    type Params: DeserializeOwned;
+    /// Runs the operation on the case's input objects.
+    ///
+    /// # Errors
+    ///
+    /// When the input objects do not fit the operation.
+    fn run(input: &[Value], params: Self::Params) -> Result<Value, String>;
+}
+
+/// Runs a case through its operation.
+///
+/// # Errors
+///
+/// When the case names another operation or its `params` do not fit [`FixtureOp::Params`].
+pub fn run_op<Op: FixtureOp>(fixture: &Fixture) -> Result<Value, String> {
+    if fixture.case.operation != Op::NAME {
+        return Err(format!(
+            "{}: operation {} is not {}",
+            fixture.name,
+            fixture.case.operation,
+            Op::NAME
+        ));
+    }
+    // A case without `params` has none, as an operation with no parameters expects.
+    let mut params = fixture.case.params.clone();
+    if params.is_null() {
+        params = Value::Object(serde_json::Map::new());
+    }
+    let params = serde_json::from_value(params)
+        .map_err(|e| format!("{}: params of {}: {e}", fixture.name, Op::NAME))?;
+    Op::run(&fixture.input, params).map_err(|e| format!("{}: {e}", fixture.name))
+}
+
+/// The parameters of an operation that takes none: only an empty map fits.
+#[derive(Debug)]
+pub struct NoParams;
+
+impl<'de> Deserialize<'de> for NoParams {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let given = Value::deserialize(deserializer)?;
+        if given.as_object().is_some_and(serde_json::Map::is_empty) {
+            Ok(Self)
+        } else {
+            Err(serde::de::Error::custom(format!(
+                "expected no parameters, got {given}"
+            )))
+        }
+    }
+}
+
+/// A parameter of a type that ignores unknown fields (a wire type).
+///
+/// Reading it fails when the fixture holds a field the type drops, unless its value could be the
+/// default the type leaves out.
+#[derive(Debug, Clone, Default)]
+pub struct Strict<T>(pub T);
+
+impl<'de, T: DeserializeOwned + Serialize> Deserialize<'de> for Strict<T> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        use serde::de::Error;
+        let given = Value::deserialize(deserializer)?;
+        let mut ignored = Vec::new();
+        let value: T = serde_ignored::deserialize(&given, |path| ignored.push(path.to_string()))
+            .map_err(D::Error::custom)?;
+        if let Some(path) = ignored.first() {
+            return Err(D::Error::custom(format!("unknown field at {path}")));
+        }
+        // serde_ignored does not see inside an internally tagged enum, which buffers its
+        // fields; a field the type does not write back is found by comparing.
+        let kept = serde_json::to_value(&value).map_err(D::Error::custom)?;
+        if let Some(path) = dropped("$", &given, &kept) {
+            return Err(D::Error::custom(format!("unknown field at {path}")));
+        }
+        Ok(Self(value))
+    }
+}
+
+/// The first place where `given` has a field that `kept` lacks. A value that could be the
+/// default a type leaves out when it writes (`null`, `false`, `0`, `""`, `[]`, `{}`) is not
+/// reported, as it changes nothing.
+fn dropped(path: &str, given: &Value, kept: &Value) -> Option<String> {
+    match (given, kept) {
+        (Value::Object(given), Value::Object(kept)) => given.iter().find_map(|(key, value)| {
+            let at = format!("{path}.{key}");
+            match kept.get(key) {
+                Some(kept) => dropped(&at, value, kept),
+                None => (!is_default_like(value)).then_some(at),
+            }
+        }),
+        (Value::Array(given), Value::Array(kept)) => given
+            .iter()
+            .zip(kept)
+            .enumerate()
+            .find_map(|(index, (g, k))| dropped(&format!("{path}[{index}]"), g, k)),
+        _ => None,
+    }
+}
+
+fn is_default_like(value: &Value) -> bool {
+    match value {
+        Value::Null => true,
+        Value::Bool(flag) => !flag,
+        Value::Number(number) => number.as_f64() == Some(0.0),
+        Value::String(text) => text.is_empty(),
+        Value::Array(items) => items.is_empty(),
+        Value::Object(fields) => fields.is_empty(),
     }
 }
 
@@ -231,9 +363,10 @@ fn compare_at(path: &str, expected: &Value, actual: &Value) -> Result<(), String
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde::Deserialize;
+    use serde_json::{Value, json};
 
-    use super::compare;
+    use super::{Case, Fixture, FixtureOp, Strict, compare, run_op};
 
     #[test]
     fn fields_left_out_are_not_asserted() {
@@ -266,5 +399,125 @@ mod tests {
             compare(&json!({"a": {"b": 1}}), &json!({"a": {}})),
             Err("$.a.b: missing, expected 1".to_owned())
         );
+    }
+
+    #[derive(Deserialize)]
+    #[serde(deny_unknown_fields)]
+    struct Pair {
+        left: u32,
+        #[serde(default)]
+        nested: Option<Strict<Vec<Leaf>>>,
+    }
+
+    impl Pair {
+        fn weight(&self) -> usize {
+            let leaves = self.nested.iter().flat_map(|n| &n.0);
+            self.left as usize + leaves.map(|l| l.name.len() + l.tags.len()).sum::<usize>()
+        }
+    }
+
+    #[derive(Deserialize, serde::Serialize)]
+    struct Leaf {
+        name: String,
+        #[serde(default)]
+        tags: Vec<String>,
+    }
+
+    #[derive(Deserialize, serde::Serialize)]
+    #[serde(tag = "op", rename_all = "camelCase")]
+    enum Tagged {
+        Delete {
+            name: String,
+            #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+            owned: bool,
+        },
+    }
+
+    struct Add;
+
+    impl FixtureOp for Add {
+        const NAME: &'static str = "test.add";
+        type Params = Pair;
+        fn run(_: &[Value], params: Pair) -> Result<Value, String> {
+            Ok(json!(params.weight()))
+        }
+    }
+
+    fn case(operation: &str, params: Value) -> Fixture {
+        Fixture {
+            name: "test/case".to_owned(),
+            dir: "".into(),
+            case: Case {
+                description: String::new(),
+                operation: operation.to_owned(),
+                params,
+            },
+            input: Vec::new(),
+            expected: Value::Null,
+        }
+    }
+
+    #[test]
+    fn a_case_runs_with_its_parameters() {
+        assert_eq!(
+            run_op::<Add>(&case("test.add", json!({"left": 2}))),
+            Ok(json!(2))
+        );
+    }
+
+    #[test]
+    fn a_misspelt_extra_or_mistyped_parameter_fails_the_load() {
+        for params in [
+            json!({"lefft": 2}),
+            json!({"left": 2, "right": 1}),
+            json!({"left": "2"}),
+            json!({}),
+            Value::Null,
+        ] {
+            assert!(
+                run_op::<Add>(&case("test.add", params.clone())).is_err(),
+                "{params}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_nested_wire_type_refuses_a_field_it_would_drop() {
+        let nested =
+            |leaf: Value| run_op::<Add>(&case("test.add", json!({"left": 1, "nested": [leaf]})));
+        assert!(nested(json!({"name": "a"})).is_ok());
+        assert!(nested(json!({"name": "a", "colour": null})).is_err());
+        assert!(nested(json!({"name": "a", "tags": []})).is_ok());
+        let error = nested(json!({"name": "a", "colour": "red"})).unwrap_err();
+        assert!(error.contains("0.colour"), "{error}");
+    }
+
+    #[test]
+    fn an_internally_tagged_variant_refuses_an_unknown_field_too() {
+        let tagged = |change: Value| {
+            serde_json::from_value::<Strict<Vec<Tagged>>>(json!([change])).map(|c| c.0.len())
+        };
+        assert!(tagged(json!({"op": "delete", "name": "a"})).is_ok());
+        assert!(tagged(json!({"op": "delete", "name": "a", "owned": false})).is_ok());
+        assert!(tagged(json!({"op": "delete", "name": "a", "owend": true})).is_err());
+    }
+
+    #[test]
+    fn parameters_given_to_an_operation_without_any_fail_the_load() {
+        struct Nothing;
+        impl FixtureOp for Nothing {
+            const NAME: &'static str = "test.nothing";
+            type Params = super::NoParams;
+            fn run(_: &[Value], _: Self::Params) -> Result<Value, String> {
+                Ok(json!(true))
+            }
+        }
+        assert!(run_op::<Nothing>(&case("test.nothing", Value::Null)).is_ok());
+        assert!(run_op::<Nothing>(&case("test.nothing", json!({"x": 1}))).is_err());
+    }
+
+    #[test]
+    fn a_case_of_another_operation_is_refused() {
+        assert!(run_op::<Add>(&case("test.sub", json!({"left": 1}))).is_err());
     }
 }

@@ -111,7 +111,7 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
       ) : null}
 
       {planned && "error" in planned ? (
-        <Alert variant="destructive">
+        <Alert variant="destructive" role="alert">
           <AlertTitle>{t("common.error")}</AlertTitle>
           <AlertDescription>{planned.error}</AlertDescription>
         </Alert>
@@ -273,7 +273,7 @@ export function ReviewStep({ wizard }: { wizard: Wizard }) {
       ) : null}
 
       {warnings.length ? (
-        <Alert variant="warn">
+        <Alert variant="warn" role="note">
           <WarningIcon aria-hidden="true" />
           <AlertTitle>{t("review.warnings")}</AlertTitle>
           <AlertDescription>

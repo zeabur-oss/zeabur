@@ -34,6 +34,15 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_secret_read_generically_keeps_its_keys_but_not_its_values() {
+        contract::a_secret_read_generically_keeps_its_keys_but_not_its_values(
+            &cluster(),
+            NAMESPACE,
+        )
+        .await;
+    }
+
+    #[tokio::test]
     async fn a_dry_run_validates_strictly_and_stores_nothing() {
         contract::a_dry_run_validates_strictly_and_stores_nothing(&cluster(), NAMESPACE).await;
     }

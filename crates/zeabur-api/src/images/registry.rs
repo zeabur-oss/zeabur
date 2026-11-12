@@ -15,8 +15,10 @@
 use std::collections::BTreeSet;
 use std::fmt;
 use std::future::Future;
+use std::net::IpAddr;
 use std::pin::Pin;
 
+use axum::http::Uri;
 use base64::Engine as _;
 use secrecy::zeroize::Zeroizing;
 use secrecy::{ExposeSecret as _, SecretString};
@@ -261,7 +263,7 @@ impl Session<'_> {
                 .map_err(Unreadable::Unreachable)?;
             match answer.status {
                 200 => return Ok(answer),
-                401 if !challenged => {
+                401 if !challenged && redirects == 0 => {
                     challenged = true;
                     let challenge = answer.www_authenticate.as_deref().unwrap_or_default();
                     self.authorization = Some(self.authorize(challenge).await?);
@@ -272,13 +274,10 @@ impl Session<'_> {
                     let location = answer.location.ok_or_else(|| {
                         Unreadable::Unexpected("a redirect without a location".to_owned())
                     })?;
-                    let next = join(&url, &location)?;
-                    // A blob is often served from another host, such as a CDN with a signed URL;
-                    // the registry's credentials stay with the registry.
-                    if origin(&next) != origin(&url) {
-                        authorization = None;
-                    }
-                    url = next;
+                    url = join(&url, &location)?;
+                    // The registry's credentials and token go only to the URL Zeabur asked for:
+                    // no hop of a redirect carries them, and a challenge after one is not answered.
+                    authorization = None;
                 }
                 401 | 403 => return Err(Unreadable::Unauthorized),
                 404 => return Err(Unreadable::NotFound),
@@ -308,11 +307,7 @@ impl Session<'_> {
             .find(|(k, _)| k == "realm")
             .map(|(_, v)| v.clone())
             .ok_or(Unreadable::Unauthorized)?;
-        if !realm.starts_with("https://") && origin(&realm) != origin(&self.base) {
-            return Err(Unreadable::Unexpected(format!(
-                "the token service {realm} is not HTTPS"
-            )));
-        }
+        check_realm(&realm, &self.base)?;
         let query = {
             let mut query = form_urlencoded::Serializer::new(String::new());
             if let Some((_, service)) = params.iter().find(|(k, _)| k == "service") {
@@ -357,6 +352,69 @@ impl Session<'_> {
 
 fn manifest_path(reference: &Reference, tag_or_digest: &str) -> String {
     format!("/v2/{}/manifests/{tag_or_digest}", reference.repository)
+}
+
+/// Refuses a token service the registry's credentials must not go to: one not on `https`, or on
+/// a loopback, link-local or private address unless the registry is on that host too. Any other
+/// host is allowed, as the token service may be on a host of its own (Docker Hub's is
+/// `auth.docker.io`) [docker-token].
+///
+/// [docker-token]: https://distribution.github.io/distribution/spec/auth/token/
+fn check_realm(realm: &str, base: &str) -> Result<(), Unreadable> {
+    let refuse = |why: &str| {
+        Err(Unreadable::Unexpected(format!(
+            "the token service {realm} {why}"
+        )))
+    };
+    let Ok(uri) = realm.parse::<Uri>() else {
+        return refuse("is not a URL");
+    };
+    if uri.scheme_str() != Some("https") {
+        return refuse("is not HTTPS");
+    }
+    let Some(host) = uri.host().map(bare_host) else {
+        return refuse("names no host");
+    };
+    let registry = base
+        .parse::<Uri>()
+        .ok()
+        .and_then(|b| b.host().map(bare_host));
+    if registry.as_deref() == Some(host.as_str()) || !internal(&host) {
+        Ok(())
+    } else {
+        refuse("is on a loopback, link-local or private address")
+    }
+}
+
+/// A URL's host, lower case, without the brackets of an IPv6 address or a trailing dot.
+fn bare_host(host: &str) -> String {
+    host.trim_start_matches('[')
+        .trim_end_matches(']')
+        .trim_end_matches('.')
+        .to_ascii_lowercase()
+}
+
+/// `localhost`, or an address that is loopback, link-local, private or unspecified.
+fn internal(host: &str) -> bool {
+    if host == "localhost" || host.ends_with(".localhost") {
+        return true;
+    }
+    let ip = match host.parse::<IpAddr>() {
+        Ok(IpAddr::V6(v6)) => v6.to_ipv4_mapped().map_or(IpAddr::V6(v6), IpAddr::V4),
+        Ok(ip) => ip,
+        Err(_) => return false,
+    };
+    match ip {
+        IpAddr::V4(v4) => {
+            v4.is_loopback() || v4.is_link_local() || v4.is_private() || v4.is_unspecified()
+        }
+        IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || v6.is_unicast_link_local()
+                || v6.is_unique_local()
+                || v6.is_unspecified()
+        }
+    }
 }
 
 /// `key="value"` pairs of a challenge (RFC 9110, §11.2), values unquoted.
@@ -807,6 +865,224 @@ mod tests {
         );
     }
 
+    fn me() -> Credential {
+        Credential {
+            username: "me".to_owned(),
+            password: SecretString::from("secret".to_owned()),
+        }
+    }
+
+    type Answers = Box<dyn Fn(&Get) -> Answer + Send + Sync>;
+
+    /// A transport that answers with `answers` and keeps what was sent.
+    struct Scripted {
+        answers: Answers,
+        sent: std::sync::Mutex<Vec<Get>>,
+    }
+
+    impl Scripted {
+        fn new(answers: impl Fn(&Get) -> Answer + Send + Sync + 'static) -> Self {
+            Self {
+                answers: Box::new(answers),
+                sent: std::sync::Mutex::default(),
+            }
+        }
+
+        /// The URLs of the requests that carried an `Authorization` header.
+        fn authorized(&self) -> Vec<String> {
+            self.sent.lock().map_or_default(|sent| {
+                sent.iter()
+                    .filter(|g| g.authorization.is_some())
+                    .map(|g| g.url.clone())
+                    .collect()
+            })
+        }
+
+        fn urls(&self) -> Vec<String> {
+            self.sent
+                .lock()
+                .map_or_default(|sent| sent.iter().map(|g| g.url.clone()).collect())
+        }
+    }
+
+    impl Transport for Scripted {
+        fn get<'a>(
+            &'a self,
+            get: Get,
+        ) -> Pin<Box<dyn Future<Output = Result<Answer, String>> + Send + 'a>> {
+            let answer = (self.answers)(&get);
+            if let Ok(mut sent) = self.sent.lock() {
+                sent.push(get);
+            }
+            Box::pin(async move { Ok(answer) })
+        }
+    }
+
+    fn status(status: u16) -> Answer {
+        Answer {
+            status,
+            ..Answer::default()
+        }
+    }
+
+    fn challenge(header: &str) -> Answer {
+        Answer {
+            status: 401,
+            www_authenticate: Some(header.to_owned()),
+            ..Answer::default()
+        }
+    }
+
+    fn redirect(location: &str) -> Answer {
+        Answer {
+            status: 307,
+            location: Some(location.to_owned()),
+            ..Answer::default()
+        }
+    }
+
+    async fn read_from(transport: &Scripted, base: &str) -> Result<Inspected, Unreadable> {
+        inspect(
+            transport,
+            &reference("registry.test/acme/api:1"),
+            base.to_owned(),
+            Some(&me()),
+            &["amd64".to_owned()],
+        )
+        .await
+    }
+
+    #[tokio::test]
+    async fn a_token_service_that_is_not_https_or_is_internal_gets_no_request() {
+        let realms = [
+            "http://registry.test/token",
+            "http://auth.test/token",
+            "ftp://auth.test/token",
+            "https://127.0.0.1/token",
+            "https://localhost/token",
+            "https://auth.localhost./token",
+            "https://169.254.169.254/latest",
+            "https://10.0.0.1/token",
+            "https://192.168.1.1/token",
+            "https://[::1]/token",
+            "https://[fe80::1]/token",
+            "https://[fd00::1]/token",
+            "https://[::ffff:127.0.0.1]/token",
+        ];
+        for realm in realms {
+            let header = format!("Bearer realm=\"{realm}\",service=\"registry.test\"");
+            let registry = Scripted::new(move |_| challenge(&header));
+            let read = read_from(&registry, REGISTRY).await;
+            assert!(
+                matches!(read, Err(Unreadable::Unexpected(_))),
+                "{realm}: {read:?}"
+            );
+            assert!(
+                registry.urls().iter().all(|u| u.starts_with(REGISTRY)),
+                "{realm}: {:?}",
+                registry.urls()
+            );
+            assert!(registry.authorized().is_empty(), "{realm}");
+        }
+    }
+
+    #[tokio::test]
+    async fn a_registry_on_an_internal_address_may_name_a_token_service_on_its_own_host() {
+        let base = "https://10.0.0.5:5000";
+        let registry = Scripted::new(|get| {
+            if get.url.starts_with("https://10.0.0.5:5001/token?") {
+                return Answer {
+                    status: 200,
+                    body: br#"{"token":"t"}"#.to_vec(),
+                    ..Answer::default()
+                };
+            }
+            if get
+                .authorization
+                .as_ref()
+                .map(|a| a.expose_secret().to_owned())
+                == Some("Bearer t".to_owned())
+            {
+                return status(404);
+            }
+            challenge(r#"Bearer realm="https://10.0.0.5:5001/token""#)
+        });
+        assert_eq!(read_from(&registry, base).await, Err(Unreadable::NotFound));
+        assert!(
+            registry
+                .authorized()
+                .iter()
+                .any(|u| u.starts_with("https://10.0.0.5:5001/token?")),
+            "{:?}",
+            registry.urls()
+        );
+    }
+
+    #[tokio::test]
+    async fn no_hop_of_a_redirect_carries_the_registry_credentials() {
+        let manifest = format!("{REGISTRY}/v2/acme/api/manifests/1");
+        let targets = [
+            format!("{REGISTRY}/v2/acme/api/manifests/2"),
+            "http://registry.test/v2/acme/api/manifests/1".to_owned(),
+            "https://other.test/v2/acme/api/manifests/1".to_owned(),
+        ];
+        let challenges = [
+            "Basic realm=\"registry.test\"".to_owned(),
+            format!("Bearer realm=\"{}\",service=\"registry.test\"", fake::REALM),
+        ];
+        for target in &targets {
+            for header in &challenges {
+                // The registry challenges first and redirects once authorized; every redirect
+                // target challenges too.
+                let (first, next, answer) = (manifest.clone(), target.clone(), header.clone());
+                let registry = Scripted::new(move |get| {
+                    if get.url.starts_with(fake::REALM) {
+                        return Answer {
+                            status: 200,
+                            body: br#"{"token":"t"}"#.to_vec(),
+                            ..Answer::default()
+                        };
+                    }
+                    if get.url == first && get.authorization.is_some() {
+                        return redirect(&next);
+                    }
+                    challenge(&answer)
+                });
+                assert_eq!(
+                    read_from(&registry, REGISTRY).await,
+                    Err(Unreadable::Unauthorized),
+                    "{target} after {header}"
+                );
+                for url in registry.authorized() {
+                    assert!(
+                        url == manifest || url.starts_with(fake::REALM),
+                        "{url} got credentials ({target} after {header})"
+                    );
+                }
+            }
+        }
+    }
+
+    #[tokio::test]
+    async fn a_challenge_after_an_anonymous_redirect_is_not_answered() {
+        let registry = Scripted::new(|get| {
+            if get.url.starts_with(REGISTRY) {
+                return redirect("https://other.test/v2/acme/api/manifests/1");
+            }
+            challenge(r#"Bearer realm="https://other.test/token",service="other.test""#)
+        });
+        assert_eq!(
+            read_from(&registry, REGISTRY).await,
+            Err(Unreadable::Unauthorized)
+        );
+        assert!(registry.authorized().is_empty(), "{:?}", registry.urls());
+        assert!(
+            !registry.urls().iter().any(|u| u.contains("/token")),
+            "{:?}",
+            registry.urls()
+        );
+    }
+
     #[tokio::test]
     async fn a_private_image_needs_its_credentials_at_the_token_service() {
         let mut registry = Registry::default().with_index(
@@ -845,6 +1121,16 @@ mod tests {
             ]
         );
         assert_eq!(read.user, "1000");
+        // The credentials go to the token service the challenge names, on a host of its own,
+        // and the token only to the registry.
+        for get in registry.sent() {
+            let Some(authorization) = &get.authorization else {
+                continue;
+            };
+            let basic = authorization.expose_secret().starts_with("Basic ");
+            assert_eq!(basic, get.url.starts_with(fake::REALM), "{}", get.url);
+            assert!(basic || get.url.starts_with(REGISTRY), "{}", get.url);
+        }
     }
 
     #[tokio::test]

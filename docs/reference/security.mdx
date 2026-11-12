@@ -71,7 +71,24 @@ Some connections must stay open:
 
 - With `access.mode: domain`, Let's Encrypt uses HTTP-01 validation, so TCP 80 must be open to the internet. You can close it if you switch to DNS-01 for certificate issuance. See [Create an issuer for wildcard domains](../configure/domains.mdx#create-an-issuer-for-wildcard-domains).
 - Services' own public domains remain publicly accessible and aren't affected.
-- The Kubernetes API uses TCP 6443, and nodes join through port 9345. These don't go through the dashboard. Restrict their sources separately to administrators and nodes.
+- On RKE2, nodes join through TCP 9345. Like the Kubernetes API, it doesn't go through the dashboard, so open it only to nodes.
+
+## Kubernetes API
+
+Zeabur keeps kube-apiserver directly reachable (TCP 6443). It authenticates every request itself, accepting Zeabur Identity tokens and ServiceAccount tokens, and anonymous access is off.
+
+Open 6443 only to what needs the API:
+
+- Nodes.
+- Administrators' addresses.
+- CI runners with fixed addresses.
+
+Avoid exposing it to the internet. Instead:
+
+- Connect over a private network or VPN.
+- For a single job such as a deploy step, run a small service in the cluster, behind HTTPS, with its own ServiceAccount. Callers then don't need the API.
+
+On K3s, workers also join through 6443. If you close 6443 to the internet, workers must join over a private network. See [Nodes](../cluster/nodes.mdx).
 
 ## Secrets and general configuration
 

@@ -1,0 +1,28 @@
+[package]
+name = "zeabur-http"
+description = "zeabur: the one outbound HTTP client, with HTTPS_PROXY support and the address guard"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+bytes.workspace = true
+http.workspace = true
+http-body.workspace = true
+http-body-util.workspace = true
+hyper.workspace = true
+hyper-util = { workspace = true, features = ["client-proxy"] }
+rustls.workspace = true
+rustls-platform-verifier.workspace = true
+tokio = { workspace = true, features = ["net", "rt", "time", "io-util"] }
+tokio-rustls.workspace = true
+tower.workspace = true
+
+[dev-dependencies]
+zeabur-test-support = { workspace = true, features = ["tls"] }
+tokio = { workspace = true, features = ["macros", "rt", "test-util"] }

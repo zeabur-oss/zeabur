@@ -8,7 +8,7 @@
 //!
 //! A URL is fetched only when its host is the location's endpoint, so a changed status cannot
 //! send Zeabur's requests elsewhere, and only at addresses the server may reach
-//! ([`https::Reach`]).
+//! ([`zeabur_http::Reach`]).
 //!
 //! [velero-download]: https://velero.io/docs/v1.17/api-types/downloadrequest/
 //! [s3-ssec]: https://docs.aws.amazon.com/AmazonS3/latest/userguide/ServerSideEncryptionCustomerKeys.html
@@ -21,8 +21,7 @@ use base64::engine::general_purpose::STANDARD;
 use bytes::Bytes;
 use http_body_util::Empty;
 use hyper_util::client::legacy::Client;
-
-use crate::images::https::{self, Connector, IDLE, Tls, connector, describe, pooled, refuse_named};
+use zeabur_http::{self, Connector, IDLE, Tls, connector, describe, pooled, refuse_named};
 
 /// How long the store may take to start answering.
 const FIRST_BYTE: Duration = Duration::from_secs(30);
@@ -31,7 +30,7 @@ const FIRST_BYTE: Duration = Duration::from_secs(30);
 #[derive(Clone)]
 pub struct Fetcher {
     client: Result<Client<Connector, Empty<Bytes>>, String>,
-    reach: https::Reach,
+    reach: zeabur_http::Reach,
 }
 
 impl std::fmt::Debug for Fetcher {
@@ -45,7 +44,7 @@ impl std::fmt::Debug for Fetcher {
 impl Fetcher {
     /// A client that connects where `reach` allows and trusts what `tls` trusts.
     #[must_use]
-    pub fn new(reach: https::Reach, tls: &Tls) -> Self {
+    pub fn new(reach: zeabur_http::Reach, tls: &Tls) -> Self {
         let client = tls
             .as_ref()
             .map(|tls| pooled(connector(reach, tls), IDLE))
@@ -242,8 +241,8 @@ mod tests {
     #[tokio::test]
     async fn the_store_trusts_the_extra_ca_and_still_refuses_link_local_addresses() {
         let broken = Fetcher::new(
-            https::Reach::Public,
-            &https::tls(Some(b"not a certificate")),
+            zeabur_http::Reach::Public,
+            &zeabur_http::tls(Some(b"not a certificate")),
         );
         let error = broken.get("https://s3.example.com/b/k", Vec::new()).await;
         assert!(
@@ -251,7 +250,7 @@ mod tests {
             "{:?}",
             error.map(|r| r.status())
         );
-        let store = Fetcher::new(https::Reach::Public, &https::tls(None));
+        let store = Fetcher::new(zeabur_http::Reach::Public, &zeabur_http::tls(None));
         let refused = store.get("https://169.254.169.254/b/k", Vec::new()).await;
         assert!(
             refused
@@ -264,7 +263,10 @@ mod tests {
 
     async fn fetch_over_tls(extra_ca: Option<&str>) -> Result<u16, String> {
         let address = zeabur_test_support::tls::serve().await;
-        let store = Fetcher::new(https::Reach::Any, &https::tls(extra_ca.map(str::as_bytes)));
+        let store = Fetcher::new(
+            zeabur_http::Reach::Any,
+            &zeabur_http::tls(extra_ca.map(str::as_bytes)),
+        );
         store
             .get(&format!("https://{address}/b/k"), Vec::new())
             .await

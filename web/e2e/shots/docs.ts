@@ -44,7 +44,7 @@ test.describe(() => {
   test("installer-review", async ({ page, shot }) => {
     await page.goto("/", { waitUntil: "networkidle" })
     await toStep(page, "review")
-    await expect(page.locator('[role="alert"]')).toBeVisible()
+    await expect(page.locator('[data-slot="alert"]')).toBeVisible()
     await shot()
   })
   test.describe(() => {
@@ -883,7 +883,7 @@ test.describe(() => {
   test("installer", async ({ page, shot }) => {
     await page.goto("/", { waitUntil: "networkidle" })
     await toStep(page, "review")
-    await expect(page.locator('[role="alert"]')).toBeVisible()
+    await expect(page.locator('[data-slot="alert"]')).toBeVisible()
     await shot()
   })
 })

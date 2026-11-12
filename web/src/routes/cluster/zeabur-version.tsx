@@ -3,7 +3,7 @@ import { useState } from "react"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 
 import type { Schemas } from "@/api/client"
-import { zeaburQuery } from "@/api/queries"
+import { updateQuery, zeaburQuery } from "@/api/queries"
 import { Command } from "@/components/bits"
 import { StatusPill } from "@/components/status"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -18,7 +18,7 @@ import {
 } from "@zeabur-oss/design-system/components/dialog"
 import { useI18n, useT } from "@/i18n"
 import { docsUrl } from "@/lib/docs"
-import { updateQuery, type Newer } from "@/model/update-check"
+import { type Newer } from "@/model/update-check"
 
 export function useNewer(): {
   zeabur?: Schemas.ZeaburVersion

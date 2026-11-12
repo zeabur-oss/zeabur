@@ -15,8 +15,10 @@ import {
   clusterNameQuery,
   clusterQuery,
   metricsStoreQuery,
-  queryClient,
+  refresh,
+  refreshHistories,
   signInSettingQuery,
+  setQueryData,
   whoamiQuery,
 } from "@/api/queries"
 import { Hint, Panel, Row, Rows, Segmented } from "@/components/bits"
@@ -187,8 +189,8 @@ function NameForm({ setting, cluster }: { setting: NameSetting; cluster: Schemas
   const save = useMutation({
     mutationFn: async (name: string | null) => await zeabur.setClusterName({ name }),
     onSuccess: (next) => {
-      queryClient.setQueryData(clusterNameQuery.queryKey, next)
-      void queryClient.invalidateQueries({ queryKey: clusterQuery.queryKey, exact: true })
+      setQueryData(clusterNameQuery, next)
+      void refresh(clusterQuery, true)
       toast.success(t("settings.storeSaved"))
     },
   })
@@ -308,11 +310,9 @@ function StoreForm({ setting }: { setting: StoreSetting }) {
   const save = useMutation({
     mutationFn: async (service: string | null) => await zeabur.setMetricsStore({ service }),
     onSuccess: (next) => {
-      queryClient.setQueryData(metricsStoreQuery.queryKey, next)
+      setQueryData(metricsStoreQuery, next)
       // Every history was read from the store this replaces.
-      void queryClient.invalidateQueries({
-        predicate: (query) => query.queryKey[0] === "project" && query.queryKey[2] === "history",
-      })
+      void refreshHistories()
       toast.success(t("settings.storeSaved"))
     },
   })
@@ -446,7 +446,7 @@ function SignInForm({ setting }: { setting: SignInSetting }) {
   const save = useMutation({
     mutationFn: async (body: Schemas.SignInChange) => await zeabur.setSignInSetting(body),
     onSuccess: (next) => {
-      queryClient.setQueryData(signInSettingQuery.queryKey, next)
+      setQueryData(signInSettingQuery, next)
       toast.success(t("settings.storeSaved"))
     },
   })

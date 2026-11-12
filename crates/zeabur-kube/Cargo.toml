@@ -41,4 +41,4 @@ tokio.workspace = true
 
 [dev-dependencies]
 zeabur-kube = { workspace = true, features = ["memory"] }
-zeabur-test-support = { workspace = true, features = ["sandbox"] }
+zeabur-test-support = { workspace = true, features = ["sandbox", "allocations"] }

@@ -3,7 +3,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
-import { applyGitHubApp, refreshGitHubApp, type GitHubAppPlan } from "@/api/github-app"
+import { applyGitHubApp, refreshGitHubApp, type GitHubAppPlanQuery } from "@/api/github-app"
 import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { useT } from "@/i18n"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
@@ -36,27 +36,18 @@ function WriteList({ writes }: { writes: Schemas.GitHubAppWrite[] }) {
 export function GitHubAppPlanDialog({
   title,
   action,
-  queryKey,
-  plan: planOf,
+  plan: planQuery,
   onDone,
   onClose,
 }: {
   title: string
   action: string
-  queryKey: unknown[]
-  plan: (signal: AbortSignal) => Promise<GitHubAppPlan>
+  plan: GitHubAppPlanQuery
   onDone: () => void
   onClose: () => void
 }) {
   const t = useT()
-  const plan = useQuery({
-    queryKey,
-    queryFn: ({ signal }) => planOf(signal),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-    refetchOnWindowFocus: false,
-  })
+  const plan = useQuery(planQuery)
   const apply = useMutation({
     mutationFn: applyGitHubApp,
     onSuccess: () => {

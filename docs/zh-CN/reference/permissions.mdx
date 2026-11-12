@@ -1,7 +1,6 @@
 ---
 title: 权限
 description: 对照成员角色、管理员账号和 Kubernetes RBAC，确认各项操作的访问范围和登录有效期。
-source: "4d65535f6503"
 ---
 
 能看到项目却读不到日志时，先确认自己在项目中的角色：**查看者**只能看状态和事件，**开发者**才能读取日志、读取 Secret 和部署。Zeabur 用你自己的身份调用 kube-apiserver，能否执行操作由 Kubernetes RBAC 决定。

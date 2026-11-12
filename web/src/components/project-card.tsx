@@ -1,4 +1,4 @@
-import { useQuery, useQueryClient } from "@tanstack/react-query"
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import { useEffect, useRef, useState, type ReactNode } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
@@ -9,7 +9,7 @@ import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import SquaresFourIcon from "~icons/ph/squares-four"
 
 import type { Schemas } from "@/api/client"
-import { projectQuery } from "@/api/queries"
+import { cached, projectQuery } from "@/api/queries"
 import { ProjectGlyph } from "@/components/shell/project-glyph"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
@@ -335,7 +335,6 @@ export function ProjectCollection({
 }) {
   const t = useT()
   const list = projectsAsList.useValue()
-  const queryClient = useQueryClient()
   const [query, setQuery] = useState(filter ? (search.q ?? "") : "")
   const sort = search.sort ?? "health"
   const descending = search.desc === true
@@ -343,7 +342,7 @@ export function ProjectCollection({
   const needle = query.trim().toLowerCase()
   // Domains match once a row's document has been read; names and descriptions always do.
   const hosts = (name: string) => {
-    const document = queryClient.getQueryData(projectQuery(name).queryKey)
+    const document = cached(projectQuery(name))
     return document
       ? document.services.flatMap((s) => domainsOf(document, s).map((d) => d.host))
       : []

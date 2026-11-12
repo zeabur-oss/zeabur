@@ -8,7 +8,7 @@ import TerminalIcon from "~icons/ph/terminal"
 import {
   applyNodeShell,
   nodeShellsQuery,
-  planNodeShell,
+  nodeShellPlanQuery,
   refreshNodeShells,
   type NodeShell,
   type NodeShellPlan,
@@ -140,13 +140,7 @@ export function NodeShellDialog({
 }) {
   const t = useT()
   // Planning writes nothing, so it is a query.
-  const plan = useQuery({
-    queryKey: ["node-shell-plan", request],
-    queryFn: ({ signal }) => planNodeShell(request, signal),
-    retry: false,
-    staleTime: Infinity,
-    gcTime: 0,
-  })
+  const plan = useQuery(nodeShellPlanQuery(request))
   const apply = useMutation({
     mutationFn: (token: string) => applyNodeShell(token),
     onSuccess: (applied) => {
