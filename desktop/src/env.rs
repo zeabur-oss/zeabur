@@ -36,6 +36,7 @@ impl ChildEnv {
 
     /// The app's own variables win, except `PATH`: the shell's entries come first, then the app's,
     /// each directory once.
+    #[cfg(any(unix, test))]
     pub fn merge(own: Vec<(OsString, OsString)>, shell: &[(OsString, OsString)]) -> Self {
         let mut env = Self { vars: own };
         let mut shell_path = None;
@@ -76,6 +77,7 @@ impl ChildEnv {
         None
     }
 
+    #[cfg(any(unix, test))]
     fn set(&mut self, name: OsString, value: OsString) {
         for (key, old) in &mut self.vars {
             if same_name(key, &name) {
@@ -116,10 +118,12 @@ impl ChildEnv {
 #[serde(rename_all = "camelCase", tag = "state")]
 pub enum ShellRead {
     Pending,
+    #[cfg(unix)]
     Done,
     /// Windows: the app uses its own environment.
     #[cfg(not(unix))]
     Skipped,
+    #[cfg(unix)]
     #[serde(rename_all = "camelCase")]
     Failed {
         shell: String,
