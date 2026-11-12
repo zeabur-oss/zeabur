@@ -1,0 +1,10 @@
+[install]
+# The same policy as web/bunfig.toml: no package published less than seven days ago, no install
+# scripts.
+minimumReleaseAge = 604800
+minimumReleaseAgeExcludes = ["@zeabur-oss/design-system"]
+exact = true
+
+[test]
+# `~icons/ph/<name>` imports, built as in vite.config.ts.
+preload = ["./scripts/test-icons.ts"]
