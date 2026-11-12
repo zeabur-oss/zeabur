@@ -12,6 +12,24 @@ if [[ "${1:-}" == "--fixtures" ]]; then
   printf '{"added":[{"kind":"folder","path":"%s"}]}\n' "$root/desktop/fixtures/team" > "$state/state.json"
 fi
 
+# GNOME takes a window's name and icon from the desktop entry named after its app ID (the
+# identifier in tauri.conf.json); this one starts the dev build.
+if [[ "$(uname -s)" == Linux ]]; then
+  apps=${XDG_DATA_HOME:-$HOME/.local/share}/applications
+  mkdir -p "$apps"
+  cat > "$apps/com.zeabur.desktop-poc.desktop" <<EOF
+[Desktop Entry]
+Type=Application
+Name=Zeabur
+Comment=Open Zeabur for the clusters in your kubeconfig
+Exec="$root/desktop/target/debug/zeabur-desktop"
+Icon=$root/desktop/icons/icon.png
+Terminal=false
+Categories=Development;
+StartupWMClass=com.zeabur.desktop-poc
+EOF
+fi
+
 pids=()
 trap 'kill "${pids[@]}" 2>/dev/null || true' EXIT
 (cd "$root" && cargo run -q -p zeabur-api --example demo) &

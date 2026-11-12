@@ -49,8 +49,18 @@ a TCP connection.
   Tools, …) follow the system language, in English, Traditional or Simplified Chinese
   (`desktop/Info.plist`), not the picker. The app stays open with no windows; a click on the Dock icon
   or File > New Cluster Window shows the chooser again.
-- Windows and Linux: the system title bar, no menu bar, and the app quits when the last window
-  closes.
+- Windows and Linux: the system title bar, which follows the light or dark system theme, no menu
+  bar, and the app quits when the last window closes. A new window is at most 90% of the screen's
+  work area, so it fits at 125% or 150% scaling.
+- Linux (GNOME): the window handles the standard shortcuts before the page sees them[^gnome-keys].
+  Ctrl+W closes the window, Ctrl+Q quits, Ctrl+N shows the chooser, Ctrl+R reloads, and Ctrl++,
+  Ctrl+- and Ctrl+0 zoom. The program name is the app ID (`com.zeabur.desktop-poc`), which Wayland
+  uses to find the desktop entry[^xdg-shell]. `desktop/run.sh` writes that entry, so the Dock and
+  Alt+Tab show Zeabur and its icon. GNOME maximizes a new window that is nearly the size of the
+  screen.
+- Windows: WebView2 handles Ctrl+R and F5, and Ctrl++, Ctrl+- and Ctrl+0 zoom. Alt+F4 closes the
+  window. Ctrl+W is not handled yet. `icons/icon.ico` has only a 256 px image; Windows wants 16, 24,
+  32, 48 and 256 at least[^win-icon].
 
 ## Screenshots
 
@@ -171,3 +181,6 @@ See the bottom of this file for what was built on Windows.
 [^hl-1716]: https://github.com/kubernetes-sigs/headlamp/issues/1716
 [^k9s-cmd]: https://k9scli.io/topics/commands/
 [^k9s-cfg]: https://k9scli.io/topics/config/
+[^gnome-keys]: https://developer.gnome.org/hig/reference/keyboard.html
+[^xdg-shell]: https://wayland.app/protocols/xdg-shell#xdg_toplevel:request:set_app_id
+[^win-icon]: https://learn.microsoft.com/en-us/windows/apps/design/style/iconography/app-icon-construction

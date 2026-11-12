@@ -26,6 +26,11 @@ custom-protocol = ["tauri/custom-protocol"]
 [build-dependencies]
 tauri-build = "2"
 
+# The window's key handler for the shortcuts and the program name (Wayland app ID); the same gtk as
+# Tauri's.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
 # The README screenshots: a snapshot of the WKWebView itself (no screen recording permission needed).
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = "0.6"

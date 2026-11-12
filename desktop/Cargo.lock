@@ -4611,6 +4611,7 @@ name = "zeabur-desktop"
 version = "0.0.0"
 dependencies = [
  "block2",
+ "gtk",
  "k8s-openapi",
  "kube",
  "objc2",

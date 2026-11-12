@@ -2,6 +2,8 @@
 //! opens Zeabur's web interface for the ones the person picks.
 
 mod chrome;
+#[cfg(any(target_os = "linux", test))]
+mod keys;
 mod menu;
 mod probe;
 mod shots;
@@ -218,6 +220,7 @@ fn open_cluster(
         .initialization_script(&script);
     let builder = chrome::cluster_window(&handle, builder);
     let window = shots::apply_theme(builder).build().map_err(|e| e.to_string())?;
+    chrome::cluster_window_built(&window);
     if shots::wants("cluster") {
         shots::capture(window);
     }
@@ -244,6 +247,8 @@ fn login_shell_path() -> Vec<PathBuf> {
 }
 
 fn main() {
+    let context = tauri::generate_context!();
+    chrome::set_app_id(&context.config().identifier);
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
         .plugin(chrome::window_state())
@@ -291,7 +296,7 @@ fn main() {
             scenario,
             menu::set_menu
         ])
-        .build(tauri::generate_context!())
+        .build(context)
         .unwrap_or_else(|err| {
             eprintln!("zeabur-desktop: {err}");
             std::process::exit(1);

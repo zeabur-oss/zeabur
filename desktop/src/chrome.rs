@@ -1,5 +1,5 @@
 //! How the windows look and behave as a desktop app: the macOS title bar, window sizes that are
-//! kept between launches, and what happens when the last window closes.
+//! kept between launches, zoom, and what happens when the last window closes.
 
 use std::path::PathBuf;
 
@@ -20,12 +20,13 @@ const CLUSTER_MIN: (f64, f64) = (800.0, 560.0);
 #[cfg(target_os = "macos")]
 const TITLE_BAR: f64 = 28.0;
 
-/// The zoom steps of View > Zoom In and Zoom Out, as in Safari and Chrome.
-#[cfg(target_os = "macos")]
+/// The zoom steps of View > Zoom In and Zoom Out on macOS and of Ctrl++ and Ctrl+- on Linux, as in
+/// Safari and Chrome.
+#[cfg(any(target_os = "macos", target_os = "linux", test))]
 const ZOOM_STEPS: [f64; 11] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0];
 
 /// The zoom of each window by label; WebKit has no call to read it back.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 static ZOOM: std::sync::Mutex<Option<std::collections::HashMap<String, f64>>> =
     std::sync::Mutex::new(None);
 
@@ -70,7 +71,7 @@ fn title_bar<'a, M: Manager<Wry>>(
     builder
 }
 
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 fn zoom_of(window: &tauri::WebviewWindow) -> f64 {
     let zooms = ZOOM.lock().unwrap_or_else(|e| e.into_inner());
     zooms
@@ -89,7 +90,7 @@ fn fit_title_bar(window: &tauri::WebviewWindow, zoom: f64) {
 }
 
 /// View > Zoom In (`Some(true)`), Zoom Out (`Some(false)`) or Actual Size (`None`).
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux"))]
 pub fn zoom(window: &tauri::WebviewWindow, up: Option<bool>) {
     let next = match up {
         Some(up) => next_zoom(zoom_of(window), up),
@@ -101,12 +102,13 @@ pub fn zoom(window: &tauri::WebviewWindow, up: Option<bool>) {
             .get_or_insert_with(Default::default)
             .insert(window.label().to_owned(), next);
         drop(zooms);
+        #[cfg(target_os = "macos")]
         fit_title_bar(window, next);
     }
 }
 
 /// The next zoom step from `current`, up or down; the same step at either end.
-#[cfg(target_os = "macos")]
+#[cfg(any(target_os = "macos", target_os = "linux", test))]
 fn next_zoom(current: f64, up: bool) -> f64 {
     if up {
         for step in ZOOM_STEPS {
@@ -142,6 +144,67 @@ pub fn allow_title_bar(_app: &AppHandle, _web_url: &tauri::Url) -> tauri::Result
     Ok(())
 }
 
+/// On Linux the program name is the Wayland app ID and the X11 window class, which GNOME matches to
+/// the `.desktop` file of the same name for the app's name and icon. The freedesktop desktop entry
+/// specification asks for a reverse DNS name
+/// (<https://specifications.freedesktop.org/desktop-entry/latest/file-naming.html>), so it is the
+/// app's identifier. Tauri's `enableGTKAppId` would do the same through a D-Bus name, which allows
+/// one instance only.
+#[cfg(target_os = "linux")]
+pub fn set_app_id(identifier: &str) {
+    gtk::glib::set_prgname(Some(identifier));
+}
+
+#[cfg(not(target_os = "linux"))]
+pub fn set_app_id(_identifier: &str) {}
+
+/// A new window's size: `want`, or 90 % of the screen's work area where that is smaller. A 1080p
+/// screen at 150 % is 1280 × 720 points, smaller than a cluster window.
+fn fit_to_screen(app: &AppHandle, want: (f64, f64)) -> (f64, f64) {
+    let mut monitor = app.primary_monitor().ok().flatten();
+    if monitor.is_none() {
+        monitor = app
+            .available_monitors()
+            .ok()
+            .and_then(|all| all.into_iter().next());
+    }
+    let Some(monitor) = monitor else {
+        return want;
+    };
+    let area = monitor
+        .work_area()
+        .size
+        .to_logical::<f64>(monitor.scale_factor());
+    fit(want, (area.width, area.height))
+}
+
+fn fit(want: (f64, f64), area: (f64, f64)) -> (f64, f64) {
+    (want.0.min(area.0 * 0.9), want.1.min(area.1 * 0.9))
+}
+
+/// What every window shares on Windows and Linux. Windows: WebView2's own Ctrl++, Ctrl+- and Ctrl+0
+/// zoom (reload with Ctrl+R and F5 is on by default). Linux: the shortcuts in `keys.rs`.
+fn platform_window(window: &tauri::WebviewWindow) {
+    #[cfg(target_os = "linux")]
+    crate::keys::attach(window);
+    #[cfg(not(target_os = "linux"))]
+    let _ = window;
+}
+
+#[cfg(windows)]
+fn zoom_keys<'a, M: Manager<Wry>>(
+    builder: WebviewWindowBuilder<'a, Wry, M>,
+) -> WebviewWindowBuilder<'a, Wry, M> {
+    builder.zoom_hotkeys_enabled(true)
+}
+
+#[cfg(not(windows))]
+fn zoom_keys<'a, M: Manager<Wry>>(
+    builder: WebviewWindowBuilder<'a, Wry, M>,
+) -> WebviewWindowBuilder<'a, Wry, M> {
+    builder
+}
+
 /// Shows the chooser, opening it again if it was closed.
 pub fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window(CHOOSER) {
@@ -149,11 +212,13 @@ pub fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
         window.show()?;
         return window.set_focus();
     }
+    let (width, height) = fit_to_screen(app, (1040.0, 680.0));
     let builder = WebviewWindowBuilder::new(app, CHOOSER, WebviewUrl::App("desktop.html".into()))
         .title("Zeabur")
-        .inner_size(1040.0, 680.0)
+        .inner_size(width, height)
         .min_inner_size(720.0, 480.0);
-    let window = title_bar(shots::apply_theme(builder)).build()?;
+    let window = zoom_keys(title_bar(shots::apply_theme(builder))).build()?;
+    platform_window(&window);
     if shots::wants("main") {
         shots::capture(window);
     }
@@ -174,11 +239,17 @@ pub fn cluster_window<'a>(
         }
     }
     let step = 24.0 * open;
+    let (width, height) = fit_to_screen(app, (1280.0, 800.0));
     let builder = builder
-        .inner_size(1280.0, 800.0)
+        .inner_size(width, height)
         .min_inner_size(CLUSTER_MIN.0, CLUSTER_MIN.1)
         .position(120.0 + step, 80.0 + step);
-    title_bar(builder)
+    zoom_keys(title_bar(builder))
+}
+
+/// Sets up a cluster window once it is built.
+pub fn cluster_window_built(window: &tauri::WebviewWindow) {
+    platform_window(window);
 }
 
 /// Keeps each window's size, place and maximized state between launches, under its label: `main`
@@ -217,9 +288,15 @@ pub fn on_run_event(app: &AppHandle, event: RunEvent) {
     }
 }
 
-#[cfg(all(test, target_os = "macos"))]
+#[cfg(test)]
 mod tests {
-    use super::next_zoom;
+    use super::{fit, next_zoom};
+
+    #[test]
+    fn a_window_larger_than_the_screen_shrinks_to_fit() {
+        assert_eq!(fit((1280.0, 800.0), (1280.0, 720.0)), (1152.0, 648.0));
+        assert_eq!(fit((1280.0, 800.0), (2560.0, 1400.0)), (1280.0, 800.0));
+    }
 
     #[test]
     fn zoom_moves_one_step_and_stops_at_the_ends() {

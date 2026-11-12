@@ -7,6 +7,10 @@ use tauri::AppHandle;
 /// Every word in the menu bar, in the app's language (`desktop.menu.*` in `web/src/i18n`).
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
+#[cfg_attr(
+    not(target_os = "macos"),
+    expect(dead_code, reason = "Windows and Linux have no menu bar")
+)]
 pub struct MenuLabels {
     about: String,
     services: String,
