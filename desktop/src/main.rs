@@ -121,13 +121,29 @@ fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), Str
     }
     let dir = app.state_dir.join("pasted");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
-    let path = dir.join(format!("{slug}.yaml"));
-    std::fs::write(&path, yaml).map_err(|e| e.to_string())?;
+    let path = write_new(&dir, &slug, yaml.as_bytes()).map_err(|e| e.to_string())?;
     let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
-    if !saved.added.iter().any(|a| a.path == path) {
-        saved.added.push(AddedSource { kind: SourceKind::Pasted, path });
-    }
+    saved.added.push(AddedSource { kind: SourceKind::Pasted, path });
     app.save(&saved)
+}
+
+/// Writes `bytes` to a new file `dir/{slug}.yaml`, or `{slug}-2.yaml` and so on when that name is
+/// taken. It never replaces a file.
+fn write_new(dir: &std::path::Path, slug: &str, bytes: &[u8]) -> std::io::Result<PathBuf> {
+    use std::io::Write;
+    let mut n = 1;
+    loop {
+        let name = if n == 1 { format!("{slug}.yaml") } else { format!("{slug}-{n}.yaml") };
+        let path = dir.join(name);
+        match std::fs::OpenOptions::new().write(true).create_new(true).open(&path) {
+            Ok(mut file) => {
+                file.write_all(bytes)?;
+                return Ok(path);
+            }
+            Err(err) if err.kind() == std::io::ErrorKind::AlreadyExists => n += 1,
+            Err(err) => return Err(err),
+        }
+    }
 }
 
 #[tauri::command]
@@ -164,19 +180,19 @@ struct ProbeResult {
     reach: probe::Reach,
 }
 
-/// Probes every server at once, one thread each.
+/// Probes every server at once on the blocking thread pool, so the async workers stay free.
 #[tauri::command]
 async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
-    let mut handles = Vec::new();
+    let mut tasks = Vec::new();
     for (key, server) in targets {
-        handles.push(std::thread::spawn(move || ProbeResult {
+        tasks.push(tauri::async_runtime::spawn_blocking(move || ProbeResult {
             reach: probe::probe(server.as_deref()),
             key,
         }));
     }
     let mut results = Vec::new();
-    for handle in handles {
-        if let Ok(result) = handle.join() {
+    for task in tasks {
+        if let Ok(result) = task.await {
             results.push(result);
         }
     }
@@ -297,4 +313,21 @@ fn main() {
             std::process::exit(1);
         })
         .run(chrome::on_run_event);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::write_new;
+
+    #[test]
+    fn pasting_the_same_name_twice_keeps_both_files() {
+        let dir = std::env::temp_dir().join(format!("zeabur-desktop-pasted-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let first = write_new(&dir, "pasted", b"first").unwrap();
+        let second = write_new(&dir, "pasted", b"second").unwrap();
+        assert_ne!(first, second);
+        assert_eq!(std::fs::read(&first).unwrap(), b"first");
+        assert_eq!(std::fs::read(&second).unwrap(), b"second");
+        std::fs::remove_dir_all(&dir).unwrap();
+    }
 }

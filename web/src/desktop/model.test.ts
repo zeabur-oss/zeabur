@@ -8,6 +8,7 @@ import {
   parseScenario,
   recentContexts,
   reachView,
+  sourceFilter,
   visibleContexts,
 } from "./model"
 
@@ -82,6 +83,13 @@ describe("desktop model", () => {
     expect(visibleContexts(snap, "", null).map((c) => c.name)).toEqual(["prod", "dev", "lab"])
     expect(visibleContexts(snap, " LAB ", null).map((c) => c.name)).toEqual(["lab"])
     expect(visibleContexts(snap, "", "b").map((c) => c.name)).toEqual(["lab"])
+  })
+
+  it("drops the source filter once its source is removed", () => {
+    const source = { id: "b" } as Snapshot["sources"][number]
+    const snap = snapshot([context("dev")])
+    expect(sourceFilter({ ...snap, sources: [source] }, "b")).toBe("b")
+    expect(sourceFilter(snap, "b")).toBeNull()
   })
 
   it("lists recents only without a search or source filter", () => {
