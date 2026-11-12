@@ -84,15 +84,12 @@ pub(crate) fn attach(window: &tauri::WebviewWindow) {
             state.contains(gtk::gdk::ModifierType::CONTROL_MASK),
             state.contains(gtk::gdk::ModifierType::SHIFT_MASK),
             state.contains(gtk::gdk::ModifierType::MOD1_MASK),
-            &name.map(|n| n.to_lowercase()).unwrap_or_default(),
+            &name.map_or_default(|n| n.to_lowercase()),
         );
-        match found {
-            Some(found) => {
-                run(&window, found);
-                gtk::glib::Propagation::Stop
-            }
-            None => gtk::glib::Propagation::Proceed,
-        }
+        found.map_or(gtk::glib::Propagation::Proceed, |found| {
+            run(&window, found);
+            gtk::glib::Propagation::Stop
+        })
     });
 }
 

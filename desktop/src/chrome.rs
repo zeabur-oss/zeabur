@@ -8,7 +8,7 @@ use std::sync::PoisonError;
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_window_state::StateFlags;
 
-use crate::{output, shots};
+use crate::shots;
 
 /// The label of the cluster chooser window.
 pub(crate) const CHOOSER: &str = "main";
@@ -127,7 +127,7 @@ fn fit_title_bar(window: &tauri::WebviewWindow, zoom: f64) {
     if let Err(err) = window.eval(format!(
         "document.documentElement.style.setProperty('--zeabur-title-bar', '{height}px')"
     )) {
-        output::warn(&format!("cannot fit the title bar to the zoom: {err}"));
+        crate::output::warn(&format!("cannot fit the title bar to the zoom: {err}"));
     }
 }
 
@@ -194,7 +194,7 @@ pub(crate) fn set_app_id(identifier: &str) {
 #[cfg(windows)]
 pub(crate) fn set_app_id(identifier: &str) {
     if let Err(err) = crate::win32::set_app_user_model_id(identifier) {
-        output::warn(&format!("cannot set the AppUserModelID: {err}"));
+        crate::output::warn(&format!("cannot set the AppUserModelID: {err}"));
     }
 }
 
@@ -369,7 +369,7 @@ pub(crate) fn on_run_event(
             ..
         } => {
             if let Err(err) = show_chooser(app) {
-                output::warn(&format!("cannot open the chooser: {err}"));
+                crate::output::warn(&format!("cannot open the chooser: {err}"));
             }
         }
         #[cfg(any(target_os = "macos", target_os = "linux"))]
