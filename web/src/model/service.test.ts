@@ -122,4 +122,16 @@ describe("the service of a pod", () => {
     expect(serviceOfPod(services, "web-7d9-abc")?.kind).toBe("Deployment")
     expect(serviceOfPod(services, "other-0")).toBe(undefined)
   })
+
+  test("is none for a Job or CronJob pod, which no controller makes again after a delete", () => {
+    const pods = (...names: string[]) => names.map((name) => ({ name }) as Pod)
+    const services = [
+      service("migrate", { kind: "Job", pods: pods("migrate-x7k2p") }),
+      service("nightly", { kind: "CronJob", pods: pods("nightly-29012-abcde") }),
+      service("agent", { kind: "DaemonSet", pods: pods("agent-q8w9e") }),
+    ]
+    expect(serviceOfPod(services, "migrate-x7k2p")).toBe(undefined)
+    expect(serviceOfPod(services, "nightly-29012-abcde")).toBe(undefined)
+    expect(serviceOfPod(services, "agent-q8w9e")?.name).toBe("agent")
+  })
 })
