@@ -25,6 +25,6 @@ pub use pods::{pods_of, summary as pod_summary};
 pub use project::{endpoint, project, project_with, provenance, with_http_routes};
 pub use snapshot::Snapshot;
 pub use workload::{
-    Workload, classify, classify_with, deployment_phase, phase, replicas, summarise,
-    summarise_with, workloads,
+    Workload, classify, classify_with, deployment_phase, on_delete, phase, replicas, rolled_out,
+    summarise, summarise_with, workloads,
 };
