@@ -104,7 +104,7 @@ a TCP connection.
 - Windows: Ctrl+W closes the window and Ctrl+N shows the chooser[^win-keys], through WebView2's
   `AcceleratorKeyPressed` event, so the page never sees them. WebView2 handles Ctrl+R and F5, and
   Ctrl++, Ctrl+- and Ctrl+0 zoom. Alt+F4 closes the window. The process sets the AppUserModelID
-  `com.zeabur.desktop-poc` before the first window[^win-appid], so the taskbar keeps every window
+  `com.zeabur.oss.desktop` before the first window[^win-appid], so the taskbar keeps every window
   under one Zeabur button. A window is placed inside the work area, title bar included, and a cluster
   window can be made 500 effective pixels wide, the most Snap layouts allows for a minimum[^win-snap].
 
