@@ -4103,7 +4103,7 @@ export const zhTW: Messages = {
   "desktop.menu.undo": "還原",
   "desktop.menu.redo": "重做",
   "desktop.menu.cut": "剪下",
-  "desktop.menu.copy": "複製",
+  "desktop.menu.copy": "拷貝",
   "desktop.menu.paste": "貼上",
   "desktop.menu.selectAll": "全選",
   "desktop.menu.view": "顯示方式",
