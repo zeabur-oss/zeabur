@@ -27,14 +27,16 @@
 //! [`Change::ForceDeleteProject`] is for a project whose Namespace stays `Terminating` because a
 //! finalizer is never removed, for example when its controller is gone. Each of its writes is a
 //! JSON Patch that sets `metadata.finalizers` to `[]` on one object, after a `test` of the
-//! finalizers as read. It writes only an object of [`DeletionInput::held`] that is in the
-//! project's namespace and already has a `deletionTimestamp`. It never writes the Namespace, so
-//! its own `spec.finalizers` stay. The namespace controller then removes what is left and the
-//! Namespace. [`Warning::RemovesFinalizers`] names each object and its finalizers. Refused: the
-//! same namespaces as a deletion, a namespace that is not being deleted, and one with no such
+//! finalizers as read. The plan token pins those finalizers too ([`versions`]), so a change to them
+//! after the review makes the apply refuse. It writes only an object of [`DeletionInput::held`]
+//! that is in the project's namespace and already has a `deletionTimestamp`. It never writes the
+//! Namespace, so its own `spec.finalizers` stay. The namespace controller then removes what is left
+//! and the Namespace. [`Warning::RemovesFinalizers`] names each object and its finalizers. Refused:
+//! the same namespaces as a deletion, a namespace that is not being deleted, and one with no such
 //! object.
 //!
 //! [`Change::ForceDeleteProject`]: crate::Change::ForceDeleteProject
+//! [`versions`]: crate::versions
 //!
 //! [k8s-ns-delete]: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/#deleting-a-namespace
 //! [k8s-finalizers]: https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/

@@ -237,8 +237,8 @@ mod tests {
         assert_eq!(status, StatusCode::CONFLICT, "{problem}");
     }
 
-    #[tokio::test]
-    async fn a_force_deletion_patches_only_the_held_objects_and_not_the_namespace() {
+    /// A project whose Namespace the database's finalizers hold.
+    fn held() -> MemoryCluster {
         let terminating = namespace(
             "shop",
             &json!({
@@ -258,6 +258,12 @@ mod tests {
                     Some(serde_json::from_value(json!("2026-10-26T00:00:00Z")).unwrap());
             }
         });
+        cluster
+    }
+
+    #[tokio::test]
+    async fn a_force_deletion_patches_only_the_held_objects_and_not_the_namespace() {
+        let cluster = held();
         let app = app(&cluster);
         let (status, plan) = send(
             &app,
@@ -296,6 +302,45 @@ mod tests {
             })
             .unwrap();
         assert_eq!(written, [("Cluster".to_owned(), "db".to_owned(), true)]);
+    }
+
+    #[tokio::test]
+    async fn a_force_deletion_is_refused_when_a_finalizer_went_after_the_plan() {
+        let cluster = held();
+        cluster.update(|s| {
+            for object in &mut s.dynamic {
+                object.metadata.generation = Some(2);
+                object.metadata.finalizers = Some(vec![
+                    "cnpg.io/cleanup".to_owned(),
+                    "cnpg.io/backup".to_owned(),
+                ]);
+            }
+        });
+        let app = app(&cluster);
+        let (status, planned) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({"changes": [{"op": "forceDeleteProject"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        cluster.update(|s| {
+            for object in &mut s.dynamic {
+                object.metadata.finalizers = Some(vec!["cnpg.io/cleanup".to_owned()]);
+                object.metadata.resource_version = Some("10".to_owned());
+            }
+        });
+
+        let (status, problem) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert!(cluster.inspect(|s| s.writes.is_empty()).unwrap());
     }
 
     #[tokio::test]
