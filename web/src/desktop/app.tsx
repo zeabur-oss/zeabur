@@ -415,12 +415,7 @@ export function App() {
             </span>
           ) : null}
         </div>
-        <Button
-          variant="secondary"
-          size="xs"
-          disabled={isBlocked}
-          onClick={() => openCluster(c)}
-        >
+        <Button variant="secondary" size="xs" disabled={isBlocked} onClick={() => openCluster(c)}>
           {t("desktop.open")}
         </Button>
       </li>

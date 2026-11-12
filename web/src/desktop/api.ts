@@ -63,5 +63,7 @@ export const api = {
 
 /** Broken entries are shown but cannot be opened. */
 export function blocked(auth: Auth): boolean {
-  return auth.state === "pluginMissing" || auth.state === "missingEntry" || auth.state === "fileMissing"
+  return (
+    auth.state === "pluginMissing" || auth.state === "missingEntry" || auth.state === "fileMissing"
+  )
 }
