@@ -45,7 +45,9 @@ a TCP connection.
 - macOS: the title bar is drawn over the page, as in Finder and Notes. The page leaves 28 pt at the
   top (`data-titlebar` and `--zeabur-title-bar`, set by `desktop/src/chrome.rs`) and a strip there
   moves the window. The menu bar (`desktop/src/menu.rs`) uses the `desktop.menu.*` strings and
-  changes with the language picker. The items macOS adds itself (Fill, Center, Move & Resize, Writing
+  changes with the language picker. In Chinese, the standard items use the words of the macOS 27
+  menus (Notes and Safari, looked up on [applelocalization.com](https://applelocalization.com/)),
+  such as 拷貝 and 拷贝 for Copy. The items macOS adds itself (Fill, Center, Move & Resize, Writing
   Tools, …) follow the system language, in English, Traditional or Simplified Chinese
   (`desktop/Info.plist`), not the picker. The app stays open with no windows; a click on the Dock icon
   or File > New Cluster Window shows the chooser again.

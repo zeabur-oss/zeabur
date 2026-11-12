@@ -4090,6 +4090,7 @@ export const zhTW: Messages = {
   "sentence.files.tooLarge.fix": () => "請改用 kubectl cp 複製。",
   // files:end
   // desktop:start
+  // The standard menu items use the terms of the macOS 27 menus (Notes, Safari), found on applelocalization.com.
   "desktop.menu.about": "關於 Zeabur",
   "desktop.menu.services": "服務",
   "desktop.menu.hide": "隱藏 Zeabur",
