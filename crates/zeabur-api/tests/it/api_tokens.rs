@@ -128,7 +128,9 @@ mod tests {
             let verb = match write.body {
                 WriteBody::Create(_) => "create",
                 WriteBody::Delete(_) => "delete",
-                WriteBody::JsonPatch(_) | WriteBody::EphemeralContainers(_) => "patch",
+                WriteBody::JsonPatch(_)
+                | WriteBody::MergePatch(_)
+                | WriteBody::EphemeralContainers(_) => "patch",
             };
             out.push(format!(
                 "{verb} {}/{}/{}",
