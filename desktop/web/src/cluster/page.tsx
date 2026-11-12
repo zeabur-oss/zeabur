@@ -14,6 +14,18 @@ import { useEffect, useState } from "react"
 
 import { useI18n } from "@/i18n"
 
+/** One start per attempt: React runs an effect twice in development, and each start replaces the
+ * window's service. Each resolves to the service's one-time link. */
+const starts = new Map<number, Promise<string>>()
+function start(attempt: number) {
+  let started = starts.get(attempt)
+  if (!started) {
+    started = invoke<string>("start_cluster")
+    starts.set(attempt, started)
+  }
+  return started
+}
+
 type State = { state: "starting" } | { state: "failed"; reason: string }
 
 /** The page a cluster window shows until its local service answers (`?name=…`). The app knows
@@ -30,7 +42,7 @@ export function ClusterPage() {
 
   useEffect(() => {
     let cancelled = false
-    invoke<string>("start_cluster")
+    start(attempt)
       .then((url) => {
         if (!cancelled) window.location.replace(url)
       })
