@@ -145,7 +145,7 @@ pub async fn guard(State(access): State<Arc<Access>>, request: Request, next: Ne
     }
     if let Some(presented) = launch_token(request.uri().query()) {
         if request.method() == Method::GET && access.redeem(&presented) {
-            return start_session(&access);
+            return start_session(&access, headers);
         }
         return link_refused(headers);
     }
@@ -204,22 +204,23 @@ fn launch_token(query: Option<&str>) -> Option<String> {
 }
 
 /// Sets the session cookie and sends the browser to the page without the token in its address.
-fn start_session(access: &Access) -> Response {
-    let mut response = Response::new(Body::empty());
-    *response.status_mut() = StatusCode::SEE_OTHER;
-    let headers = response.headers_mut();
-    headers.insert(header::LOCATION, HeaderValue::from_static("/"));
-    headers.insert(header::CACHE_CONTROL, HeaderValue::from_static("no-store"));
-    headers.insert(
-        header::REFERRER_POLICY,
-        HeaderValue::from_static("no-referrer"),
+/// A page that moves on, not a redirect: when the link is opened from another site (Zeabur
+/// Desktop's own pages), WebKit does not send a `SameSite=Strict` cookie that a redirect set to the
+/// request the redirect leads to, so the next load must start from this origin.
+fn start_session(access: &Access, headers: &HeaderMap) -> Response {
+    let mut response = page::html(
+        StatusCode::OK,
+        Lang::of(headers),
+        "",
+        None,
+        r#"<meta http-equiv="refresh" content="0; url=/"><p><a href="/">Zeabur</a></p>"#,
     );
     if let Ok(cookie) = HeaderValue::from_str(&format!(
         "{}={}; Path=/; HttpOnly; SameSite=Strict",
         access.cookie_name(),
         access.session
     )) {
-        headers.insert(header::SET_COOKIE, cookie);
+        response.headers_mut().insert(header::SET_COOKIE, cookie);
     }
     response
 }
@@ -275,8 +276,8 @@ mod tests {
         let uri = format!("/?{LAUNCH_PARAMETER}={}", token_of(&access));
 
         let first = send(app(&access), Method::GET, &uri, &[HOST]).await;
-        assert_eq!(first.status(), StatusCode::SEE_OTHER);
-        assert_eq!(first.headers()[header::LOCATION], "/");
+        assert_eq!(first.status(), StatusCode::OK);
+        assert_eq!(first.headers()[header::REFERRER_POLICY], "no-referrer");
         let set = first.headers()[header::SET_COOKIE].to_str().unwrap();
         assert!(set.contains("HttpOnly") && set.contains("SameSite=Strict"));
 
@@ -304,7 +305,7 @@ mod tests {
 
         let right = format!("/?{LAUNCH_PARAMETER}={}", token_of(&access));
         let response = send(app(&access), Method::GET, &right, &[HOST]).await;
-        assert_eq!(response.status(), StatusCode::SEE_OTHER);
+        assert!(response.headers().contains_key(header::SET_COOKIE));
     }
 
     #[tokio::test]
