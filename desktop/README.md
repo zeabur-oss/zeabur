@@ -61,8 +61,7 @@ a TCP connection.
   Alt+Tab show Zeabur and its icon. GNOME maximizes a new window that is nearly the size of the
   screen.
 - Windows: WebView2 handles Ctrl+R and F5, and Ctrl++, Ctrl+- and Ctrl+0 zoom. Alt+F4 closes the
-  window. Ctrl+W is not handled yet. `icons/icon.ico` has only a 256 px image; Windows wants 16, 24,
-  32, 48 and 256 at least[^win-icon].
+  window. Ctrl+W is not handled yet.
 
 ## Icon
 
@@ -196,4 +195,3 @@ See the bottom of this file for what was built on Windows.
 [^k9s-cfg]: https://k9scli.io/topics/config/
 [^gnome-keys]: https://developer.gnome.org/hig/reference/keyboard.html
 [^xdg-shell]: https://wayland.app/protocols/xdg-shell#xdg_toplevel:request:set_app_id
-[^win-icon]: https://learn.microsoft.com/en-us/windows/apps/design/style/iconography/app-icon-construction
