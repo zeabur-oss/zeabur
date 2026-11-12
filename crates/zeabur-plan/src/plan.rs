@@ -63,97 +63,6 @@ use crate::rules::{
     EnvEdit, diff, env_entry, managed_code, route_name, tool_name, validate_env, validate_hostname,
 };
 
-/// The kinds a plan may create, as `(apiVersion, kind, plural)`.
-///
-/// Creation is kept to kinds a person asks for through Zeabur's own forms; a kind joins the list
-/// with the form that needs it:
-///
-/// - ready-made NetworkPolicy objects;
-/// - a database and its backups: CloudNativePG's `Cluster`, `ScheduledBackup` and `Backup`, the
-///   Barman Cloud plugin's `ObjectStore`, the Percona Operator for MongoDB's `PerconaServerMongoDB`
-///   and `PerconaServerMongoDBBackup`, MOCO's `MySQLCluster` and `BackupPolicy`, mariadb-operator's
-///   `MariaDB` and `Backup`, the Dragonfly Operator's `Dragonfly`, the Secret holding the backup
-///   bucket's access keys or the database's passwords, and the ServiceAccount MOCO's backup and
-///   restore Jobs run as;
-/// - object storage: the `SeaweedFS` Operator's `Seaweed`, `Bucket`, and the `S3Identity`,
-///   `S3Credentials`, `S3Policy` and `S3PolicyBinding` that give services an access key;
-/// - a restore into a new database: Percona's `PerconaServerMongoDBRestore` (the other operators
-///   restore from fields of the new database);
-/// - a volume's backups: K8up's `Schedule`, `Backup` and `PodConfig`, and the Secret with the
-///   bucket's keys and the repository password;
-/// - a volume's restore: K8up's `Restore`, into a new claim, into the claim itself or out to the
-///   bucket;
-/// - a service from a container image: its Deployment, Service, Ingress, volume claim and Secrets;
-/// - a service from Git: the same, and Zeabur Builder's `Build`;
-/// - the page server of Zeabur Catalog's `error-pages` template: its ConfigMaps, Deployment,
-///   Service and NetworkPolicy.
-///
-/// The object is created as the person, so kube-apiserver's RBAC and admission decide, as for
-/// `kubectl create`; the plan only keeps it in the project's namespace.
-pub const CREATABLE: &[(&str, &str, &str)] = &[
-    ("networking.k8s.io/v1", "NetworkPolicy", "networkpolicies"),
-    ("v1", "ConfigMap", "configmaps"),
-    ("v1", "Secret", "secrets"),
-    ("v1", "PersistentVolumeClaim", "persistentvolumeclaims"),
-    ("v1", "ServiceAccount", "serviceaccounts"),
-    ("v1", "Service", "services"),
-    ("apps/v1", "Deployment", "deployments"),
-    ("batch/v1", "Job", "jobs"),
-    ("networking.k8s.io/v1", "Ingress", "ingresses"),
-    ("builder.zeabur.com/v1alpha1", "Build", "builds"),
-    ("postgresql.cnpg.io/v1", "Cluster", "clusters"),
-    (
-        "postgresql.cnpg.io/v1",
-        "ScheduledBackup",
-        "scheduledbackups",
-    ),
-    ("postgresql.cnpg.io/v1", "Backup", "backups"),
-    ("barmancloud.cnpg.io/v1", "ObjectStore", "objectstores"),
-    (
-        "psmdb.percona.com/v1",
-        "PerconaServerMongoDB",
-        "perconaservermongodbs",
-    ),
-    (
-        "psmdb.percona.com/v1",
-        "PerconaServerMongoDBBackup",
-        "perconaservermongodbbackups",
-    ),
-    (
-        "psmdb.percona.com/v1",
-        "PerconaServerMongoDBRestore",
-        "perconaservermongodbrestores",
-    ),
-    ("moco.cybozu.com/v1beta2", "MySQLCluster", "mysqlclusters"),
-    ("moco.cybozu.com/v1beta2", "BackupPolicy", "backuppolicies"),
-    ("k8s.mariadb.com/v1alpha1", "MariaDB", "mariadbs"),
-    ("k8s.mariadb.com/v1alpha1", "Backup", "backups"),
-    ("dragonflydb.io/v1alpha1", "Dragonfly", "dragonflies"),
-    ("seaweed.seaweedfs.com/v1", "Seaweed", "seaweeds"),
-    ("seaweed.seaweedfs.com/v1", "Bucket", "buckets"),
-    ("seaweed.seaweedfs.com/v1", "S3Identity", "s3identities"),
-    ("seaweed.seaweedfs.com/v1", "S3Credentials", "s3credentials"),
-    ("seaweed.seaweedfs.com/v1", "S3Policy", "s3policies"),
-    (
-        "seaweed.seaweedfs.com/v1",
-        "S3PolicyBinding",
-        "s3policybindings",
-    ),
-    ("k8up.io/v1", "Schedule", "schedules"),
-    ("k8up.io/v1", "Backup", "backups"),
-    ("k8up.io/v1", "PodConfig", "podconfigs"),
-    ("k8up.io/v1", "Restore", "restores"),
-];
-
-/// The plural of a kind [`CREATABLE`] lists.
-#[must_use]
-pub fn creatable(api_version: &str, kind: &str) -> Option<&'static str> {
-    CREATABLE
-        .iter()
-        .find(|(v, k, _)| *v == api_version && *k == kind)
-        .map(|(_, _, plural)| *plural)
-}
-
 /// The annotation `kubectl rollout restart` sets on the pod template.
 pub const RESTARTED_AT: &str = "kubectl.kubernetes.io/restartedAt";
 
@@ -189,8 +98,8 @@ pub struct Input<'a> {
     pub namespace: Option<&'a Value>,
     /// Whether Stakater Reloader runs in the cluster; `None` when that could not be read.
     pub reloader: Option<bool>,
-    /// The kinds the cluster serves, from discovery: what a `create` may make. Empty: only the
-    /// kinds [`CREATABLE`] lists.
+    /// The kinds the cluster serves, from discovery: what a `create` may make. Empty: discovery
+    /// was not read, and every `create` is refused.
     pub kinds: &'a [ServedKind],
     /// What deleting the project reads besides its objects; `None` when the request does not
     /// delete it.
@@ -327,6 +236,8 @@ pub enum ErrorKind {
     Invalid,
     /// It would adopt a namespace Kubernetes keeps for itself.
     SystemNamespace,
+    /// Zeabur could not read what it needs from the cluster.
+    Unavailable,
 }
 
 pub(crate) fn error(kind: ErrorKind, code: &str, detail: impl Into<String>) -> PlanError {

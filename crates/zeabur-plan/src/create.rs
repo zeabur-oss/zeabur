@@ -1,8 +1,9 @@
 //! New objects, from a ready-made object or from a person's own YAML.
 //!
 //! - **Kinds.** Any namespaced kind the cluster serves, built in or custom, as discovery names it
-//!   ([`crate::Input::kinds`]); without discovery, the kinds [`crate::CREATABLE`] lists. A
-//!   cluster-scoped kind is refused: a project holds only what is in its namespace.
+//!   ([`crate::Input::kinds`]). Without discovery every create is refused: the planner does not
+//!   guess a kind's plural or scope. A cluster-scoped kind is refused: a project holds only what is
+//!   in its namespace.
 //! - **Namespace.** The object goes in the project's namespace. A `metadata.namespace` that names
 //!   another is refused, not rewritten.
 //! - **Never an update.** The write is a `POST` of the whole object, which kube-apiserver refuses
@@ -18,7 +19,7 @@ use serde_json::{Map, Value, json};
 use zeabur_graph::manifest::HIDDEN;
 
 use crate::change::{Change, Plan, Target, Write};
-use crate::plan::{CREATABLE, ErrorKind, PlanError, Planner, Working, error};
+use crate::plan::{ErrorKind, PlanError, Planner, Working, error};
 
 /// A kind the cluster serves, from discovery.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -77,17 +78,11 @@ fn read_yaml(yaml: &str) -> Result<Value, PlanError> {
 
 /// `(plural, namespaced)` of `kind` in the API group of `api_version`.
 ///
-/// As discovery names it, or as [`CREATABLE`] does when discovery named nothing. The version is
-/// the object's own: the plural is the same in every version of a group.
+/// As discovery names it. The version is the object's own: the plural is the same in every
+/// version of a group.
 #[must_use]
 pub fn resolve(kinds: &[ServedKind], api_version: &str, kind: &str) -> Option<(String, bool)> {
     let group = api_version.rsplit_once('/').map_or("", |(group, _)| group);
-    if kinds.is_empty() {
-        return CREATABLE
-            .iter()
-            .find(|(v, k, _)| *v == api_version && *k == kind)
-            .map(|(_, _, plural)| ((*plural).to_owned(), true));
-    }
     kinds
         .iter()
         .find(|k| k.group == group && k.kind == kind)
@@ -218,6 +213,13 @@ impl Planner<'_> {
         let api_version = required("/apiVersion", "apiVersion")?;
         let kind = required("/kind", "kind")?;
         let name = required("/metadata/name", "metadata.name")?;
+        if self.input.kinds.is_empty() {
+            return Err(error(
+                ErrorKind::Unavailable,
+                "kinds_unread",
+                "Zeabur could not read which kinds the cluster serves, so it cannot create objects.",
+            ));
+        }
         let Some((plural, namespaced)) = resolve(self.input.kinds, api_version, kind) else {
             let mut refused = error(
                 ErrorKind::Invalid,
