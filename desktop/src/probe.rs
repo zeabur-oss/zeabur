@@ -17,7 +17,7 @@ pub enum Reach {
 }
 
 /// `https://host:port/path` to `host:port`. Without a port it is the scheme's default (443 for
-/// https, 80 for http); without a scheme the server is https, as in client-go.
+/// https, 80 for http); a server without a scheme is taken as https.
 fn host_port(server: &str) -> Option<(String, u16)> {
     let url = if server.contains("://") {
         tauri::Url::parse(server)
