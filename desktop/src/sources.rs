@@ -12,7 +12,7 @@ use crate::env::ChildEnv;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
-pub enum SourceKind {
+pub(crate) enum SourceKind {
     /// `~/.kube/config`, or each path in `KUBECONFIG`.
     Default,
     File,
@@ -23,9 +23,9 @@ pub enum SourceKind {
 
 /// A source the person added. Default sources are not stored; they come from the environment.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct AddedSource {
-    pub kind: SourceKind,
-    pub path: PathBuf,
+pub(crate) struct AddedSource {
+    pub(crate) kind: SourceKind,
+    pub(crate) path: PathBuf,
 }
 
 /// The default sources: each path in `KUBECONFIG` (`:` between paths, `;` on Windows), or
@@ -33,7 +33,10 @@ pub struct AddedSource {
 /// (<https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/>).
 /// The caller passes `KUBECONFIG` from the child environment: the app's own value, else the login
 /// shell's.
-pub fn default_paths(kubeconfig_env: Option<OsString>, home: Option<PathBuf>) -> Vec<PathBuf> {
+pub(crate) fn default_paths(
+    kubeconfig_env: Option<OsString>,
+    home: Option<PathBuf>,
+) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     if let Some(value) = kubeconfig_env.filter(|v| !v.is_empty()) {
         for path in std::env::split_paths(&value) {
@@ -51,27 +54,27 @@ pub fn default_paths(kubeconfig_env: Option<OsString>, home: Option<PathBuf>) ->
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct SourceView {
-    pub id: String,
-    pub kind: SourceKind,
-    pub path: String,
+pub(crate) struct SourceView {
+    pub(crate) id: String,
+    pub(crate) kind: SourceKind,
+    pub(crate) path: String,
     /// Files read from this source (one, or each file of a folder).
-    pub files: usize,
-    pub contexts: usize,
+    pub(crate) files: usize,
+    pub(crate) contexts: usize,
     /// Files that could not be read or parsed, with the reason.
-    pub errors: Vec<FileError>,
-    pub missing: bool,
+    pub(crate) errors: Vec<FileError>,
+    pub(crate) missing: bool,
 }
 
 #[derive(Debug, Serialize)]
-pub struct FileError {
-    pub file: String,
-    pub reason: String,
+pub(crate) struct FileError {
+    pub(crate) file: String,
+    pub(crate) reason: String,
 }
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "state")]
-pub enum Auth {
+pub(crate) enum Auth {
     /// Nothing the app can check is wrong.
     Ok { method: String },
     /// The exec plugin is not found at all.
@@ -87,26 +90,26 @@ pub enum Auth {
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
-pub struct ContextView {
+pub(crate) struct ContextView {
     /// The file path and the context name; stable across launches.
-    pub key: String,
-    pub source_id: String,
-    pub file: String,
-    pub name: String,
-    pub cluster: String,
-    pub server: Option<String>,
-    pub user: Option<String>,
-    pub namespace: Option<String>,
-    pub current: bool,
+    pub(crate) key: String,
+    pub(crate) source_id: String,
+    pub(crate) file: String,
+    pub(crate) name: String,
+    pub(crate) cluster: String,
+    pub(crate) server: Option<String>,
+    pub(crate) user: Option<String>,
+    pub(crate) namespace: Option<String>,
+    pub(crate) current: bool,
     /// Other files define a context with the same name.
-    pub same_name_elsewhere: usize,
-    pub auth: Auth,
+    pub(crate) same_name_elsewhere: usize,
+    pub(crate) auth: Auth,
 }
 
-pub struct SourceRef<'a> {
-    pub id: String,
-    pub kind: SourceKind,
-    pub path: &'a Path,
+pub(crate) struct SourceRef<'a> {
+    pub(crate) id: String,
+    pub(crate) kind: SourceKind,
+    pub(crate) path: &'a Path,
 }
 
 fn files_of(kind: SourceKind, path: &Path) -> std::io::Result<Vec<PathBuf>> {
@@ -147,14 +150,12 @@ fn file_names(command: &str, pathext: Option<&str>) -> Vec<String> {
 /// Whether the exec plugin exists: an absolute path as it is, a name on the child environment's
 /// `PATH`, which is the `PATH` the plugin runs with.
 fn find_command(command: &str, env: &ChildEnv) -> bool {
-    let pathext = if cfg!(windows) {
-        let value = env
-            .get(std::ffi::OsStr::new("PATHEXT"))
-            .map(|v| v.to_string_lossy().into_owned());
-        Some(value.unwrap_or_else(|| ".COM;.EXE;.BAT;.CMD".to_owned()))
-    } else {
-        None
-    };
+    let pathext = cfg!(windows).then(|| {
+        env.get(std::ffi::OsStr::new("PATHEXT")).map_or_else(
+            || ".COM;.EXE;.BAT;.CMD".to_owned(),
+            |v| v.to_string_lossy().into_owned(),
+        )
+    });
     let names = file_names(command, pathext.as_deref());
     if Path::new(command).is_absolute() {
         for name in &names {
@@ -224,7 +225,10 @@ fn check_auth(info: &AuthInfo, env: &ChildEnv) -> Auth {
 }
 
 /// Reads every source and returns the sources with counts and the contexts of every file.
-pub fn read_all(sources: &[SourceRef<'_>], env: &ChildEnv) -> (Vec<SourceView>, Vec<ContextView>) {
+pub(crate) fn read_all(
+    sources: &[SourceRef<'_>],
+    env: &ChildEnv,
+) -> (Vec<SourceView>, Vec<ContextView>) {
     let mut views = Vec::new();
     let mut contexts = Vec::new();
     for source in sources {
@@ -277,7 +281,9 @@ pub fn read_all(sources: &[SourceRef<'_>], env: &ChildEnv) -> (Vec<SourceView>, 
         *counts.entry(context.name.clone()).or_default() += 1;
     }
     for context in &mut contexts {
-        context.same_name_elsewhere = counts[&context.name] - 1;
+        context.same_name_elsewhere = counts
+            .get(&context.name)
+            .map_or(0, |count| count.saturating_sub(1));
     }
     (views, contexts)
 }
@@ -295,24 +301,25 @@ fn context_view(
     let server = cluster
         .and_then(|c| c.cluster.as_ref())
         .and_then(|c| c.server.clone());
-    let auth = if cluster.is_none() {
-        Auth::MissingEntry {
+    let auth = match (cluster, &context.user) {
+        (None, _) => Auth::MissingEntry {
             what: "cluster".into(),
             name: context.cluster.clone(),
-        }
-    } else {
-        match &context.user {
-            None => Auth::Ok {
-                method: "none".into(),
-            },
-            Some(user) => match config.auth_infos.iter().find(|a| &a.name == user) {
-                None => Auth::MissingEntry {
+        },
+        (Some(_), None) => Auth::Ok {
+            method: "none".into(),
+        },
+        (Some(_), Some(user)) => config
+            .auth_infos
+            .iter()
+            .find(|a| &a.name == user)
+            .map_or_else(
+                || Auth::MissingEntry {
                     what: "user".into(),
                     name: user.clone(),
                 },
-                Some(entry) => check_auth(&entry.auth_info.clone().unwrap_or_default(), env),
-            },
-        }
+                |entry| check_auth(&entry.auth_info.clone().unwrap_or_default(), env),
+            ),
     };
     ContextView {
         key: format!("{file_text}#{}", named.name),
@@ -343,7 +350,7 @@ mod tests {
         let paths = default_paths(Some(value), home.clone());
         assert_eq!(paths.len(), 2);
         assert_eq!(
-            default_paths(Some(OsString::new()), home.clone()),
+            default_paths(Some(OsString::new()), home),
             vec![PathBuf::from("/home/a/.kube/config")]
         );
         assert_eq!(default_paths(None, None), Vec::<PathBuf>::new());
@@ -399,7 +406,7 @@ mod tests {
         std::fs::write(dir.join(name), "").unwrap();
         let env = ChildEnv::merge(
             Vec::new(),
-            &[(OsString::from("PATH"), dir.clone().into_os_string())],
+            &[(OsString::from("PATH"), dir.into_os_string())],
         );
         assert!(find_command("kubelogin", &env));
         assert!(!find_command("kubelogin", &ChildEnv::default()));

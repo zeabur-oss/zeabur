@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Starts the demo API, the web dev server and the desktop app. Run from anywhere:
-#   nix develop -c desktop/run.sh             # your own kubeconfig
-#   nix develop -c desktop/run.sh --fixtures  # the sample kubeconfigs in desktop/fixtures
+#   nix develop .#desktop -c desktop/run.sh             # your own kubeconfig
+#   nix develop .#desktop -c desktop/run.sh --fixtures  # the sample kubeconfigs in desktop/fixtures
 set -euo pipefail
 root=$(cd "$(dirname "$0")/.." && pwd)
 

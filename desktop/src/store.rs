@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 /// Writes `bytes` to a new file `dir/{slug}.yaml`, or `{slug}-2.yaml` and so on when that name is
 /// taken; it never replaces a file. On Unix the folder is `0700`, also when it already existed
 /// with a wider mode, and the file `0600`.
-pub fn write_new_private(dir: &Path, slug: &str, bytes: &[u8]) -> std::io::Result<PathBuf> {
+pub(crate) fn write_new_private(dir: &Path, slug: &str, bytes: &[u8]) -> std::io::Result<PathBuf> {
     let mut builder = std::fs::DirBuilder::new();
     builder.recursive(true);
     #[cfg(unix)]
@@ -43,7 +43,8 @@ pub fn write_new_private(dir: &Path, slug: &str, bytes: &[u8]) -> std::io::Resul
     }
 }
 
-#[cfg(all(test, unix))]
+#[cfg(test)]
+#[cfg(unix)]
 mod tests {
     use std::os::unix::fs::PermissionsExt;
 

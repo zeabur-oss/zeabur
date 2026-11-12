@@ -1,11 +1,14 @@
 # Zeabur desktop app (proof of concept)
 
 A Tauri 2 app that lists every context of every kubeconfig on the machine and opens Zeabur's web
-interface for the ones you pick. Throwaway code to answer product questions; not built in CI.
+interface for the ones you pick. Throwaway code to answer product questions. It is a Cargo
+workspace of its own with the main workspace's rules
+([crates](../docs/internal/crates.md#apps-outside-the-workspace)); CI's `desktop` job lints and
+tests it on Linux.
 
 ```sh
-nix develop -c desktop/run.sh             # your own kubeconfig
-nix develop -c desktop/run.sh --fixtures  # the sample kubeconfigs in desktop/fixtures
+nix develop .#desktop -c desktop/run.sh             # your own kubeconfig
+nix develop .#desktop -c desktop/run.sh --fixtures  # the sample kubeconfigs in desktop/fixtures
 ```
 
 `run.sh` starts the demo API (`cargo run -p zeabur-api --example demo`), the web dev server on
@@ -214,7 +217,11 @@ which downloads the MSVC CRT and Windows SDK on first use (needs `clang`, `lld` 
 ```
 cd desktop
 cargo xwin build --release --target aarch64-pc-windows-msvc   # or x86_64-pc-windows-msvc
+cargo xwin clippy --all-targets --all-features --locked --target aarch64-pc-windows-msvc -- -D warnings
 ```
+
+CI does not build for Windows or macOS; run `cargo lint` on a Mac and the `clippy` line above
+after a change to Windows or macOS code.
 
 Copy `target/<target>/release/zeabur-desktop.exe` to a Windows 11 machine and run it; WebView2 ships
 with Windows 11. A release build is a GUI program with no console window; a debug build keeps the

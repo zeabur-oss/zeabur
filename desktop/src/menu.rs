@@ -1,82 +1,81 @@
 //! The macOS menu bar. Its words come from the chooser page, which has the web interface's
 //! catalogues and the language the person picked, so there is one set of strings.
 
-use serde::Deserialize;
-use tauri::AppHandle;
-
-/// Every word in the menu bar, in the app's language (`desktop.menu.*` in `web/src/i18n`).
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-#[cfg_attr(
-    not(target_os = "macos"),
-    expect(dead_code, reason = "Windows and Linux have no menu bar")
-)]
-pub struct MenuLabels {
-    about: String,
-    services: String,
-    hide: String,
-    hide_others: String,
-    show_all: String,
-    quit: String,
-    file: String,
-    new_window: String,
-    close: String,
-    edit: String,
-    undo: String,
-    redo: String,
-    cut: String,
-    copy: String,
-    paste: String,
-    select_all: String,
-    view: String,
-    reload: String,
-    actual_size: String,
-    zoom_in: String,
-    zoom_out: String,
-    full_screen: String,
-    window: String,
-    minimize: String,
-    zoom: String,
-    bring_all_to_front: String,
-    help: String,
-    docs: String,
-}
+#[cfg(target_os = "macos")]
+pub(crate) use mac::on_menu_event;
 
 /// Sets the menu bar in the chooser's language; the page calls it on load and when the language
-/// changes. `docs` is the docs page in that language. Windows and Linux have no menu bar.
+/// changes. `docs` is the docs page in that language.
+#[cfg(target_os = "macos")]
 #[tauri::command]
-pub fn set_menu(app: AppHandle, labels: MenuLabels, docs: String) -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    {
-        mac::set(&app, &labels).map_err(|e| e.to_string())?;
-        *mac::DOCS.lock().unwrap_or_else(|e| e.into_inner()) = docs;
-    }
-    #[cfg(not(target_os = "macos"))]
-    let _ = (app, labels, docs);
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
+pub(crate) fn set_menu(
+    app: tauri::AppHandle,
+    labels: mac::MenuLabels,
+    docs: String,
+) -> Result<(), String> {
+    mac::set(&app, &labels).map_err(|e| e.to_string())?;
+    *mac::DOCS
+        .lock()
+        .unwrap_or_else(std::sync::PoisonError::into_inner) = docs;
     Ok(())
 }
 
-/// Handles the menu items the app defines; the standard ones are handled by macOS.
-pub fn on_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
-    #[cfg(target_os = "macos")]
-    mac::on_event(app, event.id().as_ref());
-    #[cfg(not(target_os = "macos"))]
-    let _ = (app, event);
-}
+/// Windows and Linux have no menu bar; the page calls this all the same.
+#[cfg(not(target_os = "macos"))]
+#[tauri::command]
+pub(crate) const fn set_menu() {}
 
 #[cfg(target_os = "macos")]
 mod mac {
-    use std::sync::Mutex;
+    use std::sync::{Mutex, PoisonError};
 
+    use serde::Deserialize;
     use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu, SubmenuBuilder};
     use tauri::{AppHandle, Manager, WebviewWindow};
 
-    use super::MenuLabels;
-    use crate::chrome;
+    use crate::{chrome, output};
 
-    pub static DOCS: Mutex<String> = Mutex::new(String::new());
+    /// Every word in the menu bar, in the app's language (`desktop.menu.*` in `web/src/i18n`).
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    pub(crate) struct MenuLabels {
+        about: String,
+        services: String,
+        hide: String,
+        hide_others: String,
+        show_all: String,
+        quit: String,
+        file: String,
+        new_window: String,
+        close: String,
+        edit: String,
+        undo: String,
+        redo: String,
+        cut: String,
+        copy: String,
+        paste: String,
+        select_all: String,
+        view: String,
+        reload: String,
+        actual_size: String,
+        zoom_in: String,
+        zoom_out: String,
+        full_screen: String,
+        window: String,
+        minimize: String,
+        zoom: String,
+        bring_all_to_front: String,
+        help: String,
+        docs: String,
+    }
 
-    pub fn set(app: &AppHandle, l: &MenuLabels) -> tauri::Result<()> {
+    pub(crate) static DOCS: Mutex<String> = Mutex::new(String::new());
+
+    pub(crate) fn set(app: &AppHandle, l: &MenuLabels) -> tauri::Result<()> {
         let info = app.package_info();
         let about = AboutMetadata {
             name: Some(info.name.clone()),
@@ -181,22 +180,29 @@ mod mac {
         help.set_as_help_menu_for_nsapp()
     }
 
-    pub fn on_event(app: &AppHandle, id: &str) {
+    /// Handles the menu items the app defines; macOS handles the standard ones.
+    #[expect(clippy::needless_pass_by_value, reason = "the signature Tauri calls")]
+    pub(crate) fn on_menu_event(app: &AppHandle, event: tauri::menu::MenuEvent) {
+        let id = event.id().as_ref();
         match id {
             "new-window" => {
                 if let Err(err) = chrome::show_chooser(app) {
-                    eprintln!("zeabur-desktop: cannot open the chooser: {err}");
+                    output::warn(&format!("cannot open the chooser: {err}"));
                 }
             }
             "docs" => {
-                let url = DOCS.lock().unwrap_or_else(|e| e.into_inner()).clone();
-                if url.starts_with("https://oss.zeabur.com/") {
-                    let _ = std::process::Command::new("/usr/bin/open").arg(url).spawn();
+                let url = DOCS.lock().unwrap_or_else(PoisonError::into_inner).clone();
+                if url.starts_with("https://oss.zeabur.com/")
+                    && let Err(err) = std::process::Command::new("/usr/bin/open").arg(url).spawn()
+                {
+                    output::warn(&format!("cannot open the docs: {err}"));
                 }
             }
             "reload" => {
-                if let Some(window) = focused(app) {
-                    let _ = window.reload();
+                if let Some(window) = focused(app)
+                    && let Err(err) = window.reload()
+                {
+                    output::warn(&format!("cannot reload the window: {err}"));
                 }
             }
             "actual-size" | "zoom-in" | "zoom-out" => {

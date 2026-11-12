@@ -8,8 +8,14 @@ all-features = true
 [advisories]
 version = 2
 yanked = "deny"
+# The main workspace and desktop/ share this file, so an ignore can apply to one graph only.
+unused-ignored-advisory = "allow"
 # Every ignore needs an id and the reason it is acceptable.
-ignore = []
+ignore = [
+  # desktop/ on Linux: glib-macros and gtk3-macros, through Tauri's GTK 3 stack, run it at build
+  # time only. It is unmaintained, with no known vulnerability; Tauri 2 has no GTK 4 port.
+  { id = "RUSTSEC-2024-0370", reason = "build-time proc macro of Tauri's GTK 3 stack (desktop/ on Linux)" },
+]
 
 [licenses]
 version = 2

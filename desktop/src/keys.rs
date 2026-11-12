@@ -18,7 +18,7 @@
     expect(dead_code, reason = "Windows uses Close and NewWindow only")
 )]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Shortcut {
+pub(crate) enum Shortcut {
     Close,
     Quit,
     NewWindow,
@@ -31,7 +31,7 @@ pub enum Shortcut {
 /// The shortcut for a key, by its GDK key name in lower case, pressed with Ctrl. Shift is allowed
 /// only where it types the key (`+` is Shift+`=` on many layouts); Alt is never part of one.
 #[cfg(any(target_os = "linux", test))]
-pub fn shortcut(ctrl: bool, shift: bool, alt: bool, key: &str) -> Option<Shortcut> {
+pub(crate) fn shortcut(ctrl: bool, shift: bool, alt: bool, key: &str) -> Option<Shortcut> {
     if !ctrl || alt {
         return None;
     }
@@ -52,7 +52,12 @@ pub fn shortcut(ctrl: bool, shift: bool, alt: bool, key: &str) -> Option<Shortcu
 /// The shortcut for a Windows virtual-key code pressed with Ctrl alone. Only the keys WebView2 does
 /// not handle itself.
 #[cfg(any(windows, test))]
-pub fn windows_shortcut(ctrl: bool, shift: bool, alt: bool, key: u32) -> Option<Shortcut> {
+pub(crate) const fn windows_shortcut(
+    ctrl: bool,
+    shift: bool,
+    alt: bool,
+    key: u32,
+) -> Option<Shortcut> {
     if !ctrl || shift || alt {
         return None;
     }
@@ -65,7 +70,7 @@ pub fn windows_shortcut(ctrl: bool, shift: bool, alt: bool, key: u32) -> Option<
 
 /// Handles the shortcuts in this window, before the page sees the keys.
 #[cfg(target_os = "linux")]
-pub fn attach(window: &tauri::WebviewWindow) {
+pub(crate) fn attach(window: &tauri::WebviewWindow) {
     use gtk::prelude::*;
 
     let Ok(gtk_window) = window.gtk_window() else {
@@ -95,20 +100,24 @@ pub fn attach(window: &tauri::WebviewWindow) {
 fn run(window: &tauri::WebviewWindow, shortcut: Shortcut) {
     use tauri::Manager;
 
-    use crate::chrome;
+    use crate::{chrome, output};
 
     match shortcut {
         Shortcut::Close => {
-            let _ = window.close();
+            if let Err(err) = window.close() {
+                output::warn(&format!("cannot close the window: {err}"));
+            }
         }
         Shortcut::Quit => window.app_handle().exit(0),
         Shortcut::NewWindow => {
             if let Err(err) = chrome::show_chooser(window.app_handle()) {
-                eprintln!("zeabur-desktop: cannot open the chooser: {err}");
+                output::warn(&format!("cannot open the chooser: {err}"));
             }
         }
         Shortcut::Reload => {
-            let _ = window.reload();
+            if let Err(err) = window.reload() {
+                output::warn(&format!("cannot reload the window: {err}"));
+            }
         }
         Shortcut::ZoomIn => chrome::zoom(window, Some(true)),
         Shortcut::ZoomOut => chrome::zoom(window, Some(false)),
@@ -120,77 +129,54 @@ fn run(window: &tauri::WebviewWindow, shortcut: Shortcut) {
 /// before the page sees a key pressed with Ctrl or Alt
 /// (<https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2controller#add_acceleratorkeypressed>).
 #[cfg(windows)]
-pub fn attach(window: &tauri::WebviewWindow) {
-    use webview2_com::AcceleratorKeyPressedEventHandler;
-    use webview2_com::Microsoft::Web::WebView2::Win32::{
-        COREWEBVIEW2_KEY_EVENT_KIND, COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN,
-        COREWEBVIEW2_PHYSICAL_KEY_STATUS,
-    };
-    use windows::Win32::UI::Input::KeyboardAndMouse::{
-        GetKeyState, VIRTUAL_KEY, VK_CONTROL, VK_MENU, VK_SHIFT,
-    };
+pub(crate) fn attach(window: &tauri::WebviewWindow) {
+    use windows::Win32::UI::Input::KeyboardAndMouse::{VK_CONTROL, VK_MENU, VK_SHIFT};
+
+    use crate::{output, win32};
 
     let target = window.clone();
-    let _ = window.with_webview(move |webview| {
-        let handler = AcceleratorKeyPressedEventHandler::create(Box::new(move |_, args| {
-            let Some(args) = args else {
-                return Ok(());
-            };
-            let mut kind = COREWEBVIEW2_KEY_EVENT_KIND::default();
-            let mut key = 0;
-            let mut status = COREWEBVIEW2_PHYSICAL_KEY_STATUS::default();
-            // SAFETY: plain out-parameters of the event's arguments, valid during the call.
-            unsafe {
-                args.KeyEventKind(&mut kind)?;
-                args.VirtualKey(&mut key)?;
-                args.PhysicalKeyStatus(&mut status)?;
-            }
-            if kind != COREWEBVIEW2_KEY_EVENT_KIND_KEY_DOWN {
-                return Ok(());
-            }
-            // SAFETY: GetKeyState only reads this thread's keyboard state.
-            let held = |vk: VIRTUAL_KEY| unsafe { GetKeyState(i32::from(vk.0)) } < 0;
+    let attached = window.with_webview(move |webview| {
+        let result = win32::on_accelerator_key(&webview, move |key, repeat| {
+            let held = win32::key_held;
             let Some(found) =
                 windows_shortcut(held(VK_CONTROL), held(VK_SHIFT), held(VK_MENU), key)
             else {
-                return Ok(());
+                return false;
             };
-            // SAFETY: as above.
-            unsafe { args.SetHandled(true)? };
             // A held key repeats; act on the first press only. Closing or opening a window inside
             // a WebView2 event handler deadlocks, so it happens on another thread.
-            if !status.WasKeyDown.as_bool() {
+            if !repeat {
                 let window = target.clone();
                 std::thread::spawn(move || run_windows(&window, found));
             }
-            Ok(())
-        }));
-        let mut token = 0;
-        // SAFETY: the controller lives as long as the window, and the handler is reference counted.
-        if let Err(err) = unsafe {
-            webview
-                .controller()
-                .add_AcceleratorKeyPressed(&handler, &mut token)
-        } {
-            eprintln!("zeabur-desktop: cannot handle shortcuts: {err}");
+            true
+        });
+        if let Err(err) = result {
+            output::warn(&format!("cannot handle shortcuts: {err}"));
         }
     });
+    if let Err(err) = attached {
+        output::warn(&format!("cannot handle shortcuts: {err}"));
+    }
 }
 
 #[cfg(windows)]
 fn run_windows(window: &tauri::WebviewWindow, shortcut: Shortcut) {
     use tauri::Manager;
 
-    match shortcut {
-        Shortcut::Close => {
-            let _ = window.close();
-        }
-        Shortcut::NewWindow => {
-            if let Err(err) = crate::chrome::show_chooser(window.app_handle()) {
-                eprintln!("zeabur-desktop: cannot open the chooser: {err}");
-            }
-        }
-        _ => {}
+    use crate::{chrome, output};
+
+    let result = match shortcut {
+        Shortcut::Close => window.close(),
+        Shortcut::NewWindow => chrome::show_chooser(window.app_handle()),
+        Shortcut::Quit
+        | Shortcut::Reload
+        | Shortcut::ZoomIn
+        | Shortcut::ZoomOut
+        | Shortcut::ActualSize => Ok(()),
+    };
+    if let Err(err) = result {
+        output::warn(&format!("cannot run the shortcut: {err}"));
     }
 }
 

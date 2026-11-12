@@ -9,14 +9,20 @@ mod env;
 #[cfg(any(target_os = "linux", windows, test))]
 mod keys;
 mod menu;
+mod output;
 mod probe;
 mod shots;
 mod sources;
 mod store;
+#[cfg(target_os = "macos")]
+mod webkit;
+#[cfg(windows)]
+mod win32;
 
 use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
-use std::sync::{Mutex, RwLock};
+use std::process::ExitCode;
+use std::sync::{Mutex, PoisonError, RwLock};
 
 use env::{ChildEnv, ShellRead};
 use serde::{Deserialize, Serialize};
@@ -47,9 +53,16 @@ struct App {
 }
 
 impl App {
-    fn save(&self, saved: &Saved) -> Result<(), String> {
+    /// Changes the saved settings and writes them to `settings.json`.
+    #[expect(
+        clippy::significant_drop_tightening,
+        reason = "the lock is held until the file is written, so two changes cannot write out of order"
+    )]
+    fn update(&self, change: impl FnOnce(&mut Saved)) -> Result<(), String> {
+        let mut saved = self.saved.lock().unwrap_or_else(PoisonError::into_inner);
+        change(&mut saved);
         std::fs::create_dir_all(&self.config_dir).map_err(|e| e.to_string())?;
-        let text = serde_json::to_string_pretty(saved).map_err(|e| e.to_string())?;
+        let text = serde_json::to_string_pretty(&*saved).map_err(|e| e.to_string())?;
         std::fs::write(self.config_dir.join("settings.json"), text).map_err(|e| e.to_string())
     }
 }
@@ -88,10 +101,24 @@ fn source_list(saved: &Saved, env: &ChildEnv) -> Vec<(String, SourceKind, PathBu
 }
 
 #[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
 fn snapshot(app: State<'_, App>) -> Snapshot {
-    let saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
-    let env = app.env.read().unwrap_or_else(|e| e.into_inner());
-    let list = source_list(&saved, &env);
+    let env = app
+        .env
+        .read()
+        .unwrap_or_else(PoisonError::into_inner)
+        .clone();
+    let (list, favourites, recents) = {
+        let saved = app.saved.lock().unwrap_or_else(PoisonError::into_inner);
+        (
+            source_list(&saved, &env),
+            saved.favourites.clone(),
+            saved.recents.clone(),
+        )
+    };
     let mut refs = Vec::new();
     for (id, kind, path) in &list {
         refs.push(SourceRef {
@@ -104,38 +131,50 @@ fn snapshot(app: State<'_, App>) -> Snapshot {
     Snapshot {
         sources,
         contexts,
-        favourites: saved.favourites.clone(),
-        recents: saved.recents.clone(),
-        shell: app.shell.lock().unwrap_or_else(|e| e.into_inner()).clone(),
+        favourites,
+        recents,
+        shell: app
+            .shell
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .clone(),
     }
 }
 
-/// Adds files and folders from the file picker or a drop.
 /// The screenshot scenario for the page (`ZEABUR_DESKTOP_SCENARIO`), if any.
 #[tauri::command]
 fn scenario() -> Option<String> {
     std::env::var("ZEABUR_DESKTOP_SCENARIO").ok()
 }
 
+/// Adds files and folders from the file picker or a drop.
 #[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
 fn add_paths(app: State<'_, App>, paths: Vec<PathBuf>) -> Result<(), String> {
-    let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
-    for path in paths {
-        let kind = if path.is_dir() {
-            SourceKind::Folder
-        } else {
-            SourceKind::File
-        };
-        saved.hidden_defaults.retain(|p| p != &path);
-        if !saved.added.iter().any(|a| a.path == path) {
-            saved.added.push(AddedSource { kind, path });
+    app.update(|saved| {
+        for path in paths {
+            let kind = if path.is_dir() {
+                SourceKind::Folder
+            } else {
+                SourceKind::File
+            };
+            saved.hidden_defaults.retain(|p| p != &path);
+            if !saved.added.iter().any(|a| a.path == path) {
+                saved.added.push(AddedSource { kind, path });
+            }
         }
-    }
-    app.save(&saved)
+    })
 }
 
 /// Checks pasted YAML, then keeps a copy in the app's `kubeconfigs` folder.
 #[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
 fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), String> {
     let config = kube::config::Kubeconfig::from_yaml(&yaml).map_err(|e| e.to_string())?;
     if config.contexts.is_empty() {
@@ -154,40 +193,55 @@ fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), Str
     }
     let path = store::write_new_private(&app.kubeconfigs_dir, &slug, yaml.as_bytes())
         .map_err(|e| e.to_string())?;
-    let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
-    saved.added.push(AddedSource {
-        kind: SourceKind::Pasted,
-        path,
-    });
-    app.save(&saved)
+    app.update(|saved| {
+        saved.added.push(AddedSource {
+            kind: SourceKind::Pasted,
+            path,
+        });
+    })
 }
 
 #[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
 fn remove_source(app: State<'_, App>, id: String) -> Result<(), String> {
-    let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(path) = id.strip_prefix("default:") {
-        saved.hidden_defaults.push(PathBuf::from(path));
-    } else if let Some(path) = id.strip_prefix("added:") {
-        let path = PathBuf::from(path);
-        if let Some(index) = saved.added.iter().position(|a| a.path == path) {
-            let removed = saved.added.remove(index);
-            if removed.kind == SourceKind::Pasted {
-                let _ = std::fs::remove_file(&removed.path);
+    let mut pasted = None;
+    app.update(|saved| {
+        if let Some(path) = id.strip_prefix("default:") {
+            saved.hidden_defaults.push(PathBuf::from(path));
+        } else if let Some(path) = id.strip_prefix("added:") {
+            let path = PathBuf::from(path);
+            if let Some(index) = saved.added.iter().position(|a| a.path == path) {
+                let removed = saved.added.remove(index);
+                if removed.kind == SourceKind::Pasted {
+                    pasted = Some(removed.path);
+                }
             }
         }
+    })?;
+    if let Some(path) = pasted
+        && let Err(err) = std::fs::remove_file(&path)
+    {
+        output::warn(&format!("cannot remove {}: {err}", path.display()));
     }
-    app.save(&saved)
+    Ok(())
 }
 
 #[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
 fn toggle_favourite(app: State<'_, App>, key: String) -> Result<(), String> {
-    let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some(index) = saved.favourites.iter().position(|k| k == &key) {
-        saved.favourites.remove(index);
-    } else {
-        saved.favourites.push(key);
-    }
-    app.save(&saved)
+    app.update(|saved| {
+        if let Some(index) = saved.favourites.iter().position(|k| k == &key) {
+            saved.favourites.remove(index);
+        } else {
+            saved.favourites.push(key);
+        }
+    })
 }
 
 #[derive(Serialize)]
@@ -225,13 +279,11 @@ async fn open_cluster(
     name: String,
     lang: String,
 ) -> Result<(), String> {
-    {
-        let mut saved = app.saved.lock().unwrap_or_else(|e| e.into_inner());
+    app.update(|saved| {
         saved.recents.retain(|k| *k != key);
         saved.recents.insert(0, key.clone());
         saved.recents.truncate(5);
-        app.save(&saved)?;
-    }
+    })?;
     let url = app
         .web_url
         .parse::<tauri::Url>()
@@ -246,8 +298,7 @@ async fn open_cluster(
     let script = format!("try {{ {locale} }} catch {{}}");
     let label = format!("cluster-{}", shots::label_hash(&key));
     if let Some(window) = handle.get_webview_window(&label) {
-        let _ = window.set_focus();
-        return Ok(());
+        return window.set_focus().map_err(|e| e.to_string());
     }
     let builder = WebviewWindowBuilder::new(&handle, label, WebviewUrl::External(url))
         .title(format!("{name} - Zeabur"))
@@ -256,33 +307,59 @@ async fn open_cluster(
     let window = shots::apply_theme(builder)
         .build()
         .map_err(|e| e.to_string())?;
-    chrome::cluster_window_built(&window);
+    chrome::window_built(&window);
     if shots::wants("cluster") {
         shots::capture(window);
     }
     Ok(())
 }
 
-fn main() {
-    let context = tauri::tauri_build_context!();
+/// The app's config, icons and assets, which `build.rs` generates with `tauri-build`.
+#[expect(
+    clippy::default_trait_access,
+    clippy::exit,
+    clippy::expect_used,
+    clippy::manual_string_new,
+    clippy::option_if_let_else,
+    clippy::print_stderr,
+    clippy::single_match_else,
+    clippy::str_to_string,
+    clippy::unwrap_used,
+    reason = "tauri-build generates this code"
+)]
+#[cfg_attr(
+    not(windows),
+    expect(
+        clippy::unseparated_literal_suffix,
+        reason = "tauri-build generates this code"
+    )
+)]
+fn context() -> tauri::Context {
+    tauri::tauri_build_context!()
+}
+
+fn main() -> ExitCode {
+    let context = context();
     chrome::set_app_id(&context.config().identifier);
-    tauri::Builder::default()
+    let builder = tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
-        .plugin(chrome::window_state())
-        .on_menu_event(menu::on_menu_event)
+        .plugin(chrome::window_state());
+    #[cfg(target_os = "macos")]
+    let builder = builder.on_menu_event(menu::on_menu_event);
+    let app = builder
         .setup(|tauri_app| {
             // `ZEABUR_DESKTOP_STATE` puts everything in one folder, for the fixtures and
             // screenshots.
-            let (config_dir, kubeconfigs_dir) = match std::env::var_os("ZEABUR_DESKTOP_STATE") {
-                Some(dir) => (PathBuf::from(&dir), PathBuf::from(dir).join("kubeconfigs")),
-                None => {
+            let (config_dir, kubeconfigs_dir) =
+                if let Some(dir) = std::env::var_os("ZEABUR_DESKTOP_STATE") {
+                    (PathBuf::from(&dir), PathBuf::from(dir).join("kubeconfigs"))
+                } else {
                     let paths = tauri_app.path();
                     (
                         paths.app_config_dir()?,
                         paths.app_local_data_dir()?.join("kubeconfigs"),
                     )
-                }
-            };
+                };
             let saved = std::fs::read(config_dir.join("settings.json"))
                 .ok()
                 .and_then(|bytes| serde_json::from_slice(&bytes).ok())
@@ -303,13 +380,18 @@ fn main() {
             std::thread::spawn(move || {
                 let (merged, read) = env::load(ChildEnv::from_process());
                 let app = handle.state::<App>();
-                *app.env.write().unwrap_or_else(|e| e.into_inner()) = merged;
-                *app.shell.lock().unwrap_or_else(|e| e.into_inner()) = read;
-                let _sent = handle.emit("shell-env", ());
+                *app.env.write().unwrap_or_else(PoisonError::into_inner) = merged;
+                *app.shell.lock().unwrap_or_else(PoisonError::into_inner) = read;
+                if let Err(err) = handle.emit("shell-env", ()) {
+                    output::warn(&format!("cannot reload the window: {err}"));
+                }
             });
 
-            let web_url = tauri_app.state::<App>().web_url.parse::<tauri::Url>()?;
-            chrome::allow_title_bar(tauri_app.handle(), &web_url)?;
+            #[cfg(target_os = "macos")]
+            {
+                let web_url = tauri_app.state::<App>().web_url.parse::<tauri::Url>()?;
+                chrome::allow_title_bar(tauri_app.handle(), &web_url)?;
+            }
             chrome::show_chooser(tauri_app.handle())?;
             Ok(())
         })
@@ -324,10 +406,15 @@ fn main() {
             scenario,
             menu::set_menu
         ])
-        .build(context)
-        .unwrap_or_else(|err| {
-            eprintln!("zeabur-desktop: {err}");
-            std::process::exit(1);
-        })
-        .run(chrome::on_run_event);
+        .build(context);
+    match app {
+        Ok(app) => {
+            app.run(chrome::on_run_event);
+            ExitCode::SUCCESS
+        }
+        Err(err) => {
+            output::warn(&err.to_string());
+            ExitCode::FAILURE
+        }
+    }
 }

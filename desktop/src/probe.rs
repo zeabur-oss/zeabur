@@ -8,7 +8,7 @@ use serde::Serialize;
 
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "state")]
-pub enum Reach {
+pub(crate) enum Reach {
     Reachable { millis: u64 },
     NoAddress,
     Unresolved { host: String },
@@ -33,7 +33,7 @@ fn host_port(server: &str) -> Option<(String, u16)> {
     Some((host.to_owned(), url.port_or_known_default()?))
 }
 
-pub fn probe(server: Option<&str>) -> Reach {
+pub(crate) fn probe(server: Option<&str>) -> Reach {
     let Some((host, port)) = server.and_then(host_port) else {
         return Reach::NoAddress;
     };

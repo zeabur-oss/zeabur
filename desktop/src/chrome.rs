@@ -2,14 +2,16 @@
 //! kept between launches, zoom, and what happens when the last window closes.
 
 use std::path::PathBuf;
+#[cfg(any(target_os = "macos", target_os = "linux"))]
+use std::sync::PoisonError;
 
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_window_state::StateFlags;
 
-use crate::shots;
+use crate::{output, shots};
 
 /// The label of the cluster chooser window.
-pub const CHOOSER: &str = "main";
+pub(crate) const CHOOSER: &str = "main";
 
 /// Below this width the web interface hides its sidebar, and the traffic lights would sit on the
 /// page.
@@ -44,8 +46,8 @@ const ZOOM_STEPS: [f64; 11] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1
 /// The zoom of each open window by label; WebKit has no call to read it back. A window that
 /// closes leaves the map, so a new window with the same label starts at 1.0, as its web view does.
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-static ZOOM: std::sync::Mutex<Option<std::collections::HashMap<String, f64>>> =
-    std::sync::Mutex::new(None);
+static ZOOM: std::sync::Mutex<std::collections::BTreeMap<String, f64>> =
+    std::sync::Mutex::new(std::collections::BTreeMap::new());
 
 /// Puts `data-titlebar` on the page and, once the page has a body, a strip that moves the
 /// window. The strip is above the page and below dialogs and menus (`z-index` 50 and more).
@@ -72,19 +74,25 @@ fn title_bar_script() -> String {
 }
 
 /// On macOS the page fills the window and the title bar is drawn over it, as in Finder and Notes.
-/// Windows and Linux keep the system title bar.
-fn title_bar<'a, M: Manager<Wry>>(
-    builder: WebviewWindowBuilder<'a, Wry, M>,
-) -> WebviewWindowBuilder<'a, Wry, M> {
-    #[cfg(target_os = "macos")]
-    let builder = builder
+#[cfg(target_os = "macos")]
+fn title_bar<M: Manager<Wry>>(
+    builder: WebviewWindowBuilder<'_, Wry, M>,
+) -> WebviewWindowBuilder<'_, Wry, M> {
+    builder
         .title_bar_style(tauri::TitleBarStyle::Overlay)
         .initialization_script(title_bar_script())
         .on_page_load(|window, payload| {
             if payload.event() == tauri::webview::PageLoadEvent::Finished {
                 fit_title_bar(&window, zoom_of(&window));
             }
-        });
+        })
+}
+
+/// Windows and Linux keep the system title bar.
+#[cfg(not(target_os = "macos"))]
+const fn title_bar<M: Manager<Wry>>(
+    builder: WebviewWindowBuilder<'_, Wry, M>,
+) -> WebviewWindowBuilder<'_, Wry, M> {
     builder
 }
 
@@ -95,39 +103,38 @@ fn zoom_of(window: &tauri::WebviewWindow) -> f64 {
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn stored_zoom(label: &str) -> f64 {
-    let zooms = ZOOM.lock().unwrap_or_else(|e| e.into_inner());
-    zooms
-        .as_ref()
-        .and_then(|z| z.get(label).copied())
+    ZOOM.lock()
+        .unwrap_or_else(PoisonError::into_inner)
+        .get(label)
+        .copied()
         .unwrap_or(1.0)
 }
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 fn store_zoom(label: &str, zoom: Option<f64>) {
-    let mut zooms = ZOOM.lock().unwrap_or_else(|e| e.into_inner());
-    let zooms = zooms.get_or_insert_with(Default::default);
-    match zoom {
-        Some(zoom) => zooms.insert(label.to_owned(), zoom),
-        None => zooms.remove(label),
-    };
+    let mut zooms = ZOOM.lock().unwrap_or_else(PoisonError::into_inner);
+    if let Some(zoom) = zoom {
+        zooms.insert(label.to_owned(), zoom);
+    } else {
+        zooms.remove(label);
+    }
 }
 
 /// A zoomed page has larger CSS pixels, but the traffic lights keep their size.
 #[cfg(target_os = "macos")]
 fn fit_title_bar(window: &tauri::WebviewWindow, zoom: f64) {
     let height = TITLE_BAR / zoom;
-    let _ = window.eval(format!(
+    if let Err(err) = window.eval(format!(
         "document.documentElement.style.setProperty('--zeabur-title-bar', '{height}px')"
-    ));
+    )) {
+        output::warn(&format!("cannot fit the title bar to the zoom: {err}"));
+    }
 }
 
 /// View > Zoom In (`Some(true)`), Zoom Out (`Some(false)`) or Actual Size (`None`).
 #[cfg(any(target_os = "macos", target_os = "linux"))]
-pub fn zoom(window: &tauri::WebviewWindow, up: Option<bool>) {
-    let next = match up {
-        Some(up) => next_zoom(zoom_of(window), up),
-        None => 1.0,
-    };
+pub(crate) fn zoom(window: &tauri::WebviewWindow, up: Option<bool>) {
+    let next = up.map_or(1.0, |up| next_zoom(zoom_of(window), up));
     if window.set_zoom(next).is_ok() {
         store_zoom(window.label(), Some(next));
         #[cfg(target_os = "macos")]
@@ -138,38 +145,35 @@ pub fn zoom(window: &tauri::WebviewWindow, up: Option<bool>) {
 /// The next zoom step from `current`, up or down; the same step at either end.
 #[cfg(any(target_os = "macos", target_os = "linux", test))]
 fn next_zoom(current: f64, up: bool) -> f64 {
+    let mut next = current;
     if up {
         for step in ZOOM_STEPS {
+            next = step;
             if step > current + 0.001 {
-                return step;
+                break;
             }
         }
-        ZOOM_STEPS[ZOOM_STEPS.len() - 1]
     } else {
-        for step in ZOOM_STEPS.iter().rev() {
-            if *step < current - 0.001 {
-                return *step;
+        for step in ZOOM_STEPS.into_iter().rev() {
+            next = step;
+            if step < current - 0.001 {
+                break;
             }
         }
-        ZOOM_STEPS[0]
     }
+    next
 }
 
 /// Lets the strip move the window, and zoom it on a double click. Cluster windows load the web
 /// interface from `web_url`, which gets these two permissions and nothing else.
 #[cfg(target_os = "macos")]
-pub fn allow_title_bar(app: &AppHandle, web_url: &tauri::Url) -> tauri::Result<()> {
+pub(crate) fn allow_title_bar(app: &AppHandle, web_url: &tauri::Url) -> tauri::Result<()> {
     let capability = tauri::ipc::CapabilityBuilder::new("title-bar")
         .windows([CHOOSER, "cluster-*"])
         .remote(format!("{}/*", web_url.origin().ascii_serialization()))
         .permission("core:window:allow-start-dragging")
         .permission("core:window:allow-internal-toggle-maximize");
     app.add_capability(capability)
-}
-
-#[cfg(not(target_os = "macos"))]
-pub fn allow_title_bar(_app: &AppHandle, _web_url: &tauri::Url) -> tauri::Result<()> {
-    Ok(())
 }
 
 /// On Linux the program name is the Wayland app ID and the X11 window class, which GNOME matches to
@@ -179,7 +183,7 @@ pub fn allow_title_bar(_app: &AppHandle, _web_url: &tauri::Url) -> tauri::Result
 /// app's identifier. Tauri's `enableGTKAppId` would do the same through a D-Bus name, which allows
 /// one instance only.
 #[cfg(target_os = "linux")]
-pub fn set_app_id(identifier: &str) {
+pub(crate) fn set_app_id(identifier: &str) {
     gtk::glib::set_prgname(Some(identifier));
 }
 
@@ -188,19 +192,14 @@ pub fn set_app_id(identifier: &str) {
 /// (<https://learn.microsoft.com/en-us/windows/win32/shell/appids>). It is the identifier, which
 /// Tauri's installers also give the Start menu shortcut.
 #[cfg(windows)]
-pub fn set_app_id(identifier: &str) {
-    use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
-    use windows::core::HSTRING;
-
-    // SAFETY: the string outlives the call, and the system copies it.
-    if let Err(err) = unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(identifier)) }
-    {
-        eprintln!("zeabur-desktop: cannot set the AppUserModelID: {err}");
+pub(crate) fn set_app_id(identifier: &str) {
+    if let Err(err) = crate::win32::set_app_user_model_id(identifier) {
+        output::warn(&format!("cannot set the AppUserModelID: {err}"));
     }
 }
 
 #[cfg(target_os = "macos")]
-pub fn set_app_id(_identifier: &str) {}
+pub(crate) const fn set_app_id(_identifier: &str) {}
 
 /// The primary screen's work area (without the taskbar or Dock) in points: place and size.
 fn work_area(app: &AppHandle) -> Option<Area> {
@@ -256,31 +255,34 @@ fn place(offset: Option<(f64, f64)>, size: (f64, f64), area: Area) -> (f64, f64)
     (x, y)
 }
 
-/// What every window shares on Windows and Linux: the shortcuts in `keys.rs`. Windows also gets
-/// WebView2's own Ctrl++, Ctrl+- and Ctrl+0 zoom (reload with Ctrl+R and F5 is on by default).
-fn platform_window(window: &tauri::WebviewWindow) {
-    #[cfg(any(target_os = "linux", windows))]
+/// Sets up a window once it is built: on Windows and Linux, the shortcuts in `keys.rs`. macOS has
+/// them in its menu bar.
+#[cfg(any(target_os = "linux", windows))]
+pub(crate) fn window_built(window: &tauri::WebviewWindow) {
     crate::keys::attach(window);
-    #[cfg(target_os = "macos")]
-    let _ = window;
 }
 
+#[cfg(target_os = "macos")]
+pub(crate) const fn window_built(_window: &tauri::WebviewWindow) {}
+
+/// Windows also gets WebView2's own Ctrl++, Ctrl+- and Ctrl+0 zoom (reload with Ctrl+R and F5 is on
+/// by default).
 #[cfg(windows)]
-fn zoom_keys<'a, M: Manager<Wry>>(
-    builder: WebviewWindowBuilder<'a, Wry, M>,
-) -> WebviewWindowBuilder<'a, Wry, M> {
+fn zoom_keys<M: Manager<Wry>>(
+    builder: WebviewWindowBuilder<'_, Wry, M>,
+) -> WebviewWindowBuilder<'_, Wry, M> {
     builder.zoom_hotkeys_enabled(true)
 }
 
 #[cfg(not(windows))]
-fn zoom_keys<'a, M: Manager<Wry>>(
-    builder: WebviewWindowBuilder<'a, Wry, M>,
-) -> WebviewWindowBuilder<'a, Wry, M> {
+const fn zoom_keys<M: Manager<Wry>>(
+    builder: WebviewWindowBuilder<'_, Wry, M>,
+) -> WebviewWindowBuilder<'_, Wry, M> {
     builder
 }
 
 /// Shows the chooser, opening it again if it was closed.
-pub fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
+pub(crate) fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
     if let Some(window) = app.get_webview_window(CHOOSER) {
         window.unminimize()?;
         window.show()?;
@@ -297,7 +299,7 @@ pub fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
         builder = builder.inner_size(size.0, size.1).position(x, y);
     }
     let window = zoom_keys(title_bar(shots::apply_theme(builder))).build()?;
-    platform_window(&window);
+    window_built(&window);
     if shots::wants("main") {
         shots::capture(window);
     }
@@ -307,7 +309,7 @@ pub fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
 /// Size, title bar and starting place of a cluster window. A window seen before gets its saved
 /// place back from the window-state plugin; a new one is set a little below and right of the
 /// last, so it does not hide it.
-pub fn cluster_window<'a>(
+pub(crate) fn cluster_window<'a>(
     app: &AppHandle,
     builder: WebviewWindowBuilder<'a, Wry, AppHandle>,
 ) -> WebviewWindowBuilder<'a, Wry, AppHandle> {
@@ -329,15 +331,10 @@ pub fn cluster_window<'a>(
     zoom_keys(title_bar(builder))
 }
 
-/// Sets up a cluster window once it is built.
-pub fn cluster_window_built(window: &tauri::WebviewWindow) {
-    platform_window(window);
-}
-
 /// Keeps each window's size, place and maximized state between launches, under its label: `main`
 /// for the chooser and `cluster-<hash>` for each context. With `ZEABUR_DESKTOP_STATE` the file goes
 /// in that folder, so the fixtures and screenshots start from nothing.
-pub fn window_state() -> tauri::plugin::TauriPlugin<Wry> {
+pub(crate) fn window_state() -> tauri::plugin::TauriPlugin<Wry> {
     let mut builder = tauri_plugin_window_state::Builder::new()
         .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED);
     if let Some(dir) = std::env::var_os("ZEABUR_DESKTOP_STATE") {
@@ -349,7 +346,18 @@ pub fn window_state() -> tauri::plugin::TauriPlugin<Wry> {
 
 /// On macOS the app stays open with no windows, like other Mac apps, and a click on the Dock icon
 /// brings the chooser back. Windows and Linux quit when the last window closes.
-pub fn on_run_event(app: &AppHandle, event: RunEvent) {
+#[cfg_attr(
+    windows,
+    expect(clippy::needless_pass_by_value, reason = "the signature Tauri calls")
+)]
+pub(crate) fn on_run_event(
+    #[cfg_attr(
+        not(target_os = "macos"),
+        expect(unused_variables, reason = "only macOS opens the chooser again")
+    )]
+    app: &AppHandle,
+    event: RunEvent,
+) {
     match event {
         #[cfg(target_os = "macos")]
         RunEvent::ExitRequested {
@@ -361,7 +369,7 @@ pub fn on_run_event(app: &AppHandle, event: RunEvent) {
             ..
         } => {
             if let Err(err) = show_chooser(app) {
-                eprintln!("zeabur-desktop: cannot open the chooser: {err}");
+                output::warn(&format!("cannot open the chooser: {err}"));
             }
         }
         #[cfg(any(target_os = "macos", target_os = "linux"))]
@@ -370,9 +378,7 @@ pub fn on_run_event(app: &AppHandle, event: RunEvent) {
             event: tauri::WindowEvent::Destroyed,
             ..
         } => store_zoom(&label, None),
-        _ => {
-            let _ = app;
-        }
+        _ => {}
     }
 }
 
@@ -402,7 +408,7 @@ mod tests {
         let screen = area(0.0, 0.0, 1512.0, 808.0);
         let (x, y) = place(None, (1040.0, 680.0), screen);
         assert_eq!(x, 236.0);
-        assert_eq!(y * 2.0 + 680.0 + FRAME_TOP, 808.0);
+        assert_eq!(y, (808.0 - 680.0 - FRAME_TOP) / 2.0);
     }
 
     #[test]

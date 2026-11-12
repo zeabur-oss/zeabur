@@ -3,10 +3,14 @@ name = "zeabur-desktop"
 description = "Proof of concept: the Zeabur desktop app (Tauri 2) that lists kubeconfig contexts and opens Zeabur"
 version = "0.0.0"
 edition = "2024"
+rust-version = "1.99"
 license = "Apache-2.0"
+repository = "https://github.com/zeabur-oss/zeabur"
 publish = false
 
-# Kept out of the main workspace while it is a proof of concept: its own lock file and lints.
+# Its own workspace and lock file, with the main workspace's rules (docs/internal/crates.md, "Apps
+# outside the workspace"). scripts/check-desktop.sh fails when the package fields or the lints
+# below differ from the root Cargo.toml.
 [workspace]
 
 [dependencies]
@@ -48,3 +52,85 @@ block2 = "0.6"
 objc2-foundation = { version = "0.3", features = ["NSData", "NSDictionary", "NSError", "NSString"] }
 objc2-app-kit = { version = "0.3", features = ["NSImage", "NSImageRep", "NSBitmapImageRep"] }
 objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
+
+# A copy of the root [workspace.lints]; only unsafe_code differs.
+[lints.rust]
+# The main workspace forbids it; `deny` lets the modules listed in
+# scripts/check-desktop.sh opt out with `#[expect(unsafe_code)]`.
+unsafe_code = "deny"
+non_ascii_idents = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
+redundant_lifetimes = "warn"
+single_use_lifetimes = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+let_underscore_drop = "warn"
+meta_variable_misuse = "warn"
+unit_bindings = "warn"
+
+[lints.rustdoc]
+broken_intra_doc_links = "warn"
+private_intra_doc_links = "warn"
+unescaped_backticks = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Duplicate versions are tracked by cargo-deny, not clippy.
+multiple_crate_versions = "allow"
+# Contradicts rustc's `unreachable_pub`, which we keep: items are `pub(crate)` unless exported.
+redundant_pub_crate = "allow"
+
+# Selected `restriction` lints.
+# Panics on attacker-controlled input are a denial-of-service bug in a server.
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+indexing_slicing = "warn"
+string_slice = "warn"
+get_unwrap = "warn"
+unwrap_in_result = "warn"
+todo = "warn"
+unimplemented = "warn"
+exit = "warn"
+# Security-relevant logic must handle every case explicitly.
+wildcard_enum_match_arm = "warn"
+# Errors must keep their cause.
+map_err_ignore = "warn"
+let_underscore_must_use = "warn"
+let_underscore_untyped = "warn"
+unused_result_ok = "warn"
+# Suppressions must be explicit and justified.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+# Output goes through `tracing`; the CLI writes through one audited module.
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+# Hygiene.
+clone_on_ref_ptr = "warn"
+empty_structs_with_brackets = "warn"
+error_impl_error = "warn"
+format_push_string = "warn"
+if_then_some_else_none = "warn"
+infinite_loop = "warn"
+mem_forget = "warn"
+mod_module_files = "warn"
+multiple_inherent_impl = "warn"
+partial_pub_fields = "warn"
+rest_pat_in_fully_bound_structs = "warn"
+str_to_string = "warn"
+tests_outside_test_module = "warn"
+try_err = "warn"
+undocumented_unsafe_blocks = "warn"
+unneeded_field_pattern = "warn"
+unseparated_literal_suffix = "warn"
+verbose_file_reads = "warn"
+

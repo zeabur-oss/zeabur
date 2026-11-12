@@ -36,6 +36,9 @@ git diff --exit-code -- web/src/api/zeabur.ts        # the generated API client 
 ZEABUR_UI_DIST="$PWD/web/dist" cargo build --release --locked -p zeabur -p zeaburctl
 ```
 
+The desktop app (`desktop/`) is a Cargo workspace of its own with the same rules
+([crates](docs/internal/crates.md#apps-outside-the-workspace)): `nix develop .#desktop -c scripts/ci/desktop.sh`.
+
 `bun run fallow` runs [fallow](https://github.com/fallow-rs/fallow) at the version pinned in
 `web/package.json`. `fallow dead-code` finds unused files, exports and dependencies in `web/` and
 imports that cross the layers in `web/.fallowrc.json`; `fallow-baseline.json` lists the findings
@@ -69,10 +72,10 @@ the interface's styles are checked in
 `@zeabur-oss/design-system` to npm; Renovate moves its version.
 
 Each CI job in `.github/workflows/ci.yml` runs `nix develop -c scripts/ci/<job>.sh` (`.#zh` for
-`wording`); the workflow only checks out, installs Nix and restores caches. So a job runs the same
+`wording`, `.#desktop` for `desktop`); the workflow only checks out, installs Nix and restores caches. So a job runs the same
 on any Linux machine with Nix, and Docker for the cluster jobs: `nix develop -c scripts/ci/lint.sh`.
 A pull request runs `lint` (format, clippy, docs, cargo-deny, unsafe-report, levels and chart in a
-row), `test` and `ui`. The merge queue, the nightly run and a manual run add `no-ui`, `wording`,
+row), `test`, `ui` and `desktop`. The merge queue, the nightly run and a manual run add `no-ui`, `wording`,
 `cluster` and `e2e`. The nightly run and a manual run also add `fuzz`, `canary` (Zeabur Proxy
 against VictoriaLogs) and `e2e-full` (the browser specs that need Zeabur Builder and the database
 operators). A nightly-only job (`fuzz`, `canary`, `e2e-full`) that fails opens or updates the issue
@@ -152,7 +155,8 @@ scripts compile (aws-lc-sys) goes through kache too, with no further setup.
 Lints are set once for the workspace in `Cargo.toml`. All are `warn`, so unfinished work still
 compiles locally, and `cargo lint` turns every warning into an error in CI.
 
-- `unsafe_code` and `non_ascii_idents` are forbidden.
+- `unsafe_code` and `non_ascii_idents` are forbidden. `desktop/` denies `unsafe_code` and opts
+  out in two listed modules only (`scripts/check-desktop.sh`).
 - clippy `pedantic`, `cargo` and `nursery` are on.
 - A selection of `restriction` lints targets what matters in a server that handles other
   people's credentials and in an installer that runs as root on someone's server: no panics on

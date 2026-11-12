@@ -14,7 +14,7 @@ use serde::Serialize;
 
 /// The variables for child processes, in the order they were added.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct ChildEnv {
+pub(crate) struct ChildEnv {
     vars: Vec<(OsString, OsString)>,
 }
 
@@ -28,7 +28,7 @@ fn same_name(a: &OsStr, b: &OsStr) -> bool {
 }
 
 impl ChildEnv {
-    pub fn from_process() -> Self {
+    pub(crate) fn from_process() -> Self {
         Self {
             vars: std::env::vars_os().collect(),
         }
@@ -37,7 +37,7 @@ impl ChildEnv {
     /// The app's own variables win, except `PATH`: the shell's entries come first, then the app's,
     /// each directory once.
     #[cfg(any(unix, test))]
-    pub fn merge(own: Vec<(OsString, OsString)>, shell: &[(OsString, OsString)]) -> Self {
+    pub(crate) fn merge(own: Vec<(OsString, OsString)>, shell: &[(OsString, OsString)]) -> Self {
         let mut env = Self { vars: own };
         let mut shell_path = None;
         for (name, value) in shell {
@@ -53,8 +53,7 @@ impl ChildEnv {
         let mut dirs: Vec<PathBuf> = Vec::new();
         let own_path = env
             .get(OsStr::new("PATH"))
-            .map(OsStr::to_os_string)
-            .unwrap_or_default();
+            .map_or_else(OsString::new, OsStr::to_os_string);
         for list in [&shell_path, &own_path] {
             for dir in std::env::split_paths(list) {
                 if !dir.as_os_str().is_empty() && !dirs.contains(&dir) {
@@ -68,7 +67,7 @@ impl ChildEnv {
         env
     }
 
-    pub fn get(&self, name: &OsStr) -> Option<&OsStr> {
+    pub(crate) fn get(&self, name: &OsStr) -> Option<&OsStr> {
         for (key, value) in &self.vars {
             if same_name(key, name) {
                 return Some(value);
@@ -88,11 +87,9 @@ impl ChildEnv {
         self.vars.push((name, value));
     }
 
-    pub fn path_dirs(&self) -> Vec<PathBuf> {
-        match self.get(OsStr::new("PATH")) {
-            Some(path) => std::env::split_paths(path).collect(),
-            None => Vec::new(),
-        }
+    pub(crate) fn path_dirs(&self) -> Vec<PathBuf> {
+        self.get(OsStr::new("PATH"))
+            .map_or_else(Vec::new, |path| std::env::split_paths(path).collect())
     }
 
     /// A command that runs with exactly this environment. On Unix, `Command` also looks the
@@ -104,7 +101,7 @@ impl ChildEnv {
             reason = "the Zeabur backend started by Open runs through it"
         )
     )]
-    pub fn command(&self, program: impl AsRef<OsStr>) -> Command {
+    pub(crate) fn command(&self, program: impl AsRef<OsStr>) -> Command {
         let mut command = Command::new(program);
         command
             .env_clear()
@@ -116,7 +113,7 @@ impl ChildEnv {
 /// Where reading the login shell's environment stands; shown in the window.
 #[derive(Clone, Debug, Serialize)]
 #[serde(rename_all = "camelCase", tag = "state")]
-pub enum ShellRead {
+pub(crate) enum ShellRead {
     Pending,
     #[cfg(unix)]
     Done,
@@ -133,7 +130,7 @@ pub enum ShellRead {
 }
 
 #[cfg(unix)]
-pub use unix::{login_shell, read_shell_env};
+pub(crate) use unix::{login_shell, read_shell_env};
 
 #[cfg(unix)]
 mod unix {
@@ -146,7 +143,7 @@ mod unix {
     use std::time::Duration;
 
     /// The shell from the passwd entry, then `$SHELL`, then `/bin/zsh` on macOS or `/bin/sh`.
-    pub fn login_shell() -> PathBuf {
+    pub(crate) fn login_shell() -> PathBuf {
         if let Ok(Some(user)) = nix::unistd::User::from_uid(nix::unistd::Uid::current())
             && !user.shell.as_os_str().is_empty()
         {
@@ -211,7 +208,7 @@ mod unix {
         found
     }
 
-    pub enum Failure {
+    pub(crate) enum Failure {
         Start(std::io::Error),
         TimedOut,
         NoEnvironment(Option<i32>),
@@ -219,7 +216,7 @@ mod unix {
 
     /// Runs the login shell once, with `DISABLE_AUTO_UPDATE=true` so Oh My Zsh does not stop to
     /// ask about updates, no stdin, and the home folder as the working directory.
-    pub fn read_shell_env(
+    pub(crate) fn read_shell_env(
         shell: &Path,
         timeout: Duration,
     ) -> Result<Vec<(OsString, OsString)>, Failure> {
@@ -261,37 +258,35 @@ mod unix {
 }
 
 /// Reads the login shell's environment and returns the merged environment and how the read went.
-pub fn load(own: ChildEnv) -> (ChildEnv, ShellRead) {
-    #[cfg(unix)]
-    {
-        let shell = login_shell();
-        let name = shell.display().to_string();
-        match read_shell_env(&shell, std::time::Duration::from_secs(10)) {
-            Ok(vars) => (ChildEnv::merge(own.vars, &vars), ShellRead::Done),
-            Err(failure) => {
-                let (timed_out, detail) = match failure {
-                    unix::Failure::Start(err) => (false, err.to_string()),
-                    unix::Failure::TimedOut => (true, String::new()),
-                    unix::Failure::NoEnvironment(Some(code)) => {
-                        (false, format!("exit status {code}"))
-                    }
-                    unix::Failure::NoEnvironment(None) => (false, String::new()),
-                };
-                (
-                    own,
-                    ShellRead::Failed {
-                        shell: name,
-                        timed_out,
-                        detail,
-                    },
-                )
-            }
+#[cfg(unix)]
+pub(crate) fn load(own: ChildEnv) -> (ChildEnv, ShellRead) {
+    let shell = login_shell();
+    let name = shell.display().to_string();
+    match read_shell_env(&shell, std::time::Duration::from_secs(10)) {
+        Ok(vars) => (ChildEnv::merge(own.vars, &vars), ShellRead::Done),
+        Err(failure) => {
+            let (timed_out, detail) = match failure {
+                unix::Failure::Start(err) => (false, err.to_string()),
+                unix::Failure::TimedOut => (true, String::new()),
+                unix::Failure::NoEnvironment(Some(code)) => (false, format!("exit status {code}")),
+                unix::Failure::NoEnvironment(None) => (false, String::new()),
+            };
+            (
+                own,
+                ShellRead::Failed {
+                    shell: name,
+                    timed_out,
+                    detail,
+                },
+            )
         }
     }
-    #[cfg(not(unix))]
-    {
-        (own, ShellRead::Skipped)
-    }
+}
+
+/// Windows: the app uses its own environment, with no shell.
+#[cfg(not(unix))]
+pub(crate) const fn load(own: ChildEnv) -> (ChildEnv, ShellRead) {
+    (own, ShellRead::Skipped)
 }
 
 #[cfg(test)]
