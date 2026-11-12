@@ -45,7 +45,9 @@ a TCP connection.
 - macOS: the title bar is drawn over the page, as in Finder and Notes. The page leaves 28 pt at the
   top (`data-titlebar` and `--zeabur-title-bar`, set by `desktop/src/chrome.rs`) and a strip there
   moves the window. The menu bar (`desktop/src/menu.rs`) uses the `desktop.menu.*` strings and
-  changes with the language picker. The items macOS adds itself (Fill, Center, Move & Resize, Writing
+  changes with the language picker. In Chinese, the standard items use the words of the macOS 27
+  menus (Notes and Safari, looked up on [applelocalization.com](https://applelocalization.com/)),
+  such as 拷貝 and 拷贝 for Copy. The items macOS adds itself (Fill, Center, Move & Resize, Writing
   Tools, …) follow the system language, in English, Traditional or Simplified Chinese
   (`desktop/Info.plist`), not the picker. The app stays open with no windows; a click on the Dock icon
   or File > New Cluster Window shows the chooser again.
@@ -61,6 +63,17 @@ a TCP connection.
 - Windows: WebView2 handles Ctrl+R and F5, and Ctrl++, Ctrl+- and Ctrl+0 zoom. Alt+F4 closes the
   window. Ctrl+W is not handled yet. `icons/icon.ico` has only a 256 px image; Windows wants 16, 24,
   32, 48 and 256 at least[^win-icon].
+
+## Icon
+
+`icons/logo-for-dark-bg.svg` is the mark from Zeabur's logo pack, unchanged. `icons/icon.svg` puts it,
+504 px wide, on the 824 px rounded square of Apple's 1024 px macOS icon grid, in the logo's own dark
+(`#141216`). A white square loses the dark stroke of the Z when macOS shows icons in its dark style.
+The other files in `icons/` come from it:
+
+```sh
+cargo tauri icon desktop/icons/icon.svg -o desktop/icons  # then delete android/, ios/, 64x64.png, Square*.png, StoreLogo.png
+```
 
 ## Screenshots
 
