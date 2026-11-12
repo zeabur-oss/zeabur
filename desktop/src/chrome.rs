@@ -293,11 +293,10 @@ pub(crate) fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
         window.show()?;
         return window.set_focus();
     }
-    let mut builder =
-        WebviewWindowBuilder::new(app, CHOOSER, WebviewUrl::App("index.html".into()))
-            .title("Zeabur")
-            .inner_size(1040.0, 680.0)
-            .min_inner_size(720.0, 480.0);
+    let mut builder = WebviewWindowBuilder::new(app, CHOOSER, WebviewUrl::App("index.html".into()))
+        .title("Zeabur")
+        .inner_size(1040.0, 680.0)
+        .min_inner_size(720.0, 480.0);
     if let Some(area) = work_area(app) {
         let size = fit((1040.0, 680.0), area);
         let (x, y) = place(None, size, area);

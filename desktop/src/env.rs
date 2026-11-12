@@ -1,4 +1,5 @@
-//! The environment the app gives to exec credential plugins, and the login shell read that fills it.
+//! The environment the app gives to exec credential plugins, and the login shell read that fills
+//! it.
 //!
 //! An app started from Finder, the Dock or a desktop launcher does not get the variables set in
 //! the person's shell files. The app reads the login shell's environment once and merges it with
@@ -99,9 +100,7 @@ impl ChildEnv {
     pub(crate) fn changed_from(&self, own: &[(OsString, OsString)]) -> Vec<(String, String)> {
         let mut changed = Vec::new();
         for (name, value) in &self.vars {
-            let same = own
-                .iter()
-                .any(|(k, v)| same_name(k, name) && v == value);
+            let same = own.iter().any(|(k, v)| same_name(k, name) && v == value);
             if same {
                 continue;
             }

@@ -137,13 +137,21 @@ mod tests {
         for named in &kubeconfig.auth_infos {
             let exec = named.auth_info.as_ref().and_then(|a| a.exec.as_ref());
             for entry in exec.and_then(|e| e.env.as_ref()).into_iter().flatten() {
-                env.push((named.name.clone(), entry["name"].clone(), entry["value"].clone()));
+                env.push((
+                    named.name.clone(),
+                    entry["name"].clone(),
+                    entry["value"].clone(),
+                ));
             }
         }
         assert_eq!(
             env,
             vec![
-                ("eks".to_owned(), "AWS_PROFILE".to_owned(), "prod".to_owned()),
+                (
+                    "eks".to_owned(),
+                    "AWS_PROFILE".to_owned(),
+                    "prod".to_owned()
+                ),
                 (
                     "eks".to_owned(),
                     "PATH".to_owned(),
