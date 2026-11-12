@@ -74,7 +74,7 @@ portable() {
   mkdir "$dir"
   case "$1" in
     *.deb) dpkg-deb -x "$1" "$dir" ;;
-    *.rpm) (cd "$dir" && rpm2cpio "$1" | cpio -idm --quiet) ;;
+    *.rpm) bsdtar -xf "$1" -C "$dir" ;;
     *.AppImage) (cd "$dir" && "$1" --appimage-extract >/dev/null) ;;
   esac
   "$root/scripts/check-portable.sh" "$dir"
