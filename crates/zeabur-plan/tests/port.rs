@@ -181,7 +181,7 @@ mod tests {
         assert!(after(&moved, "Secret").is_none());
     }
 
-    fn with_later_import(import: Value, config: Option<Value>) -> Plan {
+    fn with_later_import(import: &Value, config: Option<Value>) -> Plan {
         let mut deployment = web();
         deployment["spec"]["template"]["spec"]["containers"][0]["envFrom"] =
             json!([{"secretRef": {"name": "web-env"}}, import]);
@@ -204,7 +204,7 @@ mod tests {
 
     #[test]
     fn a_port_change_sets_port_in_env_when_a_later_config_map_cannot_be_read() {
-        let moved = with_later_import(json!({"configMapRef": {"name": "web-config"}}), None);
+        let moved = with_later_import(&json!({"configMapRef": {"name": "web-config"}}), None);
         sets_port_in_env(&moved);
     }
 
@@ -214,7 +214,7 @@ mod tests {
             "metadata": {"name": "web-config", "namespace": "shop", "resourceVersion": "6"},
             "data": {"ORT": "8080"}});
         let import = json!({"prefix": "P", "configMapRef": {"name": "web-config"}});
-        sets_port_in_env(&with_later_import(import, Some(config)));
+        sets_port_in_env(&with_later_import(&import, Some(config)));
     }
 
     #[test]
