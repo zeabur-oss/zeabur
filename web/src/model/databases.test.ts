@@ -965,14 +965,21 @@ describe("changing backups", () => {
     expect(changed["db-scheduled"].spec).not.toHaveProperty("suspend")
   })
 
-  test("MongoDB: an edit replaces the storage and the task, and turning off disables both", () => {
+  test("MongoDB: an edit replaces the storage and the task, and turning off keeps the task for turning on again", () => {
     const backup = {
       enabled: true,
       image: "pbm:1",
       storages: {
         backups: { type: "s3", s3: { bucket: "backups", prefix: "db", region: "us-east-1" } },
       },
-      tasks: [{ name: "scheduled", schedule: "0 3 * * *" }, { name: "mine" }],
+      tasks: [
+        {
+          name: "scheduled",
+          schedule: "0 3 * * 0",
+          retention: { type: "count", count: 90, deleteFromStorage: true },
+        },
+        { name: "mine" },
+      ],
     }
     const mongoOn = on(
       "mongodb",
@@ -988,7 +995,7 @@ describe("changing backups", () => {
     expect(edited.tasks.map((task: { name: string }) => task.name)).toEqual(["mine", "scheduled"])
     expect(edits(turnOffBackups(mongoOn)).db.spec.backup).toMatchObject({
       enabled: false,
-      tasks: [{ name: "mine" }],
+      tasks: backup.tasks,
       storages: backup.storages,
     })
   })

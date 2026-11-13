@@ -1110,7 +1110,7 @@ const TURN_OFF: Record<BackupEngine, (database: Database, current: BackupTarget)
   mongodb: (database) =>
     editObject(database, (spec) => {
       const backup = (spec.backup as Manifest | undefined) ?? {}
-      spec.backup = { ...backup, enabled: false, tasks: otherTasks(backup) }
+      spec.backup = { ...backup, enabled: false }
     }),
   // MOCO deletes the backup CronJob once the cluster names no policy; the policy stays.
   mysql: (database) =>
@@ -1129,7 +1129,8 @@ const TURN_OFF: Record<BackupEngine, (database: Database, current: BackupTarget)
 /** Turning backups off: no schedule, and the database no longer names where backups go. The keys
  * Secret stays, so do the backups in the bucket, and what restoring from them reads where the
  * operator lets it pause: CloudNativePG's and MariaDB's schedules pause, MongoDB's storage and
- * MOCO's BackupPolicy stay. */
+ * tasks, which keep the schedule and retention for turning backups on again, and MOCO's
+ * BackupPolicy stay. */
 export const turnOffBackups = (database: Database): Change[] =>
   TURN_OFF[backupEngine(database)](database, currentTarget(database))
 
