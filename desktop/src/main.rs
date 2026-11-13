@@ -470,6 +470,7 @@ fn main() -> ExitCode {
             scenario,
             menu::set_menu,
             update::found_update,
+            update::take_check_request,
             update::check_update,
             update::install_update,
             update::open_releases

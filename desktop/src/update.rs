@@ -2,6 +2,7 @@
 //! `tauri.conf.json`). The app checks once on start and again from the menu; it installs only when
 //! the person asks.
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use serde::Serialize;
@@ -68,6 +69,8 @@ fn available(update: &Update) -> Available {
 #[derive(Default)]
 pub(crate) struct Updates {
     found: Mutex<Option<Update>>,
+    /// A check the menu asked for that the chooser has not taken up yet.
+    requested: AtomicBool,
 }
 
 impl std::fmt::Debug for Updates {
@@ -77,6 +80,14 @@ impl std::fmt::Debug for Updates {
 }
 
 impl Updates {
+    fn request(&self) {
+        self.requested.store(true, Ordering::SeqCst);
+    }
+
+    fn take_request(&self) -> bool {
+        self.requested.swap(false, Ordering::SeqCst)
+    }
+
     fn found(&self) -> std::sync::MutexGuard<'_, Option<Update>> {
         self.found.lock().unwrap_or_else(PoisonError::into_inner)
     }
@@ -128,9 +139,11 @@ pub(crate) fn check_on_start(app: &AppHandle) {
     });
 }
 
-/// The menu's Check for Updates: the chooser checks and shows the result.
+/// The menu's Check for Updates: the chooser checks and shows the result. The request waits in
+/// `Updates` until the chooser takes it, since a chooser opened just now has no listener yet.
 #[cfg(target_os = "macos")]
 pub(crate) fn check_from_menu(app: &AppHandle) {
+    app.state::<Updates>().request();
     if let Err(err) =
         chrome::show_chooser(app).and_then(|()| app.emit_to(chrome::CHOOSER, "check-updates", ()))
     {
@@ -146,6 +159,16 @@ pub(crate) fn check_from_menu(app: &AppHandle) {
 )]
 pub(crate) fn found_update(updates: State<'_, Updates>) -> Option<Available> {
     updates.found().as_ref().map(available)
+}
+
+/// Whether the menu asked for a check since the chooser last asked.
+#[tauri::command]
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
+pub(crate) fn take_check_request(updates: State<'_, Updates>) -> bool {
+    updates.take_request()
 }
 
 /// Checks now; `Ok(None)` when this is the newest release.
@@ -192,4 +215,18 @@ pub(crate) fn open_releases() -> Result<(), String> {
         .spawn()
         .map(drop)
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::Updates;
+
+    #[test]
+    fn a_menu_request_waits_until_the_chooser_takes_it() {
+        let updates = Updates::default();
+        assert!(!updates.take_request());
+        updates.request();
+        assert!(updates.take_request());
+        assert!(!updates.take_request());
+    }
 }

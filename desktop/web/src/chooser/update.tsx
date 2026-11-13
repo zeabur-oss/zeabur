@@ -27,6 +27,7 @@ type View =
   | { kind: "failed"; reason: string }
 
 const api = {
+  takeCheckRequest: () => invoke<boolean>("take_check_request"),
   found: () => invoke<Available | null>("found_update"),
   check: () => invoke<Available | null>("check_update"),
   install: () => invoke<void>("install_update"),
@@ -64,7 +65,9 @@ export function useUpdates(): { button: ReactElement; dialog: ReactElement } {
   useEffect(() => {
     void api.found().then((found) => found && setAvailable(found))
     const offFound = listen<Available>("update-available", (event) => setAvailable(event.payload))
-    const offMenu = listen("check-updates", () => void check())
+    const checkIfAsked = () => api.takeCheckRequest().then((asked) => asked && check())
+    void checkIfAsked()
+    const offMenu = listen("check-updates", () => void checkIfAsked())
     return () => {
       void offFound.then((off) => off())
       void offMenu.then((off) => off())
