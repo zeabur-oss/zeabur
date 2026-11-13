@@ -157,6 +157,13 @@ describe("a new database", () => {
     expect((three.object.spec as Record<string, unknown>).unsafeFlags).toBeUndefined()
   })
 
+  test("a MongoDB names its users Secret, so it is not the operator's shared default", () => {
+    const [change] = createDatabase({ ...newDatabase("mongodb", 3), name: "mongo" }) as never as [
+      { object: { spec: { secrets: unknown } } },
+    ]
+    expect(change.object.spec.secrets).toEqual({ users: "mongo-secrets" })
+  })
+
   test("a MongoDB takes its data volumes with it when deleted", () => {
     const [change] = createDatabase({ ...newDatabase("mongodb", 3), name: "mongo" }) as never as [
       { object: { metadata: unknown } },

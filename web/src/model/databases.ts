@@ -396,6 +396,8 @@ const BUILD: Record<Engine, Build> = {
           },
         ],
         sharding: { enabled: false },
+        // Without a name the operator uses one shared by every cluster of the namespace.
+        secrets: { users: `${form.name}-secrets` },
         // The user services connect as; the operator keeps its password in
         // `<name>-custom-user-secret`, key `app`.
         users: [{ name: "app", db: "app", roles: [{ name: "readWrite", db: "app" }] }],
