@@ -160,7 +160,7 @@ zeaburctl connect <project>/<database> [--port <port>] [--context <name>]
 
 Forwards a port on `127.0.0.1` to a database through kube-apiserver, like `kubectl port-forward`, and prints a connection string for it. It works for every engine. The command keeps running until you press Ctrl-C.
 
-You need `list` on the database's resources and `create pods/portforward` in the project; Developers have both. If you can't read the database's secret, the connection string has `PASSWORD` in place of the password. For MongoDB the string connects to one member directly, since the other members' addresses only work inside the cluster.
+You need `list` on the database's resources and `create pods/portforward` in the project; Developers have both. If you can't read the database's secret, the connection string has `PASSWORD` in place of the password. For MongoDB the string connects to one instance directly, since the other instances' addresses only work inside the cluster. With more than one instance, that instance may not be the primary, and then the database refuses writes; the command says so before it prints the string.
 
 | Option | Default and purpose |
 |---|---|

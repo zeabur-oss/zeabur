@@ -160,7 +160,7 @@ zeaburctl connect <project>/<database> [--port <port>] [--context <name>]
 
 經由 kube-apiserver 把 `127.0.0.1` 上的一個連接埠轉發到資料庫，就像 `kubectl port-forward`，並印出對應的連線字串。每種引擎都能用。指令會一直執行，按 Ctrl-C 才停止。
 
-你要能 `list` 資料庫的資源，並在專案有 `create pods/portforward` 權限，開發者都有。讀不到資料庫的 Secret 時，連線字串會用 `PASSWORD` 代替密碼。MongoDB 的連線字串會直接連到單一成員，因為其他成員的位址只在叢集內有效。
+你要能 `list` 資料庫的資源，並在專案有 `create pods/portforward` 權限，開發者都有。讀不到資料庫的 Secret 時，連線字串會用 `PASSWORD` 代替密碼。MongoDB 的連線字串會直接連到單一執行個體，因為其他執行個體的位址只在叢集內有效。執行個體不只一個時，連到的不一定是主要執行個體，這時資料庫會拒絕寫入；命令印出連線字串前會先提醒。
 
 | 選項 | 預設與用途 |
 |---|---|

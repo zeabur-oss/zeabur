@@ -47,6 +47,7 @@ struct Unreadable {
 struct Database {
     name: String,
     engine: Engine,
+    members: i64,
     connection: Connection,
 }
 
@@ -144,37 +145,42 @@ async fn connect(args: &ConnectArgs) -> Result<(), String> {
         })?;
     let local = forward::start(client.kube().clone(), &service, args.port).await?;
     let secret = &connection.secret;
-    let revealed: Option<RevealedSecret> = read(
-        api.post(
-            &format!("/api/v1/projects/{project}/secrets/{secret}/reveal"),
-            &json!({}),
+    // A Dragonfly without `passwordFromSecret` names no Secret: it takes no password.
+    let sign_in = if secret.is_empty() {
+        SignIn::Open
+    } else {
+        let revealed: Option<RevealedSecret> = read(
+            api.post(
+                &format!("/api/v1/projects/{project}/secrets/{secret}/reveal"),
+                &json!({}),
+            )
+            .await,
         )
-        .await,
-    )
-    .ok();
-    let value = |key: &str| revealed.as_ref().and_then(|r| r.text(key));
-    let username = connection
-        .username
-        .clone()
-        .or_else(|| connection.username_key.as_deref().and_then(value));
-    let password = value(&connection.password_key);
-    if password.is_none() {
-        output::info(&format!(
-            "You cannot read the Secret {secret}, so the URI has PASSWORD in place of the password."
-        ));
+        .ok();
+        let value = |key: &str| revealed.as_ref().and_then(|r| r.text(key));
+        let password = value(&connection.password_key);
+        if password.is_none() {
+            output::info(&format!(
+                "You cannot read the Secret {secret}, so the URI has PASSWORD in place of the password."
+            ));
+        }
+        SignIn::Password {
+            username: connection
+                .username
+                .clone()
+                .or_else(|| connection.username_key.as_deref().and_then(value)),
+            password,
+        }
+    };
+    if let Some(note) = one_member_note(&database) {
+        output::info(&note);
     }
     output::info(&format!(
         "Forwarding 127.0.0.1:{local} to {name} in {project}. Press Ctrl-C to stop."
     ));
     output::report(&format!(
         "{}\n",
-        uri(
-            database.engine,
-            connection,
-            username.as_deref(),
-            password.as_deref(),
-            local
-        )
+        uri(database.engine, connection, &sign_in, local)
     ));
     tokio::signal::ctrl_c()
         .await
@@ -217,28 +223,60 @@ fn find(listed: ProjectDatabases, project: &str, name: &str) -> Result<Database,
     }
 }
 
-/// The connection URI on `127.0.0.1:<port>`, with `PASSWORD` when the password is not known.
-fn uri(
-    engine: Engine,
-    connection: &Connection,
-    username: Option<&str>,
-    password: Option<&str>,
-    port: u16,
-) -> String {
-    let password = encode(password.unwrap_or("PASSWORD"));
-    let user = username.map_or_else(|| "USER".to_owned(), encode);
+/// How the URI signs in.
+#[derive(Debug)]
+enum SignIn {
+    /// The database takes no password.
+    Open,
+    /// A user and password; `None` where the Secret does not say.
+    Password {
+        username: Option<String>,
+        password: Option<String>,
+    },
+}
+
+/// The connection URI on `127.0.0.1:<port>`, with `USER` and `PASSWORD` for what is not known.
+fn uri(engine: Engine, connection: &Connection, sign_in: &SignIn, port: u16) -> String {
+    let userinfo = |with_user: bool| match sign_in {
+        SignIn::Open => String::new(),
+        SignIn::Password { username, password } => format!(
+            "{}:{}@",
+            match (with_user, username) {
+                (false, _) => String::new(),
+                (true, Some(username)) => encode(username),
+                (true, None) => "USER".to_owned(),
+            },
+            encode(password.as_deref().unwrap_or("PASSWORD"))
+        ),
+    };
     let database = connection.database.as_deref().unwrap_or_default();
     match engine {
-        Engine::Dragonfly => format!("redis://:{password}@127.0.0.1:{port}"),
-        // The members' own addresses are not reachable through the forward.
-        Engine::Mongodb => {
-            format!("mongodb://{user}:{password}@127.0.0.1:{port}/{database}?directConnection=true")
-        }
+        Engine::Dragonfly => format!("redis://{}127.0.0.1:{port}", userinfo(false)),
+        // The members' own addresses are not reachable through the forward, so the driver must
+        // not look for the other members.
+        Engine::Mongodb => format!(
+            "mongodb://{}127.0.0.1:{port}/{database}?directConnection=true",
+            userinfo(true)
+        ),
         Engine::Mysql | Engine::Mariadb => {
-            format!("mysql://{user}:{password}@127.0.0.1:{port}/{database}")
+            format!("mysql://{}127.0.0.1:{port}/{database}", userinfo(true))
         }
-        Engine::Postgresql => format!("postgresql://{user}:{password}@127.0.0.1:{port}/{database}"),
+        Engine::Postgresql => {
+            format!("postgresql://{}127.0.0.1:{port}/{database}", userinfo(true))
+        }
     }
+}
+
+/// Says that a MongoDB replica set of more than one member is reached through one member, which
+/// takes writes only while it is the primary. The forward cannot tell which member that is: the
+/// operator marks no pod as the primary.
+fn one_member_note(database: &Database) -> Option<String> {
+    (database.engine == Engine::Mongodb && database.members > 1).then(|| {
+        format!(
+            "{} has {} instances and the URI reaches only one of them. If that instance is not the primary, the database refuses writes (NotWritablePrimary).",
+            database.name, database.members
+        )
+    })
 }
 
 /// `text` with every byte other than the RFC 3986 unreserved characters percent-encoded.
@@ -263,7 +301,7 @@ mod tests {
     use super::*;
 
     fn database(engine: &str, name: &str, connection: &Value) -> Value {
-        json!({"engine": engine, "name": name, "provider": "x", "state": "ready", "connection": connection})
+        json!({"engine": engine, "name": name, "provider": "x", "state": "ready", "members": 1, "connection": connection})
     }
 
     fn connection(database: Option<&str>) -> Connection {
@@ -277,6 +315,13 @@ mod tests {
         .unwrap()
     }
 
+    fn password(username: Option<&str>, password: Option<&str>) -> SignIn {
+        SignIn::Password {
+            username: username.map(str::to_owned),
+            password: password.map(str::to_owned),
+        }
+    }
+
     #[test]
     fn the_uri_points_at_the_local_port_with_the_password_encoded() {
         let postgres = connection(Some("app"));
@@ -284,22 +329,20 @@ mod tests {
             uri(
                 Engine::Postgresql,
                 &postgres,
-                Some("app"),
-                Some("p@ss/w:rd"),
+                &password(Some("app"), Some("p@ss/w:rd")),
                 5433
             ),
             "postgresql://app:p%40ss%2Fw%3Ard@127.0.0.1:5433/app"
         );
         assert_eq!(
-            uri(Engine::Postgresql, &postgres, None, None, 5433),
+            uri(Engine::Postgresql, &postgres, &password(None, None), 5433),
             "postgresql://USER:PASSWORD@127.0.0.1:5433/app"
         );
         assert_eq!(
             uri(
                 Engine::Dragonfly,
                 &connection(None),
-                None,
-                Some("secret"),
+                &password(None, Some("secret")),
                 6380
             ),
             "redis://:secret@127.0.0.1:6380"
@@ -308,12 +351,34 @@ mod tests {
             uri(
                 Engine::Mongodb,
                 &connection(Some("admin")),
-                Some("root"),
-                Some("pw"),
+                &password(Some("root"), Some("pw")),
                 27018
             ),
             "mongodb://root:pw@127.0.0.1:27018/admin?directConnection=true"
         );
+    }
+
+    #[test]
+    fn a_database_without_a_password_gets_a_uri_without_one() {
+        assert_eq!(
+            uri(Engine::Dragonfly, &connection(None), &SignIn::Open, 6380),
+            "redis://127.0.0.1:6380"
+        );
+    }
+
+    #[test]
+    fn a_mongodb_replica_set_of_several_members_says_writes_may_be_refused() {
+        let mongo = |members: i64| -> Database {
+            serde_json::from_value(json!({
+                "name": "orders", "engine": "mongodb", "members": members,
+                "connection": {"host": "orders-rs0.shop.svc", "port": 27017,
+                               "secret": "orders-secrets", "passwordKey": "password"},
+            }))
+            .unwrap()
+        };
+        let note = one_member_note(&mongo(3)).unwrap();
+        assert!(note.contains("primary"), "{note}");
+        assert_eq!(one_member_note(&mongo(1)), None);
     }
 
     #[test]
