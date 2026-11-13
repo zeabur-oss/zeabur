@@ -4,7 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import GitBranchIcon from "~icons/ph/git-branch"
 import XIcon from "~icons/ph/x"
 
-import { objectQuery, type ObjectAddress } from "@/api/queries"
+import { objectQuery, projectQuery, type ObjectAddress } from "@/api/queries"
 import { DescribeYaml } from "@/components/describe-yaml"
 import { ObjectOverview } from "@/components/object-overview"
 import { LoadingRows } from "@/components/page"
@@ -20,6 +20,15 @@ import {
 import { YamlView } from "@/components/yaml-view"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
+import { serviceOfPod } from "@/model/service"
+
+/** For a pod of a service, the controller that starts a new one after a delete. */
+function useReplacedBy(project: string, address: ObjectAddress): string | undefined {
+  const isPod = address.resource === "pods" && address.group === ""
+  const services = useQuery({ ...projectQuery(project), enabled: isPod }).data?.services
+  const controller = isPod && services ? serviceOfPod(services, address.name) : undefined
+  return controller ? `${controller.kind} ${controller.name}` : undefined
+}
 
 export function ObjectSheet({
   project,
@@ -33,6 +42,7 @@ export function ObjectSheet({
   const t = useT()
   const object = useQuery(objectQuery(project, address, { poll: true }))
   const kind = object.data?.origin.kind
+  const replacedBy = useReplacedBy(project, address)
   return (
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
@@ -95,6 +105,7 @@ export function ObjectSheet({
                   yaml={object.data.yaml}
                   managedBy={object.data.provenance.tool}
                   kind={kind}
+                  note={replacedBy ? t("yaml.podReplaced", replacedBy) : undefined}
                   onDeleted={onClose}
                 />
               }
