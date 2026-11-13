@@ -119,6 +119,7 @@ pub(crate) fn plan_problem(error: PlanError) -> ApiError {
         ErrorKind::Conflict => Kind::Conflict,
         ErrorKind::Invalid => Kind::Invalid,
         ErrorKind::SystemNamespace => Kind::SystemNamespace,
+        ErrorKind::Unavailable => Kind::Unavailable,
     };
     let at = error.change.map(|change| ProblemAt {
         change,

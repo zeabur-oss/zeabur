@@ -263,6 +263,67 @@ struct StorageClassParam {
     default: bool,
 }
 
+/// What discovery names, for a case that names no kinds: the built-in kinds and the operators
+/// Zeabur's forms create objects for, all namespaced, as `(group, kind, plural)`.
+const SERVED: &[(&str, &str, &str)] = &[
+    ("", "ConfigMap", "configmaps"),
+    ("", "Secret", "secrets"),
+    ("", "PersistentVolumeClaim", "persistentvolumeclaims"),
+    ("", "ServiceAccount", "serviceaccounts"),
+    ("", "Service", "services"),
+    ("apps", "Deployment", "deployments"),
+    ("batch", "Job", "jobs"),
+    ("networking.k8s.io", "NetworkPolicy", "networkpolicies"),
+    ("networking.k8s.io", "Ingress", "ingresses"),
+    ("builder.zeabur.com", "Build", "builds"),
+    ("postgresql.cnpg.io", "Cluster", "clusters"),
+    ("postgresql.cnpg.io", "ScheduledBackup", "scheduledbackups"),
+    ("postgresql.cnpg.io", "Backup", "backups"),
+    ("barmancloud.cnpg.io", "ObjectStore", "objectstores"),
+    (
+        "psmdb.percona.com",
+        "PerconaServerMongoDB",
+        "perconaservermongodbs",
+    ),
+    (
+        "psmdb.percona.com",
+        "PerconaServerMongoDBBackup",
+        "perconaservermongodbbackups",
+    ),
+    (
+        "psmdb.percona.com",
+        "PerconaServerMongoDBRestore",
+        "perconaservermongodbrestores",
+    ),
+    ("moco.cybozu.com", "MySQLCluster", "mysqlclusters"),
+    ("moco.cybozu.com", "BackupPolicy", "backuppolicies"),
+    ("k8s.mariadb.com", "MariaDB", "mariadbs"),
+    ("k8s.mariadb.com", "Backup", "backups"),
+    ("dragonflydb.io", "Dragonfly", "dragonflies"),
+    ("seaweed.seaweedfs.com", "Seaweed", "seaweeds"),
+    ("seaweed.seaweedfs.com", "Bucket", "buckets"),
+    ("k8up.io", "Schedule", "schedules"),
+    ("k8up.io", "Backup", "backups"),
+    ("k8up.io", "Restore", "restores"),
+];
+
+/// The kinds a case names, or [`SERVED`] when it names none.
+fn served(kinds: Option<Vec<KindParam>>) -> Vec<ServedKind> {
+    let Some(kinds) = kinds else {
+        let mut all = Vec::new();
+        for (group, kind, plural) in SERVED {
+            all.push(ServedKind {
+                group: (*group).to_owned(),
+                kind: (*kind).to_owned(),
+                plural: (*plural).to_owned(),
+                namespaced: true,
+            });
+        }
+        return all;
+    };
+    kinds.into_iter().map(Into::into).collect()
+}
+
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 struct KindParam {
@@ -347,8 +408,9 @@ struct PlanParams {
     secret_values: BTreeMap<String, BTreeMap<String, String>>,
     #[serde(default)]
     reclaim_policies: BTreeMap<String, String>,
+    /// Absent: [`SERVED`].
     #[serde(default)]
-    kinds: Vec<KindParam>,
+    kinds: Option<Vec<KindParam>>,
     #[serde(default)]
     cluster_issuer: Option<String>,
     #[serde(default)]
@@ -442,7 +504,7 @@ impl FixtureOp for Plan {
             .filter(|o| o["kind"] == "ReplicaSet")
             .map(|o| from_value(o.clone()).map_err(|e| e.to_string()))
             .collect::<Result<_, _>>()?;
-        let kinds: Vec<ServedKind> = params.kinds.into_iter().map(Into::into).collect();
+        let kinds = served(params.kinds);
         let issuers: BTreeMap<String, IssuerRead> = params
             .issuers
             .into_iter()
