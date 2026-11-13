@@ -18,10 +18,10 @@ publish = false
 # (Levels order crates; the product layers L0-L4 in docs/reference/architecture.mdx are a different thing.)
 [workspace.metadata.levels]
 zeabur-core = 1
-zeabur-http = 1
+zeabur-http = 0
 zeabur-model = 0
 zeabur-embed = 0
-zeabur-telemetry = 0
+zeabur-telemetry = 1
 zeabur-ui = 1
 zeabur-kube = 2
 zeabur-proxy = 1
@@ -163,9 +163,6 @@ utoipa-axum = "=0.3.0"
 # Names the struct `#[utoipa::path]` generates for a handler (zeabur-api `described!`); already in
 # the tree through utoipa-axum.
 pastey = "=0.2.3"
-# The installer's downloads: rustls with aws-lc-rs and the system's CA store. ureq's own `rustls`
-# feature would bring ring and webpki-roots, both banned in deny.toml.
-ureq = { version = "3", default-features = false, features = ["rustls-no-provider", "platform-verifier"] }
 tracing-subscriber = { version = "0.3", default-features = false, features = ["fmt", "std"] }
 
 [workspace.lints.rust]

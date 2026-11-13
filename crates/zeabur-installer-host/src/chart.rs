@@ -3,15 +3,16 @@
 
 use std::collections::BTreeMap;
 
+use http::Response;
+use hyper::body::Incoming;
 use serde::Deserialize;
-use ureq::Agent;
-use ureq::http::Response;
+use zeabur_http::Https;
 
 use crate::HostError;
-use crate::download::{self, check};
+use crate::download::{self, Agent, check};
 
 /// The largest chart or repository index read.
-const MAX: u64 = 64 << 20;
+const MAX: usize = 64 << 20;
 /// The layer that holds an OCI chart's archive [helm-oci].
 ///
 /// [helm-oci]: https://helm.sh/docs/topics/registries/
@@ -31,21 +32,33 @@ pub fn fetch(
     version: &str,
     digest: &str,
 ) -> Result<Vec<u8>, HostError> {
+    agent.run(chart, async |https| {
+        fetch_with(https, repo, chart, version, digest).await
+    })
+}
+
+async fn fetch_with(
+    https: &Https,
+    repo: Option<&str>,
+    chart: &str,
+    version: &str,
+    digest: &str,
+) -> Result<Vec<u8>, HostError> {
     if let Some(reference) = chart.strip_prefix("oci://") {
-        return oci(agent, reference, digest);
+        return oci(https, reference, digest).await;
     }
     let repo = repo.ok_or_else(|| HostError::Parse {
         what: chart.to_owned(),
         reason: "no repository".to_owned(),
     })?;
     let index_url = format!("{}/index.yaml", repo.trim_end_matches('/'));
-    let index = String::from_utf8_lossy(&read(get(agent, &index_url, None, None)?, &index_url)?)
-        .into_owned();
+    let index = read(get(https, &index_url, None, None).await?, &index_url).await?;
+    let index = String::from_utf8_lossy(&index).into_owned();
     let url = archive_url(&index, repo, chart, version).map_err(|reason| HostError::Parse {
         what: index_url.clone(),
         reason,
     })?;
-    let archive = read(get(agent, &url, None, None)?, &url)?;
+    let archive = read(get(https, &url, None, None).await?, &url).await?;
     check(&url, digest, &archive)?;
     Ok(archive)
 }
@@ -102,14 +115,14 @@ struct Token {
 /// Reads the manifest by its digest, then the chart layer by its own [oci-pull].
 ///
 /// [oci-pull]: https://github.com/opencontainers/distribution-spec/blob/main/spec.md#pull
-fn oci(agent: &Agent, reference: &str, digest: &str) -> Result<Vec<u8>, HostError> {
+async fn oci(https: &Https, reference: &str, digest: &str) -> Result<Vec<u8>, HostError> {
     let (host, path) = reference.split_once('/').ok_or_else(|| HostError::Parse {
         what: reference.to_owned(),
         reason: "no registry host".to_owned(),
     })?;
     let manifest_url = format!("https://{host}/v2/{path}/manifests/{digest}");
     let mut token = None;
-    let manifest = registry(agent, &manifest_url, Some(OCI_MANIFEST), &mut token)?;
+    let manifest = registry(https, &manifest_url, Some(OCI_MANIFEST), &mut token).await?;
     check(reference, digest, &manifest)?;
     let manifest: Manifest = serde_json::from_slice(&manifest).map_err(|e| HostError::Parse {
         what: manifest_url.clone(),
@@ -124,7 +137,7 @@ fn oci(agent: &Agent, reference: &str, digest: &str) -> Result<Vec<u8>, HostErro
             reason: "no chart layer".to_owned(),
         })?;
     let blob_url = format!("https://{host}/v2/{path}/blobs/{}", layer.digest);
-    let archive = registry(agent, &blob_url, None, &mut token)?;
+    let archive = registry(https, &blob_url, None, &mut token).await?;
     check(reference, &layer.digest, &archive)?;
     Ok(archive)
 }
@@ -133,15 +146,15 @@ fn oci(agent: &Agent, reference: &str, digest: &str) -> Result<Vec<u8>, HostErro
 /// [token-auth].
 ///
 /// [token-auth]: https://distribution.github.io/distribution/spec/auth/token/
-fn registry(
-    agent: &Agent,
+async fn registry(
+    https: &Https,
     url: &str,
     accept: Option<&str>,
     token: &mut Option<String>,
 ) -> Result<Vec<u8>, HostError> {
-    let response = get(agent, url, accept, token.as_deref())?;
+    let response = get(https, url, accept, token.as_deref()).await?;
     if response.status() != 401 || token.is_some() {
-        return read(response, url);
+        return read(response, url).await;
     }
     let challenge = response
         .headers()
@@ -158,15 +171,16 @@ fn registry(
             query.push((key, *value));
         }
     }
-    let answer = download::get_retrying(agent, realm, &[], &query)
-        .map_err(|e| download_error(realm, e.to_string()))?;
+    let answer = download::get_retrying(https, realm, &[], &query)
+        .await
+        .map_err(|reason| download_error(realm, reason))?;
     let answer: Token =
-        serde_json::from_slice(&read(answer, realm)?).map_err(|e| HostError::Parse {
+        serde_json::from_slice(&read(answer, realm).await?).map_err(|e| HostError::Parse {
             what: (*realm).to_owned(),
             reason: e.to_string(),
         })?;
     *token = answer.token.or(answer.access_token);
-    read(get(agent, url, accept, token.as_deref())?, url)
+    read(get(https, url, accept, token.as_deref()).await?, url).await
 }
 
 /// The `key="value"` pairs of a `Bearer` challenge.
@@ -182,12 +196,12 @@ fn challenge_params(header: &str) -> BTreeMap<&str, &str> {
         .collect()
 }
 
-fn get(
-    agent: &Agent,
+async fn get(
+    https: &Https,
     url: &str,
     accept: Option<&str>,
     token: Option<&str>,
-) -> Result<Response<ureq::Body>, HostError> {
+) -> Result<Response<Incoming>, HostError> {
     let mut headers = Vec::new();
     if let Some(accept) = accept {
         headers.push(("Accept", accept));
@@ -196,21 +210,19 @@ fn get(
     if let Some(bearer) = &bearer {
         headers.push(("Authorization", bearer.as_str()));
     }
-    download::get_retrying(agent, url, &headers, &[])
-        .map_err(|e| download_error(url, e.to_string()))
+    download::get_retrying(https, url, &headers, &[])
+        .await
+        .map_err(|reason| download_error(url, reason))
 }
 
-fn read(response: Response<ureq::Body>, url: &str) -> Result<Vec<u8>, HostError> {
+async fn read(response: Response<Incoming>, url: &str) -> Result<Vec<u8>, HostError> {
     let status = response.status();
     if !status.is_success() {
         return Err(download_error(url, format!("HTTP {status}")));
     }
-    response
-        .into_body()
-        .with_config()
-        .limit(MAX)
-        .read_to_vec()
-        .map_err(|e| download_error(url, e.to_string()))
+    download::read_all(response, MAX)
+        .await
+        .map_err(|reason| download_error(url, reason))
 }
 
 fn download_error(url: &str, reason: String) -> HostError {
@@ -222,7 +234,57 @@ fn download_error(url: &str, reason: String) -> HostError {
 
 #[cfg(test)]
 mod tests {
+    use std::io::{Read as _, Write as _};
+    use std::net::TcpListener;
+
     use super::*;
+
+    /// A chart repository on a loopback port whose `index.yaml` names `zot-0.1.128.tgz`, which
+    /// holds `abc`.
+    fn repository() -> String {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let repo = format!("http://{}/charts", listener.local_addr().unwrap());
+        std::thread::spawn(move || {
+            for stream in listener.incoming() {
+                let Ok(mut stream) = stream else { return };
+                let mut request = [0_u8; 4096];
+                let n = stream.read(&mut request).unwrap_or(0);
+                let head = String::from_utf8_lossy(&request[..n]).into_owned();
+                let (status, body) = if head.starts_with("GET /charts/index.yaml ") {
+                    (
+                        "200 OK",
+                        "entries:\n  zot:\n  - version: 0.1.128\n    urls: [zot-0.1.128.tgz]\n",
+                    )
+                } else if head.starts_with("GET /charts/zot-0.1.128.tgz ") {
+                    ("200 OK", "abc")
+                } else {
+                    ("404 Not Found", "")
+                };
+                let reply = format!(
+                    "HTTP/1.1 {status}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    body.len()
+                );
+                drop(stream.write_all(reply.as_bytes()));
+            }
+        });
+        repo
+    }
+
+    #[test]
+    fn a_chart_is_read_from_its_repository_and_checked() {
+        let repo = repository();
+        let agent = download::agent();
+        let digest = "sha256:ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
+        let archive = fetch(&agent, Some(&repo), "zot", "0.1.128", digest).unwrap();
+        assert_eq!(archive, b"abc");
+        let wrong = format!("sha256:{}", "0".repeat(64));
+        assert!(matches!(
+            fetch(&agent, Some(&repo), "zot", "0.1.128", &wrong),
+            Err(HostError::Digest { .. })
+        ));
+        let missing = fetch(&agent, Some(&repo), "zot", "9.9.9", digest).unwrap_err();
+        assert!(missing.to_string().contains("no zot 9.9.9"), "{missing}");
+    }
 
     #[test]
     fn index_entries_resolve_relative_urls() {

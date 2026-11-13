@@ -13,8 +13,11 @@ readme = "README.md"
 workspace = true
 
 [dependencies]
-rustls.workspace = true
+bytes.workspace = true
+http.workspace = true
+http-body-util.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tokio.workspace = true
 tracing.workspace = true
-ureq.workspace = true
+zeabur-http.workspace = true

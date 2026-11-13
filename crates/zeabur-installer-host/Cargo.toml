@@ -12,20 +12,26 @@ readme = "README.md"
 [dependencies]
 zeabur-installer-plan.workspace = true
 base64.workspace = true
+bytes.workspace = true
 flate2.workspace = true
+form_urlencoded.workspace = true
 hex.workspace = true
+http.workspace = true
+http-body-util.workspace = true
 httpdate.workspace = true
-rustls.workspace = true
+hyper.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 serde-saphyr.workspace = true
 sha2.workspace = true
 tar.workspace = true
 thiserror.workspace = true
-ureq.workspace = true
+tokio.workspace = true
+zeabur-http.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true
+zeabur-test-support = { workspace = true, features = ["tls"] }
 
 [lints]
 workspace = true
