@@ -1,0 +1,2 @@
+description: A Seaweed store's volume claims, a K8up backup Job and its pod, and the claims of StatefulSets db and db-replica each resolve to their own owner.
+operation: graph.ownership

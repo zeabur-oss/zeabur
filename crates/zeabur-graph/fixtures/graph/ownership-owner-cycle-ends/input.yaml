@@ -1,0 +1,56 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: b
+  namespace: demo
+  uid: job-b
+  ownerReferences:
+  - apiVersion: batch/v1
+    kind: Job
+    name: a
+    uid: job-a
+    controller: true
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: main
+        image: example:1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: a
+  namespace: demo
+  uid: job-a
+  ownerReferences:
+  - apiVersion: batch/v1
+    kind: Job
+    name: b
+    uid: job-b
+    controller: true
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: main
+        image: example:1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: a-pod
+  namespace: demo
+  uid: pod-1
+  ownerReferences:
+  - apiVersion: batch/v1
+    kind: Job
+    name: a
+    uid: job-a
+    controller: true
+spec:
+  containers:
+  - name: main
+    image: example:1

@@ -1,0 +1,51 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: shop-db
+  namespace: demo
+  uid: sts-1
+  ownerReferences:
+  - apiVersion: k8s.mariadb.com/v1alpha1
+    kind: MariaDB
+    name: shop-db
+    uid: mariadb-1
+    controller: true
+spec:
+  selector:
+    matchLabels:
+      app: shop-db
+  template:
+    metadata:
+      labels:
+        app: shop-db
+    spec:
+      containers:
+      - name: main
+        image: example:1
+  volumeClaimTemplates:
+  - metadata:
+      name: storage
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: shop-db-0
+  namespace: demo
+  uid: pod-1
+  ownerReferences:
+  - apiVersion: apps/v1
+    kind: StatefulSet
+    name: shop-db
+    uid: sts-1
+    controller: true
+spec:
+  containers:
+  - name: main
+    image: example:1
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: storage-shop-db-0
+  namespace: demo
+  uid: pvc-1

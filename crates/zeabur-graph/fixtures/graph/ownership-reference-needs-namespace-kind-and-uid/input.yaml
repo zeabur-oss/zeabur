@@ -1,0 +1,84 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: web
+  namespace: demo
+  uid: web-new
+spec:
+  selector:
+    matchLabels:
+      app: web
+  template:
+    metadata:
+      labels:
+        app: web
+    spec:
+      containers:
+      - name: main
+        image: example:1
+  volumeClaimTemplates: []
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-0
+  namespace: demo
+  uid: pod-1
+  ownerReferences:
+  - apiVersion: apps/v1
+    kind: StatefulSet
+    name: web
+    uid: web-old
+    controller: true
+spec:
+  containers:
+  - name: main
+    image: example:1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: web-1
+  namespace: demo
+  uid: pod-2
+  ownerReferences:
+  - apiVersion: apps/v1
+    kind: Deployment
+    name: web
+    uid: web-new
+    controller: true
+spec:
+  containers:
+  - name: main
+    image: example:1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: migrate
+  namespace: other
+  uid: job-1
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: main
+        image: example:1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: migrate-abcde
+  namespace: demo
+  uid: pod-3
+  ownerReferences:
+  - apiVersion: batch/v1
+    kind: Job
+    name: migrate
+    uid: job-1
+    controller: true
+spec:
+  containers:
+  - name: main
+    image: example:1

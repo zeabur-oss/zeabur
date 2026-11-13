@@ -6,7 +6,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::Deserialize;
 use serde_json::{Value, from_value, json, to_value};
 use zeabur_graph::{
-    Snapshot, Workload, attribution, classify, deployment_phase, env, env_from,
+    OwnerGraph, Snapshot, Workload, attribution, classify, deployment_phase, env, env_from,
     is_machinery_secret, mounts, pods_of, port_protocol, project, provenance, workloads,
 };
 use zeabur_test_support::fixtures::{Fixture, FixtureOp, NoParams, run_op};
@@ -33,6 +33,7 @@ pub(crate) fn run(fixture: &Fixture) -> Result<Value, String> {
         SelectorAndPorts::NAME => run_op::<SelectorAndPorts>(fixture),
         Routes::NAME => run_op::<Routes>(fixture),
         Provenance::NAME => run_op::<Provenance>(fixture),
+        Ownership::NAME => run_op::<Ownership>(fixture),
         other => Err(format!("{}: no runner for operation {other}", fixture.name)),
     }
 }
@@ -123,6 +124,31 @@ impl FixtureOp for Attribution {
 
     fn run(input: &[Value], params: Self::Params) -> Result<Value, String> {
         wire(attribution(&snapshot(input, &params.namespace)?))
+    }
+}
+
+struct Ownership;
+
+impl FixtureOp for Ownership {
+    const NAME: &'static str = "graph.ownership";
+    type Params = NoParams;
+
+    fn run(input: &[Value], _: Self::Params) -> Result<Value, String> {
+        let snapshot = snapshot(input, DEMO)?;
+        let graph = OwnerGraph::new(&snapshot);
+        Ok(graph
+            .roots()
+            .map(|root| {
+                json!({
+                    "root": root,
+                    "read": graph.is_read(root),
+                    "database": graph.database(root).map(|db| json!({
+                        "kind": db.kind, "name": db.name, "engine": db.engine.as_str(),
+                    })),
+                    "members": graph.members(root).collect::<Vec<_>>(),
+                })
+            })
+            .collect())
     }
 }
 

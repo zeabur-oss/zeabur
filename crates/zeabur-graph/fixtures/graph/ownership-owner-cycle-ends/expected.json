@@ -1,0 +1,22 @@
+[
+  {
+    "root": {
+      "kind": "Job",
+      "name": "a",
+      "group": "batch",
+      "uid": "job-a"
+    },
+    "read": true,
+    "database": null,
+    "members": [
+      {
+        "kind": "Pod",
+        "name": "a-pod"
+      },
+      {
+        "kind": "Job",
+        "name": "b"
+      }
+    ]
+  }
+]

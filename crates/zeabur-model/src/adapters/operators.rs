@@ -5,7 +5,7 @@ use std::collections::BTreeMap;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 
 use crate::adapters::group::{COMPONENT_LABEL, NAME_LABEL};
-use crate::adapters::label;
+use crate::adapters::{api_group, label};
 
 /// A database engine an operator runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -175,20 +175,36 @@ pub struct DatabaseCluster<'a> {
 /// collection), and that does not hand it to their operator.
 #[must_use]
 pub fn database_cluster(meta: &ObjectMeta) -> Option<DatabaseCluster<'_>> {
-    crate::adapters::controller_of(meta).and_then(|owner| {
-        let group = api_group(&owner.api_version);
-        DATABASE_OWNERS
-            .iter()
-            .find(|rule| rule.group == group && rule.kind == owner.kind)
-            .map(|rule| DatabaseCluster {
-                kind: rule.shown_kind,
-                name: &owner.name,
-                engine: rule.engine,
-                holds_data: rule
-                    .data_label
-                    .is_some_and(|key| label(meta.labels.as_ref(), key).is_some()),
-            })
+    let owner = crate::adapters::controller_of(meta)?;
+    let rule = database_owner(api_group(&owner.api_version), &owner.kind)?;
+    Some(DatabaseCluster {
+        holds_data: rule
+            .data_label
+            .is_some_and(|key| label(meta.labels.as_ref(), key).is_some()),
+        ..database(rule, &owner.name)
     })
+}
+
+/// The database cluster an object of this API group and kind is, such as a CloudNativePG
+/// `Cluster`. `holds_data` is false: that is a property of the workloads under it.
+#[must_use]
+pub fn database_of<'a>(group: &str, kind: &str, name: &'a str) -> Option<DatabaseCluster<'a>> {
+    database_owner(group, kind).map(|rule| database(rule, name))
+}
+
+fn database_owner(group: &str, kind: &str) -> Option<&'static DatabaseOwner> {
+    DATABASE_OWNERS
+        .iter()
+        .find(|rule| rule.group == group && rule.kind == kind)
+}
+
+const fn database<'a>(rule: &DatabaseOwner, name: &'a str) -> DatabaseCluster<'a> {
+    DatabaseCluster {
+        kind: rule.shown_kind,
+        name,
+        engine: rule.engine,
+        holds_data: false,
+    }
 }
 
 /// Whether a Deployment with these labels, and these pod template labels, is an operator's
@@ -209,11 +225,4 @@ pub fn is_operator(
             || label(pod_labels, COMPONENT_LABEL) == Some("operator"),
             |component| component == "operator",
         )
-}
-
-/// The API group of an `apiVersion`: what precedes the `/`, or empty for the core group.
-fn api_group(api_version: &str) -> &str {
-    api_version
-        .split_once('/')
-        .map_or("", |(group, _version)| group)
 }

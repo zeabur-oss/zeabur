@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: report
+  namespace: demo
+  uid: cron-1
+spec:
+  schedule: 0 3 * * *
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: Never
+          containers:
+          - name: main
+            image: example:1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: report-29001
+  namespace: demo
+  uid: job-1
+  ownerReferences:
+  - apiVersion: batch/v1
+    kind: CronJob
+    name: report
+    uid: cron-1
+    controller: true
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: main
+        image: example:1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: report-29001-abcde
+  namespace: demo
+  uid: pod-1
+  ownerReferences:
+  - apiVersion: batch/v1
+    kind: Job
+    name: report-29001
+    uid: job-1
+    controller: true
+spec:
+  containers:
+  - name: main
+    image: example:1
