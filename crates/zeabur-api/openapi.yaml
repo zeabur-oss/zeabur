@@ -10214,9 +10214,7 @@ components:
           type:
           - string
           - "null"
-          description: |-
-            kube-apiserver's CA bundle, PEM, from `kube-root-ca.crt`; absent when it could not be
-            read.
+          description: kube-apiserver's CA bundle, PEM; absent when it could not be read.
         expiresAt:
           type: string
           description: When it expires, RFC 3339, as kube-apiserver answered.
@@ -10773,9 +10771,7 @@ components:
               $ref: "#/components/schemas/ProjectGrant"
             description: Its roles in projects.
       - type: object
-        description: |-
-          Issue another token for an API token; the ones issued before keep working until they
-          expire.
+        description: Issue another token; earlier ones work until they expire.
         required:
         - name
         - expirationSeconds
@@ -10793,9 +10789,7 @@ components:
             enum:
             - renewToken
       - type: object
-        description: |-
-          Delete an API token: its bindings, then its ServiceAccount, which revokes every token
-          issued for it.
+        description: "Delete an API token: its bindings, then its ServiceAccount, which revokes its tokens."
         required:
         - name
         - op

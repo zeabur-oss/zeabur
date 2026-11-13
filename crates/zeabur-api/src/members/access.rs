@@ -24,9 +24,11 @@
 use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::names::{API_TOKENS_NAMESPACE, admin_only_namespace};
+use zeabur_kube::k8s_openapi::api::rbac::v1::{ClusterRoleBinding, RoleBinding, RoleRef, Subject};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::{Cluster, ClusterError, DynamicObject, ObjectTarget, ResourceRef};
 
 use super::USER_PREFIX;
@@ -111,47 +113,67 @@ impl Holder {
         }
     }
 
-    fn labels(&self) -> Value {
-        match self {
-            Self::Member(username) => json!({MANAGED_BY: "zeabur", MEMBER_LABEL: username}),
-            Self::Token(name) => json!({MANAGED_BY: "zeabur", TOKEN_LABEL: name}),
+    fn metadata(&self, namespace: Option<&str>) -> ObjectMeta {
+        let (label, value) = match self {
+            Self::Member(username) => (MEMBER_LABEL, username),
+            Self::Token(name) => (TOKEN_LABEL, name),
+        };
+        ObjectMeta {
+            name: Some(self.binding_name()),
+            namespace: namespace.map(str::to_owned),
+            labels: Some(BTreeMap::from([
+                (MANAGED_BY.to_owned(), "zeabur".to_owned()),
+                (label.to_owned(), value.clone()),
+            ])),
+            ..ObjectMeta::default()
         }
     }
 
-    fn subjects(&self) -> Value {
-        match self {
-            Self::Member(username) => json!([{
-                "apiGroup": RBAC_GROUP, "kind": "User", "name": format!("{USER_PREFIX}{username}"),
-            }]),
-            Self::Token(name) => json!([{
-                "kind": "ServiceAccount", "name": name, "namespace": API_TOKENS_NAMESPACE,
-            }]),
-        }
+    fn subjects(&self) -> Vec<Subject> {
+        let subject = match self {
+            Self::Member(username) => Subject {
+                api_group: Some(RBAC_GROUP.to_owned()),
+                kind: "User".to_owned(),
+                name: format!("{USER_PREFIX}{username}"),
+                namespace: None,
+            },
+            Self::Token(name) => Subject {
+                api_group: None,
+                kind: "ServiceAccount".to_owned(),
+                name: name.clone(),
+                namespace: Some(API_TOKENS_NAMESPACE.to_owned()),
+            },
+        };
+        vec![subject]
+    }
+}
+
+fn role_ref(name: &str) -> RoleRef {
+    RoleRef {
+        api_group: RBAC_GROUP.to_owned(),
+        kind: "ClusterRole".to_owned(),
+        name: name.to_owned(),
     }
 }
 
 /// The `RoleBinding` that gives `holder` `role` in `project`.
 #[must_use]
-pub fn role_binding(project: &str, holder: &Holder, role: ProjectRole) -> Value {
-    json!({
-        "apiVersion": RBAC_VERSION,
-        "kind": "RoleBinding",
-        "metadata": {"name": holder.binding_name(), "namespace": project, "labels": holder.labels()},
-        "roleRef": {"apiGroup": RBAC_GROUP, "kind": "ClusterRole", "name": role.cluster_role()},
-        "subjects": holder.subjects(),
-    })
+pub fn role_binding(project: &str, holder: &Holder, role: ProjectRole) -> RoleBinding {
+    RoleBinding {
+        metadata: holder.metadata(Some(project)),
+        role_ref: role_ref(role.cluster_role()),
+        subjects: Some(holder.subjects()),
+    }
 }
 
 /// The `ClusterRoleBinding` that gives `holder` the baseline.
 #[must_use]
-pub fn baseline_binding(holder: &Holder) -> Value {
-    json!({
-        "apiVersion": RBAC_VERSION,
-        "kind": "ClusterRoleBinding",
-        "metadata": {"name": holder.binding_name(), "labels": holder.labels()},
-        "roleRef": {"apiGroup": RBAC_GROUP, "kind": "ClusterRole", "name": BASELINE_ROLE},
-        "subjects": holder.subjects(),
-    })
+pub fn baseline_binding(holder: &Holder) -> ClusterRoleBinding {
+    ClusterRoleBinding {
+        metadata: holder.metadata(None),
+        role_ref: role_ref(BASELINE_ROLE),
+        subjects: Some(holder.subjects()),
+    }
 }
 
 /// A project binding Zeabur made, as read.
@@ -339,6 +361,7 @@ pub(crate) async fn bindings_for(
 
 #[cfg(test)]
 pub(crate) mod tests {
+    use serde_json::json;
     use zeabur_core::names::{
         ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON, LABEL_PROJECT,
         MANAGE_VERB,
@@ -356,6 +379,10 @@ pub(crate) mod tests {
         }
     }
 
+    fn value(object: impl Serialize) -> Value {
+        serde_json::to_value(object).unwrap()
+    }
+
     fn grant(project: &str, role: ProjectRole) -> ProjectGrant {
         ProjectGrant {
             project: project.to_owned(),
@@ -365,14 +392,18 @@ pub(crate) mod tests {
 
     #[test]
     fn a_binding_names_the_user_as_kubernetes_sees_them_and_carries_the_member_label() {
-        let object = role_binding("shop", &Holder::member("ada"), ProjectRole::Viewer);
+        let object = value(role_binding(
+            "shop",
+            &Holder::member("ada"),
+            ProjectRole::Viewer,
+        ));
         assert_eq!(object["metadata"]["name"], "zeabur-member-ada");
         assert_eq!(object["metadata"]["namespace"], "shop");
         assert_eq!(object["metadata"]["labels"][MEMBER_LABEL], "ada");
         assert_eq!(object["roleRef"]["name"], "zeabur-project-viewer");
         assert_eq!(object["subjects"][0]["kind"], "User");
         assert_eq!(object["subjects"][0]["name"], "zeabur:ada");
-        let baseline = baseline_binding(&Holder::member("ada"));
+        let baseline = value(baseline_binding(&Holder::member("ada")));
         assert_eq!(baseline["kind"], "ClusterRoleBinding");
         assert_eq!(baseline["metadata"].get("namespace"), None);
         assert_eq!(baseline["roleRef"]["name"], BASELINE_ROLE);
@@ -381,7 +412,7 @@ pub(crate) mod tests {
     #[test]
     fn a_token_binding_names_its_service_account_in_the_token_namespace() {
         let token = Holder::token("ci");
-        let object = role_binding("shop", &token, ProjectRole::Developer);
+        let object = value(role_binding("shop", &token, ProjectRole::Developer));
         assert_eq!(object["metadata"]["name"], "zeabur-api-token-ci");
         assert_eq!(object["metadata"]["labels"][TOKEN_LABEL], "ci");
         assert_eq!(object["metadata"]["labels"].get(MEMBER_LABEL), None);
@@ -389,7 +420,10 @@ pub(crate) mod tests {
             object["subjects"],
             json!([{"kind": "ServiceAccount", "name": "ci", "namespace": API_TOKENS_NAMESPACE}])
         );
-        assert_eq!(baseline_binding(&token)["roleRef"]["name"], BASELINE_ROLE);
+        assert_eq!(
+            value(baseline_binding(&token))["roleRef"]["name"],
+            BASELINE_ROLE
+        );
         let read = bindings_of(vec![serde_json::from_value(object).unwrap()]);
         assert_eq!(read[0].holder, token);
         assert_eq!(read[0].role, Some(ProjectRole::Developer));

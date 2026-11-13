@@ -6217,8 +6217,7 @@ export type InvitationView = {
  */
 export type IssuedTokenView = {
   /**
-   * kube-apiserver's CA bundle, PEM, from `kube-root-ca.crt`; absent when it could not be
-   * read.
+   * kube-apiserver's CA bundle, PEM; absent when it could not be read.
    * @nullable
    */
   ca?: string | null

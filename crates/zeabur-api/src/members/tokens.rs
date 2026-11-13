@@ -1,21 +1,17 @@
-//! API tokens: machine accounts managed like members. Each is a ServiceAccount in
-//! [`api_token::NAMESPACE`] ([`zeabur_plan::api_token`]) with the bindings of [`super::access`]
-//! for [`Holder::Token`]: Developer or Viewer in chosen projects and the baseline. Admins make,
-//! renew, change and delete them through member plans ([`super::plan`]); nobody else has rights in
-//! the namespace.
+//! API tokens: machine accounts managed like members, each a ServiceAccount
+//! ([`zeabur_plan::api_token`]) with the bindings of [`super::access`]. Admins change them
+//! through member plans ([`super::plan`]).
 //!
-//! The token is in the answer to apply only, once, and never in a plan, a log or a stored object.
-//! The answer carries kube-apiserver's CA from the `kube-root-ca.crt` ConfigMap of the namespace
-//! [k8s-root-ca]. Zeabur knows the API server only by its in-cluster address, so the person fills
-//! in the address they reach it on.
+//! The token is only in the answer to apply, once, with kube-apiserver's CA from the namespace's
+//! `kube-root-ca.crt` [k8s-root-ca].
 //!
 //! [k8s-root-ca]: https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#bound-service-account-token-volume
 
 use serde::Serialize;
-use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, Problem};
-use zeabur_kube::{Cluster, ClusterError, ResourceRef};
+use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, ServiceAccount};
+use zeabur_kube::{Cluster, ClusterError, DynamicObject, ResourceRef};
 use zeabur_plan::api_token::{self, NAMESPACE, Refusal};
 
 use super::access::{Binding, Holder, ProjectGrant, grants_of};
@@ -55,8 +51,7 @@ pub struct IssuedTokenView {
     pub token: String,
     /// When it expires, RFC 3339, as kube-apiserver answered.
     pub expires_at: String,
-    /// kube-apiserver's CA bundle, PEM, from `kube-root-ca.crt`; absent when it could not be
-    /// read.
+    /// kube-apiserver's CA bundle, PEM; absent when it could not be read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ca: Option<String>,
     /// Whether the expiry was recorded on the ServiceAccount for the token list.
@@ -76,8 +71,7 @@ pub(crate) fn service_accounts() -> ResourceRef {
     ResourceRef::new("", "v1", "serviceaccounts", "ServiceAccount")
 }
 
-/// Whether the person may create API tokens, from a `SelfSubjectAccessReview` for `create
-/// serviceaccounts` in the token namespace; unknown when the review fails.
+/// Whether the person may create ServiceAccounts in the token namespace.
 pub(crate) async fn can_manage(cluster: &dyn Cluster) -> Permission {
     let request = Denied {
         verb: "create".to_owned(),
@@ -113,10 +107,10 @@ pub(crate) async fn list(
     };
     let mut items = Vec::new();
     for account in accounts {
-        let Ok(object) = serde_json::to_value(&account) else {
+        let Ok(account) = account.try_parse::<ServiceAccount>() else {
             continue;
         };
-        let Some(token) = api_token::read(&object) else {
+        let Some(token) = api_token::read(&account) else {
             continue;
         };
         let projects = grants_of(bindings, &Holder::token(&token.name));
@@ -140,12 +134,15 @@ fn no_token(name: &str) -> ApiError {
 }
 
 /// The ServiceAccount of the token `name`; `None` when there is none.
-pub(crate) async fn account(cluster: &dyn Cluster, name: &str) -> Result<Option<Value>, ApiError> {
+pub(crate) async fn account(
+    cluster: &dyn Cluster,
+    name: &str,
+) -> Result<Option<ServiceAccount>, ApiError> {
     match cluster
         .get_object(&service_accounts(), Some(NAMESPACE), name)
         .await
     {
-        Ok(found) => Ok(found.and_then(|o| serde_json::to_value(o).ok())),
+        Ok(found) => Ok(found.and_then(|o| o.try_parse().ok())),
         Err(error) if error.code() == Some(404) => Ok(None),
         Err(error) => Err(read_problem(
             error,
@@ -162,12 +159,15 @@ pub(crate) async fn account(cluster: &dyn Cluster, name: &str) -> Result<Option<
 }
 
 /// The ServiceAccount of the token `name`, which must exist and be that token.
-pub(crate) async fn existing(cluster: &dyn Cluster, name: &str) -> Result<Value, ApiError> {
-    let object = account(cluster, name)
+pub(crate) async fn existing(
+    cluster: &dyn Cluster,
+    name: &str,
+) -> Result<ServiceAccount, ApiError> {
+    let account = account(cluster, name)
         .await?
         .ok_or_else(|| no_token(name))?;
-    api_token::read(&object).ok_or_else(|| no_token(name))?;
-    Ok(object)
+    api_token::read(&account).ok_or_else(|| no_token(name))?;
+    Ok(account)
 }
 
 pub(crate) fn refusal(refused: Refusal) -> ApiError {
@@ -186,14 +186,9 @@ pub(crate) fn refusal(refused: Refusal) -> ApiError {
 
 /// kube-apiserver's CA bundle, from the token namespace's `kube-root-ca.crt`.
 pub(crate) async fn root_ca(cluster: &dyn Cluster) -> Option<String> {
-    let configmaps = ResourceRef::new("", "v1", "configmaps", "ConfigMap");
-    let found = cluster
-        .get_object(&configmaps, Some(NAMESPACE), ROOT_CA)
+    let found: DynamicObject = cluster
+        .get_object(&ResourceRef::of::<ConfigMap>(), Some(NAMESPACE), ROOT_CA)
         .await
         .ok()??;
-    found
-        .data
-        .pointer("/data/ca.crt")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
+    found.try_parse::<ConfigMap>().ok()?.data?.remove("ca.crt")
 }

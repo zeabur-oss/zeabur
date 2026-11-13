@@ -101,6 +101,7 @@ use zeabur_kube::k8s_openapi::api::apps::v1::ReplicaSet;
 use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, Pod, Secret};
 use zeabur_kube::k8s_openapi::api::events::v1::Event;
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_kube::memory::{MemoryCluster, State};
 use zeabur_kube::{
@@ -110,6 +111,10 @@ use zeabur_modules::alertmanager as am;
 
 fn from<T: serde::de::DeserializeOwned>(value: Value) -> T {
     serde_json::from_value(value).expect("valid example object")
+}
+
+fn from_typed(object: impl serde::Serialize) -> DynamicObject {
+    from(serde_json::to_value(object).expect("serialisable example object"))
 }
 
 /// One of Zeabur Identity's objects in `zeabur-identity`, labelled with its user when it has one.
@@ -270,15 +275,13 @@ fn member_roles() -> Vec<DynamicObject> {
     ];
     let mut objects = Vec::new();
     for (holder, project, role) in roles {
-        objects.push(from(role_binding(project, &holder, role)));
+        objects.push(from_typed(role_binding(project, &holder, role)));
     }
     for holder in baselines {
         // The memory cluster keeps a cluster-scoped object in namespace "".
         let mut binding = baseline_binding(&holder);
-        if let Some(metadata) = binding.get_mut("metadata").and_then(Value::as_object_mut) {
-            metadata.insert("namespace".to_owned(), "".into());
-        }
-        objects.push(from(binding));
+        binding.metadata.namespace = Some(String::new());
+        objects.push(from_typed(binding));
     }
     objects
 }
@@ -1270,18 +1273,15 @@ fn api_token(name: &str, by: &str, days_left: i64) -> DynamicObject {
         .expect("a time")
         .to_string();
     let mut account = api_token::service_account(name, by);
-    if let Some(Value::Object(metadata)) = account.get_mut("metadata") {
-        metadata.insert("uid".to_owned(), json!(format!("uid-sa-{name}")));
-        metadata.insert("resourceVersion".to_owned(), json!("1"));
-        metadata.insert(
-            "creationTimestamp".to_owned(),
-            json!("2026-10-01T09:00:00Z"),
-        );
-        if let Some(Value::Object(annotations)) = metadata.get_mut("annotations") {
-            annotations.insert(api_token::EXPIRES_AT_ANNOTATION.to_owned(), json!(expires));
-        }
-    }
-    from(account)
+    let metadata = &mut account.metadata;
+    metadata.uid = Some(format!("uid-sa-{name}"));
+    metadata.resource_version = Some("1".to_owned());
+    metadata.creation_timestamp = Some(Time("2026-10-01T09:00:00Z".parse().expect("a time")));
+    metadata
+        .annotations
+        .get_or_insert_default()
+        .insert(api_token::EXPIRES_AT_ANNOTATION.to_owned(), expires);
+    from_typed(account)
 }
 
 /// What one of billing's API replicas wrote: requests, and a slow one now and then.

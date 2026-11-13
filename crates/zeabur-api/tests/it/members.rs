@@ -16,6 +16,15 @@ mod tests {
 
     const NS: &str = "zeabur-identity";
 
+    fn rbac(object: impl serde::Serialize) -> DynamicObject {
+        let mut value = serde_json::to_value(object).unwrap();
+        // The memory cluster keeps a cluster-scoped object in namespace "".
+        if value["metadata"].get("namespace").is_none() {
+            value["metadata"]["namespace"] = "".into();
+        }
+        serde_json::from_value(value).unwrap()
+    }
+
     fn object(kind: &str, name: &str, spec: Value, labels: Value) -> DynamicObject {
         let mut value = json!({
             "apiVersion": "identity.zeabur.com/v1alpha1",
@@ -77,13 +86,6 @@ mod tests {
             ),
         ])
         .collect();
-        let rbac = |mut value: Value| -> DynamicObject {
-            // The memory cluster keeps a cluster-scoped object in namespace "".
-            if value["metadata"].get("namespace").is_none() {
-                value["metadata"]["namespace"] = "".into();
-            }
-            serde_json::from_value(value).unwrap()
-        };
         MemoryCluster::new(State {
             identity: Identity {
                 username: username.to_owned(),

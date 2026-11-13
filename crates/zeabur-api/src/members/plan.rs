@@ -20,6 +20,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::k8s_openapi::api::core::v1::ServiceAccount;
+use zeabur_kube::k8s_openapi::api::rbac::v1::ClusterRoleBinding;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest};
 use zeabur_plan::api_token;
@@ -103,8 +105,7 @@ pub enum MemberChange {
         #[serde(default)]
         projects: Vec<ProjectGrant>,
     },
-    /// Issue another token for an API token; the ones issued before keep working until they
-    /// expire.
+    /// Issue another token; earlier ones work until they expire.
     #[serde(rename_all = "camelCase")]
     RenewToken {
         /// The token.
@@ -112,8 +113,7 @@ pub enum MemberChange {
         /// How long the new token should last.
         expiration_seconds: i64,
     },
-    /// Delete an API token: its bindings, then its ServiceAccount, which revokes every token
-    /// issued for it.
+    /// Delete an API token: its bindings, then its ServiceAccount, which revokes its tokens.
     #[serde(rename_all = "camelCase")]
     DeleteToken {
         /// The token.
@@ -228,7 +228,7 @@ enum Op {
         name: String,
         seconds: i64,
         /// The ServiceAccount as read or as it will be made, shown before the expiry is recorded.
-        account: Value,
+        account: Box<ServiceAccount>,
     },
 }
 
@@ -291,11 +291,11 @@ impl Computed {
     }
 
     /// The baseline binding, created when it is not there yet.
-    fn baseline(&mut self, holder: &Holder, held: Option<&Value>) {
+    fn baseline(&mut self, holder: &Holder, held: Option<&ClusterRoleBinding>) {
         if held.is_none() {
             self.create(
                 access::target("ClusterRoleBinding", "", &holder.binding_name()),
-                access::baseline_binding(holder),
+                plain(access::baseline_binding(holder)),
             );
         }
     }
@@ -308,7 +308,7 @@ impl Computed {
                 Step::Delete(binding) => {
                     let before = binding
                         .role
-                        .map(|role| access::role_binding(&binding.project, holder, role));
+                        .map(|role| plain(access::role_binding(&binding.project, holder, role)));
                     self.delete(
                         access::target("RoleBinding", &binding.project, &name),
                         binding.uid,
@@ -317,15 +317,13 @@ impl Computed {
                 }
                 Step::Create(grant) => self.create(
                     access::target("RoleBinding", &grant.project, &name),
-                    access::role_binding(&grant.project, holder, grant.role),
+                    plain(access::role_binding(&grant.project, holder, grant.role)),
                 ),
             }
         }
     }
 
-    /// A token's access: its `ClusterRoleBinding` to `role` (replaced when it names another,
-    /// deleted when `role` is `None`) and its project bindings. The old `ClusterRoleBinding` goes
-    /// first and the new one last, so a failure half-way never leaves more than was asked.
+    /// The patch that makes the member's `User` an admin or not, when it is not already.
     fn patch_admin(
         &mut self,
         namespace: &str,
@@ -359,15 +357,16 @@ impl Computed {
     }
 }
 
-fn uid_of(object: &Value) -> Option<String> {
-    object
-        .pointer("/metadata/uid")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
+/// A typed object as the plan holds it.
+fn plain(object: impl Serialize) -> Value {
+    serde_json::to_value(object).unwrap_or_default()
 }
 
 /// The holder's `ClusterRoleBinding`, if Zeabur made one.
-async fn baseline_of(cluster: &dyn Cluster, holder: &Holder) -> Result<Option<Value>, ApiError> {
+async fn baseline_of(
+    cluster: &dyn Cluster,
+    holder: &Holder,
+) -> Result<Option<ClusterRoleBinding>, ApiError> {
     let resource = ResourceRef::new(
         RBAC_GROUP,
         "v1",
@@ -376,7 +375,7 @@ async fn baseline_of(cluster: &dyn Cluster, holder: &Holder) -> Result<Option<Va
     );
     let name = holder.binding_name();
     match cluster.get_object(&resource, None, &name).await {
-        Ok(found) => Ok(found.and_then(|o| serde_json::to_value(o).ok())),
+        Ok(found) => Ok(found.and_then(|o| o.try_parse().ok())),
         Err(error) if error.code() == Some(404) => Ok(None),
         Err(error) => Err(read_problem(
             error,
@@ -455,7 +454,7 @@ async fn compute(
             let mut computed = Computed::default();
             computed.versions.insert(
                 key(&account_target(name)),
-                uid_of(&account).unwrap_or_default(),
+                account.metadata.uid.unwrap_or_default(),
             );
             token_access(cluster, &mut computed, name, &projects).await?;
             Ok(computed)
@@ -487,12 +486,12 @@ async fn create_token(
     }
     let account = api_token::service_account(name, person);
     let mut computed = Computed::default();
-    computed.create(account_target(name), account.clone());
+    computed.create(account_target(name), plain(&account));
     token_access(cluster, &mut computed, name, projects).await?;
     computed.ops.push(Op::IssueToken {
         name: name.to_owned(),
         seconds,
-        account,
+        account: Box::new(account),
     });
     Ok(computed)
 }
@@ -506,16 +505,17 @@ async fn renew_token(
     let account = tokens::existing(cluster, name).await?;
     let mut computed = Computed::default();
     let version = account
-        .pointer("/metadata/resourceVersion")
-        .and_then(Value::as_str)
+        .metadata
+        .resource_version
+        .clone()
         .unwrap_or_default();
     computed
         .versions
-        .insert(key(&account_target(name)), version.to_owned());
+        .insert(key(&account_target(name)), version);
     computed.ops.push(Op::IssueToken {
         name: name.to_owned(),
         seconds,
-        account,
+        account: Box::new(account),
     });
     Ok(computed)
 }
@@ -529,11 +529,15 @@ async fn delete_token(cluster: &dyn Cluster, name: &str) -> Result<Computed, Api
     if let Some(held) = baseline_of(cluster, &holder).await? {
         computed.delete(
             access::target("ClusterRoleBinding", "", &holder.binding_name()),
-            uid_of(&held),
-            Some(held),
+            held.metadata.uid.clone(),
+            Some(plain(held)),
         );
     }
-    computed.delete(account_target(name), uid_of(&account), Some(account));
+    computed.delete(
+        account_target(name),
+        account.metadata.uid.clone(),
+        Some(plain(account)),
+    );
     Ok(computed)
 }
 
@@ -685,8 +689,8 @@ async fn remove(
     if let Some(held) = baseline_of(cluster, &holder).await? {
         computed.delete(
             access::target("ClusterRoleBinding", "", &holder.binding_name()),
-            uid_of(&held),
-            Some(held),
+            held.metadata.uid.clone(),
+            Some(plain(held)),
         );
     }
     let invitations = directory
@@ -770,22 +774,19 @@ fn writes_of(computed: &Computed, namespace: &str, username: &str, now: i64) -> 
                 writes.push(MemberWrite {
                     api_version: "authentication.k8s.io/v1".to_owned(),
                     kind: "TokenRequest".to_owned(),
-                    after_yaml: yaml(&api_token::token_request(*seconds)),
+                    after_yaml: yaml(&plain(api_token::token_request(*seconds))),
                     ..shown(&target, MemberWriteAction::Create)
                 });
-                let mut after = account.clone();
-                if let Some(annotations) = after
-                    .pointer_mut("/metadata/annotations")
-                    .and_then(Value::as_object_mut)
-                {
+                let mut after = account.as_ref().clone();
+                if let Some(annotations) = after.metadata.annotations.as_mut() {
                     annotations.insert(
                         api_token::EXPIRES_AT_ANNOTATION.to_owned(),
-                        json!("<as kube-apiserver answers>"),
+                        "<as kube-apiserver answers>".to_owned(),
                     );
                 }
                 MemberWrite {
-                    before_yaml: yaml(account),
-                    after_yaml: yaml(&after),
+                    before_yaml: yaml(&plain(account)),
+                    after_yaml: yaml(&plain(after)),
                     ..shown(&target, MemberWriteAction::Patch)
                 }
             }
@@ -1043,8 +1044,7 @@ pub(crate) async fn apply(
     }))
 }
 
-/// Requests a token for the API token `name` and records its expiry. The token is issued before
-/// the expiry is recorded, so a failed record does not hide it.
+/// Requests a token for `name`, then records its expiry; a failed record does not hide the token.
 async fn issue_token(
     cluster: &dyn Cluster,
     name: &str,
@@ -1167,7 +1167,7 @@ mod tests {
     #[test]
     fn a_held_baseline_is_not_created_again() {
         let mut computed = Computed::default();
-        computed.baseline(&Holder::member("bob"), Some(&json!({})));
+        computed.baseline(&Holder::member("bob"), Some(&ClusterRoleBinding::default()));
         assert!(computed.ops.is_empty());
     }
 
