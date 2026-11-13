@@ -26,9 +26,9 @@ commands, its profiles and its known failures. These rules hold in every reposit
   runner fails. Take the snapshot once Nix and Docker are installed (after one `nix develop`, so
   the store is warm, if you like), and restore it before the next run (`virsh snapshot-revert`,
   `prlctl snapshot-switch`, or your hypervisor's equivalent).
-- One run at a time per machine: check `pgrep -af 'ci-local.sh|ci.sh'` first.
+- One run at a time per machine: check `pgrep -af 'scripts/ci/'` first.
 - A pull request's GitHub checks remain the answer. To run a cluster job as CI does, run
-  `scripts/ci.sh <job>` on that machine (`zeabur-oss-ci`).
+  `nix develop -c scripts/ci/<job>.sh` on that machine (`zeabur-oss-ci`).
 - Clean up with the repository's `down` or `cluster delete` command when you are done.
 
 ## Rust cluster tests

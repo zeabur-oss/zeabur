@@ -1,6 +1,6 @@
 ---
 name: zeabur-oss-workflow
-description: How work moves through every zeabur-oss repository — branches, signed-off Conventional Commits, pull requests, waiting for checks, squash merging, releases (the maintainers' steps), issues (which repository, type, labels, body) and the rules for text that lands in a repository or on GitHub. Use when opening a branch, committing, opening or merging a pull request, preparing a release, or filing an issue in any zeabur-oss repository.
+description: How work moves through every zeabur-oss repository — taking an issue, milestones, branches, signed-off Conventional Commits, pull requests, waiting for checks, squash merging, releases (the maintainers' steps), issues (which repository, type, labels, body) and the rules for text that lands in a repository or on GitHub. Use when taking an issue, opening a branch, committing, opening, reviewing or merging a pull request, answering Codex, preparing a release, or filing an issue in any zeabur-oss repository.
 ---
 
 <!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-workflow/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
@@ -9,6 +9,20 @@ description: How work moves through every zeabur-oss repository — branches, si
 
 The repository's own skill (`<repo>-dev`, `<repo>-workflow`) names its checks, labels and release
 files. This skill is what every zeabur-oss repository shares.
+
+## Taking an issue
+
+- Claim the issue before you start, so two people don't do the same work. With triage access or
+  more, assign it to yourself (`gh issue edit <n> --add-assignee @me`). Without it, comment on
+  the issue that you are taking it; a maintainer assigns you.
+- Read its "Depends on" links first. Work that waits on an open issue or pull request starts
+  after it lands.
+- Milestones order the work. `Next` ships before `Later`: a pull request for a `Later` issue
+  stays unmerged until `Next` is released. Every pull request carries its issue's milestone. Set
+  it yourself if you can (`gh pr edit <n> --milestone <name>`); otherwise name the issue in the
+  body ("Closes #n") and a maintainer sets it.
+- Fix the cause, not the symptom. A small root fix that breaks an old behaviour is better than a
+  workaround around it; say what breaks in the pull request.
 
 ## Branch, commit, pull request
 
@@ -24,16 +38,30 @@ files. This skill is what every zeabur-oss repository shares.
    `BREAKING CHANGE:` footer. The subject says what changes in plain words; the body says why.
    No tool- or session-specific trailers.
 4. Run the checks for what you touched (the repository's dev skill; every CI job is
-   `scripts/ci.sh <job>`, see `zeabur-oss-ci`), push, and open the pull request with
+   `nix develop -c scripts/ci/<job>.sh`, see `zeabur-oss-ci`), push, and open the pull request with
    `gh pr create --base main`. The body: what was wrong or missing (link the failed run or the
-   issue), the cause and how it was shown, what changed. Name what was not verified.
+   issue), the cause and how it was shown, what changed. Name what was not verified. Write it in
+   English. A change people can see carries before and after screenshots in the body; host them
+   anywhere the reviewer can open them, such as an image pasted into the pull request.
 5. Wait for every check: `gh pr checks <n> --watch` returns once all have finished, non-zero if
    any failed. Without `--watch` it only reports the current state and exits 8 while checks are
    pending, so never merge on its answer alone. A red check is investigated (`zeabur-oss-ci`),
    not re-run until green.
 6. Pull requests are squash-merged (`gh pr merge <n> --squash`); no other merge method is used.
    The subject on `main` is the commit's for a single commit and the pull request title
-   otherwise, so keep both in Conventional Commits form.
+   otherwise, so keep both in Conventional Commits form. With a merge queue, `gh pr merge --squash`
+   enqueues the pull request; the slow checks run there on the commit about to land.
+
+## Review
+
+1. Open the pull request as a draft. Review your own diff against `zeabur-oss-standards` and the
+   issue's "Done when" before anyone else does.
+2. When your review finds nothing and every check is green, mark it ready (`gh pr ready <n>`).
+   Codex reviews it then.
+3. Fix each Codex finding that holds, or reply why it doesn't, and answer on its thread
+   ("Fixed in <sha>."). Before you push more commits, check the pull request is still open
+   (`gh pr view <n> --json state`); a maintainer may merge while you work.
+4. A maintainer decides when it merges.
 
 ## Releases
 

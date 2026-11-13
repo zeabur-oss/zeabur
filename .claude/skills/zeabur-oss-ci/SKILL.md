@@ -1,6 +1,6 @@
 ---
 name: zeabur-oss-ci
-description: How CI works in every zeabur-oss repository (the shared workflows of zeabur-oss/.github calling scripts/ci.sh) and how to investigate a failed or flaky CI or release run — read the job's log, find the cause, reproduce it on a Linux machine sized like the runner, and fix the test or the code rather than retrying. Use when a check on a pull request or on main fails, a test passes and fails without a change, a release run fails, or when adding a CI job.
+description: How CI works in every zeabur-oss repository (a plain .github/workflows/ci.yml that lists its jobs, each running scripts/ci/<job>.sh) and how to investigate a failed or flaky CI or release run — read the job's log, find the cause, reproduce it on a Linux machine sized like the runner, and fix the test or the code rather than retrying. Use when a check on a pull request, in the merge queue or on main fails, a test passes and fails without a change, a release run fails, or when adding a CI job.
 ---
 
 <!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-ci/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
@@ -9,24 +9,25 @@ description: How CI works in every zeabur-oss repository (the shared workflows o
 
 ## How it is wired
 
-`.github/workflows/ci.yml` calls `zeabur-oss/.github/.github/workflows/ci.yml@<sha> # main` and
-`dco.yml` at the same pin; Renovate moves the pin. The shared workflow runs one job per line of
-`scripts/ci.sh --list` (shown as `ci / <job>`), plus zizmor on `.github`, and an `ok` job that
-rulesets require. `dco / DCO` runs on pull requests only.
+`.github/workflows/ci.yml` lists its jobs directly. Each job checks out, runs
+`zeabur-oss/.github/actions/ci-setup@<sha>` (Nix and caches), then `nix develop -c scripts/ci/<job>.sh`
+(zeabur's `wording` job uses `.#zh`). A job that leaves files uploads them itself with
+`actions/upload-artifact`; the artifact name is in the job.
 
-The contract of `scripts/ci.sh` (zeabur-oss/.github `README.md`):
+- Pull requests run the fast jobs. The slow ones (cluster, e2e, kubernetes, fuzz, no-ui, wording,
+  catalog smoke) run only in the merge queue, the nightly schedule and manual runs, through an `if:`
+  on the event.
+- The required check is a plain job `ci / ok` with `if: always()` (`check / ok` and `smoke-ok` in
+  catalog). zizmor is the reusable `zizmor.yml` (`zizmor / zizmor`) and runs on every pull request.
+  `dco / DCO` runs on pull requests only.
+- `update.yml` opens one weekly pull request (Monday 02:30 Taipei; `workflow_dispatch` for an urgent
+  one) that moves the workflow pins and the shared skills together. Renovate runs daily from 03:00
+  to 07:00 Taipei, one pull request per update; K3s follows its stable channel.
 
-- `scripts/ci.sh --list` prints the job names, one per line, without the Nix dev shell.
-- `scripts/ci.sh <job>` runs one job. It enters the repository's dev shell itself, so a job runs
-  the same on GitHub and on any Linux machine with Nix (and Docker, for cluster jobs).
-- A job may leave files in `$CI_ARTIFACTS`; they are uploaded as the artifact `ci-<job>`.
-- Inputs of the shared `ci.yml`: `runner` (default `ubuntu-26.04-arm`), `fetch-depth`,
-  `rust-cache`, and `cache-paths` with `cache-key-files`.
+A new check is a new job in `ci.yml` plus `scripts/ci/<job>.sh`.
 
-A new check is a new job in `scripts/ci.sh`, not a new workflow step.
-
-`.github/workflows/release.yml` runs on a `vX.Y.Z` tag: all of `ci.yml` (`workflow_call`), then
-the shared release workflow, each stage `bun scripts/release.ts <stage>`. For a failed release run,
+`.github/workflows/release.yml` runs on a `vX.Y.Z` tag and calls the shared release workflow, each
+stage `bun scripts/release.ts <stage>`. For a failed release run,
 read [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md) before changing permissions, packages or
 artifacts.
 
@@ -43,7 +44,7 @@ grep -nE 'panicked|FAILED|Error:|error\[|failed' job.log | head
   `logs` endpoint works at once.
 - **`cancelled` is not a failure.** `concurrency` has `cancel-in-progress: true`: a new push to
   the same branch (or to main) cancels the run before it.
-- Read the artifact `ci-<job>` (`gh run download <run> -n ci-<job>`) before guessing.
+- Read the job's artifact, if it uploads one (`gh run download <run> -n <name>`), before guessing.
 - Note which commit failed (`headSha`) and whether the same test failed before on main
   (`gh run list --branch main --workflow CI`).
 
@@ -70,12 +71,12 @@ state that makes it happen. Do not fix what you have not explained.
 
 ## 3. Reproduce
 
-Run the same `scripts/ci.sh <job>` on a Linux machine or VM with Nix (and Docker for the cluster
+Run the same `nix develop -c scripts/ci/<job>.sh` on a Linux machine or VM with Nix (and Docker for the cluster
 jobs), following `zeabur-oss-cluster-tests` for where and how (sync, snapshot and restore, one
 run at a time):
 
 ```sh
-ssh host 'cd <repo> && scripts/ci.sh <job>'
+ssh host 'cd <repo> && nix develop -c scripts/ci/<job>.sh'
 ```
 
 - To match GitHub, give the VM 4 vCPU and 16 GB. Use a bigger one to rule size out.
