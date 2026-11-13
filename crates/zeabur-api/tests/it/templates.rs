@@ -56,6 +56,13 @@ mod tests {
         }
     }
 
+    fn revision(template: &str) -> String {
+        zeabur_catalog::Catalog::embedded()
+            .template(template)
+            .unwrap()
+            .revision
+    }
+
     /// What the browser sends for Miniflux: the Secret of its generated input, then the template.
     fn miniflux() -> Value {
         let password = "a".repeat(43);
@@ -63,7 +70,8 @@ mod tests {
             {"op": "create", "object": {"apiVersion": "v1", "kind": "Secret",
                 "metadata": {"name": "miniflux-secrets"}, "type": "Opaque",
                 "stringData": {"admin-password": password}}},
-            {"op": "template", "template": "miniflux", "domain": "rss.example.com"},
+            {"op": "template", "template": "miniflux", "revision": revision("miniflux"),
+                "domain": "rss.example.com"},
         ]})
     }
 
@@ -81,6 +89,28 @@ mod tests {
                     .find(|r| r["component"] == component)
             })
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_template_from_a_stale_form_or_without_its_generated_secret_is_refused() {
+        let mut stale = miniflux();
+        stale["changes"][1]["revision"] = json!("old");
+        let mut renamed = miniflux();
+        renamed["changes"][0]["object"]["metadata"]["name"] = json!("old-secrets");
+        let cases = [
+            ("stale", stale, StatusCode::CONFLICT),
+            ("renamed", renamed, StatusCode::UNPROCESSABLE_ENTITY),
+        ];
+        for (name, request, want) in cases {
+            let cluster = cluster();
+            serve_cloudnative_pg(&cluster);
+            let app = TestApi::new(&cluster).with_settings(settings()).router();
+            let (status, body) =
+                send(&app, "POST", "/api/v1/projects/shop/plan", Some(&request)).await;
+            assert_eq!(status, want, "{name}: {body}");
+            assert_eq!(body["at"]["change"], 1, "{name}: {body}");
+            assert!(cluster.inspect(|s| s.writes.is_empty()).unwrap(), "{name}");
+        }
     }
 
     #[tokio::test]
@@ -202,6 +232,12 @@ mod tests {
         let app = TestApi::new(&cluster).with_settings(settings()).router();
         let (status, list) = send(&app, "GET", "/api/v1/cluster/templates", None).await;
         assert_eq!(status, StatusCode::OK, "{list}");
+        let listed = list["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|t| t["id"] == "miniflux");
+        assert_eq!(listed.unwrap()["revision"], revision("miniflux"), "{list}");
         let cnpg = requirement(&list, "miniflux", "cloudnative-pg");
         assert_eq!(cnpg["state"], "missing");
         assert_eq!(cnpg["name"], "CloudNativePG");
@@ -235,11 +271,96 @@ mod tests {
         let cluster = cluster();
         serve_cloudnative_pg(&cluster);
         let app = TestApi::new(&cluster).with_settings(settings()).router();
-        let request = json!({"changes": [{"op": "template", "template": "wordpress",
-            "domain": "blog.example.com", "inputs": {"adminEmail": "nope"}}]});
+        let secrets = zeabur_catalog::Catalog::embedded()
+            .template("wordpress")
+            .unwrap()
+            .inputs
+            .into_iter()
+            .filter(|i| i.generate.is_some())
+            .filter_map(|i| i.secret)
+            .map(|s| {
+                json!({"op": "create", "object": {"apiVersion": "v1", "kind": "Secret",
+                    "metadata": {"name": s.name}, "stringData": {s.key: "a"}}})
+            });
+        let template = json!({"op": "template", "template": "wordpress",
+            "revision": revision("wordpress"), "domain": "blog.example.com",
+            "inputs": {"adminEmail": "nope"}});
+        let changes: Vec<Value> = secrets.chain([template]).collect();
+        let request = json!({ "changes": changes });
         let (status, problem) =
             send(&app, "POST", "/api/v1/projects/shop/plan", Some(&request)).await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
         assert_eq!(problem["at"]["field"], "inputs.adminEmail", "{problem}");
+    }
+
+    /// The embedded templates as Zeabur Catalog's API would list them after Ollama changed:
+    /// Ollama from the API, with another version, and the others as embedded.
+    fn newer_ollama() -> zeabur_catalog::Catalog {
+        let embedded = zeabur_catalog::Catalog::embedded();
+        let templates: Vec<Value> = embedded
+            .templates()
+            .unwrap()
+            .into_iter()
+            .map(|t| {
+                let digest = if t.id == "ollama" {
+                    "h1:newer"
+                } else {
+                    &t.revision
+                };
+                json!({"id": t.id, "sourceDigest": digest})
+            })
+            .collect();
+        let index = serde_json::from_value(json!({ "templates": templates })).unwrap();
+        let ollama =
+            include_str!("../../../zeabur-catalog/tests/catalog-api/v1/templates/ollama.json")
+                .replacen(r#""version": ""#, r#""version": "0.0.1-"#, 1);
+        let files = [("ollama".to_owned(), ollama.into_bytes())].into();
+        let (catalog, dropped) = embedded.updated(&index, &files);
+        assert_eq!(dropped, []);
+        catalog
+    }
+
+    #[tokio::test]
+    async fn a_plan_applies_on_another_catalogue_only_if_its_templates_render_the_same() {
+        let cases = [
+            (
+                "changed",
+                json!({"changes": [{"op": "template", "template": "ollama",
+                    "revision": revision("ollama")}]}),
+                StatusCode::CONFLICT,
+            ),
+            ("unchanged", miniflux(), StatusCode::OK),
+        ];
+        for (name, request, want) in cases {
+            let cluster = cluster();
+            serve_cloudnative_pg(&cluster);
+            let replica = |catalog| {
+                TestApi::new(&cluster)
+                    .with_settings(settings())
+                    .with_plan_key(zeabur_api::plan_token::PlanKey::from_bytes([7; 32]))
+                    .with_templates(catalog)
+                    .router()
+            };
+            let embedded = replica(zeabur_catalog::Catalog::embedded());
+            let fetched = replica(newer_ollama());
+            let (status, planned) = send(
+                &embedded,
+                "POST",
+                "/api/v1/projects/shop/plan",
+                Some(&request),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{name}: {planned}");
+            let (status, applied) = send(
+                &fetched,
+                "POST",
+                "/api/v1/projects/shop/apply",
+                Some(&json!({"token": planned["token"]})),
+            )
+            .await;
+            assert_eq!(status, want, "{name}: {applied}");
+            let written = cluster.inspect(|s| !s.writes.is_empty()).unwrap();
+            assert_eq!(written, want == StatusCode::OK, "{name}");
+        }
     }
 }

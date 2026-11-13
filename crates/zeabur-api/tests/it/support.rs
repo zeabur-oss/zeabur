@@ -96,6 +96,11 @@ impl TestApi {
         self
     }
 
+    pub(crate) fn with_templates(mut self, catalog: zeabur_catalog::Catalog) -> Self {
+        self.options.templates = Some(catalog);
+        self
+    }
+
     pub(crate) fn with_plan_key(mut self, key: PlanKey) -> Self {
         self.options.plan_key = Some(Arc::new(key));
         self

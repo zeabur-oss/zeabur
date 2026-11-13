@@ -24,6 +24,9 @@ pub struct Claims {
     pub request: PlanRequest,
     /// `resourceVersion` of each object the plan writes, by `kind/name`.
     pub versions: BTreeMap<String, String>,
+    /// SHA-256 of the objects the request's templates rendered, in hex; `None` when it has no
+    /// template.
+    pub templates: Option<String>,
     /// When the plan was made, RFC 3339.
     pub made_at: String,
     /// When it expires, in seconds since the Unix epoch.
