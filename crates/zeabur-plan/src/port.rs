@@ -125,9 +125,13 @@ impl Planner<'_> {
     fn working_container(&self, found: Workload<'_>, container: &Found) -> Container {
         let target = workload_target(found);
         let mut tokens: Vec<String> = Vec::new();
-        for token in found.kind().pod_template_path() {
-            tokens.push((*token).to_owned());
-        }
+        tokens.extend(
+            found
+                .kind()
+                .pod_template_path()
+                .iter()
+                .map(|t| (*t).to_owned()),
+        );
         tokens.extend([
             "spec".to_owned(),
             "containers".to_owned(),
@@ -135,16 +139,14 @@ impl Planner<'_> {
         ]);
         let refs: Vec<&str> = tokens.iter().map(String::as_str).collect();
         let at = pointer(&refs);
-        for working in &self.objects {
-            if working.target != target {
-                continue;
-            }
-            let current = working.current.pointer(&at).cloned();
-            if let Some(Ok(spec)) = current.map(serde_json::from_value) {
-                return spec;
-            }
-        }
-        container.spec.clone()
+        self.objects
+            .iter()
+            .filter(|working| working.target == target)
+            .find_map(|working| {
+                let current = working.current.pointer(&at).cloned()?;
+                serde_json::from_value(current).ok()
+            })
+            .unwrap_or_else(|| container.spec.clone())
     }
 
     /// The last Secret or ConfigMap `container` imports whole that holds `PORT`, unless it sets
@@ -303,12 +305,13 @@ impl Planner<'_> {
         to: i32,
         port_names: &[String],
     ) -> Result<(), PlanError> {
-        let mut names = Vec::new();
-        for service in &self.project.services {
-            if service.workload.kind == reference.kind && service.workload.name == reference.name {
-                names.extend(service.endpoint_names.iter().cloned());
-            }
-        }
+        let names: Vec<String> = self
+            .project
+            .services
+            .iter()
+            .filter(|s| s.workload.kind == reference.kind && s.workload.name == reference.name)
+            .flat_map(|s| s.endpoint_names.iter().cloned())
+            .collect();
         for name in names {
             let Some(service) = self.kube_service(&name) else {
                 continue;
