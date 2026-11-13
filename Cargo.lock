@@ -3208,6 +3208,7 @@ dependencies = [
  "serde-saphyr 2.0.0",
  "serde_json",
  "utoipa",
+ "zeabur-graph",
  "zeabur-kube",
  "zeabur-model",
  "zeabur-test-support",

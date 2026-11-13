@@ -1,0 +1,5 @@
+description: A claim from the claim template of a StatefulSet a MariaDB controls, and a claim a CloudNativePG Cluster controls, belong to their databases and get no volume advice; the Cluster's ScheduledBackup covers it, so nothing is a gap. Neither custom object is read as an owner.
+operation: modules.backupGaps
+params:
+  namespace: "shop"
+  installed: {k8up: true, velero: false}

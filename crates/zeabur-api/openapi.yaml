@@ -14013,7 +14013,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BackupCoverage"
-          description: One row per claim, then per database, then the namespace.
+          description: |-
+            One row per claim, then per database, then the namespace. A database's claims have no
+            row of their own: they are backed up with the database.
         keysFrom:
           type: object
           description: |-

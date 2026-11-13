@@ -1,0 +1,5 @@
+description: A claim of a StatefulSet nobody controls and a standalone claim are volumes; with only Velero installed, each is fixed through the cluster's Velero schedule.
+operation: modules.backupGaps
+params:
+  namespace: "shop"
+  installed: {k8up: false, velero: true}
