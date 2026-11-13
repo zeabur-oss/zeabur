@@ -2,34 +2,27 @@
 //! "the app listens on 3000, not 8080".
 //!
 //! - **The container** declares `to` where it declared `from`, or adds it when it declares neither.
-//!   A probe that names its port by name follows the entry. When it declares both, the entries for
-//!   `from` go, and probes and Services that name them use `to`.
+//!   A probe or Service that names the entry follows it. A container that declares `to` already is
+//!   refused: two entries would leave it unclear which one a name means.
 //! - **Its probes** on `from` (`httpGet`, `tcpSocket`, `grpc`) check `to`.
-//! - **`PORT`** is set to `to` where the container gets it: its own `env` when it sets `PORT`
-//!   there, else the import that provably supplies it (see `env_source`). When none does, it goes
-//!   in the container's `env`, which wins over any import. One `PORT` stays, so the variables show
-//!   it once and editing it changes what the app reads. The import is written before the workload,
-//!   so the pods the new template starts read the new value. When the template does not change, the
-//!   workload restarts. Earlier changes of the same request count: the container, the imports and
-//!   the Services are read as they left them.
+//! - **`PORT`** is set to `to` in the container's own `env`, which wins over every import
+//!   [k8s-env], so no import has to be found or changed.
 //! - **Each Service** that sends traffic to `from` on its pods (`targetPort`, or `port` without
 //!   one) sends it to `to`. The Service's own `port` stays, so its address and the routes to it do
 //!   not change.
+//!
+//! [k8s-env]: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/#using-environment-variables-inside-of-your-config
 
-use k8s_openapi::api::core::v1::{Container, Service as KubeService, ServicePort};
+use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort};
 use serde_json::{Value, json};
-use zeabur_graph::Workload;
 use zeabur_model::WorkloadRef;
 
 use crate::Target;
-use crate::change::{DataEdit, DataKind, Warning};
-use crate::env_source::{Holds, Source, source_of};
 use crate::fields::Step;
-use crate::json::{add, pointer, remove, replace, test};
-use crate::plan::{ErrorKind, PlanError, Planner, error, to_json, workload_target};
+use crate::json::{add, replace, test};
+use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
 use crate::public_port::service_target;
 use crate::rules::EnvEdit;
-use crate::settings::Found;
 
 const PROBES: [&str; 3] = ["livenessProbe", "readinessProbe", "startupProbe"];
 const HANDLERS: [&str; 3] = ["httpGet", "tcpSocket", "grpc"];
@@ -56,38 +49,15 @@ impl Planner<'_> {
         let found = self.editable_workload(reference)?;
         let target = Self::container(found, reference, container)?;
         let name = target.name.clone();
-        let workload = workload_target(found);
-        let container = self.working_container(found, &target);
-        let source = match source_of(&container, "PORT", |k, n, key| self.holds_key(k, n, key)) {
-            Source::Import(kind, data) => Some((kind, data)),
-            Source::Own | Source::Unknown => None,
-        };
-        if let Some((kind, data)) = &source {
-            let edit = DataEdit {
-                op: "set".to_owned(),
-                key: "PORT".to_owned(),
-                value: Some(to.to_string()),
-            };
-            self.data(*kind, data, &[edit])?;
-            // An earlier change can put the workload in the plan first. The import must still be
-            // written before it.
-            let workload_at = self.objects.iter().position(|w| w.target == workload);
-            let data_at = self.data_index(*kind, data);
-            if let (Some(workload_at), Some(data_at)) = (workload_at, data_at) {
-                self.write_before(data_at, workload_at);
-            }
-        }
-        let found = self.editable_workload(reference)?;
         let (index, at, steps) = self.container_slot(found, &target)?;
-        let before = self.current(index);
-        let names = self.move_declared(index, &at, &steps, &name, from, to)?;
+        self.move_declared(index, &at, &steps, &name, from, to)?;
         for probe in PROBES {
             for handler in HANDLERS {
                 let field = format!("{at}/{probe}/{handler}/port");
                 let Some(port) = self.current(index).pointer(&field).cloned() else {
                     continue;
                 };
-                if port != json!(from) && !names.iter().any(|n| port == json!(n)) {
+                if port != json!(from) {
                     continue;
                 }
                 let mut path = steps.clone();
@@ -96,106 +66,17 @@ impl Planner<'_> {
                 self.patch(index, vec![test(&field, port), replace(&field, json!(to))])?;
             }
         }
-        if source.is_some() {
-            // The pods must start again to read the new value. When the template does not change,
-            // a restart starts them.
-            if self.current(index) == before {
-                self.restarts.insert(reference.clone());
-            }
-            for warning in &mut self.warnings {
-                if let Warning::RestartNeeded { workloads } = warning {
-                    workloads.retain(|w| w != reference);
-                }
-            }
-            self.warnings.retain(
-                |w| !matches!(w, Warning::RestartNeeded { workloads } if workloads.is_empty()),
-            );
-        } else {
-            let port = EnvEdit {
-                op: "set".to_owned(),
-                name: "PORT".to_owned(),
-                value: Some(to.to_string()),
-                value_from: None,
-            };
-            self.env(reference, Some(&name), &[port])?;
-        }
-        self.move_target_ports(reference, from, to, &names)
-    }
-
-    /// What the plan holds at `at` in the object `target`, as the earlier changes of this request
-    /// left it. `None` when no change touched the object: the caller then reads the snapshot.
-    fn planned<T: serde::de::DeserializeOwned>(&self, target: &Target, at: &str) -> Option<T> {
-        let working = self.objects.iter().find(|w| w.target == *target)?;
-        serde_json::from_value(working.current.pointer(at).cloned()?).ok()
-    }
-
-    /// The container as the earlier changes of this request left it, so that a `PORT` set before
-    /// the move is the one that moves. Reading it does not add the workload to the plan, so the
-    /// import is still written first.
-    fn working_container(&self, found: Workload<'_>, container: &Found) -> Container {
-        let mut tokens: Vec<String> = found
-            .kind()
-            .pod_template_path()
-            .iter()
-            .map(|t| (*t).to_owned())
-            .collect();
-        tokens.extend([
-            "spec".to_owned(),
-            "containers".to_owned(),
-            container.position.to_string(),
-        ]);
-        let refs: Vec<&str> = tokens.iter().map(String::as_str).collect();
-        self.planned(&workload_target(found), &pointer(&refs))
-            .unwrap_or_else(|| container.spec.clone())
-    }
-
-    /// Whether ConfigMap or Secret `name` holds `key` after the earlier changes of this request.
-    /// Only what the plan has seen counts: an object that was not listed, or a Secret whose
-    /// values were not read, is [`Holds::Unknown`].
-    fn holds_key(&self, kind: DataKind, name: &str, key: &str) -> Holds {
-        let yes_no = |yes: bool| if yes { Holds::Yes } else { Holds::No };
-        if let Some(index) = self.data_index(kind, name) {
-            let Some(merge) = self.merges.get(&index) else {
-                let working = self.objects.get(index);
-                let holds = working.map(|w| w.current.pointer(&pointer(&["data", key])).is_some());
-                return holds.map_or(Holds::Unknown, yes_no);
-            };
-            // A Secret's key edits: its other keys are not in the working copy.
-            if let Some(value) = merge.get(key) {
-                return yes_no(!value.is_null());
-            }
-        }
-        match kind {
-            DataKind::ConfigMap => {
-                let found = self.input.snapshot.config_map(name);
-                found.map_or(Holds::Unknown, |m| {
-                    yes_no(m.data.as_ref().is_some_and(|d| d.contains_key(key)))
-                })
-            }
-            DataKind::Secret => {
-                if self.input.snapshot.secret(name).is_none() {
-                    return Holds::Unknown;
-                }
-                let values = self.input.secret_values.get(name);
-                values.map_or(Holds::Unknown, |v| yes_no(v.contains_key(key)))
-            }
-        }
-    }
-
-    /// The index of ConfigMap or Secret `name` in the plan.
-    fn data_index(&self, kind: DataKind, name: &str) -> Option<usize> {
-        let kind_name = match kind {
-            DataKind::ConfigMap => "ConfigMap",
-            DataKind::Secret => "Secret",
+        let port = EnvEdit {
+            op: "set".to_owned(),
+            name: "PORT".to_owned(),
+            value: Some(to.to_string()),
+            value_from: None,
         };
-        self.objects
-            .iter()
-            .position(|w| w.target.kind == kind_name && w.target.name == name)
+        self.env(reference, Some(&name), &[port])?;
+        self.move_target_ports(reference, from, to)
     }
 
-    /// Declares `to` where the container declared `from`. When it declares `to` already, the
-    /// entries for `from` go, and the names they had are returned so that what used them can use
-    /// `to`.
+    /// Declares `to` where the container declared `from`, or adds it.
     fn move_declared(
         &mut self,
         index: usize,
@@ -204,49 +85,38 @@ impl Planner<'_> {
         name: &str,
         from: i32,
         to: i32,
-    ) -> Result<Vec<String>, PlanError> {
+    ) -> Result<(), PlanError> {
         let declared = self
             .current(index)
             .pointer(&format!("{at}/ports"))
             .and_then(Value::as_array)
             .cloned();
-        let mut moved = Vec::new();
-        let mut has_to = false;
-        for (position, entry) in declared.iter().flatten().enumerate() {
-            let number = entry.get("containerPort");
-            if number == Some(&json!(to)) {
-                has_to = true;
-            }
-            if number == Some(&json!(from)) {
-                moved.push(position);
-            }
-        }
-        if has_to && moved.is_empty() {
-            return Ok(Vec::new());
+        let numbers: Vec<Option<i64>> = declared
+            .iter()
+            .flatten()
+            .map(|entry| entry.get("containerPort").and_then(Value::as_i64))
+            .collect();
+        if numbers.contains(&Some(i64::from(to))) {
+            return Err(error(
+                ErrorKind::Conflict,
+                "port_declared",
+                format!("Container {name} declares port {to} already."),
+            ));
         }
         let mut path = steps.to_vec();
         path.push(Step::field("ports"));
         self.claim(index, &path, &format!("ports of container {name}"))?;
+        let moved: Vec<usize> = numbers
+            .iter()
+            .enumerate()
+            .filter(|(_, number)| **number == Some(i64::from(from)))
+            .map(|(position, _)| position)
+            .collect();
         let mut operations = Vec::new();
-        let mut names = Vec::new();
-        if has_to {
-            // Two entries for `to` would break the `containerPort` list key, so the old ones go.
-            for position in moved.iter().rev() {
-                let field = format!("{at}/ports/{position}");
-                let entry = declared.iter().flatten().nth(*position);
-                let entry_name = entry.and_then(|e| e.get("name")).and_then(Value::as_str);
-                if let Some(entry_name) = entry_name {
-                    names.push(entry_name.to_owned());
-                }
-                operations.push(test(&format!("{field}/containerPort"), json!(from)));
-                operations.push(remove(&field));
-            }
-        } else {
-            for position in &moved {
-                let field = format!("{at}/ports/{position}/containerPort");
-                operations.push(test(&field, json!(from)));
-                operations.push(replace(&field, json!(to)));
-            }
+        for position in &moved {
+            let field = format!("{at}/ports/{position}/containerPort");
+            operations.push(test(&field, json!(from)));
+            operations.push(replace(&field, json!(to)));
         }
         if moved.is_empty() {
             operations.push(match declared {
@@ -254,15 +124,18 @@ impl Planner<'_> {
                 None => add(&format!("{at}/ports"), json!([{"containerPort": to}])),
             });
         }
-        self.patch(index, operations)?;
-        Ok(names)
+        self.patch(index, operations)
     }
 
     /// The ports of `service` as the earlier changes of this request left them, so that a second
     /// port change moves the targets the first one set.
     fn service_ports(&self, service: &KubeService) -> Vec<ServicePort> {
         let name = service.metadata.name.as_deref().unwrap_or_default();
-        self.planned(&service_target(name), "/spec/ports")
+        let target: Target = service_target(name);
+        let planned = self.objects.iter().find(|w| w.target == target);
+        let planned = planned.and_then(|w| w.current.pointer("/spec/ports").cloned());
+        planned
+            .and_then(|ports| serde_json::from_value(ports).ok())
             .or_else(|| service.spec.as_ref()?.ports.clone())
             .unwrap_or_default()
     }
@@ -272,7 +145,6 @@ impl Planner<'_> {
         reference: &WorkloadRef,
         from: i32,
         to: i32,
-        port_names: &[String],
     ) -> Result<(), PlanError> {
         let names: Vec<String> = self
             .project
@@ -285,15 +157,11 @@ impl Planner<'_> {
             let Some(service) = self.kube_service(&name) else {
                 continue;
             };
-            let ports = self.service_ports(service);
             let mut operations = Vec::new();
-            for (position, port) in ports.iter().enumerate() {
+            for (position, port) in self.service_ports(service).iter().enumerate() {
                 let field = format!("/spec/ports/{position}/targetPort");
                 match &port.target_port {
-                    Some(target)
-                        if json!(target) == json!(from)
-                            || port_names.iter().any(|n| json!(target) == json!(n)) =>
-                    {
+                    Some(target) if json!(target) == json!(from) => {
                         operations.push(test(&field, json!(target)));
                         operations.push(replace(&field, json!(to)));
                     }

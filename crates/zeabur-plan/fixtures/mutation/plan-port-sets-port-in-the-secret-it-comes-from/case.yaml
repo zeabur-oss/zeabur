@@ -1,3 +1,0 @@
-description: "A built service whose PORT comes from its web-env Secret gets PORT=3000 there, written before the Deployment, and no PORT of its own in the container: PORT stays in one place. A Secret imported before it, with PORT too, is left alone."
-operation: mutation.plan
-params: {"request": {"changes": [{"op": "port", "workload": {"kind": "Deployment", "name": "web"}, "from": 8080, "to": 3000}]}, "secretValues": {"web-env": {"PORT": "8080", "NODE_ENV": "production"}, "db-credentials": {"PORT": "5432", "PASSWORD": "hunter2"}}}

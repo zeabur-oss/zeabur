@@ -8,6 +8,3 @@ params:
         changes:
           - {op: set, name: PORT, value: "8080"}
       - {op: port, workload: {kind: Deployment, name: web}, from: 8080, to: 3000}
-  secretValues:
-    web-env: {PORT: "8080", NODE_ENV: production}
-    db-credentials: {PORT: "5432", PASSWORD: hunter2}

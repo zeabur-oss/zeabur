@@ -1,9 +1,9 @@
-// A built service whose app listens on another port than the service's: its traffic check is
+// A built container whose app does not listen on the port its readiness check uses: the check is
 // refused on that port long after the container started, and its image may declare the port the
-// app does listen on.
+// app does listen on. Everything is read from the container the diagnosis names.
 import type { Schemas } from "@/api/client"
 import { builtContainers, type Build } from "@/model/builds"
-import { imageDeclared, likelyPort } from "@/model/private-address"
+import { imageDeclared } from "@/model/private-address"
 import type { Service } from "@/model/service"
 
 type Diagnosis = Schemas.Diagnosis
@@ -25,25 +25,13 @@ export interface WrongPort {
   offer?: PortOffer
 }
 
-function portOffer(
-  service: Service,
-  builds: readonly Build[],
-  container: string | undefined,
-): PortOffer | undefined {
-  const from = likelyPort(service)
-  if (from === undefined || container === undefined) return undefined
-  const declared = imageDeclared(service, builds).find((d) => d.container === container)
-  const to = declared?.ports[0]
-  if (to === undefined || declared?.ports.includes(from)) return undefined
-  return { container, from, to }
-}
-
-/** A failing traffic check whose connection to `port` was refused. */
-function refusedOn(d: Diagnosis, port: number): boolean {
+/** The port the diagnosed container's readiness check was refused on, when the connection was
+ * refused. */
+function refusedPort(d: Diagnosis): number | undefined {
   if (d.kind !== "probeFailure" || d.cause.key !== "diagnosis.probeFailure.cause.readiness")
-    return false
-  const output = d.cause.params?.output ?? ""
-  return output.includes("connection refused") && output.includes(`:${port}:`)
+    return undefined
+  const port = /:(\d+): connect: connection refused/.exec(d.cause.params?.output ?? "")?.[1]
+  return port === undefined ? undefined : Number(port)
 }
 
 /** Whether the container is still not ready in one of the replicas the diagnosis names, after
@@ -64,12 +52,17 @@ export function wrongPort(
   builds: readonly Build[],
   now: number,
 ): WrongPort | undefined {
-  if (builtContainers(service, builds).length === 0) return undefined
-  const port = likelyPort(service)
-  if (port === undefined) return undefined
   for (const diagnosis of service.diagnoses ?? []) {
-    if (refusedOn(diagnosis, port) && stillNotListening(service, diagnosis, now))
-      return { diagnosis, port, offer: portOffer(service, builds, diagnosis.container) }
+    const container = diagnosis.container
+    const port = refusedPort(diagnosis)
+    if (container === undefined || port === undefined) continue
+    if (!builtContainers(service, builds).some((b) => b.container === container)) continue
+    if (!stillNotListening(service, diagnosis, now)) continue
+    const declared = imageDeclared(service, builds).find((d) => d.container === container)
+    const to = declared?.ports[0]
+    const offer =
+      to === undefined || declared?.ports.includes(port) ? undefined : { container, from: port, to }
+    return { diagnosis, port, offer }
   }
   return undefined
 }

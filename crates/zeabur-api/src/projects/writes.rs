@@ -188,7 +188,7 @@ async fn compute(
     };
     let kinds = served_kinds(cluster, request).await?;
     refuse_existing(cluster, project, request, &kinds).await?;
-    let secret_values = secret_values(cluster, project, request, &snapshot).await?;
+    let secret_values = secret_values(cluster, project, request).await?;
     let releases = releases_to_roll_back(cluster, project, request, &snapshot).await?;
     let storage_classes = if request
         .changes

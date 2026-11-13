@@ -64,11 +64,9 @@ describe("a built service that doesn't listen on its port", () => {
     expect(wrongPort(checkout({ started: 40 }), [build(["3000/tcp"])], NOW)).toBeUndefined()
   })
 
-  test("is not said when the check fails for another reason or on another port", () => {
+  test("is not said when the check fails for another reason", () => {
     const timeout = refused("dial tcp 10.42.2.31:8080: i/o timeout")
     expect(wrongPort(checkout({ diagnoses: [timeout] }), [build()], NOW)).toBeUndefined()
-    const other = refused("dial tcp 10.42.2.31:9090: connect: connection refused")
-    expect(wrongPort(checkout({ diagnoses: [other] }), [build()], NOW)).toBeUndefined()
   })
 
   test("is not said of a service no Build makes", () => {
@@ -83,7 +81,7 @@ describe("a built service that doesn't listen on its port", () => {
     })
   })
 
-  test("offers nothing when the image declares the service's port or only UDP ports", () => {
+  test("offers nothing when the image declares the refused port or only UDP ports", () => {
     expect(wrongPort(checkout(), [build(["8080/tcp", "3000/tcp"])], NOW)?.offer).toBeUndefined()
     expect(wrongPort(checkout(), [build(["53/udp"])], NOW)?.offer).toBeUndefined()
   })
@@ -117,5 +115,21 @@ describe("a built service that doesn't listen on its port", () => {
       to: 3000,
     })
     expect(wrongPort(withSidecar, [sidecarBuild, build()], NOW)?.offer).toBeUndefined()
+  })
+
+  test("takes the port from the diagnosed container, not from one before it", () => {
+    const service = checkout()
+    const sidecar = {
+      name: "sidecar",
+      image: "zot.zot.svc:5000/lab/sidecar:main-1-5d41402",
+      probes: { readiness: { port: "9000" } },
+    }
+    const withSidecar = {
+      ...service,
+      containers: [sidecar, ...service.containers],
+    } as unknown as Service
+    const wrong = wrongPort(withSidecar, [build(["3000/tcp"])], NOW)
+    expect(wrong?.port).toBe(8080)
+    expect(wrong?.offer).toStrictEqual({ container: "checkout", from: 8080, to: 3000 })
   })
 })

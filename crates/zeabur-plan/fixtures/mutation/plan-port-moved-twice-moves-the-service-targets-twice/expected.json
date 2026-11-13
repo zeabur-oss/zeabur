@@ -2,20 +2,6 @@
   "objects": [
     {
       "target": {
-        "kind": "Secret",
-        "name": "web-env"
-      },
-      "write": {
-        "type": "mergePatch",
-        "body": {
-          "data": {
-            "PORT": "NDAwMA=="
-          }
-        }
-      }
-    },
-    {
-      "target": {
         "kind": "Deployment",
         "name": "web"
       },
@@ -25,7 +11,12 @@
             "spec": {
               "containers": [
                 {
-                  "env": null,
+                  "env": [
+                    {
+                      "name": "PORT",
+                      "value": "4000"
+                    }
+                  ],
                   "ports": [
                     {
                       "containerPort": 4000
