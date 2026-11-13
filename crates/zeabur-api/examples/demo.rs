@@ -273,16 +273,16 @@ fn member_roles() -> Vec<DynamicObject> {
         Holder::token("grafana"),
         Holder::token("backup-bot"),
     ];
-    let mut objects = Vec::new();
-    for (holder, project, role) in roles {
-        objects.push(from_typed(role_binding(project, &holder, role)));
-    }
-    for holder in baselines {
+    let mut objects: Vec<_> = roles
+        .into_iter()
+        .map(|(holder, project, role)| from_typed(role_binding(project, &holder, role)))
+        .collect();
+    objects.extend(baselines.into_iter().map(|holder| {
         // The memory cluster keeps a cluster-scoped object in namespace "".
         let mut binding = baseline_binding(&holder);
         binding.metadata.namespace = Some(String::new());
-        objects.push(from_typed(binding));
-    }
+        from_typed(binding)
+    }));
     objects
 }
 
