@@ -69,6 +69,7 @@ import {
   turnOffSummary,
   writeBackups,
   holdsRegion,
+  MAX_KEEP_DAYS,
   daysOf,
   engineName,
   engineOperator,
@@ -912,7 +913,7 @@ function BackupForm({
                 size="sm"
                 type="number"
                 min={1}
-                max={365}
+                max={MAX_KEEP_DAYS}
                 value={String(target.keepDays)}
                 onChange={(event) => set({ keepDays: Number(event.target.value) })}
               />

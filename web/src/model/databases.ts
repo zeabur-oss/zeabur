@@ -583,13 +583,16 @@ export const newBackupTarget = (): BackupTarget => ({
 
 export type TargetProblem = "endpoint" | "bucket" | "keys" | "keep"
 
+/** The most days of backups the form keeps. */
+export const MAX_KEEP_DAYS = 365
+
 /** What is wrong with the form; with `keysExist`, keys left empty keep the Secret's. */
 export function targetProblems(target: BackupTarget, keysExist = false): TargetProblem[] {
   const problems: TargetProblem[] = []
   if (!/^https?:\/\/[^\s/]+/.test(target.endpoint.trim())) problems.push("endpoint")
   if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(target.bucket.trim())) problems.push("bucket")
   if (needsKeys(target) && !keepsKeys(target, keysExist)) problems.push("keys")
-  if (!Number.isInteger(target.keepDays) || target.keepDays < 1 || target.keepDays > 365)
+  if (!Number.isInteger(target.keepDays) || target.keepDays < 1 || target.keepDays > MAX_KEEP_DAYS)
     problems.push("keep")
   return problems
 }
@@ -770,6 +773,14 @@ export function daysOf(duration: string) {
   return hours % 24 === 0 ? hours / 24 : undefined
 }
 
+/** The days MongoDB's `runs` backups cover. The form's most days, weekly, round up to one more
+ * week, which reads back as those days. */
+function mongoDays(runs: number, frequency: Frequency) {
+  if (frequency === "daily") return runs
+  const days = runs * 7
+  return days - 7 < MAX_KEEP_DAYS ? Math.min(days, MAX_KEEP_DAYS) : days
+}
+
 /** The form as the database's backups are, with no keys: the keys Secret stays. */
 export function currentTarget(database: Database): BackupTarget {
   const store = database.backups.store
@@ -778,9 +789,7 @@ export function currentTarget(database: Database): BackupTarget {
   const frequency: Frequency = cron.trim().split(/\s+/).at(-1) === "0" ? "weekly" : "daily"
   const retention = store?.retention ?? ""
   const days =
-    database.engine === "mongodb"
-      ? Number(retention) * (frequency === "weekly" ? 7 : 1)
-      : daysOf(retention)
+    database.engine === "mongodb" ? mongoDays(Number(retention), frequency) : daysOf(retention)
   return {
     ...newBackupTarget(),
     endpoint: store?.endpoint ?? "",

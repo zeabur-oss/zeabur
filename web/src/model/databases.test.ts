@@ -1027,6 +1027,25 @@ describe("changing backups", () => {
     ])
   })
 
+  test("MongoDB: weekly backups kept 365 days open in the form as 365 days", () => {
+    const fresh = on("mongodb", "perconaservermongodbs", {}, {})
+    const year = { ...kept, frequency: "weekly" as const, keepDays: 365 }
+    const backup = edits(writeBackups(fresh, year, true)).db.spec.backup
+    const count = String(backup.tasks[0].retention.count)
+    const mongoOn = on(
+      "mongodb",
+      "perconaservermongodbs",
+      { backup },
+      {
+        store: store("backups", { retention: count, region: "us-east-1" }),
+        schedules: [schedule("db/scheduled", "0 3 * * 0")],
+      },
+    )
+    expect(currentTarget(mongoOn).keepDays).toBe(365)
+    expect(targetProblems(currentTarget(mongoOn), true)).toEqual([])
+    expect(edits(writeBackups(mongoOn, currentTarget(mongoOn), true))).not.toHaveProperty("db")
+  })
+
   test("MongoDB: an edit replaces the storage and the task, and turning off keeps the task for turning on again", () => {
     const backup = {
       enabled: true,
