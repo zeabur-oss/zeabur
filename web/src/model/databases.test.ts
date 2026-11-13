@@ -41,6 +41,18 @@ import {
   type Database,
 } from "@/model/databases"
 
+/** `live` with `patch` merged in as a JSON merge patch, as the server merges a spec-only edit. */
+function merged(live: unknown, patch: unknown): Record<string, unknown> {
+  const isMap = (v: unknown): v is Record<string, unknown> =>
+    v !== null && typeof v === "object" && !Array.isArray(v)
+  const out: Record<string, unknown> = isMap(live) ? structuredClone(live) : {}
+  for (const [key, value] of Object.entries(patch as Record<string, unknown>)) {
+    if (value === null) delete out[key]
+    else out[key] = isMap(value) ? merged(out[key], value) : value
+  }
+  return out
+}
+
 const postgres: Database = {
   apiVersion: "postgresql.cnpg.io/v1",
   kind: "Cluster",
@@ -263,7 +275,7 @@ describe("backups", () => {
       resource: "clusters",
     })
     const edited = JSON.parse(edit.yaml)
-    expect(edited.metadata.finalizers).toEqual(["x"])
+    expect(edited.metadata).toEqual({ name: "pg" })
     expect(edited.spec.plugins).toEqual([
       { name: "other" },
       {
@@ -285,8 +297,9 @@ describe("backups", () => {
   test("MongoDB: keys, and the storage and a weekly task in the cluster's own spec", () => {
     const changes = writeBackups(mongo, { ...target, frequency: "weekly", keepDays: 30 })
     expect(changes.map((c) => c.op)).toEqual(["create", "edit"])
-    const edited = JSON.parse((changes[1] as { yaml: string }).yaml)
-    expect(edited.spec.backup).toEqual({
+    const patch = JSON.parse((changes[1] as { yaml: string }).yaml).spec
+    const edited = merged((mongo.object as { spec: unknown }).spec, patch)
+    expect(edited.backup).toEqual({
       enabled: true,
       image: "pbm:1",
       storages: {
@@ -313,7 +326,7 @@ describe("backups", () => {
         },
       ],
     })
-    expect(edited.spec.replsets).toEqual([{ name: "rs0", size: 1 }])
+    expect(edited.replsets).toEqual([{ name: "rs0", size: 1 }])
   })
 
   test("back up now names the cluster and the plugin or the storage", () => {
@@ -740,7 +753,9 @@ describe("MySQL, MariaDB and Dragonfly", () => {
       "AWS_SECRET_ACCESS_KEY",
       "AWS_REGION",
     ])
-    expect(spec.snapshot).toMatchObject({ dir: "s3://backups/db", persistentVolumeClaimSpec: {} })
+    expect(merged(cache.object, { spec }).spec).toMatchObject({
+      snapshot: { dir: "s3://backups/db", persistentVolumeClaimSpec: {} },
+    })
   })
 
   test("reshaping MySQL changes mysqld's resources and the data claim template", () => {
@@ -889,7 +904,7 @@ describe("changing backups", () => {
     ).toContain("db.backup.saidNewKeys(db-backups-s3)")
   })
 
-  test("an edit takes only the spec, so an operator's finalizer and annotation stay", () => {
+  test("an edit sends only the spec it changes, so an operator's metadata stays", () => {
     const operated = {
       ...pg,
       object: {
@@ -905,10 +920,7 @@ describe("changing backups", () => {
     const changes = writeBackups(operated, { ...kept, frequency: "weekly" }, true)
     const db = changes.find((c) => c.op === "edit" && c.name === "db")
     expect(db).toMatchObject({ specOnly: true })
-    expect(db?.op === "edit" && JSON.parse(db.yaml).metadata).toMatchObject({
-      finalizers: ["cnpg.io/cluster"],
-      annotations: { "cnpg.io/operatorVersion": "1.27" },
-    })
+    expect(db?.op === "edit" && JSON.parse(db.yaml).metadata).toEqual({ name: "db" })
     for (const change of changes) if (change.op === "edit") expect(change.specOnly).toBe(true)
     for (const change of turnOffBackups(pg))
       if (change.op === "edit") expect(change.specOnly).toBe(true)
@@ -928,8 +940,7 @@ describe("changing backups", () => {
   test("PostgreSQL: a v0.1.1 setup without a region keeps the ObjectStore off REGION", () => {
     const changes = writeBackups(pg, { ...kept, keepDays: 30 }, true, false)
     const store = edits(changes)["db-backups"].spec
-    expect(store.retentionPolicy).toBe("30d")
-    expect(store.configuration.s3Credentials).not.toHaveProperty("region")
+    expect(store).toEqual({ retentionPolicy: "30d" })
     expect(changes.filter((c) => c.op === "data")).toEqual([])
     const typed = writeBackups(pg, { ...kept, region: "eu" }, true, false)
     expect(edits(typed)["db-backups"].spec.configuration.s3Credentials.region).toEqual({
@@ -991,7 +1002,7 @@ describe("changing backups", () => {
     expect(changes.some((c) => c.op === "create")).toBe(false)
     const changed = edits(changes)
     expect(changed.db.spec.plugins[0].parameters.barmanObjectName).toBe("db-backups")
-    expect(changed["db-scheduled"].spec).not.toHaveProperty("suspend")
+    expect(changed["db-scheduled"].spec).toEqual({ suspend: null })
   })
 
   test("PostgreSQL: an edit keeps the plugin's other parameters, such as the archive's server name", () => {
@@ -1054,6 +1065,38 @@ describe("changing backups", () => {
     ])
   })
 
+  test("MongoDB: the form reads and writes the scheduled task only, not an earlier one", () => {
+    const backup = {
+      enabled: true,
+      image: "pbm:1",
+      storages: {
+        backups: { type: "s3", s3: { bucket: "backups", prefix: "db", region: "us-east-1" } },
+      },
+      tasks: [
+        { name: "mine", storageName: "backups", retention: { type: "count", count: 2 } },
+        {
+          name: "scheduled",
+          schedule: "0 3 * * *",
+          storageName: "backups",
+          retention: { type: "count", count: 90, deleteFromStorage: true },
+        },
+      ],
+    }
+    const mongoOn = on(
+      "mongodb",
+      "perconaservermongodbs",
+      { backup },
+      {
+        store: store("backups", { retention: "2", region: "us-east-1" }),
+        schedules: [schedule("db/scheduled", "0 3 * * *")],
+      },
+    )
+    expect(currentTarget(mongoOn).keepDays).toBe(90)
+    const moved = edits(writeBackups(mongoOn, { ...currentTarget(mongoOn), bucket: "other" }, true))
+    const after = merged((mongoOn.object as { spec: unknown }).spec, moved.db.spec).backup
+    expect((after as typeof backup).tasks).toEqual(backup.tasks)
+  })
+
   test("MongoDB: weekly backups kept 365 days open in the form as 365 days", () => {
     const fresh = on("mongodb", "perconaservermongodbs", {}, {})
     const year = { ...kept, frequency: "weekly" as const, keepDays: 365 }
@@ -1089,7 +1132,7 @@ describe("changing backups", () => {
     expect(backupKeys(pg, noRegion)).toEqual({ keysExist: true, regionSaved: false })
   })
 
-  test("MongoDB: an edit replaces the storage and the task, and turning off keeps the task for turning on again", () => {
+  test("MongoDB: an edit changes the storage and the task in place, and turning off keeps both", () => {
     const backup = {
       enabled: true,
       image: "pbm:1",
@@ -1114,13 +1157,16 @@ describe("changing backups", () => {
         schedules: [schedule("db/scheduled", "0 3 * * *")],
       },
     )
-    const edited = edits(writeBackups(mongoOn, { ...kept, bucket: "other" }, true)).db.spec.backup
-    expect(edited.storages.backups.s3.bucket).toBe("other")
-    expect(edited.tasks.map((task: { name: string }) => task.name)).toEqual(["mine", "scheduled"])
-    expect(edits(turnOffBackups(mongoOn)).db.spec.backup).toMatchObject({
+    const live = (mongoOn.object as { spec: unknown }).spec
+    const edited = merged(
+      live,
+      edits(writeBackups(mongoOn, { ...kept, bucket: "other" }, true)).db.spec,
+    ).backup as typeof backup
+    expect(edited.storages.backups.s3).toEqual({ ...backup.storages.backups.s3, bucket: "other" })
+    expect(edited.tasks.map((task: { name: string }) => task.name)).toEqual(["scheduled", "mine"])
+    expect(merged(live, edits(turnOffBackups(mongoOn)).db.spec).backup).toEqual({
+      ...backup,
       enabled: false,
-      tasks: backup.tasks,
-      storages: backup.storages,
     })
   })
 
@@ -1138,9 +1184,28 @@ describe("changing backups", () => {
     expect(changed["db-backups"].spec.schedule).toBe("0 3 * * 0")
     expect(changed).not.toHaveProperty("db")
     const off = turnOffBackups(mysqlOn)
-    expect(edits(off).db.spec).not.toHaveProperty("backupPolicyName")
+    expect(edits(off).db.spec).toEqual({ backupPolicyName: null })
     expect(off.filter((c) => c.op !== "edit")).toEqual([])
     expect(Object.keys(edits(off))).toEqual(["db"])
+  })
+
+  test("MySQL: a schedule edit leaves the rest of a BackupPolicy as it is", () => {
+    const mysqlOn = on(
+      "mysql",
+      "mysqlclusters",
+      { backupPolicyName: "db-backups" },
+      {
+        store: store("db-backups", { destination: "s3://backups/moco/shop/db" }),
+        schedules: [schedule("db-backups", "0 3 * * *")],
+      },
+    )
+    const live = {
+      schedule: "0 3 * * *",
+      concurrencyPolicy: "Forbid",
+      jobConfig: { memory: "4Gi", cpu: "2", threads: 4, bucketConfig: { bucketName: "backups" } },
+    }
+    const patch = edits(writeBackups(mysqlOn, { ...kept, frequency: "weekly" }, true))["db-backups"]
+    expect(merged(live, patch.spec)).toEqual({ ...live, schedule: "0 3 * * 0" })
   })
 
   test("MySQL: setting up again reuses the kept BackupPolicy and updates it from the form", () => {
@@ -1171,9 +1236,8 @@ describe("changing backups", () => {
         schedules: [schedule("db-scheduled", "0 3 * * *")],
       },
     )
-    expect(edits(turnOffBackups(mariaOn))["db-scheduled"].spec.schedule).toEqual({
-      cron: "0 3 * * *",
-      suspend: true,
+    expect(edits(turnOffBackups(mariaOn))["db-scheduled"].spec).toEqual({
+      schedule: { suspend: true },
     })
     const paused = {
       ...mariaOn,
@@ -1184,7 +1248,7 @@ describe("changing backups", () => {
       },
     } as Database
     const resumed = edits(writeBackups(paused, { ...kept, keepDays: 3 }, true))["db-scheduled"].spec
-    expect(resumed.schedule).toEqual({ cron: "0 3 * * *" })
+    expect(resumed.schedule).toEqual({ suspend: null })
     expect(resumed.maxRetention).toBe("72h")
   })
 })

@@ -786,11 +786,12 @@ function mongoDays(runs: number, frequency: Frequency) {
 export function currentTarget(database: Database): BackupTarget {
   const store = database.backups.store
   const { bucket, folder } = splitDestination(store?.destination)
-  const cron = ownSchedule(database)?.cron ?? ""
+  // MongoDB's schedule and retention are the scheduled task's, which the form writes.
+  const task = database.engine === "mongodb" ? scheduledTask(mongoBackup(database)) : undefined
+  const cron = String(task?.schedule ?? ownSchedule(database)?.cron ?? "")
   const frequency: Frequency = cron.trim().split(/\s+/).at(-1) === "0" ? "weekly" : "daily"
-  const retention = store?.retention ?? ""
-  const days =
-    database.engine === "mongodb" ? mongoDays(Number(retention), frequency) : daysOf(retention)
+  const count = (task?.retention as Manifest | undefined)?.count
+  const days = task ? mongoDays(Number(count), frequency) : daysOf(store?.retention ?? "")
   return {
     ...newBackupTarget(),
     endpoint: store?.endpoint ?? "",
@@ -864,40 +865,70 @@ function keyWrites({ database, target, keysExist }: Writing): Change[] {
   return changes.length > 0 ? [{ op: "data", kind: "Secret", name, changes }] : []
 }
 
-/** `after`, of the plural `resource`, created, or, when the object exists as `before`, edited
- * if it differs. */
+const isMap = (value: unknown): value is Manifest =>
+  value !== null && typeof value === "object" && !Array.isArray(value)
+
+/** What `after` changes in `before`, as a JSON merge patch (RFC 7386): the changed fields, maps
+ * field by field, and a removed field as null. Empty when nothing changes. */
+function mergePatch(after: Manifest, before: Manifest): Manifest {
+  const patch: Manifest = {}
+  for (const key of new Set([...Object.keys(before), ...Object.keys(after)])) {
+    const [a, b] = [after[key], before[key]]
+    if (a === undefined) patch[key] = null
+    else if (isMap(a) && isMap(b)) {
+      const inner = mergePatch(a, b)
+      if (Object.keys(inner).length > 0) patch[key] = inner
+    } else if (sorted(a) !== sorted(b)) patch[key] = a
+  }
+  return patch
+}
+
+/** `live` with what changes from `before` to `after`, so that what the form does not set stays. */
+function patched(live: unknown, after: Manifest, before: Manifest = {}): Manifest {
+  const merged = isMap(live) ? structuredClone(live) : {}
+  const apply = (target: Manifest, patch: Manifest) => {
+    for (const [key, value] of Object.entries(patch)) {
+      const at = target[key]
+      if (value === null) delete target[key]
+      else if (isMap(value) && isMap(at)) apply(at, value)
+      else target[key] = structuredClone(value)
+    }
+  }
+  apply(merged, mergePatch(after, before))
+  return merged
+}
+
+/** An edit that merges `spec` into the object's spec; the rest of the object stays. */
+function specEdit(
+  apiVersion: string,
+  kind: string,
+  resource: string,
+  name: string,
+  spec: Manifest,
+): Change[] {
+  if (Object.keys(spec).length === 0) return []
+  const [group = "", version = ""] = apiVersion.split("/")
+  const yaml = JSON.stringify({ apiVersion, kind, metadata: { name }, spec })
+  return [{ op: "edit", resource: { group, version, resource }, name, yaml, specOnly: true }]
+}
+
+/** `after`, of the plural `resource`, created, or, when the object exists as the form last wrote
+ * it, `before`, edited where the form changes it. */
 function write(database: Database, resource: string, after: Manifest, before?: Manifest): Change[] {
-  const object = labelled(database.name, after)
-  if (!before) return [create(object)]
-  if (sorted(labelled(database.name, before)) === sorted(object)) return []
-  const [group = "", version = ""] = String(object.apiVersion).split("/")
-  const name = String((object.metadata as Manifest).name)
-  return [
-    {
-      op: "edit",
-      resource: { group, version, resource },
-      name,
-      yaml: JSON.stringify(object),
-      specOnly: true,
-    },
-  ]
+  if (!before) return [create(labelled(database.name, after))]
+  const name = String((after.metadata as Manifest).name)
+  const spec = mergePatch(after.spec as Manifest, before.spec as Manifest)
+  return specEdit(String(after.apiVersion), String(after.kind), resource, name, spec)
 }
 
 /** The database's object edited by `change`, if that changes it. */
 function editObject(database: Database, change: (spec: Manifest) => void): Change[] {
-  const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
-  change((object.spec ??= {}))
-  if (sorted(object) === sorted(database.object)) return []
-  const { group, version, resource } = databaseAddress(database)
-  return [
-    {
-      op: "edit",
-      resource: { group, version, resource },
-      name: database.name,
-      yaml: JSON.stringify(object),
-      specOnly: true,
-    },
-  ]
+  const before = ((database.object as { spec?: Manifest }).spec ?? {}) as Manifest
+  const after = structuredClone(before)
+  change(after)
+  const { resource } = databaseAddress(database)
+  const spec = mergePatch(after, before)
+  return specEdit(database.apiVersion, database.kind, resource, database.name, spec)
 }
 
 function postgresStore(database: Database, target: BackupTarget, region: boolean): Manifest {
@@ -986,50 +1017,64 @@ function postgresBackups(w: Writing): Change[] {
   ]
 }
 
-function mongoBackups(w: Writing): Change[] {
-  const { database, target } = w
-  const names = backupNames(database.name)
+const mongoStorage = (database: Database, target: BackupTarget): Manifest => ({
+  type: "s3",
+  s3: {
+    bucket: target.bucket.trim(),
+    prefix: folder(target, database.name),
+    endpointUrl: target.endpoint.trim(),
+    region: target.region.trim() || "us-east-1",
+    credentialsSecret: backupNames(database.name).secret,
+    forcePathStyle: true,
+  },
+})
+
+function mongoTask(target: BackupTarget): Manifest {
   const runs = target.frequency === "weekly" ? Math.ceil(target.keepDays / 7) : target.keepDays
+  return {
+    name: "scheduled",
+    enabled: true,
+    schedule: cron(target.frequency, false),
+    storageName: "backups",
+    type: "logical",
+    retention: { type: "count", count: runs, deleteFromStorage: true },
+  }
+}
+
+/** The task Zeabur schedules MongoDB's backups with. */
+const scheduledTask = (backup: Manifest | undefined) =>
+  ((backup?.tasks as Manifest[] | undefined) ?? []).find((t) => t.name === "scheduled")
+
+const mongoBackup = (database: Database) =>
+  (database.object as { spec?: { backup?: Manifest } }).spec?.backup
+
+function mongoBackups(w: Writing): Change[] {
+  const { database, target, current } = w
   return [
     ...keyWrites(w),
     ...editObject(database, (spec) => {
-      const backup = (spec.backup as Manifest | undefined) ?? {}
+      const backup = (spec.backup ?? {}) as Manifest
+      const storages = (backup.storages ?? {}) as Manifest
+      const tasks = (backup.tasks as Manifest[] | undefined) ?? []
+      const own = scheduledTask(backup)
+      const task = patched(own, mongoTask(target), current && mongoTask(current))
       spec.backup = {
         ...backup,
         enabled: true,
-        image: (backup.image as string | undefined) ?? PBM_IMAGE,
+        image: backup.image ?? PBM_IMAGE,
         storages: {
-          ...(backup.storages as Manifest | undefined),
-          backups: {
-            type: "s3",
-            s3: {
-              bucket: target.bucket.trim(),
-              prefix: folder(target, database.name),
-              endpointUrl: target.endpoint.trim(),
-              region: target.region.trim() || "us-east-1",
-              credentialsSecret: names.secret,
-              forcePathStyle: true,
-            },
-          },
+          ...storages,
+          backups: patched(
+            storages.backups,
+            mongoStorage(database, target),
+            current && mongoStorage(database, current),
+          ),
         },
-        tasks: [
-          ...otherTasks(backup),
-          {
-            name: "scheduled",
-            enabled: true,
-            schedule: cron(target.frequency, false),
-            storageName: "backups",
-            type: "logical",
-            retention: { type: "count", count: runs, deleteFromStorage: true },
-          },
-        ],
+        tasks: own ? tasks.map((t) => (t === own ? task : t)) : [...tasks, task],
       }
     }),
   ]
 }
-
-const otherTasks = (backup: Manifest) =>
-  ((backup.tasks as Manifest[] | undefined) ?? []).filter((t) => t.name !== "scheduled")
 
 function mysqlPolicy(database: Database, target: BackupTarget): Manifest {
   const names = backupNames(database.name)
