@@ -10,7 +10,6 @@
       "after": {
         "apiVersion": "v1",
         "data": {
-          "NODE_ENV": "(hidden)",
           "PORT": "(hidden)"
         },
         "kind": "Secret",
@@ -20,13 +19,9 @@
         },
         "type": "Opaque"
       },
-      "afterYaml": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: web-env\n  namespace: demo\ndata:\n  NODE_ENV: (hidden)\n  PORT: (hidden)\ntype: Opaque\n",
+      "afterYaml": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: web-env\n  namespace: demo\ndata:\n  PORT: (hidden)\ntype: Opaque\n",
       "before": {
         "apiVersion": "v1",
-        "data": {
-          "NODE_ENV": "(hidden)",
-          "PORT": "(hidden)"
-        },
         "kind": "Secret",
         "metadata": {
           "name": "web-env",
@@ -34,11 +29,10 @@
         },
         "type": "Opaque"
       },
-      "beforeYaml": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: web-env\n  namespace: demo\ndata:\n  NODE_ENV: (hidden)\n  PORT: (hidden)\ntype: Opaque\n",
+      "beforeYaml": "apiVersion: v1\nkind: Secret\nmetadata:\n  name: web-env\n  namespace: demo\ntype: Opaque\n",
       "changes": [
         {
           "after": "(hidden)",
-          "before": "(hidden)",
           "path": "data.PORT"
         }
       ],
@@ -51,19 +45,12 @@
         "plural": "secrets"
       },
       "write": {
-        "operations": [
-          {
-            "op": "test",
-            "path": "/metadata/resourceVersion",
-            "value": "5"
-          },
-          {
-            "op": "add",
-            "path": "/data/PORT",
-            "value": "MzAwMA=="
+        "body": {
+          "data": {
+            "PORT": "MzAwMA=="
           }
-        ],
-        "type": "patch"
+        },
+        "type": "mergePatch"
       }
     },
     {
