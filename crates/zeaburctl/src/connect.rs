@@ -35,6 +35,12 @@ pub(crate) struct ConnectArgs {
 #[derive(Debug, Deserialize)]
 struct ProjectDatabases {
     items: Vec<Database>,
+    unreadable: Vec<Unreadable>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Unreadable {
+    resource: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -190,10 +196,21 @@ fn read<T: DeserializeOwned>(answer: Result<Value, Value>) -> Result<T, String> 
 
 /// The database `name` of the API's list of databases.
 fn find(listed: ProjectDatabases, project: &str, name: &str) -> Result<Database, String> {
-    let mut found = listed.items.into_iter().filter(|d| d.name == name);
+    let ProjectDatabases { items, unreadable } = listed;
+    let mut found = items.into_iter().filter(|d| d.name == name);
     match (found.next(), found.next()) {
         (Some(one), None) => Ok(one),
-        (None, _) => Err(format!("Project {project} has no database named {name}.")),
+        (None, _) if unreadable.is_empty() => {
+            Err(format!("Project {project} has no database named {name}."))
+        }
+        (None, _) => Err(format!(
+            "Project {project} has no database named {name} that you can read. You cannot list {} there.",
+            unreadable
+                .iter()
+                .map(|u| u.resource.as_str())
+                .collect::<Vec<_>>()
+                .join(", ")
+        )),
         (Some(_), Some(_)) => Err(format!(
             "Project {project} has more than one database named {name}. Connect to it from the cluster instead."
         )),
@@ -314,8 +331,23 @@ mod tests {
             find(listed(), "shop", "orders").unwrap().engine,
             Engine::Postgresql
         );
-        assert!(find(listed(), "shop", "missing").is_err());
+        assert_eq!(
+            find(listed(), "shop", "missing").unwrap_err(),
+            "Project shop has no database named missing."
+        );
         assert!(find(listed(), "shop", "shared").is_err());
+    }
+
+    #[test]
+    fn a_database_the_person_cannot_list_names_what_was_refused() {
+        let listed: ProjectDatabases = serde_json::from_value(json!({"items": [], "unreadable": [
+            {"resource": "clusters.postgresql.cnpg.io", "kubernetes": {}},
+        ]}))
+        .unwrap();
+        assert_eq!(
+            find(listed, "shop", "orders").unwrap_err(),
+            "Project shop has no database named orders that you can read. You cannot list clusters.postgresql.cnpg.io there."
+        );
     }
 
     #[test]
