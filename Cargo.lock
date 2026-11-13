@@ -3135,6 +3135,7 @@ dependencies = [
  "base64 0.23.1",
  "flate2",
  "hex",
+ "httpdate",
  "rustls",
  "serde",
  "serde-saphyr 2.0.0",

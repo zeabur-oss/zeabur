@@ -4,7 +4,7 @@ use std::fs::{self, File};
 use std::io::{self, BufRead as _, Read as _, Write as _};
 use std::path::Path;
 use std::thread;
-use std::time::Duration;
+use std::time::{Duration, SystemTime};
 
 use sha2::{Digest as _, Sha256};
 use ureq::http::Response;
@@ -26,7 +26,7 @@ const BACKOFF: Duration = if cfg!(test) {
     Duration::from_secs(1)
 };
 
-/// The longest wait a `Retry-After` header can ask for.
+/// The longest `Retry-After` wait honoured; a longer one ends the retrying.
 const MAX_WAIT: Duration = Duration::from_secs(30);
 
 /// An HTTPS client trusting the system's CA store.
@@ -142,8 +142,10 @@ fn get_ok(agent: &Agent, url: &str) -> Result<Response<Body>, String> {
     }
 }
 
-/// A GET that is tried again after a 5xx, a 429, a connection error or a timeout, up to three
-/// times with a doubling wait. Any other status is returned as it is for the caller to judge.
+/// A GET that is tried again, up to three times with a doubling wait, after a connection error,
+/// a timeout or a status that RFC 9110 and RFC 6585 describe as temporary (see [`temporary`]).
+/// A `Retry-After` answer sets the wait; one longer than [`MAX_WAIT`] is not waited for and the
+/// response is returned. Any other status is returned as it is for the caller to judge.
 pub(crate) fn get_retrying(
     agent: &Agent,
     url: &str,
@@ -162,19 +164,14 @@ pub(crate) fn get_retrying(
         }
         let asked = match request.call() {
             Ok(response) => {
-                let status = response.status().as_u16();
-                if status < 500 && status != 429 {
+                if !temporary(response.status().as_u16()) || attempt == RETRIES {
                     return Ok(response);
                 }
-                if attempt == RETRIES {
+                let asked = retry_after(&response, SystemTime::now());
+                if asked.is_some_and(|a| a > MAX_WAIT) {
                     return Ok(response);
                 }
-                response
-                    .headers()
-                    .get("retry-after")
-                    .and_then(|v| v.to_str().ok())
-                    .and_then(|v| v.trim().parse::<u64>().ok())
-                    .map(Duration::from_secs)
+                asked
             }
             Err(e) => {
                 let transient = matches!(
@@ -188,10 +185,28 @@ pub(crate) fn get_retrying(
             }
         };
         attempt += 1;
-        let pause = asked.map_or(wait, |a| a.min(MAX_WAIT));
-        thread::sleep(pause);
+        thread::sleep(asked.unwrap_or(wait));
         wait *= 2;
     }
+}
+
+/// Whether the status says the same request may work later: 408 (RFC 9110 section 15.5.9),
+/// 429 (RFC 6585 section 4), and the gateway and availability errors 502, 503 and 504
+/// (RFC 9110 sections 15.6.3 to 15.6.5). 500, 501 and 505 describe a fault that waiting does
+/// not fix.
+fn temporary(status: u16) -> bool {
+    matches!(status, 408 | 429 | 502 | 503 | 504)
+}
+
+/// The wait a `Retry-After` header asks for, as `delay-seconds` or an `HTTP-date`
+/// (RFC 9110 section 10.2.3). A date in the past means no wait.
+fn retry_after(response: &Response<Body>, now: SystemTime) -> Option<Duration> {
+    let value = response.headers().get("retry-after")?.to_str().ok()?.trim();
+    if !value.is_empty() && value.bytes().all(|b| b.is_ascii_digit()) {
+        return value.parse().ok().map(Duration::from_secs);
+    }
+    let date = httpdate::parse_http_date(value).ok()?;
+    Some(date.duration_since(now).unwrap_or_default())
 }
 
 /// Checks `bytes` against `expected`, `sha256:<hex>` or bare hex.
@@ -279,6 +294,15 @@ mod tests {
     /// Serves one status per request, the last one for all later requests. Returns the URL and
     /// the number of requests seen.
     fn serve(statuses: &'static [u16], body: &'static str) -> (String, Arc<AtomicUsize>) {
+        serve_with(statuses, "", body)
+    }
+
+    /// Like [`serve`], with `extra` header lines (each ending in CRLF) on every non-200 reply.
+    fn serve_with(
+        statuses: &'static [u16],
+        extra: &'static str,
+        body: &'static str,
+    ) -> (String, Arc<AtomicUsize>) {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/file", listener.local_addr().unwrap());
         let seen = Arc::new(AtomicUsize::new(0));
@@ -295,8 +319,9 @@ mod tests {
                     .copied()
                     .unwrap_or(500);
                 let body = if status == 200 { body } else { "" };
+                let extra = if status == 200 { "" } else { extra };
                 let reply = format!(
-                    "HTTP/1.1 {status} X\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{body}",
+                    "HTTP/1.1 {status} X\r\n{extra}Content-Length: {}\r\nConnection: close\r\n\r\n{body}",
                     body.len()
                 );
                 drop(stream.write_all(reply.as_bytes()));
@@ -340,6 +365,41 @@ mod tests {
         let err = fetch_text(&agent(), &url, None).unwrap_err();
         assert!(err.to_string().contains("503"), "{err}");
         assert_eq!(seen.load(Ordering::SeqCst), 4);
+    }
+
+    #[test]
+    fn only_temporary_statuses_are_retried() {
+        let (url, seen) = serve(&[408, 502, 200], ABC);
+        assert_eq!(fetch_text(&agent(), &url, None).unwrap(), ABC);
+        assert_eq!(seen.load(Ordering::SeqCst), 3);
+        let fixed: [&'static [u16]; 3] = [&[500, 200], &[501, 200], &[505, 200]];
+        for statuses in fixed {
+            let (url, seen) = serve(statuses, ABC);
+            assert!(fetch_text(&agent(), &url, None).is_err(), "{statuses:?}");
+            assert_eq!(seen.load(Ordering::SeqCst), 1, "{statuses:?}");
+        }
+    }
+
+    #[test]
+    fn retry_after_is_honoured_as_seconds_or_a_date() {
+        let (url, seen) = serve_with(&[503, 200], "Retry-After: 0\r\n", ABC);
+        assert_eq!(fetch_text(&agent(), &url, None).unwrap(), ABC);
+        assert_eq!(seen.load(Ordering::SeqCst), 2);
+        let (url, seen) = serve_with(
+            &[429, 200],
+            "Retry-After: Fri, 31 Dec 1999 23:59:59 GMT\r\n",
+            ABC,
+        );
+        assert_eq!(fetch_text(&agent(), &url, None).unwrap(), ABC);
+        assert_eq!(seen.load(Ordering::SeqCst), 2);
+    }
+
+    #[test]
+    fn a_retry_after_beyond_the_cap_is_not_waited_for() {
+        let (url, seen) = serve_with(&[503, 200], "Retry-After: 3600\r\n", ABC);
+        let err = fetch_text(&agent(), &url, None).unwrap_err();
+        assert!(err.to_string().contains("503"), "{err}");
+        assert_eq!(seen.load(Ordering::SeqCst), 1);
     }
 
     #[test]
