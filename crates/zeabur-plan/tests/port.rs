@@ -74,4 +74,25 @@ mod tests {
         assert_eq!(container["readinessProbe"]["httpGet"]["port"], 3000);
         assert_eq!(container["ports"], ports);
     }
+
+    #[test]
+    fn a_port_change_is_refused_for_a_service_that_also_selects_another_workload() {
+        let mut snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            deployments: vec![from_value(deployment(&json!([{"containerPort": 8080}]))).unwrap()],
+            ..Snapshot::default()
+        };
+        let mut other = deployment(&json!([{"containerPort": 8080}]));
+        other["metadata"]["name"] = json!("worker");
+        snapshot.deployments.push(from_value(other).unwrap());
+        let service = json!({"apiVersion": "v1", "kind": "Service",
+            "metadata": {"name": "web", "namespace": "shop", "resourceVersion": "7"},
+            "spec": {"selector": {"app": "web"}, "ports": [{"port": 80, "targetPort": 8080}]}});
+        snapshot.services.push(from_value(service).unwrap());
+        let request = PlanRequest {
+            changes: vec![move_port()],
+        };
+        let error = plan(Input::new(&snapshot, "2026-11-06T00:00:00Z"), &request).unwrap_err();
+        assert_eq!(error.code, "shared_service");
+    }
 }

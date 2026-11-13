@@ -13,12 +13,12 @@
 //!
 //! [k8s-env]: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/#using-environment-variables-inside-of-your-config
 
-use k8s_openapi::api::core::v1::{Container, Probe, Service as KubeService, ServicePort};
+use k8s_openapi::api::core::v1::{Container, Probe, Service as KubeService};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use serde_json::json;
+use zeabur_graph::{Workload, workloads};
 use zeabur_model::WorkloadRef;
 
-use crate::Target;
 use crate::fields::Step;
 use crate::json::{add, replace, test};
 use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
@@ -165,19 +165,58 @@ impl Planner<'_> {
         Ok(names)
     }
 
-    /// The ports of `service` as the earlier changes of this request left them, so that a second
-    /// port change moves the targets the first one set.
-    fn service_ports(&self, service: &KubeService) -> Vec<ServicePort> {
-        let name = service.metadata.name.as_deref().unwrap_or_default();
-        let target: Target = service_target(name);
-        let planned = self.objects.iter().find(|w| w.target == target);
-        let planned = planned.and_then(|w| w.current.pointer("/spec/ports").cloned());
-        planned
-            .and_then(|ports| serde_json::from_value(ports).ok())
-            .or_else(|| service.spec.as_ref()?.ports.clone())
-            .unwrap_or_default()
+    /// Every Service as the plan leaves it: those in the snapshot as the earlier changes of this
+    /// request left them, and those the request creates.
+    fn planned_services(&self) -> Vec<KubeService> {
+        let planned = |name: &str| {
+            let target = service_target(name);
+            let working = self.objects.iter().find(|w| w.target == target)?;
+            serde_json::from_value::<KubeService>(working.current.clone()).ok()
+        };
+        let snapshot = &self.input.snapshot.services;
+        let known = |name: &str| {
+            snapshot
+                .iter()
+                .any(|s| s.metadata.name.as_deref() == Some(name))
+        };
+        let mut services: Vec<KubeService> = snapshot
+            .iter()
+            .map(|s| {
+                planned(s.metadata.name.as_deref().unwrap_or_default()).unwrap_or_else(|| s.clone())
+            })
+            .collect();
+        services.extend(
+            self.objects
+                .iter()
+                .filter(|w| w.target.kind == "Service" && !known(&w.target.name))
+                .filter_map(|w| planned(&w.target.name)),
+        );
+        services
     }
 
+    /// The workloads whose pods `service` selects. A Service without a selector selects none.
+    fn selected_by(&self, service: &KubeService) -> Vec<WorkloadRef> {
+        let selector = service.spec.as_ref().and_then(|s| s.selector.as_ref());
+        let Some(selector) = selector.filter(|s| !s.is_empty()) else {
+            return Vec::new();
+        };
+        workloads(self.input.snapshot)
+            .into_iter()
+            .filter(|workload| {
+                let labels = workload
+                    .pod_template()
+                    .and_then(|t| t.metadata.as_ref()?.labels.as_ref());
+                selector
+                    .iter()
+                    .all(|(key, value)| labels.and_then(|l| l.get(key)) == Some(value))
+            })
+            .map(Workload::reference)
+            .collect()
+    }
+
+    /// Sends the traffic of each Service that selects `reference` and checks `from` to `to`. A
+    /// target number is the same for every pod a Service selects, so a Service that selects another
+    /// workload too is refused.
     fn move_target_ports(
         &mut self,
         reference: &WorkloadRef,
@@ -185,19 +224,11 @@ impl Planner<'_> {
         to: i32,
         port_names: &[String],
     ) -> Result<(), PlanError> {
-        let names: Vec<String> = self
-            .project
-            .services
-            .iter()
-            .filter(|s| s.workload.kind == reference.kind && s.workload.name == reference.name)
-            .flat_map(|s| s.endpoint_names.iter().cloned())
-            .collect();
-        for name in names {
-            let Some(service) = self.kube_service(&name) else {
-                continue;
-            };
+        for service in self.planned_services() {
+            let name = service.metadata.name.clone().unwrap_or_default();
             let mut operations = Vec::new();
-            for (position, port) in self.service_ports(service).iter().enumerate() {
+            let ports = service.spec.iter().flat_map(|s| s.ports.iter().flatten());
+            for (position, port) in ports.enumerate() {
                 let field = format!("/spec/ports/{position}/targetPort");
                 match &port.target_port {
                     Some(target) if is_moved(target, from, port_names) => {
@@ -211,9 +242,21 @@ impl Planner<'_> {
             if operations.is_empty() {
                 continue;
             }
+            let selected = self.selected_by(&service);
+            if !selected.contains(reference) {
+                continue;
+            }
+            if selected.len() > 1 {
+                return Err(error(
+                    ErrorKind::Conflict,
+                    "shared_service",
+                    format!(
+                        "Service {name} also sends traffic to other workloads, so its target port cannot follow this one."
+                    ),
+                ));
+            }
             Self::refuse_managed(&service.metadata, "Service", &name)?;
-            let object = to_json(service)?;
-            let index = self.working(service_target(&name), object);
+            let index = self.working(service_target(&name), to_json(&service)?);
             self.claim(
                 index,
                 &[Step::field("spec"), Step::field("ports")],
