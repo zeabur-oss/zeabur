@@ -13,8 +13,9 @@
 //!
 //! [k8s-env]: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/#using-environment-variables-inside-of-your-config
 
-use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort};
-use serde_json::{Value, json};
+use k8s_openapi::api::core::v1::{Container, Probe, Service as KubeService, ServicePort};
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use serde_json::json;
 use zeabur_model::WorkloadRef;
 
 use crate::Target;
@@ -24,8 +25,38 @@ use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
 use crate::public_port::service_target;
 use crate::rules::EnvEdit;
 
-const PROBES: [&str; 3] = ["livenessProbe", "readinessProbe", "startupProbe"];
-const HANDLERS: [&str; 3] = ["httpGet", "tcpSocket", "grpc"];
+/// Whether a port a probe or Service names is the one being moved: its number, or the name of an
+/// entry that declares it.
+fn is_moved(port: &IntOrString, from: i32, names: &[String]) -> bool {
+    match port {
+        IntOrString::Int(number) => *number == from,
+        IntOrString::String(name) => names.contains(name),
+    }
+}
+
+/// The probes of `container` with where each checks its port: the probe's field, the handler's
+/// field and the port.
+fn probe_ports(container: &Container) -> Vec<(&'static str, &'static str, IntOrString)> {
+    let probes: [(&str, &Option<Probe>); 3] = [
+        ("livenessProbe", &container.liveness_probe),
+        ("readinessProbe", &container.readiness_probe),
+        ("startupProbe", &container.startup_probe),
+    ];
+    let mut ports = Vec::new();
+    for (field, probe) in probes {
+        let Some(probe) = probe else { continue };
+        if let Some(http) = &probe.http_get {
+            ports.push((field, "httpGet", http.port.clone()));
+        }
+        if let Some(tcp) = &probe.tcp_socket {
+            ports.push((field, "tcpSocket", tcp.port.clone()));
+        }
+        if let Some(grpc) = &probe.grpc {
+            ports.push((field, "grpc", IntOrString::Int(grpc.port)));
+        }
+    }
+    ports
+}
 
 #[expect(
     clippy::multiple_inherent_impl,
@@ -51,20 +82,19 @@ impl Planner<'_> {
         let name = target.name.clone();
         let (index, at, steps) = self.container_slot(found, &target)?;
         let names = self.move_declared(index, &at, &steps, &name, from, to)?;
-        for probe in PROBES {
-            for handler in HANDLERS {
-                let field = format!("{at}/{probe}/{handler}/port");
-                let Some(port) = self.current(index).pointer(&field).cloned() else {
-                    continue;
-                };
-                if port != json!(from) && !names.iter().any(|n| port == json!(n)) {
-                    continue;
-                }
-                let mut path = steps.clone();
-                path.push(Step::field(probe));
-                self.claim(index, &path, &format!("{probe} of container {name}"))?;
-                self.patch(index, vec![test(&field, port), replace(&field, json!(to))])?;
+        let current = self.container_now(index, &at)?;
+        for (probe, handler, port) in probe_ports(&current) {
+            if !is_moved(&port, from, &names) {
+                continue;
             }
+            let field = format!("{at}/{probe}/{handler}/port");
+            let mut path = steps.clone();
+            path.push(Step::field(probe));
+            self.claim(index, &path, &format!("{probe} of container {name}"))?;
+            self.patch(
+                index,
+                vec![test(&field, json!(port)), replace(&field, json!(to))],
+            )?;
         }
         let port = EnvEdit {
             op: "set".to_owned(),
@@ -74,6 +104,18 @@ impl Planner<'_> {
         };
         self.env(reference, Some(&name), &[port])?;
         self.move_target_ports(reference, from, to, &names)
+    }
+
+    /// The container at `at` in object `index` as the earlier changes of this request left it.
+    fn container_now(&self, index: usize, at: &str) -> Result<Container, PlanError> {
+        let value = self.current(index).pointer(at).cloned().unwrap_or_default();
+        serde_json::from_value(value).map_err(|e| {
+            error(
+                ErrorKind::BadRequest,
+                "invalid_container",
+                format!("The container is not valid: {e}."),
+            )
+        })
     }
 
     /// Declares `to` where the container declared `from`, or adds it; nothing changes when it
@@ -88,28 +130,20 @@ impl Planner<'_> {
         from: i32,
         to: i32,
     ) -> Result<Vec<String>, PlanError> {
-        let declared = self
-            .current(index)
-            .pointer(&format!("{at}/ports"))
-            .and_then(Value::as_array)
-            .cloned();
+        let declared = self.container_now(index, at)?.ports;
         let entries = declared.iter().flatten();
-        let number = |entry: &Value| entry.get("containerPort").and_then(Value::as_i64);
         let moved: Vec<usize> = entries
             .clone()
             .enumerate()
-            .filter(|(_, entry)| number(entry) == Some(i64::from(from)))
+            .filter(|(_, entry)| entry.container_port == from)
             .map(|(position, _)| position)
             .collect();
         let names = entries
             .clone()
-            .filter(|entry| number(entry) == Some(i64::from(from)))
-            .filter_map(|entry| entry.get("name").and_then(Value::as_str).map(str::to_owned))
+            .filter(|entry| entry.container_port == from)
+            .filter_map(|entry| entry.name.clone())
             .collect();
-        if entries
-            .clone()
-            .any(|entry| number(entry) == Some(i64::from(to)))
-        {
+        if entries.clone().any(|entry| entry.container_port == to) {
             return Ok(names);
         }
         let mut path = steps.to_vec();
@@ -166,10 +200,7 @@ impl Planner<'_> {
             for (position, port) in self.service_ports(service).iter().enumerate() {
                 let field = format!("/spec/ports/{position}/targetPort");
                 match &port.target_port {
-                    Some(target)
-                        if json!(target) == json!(from)
-                            || port_names.iter().any(|n| json!(target) == json!(n)) =>
-                    {
+                    Some(target) if is_moved(target, from, port_names) => {
                         operations.push(test(&field, json!(target)));
                         operations.push(replace(&field, json!(to)));
                     }
