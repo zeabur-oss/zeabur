@@ -218,6 +218,27 @@ mod tests {
     }
 
     #[test]
+    fn a_port_change_sets_port_in_env_when_a_later_secret_was_not_listed() {
+        let mut deployment = web();
+        deployment["spec"]["template"]["spec"]["containers"][0]["envFrom"] = json!([
+            {"configMapRef": {"name": "web-config"}},
+            {"secretRef": {"name": "web-env"}}
+        ]);
+        let config: Value = json!({"apiVersion": "v1", "kind": "ConfigMap",
+            "metadata": {"name": "web-config", "namespace": "shop", "resourceVersion": "6"},
+            "data": {"PORT": "8080"}});
+        let snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            deployments: vec![from_value(deployment).unwrap()],
+            config_maps: vec![from_value(config).unwrap()],
+            ..Snapshot::default()
+        };
+        let moved = planned_in(&snapshot, &values("8080"), move_port());
+        sets_port_in_env(&moved);
+        assert!(after(&moved, "ConfigMap").is_none());
+    }
+
+    #[test]
     fn a_port_change_moves_what_names_the_old_port_when_the_new_one_is_declared() {
         let mut deployment = web();
         let spec = &mut deployment["spec"]["template"]["spec"]["containers"][0];
