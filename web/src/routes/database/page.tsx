@@ -49,7 +49,6 @@ import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { openDatabaseShell } from "@/lib/dock"
 import type { Icon } from "@/lib/icon"
-import { secretData } from "@/lib/secret-data"
 import { partsOf } from "@/model/database-parts"
 import {
   addPerThreadCaches,
@@ -68,7 +67,7 @@ import {
   turnOffBackups,
   turnOffSummary,
   writeBackups,
-  holdsRegion,
+  backupKeys,
   MAX_KEEP_DAYS,
   daysOf,
   engineName,
@@ -865,9 +864,8 @@ function BackupForm({
     ...objectQuery(project, { group: "", version: "v1", resource: "secrets", name: secret }),
     retry: false,
   }).data
-  const keysExist = saved !== undefined
-  const regionSaved =
-    saved !== undefined && holdsRegion(database, Object.keys(secretData(saved.yaml)))
+  const secrets = useQuery(objectsQuery(project, { kinds: ["core/secrets"] })).data
+  const { keysExist, regionSaved } = backupKeys(database, saved?.yaml, secrets)
   const problems = targetProblems(target, keysExist)
   const startsEmpty = database.engine === "dragonfly" && database.members === 1
   const review = () => {

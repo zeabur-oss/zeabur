@@ -6,6 +6,7 @@ import type { Translate } from "@/i18n"
 import {
   backUpNow,
   backUpNowSummary,
+  backupKeys,
   backupName,
   backupsNotes,
   backupsSummary,
@@ -1044,6 +1045,22 @@ describe("changing backups", () => {
     expect(currentTarget(mongoOn).keepDays).toBe(365)
     expect(targetProblems(currentTarget(mongoOn), true)).toEqual([])
     expect(edits(writeBackups(mongoOn, currentTarget(mongoOn), true))).not.toHaveProperty("db")
+  })
+
+  test("the keys Secret exists when it is listed, though its values cannot be read", () => {
+    const listed = (...names: string[]) =>
+      ({
+        items: [{ resource: "secrets", items: names.map((name) => ({ name })) }],
+      }) as unknown as Parameters<typeof backupKeys>[2]
+    const unread = backupKeys(pg, undefined, listed("db-backups-s3"))
+    expect(unread).toEqual({ keysExist: true, regionSaved: true })
+    expect(targetProblems(kept, unread.keysExist)).toEqual([])
+    expect(backupKeys(pg, undefined, listed("other"))).toEqual({
+      keysExist: false,
+      regionSaved: false,
+    })
+    const noRegion = "data:\n  ACCESS_KEY_ID: YQ==\n  ACCESS_SECRET_KEY: Yg==\n"
+    expect(backupKeys(pg, noRegion)).toEqual({ keysExist: true, regionSaved: false })
   })
 
   test("MongoDB: an edit replaces the storage and the task, and turning off keeps the task for turning on again", () => {

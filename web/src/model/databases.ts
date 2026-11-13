@@ -24,6 +24,7 @@
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
 import type { Translate } from "@/i18n"
+import { secretData } from "@/lib/secret-data"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
 import type { Event, Health } from "@/model/service"
 
@@ -819,9 +820,22 @@ interface Writing {
 }
 
 /** The keys Secret, by its `keys`, holds the region. */
-export const holdsRegion = (database: Database, keys: string[]) => {
+const holdsRegion = (database: Database, keys: string[]) => {
   const key = SECRET_KEYS[database.engine].region
   return key !== undefined && keys.includes(key)
+}
+
+/** Whether the keys Secret exists, by its values (`yaml`) or by the project's Secrets as listed,
+ * and whether it holds the region. A Secret the person may list but not read is taken to hold it,
+ * as Zeabur writes it. */
+export function backupKeys(database: Database, yaml?: string, listed?: Schemas.ObjectList) {
+  if (yaml !== undefined)
+    return { keysExist: true, regionSaved: holdsRegion(database, Object.keys(secretData(yaml))) }
+  const secret = backupNames(database.name).secret
+  const keysExist = (listed?.items ?? []).some(
+    (kind) => kind.resource === "secrets" && kind.items.some((o) => o.name === secret),
+  )
+  return { keysExist, regionSaved: keysExist }
 }
 
 /** The region key and value the keys Secret gets, unless a kept Secret keeps its own. */
