@@ -221,7 +221,9 @@ describe("MongoDB 8 memory setting", () => {
     expect(rseqNote(eight)).toBe("missing")
     expect(rseqNote({ ...mongo, version: "7.0.43-23" })).toBeUndefined()
     const [change] = addPerThreadCaches(eight) as { yaml: string }[]
-    const fixed = { ...eight, object: JSON.parse(change?.yaml ?? "{}") as Database["object"] }
+    const patch = JSON.parse(change?.yaml ?? "{}").spec
+    const spec = merged((eight.object as { spec: unknown }).spec, patch)
+    const fixed = { ...eight, object: { spec } as unknown as Database["object"] }
     expect(rseqNote(fixed)).toBe("set")
   })
 
@@ -438,21 +440,26 @@ describe("reshaping", () => {
     expect(spec.instances).toBe(3)
     expect(spec.resources).toEqual(presetResources.postgresql.medium)
     expect(spec.storage).toEqual({ size: "10Gi" })
-    expect(spec.plugins).toEqual([{ name: "other" }])
+    expect(spec).not.toHaveProperty("plugins")
   })
 
   test("MongoDB's are the first replica set's, with the flags the operator asks for", () => {
-    const grown = { ...mongo, storage: "2Gi" }
+    const grown = structuredClone({ ...mongo, storage: "2Gi" })
+    const live = (grown.object as { spec: Record<string, unknown> }).spec
+    live.unsafeFlags = { replsetSize: true }
     const [edit] = reshapeDatabase(grown, { members: 3, size: "small", storage: "4Gi" })
-    const spec = JSON.parse((edit as { yaml: string }).yaml).spec
-    expect(spec.replsets[0]).toMatchObject({
+    const spec = merged(live, JSON.parse((edit as { yaml: string }).yaml).spec)
+    expect((spec.replsets as unknown[])[0]).toMatchObject({
       name: "rs0",
       size: 3,
       volumeSpec: { persistentVolumeClaim: { resources: { requests: { storage: "4Gi" } } } },
     })
     expect(spec.enableVolumeExpansion).toBe(true)
     expect(spec.unsafeFlags).toBeUndefined()
-    const [one] = reshapeDatabase(grown, { members: 1, size: "small", storage: "2Gi" })
+    const [one] = reshapeDatabase(
+      { ...mongo, storage: "2Gi" },
+      { members: 1, size: "small", storage: "2Gi" },
+    )
     const single = JSON.parse((one as { yaml: string }).yaml).spec
     expect(single.unsafeFlags).toEqual({ replsetSize: true })
     expect(single.enableVolumeExpansion).toBeUndefined()
@@ -1095,6 +1102,63 @@ describe("changing backups", () => {
     const moved = edits(writeBackups(mongoOn, { ...currentTarget(mongoOn), bucket: "other" }, true))
     const after = merged((mongoOn.object as { spec: unknown }).spec, moved.db.spec).backup
     expect((after as typeof backup).tasks).toEqual(backup.tasks)
+  })
+
+  test("turning off and on again changes only whether a custom schedule is paused", () => {
+    const hourly = {
+      ...pg,
+      backups: { ...pg.backups, schedules: [schedule("db-scheduled", "0 0 * * * *")] },
+    } as Database
+    expect(edits(turnOffBackups(hourly))["db-scheduled"].spec).toEqual({ suspend: true })
+    const off = {
+      ...hourly,
+      backups: { ...hourly.backups, schedules: [schedule("db-scheduled", "0 0 * * * *", true)] },
+    } as Database
+    expect(edits(writeBackups(off, currentTarget(off), true))["db-scheduled"].spec).toEqual({
+      suspend: null,
+    })
+    const maria = on(
+      "mariadb",
+      "mariadbs",
+      {},
+      {
+        store: store("db-scheduled", { retention: "168h", region: "us-east-1" }),
+        schedules: [schedule("db-scheduled", "*/30 * * * *")],
+      },
+    )
+    expect(edits(turnOffBackups(maria))["db-scheduled"].spec).toEqual({
+      schedule: { suspend: true },
+    })
+  })
+
+  test("MongoDB: backups whose scheduled task is gone get the whole task again", () => {
+    const backup = {
+      enabled: true,
+      image: "pbm:1",
+      storages: { backups: { type: "s3", s3: { bucket: "backups", prefix: "db" } } },
+      tasks: [{ name: "mine" }],
+    }
+    const mongoOn = on(
+      "mongodb",
+      "perconaservermongodbs",
+      { backup },
+      { store: store("backups", { region: "us-east-1" }), schedules: [] },
+    )
+    const patch = edits(writeBackups(mongoOn, currentTarget(mongoOn), true)).db.spec
+    const after = merged((mongoOn.object as { spec: unknown }).spec, patch).backup as {
+      tasks: Record<string, unknown>[]
+    }
+    expect(after.tasks).toEqual([
+      { name: "mine" },
+      {
+        name: "scheduled",
+        enabled: true,
+        schedule: "0 3 * * *",
+        storageName: "backups",
+        type: "logical",
+        retention: { type: "count", count: 7, deleteFromStorage: true },
+      },
+    ])
   })
 
   test("MongoDB: weekly backups kept 365 days open in the form as 365 days", () => {

@@ -230,20 +230,8 @@ export function rseqNote(database: Database): "set" | "missing" | undefined {
 }
 
 /** The edit that gives an existing MongoDB 8 per-thread caches. */
-export function addPerThreadCaches(database: Database): Change[] {
-  const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
-  perThreadCaches((object.spec ??= {}), database.version ?? database.image)
-  const { group, version, resource } = databaseAddress(database)
-  return [
-    {
-      op: "edit",
-      resource: { group, version, resource },
-      name: database.name,
-      yaml: JSON.stringify(object),
-      specOnly: true,
-    },
-  ]
-}
+export const addPerThreadCaches = (database: Database): Change[] =>
+  editObject(database, (spec) => perThreadCaches(spec, database.version ?? database.image))
 
 /** Defaults for the form: one member on a single node, else three. */
 const defaults: Record<Engine, { name: string; storage: string; quorum: boolean }> = {
@@ -883,9 +871,11 @@ function mergePatch(after: Manifest, before: Manifest): Manifest {
   return patch
 }
 
-/** `live` with what changes from `before` to `after`, so that what the form does not set stays. */
+/** `live` with what changes from `before` to `after`, so that what the form does not set stays;
+ * `after` itself when there is no `live`. */
 function patched(live: unknown, after: Manifest, before: Manifest = {}): Manifest {
-  const merged = isMap(live) ? structuredClone(live) : {}
+  if (!isMap(live)) return structuredClone(after)
+  const merged = structuredClone(live)
   const apply = (target: Manifest, patch: Manifest) => {
     for (const [key, value] of Object.entries(patch)) {
       const at = target[key]
@@ -921,7 +911,8 @@ function write(database: Database, resource: string, after: Manifest, before?: M
   return specEdit(String(after.apiVersion), String(after.kind), resource, name, spec)
 }
 
-/** The database's object edited by `change`, if that changes it. */
+/** The database's object edited by `change`, if that changes it: the one way Zeabur edits a
+ * database's object, as a merge patch with a null for each field `change` removes. */
 function editObject(database: Database, change: (spec: Manifest) => void): Change[] {
   const before = ((database.object as { spec?: Manifest }).spec ?? {}) as Manifest
   const after = structuredClone(before)
@@ -1650,28 +1641,18 @@ const RESHAPE: Record<Engine, (shaping: Reshaping) => void> = {
  * MongoDB volume grows only with `enableVolumeExpansion`, and fewer than three members needs
  * `unsafeFlags.replsetSize`; a MariaDB of more than one member replicates.
  * https://docs.percona.com/percona-operator-for-mongodb/scaling.html */
-export function reshapeDatabase(database: Database, shape: DatabaseShape): Change[] {
-  const object = structuredClone(database.object) as Manifest & { spec?: Manifest }
-  RESHAPE[database.engine]({
-    spec: (object.spec ??= {}),
-    members: shape.members,
-    resources: shape.size
-      ? structuredClone(presetResources[database.engine][shape.size])
-      : undefined,
-    storage: shape.storage.trim(),
-    database,
-  })
-  const { group, version, resource } = databaseAddress(database)
-  return [
-    {
-      op: "edit",
-      resource: { group, version, resource },
-      name: database.name,
-      yaml: JSON.stringify(object),
-      specOnly: true,
-    },
-  ]
-}
+export const reshapeDatabase = (database: Database, shape: DatabaseShape): Change[] =>
+  editObject(database, (spec) =>
+    RESHAPE[database.engine]({
+      spec,
+      members: shape.members,
+      resources: shape.size
+        ? structuredClone(presetResources[database.engine][shape.size])
+        : undefined,
+      storage: shape.storage.trim(),
+      database,
+    }),
+  )
 
 /** A claim spec asking for `storage`. */
 function withStorage(claim: Manifest, storage: string): Manifest {
