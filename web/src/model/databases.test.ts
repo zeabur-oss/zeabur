@@ -959,9 +959,16 @@ describe("changing backups", () => {
     ])
   })
 
-  test("PostgreSQL: turning off drops the plugin and pauses the schedule", () => {
+  test("PostgreSQL: turning off disables the plugin and pauses the schedule", () => {
     const changed = edits(turnOffBackups(pg))
-    expect(changed.db.spec.plugins).toEqual([])
+    expect(changed.db.spec.plugins).toEqual([
+      {
+        name: "barman-cloud.cloudnative-pg.io",
+        enabled: false,
+        isWALArchiver: true,
+        parameters: { barmanObjectName: "db-backups" },
+      },
+    ])
     expect(changed["db-scheduled"].spec.suspend).toBe(true)
     expect(turnOffSummary(t, pg).lines).toEqual([
       "db.backup.saidOff(db, s3://backups/db (http://s3.test:8333))",
@@ -1025,6 +1032,25 @@ describe("changing backups", () => {
         isWALArchiver: true,
         parameters: { barmanObjectName: "db-backups", serverName: "db-v2" },
       },
+    ])
+  })
+
+  test("PostgreSQL: turning off and on again keeps the archive's server name", () => {
+    const entry = {
+      name: "barman-cloud.cloudnative-pg.io",
+      isWALArchiver: true,
+      parameters: { barmanObjectName: "db-backups", serverName: "db-v2" },
+    }
+    const named = { ...pg, object: { ...pg.object, spec: { plugins: [entry] } } } as Database
+    const offSpec = edits(turnOffBackups(named)).db.spec
+    expect(offSpec.plugins).toEqual([{ ...entry, enabled: false }])
+    const off = {
+      ...named,
+      object: { ...named.object, spec: offSpec },
+      backups: { ...named.backups, store: store("db-backups", { retention: "7d", inUse: false }) },
+    } as Database
+    expect(edits(writeBackups(off, kept, true)).db.spec.plugins).toEqual([
+      { ...entry, enabled: true },
     ])
   })
 

@@ -944,16 +944,21 @@ const paused = (database: Database) => ownSchedule(database)?.paused === true
 const scheduled = (database: Database) => ownSchedule(database) !== undefined
 
 /** The cluster archives WAL to `store` through the Barman plugin, the plugin entry keeping its
- * other fields; without `store`, the cluster has no Barman plugin. */
+ * other fields. Without `store`, the entry is disabled, not removed: its parameters, such as the
+ * archive's server name, are what restoring and turning backups on again read. */
 function withPlugin(spec: Manifest, store?: string) {
   const plugins = (spec.plugins as Manifest[] | undefined) ?? []
   const own = plugins.find((p) => p.name === PLUGIN)
-  if (!store) {
-    spec.plugins = plugins.filter((p) => p !== own)
-    return
-  }
-  const parameters = { ...(own?.parameters as Manifest | undefined), barmanObjectName: store }
-  const entry = { ...own, name: PLUGIN, isWALArchiver: true, parameters }
+  const entry = store
+    ? {
+        ...own,
+        name: PLUGIN,
+        ...(own && "enabled" in own ? { enabled: true } : {}),
+        isWALArchiver: true,
+        parameters: { ...(own?.parameters as Manifest | undefined), barmanObjectName: store },
+      }
+    : own && { ...own, enabled: false }
+  if (!entry) return
   spec.plugins = own ? plugins.map((p) => (p === own ? entry : p)) : [...plugins, entry]
 }
 
@@ -1193,11 +1198,11 @@ const TURN_OFF: Record<BackupEngine, (database: Database, current: BackupTarget)
     ),
 }
 
-/** Turning backups off: no schedule, and the database no longer names where backups go. The keys
+/** Turning backups off: no schedule, and the database no longer uses where backups go. The keys
  * Secret stays, so do the backups in the bucket, and what restoring from them reads where the
- * operator lets it pause: CloudNativePG's and MariaDB's schedules pause, MongoDB's storage and
- * tasks, which keep the schedule and retention for turning backups on again, and MOCO's
- * BackupPolicy stay. */
+ * operator lets it pause: CloudNativePG's plugin entry is disabled and its schedule paused,
+ * MariaDB's schedule pauses, MongoDB's storage and tasks, which keep the schedule and retention
+ * for turning backups on again, and MOCO's BackupPolicy stay. */
 export const turnOffBackups = (database: Database): Change[] =>
   TURN_OFF[backupEngine(database)](database, currentTarget(database))
 
