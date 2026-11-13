@@ -397,7 +397,6 @@ function BackUpNow({ project, database }: { project: string; database: Database 
   )
 }
 
-/** The newest warnings, as a service's overview shows them, and the way to all events. */
 function LastBackup({ database }: { database: Database }) {
   const t = useT()
   const run = lastRun(database)
@@ -423,6 +422,7 @@ function storageOf(database: Database, amount: (raw: string, dimension: "bytes")
   return database.members > 1 ? `${database.members} × ${each}` : each
 }
 
+/** The newest warnings, as a service's overview shows them, and the way to all events. */
 function Overview({
   project,
   database,
