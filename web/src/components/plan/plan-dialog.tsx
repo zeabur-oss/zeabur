@@ -662,7 +662,12 @@ function warningsSaid(t: Translate, warnings: Schemas.PlanWarning[]): Said[] {
           w.objects.map((o) => `${kindName(t, o.kind)} ${o.name} (${o.finalizers.join(", ")})`),
           (list) => t("warn.removesFinalizers", list),
         ),
-        { text: t("warn.cleanupSkipped"), health: "fail" },
+        ...(w.objects.some((o) => o.thirdParty)
+          ? [{ text: t("warn.cleanupSkipped"), health: "fail" as const }]
+          : []),
+        ...(w.objects.some((o) => o.kubernetes)
+          ? [{ text: t("warn.kubernetesFinalizers"), health: "fail" as const }]
+          : []),
       ]
     if (w.code === "recreated")
       return [

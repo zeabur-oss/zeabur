@@ -3019,8 +3019,15 @@ export type HeldBy = {
   finalizers: string[]
   /** The kind. */
   kind: string
+  /**
+   * Whether one of them is Kubernetes' own (`kubernetes.io/...`): its controller still
+   * runs, so the Pod or node that holds the object is the better thing to fix.
+   */
+  kubernetes: boolean
   /** The name. */
   name: string
+  /** Whether one of them belongs to anything else. */
+  thirdParty: boolean
 }
 
 /**

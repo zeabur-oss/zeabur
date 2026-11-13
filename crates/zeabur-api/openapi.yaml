@@ -9717,6 +9717,8 @@ components:
       - kind
       - name
       - finalizers
+      - kubernetes
+      - thirdParty
       properties:
         finalizers:
           type: array
@@ -9726,9 +9728,17 @@ components:
         kind:
           type: string
           description: The kind.
+        kubernetes:
+          type: boolean
+          description: |-
+            Whether one of them is Kubernetes' own (`kubernetes.io/...`): its controller still
+            runs, so the Pod or node that holds the object is the better thing to fix.
         name:
           type: string
           description: The name.
+        thirdParty:
+          type: boolean
+          description: Whether one of them belongs to anything else.
     HeldDomain:
       type: object
       description: A hostname that another project serves.

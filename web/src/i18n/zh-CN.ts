@@ -1460,6 +1460,8 @@ export const zhCN: Messages = {
   "warn.removesFinalizers": (names: string) => `移除 ${names} 的 finalizer`,
   "warn.cleanupSkipped":
     "这些对象的控制器就没办法清理自己在集群外创建的东西，例如对象存储里的备份或云磁盘",
+  "warn.kubernetesFinalizers":
+    "其中有 Kubernetes 自己的 finalizer，它的控制器还在运行。通常是还有 Pod 在用这个磁盘，或节点宕机了，建议先处理那个 Pod 或节点。直接移除可能会留下磁盘",
   "warn.restartNeeded": (names: string) => `重启后才会生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 会重启 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `如果这个集群运行着 Reloader，会重启 ${names}`,

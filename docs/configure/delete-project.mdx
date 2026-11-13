@@ -95,7 +95,11 @@ The review lists each object and the finalizers to remove. Force delete:
 - Leaves the namespace's own `spec.finalizers` alone. Kubernetes then deletes what's left, then the namespace.
 - Runs as you, so you need `patch` on those objects.
 
-Once the finalizers are gone, the controller can't clean up what it made outside the cluster, such as a backup in object storage or a cloud disk. Check for those and remove them yourself. Enter the project name, then click **Force delete project**.
+Once the finalizers are gone, the controller can't clean up what it made outside the cluster, such as a backup in object storage or a cloud disk. Check for those and remove them yourself.
+
+A `kubernetes.io/...` finalizer, such as `kubernetes.io/pvc-protection`, usually stays because a Pod still uses the disk or a node is down, so deal with that Pod or node first, because removing it can leave a volume or disk behind.
+
+Enter the project name, then click **Force delete project**.
 
 With kubectl, for each object the project page lists:
 

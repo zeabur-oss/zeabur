@@ -366,8 +366,43 @@ mod tests {
                     kind: "Cluster".to_owned(),
                     name: "db".to_owned(),
                     finalizers: vec!["cnpg.io/cleanup".to_owned()],
+                    kubernetes: false,
+                    third_party: true,
                 }]
             }]
+        );
+    }
+
+    #[test]
+    fn a_kubernetes_finalizer_is_flagged_apart_from_a_third_party_one() {
+        let plan = forced(
+            &terminating(),
+            vec![
+                held("data", "shop", true, &["kubernetes.io/pvc-protection"]),
+                held("db", "shop", true, &["cnpg.io/cleanup"]),
+                held(
+                    "both",
+                    "shop",
+                    true,
+                    &["kubernetes.io/pv-protection", "cnpg.io/cleanup"],
+                ),
+            ],
+        )
+        .unwrap();
+        let [Warning::RemovesFinalizers { objects }] = plan.warnings.as_slice() else {
+            panic!("one RemovesFinalizers warning");
+        };
+        let flags: Vec<(&str, bool, bool)> = objects
+            .iter()
+            .map(|o| (o.name.as_str(), o.kubernetes, o.third_party))
+            .collect();
+        assert_eq!(
+            flags,
+            [
+                ("data", true, false),
+                ("db", false, true),
+                ("both", true, true)
+            ]
         );
     }
 

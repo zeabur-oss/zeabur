@@ -281,7 +281,8 @@ mod tests {
                 .any(|w| w["code"] == "removesFinalizers"
                     && w["objects"]
                         == json!([{"kind": "Cluster", "name": "db",
-                        "finalizers": ["cnpg.io/cleanup"]}])),
+                        "finalizers": ["cnpg.io/cleanup"], "kubernetes": false,
+                        "thirdParty": true}])),
             "{plan}"
         );
 

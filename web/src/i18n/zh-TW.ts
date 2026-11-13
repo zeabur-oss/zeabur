@@ -1463,6 +1463,8 @@ export const zhTW: Messages = {
   "warn.removesFinalizers": (names: string) => `移除 ${names} 的 finalizer`,
   "warn.cleanupSkipped":
     "這些物件的控制器就沒辦法清理自己在叢集外建立的東西，例如物件儲存裡的備份或雲端磁碟",
+  "warn.kubernetesFinalizers":
+    "其中有 Kubernetes 自己的 finalizer，它的控制器還在運作。通常是還有 Pod 在用這個磁碟，或節點當機了，建議先處理那個 Pod 或節點。直接移除可能會留下磁碟",
   "warn.restartNeeded": (names: string) => `重新啟動後才會生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 會重新啟動 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `若這個叢集有執行 Reloader，會重新啟動 ${names}`,

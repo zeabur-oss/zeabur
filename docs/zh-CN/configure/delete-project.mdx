@@ -95,7 +95,11 @@ kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 - 不改 Namespace 自己的 `spec.finalizers`。之后 Kubernetes 会删除剩下的东西，再删除 Namespace。
 - 以你的身份运行，所以你需要这些对象的 `patch` 权限。
 
-finalizer 移除后，控制器就没办法清理自己在集群外创建的东西，例如对象存储里的备份或云磁盘，这些要自己检查并删除。输入项目名称，再点击**强制删除项目**。
+finalizer 移除后，控制器就没办法清理自己在集群外创建的东西，例如对象存储里的备份或云磁盘，这些要自己检查并删除。
+
+`kubernetes.io/...` 的 finalizer（例如 `kubernetes.io/pvc-protection`）通常是还有 Pod 在用这个磁盘，或节点宕机了，建议先处理那个 Pod 或节点，直接移除可能会留下磁盘。
+
+输入项目名称，再点击**强制删除项目**。
 
 用 kubectl 时，对项目页列出的每个对象运行：
 

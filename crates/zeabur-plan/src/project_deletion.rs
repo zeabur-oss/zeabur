@@ -98,6 +98,24 @@ pub struct HeldBy {
     pub name: String,
     /// The finalizers removed.
     pub finalizers: Vec<String>,
+    /// Whether one of them is Kubernetes' own (`kubernetes.io/...`): its controller still
+    /// runs, so the Pod or node that holds the object is the better thing to fix.
+    pub kubernetes: bool,
+    /// Whether one of them belongs to anything else.
+    pub third_party: bool,
+}
+
+impl HeldBy {
+    fn new(kind: String, name: String, finalizers: Vec<String>) -> Self {
+        let kubernetes = |f: &String| f.starts_with("kubernetes.io/");
+        Self {
+            kubernetes: finalizers.iter().any(kubernetes),
+            third_party: !finalizers.iter().all(kubernetes),
+            kind,
+            name,
+            finalizers,
+        }
+    }
 }
 
 /// What deleting the project takes with it ([`Warning::DeletesProject`]).
@@ -261,11 +279,11 @@ impl<'a> Planner<'a> {
                 plural: held.resource.resource.clone(),
                 name: meta.name.unwrap_or_default(),
             };
-            removed.push(HeldBy {
-                kind: target.kind.clone(),
-                name: target.name.clone(),
-                finalizers: finalizers.clone(),
-            });
+            removed.push(HeldBy::new(
+                target.kind.clone(),
+                target.name.clone(),
+                finalizers.clone(),
+            ));
             let index = self.working(target, object.clone());
             self.patch(
                 index,

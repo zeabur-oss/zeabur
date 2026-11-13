@@ -95,7 +95,11 @@ kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 - 不動 Namespace 自己的 `spec.finalizers`。之後 Kubernetes 會刪掉剩下的東西，再刪掉 Namespace。
 - 用你的身分執行，所以你要有這些物件的 `patch` 權限。
 
-finalizer 移除後，控制器就沒辦法清理自己在叢集外建立的東西，例如物件儲存裡的備份或雲端磁碟，這些要自己檢查並刪除。輸入專案名稱，再按**強制刪除專案**。
+finalizer 移除後，控制器就沒辦法清理自己在叢集外建立的東西，例如物件儲存裡的備份或雲端磁碟，這些要自己檢查並刪除。
+
+`kubernetes.io/...` 的 finalizer（例如 `kubernetes.io/pvc-protection`）通常是還有 Pod 在用這個磁碟，或節點當機了，建議先處理那個 Pod 或節點，直接移除可能會留下磁碟。
+
+輸入專案名稱，再按**強制刪除專案**。
 
 用 kubectl 時，對專案頁列出的每個物件執行：
 

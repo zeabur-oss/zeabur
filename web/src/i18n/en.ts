@@ -1581,6 +1581,8 @@ export const en = {
   "warn.removesFinalizers": (names: string) => `Removes the finalizers from ${names}`,
   "warn.cleanupSkipped":
     "These objects' controllers can't clean up what they made outside the cluster, such as a backup in object storage or a cloud disk",
+  "warn.kubernetesFinalizers":
+    "Some of these finalizers are Kubernetes' own, and their controller is still running. They usually stay because a Pod still uses the disk or a node is down, so deal with that Pod or node first. Removing them can leave a volume or disk behind",
   "warn.restartNeeded": (names: string) => `Takes effect after a restart: ${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader restarts ${names}`,
   "warn.reloaderMayRestart": (names: string) =>
