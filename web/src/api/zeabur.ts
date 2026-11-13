@@ -1964,6 +1964,9 @@ export type Change =
       op: "deleteProject"
     }
   | {
+      op: "forceDeleteProject"
+    }
+  | {
       /**
        * The name to show instead of the namespace's.
        * @nullable
@@ -3009,6 +3012,25 @@ export type ProjectDeletion = {
 }
 
 /**
+ * An object whose finalizers a force deletion removes ([`Warning::RemovesFinalizers`]).
+ */
+export type HeldBy = {
+  /** The finalizers removed. */
+  finalizers: string[]
+  /** The kind. */
+  kind: string
+  /**
+   * Whether one of them is Kubernetes' own (`kubernetes.io/...`): its controller still
+   * runs, so the Pod or node that holds the object is the better thing to fix.
+   */
+  kubernetes: boolean
+  /** The name. */
+  name: string
+  /** Whether one of them belongs to anything else. */
+  thirdParty: boolean
+}
+
+/**
  * Something a person should know before applying.
  */
 export type PlanWarning =
@@ -3265,6 +3287,11 @@ export type PlanWarning =
   | (ProjectDeletion & {
       code: "deletesProject"
     })
+  | {
+      code: "removesFinalizers"
+      /** The objects, with the finalizers removed. */
+      objects: HeldBy[]
+    }
   | {
       code: "recreated"
       /** The objects. */

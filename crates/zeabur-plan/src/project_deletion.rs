@@ -22,7 +22,21 @@
 //!   installer set up (label [`LABEL_BASELINE`]), a namespace that is not a project, and one that
 //!   is already `Terminating`.
 //!
-//! The plan never removes a finalizer.
+//! # Force deletion
+//!
+//! [`Change::ForceDeleteProject`] is for a project whose Namespace stays `Terminating` because a
+//! finalizer is never removed, for example when its controller is gone. Each of its writes is a
+//! JSON Patch that sets `metadata.finalizers` to `[]` on one object, after a `test` of the
+//! finalizers as read. The plan token pins those finalizers too ([`versions`]), so a change to them
+//! after the review makes the apply refuse. It writes only an object of [`DeletionInput::held`]
+//! that is in the project's namespace and already has a `deletionTimestamp`. It never writes the
+//! Namespace, so its own `spec.finalizers` stay. The namespace controller then removes what is left
+//! and the Namespace. [`Warning::RemovesFinalizers`] names each object and its finalizers. Refused:
+//! the same namespaces as a deletion, a namespace that is not being deleted, and one with no such
+//! object.
+//!
+//! [`Change::ForceDeleteProject`]: crate::Change::ForceDeleteProject
+//! [`versions`]: crate::versions
 //!
 //! [k8s-ns-delete]: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/#deleting-a-namespace
 //! [k8s-finalizers]: https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/
@@ -32,22 +46,24 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, json};
 use zeabur_graph::workloads;
 use zeabur_model::WorkloadRef;
 use zeabur_model::adapters::provenance::{Tool, detect_tool};
 use zeabur_model::kernel::names::{LABEL_BASELINE, NODE_SHELL_NAMESPACE, is_system_namespace};
 
+use crate::access::meta_of;
 use crate::change::{ObjectName, Target, Warning};
 use crate::checks::ResourceRef;
+use crate::json::{replace, test};
 use crate::plan::{ErrorKind, PlanError, Planner, Working, error};
 
-/// A database object of the project, as read.
+/// An object of the project, as read.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct DatabaseObject {
+pub struct ProjectObject {
     /// Its resource.
     pub resource: ResourceRef,
-    /// The object, with `metadata`.
+    /// The object, with `kind` and `metadata`.
     pub object: Value,
 }
 
@@ -57,7 +73,7 @@ pub struct DeletionInput {
     /// Zeabur's own namespaces besides the node shells': its own, its members', its terminals'.
     pub zeabur_namespaces: Vec<String>,
     /// The project's database objects.
-    pub databases: Vec<DatabaseObject>,
+    pub databases: Vec<ProjectObject>,
     /// The `reclaimPolicy` of each `StorageClass` the person could read, by name.
     pub class_reclaim: BTreeMap<String, String>,
     /// The cluster's default `StorageClass`, when known.
@@ -66,6 +82,40 @@ pub struct DeletionInput {
     pub tools_namespace: String,
     /// The person's tools pods for the project, by name.
     pub tools_pods: Vec<String>,
+    /// For a force deletion: the objects with finalizers among the content the namespace
+    /// controller says is left.
+    pub held: Vec<ProjectObject>,
+}
+
+/// An object whose finalizers a force deletion removes ([`Warning::RemovesFinalizers`]).
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct HeldBy {
+    /// The kind.
+    pub kind: String,
+    /// The name.
+    pub name: String,
+    /// The finalizers removed.
+    pub finalizers: Vec<String>,
+    /// Whether one of them is Kubernetes' own (`kubernetes.io/...`): its controller still
+    /// runs, so the Pod or node that holds the object is the better thing to fix.
+    pub kubernetes: bool,
+    /// Whether one of them belongs to anything else.
+    pub third_party: bool,
+}
+
+impl HeldBy {
+    fn new(kind: String, name: String, finalizers: Vec<String>) -> Self {
+        let kubernetes = |f: &String| f.starts_with("kubernetes.io/");
+        Self {
+            kubernetes: finalizers.iter().any(kubernetes),
+            third_party: !finalizers.iter().all(kubernetes),
+            kind,
+            name,
+            finalizers,
+        }
+    }
 }
 
 /// What deleting the project takes with it ([`Warning::DeletesProject`]).
@@ -126,22 +176,19 @@ fn refusal(code: &str, detail: String) -> PlanError {
     clippy::multiple_inherent_impl,
     reason = "the planner's change kinds are split across modules by area"
 )]
-impl Planner<'_> {
+impl<'a> Planner<'a> {
     pub(crate) fn delete_project(&mut self) -> Result<(), PlanError> {
         let empty = DeletionInput::default();
         let deletion = self.input.deletion.unwrap_or(&empty);
-        let object = self.input.namespace.ok_or_else(|| {
-            error(
-                ErrorKind::NotFound,
-                "unknown_namespace",
-                "The namespace could not be read.",
-            )
-        })?;
-        let meta: ObjectMeta =
-            serde_json::from_value(object.get("metadata").cloned().unwrap_or(Value::Null))
-                .map_err(|e| error(ErrorKind::Invalid, "unreadable_object", e.to_string()))?;
+        let (object, meta) = self.project_namespace(deletion)?;
         let name = meta.name.clone().unwrap_or_default();
-        refuse_namespace(&name, &meta, deletion, &self.conventions.project_label)?;
+        if meta.deletion_timestamp.is_some() {
+            return Err(error(
+                ErrorKind::Conflict,
+                "already_deleting",
+                format!("{name} is already being deleted."),
+            ));
+        }
         let snapshot = self.input.snapshot;
         for database in &deletion.databases {
             let target = Target {
@@ -205,6 +252,80 @@ impl Planner<'_> {
         Ok(())
     }
 
+    pub(crate) fn force_delete_project(&mut self) -> Result<(), PlanError> {
+        let empty = DeletionInput::default();
+        let deletion = self.input.deletion.unwrap_or(&empty);
+        let (_, meta) = self.project_namespace(deletion)?;
+        let name = meta.name.clone().unwrap_or_default();
+        if meta.deletion_timestamp.is_none() {
+            return Err(error(
+                ErrorKind::Conflict,
+                "not_deleting",
+                format!("{name} is not being deleted; delete the project first."),
+            ));
+        }
+        let mut removed = Vec::new();
+        for held in &deletion.held {
+            let object = &held.object;
+            let meta = meta_of(object);
+            let finalizers = meta.finalizers.unwrap_or_default();
+            let in_project = meta.namespace.as_deref() == Some(name.as_str());
+            if finalizers.is_empty() || !in_project || meta.deletion_timestamp.is_none() {
+                continue;
+            }
+            let target = Target {
+                api_version: held.resource.api_version(),
+                kind: text(object, "/kind"),
+                plural: held.resource.resource.clone(),
+                name: meta.name.unwrap_or_default(),
+            };
+            removed.push(HeldBy::new(
+                target.kind.clone(),
+                target.name.clone(),
+                finalizers.clone(),
+            ));
+            let index = self.working(target, object.clone());
+            self.patch(
+                index,
+                vec![
+                    test("/metadata/finalizers", json!(finalizers)),
+                    replace("/metadata/finalizers", json!([])),
+                ],
+            )?;
+        }
+        if removed.is_empty() {
+            return Err(error(
+                ErrorKind::Conflict,
+                "nothing_held",
+                format!("No object you can read in {name} is being deleted and has finalizers."),
+            ));
+        }
+        self.warnings
+            .push(Warning::RemovesFinalizers { objects: removed });
+        Ok(())
+    }
+
+    /// The project's Namespace as read, refused when it is not a project of the person's to
+    /// delete.
+    fn project_namespace(
+        &self,
+        deletion: &DeletionInput,
+    ) -> Result<(&'a Value, ObjectMeta), PlanError> {
+        let object = self.input.namespace.ok_or_else(|| {
+            error(
+                ErrorKind::NotFound,
+                "unknown_namespace",
+                "The namespace could not be read.",
+            )
+        })?;
+        let meta: ObjectMeta =
+            serde_json::from_value(object.get("metadata").cloned().unwrap_or(Value::Null))
+                .map_err(|e| error(ErrorKind::Invalid, "unreadable_object", e.to_string()))?;
+        let name = meta.name.clone().unwrap_or_default();
+        refuse_namespace(&name, &meta, deletion, &self.conventions.project_label)?;
+        Ok((object, meta))
+    }
+
     fn push_deletion(&mut self, target: Target, object: Value) {
         self.objects.push(Working {
             target,
@@ -249,13 +370,6 @@ fn refuse_namespace(
         return Err(refusal(
             "component_namespace",
             format!("{name} holds a component the installer set up; remove the component instead."),
-        ));
-    }
-    if meta.deletion_timestamp.is_some() {
-        return Err(error(
-            ErrorKind::Conflict,
-            "already_deleting",
-            format!("{name} is already being deleted."),
         ));
     }
     if label(project_label).is_none() {

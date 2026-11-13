@@ -106,6 +106,7 @@ const plainSentence: Partial<Record<Change["op"], PlainKey>> = {
   createProject: "confirm.createProject",
   unadopt: "confirm.unadopt",
   deleteProject: "confirm.deleteProject",
+  forceDeleteProject: "confirm.forceDeleteProject",
   details: "confirm.details",
   buildLimits: "confirm.buildLimits",
   clusterTools: "confirm.clusterTools",
@@ -585,7 +586,9 @@ export function describe(
         : undefined,
     edits,
     outcomes,
-    removalsSaid: ask.changes.every((c) => c.op === "configReload") || undefined,
+    removalsSaid:
+      ask.changes.every((c) => c.op === "configReload" || c.op === "forceDeleteProject") ||
+      undefined,
   }
 }
 
@@ -859,6 +862,7 @@ const plainAction: Partial<Record<Change["op"], PlainKey>> = {
   deployKey: "action.create",
   unadopt: "action.unadopt",
   deleteProject: "action.deleteProject",
+  forceDeleteProject: "action.forceDeleteProject",
   details: "action.saveDetails",
   buildLimits: "action.saveBuildLimits",
   debugContainer: "action.openDebugTerminal",

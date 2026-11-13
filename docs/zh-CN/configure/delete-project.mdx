@@ -83,7 +83,29 @@ kubectl get namespace shop -o yaml
 kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 ```
 
-`status.conditions` 会写明还剩哪些资源、哪些 finalizer 在等。通常的处理方式是让对应的 operator 恢复运行，operator 清理完就会自己移除 finalizer。Zeabur 不会替你移除 finalizer：直接移除会跳过清理，可能留下集群外的资源，例如云磁盘或 S3 里的文件。
+`status.conditions` 会写明还剩哪些资源、哪些 finalizer 在等。通常的处理方式是让对应的 operator 恢复运行，operator 清理完就会自己移除 finalizer。
+
+### 强制删除
+
+控制器已经被移除，或一直清理不完时，在项目页上方点击**强制删除**。只要有对象在等待 finalizer，就会出现这个按钮。控制器通常会自己处理完，多等一会儿更稳妥；确实等不到，再强制删除。
+
+检查页面会列出每个对象和要移除的 finalizer。强制删除会：
+
+- Namespace 报告还在等待的对象，`metadata.finalizers` 会设为 `[]`。只改已经在删除的对象。
+- 不改 Namespace 自己的 `spec.finalizers`。之后 Kubernetes 会删除剩下的东西，再删除 Namespace。
+- 以你的身份运行，所以你需要这些对象的 `patch` 权限。
+
+finalizer 移除后，控制器就没办法清理自己在集群外创建的东西，例如对象存储里的备份或云磁盘，这些要自己检查并删除。
+
+`kubernetes.io/...` 的 finalizer（例如 `kubernetes.io/pvc-protection`）通常是还有 Pod 在用这个磁盘，或节点宕机了，建议先处理那个 Pod 或节点，直接移除可能会留下磁盘。
+
+输入项目名称，再点击**强制删除项目**。
+
+用 kubectl 时，对项目页列出的每个对象运行：
+
+```sh
+kubectl patch clusters.postgresql.cnpg.io orders -n shop --type merge -p '{"metadata":{"finalizers":[]}}'
+```
 
 ## 用同样的名称重建项目
 

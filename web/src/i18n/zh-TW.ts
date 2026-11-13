@@ -530,8 +530,9 @@ export const zhTW: Messages = {
   "deleting.since": (ago) => `${ago}開始刪除。`,
   "deleting.count": (resource, count) => `${resource}（${count}）`,
   "deleting.left": (list) => `還剩：${list}。`,
-  "deleting.held":
-    "下面這些物件在等 finalizer。控制器清理完，就會移除自己加上的 finalizer；Zeabur 不會幫你移除。",
+  "deleting.held": "下面這些物件在等 finalizer。控制器清理完，就會移除自己加上的 finalizer。",
+  "deleting.forceHint": "控制器通常會自己處理完，多等一下比較保險。真的等不到，再強制刪除。",
+  "deleting.force": "強制刪除",
   "deleting.commandsLabel": "用 kubectl 檢視",
 
   "attention.title": "需要處理",
@@ -1162,6 +1163,7 @@ export const zhTW: Messages = {
   "action.adopt": "使用這個 Namespace",
   "action.unadopt": "不再顯示為專案",
   "action.deleteProject": "刪除專案",
+  "action.forceDeleteProject": "強制刪除專案",
   "action.openDebugTerminal": "開啟除錯終端機",
   "action.openToolsTerminal": "開啟 kubectl 終端機",
   "action.saveDetails": "儲存詳細資料",
@@ -1169,6 +1171,7 @@ export const zhTW: Messages = {
   "title.adopt": (ns) => `使用既有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再顯示為專案`,
   "title.deleteProject": (ns) => `刪除專案 ${ns}`,
+  "title.forceDeleteProject": (ns) => `強制刪除專案 ${ns}`,
   "title.details": (ns) => `${ns} 的詳細資料`,
   "title.buildLimits": (ns) => `${ns} 的建置上限`,
   "title.pauseAll": (ns) => `暫停 ${ns} 的所有服務`,
@@ -1179,6 +1182,8 @@ export const zhTW: Messages = {
   "confirm.unadopt": "這個 Namespace 不再顯示為專案，裡面的物件都不會刪除。",
   "confirm.deleteProject":
     "會刪除專案的 Namespace 和裡面所有東西，效果和 kubectl delete namespace 一樣。刪除後無法復原。",
+  "confirm.forceDeleteProject":
+    "會移除卡住專案的 finalizer，讓 Kubernetes 把專案刪完。移除後無法復原。",
   "confirm.debugContainer": (pod: string) =>
     `在副本 ${pod} 加上附 shell 的除錯容器，從裡面看得到應用程式正在執行的程式。`,
   "confirm.debugStays":
@@ -1455,6 +1460,11 @@ export const zhTW: Messages = {
   "warn.rightsMissing": (rights: string) => `叢集可能會拒絕：你缺少 ${rights} 的權限。`,
   "warn.recreated": (names: string, tool: string) =>
     `${names} 由 ${tool} 管理，刪除後 ${tool} 可能會重建`,
+  "warn.removesFinalizers": (names: string) => `移除 ${names} 的 finalizer`,
+  "warn.cleanupSkipped":
+    "這些物件的控制器就沒辦法清理自己在叢集外建立的東西，例如物件儲存裡的備份或雲端磁碟",
+  "warn.kubernetesFinalizers":
+    "其中有 Kubernetes 自己的 finalizer，它的控制器還在運作。通常是還有 Pod 在用這個磁碟，或節點當機了，建議先處理那個 Pod 或節點。直接移除可能會留下磁碟",
   "warn.restartNeeded": (names: string) => `重新啟動後才會生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 會重新啟動 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `若這個叢集有執行 Reloader，會重新啟動 ${names}`,

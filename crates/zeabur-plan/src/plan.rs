@@ -323,7 +323,7 @@ pub fn plan_with(
              changes to the objects in it.",
         ));
     }
-    if request.changes.len() > 1 && request.changes.iter().any(Change::is_project_deletion) {
+    if request.changes.len() > 1 && request.changes.iter().any(Change::deletes_project) {
         return Err(error(
             ErrorKind::BadRequest,
             "delete_project_alone",
@@ -486,6 +486,7 @@ impl<'a> Planner<'a> {
             Change::Adopt => self.adopt(),
             Change::Unadopt => self.unadopt(),
             Change::DeleteProject => self.delete_project(),
+            Change::ForceDeleteProject => self.force_delete_project(),
             Change::Details {
                 display_name,
                 description,
@@ -1934,20 +1935,29 @@ pub(crate) fn pod_spec_steps(kind: WorkloadKind) -> Vec<Step> {
 /// The pin of a patch is the generation when the object has one, else its `resourceVersion`
 /// (the patch's first `test`), so a status write between plan and apply does not make the plan
 /// stale. The pin of a deletion is its `resourceVersion`, the precondition kube-apiserver checks
-/// (it has none on the generation).
+/// (it has none on the generation). A patch that tests `metadata.finalizers` also pins them: a
+/// controller can remove a finalizer without a new generation. Each object is keyed by its
+/// `apiVersion`, kind and name, as two API groups can serve the same kind.
 #[must_use]
 pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
     plan.objects
         .iter()
         .filter_map(|o| {
             let pin = match &o.write {
-                Write::Patch { operations } => operations.first().and_then(|op| {
-                    let path = op.get("path")?.as_str()?;
-                    let value = op.get("value")?;
-                    (op.get("op")?.as_str()? == "test"
-                        && (path == "/metadata/generation" || path == "/metadata/resourceVersion"))
-                        .then(|| format!("{path}={value}"))
-                }),
+                Write::Patch { operations } => operations
+                    .first()
+                    .and_then(|op| {
+                        let path = op.get("path")?.as_str()?;
+                        let value = op.get("value")?;
+                        (op.get("op")?.as_str()? == "test"
+                            && (path == "/metadata/generation"
+                                || path == "/metadata/resourceVersion"))
+                            .then(|| format!("{path}={value}"))
+                    })
+                    .map(|pin| match tested(operations, "/metadata/finalizers") {
+                        Some(finalizers) => format!("{pin} /metadata/finalizers={finalizers}"),
+                        None => pin,
+                    }),
                 Write::Delete {
                     resource_version, ..
                 } => Some(format!(
@@ -1961,7 +1971,24 @@ pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
                 }),
                 Write::Create { .. } | Write::MergePatch { .. } => None,
             };
-            pin.map(|pin| (format!("{}/{}", o.target.kind, o.target.name), pin))
+            pin.map(|pin| {
+                let key = format!(
+                    "{}/{}/{}",
+                    o.target.api_version, o.target.kind, o.target.name
+                );
+                (key, pin)
+            })
         })
         .collect()
+}
+
+/// The value a `test` operation of `operations` expects at `path`.
+fn tested<'v>(operations: &'v [Value], path: &str) -> Option<&'v Value> {
+    operations
+        .iter()
+        .find(|op| {
+            op.get("op").and_then(Value::as_str) == Some("test")
+                && op.get("path").and_then(Value::as_str) == Some(path)
+        })
+        .and_then(|op| op.get("value"))
 }

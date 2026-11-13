@@ -69,6 +69,7 @@ export const namespaceOps = new Set<Schemas.Change["op"]>([
   "adopt",
   "unadopt",
   "deleteProject",
+  "forceDeleteProject",
   "details",
   "buildLimits",
   "createProject",
