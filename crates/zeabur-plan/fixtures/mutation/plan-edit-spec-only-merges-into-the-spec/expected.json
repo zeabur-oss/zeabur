@@ -6,6 +6,10 @@
           "after": "0 0 3 * * 0",
           "before": "0 0 3 * * *",
           "path": "spec.schedule"
+        },
+        {
+          "before": "true",
+          "path": "spec.suspend"
         }
       ],
       "write": {
@@ -24,6 +28,15 @@
             "op": "replace",
             "path": "/spec/schedule",
             "value": "0 0 3 * * 0"
+          },
+          {
+            "op": "test",
+            "path": "/spec/suspend",
+            "value": true
+          },
+          {
+            "op": "remove",
+            "path": "/spec/suspend"
           }
         ],
         "type": "patch"

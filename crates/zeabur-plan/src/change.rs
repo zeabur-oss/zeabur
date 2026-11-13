@@ -317,7 +317,8 @@ pub enum Change {
         name: String,
         /// The edited object, YAML (JSON is YAML too).
         yaml: String,
-        /// Take only `spec` from the copy and keep the rest of the object, its metadata too.
+        /// Take only `spec` from the copy, merged into the object's spec as a JSON merge patch
+        /// (RFC 7386: a null removes a field), and keep the rest of the object, its metadata too.
         #[serde(default, skip_serializing_if = "std::ops::Not::not")]
         spec_only: bool,
     },

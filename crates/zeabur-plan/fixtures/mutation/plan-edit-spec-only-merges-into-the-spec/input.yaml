@@ -12,5 +12,7 @@ metadata:
     cnpg.io/operatorVersion: "1.27.0"
 spec:
   schedule: "0 0 3 * * *"
+  suspend: true
+  immediate: true
   cluster:
     name: pg

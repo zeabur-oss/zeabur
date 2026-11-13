@@ -1963,7 +1963,10 @@ export type Change =
       op: "edit"
       /** The object's resource. */
       resource: ResourceRef
-      /** Take only `spec` from the copy and keep the rest of the object, its metadata too. */
+      /**
+       * Take only `spec` from the copy, merged into the object's spec as a JSON merge patch
+       * (RFC 7386: a null removes a field), and keep the rest of the object, its metadata too.
+       */
       specOnly?: boolean
       /** The edited object, YAML (JSON is YAML too). */
       yaml: string
