@@ -986,6 +986,47 @@ describe("changing backups", () => {
     expect(changed["db-scheduled"].spec).not.toHaveProperty("suspend")
   })
 
+  test("PostgreSQL: an edit keeps the plugin's other parameters, such as the archive's server name", () => {
+    const named = {
+      ...pg,
+      object: {
+        ...pg.object,
+        spec: {
+          plugins: [
+            {
+              name: "barman-cloud.cloudnative-pg.io",
+              enabled: true,
+              isWALArchiver: true,
+              parameters: { barmanObjectName: "db-backups", serverName: "db-v2" },
+            },
+          ],
+        },
+      },
+    } as Database
+    expect(edits(writeBackups(named, { ...kept, keepDays: 30 }, true))).not.toHaveProperty("db")
+    const old = {
+      ...named,
+      object: {
+        ...named.object,
+        spec: {
+          plugins: [
+            {
+              name: "barman-cloud.cloudnative-pg.io",
+              parameters: { barmanObjectName: "elsewhere", serverName: "db-v2" },
+            },
+          ],
+        },
+      },
+    } as Database
+    expect(edits(writeBackups(old, kept, true)).db.spec.plugins).toEqual([
+      {
+        name: "barman-cloud.cloudnative-pg.io",
+        isWALArchiver: true,
+        parameters: { barmanObjectName: "db-backups", serverName: "db-v2" },
+      },
+    ])
+  })
+
   test("MongoDB: an edit replaces the storage and the task, and turning off keeps the task for turning on again", () => {
     const backup = {
       enabled: true,

@@ -920,11 +920,18 @@ function postgresSchedule(database: Database, target: BackupTarget, suspend: boo
 const paused = (database: Database) => ownSchedule(database)?.paused === true
 const scheduled = (database: Database) => ownSchedule(database) !== undefined
 
+/** The cluster archives WAL to `store` through the Barman plugin, the plugin entry keeping its
+ * other fields; without `store`, the cluster has no Barman plugin. */
 function withPlugin(spec: Manifest, store?: string) {
-  const plugins = ((spec.plugins as Manifest[] | undefined) ?? []).filter((p) => p.name !== PLUGIN)
-  spec.plugins = store
-    ? [...plugins, { name: PLUGIN, isWALArchiver: true, parameters: { barmanObjectName: store } }]
-    : plugins
+  const plugins = (spec.plugins as Manifest[] | undefined) ?? []
+  const own = plugins.find((p) => p.name === PLUGIN)
+  if (!store) {
+    spec.plugins = plugins.filter((p) => p !== own)
+    return
+  }
+  const parameters = { ...(own?.parameters as Manifest | undefined), barmanObjectName: store }
+  const entry = { ...own, name: PLUGIN, isWALArchiver: true, parameters }
+  spec.plugins = own ? plugins.map((p) => (p === own ? entry : p)) : [...plugins, entry]
 }
 
 function postgresBackups(w: Writing): Change[] {
