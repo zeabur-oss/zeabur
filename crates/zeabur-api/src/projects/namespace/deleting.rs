@@ -127,18 +127,15 @@ fn condition(namespace: &DynamicObject, kind: &str) -> String {
     else {
         return String::new();
     };
-    for c in conditions {
-        if c.get("type").and_then(Value::as_str) == Some(kind)
-            && c.get("status").and_then(Value::as_str) == Some("True")
-        {
-            return c
-                .get("message")
-                .and_then(Value::as_str)
-                .unwrap_or_default()
-                .to_owned();
-        }
-    }
-    String::new()
+    conditions
+        .iter()
+        .find(|c| {
+            c.get("type").and_then(Value::as_str) == Some(kind)
+                && c.get("status").and_then(Value::as_str) == Some("True")
+        })
+        .and_then(|c| c.get("message").and_then(Value::as_str))
+        .unwrap_or_default()
+        .to_owned()
 }
 
 /// The items of a condition message: what follows the colon, split on `", "`.
@@ -202,16 +199,18 @@ async fn held(
         let Ok(Some(objects)) = cluster.list_objects(&resource, Some(project)).await else {
             continue;
         };
-        for object in objects {
-            if object
-                .metadata
-                .finalizers
-                .as_ref()
-                .is_some_and(|f| !f.is_empty())
-            {
-                out.push((resource.clone(), object));
-            }
-        }
+        out.extend(
+            objects
+                .into_iter()
+                .filter(|object| {
+                    object
+                        .metadata
+                        .finalizers
+                        .as_ref()
+                        .is_some_and(|f| !f.is_empty())
+                })
+                .map(|object| (resource.clone(), object)),
+        );
     }
     out
 }

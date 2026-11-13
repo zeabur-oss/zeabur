@@ -1984,12 +1984,11 @@ pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
 
 /// The value a `test` operation of `operations` expects at `path`.
 fn tested<'v>(operations: &'v [Value], path: &str) -> Option<&'v Value> {
-    for op in operations {
-        if op.get("op").and_then(Value::as_str) == Some("test")
-            && op.get("path").and_then(Value::as_str) == Some(path)
-        {
-            return op.get("value");
-        }
-    }
-    None
+    operations
+        .iter()
+        .find(|op| {
+            op.get("op").and_then(Value::as_str) == Some("test")
+                && op.get("path").and_then(Value::as_str) == Some(path)
+        })
+        .and_then(|op| op.get("value"))
 }
