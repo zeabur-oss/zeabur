@@ -892,6 +892,17 @@ describe("changing backups", () => {
       if (change.op === "edit") expect(change.specOnly).toBe(true)
   })
 
+  test("PostgreSQL: a new setup without a region gets us-east-1", () => {
+    const [secret, store] = writeBackups(postgres, { ...target, region: "" }) as never as [
+      { object: Record<string, never> },
+      { object: { spec: { configuration: Record<string, unknown> } } },
+    ]
+    expect(secret.object).toMatchObject({ stringData: { REGION: "us-east-1" } })
+    expect(store.object.spec.configuration.s3Credentials).toMatchObject({
+      region: { name: "pg-backups-s3", key: "REGION" },
+    })
+  })
+
   test("PostgreSQL: a v0.1.1 setup without a region keeps the ObjectStore off REGION", () => {
     const changes = writeBackups(pg, { ...kept, keepDays: 30 }, true, false)
     const store = edits(changes)["db-backups"].spec

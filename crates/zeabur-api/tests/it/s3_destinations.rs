@@ -287,6 +287,48 @@ mod tests {
         assert_eq!(ops["/metadata/annotations"], Value::Null, "{ops:?}");
     }
 
+    #[tokio::test]
+    async fn typing_into_a_copy_plans_without_the_values_of_its_other_keys() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        copied_twice(&app).await;
+        let typed = json!({"changes": [{"op": "data", "kind": "Secret",
+            "name": "db-backups-s3", "changes": [
+                {"op": "set", "key": "ACCESS_KEY_ID", "value": "mine"}]}]});
+        let (status, planned) =
+            send(&app, "POST", "/api/v1/projects/shop/plan", Some(&typed)).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let text = planned.to_string();
+        let encoded = |value: &str| base64::engine::general_purpose::STANDARD.encode(value);
+        for value in [SECRET_KEY, "pw"] {
+            assert!(!text.contains(&encoded(value)), "{value} leaked: {planned}");
+        }
+        assert!(!text.contains(SECRET_KEY), "{planned}");
+        let after = &planned["objects"][0]["after"];
+        assert_eq!(after["metadata"]["labels"], json!({}), "{planned}");
+        for key in ["ACCESS_SECRET_KEY", "RESTIC_PASSWORD"] {
+            assert_eq!(after["data"][key], "(hidden)", "{planned}");
+        }
+    }
+
+    #[tokio::test]
+    async fn typing_into_a_secret_that_cannot_be_read_is_refused_with_the_read_named() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        copied_twice(&app).await;
+        cluster.update(|s| {
+            s.forbidden_in_namespaces.insert("secrets".to_owned());
+        });
+        let typed = json!({"changes": [{"op": "data", "kind": "Secret",
+            "name": "db-backups-s3", "changes": [
+                {"op": "set", "key": "ACCESS_KEY_ID", "value": "mine"}]}]});
+        let (status, problem) =
+            send(&app, "POST", "/api/v1/projects/shop/plan", Some(&typed)).await;
+        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+        assert_eq!(problem["denied"]["resource"], "secrets", "{problem}");
+        assert_eq!(problem["denied"]["name"], "db-backups-s3", "{problem}");
+    }
+
     fn last_patch(cluster: &MemoryCluster) -> BTreeMap<String, Value> {
         let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
         let Some(WriteBody::JsonPatch(ops)) = writes.last().map(|w| &w.body) else {

@@ -629,8 +629,13 @@ async fn detach(
     let Some(found) = cluster
         .find_object(&resource("Secret"), Some(namespace), &name)
         .await
-        .ok()
-        .flatten()
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("Secret {name} in {namespace}"),
+                get_read("", "secrets", Some(namespace), &name),
+            )
+        })?
     else {
         return Ok(unchanged(name, edits));
     };
