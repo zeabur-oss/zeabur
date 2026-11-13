@@ -18,8 +18,9 @@
 // MariaDB is a mariadb-operator `MariaDB`; its backups are `Backup` objects, scheduled or not.
 // https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/logical_backup.md
 //
-// Dragonfly is a Dragonfly Operator `Dragonfly`; it snapshots to its volume. It loads the same
-// snapshots when it starts, so they are not a separate copy, and Zeabur offers no backups for it.
+// Dragonfly is a Dragonfly Operator `Dragonfly`; it snapshots to a volume, or to a bucket when
+// `spec.snapshot.dir` is `s3://…`.
+// https://www.dragonflydb.io/docs/managing-dragonfly/backups
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
 import type { Translate } from "@/i18n"
@@ -696,23 +697,21 @@ function mariaBackupPods(database: Database) {
   }
 }
 
-/** The engines Zeabur backs up to S3. */
-export type BackupEngine = Exclude<Engine, "dragonfly">
+/** The engines whose backups Zeabur changes and turns off; Dragonfly's are only set up. */
+type BackupEngine = Exclude<Engine, "dragonfly">
 
-export const backsUp = (engine: Engine): engine is BackupEngine => engine !== "dragonfly"
-
-/** The database's engine, for a database that `backsUp`. */
-export const backupEngine = (database: Database) => database.engine as BackupEngine
+/** The database's engine, for a database with `ownBackups`. */
+const backupEngine = (database: Database) => database.engine as BackupEngine
 
 /** Engines whose backups have no retention: the person sets a lifecycle rule on the bucket. */
-export const keepsEverything = (engine: Engine) => engine === "mysql"
+export const keepsEverything = (engine: Engine) => engine === "mysql" || engine === "dragonfly"
 
 /** MOCO writes to a fixed folder, `moco/<namespace>/<name>`. */
 export const fixedFolder = (engine: Engine) => engine === "mysql"
 
 /** The keys of the backups' Secret, and the key of the region where the Secret holds it. */
 const SECRET_KEYS: Record<
-  BackupEngine,
+  Engine,
   { accessKeyId: string; secretAccessKey: string; region?: string }
 > = {
   postgresql: {
@@ -723,6 +722,7 @@ const SECRET_KEYS: Record<
   mongodb: AWS_KEYS,
   mysql: { ...AWS_KEYS, region: "AWS_REGION" },
   mariadb: { ...AWS_KEYS, region: "AWS_REGION" },
+  dragonfly: { ...AWS_KEYS, region: "AWS_REGION" },
 }
 
 /** Engines whose region only the keys Secret holds, so the page cannot show it. */
@@ -755,7 +755,11 @@ function ownSchedule(database: Database) {
 /** The database's backups are the ones Zeabur set up, so its form can change them. */
 export function ownBackups(database: Database) {
   const store = database.backups.store
-  return store?.name === storeName(database) && store.secret === backupNames(database.name).secret
+  return (
+    database.engine !== "dragonfly" &&
+    store?.name === storeName(database) &&
+    store.secret === backupNames(database.name).secret
+  )
 }
 
 /** Whole days in a duration such as "7d" or "168h". */
@@ -807,13 +811,13 @@ interface Writing {
 
 /** The keys Secret, by its `keys`, holds the region. */
 export const holdsRegion = (database: Database, keys: string[]) => {
-  const key = SECRET_KEYS[backupEngine(database)].region
+  const key = SECRET_KEYS[database.engine].region
   return key !== undefined && keys.includes(key)
 }
 
 /** The region key and value the keys Secret gets, unless a kept Secret keeps its own. */
 function regionEntry(database: Database, target: BackupTarget, keysExist: boolean) {
-  const key = SECRET_KEYS[backupEngine(database)].region
+  const key = SECRET_KEYS[database.engine].region
   const region = target.region.trim()
   if (!key || (keysExist && regionInSecret(database.engine) && region === "")) return {}
   return { [key]: region || "us-east-1" }
@@ -823,7 +827,7 @@ function regionEntry(database: Database, target: BackupTarget, keysExist: boolea
  * the Secret holds the region, an empty region keeps the one it has. */
 function keyWrites({ database, target, keysExist }: Writing): Change[] {
   const name = backupNames(database.name).secret
-  const { region: _, ...keys } = SECRET_KEYS[backupEngine(database)]
+  const { region: _, ...keys } = SECRET_KEYS[database.engine]
   const more: Record<string, string> = regionEntry(database, target, keysExist)
   if (!keysExist || target.destination !== undefined) return [keysSecret(name, target, keys, more)]
   const typed = keepsKeys(target, keysExist)
@@ -1068,11 +1072,44 @@ function mariaBackups(w: Writing): Change[] {
   ]
 }
 
-const BACKUPS: Record<BackupEngine, (w: Writing) => Change[]> = {
+function dragonflyBackups(w: Writing): Change[] {
+  const { database, target } = w
+  const secret = backupNames(database.name).secret
+  const endpoint = target.endpoint.trim()
+  const host = endpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "")
+  const own = (arg: string) => arg.startsWith("--s3_endpoint=") || arg.startsWith("--s3_use_https=")
+  const key = (name: string) => ({ name, valueFrom: { secretKeyRef: { name: secret, key: name } } })
+  return [
+    ...keyWrites(w),
+    ...editObject(database, (spec) => {
+      spec.args = [
+        ...((spec.args as string[] | undefined) ?? []).filter((arg) => !own(arg)),
+        `--s3_endpoint=${host}`,
+        `--s3_use_https=${!endpoint.startsWith("http://")}`,
+      ]
+      spec.env = [
+        ...((spec.env as Manifest[] | undefined) ?? []).filter(
+          (e) => !String(e.name).startsWith("AWS_"),
+        ),
+        key("AWS_ACCESS_KEY_ID"),
+        key("AWS_SECRET_ACCESS_KEY"),
+        key("AWS_REGION"),
+      ]
+      spec.snapshot = {
+        ...(spec.snapshot as Manifest | undefined),
+        dir: `s3://${target.bucket.trim()}/${folder(target, database.name)}`,
+        cron: cron(target.frequency, false),
+      }
+    }),
+  ]
+}
+
+const BACKUPS: Record<Engine, (w: Writing) => Change[]> = {
   postgresql: postgresBackups,
   mongodb: mongoBackups,
   mysql: mysqlBackups,
   mariadb: mariaBackups,
+  dragonfly: dragonflyBackups,
 }
 
 /**
@@ -1091,7 +1128,7 @@ export function writeBackups(
   const current = ownBackups(database) ? currentTarget(database) : undefined
   return madeFor(
     database.name,
-    BACKUPS[backupEngine(database)]({ database, target, current, keysExist, regionSaved }),
+    BACKUPS[database.engine]({ database, target, current, keysExist, regionSaved }),
   )
 }
 
@@ -1136,7 +1173,8 @@ export const turnOffBackups = (database: Database): Change[] =>
 
 /** Engines whose database restarts once its backups are turned on or off: a sidecar or new
  * arguments. */
-const restartsForBackups = (engine: Engine) => engine === "postgresql" || engine === "mongodb"
+const restartsForBackups = (engine: Engine) =>
+  engine === "postgresql" || engine === "mongodb" || engine === "dragonfly"
 
 const where = (database: Database, target: BackupTarget) => {
   const namespace = database.origin.namespace ?? ""
@@ -1239,7 +1277,7 @@ export function backupName(database: string, now: Date) {
   return `${database}-${stamp}`
 }
 
-/** Engines that take a backup on demand: MOCO only backs up on its schedule. */
+/** Engines that take a backup on demand: MOCO and Dragonfly only back up on their schedule. */
 export const canBackUpNow = (engine: Engine) =>
   engine === "postgresql" || engine === "mongodb" || engine === "mariadb"
 

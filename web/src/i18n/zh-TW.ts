@@ -2960,6 +2960,9 @@ export const zhTW: Messages = {
   "db.backup.walNote": "PostgreSQL 也會持續把交易日誌（WAL）封存到那裡。",
   "db.backup.keepsEverything": "所有備份都會保留。要刪除舊備份，在儲存貯體設定生命週期規則。",
   "db.backup.fixedFolder": (folder) => `MOCO 會寫到儲存貯體裡的 ${folder}。`,
+  "db.backup.startsEmpty":
+    "只有一個執行個體時，Dragonfly 重新啟動會從還是空的儲存貯體載入，現有資料則保存在磁碟區快照裡。",
+  "db.backup.snapshots": "Dragonfly 會依排程以及停止時寫入快照。Zeabur 無法列出這些快照。",
   "db.backup.retentionHours": (hours) => `${hours} 內的備份`,
   "db.backup.edit": "編輯",
   "db.backup.change": "變更備份",
@@ -2983,6 +2986,7 @@ export const zhTW: Messages = {
   "db.restore.title": (name) => `從 ${name} 的備份點建立新資料庫`,
   "db.restore.body": "Zeabur 會用相同設定建立新的資料庫，資料來自備份。原本的資料庫不會變動。",
   "db.restore.point": "備份",
+  "db.restore.latest": "最新的快照",
   "db.restore.name": "新資料庫名稱",
   "db.restore.none": "還沒有可以還原的完成備份或時間點。",
   "db.restore.fromBackup": "完成的備份",

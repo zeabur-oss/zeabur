@@ -1,4 +1,5 @@
-//! The Dragonfly Operator: Redis-compatible stores from `Dragonfly` objects [df-api].
+//! The Dragonfly Operator: Redis-compatible stores from `Dragonfly` objects, and their snapshots
+//! [df-api].
 //!
 //! # As a database
 //!
@@ -9,11 +10,12 @@
 //! `RollingUpdate` or `ResourcesCreated` [df-api]. `spec.authentication.passwordFromSecret` names
 //! the password.
 //!
-//! # No backups
+//! # Backups
 //!
 //! Dragonfly writes snapshots to `spec.snapshot.dir` on the `spec.snapshot.cron` schedule, and on
-//! shutdown. At start it loads the newest snapshot there [df-backups]. The folder is where the
-//! store persists, not a separate copy, so Zeabur shows no backups for it.
+//! shutdown. At start it loads the newest snapshot there. A directory `s3://bucket/path` puts
+//! snapshots in a bucket. A snapshot is a file, not an object, so there are no runs to show
+//! [df-backups].
 //!
 //! The Dragonfly server is under the Business Source License 1.1; the operator is Apache-2.0.
 //!
@@ -23,7 +25,8 @@
 use serde_json::Value;
 use zeabur_kube::DynamicObject;
 
-use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State};
+use crate::backups::{Schedule, Target, TargetKind};
+use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
 use crate::{Module, Read, text};
 
 /// The module.
@@ -51,7 +54,66 @@ fn state(phase: Option<&str>, members: i64) -> State {
     }
 }
 
-/// One `Dragonfly` as a database.
+/// The value of `--<flag>=` in `spec.args`.
+fn arg(store: &DynamicObject, flag: &str) -> Option<String> {
+    let prefix = format!("--{flag}=");
+    store
+        .data
+        .pointer("/spec/args")?
+        .as_array()?
+        .iter()
+        .filter_map(Value::as_str)
+        .find_map(|a| a.strip_prefix(&prefix))
+        .map(str::to_owned)
+}
+
+fn backups_of(namespace: &str, store: &DynamicObject, name: &str) -> Backups {
+    let Some(dir) = text(store, "/spec/snapshot/dir").filter(|d| d.starts_with("s3://")) else {
+        return Backups::default();
+    };
+    let secret = store
+        .data
+        .pointer("/spec/env")
+        .and_then(Value::as_array)
+        .and_then(|all| all.iter().find(|e| e["name"] == "AWS_SECRET_ACCESS_KEY"))
+        .and_then(|e| e.pointer("/valueFrom/secretKeyRef/name"))
+        .and_then(Value::as_str)
+        .map(str::to_owned);
+    let https = arg(store, "s3_use_https").is_none_or(|v| v != "false");
+    let schedules = text(store, "/spec/snapshot/cron")
+        .map(|cron| Schedule {
+            name: format!("{namespace}/{name}"),
+            provider: MODULE.id.to_owned(),
+            cron,
+            paused: false,
+            targets: vec![Target {
+                kind: TargetKind::Database,
+                name: name.to_owned(),
+            }],
+            note: None,
+            ..Schedule::default()
+        })
+        .into_iter()
+        .collect();
+    Backups {
+        store: Some(Store {
+            name: name.to_owned(),
+            destination: Some(dir),
+            endpoint: arg(store, "s3_endpoint")
+                .map(|host| format!("{}://{host}", if https { "https" } else { "http" })),
+            secret,
+            region: None,
+            retention: None,
+            in_use: true,
+        }),
+        schedules,
+        runs: Vec::new(),
+        ready: false,
+        recovery_window: None,
+    }
+}
+
+/// One `Dragonfly` as a database, with where its snapshots go.
 #[must_use]
 pub fn database(namespace: &str, store: &DynamicObject) -> Database {
     let name = store.metadata.name.clone().unwrap_or_default();
@@ -122,7 +184,7 @@ pub fn database(namespace: &str, store: &DynamicObject) -> Database {
             secret,
             password_key: password.1,
         }),
-        backups: Backups::default(),
+        backups: backups_of(namespace, store, &name),
         created: store
             .metadata
             .creation_timestamp
@@ -169,7 +231,7 @@ mod tests {
     }
 
     #[test]
-    fn snapshots_in_a_bucket_are_not_backups() {
+    fn a_ready_store_with_snapshots_in_a_bucket() {
         let db = database(
             "shop",
             &object(serde_json::json!({
@@ -191,7 +253,11 @@ mod tests {
         assert_eq!(db.version.as_deref(), Some("1.34.1"));
         assert_eq!(db.claims, Vec::<String>::new());
         assert_eq!(db.connection.secret, "cache-auth");
-        assert!(db.backups.store.is_none());
+        let store = db.backups.store.unwrap();
+        assert_eq!(store.destination.as_deref(), Some("s3://b/cache"));
+        assert_eq!(store.endpoint.as_deref(), Some("https://s3.example.com"));
+        assert_eq!(store.secret.as_deref(), Some("cache-backups-s3"));
+        assert_eq!(db.backups.schedules[0].cron, "0 3 * * *");
     }
 
     #[test]

@@ -57,7 +57,7 @@ const base = (patch: Partial<Database>): Database =>
 const point = { backup: "shop-1", time: "2026-10-22T03:01:00Z", from: "20261022T030000" }
 
 describe("restore points", () => {
-  test("are the succeeded runs that name what to restore", () => {
+  test("are the succeeded runs that name what to restore; Dragonfly's is its newest snapshot", () => {
     const pg = base({
       engine: "postgresql",
       backups: {
@@ -67,6 +67,11 @@ describe("restore points", () => {
       } as Database["backups"],
     })
     expect(restorePoints(pg).map((p) => p.from)).toEqual(["id-a"])
+    const cache = base({
+      engine: "dragonfly",
+      backups: { schedules: [], runs: [], ready: false, store: { name: "x", inUse: true } },
+    })
+    expect(restorePoints(cache)).toEqual([{ backup: "latest" }])
   })
 
   test("the new name is the original's with the date, cut to fit", () => {
@@ -324,6 +329,49 @@ describe("restoring into a new database", () => {
       targetRecoveryTime: "2026-10-22T03:01:00Z",
     })
   })
+
+  test("Dragonfly copies the newest snapshot into a folder of its own before it starts", () => {
+    const cache = base({
+      engine: "dragonfly",
+      apiVersion: "dragonflydb.io/v1alpha1",
+      kind: "Dragonfly",
+      backups: {
+        schedules: [],
+        runs: [],
+        ready: false,
+        store: {
+          name: "shop",
+          destination: "s3://b/shop",
+          endpoint: "https://s3.test",
+          inUse: true,
+        },
+      },
+      object: {
+        spec: {
+          authentication: { passwordFromSecret: { name: "shop-auth", key: "password" } },
+          snapshot: { dir: "s3://b/shop", cron: "0 3 * * *" },
+          env: [
+            { name: "AWS_ACCESS_KEY_ID", valueFrom: {} },
+            { name: "OTHER", value: "x" },
+          ],
+        },
+      } as unknown as Database["object"],
+    })
+    const [, store] = bodies(
+      restoreChanges(cache, { backup: "latest" }, "copy", "demo", () => "pw"),
+    )
+    expect(store?.spec.snapshot.dir).toBe("s3://b/copy")
+    expect(store?.spec.authentication.passwordFromSecret.name).toBe("copy-auth")
+    const copy = store?.spec.initContainers[0]
+    expect(copy.env.map((e: { name: string }) => e.name)).toEqual([
+      "FROM",
+      "TO",
+      "ENDPOINT",
+      "HOME",
+      "AWS_ACCESS_KEY_ID",
+    ])
+    expect(copy.env[0].value).toBe("s3://b/shop")
+  })
 })
 
 describe("the copy's own Secrets", () => {
@@ -390,8 +438,9 @@ describe("the copy's own Secrets", () => {
     })
   })
 
-  test("PostgreSQL keeps no Secret of the original", () => {
+  test("PostgreSQL and Dragonfly keep no Secret of the original", () => {
     expect(keptSecret(base({ engine: "postgresql" }))).toBeUndefined()
+    expect(keptSecret(base({ engine: "dragonfly" }))).toBeUndefined()
   })
 })
 

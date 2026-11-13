@@ -79,8 +79,6 @@ Dragonfly 的许可证为 `Apache-2.0 AND BUSL-1.1`。选用前阅读表单显�
 
 ## 配置 S3 备份
 
-PostgreSQL、MongoDB、MySQL、MariaDB 可以备份到 S3。Dragonfly 没有**备份**，数据存在卷上的快照里，启动时会加载最新的那份。
-
 1. 打开数据库的**备份** → **设置备份**。
 2. **S3 目的地**默认选择集群中添加的第一个目的地。要使用其他位置，改选另一个目的地，或选择**手动输入**，填写**端点**、**存储桶**、**区域**、**访问密钥 ID**、**私密访问密钥**。集群还没有目的地时，表单会提供添加目的地的入口。
 3. 有**文件夹**字段时，可指定存储位置，留空则使用数据库名称。MySQL 固定写入 `moco/<项目名称>/<数据库名称>`。
@@ -99,12 +97,17 @@ CloudNativePG（PostgreSQL）的备份文件以明文存入存储桶。请使用
 | MongoDB | 将表单中的天数换算成份数。每日备份保留相同份数，每周备份保留天数除以 7 后向上取整 | 有 | 已成功且包含还原信息的备份 |
 | MySQL | 保留所有备份，在 S3 存储桶中设置生命周期清理规则 | 无，按定时配置运行 | 已成功且包含还原信息的备份 |
 | MariaDB | **保留天数** | 有 | 已成功且包含还原信息的备份 |
+| Dragonfly | 保留所有快照，在 S3 存储桶中设置生命周期清理规则 | 无，按定时配置及停止时写入快照 | 最新快照 |
 
-PostgreSQL、MongoDB、MariaDB 配置好备份后，点击页面上方的**立即备份**，检查页面会显示备份目的地。再次点击**立即备份**，到**备份记录**等待备份成功。第一条成功记录出现之前，还没有可还原的备份。
+<Callout type="warn">
+只有一个实例的 Dragonfly 在切换到 S3 快照配置时会重启。如果目标位置还没有快照，Dragonfly 会从空数据开始，原数据只保留在原卷的快照中。已有数据时，先安排数据迁移，再应用这项变更。
+</Callout>
+
+PostgreSQL、MongoDB、MariaDB 配置好备份后，点击页面上方的**立即备份**，检查页面会显示备份目的地。再次点击**立即备份**，到**备份记录**等待备份成功。第一条成功记录出现之前，还没有可还原的备份。Dragonfly 的快照不会列在这个页面，需要到 S3 目标确认快照文件。
 
 ## 更改或关闭备份
 
-备份开启后，**备份**的**目的地**区块有**编辑**和**关闭备份**。
+备份开启后，**备份**的**目的地**区块有**编辑**和**关闭备份**。Dragonfly 没有这两项。
 
 1. 点击**编辑**。表单会带入当前的端点、存储桶、文件夹、定时和保留天数，但不会显示访问密钥。
 2. 修改需要改的地方。要沿用密钥，**访问密钥 ID** 和**私密访问密钥**都留空；要替换，就两个都填，或选一个共享的 S3 目的地复制它的密钥。PostgreSQL 和 MySQL 的区域和密钥存在一起，**区域**留空就沿用。
@@ -123,7 +126,7 @@ PostgreSQL、MongoDB、MariaDB 配置好备份后，点击页面上方的**立�
 
 到原数据库的**备份**，点击**还原为新数据库**。选择**备份**，填写尚未使用的**新数据库名称**，再检查并应用。
 
-**备份**只列出成功且包含还原信息的记录。新数据库沿用原来的规格，数据停留在所选备份的时间点，原数据库和应用连接保持不变。
+PostgreSQL、MongoDB、MySQL、MariaDB 只列出成功且包含还原信息的记录。Dragonfly 使用**最新的快照**。新数据库沿用原来的规格，数据停留在所选备份的时间点，原数据库和应用连接保持不变。
 
 </Step>
 <Step>
@@ -160,7 +163,7 @@ PostgreSQL、MongoDB、MariaDB 配置好备份后，点击页面上方的**立�
 | MongoDB | `mongodump --archive --gzip --oplog`，下载 `.archive.gz`。 |
 | MySQL | `mysqldump --single-transaction`，排除系统数据库，下载 gzip 压缩的 SQL。 |
 | MariaDB | `mariadb-dump --single-transaction`，排除系统数据库，下载 gzip 压缩的 SQL。 |
-| Dragonfly | 没有**导出**操作，数据存在卷上的快照里。 |
+| Dragonfly | 没有**导出**操作，使用快照备份。 |
 
 导出使用你的 `pods/exec` 权限在数据库容器中运行。MySQL 还需要读取数据库机密变量的权限。如果下载失败或中途停止，文件不完整，需要重新导出。
 
@@ -655,6 +658,7 @@ spec:
 | MongoDB | PerconaServerMongoDB 的 `spec.backup`：`storages.backups.s3` 填写存储桶和端点，`credentialsSecret` 指向密钥机密变量（`AWS_ACCESS_KEY_ID`、`AWS_SECRET_ACCESS_KEY`），`tasks` 中有一项 `scheduled`。立即备份对应 PerconaServerMongoDBBackup。 |
 | MySQL | ServiceAccount `<名称>-backup`、BackupPolicy `<名称>-backups`，MySQLCluster 的 `spec.backupPolicyName` 指向后者。 |
 | MariaDB | Backup `<名称>-scheduled`，`schedule.cron` 是定时表达式，`maxRetention` 是保留时间。 |
+| Dragonfly | 在 Dragonfly 的 `spec.args` 中添加 `--s3_endpoint`、`--s3_use_https`，`spec.env` 读取密钥，`spec.snapshot.dir` 改为 `s3://<存储桶>/<文件夹>`。 |
 
 要查看字段的完整内容，可以先在界面中配置一次，再用 `kubectl -n shop get <种类> <名称> -o yaml` 对照。
 

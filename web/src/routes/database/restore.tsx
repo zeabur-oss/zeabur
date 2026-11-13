@@ -315,6 +315,7 @@ function BackupField({
 }
 
 function pointLabel(t: Translate, locale: Locale, p: RestorePoint) {
+  if (p.backup === "latest") return t("db.restore.latest")
   return p.time ? `${formatTime(p.time, locale)}${t("common.sep")}${p.backup}` : p.backup
 }
 
