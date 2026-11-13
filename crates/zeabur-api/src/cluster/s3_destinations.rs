@@ -616,8 +616,8 @@ async fn copy_into(
 /// A change of keys of the Secret `name`. When the Secret is a copy of a destination and the
 /// change sets or removes the copied keys, the keys are the person's own from now on: an `edit`
 /// that applies the change and drops the marks, so a later rotation leaves them. Any other change
-/// stays as it is, and so does every change of a person who may not `get` the Secret: they cannot
-/// see the marks, and a key change is a merge patch that reads nothing.
+/// stays as it is. The marks come from a metadata-only `list`, so a key change of a Secret the
+/// person may not `get` still needs no `get`; only a copied key reads the Secret.
 async fn detach(
     cluster: &dyn Cluster,
     namespace: &str,
@@ -629,31 +629,29 @@ async fn detach(
         name,
         changes: edits,
     };
-    let found = match cluster
-        .find_object(&resource("Secret"), Some(namespace), &name)
+    let listed = cluster
+        .list_metadata(&resource("Secret"), Some(namespace))
         .await
-    {
-        Ok(Some(found)) => found,
-        Ok(None) => return Ok(unchanged(name, edits)),
-        Err(e) if e.code() == Some(403) => return Ok(unchanged(name, edits)),
-        Err(e) => {
-            return Err(read_problem(
+        .map_err(|e| {
+            read_problem(
                 e,
-                &format!("Secret {name} in {namespace}"),
-                get_read("", "secrets", Some(namespace), &name),
-            ));
-        }
+                &format!("the Secrets in {namespace}"),
+                list_read("", "secrets", Some(namespace)),
+            )
+        })?
+        .unwrap_or_default();
+    let Some(found) = listed
+        .into_iter()
+        .find(|m| m.name.as_deref() == Some(name.as_str()))
+    else {
+        return Ok(unchanged(name, edits));
     };
-    let found = serde_json::to_value(&found).unwrap_or_default();
-    let marked = found
-        .pointer("/metadata/labels")
-        .and_then(|l| l.get(LABEL))
-        .is_some();
-    let copied: Vec<&str> = found
-        .pointer("/metadata/annotations")
-        .and_then(|a| a.get(KEYS))
-        .and_then(Value::as_str)
-        .map_or_default(|keys| keys.split(',').collect());
+    let marked = found.labels.is_some_and(|l| l.contains_key(LABEL));
+    let keys = found
+        .annotations
+        .and_then(|mut a| a.remove(KEYS))
+        .unwrap_or_default();
+    let copied: Vec<&str> = keys.split(',').collect();
     if !marked || !edits.iter().any(|e| copied.contains(&e.key.as_str())) {
         return Ok(unchanged(name, edits));
     }
