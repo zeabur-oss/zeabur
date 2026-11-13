@@ -91,6 +91,17 @@ pub struct PlanResponse {
 pub struct ApplyRequest {
     /// The token `plan` returned.
     pub token: String,
+    /// The form that made the plan, when it is one the experience program tells apart.
+    #[serde(default)]
+    pub via: Option<Via>,
+}
+
+/// The form that made a plan.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Via {
+    /// Docker Compose import.
+    Compose,
 }
 
 /// One object an apply wrote.
@@ -501,16 +512,28 @@ pub(crate) async fn apply(
             }
         }
     }
-    if let Some(used) = &state.used {
-        crate::used::report(
-            used,
-            cluster.as_ref(),
-            &state.settings,
-            &claims.request.changes,
-        )
-        .await;
-    }
+    report_used(
+        &state,
+        cluster.as_ref(),
+        &claims.request.changes,
+        request.via,
+    )
+    .await;
     Ok(Json(ApplyResponse { applied }))
+}
+
+/// Tells the experience program what a finished apply used; nothing runs when it is off.
+async fn report_used(
+    state: &AppState,
+    cluster: &dyn Cluster,
+    changes: &[Change],
+    via: Option<Via>,
+) {
+    let Some(used) = &state.used else { return };
+    crate::used::report(used, cluster, &state.settings, changes).await;
+    if via == Some(Via::Compose) {
+        used(zeabur_telemetry::Feature::Compose);
+    }
 }
 
 /// Writes `write`. kube-apiserver makes the `default` ServiceAccount of a new namespace on its

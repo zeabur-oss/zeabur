@@ -4,7 +4,6 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
-    use std::sync::{Arc, Mutex};
 
     use axum::Router;
     use axum::http::StatusCode;
@@ -17,7 +16,7 @@ mod tests {
     use zeabur_telemetry::{Feature, Source};
 
     use crate::common::send;
-    use crate::support::TestApi;
+    use crate::support::{Seen, TestApi, recorder, taken};
 
     fn cluster() -> MemoryCluster {
         let namespace: Namespace = serde_json::from_value(json!({"metadata": {"name": "shop",
@@ -64,20 +63,13 @@ mod tests {
         }
     }
 
-    type Seen = Arc<Mutex<Vec<Feature>>>;
-
     fn api(cluster: &MemoryCluster) -> (Router, Seen) {
-        let seen = Seen::default();
-        let log = Arc::clone(&seen);
+        let (used, seen) = recorder();
         let app = TestApi::new(cluster)
             .with_settings(settings())
-            .with_used(Arc::new(move |feature| log.lock().unwrap().push(feature)))
+            .with_used(used)
             .router();
         (app, seen)
-    }
-
-    fn taken(seen: &Seen) -> Vec<Feature> {
-        seen.lock().unwrap().clone()
     }
 
     async fn plan(app: &Router, changes: &Value) -> Value {
@@ -126,6 +118,35 @@ mod tests {
         );
     }
 
+    async fn applied_via(app: &Router, changes: &Value, via: Option<&str>) {
+        let planned = plan(app, changes).await;
+        let (status, body) = send(
+            app,
+            "POST",
+            "/api/v1/projects/shop/apply",
+            Some(&json!({"token": planned["token"], "via": via})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+    }
+
+    #[tokio::test]
+    async fn a_compose_import_is_sent_after_its_apply_and_a_plain_apply_is_not() {
+        let changes = json!([deployment()]);
+        let (app, seen) = api(&cluster());
+        let planned = plan(&app, &changes).await;
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
+        assert_eq!(apply(&app, &planned).await, StatusCode::OK);
+        assert_eq!(taken(&seen), [Feature::ServiceCreated(Source::Image)]);
+
+        let (app, seen) = api(&cluster());
+        applied_via(&app, &changes, Some("compose")).await;
+        assert_eq!(
+            taken(&seen),
+            [Feature::ServiceCreated(Source::Image), Feature::Compose]
+        );
+    }
+
     #[tokio::test]
     async fn nothing_is_sent_when_the_apply_fails() {
         let cluster = cluster();
@@ -135,7 +156,7 @@ mod tests {
             s.forbidden_writes.insert("Deployment/api".to_owned());
         });
         assert_ne!(apply(&app, &planned).await, StatusCode::OK);
-        assert!(seen.lock().unwrap().is_empty());
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
     }
 
     #[tokio::test]
@@ -159,7 +180,7 @@ mod tests {
             assert_eq!(apply(&app, &planned).await, StatusCode::OK);
             cluster.inspect(|s| s.object_reads).unwrap() - before
         };
-        let used: zeabur_api::used::Used = Arc::new(|_| {});
+        let used: zeabur_api::used::Used = std::sync::Arc::new(|_| {});
         assert!(reads(Some(used)).await > reads(None).await);
     }
 }

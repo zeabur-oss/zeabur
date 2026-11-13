@@ -251,6 +251,7 @@ mod tests {
             Event::FeatureUsed(used(Feature::ServiceCreated(Source::Git))),
             Event::FeatureUsed(used(Feature::DatabaseCreated(DatabaseKind::ObjectStorage))),
             Event::FeatureUsed(used(Feature::DomainAdded(DomainKind::Custom))),
+            Event::FeatureUsed(used(Feature::LogsViewed)),
             Event::InstallStarted(install()),
             Event::InstallFinished(install()),
             Event::InstallFailed(Failure {

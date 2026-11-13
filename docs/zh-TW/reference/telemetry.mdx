@@ -12,7 +12,7 @@ description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕�
 | 事件 | 由誰傳送 | 時機 |
 |---|---|---|
 | `zeabur_active` | Zeabur | 每個人每天（UTC）第一次使用 Zeabur 網頁介面時 |
-| `feature_used` | Zeabur | 成功建立服務、資料庫或網域之後；同一項功能、同一組值每天（UTC）只傳一次 |
+| `feature_used` | Zeabur | 成功建立服務、資料庫或網域，開啟日誌串流或終端機，邀請成員，或套用 Docker Compose 匯入之後；同一項功能、同一組值每天（UTC）只傳一次 |
 | `install_started` | Installer | `apply` 開始 |
 | `install_finished` | Installer | `apply` 順利結束 |
 | `install_failed` | Installer | `apply` 中途停止 |
@@ -23,7 +23,7 @@ description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕�
 | `day` | `zeabur_active`、`feature_used` | UTC 日期，例如 `2026-10-30` |
 | `person` | `zeabur_active` | 32 位十六進位數字，只在同一個安裝、同一天裡分辨不同的人 |
 | `mode` | `zeabur_active` | `in-cluster` |
-| `feature` | `feature_used` | `service_created`、`database_created` 或 `domain_added` |
+| `feature` | `feature_used` | `service_created`、`database_created`、`domain_added`、`logs_viewed`、`terminal_opened`、`member_invited` 或 `compose` |
 | `source` | `service_created` 的 `feature_used` | 服務怎麼建立：`git`、`upload`、`image` 或 `template` |
 | `template` | `source` 為 `template` 的 `feature_used` | 範本在 Zeabur Catalog 裡的 ID，例如 `wordpress`；Catalog 沒有的 ID 不會傳送 |
 | `kind` | `database_created` 或 `domain_added` 的 `feature_used` | 資料庫或物件儲存：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。網域：名稱用的是 Zeabur 提供給新服務的網域後綴時是 `generated`，其他是 `custom` |

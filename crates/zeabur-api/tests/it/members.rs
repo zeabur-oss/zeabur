@@ -9,9 +9,10 @@ mod tests {
     use zeabur_api::settings::IdentitySettings;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, Identity, ServedResource, WriteBody};
+    use zeabur_telemetry::Feature;
 
     use crate::common::send;
-    use crate::support::TestApi;
+    use crate::support::{TestApi, recorder, taken};
 
     const NS: &str = "zeabur-identity";
 
@@ -408,6 +409,44 @@ mod tests {
                     && o.metadata.name.as_deref() == Some(name)
             })
             .unwrap()
+    }
+
+    #[tokio::test]
+    async fn an_invitation_is_reported_once_its_link_is_made_and_other_changes_are_not() {
+        let cluster = signed_in("zeabur:ada");
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster)
+            .with_settings(settings())
+            .with_used(used)
+            .router();
+        let apply = |change: Value| {
+            let app = app.clone();
+            async move {
+                let (_, plan) = send(&app, "POST", "/api/v1/members/plan", Some(&change)).await;
+                let token = &plan["token"];
+                send(
+                    &app,
+                    "POST",
+                    "/api/v1/members/apply",
+                    Some(&json!({"token": token})),
+                )
+                .await
+            }
+        };
+        let (status, ..) = apply(json!({"op": "access", "username": "bob", "admin": true})).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, ..) = send(
+            &app,
+            "POST",
+            "/api/v1/members/apply",
+            Some(&json!({"token": "m1.nope"})),
+        )
+        .await;
+        assert_ne!(status, StatusCode::OK);
+        assert_eq!(taken(&seen), []);
+        let (status, ..) = apply(json!({"op": "invite", "username": "cy"})).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(taken(&seen), [Feature::MemberInvited]);
     }
 
     #[tokio::test]

@@ -31,6 +31,8 @@ export interface PlanAsk {
   quiet?: boolean
   /** Where the toast's View goes, when the changes do not say. */
   view?: string
+  /** The form that made the ask, when the apply should say so. */
+  via?: Schemas.Via
 }
 
 /** For a plan of objects written as YAML. */

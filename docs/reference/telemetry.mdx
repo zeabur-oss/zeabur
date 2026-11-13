@@ -12,7 +12,7 @@ Zeabur sends one event the first time each person uses it in a UTC day, and one 
 | Event | Sent by | When |
 |---|---|---|
 | `zeabur_active` | Zeabur | The first time each person uses Zeabur's web interface in a UTC day |
-| `feature_used` | Zeabur | After a call succeeds that creates a service, a database or a domain; once per UTC day for each feature and set of values |
+| `feature_used` | Zeabur | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import; once per UTC day for each feature and set of values |
 | `install_started` | Installer | `apply` begins |
 | `install_finished` | Installer | `apply` succeeds |
 | `install_failed` | Installer | `apply` stops |
@@ -23,7 +23,7 @@ Zeabur sends one event the first time each person uses it in a UTC day, and one 
 | `day` | `zeabur_active`, `feature_used` | The UTC date, such as `2026-10-30` |
 | `person` | `zeabur_active` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `mode` | `zeabur_active` | `in-cluster` |
-| `feature` | `feature_used` | `service_created`, `database_created` or `domain_added` |
+| `feature` | `feature_used` | `service_created`, `database_created`, `domain_added`, `logs_viewed`, `terminal_opened`, `member_invited` or `compose` |
 | `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
 | `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID not in the catalog is left out |
 | `kind` | `feature_used` with `database_created` or `domain_added` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` when the name ends in a suffix Zeabur offers for new services, `custom` otherwise |
