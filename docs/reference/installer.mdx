@@ -193,6 +193,14 @@ After K3s or RKE2 is removed, `uninstall --purge` deletes the installer's downlo
 
 With `use: personal` in the configuration, `uninstall` deletes nothing and only prints the commands to remove KubeSolo. See [Personal use: Install on a small machine](../install/personal.mdx#uninstall). `node add` and `node sync` aren't available because KubeSolo has only one node.
 
+## Behind a proxy
+
+The installer and its usage statistics reach the network through the standard proxy variables. Set `HTTPS_PROXY`, `HTTP_PROXY`, or `ALL_PROXY` before you run a command, and `NO_PROXY` for hosts that should be reached directly. Upper or lower case both work. Because `apply` runs as root, make sure `sudo` passes the variables on, for example with `sudo -E`.
+
+- The proxy address must start with `http://`. SOCKS proxies aren't supported.
+- HTTPS destinations go through the proxy with a `CONNECT` tunnel.
+- Loopback, link-local, and other local addresses never go through a proxy.
+
 ## If installation stops
 
 - Host check failed: free the ports or fix the disk as directed in the output, then run `plan` and `apply` again.
