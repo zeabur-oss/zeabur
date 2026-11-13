@@ -616,7 +616,8 @@ async fn copy_into(
 /// A change of keys of the Secret `name`. When the Secret is a copy of a destination and the
 /// change sets or removes the copied keys, the keys are the person's own from now on: an `edit`
 /// that applies the change and drops the marks, so a later rotation leaves them. Any other change
-/// stays as it is.
+/// stays as it is, and so does every change of a person who may not `get` the Secret: they cannot
+/// see the marks, and a key change is a merge patch that reads nothing.
 async fn detach(
     cluster: &dyn Cluster,
     namespace: &str,
@@ -628,18 +629,20 @@ async fn detach(
         name,
         changes: edits,
     };
-    let Some(found) = cluster
+    let found = match cluster
         .find_object(&resource("Secret"), Some(namespace), &name)
         .await
-        .map_err(|e| {
-            read_problem(
+    {
+        Ok(Some(found)) => found,
+        Ok(None) => return Ok(unchanged(name, edits)),
+        Err(e) if e.code() == Some(403) => return Ok(unchanged(name, edits)),
+        Err(e) => {
+            return Err(read_problem(
                 e,
                 &format!("Secret {name} in {namespace}"),
                 get_read("", "secrets", Some(namespace), &name),
-            )
-        })?
-    else {
-        return Ok(unchanged(name, edits));
+            ));
+        }
     };
     let found = serde_json::to_value(&found).unwrap_or_default();
     let marked = found
