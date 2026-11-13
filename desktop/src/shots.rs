@@ -1,5 +1,4 @@
-//! Hooks for the README screenshots: a fixed theme, a scenario for the page, and a capture of the
-//! web view.
+//! README screenshot hooks.
 
 use tauri::{WebviewWindow, WebviewWindowBuilder, Wry};
 
@@ -12,8 +11,7 @@ pub(crate) fn label_hash(key: &str) -> String {
     format!("{hash:016x}")
 }
 
-/// `ZEABUR_DESKTOP_THEME=light|dark` fixes the window's appearance; otherwise it follows the
-/// system.
+/// `ZEABUR_DESKTOP_THEME=light|dark` fixes the window's theme; otherwise it follows the system.
 pub(crate) fn apply_theme<M: tauri::Manager<Wry>>(
     builder: WebviewWindowBuilder<'_, Wry, M>,
 ) -> WebviewWindowBuilder<'_, Wry, M> {
@@ -33,8 +31,8 @@ pub(crate) fn wants(kind: &str) -> bool {
             == kind
 }
 
-/// With `ZEABUR_DESKTOP_SHOT=<file.png>`, waits `ZEABUR_DESKTOP_SHOT_DELAY` milliseconds (3000),
-/// writes a PNG of the window's web view and quits.
+/// With `ZEABUR_DESKTOP_SHOT=<file.png>`, saves a PNG of the web view after
+/// `ZEABUR_DESKTOP_SHOT_DELAY` milliseconds (3000) and quits.
 #[cfg(target_os = "macos")]
 pub(crate) fn capture(window: WebviewWindow) {
     use tauri::Manager;

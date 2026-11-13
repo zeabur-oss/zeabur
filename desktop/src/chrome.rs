@@ -18,16 +18,13 @@ pub(crate) const CHOOSER: &str = "main";
 #[cfg(target_os = "macos")]
 const CLUSTER_MIN: (f64, f64) = (800.0, 560.0);
 
-/// Snap layouts need a minimum width of at most 500 effective pixels
-/// (<https://learn.microsoft.com/en-us/windows/apps/desktop/modernize/ui/apply-snap-layout-menu>),
-/// so two cluster windows fit side by side. Without traffic lights the web interface may hide its
-/// sidebar.
+/// Snap layouts need a minimum width of at most 500 effective pixels, so two cluster windows fit
+/// side by side.
 #[cfg(not(target_os = "macos"))]
 const CLUSTER_MIN: (f64, f64) = (500.0, 560.0);
 
-/// Room for the system title bar above a window's content: 32 px on Windows
-/// (<https://learn.microsoft.com/en-us/windows/apps/design/basics/titlebar-design>). The macOS title
-/// bar is drawn over the page.
+/// Room for the system title bar above a window's content: 32 px on Windows. The macOS title bar
+/// is drawn over the page.
 #[cfg(target_os = "macos")]
 const FRAME_TOP: f64 = 0.0;
 #[cfg(not(target_os = "macos"))]
@@ -43,8 +40,7 @@ const TITLE_BAR: f64 = 28.0;
 #[cfg(any(target_os = "macos", target_os = "linux", test))]
 const ZOOM_STEPS: [f64; 11] = [0.5, 0.67, 0.75, 0.8, 0.9, 1.0, 1.1, 1.25, 1.5, 1.75, 2.0];
 
-/// The zoom of each open window by label; WebKit has no call to read it back. A window that
-/// closes leaves the map, so a new window with the same label starts at 1.0, as its web view does.
+/// The zoom of each open window by label; WebKit has no call to read it back.
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 static ZOOM: std::sync::Mutex<std::collections::BTreeMap<String, f64>> =
     std::sync::Mutex::new(std::collections::BTreeMap::new());
@@ -164,9 +160,8 @@ fn next_zoom(current: f64, up: bool) -> f64 {
     next
 }
 
-/// Lets the strip move the window, and zoom it on a double click. Cluster windows load the web
-/// interface from their local service on `127.0.0.1` (or from `dev_web`), which gets these two
-/// permissions and nothing else.
+/// Lets the strip move the window and zoom it on a double click. The page from the local service
+/// gets these two permissions and nothing else.
 #[cfg(target_os = "macos")]
 pub(crate) fn allow_title_bar(app: &AppHandle, dev_web: Option<&tauri::Url>) -> tauri::Result<()> {
     let mut capability = tauri::ipc::CapabilityBuilder::new("title-bar")
@@ -181,21 +176,15 @@ pub(crate) fn allow_title_bar(app: &AppHandle, dev_web: Option<&tauri::Url>) -> 
     app.add_capability(capability)
 }
 
-/// On Linux the program name is the Wayland app ID and the X11 window class, which GNOME matches to
-/// the `.desktop` file of the same name for the app's name and icon. The freedesktop desktop entry
-/// specification asks for a reverse DNS name
-/// (<https://specifications.freedesktop.org/desktop-entry/latest/file-naming.html>), so it is the
-/// app's identifier. Tauri's `enableGTKAppId` would do the same through a D-Bus name, which allows
-/// one instance only.
+/// On Linux the program name is the Wayland app ID and X11 window class, which GNOME matches to
+/// the `.desktop` file of the same name, so it is the app's reverse DNS identifier.
 #[cfg(target_os = "linux")]
 pub(crate) fn set_app_id(identifier: &str) {
     gtk::glib::set_prgname(Some(identifier));
 }
 
-/// On Windows the AppUserModelID groups the app's windows under one taskbar button and names its
-/// jump list. It must be set before any window is shown
-/// (<https://learn.microsoft.com/en-us/windows/win32/shell/appids>). It is the identifier, which
-/// Tauri's installers also give the Start menu shortcut.
+/// On Windows the AppUserModelID groups the app's windows under one taskbar button. It must be set
+/// before any window is shown.
 #[cfg(windows)]
 pub(crate) fn set_app_id(identifier: &str) {
     if let Err(err) = crate::win32::set_app_user_model_id(identifier) {
@@ -241,11 +230,9 @@ fn fit(want: (f64, f64), area: Area) -> (f64, f64) {
     (want.0.min(area.width * 0.9), want.1.min(area.height * 0.9))
 }
 
-/// Where a new window of content `size` goes: `offset` from the work area's corner, or centred
-/// when there is none, then moved up and left until the whole window, title bar included, is inside
-/// the work area. Windows' guidance: "adjust the initial location so that the entire window is
-/// visible within the target monitor"
-/// (<https://learn.microsoft.com/en-us/windows/win32/uxguide/win-window-mgt>).
+/// Where a new window of content `size` goes: `offset` from the work area's corner, or centred when
+/// there is none, then moved up and left until the whole window, title bar included, is inside the
+/// work area.
 fn place(offset: Option<(f64, f64)>, size: (f64, f64), area: Area) -> (f64, f64) {
     let outer = (size.0, size.1 + FRAME_TOP);
     let (x, y) = match offset {

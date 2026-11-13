@@ -1,7 +1,5 @@
-//! Files the app keeps: `settings.json` in Tauri's `app_config_dir` and pasted kubeconfigs in
-//! `app_local_data_dir/kubeconfigs` (<https://docs.rs/tauri/latest/tauri/path/struct.PathResolver.html>).
-//! Pasted kubeconfigs hold credentials, so they stay in the local folder, not the roaming one on
-//! Windows, and on Unix only the owner can read them.
+//! Files the app keeps: `settings.json` and pasted kubeconfigs. Pasted kubeconfigs hold
+//! credentials, so they stay in the local data folder, readable by the owner only on Unix.
 
 use std::io::Write;
 use std::path::{Path, PathBuf};

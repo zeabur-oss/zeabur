@@ -15,8 +15,7 @@ use windows::Win32::UI::Input::KeyboardAndMouse::{GetKeyState, VIRTUAL_KEY};
 use windows::Win32::UI::Shell::SetCurrentProcessExplicitAppUserModelID;
 use windows::core::HSTRING;
 
-/// Sets the process's AppUserModelID
-/// (<https://learn.microsoft.com/en-us/windows/win32/shell/appids>).
+/// Sets the process's AppUserModelID.
 pub(crate) fn set_app_user_model_id(id: &str) -> windows::core::Result<()> {
     // SAFETY: the string outlives the call, and the system copies it.
     unsafe { SetCurrentProcessExplicitAppUserModelID(&HSTRING::from(id)) }
@@ -28,10 +27,9 @@ pub(crate) fn key_held(key: VIRTUAL_KEY) -> bool {
     unsafe { GetKeyState(i32::from(key.0)) < 0 }
 }
 
-/// Calls `on_key` with the virtual-key code, and whether the key repeats, for each key pressed
-/// with Ctrl or Alt, before the page sees it. When `on_key` returns `true`, the page does not get
-/// the key
-/// (<https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2controller#add_acceleratorkeypressed>).
+/// Calls `on_key` with the virtual-key code, and whether the key repeats, for each key pressed with
+/// Ctrl or Alt, before the page sees it. When `on_key` returns `true`, the page does not get the
+/// key.
 pub(crate) fn on_accelerator_key(
     webview: &PlatformWebview,
     on_key: impl Fn(u32, bool) -> bool + 'static,

@@ -1,11 +1,6 @@
-//! The environment the app gives to exec credential plugins, and the login shell read that fills
-//! it.
-//!
-//! An app started from Finder, the Dock or a desktop launcher does not get the variables set in
-//! the person's shell files. The app reads the login shell's environment once and merges it with
-//! its own. The same merged environment decides if an exec plugin is found and is given to the
-//! plugin through the kubeconfig's exec `env` when a cluster opens; the app never calls
-//! `std::env::set_var` (<https://doc.rust-lang.org/std/env/fn.set_var.html>).
+//! The environment for exec credential plugins: the app's own variables merged with the login
+//! shell's, which a launch from Finder or a desktop launcher lacks. The app never calls
+//! `std::env::set_var`.
 
 use std::ffi::{OsStr, OsString};
 use std::path::PathBuf;
@@ -92,11 +87,8 @@ impl ChildEnv {
             .map_or_else(Vec::new, |path| std::env::split_paths(path).collect())
     }
 
-    /// The variables that differ from `own` (the app's own environment), for a kubeconfig's exec
-    /// credential plugin: kube-rs starts it with the app's environment plus the exec entry's `env`.
-    /// On Unix, `Command` looks the plugin up on the `PATH` it is given
-    /// (<https://doc.rust-lang.org/std/process/struct.Command.html>). Names or values that are not
-    /// UTF-8 are left out, as a kubeconfig cannot hold them.
+    /// The variables that differ from `own`, for a kubeconfig's exec `env`. Names or values that
+    /// are not UTF-8 are left out.
     pub(crate) fn changed_from(&self, own: &[(OsString, OsString)]) -> Vec<(String, String)> {
         let mut changed = Vec::new();
         for (name, value) in &self.vars {
@@ -216,8 +208,8 @@ mod unix {
         NoEnvironment(Option<i32>),
     }
 
-    /// Runs the login shell once, with `DISABLE_AUTO_UPDATE=true` so Oh My Zsh does not stop to
-    /// ask about updates, no stdin, and the home folder as the working directory.
+    /// Runs the login shell once with `DISABLE_AUTO_UPDATE=true` so Oh My Zsh does not prompt, no
+    /// stdin, and the home folder as the working directory.
     pub(crate) fn read_shell_env(
         shell: &Path,
         timeout: Duration,

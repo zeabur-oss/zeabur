@@ -1,16 +1,8 @@
-//! Keyboard shortcuts on Linux and Windows. Neither has a menu bar here to carry them, so the
-//! window handles the keys before the page sees them. macOS gets the same shortcuts from its menu
-//! bar (`menu.rs`).
+//! Keyboard shortcuts on Linux and Windows, which have no menu bar here. macOS gets them from
+//! `menu.rs`.
 //!
-//! Linux: the GNOME HIG's standard shortcuts
-//! (<https://developer.gnome.org/hig/reference/keyboard.html>): Ctrl+W closes the window, Ctrl+Q
-//! closes the app with all its windows, Ctrl+N creates a new item (here the chooser), Ctrl+R
-//! reloads, and Ctrl++, Ctrl+- and Ctrl+0 zoom.
-//!
-//! Windows: the common keyboard accelerators
-//! (<https://learn.microsoft.com/en-us/windows/apps/develop/input/keyboard-accelerators>) Ctrl+W
-//! (close) and Ctrl+N (new item, here the chooser). WebView2 already handles Ctrl+R and F5 and the
-//! zoom keys, and Alt+F4 is the system's.
+//! Linux: Ctrl+W, Ctrl+Q, Ctrl+N (the chooser), Ctrl+R and Ctrl++, Ctrl+-, Ctrl+0 for zoom.
+//! Windows: Ctrl+W and Ctrl+N; WebView2 already handles reload and zoom.
 
 /// What a shortcut does.
 #[cfg_attr(
@@ -122,9 +114,8 @@ fn run(window: &tauri::WebviewWindow, shortcut: Shortcut) {
     }
 }
 
-/// Handles Ctrl+W and Ctrl+N in this window through WebView2's `AcceleratorKeyPressed`, which runs
-/// before the page sees a key pressed with Ctrl or Alt
-/// (<https://learn.microsoft.com/en-us/microsoft-edge/webview2/reference/win32/icorewebview2controller#add_acceleratorkeypressed>).
+/// Handles Ctrl+W and Ctrl+N through WebView2's `AcceleratorKeyPressed`, which runs before the
+/// page sees the key.
 #[cfg(windows)]
 pub(crate) fn attach(window: &tauri::WebviewWindow) {
     use windows::Win32::UI::Input::KeyboardAndMouse::{VK_CONTROL, VK_MENU, VK_SHIFT};

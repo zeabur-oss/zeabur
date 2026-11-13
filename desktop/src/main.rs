@@ -30,8 +30,8 @@ use serde::{Deserialize, Serialize};
 use sources::{AddedSource, ContextView, SourceKind, SourceRef, SourceView};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
-/// What the app remembers between launches, in `settings.json`. Added files and folders are stored
-/// as absolute paths and read in place; the app never writes to a kubeconfig file.
+/// What the app remembers between launches, in `settings.json`. Kubeconfig files are read in
+/// place and never written.
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 struct Saved {
@@ -318,8 +318,7 @@ async fn open_cluster(
             context: context.name,
         },
     );
-    // The web interface keeps its language under `zeabur.locale` and has no Japanese yet; without
-    // a match it follows the system languages.
+    // Without a matching locale the web interface follows the system languages.
     let locale = if ["en", "zh-TW", "zh-CN"].contains(&lang.as_str()) {
         format!("localStorage.setItem('zeabur.locale', '{lang}')")
     } else {

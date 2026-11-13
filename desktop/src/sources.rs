@@ -28,11 +28,8 @@ pub(crate) struct AddedSource {
     pub(crate) path: PathBuf,
 }
 
-/// The default sources: each path in `KUBECONFIG` (`:` between paths, `;` on Windows), or
-/// `~/.kube/config` (`%USERPROFILE%\.kube\config` on Windows) when it is unset or empty
-/// (<https://kubernetes.io/docs/concepts/configuration/organize-cluster-access-kubeconfig/>).
-/// The caller passes `KUBECONFIG` from the child environment: the app's own value, else the login
-/// shell's.
+/// The default sources: each path in `KUBECONFIG`, or `~/.kube/config` when it is unset or empty.
+/// The caller passes `KUBECONFIG` from the child environment.
 pub(crate) fn default_paths(
     kubeconfig_env: Option<OsString>,
     home: Option<PathBuf>,
@@ -188,8 +185,7 @@ fn check_auth(info: &AuthInfo, env: &ChildEnv) -> Auth {
             hint: exec.install_hint.clone(),
         };
     }
-    // Inline data and a token win over the file that names the same credential, as in kube-rs
-    // (`kube_client::config::file_config`); such a file is not needed.
+    // Inline data and a token win over a file naming the same credential, as in kube-rs.
     let files = [
         (
             &info.client_certificate,
@@ -348,7 +344,11 @@ mod tests {
         #[cfg(not(windows))]
         let value = OsString::from("/home/a/.kube/config:/srv/kube/team.yaml:");
         let paths = default_paths(Some(value), home.clone());
-        assert_eq!(paths.len(), 2);
+        #[cfg(windows)]
+        let expected = [r"C:\Users\a\.kube\config", r"D:\kube\team.yaml"];
+        #[cfg(not(windows))]
+        let expected = ["/home/a/.kube/config", "/srv/kube/team.yaml"];
+        assert_eq!(paths, expected.map(PathBuf::from));
         assert_eq!(
             default_paths(Some(OsString::new()), home),
             vec![PathBuf::from("/home/a/.kube/config")]
@@ -464,8 +464,8 @@ mod tests {
         let (views, contexts) = read_all(&sources, &ChildEnv::default());
         assert_eq!(views[1].files, 3);
         let staging: Vec<_> = contexts.iter().filter(|c| c.name == "staging").collect();
-        assert_eq!(staging.len(), 2);
-        assert_ne!(staging[0].file, staging[1].file);
+        assert!(staging.iter().any(|c| c.file.ends_with("config")));
+        assert!(staging.iter().any(|c| c.file.ends_with("aks.yaml")));
         assert!(staging.iter().all(|c| c.same_name_elsewhere == 1));
     }
 }

@@ -1,11 +1,9 @@
-//! The macOS menu bar. Its words come from the chooser page, which has the web interface's
-//! catalogues and the language the person picked, so there is one set of strings.
+//! The macOS menu bar, in the chooser page's language.
 
 #[cfg(target_os = "macos")]
 pub(crate) use mac::on_menu_event;
 
-/// Sets the menu bar in the chooser's language; the page calls it on load and when the language
-/// changes. `docs` is the docs page in that language.
+/// Sets the menu bar in the chooser's language; `docs` is the docs page in that language.
 #[cfg(target_os = "macos")]
 #[tauri::command]
 #[expect(
@@ -39,7 +37,7 @@ mod mac {
 
     use crate::{chrome, output};
 
-    /// Every word in the menu bar, in the app's language (`desktop.menu.*` in `web/src/i18n`).
+    /// Every word in the menu bar (`desktop.menu.*` in `web/src/i18n`).
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct MenuLabels {

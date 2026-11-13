@@ -1,5 +1,4 @@
-//! The WebKit calls of the README screenshots, as a safe function. The `objc2` crates make these
-//! Objective-C calls `unsafe`, so this is the only macOS code that uses `unsafe`.
+//! The WebKit calls of the README screenshots. This is the only macOS code that uses `unsafe`.
 #![expect(
     unsafe_code,
     reason = "objc2-web-kit has no safe API for a snapshot of the web view"
