@@ -194,7 +194,7 @@ pub(crate) fn get_retrying(
 /// 429 (RFC 6585 section 4), and the gateway and availability errors 502, 503 and 504
 /// (RFC 9110 sections 15.6.3 to 15.6.5). 500, 501 and 505 describe a fault that waiting does
 /// not fix.
-fn temporary(status: u16) -> bool {
+const fn temporary(status: u16) -> bool {
     matches!(status, 408 | 429 | 502 | 503 | 504)
 }
 
