@@ -8679,6 +8679,11 @@ export type ProjectRights = {
   deployFromGit: Permission
   /** Open a terminal in a container: `create` on `pods/exec`. */
   openTerminal: Permission
+  /**
+   * Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
+   * on `pods/portforward`.
+   */
+  portForward: Permission
   /** Read the pods' logs: `get` on `pods/log`. */
   readLogs: Permission
   /** Read Secret values: `get` on secrets. */

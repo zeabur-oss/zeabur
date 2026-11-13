@@ -1019,6 +1019,10 @@ export function connectionUri(database: Database, password = "PASSWORD") {
   return `${scheme}://${user}:${encodeURIComponent(password)}@${c.host}:${c.port}/${c.database ?? ""}${options}`
 }
 
+/** The command that forwards a port on the person's computer to the database. */
+export const connectCommand = (project: string, database: Pick<Database, "name">) =>
+  `zeaburctl connect ${project}/${database.name}`
+
 /** Where the database's own object lives in the objects API: a custom resource of its operator. */
 export function databaseAddress(database: Database): ObjectAddress {
   const [group = "", version = ""] = database.apiVersion.split("/")

@@ -1,6 +1,6 @@
 [package]
 name = "zeaburctl"
-description = "Kubernetes made simple and secure by default: the command-line tool (ui, doctor, up, components)"
+description = "Kubernetes made simple and secure by default: the command-line tool (ui, doctor, up, connect, components)"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

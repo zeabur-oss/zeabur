@@ -157,6 +157,16 @@ Exports run in the database container using your `pods/exec` permission. MySQL a
 
 Use the corresponding database tools to work with downloaded dumps. **Restore to a new database** uses S3 backup records and has no field for uploading a dump.
 
+## Connect from outside the cluster
+
+**Connect** on the database page lists addresses that work only inside the cluster. To reach the database from your own computer, for example with `psql` or a desktop client, copy the command under **Connect from outside the cluster** and run it on your computer. It works for every engine:
+
+```sh
+zeaburctl connect shop/orders
+```
+
+It forwards a local port to the database through kube-apiserver and prints a connection string on `127.0.0.1`. Nothing in the cluster changes, and the connection stops when you press Ctrl-C. You need `create pods/portforward` in the project, which Developers have. See [`connect`](../reference/zeaburctl.mdx#connect) for the options.
+
 ## Verify the result
 
 The database is ready to use when its page shows **Ready** and **Connections** lists a host and port. After setting up backups, you have a restorable backup only when the first record in **Backups** shows success.

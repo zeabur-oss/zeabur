@@ -10,6 +10,7 @@ import {
   backupsSummary,
   canBackUpNow,
   commands,
+  connectCommand,
   connectionUri,
   createDatabase,
   databaseAddress,
@@ -343,6 +344,10 @@ describe("connecting", () => {
     expect(connectionUri(mongo, "p@ss")).toBe(
       "mongodb://USER:p%40ss@mongo-rs0.shop.svc:27017/admin?replicaSet=rs0",
     )
+  })
+
+  test("from outside the cluster: the zeaburctl command", () => {
+    expect(connectCommand("shop", postgres)).toBe("zeaburctl connect shop/pg")
   })
 
   test("kubectl commands for the object and a shell in the primary", () => {

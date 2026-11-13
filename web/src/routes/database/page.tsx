@@ -83,6 +83,7 @@ import {
 import { needed } from "@/model/installer"
 import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
+import { Outside } from "@/routes/database/outside"
 import { Restore, Restored } from "@/routes/database/restore"
 import { DatabaseSettings } from "@/routes/database/settings"
 import { databaseTabs, type DatabaseTab } from "@/routes/search"
@@ -464,6 +465,7 @@ function Overview({
       <Cautions project={project} database={database} />
       <Warnings events={events} onEvents={onEvents} />
       <Connection project={project} database={database} />
+      <Outside project={project} database={database} />
     </div>
   )
 }
