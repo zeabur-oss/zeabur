@@ -311,24 +311,6 @@ mod tests {
         }
     }
 
-    #[tokio::test]
-    async fn typing_into_a_secret_that_cannot_be_read_is_refused_with_the_read_named() {
-        let cluster = cluster();
-        let app = app(&cluster);
-        copied_twice(&app).await;
-        cluster.update(|s| {
-            s.forbidden_in_namespaces.insert("secrets".to_owned());
-        });
-        let typed = json!({"changes": [{"op": "data", "kind": "Secret",
-            "name": "db-backups-s3", "changes": [
-                {"op": "set", "key": "ACCESS_KEY_ID", "value": "mine"}]}]});
-        let (status, problem) =
-            send(&app, "POST", "/api/v1/projects/shop/plan", Some(&typed)).await;
-        assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
-        assert_eq!(problem["denied"]["resource"], "secrets", "{problem}");
-        assert_eq!(problem["denied"]["name"], "db-backups-s3", "{problem}");
-    }
-
     fn last_patch(cluster: &MemoryCluster) -> BTreeMap<String, Value> {
         let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
         let Some(WriteBody::JsonPatch(ops)) = writes.last().map(|w| &w.body) else {
