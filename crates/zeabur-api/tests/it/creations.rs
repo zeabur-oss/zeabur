@@ -442,6 +442,36 @@ stringData:
         assert_eq!(status, StatusCode::OK, "{applied}");
     }
 
+    /// A ready-made object from a form is checked against discovery like YAML is: a kind the
+    /// cluster does not serve is refused when planned, and is planned once it is served.
+    #[tokio::test]
+    async fn a_form_object_of_a_kind_the_cluster_does_not_serve_is_refused_when_planned() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let request = json!({"changes": [{"op": "create", "object": {
+            "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+            "metadata": {"name": "db"}, "spec": {"instances": 1}
+        }}]});
+        let (status, refused) = plan(&app, &request).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        assert!(
+            refused["detail"]
+                .as_str()
+                .unwrap()
+                .contains("does not serve"),
+            "{refused}"
+        );
+        cluster.update(|s| {
+            s.served.push(ServedResource {
+                verbs: ["create", "get", "list"].map(str::to_owned).to_vec(),
+                ..ServedResource::readable("postgresql.cnpg.io", "v1", "clusters", "Cluster", true)
+            });
+        });
+        let (status, planned) = plan(&app, &request).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        assert_eq!(planned["objects"][0]["target"]["plural"], "clusters");
+    }
+
     /// The kinds a person may create: namespaced, not generated, each with a hint; the cluster's
     /// own kinds named apart.
     #[tokio::test]

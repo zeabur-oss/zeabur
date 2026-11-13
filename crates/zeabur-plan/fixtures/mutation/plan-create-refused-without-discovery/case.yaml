@@ -1,0 +1,7 @@
+description: "Without discovery the planner does not guess a kind's plural or scope; even a ConfigMap is refused."
+operation: mutation.plan
+params:
+  kinds: []
+  request:
+    changes:
+      - {"op": "create", "object": {"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "x"}}}

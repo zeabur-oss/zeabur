@@ -789,6 +789,7 @@ export const zhCN: Messages = {
   "pod.notReady": "未就绪",
   "pod.readyCount": (ready, total) => `${ready}/${total} 就绪`,
   "pod.restarts": (n) => `重启 ${n} 次`,
+  "pod.yaml": "YAML",
   "pod.logsOf": (pod) => `${pod} 的日志`,
   "resources.title": "资源",
   "resources.hint": "副本模板里的预留量和上限。查看实际用量需要 metrics-server。",
@@ -1348,6 +1349,7 @@ export const zhCN: Messages = {
   "object.statusLabel": (name: string) => `${name} 的状态`,
   "tab.yaml": "YAML",
   "yaml.intro": (name: string) => `这份是目前 ${name} 在集群里的配置，改了会照原样写入。`,
+  "yaml.podReplaced": (owner: string) => `删除这个副本后，${owner} 会创建新的副本。`,
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
   // 检查变更

@@ -79,6 +79,18 @@ export const routesOf = (network: Network, service: Service): Route[] =>
 
 export const podReason = (pod: Pod): string | undefined => pod.reason ?? undefined
 
+/** Controllers that keep their replicas running, so a deleted pod is made again. A Job or CronJob
+ * does not make a finished pod again. */
+const replacing = new Set(["Deployment", "StatefulSet", "DaemonSet"])
+
+/** The service whose replicas include the pod, when its controller makes a new one after a
+ * delete. */
+export const serviceOfPod = (services: Service[], pod: string): Service | undefined =>
+  services.find(
+    (service) =>
+      replacing.has(service.kind) && service.pods.some((replica) => replica.name === pod),
+  )
+
 export const podHealth = (pod: Pod): Health => pod.health
 
 export function worstPod(service: Pick<Service, "pods">): Pod | undefined {

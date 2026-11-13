@@ -846,6 +846,7 @@ export const en = {
   "pod.notReady": "Not ready",
   "pod.readyCount": (ready: number, total: number) => `${ready}/${total} ready`,
   "pod.restarts": (n: number) => plural(n, "restart", "restarts"),
+  "pod.yaml": "YAML",
   "pod.logsOf": (pod: string) => `Logs of ${pod}`,
   "resources.title": "Resources",
   "resources.hint":
@@ -1457,6 +1458,8 @@ export const en = {
   "tab.yaml": "YAML",
   "yaml.intro": (name: string) =>
     `This is how ${name} is set up in the cluster now. A change is written as you make it.`,
+  "yaml.podReplaced": (owner: string) =>
+    `If you delete this replica, ${owner} creates a new one in its place.`,
   "yaml.label": (name: string) => `YAML of ${name}`,
 
   // Plans

@@ -6,11 +6,17 @@ metadata:
   generation: 1
 spec:
   replicas: 1
+  progressDeadlineSeconds: 600
 status:
   observedGeneration: 1
+  replicas: 1
   readyReplicas: 1
+  availableReplicas: 1
   updatedReplicas: 1
   conditions:
+    - type: Available
+      status: "True"
+      reason: MinimumReplicasAvailable
     - type: Progressing
       status: "True"
       reason: NewReplicaSetAvailable

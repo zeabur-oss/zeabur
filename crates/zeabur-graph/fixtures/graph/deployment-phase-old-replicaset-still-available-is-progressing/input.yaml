@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: web
+  namespace: demo
+  generation: 2
+spec:
+  replicas: 2
+  progressDeadlineSeconds: 600
+status:
+  observedGeneration: 2
+  replicas: 3
+  readyReplicas: 3
+  availableReplicas: 3
+  updatedReplicas: 2
+  conditions:
+    - type: Available
+      status: "True"
+      reason: MinimumReplicasAvailable
+    - type: Progressing
+      status: "True"
+      reason: ReplicaSetUpdated

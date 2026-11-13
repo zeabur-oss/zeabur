@@ -8,7 +8,7 @@ use ureq::Agent;
 use ureq::http::Response;
 
 use crate::HostError;
-use crate::download::check;
+use crate::download::{self, check};
 
 /// The largest chart or repository index read.
 const MAX: u64 = 64 << 20;
@@ -152,14 +152,13 @@ fn registry(
     let realm = params
         .get("realm")
         .ok_or_else(|| download_error(url, "HTTP 401 without a token realm".to_owned()))?;
-    let mut request = agent.get(*realm);
+    let mut query = Vec::new();
     for key in ["service", "scope"] {
         if let Some(value) = params.get(key) {
-            request = request.query(key, *value);
+            query.push((key, *value));
         }
     }
-    let answer = request
-        .call()
+    let answer = download::get_retrying(agent, realm, &[], &query)
         .map_err(|e| download_error(realm, e.to_string()))?;
     let answer: Token =
         serde_json::from_slice(&read(answer, realm)?).map_err(|e| HostError::Parse {
@@ -189,15 +188,15 @@ fn get(
     accept: Option<&str>,
     token: Option<&str>,
 ) -> Result<Response<ureq::Body>, HostError> {
-    let mut request = agent.get(url).config().http_status_as_error(false).build();
+    let mut headers = Vec::new();
     if let Some(accept) = accept {
-        request = request.header("Accept", accept);
+        headers.push(("Accept", accept));
     }
-    if let Some(token) = token {
-        request = request.header("Authorization", format!("Bearer {token}"));
+    let bearer = token.map(|t| format!("Bearer {t}"));
+    if let Some(bearer) = &bearer {
+        headers.push(("Authorization", bearer.as_str()));
     }
-    request
-        .call()
+    download::get_retrying(agent, url, &headers, &[])
         .map_err(|e| download_error(url, e.to_string()))
 }
 

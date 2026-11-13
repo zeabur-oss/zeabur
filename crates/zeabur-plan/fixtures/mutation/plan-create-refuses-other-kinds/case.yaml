@@ -1,6 +1,0 @@
-description: "Without discovery only the kinds Zeabur's own forms create are known; a StatefulSet is refused."
-operation: mutation.plan
-params:
-  request:
-    changes:
-      - {"op": "create", "object": {"apiVersion": "apps/v1", "kind": "StatefulSet", "metadata": {"name": "x"}}}

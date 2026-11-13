@@ -1,14 +1,14 @@
 ---
 name: zeabur-oss-dependencies
-description: The supply-chain policy every zeabur-oss repository shares for Rust crates and Bun packages — OSI licences, aws-lc-rs as the only crypto backend, a seven-day publish age, unsafe and native-code review, no install scripts, committed lock files, Git-pinned design system, fallow through bunx. Use whenever Cargo.toml, Cargo.lock, deny.toml, a package.json, a bun.lock, bunfig.toml or flake.nix changes in any zeabur-oss repository.
+description: The supply-chain policy every zeabur-oss repository shares for Rust crates and Bun packages — OSI licences, aws-lc-rs as the only crypto backend, a seven-day publish age, unsafe and native-code review, no install scripts, committed lock files, the design system from npm, fallow through bunx. Use whenever Cargo.toml, Cargo.lock, deny.toml, a package.json, a bun.lock, bunfig.toml or flake.nix changes in any zeabur-oss repository.
 ---
 
 <!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-dependencies/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # Zeabur OSS dependencies
 
-The repository's dependencies skill names its shipped binaries, its frontend directory and its
-exceptions. Run every command inside `nix develop`.
+This is the only dependency skill. The repository's CONTRIBUTING.md names its shipped binaries,
+its frontend directory and its exceptions. Run every command inside `nix develop`.
 
 ## Rust
 
@@ -52,7 +52,7 @@ exceptions. Run every command inside `nix develop`.
   disagree.
 - `@zeabur-oss/design-system` comes from npm at an exact version, published from the design
   system's version tags; Renovate moves it, and `bunfig.toml` exempts it from the minimum release
-  age. To try an unpublished design-system commit, point it at a local tarball (the design
+  age (`minimumReleaseAgeExcludes` takes exact package names, not a scope). To try an unpublished design-system commit, point it at a local tarball (the design
   system's `design-system-change` skill) and `bun install`; never commit `package.json` or
   `bun.lock` with a path outside the repository.
 - fallow is not in nixpkgs. It runs as `bunx fallow@<version>` from the `fallow` script in
@@ -66,4 +66,6 @@ exceptions. Run every command inside `nix develop`.
 - `flake.lock` pins nixpkgs and every tool of the dev shell. Renovate (`renovate.json`, extending
   `github>zeabur-oss/.github`) updates it with lock file maintenance every Monday, and opens
   pull requests for packages and action digests after the same seven days (`minimumReleaseAge`).
+  Our own releases (`@zeabur-oss/*` on npm, `zeabur-oss/*` tags) have no wait. A repository that
+  pins K3s also extends `github>zeabur-oss/.github:k3s`, which follows K3s's stable channel.
   Fix what a new tool version breaks on that pull request before merging.

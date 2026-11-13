@@ -3,16 +3,9 @@
 //!
 //! # Done
 //!
-//! As `kubectl rollout status` decides it [kubectl-rollout-status]:
-//!
-//! - a Deployment is done once its controller has seen the latest spec
-//!   (`status.observedGeneration`), every replica is updated, no old replica is left and every
-//!   updated one is available;
-//! - a StatefulSet once it has seen the spec, `status.updatedReplicas` reaches the replicas the
-//!   update covers (those at or above `rollingUpdate.partition`), every replica is ready and
-//!   `currentRevision` equals `updateRevision`; with `OnDelete` its pods change only when deleted,
-//!   so it is never done by itself;
-//! - a DaemonSet once it has seen the spec and every node's pod is updated and available.
+//! A rollout is done once `zeabur_graph::rolled_out` says so: kstatus for a Deployment,
+//! StatefulSet (rolling or partitioned) or DaemonSet, and every replica updated and ready for an
+//! `OnDelete` StatefulSet. A Deployment is done only when no old replica is left.
 //!
 //! # Stuck
 //!
@@ -25,14 +18,14 @@
 //!
 //! A stuck rollout carries the plan that returns to the release before it.
 //!
-//! [kubectl-rollout-status]: https://github.com/kubernetes/kubectl/blob/master/pkg/polymorphichelpers/rollout_status.go
 //! [k8s-deployment-failed]: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#failed-deployment
 
 use axum::extract::State;
 use serde::Serialize;
-use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_graph::Workload;
+use zeabur_kube::k8s_openapi::api::apps::v1::DeploymentCondition;
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_model::{Diagnosis, DiagnosisKind, Message, Origin, WorkloadKind, WorkloadRef, id};
 use zeabur_plan::{Change, PlanRequest, Release};
@@ -126,60 +119,16 @@ pub struct RolloutProgress {
     pub unreadable: Vec<UnreadableView>,
 }
 
-fn int(object: &Value, pointer: &str) -> Option<i64> {
-    object.pointer(pointer).and_then(Value::as_i64)
-}
-
-fn count(object: &Value, pointer: &str) -> i32 {
-    int(object, pointer)
-        .and_then(|n| i32::try_from(n).ok())
-        .unwrap_or(0)
-}
-
-fn condition<'a>(object: &'a Value, kind: &str) -> Option<&'a Value> {
-    object
-        .pointer("/status/conditions")
-        .and_then(Value::as_array)?
-        .iter()
-        .find(|c| c.get("type").and_then(Value::as_str) == Some(kind))
-}
-
-/// Whether the workload's controller has seen its latest spec.
-fn observed(object: &Value) -> bool {
-    int(object, "/status/observedGeneration") >= int(object, "/metadata/generation")
-}
-
-/// Whether `object` is done, by the rules in the module documentation.
-fn done(kind: WorkloadKind, object: &Value) -> bool {
-    if !observed(object) {
-        return false;
-    }
-    match kind {
-        WorkloadKind::Deployment => {
-            let desired = int(object, "/spec/replicas").unwrap_or(1);
-            let updated = int(object, "/status/updatedReplicas").unwrap_or(0);
-            updated >= desired
-                && int(object, "/status/replicas").unwrap_or(0) <= updated
-                && int(object, "/status/availableReplicas").unwrap_or(0) >= updated
-        }
-        WorkloadKind::StatefulSet => {
-            let desired = int(object, "/spec/replicas").unwrap_or(1);
-            let partition =
-                int(object, "/spec/updateStrategy/rollingUpdate/partition").unwrap_or(0);
-            let covered = (desired - partition).max(0);
-            let revisions_match = object.pointer("/status/currentRevision")
-                == object.pointer("/status/updateRevision");
-            int(object, "/status/updatedReplicas").unwrap_or(0) >= covered
-                && int(object, "/status/readyReplicas").unwrap_or(0) >= desired
-                && (partition > 0 || revisions_match)
-        }
-        WorkloadKind::DaemonSet => {
-            let desired = int(object, "/status/desiredNumberScheduled").unwrap_or(0);
-            int(object, "/status/updatedNumberScheduled").unwrap_or(0) >= desired
-                && int(object, "/status/numberAvailable").unwrap_or(0) >= desired
-        }
-        WorkloadKind::Job | WorkloadKind::CronJob => true,
-    }
+/// The condition of `type_` of a Deployment.
+fn deployment_condition<'a>(
+    workload: Workload<'a>,
+    type_: &str,
+) -> Option<&'a DeploymentCondition> {
+    let Workload::Deployment(deployment) = workload else {
+        return None;
+    };
+    let conditions = deployment.status.as_ref()?.conditions.as_deref()?;
+    conditions.iter().find(|condition| condition.type_ == type_)
 }
 
 const fn stuck_by(kind: DiagnosisKind) -> Option<StuckReason> {
@@ -243,11 +192,10 @@ fn pods_of_release(kind: WorkloadKind, release: &Release, pods: &[Pod]) -> Vec<S
         .collect()
 }
 
-/// The progress of the rollout of `workload` (the object as JSON), with its `releases` (newest
-/// first), the names of the current release's pods and the service's diagnoses.
+/// The progress of the rollout of `workload`, with its `releases` (newest first), the names of
+/// the current release's pods and the service's diagnoses.
 pub(crate) fn progress(
-    workload: &WorkloadRef,
-    object: &Value,
+    workload: Workload<'_>,
     releases: &[Release],
     new_pods: &[String],
     diagnoses: &[Diagnosis],
@@ -257,30 +205,25 @@ pub(crate) fn progress(
     Vec<Diagnosis>,
     Vec<Origin>,
 ) {
-    let kind = workload.kind.as_str();
-    let on = |path: &str| Origin::field(kind, &workload.name, path.to_owned());
+    let kind = workload.kind().as_str();
+    let on = |path: &str| Origin::field(kind, workload.name(), path.to_owned());
     let mine: Vec<Diagnosis> = diagnoses
         .iter()
         .filter(|d| d.pods.is_empty() || d.pods.iter().any(|p| new_pods.contains(p)))
         .cloned()
         .collect();
     let mut evidence = vec![on("status")];
-    if workload.kind == WorkloadKind::Deployment
-        && object.pointer("/spec/paused").and_then(Value::as_bool) == Some(true)
+    if let Workload::Deployment(deployment) = workload
+        && deployment.spec.as_ref().and_then(|spec| spec.paused) == Some(true)
     {
         return (RolloutStatus::Paused, None, mine, vec![on("spec.paused")]);
     }
-    let on_delete = object
-        .pointer("/spec/updateStrategy/type")
-        .and_then(Value::as_str)
-        == Some("OnDelete");
-    if done(workload.kind, object) {
+    if zeabur_graph::rolled_out(workload) {
         return (RolloutStatus::Done, None, Vec::new(), evidence);
     }
-    let deadline = condition(object, "Progressing")
-        .filter(|c| c.get("reason").and_then(Value::as_str) == Some("ProgressDeadlineExceeded"));
-    let failure = condition(object, "ReplicaFailure")
-        .filter(|c| c.get("status").and_then(Value::as_str) == Some("True"));
+    let deadline = deployment_condition(workload, "Progressing")
+        .filter(|c| c.reason.as_deref() == Some("ProgressDeadlineExceeded"));
+    let failure = deployment_condition(workload, "ReplicaFailure").filter(|c| c.status == "True");
     let from_pods = mine.iter().find_map(|d| stuck_by(d.kind));
     let reason = from_pods
         .or_else(|| failure.map(|_| StuckReason::ReplicaFailure))
@@ -293,7 +236,9 @@ pub(crate) fn progress(
     }
     let status = match reason {
         Some(_) => RolloutStatus::Stuck,
-        None if on_delete && releases.first().is_some_and(|r| r.pods.total == 0) => {
+        None if zeabur_graph::on_delete(workload)
+            && releases.first().is_some_and(|r| r.pods.total == 0) =>
+        {
             RolloutStatus::WaitsForDeletion
         }
         None => RolloutStatus::Progressing,
@@ -342,27 +287,15 @@ pub(crate) async fn rollout(
     let releases = history(cluster, &project, &mut unreadable)
         .await?
         .of(workload, &read.snapshot.pods);
-    let object = match workload {
-        zeabur_graph::Workload::Deployment(o) => serde_json::to_value(o),
-        zeabur_graph::Workload::StatefulSet(o) => serde_json::to_value(o),
-        zeabur_graph::Workload::DaemonSet(o) => serde_json::to_value(o),
-        zeabur_graph::Workload::Job(o) => serde_json::to_value(o),
-        zeabur_graph::Workload::CronJob(o) => serde_json::to_value(o),
-    }
-    .unwrap_or_default();
     let me = workload.reference();
     let current = releases.iter().find(|r| r.current);
     let new_pods = current.map_or_else(Vec::new, |r| {
         pods_of_release(workload_kind, r, &read.snapshot.pods)
     });
     let (status, reason, diagnoses, evidence) =
-        progress(&me, &object, &releases, &new_pods, &service.diagnoses);
+        progress(workload, &releases, &new_pods, &service.diagnoses);
     let older = releases.iter().filter(|r| !r.current);
-    let desired = if workload_kind == WorkloadKind::DaemonSet {
-        count(&object, "/status/desiredNumberScheduled")
-    } else {
-        count(&object, "/spec/replicas")
-    };
+    let desired = zeabur_graph::replicas(workload).map_or(0, |replicas| replicas.desired);
     let rollback = releases
         .iter()
         .find(|r| !r.current && current.is_some_and(|c| r.revision < c.revision))
@@ -408,40 +341,171 @@ pub(crate) async fn rollout(
 
 #[cfg(test)]
 mod tests {
-    use serde_json::json;
+    use serde_json::{Value, json};
+    use zeabur_graph::Snapshot;
+    use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
+    use zeabur_model::StatusWord;
+    use zeabur_plan::ReleasePods;
 
     use super::*;
 
-    fn web() -> WorkloadRef {
-        WorkloadRef {
-            kind: WorkloadKind::Deployment,
-            name: "web".to_owned(),
-        }
+    fn typed<T: serde::de::DeserializeOwned>(object: Value) -> T {
+        serde_json::from_value(object).unwrap()
+    }
+
+    /// The status light's word and the rollout panel's status, with no pod and no release.
+    fn both(workload: Workload<'_>) -> (StatusWord, RolloutStatus) {
+        let summary = zeabur_graph::summarise(&Snapshot::default(), workload);
+        let light = zeabur_graph::status(&summary, &[], None).word;
+        (light, progress(workload, &[], &[], &[]).0)
+    }
+
+    const UPDATING: (StatusWord, RolloutStatus) =
+        (StatusWord::RollingOut, RolloutStatus::Progressing);
+    const DONE: (StatusWord, RolloutStatus) = (StatusWord::Ready, RolloutStatus::Done);
+
+    /// A StatefulSet of three replicas at observed generation 2, updated with `strategy`, and
+    /// its `status`.
+    fn stateful_set(strategy: &Value, status: &Value) -> StatefulSet {
+        let mut status = status.clone();
+        status["replicas"] = json!(3);
+        status["observedGeneration"] = json!(2);
+        typed(json!({"metadata": {"name": "db", "generation": 2},
+            "spec": {"replicas": 3, "serviceName": "db", "selector": {}, "template": {},
+                "updateStrategy": strategy},
+            "status": status}))
     }
 
     #[test]
-    fn a_deployment_is_done_as_kubectl_says() {
-        let object = |updated: i64, replicas: i64, available: i64| {
-            json!({"metadata": {"generation": 3}, "spec": {"replicas": 2},
-                "status": {"observedGeneration": 3, "updatedReplicas": updated,
-                    "replicas": replicas, "availableReplicas": available}})
+    fn a_stateful_set_image_change_shows_updating_until_the_update_revision_rolled_out() {
+        let rolling = json!({"type": "RollingUpdate", "rollingUpdate": {"partition": 0}});
+        let stage = |updated: i32, current: i32, ready: i32, current_revision: &str| {
+            stateful_set(
+                &rolling,
+                &json!({"updatedReplicas": updated, "currentReplicas": current,
+                    "readyReplicas": ready, "currentRevision": current_revision,
+                    "updateRevision": "db-new"}),
+            )
         };
-        assert!(done(WorkloadKind::Deployment, &object(2, 2, 2)));
-        assert!(!done(WorkloadKind::Deployment, &object(2, 3, 2)));
-        assert!(!done(WorkloadKind::Deployment, &object(1, 2, 2)));
-        let unseen = json!({"metadata": {"generation": 4}, "spec": {"replicas": 1},
-            "status": {"observedGeneration": 3, "updatedReplicas": 1, "replicas": 1,
-                "availableReplicas": 1}});
-        assert!(!done(WorkloadKind::Deployment, &unseen));
+        let cases = [
+            ("old pods all ready", stage(0, 3, 3, "db-old"), UPDATING),
+            ("one pod replaced", stage(1, 2, 3, "db-old"), UPDATING),
+            ("a pod restarting", stage(2, 1, 2, "db-old"), UPDATING),
+            ("rolled out", stage(3, 3, 3, "db-new"), DONE),
+        ];
+        for (name, object, expected) in &cases {
+            assert_eq!(both(Workload::StatefulSet(object)), *expected, "{name}");
+        }
+        let mut unobserved = stage(3, 3, 3, "db-new");
+        unobserved.status.as_mut().unwrap().observed_generation = Some(1);
+        assert_eq!(both(Workload::StatefulSet(&unobserved)), UPDATING);
+        let mut without_partition = stage(0, 3, 3, "db-old");
+        without_partition.spec.as_mut().unwrap().update_strategy =
+            typed(json!({"type": "RollingUpdate"}));
+        assert_eq!(both(Workload::StatefulSet(&without_partition)), UPDATING);
+    }
+
+    #[test]
+    fn an_on_delete_stateful_set_waits_for_deletion_and_is_done_once_every_pod_is_new() {
+        let on_delete = json!({"type": "OnDelete"});
+        // The controller keeps `currentRevision` for `OnDelete`, also after every pod is new.
+        let object = |updated: i32, ready: i32| {
+            stateful_set(
+                &on_delete,
+                &json!({"updatedReplicas": updated, "currentReplicas": 3 - updated,
+                    "readyReplicas": ready, "currentRevision": "db-old",
+                    "updateRevision": "db-new"}),
+            )
+        };
+        let release = |pods: i32| Release {
+            revision: 2,
+            name: "db-new".to_owned(),
+            images: Vec::new(),
+            created: None,
+            change_cause: None,
+            current: true,
+            pods: ReleasePods {
+                ready: pods,
+                total: pods,
+            },
+            template: Value::Null,
+            template_yaml: String::new(),
+        };
+        let panel = |object: &StatefulSet, pods: i32| {
+            progress(Workload::StatefulSet(object), &[release(pods)], &[], &[]).0
+        };
+        let waiting = object(0, 3);
+        assert_eq!(panel(&waiting, 0), RolloutStatus::WaitsForDeletion);
+        assert_eq!(both(Workload::StatefulSet(&waiting)).0, StatusWord::Ready);
+        let recreating = object(1, 2);
+        assert_eq!(panel(&recreating, 1), RolloutStatus::Progressing);
+        assert_eq!(
+            both(Workload::StatefulSet(&recreating)).0,
+            StatusWord::RollingOut
+        );
+        assert_eq!(both(Workload::StatefulSet(&object(3, 3))), DONE);
+    }
+
+    #[test]
+    fn a_partitioned_stateful_set_is_done_once_the_pods_above_the_partition_are_new() {
+        let partition = json!({"type": "RollingUpdate", "rollingUpdate": {"partition": 2}});
+        let object = |updated: i32| {
+            stateful_set(
+                &partition,
+                &json!({"updatedReplicas": updated, "currentReplicas": 3 - updated,
+                    "readyReplicas": 3, "currentRevision": "db-old",
+                    "updateRevision": "db-new"}),
+            )
+        };
+        assert_eq!(both(Workload::StatefulSet(&object(0))), UPDATING);
+        assert_eq!(both(Workload::StatefulSet(&object(1))), DONE);
+    }
+
+    #[test]
+    fn a_daemon_set_with_a_new_template_shows_updating_until_every_node_runs_it() {
+        let object = |updated: i32| -> DaemonSet {
+            typed(json!({"metadata": {"name": "agent", "generation": 2},
+                "spec": {"selector": {}, "template": {}},
+                "status": {"observedGeneration": 2, "desiredNumberScheduled": 3,
+                    "currentNumberScheduled": 3, "updatedNumberScheduled": updated,
+                    "numberAvailable": 3, "numberReady": 3, "numberMisscheduled": 0}}))
+        };
+        assert_eq!(both(Workload::DaemonSet(&object(0))), UPDATING);
+        assert_eq!(both(Workload::DaemonSet(&object(2))), UPDATING);
+        assert_eq!(both(Workload::DaemonSet(&object(3))), DONE);
+    }
+
+    fn deployment(status: &Value) -> Deployment {
+        typed(json!({"metadata": {"name": "web", "generation": 3},
+            "spec": {"replicas": 2, "progressDeadlineSeconds": 600, "selector": {},
+                "template": {}},
+            "status": status}))
+    }
+
+    #[test]
+    fn a_deployment_whose_old_replica_set_is_still_available_is_updating() {
+        let surging = deployment(&json!({"observedGeneration": 3, "replicas": 3,
+            "updatedReplicas": 2, "readyReplicas": 3, "availableReplicas": 3,
+            "conditions": [{"type": "Available", "status": "True"},
+                {"type": "Progressing", "status": "True", "reason": "ReplicaSetUpdated"}]}));
+        assert_eq!(both(Workload::Deployment(&surging)), UPDATING);
+        let finished = deployment(&json!({"observedGeneration": 3, "replicas": 2,
+            "updatedReplicas": 2, "readyReplicas": 2, "availableReplicas": 2,
+            "conditions": [{"type": "Available", "status": "True"},
+                {"type": "Progressing", "status": "True", "reason": "NewReplicaSetAvailable"}]}));
+        assert_eq!(both(Workload::Deployment(&finished)), DONE);
+        let mut unobserved = finished;
+        unobserved.metadata.generation = Some(4);
+        assert_eq!(both(Workload::Deployment(&unobserved)), UPDATING);
     }
 
     #[test]
     fn a_crash_loop_of_a_new_pod_makes_it_stuck_and_a_deadline_says_so_without_one() {
-        let object = json!({"metadata": {"generation": 2}, "spec": {"replicas": 1},
-            "status": {"observedGeneration": 2, "updatedReplicas": 1, "replicas": 2,
-                "availableReplicas": 1,
-                "conditions": [{"type": "Progressing", "status": "False",
-                    "reason": "ProgressDeadlineExceeded"}]}});
+        let object = deployment(&json!({"observedGeneration": 3, "replicas": 3,
+            "updatedReplicas": 2, "readyReplicas": 2, "availableReplicas": 2,
+            "conditions": [{"type": "Progressing", "status": "False",
+                "reason": "ProgressDeadlineExceeded"}]}));
+        let web = Workload::Deployment(&object);
         let diagnosis: Diagnosis = serde_json::from_value(json!({
             "kind": "crashLoop", "container": "app", "pods": ["web-2-abcde"],
             "cause": {"key": "diagnosis.crashLoop.cause.exitCode", "params": {}},
@@ -449,25 +513,18 @@ mod tests {
             "evidence": []}))
         .unwrap();
         let (status, reason, mine, _) = progress(
-            &web(),
-            &object,
+            web,
             &[],
             &["web-2-abcde".to_owned()],
             std::slice::from_ref(&diagnosis),
         );
         assert_eq!(status, RolloutStatus::Stuck);
         assert_eq!(reason, Some(StuckReason::CrashLoop));
-        assert_eq!(mine.len(), 1);
-        let (_, reason, mine, _) = progress(&web(), &object, &[], &[], &[]);
+        assert_eq!(mine, vec![diagnosis.clone()]);
+        let (_, reason, mine, _) = progress(web, &[], &[], &[]);
         assert_eq!(reason, Some(StuckReason::DeadlineExceeded));
         assert_eq!(mine, Vec::<Diagnosis>::new());
-        let (_, reason, mine, _) = progress(
-            &web(),
-            &object,
-            &[],
-            &["web-3-zzzzz".to_owned()],
-            &[diagnosis],
-        );
+        let (_, reason, mine, _) = progress(web, &[], &["web-3-zzzzz".to_owned()], &[diagnosis]);
         assert_eq!(reason, Some(StuckReason::DeadlineExceeded));
         assert_eq!(mine, Vec::<Diagnosis>::new());
     }

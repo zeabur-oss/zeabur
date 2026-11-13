@@ -32,7 +32,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -51,7 +51,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -65,7 +65,7 @@ jobs:
           persist-credentials: false
           # fallow audit compares HEAD with HEAD^.
           fetch-depth: 2
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -105,7 +105,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -118,7 +118,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -131,7 +131,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
       # zhtw-mcp builds from source; main's scheduled run keeps it, keyed on the lock file.
       - id: zhtw-mcp
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -157,7 +157,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -170,7 +170,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -192,7 +192,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -206,7 +206,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -231,7 +231,7 @@ jobs:
         run: scripts/nightly-issues.sh
 
   zizmor:
-    uses: zeabur-oss/.github/.github/workflows/zizmor.yml@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+    uses: zeabur-oss/.github/.github/workflows/zizmor.yml@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
 
   # The check rulesets require.
   ok:
@@ -244,4 +244,4 @@ jobs:
         run: exit 1
 
   dco:
-    uses: zeabur-oss/.github/.github/workflows/dco.yml@6ab106525ce16169ab0ecfebe4b0248e096797fa # main
+    uses: zeabur-oss/.github/.github/workflows/dco.yml@c43a5d36ad39f938de24e0b59109c82a20f6265a # main

@@ -6,8 +6,7 @@
 //! is named in `unreadable`. No Secret is read: the interface reveals the keys, as the person,
 //! only when asked (`POST /projects/{p}/secrets/{name}/reveal`).
 //!
-//! Stores and buckets are created and deleted through plans: the kinds are in
-//! `zeabur_plan::CREATABLE`.
+//! Stores and buckets are created and deleted through plans, as kinds the cluster serves.
 
 use axum::extract::State;
 use serde::Serialize;

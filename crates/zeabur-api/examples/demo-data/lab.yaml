@@ -42,6 +42,17 @@ spec:
               memory: 128Mi
 status:
   availableReplicas: 1
+  conditions:
+    - lastTransitionTime: now-2d
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: now-2d
+      message: ReplicaSet has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
   observedGeneration: 3
   readyReplicas: 1
   replicas: 1
@@ -186,6 +197,17 @@ spec:
               memory: 128Mi
 status:
   availableReplicas: 1
+  conditions:
+    - lastTransitionTime: now-2d
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: now-2d
+      message: ReplicaSet has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
   observedGeneration: 3
   readyReplicas: 1
   replicas: 1
@@ -230,6 +252,17 @@ spec:
               memory: 128Mi
 status:
   availableReplicas: 1
+  conditions:
+    - lastTransitionTime: now-2d
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: now-2d
+      message: ReplicaSet has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
   observedGeneration: 3
   readyReplicas: 1
   replicas: 1
@@ -281,8 +314,10 @@ spec:
           requests:
             storage: 10Gi
 status:
+  currentReplicas: 1
   readyReplicas: 1
   replicas: 1
+  updatedReplicas: 1
 ---
 apiVersion: v1
 kind: Pod

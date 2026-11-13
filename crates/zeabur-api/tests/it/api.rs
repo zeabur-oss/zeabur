@@ -6,6 +6,7 @@
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
+    use std::sync::Arc;
 
     use axum::Router;
     use axum::body::Body;
@@ -20,9 +21,10 @@ mod tests {
     use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, SecretSummary, ServedResource};
+    use zeabur_telemetry::Feature;
 
     use crate::common::app;
-    use crate::support::TestApi;
+    use crate::support::{TestApi, recorder, taken};
 
     const SECRET_VALUE: &str = "correct-horse-battery-staple";
 
@@ -1046,6 +1048,22 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK);
         assert_eq!(body, "data: one\n\ndata: two\n\n");
+    }
+
+    #[tokio::test]
+    async fn a_log_stream_is_reported_when_it_opens_and_a_refused_one_or_a_snapshot_is_not() {
+        let cluster = cluster();
+        let (used, seen) = recorder();
+        let app = || TestApi::new(&cluster).with_used(Arc::clone(&used)).router();
+        for path in ["logs", "logs/follow?previous=true"] {
+            let uri = format!("/api/v1/projects/shop/pods/web-1/{path}");
+            call(app(), "GET", &uri).await;
+            assert_eq!(taken(&seen), [], "{path}");
+        }
+        let uri = "/api/v1/projects/shop/pods/web-1/logs/follow";
+        let (status, ..) = call(app(), "GET", uri).await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(taken(&seen), [Feature::LogsViewed]);
     }
 
     #[tokio::test]

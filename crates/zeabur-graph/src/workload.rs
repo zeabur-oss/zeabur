@@ -12,6 +12,7 @@ use zeabur_model::adapters::group::{
     DATABASES_GROUP, OPERATORS_GROUP, explicit_group_with, resolve_group_with,
 };
 use zeabur_model::adapters::operators::{database_cluster, is_operator};
+use zeabur_model::readiness::{self, Reason, Status};
 use zeabur_model::{
     Classification, ManagedBy, Origin, Phase, Replicas, TaskConcurrency, TaskSchedule,
     WorkloadKind, WorkloadRef, WorkloadSummary,
@@ -299,56 +300,61 @@ pub fn classify_with(workload: Workload<'_>, conventions: &Conventions) -> Class
     }
 }
 
-/// The phase of a Deployment, from its rollout conditions rather than replica counts alone, so a
-/// stuck rollout is reported as one.
+/// The phase of a Deployment.
 ///
-/// A rollout is under way until the controller has observed the current generation and its
-/// `Progressing` condition says the new ReplicaSet is available. A `Progressing` condition that
-/// is `False` with reason `ProgressDeadlineExceeded` is a failed rollout. With no ready pod and
-/// no rollout under way, pods that were once available have stopped serving: degraded.
+/// [`readiness::deployment`] decides whether it runs or failed. A Deployment that is not current
+/// is degraded when no pod is ready and no rollout is under way: pods that were
+/// once available have stopped serving. Otherwise it progresses.
 #[must_use]
 pub fn deployment_phase(deployment: &Deployment) -> Phase {
     let spec = deployment.spec.as_ref();
     if spec.and_then(|spec| spec.paused) == Some(true) {
         return Phase::Paused;
     }
+    let readiness = readiness::deployment(deployment);
+    if readiness.status == Status::Failed {
+        return Phase::Failed;
+    }
+    if desired_replicas(spec.and_then(|spec| spec.replicas)) == 0 {
+        return Phase::Paused;
+    }
+    if readiness.is_current() {
+        return Phase::Running;
+    }
+    let ready = deployment
+        .status
+        .as_ref()
+        .and_then(|status| status.ready_replicas)
+        .unwrap_or_default();
+    if ready == 0 && !rolling(deployment) {
+        Phase::Degraded
+    } else {
+        Phase::Progressing
+    }
+}
+
+/// Whether a Deployment's rollout is under way: the controller has not observed the current
+/// generation, or the `Progressing` condition is `True` for a reason other than
+/// `NewReplicaSetAvailable`.
+fn rolling(deployment: &Deployment) -> bool {
     let status = deployment.status.as_ref();
     let generation = deployment.metadata.generation.unwrap_or_default();
     let observed = status
         .and_then(|status| status.observed_generation)
         .unwrap_or_default();
-    let unobserved = observed < generation;
-    let mut rolling = unobserved;
-    for condition in status
-        .and_then(|status| status.conditions.as_ref())
-        .into_iter()
-        .flatten()
-        .filter(|condition| condition.type_ == "Progressing")
-    {
-        let reason = condition.reason.as_deref().unwrap_or_default();
-        if condition.status == "False" && reason == "ProgressDeadlineExceeded" {
-            return Phase::Failed;
-        }
-        if condition.status == "True" && reason != "NewReplicaSetAvailable" {
-            rolling = true;
+    if observed < generation {
+        return true;
+    }
+    let conditions = status.and_then(|status| status.conditions.as_deref());
+    for condition in conditions.unwrap_or_default() {
+        if condition.type_ == "Progressing"
+            && condition.status == "True"
+            && condition.reason.as_deref() != Some("NewReplicaSetAvailable")
+        {
+            return true;
         }
     }
-    let desired = desired_replicas(spec.and_then(|spec| spec.replicas));
-    let ready = status
-        .and_then(|status| status.ready_replicas)
-        .unwrap_or_default();
-    let updated = status
-        .and_then(|status| status.updated_replicas)
-        .unwrap_or_default();
-    if desired == 0 {
-        Phase::Paused
-    } else if !unobserved && ready >= desired && updated >= desired {
-        Phase::Running
-    } else if ready == 0 && !rolling {
-        Phase::Degraded
-    } else {
-        Phase::Progressing
-    }
+    false
 }
 
 /// `spec.replicas`, which defaults to one.
@@ -356,7 +362,64 @@ fn desired_replicas(replicas: Option<i32>) -> i32 {
     replicas.unwrap_or(1)
 }
 
+/// Whether the workload is a StatefulSet or DaemonSet with the `OnDelete` update strategy: its
+/// pods take a new template only when someone deletes them.
+#[must_use]
+pub fn on_delete(workload: Workload<'_>) -> bool {
+    let strategy = match workload {
+        Workload::StatefulSet(object) => object
+            .spec
+            .as_ref()
+            .and_then(|spec| spec.update_strategy.as_ref())
+            .and_then(|strategy| strategy.type_.as_deref()),
+        Workload::DaemonSet(object) => object
+            .spec
+            .as_ref()
+            .and_then(|spec| spec.update_strategy.as_ref())
+            .and_then(|strategy| strategy.type_.as_deref()),
+        Workload::Deployment(_) | Workload::Job(_) | Workload::CronJob(_) => None,
+    };
+    strategy == Some("OnDelete")
+}
+
+/// Whether every pod of the workload runs its current template and is ready.
+///
+/// The [`readiness`] of a Deployment, StatefulSet or DaemonSet decides. kstatus does not follow
+/// an `OnDelete` StatefulSet, and its controller moves `status.currentRevision` only for
+/// `RollingUpdate` ([k8s-sts-utils], `completeRollingUpdate`). So an `OnDelete` StatefulSet is
+/// rolled out once `status.updatedReplicas` and `status.readyReplicas` reach `spec.replicas`. A
+/// Job or CronJob starts new pods for each run, so it has nothing to roll out.
+///
+/// [k8s-sts-utils]: https://github.com/kubernetes/kubernetes/blob/v1.34.0/pkg/controller/statefulset/stateful_set_utils.go
+#[must_use]
+pub fn rolled_out(workload: Workload<'_>) -> bool {
+    match workload {
+        Workload::Deployment(object) => readiness::deployment(object).is_current(),
+        Workload::DaemonSet(object) => readiness::daemon_set(object).is_current(),
+        Workload::StatefulSet(object) => {
+            let readiness = readiness::stateful_set(object);
+            if readiness.reason != Reason::OnDelete {
+                return readiness.is_current();
+            }
+            let wanted = desired_replicas(object.spec.as_ref().and_then(|spec| spec.replicas));
+            let status = object.status.as_ref();
+            let updated = status
+                .and_then(|status| status.updated_replicas)
+                .unwrap_or_default();
+            let ready = status
+                .and_then(|status| status.ready_replicas)
+                .unwrap_or_default();
+            updated >= wanted && ready >= wanted
+        }
+        Workload::Job(_) | Workload::CronJob(_) => true,
+    }
+}
+
 /// The workload's phase.
+///
+/// A StatefulSet or DaemonSet runs once [`rolled_out`]; with `OnDelete`, once every pod is ready,
+/// whichever template it runs. One that does not run is degraded with no pod ready, and
+/// progresses otherwise. A StatefulSet scaled to zero is paused.
 #[must_use]
 pub fn phase(workload: Workload<'_>) -> Phase {
     match workload {
@@ -365,12 +428,24 @@ pub fn phase(workload: Workload<'_>) -> Phase {
             let Some(Replicas { ready, desired }) = replicas(workload) else {
                 return Phase::Unknown;
             };
-            match (desired, matches!(workload, Workload::StatefulSet(_))) {
-                (0, true) => Phase::Paused,
-                (0, false) => Phase::Unknown,
-                _ if ready >= desired => Phase::Running,
-                _ if ready == 0 => Phase::Degraded,
-                _ => Phase::Progressing,
+            if desired == 0 {
+                return if matches!(workload, Workload::StatefulSet(_)) {
+                    Phase::Paused
+                } else {
+                    Phase::Unknown
+                };
+            }
+            let running = if on_delete(workload) {
+                ready >= desired
+            } else {
+                rolled_out(workload)
+            };
+            if running {
+                Phase::Running
+            } else if ready == 0 {
+                Phase::Degraded
+            } else {
+                Phase::Progressing
             }
         }
         Workload::Job(job) => job_phase(job),
@@ -384,16 +459,8 @@ pub fn phase(workload: Workload<'_>) -> Phase {
     }
 }
 
-/// The phase of a Job: its `Complete` and `Failed` conditions first, then its pod counts.
+/// The phase of a Job: [`readiness::job`] and its pod counts.
 fn job_phase(job: &Job) -> Phase {
-    let condition = |kind: &str| {
-        job.status
-            .as_ref()
-            .and_then(|status| status.conditions.as_ref())
-            .into_iter()
-            .flatten()
-            .any(|condition| condition.type_ == kind && condition.status == "True")
-    };
     let status = job.status.as_ref();
     let count = |field: fn(&k8s_openapi::api::batch::v1::JobStatus) -> Option<i32>| {
         status.and_then(field).unwrap_or_default()
@@ -403,11 +470,13 @@ fn job_phase(job: &Job) -> Phase {
         .as_ref()
         .and_then(|spec| spec.completions)
         .unwrap_or(1);
+    let readiness = readiness::job(job);
     if job.spec.as_ref().and_then(|spec| spec.suspend) == Some(true) {
         Phase::Suspended
-    } else if condition("Complete") || count(|status| status.succeeded) >= desired {
+    } else if readiness.reason == Reason::JobComplete || count(|status| status.succeeded) >= desired
+    {
         Phase::Completed
-    } else if condition("Failed") {
+    } else if readiness.status == Status::Failed {
         Phase::Failed
     } else if count(|status| status.active) > 0 {
         Phase::Progressing

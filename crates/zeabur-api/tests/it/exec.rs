@@ -25,8 +25,9 @@ mod tests {
     use zeabur_kube::k8s_openapi::jiff::Timestamp;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Cluster, NamespaceObjects, TerminalSize};
+    use zeabur_telemetry::Feature;
 
-    use crate::support::TestApi;
+    use crate::support::{TestApi, recorder, taken};
 
     type Socket = WebSocketStream<MaybeTlsStream<TcpStream>>;
 
@@ -277,6 +278,28 @@ mod tests {
                    "name": "web-1", "namespace": "shop"})
         );
         assert_eq!(close_code(&mut socket).await.0, CloseCode::Normal);
+    }
+
+    #[tokio::test]
+    async fn a_terminal_is_reported_when_it_is_ready_and_a_refused_one_is_not() {
+        let cluster = cluster();
+        let (used, seen) = recorder();
+        let app = || {
+            TestApi::new(&cluster)
+                .with_clock(now)
+                .with_used(Arc::clone(&used))
+                .router()
+        };
+        cluster.update(|s| {
+            s.refused_rights.insert("create pods/exec".to_owned());
+        });
+        let mut socket = connect(app(), "").await;
+        assert_eq!(frame(&mut socket).await["type"], "error");
+        assert_eq!(taken(&seen), []);
+        cluster.update(|s| s.refused_rights.clear());
+        let mut socket = connect(app(), "?container=web").await;
+        assert_eq!(frame(&mut socket).await["type"], "ready");
+        assert_eq!(taken(&seen), [Feature::TerminalOpened]);
     }
 
     #[tokio::test]

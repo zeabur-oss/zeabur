@@ -136,6 +136,7 @@ export function ComposeDrawer({ project, onClose }: { project: string; onClose: 
     if (!conversion || problems.size > 0 || made.length === 0) return
     planner.plan({
       title: t("add.composePlan", made.length),
+      via: "compose",
       changes: composeChanges(conversion, choices, { project, ...context }),
       notes: notesOf(t, conversion, offers, diffs, choices.managed, envFiles),
     })

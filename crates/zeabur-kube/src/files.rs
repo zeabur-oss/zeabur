@@ -23,6 +23,7 @@
 use std::pin::Pin;
 
 use futures_util::{Stream, StreamExt as _};
+use tar::{EntryType, Header};
 use tokio::io::{AsyncRead, AsyncReadExt as _, AsyncWriteExt as _};
 
 use crate::port::{Cluster, ClusterError, ExecStream, ExitStatus};
@@ -493,31 +494,26 @@ fn by_name(a: &str, b: &str) -> std::cmp::Ordering {
 
 // ── Tar ──────────────────────────────────────────────────────────────────────────────────────
 
-/// One header of a tar archive, as the POSIX ustar format lays it out [ustar], with the GNU
-/// magic and the GNU long name entry (`L`) for a name longer than 99 bytes, which GNU tar and
-/// BusyBox both read [gnu-tar].
+/// One GNU header block: the ustar layout [ustar] with the GNU magic, which GNU tar and BusyBox
+/// both read [gnu-tar]. A name longer than 99 bytes is cut here; [`file_header`] puts the whole
+/// name in a GNU long name entry (`L`) before it.
 ///
 /// [ustar]: https://pubs.opengroup.org/onlinepubs/9799919799/utilities/pax.html#tag_20_94_13_06
 /// [gnu-tar]: https://www.gnu.org/software/tar/manual/html_node/Standard.html
-fn header(name: &[u8], size: u64, kind: u8, modified: u64) -> [u8; BLOCK] {
-    fn put_at(block: &mut [u8; BLOCK], at: usize, bytes: &[u8]) {
-        if let Some(field) = block.get_mut(at..at + bytes.len()) {
-            field.copy_from_slice(bytes);
-        }
+fn header(name: &[u8], size: u64, kind: EntryType, modified: u64) -> Header {
+    let mut header = Header::new_gnu();
+    let short = name.get(..99).unwrap_or(name);
+    if let Some(field) = header.as_old_mut().name.get_mut(..short.len()) {
+        field.copy_from_slice(short);
     }
-    let mut block = [0_u8; BLOCK];
-    put_at(&mut block, 0, name.get(..99).unwrap_or(name));
-    put_at(&mut block, 100, b"0000644\0");
-    put_at(&mut block, 108, b"0000000\0");
-    put_at(&mut block, 116, b"0000000\0");
-    put_at(&mut block, 124, format!("{size:011o}\0").as_bytes());
-    put_at(&mut block, 136, format!("{modified:011o}\0").as_bytes());
-    put_at(&mut block, 148, b"        ");
-    put_at(&mut block, 156, &[kind]);
-    put_at(&mut block, 257, b"ustar  \0");
-    let sum: u32 = block.iter().map(|b| u32::from(*b)).sum();
-    put_at(&mut block, 148, format!("{sum:06o}\0 ").as_bytes());
-    block
+    header.set_mode(0o644);
+    header.set_uid(0);
+    header.set_gid(0);
+    header.set_size(size);
+    header.set_mtime(modified);
+    header.set_entry_type(kind);
+    header.set_cksum();
+    header
 }
 
 fn padding(size: u64) -> usize {
@@ -528,16 +524,21 @@ fn padding(size: u64) -> usize {
 /// The headers that come before a file of `name` and `size` in an archive.
 #[must_use]
 pub fn file_header(name: &str, size: u64, modified: u64) -> Vec<u8> {
+    entry_header(name, EntryType::Regular, size, modified)
+}
+
+/// The headers that come before an entry of `name`, `kind` and `size` in an archive.
+pub(crate) fn entry_header(name: &str, kind: EntryType, size: u64, modified: u64) -> Vec<u8> {
     let bytes = name.as_bytes();
     let mut out = Vec::with_capacity(3 * BLOCK);
     if bytes.len() > 99 {
         let long = u64::try_from(bytes.len() + 1).unwrap_or(u64::MAX);
-        out.extend_from_slice(&header(b"././@LongLink", long, b'L', 0));
+        out.extend_from_slice(header(b"././@LongLink", long, EntryType::GNULongName, 0).as_bytes());
         out.extend_from_slice(bytes);
         out.push(0);
         out.resize(out.len() + padding(long), 0);
     }
-    out.extend_from_slice(&header(bytes, size, b'0', modified));
+    out.extend_from_slice(header(bytes, size, kind, modified).as_bytes());
     out
 }
 
@@ -548,27 +549,23 @@ pub fn archive_end(size: u64) -> Vec<u8> {
     vec![0; padding(size) + 2 * BLOCK]
 }
 
-/// The type and size of a header block's entry.
+/// The type and size of a header block's entry, after its checksum is checked.
 fn parse_header(block: &[u8; BLOCK]) -> Result<(u8, u64), FileError> {
     if block.iter().all(|b| *b == 0) {
         return Err(FileError::Protocol("the archive is empty".to_owned()));
     }
-    let field = block.get(124..136).unwrap_or_default();
-    let size = if field.first().is_some_and(|b| b & 0x80 != 0) {
-        // GNU's base-256 for sizes of 8 GiB and more.
-        field.iter().skip(1).fold(0_u64, |n, b| {
-            n.saturating_mul(256).saturating_add(u64::from(*b))
-        })
-    } else {
-        let text: String = field
-            .iter()
-            .map(|b| char::from(*b))
-            .filter(char::is_ascii_digit)
-            .collect();
-        u64::from_str_radix(if text.is_empty() { "0" } else { &text }, 8)
-            .map_err(|e| FileError::Protocol(format!("a size that is not a number ({e})")))?
-    };
-    Ok((block.get(156).copied().unwrap_or(0), size))
+    let header = Header::from_byte_slice(block);
+    let mut summed = header.clone();
+    summed.set_cksum();
+    if header.cksum().ok() != summed.cksum().ok() {
+        return Err(FileError::Protocol(
+            "a header with a wrong checksum".to_owned(),
+        ));
+    }
+    let size = header
+        .entry_size()
+        .map_err(|e| FileError::Protocol(format!("a size that is not a number ({e})")))?;
+    Ok((header.entry_type().as_byte(), size))
 }
 
 fn pax_size(records: &[u8]) -> Option<u64> {
@@ -1301,24 +1298,26 @@ mod tests {
             assert_eq!(contents, data);
             let (kind, size) = first_entry(&mut archive.as_slice()).await.unwrap();
             assert_eq!((kind, size), (b'0', data.len() as u64));
+            let mut upstream = tar::Archive::new(archive.as_slice());
+            let mut entry = upstream.entries().unwrap().next().unwrap().unwrap();
+            assert_eq!(entry.path_bytes().as_ref(), name.as_bytes());
+            let mut contents = Vec::new();
+            std::io::Read::read_to_end(&mut entry, &mut contents).unwrap();
+            assert_eq!(contents, data);
         }
     }
 
     #[test]
-    fn header_checksums_as_tar_computes_them() {
-        let block = header(b"a.txt", 5, b'0', 0);
-        let stored = u32::from_str_radix(
-            std::str::from_utf8(block.get(148..154).unwrap()).unwrap(),
-            8,
-        )
-        .unwrap();
-        let mut blank = block;
-        blank
-            .get_mut(148..156)
-            .unwrap()
-            .copy_from_slice(b"        ");
-        assert_eq!(stored, blank.iter().map(|b| u32::from(*b)).sum::<u32>());
+    fn a_header_reads_back_and_a_wrong_checksum_is_refused() {
+        let mut block = *header(b"a.txt", 5, EntryType::Regular, 0).as_bytes();
         assert_eq!(parse_header(&block).unwrap(), (b'0', 5));
+        if let Some(byte) = block.get_mut(0) {
+            *byte = b'b';
+        }
+        assert!(matches!(
+            parse_header(&block),
+            Err(FileError::Protocol(message)) if message.contains("checksum")
+        ));
     }
 
     #[test]

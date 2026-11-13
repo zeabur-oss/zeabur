@@ -240,6 +240,14 @@ pub enum Feature {
     DatabaseCreated(DatabaseKind),
     /// A domain was added.
     DomainAdded(DomainKind),
+    /// A log stream was opened.
+    LogsViewed,
+    /// A terminal session was opened.
+    TerminalOpened,
+    /// Someone was invited.
+    MemberInvited,
+    /// Services were created from a Docker Compose file.
+    Compose,
 }
 
 impl Feature {
@@ -248,6 +256,10 @@ impl Feature {
             Self::ServiceCreated(_) => "service_created",
             Self::DatabaseCreated(_) => "database_created",
             Self::DomainAdded(_) => "domain_added",
+            Self::LogsViewed => "logs_viewed",
+            Self::TerminalOpened => "terminal_opened",
+            Self::MemberInvited => "member_invited",
+            Self::Compose => "compose",
         }
     }
 }
@@ -265,6 +277,7 @@ impl Serialize for Feature {
             }
             Self::DatabaseCreated(kind) => map.serialize_entry("kind", kind)?,
             Self::DomainAdded(kind) => map.serialize_entry("kind", kind)?,
+            Self::LogsViewed | Self::TerminalOpened | Self::MemberInvited | Self::Compose => {}
         }
         map.end()
     }

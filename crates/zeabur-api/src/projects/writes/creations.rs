@@ -27,7 +27,8 @@ fn is_ingress_maintenance(change: &Change) -> bool {
 }
 
 /// The kinds discovery names, for a request that creates objects or Traefik middlewares; none
-/// otherwise, and the planner knows only the kinds it creates itself.
+/// otherwise. Every signed-in person may read discovery (`system:discovery`), so a failed read is
+/// a cluster problem and the plan is refused.
 pub(super) async fn served_kinds(
     cluster: &dyn Cluster,
     request: &PlanRequest,
@@ -36,7 +37,11 @@ pub(super) async fn served_kinds(
         .changes
         .iter()
         .any(|c| zeabur_plan::access::middleware_read(c).is_some() || is_ingress_maintenance(c));
-    if !from_yaml(request) && !middlewares {
+    let creates = request
+        .changes
+        .iter()
+        .any(|c| matches!(c, Change::Create { .. } | Change::CreateUploadService(_)));
+    if !creates && !middlewares {
         return Ok(Vec::new());
     }
     let served = cluster

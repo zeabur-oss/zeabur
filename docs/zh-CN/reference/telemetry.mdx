@@ -12,7 +12,7 @@ description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝
 | 事件 | 由谁发送 | 时机 |
 |---|---|---|
 | `zeabur_active` | Zeabur | 每个人每天（UTC）第一次使用 Zeabur 网页界面时 |
-| `feature_used` | Zeabur | 成功创建服务、数据库或域名之后；同一项功能、同一组值每天（UTC）只发送一次 |
+| `feature_used` | Zeabur | 成功创建服务、数据库或域名，打开日志流或终端，邀请成员，或应用 Docker Compose 导入之后；同一项功能、同一组值每天（UTC）只发送一次 |
 | `install_started` | 安装程序 | `apply` 开始 |
 | `install_finished` | 安装程序 | `apply` 顺利结束 |
 | `install_failed` | 安装程序 | `apply` 中途停止 |
@@ -23,7 +23,7 @@ description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝
 | `day` | `zeabur_active`、`feature_used` | UTC 日期，例如 `2026-10-30` |
 | `person` | `zeabur_active` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
 | `mode` | `zeabur_active` | `in-cluster` |
-| `feature` | `feature_used` | `service_created`、`database_created` 或 `domain_added` |
+| `feature` | `feature_used` | `service_created`、`database_created`、`domain_added`、`logs_viewed`、`terminal_opened`、`member_invited` 或 `compose` |
 | `source` | `service_created` 的 `feature_used` | 服务怎么创建：`git`、`upload`、`image` 或 `template` |
 | `template` | `source` 为 `template` 的 `feature_used` | 模板在 Zeabur Catalog 里的 ID，例如 `wordpress`；Catalog 里没有的 ID 不会发送 |
 | `kind` | `database_created` 或 `domain_added` 的 `feature_used` | 数据库或对象存储：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。域名：名称用的是 Zeabur 提供给新服务的域名后缀时是 `generated`，其他是 `custom` |

@@ -30,12 +30,58 @@ const undeletableResources = new Set([
   "endpointslices",
 ])
 
+function Intro({ address, note }: { address: ObjectAddress; note?: string }) {
+  const t = useT()
+  return (
+    <p className="min-w-0 basis-full type-meta text-muted-foreground sm:basis-0 sm:flex-1">
+      {t("yaml.intro", address.name)}
+      {note ? ` ${note}` : ""}
+    </p>
+  )
+}
+
+/** A Delete or Edit button: disabled with the reason when blocked, else behind its gate. */
+function YamlAction({
+  icon: Icon,
+  text,
+  blocked,
+  gate,
+  onClick,
+}: {
+  icon: typeof TrashIcon
+  text: string
+  blocked?: string
+  gate: Gate
+  onClick: () => void
+}) {
+  if (blocked)
+    return (
+      <Tooltip content={blocked}>
+        <span>
+          <Button variant="outline" size="xs" disabled>
+            <Icon aria-hidden="true" data-icon="inline-start" />
+            {text}
+          </Button>
+        </span>
+      </Tooltip>
+    )
+  return (
+    <GateTip gate={gate}>
+      <Button variant="outline" size="xs" onClick={onClick}>
+        <Icon aria-hidden="true" data-icon="inline-start" />
+        {text}
+      </Button>
+    </GateTip>
+  )
+}
+
 export function YamlView({
   project,
   address,
   yaml,
   managedBy,
   kind,
+  note,
   onDeleted,
 }: {
   project: string
@@ -43,6 +89,8 @@ export function YamlView({
   yaml: string
   managedBy?: string | null
   kind?: string
+  /** Follows the intro. */
+  note?: string
   /** Offers Delete when given. */
   onDeleted?: () => void
 }) {
@@ -74,7 +122,11 @@ export function YamlView({
       changes: [
         {
           op: "delete",
-          resource: { group: address.group, version: address.version, resource: address.resource },
+          resource: {
+            group: address.group,
+            version: address.version,
+            resource: address.resource,
+          },
           name: address.name,
         },
       ],
@@ -84,46 +136,24 @@ export function YamlView({
     return (
       <div className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
-          <p className="min-w-0 basis-full type-meta text-muted-foreground sm:basis-0 sm:flex-1">
-            {t("yaml.intro", address.name)}
-          </p>
+          <Intro address={address} note={note} />
           <span className="flex shrink-0 gap-1.5 sm:ml-auto">
             {onDeleted ? (
-              undeletable ? (
-                <Tooltip content={undeletable}>
-                  <span>
-                    <Button variant="outline" size="xs" disabled>
-                      <TrashIcon aria-hidden="true" data-icon="inline-start" />
-                      {t("yaml.delete")}
-                    </Button>
-                  </span>
-                </Tooltip>
-              ) : (
-                <GateTip gate={deleteGate}>
-                  <Button variant="outline" size="xs" onClick={planDeletion}>
-                    <TrashIcon aria-hidden="true" data-icon="inline-start" />
-                    {t("yaml.delete")}
-                  </Button>
-                </GateTip>
-              )
+              <YamlAction
+                icon={TrashIcon}
+                text={t("yaml.delete")}
+                blocked={undeletable}
+                gate={deleteGate}
+                onClick={planDeletion}
+              />
             ) : null}
-            {blocked ? (
-              <Tooltip content={blocked}>
-                <span>
-                  <Button variant="outline" size="xs" disabled>
-                    <PencilSimpleIcon aria-hidden="true" data-icon="inline-start" />
-                    {t("yaml.edit")}
-                  </Button>
-                </span>
-              </Tooltip>
-            ) : (
-              <GateTip gate={editGate}>
-                <Button variant="outline" size="xs" onClick={() => setDraft(yaml)}>
-                  <PencilSimpleIcon aria-hidden="true" data-icon="inline-start" />
-                  {t("yaml.edit")}
-                </Button>
-              </GateTip>
-            )}
+            <YamlAction
+              icon={PencilSimpleIcon}
+              text={t("yaml.edit")}
+              blocked={blocked}
+              gate={editGate}
+              onClick={() => setDraft(yaml)}
+            />
           </span>
         </div>
         <YamlBlock yaml={yaml} label={label} />

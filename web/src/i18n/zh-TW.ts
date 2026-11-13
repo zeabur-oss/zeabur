@@ -790,6 +790,7 @@ export const zhTW: Messages = {
   "pod.notReady": "未就緒",
   "pod.readyCount": (ready, total) => `${ready}/${total} 就緒`,
   "pod.restarts": (n) => `重新啟動 ${n} 次`,
+  "pod.yaml": "YAML",
   "pod.logsOf": (pod) => `${pod} 的日誌`,
   "resources.title": "資源",
   "resources.hint": "副本範本裡的保留量與上限。要看實際用量需要 metrics-server。",
@@ -1351,6 +1352,7 @@ export const zhTW: Messages = {
   "object.statusLabel": (name: string) => `${name} 的狀態`,
   "tab.yaml": "YAML",
   "yaml.intro": (name: string) => `這份是目前 ${name} 在叢集裡的設定，改了會照原樣寫入。`,
+  "yaml.podReplaced": (owner: string) => `刪除這個副本後，${owner} 會建立新的副本。`,
   "yaml.label": (name: string) => `${name} 的 YAML`,
 
   // 檢查變更

@@ -17,8 +17,8 @@
 //! Each database carries its members' pods, which its logs, events and terminal are read from; a
 //! refused pod read leaves them empty.
 //!
-//! Databases are created, changed and backed up through plans like any other change: the kinds
-//! are in `zeabur_plan::CREATABLE`, and the writes go with the person's credential.
+//! Databases are created, changed and backed up through plans like any other change, and the
+//! writes go with the person's credential.
 
 use axum::extract::State;
 use serde::Serialize;
