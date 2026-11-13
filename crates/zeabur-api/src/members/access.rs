@@ -256,18 +256,16 @@ pub(crate) fn grants_by_member(bindings: &[Binding]) -> BTreeMap<String, Vec<Pro
 
 /// `holder`'s projects, from `bindings`; a binding to another role is left out.
 pub(crate) fn grants_of(bindings: &[Binding], holder: &Holder) -> Vec<ProjectGrant> {
-    let mut grants = Vec::new();
-    for binding in bindings {
-        if let Some(role) = binding.role
-            && binding.holder == *holder
-        {
-            grants.push(ProjectGrant {
+    bindings
+        .iter()
+        .filter(|binding| binding.holder == *holder)
+        .filter_map(|binding| {
+            Some(ProjectGrant {
                 project: binding.project.clone(),
-                role,
-            });
-        }
-    }
-    grants
+                role: binding.role?,
+            })
+        })
+        .collect()
 }
 
 /// One write towards a member's wanted projects.
