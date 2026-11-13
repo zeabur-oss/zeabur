@@ -1,6 +1,6 @@
 ---
 title: 體驗計畫
-description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；以及怎麼分別關閉。
+description: 加入體驗計畫後，Zeabur 和 installer 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；Zeabur 怎麼取得較新的範本；以及怎麼分別關閉。
 ---
 
 體驗計畫會傳送版本、每天的使用人數和用過哪些功能，讓我們知道有多少人在用、該先修哪裡。用 installer 安裝時預設加入，可以在確認頁取消勾選；用 Helm 安裝時預設不加入，要自己開啟。
@@ -94,3 +94,23 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 - 用 Helm 安裝時，設定 `updateCheck.enabled=false`。叢集頁就只顯示版本。
 - 在 Zeabur 的環境變數設定 `DO_NOT_TRACK=1`。`zeaburctl` 則是在你自己的環境變數設定。這也會關閉體驗計畫。
 - 為 `zeaburctl`（包括 `zeaburctl ui`）在你的環境變數設定 `NO_UPDATE_NOTIFIER`，任何值都可以。這只關閉檢查更新。
+
+## 範本更新
+
+不用升級 Zeabur，也能用到較新的範本。Zeabur 會讀取 Zeabur Catalog 的 API，用那裡的範本取代 Zeabur 內建的範本。元件，以及 Zeabur 怎麼在叢集裡找到它們，仍以內建的為準。已經用範本部署的服務不會變動。範本更新和體驗計畫、檢查更新各自獨立，預設開啟。
+
+**取得什麼**。從 `https://oss-catalog.zeabur.com/v1/` 取得 `catalog.json`，裡面列出每個範本和它的檔案雜湊值。雜湊值和 Zeabur 現在提供的不同時，才再取得那個範本的 `templates/<id>.json`。
+
+**信任什麼**。Zeabur 信任它取得檔案的網址：會檢查 HTTPS 憑證的 `https://oss-catalog.zeabur.com/v1/`，或你設定的鏡像站。這些檔案沒有簽章，所以掌控這個網址的人決定 Zeabur 提供哪些範本。接著 Zeabur 逐一檢查每個範本：要能讀取，需要的元件也要是這個 Zeabur 認得的。沒通過的範本不會出現，原本提供的同一個範本會留著。取得失敗時，什麼都不會改變。
+
+**什麼時候執行**。有人打開範本清單時才會取得，每 6 小時最多一次，失敗時 10 分鐘後再試。取得的是 Zeabur 伺服器，瀏覽器不會連過去。範本只放在記憶體裡，重新啟動後，下次取得前先用內建的範本。`zeaburctl ui` 不會取得。打開範本表單或規劃好之後，範本如果有了新版，Zeabur 會拒絕這次變更，請重新打開表單。
+
+**會傳送什麼**。普通的請求，不帶任何 ID 或 Cookie。Zeabur 伺服器的 user agent 是 `zeabur`。提供 `oss-catalog.zeabur.com` 的 GitHub Pages 會看到請求來自哪個 IP 位址。不會傳送任何關於叢集或使用者的資料，所以 `DO_NOT_TRACK` 不會關閉它。
+
+**使用鏡像站**。叢集連不到網際網路時，把 Zeabur Catalog 某一版的 `api-v1.tar.gz` 原封不動解開到叢集連得到的網頁伺服器，再填上其中 `v1/` 的網址：installer 設定裡的 `templateFetchUrl`、Helm 的 `templateFetch.url`，或 Zeabur 環境變數 `ZEABUR_TEMPLATE_FETCH_URL`。Zeabur 信任鏡像站的方式和信任 `oss-catalog.zeabur.com` 一樣。想信任某一版而不是某個伺服器，請在複製前先驗證它的簽章，做法見 Zeabur Catalog 的[版本與 API](https://github.com/zeabur-oss/catalog/blob/main/docs/zh-TW/reference/releases.mdx#驗證並讀取版本)。
+
+**關閉**。以下任何一種都有效。關閉後，Zeabur 只提供內建的範本，也不會為範本發出任何請求。
+
+- 用 installer 安裝時，在 `/etc/zeabur-installer/config.yaml` 設定 `templateFetch: false`。
+- 用 Helm 安裝時，設定 `templateFetch.enabled=false`。
+- 在 Zeabur 的環境變數設定 `ZEABUR_TEMPLATE_FETCH=false`。

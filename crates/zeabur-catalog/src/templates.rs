@@ -6,12 +6,17 @@
 //!
 //! [template-clients]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/template-clients.mdx
 
+use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::net::IpAddr;
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
+use serde_json::value::RawValue;
 use serde_json::{Value, json};
+use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
 
 use crate::bundle;
@@ -31,6 +36,9 @@ pub struct Template {
     pub name: String,
     /// The application's version, the tag of its main image (`2.3.4`).
     pub version: String,
+    /// Zeabur Catalog's `sourceDigest` of its directory (`h1:…`). A `template` change names the
+    /// revision its form was built from.
+    pub revision: String,
     /// The labels of every object of an install, and of the Secrets of its generated inputs:
     /// `app.kubernetes.io/instance` and `templates.zeabur.com/template` (its id) and
     /// `app.kubernetes.io/version`.
@@ -343,49 +351,232 @@ struct FileValidation {
     pattern: String,
 }
 
-/// The templates this build carries and can deploy, sorted by id. A template with an input this
-/// build cannot generate is left out.
-///
-/// # Errors
-///
-/// When a template does not read. A test reads them all, so a build that passes CI cannot fail
-/// here.
-pub fn templates() -> Result<Vec<Template>, RenderError> {
-    bundle::TEMPLATES
-        .iter()
-        .filter_map(|(id, file, manifests)| match read(id, file, manifests) {
-            Err(RenderError::UnknownTemplate(_)) => None,
-            read => Some(read),
-        })
-        .collect()
+/// The templates Zeabur offers: the ones this build carries ([`Catalog::embedded`]), or those
+/// Zeabur Catalog's API lists now ([`Catalog::updated`]).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Catalog {
+    sources: BTreeMap<String, Source>,
 }
 
-/// The template `id`.
-///
-/// # Errors
-///
-/// When this build does not carry it, or it does not read.
-pub fn template(id: &str) -> Result<Template, RenderError> {
-    let (id, file, manifests) = find(id)?;
-    read(id, file, manifests)
+/// A template's `template.yaml` (as written, or as JSON), its `manifests.yaml` and its revision.
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct Source {
+    file: Cow<'static, str>,
+    manifests: Cow<'static, str>,
+    revision: String,
+}
+
+/// `catalog.json` of Zeabur Catalog's API: the part Zeabur reads.
+#[derive(Debug, Deserialize)]
+pub struct Index {
+    templates: Vec<IndexEntry>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct IndexEntry {
+    id: String,
+    source_digest: String,
+}
+
+/// `templates/<id>.json` of Zeabur Catalog's API.
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct TemplateFile {
+    id: String,
+    source_digest: String,
+    /// `template.yaml` as JSON, which reads as YAML.
+    template: Box<RawValue>,
+    manifests: String,
+}
+
+/// A template the API lists that Zeabur does not offer as listed, and why.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Dropped {
+    /// The template's id.
+    pub id: String,
+    /// Why it is not offered.
+    pub reason: String,
+}
+
+impl Catalog {
+    /// The templates this build carries.
+    #[must_use]
+    pub fn embedded() -> Self {
+        let sources = bundle::TEMPLATES
+            .iter()
+            .map(|(id, file, manifests)| {
+                let source = Source {
+                    file: Cow::Borrowed(file),
+                    manifests: Cow::Borrowed(manifests),
+                    revision: source_digest(file, manifests),
+                };
+                ((*id).to_owned(), source)
+            })
+            .collect();
+        Self { sources }
+    }
+
+    /// The ids `index` lists whose `sourceDigest` is not the revision offered here: the
+    /// `templates/<id>.json` to fetch for [`Self::updated`]. An id that is not a DNS label is
+    /// left out.
+    pub fn stale<'a>(&self, index: &'a Index) -> impl Iterator<Item = &'a str> {
+        index
+            .templates
+            .iter()
+            .filter(|entry| is_dns_label(&entry.id))
+            .filter(|entry| {
+                self.sources
+                    .get(&entry.id)
+                    .is_none_or(|source| source.revision != entry.source_digest)
+            })
+            .map(|entry| entry.id.as_str())
+    }
+
+    /// The templates `index` lists, each from its `templates/<id>.json` in `files` when it is
+    /// there and as offered here otherwise. A file is dropped when it does not read or requires a
+    /// component this build does not carry, and the template offered here stays in its place.
+    #[must_use]
+    pub fn updated(
+        &self,
+        index: &Index,
+        files: &BTreeMap<String, Vec<u8>>,
+    ) -> (Self, Vec<Dropped>) {
+        let mut sources = BTreeMap::new();
+        let mut dropped = Vec::new();
+        for IndexEntry { id, .. } in &index.templates {
+            let fetched = files
+                .get(id)
+                .map(|file| read_fetched(id, file).and_then(|source| offerable(id, source)));
+            if let Some(Err(reason)) = &fetched {
+                dropped.push(Dropped {
+                    id: id.clone(),
+                    reason: reason.clone(),
+                });
+            }
+            let source = match fetched {
+                Some(Ok(source)) => Some(source),
+                Some(Err(_)) | None => self.sources.get(id).cloned(),
+            };
+            if let Some(source) = source {
+                sources.insert(id.clone(), source);
+            }
+        }
+        (Self { sources }, dropped)
+    }
+
+    /// The templates Zeabur can deploy, sorted by id. A template with an input this build cannot
+    /// generate is left out.
+    ///
+    /// # Errors
+    ///
+    /// When a template does not read. A test reads every embedded one, and a fetched one is
+    /// checked before it is offered.
+    pub fn templates(&self) -> Result<Vec<Template>, RenderError> {
+        let mut templates = Vec::with_capacity(self.sources.len());
+        for (id, source) in &self.sources {
+            match source.read(id) {
+                Ok(template) => templates.push(template),
+                Err(RenderError::UnknownTemplate(_)) => {}
+                Err(error) => return Err(error),
+            }
+        }
+        Ok(templates)
+    }
+
+    /// The template `id`.
+    ///
+    /// # Errors
+    ///
+    /// When the catalogue does not have it, or it does not read.
+    pub fn template(&self, id: &str) -> Result<Template, RenderError> {
+        self.find(id)?.read(id)
+    }
+
+    /// The objects of the template `id` for `options`, in the order of its `manifests.yaml`.
+    ///
+    /// # Errors
+    ///
+    /// When the catalogue does not have the template, when `options` fail the catalogue's
+    /// checks, or when the template does not read.
+    pub fn render(&self, id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
+        let source = self.find(id)?;
+        render_file(id, source, options)
+    }
+
+    fn find(&self, id: &str) -> Result<&Source, RenderError> {
+        self.sources
+            .get(id)
+            .ok_or_else(|| RenderError::UnknownTemplate(id.to_owned()))
+    }
+}
+
+impl Source {
+    fn read(&self, id: &str) -> Result<Template, RenderError> {
+        read(id, &self.file, &self.manifests, &self.revision)
+    }
+}
+
+/// Zeabur Catalog's `sourceDigest` of a template directory that holds `template.yaml` and
+/// `manifests.yaml`: Go's `dirhash.Hash1`, the SHA-256 of one `<SHA-256 in hex>  <name>` line per
+/// file in name order, in base64 after `h1:`.
+fn source_digest(file: &str, manifests: &str) -> String {
+    let mut summary = Sha256::new();
+    for (name, text) in [("manifests.yaml", manifests), ("template.yaml", file)] {
+        summary.update(format!("{}  {name}\n", hex::encode(Sha256::digest(text))));
+    }
+    format!("h1:{}", STANDARD.encode(summary.finalize()))
+}
+
+/// The template in `templates/<id>.json`.
+fn read_fetched(id: &str, file: &[u8]) -> Result<Source, String> {
+    let file: TemplateFile = serde_json::from_slice(file).map_err(|e| e.to_string())?;
+    if file.id != id {
+        return Err(format!("its file names the template {}", file.id));
+    }
+    Ok(Source {
+        file: Cow::Owned(file.template.get().to_owned()),
+        manifests: Cow::Owned(file.manifests),
+        revision: file.source_digest,
+    })
+}
+
+/// `source`, once it reads and needs only components this build carries.
+fn offerable(id: &str, source: Source) -> Result<Source, String> {
+    let template = source.read(id).map_err(|e| e.to_string())?;
+    for wanted in &template.requires {
+        if !carries(wanted) {
+            let (Reference::Capability(name) | Reference::Component(name)) = wanted;
+            return Err(format!(
+                "it requires {name}, which this build of Zeabur does not carry"
+            ));
+        }
+    }
+    Ok(source)
+}
+
+/// Whether this build carries a component `wanted` names.
+fn carries(wanted: &Reference) -> bool {
+    bundle::FILES
+        .iter()
+        .any(|(capability, id, _)| match wanted {
+            Reference::Capability(name) => name == capability,
+            Reference::Component(name) => name.split_once('/') == Some((capability, id)),
+        })
 }
 
 /// The ID of the template `id` as the embedded catalogue spells it; `None` for a name it does not
 /// carry.
 #[must_use]
 pub fn template_id(id: &str) -> Option<&'static str> {
-    find(id).ok().map(|(id, ..)| *id)
-}
-
-fn find(id: &str) -> Result<&'static (&'static str, &'static str, &'static str), RenderError> {
     bundle::TEMPLATES
         .iter()
         .find(|(name, ..)| *name == id)
-        .ok_or_else(|| RenderError::UnknownTemplate(id.to_owned()))
+        .map(|(name, ..)| *name)
 }
 
 #[expect(clippy::too_many_lines, reason = "one pass over the file's parts")]
-fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> {
+fn read(id: &str, file: &str, manifests: &str, revision: &str) -> Result<Template, RenderError> {
     let broken = |detail: String| RenderError::Broken {
         template: id.to_owned(),
         detail,
@@ -453,6 +644,7 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
         id: id.to_owned(),
         name: file.metadata.name,
         version: file.metadata.version.clone(),
+        revision: revision.to_owned(),
         labels,
         tagline: file.metadata.summary.trim().to_owned(),
         tagline_locales: file
@@ -505,24 +697,12 @@ fn read(id: &str, file: &str, manifests: &str) -> Result<Template, RenderError> 
     })
 }
 
-/// The objects of the template `id` for `options`, in the order of its `manifests.yaml`.
-///
-/// # Errors
-///
-/// When this build does not carry the template, when `options` fail the catalogue's checks, or
-/// when the template does not read.
-pub fn render(id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
-    let (id, file, manifests) = find(id)?;
-    render_file(id, file, manifests, options)
-}
-
 fn render_file(
     id: &str,
-    file: &str,
-    manifests: &str,
+    source: &Source,
     options: &RenderOptions<'_>,
 ) -> Result<Vec<Value>, RenderError> {
-    let template = read(id, file, manifests)?;
+    let template = source.read(id)?;
     let broken = |detail: String| RenderError::Broken {
         template: id.to_owned(),
         detail,
@@ -546,8 +726,8 @@ fn render_file(
         cluster_issuer: options.cluster_issuer.unwrap_or_default(),
         inputs,
     };
-    let nodes = parse(manifests).map_err(broken)?;
-    let mut text = String::with_capacity(manifests.len());
+    let nodes = parse(&source.manifests).map_err(broken)?;
+    let mut text = String::with_capacity(source.manifests.len());
     execute(&nodes, &values, &mut text).map_err(broken)?;
     let documents: Vec<Value> =
         serde_saphyr::from_multiple(&text).map_err(|e| broken(e.to_string()))?;
@@ -732,6 +912,18 @@ fn execute(nodes: &[Node], values: &Values<'_>, out: &mut String) -> Result<(), 
 mod tests {
     use super::*;
 
+    fn templates() -> Result<Vec<Template>, RenderError> {
+        Catalog::embedded().templates()
+    }
+
+    fn template(id: &str) -> Result<Template, RenderError> {
+        Catalog::embedded().template(id)
+    }
+
+    fn render(id: &str, options: &RenderOptions<'_>) -> Result<Vec<Value>, RenderError> {
+        Catalog::embedded().render(id, options)
+    }
+
     fn run(text: &str, inputs: &[(&str, &str)]) -> Result<String, String> {
         let values = Values {
             namespace: "shop",
@@ -808,11 +1000,11 @@ mod tests {
         };
         let secret = |name: &str, key: &str| format!("{{name: {name}, key: {key}}}");
         let ok = file(&(input("a", &secret("s", "k")) + &input("b", &secret("s", "l"))));
-        assert!(read("t", &ok, "").is_ok());
+        assert!(read("t", &ok, "", "").is_ok());
         let same_name = file(&(input("a", &secret("s", "k")) + &input("a", &secret("s", "l"))));
-        assert!(read("t", &same_name, "").is_err());
+        assert!(read("t", &same_name, "", "").is_err());
         let same_key = file(&(input("a", &secret("s", "k")) + &input("b", &secret("s", "k"))));
-        assert!(read("t", &same_key, "").is_err());
+        assert!(read("t", &same_key, "", "").is_err());
     }
 
     #[test]
@@ -1022,10 +1214,14 @@ mod tests {
             let options = &case["options"];
             let inputs: BTreeMap<String, String> =
                 serde_json::from_value(options["inputs"].clone()).unwrap_or_default();
+            let source = Source {
+                file: Cow::Owned(file.to_string()),
+                manifests: Cow::Owned(manifests.to_owned()),
+                revision: String::new(),
+            };
             let got = render_file(
                 id,
-                &file.to_string(),
-                manifests,
+                &source,
                 &RenderOptions {
                     namespace: options["namespace"].as_str().unwrap(),
                     domain: options["domain"].as_str(),
@@ -1093,5 +1289,107 @@ mod tests {
         )
         .unwrap();
         assert!(objects.iter().any(|o| o["kind"] == "Deployment"));
+    }
+
+    /// Zeabur Catalog's API as `catalog api` writes it (zeabur-oss/catalog#293 at 2c8d7c7):
+    /// `catalog.json`, two template files, and the two files of Miniflux they were made from.
+    const INDEX: &str = include_str!("../tests/catalog-api/v1/catalog.json");
+    const MINIFLUX: &str = include_str!("../tests/catalog-api/v1/templates/miniflux.json");
+    const OLLAMA: &str = include_str!("../tests/catalog-api/v1/templates/ollama.json");
+
+    #[test]
+    fn a_template_from_the_api_reads_and_renders_as_its_files_do() {
+        let file = include_str!("../tests/catalog-api/miniflux/template.yaml");
+        let manifests = include_str!("../tests/catalog-api/miniflux/manifests.yaml");
+        let written = Source {
+            file: Cow::Borrowed(file),
+            manifests: Cow::Borrowed(manifests),
+            revision: source_digest(file, manifests),
+        };
+        let fetched = read_fetched("miniflux", MINIFLUX.as_bytes()).unwrap();
+        assert_eq!(fetched.read("miniflux"), written.read("miniflux"));
+        let index: Index = serde_json::from_str(INDEX).unwrap();
+        let listed = index.templates.iter().find(|t| t.id == "miniflux").unwrap();
+        assert_eq!(written.revision, listed.source_digest);
+
+        let inputs = BTreeMap::new();
+        let options = RenderOptions {
+            namespace: "shop",
+            domain: Some("rss.example.com"),
+            cluster_issuer: Some("letsencrypt"),
+            inputs: &inputs,
+        };
+        assert_eq!(
+            render_file("miniflux", &fetched, &options).unwrap(),
+            render_file("miniflux", &written, &options).unwrap()
+        );
+    }
+
+    fn listed(entries: &[(&str, &str)]) -> Index {
+        let templates = entries
+            .iter()
+            .map(|(id, digest)| IndexEntry {
+                id: (*id).to_owned(),
+                source_digest: (*digest).to_owned(),
+            })
+            .collect();
+        Index { templates }
+    }
+
+    #[test]
+    fn only_a_listed_template_with_another_revision_is_fetched() {
+        let embedded = Catalog::embedded();
+        let ghost = embedded.template("ghost").unwrap().revision;
+        let index = listed(&[
+            ("ghost", &ghost),
+            ("ollama", "h1:newer"),
+            ("brand-new", "h1:new"),
+            ("../catalog.json", "h1:x"),
+        ]);
+        let stale: Vec<&str> = embedded.stale(&index).collect();
+        assert_eq!(stale, ["ollama", "brand-new"]);
+    }
+
+    #[test]
+    fn the_listed_templates_are_offered_and_a_bad_file_keeps_the_one_offered() {
+        let embedded = Catalog::embedded();
+        let revision = |id: &str| embedded.template(id).unwrap().revision;
+        let index = listed(&[
+            ("ollama", "h1:newer"),
+            ("miniflux", "h1:newer"),
+            ("ghost", "h1:newer"),
+            ("error-pages", &revision("error-pages")),
+            ("brand-new", "h1:new"),
+        ]);
+        let unknown = MINIFLUX.replace(
+            r#""component": "traefik""#,
+            r#""component": "not-in-zeabur""#,
+        );
+        let files = BTreeMap::from([
+            ("ollama".to_owned(), OLLAMA.as_bytes().to_vec()),
+            ("miniflux".to_owned(), unknown.into_bytes()),
+            ("ghost".to_owned(), b"{".to_vec()),
+            ("brand-new".to_owned(), OLLAMA.as_bytes().to_vec()),
+        ]);
+        let (catalog, dropped) = embedded.updated(&index, &files);
+
+        let ollama: TemplateFile = serde_json::from_str(OLLAMA).unwrap();
+        assert_eq!(
+            catalog.template("ollama").unwrap().revision,
+            ollama.source_digest
+        );
+        for id in ["miniflux", "ghost", "error-pages"] {
+            assert_eq!(catalog.template(id), embedded.template(id), "{id}");
+        }
+        for id in ["brand-new", "hermes-agent"] {
+            assert_eq!(
+                catalog.template(id).map_err(|e| e.code()),
+                Err("unknown_template"),
+                "{id}"
+            );
+        }
+        let dropped: BTreeSet<&str> = dropped.iter().map(|d| d.id.as_str()).collect();
+        assert_eq!(dropped, BTreeSet::from(["miniflux", "ghost", "brand-new"]));
+        assert!(catalog.templates().is_ok());
     }
 }

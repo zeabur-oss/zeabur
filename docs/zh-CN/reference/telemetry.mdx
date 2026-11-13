@@ -1,6 +1,6 @@
 ---
 title: 体验计划
-description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；以及如何分别关闭。
+description: 加入体验计划后，Zeabur 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；Zeabur 如何获取更新的模板；以及如何分别关闭。
 ---
 
 体验计划会发送版本、每天的使用人数和用过哪些功能，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启。
@@ -94,3 +94,23 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 - 用 Helm 安装时，设置 `updateCheck.enabled=false`。集群页就只显示版本。
 - 在 Zeabur 的环境变量中设置 `DO_NOT_TRACK=1`。`zeaburctl` 则是在你自己的环境变量中设置。这也会关闭体验计划。
 - 为 `zeaburctl`（包括 `zeaburctl ui`）在你的环境变量中设置 `NO_UPDATE_NOTIFIER`，任意值都可以。这只关闭检查更新。
+
+## 模板更新
+
+不用升级 Zeabur，也能用上更新的模板。Zeabur 会读取 Zeabur Catalog 的 API，用那里的模板替换 Zeabur 内置的模板。组件，以及 Zeabur 如何在集群里找到它们，仍以内置的为准。已经用模板部署的服务不会变化。模板更新和体验计划、检查更新各自独立，默认开启。
+
+**获取什么**。从 `https://oss-catalog.zeabur.com/v1/` 获取 `catalog.json`，其中列出每个模板及其文件的哈希值。哈希值与 Zeabur 当前提供的不同时，才再获取该模板的 `templates/<id>.json`。
+
+**信任什么**。Zeabur 信任它获取文件的地址：会检查 HTTPS 证书的 `https://oss-catalog.zeabur.com/v1/`，或你设置的镜像站。这些文件没有签名，所以控制这个地址的人决定 Zeabur 提供哪些模板。然后 Zeabur 逐个检查模板：要能读取，需要的组件也要是这个 Zeabur 认识的。没通过的模板不会出现，原先提供的同一个模板会保留。获取失败时，什么都不会改变。
+
+**什么时候运行**。有人打开模板列表时才会获取，每 6 小时最多一次，失败时 10 分钟后再试。获取的是 Zeabur 服务器，浏览器不会访问。模板只保存在内存中，重启后，在下次获取前先用内置的模板。`zeaburctl ui` 不会获取。打开模板表单或规划好之后，如果模板有了新版本，Zeabur 会拒绝这次变更，请重新打开表单。
+
+**会发送什么**。普通的请求，不带任何 ID 或 Cookie。Zeabur 服务器的 user agent 是 `zeabur`。托管 `oss-catalog.zeabur.com` 的 GitHub Pages 会看到请求来自哪个 IP 地址。不会发送任何关于集群或用户的数据，所以 `DO_NOT_TRACK` 不会关闭它。
+
+**使用镜像站**。集群无法访问互联网时，把 Zeabur Catalog 某一版的 `api-v1.tar.gz` 原样解压到集群能访问的 Web 服务器上，再填上其中 `v1/` 的地址：安装程序配置中的 `templateFetchUrl`、Helm 的 `templateFetch.url`，或 Zeabur 环境变量 `ZEABUR_TEMPLATE_FETCH_URL`。Zeabur 信任镜像站的方式与信任 `oss-catalog.zeabur.com` 相同。想信任某一版而不是某个服务器，请在复制前先验证它的签名，做法见 Zeabur Catalog 的[版本与 API](https://github.com/zeabur-oss/catalog/blob/main/docs/zh-CN/reference/releases.mdx#验证并读取版本)。
+
+**关闭**。以下任意一种都有效。关闭后，Zeabur 只提供内置的模板，也不会为模板发出任何请求。
+
+- 用安装程序安装时，在 `/etc/zeabur-installer/config.yaml` 中设置 `templateFetch: false`。
+- 用 Helm 安装时，设置 `templateFetch.enabled=false`。
+- 在 Zeabur 的环境变量中设置 `ZEABUR_TEMPLATE_FETCH=false`。

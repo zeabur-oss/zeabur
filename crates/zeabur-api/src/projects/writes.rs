@@ -339,9 +339,15 @@ pub(crate) async fn plan(
         handoff: handoff.as_ref(),
         zeabur: state.terminals.as_deref(),
     };
+    let catalog = state.templates.current();
+    templates::check_forms(&catalog, &request)?;
     let opened = deploy_keys::open(&state, &identity.username, &project, &request)?;
     let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
-    let opened = templates::open(
+    let templates::Opened {
+        request: opened,
+        digest: rendered,
+    } = templates::open(
+        &catalog,
         &project,
         state.settings.domains.cluster_issuer.as_deref(),
         opened,
@@ -373,6 +379,7 @@ pub(crate) async fn plan(
         project,
         request,
         versions: zeabur_plan::versions(&plan),
+        templates: rendered,
         made_at,
         expires_at,
     };
@@ -469,10 +476,12 @@ pub(crate) async fn apply(
     };
     let opened = deploy_keys::open(&state, &identity.username, &project, &claims.request)?;
     let opened = s3_destinations::open(cluster.as_ref(), opened).await?;
-    let opened = templates::open(
+    let opened = templates::open_as_planned(
+        &state.templates.current(),
         &project,
         state.settings.domains.cluster_issuer.as_deref(),
         opened,
+        claims.templates.as_deref(),
     )?;
     let plan = compute_any(
         &planner,

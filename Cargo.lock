@@ -3025,11 +3025,14 @@ dependencies = [
 name = "zeabur-catalog"
 version = "0.2.0"
 dependencies = [
+ "base64 0.23.1",
  "flate2",
+ "hex",
  "regex",
  "serde",
  "serde-saphyr 2.0.0",
  "serde_json",
+ "sha2",
  "tar",
  "thiserror",
  "utoipa",

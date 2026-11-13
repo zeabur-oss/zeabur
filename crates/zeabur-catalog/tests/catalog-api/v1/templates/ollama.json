@@ -1,0 +1,104 @@
+{
+  "id": "ollama",
+  "sourceDigest": "h1:/UdgbWYlf4hkxosOC5zurSHy4b4lzoUh3n8DJhYdv1Q=",
+  "template": {
+    "apiVersion": "catalog.zeabur.com/v1",
+    "kind": "Template",
+    "metadata": {
+      "homepage": "https://github.com/ollama/ollama",
+      "license": "MIT",
+      "locales": {
+        "zh-CN": {
+          "summary": "在 CPU 上运行本地模型，API 只能从集群内访问。"
+        },
+        "zh-TW": {
+          "summary": "在 CPU 上執行本機模型，API 只能從叢集內連線。"
+        }
+      },
+      "name": "Ollama",
+      "summary": "Runs local models on the CPU; its API is reachable only inside the cluster.",
+      "version": "0.40.14"
+    },
+    "security": {
+      "locales": {
+        "zh-CN": {
+          "summary": "以 UID 1000 运行，没有额外的系统权限，镜像只读。API 没有登录验证，只有同一个命名空间里、带有指定标签的客户端连得到。"
+        },
+        "zh-TW": {
+          "summary": "以 UID 1000 執行，沒有額外的系統權限，映像檔唯讀。API 沒有登入驗證，只有同一個命名空間裡、帶有指定標籤的用戶端連得到。"
+        }
+      },
+      "risks": [
+        {
+          "locales": {
+            "zh-CN": {
+              "mitigation": "没有 Ingress 也没有 NodePort。只有这个命名空间里、带有标签 templates.zeabur.com/ollama-client=true 的可信 Pod 连得进来。不要给这个服务加公开路由，因为它没有登录验证。",
+              "risk": "Ollama API 没有登录验证，连得到的人都能管理模型。"
+            },
+            "zh-TW": {
+              "mitigation": "沒有 Ingress 也沒有 NodePort。只有這個命名空間裡、帶有標籤 templates.zeabur.com/ollama-client=true 的可信任 Pod 連得進來。不要幫這個服務加公開路由，因為它沒有登入驗證。",
+              "risk": "Ollama API 沒有登入驗證，連得到的人都能管理模型。"
+            }
+          },
+          "mitigation": "There is no Ingress or NodePort. Only trusted pods in this namespace that carry the label templates.zeabur.com/ollama-client=true can connect. Do not attach a public route to this service, because it has no sign-in.",
+          "risk": "The Ollama API has no sign-in, and anyone who can reach it can manage models."
+        },
+        {
+          "locales": {
+            "zh-CN": {
+              "mitigation": "不会预先加载任何模型。请先看过每个模型的许可和大小，再到 Pod 里运行 `ollama pull MODEL`。Pod 一次只加载一个模型，一次只处理一个请求。内存上限是 8Gi，存储卷是 50Gi，所以多数大型模型放不下。",
+              "risk": "每个模型都有自己的许可，跟 Ollama 软件本身的 MIT 许可无关。模型文件也可能把内存和磁盘用光。"
+            },
+            "zh-TW": {
+              "mitigation": "不會預先載入任何模型。請先看過每個模型的授權和大小，再到 Pod 裡執行 `ollama pull MODEL`。Pod 一次只載入一個模型，一次只處理一個請求。記憶體上限是 8Gi，儲存空間是 50Gi，所以多數大型模型放不下。",
+              "risk": "每個模型都有自己的授權，跟 Ollama 軟體本身的 MIT 授權無關。模型檔也可能把記憶體和磁碟吃光。"
+            }
+          },
+          "mitigation": "No model is preloaded. Read each model's license and check its size, then run `ollama pull MODEL` in the Pod. The Pod loads one model and serves one request at a time. It has an 8Gi memory limit and a 50Gi volume, so most large models do not fit.",
+          "risk": "Each model has its own license, separate from the MIT license of the Ollama software. Model files can also use up all your RAM and disk."
+        }
+      ],
+      "summary": "The container runs as UID 1000 with no extra system privileges and a read-only image. The API has no sign-in. Only clients in the same namespace that carry a specific label can reach it.",
+      "unauthenticated": [
+        "ollama"
+      ]
+    },
+    "services": [
+      {
+        "name": "ollama",
+        "podSecurity": "restricted",
+        "ports": [
+          {
+            "name": "http",
+            "port": 11434
+          }
+        ],
+        "resources": {
+          "limits": {
+            "cpu": "4",
+            "memory": "8Gi"
+          },
+          "requests": {
+            "cpu": "500m",
+            "memory": "2Gi"
+          }
+        }
+      }
+    ],
+    "smoke": [
+      {
+        "condition": "condition=Available",
+        "http": {
+          "path": "/api/tags",
+          "port": 11434,
+          "service": "ollama",
+          "status": 200
+        },
+        "name": "ollama-ready",
+        "resource": "deployment/ollama",
+        "timeout": "600s"
+      }
+    ]
+  },
+  "manifests": "apiVersion: v1\nkind: PersistentVolumeClaim\nmetadata:\n  name: ollama-data\n  namespace: '{{ .Namespace }}'\nspec:\n  accessModes:\n  - ReadWriteOnce\n  resources:\n    requests:\n      storage: 50Gi\n---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: ollama\n  namespace: '{{ .Namespace }}'\nspec:\n  replicas: 1\n  strategy:\n    type: Recreate\n  revisionHistoryLimit: 2\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: ollama\n  template:\n    metadata:\n      labels:\n        templates.zeabur.com/template: ollama\n        app.kubernetes.io/name: ollama\n    spec:\n      automountServiceAccountToken: false\n      securityContext:\n        runAsNonRoot: true\n        runAsUser: 1000\n        runAsGroup: 1000\n        fsGroup: 1000\n        fsGroupChangePolicy: OnRootMismatch\n        seccompProfile:\n          type: RuntimeDefault\n      containers:\n      - name: ollama\n        image: docker.io/ollama/ollama:0.40.14@sha256:ebaef4f4c5d93660e1f25f8ad085a112f51ccfb0e8458073e71793959dba91c9\n        ports:\n        - name: http\n          containerPort: 11434\n        env:\n        - name: HOME\n          value: /data\n        - name: OLLAMA_MODELS\n          value: /data/models\n        - name: OLLAMA_HOST\n          value: 0.0.0.0:11434\n        - name: OLLAMA_NUM_PARALLEL\n          value: '1'\n        - name: OLLAMA_MAX_LOADED_MODELS\n          value: '1'\n        - name: OLLAMA_NO_CLOUD\n          value: 'true'\n        securityContext:\n          runAsNonRoot: true\n          allowPrivilegeEscalation: false\n          readOnlyRootFilesystem: true\n          capabilities:\n            drop:\n            - ALL\n        resources:\n          requests:\n            cpu: 500m\n            memory: 2Gi\n          limits:\n            cpu: '4'\n            memory: 8Gi\n        volumeMounts:\n        - name: data\n          mountPath: /data\n        - name: tmp\n          mountPath: /tmp\n        startupProbe:\n          httpGet:\n            path: /api/tags\n            port: http\n          failureThreshold: 90\n          periodSeconds: 5\n          timeoutSeconds: 3\n        readinessProbe:\n          httpGet:\n            path: /api/tags\n            port: http\n          periodSeconds: 10\n          timeoutSeconds: 3\n        livenessProbe:\n          httpGet:\n            path: /api/tags\n            port: http\n          periodSeconds: 30\n          timeoutSeconds: 3\n          failureThreshold: 6\n      volumes:\n      - name: data\n        persistentVolumeClaim:\n          claimName: ollama-data\n      - name: tmp\n        emptyDir:\n          sizeLimit: 1Gi\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: ollama\n  namespace: '{{ .Namespace }}'\nspec:\n  selector:\n    app.kubernetes.io/name: ollama\n  ports:\n  - name: http\n    port: 11434\n    targetPort: http\n---\napiVersion: networking.k8s.io/v1\nkind: NetworkPolicy\nmetadata:\n  name: ollama-access\n  namespace: '{{ .Namespace }}'\nspec:\n  podSelector:\n    matchLabels:\n      templates.zeabur.com/template: ollama\n      app.kubernetes.io/name: ollama\n  policyTypes: [Ingress]\n  ingress:\n  - from:\n    - podSelector:\n        matchLabels:\n          templates.zeabur.com/template: ollama\n          templates.zeabur.com/ollama-client: 'true'\n    ports:\n    - port: 11434\n      protocol: TCP\n"
+}

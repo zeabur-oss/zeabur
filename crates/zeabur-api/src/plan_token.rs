@@ -138,6 +138,7 @@ mod tests {
                 changes: Vec::new(),
             },
             versions: BTreeMap::from([("Deployment/web".to_owned(), "41".to_owned())]),
+            templates: None,
             made_at: "2026-10-15T00:00:00Z".to_owned(),
             expires_at: 1_000,
         }

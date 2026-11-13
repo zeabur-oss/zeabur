@@ -787,6 +787,8 @@ pub struct ErrorPageHtml {
 pub struct TemplateChange {
     /// The template's id (`miniflux`).
     pub template: String,
+    /// The template's `revision` in the list the form was built from.
+    pub revision: String,
     /// The domain, for a template that routes one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub domain: Option<String>,

@@ -17077,6 +17077,7 @@ components:
       description: A [`Change::Template`].
       required:
       - template
+      - revision
       properties:
         domain:
           type:
@@ -17090,6 +17091,9 @@ components:
             type: string
           propertyNames:
             type: string
+        revision:
+          type: string
+          description: The template's `revision` in the list the form was built from.
         template:
           type: string
           description: The template's id (`miniflux`).
@@ -17202,6 +17206,7 @@ components:
       - license
       - homepage
       - version
+      - revision
       - labels
       - requires
       - services
@@ -17257,6 +17262,9 @@ components:
           items:
             $ref: "#/components/schemas/Requirement"
           description: The components it needs, and whether each one is there.
+        revision:
+          type: string
+          description: The template's revision, which a `template` change made from this view names.
         risks:
           type: array
           items:

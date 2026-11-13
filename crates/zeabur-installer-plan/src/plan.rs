@@ -1821,6 +1821,10 @@ fn zeabur_values(
         "issuer": issuer_values,
         "planKey": {"existingSecret": "zeabur-plan-key"},
         "domains": {"suffixes": suffixes, "clusterIssuer": issuer},
+        "templateFetch": {
+            "enabled": config.template_fetch,
+            "url": config.template_fetch_url.as_deref().unwrap_or_default(),
+        },
         "ingress": {
             "enabled": true,
             "className": "traefik",
@@ -2480,6 +2484,13 @@ mod tests {
         );
         assert_eq!(values["domains"]["clusterIssuer"], "letsencrypt");
         assert_eq!(values["domains"]["suffixes"], json!([]));
+        assert_eq!(values["templateFetch"], json!({"enabled": true, "url": ""}));
+        let off = "templateFetch: false\ntemplateFetchUrl: https://mirror.example.com/v1/\n";
+        let p = plan(&index, &config(off), &facts()).unwrap();
+        assert_eq!(
+            p.zeabur.unwrap().values["templateFetch"],
+            json!({"enabled": false, "url": "https://mirror.example.com/v1/"})
+        );
     }
 
     #[test]

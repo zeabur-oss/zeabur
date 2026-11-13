@@ -152,6 +152,7 @@ export function templateChanges(
     {
       op: "template",
       template: template.id,
+      revision: template.revision,
       inputs,
       ...(template.needsDomain && domain ? { domain } : {}),
     },

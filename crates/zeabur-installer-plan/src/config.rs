@@ -16,6 +16,10 @@ use crate::cluster::Distribution;
 /// The whole configuration.
 #[derive(Debug, Clone, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "each is a switch of the file people write"
+)]
 pub struct Config {
     /// `team`, the default; `personal` makes a [`PersonalConfig`].
     #[serde(default, rename = "use", skip_serializing_if = "Use::is_team")]
@@ -56,6 +60,14 @@ pub struct Config {
     /// whatever this says.
     #[serde(default = "yes", skip_serializing_if = "is_true")]
     pub update_check: bool,
+    /// Let Zeabur fetch Zeabur Catalog's newest templates (docs/reference/telemetry.mdx).
+    /// `DO_NOT_TRACK` does not turn it off.
+    #[serde(default = "yes", skip_serializing_if = "is_true")]
+    pub template_fetch: bool,
+    /// Where Zeabur fetches templates from instead of `https://oss-catalog.zeabur.com/v1/`, such
+    /// as a mirror.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub template_fetch_url: Option<String>,
     /// An RKE2 release other than the pinned one, such as `v1.37.1+rke2r1`. Its downloads are
     /// checked only against the release's own checksum list, so the plan warns that it is
     /// unsupported.
@@ -685,6 +697,8 @@ impl Config {
             allow_data_loss: Vec::new(),
             telemetry: true,
             update_check: true,
+            template_fetch: true,
+            template_fetch_url: None,
             distribution: Distribution::default(),
             rke2_version: None,
             k3s_version: None,
