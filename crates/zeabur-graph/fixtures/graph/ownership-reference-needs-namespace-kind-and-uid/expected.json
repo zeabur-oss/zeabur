@@ -1,0 +1,75 @@
+[
+  {
+    "root": {
+      "kind": "Deployment",
+      "name": "web",
+      "group": "apps",
+      "uid": "web-new",
+      "namespace": "demo"
+    },
+    "read": false,
+    "database": null,
+    "members": [
+      {
+        "kind": "Pod",
+        "name": "web-1"
+      }
+    ]
+  },
+  {
+    "root": {
+      "kind": "StatefulSet",
+      "name": "web",
+      "group": "apps",
+      "uid": "web-new"
+    },
+    "read": true,
+    "database": null,
+    "members": []
+  },
+  {
+    "root": {
+      "kind": "StatefulSet",
+      "name": "web",
+      "group": "apps",
+      "uid": "web-old"
+    },
+    "read": false,
+    "database": null,
+    "members": [
+      {
+        "kind": "Pod",
+        "name": "web-0"
+      }
+    ]
+  },
+  {
+    "root": {
+      "kind": "Job",
+      "name": "migrate",
+      "group": "batch",
+      "uid": "job-1",
+      "namespace": "demo"
+    },
+    "read": false,
+    "database": null,
+    "members": [
+      {
+        "kind": "Pod",
+        "name": "migrate-abcde"
+      }
+    ]
+  },
+  {
+    "root": {
+      "kind": "Job",
+      "name": "migrate",
+      "group": "batch",
+      "uid": "job-1",
+      "namespace": "other"
+    },
+    "read": true,
+    "database": null,
+    "members": []
+  }
+]

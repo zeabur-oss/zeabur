@@ -1,0 +1,38 @@
+[
+  {
+    "root": {
+      "kind": "Cluster",
+      "name": "db",
+      "group": "example.com",
+      "uid": "other-db"
+    },
+    "read": false,
+    "database": null,
+    "members": [
+      {
+        "kind": "PersistentVolumeClaim",
+        "name": "other-data"
+      }
+    ]
+  },
+  {
+    "root": {
+      "kind": "Cluster",
+      "name": "db",
+      "group": "postgresql.cnpg.io",
+      "uid": "cnpg-db"
+    },
+    "read": false,
+    "database": {
+      "kind": "Cluster",
+      "name": "db",
+      "engine": "PostgreSQL"
+    },
+    "members": [
+      {
+        "kind": "PersistentVolumeClaim",
+        "name": "pg-data"
+      }
+    ]
+  }
+]

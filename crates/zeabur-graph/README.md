@@ -28,6 +28,10 @@ Level 2: may depend on `zeabur-model`. No I/O.
   PVCs a StatefulSet's claim templates created (named `<template>-<set>-<ordinal>`), the
   Services whose selector matches the pod labels, and the Ingresses routing to those Services.
   One owner: `owned`; several: `shared`; none: `orphan`. Owners are sorted by kind then name.
+- **Who manages an object comes from controller owner references.** [`OwnerGraph`] walks them
+  by UID to a root, with a StatefulSet's claims joined by their claim template's name, and an
+  owner that was not read kept as a node. Its root says which database operator, if any, runs
+  the object, so a database's claims are not taken for volumes of their own.
 - **What is not a workload or a resource.** A Job a CronJob controls is one of its runs.
   Service account token and Helm release Secrets, and the `kube-root-ca.crt` ConfigMap, are
   machinery.

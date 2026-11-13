@@ -60,6 +60,7 @@ Comparison rules:
 | `graph.attribution` | objects of one namespace | `namespace` | `{configMaps, secrets, persistentVolumeClaims, services}`, each a map name → `{ownership, owners}` (all four present, `{}` when empty), and `workloads: [{kind, name}]` sorted by kind then name |
 | `graph.deploymentPhase` | one Deployment | — | one of `Running`, `Progressing`, `Degraded`, `Paused`, `Suspended`, `Completed`, `Failed`, `Unknown` |
 | `graph.isMachinerySecret` | one Secret | — | a boolean |
+| `graph.ownership` | objects of one namespace | — | `[{root: {namespace, group, kind, name, uid}, read, database: {kind, name, engine} \| null, members: [{namespace, group, kind, name, uid}]}]`, roots and members sorted by namespace, group, kind, name, then UID; each object follows its controller owner reference, a claim without one follows the only StatefulSet whose claim template named it; an owner named but not read is a root with `read: false`; a cycle ends at its least object; `database` classifies the root |
 | `projection.env` | one workload | `container` | `[EnvVar]`; a Secret-sourced value is masked and never present |
 | `projection.envFrom` | a workload and the ConfigMaps/Secrets it imports | `container` | `[ImportedEnv]`; `keyCount` counts the imported object's keys |
 | `projection.portProtocol` | one Service | `port` (the port's name) | `{protocol: HTTP \| HTTPS \| gRPC \| TCP \| UDP, inferredFrom: appProtocol \| name \| protocol}` |

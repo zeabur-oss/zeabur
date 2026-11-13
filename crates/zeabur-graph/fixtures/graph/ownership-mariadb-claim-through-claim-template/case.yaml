@@ -1,0 +1,2 @@
+description: A claim with no owner reference, named by the claim template of a StatefulSet that mariadb-operator controls, belongs to the MariaDB database even though the MariaDB object was not read.
+operation: graph.ownership

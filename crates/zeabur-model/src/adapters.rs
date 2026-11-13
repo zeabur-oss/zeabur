@@ -30,6 +30,14 @@ pub fn controller_of(
         .find(|owner| owner.controller == Some(true))
 }
 
+/// The API group of an `apiVersion`: what precedes the `/`, or empty for the core group.
+#[must_use]
+pub fn api_group(api_version: &str) -> &str {
+    api_version
+        .split_once('/')
+        .map_or("", |(group, _version)| group)
+}
+
 /// The value of label `key`, when it is present and not empty.
 ///
 /// An empty label value says nothing, so every convention here treats it as absent.

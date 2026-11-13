@@ -1,16 +1,17 @@
 //! The projection is a function of the objects, not of the order kube-apiserver lists them in,
-//! checked on generated namespaces. The round trip through a change (project, plan, project
-//! again) is `zeabur-plan`'s property test.
+//! checked on generated namespaces, and so is the ownership graph. The round trip through a change
+//! (project, plan, project again) is `zeabur-plan`'s property test.
 
 #[cfg(test)]
 mod tests {
     use std::collections::BTreeMap;
 
     use k8s_openapi::api::apps::v1::Deployment;
+    use k8s_openapi::api::batch::v1::Job;
     use k8s_openapi::api::core::v1::{ConfigMap, Service};
     use proptest::prelude::*;
     use serde_json::json;
-    use zeabur_graph::{Snapshot, project};
+    use zeabur_graph::{OwnerGraph, Snapshot, project};
 
     /// One generated workload: a name, a role label and literal env values.
     #[derive(Debug, Clone)]
@@ -110,5 +111,66 @@ mod tests {
             reversed.services.reverse();
             prop_assert_eq!(project(&forward), project(&reversed));
         }
+
+        #[test]
+        fn ownership_ends_and_does_not_depend_on_object_order(
+            jobs in owned_jobs().prop_flat_map(|jobs| {
+                let shuffled = Just(jobs.clone()).prop_shuffle();
+                (Just(jobs), shuffled)
+            })
+        ) {
+            let (listed, shuffled) = jobs;
+            prop_assert_eq!(groups(&listed), groups(&shuffled));
+        }
+    }
+
+    /// Jobs `j0`, `j1`, … each controlled by an optional other: by index, which may close a
+    /// cycle, or by a CloudNativePG `Cluster` that was not read.
+    fn owned_jobs() -> impl Strategy<Value = Vec<Job>> {
+        prop::collection::vec(prop::option::of(0..8_usize), 1..8).prop_map(|owners| {
+            let count = owners.len();
+            owners
+                .into_iter()
+                .enumerate()
+                .map(|(index, owner)| {
+                    let reference = owner.map(|owner| {
+                        if owner < count {
+                            json!({"apiVersion": "batch/v1", "kind": "Job",
+                                   "name": format!("j{owner}"), "uid": format!("u{owner}"),
+                                   "controller": true})
+                        } else {
+                            json!({"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                                   "name": "pg", "uid": "pg", "controller": true})
+                        }
+                    });
+                    serde_json::from_value(json!({
+                        "metadata": {"name": format!("j{index}"), "namespace": "generated",
+                                     "uid": format!("u{index}"),
+                                     "ownerReferences": reference.into_iter().collect::<Vec<_>>()}
+                    }))
+                    .unwrap()
+                })
+                .collect()
+        })
+    }
+
+    /// Each root, whether it is a database, and its members.
+    fn groups(jobs: &[Job]) -> Vec<(String, bool, Vec<String>)> {
+        let snapshot = Snapshot {
+            namespace: "generated".to_owned(),
+            jobs: jobs.to_vec(),
+            ..Snapshot::default()
+        };
+        let graph = OwnerGraph::new(&snapshot);
+        graph
+            .roots()
+            .map(|root| {
+                (
+                    root.uid.clone(),
+                    graph.database(root).is_some(),
+                    graph.members(root).map(|key| key.uid.clone()).collect(),
+                )
+            })
+            .collect()
     }
 }

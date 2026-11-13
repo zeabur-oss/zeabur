@@ -1,0 +1,2 @@
+description: A pod of a Job a CronJob created belongs to the CronJob.
+operation: graph.ownership
