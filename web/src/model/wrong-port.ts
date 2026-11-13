@@ -8,8 +8,7 @@ import type { Service } from "@/model/service"
 
 type Diagnosis = Schemas.Diagnosis
 
-/** How long an app has to start listening before a refused check counts, as Heroku's boot
- * timeout. */
+/** How long an app has to start listening before a refused check counts. */
 const BIND_WINDOW_MS = 60_000
 
 /** The image's port to use instead of the service's: the lowest it declares, when it declares
