@@ -450,7 +450,8 @@ mod tests {
                          "template": {"metadata": {"labels": {"app": "site"}},
                                       "spec": {"containers": [{"name": "site", "image": BUILT}]}}},
                 "status": {"replicas": 1, "readyReplicas": 1, "availableReplicas": 1,
-                           "updatedReplicas": 1}
+                           "updatedReplicas": 1,
+                           "conditions": [{"type": "Available", "status": "True"}]}
             }))
             .unwrap();
             let pod: Pod = serde_json::from_value(json!({

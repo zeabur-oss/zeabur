@@ -17,6 +17,8 @@ mod network;
 mod pod_security;
 mod project;
 mod provenance;
+/// Whether a workload or a pod has reached its spec, as kstatus computes it.
+pub mod readiness;
 mod reload;
 mod source;
 mod trace;

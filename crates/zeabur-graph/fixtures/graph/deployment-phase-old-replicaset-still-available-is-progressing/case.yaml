@@ -1,0 +1,2 @@
+description: A Deployment whose new replicas are all ready but whose old ReplicaSet still has an available pod is progressing.
+operation: graph.deploymentPhase

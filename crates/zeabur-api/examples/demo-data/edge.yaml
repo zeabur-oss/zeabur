@@ -91,6 +91,17 @@ spec:
               memory: 128Mi
 status:
   availableReplicas: 1
+  conditions:
+    - lastTransitionTime: now-2d
+      message: Deployment has minimum availability.
+      reason: MinimumReplicasAvailable
+      status: "True"
+      type: Available
+    - lastTransitionTime: now-2d
+      message: ReplicaSet has successfully progressed.
+      reason: NewReplicaSetAvailable
+      status: "True"
+      type: Progressing
   observedGeneration: 3
   readyReplicas: 1
   replicas: 1

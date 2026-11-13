@@ -28,6 +28,10 @@ Level 0: depends on no other workspace crate.
   answer; an empty label is no label; only a controller reference hands a workload to an
   operator. It answers in its own terms (`adapters::provenance::Tool`, `Engine`,
   `DatabaseCluster`); `zeabur-graph` maps them to the types of this crate.
+- `readiness`: whether a Deployment, StatefulSet, DaemonSet, Pod or Job has reached its spec,
+  as kstatus computes it: `Current`, `InProgress` or `Failed`, with the reason. The status light
+  (`zeabur-graph`'s `phase`) and the rollout panel both start from it and add Zeabur's own
+  states on top.
 
 ## Features
 
@@ -37,7 +41,8 @@ Level 0: depends on no other workspace crate.
 ## Design
 
 - **Plain data.** Serde types in camelCase, no logic beyond constructors: the rules live in
-  `zeabur-graph`, so the shape can be read without them.
+  `zeabur-graph`, so the shape can be read without them. `adapters` and `readiness` are the
+  exceptions: they read Kubernetes objects.
 - **Every value says where it comes from.** An environment variable's `source` is where its
   *value* is read from (`Literal`, `Secret`, `ConfigMap`, `PodField`, `ResourceField`, `File`).
   Every projected item also carries an `origin`: the Kubernetes object (kind and name) and the
