@@ -543,9 +543,11 @@ async fn read_with_data(
         .await
         .map_err(denied)?;
     let mut data = serde_json::Map::new();
-    for (key, bytes) in values {
-        data.insert(key, Value::String(BASE64.encode(bytes)));
-    }
+    data.extend(
+        values
+            .into_iter()
+            .map(|(key, bytes)| (key, Value::String(BASE64.encode(bytes)))),
+    );
     if let Some(map) = edited.as_object_mut() {
         map.insert("data".to_owned(), Value::Object(data));
     }
