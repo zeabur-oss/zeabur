@@ -141,6 +141,20 @@ function mountSentence(t: Translate, change: Extract<Change, { op: "editMount" }
   return t("common.sentences", [moved, mode]) || t("confirm.mount", change.workload.name)
 }
 
+function settingSentence(
+  t: Translate,
+  change: Extract<Change, { op: "configReload" | "securityProfile" | "port" }>,
+): string {
+  const name = change.workload.name
+  if (change.op === "port") return t("confirm.port", name, change.from, change.to)
+  if (change.op === "configReload")
+    return t(change.enabled ? "confirm.configReloadOn" : "confirm.configReloadOff", name)
+  return t(
+    change.profile === "restricted" ? "confirm.securityRestricted" : "confirm.securityBaseline",
+    name,
+  )
+}
+
 function sentenceOf(
   t: Translate,
   change: Change,
@@ -188,13 +202,9 @@ function sentenceOf(
     case "probe":
       return probeSentence(t, change.probe, change.set ?? undefined)
     case "configReload":
-      return change.enabled
-        ? t("confirm.configReloadOn", change.workload.name)
-        : t("confirm.configReloadOff", change.workload.name)
     case "securityProfile":
-      return change.profile === "restricted"
-        ? t("confirm.securityRestricted", change.workload.name)
-        : t("confirm.securityBaseline", change.workload.name)
+    case "port":
+      return settingSentence(t, change)
     case "image":
       return t("confirm.image", change.workload.name, imageTag(change.image))
     case "rebuild":

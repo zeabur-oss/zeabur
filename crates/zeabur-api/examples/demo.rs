@@ -28,6 +28,9 @@
 //! holds the projects as the demo starts and `wiki`, deleted since. A store on 127.0.0.1 answers
 //! the `DownloadRequest`s, so restore plans list what a backup holds.
 //!
+//! `ZEABUR_DEMO_WRONG_PORT=1` adds `lab/checkout`, a built service whose app does not listen on
+//! its port 8080 while its image declares 3000; `no-expose` makes the image declare none.
+//!
 //! `ZEABUR_DEMO_DELETING=1` adds a project, `archive`, that a database's finalizer keeps from
 //! being deleted.
 //!
@@ -438,6 +441,38 @@ fn storefront_build() -> DynamicObject {
     .expect("a Build")
 }
 
+/// `ZEABUR_DEMO_WRONG_PORT`: `1` adds lab's checkout, built from a Dockerfile that declares 3000
+/// while the service uses 8080, whose readiness check keeps being refused; `no-expose` makes its
+/// image declare no port.
+fn wrong_port() -> Option<String> {
+    std::env::var("ZEABUR_DEMO_WRONG_PORT").ok()
+}
+
+fn checkout_build() -> Vec<DynamicObject> {
+    let Some(variant) = wrong_port() else {
+        return Vec::new();
+    };
+    let ports = if variant == "no-expose" {
+        json!([])
+    } else {
+        json!(["3000/tcp"])
+    };
+    vec![
+        serde_json::from_value(json!({
+            "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+            "metadata": {"name": "checkout", "namespace": "lab"},
+            "spec": {"builderRef": "dockerfile",
+                "source": {"git": {"url": "https://github.com/example/checkout.git", "ref": "main"}},
+                "output": {"image": "zot.zot.svc:5000/lab/checkout"}},
+            "status": {"latestImage": "zot.zot.svc:5000/lab/checkout:main-1-5d41402",
+                "exposedPorts": ports,
+                "conditions": [{"type": "SourceReady", "status": "True", "reason": "Git"},
+                    {"type": "Ready", "status": "True", "reason": "Succeeded"}]}
+        }))
+        .expect("a Build"),
+    ]
+}
+
 /// One namespace's hand-written objects in `demo-data/<namespace>.yaml`: a manifest each, split
 /// by `---`. A string `now`, `now-2d4h` or `now+30m` (units `d`, `h`, `m`, `s`) is a time
 /// relative to the demo clock. A Secret lists its keys under `data` with empty values; only the
@@ -468,7 +503,23 @@ struct DemoData {
 
 impl DemoData {
     fn load() -> Self {
-        Self::parse(&DEMO_DATA, clock())
+        let mut files: Vec<(&str, String)> = DEMO_DATA
+            .iter()
+            .map(|(namespace, source)| (*namespace, (*source).to_owned()))
+            .collect();
+        if wrong_port().is_some() {
+            for (namespace, source) in &mut files {
+                if *namespace == "lab" {
+                    source.push_str("\n---\n");
+                    source.push_str(include_str!("demo-data/lab-wrong-port.yaml"));
+                }
+            }
+        }
+        let files: Vec<(&str, &str)> = files
+            .iter()
+            .map(|(namespace, source)| (*namespace, source.as_str()))
+            .collect();
+        Self::parse(&files, clock())
     }
 
     fn parse(files: &[(&str, &str)], now: Timestamp) -> Self {
@@ -1164,6 +1215,7 @@ fn state() -> State {
         .chain(live)
         .chain(docs_build())
         .chain([storefront_build()])
+        .chain(checkout_build())
         .chain(people())
         .chain(member_roles())
         .chain(api_tokens())

@@ -1,0 +1,7 @@
+description: "One request opens port 8080 to the internet and then moves the port to 3000. The Service the first change makes sends its traffic to 3000 too."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: publicPort, workload: {kind: Deployment, name: web}, service: web, port: 8080}
+      - {op: port, workload: {kind: Deployment, name: web}, from: 8080, to: 3000}

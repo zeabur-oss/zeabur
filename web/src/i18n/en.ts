@@ -1751,6 +1751,8 @@ export const en = {
     `Also affects ${names} (${count === 1 ? "it reads" : "they read"} ${object}).`,
   "confirm.alsoAffects": (names: string) => `Also affects ${names}.`,
   "confirm.addDomain": (host: string, service: string) => `Serve ${service} at ${host}.`,
+  "confirm.port": (service: string, from: number, to: number) =>
+    `${service} moves from port ${from} to ${to}: its container port, health checks and PORT change, and its private addresses send traffic to ${to}.`,
   "confirm.image": (service: string, tag: string) => `${service} will run ${tag}.`,
   "confirm.rebuild": (build: string) =>
     `Zeabur Builder builds ${build} again from the newest commit of its branch.`,
@@ -3762,6 +3764,15 @@ export const en = {
   "fixer.clusterAdmin.lead": "This needs a cluster administrator: ",
   "diagnosis.copy": "Copy diagnosis",
   "diagnosis.copyFailed": "Could not copy the diagnosis. Try again.",
+  "wrongPort.cause": (port: number) => `The app isn't listening on port ${port}.`,
+  "wrongPort.why": (port: number) =>
+    `Zeabur sets PORT to ${port} and checks that port. Connections to it have been refused for over a minute.`,
+  "wrongPort.fix":
+    "Have the app read PORT, or use the port it listens on; its logs usually say which. If it listens on 127.0.0.1 only, make it listen on 0.0.0.0.",
+  "wrongPort.fixOffer": (port: number) =>
+    `The image declares port ${port}; use it, or have the app read PORT. If the app listens on 127.0.0.1 only, make it listen on 0.0.0.0.`,
+  "wrongPort.use": (port: number) => `Use port ${port}`,
+  "wrongPort.plan": (service: string, port: number) => `Use port ${port} for ${service}`,
   "diagnosis.lastSeen": "Last seen",
   "trace.title": "Connection checks",
   "trace.reachable": "Reachable",

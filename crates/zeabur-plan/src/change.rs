@@ -192,6 +192,20 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         set: Option<ProbeRequest>,
     },
+    /// Move the port a container listens on: its declared port, its probes, its `PORT` and the
+    /// Services that send traffic to it (see the `port` module).
+    #[serde(rename_all = "camelCase")]
+    Port {
+        /// The workload.
+        workload: WorkloadRef,
+        /// The container; may be left out when the workload has only one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        container: Option<String>,
+        /// The port it is set to listen on now.
+        from: i32,
+        /// The port it listens on.
+        to: i32,
+    },
     /// Have Stakater Reloader replace a workload's pods when a ConfigMap or Secret it reads
     /// changes, or stop it: the workload's `reloader.stakater.com/auto` annotation (see the
     /// `reload` module).
