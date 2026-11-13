@@ -181,6 +181,42 @@ mod tests {
         assert!(after(&moved, "Secret").is_none());
     }
 
+    fn with_later_import(import: Value, config: Option<Value>) -> Plan {
+        let mut deployment = web();
+        deployment["spec"]["template"]["spec"]["containers"][0]["envFrom"] =
+            json!([{"secretRef": {"name": "web-env"}}, import]);
+        let snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            deployments: vec![from_value(deployment).unwrap()],
+            secrets: vec![from_value(web_env()).unwrap()],
+            config_maps: config.into_iter().map(|c| from_value(c).unwrap()).collect(),
+            ..Snapshot::default()
+        };
+        planned_in(&snapshot, &values("8080"), move_port())
+    }
+
+    fn sets_port_in_env(plan: &Plan) {
+        let deployment = after(plan, "Deployment").unwrap();
+        let env = &container(&deployment)["env"];
+        assert_eq!(env, &json!([{"name": "PORT", "value": "3000"}]));
+        assert!(after(plan, "Secret").is_none());
+    }
+
+    #[test]
+    fn a_port_change_sets_port_in_env_when_a_later_config_map_cannot_be_read() {
+        let moved = with_later_import(json!({"configMapRef": {"name": "web-config"}}), None);
+        sets_port_in_env(&moved);
+    }
+
+    #[test]
+    fn a_port_change_sets_port_in_env_when_a_later_prefixed_import_forms_port() {
+        let config = json!({"apiVersion": "v1", "kind": "ConfigMap",
+            "metadata": {"name": "web-config", "namespace": "shop", "resourceVersion": "6"},
+            "data": {"ORT": "8080"}});
+        let import = json!({"prefix": "P", "configMapRef": {"name": "web-config"}});
+        sets_port_in_env(&with_later_import(import, Some(config)));
+    }
+
     #[test]
     fn a_port_change_moves_what_names_the_old_port_when_the_new_one_is_declared() {
         let mut deployment = web();

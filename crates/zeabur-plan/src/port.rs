@@ -7,12 +7,12 @@
 //! - **Its probes** on `from` (`httpGet`, `tcpSocket`, `grpc`) check `to`.
 //! - **`PORT`** is set to `to` where the container gets it: its own `env` when it sets `PORT`
 //!   there, else the last Secret or ConfigMap it imports (`envFrom`, no prefix) that holds `PORT`,
-//!   as the last import wins [k8s-env]. Otherwise, or when a Secret imported after it cannot be
-//!   read, it goes in the container's `env`, which wins over any import. One `PORT` stays, so the
-//!   variables show it once and editing it changes what the app reads. The import is written before
-//!   the workload, so the pods the new template starts read the new value. When the template does
-//!   not change, the workload restarts. Earlier changes of the same request count: the container,
-//!   the imports and the Services are read as they left them.
+//!   as the last import wins [k8s-env]. Otherwise, or when an import after it cannot be read or can
+//!   form `PORT` with a prefix, it goes in the container's `env`, which wins over any import. One
+//!   `PORT` stays, so the variables show it once and editing it changes what the app reads. The
+//!   import is written before the workload, so the pods the new template starts read the new value.
+//!   When the template does not change, the workload restarts. Earlier changes of the same request
+//!   count: the container, the imports and the Services are read as they left them.
 //! - **Each Service** that sends traffic to `from` on its pods (`targetPort`, or `port` without
 //!   one) sends it to `to`. The Service's own `port` stays, so its address and the routes to it do
 //!   not change.
@@ -150,17 +150,18 @@ impl Planner<'_> {
     }
 
     /// The last Secret or ConfigMap `container` imports whole that holds `PORT`, unless it sets
-    /// `PORT` itself. `None` also when a Secret imported after the last one that holds `PORT`
-    /// cannot be read: it can set `PORT` too, so only the container's own `PORT` is sure to win.
+    /// `PORT` itself. `None` also when an import after it cannot be read, or can form `PORT` with
+    /// a prefix: it can set `PORT` too, so only the container's own `PORT` is sure to win.
     fn port_source(&self, container: &Container) -> Option<(DataKind, String)> {
         let own = container.env.iter().flatten().any(|e| e.name == "PORT");
         if own {
             return None;
         }
         for from in container.env_from.iter().flatten().rev() {
-            if from.prefix.as_deref().is_some_and(|p| !p.is_empty()) {
+            let prefix = from.prefix.as_deref().unwrap_or_default();
+            let Some(key) = "PORT".strip_prefix(prefix).filter(|k| !k.is_empty()) else {
                 continue;
-            }
+            };
             let (kind, name) = if let Some(secret) = &from.secret_ref {
                 (DataKind::Secret, &secret.name)
             } else if let Some(map) = &from.config_map_ref {
@@ -168,40 +169,39 @@ impl Planner<'_> {
             } else {
                 continue;
             };
-            match self.holds_port(kind, name) {
-                Some(true) => return Some((kind, name.clone())),
+            match self.holds_key(kind, name, key) {
                 Some(false) => {}
-                None => return None,
+                Some(true) if prefix.is_empty() => return Some((kind, name.clone())),
+                _ => return None,
             }
         }
         None
     }
 
-    /// Whether ConfigMap or Secret `name` holds `PORT` after the earlier changes of this request;
-    /// `None` for a Secret whose values were not read.
-    fn holds_port(&self, kind: DataKind, name: &str) -> Option<bool> {
+    /// Whether ConfigMap or Secret `name` holds `key` after the earlier changes of this request;
+    /// `None` for a ConfigMap that was not listed or a Secret whose values were not read.
+    fn holds_key(&self, kind: DataKind, name: &str, key: &str) -> Option<bool> {
         if let Some(index) = self.data_index(kind, name) {
             let Some(merge) = self.merges.get(&index) else {
                 let working = self.objects.get(index)?;
-                return Some(working.current.pointer("/data/PORT").is_some());
+                return Some(working.current.pointer(&pointer(&["data", key])).is_some());
             };
             // A Secret's key edits: its other keys are not in the working copy.
-            if let Some(value) = merge.get("PORT") {
+            if let Some(value) = merge.get(key) {
                 return Some(!value.is_null());
             }
         }
         match kind {
             DataKind::ConfigMap => {
-                let found = self.input.snapshot.config_map(name);
-                let data = found.and_then(|m| m.data.as_ref());
-                Some(data.is_some_and(|d| d.contains_key("PORT")))
+                let found = self.input.snapshot.config_map(name)?;
+                Some(found.data.as_ref().is_some_and(|d| d.contains_key(key)))
             }
             DataKind::Secret => {
                 if self.input.snapshot.secret(name).is_none() {
                     return Some(false);
                 }
                 let values = self.input.secret_values.get(name)?;
-                Some(values.contains_key("PORT"))
+                Some(values.contains_key(key))
             }
         }
     }
