@@ -1,0 +1,206 @@
+---
+title: API 令牌
+description: 让脚本和 CI 以各项目的角色调用 Kubernetes API，令牌会到期。
+source: "5f7bb07ea1d9"
+---
+
+脚本或 CI 无需任何人登录，也能用 API 令牌操作集群。管理员在**成员**页创建令牌，像给成员授权一样，为它在各项目设置角色。令牌和 kubectl 一样直接调用 kube-apiserver，能做什么由 Kubernetes RBAC 决定。每个令牌都会到期。
+
+## 开始前
+
+- 你是管理员。只有管理员能创建、续期、更改和删除 API 令牌，见[权限](./permissions.mdx)。
+- 使用令牌的机器能访问 kube-apiserver 的 TCP 6443。
+
+## 创建令牌
+
+1. 打开**成员**，在 **API 令牌**下点击**创建令牌**。
+2. 起一个能看出用途的名称，比如 `github-actions`。
+3. 在需要的项目中选择**开发者**或**查看者**，选好有效期，点击**检查**。
+4. 确认变更后应用。
+5. 复制令牌。Zeabur 只会显示这一次。窗口中还有 kubeconfig 和集群的 CA 证书。
+
+列表会显示每个令牌的角色、创建者和过期时间。集群用 `--service-account-max-token-expiration` 限制令牌有效期时，kube-apiserver 会缩短令牌的有效期，列表显示的是实际过期时间。
+
+## 连接
+
+每个请求需要三样东西：API 地址、CA 证书和令牌。
+
+**地址**：kube-apiserver 监听每个 server 节点的 TCP 6443，比如 `https://203.0.113.10:6443`。你平时用 kubectl 的 kubeconfig 中，`server` 那一行就是这个地址。要通过域名或其他地址访问 API 时，把它加到 [`host.tlsSan`](./installer-configuration.mdx)，证书才会覆盖它。
+
+**CA 证书**：创建或续期令牌后，窗口中会显示。在项目中有角色的令牌，也可以从项目的 `kube-root-ca.crt` 配置文件读取：
+
+```sh
+kubectl -n shop get configmap kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > ca.crt
+```
+
+**kubeconfig**：复制窗口中的 kubeconfig，填上 `server` 后保存，比如 `ci.yaml`。CA 证书已经在 `certificate-authority-data` 中。令牌只在一个项目中有角色时，kubeconfig 会直接从那个项目开始；否则每条命令都要加 `-n <项目>`。
+
+```sh
+export KUBECONFIG=$PWD/ci.yaml
+kubectl auth whoami
+```
+
+`kubectl auth whoami` 会显示 `system:serviceaccount:zeabur-api-tokens:github-actions`，kube-apiserver 记录这个令牌的请求时用的就是这个名称。
+
+用 curl 时，先设好地址和令牌：
+
+```sh
+APISERVER=https://203.0.113.10:6443
+TOKEN='<令牌>'
+```
+
+## 令牌能做什么
+
+令牌只有你在各项目授予它的角色，加上 `zeabur-member`，可以读取节点和 Namespace 的名称。**查看者**令牌能查看项目中各服务的状态。**开发者**令牌还能：
+
+- 更换服务的镜像、调整副本数，以及重启。
+- 读取和编辑机密变量，设置环境变量。
+- 读取日志，用 `kubectl exec` 在副本中执行命令。
+- 重新构建。
+
+令牌不能：
+
+- 创建或删除项目，也无法操作没有角色的项目。
+- 更改节点、集群组件或集群备份。
+- 读取或更改 `zeabur-api-tokens` 中的任何内容，因此无法再申请令牌。
+
+没有管理员令牌。管理员账号只能用通行密钥登录，拥有完整权限的令牌会绕过这一关。需要在整个集群上操作时，例如创建项目、安装组件、管理节点或集群备份，请以管理员身份使用你自己的 kubeconfig。详见[管理员账号和普通账号](./permissions.mdx#管理员账号和普通账号)。
+
+## 常用操作
+
+以下以项目 `shop`、服务 `web` 为例。从镜像或 Git 部署的服务是 Deployment，容器名称与服务名称相同。**查看者**令牌只能列出服务，其他操作都需要**开发者**。
+
+| 操作 | Method 和路径 |
+|---|---|
+| 列出服务 | `GET /apis/apps/v1/namespaces/shop/deployments` |
+| 读取日志 | `GET /api/v1/namespaces/shop/pods/<副本>/log` |
+| 重启 | `PATCH /apis/apps/v1/namespaces/shop/deployments/web` |
+| 更换镜像 | `PATCH /apis/apps/v1/namespaces/shop/deployments/web` |
+| 设置变量 | `PATCH /apis/apps/v1/namespaces/shop/deployments/web` |
+| 重新构建 | `PATCH /apis/builder.zeabur.com/v1alpha1/namespaces/shop/builds/web` |
+| 调整副本数 | `PATCH /apis/apps/v1/namespaces/shop/deployments/web/scale` |
+
+### 列出服务
+
+```sh
+kubectl get deployments -l app.kubernetes.io/name
+```
+
+```sh
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" \
+  "$APISERVER/apis/apps/v1/namespaces/shop/deployments?labelSelector=app.kubernetes.io/name"
+```
+
+数据库和带卷的服务可能是 StatefulSet，路径为 `/apis/apps/v1/namespaces/shop/statefulsets`。
+
+### 读取日志
+
+```sh
+kubectl logs -l app.kubernetes.io/name=web --tail=100
+```
+
+curl 一次读取一个副本。先查询副本名称，再读取其中一个：
+
+```sh
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" \
+  "$APISERVER/api/v1/namespaces/shop/pods?labelSelector=app.kubernetes.io/name%3Dweb"
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" \
+  "$APISERVER/api/v1/namespaces/shop/pods/<副本>/log?container=web&tailLines=100"
+```
+
+### 重启
+
+和 Zeabur 的**重启**一样，将 Pod template 的 annotation `kubectl.kubernetes.io/restartedAt` 设为当前时间。
+
+```sh
+kubectl rollout restart deployment/web
+```
+
+```sh
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
+  -H "Content-Type: application/strategic-merge-patch+json" \
+  -d "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"kubectl.kubernetes.io/restartedAt\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}}}}" \
+  "$APISERVER/apis/apps/v1/namespaces/shop/deployments/web"
+```
+
+### 更换镜像
+
+从 Git 构建的服务请改用重新构建，构建完成后 Keel 会换上新镜像。
+
+```sh
+kubectl set image deployment/web web=ghcr.io/acme/web:1.5
+```
+
+```sh
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
+  -H "Content-Type: application/strategic-merge-patch+json" \
+  -d '{"spec":{"template":{"spec":{"containers":[{"name":"web","image":"ghcr.io/acme/web:1.5"}]}}}}' \
+  "$APISERVER/apis/apps/v1/namespaces/shop/deployments/web"
+```
+
+### 设置变量
+
+修改的是服务**变量**标签页中**直接设置**的变量，新副本启动时会使用新值。
+
+```sh
+kubectl set env deployment/web -c web LOG_LEVEL=debug
+```
+
+```sh
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
+  -H "Content-Type: application/strategic-merge-patch+json" \
+  -d '{"spec":{"template":{"spec":{"containers":[{"name":"web","env":[{"name":"LOG_LEVEL","value":"debug"}]}]}}}}' \
+  "$APISERVER/apis/apps/v1/namespaces/shop/deployments/web"
+```
+
+### 重新构建
+
+和 Zeabur 的**重新构建**一样，在 Build 上设置 `builder.zeabur.com/rebuild` annotation，Zeabur Builder 会使用分支最新的提交构建。
+
+```sh
+kubectl annotate build web --overwrite builder.zeabur.com/rebuild="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+```
+
+```sh
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
+  -H "Content-Type: application/merge-patch+json" \
+  -d "{\"metadata\":{\"annotations\":{\"builder.zeabur.com/rebuild\":\"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"}}}" \
+  "$APISERVER/apis/builder.zeabur.com/v1alpha1/namespaces/shop/builds/web"
+```
+
+### 调整副本数
+
+```sh
+kubectl scale deployment/web --replicas=2
+```
+
+```sh
+curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
+  -H "Content-Type: application/merge-patch+json" \
+  -d '{"spec":{"replicas":2}}' \
+  "$APISERVER/apis/apps/v1/namespaces/shop/deployments/web/scale"
+```
+
+## 续期、更改和删除
+
+在令牌旁边选择**更多** → **续期**，会拿到同一个名称、同样权限的新令牌。之前拿到的令牌，过期前都还能用。
+
+选择**更多** → **更改权限**，可以让令牌在其他项目中有角色。之前拿到的令牌也会跟着变。
+
+要让令牌立即失效，选择**更多** → **删除**。之前拿到的令牌全都会失效，请求会收到 `401 Unauthorized`。
+
+令牌不属于创建它的人。创建者离开后，令牌在过期或被管理员删除之前都照样能用。
+
+## Zeabur 会创建什么
+
+Zeabur 用管理员自己的权限写入这些对象：
+
+| 对象 | 内容 |
+|---|---|
+| `zeabur-api-tokens` Namespace 中的 `ServiceAccount <name>` | 标签 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur`。annotation 记录创建者，以及最新令牌的过期时间 |
+| 各项目中的 `RoleBinding zeabur-api-token-<name>` | 将 `zeabur-project-developer` 或 `zeabur-project-viewer` 绑定给该 ServiceAccount |
+| `ClusterRoleBinding zeabur-api-token-<name>` | 和成员一样绑定 `zeabur-member` |
+
+令牌本身来自对该 ServiceAccount 的 TokenRequest，Zeabur 不会存进 Secret 或其他地方。删除令牌会删除它的 binding 和 ServiceAccount。
+
+Chart 会创建 `zeabur-api-tokens` Namespace，其中不运行其他东西。只有管理员在那里有权限，所以其他人无法申请令牌，也无法让 Pod 以令牌的身份运行。见[API 令牌和 RBAC](./permissions.mdx#api-令牌和-rbac)。

@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod access;
+pub mod api_token;
 pub mod builds;
 mod certificates;
 mod change;

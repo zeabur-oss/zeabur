@@ -26,6 +26,7 @@ For steps to assign member roles, see [Members](../cluster/members.mdx). When yo
 | Edit a project's display name, description, and icon | No | Yes |
 | Create or delete namespaces and add namespaces to or remove them from Zeabur | No | No |
 | Edit roles, member access, nodes, and cluster components | No | No |
+| Create and manage [API tokens](./api-tokens.mdx) | No | No |
 | Restore volumes from backups (K8up) | No | Yes |
 | Configure cluster backups and restore from cluster backups | No | No |
 
@@ -83,6 +84,19 @@ Developers can read the project's secrets, create replicas, edit workloads, and 
 The Developer role can't write RBAC objects or ServiceAccounts and has no `bind`, `escalate`, `impersonate`, `nodes/proxy`, or service/pod proxy permissions, so developers can't grant themselves more permissions.
 
 Viewers can't read secrets or logs, but they can read config files and workload configurations. They can also see passwords written directly in those places.
+
+## API tokens and RBAC
+
+An [API token](./api-tokens.mdx) gets roles the same way a member does. Its subject is a ServiceAccount in the `zeabur-api-tokens` namespace instead of `zeabur:<username>`:
+
+| Object | Scope and contents |
+|---|---|
+| `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member` to the ServiceAccount |
+| `RoleBinding zeabur-api-token-<name>` in each project | Binds the project's developer or viewer role to the same ServiceAccount |
+
+These bindings and the ServiceAccount have the labels `zeabur.com/api-token: <name>` and `app.kubernetes.io/managed-by: zeabur`.
+
+The chart creates the `zeabur-api-tokens` namespace and grants no role in it, so only admins can create ServiceAccounts there or request tokens for them. A pod can run only as a ServiceAccount in its own namespace, and members can't create pods in `zeabur-api-tokens`, so nobody else can run a pod as a token. Zeabur refuses to make `zeabur-api-tokens` a project or give anyone a role in it.
 
 ## Admin accounts and regular accounts
 

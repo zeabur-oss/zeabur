@@ -135,6 +135,13 @@ kubectl delete rolebindings,clusterrolebindings --all-namespaces \
 
 If you keep Identity, other clients or kubeconfigs may still sign in as `zeabur:<username>`. Before deleting these bindings, check that those clients no longer depend on them.
 
+Uninstalling the chart also deletes the `zeabur-api-tokens` namespace. Its ServiceAccounts go with it, so every [API token](../reference/api-tokens.mdx) stops working. The tokens' bindings stay in place. Delete them with:
+
+```sh
+kubectl delete rolebindings,clusterrolebindings --all-namespaces \
+  -l app.kubernetes.io/managed-by=zeabur,zeabur.com/api-token
+```
+
 ## Clean up temporary tools and registered destinations
 
 ### Terminal objects

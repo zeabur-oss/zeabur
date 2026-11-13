@@ -26,6 +26,7 @@ description: 对照成员角色、管理员账号和 Kubernetes RBAC，确认各
 | 修改项目显示名称、描述和图标 | 不可以 | 可以 |
 | 创建／删除 Namespace、将 Namespace 加入或移出 Zeabur | 不可以 | 不可以 |
 | 修改角色和成员访问权限、节点、集群组件 | 不可以 | 不可以 |
+| 创建和管理 [API 令牌](./api-tokens.mdx) | 不可以 | 不可以 |
 | 从卷的备份还原（K8up） | 不可以 | 可以 |
 | 配置集群备份、从集群备份还原 | 不可以 | 不可以 |
 
@@ -83,6 +84,19 @@ zeabur.com/icon
 开发者角色不能写入 RBAC 对象和 ServiceAccount，也没有 `bind`、`escalate`、`impersonate`、`nodes/proxy` 或 service／pod proxy 权限，因此无法自行扩大权限。
 
 查看者无法读取 Secret 和日志，但能读取 ConfigMap 和工作负载的配置。直接写在这些位置的密码，查看者也能看到。
+
+## API 令牌和 RBAC
+
+[API 令牌](./api-tokens.mdx)获得角色的方式和成员一样，只是绑定的对象是 `zeabur-api-tokens` Namespace 中的 ServiceAccount，而不是 `zeabur:<username>`：
+
+| 对象 | 范围和内容 |
+|---|---|
+| `ClusterRoleBinding zeabur-api-token-<name>` | 将 `zeabur-member` 绑定给该 ServiceAccount |
+| 各项目中的 `RoleBinding zeabur-api-token-<name>` | 将该项目的 developer 或 viewer 角色绑定给同一个 ServiceAccount |
+
+这些 binding 和 ServiceAccount 都带有 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur` 标签。
+
+Chart 会创建 `zeabur-api-tokens` Namespace，但不在其中授予任何角色，因此只有管理员能在那里创建 ServiceAccount 或为它们申请令牌。Pod 只能以同一 Namespace 的 ServiceAccount 运行，成员又不能在 `zeabur-api-tokens` 创建 Pod，所以其他人无法让 Pod 以令牌的身份运行。Zeabur 不会把 `zeabur-api-tokens` 当作项目，也不会让任何人在其中获得角色。
 
 ## 管理员账号和普通账号
 

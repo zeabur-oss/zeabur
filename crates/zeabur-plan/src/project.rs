@@ -29,8 +29,8 @@
 //! for any field ([`crate::fields::reapplying_tool`]): the tool would restore it.
 //!
 //! The namespaces Kubernetes keeps for itself (`kube-` prefix,
-//! [`zeabur_model::kernel::names::is_system_namespace`]) are never adopted, nor the one of node
-//! shells ([`NODE_SHELL_NAMESPACE`]), which only cluster administrators may use.
+//! [`zeabur_model::kernel::names::is_system_namespace`]) are never adopted, nor the ones only
+//! cluster administrators may use ([`admin_only_namespace`]): node shells and API tokens.
 //!
 //! [rfc6902-add]: https://www.rfc-editor.org/rfc/rfc6902#section-4.1
 //! [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
@@ -40,7 +40,7 @@ use k8s_openapi::api::networking::v1::NetworkPolicy;
 use serde_json::{Value, json};
 use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
 use zeabur_model::kernel::names::{
-    ANNOTATION_BUILD_CPU, ANNOTATION_BUILD_MEMORY, Conventions, NODE_SHELL_NAMESPACE,
+    ANNOTATION_BUILD_CPU, ANNOTATION_BUILD_MEMORY, Conventions, admin_only_namespace,
     is_system_namespace,
 };
 use zeabur_model::kernel::quantity;
@@ -54,12 +54,12 @@ use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
 use crate::plan::{ErrorKind, PlanError, Planner, Working, error};
 
-fn node_shell_namespace(name: &str) -> PlanError {
+fn admin_namespace(name: &str, holds: &str) -> PlanError {
     error(
         ErrorKind::SystemNamespace,
         "system_namespace",
         format!(
-            "{name} holds node shells, which only cluster administrators may use; it cannot be a \
+            "{name} holds {holds}, which only cluster administrators may use; it cannot be a \
              project."
         ),
     )
@@ -155,8 +155,8 @@ impl Planner<'_> {
                 ),
             ));
         }
-        if name == NODE_SHELL_NAMESPACE {
-            return Err(node_shell_namespace(&name));
+        if let Some(holds) = admin_only_namespace(&name) {
+            return Err(admin_namespace(&name, holds));
         }
         if self.input.namespace.is_some() {
             return Err(error(
@@ -221,8 +221,8 @@ impl Planner<'_> {
                 ),
             ));
         }
-        if name == NODE_SHELL_NAMESPACE {
-            return Err(node_shell_namespace(&name));
+        if let Some(holds) = admin_only_namespace(&name) {
+            return Err(admin_namespace(&name, holds));
         }
         if self.adopted(index) {
             return Err(error(

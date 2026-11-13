@@ -4509,6 +4509,36 @@ components:
       - certificate
       - node-not-ready
       - runtime-security
+    ApiTokenView:
+      type: object
+      description: One API token.
+      required:
+      - name
+      - projects
+      properties:
+        createdAt:
+          type:
+          - string
+          - "null"
+          description: When it was made, RFC 3339.
+        createdBy:
+          type:
+          - string
+          - "null"
+          description: The Kubernetes user name of whoever made it.
+        expiresAt:
+          type:
+          - string
+          - "null"
+          description: When its latest token expires, RFC 3339, as kube-apiserver answered.
+        name:
+          type: string
+          description: Its name, which is its ServiceAccount's.
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectGrant"
+          description: Its roles in projects.
     Applied:
       type: object
       description: One object an apply wrote.
@@ -10213,6 +10243,36 @@ components:
         route:
           $ref: "#/components/schemas/RouteRef"
           description: The Ingress.
+    IssuedTokenView:
+      type: object
+      description: A token kube-apiserver issued, shown once.
+      required:
+      - name
+      - namespace
+      - token
+      - expiresAt
+      - recorded
+      properties:
+        ca:
+          type:
+          - string
+          - "null"
+          description: kube-apiserver's CA bundle, PEM; absent when it could not be read.
+        expiresAt:
+          type: string
+          description: When it expires, RFC 3339, as kube-apiserver answered.
+        name:
+          type: string
+          description: The token's name.
+        namespace:
+          type: string
+          description: The namespace of its ServiceAccount.
+        recorded:
+          type: boolean
+          description: Whether the expiry was recorded on the ServiceAccount for the token list.
+        token:
+          type: string
+          description: The bearer token.
     IssuerView:
       type: object
       description: One `ClusterIssuer`.
@@ -10624,6 +10684,11 @@ components:
       type: object
       description: What an applied member plan made.
       properties:
+        issued:
+          oneOf:
+          - $ref: "#/components/schemas/IssuedTokenView"
+            description: "For a new or renewed API token: the token, shown once."
+          - type: "null"
         link:
           oneOf:
           - $ref: "#/components/schemas/SetupLinkView"
@@ -10707,6 +10772,78 @@ components:
           username:
             type: string
             description: The member.
+      - type: object
+        description: "Make an API token: its ServiceAccount, the access a member would get, and its first token."
+        required:
+        - name
+        - expirationSeconds
+        - op
+        properties:
+          expirationSeconds:
+            type: integer
+            format: int64
+            description: How long the token should last; kube-apiserver may cut it.
+          name:
+            type: string
+            description: "Its name: lower-case letters, digits and `-`, at most 63 characters."
+          op:
+            type: string
+            enum:
+            - createToken
+          projects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: Its roles in projects.
+      - type: object
+        description: Change what an API token may do, as for a member.
+        required:
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - tokenAccess
+          projects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: Its roles in projects.
+      - type: object
+        description: Issue another token; earlier ones work until they expire.
+        required:
+        - name
+        - expirationSeconds
+        - op
+        properties:
+          expirationSeconds:
+            type: integer
+            format: int64
+            description: How long the new token should last.
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - renewToken
+      - type: object
+        description: "Delete an API token: its bindings, then its ServiceAccount, which revokes its tokens."
+        required:
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - deleteToken
       description: A change to the members, as a person asks for it.
     MemberPlan:
       type: object
@@ -10867,17 +11004,29 @@ components:
       description: Everyone who can sign in, and the links waiting to be used.
       required:
       - id
+      - apiTokens
       - installed
       - items
       - invitations
       - setupLinks
       - canManage
+      - canManageTokens
       - projectRoles
       - unreadable
       properties:
+        apiTokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiTokenView"
+          description: "API tokens, by name: machine accounts with the access of a member."
         canManage:
           $ref: "#/components/schemas/Permission"
           description: Whether the person may create invitations, as far as their rules tell.
+        canManageTokens:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Whether the person may create API tokens: `create serviceaccounts` in the token
+            namespace.
         id:
           type: string
           description: "`members`."
