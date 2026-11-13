@@ -105,23 +105,17 @@ pub(crate) async fn list(
         Err(error) if error.code() == Some(404) => Vec::new(),
         Err(error) => return Err(error),
     };
-    let mut items = Vec::new();
-    for account in accounts {
-        let Ok(account) = account.try_parse::<ServiceAccount>() else {
-            continue;
-        };
-        let Some(token) = api_token::read(&account) else {
-            continue;
-        };
-        let projects = grants_of(bindings, &Holder::token(&token.name));
-        items.push(ApiTokenView {
-            projects,
+    let mut items: Vec<ApiTokenView> = accounts
+        .into_iter()
+        .filter_map(|account| api_token::read(&account.try_parse::<ServiceAccount>().ok()?))
+        .map(|token| ApiTokenView {
+            projects: grants_of(bindings, &Holder::token(&token.name)),
             name: token.name,
             created_by: token.created_by,
             created_at: token.created_at,
             expires_at: token.expires_at,
-        });
-    }
+        })
+        .collect();
     items.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(items)
 }
