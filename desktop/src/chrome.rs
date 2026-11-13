@@ -304,13 +304,12 @@ pub(crate) fn cluster_window<'a>(
     app: &AppHandle,
     builder: WebviewWindowBuilder<'a, Wry, AppHandle>,
 ) -> WebviewWindowBuilder<'a, Wry, AppHandle> {
-    let mut open = 0.0;
-    for label in app.webview_windows().keys() {
-        if label.starts_with("cluster-") {
-            open += 1.0;
-        }
-    }
-    let step = 24.0 * open;
+    let open = app
+        .webview_windows()
+        .keys()
+        .filter(|label| label.starts_with("cluster-"))
+        .count();
+    let step = 24.0 * f64::from(u32::try_from(open).unwrap_or(u32::MAX));
     let mut builder = builder
         .inner_size(1280.0, 800.0)
         .min_inner_size(CLUSTER_MIN.0, CLUSTER_MIN.1);

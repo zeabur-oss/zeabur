@@ -85,22 +85,25 @@ fn source_list(saved: &Saved, env: &ChildEnv) -> Vec<(String, SourceKind, PathBu
     let mut list = Vec::new();
     let kubeconfig = env.get(OsStr::new("KUBECONFIG")).map(OsString::from);
     let defaults = sources::default_paths(kubeconfig, std::env::home_dir());
-    for path in defaults {
-        if !saved.hidden_defaults.contains(&path) && path.exists() {
-            list.push((
-                format!("default:{}", path.display()),
-                SourceKind::Default,
-                path,
-            ));
-        }
-    }
-    for added in &saved.added {
-        list.push((
+    list.extend(
+        defaults
+            .into_iter()
+            .filter(|path| !saved.hidden_defaults.contains(path) && path.exists())
+            .map(|path| {
+                (
+                    format!("default:{}", path.display()),
+                    SourceKind::Default,
+                    path,
+                )
+            }),
+    );
+    list.extend(saved.added.iter().map(|added| {
+        (
             format!("added:{}", added.path.display()),
             added.kind,
             added.path.clone(),
-        ));
-    }
+        )
+    }));
     list
 }
 
@@ -127,14 +130,14 @@ fn read_snapshot(app: &App) -> Snapshot {
             saved.recents.clone(),
         )
     };
-    let mut refs = Vec::new();
-    for (id, kind, path) in &list {
-        refs.push(SourceRef {
+    let refs: Vec<_> = list
+        .iter()
+        .map(|(id, kind, path)| SourceRef {
             id: id.clone(),
             kind: *kind,
             path,
-        });
-    }
+        })
+        .collect();
     let (sources, contexts) = sources::read_all(&refs, &env);
     Snapshot {
         sources,
@@ -188,14 +191,17 @@ fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), Str
     if config.contexts.is_empty() {
         return Err("no-contexts".into());
     }
-    let mut slug = String::new();
-    for c in name.trim().chars() {
-        slug.push(if c.is_alphanumeric() || c == '-' {
-            c
-        } else {
-            '-'
-        });
-    }
+    let mut slug: String = name
+        .trim()
+        .chars()
+        .map(|c| {
+            if c.is_alphanumeric() || c == '-' {
+                c
+            } else {
+                '-'
+            }
+        })
+        .collect();
     if slug.is_empty() {
         slug.push_str("pasted");
     }
@@ -261,13 +267,15 @@ struct ProbeResult {
 /// Probes every server at once on the blocking thread pool, so the async workers stay free.
 #[tauri::command]
 async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
-    let mut tasks = Vec::new();
-    for (key, server) in targets {
-        tasks.push(tauri::async_runtime::spawn_blocking(move || ProbeResult {
-            reach: probe::probe(server.as_deref()),
-            key,
-        }));
-    }
+    let tasks: Vec<_> = targets
+        .into_iter()
+        .map(|(key, server)| {
+            tauri::async_runtime::spawn_blocking(move || ProbeResult {
+                reach: probe::probe(server.as_deref()),
+                key,
+            })
+        })
+        .collect();
     let mut results = Vec::new();
     for task in tasks {
         if let Ok(result) = task.await {

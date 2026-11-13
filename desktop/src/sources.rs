@@ -36,11 +36,7 @@ pub(crate) fn default_paths(
 ) -> Vec<PathBuf> {
     let mut paths = Vec::new();
     if let Some(value) = kubeconfig_env.filter(|v| !v.is_empty()) {
-        for path in std::env::split_paths(&value) {
-            if !path.as_os_str().is_empty() {
-                paths.push(path);
-            }
-        }
+        paths.extend(std::env::split_paths(&value).filter(|path| !path.as_os_str().is_empty()));
         return paths;
     }
     if let Some(home) = home {
@@ -135,13 +131,11 @@ fn file_names(command: &str, pathext: Option<&str>) -> Vec<String> {
     if Path::new(command).extension().is_some() {
         return vec![command.to_owned()];
     }
-    let mut names = Vec::new();
-    for ext in pathext.split(';') {
-        if !ext.is_empty() {
-            names.push(format!("{command}{ext}"));
-        }
-    }
-    names
+    pathext
+        .split(';')
+        .filter(|ext| !ext.is_empty())
+        .map(|ext| format!("{command}{ext}"))
+        .collect()
 }
 
 /// Whether the exec plugin exists: an absolute path as it is, a name on the child environment's
@@ -155,12 +149,7 @@ fn find_command(command: &str, env: &ChildEnv) -> bool {
     });
     let names = file_names(command, pathext.as_deref());
     if Path::new(command).is_absolute() {
-        for name in &names {
-            if Path::new(name).is_file() {
-                return true;
-            }
-        }
-        return false;
+        return names.iter().any(|name| Path::new(name).is_file());
     }
     for dir in env.path_dirs() {
         for name in &names {

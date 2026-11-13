@@ -63,12 +63,10 @@ impl ChildEnv {
     }
 
     pub(crate) fn get(&self, name: &OsStr) -> Option<&OsStr> {
-        for (key, value) in &self.vars {
-            if same_name(key, name) {
-                return Some(value);
-            }
-        }
-        None
+        self.vars
+            .iter()
+            .find(|(key, _)| same_name(key, name))
+            .map(|(_, value)| value.as_os_str())
     }
 
     #[cfg(any(unix, test))]
@@ -90,17 +88,13 @@ impl ChildEnv {
     /// The variables that differ from `own`, for a kubeconfig's exec `env`. Names or values that
     /// are not UTF-8 are left out.
     pub(crate) fn changed_from(&self, own: &[(OsString, OsString)]) -> Vec<(String, String)> {
-        let mut changed = Vec::new();
-        for (name, value) in &self.vars {
-            let same = own.iter().any(|(k, v)| same_name(k, name) && v == value);
-            if same {
-                continue;
-            }
-            if let (Some(name), Some(value)) = (name.to_str(), value.to_str()) {
-                changed.push((name.to_owned(), value.to_owned()));
-            }
-        }
-        changed
+        self.vars
+            .iter()
+            .filter(|(name, value)| !own.iter().any(|(k, v)| same_name(k, name) && v == value))
+            .filter_map(|(name, value)| {
+                Some((name.to_str()?.to_owned(), value.to_str()?.to_owned()))
+            })
+            .collect()
     }
 }
 
@@ -288,11 +282,10 @@ mod tests {
     use super::*;
 
     fn vars(pairs: &[(&str, &str)]) -> Vec<(OsString, OsString)> {
-        let mut out = Vec::new();
-        for (k, v) in pairs {
-            out.push((OsString::from(k), OsString::from(v)));
-        }
-        out
+        pairs
+            .iter()
+            .map(|(k, v)| (OsString::from(k), OsString::from(v)))
+            .collect()
     }
 
     fn joined(dirs: &[&str]) -> String {

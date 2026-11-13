@@ -3,11 +3,9 @@
 use tauri::{WebviewWindow, WebviewWindowBuilder, Wry};
 
 pub(crate) fn label_hash(key: &str) -> String {
-    let mut hash: u64 = 0xCBF2_9CE4_8422_2325;
-    for byte in key.bytes() {
-        hash ^= u64::from(byte);
-        hash = hash.wrapping_mul(0x0100_0000_01B3);
-    }
+    let hash = key.bytes().fold(0xCBF2_9CE4_8422_2325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01B3)
+    });
     format!("{hash:016x}")
 }
 
