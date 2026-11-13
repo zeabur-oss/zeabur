@@ -99,6 +99,7 @@ futures-util = { version = "0.3", default-features = false, features = ["std", "
 hex = "0.4"
 http = "1"
 http-body = "1"
+httpdate = "1"
 http-body-util = "0.1"
 # The HTTP client stack kube-rs already ships, used directly for the OAuth client (zeabur-auth).
 bytes = "1"
