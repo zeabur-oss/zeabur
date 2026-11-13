@@ -2,14 +2,14 @@
 //! "the app listens on 3000, not 8080".
 //!
 //! - **The container** declares `to` where it declared `from`, or adds it when it declares neither.
-//!   A probe or Service that names the entry follows it. A container that declares `to` already is
-//!   refused: two entries would leave it unclear which one a name means.
-//! - **Its probes** on `from` (`httpGet`, `tcpSocket`, `grpc`) check `to`.
+//!   When it declares `to` already, its entries are left as they are.
+//! - **Its probes** (`httpGet`, `tcpSocket`, `grpc`) that check `from`, by number or by the name of
+//!   an entry that declares it, check `to`.
 //! - **`PORT`** is set to `to` in the container's own `env`, which wins over every import
 //!   [k8s-env], so no import has to be found or changed.
 //! - **Each Service** that sends traffic to `from` on its pods (`targetPort`, or `port` without
-//!   one) sends it to `to`. The Service's own `port` stays, so its address and the routes to it do
-//!   not change.
+//!   one), or by the name of such an entry, sends it to `to`. The Service's own `port` stays, so
+//!   its address and the routes to it do not change.
 //!
 //! [k8s-env]: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/#using-environment-variables-inside-of-your-config
 
@@ -50,14 +50,14 @@ impl Planner<'_> {
         let target = Self::container(found, reference, container)?;
         let name = target.name.clone();
         let (index, at, steps) = self.container_slot(found, &target)?;
-        self.move_declared(index, &at, &steps, &name, from, to)?;
+        let names = self.move_declared(index, &at, &steps, &name, from, to)?;
         for probe in PROBES {
             for handler in HANDLERS {
                 let field = format!("{at}/{probe}/{handler}/port");
                 let Some(port) = self.current(index).pointer(&field).cloned() else {
                     continue;
                 };
-                if port != json!(from) {
+                if port != json!(from) && !names.iter().any(|n| port == json!(n)) {
                     continue;
                 }
                 let mut path = steps.clone();
@@ -73,10 +73,12 @@ impl Planner<'_> {
             value_from: None,
         };
         self.env(reference, Some(&name), &[port])?;
-        self.move_target_ports(reference, from, to)
+        self.move_target_ports(reference, from, to, &names)
     }
 
-    /// Declares `to` where the container declared `from`, or adds it.
+    /// Declares `to` where the container declared `from`, or adds it; nothing changes when it
+    /// declares `to` already. Returns the names of the entries that declared `from`, which a probe
+    /// or Service may use instead of the number.
     fn move_declared(
         &mut self,
         index: usize,
@@ -85,33 +87,34 @@ impl Planner<'_> {
         name: &str,
         from: i32,
         to: i32,
-    ) -> Result<(), PlanError> {
+    ) -> Result<Vec<String>, PlanError> {
         let declared = self
             .current(index)
             .pointer(&format!("{at}/ports"))
             .and_then(Value::as_array)
             .cloned();
-        let numbers: Vec<Option<i64>> = declared
-            .iter()
-            .flatten()
-            .map(|entry| entry.get("containerPort").and_then(Value::as_i64))
+        let entries = declared.iter().flatten();
+        let number = |entry: &Value| entry.get("containerPort").and_then(Value::as_i64);
+        let moved: Vec<usize> = entries
+            .clone()
+            .enumerate()
+            .filter(|(_, entry)| number(entry) == Some(i64::from(from)))
+            .map(|(position, _)| position)
             .collect();
-        if numbers.contains(&Some(i64::from(to))) {
-            return Err(error(
-                ErrorKind::Conflict,
-                "port_declared",
-                format!("Container {name} declares port {to} already."),
-            ));
+        let names = entries
+            .clone()
+            .filter(|entry| number(entry) == Some(i64::from(from)))
+            .filter_map(|entry| entry.get("name").and_then(Value::as_str).map(str::to_owned))
+            .collect();
+        if entries
+            .clone()
+            .any(|entry| number(entry) == Some(i64::from(to)))
+        {
+            return Ok(names);
         }
         let mut path = steps.to_vec();
         path.push(Step::field("ports"));
         self.claim(index, &path, &format!("ports of container {name}"))?;
-        let moved: Vec<usize> = numbers
-            .iter()
-            .enumerate()
-            .filter(|(_, number)| **number == Some(i64::from(from)))
-            .map(|(position, _)| position)
-            .collect();
         let mut operations = Vec::new();
         for position in &moved {
             let field = format!("{at}/ports/{position}/containerPort");
@@ -124,7 +127,8 @@ impl Planner<'_> {
                 None => add(&format!("{at}/ports"), json!([{"containerPort": to}])),
             });
         }
-        self.patch(index, operations)
+        self.patch(index, operations)?;
+        Ok(names)
     }
 
     /// The ports of `service` as the earlier changes of this request left them, so that a second
@@ -145,6 +149,7 @@ impl Planner<'_> {
         reference: &WorkloadRef,
         from: i32,
         to: i32,
+        port_names: &[String],
     ) -> Result<(), PlanError> {
         let names: Vec<String> = self
             .project
@@ -161,7 +166,10 @@ impl Planner<'_> {
             for (position, port) in self.service_ports(service).iter().enumerate() {
                 let field = format!("/spec/ports/{position}/targetPort");
                 match &port.target_port {
-                    Some(target) if json!(target) == json!(from) => {
+                    Some(target)
+                        if json!(target) == json!(from)
+                            || port_names.iter().any(|n| json!(target) == json!(n)) =>
+                    {
                         operations.push(test(&field, json!(target)));
                         operations.push(replace(&field, json!(to)));
                     }

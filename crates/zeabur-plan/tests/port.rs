@@ -64,9 +64,14 @@ mod tests {
     }
 
     #[test]
-    fn a_port_change_to_a_port_the_container_declares_is_refused() {
+    fn a_port_change_to_a_port_the_container_declares_moves_what_checks_the_old_one() {
         let ports = json!([{"name": "http", "containerPort": 8080}, {"containerPort": 3000}]);
-        let error = planned(deployment(&ports)).unwrap_err();
-        assert_eq!(error.code, "port_declared");
+        let mut web = deployment(&ports);
+        web["spec"]["template"]["spec"]["containers"][0]["readinessProbe"] =
+            json!({"httpGet": {"path": "/", "port": "http"}});
+        let moved = planned(web).unwrap();
+        let container = &moved.objects[0].raw_after["spec"]["template"]["spec"]["containers"][0];
+        assert_eq!(container["readinessProbe"]["httpGet"]["port"], 3000);
+        assert_eq!(container["ports"], ports);
     }
 }
