@@ -1,0 +1,8 @@
+description: "The container imports db-credentials, which holds PORT, and then web-env, which the person cannot read. web-env may set PORT over db-credentials, so the port change sets PORT=3000 in the container, which wins over both, and leaves both Secrets alone."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: port, workload: {kind: Deployment, name: web}, from: 8080, to: 3000}
+  secretValues:
+    db-credentials: {PORT: "8080", PASSWORD: hunter2}

@@ -2,8 +2,8 @@
 //!
 //! A YAML edit compares the Secret as read, so a Secret it edits must be readable. A `port` change
 //! sets `PORT` in the Secret the container imports it from, so the Secrets its workload imports
-//! whole are read too, where the person may read them; one they may not read is taken not to hold
-//! `PORT`.
+//! whole are read too, where the person may read them. When one they may not read comes after
+//! the last one that holds `PORT`, the plan sets `PORT` in the container instead.
 
 use std::collections::BTreeMap;
 

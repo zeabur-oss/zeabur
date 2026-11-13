@@ -1,0 +1,10 @@
+description: "One request moves the port from 8080 to 3000 and then from 3000 to 4000. The second move reads the Services as the first left them, so both send traffic to 4000, as the container, its probe and PORT in web-env do."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: port, workload: {kind: Deployment, name: web}, from: 8080, to: 3000}
+      - {op: port, workload: {kind: Deployment, name: web}, from: 3000, to: 4000}
+  secretValues:
+    web-env: {PORT: "8080", NODE_ENV: production}
+    db-credentials: {PORT: "5432", PASSWORD: hunter2}

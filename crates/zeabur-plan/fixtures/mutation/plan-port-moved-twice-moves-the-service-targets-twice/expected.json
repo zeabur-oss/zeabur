@@ -1,0 +1,80 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "Secret",
+        "name": "web-env"
+      },
+      "write": {
+        "type": "mergePatch",
+        "body": {
+          "data": {
+            "PORT": "NDAwMA=="
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Deployment",
+        "name": "web"
+      },
+      "after": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "env": null,
+                  "ports": [
+                    {
+                      "containerPort": 4000
+                    }
+                  ],
+                  "readinessProbe": {
+                    "tcpSocket": {
+                      "port": 4000
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web"
+      },
+      "after": {
+        "spec": {
+          "ports": [
+            {
+              "name": "http",
+              "port": 8080,
+              "targetPort": 4000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web-public-8080"
+      },
+      "after": {
+        "spec": {
+          "ports": [
+            {
+              "port": 8080,
+              "targetPort": 4000
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,71 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "Deployment",
+        "name": "web"
+      },
+      "after": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "env": [
+                    {
+                      "name": "PORT",
+                      "value": "3000"
+                    }
+                  ],
+                  "ports": [
+                    {
+                      "containerPort": 3000
+                    }
+                  ],
+                  "readinessProbe": {
+                    "tcpSocket": {
+                      "port": 3000
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web"
+      },
+      "after": {
+        "spec": {
+          "ports": [
+            {
+              "name": "http",
+              "port": 8080,
+              "targetPort": 3000
+            }
+          ]
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web-public-8080"
+      },
+      "after": {
+        "spec": {
+          "ports": [
+            {
+              "port": 8080,
+              "targetPort": 3000
+            }
+          ]
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,59 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "Secret",
+        "name": "web-env"
+      },
+      "write": {
+        "type": "mergePatch",
+        "body": {
+          "data": {
+            "PORT": "MzAwMA=="
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Deployment",
+        "name": "web"
+      },
+      "after": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "env": [
+                    {
+                      "name": "LOG_LEVEL",
+                      "value": "debug"
+                    }
+                  ],
+                  "ports": [
+                    {
+                      "containerPort": 3000
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web"
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web-public-8080"
+      }
+    }
+  ]
+}

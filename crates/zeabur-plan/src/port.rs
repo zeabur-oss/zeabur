@@ -7,17 +7,19 @@
 //! - **Its probes** on `from` (`httpGet`, `tcpSocket`, `grpc`) check `to`.
 //! - **`PORT`** is set to `to` where the container gets it: its own `env` when it sets `PORT`
 //!   there, else the last Secret or ConfigMap it imports (`envFrom`, no prefix) that holds `PORT`,
-//!   as the last import wins [k8s-env]. Otherwise it goes in the container's `env`, which wins over
-//!   any import. One `PORT` stays, so the variables show it once and editing it changes what the
-//!   app reads. The import is changed first, so the pods the new template starts read the new
-//!   value. When the template does not change, the workload restarts.
+//!   as the last import wins [k8s-env]. Otherwise, or when a Secret imported after it cannot be
+//!   read, it goes in the container's `env`, which wins over any import. One `PORT` stays, so the
+//!   variables show it once and editing it changes what the app reads. The import is written before
+//!   the workload, so the pods the new template starts read the new value. When the template does
+//!   not change, the workload restarts. Earlier changes of the same request count: the container,
+//!   the imports and the Services are read as they left them.
 //! - **Each Service** that sends traffic to `from` on its pods (`targetPort`, or `port` without
 //!   one) sends it to `to`. The Service's own `port` stays, so its address and the routes to it do
 //!   not change.
 //!
 //! [k8s-env]: https://kubernetes.io/docs/tasks/inject-data-application/define-environment-variable-container/#using-environment-variables-inside-of-your-config
 
-use k8s_openapi::api::core::v1::Container;
+use k8s_openapi::api::core::v1::{Container, Service as KubeService, ServicePort};
 use serde_json::{Value, json};
 use zeabur_graph::Workload;
 use zeabur_model::WorkloadRef;
@@ -55,6 +57,7 @@ impl Planner<'_> {
         let found = self.editable_workload(reference)?;
         let target = Self::container(found, reference, container)?;
         let name = target.name.clone();
+        let workload = workload_target(found);
         let source = self.port_source(&self.working_container(found, &target));
         if let Some((kind, data)) = &source {
             let edit = DataEdit {
@@ -63,6 +66,13 @@ impl Planner<'_> {
                 value: Some(to.to_string()),
             };
             self.data(*kind, data, &[edit])?;
+            // An earlier change can put the workload in the plan first. The import must still be
+            // written before it.
+            let workload_at = self.objects.iter().position(|w| w.target == workload);
+            let data_at = self.data_index(*kind, data);
+            if let (Some(workload_at), Some(data_at)) = (workload_at, data_at) {
+                self.write_before(data_at, workload_at);
+            }
         }
         let found = self.editable_workload(reference)?;
         let (index, at, steps) = self.container_slot(found, &target)?;
@@ -138,7 +148,8 @@ impl Planner<'_> {
     }
 
     /// The last Secret or ConfigMap `container` imports whole that holds `PORT`, unless it sets
-    /// `PORT` itself.
+    /// `PORT` itself. `None` also when a Secret imported after the last one that holds `PORT`
+    /// cannot be read: it can set `PORT` too, so only the container's own `PORT` is sure to win.
     fn port_source(&self, container: &Container) -> Option<(DataKind, String)> {
         let own = container.env.iter().flatten().any(|e| e.name == "PORT");
         if own {
@@ -148,21 +159,60 @@ impl Planner<'_> {
             if from.prefix.as_deref().is_some_and(|p| !p.is_empty()) {
                 continue;
             }
-            if let Some(secret) = &from.secret_ref {
-                let values = self.input.secret_values.get(&secret.name);
-                if values.is_some_and(|v| v.contains_key("PORT")) {
-                    return Some((DataKind::Secret, secret.name.clone()));
-                }
-            }
-            if let Some(map) = &from.config_map_ref {
-                let found = self.input.snapshot.config_map(&map.name);
-                let data = found.and_then(|m| m.data.as_ref());
-                if data.is_some_and(|d| d.contains_key("PORT")) {
-                    return Some((DataKind::ConfigMap, map.name.clone()));
-                }
+            let (kind, name) = if let Some(secret) = &from.secret_ref {
+                (DataKind::Secret, &secret.name)
+            } else if let Some(map) = &from.config_map_ref {
+                (DataKind::ConfigMap, &map.name)
+            } else {
+                continue;
+            };
+            match self.holds_port(kind, name) {
+                Some(true) => return Some((kind, name.clone())),
+                Some(false) => {}
+                None => return None,
             }
         }
         None
+    }
+
+    /// Whether ConfigMap or Secret `name` holds `PORT` after the earlier changes of this request;
+    /// `None` for a Secret whose values were not read.
+    fn holds_port(&self, kind: DataKind, name: &str) -> Option<bool> {
+        if let Some(index) = self.data_index(kind, name) {
+            let Some(merge) = self.merges.get(&index) else {
+                let working = self.objects.get(index)?;
+                return Some(working.current.pointer("/data/PORT").is_some());
+            };
+            // A Secret's key edits: its other keys are not in the working copy.
+            if let Some(value) = merge.get("PORT") {
+                return Some(!value.is_null());
+            }
+        }
+        match kind {
+            DataKind::ConfigMap => {
+                let found = self.input.snapshot.config_map(name);
+                let data = found.and_then(|m| m.data.as_ref());
+                Some(data.is_some_and(|d| d.contains_key("PORT")))
+            }
+            DataKind::Secret => {
+                if self.input.snapshot.secret(name).is_none() {
+                    return Some(false);
+                }
+                let values = self.input.secret_values.get(name)?;
+                Some(values.contains_key("PORT"))
+            }
+        }
+    }
+
+    /// The index of ConfigMap or Secret `name` in the plan.
+    fn data_index(&self, kind: DataKind, name: &str) -> Option<usize> {
+        let kind_name = match kind {
+            DataKind::ConfigMap => "ConfigMap",
+            DataKind::Secret => "Secret",
+        };
+        self.objects
+            .iter()
+            .position(|w| w.target.kind == kind_name && w.target.name == name)
     }
 
     /// Declares `to` where the container declared `from`. When it declares `to` already, the
@@ -230,6 +280,22 @@ impl Planner<'_> {
         Ok(names)
     }
 
+    /// The ports of `service` as the earlier changes of this request left them, so that a second
+    /// port change moves the targets the first one set.
+    fn service_ports(&self, service: &KubeService) -> Vec<ServicePort> {
+        let name = service.metadata.name.as_deref().unwrap_or_default();
+        for working in &self.objects {
+            if working.target != service_target(name) {
+                continue;
+            }
+            let current = working.current.pointer("/spec/ports").cloned();
+            let ports = current.and_then(|p| serde_json::from_value(p).ok());
+            return ports.unwrap_or_default();
+        }
+        let spec = service.spec.as_ref();
+        spec.and_then(|s| s.ports.clone()).unwrap_or_default()
+    }
+
     fn move_target_ports(
         &mut self,
         reference: &WorkloadRef,
@@ -247,11 +313,7 @@ impl Planner<'_> {
             let Some(service) = self.kube_service(&name) else {
                 continue;
             };
-            let ports = service
-                .spec
-                .as_ref()
-                .and_then(|s| s.ports.clone())
-                .unwrap_or_default();
+            let ports = self.service_ports(service);
             let mut operations = Vec::new();
             for (position, port) in ports.iter().enumerate() {
                 let field = format!("/spec/ports/{position}/targetPort");

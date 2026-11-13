@@ -619,6 +619,28 @@ impl<'a> Planner<'a> {
         self.objects.len() - 1
     }
 
+    /// Moves object `object` to `before`, so that it is written before the object there and the
+    /// ones after it.
+    pub(crate) fn write_before(&mut self, object: usize, before: usize) {
+        if object <= before || object >= self.objects.len() {
+            return;
+        }
+        let working = self.objects.remove(object);
+        self.objects.insert(before, working);
+        let mut merges = BTreeMap::new();
+        for (index, merge) in std::mem::take(&mut self.merges) {
+            let moved = if index == object {
+                before
+            } else if index >= before && index < object {
+                index + 1
+            } else {
+                index
+            };
+            merges.insert(moved, merge);
+        }
+        self.merges = merges;
+    }
+
     /// Records who owns `path` in object `index`, refusing when Helm, Argo CD or Flux does.
     pub(crate) fn claim(
         &mut self,
