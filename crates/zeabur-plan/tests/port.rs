@@ -95,4 +95,41 @@ mod tests {
         let error = plan(Input::new(&snapshot, "2026-11-06T00:00:00Z"), &request).unwrap_err();
         assert_eq!(error.code, "shared_service");
     }
+
+    #[test]
+    fn a_port_change_leaves_a_udp_port_with_the_same_number_alone() {
+        let ports = json!([{"containerPort": 8080}, {"containerPort": 8080, "protocol": "UDP"}]);
+        let mut snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            deployments: vec![from_value(deployment(&ports)).unwrap()],
+            ..Snapshot::default()
+        };
+        let service = json!({"apiVersion": "v1", "kind": "Service",
+            "metadata": {"name": "web", "namespace": "shop", "resourceVersion": "7"},
+            "spec": {"selector": {"app": "web"}, "ports": [
+                {"name": "tcp", "port": 80, "targetPort": 8080},
+                {"name": "dns", "port": 53, "protocol": "UDP", "targetPort": 8080}]}});
+        snapshot.services.push(from_value(service).unwrap());
+        let request = PlanRequest {
+            changes: vec![move_port()],
+        };
+        let moved = plan(Input::new(&snapshot, "2026-11-06T00:00:00Z"), &request).unwrap();
+        let container = &moved.objects[0].raw_after["spec"]["template"]["spec"]["containers"][0];
+        assert_eq!(
+            container["ports"],
+            json!([{"containerPort": 3000}, {"containerPort": 8080, "protocol": "UDP"}])
+        );
+        let service = moved
+            .objects
+            .iter()
+            .find(|o| o.target.kind == "Service")
+            .unwrap();
+        let targets: Vec<&Value> = service.raw_after["spec"]["ports"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| &p["targetPort"])
+            .collect();
+        assert_eq!(targets, [&json!(3000), &json!(8080)]);
+    }
 }

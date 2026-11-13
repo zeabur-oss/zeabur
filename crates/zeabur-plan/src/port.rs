@@ -1,6 +1,8 @@
 //! The port a container listens on, moved from one number to another: what a person means by
 //! "the app listens on 3000, not 8080".
 //!
+//! - **The port** is a TCP one: an entry of another protocol with the same number is left alone, in
+//!   the container and in the Services.
 //! - **The container** declares `to` where it declared `from`, or adds it when it declares neither.
 //!   When it declares `to` already, its entries are left as they are.
 //! - **Its probes** (`httpGet`, `tcpSocket`, `grpc`) that check `from`, by number or by the name of
@@ -24,6 +26,12 @@ use crate::json::{add, replace, test};
 use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
 use crate::public_port::service_target;
 use crate::rules::EnvEdit;
+
+/// Whether a port entry is TCP, which is the protocol when it names none. The port that moves is a
+/// TCP one: a UDP or SCTP port with the same number is another port.
+fn is_tcp(protocol: Option<&str>) -> bool {
+    matches!(protocol, None | Some("TCP"))
+}
 
 /// Whether a port a probe or Service names is the one being moved: its number, or the name of an
 /// entry that declares it.
@@ -131,11 +139,15 @@ impl Planner<'_> {
         to: i32,
     ) -> Result<Vec<String>, PlanError> {
         let declared = self.container_now(index, at)?.ports;
-        let entries = declared.iter().flatten();
-        let moved: Vec<usize> = entries
-            .clone()
+        let entries = declared
+            .iter()
+            .flatten()
+            .filter(|e| is_tcp(e.protocol.as_deref()));
+        let moved: Vec<usize> = declared
+            .iter()
+            .flatten()
             .enumerate()
-            .filter(|(_, entry)| entry.container_port == from)
+            .filter(|(_, e)| is_tcp(e.protocol.as_deref()) && e.container_port == from)
             .map(|(position, _)| position)
             .collect();
         let names = entries
@@ -229,6 +241,9 @@ impl Planner<'_> {
             let mut operations = Vec::new();
             let ports = service.spec.iter().flat_map(|s| s.ports.iter().flatten());
             for (position, port) in ports.enumerate() {
+                if !is_tcp(port.protocol.as_deref()) {
+                    continue;
+                }
                 let field = format!("/spec/ports/{position}/targetPort");
                 match &port.target_port {
                     Some(target) if is_moved(target, from, port_names) => {
