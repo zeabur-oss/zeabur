@@ -164,7 +164,13 @@ fn find_command(command: &str, env: &ChildEnv) -> bool {
 fn check_auth(info: &AuthInfo, env: &ChildEnv) -> Auth {
     if let Some(exec) = &info.exec {
         let command = exec.command.clone().unwrap_or_default();
-        if find_command(&command, env) {
+        let mut env = env.clone();
+        for entry in exec.env.iter().flatten() {
+            if let (Some(name), Some(value)) = (entry.get("name"), entry.get("value")) {
+                env.set(name.into(), value.into());
+            }
+        }
+        if find_command(&command, &env) {
             return Auth::Ok {
                 method: format!("exec {command}"),
             };
@@ -323,6 +329,8 @@ fn context_view(
 
 #[cfg(test)]
 mod tests {
+    use kube::config::ExecConfig;
+
     use super::*;
 
     #[test]
@@ -399,6 +407,34 @@ mod tests {
         );
         assert!(find_command("kubelogin", &env));
         assert!(!find_command("kubelogin", &ChildEnv::default()));
+    }
+
+    #[test]
+    fn a_plugin_is_found_on_the_path_the_entry_sets() {
+        let dir =
+            std::env::temp_dir().join(format!("zeabur-desktop-execenv-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let name = if cfg!(windows) {
+            "kubelogin.EXE"
+        } else {
+            "kubelogin"
+        };
+        std::fs::write(dir.join(name), "").unwrap();
+        let exec = ExecConfig {
+            command: Some("kubelogin".into()),
+            env: Some(vec![HashMap::from([
+                ("name".to_owned(), "PATH".to_owned()),
+                ("value".to_owned(), dir.to_string_lossy().into_owned()),
+            ])]),
+            ..ExecConfig::default()
+        };
+        let info = AuthInfo {
+            exec: Some(exec),
+            ..AuthInfo::default()
+        };
+        let found = matches!(check_auth(&info, &ChildEnv::default()), Auth::Ok { .. });
+        std::fs::remove_dir_all(&dir).unwrap();
+        assert!(found);
     }
 
     #[test]

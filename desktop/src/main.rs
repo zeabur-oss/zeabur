@@ -361,13 +361,10 @@ async fn start_cluster(
     app.clusters.start(window.label(), &env).await
 }
 
-/// Closes the calling cluster window and shows the chooser.
+/// Closes the calling cluster window and shows the chooser. Async, because it can build the
+/// chooser window.
 #[tauri::command]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Tauri passes a command's arguments by value"
-)]
-fn back_to_chooser(window: tauri::WebviewWindow) -> Result<(), String> {
+async fn back_to_chooser(window: tauri::WebviewWindow) -> Result<(), String> {
     chrome::show_chooser(window.app_handle()).map_err(|e| e.to_string())?;
     window.close().map_err(|e| e.to_string())
 }

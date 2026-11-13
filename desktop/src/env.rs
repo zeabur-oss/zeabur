@@ -69,8 +69,7 @@ impl ChildEnv {
             .map(|(_, value)| value.as_os_str())
     }
 
-    #[cfg(any(unix, test))]
-    fn set(&mut self, name: OsString, value: OsString) {
+    pub(crate) fn set(&mut self, name: OsString, value: OsString) {
         for (key, old) in &mut self.vars {
             if same_name(key, &name) {
                 *old = value;

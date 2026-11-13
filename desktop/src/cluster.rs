@@ -4,6 +4,7 @@
 use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::PathBuf;
+use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 
 use zeabur_local::{Kubeconfig, Running, Settings};
@@ -21,7 +22,8 @@ pub(crate) struct Target {
 /// What each cluster window opens and the service it runs, by window label.
 #[derive(Debug, Default)]
 pub(crate) struct Clusters {
-    targets: Mutex<HashMap<String, Target>>,
+    targets: Mutex<HashMap<String, (u64, Target)>>,
+    next: AtomicU64,
     running: Mutex<HashMap<String, Running>>,
 }
 
@@ -30,19 +32,20 @@ impl Clusters {
         self.targets
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
-            .insert(label.to_owned(), target);
+            .insert(
+                label.to_owned(),
+                (self.next.fetch_add(1, Ordering::Relaxed), target),
+            );
     }
 
     /// Starts the service for the window `label`, replacing one it already runs, and returns the
     /// link to load.
     pub(crate) async fn start(&self, label: &str, env: &ChildEnv) -> Result<String, String> {
-        let target = self
-            .targets
-            .lock()
-            .unwrap_or_else(PoisonError::into_inner)
-            .get(label)
-            .cloned()
-            .ok_or_else(|| "This window has no cluster to open.".to_owned())?;
+        let (id, target) = lookup(
+            &self.targets.lock().unwrap_or_else(PoisonError::into_inner),
+            label,
+        )
+        .ok_or_else(|| "This window has no cluster to open.".to_owned())?;
         self.stop(label);
         let own: Vec<(OsString, OsString)> = std::env::vars_os().collect();
         let kubeconfig = read(&target, &env.changed_from(&own))?;
@@ -50,10 +53,17 @@ impl Clusters {
             .await
             .map_err(|e| e.to_string())?;
         let url = running.url().to_owned();
+        let targets = self.targets.lock().unwrap_or_else(PoisonError::into_inner);
+        if lookup(&targets, label).is_none_or(|(now, _)| now != id) {
+            drop(targets);
+            stop_later(running);
+            return Err("This window was closed.".to_owned());
+        }
         self.running
             .lock()
             .unwrap_or_else(PoisonError::into_inner)
             .insert(label.to_owned(), running);
+        drop(targets);
         Ok(url)
     }
 
@@ -73,13 +83,21 @@ impl Clusters {
             .unwrap_or_else(PoisonError::into_inner)
             .remove(label);
         if let Some(running) = running {
-            tauri::async_runtime::spawn(async move {
-                if let Err(err) = running.stop().await {
-                    output::warn(&format!("the local service stopped with an error: {err}"));
-                }
-            });
+            stop_later(running);
         }
     }
+}
+
+fn stop_later(running: Running) {
+    tauri::async_runtime::spawn(async move {
+        if let Err(err) = running.stop().await {
+            output::warn(&format!("the local service stopped with an error: {err}"));
+        }
+    });
+}
+
+fn lookup(targets: &HashMap<String, (u64, Target)>, label: &str) -> Option<(u64, Target)> {
+    targets.get(label).cloned()
 }
 
 /// Reads the target's file and gives every exec credential plugin in it the variables of the
@@ -109,6 +127,23 @@ fn read(target: &Target, vars: &[(String, String)]) -> Result<Kubeconfig, String
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_startup_belongs_to_the_window_that_began_it() {
+        let target = Target {
+            file: PathBuf::from("config"),
+            context: "c".to_owned(),
+        };
+        let clusters = Clusters::default();
+        let id = |c: &Clusters| lookup(&c.targets.lock().unwrap(), "cluster-a").map(|(id, _)| id);
+        clusters.set_target("cluster-a", target.clone());
+        let first = id(&clusters);
+        clusters.closed("cluster-a");
+        assert_eq!(id(&clusters), None);
+        clusters.set_target("cluster-a", target);
+        assert!(id(&clusters).is_some());
+        assert_ne!(id(&clusters), first);
+    }
 
     #[test]
     fn exec_plugins_get_the_shell_variables_they_do_not_set() {
