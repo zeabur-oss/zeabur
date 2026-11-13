@@ -155,7 +155,8 @@ pub(crate) async fn check_update(app: AppHandle) -> Result<Option<Available>, St
 }
 
 /// Downloads the release the last check found, checks its signature, installs it and starts the
-/// new version. On Windows the installer closes the app and starts it again.
+/// new version. On Windows the installer closes the app and starts it again. A failed install keeps
+/// the release, so the button can try again.
 #[tauri::command]
 pub(crate) async fn install_update(app: AppHandle) -> Result<(), String> {
     if install_kind() != Install::InPlace {
@@ -164,7 +165,7 @@ pub(crate) async fn install_update(app: AppHandle) -> Result<(), String> {
     let update = app
         .state::<Updates>()
         .found()
-        .take()
+        .clone()
         .ok_or("no update to install")?;
     update
         .download_and_install(|_, _| {}, || {})
