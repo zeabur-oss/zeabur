@@ -1,4 +1,4 @@
-import { createContext, use, useEffect, useState, type ReactNode } from "react"
+import { createContext, use, useState, type ReactNode } from "react"
 import * as z from "zod/mini"
 
 import { core } from "@/i18n/en-core"
@@ -75,6 +75,10 @@ export function prepareI18n(locale: Locale = initialLocale()): Promise<Catalogue
   return catalogues.load(locale)
 }
 
+function showLang(locale: Locale) {
+  document.documentElement.lang = locale
+}
+
 const storageKey = "zeabur.locale"
 
 /** Maps a BCP 47 tag to a supported locale, or `undefined`. */
@@ -145,14 +149,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
       catalogues.cached("en") ?? { locale: "en", messages: fallback },
   )
 
-  useEffect(() => {
-    document.documentElement.lang = catalogue.locale
-  }, [catalogue.locale])
-
   const setLocale = (next: Locale) => {
     saveLocale(next)
     void catalogues.choose(next).then((chosen) => {
-      if (chosen) setCatalogue(chosen)
+      if (!chosen) return
+      showLang(chosen.locale)
+      setCatalogue(chosen)
     })
   }
 
