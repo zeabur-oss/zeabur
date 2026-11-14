@@ -279,8 +279,7 @@ fn find(databases: Vec<Database>, project: &str, name: &str) -> Result<Option<Da
     }
 }
 
-/// The ports of the Kubernetes Services selecting the pods of the service `name`, by port, each
-/// port once.
+/// The ports of the Kubernetes Services of the service `name`, each with the Service it is of.
 fn service_ports(
     document: ProjectDocument,
     databases_unreadable: &[Unreadable],
@@ -293,6 +292,11 @@ fn service_ports(
         unreadable,
     } = document;
     let services: Vec<Service> = services.into_iter().filter(|s| s.name == name).collect();
+    if services.len() > 1 {
+        return Err(format!(
+            "Project {project} has more than one service named {name}. Connect to it from the cluster instead."
+        ));
+    }
     if services.is_empty() {
         let mut refused: Vec<&str> = databases_unreadable
             .iter()
@@ -323,41 +327,51 @@ fn service_ports(
             })
         })
         .collect();
-    // Every one of these Services selects the service's pods, so one port number reaches the
-    // same place through any of them.
-    ports.sort_by_key(|p| p.port);
-    ports.dedup_by_key(|p| p.port);
+    ports.sort_by(|a, b| (a.port, &a.name).cmp(&(b.port, &b.name)));
     Ok(ports)
 }
 
-/// The one port of `ports`, or `port` of them.
+/// The one destination of `ports` that `port` names, or the only one there is. A port number that
+/// two Kubernetes Services offer may lead to different pod ports, so it is not picked for the
+/// person.
 fn pick(
     ports: &[ServiceAddress],
     project: &str,
     name: &str,
     port: Option<u16>,
 ) -> Result<ServiceAddress, String> {
-    let list = || {
-        ports
-            .iter()
-            .map(|p| p.port.to_string())
-            .collect::<Vec<_>>()
-            .join(", ")
-    };
-    match (port, ports) {
-        (_, []) => Err(format!(
+    let mut numbers: Vec<String> = ports.iter().map(|p| p.port.to_string()).collect();
+    numbers.dedup();
+    let list = numbers.join(", ");
+    let Some(first) = ports.first() else {
+        return Err(format!(
             "{name} has no Kubernetes Service, so no port to forward to."
-        )),
-        (None, [one]) => Ok(one.clone()),
-        (None, _) => Err(format!(
-            "{name} has more than one port: {}. Pick one with {project}/{name}:<port>.",
-            list()
-        )),
-        (Some(port), _) => ports
-            .iter()
-            .find(|p| p.port == port)
-            .cloned()
-            .ok_or_else(|| format!("{name} has no port {port}. Its ports: {}.", list())),
+        ));
+    };
+    let wanted = match port {
+        Some(port) => port,
+        None if numbers.len() == 1 => first.port,
+        None => {
+            return Err(format!(
+                "{name} has more than one port: {list}. Pick one with {project}/{name}:<port>."
+            ));
+        }
+    };
+    let mut found = ports.iter().filter(|p| p.port == wanted);
+    match (found.next(), found.next()) {
+        (Some(one), None) => Ok(one.clone()),
+        (None, _) => Err(format!("{name} has no port {wanted}. Its ports: {list}.")),
+        (Some(_), Some(_)) => {
+            let services: Vec<&str> = ports
+                .iter()
+                .filter(|p| p.port == wanted)
+                .map(|p| p.name.as_str())
+                .collect();
+            Err(format!(
+                "Port {wanted} of {name} is offered by more than one Kubernetes Service ({}), which may lead to different ports of its pods. Connect to one of them from the cluster instead.",
+                services.join(", ")
+            ))
+        }
     }
 }
 
@@ -612,7 +626,11 @@ mod tests {
         let (database, admin) = to(Some(8081)).await.unwrap();
         assert!(database.is_none());
         assert_eq!(admin, address("web-admin", 8081));
-        assert_eq!(to(Some(80)).await.unwrap().1.port, 80);
+        assert_eq!(
+            to(Some(80)).await.unwrap_err(),
+            "Port 80 of web is offered by more than one Kubernetes Service (web, web-admin), which may lead to different ports of its pods. Connect to one of them from the cluster instead."
+        );
+        assert_eq!(to(Some(9090)).await.unwrap().1, address("web", 9090));
         assert!(
             target(&shop, "shop", "worker", None)
                 .await
@@ -644,6 +662,29 @@ mod tests {
         );
     }
 
+    #[tokio::test]
+    async fn a_name_two_workloads_share_is_refused() {
+        let cluster = shop();
+        cluster.update(|s| {
+            let set = serde_json::from_value(json!({
+                "metadata": {"name": "web", "namespace": "shop"},
+                "spec": {"serviceName": "web", "selector": {"matchLabels": {"app": "web"}},
+                         "template": {"metadata": {"labels": {"app": "web"}},
+                                      "spec": {"containers": [{"name": "web", "image": "nginx"}]}}},
+            }))
+            .unwrap();
+            if let Some(objects) = s.objects.get_mut("shop") {
+                objects.stateful_sets.push(set);
+            }
+        });
+        assert_eq!(
+            target(&api(&cluster), "shop", "web", Some(9090))
+                .await
+                .unwrap_err(),
+            "Project shop has more than one service named web. Connect to it from the cluster instead."
+        );
+    }
+
     fn address(name: &str, port: u16) -> ServiceAddress {
         ServiceAddress {
             namespace: "shop".to_owned(),
@@ -672,6 +713,15 @@ mod tests {
             "web has no port 443. Its ports: 80, 9090."
         );
         assert!(pick(&[], "shop", "cron", None).is_err());
+    }
+
+    #[test]
+    fn a_port_number_two_kubernetes_services_offer_is_not_picked_for_the_person() {
+        let twice = [address("web", 80), address("web-admin", 80)];
+        for port in [None, Some(80)] {
+            let refused = pick(&twice, "shop", "web", port).unwrap_err();
+            assert!(refused.contains("(web, web-admin)"), "{refused}");
+        }
     }
 
     #[test]
