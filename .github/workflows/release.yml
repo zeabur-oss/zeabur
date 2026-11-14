@@ -1,7 +1,8 @@
 name: Release
 
-# Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: the shared release builds, publishes and signs the
-# image, chart and installers, then leaves a draft (docs/internal/releasing.md). Manual run: rehearse.
+# Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: desktop.yml builds and signs Zeabur Desktop, then the
+# shared release builds, publishes and signs the image, chart and installers and leaves a draft with
+# all of them (docs/internal/releasing.md). Manual run: rehearse.
 on:
   push:
     tags: ['v[0-9]*']
@@ -19,7 +20,25 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  desktop:
+    uses: ./.github/workflows/desktop.yml
+    permissions:
+      contents: read
+      id-token: write
+    with:
+      version: ${{ inputs.version || github.ref_name }}
+    secrets:
+      APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+      TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+
+  # The draft takes the desktop files from desktop's artifacts.
   release:
+    needs: desktop
     uses: zeabur-oss/.github/.github/workflows/release.yml@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
     permissions:
       contents: write

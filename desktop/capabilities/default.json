@@ -1,7 +1,7 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "The cluster chooser: its own commands and the file dialog.",
+  "description": "The cluster chooser: its own commands, the file dialog and the update check.",
   "windows": ["main"],
   "permissions": [
     "core:default",
@@ -14,6 +14,10 @@
     "allow-probe",
     "allow-open-cluster",
     "allow-scenario",
-    "allow-set-menu"
+    "allow-set-menu",
+    "allow-found-update",
+    "allow-check-update",
+    "allow-install-update",
+    "allow-open-releases"
   ]
 }

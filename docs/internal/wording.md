@@ -178,6 +178,7 @@ why. Add a row before introducing a new concept.
 | releases (a service's revisions) | 發布紀錄 | 发布记录 | |
 | revision | 修訂版本 | 修订版本 | |
 | restart | 重新啟動 | 重启 | |
+| update (a newer version of Zeabur Desktop) | 更新；新版本 | 更新；新版本 | The action is 更新 (檢查更新, 更新並重新啟動); the thing found is a 新版本. The page it downloads from is the release page, 發行頁面／发布页面, as the release docs call a GitHub release 發行 |
 | roll back | 回滾 | 回滚 | |
 | apply a change | 套用 | 应用 | |
 | review changes (a plan, as the API and docs keep calling it) | 檢查變更 | 检查变更 | Never 計畫／计划 on screen: it reads as a schedule. Expired: 這份變更已過期 |

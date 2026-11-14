@@ -1,0 +1,189 @@
+name: Desktop
+
+# Zeabur Desktop's packages for the release (docs/internal/releasing.md): release.yml calls this
+# before the shared release, which takes the files from these artifacts into the draft with the
+# rest. A pull request that changes the packaging builds them unsigned.
+#
+# The packages build outside the Nix shell, with the runner's own compiler, linker and system
+# libraries, so the app loads nothing from /nix/store (scripts/check-portable.sh checks
+# each). prepare makes what the build needs from the dev shell: the web pages, the catalog and the
+# toolchain versions. Signing runs only for main and v* tags, whose environments hold the
+# credentials; anywhere else the files are unsigned and the updater job is skipped.
+on:
+  workflow_call:
+    inputs:
+      version:
+        description: The release's version, v and SemVer.
+        type: string
+        required: true
+    secrets:
+      APPLE_CERTIFICATE_P12:
+        required: false
+      APPLE_CERTIFICATE_PASSWORD:
+        required: false
+      APPLE_API_KEY_P8:
+        required: false
+      APPLE_API_KEY_ID:
+        required: false
+      APPLE_API_ISSUER_ID:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY:
+        required: false
+      TAURI_SIGNING_PRIVATE_KEY_PASSWORD:
+        required: false
+  pull_request:
+    paths:
+      - .github/workflows/desktop.yml
+      - desktop/Cargo.toml
+      - desktop/tauri.conf.json
+      - scripts/package-desktop.sh
+      - scripts/check-portable.sh
+      - scripts/desktop-release.ts
+
+permissions:
+  contents: read
+
+# bash with pipefail on every runner, so a failed command before `| tee` fails its step.
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  prepare:
+    runs-on: ubuntu-26.04-arm
+    outputs:
+      version: ${{ steps.versions.outputs.version }}
+      toolchain: ${{ steps.versions.outputs.toolchain }}
+      tauri-cli: ${{ steps.versions.outputs.tauri-cli }}
+      catalog-commit: ${{ steps.versions.outputs.catalog-commit }}
+      updater: ${{ steps.versions.outputs.updater }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: ./.github/actions/catalog-release
+      - id: versions
+        name: Build the pages, copy the catalog, and name the versions and the updater key
+        env:
+          VERSION: ${{ inputs.version }}
+        run: nix develop .#desktop --command scripts/ci/desktop-inputs.sh | tee -a "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-inputs
+          path: |
+            web/dist/
+            desktop/web/dist/
+            target/desktop-inputs/
+          if-no-files-found: error
+          retention-days: 1
+
+  build:
+    name: build (${{ matrix.os }}-${{ matrix.arch }})
+    needs: prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: darwin, arch: arm64, runner: macos-26, signing: apple-signing }
+          - { os: windows, arch: amd64, runner: windows-2025, signing: windows-signing }
+          # The oldest supported Ubuntu, so the packages run on its glibc and newer.
+          - { os: linux, arch: amd64, runner: ubuntu-24.04, signing: '' }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm, signing: '' }
+    runs-on: ${{ matrix.runner }}
+    permissions:
+      contents: read
+      id-token: write # azure/login
+    # The environments' branch rules keep the credentials to main and tags.
+    environment: >-
+      ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+          matrix.signing || '' }}
+    env:
+      VERSION: ${{ needs.prepare.outputs.version }}
+      OS: ${{ matrix.os }}
+      ARCH: ${{ matrix.arch }}
+      RUSTUP_TOOLCHAIN: ${{ needs.prepare.outputs.toolchain }}
+      ZEABUR_CATALOG_COMMIT: ${{ needs.prepare.outputs.catalog-commit }}
+      ZEABUR_CATALOG_RELEASE: ${{ github.workspace }}/target/desktop-inputs/catalog
+      ZEABUR_UI_DIST: ${{ github.workspace }}/web/dist
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-inputs
+      - name: Install the toolchain and the system libraries
+        env:
+          TAURI_CLI: ${{ needs.prepare.outputs.tauri-cli }}
+        run: |
+          if [[ "$OS" == linux ]]; then
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends libwebkit2gtk-4.1-dev \
+              libgtk-3-dev librsvg2-dev libxdo-dev libssl-dev file libarchive-tools
+          fi
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+          cargo install tauri-cli --version "=$TAURI_CLI" --locked
+      - name: Build
+        run: scripts/package-desktop.sh compile "$VERSION" "$OS" "$ARCH" dist
+      # Signing logs in right before packaging, so the short-lived token is still valid.
+      - if: matrix.os == 'windows' && vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Package and sign
+        env:
+          APPLE_CERTIFICATE_P12: ${{ matrix.os == 'darwin' && secrets.APPLE_CERTIFICATE_P12 || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.os == 'darwin' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_P8: ${{ matrix.os == 'darwin' && secrets.APPLE_API_KEY_P8 || '' }}
+          APPLE_API_KEY_ID: ${{ matrix.os == 'darwin' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER_ID: ${{ matrix.os == 'darwin' && secrets.APPLE_API_ISSUER_ID || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ matrix.os == 'windows' && vars.AZURE_CLIENT_ID != '' && vars.AZURE_SIGNING_ENDPOINT || '' }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+        run: scripts/package-desktop.sh package "$VERSION" "$OS" "$ARCH" dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Signs each file the updater installs and writes latest.json, once the app has an updater key
+  # (desktop/tauri.conf.json), for main and tags.
+  updater:
+    if: >-
+      needs.prepare.outputs.updater == 'true' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [prepare, build]
+    runs-on: ubuntu-26.04-arm
+    environment: desktop-updater
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+      - uses: ./.github/actions/catalog-release
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*-*
+          path: packages
+          merge-multiple: true
+      - name: Sign the updates and write latest.json
+        env:
+          VERSION: ${{ needs.prepare.outputs.version }}
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          mkdir updater
+          nix develop .#desktop --command bun install --frozen-lockfile
+          nix develop .#desktop --command node_modules/.bin/zeabur-oss-release notes CHANGELOG.md "$VERSION" >notes.md
+          nix develop .#desktop --command bun scripts/desktop-release.ts updater "$VERSION" packages notes.md updater/latest.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-updater
+          path: updater/latest.json
+          if-no-files-found: error
+          retention-days: 7

@@ -4,6 +4,7 @@ const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one :
 
 export const en = {
   "desktop.menu.about": "About Zeabur",
+  "desktop.menu.checkUpdates": "Check for Updates…",
   "desktop.menu.services": "Services",
   "desktop.menu.hide": "Hide Zeabur",
   "desktop.menu.hideOthers": "Hide Others",
@@ -84,6 +85,26 @@ export const en = {
   "desktop.pasteError": (reason: string) => `Zeabur can't read this kubeconfig: ${reason}`,
   "desktop.pasteEmpty": "This kubeconfig has no contexts.",
   "desktop.cancel": "Cancel",
+  "desktop.update.check": "Check for updates",
+  "desktop.update.checking": "Checking for updates…",
+  "desktop.update.available": (version: string) => `Version ${version} is available`,
+  "desktop.update.title": (version: string) => `Zeabur ${version} is available`,
+  "desktop.update.current": (version: string) => `You have ${version}.`,
+  "desktop.update.notes": "What's new",
+  "desktop.update.install": "Update and restart",
+  "desktop.update.installing": "Updating…",
+  "desktop.update.later": "Later",
+  "desktop.update.package":
+    "Download the new .deb or .rpm from the release page and install it the way you installed this one.",
+  "desktop.update.download":
+    "This copy of Zeabur can't update itself. Download the new version from the release page.",
+  "desktop.update.openReleases": "Open the release page",
+  "desktop.update.latestTitle": "Zeabur is up to date",
+  "desktop.update.latest": (version: string) => `You have the newest version, ${version}.`,
+  "desktop.update.failedTitle": "Zeabur couldn't check for updates",
+  "desktop.update.installFailed": "Zeabur couldn't install the update.",
+  "desktop.update.notConfigured": "This build of Zeabur doesn't check for updates.",
+  "desktop.update.close": "Close",
   "desktop.language": "Language",
   "desktop.shellFailed": (shell: string) =>
     `Zeabur couldn't read the settings of ${shell}, so programs installed from your shell files may not be found.`,

@@ -1,7 +1,7 @@
 [package]
 name = "zeabur-desktop"
 description = "Zeabur Desktop (Tauri 2): lists kubeconfig contexts and opens Zeabur for each with its local service"
-version = "0.0.0"
+version = "0.2.0"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
@@ -9,8 +9,9 @@ repository = "https://github.com/zeabur-oss/zeabur"
 publish = false
 
 # Its own workspace and lock file, with the main workspace's rules (docs/internal/crates.md, "Apps
-# outside the workspace"). scripts/check-desktop.sh fails when the package fields, the lints or
-# the release profile below differ from the root Cargo.toml.
+# outside the workspace"). scripts/check-desktop.sh fails when the package fields (the version
+# too, which the release sets with the rest), the lints or the release profile below differ from
+# the root Cargo.toml.
 [workspace]
 
 [dependencies]
@@ -28,6 +29,11 @@ tauri-plugin-window-state = "2"
 # required by a release build). The one workspace crate desktop/ may depend on
 # (scripts/check-desktop.sh).
 zeabur-local = { path = "../crates/zeabur-local", features = ["ui"] }
+# Updates from the release's latest.json (src/update.rs). Its `rustls-tls` feature brings ring, so
+# it gets TLS from reqwest's `rustls` feature below instead, with aws-lc-rs. `zip` unpacks the macOS
+# app's .tar.gz.
+tauri-plugin-updater = { version = "2", default-features = false, features = ["zip"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
 
 # Set for a build that embeds desktop/web/dist instead of loading the dev server
 # (`--features custom-protocol`; `cargo tauri build` sets it).

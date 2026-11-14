@@ -15,6 +15,7 @@ mod probe;
 mod shots;
 mod sources;
 mod store;
+mod update;
 #[cfg(target_os = "macos")]
 mod webkit;
 #[cfg(windows)]
@@ -393,6 +394,59 @@ fn context() -> tauri::Context {
     tauri::tauri_build_context!()
 }
 
+fn setup(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    // `ZEABUR_DESKTOP_STATE` puts everything in one folder, for the fixtures and
+    // screenshots.
+    let (config_dir, kubeconfigs_dir) = if let Some(dir) = std::env::var_os("ZEABUR_DESKTOP_STATE")
+    {
+        (PathBuf::from(&dir), PathBuf::from(dir).join("kubeconfigs"))
+    } else {
+        let paths = tauri_app.path();
+        (
+            paths.app_config_dir()?,
+            paths.app_local_data_dir()?.join("kubeconfigs"),
+        )
+    };
+    let saved = std::fs::read(config_dir.join("settings.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default();
+    tauri_app.manage(App {
+        config_dir,
+        kubeconfigs_dir,
+        saved: Mutex::new(saved),
+        env: RwLock::new(ChildEnv::from_process()),
+        shell: Mutex::new(ShellRead::Pending),
+        dev_web: match std::env::var("ZEABUR_DESKTOP_WEB") {
+            Ok(url) => Some(url.parse::<tauri::Url>()?),
+            Err(_) => None,
+        },
+        clusters: cluster::Clusters::default(),
+    });
+
+    // A login shell can take seconds; the window opens without waiting and reloads on the
+    // event.
+    let handle = tauri_app.handle().clone();
+    std::thread::spawn(move || {
+        let (merged, read) = env::load(ChildEnv::from_process());
+        let app = handle.state::<App>();
+        *app.env.write().unwrap_or_else(PoisonError::into_inner) = merged;
+        *app.shell.lock().unwrap_or_else(PoisonError::into_inner) = read;
+        if let Err(err) = handle.emit("shell-env", ()) {
+            output::warn(&format!("cannot reload the window: {err}"));
+        }
+    });
+
+    #[cfg(target_os = "macos")]
+    chrome::allow_title_bar(
+        tauri_app.handle(),
+        tauri_app.state::<App>().dev_web.as_ref(),
+    )?;
+    chrome::show_chooser(tauri_app.handle())?;
+    update::check_on_start(tauri_app.handle());
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let context = context();
     #[cfg(windows)]
@@ -412,61 +466,13 @@ fn main() -> ExitCode {
     };
     let builder = builder
         .plugin(tauri_plugin_dialog::init())
-        .plugin(chrome::window_state());
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(chrome::window_state())
+        .manage(update::Updates::default());
     #[cfg(target_os = "macos")]
     let builder = builder.on_menu_event(menu::on_menu_event);
     let app = builder
-        .setup(|tauri_app| {
-            // `ZEABUR_DESKTOP_STATE` puts everything in one folder, for the fixtures and
-            // screenshots.
-            let (config_dir, kubeconfigs_dir) =
-                if let Some(dir) = std::env::var_os("ZEABUR_DESKTOP_STATE") {
-                    (PathBuf::from(&dir), PathBuf::from(dir).join("kubeconfigs"))
-                } else {
-                    let paths = tauri_app.path();
-                    (
-                        paths.app_config_dir()?,
-                        paths.app_local_data_dir()?.join("kubeconfigs"),
-                    )
-                };
-            let saved = std::fs::read(config_dir.join("settings.json"))
-                .ok()
-                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-                .unwrap_or_default();
-            tauri_app.manage(App {
-                config_dir,
-                kubeconfigs_dir,
-                saved: Mutex::new(saved),
-                env: RwLock::new(ChildEnv::from_process()),
-                shell: Mutex::new(ShellRead::Pending),
-                dev_web: match std::env::var("ZEABUR_DESKTOP_WEB") {
-                    Ok(url) => Some(url.parse::<tauri::Url>()?),
-                    Err(_) => None,
-                },
-                clusters: cluster::Clusters::default(),
-            });
-
-            // A login shell can take seconds; the window opens without waiting and reloads on the
-            // event.
-            let handle = tauri_app.handle().clone();
-            std::thread::spawn(move || {
-                let (merged, read) = env::load(ChildEnv::from_process());
-                let app = handle.state::<App>();
-                *app.env.write().unwrap_or_else(PoisonError::into_inner) = merged;
-                *app.shell.lock().unwrap_or_else(PoisonError::into_inner) = read;
-                if let Err(err) = handle.emit("shell-env", ()) {
-                    output::warn(&format!("cannot reload the window: {err}"));
-                }
-            });
-
-            #[cfg(target_os = "macos")]
-            chrome::allow_title_bar(
-                tauri_app.handle(),
-                tauri_app.state::<App>().dev_web.as_ref(),
-            )?;
-            chrome::show_chooser(tauri_app.handle())?;
-            Ok(())
-        })
+        .setup(setup)
         .invoke_handler(tauri::generate_handler![
             snapshot,
             add_paths,
@@ -478,7 +484,12 @@ fn main() -> ExitCode {
             start_cluster,
             back_to_chooser,
             scenario,
-            menu::set_menu
+            menu::set_menu,
+            update::found_update,
+            update::take_check_request,
+            update::check_update,
+            update::install_update,
+            update::open_releases
         ])
         .build(context);
     match app {

@@ -25,12 +25,15 @@ nix develop .#desktop -c scripts/build-desktop.sh
 
 It builds `web/dist` (embedded in the local service), `desktop/web/dist` (bundled into the app),
 the binary, then the bundles: on macOS `Zeabur.app` and `Zeabur_<version>_<arch>.dmg` under
-`target/desktop/release/bundle/`. The version is `web/package.json`'s. A binary built in the Nix
-shell links the Nix store's libiconv; on macOS the script points it at `/usr/lib/libiconv.2.dylib`
-before the bundler signs it, and `scripts/check-portable.sh` then fails if anything in the app
-links a library that a Mac without Nix lacks. CI's `desktop-bundle` job does the same on macOS.
-On Linux the check fails for now: a binary built in the Nix shell uses the Nix store's dynamic
-loader, glibc and WebKitGTK, so a `.deb` or AppImage of it would not run on other distributions. With
+`target/desktop/release/bundle/`. The version is `desktop/Cargo.toml`'s, which the release sets
+with the rest of the repository. A binary built in the Nix shell links the Nix store's libiconv;
+on macOS the script points it at `/usr/lib/libiconv.2.dylib` before the bundler signs it, and
+`scripts/check-portable.sh` then fails if anything in the app links a library that a Mac without
+Nix lacks. CI's `desktop-bundle` job does the same on macOS. On Linux the check fails for now: a
+binary built in the Nix shell uses the Nix store's dynamic loader, glibc and WebKitGTK, so a
+`.deb` or AppImage of it would not run on other distributions. Release packages build outside the
+Nix shell with `scripts/package-desktop.sh`, on every platform
+([Releasing](../docs/internal/releasing.md#zeabur-desktop)). With
 `APPLE_SIGNING_IDENTITY` set to a Developer ID Application identity the bundler signs with the
 hardened runtime; with `APPLE_API_ISSUER`, `APPLE_API_KEY` and `APPLE_API_KEY_PATH` (or
 `APPLE_ID`, `APPLE_PASSWORD` and `APPLE_TEAM_ID`) it also notarizes. Without them the app is signed
@@ -57,6 +60,18 @@ ad hoc, and macOS asks before the first launch of a downloaded copy.
 - English, Traditional Chinese and Simplified Chinese (`desktop/web/src/i18n`). The first
   language comes from the system; the picker in the sidebar switches it live, and a cluster window
   opens in the same language.
+
+## Updates
+
+`src/update.rs` and `web/src/chooser/update.tsx`, with Tauri's updater plugin. The app checks the
+newest release's `latest.json` once at start, quietly, and when asked (the sidebar's button, on
+macOS also **Zeabur > Check for Updates…**); it shows the version and the notes and installs only
+after **Update and restart**. What it can do depends on how it was installed, which the bundler
+marks in the binary: the macOS app, the NSIS install and the AppImage replace themselves; a `.deb`,
+`.rpm`, the portable `.exe` and a development build offer the release page. Updates must carry a
+signature of the key in `tauri.conf.json` for that exact version (`requireSignedVersion`); while
+the key is empty the app does not check. The release side is in
+[Releasing](../docs/internal/releasing.md#zeabur-desktop).
 
 ## Folders
 

@@ -1,5 +1,5 @@
 import { open as pick } from "@tauri-apps/plugin-dialog"
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactElement } from "react"
 
 import { useI18n } from "@/i18n"
 
@@ -12,6 +12,7 @@ import { recentContexts, sourceFilter, visibleContexts } from "./model"
 import { PasteDialog, type Paste } from "./paste-dialog"
 import { pasteSample } from "./shots"
 import { Sidebar } from "./sources"
+import { useUpdates } from "./update"
 
 interface BrowserProps {
   snap: Snapshot
@@ -22,6 +23,7 @@ interface BrowserProps {
   setOnly: (id: string | null) => void
   add: AddActions
   reload: () => Promise<unknown>
+  update: ReactElement
 }
 
 function Browser({
@@ -33,6 +35,7 @@ function Browser({
   setOnly,
   add,
   reload,
+  update,
 }: BrowserProps) {
   const { locale } = useI18n()
   const only = sourceFilter(snap, chosen)
@@ -50,6 +53,7 @@ function Browser({
         setOnly={setOnly}
         removeSource={(id) => void api.removeSource(id).then(reload)}
         add={add}
+        update={update}
       />
       <ContextPane
         visible={visible}
@@ -73,6 +77,7 @@ export function App() {
   const [paste, setPaste] = useState<Paste | null>(null)
   const { dropping, setDropping } = useDropTarget(reload)
   useMenuBar()
+  const updates = useUpdates()
 
   useScenario(reload, {
     locale,
@@ -107,13 +112,15 @@ export function App() {
       setOnly={setOnly}
       add={add}
       reload={reload}
+      update={updates.button}
     />
   )
 
   return (
     <div data-titlebar-inset className="flex h-dvh bg-surface-page text-main select-none">
-      {snap.sources.length === 0 ? <FirstRun actions={add} /> : browser}
+      {snap.sources.length === 0 ? <FirstRun actions={add} update={updates.button} /> : browser}
       <PasteDialog paste={paste} setPaste={setPaste} reload={reload} />
+      {updates.dialog}
       <DropOverlay dropping={dropping} />
     </div>
   )
