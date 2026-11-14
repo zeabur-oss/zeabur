@@ -1,10 +1,11 @@
 //! The experience program (docs/reference/telemetry.mdx): an install's start, end and failure.
 
 use std::cell::Cell;
-use std::fs;
 use std::path::Path;
+use std::sync::{Arc, mpsc};
+use std::{fs, thread};
 
-use tokio::runtime::{Builder, Runtime};
+use tokio::runtime::Builder;
 use zeabur_installer_host::{HostError, files};
 use zeabur_installer_plan::PlanError;
 use zeabur_installer_plan::cluster::Distribution;
@@ -18,7 +19,7 @@ const ID_FILE: &str = "installation-id";
 
 /// Reports one `apply`. Does nothing unless the program is on.
 pub(crate) struct Reporter {
-    on: Option<(Sender, InstallationId, Runtime)>,
+    on: Option<(Arc<Sender>, InstallationId)>,
     install: Install,
     step: Cell<zeabur_telemetry::Step>,
     switch: Switch,
@@ -30,7 +31,7 @@ impl Reporter {
         Self::start_with(Switch::from_env(joined), config_path, install, |switch| {
             Sender::new(
                 switch,
-                std::sync::Arc::new(|body| out::err(&format!("telemetry: {body}"))),
+                Arc::new(|body| out::err(&format!("telemetry: {body}"))),
             )
         })
     }
@@ -44,8 +45,7 @@ impl Reporter {
         let on = (switch != Switch::Off)
             .then(|| installation_id(config_path))
             .flatten()
-            .zip(Builder::new_current_thread().enable_all().build().ok())
-            .map(|(id, runtime)| (sender(switch), id, runtime));
+            .map(|id| (Arc::new(sender(switch)), id));
         let reporter = Self {
             on,
             install,
@@ -61,7 +61,7 @@ impl Reporter {
         self.on
             .as_ref()
             .filter(|_| self.switch == Switch::On)
-            .map(|(_, id, _)| id)
+            .map(|(_, id)| id)
     }
 
     /// Notes that the install reached `step`.
@@ -83,18 +83,26 @@ impl Reporter {
         result
     }
 
+    /// Sends `event` on a thread of its own, as Sentry's transport does, and waits for it. The
+    /// send ends within its own timeout, and a thread that is stuck in a name lookup is left
+    /// behind, not waited for.
     fn send(&self, event: &Event) {
-        if let Some((sender, id, runtime)) = &self.on {
-            runtime.block_on(sender.send(id, event));
-        }
-    }
-}
-
-impl Drop for Reporter {
-    /// A name lookup that hangs does not hold the installer.
-    fn drop(&mut self) {
-        if let Some((_, _, runtime)) = self.on.take() {
-            runtime.shutdown_background();
+        let Some((sender, id)) = &self.on else {
+            return;
+        };
+        let (sender, id, event) = (Arc::clone(sender), id.clone(), event.clone());
+        let (done, finished) = mpsc::channel::<()>();
+        let sending = thread::Builder::new()
+            .name("telemetry".to_owned())
+            .spawn(move || {
+                let Ok(runtime) = Builder::new_current_thread().enable_all().build() else {
+                    return;
+                };
+                runtime.block_on(sender.send(&id, &event));
+                drop(done);
+            });
+        if sending.is_ok() {
+            let _ended = finished.recv();
         }
     }
 }
