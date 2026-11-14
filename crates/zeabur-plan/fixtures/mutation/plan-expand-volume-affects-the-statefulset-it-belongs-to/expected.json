@@ -1,0 +1,8 @@
+{
+  "impact": [
+    {
+      "kind": "StatefulSet",
+      "name": "db-replica"
+    }
+  ]
+}

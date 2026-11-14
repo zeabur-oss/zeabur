@@ -18,6 +18,7 @@ use zeabur_model::{
     WorkloadKind, WorkloadRef, WorkloadSummary,
 };
 
+use crate::ownership::ObjectKey;
 use crate::project::provenance;
 use crate::snapshot::{Snapshot, name_of};
 
@@ -73,6 +74,18 @@ impl<'a> Workload<'a> {
         WorkloadRef {
             kind: self.kind(),
             name: self.name().to_owned(),
+        }
+    }
+
+    /// The workload's identity in an [`OwnerGraph`](crate::OwnerGraph).
+    #[must_use]
+    pub fn key(self) -> ObjectKey {
+        match self {
+            Self::CronJob(object) => ObjectKey::of(object),
+            Self::DaemonSet(object) => ObjectKey::of(object),
+            Self::Deployment(object) => ObjectKey::of(object),
+            Self::Job(object) => ObjectKey::of(object),
+            Self::StatefulSet(object) => ObjectKey::of(object),
         }
     }
 
