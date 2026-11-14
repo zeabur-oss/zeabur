@@ -5,8 +5,8 @@ name: Benchmark
 # run's summary (scripts/benchmark-report.sh). `machine` writes what each runner has: the CPU,
 # memory and disk, Docker, /dev/kvm and a k3d cluster. Run it on main, once to fill the caches of
 # a new runner and then to measure.
-# instabox-large is only a comparison: a CI job uses it only when its run there is shorter than on
-# the GitHub runner.
+# A CI job's size follows the median run time against the GitHub runner's: small if small is
+# shorter, else medium if medium is shorter, else medium, or large only when medium is much slower.
 on:
   workflow_dispatch:
     inputs:
