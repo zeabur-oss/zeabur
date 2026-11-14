@@ -13,7 +13,7 @@ import XIcon from "~icons/ph/x"
 
 import { useI18n, type Translate } from "@/i18n"
 
-import { api } from "./api"
+import { useChanges } from "./hooks"
 
 export interface Paste {
   name: string
@@ -29,22 +29,19 @@ function pasteErrorText(error: unknown, t: Translate): string {
 interface Props {
   paste: Paste | null
   setPaste: (paste: Paste | null) => void
-  reload: () => Promise<unknown>
 }
 
-export function PasteDialog({ paste, setPaste, reload }: Props) {
+export function PasteDialog({ paste, setPaste }: Props) {
   const { t } = useI18n()
+  const { addPasted } = useChanges()
   const nameRef = useRef<HTMLInputElement>(null)
   if (!paste) return null
 
   function submit(current: Paste) {
-    api
-      .addPasted(current.name, current.yaml)
-      .then(() => {
-        setPaste(null)
-        return reload()
-      })
-      .catch((error: unknown) => setPaste({ ...current, error: pasteErrorText(error, t) }))
+    addPasted.mutate(current, {
+      onSuccess: () => setPaste(null),
+      onError: (error) => setPaste({ ...current, error: pasteErrorText(error, t) }),
+    })
   }
 
   return (
