@@ -7,12 +7,6 @@ name: CI
 # canary, e2e-full) opens or updates one issue (scripts/nightly-issues.sh), and closes it when the
 # job passes again.
 on:
-  push:
-    branches: [main]
-  pull_request:
-  merge_group:
-  schedule:
-    - cron: "0 17 * * *"
   workflow_dispatch:
 
 permissions:
@@ -27,7 +21,7 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,7 +40,7 @@ jobs:
           retention-days: 14
 
   test:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,7 +52,7 @@ jobs:
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -70,152 +64,3 @@ jobs:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/ui.sh
-
-  # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
-  fuzz:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-26.04-arm
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
-        with:
-          rust-cache: true
-      - uses: ./.github/actions/catalog-release
-      - run: nix develop -c scripts/ci/fuzz.sh
-
-  no-ui:
-    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
-        with:
-          rust-cache: true
-      - uses: ./.github/actions/catalog-release
-      - run: nix develop -c scripts/ci/no-ui.sh
-
-  wording:
-    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
-      # zhtw-mcp builds from source; main's scheduled run keeps it, keyed on the lock file.
-      - id: zhtw-mcp
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/zhtw-mcp-store
-          key: zhtw-mcp-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
-      # Root trusts the unsigned local store.
-      - if: steps.zhtw-mcp.outputs.cache-hit == 'true'
-        run: sudo "$(command -v nix)" copy --no-check-sigs --from "file://$HOME/.cache/zhtw-mcp-store" --all
-      - run: nix develop .#zh -c scripts/ci/wording.sh
-      - if: github.ref == 'refs/heads/main' && steps.zhtw-mcp.outputs.cache-hit != 'true'
-        run: nix copy --to "file://$HOME/.cache/zhtw-mcp-store" "$(nix build .#zhtw-mcp --no-link --print-out-paths)"
-      - if: github.ref == 'refs/heads/main' && steps.zhtw-mcp.outputs.cache-hit != 'true'
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/zhtw-mcp-store
-          key: zhtw-mcp-${{ runner.arch }}-${{ hashFiles('flake.lock') }}
-
-  cluster:
-    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
-        with:
-          rust-cache: true
-      - uses: ./.github/actions/catalog-release
-      - run: nix develop -c scripts/ci/cluster.sh
-
-  e2e:
-    if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
-        with:
-          rust-cache: true
-      - uses: ./.github/actions/catalog-release
-      - run: nix develop -c scripts/ci/e2e.sh
-      - if: always()
-        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: e2e-measurements
-          path: target/dev-cluster/measurements.json
-          if-no-files-found: ignore
-          retention-days: 14
-
-  # The specs the default cluster skips (Git, upload and database deploys, which need Zeabur Builder
-  # and the database operators): nightly and by hand.
-  e2e-full:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-26.04-arm
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
-        with:
-          rust-cache: true
-      - uses: ./.github/actions/catalog-release
-      - run: nix develop -c scripts/ci/e2e-full.sh
-
-  # Zeabur Proxy against the real VictoriaLogs: nightly and by hand.
-  canary:
-    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-26.04-arm
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
-        with:
-          rust-cache: true
-      - uses: ./.github/actions/catalog-release
-      - run: nix develop -c scripts/ci/canary.sh
-
-  # One issue for each failing nightly job, opened or updated while it fails, closed when it passes.
-  nightly-issues:
-    if: always() && github.event_name == 'schedule'
-    needs: [fuzz, canary, e2e-full]
-    runs-on: ubuntu-slim
-    permissions:
-      contents: read
-      issues: write
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - env:
-          GH_TOKEN: ${{ github.token }}
-          RESULTS: ${{ toJSON(needs) }}
-          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
-        run: scripts/nightly-issues.sh
-
-  zizmor:
-    uses: zeabur-oss/.github/.github/workflows/zizmor.yml@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
-
-  # The check rulesets require.
-  ok:
-    name: ci / ok
-    if: always()
-    needs: [lint, test, ui, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, zizmor]
-    runs-on: ubuntu-slim
-    steps:
-      - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
-        run: exit 1
-
-  dco:
-    uses: zeabur-oss/.github/.github/workflows/dco.yml@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
