@@ -57,7 +57,9 @@ function SourceItem({ source, active, onSelect, onRemove }: ItemProps) {
         onClick={onSelect}
         title={source.path}
       >
-        <span className="flex h-control-xs items-center text-tertiary">{sourceIcons[source.kind]()}</span>
+        <span className="flex h-control-xs items-center text-tertiary">
+          {sourceIcons[source.kind]()}
+        </span>
         <span className="min-w-0 flex-1">
           <span className="flex h-control-xs items-center gap-2">
             <span className="min-w-0 flex-1 truncate type-body text-main" translate="no">
