@@ -1354,6 +1354,8 @@ export type TemplateChange = {
   domain?: string | null
   /** The values of the inputs that are not generated, by name. */
   inputs?: TemplateChangeInputs
+  /** The template's `revision` in the list the form was built from. */
+  revision: string
   /** The template's id (`miniflux`). */
   template: string
 }
@@ -9734,6 +9736,8 @@ export type TemplateView = {
   requests: Requests
   /** The components it needs, and whether each one is there. */
   requires: Requirement[]
+  /** The template's revision, which a `template` change made from this view names. */
+  revision: string
   /**
    * What to know before deploying it, with how to contain each. In English, with the other
    * languages in `locales`.

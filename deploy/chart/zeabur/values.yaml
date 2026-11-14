@@ -242,6 +242,14 @@ telemetry:
 updateCheck:
   enabled: true
 
+# Template updates (docs/reference/telemetry.mdx): every 6 hours at most, Zeabur fetches Zeabur
+# Catalog's newest templates and offers them in place of the ones it was built with. It trusts the
+# address it fetches from. DO_NOT_TRACK does not turn it off. url: a copy of
+# https://oss-catalog.zeabur.com/v1/, such as a mirror; empty for that address.
+templateFetch:
+  enabled: true
+  url: ""
+
 podAnnotations: {}
 podLabels: {}
 nodeSelector: {}

@@ -157,6 +157,12 @@ spec:
             {{- end }}
             - name: ZEABUR_UPDATE_CHECK
               value: {{ .Values.updateCheck.enabled | quote }}
+            - name: ZEABUR_TEMPLATE_FETCH
+              value: {{ .Values.templateFetch.enabled | quote }}
+            {{- with .Values.templateFetch.url }}
+            - name: ZEABUR_TEMPLATE_FETCH_URL
+              value: {{ . | quote }}
+            {{- end }}
             - name: ZEABUR_DEPLOYMENT
               value: {{ include "zeabur.fullname" . | quote }}
             {{- if .Values.proxy.enabled }}

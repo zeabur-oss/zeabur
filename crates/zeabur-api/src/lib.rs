@@ -418,6 +418,9 @@ pub struct Options {
     /// Reads images' configurations; `None` connects to registries at `reach`, trusting
     /// `settings.trusted_ca`.
     pub images: Option<Arc<images::Inspector>>,
+    /// The templates offered; `None` offers the ones this build carries and fetches newer ones
+    /// from `settings.template_fetch`.
+    pub templates: Option<zeabur_catalog::Catalog>,
     /// What a template uses when idle.
     pub template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
     /// Which addresses registries, buckets and GitHub may be reached at.
@@ -440,6 +443,7 @@ impl Default for Options {
             sign_in: Arc::new(account::Fixed(None)),
             zeabur_proxy: None,
             images: None,
+            templates: None,
             template_idle: zeabur_catalog::template_idle,
             reach: zeabur_http::Reach::Any,
             terminals: None,
@@ -472,6 +476,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         sign_in,
         zeabur_proxy,
         images,
+        templates,
         template_idle,
         reach,
         terminals,
@@ -484,9 +489,20 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         .as_ref()
         .ok()
         .map(|tls| zeabur_http::Https::new(reach, tls));
+    let templates = match (templates, &settings.template_fetch, &tls) {
+        (Some(catalog), ..) => cluster::template_fetch::Templates::fixed(catalog),
+        (None, Some(url), Ok(tls)) => cluster::template_fetch::Templates::fetching(
+            url.clone(),
+            zeabur_http::Https::new(reach, tls),
+        ),
+        (None, ..) => {
+            cluster::template_fetch::Templates::fixed(zeabur_catalog::Catalog::embedded())
+        }
+    };
     let state = AppState {
         access,
         catalogue,
+        templates: Arc::new(templates),
         template_idle,
         plan_key,
         clock,

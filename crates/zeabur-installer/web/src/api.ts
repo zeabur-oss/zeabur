@@ -81,6 +81,10 @@ export interface Config {
   telemetry?: boolean
   /** The Zeabur panel's update check; on unless `false`. */
   updateCheck?: boolean
+  /** Fetching Zeabur Catalog's newest templates; on unless `false`. */
+  templateFetch?: boolean
+  /** Where templates are fetched from instead of Zeabur Catalog's address. */
+  templateFetchUrl?: string
   distribution: Distribution
   k3sVersion?: string | null
   rke2Version?: string | null

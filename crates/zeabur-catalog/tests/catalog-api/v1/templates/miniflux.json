@@ -1,0 +1,184 @@
+{
+  "id": "miniflux",
+  "sourceDigest": "h1:q3v6Nm7KFobn+blakE/PBfDyhV7zdcDOH6f3yLjL27Q=",
+  "template": {
+    "apiVersion": "catalog.zeabur.com/v1",
+    "inputs": [
+      {
+        "description": "Password of the admin user, created at the first start. Change it in Miniflux after you sign in; the Secret is not applied again.",
+        "generate": {
+          "bytes": 32,
+          "encoding": "base64url",
+          "type": "random"
+        },
+        "name": "adminPassword",
+        "secret": {
+          "key": "admin-password",
+          "name": "miniflux-secrets"
+        },
+        "validation": {
+          "pattern": "^[A-Za-z0-9_-]{43}$"
+        }
+      }
+    ],
+    "kind": "Template",
+    "metadata": {
+      "homepage": "https://miniflux.app/",
+      "license": "Apache-2.0 AND PostgreSQL",
+      "locales": {
+        "zh-CN": {
+          "summary": "RSS 阅读器，搭配 PostgreSQL。"
+        },
+        "zh-TW": {
+          "summary": "RSS 閱讀器，搭配 PostgreSQL。"
+        }
+      },
+      "name": "Miniflux",
+      "summary": "A feed reader, with PostgreSQL.",
+      "version": "2.3.5"
+    },
+    "requires": [
+      {
+        "component": "traefik"
+      },
+      {
+        "component": "cert-manager"
+      },
+      {
+        "component": "cloudnative-pg"
+      }
+    ],
+    "security": {
+      "locales": {
+        "zh-CN": {
+          "summary": "以 UID 65534 运行，文件系统只读，没有 Kubernetes 令牌，也去掉了所有额外的系统权限。对外连接没有限制。安装完只有 admin 一个用户。"
+        },
+        "zh-TW": {
+          "summary": "以 UID 65534 執行，檔案系統唯讀，沒有 Kubernetes 權杖，也拿掉了所有額外的系統權限。對外連線沒有限制。安裝完只有 admin 一個使用者。"
+        }
+      },
+      "risks": [
+        {
+          "locales": {
+            "zh-CN": {
+              "mitigation": "Miniflux 默认会拒绝私有网络地址。模板没有限制对外连接，需要限制时，请加一条 egress NetworkPolicy（限制对外连接的规则）。",
+              "risk": "服务器会去抓取用户指定地址的订阅源。"
+            },
+            "zh-TW": {
+              "mitigation": "Miniflux 預設會拒絕私有網路位址。範本沒有限制對外連線，需要限制時，請加一條 egress NetworkPolicy（限制對外連線的規則）。",
+              "risk": "伺服器會去抓使用者指定位址的訂閱源。"
+            }
+          },
+          "mitigation": "Miniflux refuses private network addresses by default. The template does not limit outbound traffic. To limit it, add an egress NetworkPolicy (a rule that limits outbound traffic).",
+          "risk": "The server fetches feeds from addresses that users choose."
+        },
+        {
+          "locales": {
+            "zh-CN": {
+              "mitigation": "cloudnative-pg 组件会为每个数据库集群各建一组权限。Miniflux 的 Pod 没有令牌。",
+              "risk": "数据库 Pod（CloudNativePG）会用数据库 operator 创建的身份去调用 Kubernetes API。"
+            },
+            "zh-TW": {
+              "mitigation": "cloudnative-pg 元件會為每個資料庫叢集各建一組權限。Miniflux 的 Pod 沒有權杖。",
+              "risk": "資料庫 Pod（CloudNativePG）會用資料庫 operator 建立的身分去呼叫 Kubernetes API。"
+            }
+          },
+          "mitigation": "The cloudnative-pg component creates separate permissions for each database cluster. The Miniflux Pod has no token.",
+          "risk": "The database pods (CloudNativePG) call the Kubernetes API with an identity that the database operator creates."
+        }
+      ],
+      "summary": "The container runs as UID 65534 with a read-only filesystem, no Kubernetes token and all extra system privileges removed. Outbound traffic is not limited. After installation, only the admin user exists."
+    },
+    "services": [
+      {
+        "domains": [
+          "{{ .Domain }}"
+        ],
+        "name": "miniflux",
+        "podSecurity": "restricted",
+        "ports": [
+          {
+            "name": "http",
+            "port": 8080
+          }
+        ],
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "512Mi"
+          },
+          "requests": {
+            "cpu": "50m",
+            "memory": "64Mi"
+          }
+        }
+      },
+      {
+        "name": "miniflux-db",
+        "podSecurity": "restricted",
+        "ports": [
+          {
+            "name": "postgresql",
+            "port": 5432
+          }
+        ],
+        "resources": {
+          "limits": {
+            "cpu": "1",
+            "memory": "1Gi"
+          },
+          "requests": {
+            "cpu": "100m",
+            "memory": "256Mi"
+          }
+        }
+      }
+    ],
+    "smoke": [
+      {
+        "condition": "condition=Ready",
+        "name": "postgresql-ready",
+        "resource": "cluster/miniflux-db",
+        "timeout": "900s"
+      },
+      {
+        "condition": "condition=Available",
+        "http": {
+          "contains": "OK",
+          "path": "/healthcheck",
+          "port": 8080,
+          "service": "miniflux",
+          "status": 200
+        },
+        "name": "miniflux-ready",
+        "resource": "deployment/miniflux",
+        "timeout": "600s"
+      },
+      {
+        "condition": "condition=Available",
+        "http": {
+          "path": "/v1/me",
+          "port": 8080,
+          "service": "miniflux",
+          "status": 401
+        },
+        "name": "authentication-required",
+        "resource": "deployment/miniflux",
+        "timeout": "120s"
+      },
+      {
+        "condition": "condition=Ready",
+        "name": "administrator-created",
+        "resource": "cluster/miniflux-db",
+        "sql": {
+          "cluster": "miniflux-db",
+          "database": "miniflux",
+          "expect": "1",
+          "query": "SELECT count(*) FROM users WHERE is_admin"
+        },
+        "timeout": "120s"
+      }
+    ]
+  },
+  "manifests": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: miniflux\n  namespace: '{{ .Namespace }}'\nspec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app.kubernetes.io/name: miniflux\n  template:\n    metadata:\n      labels:\n        templates.zeabur.com/template: miniflux\n        app.kubernetes.io/name: miniflux\n    spec:\n      automountServiceAccountToken: false\n      securityContext:\n        runAsNonRoot: true\n        runAsUser: 65534\n        runAsGroup: 65534\n        seccompProfile:\n          type: RuntimeDefault\n      containers:\n      - name: miniflux\n        image: miniflux/miniflux:2.3.5@sha256:8fd6c3c434ecc3d4083306f83e03c0bb74c632e0f8378da5ead7e1773b0b89c9\n        ports:\n        - name: http\n          containerPort: 8080\n        securityContext:\n          runAsNonRoot: true\n          allowPrivilegeEscalation: false\n          readOnlyRootFilesystem: true\n          capabilities:\n            drop: [ALL]\n        resources:\n          requests:\n            cpu: 50m\n            memory: 64Mi\n          limits:\n            cpu: '1'\n            memory: 512Mi\n        env:\n        - name: DATABASE_PASSWORD\n          valueFrom:\n            secretKeyRef:\n              name: miniflux-db-app\n              key: password\n        - name: DATABASE_URL\n          value: postgres://miniflux:$(DATABASE_PASSWORD)@miniflux-db-rw:5432/miniflux?sslmode=verify-full\u0026sslrootcert=/db-ca/ca.crt\n        - name: RUN_MIGRATIONS\n          value: '1'\n        - name: CREATE_ADMIN\n          value: '1'\n        - name: ADMIN_USERNAME\n          value: admin\n        - name: ADMIN_PASSWORD\n          valueFrom:\n            secretKeyRef:\n              name: miniflux-secrets\n              key: admin-password\n        - name: LISTEN_ADDR\n          value: 0.0.0.0:8080\n        - name: BASE_URL\n          value: https://{{ .Domain }}/\n        volumeMounts:\n        - name: db-ca\n          mountPath: /db-ca\n          readOnly: true\n        - name: tmp\n          mountPath: /tmp\n        startupProbe:\n          httpGet:\n            path: /healthcheck\n            port: http\n          periodSeconds: 5\n          failureThreshold: 60\n        readinessProbe:\n          httpGet:\n            path: /healthcheck\n            port: http\n          periodSeconds: 10\n        livenessProbe:\n          httpGet:\n            path: /healthcheck\n            port: http\n          periodSeconds: 20\n          failureThreshold: 6\n      volumes:\n      - name: db-ca\n        secret:\n          secretName: miniflux-db-ca\n          items:\n          - {key: ca.crt, path: ca.crt}\n      - name: tmp\n        emptyDir:\n          sizeLimit: 64Mi\n      terminationGracePeriodSeconds: 30\n---\napiVersion: v1\nkind: Service\nmetadata:\n  name: miniflux\n  namespace: '{{ .Namespace }}'\nspec:\n  selector:\n    app.kubernetes.io/name: miniflux\n  ports:\n  - name: http\n    port: 8080\n    targetPort: http\n---\napiVersion: networking.k8s.io/v1\nkind: Ingress\nmetadata:\n  name: miniflux\n  namespace: '{{ .Namespace }}'\n  annotations:\n    cert-manager.io/cluster-issuer: '{{ .ClusterIssuer }}'\nspec:\n  ingressClassName: traefik\n  tls:\n  - hosts: ['{{ .Domain }}']\n    secretName: miniflux-tls\n  rules:\n  - host: '{{ .Domain }}'\n    http:\n      paths:\n      - path: /\n        pathType: Prefix\n        backend:\n          service:\n            name: miniflux\n            port:\n              number: 8080\n---\napiVersion: postgresql.cnpg.io/v1\nkind: Cluster\nmetadata:\n  name: miniflux-db\n  namespace: '{{ .Namespace }}'\nspec:\n  inheritedMetadata:\n    labels:\n      templates.zeabur.com/template: miniflux\n  instances: 1\n  imageName: ghcr.io/cloudnative-pg/postgresql:18-minimal-trixie@sha256:0675340b02be838319b9b6f323c206693e519dcd62ec729d539be9f46bb7a2f9\n  enableSuperuserAccess: false\n  enablePDB: true\n  postgresUID: 26\n  postgresGID: 26\n  seccompProfile:\n    type: RuntimeDefault\n  bootstrap:\n    initdb:\n      database: miniflux\n      owner: miniflux\n      encoding: UTF8\n  storage:\n    size: 5Gi\n  resources:\n    requests:\n      cpu: 100m\n      memory: 256Mi\n    limits:\n      cpu: '1'\n      memory: 1Gi\n  postgresql:\n    parameters:\n      shared_buffers: 128MB\n      max_connections: '100'\n"
+}

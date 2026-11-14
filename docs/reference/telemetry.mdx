@@ -1,6 +1,6 @@
 ---
 title: Experience program
-description: What Zeabur and its installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, and how to turn each off.
+description: What Zeabur and its installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, how Zeabur fetches newer templates, and how to turn each off.
 ---
 
 The experience program sends the version, how many people use Zeabur each day and which features they use, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on.
@@ -94,3 +94,23 @@ Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. 
 - With Helm, set `updateCheck.enabled=false`. The cluster page then only shows the version.
 - Set `DO_NOT_TRACK=1` in Zeabur's environment, or in yours for `zeaburctl`. It turns off the experience program too.
 - Set `NO_UPDATE_NOTIFIER` to any value in your environment for `zeaburctl`, including `zeaburctl ui`. It turns off only the update check.
+
+## Template updates
+
+Zeabur offers newer templates without an upgrade. It reads Zeabur Catalog's API and offers the templates there in place of the ones it was built with. Components, and how Zeabur finds them in your cluster, stay as they were built. Services you already deployed from a template don't change. This is separate from the experience program and the update check, and on by default.
+
+**What is fetched.** From `https://oss-catalog.zeabur.com/v1/`: `catalog.json`, which lists each template with a digest of its files, and `templates/<id>.json` for each template whose digest isn't the one Zeabur offers now.
+
+**What Zeabur trusts.** The address it fetches from: `https://oss-catalog.zeabur.com/v1/`, whose HTTPS certificate it checks, or the mirror you set. The files carry no signature, so whoever controls that address decides which templates Zeabur offers. Zeabur then checks each template on its own: it must read, and the components it needs must be ones this Zeabur knows. A template that fails isn't offered; the one offered before stays, if there is one. When a fetch fails, nothing changes.
+
+**When it runs.** When someone opens the template list, at most once every 6 hours, or 10 minutes after a failure. The Zeabur server fetches; browsers don't. The templates are kept in memory only: after a restart, Zeabur offers the ones it was built with until the next fetch. `zeaburctl ui` doesn't fetch. If a template changes after you open its form, or after you plan it, Zeabur refuses the change; open the form again.
+
+**What is sent.** Plain requests with no ID or cookie. The Zeabur server sends `zeabur` as its user agent. GitHub Pages, which serves `oss-catalog.zeabur.com`, sees the IP address they come from. Nothing about your cluster or its people is sent, so `DO_NOT_TRACK` doesn't turn this off.
+
+**Use a mirror.** For a cluster without internet access, unpack a Zeabur Catalog release's `api-v1.tar.gz` unchanged on a web server the cluster can reach, and give the address of its `v1/`: `templateFetchUrl` in the installer's config, `templateFetch.url` with Helm or `ZEABUR_TEMPLATE_FETCH_URL` in Zeabur's environment. Zeabur trusts the mirror as it trusts `oss-catalog.zeabur.com`. To trust a release rather than a server, verify its signature before you copy it, as Zeabur Catalog's [Releases and the API](https://github.com/zeabur-oss/catalog/blob/main/docs/reference/releases.mdx#verify-and-read-a-release) describes.
+
+**Turn it off.** Any one of these is enough. Once it's off, Zeabur offers only the templates it was built with and makes no request for them.
+
+- In the installer, set `templateFetch: false` in `/etc/zeabur-installer/config.yaml`.
+- With Helm, set `templateFetch.enabled=false`.
+- Set `ZEABUR_TEMPLATE_FETCH=false` in Zeabur's environment.
