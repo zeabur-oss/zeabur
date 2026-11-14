@@ -43,6 +43,11 @@ on:
 permissions:
   contents: read
 
+# bash with pipefail on every runner, so a failed command before `| tee` fails its step.
+defaults:
+  run:
+    shell: bash
+
 jobs:
   prepare:
     runs-on: ubuntu-26.04-arm
@@ -93,9 +98,6 @@ jobs:
     environment: >-
       ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
           matrix.signing || '' }}
-    defaults:
-      run:
-        shell: bash
     env:
       VERSION: ${{ needs.prepare.outputs.version }}
       OS: ${{ matrix.os }}

@@ -65,7 +65,9 @@ export function useUpdates(): { button: ReactElement; dialog: ReactElement } {
   useEffect(() => {
     void api.found().then((found) => found && setAvailable(found))
     const offFound = listen<Available>("update-available", (event) => setAvailable(event.payload))
-    const checkIfAsked = () => api.takeCheckRequest().then((asked) => asked && check())
+    const checkIfAsked = async () => {
+      if (await api.takeCheckRequest()) await check()
+    }
     void checkIfAsked()
     const offMenu = listen("check-updates", () => void checkIfAsked())
     return () => {
