@@ -16,6 +16,7 @@ zeaburctl ui --context production --no-browser
 zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
 zeaburctl connect shop/orders
+zeaburctl connect shop/api:8080
 zeaburctl components export certificates/cert-manager
 ```
 
@@ -26,7 +27,7 @@ zeaburctl components export certificates/cert-manager
 | `ui` | 在本机浏览器中打开 Zeabur | 不在集群中安装组件，在界面中应用的变更直接写入集群 |
 | `doctor` | 检查集群版本、组件和 Zeabur Identity 配置 | 仅读取，不修改配置 |
 | `up` | 将文件夹上传到通过文件夹创建的服务，并开始构建 | 修改该服务的 Build，将文件夹推送到 registry |
-| `connect` | 把本机端口转发到数据库，并打印连接字符串 | 不修改集群中的任何内容 |
+| `connect` | 把本机端口转发到数据库或服务，并打印连接方式 | 不修改集群中的任何内容 |
 | `components export` | 输出安装 Catalog 组件的 manifest 或 Helm 命令 | 不连接集群，不做任何修改 |
 
 ## `ui`
@@ -155,12 +156,14 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 ## `connect`
 
 ```sh
-zeaburctl connect <project>/<database> [--port <port>] [--context <name>]
+zeaburctl connect <project>/<name>[:<port>] [--port <port>] [--context <name>]
 ```
 
-通过 kube-apiserver 把 `127.0.0.1` 上的一个端口转发到数据库，类似 `kubectl port-forward`，并打印对应的连接字符串。所有引擎都能用。命令会一直运行，按 Ctrl-C 才停止。
+通过 kube-apiserver 把 `127.0.0.1` 上的一个端口转发到数据库或服务，类似 `kubectl port-forward`。命令会一直运行，按 Ctrl-C 才停止。
 
-你需要能 `list` 数据库的资源，并在项目中有 `create pods/portforward` 权限，开发者都有。读不到数据库的 Secret 时，连接字符串会用 `PASSWORD` 代替密码。MongoDB 的连接字符串会直接连接单个实例，因为其他实例的地址只在集群内有效。实例不止一个时，连到的不一定是主实例，这时数据库会拒绝写入；命令打印连接字符串前会先提醒。
+命令先在项目的数据库中查找 `<name>`。找到数据库时，打印连接字符串，所有引擎都能用。找不到时，就把 `<name>` 当作服务，打印本机地址，例如 `127.0.0.1:52341`。服务通过它的 Kubernetes Service 的端口连接；端口不止一个时，在名称后加上要连的端口，例如 `shop/api:8080`。不加的话，命令会列出所有端口后停止。
+
+你需要在项目中有 `create pods/portforward` 权限，连接数据库时还需要能 `list` 数据库的资源，开发者都有。读不到数据库的 Secret 时，连接字符串会用 `PASSWORD` 代替密码。MongoDB 的连接字符串会直接连接单个实例，因为其他实例的地址只在集群内有效。实例不止一个时，连到的不一定是主实例，这时数据库会拒绝写入；命令打印连接字符串前会先提醒。
 
 | 选项 | 默认值与用途 |
 |---|---|
