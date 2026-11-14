@@ -80,6 +80,8 @@ impl std::fmt::Debug for Updates {
 }
 
 impl Updates {
+    /// Only the macOS menu asks for a check.
+    #[cfg(any(target_os = "macos", test))]
     fn request(&self) {
         self.requested.store(true, Ordering::SeqCst);
     }
