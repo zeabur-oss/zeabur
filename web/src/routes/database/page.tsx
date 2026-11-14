@@ -17,6 +17,7 @@ import type { Schemas } from "@/api/client"
 import {
   capabilitiesQuery,
   databasesQuery,
+  objectQuery,
   objectsQuery,
   projectQuery,
   queryClient,
@@ -59,8 +60,17 @@ import {
   deleteDatabase,
   backupsSummary,
   backUpNowSummary,
-  enableBackups,
   backsUp,
+  backupsNotes,
+  currentTarget,
+  ownBackups,
+  regionInSecret,
+  turnOffBackups,
+  turnOffSummary,
+  writeBackups,
+  backupKeys,
+  MAX_KEEP_DAYS,
+  daysOf,
   engineName,
   engineOperator,
   eventsOf,
@@ -84,6 +94,7 @@ import {
 import { needed } from "@/model/installer"
 import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
+import { FormButtons } from "@/routes/cluster/section"
 import { Outside } from "@/routes/database/outside"
 import { Restore, Restored } from "@/routes/database/restore"
 import { DatabaseSettings } from "@/routes/database/settings"
@@ -411,6 +422,12 @@ function LastBackup({ database }: { database: Database }) {
   )
 }
 
+function storageOf(database: Database, amount: (raw: string, dimension: "bytes") => string) {
+  if (!database.storage) return "—"
+  const each = amount(database.storage, "bytes")
+  return database.members > 1 ? `${database.members} × ${each}` : each
+}
+
 /** The newest warnings, as a service's overview shows them, and the way to all events. */
 function Overview({
   project,
@@ -451,22 +468,14 @@ function Overview({
               </span>
             </SummaryCardFact>
             <SummaryCardFact label={t("db.fact.storage")}>
-              <span translate="no">
-                {database.storage
-                  ? database.members > 1
-                    ? `${database.members} × ${amount(database.storage, "bytes")}`
-                    : amount(database.storage, "bytes")
-                  : "—"}
-              </span>
+              <span translate="no">{storageOf(database, amount)}</span>
             </SummaryCardFact>
             <SummaryCardFact label={t("db.fact.size")}>
               {preset ? t(`db.size.${preset}`) : t("db.fact.custom")}
             </SummaryCardFact>
-            {backsUp(database.engine) ? (
-              <SummaryCardFact label={t("db.backup.last")}>
-                <LastBackup database={database} />
-              </SummaryCardFact>
-            ) : null}
+            <SummaryCardFact label={t("db.backup.last")}>
+              <LastBackup database={database} />
+            </SummaryCardFact>
           </SummaryCardFacts>
         </SummaryCardMain>
         {database.message && database.state !== "ready" ? (
@@ -654,14 +663,7 @@ function Backups({
       {on && store ? (
         <Target project={project} database={database} />
       ) : pluginMissing ? null : (
-        <>
-          {store ? (
-            <p className="type-meta text-muted-foreground">
-              {t("db.backup.storeIdle", store.name)}
-            </p>
-          ) : null}
-          <SetUp project={project} database={database} />
-        </>
+        <SetUp project={project} database={database} />
       )}
       <Runs database={database} />
       <Section id="db-restore" title={t("db.restore.action")}>
@@ -681,22 +683,64 @@ function useRetention(database: Database) {
   return days === undefined ? retention : t("db.backup.retentionDays", days)
 }
 
-/** Whole days in a duration such as "7d" or "168h". */
-function daysOf(duration: string) {
-  const days = duration.match(/^(\d+)d$/)?.[1]
-  if (days) return Number(days)
-  const hours = Number(duration.match(/^(\d+)h$/)?.[1] ?? Number.NaN)
-  return hours % 24 === 0 ? hours / 24 : undefined
-}
-
 function Target({ project, database }: { project: string; database: Database }) {
   const t = useT()
-  const retention = useRetention(database)
+  const [editing, setEditing] = useState(false)
+  const planner = usePlanner(project)
+  const gate = useGate(project, "changeDatabases")
   const store = database.backups.store
   if (!store) return null
+  const turnOff = () =>
+    planner.plan({
+      title: t("db.backup.planOff", database.name),
+      changes: turnOffBackups(database),
+      summary: turnOffSummary(t, database),
+    })
+  return (
+    <Section
+      id="db-target"
+      title={t("db.backup.destination")}
+      action={
+        ownBackups(database) && !editing ? (
+          <div className="flex gap-2">
+            <GateTip gate={gate}>
+              <Button size="xs" variant="ghost" onClick={turnOff}>
+                {t("db.backup.turnOff")}
+              </Button>
+            </GateTip>
+            <GateTip gate={gate}>
+              <Button size="xs" variant="outline" onClick={() => setEditing(true)}>
+                {t("db.backup.edit")}
+              </Button>
+            </GateTip>
+          </div>
+        ) : null
+      }
+    >
+      {editing ? (
+        <BackupForm project={project} database={database} onCancel={() => setEditing(false)} />
+      ) : (
+        <TargetRows project={project} database={database} store={store} />
+      )}
+      {planner.dialog}
+    </Section>
+  )
+}
+
+function TargetRows({
+  project,
+  database,
+  store,
+}: {
+  project: string
+  database: Database
+  store: NonNullable<Database["backups"]["store"]>
+}) {
+  const t = useT()
+  const retention = useRetention(database)
   const note = database.engine === "postgresql" ? "db.backup.walNote" : undefined
   return (
-    <Section id="db-target" title={t("db.backup.destination")}>
+    <>
       <CardRows>
         <CardRow label={t("db.backup.destination")}>
           <span className="min-w-0 truncate type-mono" translate="no">
@@ -730,7 +774,7 @@ function Target({ project, database }: { project: string; database: Database }) 
         <KeysFrom project={project} secret={store.secret ?? backupNames(database.name).secret} />
       </CardRows>
       {note ? <p className="type-meta text-muted-foreground">{t(note)}</p> : null}
-    </Section>
+    </>
   )
 }
 
@@ -781,29 +825,70 @@ function Runs({ database }: { database: Database }) {
 
 function SetUp({ project, database }: { project: string; database: Database }) {
   const t = useT()
-  const [target, setTarget] = useState<BackupTarget>(newBackupTarget)
+  const store = database.backups.store
+  return (
+    <Section id="db-setup" title={t("db.backup.setUp")}>
+      <div className="flex flex-col gap-1.5">
+        {store && ownBackups(database) ? (
+          <p className="text-sm text-muted-foreground">{t("db.backup.offBody")}</p>
+        ) : (
+          <>
+            {store ? (
+              <p className="type-meta text-muted-foreground">
+                {t("db.backup.storeIdle", store.name)}
+              </p>
+            ) : null}
+            <p className="text-sm text-muted-foreground">{t("db.backup.setUpBody")}</p>
+          </>
+        )}
+        <DocsLink page="cluster/s3-destinations">{t("db.backup.getBucket")}</DocsLink>
+      </div>
+      <BackupForm project={project} database={database} />
+    </Section>
+  )
+}
+
+/** Sets up backups, or changes them. A form for changes starts as the backups are, without
+ * the keys. */
+function BackupForm({
+  project,
+  database,
+  onCancel,
+}: {
+  project: string
+  database: Database
+  onCancel?: () => void
+}) {
+  const t = useT()
+  const [target, setTarget] = useState<BackupTarget>(() =>
+    ownBackups(database) ? currentTarget(database) : newBackupTarget(),
+  )
   const [tried, setTried] = useState(false)
-  const planner = usePlanner(project)
-  const setUpGate = useGate(project, "changeDatabases")
-  const problems = targetProblems(target)
+  const planner = usePlanner(project, onCancel)
+  const gate = useGate(project, "changeDatabases")
+  const secret = backupNames(database.name).secret
+  const saved = useQuery({
+    ...objectQuery(project, { group: "", version: "v1", resource: "secrets", name: secret }),
+    retry: false,
+  }).data
+  const secrets = useQuery(objectsQuery(project, { kinds: ["core/secrets"] })).data
+  const { keysExist, regionSaved } = backupKeys(database, saved?.yaml, secrets)
+  const problems = targetProblems(target, keysExist)
   const review = () => {
     setTried(true)
     if (problems.length > 0) return
     planner.plan({
-      title: t("db.backup.plan", database.name),
-      changes: enableBackups(database, target),
-      summary: backupsSummary(t, database, target),
+      title: t(backupsOn(database) ? "db.backup.planEdit" : "db.backup.plan", database.name),
+      changes: writeBackups(database, target, keysExist, regionSaved),
+      summary: backupsSummary(t, database, target, keysExist),
+      notes: backupsNotes(t, database, target),
     })
   }
   const set = (patch: Partial<BackupTarget>) => setTarget((v) => ({ ...v, ...patch }))
   const error = (problem: (typeof problems)[number]) =>
     tried && problems.includes(problem) ? [t(`db.backup.problem.${problem}`)] : []
   return (
-    <Section id="db-setup" title={t("db.backup.setUp")}>
-      <div className="flex flex-col gap-1.5">
-        <p className="text-sm text-muted-foreground">{t("db.backup.setUpBody")}</p>
-        <DocsLink page="cluster/s3-destinations">{t("db.backup.getBucket")}</DocsLink>
-      </div>
+    <>
       <form
         className="flex flex-col gap-4 rounded-xl border border-main bg-card p-5"
         onSubmit={(event) => {
@@ -817,6 +902,10 @@ function SetUp({ project, database }: { project: string; database: Database }) {
           errors={error}
           folder={fixedFolder(database.engine) ? undefined : database.name}
           folderHint={t("db.backup.pathHint")}
+          keysHint={keysExist ? t("db.backup.keepKeys", secret) : undefined}
+          regionHint={
+            regionSaved && regionInSecret(database.engine) ? t("db.backup.keepRegion") : undefined
+          }
         >
           <FrequencyField value={target.frequency} onChange={(frequency) => set({ frequency })} />
           {keepsEverything(database.engine) ? null : (
@@ -825,30 +914,33 @@ function SetUp({ project, database }: { project: string; database: Database }) {
                 size="sm"
                 type="number"
                 min={1}
-                max={365}
+                max={MAX_KEEP_DAYS}
                 value={String(target.keepDays)}
                 onChange={(event) => set({ keepDays: Number(event.target.value) })}
               />
             </FormField>
           )}
         </S3Fields>
-        {fixedFolder(database.engine) ? (
-          <p className="type-meta text-muted-foreground">
-            {t("db.backup.fixedFolder", `moco/${project}/${database.name}`)}
-          </p>
-        ) : null}
-        {keepsEverything(database.engine) ? (
-          <p className="type-meta text-muted-foreground">{t("db.backup.keepsEverything")}</p>
-        ) : null}
-        <div className="flex justify-end">
-          <GateTip gate={setUpGate}>
-            <Button size="sm" type="submit">
-              {t("edit.review")}
-            </Button>
-          </GateTip>
-        </div>
+        <FormNotes project={project} database={database} />
+        <FormButtons gate={gate} onCancel={onCancel} />
       </form>
       {planner.dialog}
-    </Section>
+    </>
+  )
+}
+
+function FormNotes({ project, database }: { project: string; database: Database }) {
+  const t = useT()
+  return (
+    <>
+      {fixedFolder(database.engine) ? (
+        <p className="type-meta text-muted-foreground">
+          {t("db.backup.fixedFolder", `moco/${project}/${database.name}`)}
+        </p>
+      ) : null}
+      {keepsEverything(database.engine) ? (
+        <p className="type-meta text-muted-foreground">{t("db.backup.keepsEverything")}</p>
+      ) : null}
+    </>
   )
 }

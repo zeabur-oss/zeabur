@@ -146,6 +146,38 @@ describe("restoring into a new database", () => {
     })
   })
 
+  test("PostgreSQL with backups turned off reads the backups under the kept server name", () => {
+    const pg = base({
+      engine: "postgresql",
+      apiVersion: "postgresql.cnpg.io/v1",
+      kind: "Cluster",
+      backups: {
+        schedules: [],
+        runs: [],
+        ready: true,
+        store: { name: "shop-backups", inUse: false },
+      },
+      object: {
+        spec: {
+          plugins: [
+            {
+              name: "barman-cloud.cloudnative-pg.io",
+              enabled: false,
+              isWALArchiver: true,
+              parameters: { barmanObjectName: "shop-backups", serverName: "shop-2025" },
+            },
+          ],
+        },
+      } as unknown as Database["object"],
+    })
+    const [cluster] = bodies(restoreChanges(pg, point, "copy", "demo"))
+    expect(cluster?.spec.plugins).toBeUndefined()
+    expect(cluster?.spec.externalClusters[0].plugin.parameters).toEqual({
+      barmanObjectName: "shop-backups",
+      serverName: "shop-2025",
+    })
+  })
+
   test("PostgreSQL recovers to a point in time inside the window, given in UTC", () => {
     const window = { first: "2026-10-20T03:00:00Z", lagSeconds: 300 }
     const pg = base({
@@ -210,6 +242,22 @@ describe("restoring into a new database", () => {
         backupSource: { type: "logical", destination: "s3://b/shop/2026", s3 },
       },
     })
+  })
+
+  test("a MongoDB copy runs the backup agent when the original has backups off", () => {
+    const mongo = base({
+      engine: "mongodb",
+      apiVersion: "psmdb.percona.com/v1",
+      kind: "PerconaServerMongoDB",
+      backups: { schedules: [], runs: [], ready: true, store: { name: "backups", inUse: true } },
+      object: {
+        metadata: {},
+        spec: { backup: { enabled: false, storages: { backups: { s3: {} } }, tasks: [] } },
+      } as unknown as Database["object"],
+    })
+    const [cluster] = bodies(restoreChanges(mongo, point, "copy", "demo"))
+    expect(cluster?.spec.backup.enabled).toBe(true)
+    expect(cluster?.spec.backup.tasks).toEqual([])
   })
 
   test("a copy of a MongoDB 8 keeps rseq in glibc", () => {

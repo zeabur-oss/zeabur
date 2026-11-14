@@ -481,7 +481,8 @@ impl<'a> Planner<'a> {
                 resource,
                 name,
                 yaml,
-            } => self.edit(resource, name, yaml),
+                spec_only,
+            } => self.edit(resource, name, yaml, *spec_only),
             Change::Delete {
                 resource,
                 name,

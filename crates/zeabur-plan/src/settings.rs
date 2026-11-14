@@ -938,6 +938,7 @@ impl<'a> Planner<'a> {
         resource: &ResourceRef,
         name: &str,
         yaml: &str,
+        spec_only: bool,
     ) -> Result<(), PlanError> {
         let edited: Value = serde_saphyr::from_str(yaml).map_err(|e| {
             error(
@@ -995,6 +996,15 @@ impl<'a> Planner<'a> {
                 "unknown_object",
                 format!("There is no {} named {name}.", resource.resource),
             ));
+        };
+        let edited = if spec_only {
+            let mut whole = object.clone();
+            if let (Some(map), Some(spec)) = (whole.as_object_mut(), edited.get("spec")) {
+                merge_patch(map.entry("spec").or_insert(Value::Null), spec);
+            }
+            whole
+        } else {
+            edited
         };
         let kind = object
             .get("kind")
@@ -1057,6 +1067,28 @@ impl<'a> Planner<'a> {
             });
         }
         Ok(())
+    }
+}
+
+/// `patch` merged into `target` as a JSON merge patch (RFC 7386): objects merge field by field, a
+/// null removes the field, anything else replaces it.
+fn merge_patch(target: &mut Value, patch: &Value) {
+    let Value::Object(fields) = patch else {
+        target.clone_from(patch);
+        return;
+    };
+    if !target.is_object() {
+        *target = Value::Object(Map::new());
+    }
+    let Some(map) = target.as_object_mut() else {
+        return;
+    };
+    for (key, value) in fields {
+        if value.is_null() {
+            map.remove(key);
+        } else {
+            merge_patch(map.entry(key.clone()).or_insert(Value::Null), value);
+        }
     }
 }
 

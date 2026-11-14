@@ -102,6 +102,18 @@ When you use a shared destination, applying the changes copies its keys to the p
 
 After setting up backups for PostgreSQL, MongoDB, or MariaDB, select **Back up now** at the top of the page. The review shows the backup destination. Select **Back up now** again, then wait for it to succeed in **Backups**. Until the first successful record appears, there's no backup you can restore.
 
+## Change or turn off backups
+
+Once backups are on, the **Destination** section of **Backups** has **Edit** and **Turn off backups**.
+
+1. Select **Edit**. The form shows the current endpoint, bucket, folder, schedule and retention. It never shows the access keys.
+2. Change what you need. To keep the keys, leave **Access key ID** and **Secret access key** empty. To replace them, type both, or choose a shared S3 destination to copy its keys. For PostgreSQL and MySQL, the region is saved with the keys, so leave **Region** empty to keep it.
+3. Select **Review changes**, check the sentences, then select **Change backups**.
+
+Moving to another bucket, folder or endpoint leaves earlier backups where they are, and restoring from them needs the old settings. For PostgreSQL, restoring to a point in time from the new destination works after the next scheduled backup.
+
+**Turn off backups** stops the schedule and the database stops sending backups to the bucket. The keys secret `<name>-backups-s3` stays, and so do the backups already in the bucket. PostgreSQL and MariaDB keep their schedule paused, so **Restore to a new database** still lists their backups. MySQL keeps its BackupPolicy, and MOCO removes the backup CronJob. To turn backups on again, fill in the form under **Set up backups**. It starts from the earlier settings and keeps the saved keys when you leave them empty.
+
 ## Restore to a new database and switch services
 
 <Steps>

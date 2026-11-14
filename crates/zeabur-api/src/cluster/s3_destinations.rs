@@ -32,6 +32,8 @@
 use std::collections::BTreeMap;
 
 use axum::extract::State;
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -43,7 +45,7 @@ use zeabur_kube::{
 };
 use zeabur_model::Origin;
 use zeabur_modules::velero::cluster as v;
-use zeabur_plan::{Change, CopyS3KeysChange, PlanRequest};
+use zeabur_plan::{Change, CopyS3KeysChange, DataEdit, DataKind, PlanRequest};
 
 use crate::error::{ApiError, get_read, list_read, read_problem};
 use crate::extract::Json;
@@ -404,23 +406,30 @@ pub(crate) fn mark_ops(existing: &Value, destination: Option<&str>, keys: &str) 
     ops
 }
 
-/// `request` with each `copyS3Keys` change opened into the `create` of its Secret, with the
-/// destination's keys read as the person; the request as it is when it has none.
+/// `request` with each `copyS3Keys` change opened into the write of its Secret in `namespace`,
+/// with the destination's keys read as the person; the request as it is when it has none.
 ///
 /// # Errors
 ///
-/// What [`keys`] refuses, and `422` for an object that is not a Secret.
+/// What [`keys`] refuses, `422` for an object that is not a Secret, and the problem of reading
+/// the Secret.
 pub(crate) async fn open(
     cluster: &dyn Cluster,
+    namespace: &str,
     request: PlanRequest,
 ) -> Result<PlanRequest, ApiError> {
     let mut changes = Vec::with_capacity(request.changes.len());
     for change in request.changes {
         changes.push(match change {
-            Change::CopyS3Keys(copy) => Change::Create {
-                object: copied(cluster, copy).await?,
-                yaml: None,
+            Change::CopyS3Keys(copy) => match copy_into(cluster, namespace, copy).await? {
+                Some(change) => change,
+                None => continue,
             },
+            Change::Data {
+                kind: DataKind::Secret,
+                name,
+                changes: edits,
+            } => detach(cluster, namespace, name, edits).await?,
             other @ (Change::Env { .. }
             | Change::Data { .. }
             | Change::AddDomain { .. }
@@ -501,6 +510,178 @@ pub(crate) fn set(object: &mut Value, path: &[&str], value: String) {
     if let Some(map) = at.as_object_mut() {
         map.insert((*last).to_owned(), Value::String(value));
     }
+}
+
+/// The Secret `name` as read, with its keys' values in `data`; `None` when it does not exist.
+async fn read_with_data(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    name: &str,
+) -> Result<Option<Value>, ApiError> {
+    let denied = |e| {
+        read_problem(
+            e,
+            &format!("Secret {name} in {namespace}"),
+            get_read("", "secrets", Some(namespace), name),
+        )
+    };
+    let Some(existing) = cluster
+        .find_object(&resource("Secret"), Some(namespace), name)
+        .await
+        .map_err(denied)?
+    else {
+        return Ok(None);
+    };
+    let mut edited = serde_json::to_value(&existing).map_err(|e| {
+        ApiError::from(Problem::new(
+            Kind::Internal,
+            format!("Zeabur could not read Secret {name}: {e}"),
+        ))
+    })?;
+    let values = cluster
+        .reveal_secret(namespace, name)
+        .await
+        .map_err(denied)?;
+    let mut data = serde_json::Map::new();
+    data.extend(
+        values
+            .into_iter()
+            .map(|(key, bytes)| (key, Value::String(BASE64.encode(bytes)))),
+    );
+    if let Some(map) = edited.as_object_mut() {
+        map.insert("data".to_owned(), Value::Object(data));
+    }
+    Ok(Some(edited))
+}
+
+fn secret_edit(name: String, edited: &Value) -> Change {
+    Change::Edit {
+        resource: zeabur_plan::ResourceRef {
+            group: String::new(),
+            version: "v1".to_owned(),
+            resource: "secrets".to_owned(),
+        },
+        name,
+        yaml: edited.to_string(),
+        spec_only: false,
+    }
+}
+
+/// The `create` of the Secret, or, when it exists, an `edit` that sets the copied keys and the
+/// marks and keeps its other keys as read. The edit compares the Secret as read, values included,
+/// so only the copied keys and the marks are written. `None` when the Secret already is that
+/// copy, so the request has nothing to write for it.
+async fn copy_into(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    copy: CopyS3KeysChange,
+) -> Result<Option<Change>, ApiError> {
+    let name = copy
+        .object
+        .pointer("/metadata/name")
+        .and_then(Value::as_str)
+        .unwrap_or_default()
+        .to_owned();
+    let existing = read_with_data(cluster, namespace, &name).await?;
+    let object = copied(cluster, copy).await?;
+    let Some(mut edited) = existing else {
+        return Ok(Some(Change::Create { object, yaml: None }));
+    };
+    let before = edited.clone();
+    for field in ["labels", "annotations"] {
+        let marks = object
+            .pointer(&format!("/metadata/{field}"))
+            .and_then(Value::as_object)
+            .cloned()
+            .unwrap_or_default();
+        for (key, value) in marks {
+            if let Some(value) = value.as_str() {
+                set(&mut edited, &["metadata", field, &key], value.to_owned());
+            }
+        }
+    }
+    if let Some(keys) = object.get("stringData").and_then(Value::as_object) {
+        for (key, value) in keys {
+            if let Some(value) = value.as_str() {
+                set(&mut edited, &["data", key], BASE64.encode(value));
+            }
+        }
+    }
+    if edited == before {
+        return Ok(None);
+    }
+    Ok(Some(secret_edit(name, &edited)))
+}
+
+/// A change of keys of the Secret `name`. When the Secret is a copy of a destination and the
+/// change sets or removes the copied keys, the keys are the person's own from now on: an `edit`
+/// that applies the change and drops the marks, so a later rotation leaves them. Any other change
+/// stays as it is. The marks come from a metadata-only `list`, so a key change of a Secret the
+/// person may not `get` still needs no `get`; only a copied key reads the Secret.
+async fn detach(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    name: String,
+    edits: Vec<DataEdit>,
+) -> Result<Change, ApiError> {
+    let unchanged = |name, edits| Change::Data {
+        kind: DataKind::Secret,
+        name,
+        changes: edits,
+    };
+    let listed = cluster
+        .list_metadata(&resource("Secret"), Some(namespace))
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("the Secrets in {namespace}"),
+                list_read("", "secrets", Some(namespace)),
+            )
+        })?
+        .unwrap_or_default();
+    let Some(found) = listed
+        .into_iter()
+        .find(|m| m.name.as_deref() == Some(name.as_str()))
+    else {
+        return Ok(unchanged(name, edits));
+    };
+    let marked = found.labels.is_some_and(|l| l.contains_key(LABEL));
+    let keys = found
+        .annotations
+        .and_then(|mut a| a.remove(KEYS))
+        .unwrap_or_default();
+    let copied: Vec<&str> = keys.split(',').collect();
+    if !marked || !edits.iter().any(|e| copied.contains(&e.key.as_str())) {
+        return Ok(unchanged(name, edits));
+    }
+    let Some(mut edited) = read_with_data(cluster, namespace, &name).await? else {
+        return Ok(unchanged(name, edits));
+    };
+    for edit in &edits {
+        match edit.op.as_str() {
+            "set" => set(
+                &mut edited,
+                &["data", &edit.key],
+                BASE64.encode(edit.value.as_deref().unwrap_or_default()),
+            ),
+            "remove" => {
+                if let Some(data) = edited.pointer_mut("/data").and_then(Value::as_object_mut) {
+                    data.remove(&edit.key);
+                }
+            }
+            _ => return Ok(unchanged(name, edits)),
+        }
+    }
+    for (field, key) in [("labels", LABEL), ("annotations", KEYS)] {
+        if let Some(map) = edited
+            .pointer_mut(&format!("/metadata/{field}"))
+            .and_then(Value::as_object_mut)
+        {
+            map.remove(key);
+        }
+    }
+    Ok(secret_edit(name, &edited))
 }
 
 async fn copied(cluster: &dyn Cluster, copy: CopyS3KeysChange) -> Result<Value, ApiError> {

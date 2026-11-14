@@ -776,6 +776,19 @@ data:
 apiVersion: v1
 kind: Secret
 metadata:
+  name: mysql-backups-s3
+  namespace: lab
+  labels:
+    zeabur.com/database: mysql
+type: Opaque
+data:
+  AWS_ACCESS_KEY_ID: ""
+  AWS_SECRET_ACCESS_KEY: ""
+  AWS_REGION: ""
+---
+apiVersion: v1
+kind: Secret
+metadata:
   name: moco-mysql
   namespace: lab
 type: Opaque
