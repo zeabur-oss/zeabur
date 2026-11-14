@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::fs;
 use std::path::Path;
 
+use tokio::runtime::{Builder, Runtime};
 use zeabur_installer_host::{HostError, files};
 use zeabur_installer_plan::PlanError;
 use zeabur_installer_plan::cluster::Distribution;
@@ -17,7 +18,7 @@ const ID_FILE: &str = "installation-id";
 
 /// Reports one `apply`. Does nothing unless the program is on.
 pub(crate) struct Reporter {
-    on: Option<(Sender, InstallationId)>,
+    on: Option<(Sender, InstallationId, Runtime)>,
     install: Install,
     step: Cell<zeabur_telemetry::Step>,
     switch: Switch,
@@ -43,7 +44,8 @@ impl Reporter {
         let on = (switch != Switch::Off)
             .then(|| installation_id(config_path))
             .flatten()
-            .map(|id| (sender(switch), id));
+            .zip(Builder::new_current_thread().enable_all().build().ok())
+            .map(|(id, runtime)| (sender(switch), id, runtime));
         let reporter = Self {
             on,
             install,
@@ -59,7 +61,7 @@ impl Reporter {
         self.on
             .as_ref()
             .filter(|_| self.switch == Switch::On)
-            .map(|(_, id)| id)
+            .map(|(_, id, _)| id)
     }
 
     /// Notes that the install reached `step`.
@@ -82,8 +84,17 @@ impl Reporter {
     }
 
     fn send(&self, event: &Event) {
-        if let Some((sender, id)) = &self.on {
-            sender.send(id, event);
+        if let Some((sender, id, runtime)) = &self.on {
+            runtime.block_on(sender.send(id, event));
+        }
+    }
+}
+
+impl Drop for Reporter {
+    /// A name lookup that hangs does not hold the installer.
+    fn drop(&mut self) {
+        if let Some((_, _, runtime)) = self.on.take() {
+            runtime.shutdown_background();
         }
     }
 }
