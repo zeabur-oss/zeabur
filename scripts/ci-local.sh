@@ -32,7 +32,7 @@ min_free_gb="${CI_LOCAL_MIN_FREE_GB:-25}"
 mkdir -p "$out"
 
 # In this order, which puts the cluster jobs last.
-all=(lint test ui fuzz no-ui wording cluster e2e e2e-full canary)
+all=(lint test ui desktop fuzz no-ui wording cluster e2e e2e-full canary)
 for t in "$@"; do
   [[ " ${all[*]} " == *" $t "* ]] || { echo "error: no job named $t" >&2; exit 1; }
 done
@@ -73,6 +73,7 @@ run_job() { # $1 = job name
     "$root/" "$work/"
   local shell=default
   [[ "$name" != wording ]] || shell=zh
+  [[ "$name" != desktop ]] || shell=desktop
   nix develop "$work#$shell" -c "$work/scripts/ci/$name.sh" >"$out/$name.log" 2>&1 </dev/null || result=FAIL
   [[ "$result" == PASS ]] && rm -rf "$work"
   printf '%-14s %-5s %5ss  %s\n' "$name" "$result" $(($(date +%s) - started)) "$out/$name.log" \

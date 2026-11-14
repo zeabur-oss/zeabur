@@ -39,7 +39,8 @@ flowchart BT
   recommend[zeabur-catalog] --> kube
   api[zeabur-api] --> kube & gaps & plan & recommend & modules
   zeabur([zeabur]) --> api & ui & auth
-  zeaburctl([zeaburctl]) --> api & ui
+  local[zeabur-local] --> api & ui
+  zeaburctl([zeaburctl]) --> local
 ```
 
 Arrows point from a crate to what it may depend on (transitive edges omitted).
@@ -60,7 +61,9 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 3 | [`zeabur-plan`](../../crates/zeabur-plan) | change plans, minimal apply bodies, impact |
 | 3 | [`zeabur-catalog`](../../crates/zeabur-catalog) | the recommendations bundle and install suggestions |
 | 4 | [`zeabur-api`](../../crates/zeabur-api) | the HTTP API and its OpenAPI document |
-| 5 | [`zeabur`](../../crates/zeabur), [`zeaburctl`](../../crates/zeaburctl) | **binaries** |
+| 5 | [`zeabur-local`](../../crates/zeabur-local) | the local service: the API with a person's kubeconfig and the web interface on a loopback port, as `zeaburctl ui` starts it |
+| 5 | [`zeabur`](../../crates/zeabur) | **binary**: the in-cluster server |
+| 6 | [`zeaburctl`](../../crates/zeaburctl) | **binary**: the command-line tool |
 | 6 | [`zeabur-test-support`](../../crates/zeabur-test-support) | test helpers: loading the fixture cases, the cluster tests' sandbox |
 | 0 | [`zeabur-installer-plan`](../../crates/zeabur-installer-plan) | the installer's configuration, component selection and install plan; no I/O |
 | 1 | [`zeabur-installer-host`](../../crates/zeabur-installer-host) | what the installer does to a host: facts, preflight, downloads, files, systemd, `kubectl` |
@@ -68,6 +71,35 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 7 | [`xtask`](../../xtask) | **binary**, not shipped: development tasks run as `cargo xtask`: the development cluster (`scripts/dev-cluster.sh`) and Zeabur Proxy's canary (`scripts/e2e-proxy.sh`) |
 
 Every crate has a README that is also its crate-level documentation (`cargo doc --open`).
+
+## Apps outside the workspace
+
+[`desktop/`](../../desktop) (the Tauri desktop app) is a Cargo workspace of its own, with its own
+lock file, so the server's dependency graph never has Tauri, GTK or WebKit in it. It follows the
+main workspace's rules:
+
+- **Shared files.** Cargo, clippy and rustfmt read `.cargo/config.toml` (the `cargo lint` alias,
+  rustflags, the publish age), `clippy.toml` and `rustfmt.toml` from the parent folders, and
+  `cargo deny --config deny.toml` checks it with the same policy for the desktop platforms. The
+  toolchain is the dev shell's (`nix develop .#desktop`, which adds GTK and WebKitGTK on Linux).
+- **Copied tables.** Cargo reads `[workspace.lints]`, `[workspace.package]` and
+  `[profile.release]` only from the root of a workspace, so `desktop/Cargo.toml` has a copy. `scripts/check-desktop.sh` fails CI when the copy
+  differs. The one difference is `unsafe_code`: `deny`, not `forbid`, so that the two modules the
+  script lists (`webkit.rs`, `win32.rs`) can wrap the system calls that have no safe binding,
+  each with `#![expect(unsafe_code, reason = "…")]`. A new module that names `unsafe_code` fails
+  the script.
+- **One dependency edge.** Of the workspace crates, `desktop/` may depend only on `zeabur-local`
+  (checked by the same script), which each cluster window starts; nothing in the workspace depends
+  on `desktop/`.
+- **Its own pages.** The chooser and the cluster window's start page are `desktop/web/`, a Vite
+  project with its own `package.json` and `bun.lock` under the same package policy as `web/`. The
+  app bundles their build; the cluster's web interface is `web/dist`, embedded in `zeabur-local`.
+
+CI's `desktop` job (`scripts/ci/desktop.sh`) runs the script, the checks and build of
+`desktop/web`, `cargo fmt`, `cargo lint`, the tests and `cargo deny` for `desktop/` on Linux.
+`scripts/build-desktop.sh` bundles the app, and CI's `desktop-bundle` job builds the macOS app and checks it links
+nothing from the Nix store (`scripts/check-portable.sh`). The macOS and Windows code is linted on a Mac
+(`cargo lint`, and `cargo xwin clippy` for Windows, see `desktop/README.md`).
 
 ## Web interface
 

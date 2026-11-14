@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: Config
+clusters:
+  - name: aks-staging
+    cluster:
+      server: https://aks-staging-dns-1a2b3c.hcp.japaneast.azmk8s.io:443
+users:
+  - name: aks-staging-user
+    user:
+      exec:
+        apiVersion: client.authentication.k8s.io/v1beta1
+        command: kubelogin
+        args: [get-token, --login, azurecli, --server-id, 6dae42f8-4368-4678-94ff-3960e28e3630]
+        installHint: Install kubelogin from https://azure.github.io/kubelogin/
+contexts:
+  - name: staging
+    context:
+      cluster: aks-staging
+      user: aks-staging-user

@@ -21,6 +21,8 @@ ignore_terms = [
   "跟隨",
   # 只讀取了…: 只 + 讀取 ("only read"), not "read-only".
   "只讀",
+  # 拷貝: the Edit menu of macOS in zh-TW says 拷貝, and the desktop menu follows it.
+  "拷貝",
   # 通行密鑰: the zh-TW name of a passkey on Apple's platforms.
   "密鑰",
   # 一次性的工作: a one-off Job, not "disposable".

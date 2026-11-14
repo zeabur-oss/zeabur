@@ -33,5 +33,5 @@ stderr and the empty stdout.
 
 ## Features
 
-- `ui` (default): embed the web interface (`zeabur-ui`). `--no-default-features` builds without
-  it and needs no JavaScript toolchain.
+- `ui` (default): embed the web interface (`zeabur-local`'s `ui`). `--no-default-features`
+  builds without it and needs no JavaScript toolchain.
