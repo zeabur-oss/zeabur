@@ -8103,7 +8103,10 @@ export type ProjectBackupsKeysFrom = { [key: string]: string }
  * A project's backups across providers.
  */
 export type ProjectBackups = {
-  /** One row per claim, then per database, then the namespace. */
+  /**
+   * One row per claim, then per database, then the namespace. A database's claims have no
+   * row of their own: they are backed up with the database.
+   */
   coverage: BackupCoverage[]
   /**
    * The S3 destination each Secret's keys were copied from, by the Secret's name; empty

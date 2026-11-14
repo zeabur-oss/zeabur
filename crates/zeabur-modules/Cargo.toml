@@ -21,6 +21,7 @@ utoipa.workspace = true
 [dev-dependencies]
 datatest-stable.workspace = true
 serde-saphyr.workspace = true
+zeabur-graph.workspace = true
 zeabur-test-support.workspace = true
 
 # One test per fixture case (datatest-stable runs them).

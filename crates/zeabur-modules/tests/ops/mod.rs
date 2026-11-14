@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::Deserialize;
 use serde_json::{Value, from_value, to_value};
+use zeabur_graph::{ObjectKey, OwnerGraph, Snapshot};
 use zeabur_kube::DynamicObject;
 use zeabur_modules::{backups, cloudnative_pg, k8up, network_policy, velero};
 use zeabur_test_support::fixtures::{Fixture, FixtureOp, run_op};
@@ -116,6 +117,21 @@ impl FixtureOp for NetworkGaps {
     }
 }
 
+/// The claims that are not a database's, as `zeabur-api` passes them to [`backups::targets`].
+fn volumes(input: &[Value]) -> Result<Vec<String>, String> {
+    let mut snapshot = Snapshot::default();
+    for object in of_kind(input, "PersistentVolumeClaim").chain(of_kind(input, "StatefulSet")) {
+        snapshot.insert(object.clone()).map_err(|e| e.to_string())?;
+    }
+    let graph = OwnerGraph::new(&snapshot);
+    Ok(snapshot
+        .persistent_volume_claims
+        .iter()
+        .filter(|claim| graph.database(&ObjectKey::of(*claim)).is_none())
+        .filter_map(|claim| claim.metadata.name.clone())
+        .collect())
+}
+
 fn coverage(input: &[Value], namespace: &str) -> Result<Vec<backups::Coverage>, String> {
     let mut claims = Vec::new();
     for claim in of_kind(input, "PersistentVolumeClaim") {
@@ -146,7 +162,7 @@ fn coverage(input: &[Value], namespace: &str) -> Result<Vec<backups::Coverage>, 
             &objects(input, "Backup", "postgresql.cnpg.io")?,
         ),
     ];
-    let targets = backups::targets(namespace, &names, &databases);
+    let targets = backups::targets(namespace, &volumes(input)?, &databases);
     Ok(backups::coverage(&targets, &findings))
 }
 
