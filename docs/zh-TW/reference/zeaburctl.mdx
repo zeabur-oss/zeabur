@@ -16,6 +16,7 @@ zeaburctl ui --context production --no-browser
 zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
 zeaburctl connect shop/orders
+zeaburctl connect shop/api:8080
 zeaburctl components export certificates/cert-manager
 ```
 
@@ -26,7 +27,7 @@ zeaburctl components export certificates/cert-manager
 | `ui` | 在本機瀏覽器開啟 Zeabur | 不在叢集安裝元件，在介面套用的變更直接寫入叢集 |
 | `doctor` | 檢查叢集版本、元件和 Zeabur Identity 設定 | 只讀取，不修改設定 |
 | `up` | 把資料夾上傳到從資料夾建立的服務，並開始建置 | 修改該服務的 Build，把資料夾推到 registry |
-| `connect` | 把本機連接埠轉發到資料庫，並印出連線字串 | 不改叢集裡的任何東西 |
+| `connect` | 把本機連接埠轉發到資料庫或服務，並印出連線方式 | 不改叢集裡的任何東西 |
 | `components export` | 印出安裝 Catalog 元件的 manifest 或 Helm 指令 | 不連叢集，什麼都不改 |
 
 ## `ui`
@@ -155,12 +156,14 @@ zeaburctl up [資料夾] [--project <專案>] [--service <服務>]
 ## `connect`
 
 ```sh
-zeaburctl connect <project>/<database> [--port <port>] [--context <name>]
+zeaburctl connect <project>/<name>[:<port>] [--port <port>] [--context <name>]
 ```
 
-經由 kube-apiserver 把 `127.0.0.1` 上的一個連接埠轉發到資料庫，就像 `kubectl port-forward`，並印出對應的連線字串。每種引擎都能用。指令會一直執行，按 Ctrl-C 才停止。
+經由 kube-apiserver 把 `127.0.0.1` 上的一個連接埠轉發到資料庫或服務，就像 `kubectl port-forward`。指令會一直執行，按 Ctrl-C 才停止。
 
-你要能 `list` 資料庫的資源，並在專案有 `create pods/portforward` 權限，開發者都有。讀不到資料庫的 Secret 時，連線字串會用 `PASSWORD` 代替密碼。MongoDB 的連線字串會直接連到單一執行個體，因為其他執行個體的位址只在叢集內有效。執行個體不只一個時，連到的不一定是主要執行個體，這時資料庫會拒絕寫入；命令印出連線字串前會先提醒。
+指令會先在專案的資料庫裡找 `<name>`。找到資料庫時，印出連線字串，每種引擎都能用。找不到時，就把 `<name>` 當成服務，印出本機位址，例如 `127.0.0.1:52341`。服務要透過它的 Kubernetes Service 的連接埠連線；連接埠不只一個時，在名稱後面加上要連的那個，例如 `shop/api:8080`。沒加的話，指令會列出所有連接埠後停止。
+
+你要在專案有 `create pods/portforward` 權限，連資料庫時還要能 `list` 資料庫的資源，開發者都有。讀不到資料庫的 Secret 時，連線字串會用 `PASSWORD` 代替密碼。MongoDB 的連線字串會直接連到單一執行個體，因為其他執行個體的位址只在叢集內有效。執行個體不只一個時，連到的不一定是主要執行個體，這時資料庫會拒絕寫入；命令印出連線字串前會先提醒。
 
 | 選項 | 預設與用途 |
 |---|---|

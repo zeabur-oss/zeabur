@@ -44,8 +44,8 @@ enum Command {
     /// cluster. With other credentials, zeaburctl does the same steps on this computer, and the
     /// credentials stay here.
     Up(up::UpArgs),
-    /// Reach a database of a project from this computer: forward a local port to it and print a
-    /// connection URI on 127.0.0.1.
+    /// Reach a database or a service of a project from this computer: forward a local port to it
+    /// and print a connection URI on 127.0.0.1 for a database, the address for a service.
     ///
     /// The forward goes through the Kubernetes API with your kubeconfig, as `kubectl
     /// port-forward` does, and needs `create` on `pods/portforward` in the project. It runs until
