@@ -123,7 +123,7 @@ impl Sender {
         self.switch != Switch::Off
     }
 
-    /// Sends `event` once. Waits for at most [`TIMEOUT`]; a failure is a debug log line.
+    /// Sends `event` once. Waits for at most five seconds; a failure is a debug log line.
     pub async fn send(&self, id: &InstallationId, event: &Event) {
         match self.switch {
             Switch::Off => {}

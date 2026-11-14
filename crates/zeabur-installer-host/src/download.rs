@@ -54,6 +54,16 @@ impl std::fmt::Debug for Agent {
     }
 }
 
+impl Drop for Agent {
+    /// A name lookup that hangs does not hold the caller: the runtime is shut down without
+    /// waiting for it.
+    fn drop(&mut self) {
+        if let Ok((_, runtime)) = std::mem::replace(&mut self.client, Err(String::new())) {
+            runtime.shutdown_background();
+        }
+    }
+}
+
 impl Agent {
     /// Runs `work` with the client; a client that could not be made fails it as a download of
     /// `url`.
@@ -299,25 +309,65 @@ async fn get(
     Err(format!("more than {REDIRECTS} redirects"))
 }
 
-/// The target of a redirect from `base` to `location` (RFC 9110 section 10.2.2).
+/// The target of a redirect from `base` to `location`: the reference resolution of RFC 3986
+/// section 5.2, as RFC 9110 section 10.2.2 asks.
 fn resolve(base: &Uri, location: &str) -> Result<Uri, String> {
     let scheme = base.scheme_str().unwrap_or("https");
     let authority = base.authority().map_or("", |a| a.as_str());
+    let location = location.split('#').next().unwrap_or_default();
     let lower = location.to_ascii_lowercase();
     let target = if lower.starts_with("http://") || lower.starts_with("https://") {
         location.to_owned()
     } else if let Some(rest) = location.strip_prefix("//") {
         format!("{scheme}://{rest}")
-    } else if location.starts_with('/') {
-        format!("{scheme}://{authority}{location}")
+    } else if location.is_empty() {
+        base.to_string()
+    } else if location.starts_with('?') {
+        format!("{scheme}://{authority}{}{location}", base.path())
     } else {
-        let path = base.path();
-        let dir = path.rfind('/').and_then(|i| path.get(..=i)).unwrap_or("/");
-        format!("{scheme}://{authority}{dir}{location}")
+        let (path, query) = location
+            .split_once('?')
+            .map_or((location, ""), |(p, q)| (p, q));
+        let joined = if path.starts_with('/') {
+            path.to_owned()
+        } else {
+            let own = base.path();
+            let dir = own.rfind('/').and_then(|i| own.get(..=i)).unwrap_or("/");
+            format!("{dir}{path}")
+        };
+        let query = if location.contains('?') {
+            format!("?{query}")
+        } else {
+            String::new()
+        };
+        format!("{scheme}://{authority}{}{query}", without_dots(&joined))
     };
     target
         .parse()
         .map_err(|e| format!("the redirect to {location}: {e}"))
+}
+
+/// `path` without its `.` and `..` segments (RFC 3986 section 5.2.4).
+fn without_dots(path: &str) -> String {
+    let mut kept: Vec<&str> = Vec::new();
+    let mut segments = path.split('/').skip(1).peekable();
+    while let Some(segment) = segments.next() {
+        let last = segments.peek().is_none();
+        match segment {
+            "." => {}
+            ".." => {
+                kept.pop();
+            }
+            _ => {
+                kept.push(segment);
+                continue;
+            }
+        }
+        if last {
+            kept.push("");
+        }
+    }
+    format!("/{}", kept.join("/"))
 }
 
 /// Whether the status says the same request may work later: 408 (RFC 9110 section 15.5.9),
@@ -612,6 +662,12 @@ mod tests {
             ("/c", "https://example.com/c"),
             ("//cdn.example.com/x", "https://cdn.example.com/x"),
             ("HTTPS://cdn.example.com/y", "https://cdn.example.com/y"),
+            ("?token=abc", "https://example.com/a/b?token=abc"),
+            ("c?x=1#frag", "https://example.com/a/c?x=1"),
+            ("../c", "https://example.com/c"),
+            ("../../../c", "https://example.com/c"),
+            ("./c/./d/..", "https://example.com/a/c/"),
+            ("/p/../q?r=1", "https://example.com/q?r=1"),
         ] {
             assert_eq!(resolve(&base, location).unwrap().to_string(), target);
         }
