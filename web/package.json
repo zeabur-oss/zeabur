@@ -46,6 +46,7 @@
     "@svgr/core": "8.1.0",
     "@svgr/plugin-jsx": "8.1.0",
     "@tailwindcss/vite": "4.3.3",
+    "@tauri-apps/api": "2.12.4",
     "@types/bun": "1.4.4",
     "@types/node": "26.6.5",
     "@types/react": "19.3.0",

@@ -125,6 +125,15 @@ for a plugin name without one.
   `back_to_chooser`. The web interface on `127.0.0.1` is a remote page and may only move and
   zoom the window on macOS (`chrome.rs`).
 
+## Screenshots
+
+The images of the chooser and the cluster error page are an image set, `desktop`, taken with
+Chromium from the pages of `desktop/web` with mocked commands (`docs/internal/screenshots.md`):
+
+```sh
+nix develop -c scripts/docs-shots.sh desktop
+```
+
 ## Windows and menus
 
 - Every cluster is its own window. A new one is placed a little below and right of the last; each
@@ -265,7 +274,6 @@ From code and unit tests only:
 - The default path is `home_dir()\.kube\config`, which is `%USERPROFILE%\.kube\config`.
 - Exec plugins are also looked up with each extension in `PATHEXT` (`.COM;.EXE;.BAT;.CMD` when it
   is unset); the login shell read is skipped.
-- The screenshot hook is macOS only.
 
 Not done: an installer and Start menu shortcut, Mica behind the page, the accent colour on title
 bars, and high contrast themes.

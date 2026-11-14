@@ -8,6 +8,7 @@ from nixpkgs by `scripts/docs-shots.sh`. Each spec is one image set, with its se
 | -------- | ------------------------- | -------------------------------------- | ---------------------------------------- |
 | `docs`   | `web/e2e/shots/docs.ts`   | The documentation and oss.zeabur.com   | `docs/[<locale>/]images/shots/<id>.avif` |
 | `readme` | `web/e2e/shots/readme.ts` | The README, English, 1×, at most 30 KB | `docs/images/<id>-<theme>.avif`          |
+| `desktop` | `web/e2e/shots/desktop.ts` | The Desktop app's pages, 2×, light and dark | `docs/[<locale>/]images/desktop/<id>-<theme>.avif` |
 | `cover`  | `web/e2e/shots/cover.ts`  | The plate of the README cover          | design-system's `covers/zeabur`          |
 
 All of them are kept in git. Run the script after changing a page a shot covers, and commit the
@@ -78,7 +79,7 @@ test.describe(() => {
 })
 ```
 
-- `app`: `zeabur` (default) or `installer`.
+- `app`: `zeabur` (default), `installer` or `desktop`.
 - `demo`: the demo's `ZEABUR_DEMO_*` variables, listed at the top of
   `crates/zeabur-api/examples/demo.rs`. The shots with the same `app` and `demo` share a server in
   each Playwright worker.
@@ -121,5 +122,11 @@ script builds. The Playwright config makes a project for each set, locale and th
   removes images whose shot is gone.
 - **README** (`readme`): one pixel for each CSS pixel, light and dark, English only, at most 30 KB
   each. The fonts of macOS make some of them larger; take them on Linux.
+- **Desktop** (`desktop`): the pages of `desktop/web` (the chooser and the cluster error page) built
+  and served by `vite preview`, in a 1100×720 window at twice the pixel density, in all three
+  locales, light and dark. There is no native title bar or window frame. The Tauri commands are
+  mocked in the page with `mockIPC`, and `web/e2e/shots/demo.ts` holds their answers, so the app
+  has no code for screenshots. `scripts/docs-shots.sh desktop` builds `desktop/web` first. `clean`
+  removes images whose shot is gone.
 - **Cover** (`cover`): the plate of the README cover, at 544×544. It has no `out`: pass
   design-system's `covers/zeabur`, then render the cover there (its `covers/README.md`).
