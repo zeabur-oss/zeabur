@@ -54,6 +54,23 @@ pub const MANAGE_VERB: &str = "zeabur-manage";
 /// administrators may run or enter. It is never a project, so no member role is bound in it.
 pub const NODE_SHELL_NAMESPACE: &str = "zeabur-node-shell";
 
+/// The namespace of API tokens, one ServiceAccount per token.
+///
+/// Only cluster administrators may make or request tokens there. It is never a project: a member
+/// who could run a pod there could run it as a token.
+pub const API_TOKENS_NAMESPACE: &str = "zeabur-api-tokens";
+
+/// What a namespace kept for cluster administrators holds, such as `"node shells"`; `None` for any
+/// other namespace. Such a namespace is never a project.
+#[must_use]
+pub fn admin_only_namespace(namespace: &str) -> Option<&'static str> {
+    match namespace {
+        NODE_SHELL_NAMESPACE => Some("node shells"),
+        API_TOKENS_NAMESPACE => Some("API tokens"),
+        _ => None,
+    }
+}
+
 /// The label `zeabur-installer` puts on the namespace of each component it sets up, with the
 /// value `"true"`. Such a namespace is never deleted as a project.
 pub const LABEL_BASELINE: &str = "zeabur.com/platform";

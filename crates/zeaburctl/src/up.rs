@@ -213,7 +213,9 @@ async fn local(client: UserClient, info: &ZeaburInfo) -> Result<Zeabur, String> 
         if let Some(reference) = info.registry_ca.as_deref() {
             settings.trusted_ca = Some(registry_ca(client.kube(), reference).await?);
         }
-        let port = forward::start(client.kube().clone(), &service).await?;
+        let port = forward::start(client.kube().clone(), &service, 0)
+            .await
+            .map_err(|e| format!("{e} Uploading a folder from this computer needs it. A cluster administrator has it; otherwise upload from Zeabur's web interface."))?;
         settings.upload_address = Some(format!("https://127.0.0.1:{port}"));
     }
     Ok(Zeabur::Local(InProcess::with_client(client, settings)))

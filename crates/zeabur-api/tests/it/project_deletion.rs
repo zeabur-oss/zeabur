@@ -1,7 +1,7 @@
 //! Deleting a project through the API, against an in-memory cluster: the plan says what goes and
 //! what stays; the apply deletes the database objects before the Namespace, as the person; Zeabur's
 //! own namespaces are refused; a missing right is told; a project being deleted says what holds
-//! it.
+//! it, and a force deletion removes those finalizers as the person, without writing the Namespace.
 
 #[cfg(test)]
 mod tests {
@@ -235,5 +235,122 @@ mod tests {
         let (status, problem) =
             plan_and_apply(&app, "shop", json!([{"op": "deleteProject"}])).await;
         assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+    }
+
+    /// A project whose Namespace the database's finalizers hold.
+    fn held() -> MemoryCluster {
+        let terminating = namespace(
+            "shop",
+            &json!({
+                "metadata": {"deletionTimestamp": "2026-10-26T00:00:00Z"},
+                "status": {"phase": "Terminating", "conditions": [
+                    {"type": "NamespaceContentRemaining", "status": "True",
+                     "message": "Some resources are remaining: clusters.postgresql.cnpg.io has 1 resource instances"},
+                    {"type": "NamespaceFinalizersRemaining", "status": "True",
+                     "message": "Some content in the namespace has finalizers remaining: cnpg.io/cleanup in 1 resource instances"}
+                ]}
+            }),
+        );
+        let cluster = cluster(terminating);
+        cluster.update(|s| {
+            for object in &mut s.dynamic {
+                object.metadata.deletion_timestamp =
+                    Some(serde_json::from_value(json!("2026-10-26T00:00:00Z")).unwrap());
+            }
+        });
+        cluster
+    }
+
+    #[tokio::test]
+    async fn a_force_deletion_patches_only_the_held_objects_and_not_the_namespace() {
+        let cluster = held();
+        let app = app(&cluster);
+        let (status, plan) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({"changes": [{"op": "forceDeleteProject"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert!(
+            plan["warnings"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|w| w["code"] == "removesFinalizers"
+                    && w["objects"]
+                        == json!([{"kind": "Cluster", "name": "db",
+                        "finalizers": ["cnpg.io/cleanup"], "kubernetes": false,
+                        "thirdParty": true}])),
+            "{plan}"
+        );
+
+        let (status, applied) =
+            plan_and_apply(&app, "shop", json!([{"op": "forceDeleteProject"}])).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let written: Vec<(String, String, bool)> = cluster
+            .inspect(|s| {
+                s.writes
+                    .iter()
+                    .map(|w| {
+                        let empties = matches!(&w.body, zeabur_kube::WriteBody::JsonPatch(ops)
+                            if ops.as_array().unwrap().contains(
+                                &json!({"op": "replace", "path": "/metadata/finalizers", "value": []})));
+                        (w.target.kind.clone(), w.target.name.clone(), empties)
+                    })
+                    .collect()
+            })
+            .unwrap();
+        assert_eq!(written, [("Cluster".to_owned(), "db".to_owned(), true)]);
+    }
+
+    #[tokio::test]
+    async fn a_force_deletion_is_refused_when_a_finalizer_went_after_the_plan() {
+        let cluster = held();
+        cluster.update(|s| {
+            for object in &mut s.dynamic {
+                object.metadata.generation = Some(2);
+                object.metadata.finalizers = Some(vec![
+                    "cnpg.io/cleanup".to_owned(),
+                    "cnpg.io/backup".to_owned(),
+                ]);
+            }
+        });
+        let app = app(&cluster);
+        let (status, planned) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({"changes": [{"op": "forceDeleteProject"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        cluster.update(|s| {
+            for object in &mut s.dynamic {
+                object.metadata.finalizers = Some(vec!["cnpg.io/cleanup".to_owned()]);
+                object.metadata.resource_version = Some("10".to_owned());
+            }
+        });
+
+        let (status, problem) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert!(cluster.inspect(|s| s.writes.is_empty()).unwrap());
+    }
+
+    #[tokio::test]
+    async fn a_project_not_being_deleted_is_not_force_deleted() {
+        let cluster = cluster(namespace("shop", &json!({})));
+        let app = app(&cluster);
+        let (status, problem) =
+            plan_and_apply(&app, "shop", json!([{"op": "forceDeleteProject"}])).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert!(cluster.inspect(|s| s.writes.is_empty()).unwrap());
     }
 }

@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { useId, useState } from "react"
+import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
 import { projectsQuery } from "@/api/queries"
@@ -139,7 +139,7 @@ export function AccessFields({
 }
 
 /** Every project with a box to pick it and, once picked, its role; a filter once there are many. */
-function ProjectPicker({
+export function ProjectPicker({
   chosen,
   onChosen,
   held,
@@ -319,20 +319,10 @@ export function AccessDialog({
     )
   }
   return (
-    <Frame
+    <ReviewFrame
       title={t("roles.title", name)}
-      wide
       onClose={onClose}
-      footer={
-        <>
-          <Button variant="ghost" size="sm" onClick={onClose}>
-            {t("plan.cancel")}
-          </Button>
-          <Button size="sm" onClick={() => setReviewing(true)}>
-            {t("create.review")}
-          </Button>
-        </>
-      }
+      onReview={() => setReviewing(true)}
     >
       <AccessFields
         projectRoles={projectRoles}
@@ -342,6 +332,40 @@ export function AccessDialog({
         onChosen={setChosen}
         held={held}
       />
+    </ReviewFrame>
+  )
+}
+
+/** A form in a wide dialog, with Cancel and Review changes. */
+export function ReviewFrame({
+  title,
+  onClose,
+  onReview,
+  children,
+}: {
+  title: string
+  onClose: () => void
+  onReview: () => void
+  children: ReactNode
+}) {
+  const t = useT()
+  return (
+    <Frame
+      title={title}
+      wide
+      onClose={onClose}
+      footer={
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("plan.cancel")}
+          </Button>
+          <Button size="sm" onClick={onReview}>
+            {t("create.review")}
+          </Button>
+        </>
+      }
+    >
+      {children}
     </Frame>
   )
 }

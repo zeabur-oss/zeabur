@@ -531,8 +531,9 @@ export const zhCN: Messages = {
   "deleting.since": (ago) => `${ago}开始删除。`,
   "deleting.count": (resource, count) => `${resource}（${count}）`,
   "deleting.left": (list) => `还剩：${list}。`,
-  "deleting.held":
-    "下面这些对象在等待 finalizer。控制器清理完，就会移除自己添加的 finalizer；Zeabur 不会替你移除。",
+  "deleting.held": "下面这些对象在等待 finalizer。控制器清理完，就会移除自己添加的 finalizer。",
+  "deleting.forceHint": "控制器通常会自己处理完，多等一会儿更稳妥。确实等不到，再强制删除。",
+  "deleting.force": "强制删除",
   "deleting.commandsLabel": "用 kubectl 查看",
 
   "attention.title": "需要处理",
@@ -1159,6 +1160,7 @@ export const zhCN: Messages = {
   "action.adopt": "使用这个 Namespace",
   "action.unadopt": "不再显示为项目",
   "action.deleteProject": "删除项目",
+  "action.forceDeleteProject": "强制删除项目",
   "action.openDebugTerminal": "打开调试终端",
   "action.openToolsTerminal": "打开 kubectl 终端",
   "action.saveDetails": "保存详细信息",
@@ -1166,6 +1168,7 @@ export const zhCN: Messages = {
   "title.adopt": (ns) => `使用已有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再显示为项目`,
   "title.deleteProject": (ns) => `删除项目 ${ns}`,
+  "title.forceDeleteProject": (ns) => `强制删除项目 ${ns}`,
   "title.details": (ns) => `${ns} 的详细信息`,
   "title.buildLimits": (ns) => `${ns} 的构建上限`,
   "title.pauseAll": (ns) => `暂停 ${ns} 的所有服务`,
@@ -1176,6 +1179,8 @@ export const zhCN: Messages = {
   "confirm.unadopt": "这个 Namespace 不再显示为项目，其中的对象都不会删除。",
   "confirm.deleteProject":
     "删除这个项目的 Namespace 和其中的所有内容，和 kubectl delete namespace 一样，删除后无法恢复。",
+  "confirm.forceDeleteProject":
+    "移除卡住项目的 finalizer，让 Kubernetes 把项目删完。移除后无法恢复。",
   "confirm.debugContainer": (pod: string) =>
     `在副本 ${pod} 中加上带 shell 的调试容器，从里面能看到应用程序的进程。`,
   "confirm.debugStays":
@@ -1221,6 +1226,52 @@ export const zhCN: Messages = {
   "projectMembers.inviteHint": "对方在这里默认是开发者，创建链接前可以改。",
   "projectMembers.more": (n: number) => `还有 ${n} 个人`,
   "projectMembers.all": "打开成员页",
+  "apiTokens.title": "API 令牌",
+  "apiTokens.about":
+    "脚本和 CI 可以用 API 令牌调用 Kubernetes API，和成员一样在各项目有角色。每个令牌都会过期。",
+  "apiTokens.none": "还没有 API 令牌。给脚本或 CI 建一个吧。",
+  "apiTokens.create": "创建令牌",
+  "apiTokens.createTitle": "创建 API 令牌",
+  "apiTokens.name": "名称",
+  "apiTokens.nameHint": "写明谁会用它，比如 github-actions。可用小写英文字母、数字和 -。",
+  "apiTokens.nameProblem": "请用小写英文字母、数字和 -，最多 63 个字符，开头和结尾要是字母或数字。",
+  "apiTokens.projects": "项目",
+  "apiTokens.projectsHint":
+    "令牌只能在选定的项目里使用。需要在整个集群上操作时，请用管理员自己的 kubeconfig。",
+  "apiTokens.noProjectRoles":
+    "安装 Chart 时设置 memberRoles.enabled=true 才能创建令牌。没有成员角色，令牌就拿不到任何角色。",
+  "apiTokens.lifetime": "有效期",
+  "apiTokens.lifetimeHint": "集群可能限制得更短，列表会显示实际的过期时间。",
+  "apiTokens.lasts": (seconds: number) =>
+    seconds < 86_400
+      ? `${seconds / 3600} 小时`
+      : seconds === 365 * 86_400
+        ? "1 年"
+        : `${seconds / 86_400} 天`,
+  "apiTokens.by": (user: string) => `由 ${user} 创建`,
+  "apiTokens.expires": (time: string) => `${time} 过期`,
+  "apiTokens.expired": (time: string) => `已于 ${time} 过期`,
+  "apiTokens.renew": "续期",
+  "apiTokens.renewTitle": (name: string) => `续期 ${name}`,
+  "apiTokens.renewAbout": "你会拿到同一个名称、同样权限的新令牌。之前拿到的令牌，过期前都还能用。",
+  "apiTokens.delete": "删除",
+  "apiTokens.deleteTitle": (name: string) => `删除 ${name}`,
+  "apiTokens.deleted": (name: string) => `已删除 ${name}`,
+  "apiTokens.more": (name: string) => `${name} 的更多操作`,
+  "apiTokens.plan.noRole": (name: string) => `${name} 目前在任何项目都没有角色。`,
+  "apiTokens.plan.renew": (name: string) => `为 ${name} 生成一个新令牌。`,
+  "apiTokens.plan.lasts": (lasts: string) => `令牌可以用 ${lasts}，集群限制更短的话就按集群的来。`,
+  "apiTokens.plan.delete": (name: string) => `删除 ${name} 和它的角色。`,
+  "apiTokens.plan.revokes": "之前拿到的令牌全都会立刻失效。",
+  "apiTokens.shownTitle": (name: string) => `${name} 的令牌`,
+  "apiTokens.shown.lead": "现在就复制令牌，Zeabur 只会显示这一次。",
+  "apiTokens.shown.copy": "复制令牌",
+  "apiTokens.shown.notRecorded": "Zeabur 没能保存过期时间，所以列表不会显示。",
+  "apiTokens.shown.kubeconfig": "kubeconfig",
+  "apiTokens.shown.kubeconfigHint":
+    "在 server 填上你连到 Kubernetes API 的地址，比如 https://203.0.113.10:6443。",
+  "apiTokens.shown.ca": "CA 证书",
+  "apiTokens.docs": "搭配 kubectl 或 curl 使用令牌",
   "projectSettings.basic": "基本信息",
   "projectSettings.iconHint": "显示在项目名称旁。",
   "projectSettings.changeIcon": "更换图标",
@@ -1452,6 +1503,11 @@ export const zhCN: Messages = {
   "warn.rightsMissing": (rights: string) => `集群可能会拒绝：你缺少 ${rights} 的权限。`,
   "warn.recreated": (names: string, tool: string) =>
     `${names} 由 ${tool} 管理，删除后 ${tool} 可能会重新创建`,
+  "warn.removesFinalizers": (names: string) => `移除 ${names} 的 finalizer`,
+  "warn.cleanupSkipped":
+    "这些对象的控制器就没办法清理自己在集群外创建的东西，例如对象存储里的备份或云磁盘",
+  "warn.kubernetesFinalizers":
+    "其中有 Kubernetes 自己的 finalizer，它的控制器还在运行。通常是还有 Pod 在用这个磁盘，或节点宕机了，建议先处理那个 Pod 或节点。直接移除可能会留下磁盘",
   "warn.restartNeeded": (names: string) => `重启后才会生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 会重启 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `如果这个集群运行着 Reloader，会重启 ${names}`,
@@ -1548,6 +1604,8 @@ export const zhCN: Messages = {
   "confirm.alsoReads": (names, object) => `也会影响 ${names}（读取 ${object}）。`,
   "confirm.alsoAffects": (names) => `也会影响 ${names}。`,
   "confirm.addDomain": (host, service) => `${host} 会指向 ${service}。`,
+  "confirm.port": (service, from, to) =>
+    `${service} 从端口 ${from} 改用 ${to}：容器端口、健康检查和 PORT 都会跟着调整，私有地址也会把流量转发到 ${to}。`,
   "confirm.image": (service, tag) => `${service} 会改为运行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 会用分支最新的提交重新构建 ${build}。`,
   "confirm.buildOptions": (build) => `从下一次构建起，Zeabur Builder 用这些选项构建 ${build}。`,
@@ -2686,7 +2744,12 @@ export const zhCN: Messages = {
   "db.fact.created": "创建时间",
   "db.fact.operator": "Operator 报告",
   "db.connect": "连接",
-  "db.inCluster": "只能从集群内部连接。",
+  "db.inCluster": "这些信息只能在集群内部使用。",
+  "db.outside.title": "从集群外连接",
+  "db.outside.commandHint":
+    "在你的电脑上运行。它会通过集群把本机的一个端口接到数据库，并打印 127.0.0.1 的连接字符串。按 Ctrl-C 才会停止。",
+  "db.outside.refused": (reason) => `集群会拒绝你运行这条命令。${reason}。`,
+  "db.outside.docs": "安装 zeaburctl",
   "db.noDatabase": "这个集群没有应用数据库。服务以 moco-writable 连接，这个用户可以创建数据库。",
   "db.noAuth": (engine) => `这个 ${engine} 没有设置密码，集群里的任何程序都能连接。`,
   "db.export": "导出",
@@ -2895,15 +2958,28 @@ export const zhCN: Messages = {
   "db.backup.walNote": "PostgreSQL 也会持续把预写日志（WAL）归档到那里。",
   "db.backup.keepsEverything": "所有备份都会保留。要删除旧备份，在存储桶设置生命周期规则。",
   "db.backup.fixedFolder": (folder) => `MOCO 会写到存储桶里的 ${folder}。`,
-  "db.backup.startsEmpty":
-    "只有一个实例时，Dragonfly 重启会从仍为空的存储桶加载，目前的数据留在卷上的快照里。",
   "db.backup.retentionHours": (hours) => `${hours} 内的备份`,
-  "db.backup.snapshots": "Dragonfly 会定时以及在停止时写入快照。Zeabur 无法列出这些快照。",
+  "db.backup.edit": "编辑",
+  "db.backup.change": "更改备份",
+  "db.backup.turnOff": "关闭备份",
+  "db.backup.planEdit": (name) => `更改 ${name} 的备份`,
+  "db.backup.planOff": (name) => `关闭 ${name} 的备份`,
+  "db.backup.keepKeys": (secret) => `两个都留空就沿用机密变量 ${secret} 里的密钥。`,
+  "db.backup.keepRegion": "留空就沿用和密钥存在一起的区域。",
+  "db.backup.offBody": "备份已关闭。存储桶里现有的备份都还在。",
+  "db.backup.saidNewKeys": (secret) => `替换机密变量 ${secret} 里的访问密钥。`,
+  "db.backup.saidCopyKeys": (secret, destination) =>
+    `机密变量 ${secret} 里的访问密钥，会换成 ${destination} 那组。`,
+  "db.backup.moved": (where) => `之前的备份会留在 ${where}。要从那些备份还原，需要用旧的设置。`,
+  "db.backup.movedPitr":
+    "要等下一次定时备份完成，才能从新目的地还原到某个时间点。这次更改不会马上备份。",
+  "db.backup.saidOff": (name, where) => `停止把 ${name} 备份到 ${where}。`,
+  "db.backup.saidOffKept": (secret) => `密钥会留在机密变量 ${secret}，存储桶里现有的备份也都还在。`,
+  "db.backup.saidOffRestart": (name) => `${name} 会重启，停止备份。`,
   "db.restore.action": "从备份点创建新数据库",
   "db.restore.title": (name) => `从 ${name} 的备份点创建新数据库`,
   "db.restore.body": "Zeabur 会用相同设置创建新的数据库，数据来自备份。原来的数据库不会变动。",
   "db.restore.point": "备份",
-  "db.restore.latest": "最新的快照",
   "db.restore.name": "新数据库名称",
   "db.restore.none": "还没有可以还原的已完成备份或时间点。",
   "db.restore.fromBackup": "已完成的备份",
@@ -3245,6 +3321,9 @@ export const zhCN: Messages = {
   "remove.done": (name) => `已移除 ${name}`,
   "sentence.account.lastPasskey": () => "这是你唯一的通行密钥",
   "sentence.account.lastPasskey.fix": () => "请先添加另一把通行密钥，再移除这一把。",
+  "sentence.apiTokens.taken": () => "已经有同名的 API 令牌",
+  "sentence.apiTokens.noProjectRoles": () => "安装 Zeabur 时没有启用成员角色",
+  "sentence.apiTokens.noProjectRoles.fix": () => "安装 Chart 时设置 memberRoles.enabled=true。",
   "sentence.members.resetSelf": () => "你不能重置自己的账号",
   "sentence.members.resetSelf.fix": () => "改从账号页添加通行密钥，或请其他管理员处理。",
   "sentence.members.removeSelf": () => "你不能移除自己",
@@ -3363,6 +3442,15 @@ export const zhCN: Messages = {
   "fixer.clusterAdmin.lead": "这需要集群管理员处理：",
   "diagnosis.copy": "复制诊断",
   "diagnosis.copyFailed": "无法复制诊断，请重试。",
+  "wrongPort.cause": (port) => `应用没有监听端口 ${port}。`,
+  "wrongPort.why": (port) =>
+    `Zeabur 把 PORT 设为 ${port}，也会检查这个端口。连接一直被拒绝，已经超过一分钟。`,
+  "wrongPort.fix":
+    "让应用读取 PORT，或改用实际监听的端口，日志通常会写出是哪一个。如果只监听 127.0.0.1，请改为监听 0.0.0.0。",
+  "wrongPort.fixOffer": (port) =>
+    `镜像声明的端口是 ${port}，可以改用它，或让应用读取 PORT。如果只监听 127.0.0.1，请改为监听 0.0.0.0。`,
+  "wrongPort.use": (port) => `改用端口 ${port}`,
+  "wrongPort.plan": (service, port) => `${service} 改用端口 ${port}`,
   "diagnosis.lastSeen": "最后出现",
   "trace.title": "连接检查",
   "trace.reachable": "可访问",

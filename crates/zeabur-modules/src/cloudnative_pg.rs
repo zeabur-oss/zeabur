@@ -704,4 +704,24 @@ mod tests {
         assert!(!db.backups.ready);
         assert!(!db.backups.store.unwrap().in_use);
     }
+
+    #[test]
+    fn a_disabled_plugin_entry_leaves_its_store_not_in_use() {
+        let pg = object(serde_json::json!({
+            "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+            "metadata": {"name": "pg", "namespace": "shop"},
+            "spec": {"instances": 1, "plugins": [{
+                "name": "barman-cloud.cloudnative-pg.io", "enabled": false, "isWALArchiver": true,
+                "parameters": {"barmanObjectName": "pg-backups", "serverName": "pg-v2"}}]}
+        }));
+        let store = object(serde_json::json!({
+            "apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore",
+            "metadata": {"name": "pg-backups", "namespace": "shop"},
+            "spec": {"configuration": {"destinationPath": "s3://b/p"}}
+        }));
+        let db = database("shop", &pg, &[store], &[], &[]);
+        let store = db.backups.store.unwrap();
+        assert_eq!(store.name, "pg-backups");
+        assert!(!store.in_use);
+    }
 }

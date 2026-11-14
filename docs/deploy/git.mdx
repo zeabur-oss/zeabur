@@ -281,6 +281,12 @@ Zeabur Builder and Keel keep building and deploying after you remove Zeabur. The
 | The build succeeded, but the service still uses the old image | Check **Auto-deploy new builds** and Keel's status, or select **Deploy newest** to apply the image manually. |
 | The container starts but doesn't respond | Check the service's **Logs** and confirm that the app listens on the port entered in the form. Then check the connection checks in **Networking**. |
 
+## When the app listens on another port
+
+If a minute after the container starts nothing answers on the service's port, **Overview** says the app isn't listening on that port. Have the app read `PORT`, or change the service to the port the app listens on. An app that listens on `127.0.0.1` only can't be reached from outside its container; make it listen on `0.0.0.0`.
+
+When the image declares a port with `EXPOSE` and the service uses another one, that message also offers **Use port …**. It changes the container port, health checks, `PORT` and the port the service's private addresses send traffic to, and shows you the change before applying it. Railpack builds declare no port, so they only get the first message.
+
 ## Delete a service
 
 Select **More** → **Delete service** in the upper-right corner of the service. Review which objects will be deleted and which will be kept, then apply the changes. If no other service uses the same Build, deletion also removes the Build. Git credential secrets created by the form are deleted only if no other Build uses them.

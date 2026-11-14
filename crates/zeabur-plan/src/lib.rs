@@ -1,6 +1,7 @@
 #![doc = include_str!("../README.md")]
 
 pub mod access;
+pub mod api_token;
 pub mod builds;
 mod certificates;
 mod change;
@@ -17,6 +18,7 @@ pub mod node_shell;
 mod owned;
 mod plan;
 mod pod_security;
+mod port;
 mod project;
 mod project_deletion;
 mod public_port;
@@ -51,7 +53,7 @@ pub use plan::{
 };
 pub use project::{DEFAULT_ACCOUNT, project_namespace};
 pub use project_deletion::{
-    DatabaseDeletion, DatabaseObject, DeletionInput, ProjectDeletion, VolumeDeletion,
+    DatabaseDeletion, DeletionInput, HeldBy, ProjectDeletion, ProjectObject, VolumeDeletion,
 };
 pub use public_port::public_service_name;
 pub use releases::{Release, ReleasePods};

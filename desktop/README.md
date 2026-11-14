@@ -184,7 +184,7 @@ cargo tauri icon desktop/icons/icon.svg -o desktop/icons  # then delete android/
 
 ## Screenshots
 
-`desktop/shots/<lang>-<screen>-<theme>.png` (made by `desktop/shots.sh`), 4 languages × light and dark, taken from the running
+`desktop/shots/<lang>-<screen>-<theme>.png` (made by `desktop/shots.sh`, not committed), 4 languages × light and dark, taken from the running
 app (a WKWebView snapshot of the window, no screen recording):
 
 | Screen    | Shows                                                                  |

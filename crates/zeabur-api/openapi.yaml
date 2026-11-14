@@ -4509,6 +4509,36 @@ components:
       - certificate
       - node-not-ready
       - runtime-security
+    ApiTokenView:
+      type: object
+      description: One API token.
+      required:
+      - name
+      - projects
+      properties:
+        createdAt:
+          type:
+          - string
+          - "null"
+          description: When it was made, RFC 3339.
+        createdBy:
+          type:
+          - string
+          - "null"
+          description: The Kubernetes user name of whoever made it.
+        expiresAt:
+          type:
+          - string
+          - "null"
+          description: When its latest token expires, RFC 3339, as kube-apiserver answered.
+        name:
+          type: string
+          description: Its name, which is its ServiceAccount's.
+        projects:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectGrant"
+          description: Its roles in projects.
     Applied:
       type: object
       description: One object an apply wrote.
@@ -5786,6 +5816,36 @@ components:
             description: The workload.
       - type: object
         description: |-
+          Move the port a container listens on: its declared port, its probes, its `PORT` and the
+          Services that send traffic to it (see the `port` module).
+        required:
+        - workload
+        - from
+        - to
+        - op
+        properties:
+          container:
+            type:
+            - string
+            - "null"
+            description: The container; may be left out when the workload has only one.
+          from:
+            type: integer
+            format: int32
+            description: The port it is set to listen on now.
+          op:
+            type: string
+            enum:
+            - port
+          to:
+            type: integer
+            format: int32
+            description: The port it listens on.
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The workload.
+      - type: object
+        description: |-
           Have Stakater Reloader replace a workload's pods when a ConfigMap or Secret it reads
           changes, or stop it: the workload's `reloader.stakater.com/auto` annotation (see the
           `reload` module).
@@ -6020,6 +6080,11 @@ components:
           resource:
             $ref: "#/components/schemas/ResourceRef"
             description: The object's resource.
+          specOnly:
+            type: boolean
+            description: |-
+              Take only `spec` from the copy, merged into the object's spec as a JSON merge patch
+              (RFC 7386: a null removes a field), and keep the rest of the object, its metadata too.
           yaml:
             type: string
             description: The edited object, YAML (JSON is YAML too).
@@ -6176,6 +6241,18 @@ components:
             type: string
             enum:
             - deleteProject
+      - type: object
+        description: |-
+          Finish deleting a project whose Namespace a finalizer holds: remove the finalizers of the
+          objects the namespace controller waits on, never the Namespace's own (see the
+          `project_deletion` module). Planned on its own.
+        required:
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - forceDeleteProject
       - type: object
         description: |-
           Create the project's Namespace, with the project label and, when given, its display
@@ -9696,6 +9773,37 @@ components:
       - progress
       - ok
       - idle
+    HeldBy:
+      type: object
+      description: >-
+        An object whose finalizers a force deletion removes
+        ([`Warning::RemovesFinalizers`]).
+      required:
+      - kind
+      - name
+      - finalizers
+      - kubernetes
+      - thirdParty
+      properties:
+        finalizers:
+          type: array
+          items:
+            type: string
+          description: The finalizers removed.
+        kind:
+          type: string
+          description: The kind.
+        kubernetes:
+          type: boolean
+          description: |-
+            Whether one of them is Kubernetes' own (`kubernetes.io/...`): its controller still
+            runs, so the Pod or node that holds the object is the better thing to fix.
+        name:
+          type: string
+          description: The name.
+        thirdParty:
+          type: boolean
+          description: Whether one of them belongs to anything else.
     HeldDomain:
       type: object
       description: A hostname that another project serves.
@@ -10170,6 +10278,36 @@ components:
         route:
           $ref: "#/components/schemas/RouteRef"
           description: The Ingress.
+    IssuedTokenView:
+      type: object
+      description: A token kube-apiserver issued, shown once.
+      required:
+      - name
+      - namespace
+      - token
+      - expiresAt
+      - recorded
+      properties:
+        ca:
+          type:
+          - string
+          - "null"
+          description: kube-apiserver's CA bundle, PEM; absent when it could not be read.
+        expiresAt:
+          type: string
+          description: When it expires, RFC 3339, as kube-apiserver answered.
+        name:
+          type: string
+          description: The token's name.
+        namespace:
+          type: string
+          description: The namespace of its ServiceAccount.
+        recorded:
+          type: boolean
+          description: Whether the expiry was recorded on the ServiceAccount for the token list.
+        token:
+          type: string
+          description: The bearer token.
     IssuerView:
       type: object
       description: One `ClusterIssuer`.
@@ -10581,6 +10719,11 @@ components:
       type: object
       description: What an applied member plan made.
       properties:
+        issued:
+          oneOf:
+          - $ref: "#/components/schemas/IssuedTokenView"
+            description: "For a new or renewed API token: the token, shown once."
+          - type: "null"
         link:
           oneOf:
           - $ref: "#/components/schemas/SetupLinkView"
@@ -10664,6 +10807,78 @@ components:
           username:
             type: string
             description: The member.
+      - type: object
+        description: "Make an API token: its ServiceAccount, the access a member would get, and its first token."
+        required:
+        - name
+        - expirationSeconds
+        - op
+        properties:
+          expirationSeconds:
+            type: integer
+            format: int64
+            description: How long the token should last; kube-apiserver may cut it.
+          name:
+            type: string
+            description: "Its name: lower-case letters, digits and `-`, at most 63 characters."
+          op:
+            type: string
+            enum:
+            - createToken
+          projects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: Its roles in projects.
+      - type: object
+        description: Change what an API token may do, as for a member.
+        required:
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - tokenAccess
+          projects:
+            type: array
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: Its roles in projects.
+      - type: object
+        description: Issue another token; earlier ones work until they expire.
+        required:
+        - name
+        - expirationSeconds
+        - op
+        properties:
+          expirationSeconds:
+            type: integer
+            format: int64
+            description: How long the new token should last.
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - renewToken
+      - type: object
+        description: "Delete an API token: its bindings, then its ServiceAccount, which revokes its tokens."
+        required:
+        - name
+        - op
+        properties:
+          name:
+            type: string
+            description: The token.
+          op:
+            type: string
+            enum:
+            - deleteToken
       description: A change to the members, as a person asks for it.
     MemberPlan:
       type: object
@@ -10824,17 +11039,29 @@ components:
       description: Everyone who can sign in, and the links waiting to be used.
       required:
       - id
+      - apiTokens
       - installed
       - items
       - invitations
       - setupLinks
       - canManage
+      - canManageTokens
       - projectRoles
       - unreadable
       properties:
+        apiTokens:
+          type: array
+          items:
+            $ref: "#/components/schemas/ApiTokenView"
+          description: "API tokens, by name: machine accounts with the access of a member."
         canManage:
           $ref: "#/components/schemas/Permission"
           description: Whether the person may create invitations, as far as their rules tell.
+        canManageTokens:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Whether the person may create API tokens: `create serviceaccounts` in the token
+            namespace.
         id:
           type: string
           description: "`members`."
@@ -13065,6 +13292,24 @@ components:
           happens to the data of each volume.
       - type: object
         description: |-
+          The plan removes these objects' finalizers, so their controllers do not finish their
+          cleanup: what they made outside the cluster, such as a backup in object storage or a
+          cloud disk, may stay.
+        required:
+        - objects
+        - code
+        properties:
+          code:
+            type: string
+            enum:
+            - removesFinalizers
+          objects:
+            type: array
+            items:
+              $ref: "#/components/schemas/HeldBy"
+            description: The objects, with the finalizers removed.
+      - type: object
+        description: |-
           Helm, Argo CD or Flux manages these objects of the deleted project: if the tool still
           deploys them, it creates them again after the deletion.
         required:
@@ -13773,7 +14018,9 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/BackupCoverage"
-          description: One row per claim, then per database, then the namespace.
+          description: |-
+            One row per claim, then per database, then the namespace. A database's claims have no
+            row of their own: they are backed up with the database.
         keysFrom:
           type: object
           description: |-
@@ -14313,6 +14560,7 @@ components:
       - backUpVolumes
       - restoreVolumes
       - openTerminal
+      - portForward
       - readLogs
       - build
       - deployFromGit
@@ -14369,6 +14617,11 @@ components:
         openTerminal:
           $ref: "#/components/schemas/Permission"
           description: "Open a terminal in a container: `create` on `pods/exec`."
+        portForward:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
+            on `pods/portforward`.
         readLogs:
           $ref: "#/components/schemas/Permission"
           description: "Read the pods' logs: `get` on `pods/log`."

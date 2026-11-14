@@ -176,13 +176,6 @@ pub(crate) fn allow_title_bar(app: &AppHandle, dev_web: Option<&tauri::Url>) -> 
     app.add_capability(capability)
 }
 
-/// On Linux the program name is the Wayland app ID and X11 window class, which GNOME matches to
-/// the `.desktop` file of the same name, so it is the app's reverse DNS identifier.
-#[cfg(target_os = "linux")]
-pub(crate) fn set_app_id(identifier: &str) {
-    gtk::glib::set_prgname(Some(identifier));
-}
-
 /// On Windows the AppUserModelID groups the app's windows under one taskbar button. It must be set
 /// before any window is shown.
 #[cfg(windows)]
@@ -191,9 +184,6 @@ pub(crate) fn set_app_id(identifier: &str) {
         crate::output::warn(&format!("cannot set the AppUserModelID: {err}"));
     }
 }
-
-#[cfg(target_os = "macos")]
-pub(crate) const fn set_app_id(_identifier: &str) {}
 
 /// The primary screen's work area (without the taskbar or Dock) in points: place and size.
 fn work_area(app: &AppHandle) -> Option<Area> {

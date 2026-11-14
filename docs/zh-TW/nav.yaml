@@ -64,6 +64,7 @@
     installer-configuration: Installer 設定
     installer: Installer 指令
     permissions: 權限
+    api-tokens: API 權杖
     architecture: 架構
     releases: 發行檔與驗證
     security: 安全性

@@ -124,7 +124,7 @@ fn backups_of(
                 secret: s3("secretAccessKeySecretKeyRef/name"),
                 region: s3("region"),
                 retention: text(b, "/spec/maxRetention"),
-                in_use: true,
+                in_use: b.data.pointer("/spec/schedule/suspend") != Some(&Value::Bool(true)),
             }
         });
     let owners: Vec<String> = mine
@@ -134,7 +134,7 @@ fn backups_of(
     let mut runs = databases::job_runs(MODULE.id, name, jobs, &owners);
     newest(&mut runs, 20);
     Backups {
-        ready: store.is_some() && state == State::Ready,
+        ready: store.as_ref().is_some_and(|s| s.in_use) && state == State::Ready,
         store,
         schedules,
         runs,
@@ -320,6 +320,29 @@ mod tests {
             db.backups.runs[0].restore_from.as_deref(),
             Some("2026-10-20T03:01:00Z")
         );
+    }
+
+    #[test]
+    fn a_suspended_schedule_leaves_the_store_out_of_use() {
+        let server = object(serde_json::json!({
+            "apiVersion": "k8s.mariadb.com/v1alpha1", "kind": "MariaDB",
+            "metadata": {"name": "maria", "namespace": "shop"},
+            "spec": {"image": "mariadb:11.8.3"},
+            "status": {"conditions": [{"type": "Ready", "status": "True"}]}
+        }));
+        let backup = object(serde_json::json!({
+            "apiVersion": "k8s.mariadb.com/v1alpha1", "kind": "Backup",
+            "metadata": {"name": "maria-scheduled", "namespace": "shop"},
+            "spec": {"mariaDbRef": {"name": "maria"},
+                     "schedule": {"cron": "0 3 * * *", "suspend": true},
+                     "storage": {"s3": {"bucket": "b", "prefix": "maria"}}}
+        }));
+        let db = database("shop", &server, &[backup], &[]);
+        let store = db.backups.store.unwrap();
+        assert_eq!(store.destination.as_deref(), Some("s3://b/maria"));
+        assert!(!store.in_use);
+        assert!(!db.backups.ready);
+        assert!(db.backups.schedules[0].paused);
     }
 
     #[test]

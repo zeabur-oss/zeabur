@@ -43,10 +43,13 @@ custom-protocol = ["tauri/custom-protocol"]
 [build-dependencies]
 tauri-build = { version = "2", features = ["codegen"] }
 
-# The window's key handler for the shortcuts and the program name (Wayland app ID); the same gtk as
-# Tauri's.
+# The window's key handler for the shortcuts; the same gtk as Tauri's.
 [target.'cfg(target_os = "linux")'.dependencies]
 gtk = "0.18"
+
+# A second launch shows the chooser of the running app. macOS already runs one instance per app.
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2"
 
 # The shortcuts, through WebView2's accelerator key event, and the AppUserModelID; the same versions
 # as wry's.

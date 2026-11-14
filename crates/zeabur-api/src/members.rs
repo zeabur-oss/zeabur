@@ -46,6 +46,7 @@ pub mod access;
 mod directory;
 pub(crate) mod handlers;
 pub(crate) mod plan;
+mod tokens;
 mod writes;
 
 pub use directory::{
@@ -54,6 +55,7 @@ pub use directory::{
 pub use plan::{
     MemberApplied, MemberApplyRequest, MemberChange, MemberPlan, MemberWrite, MemberWriteAction,
 };
+pub use tokens::{ApiTokenView, IssuedTokenView};
 pub use writes::{SetupLinkRequest, SetupLinkView};
 
 /// Zeabur Identity's API group.

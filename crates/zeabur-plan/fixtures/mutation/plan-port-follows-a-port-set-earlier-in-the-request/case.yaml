@@ -1,0 +1,10 @@
+description: "PORT comes from the web-env Secret, and the same request first sets PORT in the container. The port change follows that earlier change. It moves the container's own PORT to 3000, which wins over the Secret, and leaves the Secret alone."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: env
+        workload: {kind: Deployment, name: web}
+        changes:
+          - {op: set, name: PORT, value: "8080"}
+      - {op: port, workload: {kind: Deployment, name: web}, from: 8080, to: 3000}

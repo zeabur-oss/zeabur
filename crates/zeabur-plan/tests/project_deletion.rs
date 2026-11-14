@@ -1,6 +1,7 @@
 //! Deleting a project: the database objects go first, then the Namespace, each pinned to the
 //! object as read; the plan says what goes and what happens to each volume's data; Zeabur's own
-//! and the system's namespaces are refused.
+//! and the system's namespaces are refused. A force deletion removes the finalizers only of the
+//! project's objects already being deleted, and never writes the Namespace.
 
 #[cfg(test)]
 mod tests {
@@ -10,7 +11,7 @@ mod tests {
     use zeabur_graph::Snapshot;
     use zeabur_model::{Tool, WorkloadKind, WorkloadRef};
     use zeabur_plan::{
-        Change, DatabaseObject, DeletionInput, ObjectName, Plan, PlanError, PlanRequest,
+        Change, DeletionInput, HeldBy, ObjectName, Plan, PlanError, PlanRequest, ProjectObject,
         ResourceRef, VolumeDeletion, Warning, Write, plan,
     };
 
@@ -32,8 +33,8 @@ mod tests {
         }
     }
 
-    fn database(name: &str) -> DatabaseObject {
-        DatabaseObject {
+    fn database(name: &str) -> ProjectObject {
+        ProjectObject {
             resource: cnpg(),
             object: json!({"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
                 "metadata": {"name": name, "uid": format!("{name}-uid"), "resourceVersion": "40",
@@ -77,6 +78,7 @@ mod tests {
             default_class: Some("local-path".to_owned()),
             tools_namespace: "zeabur-terminals".to_owned(),
             tools_pods: vec!["zeabur-tools-alice-1".to_owned()],
+            ..DeletionInput::default()
         }
     }
 
@@ -287,5 +289,188 @@ mod tests {
         )
         .unwrap_err();
         assert_eq!(error.code, "delete_project_alone");
+    }
+
+    fn terminating() -> Value {
+        let mut ns = shop();
+        ns["metadata"]["deletionTimestamp"] = json!("2026-10-26T00:00:00Z");
+        ns
+    }
+
+    fn held(name: &str, namespace: &str, deleted: bool, finalizers: &[&str]) -> ProjectObject {
+        let mut object = json!({"apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+            "metadata": {"name": name, "namespace": namespace, "uid": format!("{name}-uid"),
+                "resourceVersion": "40", "generation": 2, "finalizers": finalizers}});
+        if deleted {
+            object["metadata"]["deletionTimestamp"] = json!("2026-10-26T00:00:00Z");
+        }
+        ProjectObject {
+            resource: cnpg(),
+            object,
+        }
+    }
+
+    fn forced(namespace: &Value, held: Vec<ProjectObject>) -> Result<Plan, PlanError> {
+        let input = DeletionInput {
+            zeabur_namespaces: vec!["zeabur".to_owned()],
+            held,
+            ..DeletionInput::default()
+        };
+        plan(
+            zeabur_plan::Input {
+                namespace: Some(namespace),
+                deletion: Some(&input),
+                ..zeabur_plan::Input::new(&Snapshot::default(), "2026-10-26T00:00:00Z")
+            },
+            &PlanRequest {
+                changes: vec![Change::ForceDeleteProject],
+            },
+        )
+    }
+
+    #[test]
+    fn a_force_deletion_empties_the_finalizers_only_of_objects_being_deleted_in_the_project() {
+        let plan = forced(
+            &terminating(),
+            vec![
+                held("db", "shop", true, &["cnpg.io/cleanup"]),
+                held("not-deleted", "shop", false, &["cnpg.io/cleanup"]),
+                held("elsewhere", "other", true, &["cnpg.io/cleanup"]),
+                held("released", "shop", true, &[]),
+            ],
+        )
+        .unwrap();
+        let writes: Vec<(&str, &Write)> = plan
+            .objects
+            .iter()
+            .map(|o| (o.target.name.as_str(), &o.write))
+            .collect();
+        assert_eq!(
+            writes,
+            [(
+                "db",
+                &Write::Patch {
+                    operations: vec![
+                        json!({"op": "test", "path": "/metadata/generation", "value": 2}),
+                        json!({"op": "test", "path": "/metadata/finalizers",
+                            "value": ["cnpg.io/cleanup"]}),
+                        json!({"op": "replace", "path": "/metadata/finalizers", "value": []}),
+                    ]
+                }
+            )]
+        );
+        assert_eq!(
+            plan.warnings,
+            [Warning::RemovesFinalizers {
+                objects: vec![HeldBy {
+                    kind: "Cluster".to_owned(),
+                    name: "db".to_owned(),
+                    finalizers: vec!["cnpg.io/cleanup".to_owned()],
+                    kubernetes: false,
+                    third_party: true,
+                }]
+            }]
+        );
+    }
+
+    #[test]
+    fn a_kubernetes_finalizer_is_flagged_apart_from_a_third_party_one() {
+        let plan = forced(
+            &terminating(),
+            vec![
+                held("data", "shop", true, &["kubernetes.io/pvc-protection"]),
+                held("db", "shop", true, &["cnpg.io/cleanup"]),
+                held(
+                    "both",
+                    "shop",
+                    true,
+                    &["kubernetes.io/pv-protection", "cnpg.io/cleanup"],
+                ),
+            ],
+        )
+        .unwrap();
+        let [Warning::RemovesFinalizers { objects }] = plan.warnings.as_slice() else {
+            panic!("one RemovesFinalizers warning");
+        };
+        let flags: Vec<(&str, bool, bool)> = objects
+            .iter()
+            .map(|o| (o.name.as_str(), o.kubernetes, o.third_party))
+            .collect();
+        assert_eq!(
+            flags,
+            [
+                ("data", true, false),
+                ("db", false, true),
+                ("both", true, true)
+            ]
+        );
+    }
+
+    /// A `Backup` named `nightly` in each of two API groups, held by `finalizers[i]`.
+    fn backups(finalizers: [&[&str]; 2]) -> Vec<ProjectObject> {
+        let mut out = Vec::new();
+        for (group, finalizers) in [
+            ("postgresql.cnpg.io", finalizers[0]),
+            ("velero.io", finalizers[1]),
+        ] {
+            out.push(ProjectObject {
+                resource: ResourceRef {
+                    group: group.to_owned(),
+                    version: "v1".to_owned(),
+                    resource: "backups".to_owned(),
+                },
+                object: json!({"apiVersion": format!("{group}/v1"), "kind": "Backup",
+                    "metadata": {"name": "nightly", "namespace": "shop", "uid": format!("{group}-uid"),
+                        "resourceVersion": "40", "generation": 2, "finalizers": finalizers,
+                        "deletionTimestamp": "2026-10-26T00:00:00Z"}}),
+            });
+        }
+        out
+    }
+
+    #[test]
+    fn a_finalizer_gone_from_either_of_two_objects_of_one_kind_and_name_changes_the_pins() {
+        let reviewed = forced(&terminating(), backups([&["a", "b"], &["a", "b"]])).unwrap();
+        for changed in [
+            backups([&["a"], &["a", "b"]]),
+            backups([&["a", "b"], &["a"]]),
+        ] {
+            let now = forced(&terminating(), changed).unwrap();
+            assert_ne!(
+                zeabur_plan::versions(&reviewed),
+                zeabur_plan::versions(&now),
+                "{now:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_force_deletion_is_refused_where_a_deletion_is_and_where_nothing_is_held() {
+        let mut zeabur = namespace("zeabur", &json!({"zeabur.com/project": "true"}));
+        zeabur["metadata"]["deletionTimestamp"] = json!("2026-10-26T00:00:00Z");
+        let cases = [
+            (
+                "not being deleted",
+                shop(),
+                vec![held("db", "shop", true, &["cnpg.io/cleanup"])],
+                "not_deleting",
+            ),
+            (
+                "Zeabur's own",
+                zeabur,
+                vec![held("db", "zeabur", true, &["cnpg.io/cleanup"])],
+                "zeabur_namespace",
+            ),
+            (
+                "nothing held",
+                terminating(),
+                vec![held("db", "shop", false, &["cnpg.io/cleanup"])],
+                "nothing_held",
+            ),
+        ];
+        for (case, ns, objects, code) in cases {
+            let error = forced(&ns, objects).unwrap_err();
+            assert_eq!(error.code, code, "{case}");
+        }
     }
 }

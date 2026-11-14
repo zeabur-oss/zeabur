@@ -14,7 +14,7 @@ use super::writes::{
     RESET_SECONDS, SetupLinkRequest, SetupLinkView, clear, delete, issue, refuse, target,
     user_object,
 };
-use super::{USER_PREFIX, access};
+use super::{USER_PREFIX, access, tokens};
 use crate::error::{ApiError, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
@@ -77,29 +77,59 @@ pub(crate) async fn list(
 ) -> Result<Json<MembersView>, ApiError> {
     let identity = &state.settings.identity;
     let namespace = identity.namespace.as_str();
-    let (directory, you, links, can, bindings) = futures_util::join!(
+    let (directory, you, links, can, can_tokens, bindings) = futures_util::join!(
         Directory::load(cluster.as_ref(), namespace),
         you(cluster.as_ref()),
         setup_links(cluster.as_ref(), identity),
         can_manage(cluster.as_ref(), namespace),
+        tokens::can_manage(cluster.as_ref()),
         access::read(cluster.as_ref()),
     );
-    let Some(mut directory) = directory? else {
-        return Ok(Json(MembersView::not_installed(links, can)));
-    };
+    let mut found = Access::default();
     match bindings {
         Ok(bindings) => {
-            directory.projects = Some(access::grants_by_member(&bindings.unwrap_or_default()));
+            let bindings = bindings.unwrap_or_default();
+            found.projects = Some(access::grants_by_member(&bindings));
+            match tokens::list(cluster.as_ref(), &bindings).await {
+                Ok(listed) => found.api_tokens = listed,
+                Err(error) => {
+                    if let Ok(refused) = error.into_unreadable(&tokens::key()) {
+                        found.unreadable.push(refused.into());
+                    }
+                }
+            }
         }
         Err(error) => {
             if let Ok(refused) = error.into_unreadable(&access::key()) {
-                directory.unreadable.push(refused.into());
+                found.unreadable.push(refused.into());
             }
         }
     }
+    // API tokens are plain ServiceAccounts: they work without Zeabur Identity.
+    let Some(mut directory) = directory? else {
+        let mut view = MembersView::not_installed(links, can);
+        view.project_roles = identity.project_roles;
+        view.api_tokens = found.api_tokens;
+        view.can_manage_tokens = can_tokens;
+        view.unreadable = found.unreadable;
+        return Ok(Json(view));
+    };
+    directory.projects = found.projects;
+    directory.unreadable.extend(found.unreadable);
     let mut view = directory.view(namespace, Some(&you), (state.clock)(), links, can);
     view.project_roles = identity.project_roles;
+    view.api_tokens = found.api_tokens;
+    view.can_manage_tokens = can_tokens;
     Ok(Json(view))
+}
+
+/// Roles in projects and API tokens, read from the bindings whether Zeabur Identity is installed
+/// or not.
+#[derive(Default)]
+struct Access {
+    projects: Option<std::collections::BTreeMap<String, Vec<access::ProjectGrant>>>,
+    api_tokens: Vec<tokens::ApiTokenView>,
+    unreadable: Vec<crate::views::UnreadableView>,
 }
 
 /// Revokes a setup link that has not been used. One already used or expired is gone already.
@@ -258,6 +288,8 @@ impl MembersView {
             setup_links,
             can_manage,
             project_roles: false,
+            api_tokens: Vec::new(),
+            can_manage_tokens: crate::projects::namespace::Permission::Unknown,
             unreadable: Vec::new(),
         }
     }

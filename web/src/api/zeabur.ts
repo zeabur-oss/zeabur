@@ -341,6 +341,51 @@ export type AlertmanagerChannelSettings =
     }
 
 /**
+ * What a member may do in one project.
+ */
+export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole]
+
+export const ProjectRole = {
+  developer: "developer",
+  viewer: "viewer",
+} as const
+
+/**
+ * A member's role in a project.
+ */
+export type ProjectGrant = {
+  /** The project (its namespace). */
+  project: string
+  /** The role there. */
+  role: ProjectRole
+}
+
+/**
+ * One API token.
+ */
+export type ApiTokenView = {
+  /**
+   * When it was made, RFC 3339.
+   * @nullable
+   */
+  createdAt?: string | null
+  /**
+   * The Kubernetes user name of whoever made it.
+   * @nullable
+   */
+  createdBy?: string | null
+  /**
+   * When its latest token expires, RFC 3339, as kube-apiserver answered.
+   * @nullable
+   */
+  expiresAt?: string | null
+  /** Its name, which is its ServiceAccount's. */
+  name: string
+  /** Its roles in projects. */
+  projects: ProjectGrant[]
+}
+
+/**
  * The object a planned write addresses.
  */
 export type PlanTarget = {
@@ -1810,6 +1855,20 @@ export type Change =
       workload: WorkloadRef
     }
   | {
+      /**
+       * The container; may be left out when the workload has only one.
+       * @nullable
+       */
+      container?: string | null
+      /** The port it is set to listen on now. */
+      from: number
+      op: "port"
+      /** The port it listens on. */
+      to: number
+      /** The workload. */
+      workload: WorkloadRef
+    }
+  | {
       /** On or off. */
       enabled: boolean
       op: "configReload"
@@ -1904,6 +1963,11 @@ export type Change =
       op: "edit"
       /** The object's resource. */
       resource: ResourceRef
+      /**
+       * Take only `spec` from the copy, merged into the object's spec as a JSON merge patch
+       * (RFC 7386: a null removes a field), and keep the rest of the object, its metadata too.
+       */
+      specOnly?: boolean
       /** The edited object, YAML (JSON is YAML too). */
       yaml: string
     }
@@ -1962,6 +2026,9 @@ export type Change =
     }
   | {
       op: "deleteProject"
+    }
+  | {
+      op: "forceDeleteProject"
     }
   | {
       /**
@@ -3009,6 +3076,25 @@ export type ProjectDeletion = {
 }
 
 /**
+ * An object whose finalizers a force deletion removes ([`Warning::RemovesFinalizers`]).
+ */
+export type HeldBy = {
+  /** The finalizers removed. */
+  finalizers: string[]
+  /** The kind. */
+  kind: string
+  /**
+   * Whether one of them is Kubernetes' own (`kubernetes.io/...`): its controller still
+   * runs, so the Pod or node that holds the object is the better thing to fix.
+   */
+  kubernetes: boolean
+  /** The name. */
+  name: string
+  /** Whether one of them belongs to anything else. */
+  thirdParty: boolean
+}
+
+/**
  * Something a person should know before applying.
  */
 export type PlanWarning =
@@ -3265,6 +3351,11 @@ export type PlanWarning =
   | (ProjectDeletion & {
       code: "deletesProject"
     })
+  | {
+      code: "removesFinalizers"
+      /** The objects, with the finalizers removed. */
+      objects: HeldBy[]
+    }
   | {
       code: "recreated"
       /** The objects. */
@@ -6168,6 +6259,27 @@ export type InvitationView = {
 }
 
 /**
+ * A token kube-apiserver issued, shown once.
+ */
+export type IssuedTokenView = {
+  /**
+   * kube-apiserver's CA bundle, PEM; absent when it could not be read.
+   * @nullable
+   */
+  ca?: string | null
+  /** When it expires, RFC 3339, as kube-apiserver answered. */
+  expiresAt: string
+  /** The token's name. */
+  name: string
+  /** The namespace of its ServiceAccount. */
+  namespace: string
+  /** Whether the expiry was recorded on the ServiceAccount for the token list. */
+  recorded: boolean
+  /** The bearer token. */
+  token: string
+}
+
+/**
  * A workload's Keel policy.
  */
 export type KeelPolicy = {
@@ -6375,6 +6487,7 @@ export type SetupLinkView = {
  * What an applied member plan made.
  */
 export type MemberApplied = {
+  issued?: IssuedTokenView | null
   link?: SetupLinkView | null
 }
 
@@ -6384,26 +6497,6 @@ export type MemberApplied = {
 export type MemberApplyRequest = {
   /** The token `plan` returned. */
   token: string
-}
-
-/**
- * What a member may do in one project.
- */
-export type ProjectRole = (typeof ProjectRole)[keyof typeof ProjectRole]
-
-export const ProjectRole = {
-  developer: "developer",
-  viewer: "viewer",
-} as const
-
-/**
- * A member's role in a project.
- */
-export type ProjectGrant = {
-  /** The project (its namespace). */
-  project: string
-  /** The role there. */
-  role: ProjectRole
 }
 
 /**
@@ -6437,6 +6530,34 @@ export type MemberChange =
       op: "remove"
       /** The member. */
       username: string
+    }
+  | {
+      /** How long the token should last; kube-apiserver may cut it. */
+      expirationSeconds: number
+      /** Its name: lower-case letters, digits and `-`, at most 63 characters. */
+      name: string
+      op: "createToken"
+      /** Its roles in projects. */
+      projects?: ProjectGrant[]
+    }
+  | {
+      /** The token. */
+      name: string
+      op: "tokenAccess"
+      /** Its roles in projects. */
+      projects?: ProjectGrant[]
+    }
+  | {
+      /** How long the new token should last. */
+      expirationSeconds: number
+      /** The token. */
+      name: string
+      op: "renewToken"
+    }
+  | {
+      /** The token. */
+      name: string
+      op: "deleteToken"
     }
 
 /**
@@ -6612,8 +6733,15 @@ export type SetupLinks = {
  * Everyone who can sign in, and the links waiting to be used.
  */
 export type MembersView = {
+  /** API tokens, by name: machine accounts with the access of a member. */
+  apiTokens: ApiTokenView[]
   /** Whether the person may create invitations, as far as their rules tell. */
   canManage: Permission
+  /**
+   * Whether the person may create API tokens: `create serviceaccounts` in the token
+   * namespace.
+   */
+  canManageTokens: Permission
   /** `members`. */
   id: string
   /** Whether Zeabur Identity is installed; when not, everything else is empty. */
@@ -7980,7 +8108,10 @@ export type ProjectBackupsKeysFrom = { [key: string]: string }
  * A project's backups across providers.
  */
 export type ProjectBackups = {
-  /** One row per claim, then per database, then the namespace. */
+  /**
+   * One row per claim, then per database, then the namespace. A database's claims have no
+   * row of their own: they are backed up with the database.
+   */
   coverage: BackupCoverage[]
   /**
    * The S3 destination each Secret's keys were copied from, by the Secret's name; empty
@@ -8556,6 +8687,11 @@ export type ProjectRights = {
   deployFromGit: Permission
   /** Open a terminal in a container: `create` on `pods/exec`. */
   openTerminal: Permission
+  /**
+   * Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
+   * on `pods/portforward`.
+   */
+  portForward: Permission
   /** Read the pods' logs: `get` on `pods/log`. */
   readLogs: Permission
   /** Read Secret values: `get` on secrets. */

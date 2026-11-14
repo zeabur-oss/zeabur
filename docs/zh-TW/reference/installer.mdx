@@ -193,6 +193,14 @@ K3s 或 RKE2 移除後，`uninstall --purge` 清掉 installer 的下載快取、
 
 設定檔是 `use: personal` 時，`uninstall` 不刪東西，只印出移除 KubeSolo 的指令，見[自己用：在小機器上安裝](../install/personal.mdx#移除)。`node add` 和 `node sync` 不能用，因為 KubeSolo 只有一個節點。
 
+## 經過代理伺服器
+
+Installer 和它的使用統計會依標準的代理環境變數連線。執行指令前設定 `HTTPS_PROXY`、`HTTP_PROXY` 或 `ALL_PROXY`，要直接連線的主機放進 `NO_PROXY`，大小寫都可以。`apply` 要以 root 執行，記得讓 `sudo` 帶入這些變數，例如用 `sudo -E`。
+
+- 代理位址必須以 `http://` 開頭，不支援 SOCKS。
+- 連到 HTTPS 目的地時，會透過 `CONNECT` 通道經過代理。
+- 本機（loopback）、連結本地（link-local）和其他本地位址不會經過代理。
+
 ## 安裝中斷時
 
 - 主機檢查失敗：依輸出釋出連接埠或修正磁碟，再執行一次 `plan`、`apply`。

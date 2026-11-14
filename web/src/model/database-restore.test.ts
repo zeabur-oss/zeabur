@@ -57,7 +57,7 @@ const base = (patch: Partial<Database>): Database =>
 const point = { backup: "shop-1", time: "2026-10-22T03:01:00Z", from: "20261022T030000" }
 
 describe("restore points", () => {
-  test("are the succeeded runs that name what to restore; Dragonfly's is its newest snapshot", () => {
+  test("are the succeeded runs that name what to restore", () => {
     const pg = base({
       engine: "postgresql",
       backups: {
@@ -67,11 +67,6 @@ describe("restore points", () => {
       } as Database["backups"],
     })
     expect(restorePoints(pg).map((p) => p.from)).toEqual(["id-a"])
-    const cache = base({
-      engine: "dragonfly",
-      backups: { schedules: [], runs: [], ready: false, store: { name: "x", inUse: true } },
-    })
-    expect(restorePoints(cache)).toEqual([{ backup: "latest" }])
   })
 
   test("the new name is the original's with the date, cut to fit", () => {
@@ -151,6 +146,38 @@ describe("restoring into a new database", () => {
     })
   })
 
+  test("PostgreSQL with backups turned off reads the backups under the kept server name", () => {
+    const pg = base({
+      engine: "postgresql",
+      apiVersion: "postgresql.cnpg.io/v1",
+      kind: "Cluster",
+      backups: {
+        schedules: [],
+        runs: [],
+        ready: true,
+        store: { name: "shop-backups", inUse: false },
+      },
+      object: {
+        spec: {
+          plugins: [
+            {
+              name: "barman-cloud.cloudnative-pg.io",
+              enabled: false,
+              isWALArchiver: true,
+              parameters: { barmanObjectName: "shop-backups", serverName: "shop-2025" },
+            },
+          ],
+        },
+      } as unknown as Database["object"],
+    })
+    const [cluster] = bodies(restoreChanges(pg, point, "copy", "demo"))
+    expect(cluster?.spec.plugins).toBeUndefined()
+    expect(cluster?.spec.externalClusters[0].plugin.parameters).toEqual({
+      barmanObjectName: "shop-backups",
+      serverName: "shop-2025",
+    })
+  })
+
   test("PostgreSQL recovers to a point in time inside the window, given in UTC", () => {
     const window = { first: "2026-10-20T03:00:00Z", lagSeconds: 300 }
     const pg = base({
@@ -197,7 +224,10 @@ describe("restoring into a new database", () => {
       backups: { schedules: [], runs: [], ready: true, store: { name: "backups", inUse: true } },
       object: {
         metadata: { finalizers: ["percona.com/delete-psmdb-pvc"] },
-        spec: { backup: { enabled: true, storages: { backups: { s3 } }, tasks: [{ name: "x" }] } },
+        spec: {
+          secrets: { users: "shop-secrets" },
+          backup: { enabled: true, storages: { backups: { s3 } }, tasks: [{ name: "x" }] },
+        },
       } as unknown as Database["object"],
     })
     const [cluster, restore] = bodies(
@@ -212,6 +242,22 @@ describe("restoring into a new database", () => {
         backupSource: { type: "logical", destination: "s3://b/shop/2026", s3 },
       },
     })
+  })
+
+  test("a MongoDB copy runs the backup agent when the original has backups off", () => {
+    const mongo = base({
+      engine: "mongodb",
+      apiVersion: "psmdb.percona.com/v1",
+      kind: "PerconaServerMongoDB",
+      backups: { schedules: [], runs: [], ready: true, store: { name: "backups", inUse: true } },
+      object: {
+        metadata: {},
+        spec: { backup: { enabled: false, storages: { backups: { s3: {} } }, tasks: [] } },
+      } as unknown as Database["object"],
+    })
+    const [cluster] = bodies(restoreChanges(mongo, point, "copy", "demo"))
+    expect(cluster?.spec.backup.enabled).toBe(true)
+    expect(cluster?.spec.backup.tasks).toEqual([])
   })
 
   test("a copy of a MongoDB 8 keeps rseq in glibc", () => {
@@ -313,49 +359,6 @@ describe("restoring into a new database", () => {
       targetRecoveryTime: "2026-10-22T03:01:00Z",
     })
   })
-
-  test("Dragonfly copies the newest snapshot into a folder of its own before it starts", () => {
-    const cache = base({
-      engine: "dragonfly",
-      apiVersion: "dragonflydb.io/v1alpha1",
-      kind: "Dragonfly",
-      backups: {
-        schedules: [],
-        runs: [],
-        ready: false,
-        store: {
-          name: "shop",
-          destination: "s3://b/shop",
-          endpoint: "https://s3.test",
-          inUse: true,
-        },
-      },
-      object: {
-        spec: {
-          authentication: { passwordFromSecret: { name: "shop-auth", key: "password" } },
-          snapshot: { dir: "s3://b/shop", cron: "0 3 * * *" },
-          env: [
-            { name: "AWS_ACCESS_KEY_ID", valueFrom: {} },
-            { name: "OTHER", value: "x" },
-          ],
-        },
-      } as unknown as Database["object"],
-    })
-    const [, store] = bodies(
-      restoreChanges(cache, { backup: "latest" }, "copy", "demo", () => "pw"),
-    )
-    expect(store?.spec.snapshot.dir).toBe("s3://b/copy")
-    expect(store?.spec.authentication.passwordFromSecret.name).toBe("copy-auth")
-    const copy = store?.spec.initContainers[0]
-    expect(copy.env.map((e: { name: string }) => e.name)).toEqual([
-      "FROM",
-      "TO",
-      "ENDPOINT",
-      "HOME",
-      "AWS_ACCESS_KEY_ID",
-    ])
-    expect(copy.env[0].value).toBe("s3://b/shop")
-  })
 })
 
 describe("the copy's own Secrets", () => {
@@ -422,9 +425,8 @@ describe("the copy's own Secrets", () => {
     })
   })
 
-  test("PostgreSQL and Dragonfly keep no Secret of the original", () => {
+  test("PostgreSQL keeps no Secret of the original", () => {
     expect(keptSecret(base({ engine: "postgresql" }))).toBeUndefined()
-    expect(keptSecret(base({ engine: "dragonfly" }))).toBeUndefined()
   })
 })
 

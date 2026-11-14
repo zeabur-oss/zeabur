@@ -28,6 +28,9 @@
 //! holds the projects as the demo starts and `wiki`, deleted since. A store on 127.0.0.1 answers
 //! the `DownloadRequest`s, so restore plans list what a backup holds.
 //!
+//! `ZEABUR_DEMO_WRONG_PORT=1` adds `lab/checkout`, a built service whose app does not listen on
+//! its port 8080 while its image declares 3000; `no-expose` makes the image declare none.
+//!
 //! `ZEABUR_DEMO_DELETING=1` adds a project, `archive`, that a database's finalizer keeps from
 //! being deleted.
 //!
@@ -37,6 +40,8 @@
 //! Alerting sends shop's deploy failures to Slack and the cluster's node alerts to Telegram; a
 //! second shop channel was rejected by Alertmanager. `ZEABUR_DEMO_ALERTING=none` leaves it
 //! uninstalled.
+//!
+//! `ZEABUR_DEMO_IDENTITY=none` leaves Zeabur Identity uninstalled; the API tokens stay.
 //!
 //! `storageclasses.storage.k8s.io` and `persistentvolumes` in `ZEABUR_DEMO_FORBID` refuse
 //! reading the storage classes (local-path, the default, and Longhorn) and the volumes behind
@@ -99,6 +104,7 @@ use zeabur_kube::k8s_openapi::api::apps::v1::ReplicaSet;
 use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, Pod, Secret};
 use zeabur_kube::k8s_openapi::api::events::v1::Event;
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::Time;
 use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_kube::memory::{MemoryCluster, State};
 use zeabur_kube::{
@@ -108,6 +114,10 @@ use zeabur_modules::alertmanager as am;
 
 fn from<T: serde::de::DeserializeOwned>(value: Value) -> T {
     serde_json::from_value(value).expect("valid example object")
+}
+
+fn from_typed(object: impl serde::Serialize) -> DynamicObject {
+    from(serde_json::to_value(object).expect("serialisable example object"))
 }
 
 /// One of Zeabur Identity's objects in `zeabur-identity`, labelled with its user when it has one.
@@ -232,29 +242,51 @@ fn people() -> Vec<DynamicObject> {
 }
 
 /// What Bob and Carol may do: Bob develops `shop` and views `blog`, Carol views five projects.
+/// The API token `github-actions` develops `shop`, `grafana` views `shop` and `blog`, and
+/// `backup-bot` develops `billing`.
 fn member_roles() -> Vec<DynamicObject> {
-    use zeabur_api::members::access::{ProjectRole, baseline_binding, role_binding};
+    use zeabur_api::members::access::{Holder, ProjectRole, baseline_binding, role_binding};
     let roles = [
-        ("bob", "shop", ProjectRole::Developer),
-        ("bob", "blog", ProjectRole::Viewer),
-        ("carol", "shop", ProjectRole::Viewer),
-        ("carol", "blog", ProjectRole::Viewer),
-        ("carol", "billing", ProjectRole::Viewer),
-        ("carol", "payments", ProjectRole::Viewer),
-        ("carol", "analytics", ProjectRole::Viewer),
+        (Holder::member("bob"), "shop", ProjectRole::Developer),
+        (Holder::member("bob"), "blog", ProjectRole::Viewer),
+        (Holder::member("carol"), "shop", ProjectRole::Viewer),
+        (Holder::member("carol"), "blog", ProjectRole::Viewer),
+        (Holder::member("carol"), "billing", ProjectRole::Viewer),
+        (Holder::member("carol"), "payments", ProjectRole::Viewer),
+        (Holder::member("carol"), "analytics", ProjectRole::Viewer),
+        (
+            Holder::token("github-actions"),
+            "shop",
+            ProjectRole::Developer,
+        ),
+        (Holder::token("grafana"), "shop", ProjectRole::Viewer),
+        (Holder::token("grafana"), "blog", ProjectRole::Viewer),
+        (
+            Holder::token("backup-bot"),
+            "billing",
+            ProjectRole::Developer,
+        ),
     ];
-    roles
+    let baselines = [
+        Holder::member("alice"),
+        Holder::member("bob"),
+        Holder::member("carol"),
+        Holder::member("dan"),
+        Holder::token("github-actions"),
+        Holder::token("grafana"),
+        Holder::token("backup-bot"),
+    ];
+    let mut objects: Vec<_> = roles
         .into_iter()
-        .map(|(user, project, role)| from(role_binding(project, user, role)))
-        .chain(["alice", "bob", "carol", "dan"].map(|user| {
-            // The memory cluster keeps a cluster-scoped object in namespace "".
-            let mut binding = baseline_binding(user);
-            if let Some(metadata) = binding.get_mut("metadata").and_then(Value::as_object_mut) {
-                metadata.insert("namespace".to_owned(), "".into());
-            }
-            from(binding)
-        }))
-        .collect()
+        .map(|(holder, project, role)| from_typed(role_binding(project, &holder, role)))
+        .collect();
+    objects.extend(baselines.into_iter().map(|holder| {
+        // The memory cluster keeps a cluster-scoped object in namespace "".
+        let mut binding = baseline_binding(&holder);
+        binding.metadata.namespace = Some(String::new());
+        from_typed(binding)
+    }));
+    objects
 }
 
 /// The address Traefik writes into every Ingress's status.
@@ -409,6 +441,38 @@ fn storefront_build() -> DynamicObject {
     .expect("a Build")
 }
 
+/// `ZEABUR_DEMO_WRONG_PORT`: `1` adds lab's checkout, built from a Dockerfile that declares 3000
+/// while the service uses 8080, whose readiness check keeps being refused; `no-expose` makes its
+/// image declare no port.
+fn wrong_port() -> Option<String> {
+    std::env::var("ZEABUR_DEMO_WRONG_PORT").ok()
+}
+
+fn checkout_build() -> Vec<DynamicObject> {
+    let Some(variant) = wrong_port() else {
+        return Vec::new();
+    };
+    let ports = if variant == "no-expose" {
+        json!([])
+    } else {
+        json!(["3000/tcp"])
+    };
+    vec![
+        serde_json::from_value(json!({
+            "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+            "metadata": {"name": "checkout", "namespace": "lab"},
+            "spec": {"builderRef": "dockerfile",
+                "source": {"git": {"url": "https://github.com/example/checkout.git", "ref": "main"}},
+                "output": {"image": "zot.zot.svc:5000/lab/checkout"}},
+            "status": {"latestImage": "zot.zot.svc:5000/lab/checkout:main-1-5d41402",
+                "exposedPorts": ports,
+                "conditions": [{"type": "SourceReady", "status": "True", "reason": "Git"},
+                    {"type": "Ready", "status": "True", "reason": "Succeeded"}]}
+        }))
+        .expect("a Build"),
+    ]
+}
+
 /// One namespace's hand-written objects in `demo-data/<namespace>.yaml`: a manifest each, split
 /// by `---`. A string `now`, `now-2d4h` or `now+30m` (units `d`, `h`, `m`, `s`) is a time
 /// relative to the demo clock. A Secret lists its keys under `data` with empty values; only the
@@ -439,7 +503,23 @@ struct DemoData {
 
 impl DemoData {
     fn load() -> Self {
-        Self::parse(&DEMO_DATA, clock())
+        let mut files: Vec<(&str, String)> = DEMO_DATA
+            .iter()
+            .map(|(namespace, source)| (*namespace, (*source).to_owned()))
+            .collect();
+        if wrong_port().is_some() {
+            for (namespace, source) in &mut files {
+                if *namespace == "lab" {
+                    source.push_str("\n---\n");
+                    source.push_str(include_str!("demo-data/lab-wrong-port.yaml"));
+                }
+            }
+        }
+        let files: Vec<(&str, &str)> = files
+            .iter()
+            .map(|(namespace, source)| (*namespace, source.as_str()))
+            .collect();
+        Self::parse(&files, clock())
     }
 
     fn parse(files: &[(&str, &str)], now: Timestamp) -> Self {
@@ -630,6 +710,7 @@ fn state() -> State {
             namespace("edge", true),
             namespace("default", false),
             namespace("kube-system", false),
+            namespace("zeabur-api-tokens", false),
         ],
         objects,
         events: data.events,
@@ -745,6 +826,7 @@ fn state() -> State {
                 true,
             ),
             ServedResource::readable("batch", "v1", "jobs", "Job", true),
+            ServedResource::readable("", "v1", "serviceaccounts", "ServiceAccount", true),
             ServedResource::readable(
                 "postgresql.cnpg.io",
                 "v1",
@@ -819,6 +901,7 @@ fn state() -> State {
                 "Gateway",
                 true,
             ),
+            ServedResource::readable("", "v1", "serviceaccounts", "ServiceAccount", true),
         ]
         .into_iter()
         .chain(velero_served())
@@ -834,6 +917,7 @@ fn state() -> State {
                 false,
             )
         }])
+        .filter(|r| identity_installed() || r.group != "identity.zeabur.com")
         .collect(),
         dynamic: [
             // The Gateway of the shop's HTTPRoute, which accepts routes from every namespace.
@@ -1007,12 +1091,21 @@ fn state() -> State {
                         "gtidSet": "", "dumpSize": 1, "binlogSize": 1, "workDirUsage": 1, "warnings": []}}
             })),
             from(json!({
+                "apiVersion": "v1", "kind": "ServiceAccount",
+                "metadata": {"name": "mysql-backup", "namespace": "lab", "resourceVersion": "1"}
+            })),
+            from(json!({
                 "apiVersion": "moco.cybozu.com/v1beta2", "kind": "BackupPolicy",
-                "metadata": {"name": "mysql-backups", "namespace": "lab"},
-                "spec": {"schedule": "0 3 * * *", "jobConfig": {"serviceAccountName": "mysql-backup",
+                "metadata": {"name": "mysql-backups", "namespace": "lab", "resourceVersion": "1",
+                    "labels": {"zeabur.com/database": "mysql"}},
+                "spec": {"schedule": "0 3 * * *", "concurrencyPolicy": "Forbid",
+                    "jobConfig": {"serviceAccountName": "mysql-backup",
                     "bucketConfig": {"bucketName": "lab-backups", "endpointURL": "https://s3.example.com", "usePathStyle": true},
                     "envFrom": [{"secretRef": {"name": "mysql-backups-s3"}}],
-                    "workVolume": {"emptyDir": {}}}}
+                    "threads": 2, "cpu": "500m", "memory": "1Gi",
+                    "workVolume": {"ephemeral": {"volumeClaimTemplate": {"spec": {
+                        "accessModes": ["ReadWriteOnce"], "storageClassName": "local-path",
+                        "resources": {"requests": {"storage": "10Gi"}}}}}}}}
             })),
             from(json!({
                 "apiVersion": "batch/v1", "kind": "Job",
@@ -1132,8 +1225,10 @@ fn state() -> State {
         .chain(live)
         .chain(docs_build())
         .chain([storefront_build()])
+        .chain(checkout_build())
         .chain(people())
         .chain(member_roles())
+        .chain(api_tokens())
         .chain(velero())
         .chain(k8up())
         .chain(alerting())
@@ -1214,8 +1309,41 @@ fn state() -> State {
             ),
         ]),
         facts,
+        now: clock().as_second(),
         ..State::default()
     }
+}
+
+/// API tokens' ServiceAccounts, and the CA their kubeconfigs carry.
+fn api_tokens() -> Vec<DynamicObject> {
+    vec![
+        api_token("github-actions", "zeabur:alice", 20),
+        api_token("grafana", "zeabur:alice", -2),
+        api_token("backup-bot", "zeabur:alice", 300),
+        from(json!({
+            "apiVersion": "v1", "kind": "ConfigMap",
+            "metadata": {"name": "kube-root-ca.crt", "namespace": "zeabur-api-tokens", "resourceVersion": "1"},
+            "data": {"ca.crt": "-----BEGIN CERTIFICATE-----\nMIIBdzCCAR2gAwIBAgIBADAKBggqhkjOPQQDAjAjMSEwHwYDVQQDDBhrM3Mtc2Vy\ndmVyLWNhQDE3NjE0NjkyMDAwHhcNMjYxMDI2MDkwMDAwWhcNMzYxMDIzMDkwMDAw\n-----END CERTIFICATE-----\n"}
+        })),
+    ]
+}
+
+/// An API token's ServiceAccount, made `days_left` days before it expires (negative: expired).
+fn api_token(name: &str, by: &str, days_left: i64) -> DynamicObject {
+    use zeabur_plan::api_token;
+    let expires = Timestamp::from_second(clock().as_second() + days_left * 86_400)
+        .expect("a time")
+        .to_string();
+    let mut account = api_token::service_account(name, by);
+    let metadata = &mut account.metadata;
+    metadata.uid = Some(format!("uid-sa-{name}"));
+    metadata.resource_version = Some("1".to_owned());
+    metadata.creation_timestamp = Some(Time("2026-10-01T09:00:00Z".parse().expect("a time")));
+    metadata
+        .annotations
+        .get_or_insert_default()
+        .insert(api_token::EXPIRES_AT_ANNOTATION.to_owned(), expires);
+    from_typed(account)
 }
 
 /// What one of billing's API replicas wrote: requests, and a slow one now and then.
@@ -1423,6 +1551,10 @@ fn k8up() -> Vec<DynamicObject> {
                 "reason": "Succeeded", "lastTransitionTime": minutes_ago(88)}]}
         })),
     ]
+}
+
+fn identity_installed() -> bool {
+    std::env::var("ZEABUR_DEMO_IDENTITY").as_deref() != Ok("none")
 }
 
 /// Velero, unless `ZEABUR_DEMO_VELERO` is `none`; `location` has a location and nothing else.

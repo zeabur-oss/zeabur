@@ -1,0 +1,53 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mariadb
+  namespace: shop
+  uid: sts-mariadb
+  ownerReferences:
+    - {apiVersion: k8s.mariadb.com/v1alpha1, kind: MariaDB, name: mariadb, uid: mariadb-1, controller: true}
+spec:
+  serviceName: mariadb
+  selector: {matchLabels: {app: mariadb}}
+  template:
+    metadata: {labels: {app: mariadb}}
+    spec:
+      containers: [{name: mariadb, image: "mariadb:11.4"}]
+  volumeClaimTemplates:
+    - metadata: {name: storage}
+      spec:
+        accessModes: [ReadWriteOnce]
+        resources: {requests: {storage: 1Gi}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata: {name: storage-mariadb-0, namespace: shop, uid: pvc-storage-mariadb-0}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-1
+  namespace: shop
+  uid: pvc-pg-1
+  ownerReferences:
+    - {apiVersion: postgresql.cnpg.io/v1, kind: Cluster, name: pg, uid: cluster-pg, controller: true}
+spec:
+  accessModes: [ReadWriteOnce]
+  resources: {requests: {storage: 1Gi}}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata: {name: pg, namespace: shop, uid: cluster-pg}
+spec:
+  instances: 1
+  storage: {size: 1Gi}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata: {name: pg-daily, namespace: shop}
+spec:
+  schedule: "0 0 2 * * *"
+  cluster: {name: pg}

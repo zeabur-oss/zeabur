@@ -101,13 +101,16 @@ function NoDestinations() {
 }
 
 /** Where backups go in S3-compatible storage, and its keys. `folder` is the folder's placeholder;
- * without it there is no folder field. `children` are more fields in the same grid. */
+ * without it there is no folder field. `children` are more fields in the same grid. The hints
+ * replace the key and region fields' own. */
 export function S3Fields({
   target,
   set,
   errors,
   folder,
   folderHint,
+  keysHint,
+  regionHint,
   children,
 }: {
   target: S3
@@ -115,6 +118,8 @@ export function S3Fields({
   errors: (problem: TargetProblem) => string[]
   folder?: string
   folderHint?: string
+  keysHint?: string
+  regionHint?: string
   children?: ReactNode
 }) {
   const t = useT()
@@ -149,8 +154,10 @@ export function S3Fields({
             {text("path", folder)}
           </FormField>
         )}
-        {copied ? null : <KeyFields target={target} set={set} errors={errors} text={text} />}
-        <FormField label={t("db.backup.region")} hint={t("db.backup.regionHint")}>
+        {copied ? null : (
+          <KeyFields target={target} set={set} errors={errors} text={text} hint={keysHint} />
+        )}
+        <FormField label={t("db.backup.region")} hint={regionHint ?? t("db.backup.regionHint")}>
           {text("region", "")}
         </FormField>
         {children}
@@ -164,16 +171,18 @@ function KeyFields({
   set,
   errors,
   text,
+  hint,
 }: {
   target: S3
   set: (patch: Partial<S3>) => void
   errors: (problem: TargetProblem) => string[]
   text: (key: Field, value: string) => ReactNode
+  hint?: string
 }) {
   const t = useT()
   return (
     <>
-      <FormField label={t("db.backup.accessKey")} errors={errors("keys")}>
+      <FormField label={t("db.backup.accessKey")} hint={hint} errors={errors("keys")}>
         {text("accessKey", "")}
       </FormField>
       <FormField label={t("db.backup.secretKey")}>

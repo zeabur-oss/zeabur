@@ -51,24 +51,28 @@ function SourceItem({ source, active, onSelect, onRemove }: ItemProps) {
   const { t } = useI18n()
   const tone = active ? "bg-v2-surface-active" : "hover:bg-v2-surface-hover"
   return (
-    <div className={`group flex items-start gap-2 rounded-md px-2 py-1.5 ${tone}`}>
+    <div className={`group flex items-start gap-2 rounded-md px-2 py-1 ${tone}`}>
       <button
         type="button"
         className="flex min-w-0 flex-1 items-start gap-2 text-left"
         onClick={onSelect}
         title={source.path}
       >
-        <span className="mt-0.5 text-tertiary">{sourceIcons[source.kind]()}</span>
+        <span className="flex h-control-xs items-center text-tertiary">
+          {sourceIcons[source.kind]()}
+        </span>
         <span className="min-w-0 flex-1">
-          <span className="block truncate type-body text-main" translate="no">
-            {baseName(source.path)}
+          <span className="flex h-control-xs items-center gap-2">
+            <span className="min-w-0 flex-1 truncate type-body text-main" translate="no">
+              {baseName(source.path)}
+            </span>
+            <span className="type-meta text-tertiary tabular-nums">{source.contexts}</span>
           </span>
           <span className="block truncate type-meta text-tertiary">
             {t(sourceKindKeys[source.kind])}
           </span>
           <SourceNotes source={source} />
         </span>
-        <span className="type-meta text-tertiary">{source.contexts}</span>
       </button>
       <Button
         variant="ghost"

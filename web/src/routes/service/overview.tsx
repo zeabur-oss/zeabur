@@ -14,6 +14,7 @@ import { projectAlertsQuery, rolloutQuery, traceQuery } from "@/api/queries"
 import { AlertList, RecentNote } from "@/components/alerts"
 import { Ago, CopyButton } from "@/components/bits"
 import { Diagnoses } from "@/components/diagnoses"
+import { useWrongPort } from "@/components/wrong-port"
 import { EventList } from "@/components/events"
 import { replicaCounts } from "@/components/pods"
 import { RouteLine } from "@/components/route-trace"
@@ -100,7 +101,6 @@ export function OverviewTab({
   events: Event[]
   onTab: OnTab
 }) {
-  const t = useT()
   const task = isTask(service.kind)
   const rollout = useQuery({
     ...rolloutQuery(project, service.kind, service.name),
@@ -114,6 +114,7 @@ export function OverviewTab({
     events,
   )
   const diagnosed = said.causes.length > 0
+  const wrong = useWrongPort(project, service)
   const browser = useBrowserChecks()
   const routes = trace.data?.routes ?? []
   const verdict = verdictOf({
@@ -143,6 +144,7 @@ export function OverviewTab({
           also={
             <AlsoMeans project={project} service={service} said={said} rollout={rollout.data} />
           }
+          wrongPort={wrong}
         />
       ) : null}
       {service.kind === "CronJob" ? <TaskRunsCard project={project} service={service} /> : null}
@@ -158,22 +160,29 @@ export function OverviewTab({
           onTab={onTab}
         />
         <div className="flex min-w-0 flex-col gap-4 lg:gap-5">
-          {said.warnings.length > 0 ? (
-            <Container
-              title={t("overview.warnings")}
-              titleAction={<More onClick={() => onTab("events")}>{t("common.all")}</More>}
-              variant="list"
-            >
-              <div className="px-4">
-                <EventList events={said.warnings} limit={3} compact plain />
-              </div>
-            </Container>
-          ) : null}
+          <WarningsCard warnings={said.warnings} onTab={onTab} />
           <AlertsCard project={project} service={service} />
           <ConnectionsCard project={project} service={service} services={services} edges={edges} />
         </div>
       </div>
     </div>
+  )
+}
+
+/** The last few warning events. */
+function WarningsCard({ warnings, onTab }: { warnings: Event[]; onTab: OnTab }) {
+  const t = useT()
+  if (warnings.length === 0) return null
+  return (
+    <Container
+      title={t("overview.warnings")}
+      titleAction={<More onClick={() => onTab("events")}>{t("common.all")}</More>}
+      variant="list"
+    >
+      <div className="px-4">
+        <EventList events={warnings} limit={3} compact plain />
+      </div>
+    </Container>
   )
 }
 

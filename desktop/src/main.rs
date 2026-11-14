@@ -396,8 +396,22 @@ fn context() -> tauri::Context {
 
 fn main() -> ExitCode {
     let context = context();
+    #[cfg(windows)]
     chrome::set_app_id(&context.config().identifier);
-    let builder = tauri::Builder::default()
+    let builder = tauri::Builder::default();
+    // It comes first, as the plugin requires. A run with its own state folder (the screenshots) is
+    // another app and does not join the one that is open.
+    #[cfg(any(windows, target_os = "linux"))]
+    let builder = if std::env::var_os("ZEABUR_DESKTOP_STATE").is_none() {
+        builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+            if let Err(err) = chrome::show_chooser(app) {
+                output::warn(&format!("cannot open the chooser: {err}"));
+            }
+        }))
+    } else {
+        builder
+    };
+    let builder = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(chrome::window_state())

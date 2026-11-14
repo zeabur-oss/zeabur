@@ -259,6 +259,7 @@ fn fix(read: &ProjectRead, service: &Service, trace: &RouteTrace) -> Option<Plan
             },
             name: endpoint.clone(),
             yaml: serde_json::to_string_pretty(&value).ok()?,
+            spec_only: false,
         }],
     })
 }

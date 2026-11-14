@@ -102,6 +102,7 @@ pub(crate) async fn compute(
         | Change::RemoveVolume { .. }
         | Change::SwapClaim { .. }
         | Change::Probe { .. }
+        | Change::Port { .. }
         | Change::Image { .. }
         | Change::Rebuild { .. }
         | Change::UploadToken { .. }
@@ -122,6 +123,7 @@ pub(crate) async fn compute(
         | Change::Adopt
         | Change::Unadopt
         | Change::DeleteProject
+        | Change::ForceDeleteProject
         | Change::Details { .. }
         | Change::BuildLimits { .. }
         | Change::ScheduleTask { .. }

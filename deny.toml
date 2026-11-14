@@ -15,6 +15,12 @@ ignore = [
   # desktop/ on Linux: glib-macros and gtk3-macros, through Tauri's GTK 3 stack, run it at build
   # time only. It is unmaintained, with no known vulnerability; Tauri 2 has no GTK 4 port.
   { id = "RUSTSEC-2024-0370", reason = "build-time proc macro of Tauri's GTK 3 stack (desktop/ on Linux)" },
+  # desktop/ on Windows and Linux: tauri-plugin-single-instance uses zbus 5 on Linux. These are
+  # unmaintained notices for zbus's helper crates, with no known vulnerability; the fix is in the
+  # zbus announcement (z-galaxy/zbus#2043) and has to come through zbus and the plugin.
+  { id = "RUSTSEC-2026-0370", reason = "zvariant under zbus 5, through tauri-plugin-single-instance (desktop/)" },
+  { id = "RUSTSEC-2026-0371", reason = "zbus_names under zbus 5, through tauri-plugin-single-instance (desktop/)" },
+  { id = "RUSTSEC-2026-0372", reason = "zvariant_derive under zbus 5, through tauri-plugin-single-instance (desktop/)" },
 ]
 
 [licenses]

@@ -1,0 +1,2 @@
+description: CloudNativePG's claims and pods name the Cluster as their controller, so they belong to the PostgreSQL database even though the Cluster was not read, while a claim with no owner stays on its own.
+operation: graph.ownership

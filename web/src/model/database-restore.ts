@@ -6,6 +6,7 @@ import { databaseOfEnv, type Target } from "@/model/connect"
 import {
   APP_DATABASE,
   APP_SECRET,
+  backupEngine,
   jobAccount,
   MOCO_JOB_RESOURCES,
   madeFor,
@@ -21,7 +22,7 @@ type Manifest = Record<string, unknown>
 
 /** A backup a new database can start from. */
 export interface RestorePoint {
-  /** The run's name; `latest` for Dragonfly's newest snapshot. */
+  /** The run's name. */
   backup: string
   /** When the backup finished, if known. */
   time?: string
@@ -57,11 +58,8 @@ export const pointInTime = (time: Date): RestorePoint => {
   return { backup: target, time: target, target }
 }
 
-/** The backups a database can be restored from, newest first. Dragonfly keeps one snapshot set
- * per save and loads the newest. */
+/** The backups a database can be restored from, newest first. */
 export function restorePoints(database: Database): RestorePoint[] {
-  if (database.engine === "dragonfly")
-    return database.backups.store?.inUse ? [{ backup: "latest" }] : []
   return database.backups.runs
     .filter((r) => r.outcome === "succeeded" && r.restoreFrom)
     .map((r) => ({
@@ -80,17 +78,6 @@ export function restoredName(name: string, now: Date, max = NAME_MAX): string {
 }
 
 const PLUGIN = "barman-cloud.cloudnative-pg.io"
-/** Copies the newest snapshot set into the new folder before Dragonfly starts. */
-const AWS_CLI = "amazon/aws-cli:2.27.0"
-
-// The newest `dump-<time>-summary.dfs` names its set; the copy runs once, into an empty folder.
-const COPY_SNAPSHOT = `set -eu
-endpoint=\${ENDPOINT:+--endpoint-url=$ENDPOINT}
-if [ -n "$(aws s3 ls $endpoint "$TO/")" ]; then exit 0; fi
-latest=$(aws s3 ls $endpoint "$FROM/" | awk '{print $4}' | grep -- '-summary.dfs$' | sort | tail -n 1)
-if [ -z "$latest" ]; then exit 0; fi
-aws s3 cp $endpoint --recursive --exclude '*' --include "\${latest%-summary.dfs}-*" "$FROM/" "$TO/"`
-
 type Spec = Manifest
 type Store = NonNullable<Database["backups"]["store"]>
 
@@ -123,7 +110,7 @@ export function keptSecret(source: Database): { name: string; suffix: string } |
   const spec = object?.spec ?? {}
   if (source.engine === "mongodb") {
     const users = (spec.secrets as { users?: string } | undefined)?.users
-    return { name: users ?? `${source.name}-secrets`, suffix: "secrets" }
+    return { name: users ?? "percona-server-mongodb-users", suffix: "secrets" }
   }
   if (source.engine === "mysql") {
     const app = (object?.metadata?.annotations as Record<string, string> | undefined)?.[APP_SECRET]
@@ -172,10 +159,12 @@ function backupS3(backup: Manifest, store?: Store) {
 }
 
 // A logical dump holds the system users, so the copy's users Secret has the original's values.
+// Percona runs a restore through the backup agent, so the copy has backups on even when the
+// original has them off, without scheduled tasks.
 function restoreMongodb({ source, point, name, spec, store, object, copied }: Restoring): Change[] {
   const backup = (spec.backup as Manifest | undefined) ?? {}
   const s3 = backupS3(backup, store)
-  spec.backup = { ...backup, tasks: [] }
+  spec.backup = { ...backup, enabled: true, tasks: [] }
   const users = copied ? `${name}-secrets` : keptSecret(source)?.name
   spec.secrets = { ...(spec.secrets as Manifest | undefined), users }
   perThreadCaches(spec, source.version)
@@ -242,43 +231,11 @@ function restoreMariadb({ point, name, spec, store, object, secret, copied }: Re
   return [...kept, secret(`${name}-app`), create(object)]
 }
 
-function restoreDragonfly({ name, spec, store, object, secret }: Restoring): Change[] {
-  const { bucket } = splitDestination(store?.destination)
-  const to = `s3://${bucket}/${name}`
-  const aws = ((spec.env as Manifest[] | undefined) ?? []).filter((e) =>
-    String(e.name).startsWith("AWS_"),
-  )
-  const others = ((spec.initContainers as Manifest[] | undefined) ?? []).filter(
-    (c) => c.name !== "zeabur-restore",
-  )
-  spec.snapshot = { ...(spec.snapshot as Manifest | undefined), dir: to }
-  spec.initContainers = [
-    ...others,
-    {
-      name: "zeabur-restore",
-      image: AWS_CLI,
-      command: ["sh", "-c", COPY_SNAPSHOT],
-      env: [
-        { name: "FROM", value: store?.destination ?? "" },
-        { name: "TO", value: to },
-        { name: "ENDPOINT", value: store?.endpoint ?? "" },
-        { name: "HOME", value: "/tmp" },
-        ...aws,
-      ],
-      securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } },
-    },
-  ]
-  if (!spec.authentication) return [create(object)]
-  spec.authentication = { passwordFromSecret: { name: `${name}-auth`, key: "password" } }
-  return [secret(`${name}-auth`), create(object)]
-}
-
 const RESTORE = {
   postgresql: restorePostgresql,
   mongodb: restoreMongodb,
   mysql: restoreMysql,
   mariadb: restoreMariadb,
-  dragonfly: restoreDragonfly,
 }
 
 /** The copy's metadata: its name, the original's finalizers, and where it came from. MOCO's
@@ -327,7 +284,7 @@ export function restoreChanges(
   const secret = (secretName: string) => secretOf(secretName, { password: password() })
   return madeFor(
     name,
-    RESTORE[source.engine]({
+    RESTORE[backupEngine(source)]({
       source,
       point,
       name,

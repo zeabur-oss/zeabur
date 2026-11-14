@@ -83,7 +83,29 @@ kubectl get namespace shop -o yaml
 kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 ```
 
-`status.conditions` says which resources remain and which finalizers are still pending. Usually, the fix is to get the corresponding operator running again; it removes its finalizer when cleanup is done. Zeabur doesn't remove finalizers for you: removing one directly skips cleanup and can leave resources outside the cluster, such as cloud disks or files in S3.
+`status.conditions` says which resources remain and which finalizers are still pending. Usually, the fix is to get the corresponding operator running again; it removes its finalizer when cleanup is done.
+
+### Force delete
+
+When the controller is gone for good or can't finish its cleanup, click **Force delete** at the top of the project page. The button appears as soon as an object waits for a finalizer. A controller usually finishes on its own, so waiting longer is safer. Force delete only when it can't finish.
+
+The review lists each object and the finalizers to remove. Force delete:
+
+- Sets `metadata.finalizers` to `[]` on the objects still waiting, and only on those already being deleted.
+- Leaves the namespace's own `spec.finalizers` alone. Kubernetes then deletes what's left, then the namespace.
+- Runs as you, so you need `patch` on those objects.
+
+Once the finalizers are gone, the controller can't clean up what it made outside the cluster, such as a backup in object storage or a cloud disk. Check for those and remove them yourself.
+
+A `kubernetes.io/...` finalizer, such as `kubernetes.io/pvc-protection`, usually stays because a Pod still uses the disk or a node is down, so deal with that Pod or node first, because removing it can leave a volume or disk behind.
+
+Enter the project name, then click **Force delete project**.
+
+With kubectl, for each object the project page lists:
+
+```sh
+kubectl patch clusters.postgresql.cnpg.io orders -n shop --type merge -p '{"metadata":{"finalizers":[]}}'
+```
 
 ## Create a project again with the same name
 

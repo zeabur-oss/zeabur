@@ -3,8 +3,11 @@
 use std::sync::Arc;
 use std::time::Duration;
 
-use ureq::Agent;
-use ureq::tls::{RootCerts, TlsConfig};
+use bytes::Bytes;
+use http::Request;
+use http::header::CONTENT_TYPE;
+use http_body_util::Full;
+use zeabur_http::{Https, Reach};
 
 use crate::event::{Event, InstallationId};
 
@@ -18,7 +21,11 @@ pub const PROJECT_KEY: &str = match option_env!("ZEABUR_TELEMETRY_KEY") {
 };
 
 /// How long the whole request may take.
-const TIMEOUT: Duration = Duration::from_secs(5);
+const TIMEOUT: Duration = if cfg!(test) {
+    Duration::from_millis(500)
+} else {
+    Duration::from_secs(5)
+};
 
 /// Where the body goes in debug mode.
 pub type Show = Arc<dyn Fn(&str) + Send + Sync>;
@@ -116,39 +123,34 @@ impl Sender {
         self.switch != Switch::Off
     }
 
-    /// Sends `event` once. Blocks for at most a few seconds; a failure is a debug log line.
-    pub fn send(&self, id: &InstallationId, event: &Event) {
+    /// Sends `event` once. Waits for at most five seconds; a failure is a debug log line.
+    pub async fn send(&self, id: &InstallationId, event: &Event) {
         match self.switch {
             Switch::Off => {}
             Switch::Debug => (self.show)(&event.body(self.key, id)),
             Switch::On if self.key.is_empty() => {}
             Switch::On => {
-                if let Err(error) = self.post(&event.body(self.key, id)) {
+                if let Err(error) = self.post(&event.body(self.key, id)).await {
                     tracing::debug!(event = "telemetry.failed", %error, "not sent");
                 }
             }
         }
     }
 
-    fn post(&self, body: &str) -> Result<(), ureq::Error> {
-        // Fails only when a provider is already installed, which is as good.
-        drop(rustls::crypto::aws_lc_rs::default_provider().install_default());
-        let agent: Agent = Agent::config_builder()
-            .tls_config(
-                TlsConfig::builder()
-                    .root_certs(RootCerts::PlatformVerifier)
-                    .build(),
-            )
-            .timeout_global(Some(TIMEOUT))
-            .http_status_as_error(false)
-            .max_redirects(0)
-            .build()
-            .into();
-        agent
-            .post(&self.endpoint)
-            .header("content-type", "application/json")
-            .send(body)
-            .map(drop)
+    /// Posts `body` and waits for the answer's head, within [`TIMEOUT`]. The endpoint is
+    /// fixed in the binary, so any address may be reached.
+    async fn post(&self, body: &str) -> Result<(), String> {
+        let tls = zeabur_http::tls(None)?;
+        let request = Request::post(self.endpoint.as_str())
+            .header(CONTENT_TYPE, "application/json")
+            .body(Full::new(Bytes::from(body.to_owned())))
+            .map_err(|e| e.to_string())?;
+        let https = Https::new(Reach::Any, &tls);
+        match tokio::time::timeout(TIMEOUT, https.request(request)).await {
+            Ok(Ok(_answer)) => Ok(()),
+            Ok(Err(error)) => Err(error),
+            Err(_elapsed) => Err("no answer in time".to_owned()),
+        }
     }
 }
 
@@ -284,8 +286,8 @@ mod tests {
         assert_eq!(Switch::resolve(false, None, Some("debug")), Switch::Off);
     }
 
-    #[test]
-    fn off_makes_no_request() {
+    #[tokio::test]
+    async fn off_makes_no_request() {
         let receiver = receiver();
         for switch in [
             Switch::resolve(true, Some("1"), None),
@@ -294,31 +296,35 @@ mod tests {
         ] {
             let sender = Sender::to(switch, &receiver.url, "phc_test", nobody());
             for event in events() {
-                sender.send(&id(), &event);
+                sender.send(&id(), &event).await;
             }
         }
         assert_eq!(receiver.requests(), Vec::<String>::new());
     }
 
-    #[test]
-    fn debug_shows_the_body_and_sends_nothing() {
+    #[tokio::test]
+    async fn debug_shows_the_body_and_sends_nothing() {
         let receiver = receiver();
         let shown = Arc::new(Mutex::new(Vec::new()));
         let log = Arc::clone(&shown);
         let show: Show = Arc::new(move |body| log.lock().unwrap().push(body.to_owned()));
         let sender = Sender::to(Switch::Debug, &receiver.url, "phc_test", show);
         let event = &events()[0];
-        sender.send(&id(), event);
+        sender.send(&id(), event).await;
         assert_eq!(receiver.requests(), Vec::<String>::new());
         assert_eq!(*shown.lock().unwrap(), vec![event.body("phc_test", &id())]);
     }
 
-    #[test]
-    fn on_sends_one_request_and_no_key_sends_none() {
+    #[tokio::test]
+    async fn on_sends_one_request_and_no_key_sends_none() {
         let receiver = receiver();
-        Sender::to(Switch::On, &receiver.url, "", nobody()).send(&id(), &events()[0]);
+        Sender::to(Switch::On, &receiver.url, "", nobody())
+            .send(&id(), &events()[0])
+            .await;
         assert_eq!(receiver.requests(), Vec::<String>::new());
-        Sender::to(Switch::On, &receiver.url, "phc_test", nobody()).send(&id(), &events()[0]);
+        Sender::to(Switch::On, &receiver.url, "phc_test", nobody())
+            .send(&id(), &events()[0])
+            .await;
         let requests = receiver.requests();
         assert_eq!(requests.len(), 1);
         let body: Value = serde_json::from_str(&requests[0]).unwrap();
@@ -326,13 +332,27 @@ mod tests {
         assert_eq!(body["batch"][0]["distinct_id"], id().as_str());
     }
 
-    #[test]
-    fn a_receiver_that_is_down_costs_nothing() {
+    #[tokio::test]
+    async fn a_receiver_that_never_answers_holds_the_caller_no_longer_than_the_timeout() {
+        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+        let url = format!("http://{}/batch/", listener.local_addr().unwrap());
+        let started = std::time::Instant::now();
+        Sender::to(Switch::On, &url, "phc_test", nobody())
+            .send(&id(), &events()[0])
+            .await;
+        assert!(started.elapsed() < TIMEOUT * 4, "{:?}", started.elapsed());
+        drop(listener);
+    }
+
+    #[tokio::test]
+    async fn a_receiver_that_is_down_costs_nothing() {
         let url = {
             let listener = TcpListener::bind("127.0.0.1:0").unwrap();
             format!("http://{}/batch/", listener.local_addr().unwrap())
         };
-        Sender::to(Switch::On, &url, "phc_test", nobody()).send(&id(), &events()[0]);
+        Sender::to(Switch::On, &url, "phc_test", nobody())
+            .send(&id(), &events()[0])
+            .await;
     }
 
     /// Everything an event may carry. A new property has to be added here and to the docs page.

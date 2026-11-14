@@ -1,0 +1,2 @@
+description: An owner reference matches only an object of the dependent's namespace with the same kind, name and UID. An old UID does not resolve to a same-name replacement, another kind with that UID is not the owner, and neither is an object of another namespace.
+operation: graph.ownership

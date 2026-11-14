@@ -1,6 +1,6 @@
 //! A port-forward from this computer to a Service that only the cluster reaches, such as the
-//! registry `zot.zot.svc:5000`. It goes through kube-apiserver with the person's own rights
-//! (`pods/portforward`), as `kubectl port-forward` does.
+//! registry `zot.zot.svc:5000` or a database. It goes through kube-apiserver with the person's
+//! own rights (`pods/portforward`), as `kubectl port-forward` does.
 
 use std::net::Ipv4Addr;
 
@@ -52,19 +52,23 @@ impl std::fmt::Display for ServiceAddress {
     }
 }
 
-/// Listens on a loopback port and forwards each connection to a ready pod of `service`. Gives
-/// the port.
-pub(crate) async fn start(client: kube::Client, service: &ServiceAddress) -> Result<u16, String> {
+/// Listens on loopback port `local` (any free port for 0) and forwards each connection to a
+/// ready pod of `service`. Gives the port.
+pub(crate) async fn start(
+    client: kube::Client,
+    service: &ServiceAddress,
+    local: u16,
+) -> Result<u16, String> {
     let (pod, port) = target(&client, service).await.map_err(|e| {
         format!(
-            "Cannot port-forward to the registry {service}: {e}. Local mode needs `get services`, `list endpointslices` and `create pods/portforward` in {}. An administrator has them.",
+            "Cannot forward a port to {service}: {e}. This needs `get services`, `list endpointslices` and `create pods/portforward` in {}.",
             service.namespace
         )
     })?;
-    may_forward(&client, &pod, &service.namespace).await?;
-    let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, 0))
+    may_forward(&client, &pod, service).await?;
+    let listener = tokio::net::TcpListener::bind((Ipv4Addr::LOCALHOST, local))
         .await
-        .map_err(|e| format!("cannot listen on 127.0.0.1: {e}"))?;
+        .map_err(|e| format!("Cannot listen on 127.0.0.1:{local}: {e}."))?;
     let local = listener.local_addr().map_err(|e| e.to_string())?.port();
     let pods: Api<Pod> = Api::namespaced(client, &service.namespace);
     tokio::spawn(async move {
@@ -89,8 +93,13 @@ pub(crate) async fn start(client: kube::Client, service: &ServiceAddress) -> Res
 }
 
 /// Asks kube-apiserver whether the kubeconfig may forward a port to `pod`, so a missing right is
-/// told at the start and not as a refused connection halfway through the upload.
-async fn may_forward(client: &kube::Client, pod: &str, namespace: &str) -> Result<(), String> {
+/// told at the start and not as a refused connection later.
+async fn may_forward(
+    client: &kube::Client,
+    pod: &str,
+    service: &ServiceAddress,
+) -> Result<(), String> {
+    let namespace = &service.namespace;
     let review = SelfSubjectAccessReview {
         spec: SelfSubjectAccessReviewSpec {
             resource_attributes: Some(ResourceAttributes {
@@ -108,14 +117,14 @@ async fn may_forward(client: &kube::Client, pod: &str, namespace: &str) -> Resul
     let answer = Api::<SelfSubjectAccessReview>::all(client.clone())
         .create(&PostParams::default(), &review)
         .await;
-    // When the question cannot be asked, the upload tries and tells what it gets.
+    // When the question cannot be asked, the forward tries and tells what it gets.
     if answer
         .ok()
         .and_then(|a| a.status)
         .is_some_and(|s| !s.allowed)
     {
         return Err(format!(
-            "Your kubeconfig is not allowed to forward a port to the registry in the namespace {namespace}, which uploading a folder from this computer needs. Ask a cluster administrator for `create` on `pods/portforward` there, or upload from Zeabur's web interface."
+            "Your kubeconfig is not allowed to forward a port to {service}: it needs `create` on `pods/portforward` in the namespace {namespace}."
         ));
     }
     Ok(())
