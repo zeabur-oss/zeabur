@@ -1,4 +1,4 @@
-import { createContext, use, useEffect, useState, type ReactNode } from "react"
+import { createContext, use, useState, type ReactNode } from "react"
 
 import { en, type Messages } from "@/i18n/en"
 
@@ -61,6 +61,10 @@ const catalogues = catalogueLoader(loaders)
 /** Never rejects. */
 export function prepareI18n(): Promise<Catalogue> {
   return catalogues.load(initialLocale())
+}
+
+function showLang(locale: Locale) {
+  document.documentElement.lang = locale
 }
 
 const storageKey = "zeabur-installer.locale"
@@ -134,14 +138,12 @@ export function I18nProvider({ children }: { children: ReactNode }) {
     () => catalogues.cached(initialLocale()) ?? { locale: "en", messages: en },
   )
 
-  useEffect(() => {
-    document.documentElement.lang = catalogue.locale
-  }, [catalogue.locale])
-
   const setLocale = (next: Locale) => {
     saveLocale(next)
     void catalogues.choose(next).then((chosen) => {
-      if (chosen) setCatalogue(chosen)
+      if (!chosen) return
+      showLang(chosen.locale)
+      setCatalogue(chosen)
     })
   }
 
