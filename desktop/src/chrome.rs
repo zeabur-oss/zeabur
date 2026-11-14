@@ -1,14 +1,11 @@
 //! How the windows look and behave as a desktop app: the macOS title bar, window sizes that are
 //! kept between launches, zoom, and what happens when the last window closes.
 
-use std::path::PathBuf;
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::sync::PoisonError;
 
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, Wry};
 use tauri_plugin_window_state::StateFlags;
-
-use crate::shots;
 
 /// The label of the cluster chooser window.
 pub(crate) const CHOOSER: &str = "main";
@@ -279,11 +276,8 @@ pub(crate) fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
         let (x, y) = place(None, size, area);
         builder = builder.inner_size(size.0, size.1).position(x, y);
     }
-    let window = zoom_keys(title_bar(shots::apply_theme(builder))).build()?;
+    let window = zoom_keys(title_bar(builder)).build()?;
     window_built(&window);
-    if shots::wants("main") {
-        shots::capture(window);
-    }
     Ok(())
 }
 
@@ -312,16 +306,11 @@ pub(crate) fn cluster_window<'a>(
 }
 
 /// Keeps each window's size, place and maximized state between launches, under its label: `main`
-/// for the chooser and `cluster-<hash>` for each context. With `ZEABUR_DESKTOP_STATE` the file goes
-/// in that folder, so the fixtures and screenshots start from nothing.
+/// for the chooser and `cluster-<hash>` for each context.
 pub(crate) fn window_state() -> tauri::plugin::TauriPlugin<Wry> {
-    let mut builder = tauri_plugin_window_state::Builder::new()
-        .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED);
-    if let Some(dir) = std::env::var_os("ZEABUR_DESKTOP_STATE") {
-        let path = PathBuf::from(dir).join("window-state.json");
-        builder = builder.with_filename(path.to_string_lossy());
-    }
-    builder.build()
+    tauri_plugin_window_state::Builder::new()
+        .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
+        .build()
 }
 
 /// On macOS the app stays open with no windows, like other Mac apps, and a click on the Dock icon

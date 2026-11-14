@@ -63,7 +63,6 @@ export const api = {
     invoke<{ key: string; reach: Reach }[]>("probe", { targets }),
   open: (key: string, name: string, lang: string) =>
     invoke<void>("open_cluster", { key, name, lang }),
-  scenario: () => invoke<string | null>("scenario"),
 }
 
 /** Broken entries are shown but cannot be opened. */

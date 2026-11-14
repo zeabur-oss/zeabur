@@ -13,7 +13,6 @@
     "allow-toggle-favourite",
     "allow-probe",
     "allow-open-cluster",
-    "allow-scenario",
     "allow-set-menu"
   ]
 }

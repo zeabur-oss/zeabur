@@ -6,11 +6,10 @@ import { useI18n } from "@/i18n"
 import { api, type Context, type Snapshot } from "./api"
 import { DropOverlay, FirstRun, type AddActions } from "./chrome"
 import { ContextPane, type RowActions } from "./contexts"
-import { useDropTarget, useScenario, useSnapshot } from "./hooks"
+import { useDropTarget, useSnapshot } from "./hooks"
 import { useMenuBar } from "./menu"
 import { recentContexts, sourceFilter, visibleContexts } from "./model"
 import { PasteDialog, type Paste } from "./paste-dialog"
-import { pasteSample } from "./shots"
 import { Sidebar } from "./sources"
 
 interface BrowserProps {
@@ -66,22 +65,12 @@ function Browser({
 }
 
 export function App() {
-  const { locale, setLocale } = useI18n()
   const { snap, reach, reload } = useSnapshot()
   const [query, setQuery] = useState("")
   const [only, setOnly] = useState<string | null>(null)
   const [paste, setPaste] = useState<Paste | null>(null)
-  const { dropping, setDropping } = useDropTarget(reload)
+  const { dropping } = useDropTarget(reload)
   useMenuBar()
-
-  useScenario(reload, {
-    locale,
-    setLocale,
-    setQuery,
-    setOnly,
-    showPaste: () => setPaste({ name: "homelab", yaml: pasteSample, error: null }),
-    showDrop: () => setDropping(true),
-  })
 
   if (!snap) return null
 

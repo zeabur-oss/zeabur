@@ -51,17 +51,9 @@ tauri-plugin-single-instance = "2"
 webview2-com = "0.39"
 windows = { version = "0.62", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
 
-# The README screenshots: a snapshot of the WKWebView itself (no screen recording permission needed).
 # The login shell from the passwd entry.
 [target.'cfg(unix)'.dependencies]
 nix = { version = "0.31", default-features = false, features = ["user"] }
-
-[target.'cfg(target_os = "macos")'.dependencies]
-objc2 = "0.6"
-block2 = "0.6"
-objc2-foundation = { version = "0.3", features = ["NSData", "NSDictionary", "NSError", "NSString"] }
-objc2-app-kit = { version = "0.3", features = ["NSImage", "NSImageRep", "NSBitmapImageRep"] }
-objc2-web-kit = { version = "0.3", features = ["WKWebView", "WKSnapshotConfiguration", "block2", "objc2-app-kit"] }
 
 # A copy of the root [workspace.lints]; only unsafe_code differs.
 [lints.rust]

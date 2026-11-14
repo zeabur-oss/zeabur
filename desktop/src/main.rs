@@ -12,11 +12,9 @@ mod keys;
 mod menu;
 mod output;
 mod probe;
-mod shots;
 mod sources;
 mod store;
 #[cfg(target_os = "macos")]
-mod webkit;
 #[cfg(windows)]
 mod win32;
 
@@ -150,12 +148,6 @@ fn read_snapshot(app: &App) -> Snapshot {
             .unwrap_or_else(PoisonError::into_inner)
             .clone(),
     }
-}
-
-/// The screenshot scenario for the page (`ZEABUR_DESKTOP_SCENARIO`), if any.
-#[tauri::command]
-fn scenario() -> Option<String> {
-    std::env::var("ZEABUR_DESKTOP_SCENARIO").ok()
 }
 
 /// Adds files and folders from the file picker or a drop.
@@ -296,7 +288,7 @@ async fn open_cluster(
     name: String,
     lang: String,
 ) -> Result<(), String> {
-    let label = format!("cluster-{}", shots::label_hash(&key));
+    let label = format!("cluster-{}", label_hash(&key));
     if let Some(window) = handle.get_webview_window(&label) {
         return window.set_focus().map_err(|e| e.to_string());
     }
@@ -337,13 +329,8 @@ async fn open_cluster(
         .title(format!("{name} - Zeabur"))
         .initialization_script(&script);
     let builder = chrome::cluster_window(&handle, builder);
-    let window = shots::apply_theme(builder)
-        .build()
-        .map_err(|e| e.to_string())?;
+    let window = builder.build().map_err(|e| e.to_string())?;
     chrome::window_built(&window);
-    if shots::wants("cluster") {
-        shots::capture(window);
-    }
     Ok(())
 }
 
@@ -393,23 +380,26 @@ fn context() -> tauri::Context {
     tauri::tauri_build_context!()
 }
 
+/// A window label's part for a context key: the same key always gives the same label.
+fn label_hash(key: &str) -> String {
+    let hash = key.bytes().fold(0xCBF2_9CE4_8422_2325_u64, |hash, byte| {
+        (hash ^ u64::from(byte)).wrapping_mul(0x0100_0000_01B3)
+    });
+    format!("{hash:016x}")
+}
+
 fn main() -> ExitCode {
     let context = context();
     #[cfg(windows)]
     chrome::set_app_id(&context.config().identifier);
     let builder = tauri::Builder::default();
-    // It comes first, as the plugin requires. A run with its own state folder (the screenshots) is
-    // another app and does not join the one that is open.
+    // It comes first, as the plugin requires.
     #[cfg(any(windows, target_os = "linux"))]
-    let builder = if std::env::var_os("ZEABUR_DESKTOP_STATE").is_none() {
-        builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
-            if let Err(err) = chrome::show_chooser(app) {
-                output::warn(&format!("cannot open the chooser: {err}"));
-            }
-        }))
-    } else {
-        builder
-    };
+    let builder = builder.plugin(tauri_plugin_single_instance::init(|app, _args, _cwd| {
+        if let Err(err) = chrome::show_chooser(app) {
+            output::warn(&format!("cannot open the chooser: {err}"));
+        }
+    }));
     let builder = builder
         .plugin(tauri_plugin_dialog::init())
         .plugin(chrome::window_state());
@@ -417,18 +407,9 @@ fn main() -> ExitCode {
     let builder = builder.on_menu_event(menu::on_menu_event);
     let app = builder
         .setup(|tauri_app| {
-            // `ZEABUR_DESKTOP_STATE` puts everything in one folder, for the fixtures and
-            // screenshots.
-            let (config_dir, kubeconfigs_dir) =
-                if let Some(dir) = std::env::var_os("ZEABUR_DESKTOP_STATE") {
-                    (PathBuf::from(&dir), PathBuf::from(dir).join("kubeconfigs"))
-                } else {
-                    let paths = tauri_app.path();
-                    (
-                        paths.app_config_dir()?,
-                        paths.app_local_data_dir()?.join("kubeconfigs"),
-                    )
-                };
+            let paths = tauri_app.path();
+            let config_dir = paths.app_config_dir()?;
+            let kubeconfigs_dir = paths.app_local_data_dir()?.join("kubeconfigs");
             let saved = std::fs::read(config_dir.join("settings.json"))
                 .ok()
                 .and_then(|bytes| serde_json::from_slice(&bytes).ok())
@@ -477,7 +458,6 @@ fn main() -> ExitCode {
             open_cluster,
             start_cluster,
             back_to_chooser,
-            scenario,
             menu::set_menu
         ])
         .build(context);

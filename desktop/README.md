@@ -8,12 +8,12 @@ environment variables. It is a Cargo workspace of its own with the main workspac
 tests it on Linux.
 
 ```sh
-nix develop .#desktop -c desktop/run.sh             # your own kubeconfig
-nix develop .#desktop -c desktop/run.sh --fixtures  # the sample kubeconfigs in desktop/fixtures
+nix develop .#desktop -c scripts/build-ui.sh                 # web/dist, once
+cd desktop/web && bun install && bun run dev                 # the app's own pages, port 5174
+cd desktop && ZEABUR_UI_DIST=$PWD/../web/dist cargo run      # in another terminal
 ```
 
-`run.sh` builds the web interface into `web/dist` when it is missing, starts the dev server of the
-app's own pages on port 5174, and the app. The app's own pages are in `desktop/web/` (Vite): the
+The app's own pages are in `desktop/web/` (Vite): the
 chooser (`index.html`, `src/chooser/`) and the page a cluster window shows while its service
 starts or when it cannot (`cluster.html`, `src/cluster/`). The Rust side is `desktop/src/`.
 
@@ -69,8 +69,7 @@ adds the identifier:[^tauri-path]
 | Pasted kubeconfigs | `app_local_data_dir/kubeconfigs` | `~/Library/Application Support/` | `$XDG_DATA_HOME` or `~/.local/share/` | `%LOCALAPPDATA%\` |
 
 Pasted kubeconfigs hold credentials: they stay out of the roaming folder on Windows, and on macOS
-and Linux the folder is `0700` and each file `0600`. `ZEABUR_DESKTOP_STATE` puts both in one
-folder; `run.sh --fixtures` and `shots.sh` use it.
+and Linux the folder is `0700` and each file `0600`.
 
 ## Exec plugins and the login shell
 
@@ -129,8 +128,7 @@ for a plugin name without one.
 ## Windows and menus
 
 - Every cluster is its own window. A new one is placed a little below and right of the last; each
-  window's size, place and maximized state are kept between launches (`window-state.json`, in
-  `ZEABUR_DESKTOP_STATE` when set).
+  window's size, place and maximized state are kept between launches (`window-state.json`).
 - macOS: the title bar is drawn over the page, as in Finder and Notes. The page leaves 28 pt at the
   top (`data-titlebar` and `--zeabur-title-bar`, set by `desktop/src/chrome.rs`) and a strip there
   moves the window. The menu bar (`desktop/src/menu.rs`) uses the `desktop.menu.*` strings and
@@ -146,8 +144,7 @@ for a plugin name without one.
 - Linux (GNOME): the window handles the standard shortcuts before the page sees them[^gnome-keys].
   Ctrl+W closes the window, Ctrl+Q quits, Ctrl+N shows the chooser, Ctrl+R reloads, and Ctrl++,
   Ctrl+- and Ctrl+0 zoom. The program name is the app ID (`com.zeabur.oss.desktop`), which Wayland
-  uses to find the desktop entry[^xdg-shell]. `desktop/run.sh` writes that entry and the icon (`hicolor`
-  theme, 32 to 512 px) while it runs, so the Dock and Alt+Tab show Zeabur and its icon. GNOME maximizes a new window that is nearly the size of the
+  uses to find the desktop entry[^xdg-shell]. An installed app has that entry and the icon (`hicolor` theme), so the Dock and Alt+Tab show Zeabur and its icon; a bare `cargo run` has neither. GNOME maximizes a new window that is nearly the size of the
   screen.
 - Windows: Ctrl+W closes the window and Ctrl+N shows the chooser[^win-keys], through WebView2's
   `AcceleratorKeyPressed` event, so the page never sees them. WebView2 handles Ctrl+R and F5, and
@@ -166,25 +163,6 @@ The other files in `icons/` come from it:
 ```sh
 cargo tauri icon desktop/icons/icon.svg -o desktop/icons  # then delete android/, ios/, 64x64.png, Square*.png, StoreLogo.png
 ```
-
-## Screenshots
-
-`desktop/shots/<lang>-<screen>-<theme>.png` (made by `desktop/shots.sh`, not committed), 4 languages × light and dark, taken from the running
-app (a WKWebView snapshot of the window, no screen recording):
-
-| Screen    | Shows                                                                  |
-| --------- | ---------------------------------------------------------------------- |
-| `first`   | No kubeconfig found: choose files, a folder, paste, or drop            |
-| `list`    | Two sources, a favourite, recently opened, every kind of problem      |
-| `search`  | "staging" found in two files                                           |
-| `paste`   | The paste dialog with a sample kubeconfig                              |
-| `drop`    | A file dragged over the window                                         |
-| `cluster` | The window opened for `zeabur-demo`, which cannot sign in: the error page |
-
-The shots run with the fixtures and a Finder-like environment (`PATH=/usr/bin:/bin:/usr/sbin:/sbin`,
-no shell variables), so `aws` is found only through the login shell. Every capture has a 28 pt band
-at the bottom: WebKit reports a 28 pt top safe area (the title bar) and lays the page out 28 pt
-shorter than the view.
 
 ## How others do it
 

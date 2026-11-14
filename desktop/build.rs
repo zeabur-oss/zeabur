@@ -14,7 +14,6 @@ fn main() {
         "open_cluster",
         "start_cluster",
         "back_to_chooser",
-        "scenario",
         "set_menu",
     ]);
     let attributes = tauri_build::Attributes::new()

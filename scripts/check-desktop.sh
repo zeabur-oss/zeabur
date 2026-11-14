@@ -7,7 +7,7 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 # The only files that may name unsafe_code, each with #![expect(unsafe_code, reason = "...")].
-unsafe_modules=(desktop/src/webkit.rs desktop/src/win32.rs)
+unsafe_modules=(desktop/src/win32.rs)
 # The only workspace crates desktop/ may depend on.
 crates=(zeabur-local)
 

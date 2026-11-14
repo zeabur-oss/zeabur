@@ -5,7 +5,6 @@ import {
   authText,
   baseName,
   fileLabel,
-  parseScenario,
   recentContexts,
   reachView,
   sourceFilter,
@@ -69,11 +68,6 @@ describe("desktop model", () => {
     const plugin: Auth = { state: "pluginMissing", command: "aws", hint: null }
     expect(authText(plugin, done, t)).toBe("desktop.authPluginMissing aws")
     expect(authText(plugin, { state: "pending" }, t)).toBe("desktop.authLooking aws")
-  })
-
-  it("reads a scenario and skips empty keys", () => {
-    expect(parseScenario("lang=en;q=prod;drop")).toEqual({ lang: "en", q: "prod", drop: "" })
-    expect(parseScenario(null)).toEqual({})
   })
 
   it("filters by source and search, and lists favourites first", () => {

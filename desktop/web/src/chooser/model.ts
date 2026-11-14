@@ -70,12 +70,6 @@ export function authText(auth: Auth, shell: ShellRead, t: Translate): string | n
   return message(auth, shell, t)
 }
 
-/** A screenshot scenario such as `lang=en;q=prod`. */
-export function parseScenario(text: string | null): Record<string, string> {
-  const pairs = (text ?? "").split(";").map((part) => part.split("="))
-  return Object.fromEntries(pairs.filter(([key]) => key).map(([key, value]) => [key, value ?? ""]))
-}
-
 function matchesQuery(c: Context, query: string): boolean {
   return [c.name, c.server, c.user, c.file, c.cluster].some((v) => v?.toLowerCase().includes(query))
 }
