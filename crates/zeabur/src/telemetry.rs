@@ -126,8 +126,8 @@ impl Telemetry {
             mode: Mode::InCluster,
         });
         let (sender, id) = (Arc::clone(sender), id.clone());
-        drop(tokio::task::spawn_blocking(move || {
-            sender.send(&id, &event);
+        drop(tokio::spawn(async move {
+            sender.send(&id, &event).await;
         }));
     }
 
@@ -146,8 +146,8 @@ impl Telemetry {
             feature,
         });
         let (sender, id) = (Arc::clone(sender), id.clone());
-        drop(tokio::task::spawn_blocking(move || {
-            sender.send(&id, &event);
+        drop(tokio::spawn(async move {
+            sender.send(&id, &event).await;
         }));
     }
 }
