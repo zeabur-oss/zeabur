@@ -1,4 +1,4 @@
-import { createContext, use, useEffect, useState, type ReactNode } from "react"
+import { createContext, use, useState, type ReactNode } from "react"
 
 import { en, type Messages } from "@/i18n/en"
 import { zhCN } from "@/i18n/zh-CN"
@@ -72,6 +72,14 @@ interface I18n {
   t: Translate
 }
 
+const startLocale = initialLocale()
+
+function showLang(locale: Locale) {
+  document.documentElement.lang = locale
+}
+
+showLang(startLocale)
+
 const I18nContext = createContext<I18n>({
   locale: "en",
   setLocale: () => {},
@@ -79,14 +87,11 @@ const I18nContext = createContext<I18n>({
 })
 
 export function I18nProvider({ children }: { children: ReactNode }) {
-  const [locale, setLocaleState] = useState<Locale>(initialLocale)
-
-  useEffect(() => {
-    document.documentElement.lang = locale
-  }, [locale])
+  const [locale, setLocaleState] = useState<Locale>(startLocale)
 
   const setLocale = (next: Locale) => {
     saveLocale(next)
+    showLang(next)
     setLocaleState(next)
   }
 

@@ -334,18 +334,17 @@ async fn open_cluster(
     Ok(())
 }
 
-/// Starts the local service of the calling cluster window and returns the link to load.
+/// Starts the local service of the calling cluster window and loads its link in that window.
 #[tauri::command]
-async fn start_cluster(
-    window: tauri::WebviewWindow,
-    app: State<'_, App>,
-) -> Result<String, String> {
+async fn start_cluster(window: tauri::WebviewWindow, app: State<'_, App>) -> Result<(), String> {
     let env = app
         .env
         .read()
         .unwrap_or_else(PoisonError::into_inner)
         .clone();
-    app.clusters.start(window.label(), &env).await
+    let link = app.clusters.start(window.label(), &env).await?;
+    let url = link.parse::<tauri::Url>().map_err(|e| e.to_string())?;
+    window.navigate(url).map_err(|e| e.to_string())
 }
 
 /// Closes the calling cluster window and shows the chooser. Async, because it can build the
