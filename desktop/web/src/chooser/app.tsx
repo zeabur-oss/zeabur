@@ -118,7 +118,7 @@ export function App() {
 
   return (
     <div data-titlebar-inset className="flex h-dvh bg-surface-page text-main select-none">
-      {snap.sources.length === 0 ? <FirstRun actions={add} /> : browser}
+      {snap.sources.length === 0 ? <FirstRun actions={add} update={updates.button} /> : browser}
       <PasteDialog paste={paste} setPaste={setPaste} reload={reload} />
       {updates.dialog}
       <DropOverlay dropping={dropping} />
