@@ -8,6 +8,11 @@ name: CI
 # job passes again.
 on:
   workflow_dispatch:
+    inputs:
+      size:
+        type: choice
+        options: [small, medium, large]
+        default: small
 
 permissions:
   contents: read
@@ -21,12 +26,12 @@ env:
 
 jobs:
   lint:
-    runs-on: instabox-small
+    runs-on: instabox-${{ inputs.size }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
+      - uses: ./.github/actions/ci-setup
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -40,26 +45,26 @@ jobs:
           retention-days: 14
 
   test:
-    runs-on: instabox-small
+    runs-on: instabox-${{ inputs.size }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
+      - uses: ./.github/actions/ci-setup
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: instabox-small
+    runs-on: instabox-${{ inputs.size }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           # fallow audit compares HEAD with HEAD^.
           fetch-depth: 2
-      - uses: zeabur-oss/.github/actions/ci-setup@c43a5d36ad39f938de24e0b59109c82a20f6265a # main
+      - uses: ./.github/actions/ci-setup
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release

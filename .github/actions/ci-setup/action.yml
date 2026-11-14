@@ -1,0 +1,24 @@
+name: CI setup
+description: >-
+  Installs Nix and, with rust-cache, caches Cargo's build output for the dev shell's Rust
+  toolchain.
+inputs:
+  rust-cache:
+    description: >-
+      "true" to cache ~/.cargo and target/ with Swatinem/rust-cache, keyed on the job. Runs on main
+      save it; pull requests and the merge queue only restore, since a cache saved on their refs
+      can't be read from any other ref.
+    default: "false"
+runs:
+  using: composite
+  steps:
+    - uses: DeterminateSystems/determinate-nix-action@16f94ba7aae399b9f9077c254b6719ec6de7e3e3 # v3.24.2
+    # rust-cache keys on `rustc -vV`, so use the dev shell's toolchain. The path comes from the
+    # caller's own flake, which the job runs anyway.
+    - if: inputs.rust-cache == 'true'
+      shell: bash
+      run: dirname "$(nix develop --command bash -c 'command -v rustc')" >> "$GITHUB_PATH" # zizmor: ignore[github-env]
+    - if: inputs.rust-cache == 'true'
+      uses: Swatinem/rust-cache@d1527c8f67ef9af357290475d4af4b0fab8f12e0 # v2.9.3
+      with:
+        save-if: true
