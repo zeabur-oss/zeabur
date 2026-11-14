@@ -14555,6 +14555,7 @@ components:
       - backUpVolumes
       - restoreVolumes
       - openTerminal
+      - portForward
       - readLogs
       - build
       - deployFromGit
@@ -14611,6 +14612,11 @@ components:
         openTerminal:
           $ref: "#/components/schemas/Permission"
           description: "Open a terminal in a container: `create` on `pods/exec`."
+        portForward:
+          $ref: "#/components/schemas/Permission"
+          description: |-
+            Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
+            on `pods/portforward`.
         readLogs:
           $ref: "#/components/schemas/Permission"
           description: "Read the pods' logs: `get` on `pods/log`."

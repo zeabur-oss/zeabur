@@ -3000,7 +3000,13 @@ export const en = {
   "db.fact.created": "Created",
   "db.fact.operator": "Operator says",
   "db.connect": "Connect",
-  "db.inCluster": "Reachable from inside the cluster.",
+  "db.inCluster": "These work only inside the cluster.",
+  "db.outside.title": "Connect from outside the cluster",
+  "db.outside.commandHint":
+    "Run it on your computer. It connects a local port to the database through the cluster and prints a connection string on 127.0.0.1. It keeps running until you press Ctrl-C.",
+  "db.outside.refused": (reason: string) =>
+    `The cluster will refuse this command for you. ${reason}.`,
+  "db.outside.docs": "Install zeaburctl",
   "db.noDatabase":
     "This cluster has no app database. Services connect as moco-writable, which can create one.",
   "db.noAuth": (engine: string) =>
