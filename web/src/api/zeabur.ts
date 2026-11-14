@@ -8108,7 +8108,10 @@ export type ProjectBackupsKeysFrom = { [key: string]: string }
  * A project's backups across providers.
  */
 export type ProjectBackups = {
-  /** One row per claim, then per database, then the namespace. */
+  /**
+   * One row per claim, then per database, then the namespace. A database's claims have no
+   * row of their own: they are backed up with the database.
+   */
   coverage: BackupCoverage[]
   /**
    * The S3 destination each Secret's keys were copied from, by the Secret's name; empty
@@ -8684,6 +8687,11 @@ export type ProjectRights = {
   deployFromGit: Permission
   /** Open a terminal in a container: `create` on `pods/exec`. */
   openTerminal: Permission
+  /**
+   * Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
+   * on `pods/portforward`.
+   */
+  portForward: Permission
   /** Read the pods' logs: `get` on `pods/log`. */
   readLogs: Permission
   /** Read Secret values: `get` on secrets. */

@@ -2744,7 +2744,12 @@ export const zhCN: Messages = {
   "db.fact.created": "创建时间",
   "db.fact.operator": "Operator 报告",
   "db.connect": "连接",
-  "db.inCluster": "只能从集群内部连接。",
+  "db.inCluster": "这些信息只能在集群内部使用。",
+  "db.outside.title": "从集群外连接",
+  "db.outside.commandHint":
+    "在你的电脑上运行。它会通过集群把本机的一个端口接到数据库，并打印 127.0.0.1 的连接字符串。按 Ctrl-C 才会停止。",
+  "db.outside.refused": (reason) => `集群会拒绝你运行这条命令。${reason}。`,
+  "db.outside.docs": "安装 zeaburctl",
   "db.noDatabase": "这个集群没有应用数据库。服务以 moco-writable 连接，这个用户可以创建数据库。",
   "db.noAuth": (engine) => `这个 ${engine} 没有设置密码，集群里的任何程序都能连接。`,
   "db.export": "导出",

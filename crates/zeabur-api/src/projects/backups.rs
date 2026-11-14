@@ -14,8 +14,11 @@ use std::collections::BTreeMap;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_graph::{ObjectKey, OwnerGraph, Snapshot};
+use zeabur_kube::k8s_openapi::api::apps::v1::StatefulSet;
+use zeabur_kube::k8s_openapi::api::core::v1::PersistentVolumeClaim;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_kube::{Cluster, ClusterError, DynamicObject, ResourceRef};
+use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, DynamicObject, ResourceRef};
 use zeabur_modules::backups::{self, Coverage, Findings, Run, Schedule, Target};
 use zeabur_modules::{Module, Reading};
 
@@ -51,7 +54,8 @@ pub struct BackupProvider {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectBackups {
-    /// One row per claim, then per database, then the namespace.
+    /// One row per claim, then per database, then the namespace. A database's claims have no
+    /// row of their own: they are backed up with the database.
     pub coverage: Vec<Coverage>,
     /// Claims and databases no active schedule covers.
     pub unscheduled: Vec<Target>,
@@ -188,6 +192,45 @@ async fn gather(
     Ok(g)
 }
 
+/// The names of the claims that are volumes and not a database's: a claim whose owners lead to a
+/// database operator's object ([`OwnerGraph::database`]) is backed up with that database. When
+/// the StatefulSets cannot be read (named in `unreadable`), a claim from a claim template counts
+/// as a volume.
+async fn volumes(
+    cluster: &dyn Cluster,
+    project: &str,
+    claims: &[ObjectMeta],
+    unreadable: &mut Vec<UnreadableView>,
+) -> Result<Vec<String>, ClusterError> {
+    let stateful_sets = match cluster.list::<StatefulSet>(Some(project)).await {
+        Ok(sets) => sets,
+        Err(error) => {
+            let resource = ResourceRef::of::<StatefulSet>().key();
+            unreadable.push(error.into_unreadable(&resource)?.into());
+            Vec::new()
+        }
+    };
+    let snapshot = Snapshot {
+        namespace: project.to_owned(),
+        stateful_sets,
+        persistent_volume_claims: claims
+            .iter()
+            .map(|metadata| PersistentVolumeClaim {
+                metadata: metadata.clone(),
+                ..PersistentVolumeClaim::default()
+            })
+            .collect(),
+        ..Snapshot::default()
+    };
+    let graph = OwnerGraph::new(&snapshot);
+    Ok(snapshot
+        .persistent_volume_claims
+        .iter()
+        .filter(|claim| graph.database(&ObjectKey::of(*claim)).is_none())
+        .filter_map(|claim| claim.metadata.name.clone())
+        .collect())
+}
+
 /// Backups of a project: which claims, databases and the namespace a schedule covers, and how
 /// the latest backups went, from every backup provider this build has (K8up, Velero,
 /// CloudNativePG), read as the person. Outcomes are as each provider reports them; Zeabur does
@@ -227,12 +270,15 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
         findings,
         providers,
         databases,
-        unreadable,
+        mut unreadable,
     } = gather(cluster, &project, &claims, &names)
         .await
         .map_err(failed)?;
+    let volumes = volumes(cluster, &project, &claims, &mut unreadable)
+        .await
+        .map_err(failed)?;
 
-    let targets = backups::targets(&project, &names, &databases);
+    let targets = backups::targets(&project, &volumes, &databases);
     let coverage = backups::coverage(&targets, &findings);
     let unscheduled = backups::unscheduled(&coverage)
         .into_iter()

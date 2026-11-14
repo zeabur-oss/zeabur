@@ -596,6 +596,96 @@ mod tests {
         assert_eq!(backups["unreadable"][0]["resource"], "schedules.velero.io");
     }
 
+    /// A claim of a StatefulSet a `MariaDB` controls and a claim a CloudNativePG `Cluster`
+    /// controls are their databases' data: they get no volume row and no volume advice. The
+    /// standalone claim keeps its advice and the `Cluster` without a `ScheduledBackup` keeps its
+    /// warning. Without the StatefulSets, a claim from a claim template counts as a volume.
+    #[tokio::test]
+    async fn a_database_operators_claims_get_no_volume_backup_advice() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            for (resource, kind) in [
+                ("clusters", "Cluster"),
+                ("scheduledbackups", "ScheduledBackup"),
+                ("backups", "Backup"),
+            ] {
+                s.served.push(ServedResource::readable(
+                    "postgresql.cnpg.io",
+                    "v1",
+                    resource,
+                    kind,
+                    true,
+                ));
+            }
+            let objects = s.objects.get_mut("shop").unwrap();
+            objects.stateful_sets.push(
+                serde_json::from_value(json!({
+                    "metadata": {"name": "mariadb", "namespace": "shop", "uid": "sts-mariadb",
+                        "ownerReferences": [{"apiVersion": "k8s.mariadb.com/v1alpha1",
+                            "kind": "MariaDB", "name": "mariadb", "uid": "mariadb-1",
+                            "controller": true}]},
+                    "spec": {"serviceName": "mariadb",
+                        "selector": {"matchLabels": {"app": "mariadb"}},
+                        "template": {"metadata": {"labels": {"app": "mariadb"}},
+                            "spec": {"containers": [{"name": "mariadb", "image": "mariadb:11.4"}]}},
+                        "volumeClaimTemplates": [{"metadata": {"name": "storage"}}]}
+                }))
+                .unwrap(),
+            );
+            for claim in [
+                json!({"name": "storage-mariadb-0", "namespace": "shop", "uid": "pvc-1"}),
+                json!({"name": "pg-1", "namespace": "shop", "uid": "pvc-2",
+                    "ownerReferences": [{"apiVersion": "postgresql.cnpg.io/v1",
+                        "kind": "Cluster", "name": "pg", "uid": "cluster-pg",
+                        "controller": true}]}),
+                json!({"name": "uploads", "namespace": "shop", "uid": "pvc-3"}),
+            ] {
+                objects
+                    .persistent_volume_claims
+                    .push(serde_json::from_value(json!({"metadata": claim})).unwrap());
+            }
+            s.dynamic.push(
+                serde_json::from_value(json!({
+                    "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                    "metadata": {"name": "pg", "namespace": "shop", "uid": "cluster-pg"},
+                    "spec": {"instances": 1}
+                }))
+                .unwrap(),
+            );
+        });
+
+        let backups = get(&cluster, "/api/v1/projects/shop/backups").await;
+        assert_eq!(
+            backups["unscheduled"],
+            json!([{"kind": "volume", "name": "uploads"}, {"kind": "database", "name": "pg"}])
+        );
+        let gaps = get(&cluster, "/api/v1/projects/shop/gaps").await;
+        let subjects = |rule: &str| -> Vec<&str> {
+            gaps["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .filter(|g| g["rule"] == rule)
+                .map(|g| g["subject"]["name"].as_str().unwrap())
+                .collect()
+        };
+        assert_eq!(subjects("volume-without-backup"), ["uploads"]);
+        assert_eq!(subjects("database-without-backup"), ["pg"]);
+
+        cluster.update(|s| {
+            s.forbidden_in_namespaces
+                .insert("statefulsets.apps".to_owned());
+        });
+        let refused = get(&cluster, "/api/v1/projects/shop/backups").await;
+        assert_eq!(
+            refused["unscheduled"],
+            json!([{"kind": "volume", "name": "storage-mariadb-0"},
+                   {"kind": "volume", "name": "uploads"},
+                   {"kind": "database", "name": "pg"}])
+        );
+        assert_eq!(refused["unreadable"][0]["resource"], "statefulsets.apps");
+    }
+
     #[tokio::test]
     async fn runtime_alerts_are_falcos_report_results_or_say_why_there_are_none() {
         let cluster = cluster();

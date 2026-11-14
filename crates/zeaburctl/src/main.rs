@@ -3,6 +3,7 @@
 #![forbid(unsafe_code)]
 
 mod components;
+mod connect;
 mod doctor;
 mod forward;
 mod in_process;
@@ -43,6 +44,13 @@ enum Command {
     /// cluster. With other credentials, zeaburctl does the same steps on this computer, and the
     /// credentials stay here.
     Up(up::UpArgs),
+    /// Reach a database of a project from this computer: forward a local port to it and print a
+    /// connection URI on 127.0.0.1.
+    ///
+    /// The forward goes through the Kubernetes API with your kubeconfig, as `kubectl
+    /// port-forward` does, and needs `create` on `pods/portforward` in the project. It runs until
+    /// Ctrl-C.
+    Connect(connect::ConnectArgs),
     /// Print Zeabur Catalog components' manifests, for a cluster that zeabur-installer did not
     /// install.
     Components(components::ComponentsArgs),
@@ -59,6 +67,7 @@ fn main() -> ExitCode {
         Command::Ui(ui_args) => ui::run(&ui_args),
         Command::Doctor(doctor_args) => doctor::run(&doctor_args),
         Command::Up(up_args) => up::run(&up_args),
+        Command::Connect(connect_args) => connect::run(&connect_args),
         Command::Components(components_args) => components::run(&components_args),
     };
     if let Some(check) = check {

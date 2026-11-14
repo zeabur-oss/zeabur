@@ -15,6 +15,7 @@ import {
   turnOffSummary,
   canBackUpNow,
   commands,
+  connectCommand,
   connectionUri,
   createDatabase,
   databaseAddress,
@@ -173,6 +174,13 @@ describe("a new database", () => {
       object: { spec: never }
     }
     expect((three.object.spec as Record<string, unknown>).unsafeFlags).toBeUndefined()
+  })
+
+  test("a MongoDB names its users Secret, so it is not the operator's shared default", () => {
+    const [change] = createDatabase({ ...newDatabase("mongodb", 3), name: "mongo" }) as never as [
+      { object: { spec: { secrets: unknown } } },
+    ]
+    expect(change.object.spec.secrets).toEqual({ users: "mongo-secrets" })
   })
 
   test("a MongoDB takes its data volumes with it when deleted", () => {
@@ -364,6 +372,10 @@ describe("connecting", () => {
     expect(connectionUri(mongo, "p@ss")).toBe(
       "mongodb://USER:p%40ss@mongo-rs0.shop.svc:27017/admin?replicaSet=rs0",
     )
+  })
+
+  test("from outside the cluster: the zeaburctl command", () => {
+    expect(connectCommand("shop", postgres)).toBe("zeaburctl connect shop/pg")
   })
 
   test("kubectl commands for the object and a shell in the primary", () => {

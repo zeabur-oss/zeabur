@@ -224,7 +224,10 @@ describe("restoring into a new database", () => {
       backups: { schedules: [], runs: [], ready: true, store: { name: "backups", inUse: true } },
       object: {
         metadata: { finalizers: ["percona.com/delete-psmdb-pvc"] },
-        spec: { backup: { enabled: true, storages: { backups: { s3 } }, tasks: [{ name: "x" }] } },
+        spec: {
+          secrets: { users: "shop-secrets" },
+          backup: { enabled: true, storages: { backups: { s3 } }, tasks: [{ name: "x" }] },
+        },
       } as unknown as Database["object"],
     })
     const [cluster, restore] = bodies(

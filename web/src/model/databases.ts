@@ -390,6 +390,8 @@ const BUILD: Record<Engine, Build> = {
           },
         ],
         sharding: { enabled: false },
+        // Without a name the operator uses one shared by every cluster of the namespace.
+        secrets: { users: `${form.name}-secrets` },
         // The user services connect as; the operator keeps its password in
         // `<name>-custom-user-secret`, key `app`.
         users: [{ name: "app", db: "app", roles: [{ name: "readWrite", db: "app" }] }],
@@ -1403,6 +1405,10 @@ export function connectionUri(database: Database, password = "PASSWORD") {
   const options = c.options ? `?${c.options}` : ""
   return `${scheme}://${user}:${encodeURIComponent(password)}@${c.host}:${c.port}/${c.database ?? ""}${options}`
 }
+
+/** The command that forwards a port on the person's computer to the database. */
+export const connectCommand = (project: string, database: Pick<Database, "name">) =>
+  `zeaburctl connect ${project}/${database.name}`
 
 /** Where the database's own object lives in the objects API: a custom resource of its operator. */
 export function databaseAddress(database: Database): ObjectAddress {

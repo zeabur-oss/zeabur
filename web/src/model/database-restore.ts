@@ -110,7 +110,7 @@ export function keptSecret(source: Database): { name: string; suffix: string } |
   const spec = object?.spec ?? {}
   if (source.engine === "mongodb") {
     const users = (spec.secrets as { users?: string } | undefined)?.users
-    return { name: users ?? `${source.name}-secrets`, suffix: "secrets" }
+    return { name: users ?? "percona-server-mongodb-users", suffix: "secrets" }
   }
   if (source.engine === "mysql") {
     const app = (object?.metadata?.annotations as Record<string, string> | undefined)?.[APP_SECRET]

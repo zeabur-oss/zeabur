@@ -9,9 +9,10 @@
 //! cluster (`initializing`, `ready`, `error`, `stopping`, `paused`), and
 //! `status.replsets.<name>.ready` counts the members ready [psmdb-cr]. Each member's data is in the
 //! claim `mongod-data-<cluster>-<replset>-<n>`, from the StatefulSet's claim template. The
-//! operator's system users and their passwords are in the Secret `spec.secrets.users`
-//! (`<cluster>-secrets` by default); applications connect as the database admin
-//! (`MONGODB_DATABASE_ADMIN_USER`, `…_PASSWORD`) [psmdb-users].
+//! operator's system users and their passwords are in the Secret `spec.secrets.users`, which
+//! the operator defaults to `percona-server-mongodb-users`, one name for every cluster of a
+//! namespace (`psmdb_defaults.go`, v1.23.1); Zeabur's form names `<cluster>-secrets`. Applications
+//! connect as the database admin (`MONGODB_DATABASE_ADMIN_USER`, `…_PASSWORD`) [psmdb-users].
 //!
 //! # Backups
 //!
@@ -233,6 +234,9 @@ fn app_user(cluster: &DynamicObject, name: &str) -> Option<AppUser> {
     })
 }
 
+/// The users Secret of a cluster that does not set `spec.secrets.users`.
+const OPERATOR_USERS_SECRET: &str = "percona-server-mongodb-users";
+
 /// One `PerconaServerMongoDB` as a database, with its backups. Runs are the newest twenty.
 #[must_use]
 pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObject]) -> Database {
@@ -248,7 +252,8 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
     let image = text(cluster, "/spec/image");
     let version = text(cluster, "/status/mongoVersion")
         .or_else(|| image.as_deref().and_then(databases::tag).map(str::to_owned));
-    let secret = text(cluster, "/spec/secrets/users").unwrap_or_else(|| format!("{name}-secrets"));
+    let secret =
+        text(cluster, "/spec/secrets/users").unwrap_or_else(|| OPERATOR_USERS_SECRET.to_owned());
     let claims = (0..members.max(0))
         .map(|i| format!("mongod-data-{name}-{rs}-{i}"))
         .collect();
@@ -375,7 +380,7 @@ mod tests {
         assert_eq!(db.claims, ["mongod-data-mongo-rs0-0"]);
         assert_eq!(db.storage_class.as_deref(), Some("local-path"));
         assert_eq!(db.connection.host, "mongo-rs0.shop.svc");
-        assert_eq!(db.connection.secret, "mongo-secrets");
+        assert_eq!(db.connection.secret, "percona-server-mongodb-users");
         let store = db.backups.store.unwrap();
         assert_eq!(store.destination.as_deref(), Some("s3://b/shop"));
         assert_eq!(store.retention.as_deref(), Some("7"));
@@ -390,6 +395,20 @@ mod tests {
         let mut changed = cluster;
         changed.metadata.generation = Some(3);
         assert!(!database("shop", &changed, &[]).backups.ready);
+    }
+
+    #[test]
+    fn the_connection_reads_the_users_secret_the_cluster_names() {
+        let cluster = object(serde_json::json!({
+            "apiVersion": "psmdb.percona.com/v1", "kind": "PerconaServerMongoDB",
+            "metadata": {"name": "mongo", "namespace": "shop"},
+            "spec": {"image": "x:1", "replsets": [{"name": "rs0", "size": 3}],
+                     "secrets": {"users": "mongo-secrets"}},
+        }));
+        assert_eq!(
+            database("shop", &cluster, &[]).connection.secret,
+            "mongo-secrets"
+        );
     }
 
     #[test]
