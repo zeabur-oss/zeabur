@@ -24,7 +24,7 @@ concurrency:
 jobs:
   shots:
     if: github.ref == 'refs/heads/release/next'
-    runs-on: ubuntu-26.04-arm
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04-arm' }}
     timeout-minutes: 60
     defaults:
       run:
