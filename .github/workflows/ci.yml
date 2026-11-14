@@ -30,7 +30,7 @@ env:
 # for the jobs that need Docker, jobs run on GitHub's runners.
 jobs:
   lint:
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-large' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-small' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,7 +49,7 @@ jobs:
           retention-days: 14
 
   test:
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-large' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-medium' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,7 +61,7 @@ jobs:
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-large' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-medium' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -90,7 +90,7 @@ jobs:
 
   no-ui:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-large' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-small' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -103,7 +103,7 @@ jobs:
 
   wording:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-medium' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-small' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
