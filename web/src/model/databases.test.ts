@@ -742,29 +742,6 @@ describe("MySQL, MariaDB and Dragonfly", () => {
     ])
   })
 
-  test("Dragonfly snapshots to the bucket with the endpoint as its flags", () => {
-    const cache = as("dragonfly", "Dragonfly", "dragonflies", {
-      args: ["--s3_endpoint=old", "--maxmemory=1gb"],
-      env: [{ name: "AWS_REGION", value: "x" }],
-      snapshot: { cron: "0 * * * *", persistentVolumeClaimSpec: {} },
-    })
-    const [, edit] = writeBackups(cache, target)
-    const spec = edit?.op === "edit" ? JSON.parse(edit.yaml).spec : {}
-    expect(spec.args).toEqual([
-      "--maxmemory=1gb",
-      "--s3_endpoint=s3.test:8333",
-      "--s3_use_https=false",
-    ])
-    expect(spec.env.map((e: { name: string }) => e.name)).toEqual([
-      "AWS_ACCESS_KEY_ID",
-      "AWS_SECRET_ACCESS_KEY",
-      "AWS_REGION",
-    ])
-    expect(merged(cache.object, { spec }).spec).toMatchObject({
-      snapshot: { dir: "s3://backups/db", persistentVolumeClaimSpec: {} },
-    })
-  })
-
   test("reshaping MySQL changes mysqld's resources and the data claim template", () => {
     const mysql = as("mysql", "MySQLCluster", "mysqlclusters", {
       replicas: 1,

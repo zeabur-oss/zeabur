@@ -167,7 +167,7 @@ async fn plan(cluster: &dyn Cluster, project: &str, database: &Database) -> Resu
             extension: "sql.gz",
         },
         zeabur_modules::databases::Engine::Dragonfly => {
-            return Err(failed("Dragonfly has no dump to export; its snapshots are its backups."));
+            return Err(failed("Dragonfly has no dump to export; its data is on its volume."));
         }
     })
 }

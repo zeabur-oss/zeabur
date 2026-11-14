@@ -3234,10 +3234,6 @@ export const en = {
   "db.backup.keepsEverything":
     "Every backup is kept. Set a lifecycle rule on the bucket to delete old ones.",
   "db.backup.fixedFolder": (folder: string) => `MOCO writes to ${folder} in the bucket.`,
-  "db.backup.startsEmpty":
-    "With one instance, Dragonfly restarts from the bucket, which is empty: the data so far stays in the snapshot on its volume.",
-  "db.backup.snapshots":
-    "Dragonfly writes a snapshot there on its schedule and when it stops. Zeabur cannot list them.",
   "db.backup.retentionHours": (hours: string) => `${hours} of backups`,
   "db.backup.edit": "Edit",
   "db.backup.change": "Change backups",
@@ -3264,7 +3260,6 @@ export const en = {
   "db.restore.body":
     "Zeabur creates a new database with the same settings, starting from the backup. The original is not changed.",
   "db.restore.point": "Backup",
-  "db.restore.latest": "Newest snapshot",
   "db.restore.name": "New database name",
   "db.restore.none": "No finished backup or point in time to restore from yet.",
   "db.restore.fromBackup": "A finished backup",

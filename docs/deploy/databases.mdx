@@ -79,6 +79,8 @@ The database's **Connections** section shows an address inside the cluster. To c
 
 ## Set up S3 backups
 
+PostgreSQL, MongoDB, MySQL and MariaDB can back up to S3. Dragonfly has no **Backups**. It keeps its data in snapshots on its volume and loads the newest one when it starts.
+
 1. Open the database's **Backups** → **Set up backups**.
 2. **S3 destination** defaults to the first destination registered in the cluster. To use a different location, choose another destination, or select **Enter manually** and fill in the **Endpoint**, **Bucket**, **Region**, **Access key ID**, and **Secret access key**. If the cluster has no destinations yet, the form links to where you can add one.
 3. If a **Folder** field is available, use it to specify the storage location. Leave it empty to use the database name. MySQL always writes to `moco/<project-name>/<database-name>`.
@@ -97,17 +99,12 @@ When you use a shared destination, applying the changes copies its keys to the p
 | MongoDB | The form converts days to a backup count. Daily backups keep the same number; weekly backups keep the number of days divided by 7, rounded up | Available | Successful backups that include restore information |
 | MySQL | Keeps all backups; configure lifecycle cleanup in the S3 bucket | Unavailable; runs on schedule | Successful backups that include restore information |
 | MariaDB | **Keep, in days** | Available | Successful backups that include restore information |
-| Dragonfly | Keeps all snapshots; configure lifecycle cleanup in the S3 bucket | Unavailable; writes snapshots on schedule and when stopping | The latest snapshot |
 
-<Callout type="warn">
-A single-instance Dragonfly database restarts when you switch it to S3 snapshots. If the destination has no snapshots yet, it starts with empty data, leaving the original data only in snapshots on the original volume. If the database already has data, plan a data migration before applying this change.
-</Callout>
-
-After setting up backups for PostgreSQL, MongoDB, or MariaDB, select **Back up now** at the top of the page. The review shows the backup destination. Select **Back up now** again, then wait for it to succeed in **Backups**. Until the first successful record appears, there's no backup you can restore. Dragonfly snapshots aren't listed on this page. Check the S3 destination for snapshot files.
+After setting up backups for PostgreSQL, MongoDB, or MariaDB, select **Back up now** at the top of the page. The review shows the backup destination. Select **Back up now** again, then wait for it to succeed in **Backups**. Until the first successful record appears, there's no backup you can restore.
 
 ## Change or turn off backups
 
-Once backups are on, the **Destination** section of **Backups** has **Edit** and **Turn off backups**. Dragonfly has neither.
+Once backups are on, the **Destination** section of **Backups** has **Edit** and **Turn off backups**.
 
 1. Select **Edit**. The form shows the current endpoint, bucket, folder, schedule and retention. It never shows the access keys.
 2. Change what you need. To keep the keys, leave **Access key ID** and **Secret access key** empty. To replace them, type both, or choose a shared S3 destination to copy its keys. For PostgreSQL and MySQL, the region is saved with the keys, so leave **Region** empty to keep it.
@@ -126,7 +123,7 @@ Moving to another bucket, folder or endpoint leaves earlier backups where they a
 
 Go to the original database's **Backups** and select **Restore to a new database**. Choose a **Backup**, enter an unused **New database name**, then review and apply the changes.
 
-PostgreSQL, MongoDB, MySQL, and MariaDB only list successful records that include restore information. Dragonfly uses the **Newest snapshot**. The new database uses the original database's size settings and contains data as of the selected backup. The original database and app connections stay unchanged.
+PostgreSQL, MongoDB, MySQL, and MariaDB only list successful records that include restore information. The new database uses the original database's size settings and contains data as of the selected backup. The original database and app connections stay unchanged.
 
 </Step>
 <Step>
@@ -163,7 +160,7 @@ From **More** in the top-right corner of the database page, select **Export**. T
 | MongoDB | `mongodump --archive --gzip --oplog`; downloads an `.archive.gz` file. |
 | MySQL | `mysqldump --single-transaction`; excludes system databases and downloads gzip-compressed SQL. |
 | MariaDB | `mariadb-dump --single-transaction`; excludes system databases and downloads gzip-compressed SQL. |
-| Dragonfly | No **Export** action; use snapshot backups. |
+| Dragonfly | No **Export** action. Its data is in snapshots on its volume. |
 
 Exports run in the database container using your `pods/exec` permission. MySQL also requires permission to read its secret. If a download fails or stops partway through, the file is incomplete. Export it again.
 
@@ -658,7 +655,6 @@ Other engines store backup settings in the following objects, using the same nam
 | MongoDB | In the PerconaServerMongoDB's `spec.backup`, `storages.backups.s3` sets the bucket and endpoint, `credentialsSecret` points to the key secret (`AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`), and `tasks` contains a `scheduled` entry. An immediate backup is a PerconaServerMongoDBBackup. |
 | MySQL | ServiceAccount `<name>-backup` and BackupPolicy `<name>-backups`. The MySQLCluster's `spec.backupPolicyName` points to the policy. |
 | MariaDB | Backup `<name>-scheduled`, where `schedule.cron` sets the schedule and `maxRetention` sets the retention period. |
-| Dragonfly | Add `--s3_endpoint` and `--s3_use_https` to the Dragonfly's `spec.args`, read keys through `spec.env`, and change `spec.snapshot.dir` to `s3://<bucket>/<folder>`. |
 
 To see all the fields, set up backups once in the interface, then inspect the result with `kubectl -n shop get <kind> <name> -o yaml`.
 

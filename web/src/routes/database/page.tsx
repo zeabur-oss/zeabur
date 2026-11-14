@@ -60,6 +60,7 @@ import {
   deleteDatabase,
   backupsSummary,
   backUpNowSummary,
+  backsUp,
   backupsNotes,
   currentTarget,
   ownBackups,
@@ -115,6 +116,10 @@ import {
 import { TabsContent } from "@zeabur-oss/design-system/components/tabs"
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
+
+/** Dragonfly has no Backups tab. */
+const tabsOf = (database: Database) =>
+  backsUp(database.engine) ? databaseTabs : databaseTabs.filter((value) => value !== "backups")
 
 const tabIcons: Record<DatabaseTab, Icon> = {
   overview: InfoIcon,
@@ -202,7 +207,7 @@ function Body({
   const { tab, shown, gates, unreadable, deleter, setTab, setPod, setMode } = useStorePage(
     project,
     search.tab,
-    databaseTabs,
+    tabsOf(database),
   )
   const events = eventsOf(useProjectEvents(project), database)
   const shell = (pod?: string) => openDatabaseShell(project, database, pod)
@@ -497,7 +502,10 @@ function Cautions({ project, database }: { project: string; database: Database }
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
           <AlertDescription>
-            {t("db.noRedundancy", Boolean(database.backups.store?.inUse))}
+            {t(
+              "db.noRedundancy",
+              !backsUp(database.engine) || Boolean(database.backups.store?.inUse),
+            )}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -655,16 +663,13 @@ function Backups({
       ) : pluginMissing ? null : (
         <SetUp project={project} database={database} />
       )}
-      {database.engine === "dragonfly" ? null : <Runs database={database} />}
+      <Runs database={database} />
       <Section id="db-restore" title={t("db.restore.action")}>
         <Restore project={project} database={database} />
       </Section>
     </div>
   )
 }
-
-const targetNote: Partial<Record<Database["engine"], "db.backup.walNote" | "db.backup.snapshots">> =
-  { postgresql: "db.backup.walNote", dragonfly: "db.backup.snapshots" }
 
 /** How long the destination keeps backups, as each operator counts it. */
 function useRetention(database: Database) {
@@ -731,7 +736,7 @@ function TargetRows({
 }) {
   const t = useT()
   const retention = useRetention(database)
-  const note = targetNote[database.engine]
+  const note = database.engine === "postgresql" ? "db.backup.walNote" : undefined
   return (
     <>
       <CardRows>
@@ -867,7 +872,6 @@ function BackupForm({
   const secrets = useQuery(objectsQuery(project, { kinds: ["core/secrets"] })).data
   const { keysExist, regionSaved } = backupKeys(database, saved?.yaml, secrets)
   const problems = targetProblems(target, keysExist)
-  const startsEmpty = database.engine === "dragonfly" && database.members === 1
   const review = () => {
     setTried(true)
     if (problems.length > 0) return
@@ -875,10 +879,7 @@ function BackupForm({
       title: t(backupsOn(database) ? "db.backup.planEdit" : "db.backup.plan", database.name),
       changes: writeBackups(database, target, keysExist, regionSaved),
       summary: backupsSummary(t, database, target, keysExist),
-      notes: [
-        ...(startsEmpty ? [t("db.backup.startsEmpty")] : []),
-        ...backupsNotes(t, database, target),
-      ],
+      notes: backupsNotes(t, database, target),
     })
   }
   const set = (patch: Partial<BackupTarget>) => setTarget((v) => ({ ...v, ...patch }))
@@ -918,7 +919,7 @@ function BackupForm({
             </FormField>
           )}
         </S3Fields>
-        <FormNotes project={project} database={database} startsEmpty={startsEmpty} />
+        <FormNotes project={project} database={database} />
         <FormButtons gate={gate} onCancel={onCancel} />
       </form>
       {planner.dialog}
@@ -926,15 +927,7 @@ function BackupForm({
   )
 }
 
-function FormNotes({
-  project,
-  database,
-  startsEmpty,
-}: {
-  project: string
-  database: Database
-  startsEmpty: boolean
-}) {
+function FormNotes({ project, database }: { project: string; database: Database }) {
   const t = useT()
   return (
     <>
@@ -945,12 +938,6 @@ function FormNotes({
       ) : null}
       {keepsEverything(database.engine) ? (
         <p className="type-meta text-muted-foreground">{t("db.backup.keepsEverything")}</p>
-      ) : null}
-      {startsEmpty ? (
-        <Alert variant="warn">
-          <WarningIcon aria-hidden="true" />
-          <AlertDescription>{t("db.backup.startsEmpty")}</AlertDescription>
-        </Alert>
       ) : null}
     </>
   )
