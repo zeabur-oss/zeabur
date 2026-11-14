@@ -25,12 +25,13 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
 
-# A job whose runs-on can name Instabox (instabox-<size>) runs on a fresh Instabox machine when the
-# organization variable CI_INSTABOX is "true". Otherwise, and for the jobs that need Docker, jobs
-# run on GitHub's runners.
+# A job that can run on Instabox takes its runner from a variable, such as instabox-small: lint,
+# no-ui and wording from CI_RUNNER_LINT, the ubuntu-slim jobs from CI_RUNNER_SLIM, the others from
+# CI_RUNNER. Without the variable it runs on GitHub's runner. The jobs that need Docker, k3d or kind
+# stay there.
 jobs:
   lint:
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && 'instabox-small' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_RUNNER_LINT || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -49,7 +50,7 @@ jobs:
           retention-days: 14
 
   test:
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && 'instabox-medium' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -61,7 +62,7 @@ jobs:
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && 'instabox-medium' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -77,7 +78,7 @@ jobs:
   # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
   fuzz:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && 'instabox-medium' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_RUNNER || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -90,7 +91,7 @@ jobs:
 
   no-ui:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && 'instabox-small' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_RUNNER_LINT || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -103,7 +104,7 @@ jobs:
 
   wording:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ${{ vars.CI_INSTABOX == 'true' && 'instabox-small' || 'ubuntu-26.04-arm' }}
+    runs-on: ${{ vars.CI_RUNNER_LINT || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -193,7 +194,7 @@ jobs:
   nightly-issues:
     if: always() && github.event_name == 'schedule'
     needs: [fuzz, canary, e2e-full]
-    runs-on: ubuntu-slim
+    runs-on: ${{ vars.CI_RUNNER_SLIM || 'ubuntu-slim' }}
     permissions:
       contents: read
       issues: write
@@ -215,7 +216,7 @@ jobs:
     name: ci / ok
     if: always()
     needs: [lint, test, ui, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, zizmor]
-    runs-on: ubuntu-slim
+    runs-on: ${{ vars.CI_RUNNER_SLIM || 'ubuntu-slim' }}
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1

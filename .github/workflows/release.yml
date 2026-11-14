@@ -27,6 +27,7 @@ jobs:
       id-token: write
       attestations: write
     with:
+      runner: ${{ vars.CI_RUNNER_LINT || 'ubuntu-26.04-arm' }}
       name: Zeabur
       docs: https://oss.zeabur.com/docs/zeabur/
       version: ${{ inputs.version }}
