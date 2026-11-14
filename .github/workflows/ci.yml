@@ -25,9 +25,12 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
 
+# A job whose runs-on can name Instabox (instabox-<size>) runs on a fresh Instabox machine when the
+# organization variable CI_INSTABOX is "true", except for pull requests from forks. Otherwise, and
+# for the jobs that need Docker, jobs run on GitHub's runners.
 jobs:
   lint:
-    runs-on: ubuntu-26.04-arm
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-large' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -46,7 +49,7 @@ jobs:
           retention-days: 14
 
   test:
-    runs-on: ubuntu-26.04-arm
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-large' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -58,7 +61,7 @@ jobs:
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: ubuntu-26.04-arm
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-large' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,7 +77,7 @@ jobs:
   # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
   fuzz:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-26.04-arm
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-medium' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -87,7 +90,7 @@ jobs:
 
   no-ui:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-large' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -100,7 +103,7 @@ jobs:
 
   wording:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
+    runs-on: ${{ vars.CI_INSTABOX == 'true' && !github.event.pull_request.head.repo.fork && 'instabox-medium' || 'ubuntu-26.04-arm' }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
