@@ -60,6 +60,7 @@ import {
   backupsSummary,
   backUpNowSummary,
   enableBackups,
+  backsUp,
   engineName,
   engineOperator,
   eventsOf,
@@ -105,6 +106,10 @@ import {
 import { TabsContent } from "@zeabur-oss/design-system/components/tabs"
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
+
+/** Dragonfly has no Backups tab. */
+const tabsOf = (database: Database) =>
+  backsUp(database.engine) ? databaseTabs : databaseTabs.filter((value) => value !== "backups")
 
 const tabIcons: Record<DatabaseTab, Icon> = {
   overview: InfoIcon,
@@ -192,7 +197,7 @@ function Body({
   const { tab, shown, gates, unreadable, deleter, setTab, setPod, setMode } = useStorePage(
     project,
     search.tab,
-    databaseTabs,
+    tabsOf(database),
   )
   const events = eventsOf(useProjectEvents(project), database)
   const shell = (pod?: string) => openDatabaseShell(project, database, pod)
@@ -387,6 +392,25 @@ function BackUpNow({ project, database }: { project: string; database: Database 
   )
 }
 
+function LastBackup({ database }: { database: Database }) {
+  const t = useT()
+  const run = lastRun(database)
+  if (!run)
+    return (
+      <span className="text-muted-foreground">
+        {backupsOn(database) ? t("db.backup.noRun") : t("db.backup.none")}
+      </span>
+    )
+  return (
+    <>
+      <StatusPill health={outcomeHealth[run.outcome]} size="sm">
+        {t(`backups.${run.outcome}`)}
+      </StatusPill>
+      <Ago iso={run.finished ?? run.started} />
+    </>
+  )
+}
+
 /** The newest warnings, as a service's overview shows them, and the way to all events. */
 function Overview({
   project,
@@ -402,7 +426,6 @@ function Overview({
   const t = useT()
   const { amount } = useQuantityFormat()
   const preset = presetOf(database.engine, database.resources)
-  const run = lastRun(database)
   return (
     <div className="flex flex-col gap-7">
       <Restored project={project} database={database} />
@@ -439,20 +462,11 @@ function Overview({
             <SummaryCardFact label={t("db.fact.size")}>
               {preset ? t(`db.size.${preset}`) : t("db.fact.custom")}
             </SummaryCardFact>
-            <SummaryCardFact label={t("db.backup.last")}>
-              {run ? (
-                <>
-                  <StatusPill health={outcomeHealth[run.outcome]} size="sm">
-                    {t(`backups.${run.outcome}`)}
-                  </StatusPill>
-                  <Ago iso={run.finished ?? run.started} />
-                </>
-              ) : (
-                <span className="text-muted-foreground">
-                  {backupsOn(database) ? t("db.backup.noRun") : t("db.backup.none")}
-                </span>
-              )}
-            </SummaryCardFact>
+            {backsUp(database.engine) ? (
+              <SummaryCardFact label={t("db.backup.last")}>
+                <LastBackup database={database} />
+              </SummaryCardFact>
+            ) : null}
           </SummaryCardFacts>
         </SummaryCardMain>
         {database.message && database.state !== "ready" ? (
@@ -481,7 +495,10 @@ function Cautions({ project, database }: { project: string; database: Database }
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
           <AlertDescription>
-            {t("db.noRedundancy", Boolean(database.backups.store?.inUse))}
+            {t(
+              "db.noRedundancy",
+              !backsUp(database.engine) || Boolean(database.backups.store?.inUse),
+            )}
           </AlertDescription>
         </Alert>
       ) : null}
@@ -646,16 +663,13 @@ function Backups({
           <SetUp project={project} database={database} />
         </>
       )}
-      {database.engine === "dragonfly" ? null : <Runs database={database} />}
+      <Runs database={database} />
       <Section id="db-restore" title={t("db.restore.action")}>
         <Restore project={project} database={database} />
       </Section>
     </div>
   )
 }
-
-const targetNote: Partial<Record<Database["engine"], "db.backup.walNote" | "db.backup.snapshots">> =
-  { postgresql: "db.backup.walNote", dragonfly: "db.backup.snapshots" }
 
 /** How long the destination keeps backups, as each operator counts it. */
 function useRetention(database: Database) {
@@ -680,7 +694,7 @@ function Target({ project, database }: { project: string; database: Database }) 
   const retention = useRetention(database)
   const store = database.backups.store
   if (!store) return null
-  const note = targetNote[database.engine]
+  const note = database.engine === "postgresql" ? "db.backup.walNote" : undefined
   return (
     <Section id="db-target" title={t("db.backup.destination")}>
       <CardRows>
@@ -772,7 +786,6 @@ function SetUp({ project, database }: { project: string; database: Database }) {
   const planner = usePlanner(project)
   const setUpGate = useGate(project, "changeDatabases")
   const problems = targetProblems(target)
-  const startsEmpty = database.engine === "dragonfly" && database.members === 1
   const review = () => {
     setTried(true)
     if (problems.length > 0) return
@@ -780,7 +793,6 @@ function SetUp({ project, database }: { project: string; database: Database }) {
       title: t("db.backup.plan", database.name),
       changes: enableBackups(database, target),
       summary: backupsSummary(t, database, target),
-      notes: startsEmpty ? [t("db.backup.startsEmpty")] : undefined,
     })
   }
   const set = (patch: Partial<BackupTarget>) => setTarget((v) => ({ ...v, ...patch }))
@@ -827,12 +839,6 @@ function SetUp({ project, database }: { project: string; database: Database }) {
         ) : null}
         {keepsEverything(database.engine) ? (
           <p className="type-meta text-muted-foreground">{t("db.backup.keepsEverything")}</p>
-        ) : null}
-        {startsEmpty ? (
-          <Alert variant="warn">
-            <WarningIcon aria-hidden="true" />
-            <AlertDescription>{t("db.backup.startsEmpty")}</AlertDescription>
-          </Alert>
         ) : null}
         <div className="flex justify-end">
           <GateTip gate={setUpGate}>

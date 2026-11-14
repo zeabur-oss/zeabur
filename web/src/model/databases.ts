@@ -18,8 +18,8 @@
 // MariaDB is a mariadb-operator `MariaDB`; its backups are `Backup` objects, scheduled or not.
 // https://github.com/mariadb-operator/mariadb-operator/blob/main/docs/logical_backup.md
 //
-// Dragonfly is a Dragonfly Operator `Dragonfly`; it snapshots to a volume, or to a bucket when
-// `spec.snapshot.dir` is `s3://…`.
+// Dragonfly is a Dragonfly Operator `Dragonfly`; it snapshots to its volume. It loads the same
+// snapshots when it starts, so they are not a separate copy, and Zeabur offers no backups for it.
 // https://www.dragonflydb.io/docs/managing-dragonfly/backups
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
@@ -696,8 +696,16 @@ function mariaBackupPods(database: Database) {
 const awsKeys = (name: string, target: BackupTarget, region: string) =>
   keysSecret(name, target, AWS_KEYS, { AWS_REGION: region || "us-east-1" })
 
+/** The engines Zeabur backs up to S3. */
+export type BackupEngine = Exclude<Engine, "dragonfly">
+
+export const backsUp = (engine: Engine): engine is BackupEngine => engine !== "dragonfly"
+
+/** The database's engine, for a database that `backsUp`. */
+export const backupEngine = (database: Database) => database.engine as BackupEngine
+
 /** Engines whose backups have no retention: the person sets a lifecycle rule on the bucket. */
-export const keepsEverything = (engine: Engine) => engine === "mysql" || engine === "dragonfly"
+export const keepsEverything = (engine: Engine) => engine === "mysql"
 
 /** MOCO writes to a fixed folder, `moco/<namespace>/<name>`. */
 export const fixedFolder = (engine: Engine) => engine === "mysql"
@@ -720,7 +728,7 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
     name: database.name,
     yaml: JSON.stringify(object),
   })
-  switch (database.engine) {
+  switch (backupEngine(database)) {
     case "postgresql": {
       const keys = keysSecret(
         names.secret,
@@ -844,42 +852,11 @@ export function enableBackups(database: Database, target: BackupTarget): Change[
       })
       return madeFor(database.name, [keys, backup])
     }
-    case "dragonfly": {
-      const keys = awsKeys(names.secret, target, region)
-      const https = !endpoint.startsWith("http://")
-      const host = endpoint.replace(/^https?:\/\//, "").replace(/\/+$/, "")
-      const own = (arg: string) =>
-        arg.startsWith("--s3_endpoint=") || arg.startsWith("--s3_use_https=")
-      spec.args = [
-        ...((spec.args as string[] | undefined) ?? []).filter((arg) => !own(arg)),
-        `--s3_endpoint=${host}`,
-        `--s3_use_https=${https}`,
-      ]
-      const key = (name: string) => ({
-        name,
-        valueFrom: { secretKeyRef: { name: names.secret, key: name } },
-      })
-      spec.env = [
-        ...((spec.env as Manifest[] | undefined) ?? []).filter(
-          (e) => !String(e.name).startsWith("AWS_"),
-        ),
-        key("AWS_ACCESS_KEY_ID"),
-        key("AWS_SECRET_ACCESS_KEY"),
-        key("AWS_REGION"),
-      ]
-      spec.snapshot = {
-        ...(spec.snapshot as Manifest | undefined),
-        dir: `s3://${bucket}/${folder(target, database.name)}`,
-        cron: cron(target.frequency, false),
-      }
-      return madeFor(database.name, [keys, edit()])
-    }
   }
 }
 
 /** Engines whose database restarts once its backups are turned on: a sidecar or new arguments. */
-const restartsForBackups = (engine: Engine) =>
-  engine === "postgresql" || engine === "mongodb" || engine === "dragonfly"
+const restartsForBackups = (engine: Engine) => engine === "postgresql" || engine === "mongodb"
 
 /** What `enableBackups` does, in the form's words. */
 export function backupsSummary(t: Translate, database: Database, target: BackupTarget) {
@@ -928,7 +905,7 @@ export function backupName(database: string, now: Date) {
   return `${database}-${stamp}`
 }
 
-/** Engines that take a backup on demand: MOCO and Dragonfly only back up on their schedule. */
+/** Engines that take a backup on demand: MOCO only backs up on its schedule. */
 export const canBackUpNow = (engine: Engine) =>
   engine === "postgresql" || engine === "mongodb" || engine === "mariadb"
 
