@@ -39,13 +39,11 @@ impl Clusters {
     }
 
     /// Starts the service for the window `label`, replacing one it already runs, and returns the
-    /// link to load.
+    /// link to load. Each call takes a new id, so an earlier call that finishes later is dropped.
     pub(crate) async fn start(&self, label: &str, env: &ChildEnv) -> Result<String, String> {
-        let (id, target) = lookup(
-            &self.targets.lock().unwrap_or_else(PoisonError::into_inner),
-            label,
-        )
-        .ok_or_else(|| "This window has no cluster to open.".to_owned())?;
+        let (id, target) = self
+            .begin(label)
+            .ok_or_else(|| "This window has no cluster to open.".to_owned())?;
         self.stop(label);
         let own: Vec<(OsString, OsString)> = std::env::vars_os().collect();
         let kubeconfig = read(&target, &env.changed_from(&own))?;
@@ -65,6 +63,15 @@ impl Clusters {
             .insert(label.to_owned(), running);
         drop(targets);
         Ok(url)
+    }
+
+    fn begin(&self, label: &str) -> Option<(u64, Target)> {
+        let mut targets = self.targets.lock().unwrap_or_else(PoisonError::into_inner);
+        let entry = targets.get_mut(label)?;
+        entry.0 = self.next.fetch_add(1, Ordering::Relaxed);
+        let started = entry.clone();
+        drop(targets);
+        Some(started)
     }
 
     /// Forgets the window `label` and stops its service.
@@ -143,6 +150,24 @@ mod tests {
         clusters.set_target("cluster-a", target);
         assert!(id(&clusters).is_some());
         assert_ne!(id(&clusters), first);
+    }
+
+    #[test]
+    fn a_second_start_drops_the_first() {
+        let clusters = Clusters::default();
+        clusters.set_target(
+            "cluster-a",
+            Target {
+                file: PathBuf::from("/nonexistent"),
+                context: "c".to_owned(),
+            },
+        );
+        let before = lookup(&clusters.targets.lock().unwrap(), "cluster-a").map(|(id, _)| id);
+        drop(tauri::async_runtime::block_on(
+            clusters.start("cluster-a", &ChildEnv::default()),
+        ));
+        let after = lookup(&clusters.targets.lock().unwrap(), "cluster-a").map(|(id, _)| id);
+        assert_ne!(before, after);
     }
 
     #[test]
