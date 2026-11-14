@@ -1398,4 +1398,23 @@ mod tests {
         assert_eq!(dropped, BTreeSet::from(["miniflux", "ghost", "brand-new"]));
         assert!(catalog.templates().is_ok());
     }
+
+    #[test]
+    fn a_fetched_template_that_needs_components_this_build_carries_is_offered() {
+        let embedded = Catalog::embedded();
+        let carried = MINIFLUX
+            .replace(r#""traefik""#, r#""ingress/traefik""#)
+            .replace(r#""cert-manager""#, r#""certificates/cert-manager""#)
+            .replace(r#""cloudnative-pg""#, r#""databases/cloudnative-pg""#);
+        let index = listed(&[("miniflux", "h1:newer")]);
+        let files = BTreeMap::from([("miniflux".to_owned(), carried.into_bytes())]);
+        let (catalog, dropped) = embedded.updated(&index, &files);
+
+        assert_eq!(dropped, []);
+        let miniflux: TemplateFile = serde_json::from_str(MINIFLUX).unwrap();
+        assert_eq!(
+            catalog.template("miniflux").unwrap().revision,
+            miniflux.source_digest
+        );
+    }
 }

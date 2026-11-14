@@ -197,7 +197,7 @@
         "url": {
           "description": "Where to fetch templates from, or empty for https://oss-catalog.zeabur.com/v1/.",
           "type": "string",
-          "pattern": "^$|^https?://"
+          "pattern": "^$|^https://"
         }
       }
     },

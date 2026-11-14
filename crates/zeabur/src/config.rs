@@ -326,9 +326,9 @@ fn template_fetch(args: &Args) -> Result<Option<String>, String> {
     if url.is_empty() {
         return Ok(Some(zeabur_api::settings::TEMPLATE_FETCH_URL.to_owned()));
     }
-    if !(url.starts_with("https://") || url.starts_with("http://")) {
+    if !url.starts_with("https://") {
         return Err(format!(
-            "--template-fetch-url: {url:?} is not an http:// or https:// URL"
+            "--template-fetch-url: {url:?} is not an https:// URL"
         ));
     }
     if url.ends_with('/') {
@@ -601,6 +601,26 @@ mod tests {
     }
 
     #[test]
+    fn templates_are_fetched_over_https_only_and_can_be_turned_off() {
+        let files = Files::new("template-fetch");
+        let config = args(&files, &["--template-fetch", "false"]).unwrap();
+        assert_eq!(config.settings.template_fetch, None);
+        let config = args(
+            &files,
+            &["--template-fetch-url", "https://catalog.mirror.svc/v1"],
+        )
+        .unwrap();
+        assert_eq!(
+            config.settings.template_fetch.as_deref(),
+            Some("https://catalog.mirror.svc/v1/")
+        );
+        for url in ["catalog.example.com", "http://catalog.mirror.svc/v1/"] {
+            let error = args(&files, &["--template-fetch-url", url]).unwrap_err();
+            assert!(error.starts_with("--template-fetch-url:"), "{error}");
+        }
+    }
+
+    #[test]
     fn the_metrics_store_and_the_settings_namespace_are_optional() {
         let files = Files::new("settings");
         let config = args(&files, &[]).unwrap();
@@ -624,19 +644,6 @@ mod tests {
         .unwrap();
         assert!(!config.settings.update_check);
         assert_eq!(config.settings.deployment.as_deref(), Some("zeabur"));
-        let config = args(&files, &["--template-fetch", "false"]).unwrap();
-        assert_eq!(config.settings.template_fetch, None);
-        let config = args(
-            &files,
-            &["--template-fetch-url", "http://catalog.mirror.svc/v1"],
-        )
-        .unwrap();
-        assert_eq!(
-            config.settings.template_fetch.as_deref(),
-            Some("http://catalog.mirror.svc/v1/")
-        );
-        let error = args(&files, &["--template-fetch-url", "catalog.example.com"]).unwrap_err();
-        assert!(error.starts_with("--template-fetch-url:"), "{error}");
         let config = args(
             &files,
             &["--account-url", "https://id.example.com/me?tab=keys"],
