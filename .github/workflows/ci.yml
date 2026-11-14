@@ -69,3 +69,37 @@ jobs:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/ui.sh
+
+  e2e:
+    runs-on: instabox-${{ inputs.size }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          uname -m; nproc; free -g | head -2; df -h / | tail -1
+          docker version --format '{{.Server.Version}}' || echo "no docker"
+          ls -l /dev/kvm || echo "no /dev/kvm"
+          sudo modprobe iscsi_tcp && echo "iscsi_tcp ok" || echo "no iscsi_tcp"
+      - uses: ./.github/actions/ci-setup
+        with:
+          rust-cache: true
+      - uses: ./.github/actions/catalog-release
+      - run: nix develop -c scripts/ci/e2e.sh
+
+  e2e-github:
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - run: |
+          uname -m; nproc; free -g | head -2; df -h / | tail -1
+          docker version --format '{{.Server.Version}}' || echo "no docker"
+          ls -l /dev/kvm || echo "no /dev/kvm"
+          sudo modprobe iscsi_tcp && echo "iscsi_tcp ok" || echo "no iscsi_tcp"
+      - uses: ./.github/actions/ci-setup
+        with:
+          rust-cache: true
+      - uses: ./.github/actions/catalog-release
+      - run: nix develop -c scripts/ci/e2e.sh
