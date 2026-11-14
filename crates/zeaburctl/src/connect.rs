@@ -64,6 +64,8 @@ struct Endpoint {
 #[derive(Debug, Deserialize)]
 struct EndpointPort {
     port: i32,
+    /// The transport, `TCP` or `UDP`: the forwarder opens a TCP listener only.
+    protocol: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -318,13 +320,16 @@ fn service_ports(
         .into_iter()
         .filter(|e| services.iter().any(|s| s.endpoint_names.contains(&e.name)))
         .flat_map(|e| {
-            e.ports.into_iter().filter_map(move |p| {
-                Some(ServiceAddress {
-                    namespace: project.to_owned(),
-                    name: e.name.clone(),
-                    port: u16::try_from(p.port).ok()?,
+            e.ports
+                .into_iter()
+                .filter(|p| p.protocol != "UDP")
+                .filter_map(move |p| {
+                    Some(ServiceAddress {
+                        namespace: project.to_owned(),
+                        name: e.name.clone(),
+                        port: u16::try_from(p.port).ok()?,
+                    })
                 })
-            })
         })
         .collect();
     ports.sort_by(|a, b| (a.port, &a.name).cmp(&(b.port, &b.name)));
@@ -682,6 +687,28 @@ mod tests {
                 .await
                 .unwrap_err(),
             "Project shop has more than one service named web. Connect to it from the cluster instead."
+        );
+    }
+
+    #[tokio::test]
+    async fn a_udp_port_is_not_offered() {
+        let cluster = shop();
+        cluster.update(|s| {
+            let dns = serde_json::from_value(json!({
+                "metadata": {"name": "web-dns", "namespace": "shop"},
+                "spec": {"selector": {"app": "web"},
+                         "ports": [{"name": "dns", "port": 53, "protocol": "UDP"}]},
+            }))
+            .unwrap();
+            if let Some(objects) = s.objects.get_mut("shop") {
+                objects.services.push(dns);
+            }
+        });
+        assert_eq!(
+            target(&api(&cluster), "shop", "web", Some(53))
+                .await
+                .unwrap_err(),
+            "web has no port 53. Its ports: 80, 8081, 9090."
         );
     }
 
