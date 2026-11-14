@@ -15,8 +15,8 @@ use zeabur_core::problem::Denied;
 use crate::objects::{AccessRules, ResourceRef, ServedResource};
 use crate::port::{
     Answer, Cluster, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest, ExecSession,
-    ExecStream, ExitStatus, Identity, LogLines, LogOptions, NamespaceObjects, RawList, ServicePort,
-    WriteRequest, Written,
+    ExecStream, ExitStatus, Identity, IssuedToken, LogLines, LogOptions, NamespaceObjects, RawList,
+    ServicePort, WriteRequest, Written,
 };
 
 /// Wraps a [`Cluster`] and logs each call made through it.
@@ -161,6 +161,16 @@ impl<C: Cluster> Cluster for Recording<C> {
     ) -> Answer<'a, BTreeMap<String, Vec<u8>>> {
         self.note(format!("reveal_secret {namespace}/{name}"));
         self.inner.reveal_secret(namespace, name)
+    }
+
+    fn request_token<'a>(
+        &'a self,
+        namespace: &'a str,
+        name: &'a str,
+        seconds: i64,
+    ) -> Answer<'a, IssuedToken> {
+        self.note(format!("request_token {namespace}/{name}"));
+        self.inner.request_token(namespace, name, seconds)
     }
 
     fn cluster_facts(&self) -> Answer<'_, ClusterFacts> {

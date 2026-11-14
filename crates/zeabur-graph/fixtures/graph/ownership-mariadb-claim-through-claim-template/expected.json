@@ -1,0 +1,30 @@
+[
+  {
+    "root": {
+      "kind": "MariaDB",
+      "name": "shop-db",
+      "group": "k8s.mariadb.com",
+      "uid": "mariadb-1"
+    },
+    "read": false,
+    "database": {
+      "kind": "MariaDB",
+      "name": "shop-db",
+      "engine": "MariaDB"
+    },
+    "members": [
+      {
+        "kind": "PersistentVolumeClaim",
+        "name": "storage-shop-db-0"
+      },
+      {
+        "kind": "Pod",
+        "name": "shop-db-0"
+      },
+      {
+        "kind": "StatefulSet",
+        "name": "shop-db"
+      }
+    ]
+  }
+]

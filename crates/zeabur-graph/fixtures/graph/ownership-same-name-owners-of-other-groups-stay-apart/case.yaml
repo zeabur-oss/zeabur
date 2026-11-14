@@ -1,0 +1,2 @@
+description: Two Clusters both named db, one of CloudNativePG and one of another API group, are different owners, and only CloudNativePG's is a database.
+operation: graph.ownership

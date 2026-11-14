@@ -63,6 +63,7 @@
     installer-configuration: Installer 配置
     installer: Installer 命令
     permissions: 权限
+    api-tokens: API 令牌
     architecture: 架构
     releases: 发行文件与验证
     security: 安全性

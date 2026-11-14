@@ -135,6 +135,13 @@ kubectl delete rolebindings,clusterrolebindings --all-namespaces \
 
 保留 Identity 时，其他 client 或 kubeconfig 仍可能以 `zeabur:<username>` 身份登录，删除前先确认它们不再依赖这些 binding。
 
+卸载 chart 也会删除 `zeabur-api-tokens` Namespace，其中的 ServiceAccount 随之删除，所以每个 [API 令牌](../reference/api-tokens.mdx)都会失效。令牌的 binding 会保留，用以下命令删除：
+
+```sh
+kubectl delete rolebindings,clusterrolebindings --all-namespaces \
+  -l app.kubernetes.io/managed-by=zeabur,zeabur.com/api-token
+```
+
 ## 清理临时工具和目的地信息
 
 ### 终端对象

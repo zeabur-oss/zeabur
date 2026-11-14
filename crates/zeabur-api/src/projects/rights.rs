@@ -48,6 +48,9 @@ pub struct ProjectRights {
     pub restore_volumes: Permission,
     /// Open a terminal in a container: `create` on `pods/exec`.
     pub open_terminal: Permission,
+    /// Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
+    /// on `pods/portforward`.
+    pub port_forward: Permission,
     /// Read the pods' logs: `get` on `pods/log`.
     pub read_logs: Permission,
     /// Build again: `patch` on Zeabur Builder's builds.
@@ -139,6 +142,7 @@ impl ProjectRights {
             back_up_volumes: u,
             restore_volumes: u,
             open_terminal: u,
+            port_forward: u,
             read_logs: u,
             build: u,
             deploy_from_git: u,
@@ -195,6 +199,7 @@ impl ProjectRights {
                 ask.can("create", "", "persistentvolumeclaims"),
             ]),
             open_terminal: ask.can("create", "", "pods/exec"),
+            port_forward: ask.can("create", "", "pods/portforward"),
             read_logs: ask.can("get", "", "pods/log"),
             build: ask.can("patch", "builder.zeabur.com", "builds"),
             deploy_from_git: all([
@@ -267,6 +272,7 @@ mod tests {
                     back_up_volumes: allowed,
                     restore_volumes: allowed,
                     open_terminal: allowed,
+                    port_forward: allowed,
                     read_logs: allowed,
                     build: allowed,
                     deploy_from_git: allowed,

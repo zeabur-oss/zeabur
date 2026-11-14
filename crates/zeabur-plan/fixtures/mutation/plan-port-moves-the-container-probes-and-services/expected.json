@@ -1,0 +1,41 @@
+{
+  "impact": [{"kind": "Deployment", "name": "web"}],
+  "objects": [
+    {
+      "target": {"apiVersion": "apps/v1", "kind": "Deployment", "name": "web", "plural": "deployments"},
+      "write": {
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "41"},
+          {"op": "test", "path": "/spec/template/spec/containers/0/ports/0/containerPort", "value": 8080},
+          {"op": "replace", "path": "/spec/template/spec/containers/0/ports/0/containerPort", "value": 3000},
+          {"op": "test", "path": "/spec/template/spec/containers/0/readinessProbe/tcpSocket/port", "value": 8080},
+          {"op": "replace", "path": "/spec/template/spec/containers/0/readinessProbe/tcpSocket/port", "value": 3000},
+          {"op": "add", "path": "/spec/template/spec/containers/0/env", "value": [{"name": "PORT", "value": "3000"}]}
+        ],
+        "type": "patch"
+      }
+    },
+    {
+      "target": {"apiVersion": "v1", "kind": "Service", "name": "web", "plural": "services"},
+      "write": {
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "7"},
+          {"op": "test", "path": "/spec/ports/0/targetPort", "value": 8080},
+          {"op": "replace", "path": "/spec/ports/0/targetPort", "value": 3000}
+        ],
+        "type": "patch"
+      }
+    },
+    {
+      "target": {"apiVersion": "v1", "kind": "Service", "name": "web-public-8080", "plural": "services"},
+      "write": {
+        "operations": [
+          {"op": "test", "path": "/metadata/resourceVersion", "value": "9"},
+          {"op": "add", "path": "/spec/ports/0/targetPort", "value": 3000}
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

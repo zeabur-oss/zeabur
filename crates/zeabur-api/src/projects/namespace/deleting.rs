@@ -1,7 +1,7 @@
 //! A project being deleted: its Namespace is `Terminating`, and the namespace controller says in
 //! its conditions what is left [k8s-ns-conditions]. When objects with finalizers hold it, they are
-//! listed as the person, so the interface can name them and show how to look at them. Zeabur
-//! never removes a finalizer.
+//! listed as the person, so the interface can name them and show how to look at them. Only a
+//! force deletion (`zeabur_plan::Change::ForceDeleteProject`) removes their finalizers.
 //!
 //! The controller's messages are `Some resources are remaining: <group-resource> has <n>
 //! resource instances, …` (`NamespaceContentRemaining`) and `Some content in the namespace has
@@ -16,9 +16,6 @@ use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::{Cluster, DynamicObject, ResourceRef};
-
-/// Objects held back from more than this many kinds are not listed one by one.
-const KINDS_LISTED: usize = 10;
 
 /// A project whose Namespace is being deleted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
@@ -85,29 +82,22 @@ pub(super) async fn read(
         .as_ref()?
         .0
         .to_string();
-    let conditions = namespace
-        .data
-        .pointer("/status/conditions")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let message = |kind: &str| {
-        conditions
-            .iter()
-            .find(|c| {
-                c.get("type").and_then(Value::as_str) == Some(kind)
-                    && c.get("status").and_then(Value::as_str) == Some("True")
-            })
-            .and_then(|c| c.get("message").and_then(Value::as_str))
-            .unwrap_or_default()
-            .to_owned()
-    };
-    let remaining = remaining(&message("NamespaceContentRemaining"));
-    let finalizers = finalizers(&message("NamespaceFinalizersRemaining"));
+    let remaining = remaining(&condition(namespace, "NamespaceContentRemaining"));
+    let finalizers = finalizers(&condition(namespace, "NamespaceFinalizersRemaining"));
     let held = if finalizers.is_empty() {
         Vec::new()
     } else {
-        held(cluster, project, &remaining).await
+        held(cluster, project, &remaining)
+            .await
+            .into_iter()
+            .map(|(resource, object)| HeldObject {
+                group: resource.group,
+                resource: resource.resource,
+                kind: resource.kind,
+                name: object.metadata.name.unwrap_or_default(),
+                finalizers: object.metadata.finalizers.unwrap_or_default(),
+            })
+            .collect()
     };
     Some(ProjectDeleting {
         since,
@@ -115,6 +105,37 @@ pub(super) async fn read(
         finalizers,
         held,
     })
+}
+
+/// The objects with finalizers among what the namespace controller says is left of `namespace`,
+/// read as the person.
+pub(crate) async fn held_objects(
+    cluster: &dyn Cluster,
+    project: &str,
+    namespace: &DynamicObject,
+) -> Vec<(ResourceRef, DynamicObject)> {
+    let remaining = remaining(&condition(namespace, "NamespaceContentRemaining"));
+    held(cluster, project, &remaining).await
+}
+
+/// The message of `namespace`'s condition `kind` when it is `True`; empty otherwise.
+fn condition(namespace: &DynamicObject, kind: &str) -> String {
+    let Some(conditions) = namespace
+        .data
+        .pointer("/status/conditions")
+        .and_then(Value::as_array)
+    else {
+        return String::new();
+    };
+    conditions
+        .iter()
+        .find(|c| {
+            c.get("type").and_then(Value::as_str) == Some(kind)
+                && c.get("status").and_then(Value::as_str) == Some("True")
+        })
+        .and_then(|c| c.get("message").and_then(Value::as_str))
+        .unwrap_or_default()
+        .to_owned()
 }
 
 /// The items of a condition message: what follows the colon, split on `", "`.
@@ -162,12 +183,12 @@ async fn held(
     cluster: &dyn Cluster,
     project: &str,
     remaining: &[RemainingContent],
-) -> Vec<HeldObject> {
+) -> Vec<(ResourceRef, DynamicObject)> {
     let Ok(served) = cluster.served_resources().await else {
         return Vec::new();
     };
     let mut out = Vec::new();
-    for left in remaining.iter().take(KINDS_LISTED) {
+    for left in remaining {
         let Some(found) = served
             .iter()
             .find(|s| s.group == left.group && s.resource == left.resource && s.namespaced)
@@ -178,16 +199,18 @@ async fn held(
         let Ok(Some(objects)) = cluster.list_objects(&resource, Some(project)).await else {
             continue;
         };
-        out.extend(objects.into_iter().filter_map(|object| {
-            let finalizers = object.metadata.finalizers.clone().unwrap_or_default();
-            (!finalizers.is_empty()).then(|| HeldObject {
-                group: found.group.clone(),
-                resource: found.resource.clone(),
-                kind: found.kind.clone(),
-                name: object.metadata.name.clone().unwrap_or_default(),
-                finalizers,
-            })
-        }));
+        out.extend(
+            objects
+                .into_iter()
+                .filter(|object| {
+                    object
+                        .metadata
+                        .finalizers
+                        .as_ref()
+                        .is_some_and(|f| !f.is_empty())
+                })
+                .map(|object| (resource.clone(), object)),
+        );
     }
     out
 }

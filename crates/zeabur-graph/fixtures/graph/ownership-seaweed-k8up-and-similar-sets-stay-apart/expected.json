@@ -1,0 +1,74 @@
+[
+  {
+    "root": {
+      "kind": "StatefulSet",
+      "name": "db",
+      "group": "apps"
+    },
+    "read": true,
+    "database": null,
+    "members": [
+      {
+        "kind": "PersistentVolumeClaim",
+        "name": "data-db-0"
+      }
+    ]
+  },
+  {
+    "root": {
+      "kind": "StatefulSet",
+      "name": "db-replica",
+      "group": "apps"
+    },
+    "read": true,
+    "database": null,
+    "members": [
+      {
+        "kind": "PersistentVolumeClaim",
+        "name": "data-db-replica-0"
+      }
+    ]
+  },
+  {
+    "root": {
+      "kind": "Backup",
+      "name": "nightly",
+      "group": "k8up.io"
+    },
+    "read": false,
+    "database": null,
+    "members": [
+      {
+        "kind": "Pod",
+        "name": "backup-nightly-x7k2p"
+      },
+      {
+        "kind": "Job",
+        "name": "backup-nightly"
+      }
+    ]
+  },
+  {
+    "root": {
+      "kind": "Seaweed",
+      "name": "store",
+      "group": "seaweed.seaweedfs.com"
+    },
+    "read": false,
+    "database": {
+      "kind": "Seaweed",
+      "name": "store",
+      "engine": "SeaweedFS"
+    },
+    "members": [
+      {
+        "kind": "PersistentVolumeClaim",
+        "name": "mount0-store-volume-0"
+      },
+      {
+        "kind": "StatefulSet",
+        "name": "store-volume"
+      }
+    ]
+  }
+]

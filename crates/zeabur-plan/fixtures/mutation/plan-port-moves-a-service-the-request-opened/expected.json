@@ -1,0 +1,104 @@
+{
+  "objects": [
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web-public-8080"
+      },
+      "after": {
+        "spec": {
+          "ports": [
+            {
+              "name": "http",
+              "port": 8080,
+              "targetPort": 3000
+            }
+          ],
+          "selector": {
+            "app.kubernetes.io/name": "web"
+          },
+          "type": "LoadBalancer"
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Deployment",
+        "name": "web"
+      },
+      "after": {
+        "spec": {
+          "replicas": 1,
+          "selector": {
+            "matchLabels": {
+              "app.kubernetes.io/name": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app.kubernetes.io/name": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "env": [
+                    {
+                      "name": "PORT",
+                      "value": "3000"
+                    }
+                  ],
+                  "envFrom": [
+                    {
+                      "secretRef": {
+                        "name": "db-credentials"
+                      }
+                    },
+                    {
+                      "secretRef": {
+                        "name": "web-env"
+                      }
+                    }
+                  ],
+                  "image": "registry.local/demo/web:1",
+                  "name": "web",
+                  "ports": [
+                    {
+                      "containerPort": 3000
+                    }
+                  ],
+                  "readinessProbe": {
+                    "tcpSocket": {
+                      "port": 3000
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web"
+      },
+      "after": {
+        "spec": {
+          "ports": [
+            {
+              "name": "http",
+              "port": 8080,
+              "targetPort": 3000
+            }
+          ],
+          "selector": {
+            "app.kubernetes.io/name": "web"
+          }
+        }
+      }
+    }
+  ]
+}

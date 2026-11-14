@@ -1,0 +1,18 @@
+[
+  {
+    "gap": {
+      "rule": "volume-without-backup",
+      "severity": "advice",
+      "subject": { "kind": "PersistentVolumeClaim", "name": "data-db-0" },
+      "fix": { "kind": "plan", "id": "backups.veleroSchedule", "params": { "claim": "data-db-0" } }
+    }
+  },
+  {
+    "gap": {
+      "rule": "volume-without-backup",
+      "severity": "advice",
+      "subject": { "kind": "PersistentVolumeClaim", "name": "uploads" },
+      "fix": { "kind": "plan", "id": "backups.veleroSchedule", "params": { "claim": "uploads" } }
+    }
+  }
+]

@@ -23,9 +23,11 @@ description: 對照成員角色、管理員帳號與 Kubernetes RBAC，確認每
 | 建立資料庫、物件儲存與支援的備份設定 | 無 | 可 |
 | 從 Git 部署、重新建置 | 無 | 可 |
 | 開啟容器終端機、加入除錯容器 | 無 | 可 |
+| 用 `zeaburctl connect` 連線到資料庫 | 無 | 可 |
 | 修改專案顯示名稱、描述與圖示 | 無 | 可 |
 | 建立／刪除 Namespace、把 Namespace 加入或移出 Zeabur | 無 | 無 |
 | 修改角色與成員存取權、節點、叢集元件 | 無 | 無 |
+| 建立與管理 [API 權杖](./api-tokens.mdx) | 無 | 無 |
 | 從磁碟區的備份還原（K8up） | 無 | 可 |
 | 設定叢集備份、從叢集備份還原 | 無 | 無 |
 
@@ -83,6 +85,19 @@ zeabur.com/icon
 開發者角色不能寫入 RBAC 物件和 ServiceAccount，也沒有 `bind`、`escalate`、`impersonate`、`nodes/proxy` 或 service／pod proxy 權限，所以不能自己擴大權限。
 
 檢視者讀不到 Secret 和日誌，但讀得到 ConfigMap 和工作負載的設定。直接寫在這些地方的密碼，檢視者也看得到。
+
+## API 權杖與 RBAC
+
+[API 權杖](./api-tokens.mdx)拿到角色的方式跟成員一樣，只是綁定的對象是 `zeabur-api-tokens` Namespace 裡的 ServiceAccount，不是 `zeabur:<username>`：
+
+| 物件 | 範圍與內容 |
+|---|---|
+| `ClusterRoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-member` 給該 ServiceAccount |
+| 各專案中的 `RoleBinding zeabur-api-token-<name>` | 綁定該專案的 developer 或 viewer 角色給同一個 ServiceAccount |
+
+這些 binding 和 ServiceAccount 都帶有 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。
+
+Chart 會建立 `zeabur-api-tokens` Namespace，但不在裡面給任何角色，所以只有管理員能在那裡建立 ServiceAccount 或幫它們申請權杖。Pod 只能以同一個 Namespace 的 ServiceAccount 執行，成員又不能在 `zeabur-api-tokens` 建立 Pod，所以其他人沒辦法讓 Pod 以權杖的身分執行。Zeabur 不會把 `zeabur-api-tokens` 當成專案，也不會讓任何人在裡面拿到角色。
 
 ## 管理員帳號和一般帳號
 

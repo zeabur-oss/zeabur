@@ -193,6 +193,14 @@ sudo zeabur-installer uninstall zeabur
 
 如果配置文件中设置了 `use: personal`，`uninstall` 不会删除任何内容，只会输出卸载 KubeSolo 的命令，见[个人使用：在小型服务器上安装](../install/personal.mdx#移除)。`node add` 和 `node sync` 不可用，因为 KubeSolo 只有一个节点。
 
+## 经过代理服务器
+
+Installer 和它的使用统计会按标准的代理环境变量联网。运行命令前设置 `HTTPS_PROXY`、`HTTP_PROXY` 或 `ALL_PROXY`，要直接连接的主机放进 `NO_PROXY`，大小写都可以。`apply` 要以 root 运行，记得让 `sudo` 带入这些变量，例如用 `sudo -E`。
+
+- 代理地址必须以 `http://` 开头，不支持 SOCKS。
+- 连接 HTTPS 目的地时，会通过 `CONNECT` 隧道经过代理。
+- 本机（loopback）、链路本地（link-local）和其他本地地址不会经过代理。
+
 ## 安装中断时
 
 - 主机检查失败：根据输出释放端口或修复磁盘，再重新运行 `plan`、`apply`。

@@ -1,0 +1,40 @@
+[
+  {
+    "root": {
+      "kind": "PersistentVolumeClaim",
+      "name": "uploads",
+      "group": ""
+    },
+    "read": true,
+    "database": null,
+    "members": []
+  },
+  {
+    "root": {
+      "kind": "Cluster",
+      "name": "pg",
+      "group": "postgresql.cnpg.io",
+      "uid": "cnpg-1"
+    },
+    "read": false,
+    "database": {
+      "kind": "Cluster",
+      "name": "pg",
+      "engine": "PostgreSQL"
+    },
+    "members": [
+      {
+        "kind": "PersistentVolumeClaim",
+        "name": "pg-1"
+      },
+      {
+        "kind": "PersistentVolumeClaim",
+        "name": "pg-2"
+      },
+      {
+        "kind": "Pod",
+        "name": "pg-1"
+      }
+    ]
+  }
+]

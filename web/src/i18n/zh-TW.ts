@@ -530,8 +530,9 @@ export const zhTW: Messages = {
   "deleting.since": (ago) => `${ago}開始刪除。`,
   "deleting.count": (resource, count) => `${resource}（${count}）`,
   "deleting.left": (list) => `還剩：${list}。`,
-  "deleting.held":
-    "下面這些物件在等 finalizer。控制器清理完，就會移除自己加上的 finalizer；Zeabur 不會幫你移除。",
+  "deleting.held": "下面這些物件在等 finalizer。控制器清理完，就會移除自己加上的 finalizer。",
+  "deleting.forceHint": "控制器通常會自己處理完，多等一下比較保險。真的等不到，再強制刪除。",
+  "deleting.force": "強制刪除",
   "deleting.commandsLabel": "用 kubectl 檢視",
 
   "attention.title": "需要處理",
@@ -1162,6 +1163,7 @@ export const zhTW: Messages = {
   "action.adopt": "使用這個 Namespace",
   "action.unadopt": "不再顯示為專案",
   "action.deleteProject": "刪除專案",
+  "action.forceDeleteProject": "強制刪除專案",
   "action.openDebugTerminal": "開啟除錯終端機",
   "action.openToolsTerminal": "開啟 kubectl 終端機",
   "action.saveDetails": "儲存詳細資料",
@@ -1169,6 +1171,7 @@ export const zhTW: Messages = {
   "title.adopt": (ns) => `使用既有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再顯示為專案`,
   "title.deleteProject": (ns) => `刪除專案 ${ns}`,
+  "title.forceDeleteProject": (ns) => `強制刪除專案 ${ns}`,
   "title.details": (ns) => `${ns} 的詳細資料`,
   "title.buildLimits": (ns) => `${ns} 的建置上限`,
   "title.pauseAll": (ns) => `暫停 ${ns} 的所有服務`,
@@ -1179,6 +1182,8 @@ export const zhTW: Messages = {
   "confirm.unadopt": "這個 Namespace 不再顯示為專案，裡面的物件都不會刪除。",
   "confirm.deleteProject":
     "會刪除專案的 Namespace 和裡面所有東西，效果和 kubectl delete namespace 一樣。刪除後無法復原。",
+  "confirm.forceDeleteProject":
+    "會移除卡住專案的 finalizer，讓 Kubernetes 把專案刪完。移除後無法復原。",
   "confirm.debugContainer": (pod: string) =>
     `在副本 ${pod} 加上附 shell 的除錯容器，從裡面看得到應用程式正在執行的程式。`,
   "confirm.debugStays":
@@ -1224,6 +1229,52 @@ export const zhTW: Messages = {
   "projectMembers.inviteHint": "對方在這裡預設是開發者，建立連結前可以改。",
   "projectMembers.more": (n: number) => `還有 ${n} 個人`,
   "projectMembers.all": "開啟成員頁",
+  "apiTokens.title": "API 權杖",
+  "apiTokens.about":
+    "腳本和 CI 可以用 API 權杖呼叫 Kubernetes API，跟成員一樣在各專案有角色。每個權杖都會到期。",
+  "apiTokens.none": "還沒有 API 權杖。幫腳本或 CI 建一個吧。",
+  "apiTokens.create": "建立權杖",
+  "apiTokens.createTitle": "建立 API 權杖",
+  "apiTokens.name": "名稱",
+  "apiTokens.nameHint": "寫出誰會用它，例如 github-actions。可用小寫英文字母、數字和 -。",
+  "apiTokens.nameProblem": "請用小寫英文字母、數字和 -，最多 63 個字元，開頭和結尾要是字母或數字。",
+  "apiTokens.projects": "專案",
+  "apiTokens.projectsHint":
+    "權杖只能在選定的專案裡使用。需要在整個叢集操作時，請用管理員自己的 kubeconfig。",
+  "apiTokens.noProjectRoles":
+    "安裝 Chart 時設定 memberRoles.enabled=true 才能建立權杖。沒有成員角色，權杖就拿不到任何角色。",
+  "apiTokens.lifetime": "有效期間",
+  "apiTokens.lifetimeHint": "叢集可能限制得更短，清單會顯示實際的到期時間。",
+  "apiTokens.lasts": (seconds: number) =>
+    seconds < 86_400
+      ? `${seconds / 3600} 小時`
+      : seconds === 365 * 86_400
+        ? "1 年"
+        : `${seconds / 86_400} 天`,
+  "apiTokens.by": (user: string) => `由 ${user} 建立`,
+  "apiTokens.expires": (time: string) => `${time} 到期`,
+  "apiTokens.expired": (time: string) => `已在 ${time} 到期`,
+  "apiTokens.renew": "更新",
+  "apiTokens.renewTitle": (name: string) => `更新 ${name}`,
+  "apiTokens.renewAbout": "你會拿到同一個名稱、同樣權限的新權杖。之前拿到的權杖，到期前都還能用。",
+  "apiTokens.delete": "刪除",
+  "apiTokens.deleteTitle": (name: string) => `刪除 ${name}`,
+  "apiTokens.deleted": (name: string) => `已刪除 ${name}`,
+  "apiTokens.more": (name: string) => `${name} 的更多動作`,
+  "apiTokens.plan.noRole": (name: string) => `${name} 目前在任何專案都沒有角色。`,
+  "apiTokens.plan.renew": (name: string) => `幫 ${name} 產生一個新權杖。`,
+  "apiTokens.plan.lasts": (lasts: string) => `權杖可以用 ${lasts}，叢集限制更短的話就照叢集的。`,
+  "apiTokens.plan.delete": (name: string) => `刪除 ${name} 和它的角色。`,
+  "apiTokens.plan.revokes": "之前拿到的權杖全都會立刻失效。",
+  "apiTokens.shownTitle": (name: string) => `${name} 的權杖`,
+  "apiTokens.shown.lead": "現在就複製權杖，Zeabur 只會顯示這一次。",
+  "apiTokens.shown.copy": "複製權杖",
+  "apiTokens.shown.notRecorded": "Zeabur 沒能存下到期時間，所以清單不會顯示。",
+  "apiTokens.shown.kubeconfig": "kubeconfig",
+  "apiTokens.shown.kubeconfigHint":
+    "在 server 填上你連到 Kubernetes API 的位址，例如 https://203.0.113.10:6443。",
+  "apiTokens.shown.ca": "CA 憑證",
+  "apiTokens.docs": "搭配 kubectl 或 curl 使用權杖",
   "projectSettings.basic": "基本資訊",
   "projectSettings.iconHint": "顯示在專案名稱旁。",
   "projectSettings.changeIcon": "更換圖示",
@@ -1455,6 +1506,11 @@ export const zhTW: Messages = {
   "warn.rightsMissing": (rights: string) => `叢集可能會拒絕：你缺少 ${rights} 的權限。`,
   "warn.recreated": (names: string, tool: string) =>
     `${names} 由 ${tool} 管理，刪除後 ${tool} 可能會重建`,
+  "warn.removesFinalizers": (names: string) => `移除 ${names} 的 finalizer`,
+  "warn.cleanupSkipped":
+    "這些物件的控制器就沒辦法清理自己在叢集外建立的東西，例如物件儲存裡的備份或雲端磁碟",
+  "warn.kubernetesFinalizers":
+    "其中有 Kubernetes 自己的 finalizer，它的控制器還在運作。通常是還有 Pod 在用這個磁碟，或節點當機了，建議先處理那個 Pod 或節點。直接移除可能會留下磁碟",
   "warn.restartNeeded": (names: string) => `重新啟動後才會生效：${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader 會重新啟動 ${names}`,
   "warn.reloaderMayRestart": (names: string) => `若這個叢集有執行 Reloader，會重新啟動 ${names}`,
@@ -1551,6 +1607,8 @@ export const zhTW: Messages = {
   "confirm.alsoReads": (names, object) => `也會影響 ${names}（讀取 ${object}）。`,
   "confirm.alsoAffects": (names) => `也會影響 ${names}。`,
   "confirm.addDomain": (host, service) => `${host} 會連到 ${service}。`,
+  "confirm.port": (service, from, to) =>
+    `${service} 從連接埠 ${from} 改用 ${to}：容器連接埠、健康檢查和 PORT 都會跟著調整，私有位址也會把流量轉送到 ${to}。`,
   "confirm.image": (service, tag) => `${service} 會改為執行 ${tag}。`,
   "confirm.rebuild": (build) => `Zeabur Builder 會用分支最新的提交重新建置 ${build}。`,
   "confirm.buildOptions": (build) => `從下一次建置起，Zeabur Builder 用這些選項建置 ${build}。`,
@@ -2692,7 +2750,12 @@ export const zhTW: Messages = {
   "db.fact.created": "建立時間",
   "db.fact.operator": "Operator 回報",
   "db.connect": "連線",
-  "db.inCluster": "只能從叢集內部連線。",
+  "db.inCluster": "這些資訊只能在叢集內部使用。",
+  "db.outside.title": "從叢集外連線",
+  "db.outside.commandHint":
+    "在你的電腦上執行。它會經由叢集把本機的一個連接埠接到資料庫，並印出 127.0.0.1 的連線字串。按 Ctrl-C 才會停止。",
+  "db.outside.refused": (reason) => `叢集會拒絕你執行這個指令。${reason}。`,
+  "db.outside.docs": "安裝 zeaburctl",
   "db.noDatabase":
     "這個叢集沒有應用程式資料庫。服務以 moco-writable 連線，這個使用者可以建立資料庫。",
   "db.noAuth": (engine) => `這個 ${engine} 沒有設定密碼，叢集裡的任何程式都能連線。`,
@@ -2902,15 +2965,29 @@ export const zhTW: Messages = {
   "db.backup.walNote": "PostgreSQL 也會持續把交易日誌（WAL）封存到那裡。",
   "db.backup.keepsEverything": "所有備份都會保留。要刪除舊備份，在儲存貯體設定生命週期規則。",
   "db.backup.fixedFolder": (folder) => `MOCO 會寫到儲存貯體裡的 ${folder}。`,
-  "db.backup.startsEmpty":
-    "只有一個執行個體時，Dragonfly 重新啟動會從還是空的儲存貯體載入，現有資料則保存在磁碟區快照裡。",
   "db.backup.retentionHours": (hours) => `${hours} 內的備份`,
-  "db.backup.snapshots": "Dragonfly 會依排程以及停止時寫入快照。Zeabur 無法列出這些快照。",
+  "db.backup.edit": "編輯",
+  "db.backup.change": "變更備份",
+  "db.backup.turnOff": "關閉備份",
+  "db.backup.planEdit": (name) => `變更 ${name} 的備份`,
+  "db.backup.planOff": (name) => `關閉 ${name} 的備份`,
+  "db.backup.keepKeys": (secret) => `兩個都留白就沿用機密變數 ${secret} 裡的金鑰。`,
+  "db.backup.keepRegion": "留白就沿用跟金鑰存在一起的區域。",
+  "db.backup.offBody": "備份已關閉。儲存貯體裡現有的備份都還在。",
+  "db.backup.saidNewKeys": (secret) => `換掉機密變數 ${secret} 裡的存取金鑰。`,
+  "db.backup.saidCopyKeys": (secret, destination) =>
+    `機密變數 ${secret} 裡的存取金鑰，會換成 ${destination} 那組。`,
+  "db.backup.moved": (where) => `之前的備份會留在 ${where}。要從那些備份還原，需要用舊的設定。`,
+  "db.backup.movedPitr":
+    "要等下一次排程備份完成，才能從新目的地還原到某個時間點。這次變更不會馬上備份。",
+  "db.backup.saidOff": (name, where) => `停止把 ${name} 備份到 ${where}。`,
+  "db.backup.saidOffKept": (secret) =>
+    `金鑰會留在機密變數 ${secret}，儲存貯體裡現有的備份也都還在。`,
+  "db.backup.saidOffRestart": (name) => `${name} 會重新啟動，停止備份。`,
   "db.restore.action": "從備份點建立新資料庫",
   "db.restore.title": (name) => `從 ${name} 的備份點建立新資料庫`,
   "db.restore.body": "Zeabur 會用相同設定建立新的資料庫，資料來自備份。原本的資料庫不會變動。",
   "db.restore.point": "備份",
-  "db.restore.latest": "最新的快照",
   "db.restore.name": "新資料庫名稱",
   "db.restore.none": "還沒有可以還原的完成備份或時間點。",
   "db.restore.fromBackup": "完成的備份",
@@ -3252,6 +3329,9 @@ export const zhTW: Messages = {
   "remove.done": (name) => `已移除 ${name}`,
   "sentence.account.lastPasskey": () => "這是你唯一的通行密鑰",
   "sentence.account.lastPasskey.fix": () => "請先新增另一把通行密鑰，再移除這一把。",
+  "sentence.apiTokens.taken": () => "已經有同名的 API 權杖",
+  "sentence.apiTokens.noProjectRoles": () => "安裝 Zeabur 時沒有啟用成員角色",
+  "sentence.apiTokens.noProjectRoles.fix": () => "安裝 Chart 時設定 memberRoles.enabled=true。",
   "sentence.members.resetSelf": () => "你不能重設自己的帳號",
   "sentence.members.resetSelf.fix": () => "改從帳號頁新增通行密鑰，或請其他管理員處理。",
   "sentence.members.removeSelf": () => "你不能移除自己",
@@ -3371,6 +3451,15 @@ export const zhTW: Messages = {
   "fixer.clusterAdmin.lead": "這需要叢集管理員處理：",
   "diagnosis.copy": "複製診斷",
   "diagnosis.copyFailed": "無法複製診斷，請再試一次。",
+  "wrongPort.cause": (port) => `應用程式沒有監聽連接埠 ${port}。`,
+  "wrongPort.why": (port) =>
+    `Zeabur 把 PORT 設成 ${port}，也會檢查這個連接埠。連線一直被拒絕，已經超過一分鐘。`,
+  "wrongPort.fix":
+    "讓應用程式讀取 PORT，或改用實際監聽的連接埠，日誌通常會寫出是哪一個。如果只監聽 127.0.0.1，請改成監聽 0.0.0.0。",
+  "wrongPort.fixOffer": (port) =>
+    `映像檔宣告的連接埠是 ${port}，可以改用它，或讓應用程式讀取 PORT。如果只監聽 127.0.0.1，請改成監聽 0.0.0.0。`,
+  "wrongPort.use": (port) => `改用連接埠 ${port}`,
+  "wrongPort.plan": (service, port) => `${service} 改用連接埠 ${port}`,
   "diagnosis.lastSeen": "最後出現",
   "trace.title": "連線檢查",
   "trace.reachable": "可連線",

@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pg-data
+  namespace: demo
+  uid: pvc-1
+  ownerReferences:
+  - apiVersion: postgresql.cnpg.io/v1
+    kind: Cluster
+    name: db
+    uid: cnpg-db
+    controller: true
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: other-data
+  namespace: demo
+  uid: pvc-2
+  ownerReferences:
+  - apiVersion: example.com/v1
+    kind: Cluster
+    name: db
+    uid: other-db
+    controller: true

@@ -49,10 +49,31 @@ export function likelyPort(service: Service): number | undefined {
   return declaredPorts(service).find((p) => !p.protocol)?.port
 }
 
-/** The TCP ports the Builds of the service's images last built declare (`EXPOSE`) that the
- * service does not use yet: none of its containers declares them and no Service has them. A
- * container that runs an older image than the Build's newest gets none, since the newest
- * image's ports may not be the ones it listens on. */
+/** The TCP ports each running container's image declares (`EXPOSE`), lowest first, read from
+ * the Build that made it. A container that runs an older image than the Build's newest is left
+ * out, since the newest image's ports may not be the ones it listens on. */
+export function imageDeclared(
+  service: Service,
+  builds: readonly Build[],
+): { container: string; ports: number[] }[] {
+  const running = new Set(service.containers.filter((c) => !c.init).map((c) => c.name))
+  const out: { container: string; ports: number[] }[] = []
+  for (const built of builtContainers(service, builds)) {
+    if (!running.has(built.container) || runsLatest(built.image, built.build) !== true) continue
+    const ports: number[] = []
+    for (const spec of built.build.exposedPorts ?? []) {
+      const [port = "", protocol = "tcp"] = spec.split("/")
+      const number = Number(port)
+      if (protocol.toLowerCase() === "tcp" && /^\d+$/.test(port) && isPort(number))
+        ports.push(number)
+    }
+    out.push({ container: built.container, ports: ports.sort((a, b) => a - b) })
+  }
+  return out
+}
+
+/** The ports the service's images declare that it does not use yet: none of its containers
+ * declares them and no Service has them. */
 export function imagePorts(
   service: Service,
   builds: readonly Build[],
@@ -62,17 +83,8 @@ export function imagePorts(
     ...declaredPorts(service).map((p) => p.port),
     ...endpoints.flatMap((e) => e.ports.map((p) => p.port)),
   ])
-  const running = new Set(service.containers.filter((c) => !c.init).map((c) => c.name))
-  const declared = builtContainers(service, builds)
-    .filter((b) => running.has(b.container) && runsLatest(b.image, b.build) === true)
-    .flatMap((b) => b.build.exposedPorts ?? [])
-    .flatMap((spec) => {
-      const [port, protocol = "tcp"] = spec.split("/")
-      return protocol.toLowerCase() === "tcp" && /^\d+$/.test(port ?? "") ? [Number(port)] : []
-    })
-  return [...new Set(declared)]
-    .filter((port) => isPort(port) && !used.has(port))
-    .sort((a, b) => a - b)
+  const declared = imageDeclared(service, builds).flatMap((d) => d.ports)
+  return [...new Set(declared)].filter((port) => !used.has(port)).sort((a, b) => a - b)
 }
 
 export const isPort = (port: number) => Number.isInteger(port) && port >= 1 && port <= 65535

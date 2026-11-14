@@ -12,23 +12,28 @@
 //! last deletes the person's tools pods for the project with Zeabur's service account. The wait
 //! ends early when they are gone; past the deadline the Namespace is deleted all the
 //! same, and the namespace controller deletes what is left.
+//!
+//! A force deletion (`forceDeleteProject`) reads, as the person, the Namespace and the objects
+//! with finalizers the namespace controller waits on (the `namespace::deleting` module). Its plan
+//! patches only those objects and is applied like any other.
 
 use std::collections::BTreeMap;
 use std::time::Duration;
 
 use serde_json::Value;
-use zeabur_core::problem::Denied;
+use zeabur_core::problem::{Denied, Kind, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef, WriteRequest};
 use zeabur_modules::{Reading, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb};
 use zeabur_plan::terminal::{self as plans, ToolsScope};
-use zeabur_plan::{DatabaseObject, DeletionInput, Input, Plan, PlanRequest, Warning, Write};
+use zeabur_plan::{DeletionInput, Input, Plan, PlanRequest, ProjectObject, Warning, Write};
 
 use super::terminal::{self, Planner};
 use super::{Applied, plan_problem, refusal, refused, write_request};
 use crate::error::{ApiError, get_read, project_read, read_problem};
+use crate::projects::namespace::held_objects;
 use crate::projects::snapshot;
 use crate::settings::Settings;
 
@@ -96,6 +101,7 @@ pub(super) async fn compute(
         default_class,
         tools_namespace,
         tools_pods,
+        ..DeletionInput::default()
     };
     let mut plan = zeabur_plan::plan(
         Input {
@@ -136,13 +142,86 @@ pub(super) async fn compute(
     Ok(plan)
 }
 
+/// The plan that removes the finalizers holding `project`'s Namespace.
+pub(super) async fn compute_force(
+    cluster: &dyn Cluster,
+    project: &str,
+    request: &PlanRequest,
+    now: &str,
+    zeabur_namespaces: Vec<String>,
+) -> Result<Plan, ApiError> {
+    let namespaces = ResourceRef::new("", "v1", "namespaces", "Namespace");
+    let what = format!("namespace {project}");
+    let Some(found) = cluster
+        .get_object(&namespaces, None, project)
+        .await
+        .map_err(|e| read_problem(e, &what, get_read("", "namespaces", None, project)))?
+    else {
+        return Err(ApiError::from(Problem::new(
+            Kind::NotFound,
+            format!("There is no namespace named {project}."),
+        )));
+    };
+    let objects = held_objects(cluster, project, &found).await;
+    let mut held = Vec::new();
+    let mut wanted = Vec::new();
+    for (resource, object) in objects {
+        let name = object.metadata.name.clone();
+        let mut object = serde_json::to_value(object).map_err(|e| {
+            ApiError::from(ClusterError::Decode(e.to_string()).into_problem(&resource.kind))
+        })?;
+        if let Some(map) = object.as_object_mut() {
+            map.entry("kind")
+                .or_insert_with(|| resource.kind.clone().into());
+        }
+        wanted.push(Denied {
+            verb: "patch".to_owned(),
+            group: resource.group.clone(),
+            resource: resource.resource.clone(),
+            name,
+            namespace: Some(project.to_owned()),
+        });
+        held.push(ProjectObject {
+            resource: zeabur_plan::ResourceRef {
+                group: resource.group,
+                version: resource.version,
+                resource: resource.resource,
+            },
+            object,
+        });
+    }
+    let namespace = serde_json::to_value(found)
+        .map_err(|e| ApiError::from(ClusterError::Decode(e.to_string()).into_problem(&what)))?;
+    let deletion = DeletionInput {
+        zeabur_namespaces,
+        held,
+        ..DeletionInput::default()
+    };
+    let snapshot = zeabur_graph::Snapshot::default();
+    let mut plan = zeabur_plan::plan(
+        Input {
+            namespace: Some(&namespace),
+            deletion: Some(&deletion),
+            ..Input::new(&snapshot, now)
+        },
+        request,
+    )
+    .map_err(plan_problem)?;
+    let missing = terminal::denied(cluster, wanted).await;
+    if !missing.is_empty() {
+        plan.warnings
+            .push(Warning::RightsMissing { rights: missing });
+    }
+    Ok(plan)
+}
+
 /// The project's database objects. A kind whose list is
 /// refused is left out, and its `list` right named in `unreadable`.
 async fn databases(
     cluster: &dyn Cluster,
     project: &str,
     unreadable: &mut Vec<Denied>,
-) -> Result<Vec<DatabaseObject>, ApiError> {
+) -> Result<Vec<ProjectObject>, ApiError> {
     let mut out = Vec::new();
     for read in DATABASES {
         let objects = match crate::cluster::modules::read_in(cluster, read, Some(project))
@@ -172,7 +251,7 @@ async fn databases(
             if let Some(map) = object.as_object_mut() {
                 map.entry("kind").or_insert_with(|| read.kind.into());
             }
-            out.push(DatabaseObject {
+            out.push(ProjectObject {
                 resource: zeabur_plan::ResourceRef {
                     group: read.group.to_owned(),
                     version: read.version.to_owned(),

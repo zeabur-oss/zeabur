@@ -1,0 +1,129 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: store-volume
+  namespace: demo
+  uid: sts-1
+  ownerReferences:
+  - apiVersion: seaweed.seaweedfs.com/v1
+    kind: Seaweed
+    name: store
+    uid: seaweed-1
+    controller: true
+spec:
+  selector:
+    matchLabels:
+      app: store-volume
+  template:
+    metadata:
+      labels:
+        app: store-volume
+    spec:
+      containers:
+      - name: main
+        image: example:1
+  volumeClaimTemplates:
+  - metadata:
+      name: mount0
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: mount0-store-volume-0
+  namespace: demo
+  uid: pvc-1
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: backup-nightly
+  namespace: demo
+  uid: job-1
+  ownerReferences:
+  - apiVersion: k8up.io/v1
+    kind: Backup
+    name: nightly
+    uid: backup-1
+    controller: true
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+      - name: main
+        image: example:1
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: backup-nightly-x7k2p
+  namespace: demo
+  uid: pod-1
+  ownerReferences:
+  - apiVersion: batch/v1
+    kind: Job
+    name: backup-nightly
+    uid: job-1
+    controller: true
+spec:
+  containers:
+  - name: main
+    image: example:1
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db
+  namespace: demo
+  uid: sts-2
+spec:
+  selector:
+    matchLabels:
+      app: db
+  template:
+    metadata:
+      labels:
+        app: db
+    spec:
+      containers:
+      - name: main
+        image: example:1
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db-replica
+  namespace: demo
+  uid: sts-3
+spec:
+  selector:
+    matchLabels:
+      app: db-replica
+  template:
+    metadata:
+      labels:
+        app: db-replica
+    spec:
+      containers:
+      - name: main
+        image: example:1
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-db-0
+  namespace: demo
+  uid: pvc-2
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-db-replica-0
+  namespace: demo
+  uid: pvc-3

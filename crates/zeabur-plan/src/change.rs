@@ -192,6 +192,20 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         set: Option<ProbeRequest>,
     },
+    /// Move the port a container listens on: its declared port, its probes, its `PORT` and the
+    /// Services that send traffic to it (see the `port` module).
+    #[serde(rename_all = "camelCase")]
+    Port {
+        /// The workload.
+        workload: WorkloadRef,
+        /// The container; may be left out when the workload has only one.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        container: Option<String>,
+        /// The port it is set to listen on now.
+        from: i32,
+        /// The port it listens on.
+        to: i32,
+    },
     /// Have Stakater Reloader replace a workload's pods when a ConfigMap or Secret it reads
     /// changes, or stop it: the workload's `reloader.stakater.com/auto` annotation (see the
     /// `reload` module).
@@ -303,6 +317,10 @@ pub enum Change {
         name: String,
         /// The edited object, YAML (JSON is YAML too).
         yaml: String,
+        /// Take only `spec` from the copy, merged into the object's spec as a JSON merge patch
+        /// (RFC 7386: a null removes a field), and keep the rest of the object, its metadata too.
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        spec_only: bool,
     },
     /// Create one object in the project, of any namespaced kind the cluster serves (see the
     /// `create` module). Its namespace is the project's; an object of that name must not exist
@@ -369,6 +387,10 @@ pub enum Change {
     /// Delete the project: its database objects, then its Namespace and everything in it, as
     /// `kubectl delete namespace` does (see the `project_deletion` module). Planned on its own.
     DeleteProject,
+    /// Finish deleting a project whose Namespace a finalizer holds: remove the finalizers of the
+    /// objects the namespace controller waits on, never the Namespace's own (see the
+    /// `project_deletion` module). Planned on its own.
+    ForceDeleteProject,
     /// Create the project's Namespace, with the project label and, when given, its display
     /// name. Refused when a namespace of that name exists (adopt it instead), and for a name
     /// Kubernetes keeps for itself (`kube-` prefix). Planned on its own.
@@ -499,6 +521,12 @@ impl Change {
     #[must_use]
     pub const fn is_project_deletion(&self) -> bool {
         matches!(self, Self::DeleteProject)
+    }
+
+    /// Whether the change deletes the project or finishes its deletion, alone.
+    #[must_use]
+    pub const fn deletes_project(&self) -> bool {
+        matches!(self, Self::DeleteProject | Self::ForceDeleteProject)
     }
 
     /// Whether the change writes the project's Namespace (creating it, adopting it, letting it
@@ -1445,6 +1473,14 @@ pub enum Warning {
     /// The plan deletes the project's Namespace and everything in it: what goes, and what
     /// happens to the data of each volume.
     DeletesProject(crate::project_deletion::ProjectDeletion),
+    /// The plan removes these objects' finalizers, so their controllers do not finish their
+    /// cleanup: what they made outside the cluster, such as a backup in object storage or a
+    /// cloud disk, may stay.
+    #[serde(rename_all = "camelCase")]
+    RemovesFinalizers {
+        /// The objects, with the finalizers removed.
+        objects: Vec<crate::project_deletion::HeldBy>,
+    },
     /// Helm, Argo CD or Flux manages these objects of the deleted project: if the tool still
     /// deploys them, it creates them again after the deletion.
     #[serde(rename_all = "camelCase")]

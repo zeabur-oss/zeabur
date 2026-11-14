@@ -571,7 +571,10 @@ export const en = {
   "deleting.count": (resource: string, count: number) => `${resource} (${count})`,
   "deleting.left": (list: string) => `Left: ${list}.`,
   "deleting.held":
-    "These objects wait for their finalizers. The controller that added each finalizer removes it after its cleanup; Zeabur doesn't remove finalizers.",
+    "These objects wait for their finalizers. The controller that added each finalizer removes it after its cleanup.",
+  "deleting.forceHint":
+    "A controller usually finishes on its own, so waiting longer is safer. Force delete only when it can't finish.",
+  "deleting.force": "Force delete",
   "deleting.commandsLabel": "Look with kubectl",
 
   // Overview
@@ -1247,6 +1250,7 @@ export const en = {
   "action.adopt": "Use this namespace",
   "action.unadopt": "Stop showing as a project",
   "action.deleteProject": "Delete project",
+  "action.forceDeleteProject": "Force delete project",
   "action.openDebugTerminal": "Open debug terminal",
   "action.openToolsTerminal": "Open kubectl terminal",
   "action.saveDetails": "Save details",
@@ -1254,6 +1258,7 @@ export const en = {
   "title.adopt": (ns: string) => `Use the existing namespace ${ns}`,
   "title.unadopt": (ns: string) => `Stop showing ${ns} as a project`,
   "title.deleteProject": (ns: string) => `Delete project ${ns}`,
+  "title.forceDeleteProject": (ns: string) => `Force delete project ${ns}`,
   "title.details": (ns: string) => `${ns} details`,
   "title.buildLimits": (ns: string) => `${ns} build limits`,
   "title.pauseAll": (ns: string) => `Pause every service in ${ns}`,
@@ -1264,6 +1269,8 @@ export const en = {
   "confirm.unadopt": "The namespace stops showing as a project. Nothing in it is deleted.",
   "confirm.deleteProject":
     "Deletes the project's namespace and everything in it, as kubectl delete namespace does. This can't be undone.",
+  "confirm.forceDeleteProject":
+    "Removes the finalizers that keep the project from being deleted, so Kubernetes can finish deleting it. This can't be undone.",
   "confirm.debugContainer": (pod: string) =>
     `Adds a debug container with a shell to replica ${pod}. It can see the app's processes.`,
   "confirm.debugStays":
@@ -1314,6 +1321,56 @@ export const en = {
     "They start as Developer here. You can change it before you create the link.",
   "projectMembers.more": (n: number) => `${n} more ${n === 1 ? "person" : "people"}`,
   "projectMembers.all": "Open members",
+  "apiTokens.title": "API tokens",
+  "apiTokens.about":
+    "Scripts and CI use an API token to call the Kubernetes API, with roles in projects like a member's. Every token expires.",
+  "apiTokens.none": "No API tokens yet. Create one for a script or CI job.",
+  "apiTokens.create": "Create token",
+  "apiTokens.createTitle": "Create an API token",
+  "apiTokens.name": "Name",
+  "apiTokens.nameHint":
+    "Say what uses it, such as github-actions. Use lower-case letters, digits and hyphens.",
+  "apiTokens.nameProblem":
+    "Use lower-case letters, digits and hyphens, up to 63 characters. Start and end with a letter or digit.",
+  "apiTokens.projects": "Projects",
+  "apiTokens.projectsHint":
+    "A token works only in the projects you choose. For work across the cluster, use an admin's own kubeconfig.",
+  "apiTokens.noProjectRoles":
+    "To create a token, install the chart with memberRoles.enabled=true. Without the member roles, a token can't get a role.",
+  "apiTokens.lifetime": "Lasts",
+  "apiTokens.lifetimeHint": "The cluster may set a shorter limit. The list shows the real expiry.",
+  "apiTokens.lasts": (seconds: number) =>
+    seconds < 86_400
+      ? plural(seconds / 3600, "hour", "hours")
+      : seconds === 365 * 86_400
+        ? "1 year"
+        : plural(seconds / 86_400, "day", "days"),
+  "apiTokens.by": (user: string) => `Created by ${user}`,
+  "apiTokens.expires": (time: string) => `Expires ${time}`,
+  "apiTokens.expired": (time: string) => `Expired ${time}`,
+  "apiTokens.renew": "Renew",
+  "apiTokens.renewTitle": (name: string) => `Renew ${name}`,
+  "apiTokens.renewAbout":
+    "You get a new token with the same name and access. Tokens issued before keep working until they expire.",
+  "apiTokens.delete": "Delete",
+  "apiTokens.deleteTitle": (name: string) => `Delete ${name}`,
+  "apiTokens.deleted": (name: string) => `Deleted ${name}`,
+  "apiTokens.more": (name: string) => `More for ${name}`,
+  "apiTokens.plan.noRole": (name: string) => `${name} gets no role in any project yet.`,
+  "apiTokens.plan.renew": (name: string) => `Issues a new token for ${name}.`,
+  "apiTokens.plan.lasts": (lasts: string) =>
+    `The token lasts ${lasts}, or less if the cluster sets a shorter limit.`,
+  "apiTokens.plan.delete": (name: string) => `Deletes ${name} and its roles.`,
+  "apiTokens.plan.revokes": "Every token issued for it stops working at once.",
+  "apiTokens.shownTitle": (name: string) => `Token for ${name}`,
+  "apiTokens.shown.lead": "Copy the token now. Zeabur shows it only once.",
+  "apiTokens.shown.copy": "Copy token",
+  "apiTokens.shown.notRecorded": "Zeabur couldn't save the expiry, so the list won't show it.",
+  "apiTokens.shown.kubeconfig": "kubeconfig",
+  "apiTokens.shown.kubeconfigHint":
+    "Fill in server with the address you reach the Kubernetes API on, such as https://203.0.113.10:6443.",
+  "apiTokens.shown.ca": "CA certificate",
+  "apiTokens.docs": "Use the token with kubectl or curl",
   "projectSettings.basic": "Basic information",
   "projectSettings.iconHint": "Shown beside the project's name.",
   "projectSettings.changeIcon": "Change icon",
@@ -1571,6 +1628,11 @@ export const en = {
   "warn.rightsMissing": (rights: string) => `The cluster may refuse this: you lack ${rights}.`,
   "warn.recreated": (names: string, tool: string) =>
     `${tool} manages ${names}: it may create them again after the deletion`,
+  "warn.removesFinalizers": (names: string) => `Removes the finalizers from ${names}`,
+  "warn.cleanupSkipped":
+    "These objects' controllers can't clean up what they made outside the cluster, such as a backup in object storage or a cloud disk",
+  "warn.kubernetesFinalizers":
+    "Some of these finalizers are Kubernetes' own, and their controller is still running. They usually stay because a Pod still uses the disk or a node is down, so deal with that Pod or node first. Removing them can leave a volume or disk behind",
   "warn.restartNeeded": (names: string) => `Takes effect after a restart: ${names}`,
   "warn.reloaderRestarts": (names: string) => `Reloader restarts ${names}`,
   "warn.reloaderMayRestart": (names: string) =>
@@ -1689,6 +1751,8 @@ export const en = {
     `Also affects ${names} (${count === 1 ? "it reads" : "they read"} ${object}).`,
   "confirm.alsoAffects": (names: string) => `Also affects ${names}.`,
   "confirm.addDomain": (host: string, service: string) => `Serve ${service} at ${host}.`,
+  "confirm.port": (service: string, from: number, to: number) =>
+    `${service} moves from port ${from} to ${to}: its container port, health checks and PORT change, and its private addresses send traffic to ${to}.`,
   "confirm.image": (service: string, tag: string) => `${service} will run ${tag}.`,
   "confirm.rebuild": (build: string) =>
     `Zeabur Builder builds ${build} again from the newest commit of its branch.`,
@@ -2936,7 +3000,13 @@ export const en = {
   "db.fact.created": "Created",
   "db.fact.operator": "Operator says",
   "db.connect": "Connect",
-  "db.inCluster": "Reachable from inside the cluster.",
+  "db.inCluster": "These work only inside the cluster.",
+  "db.outside.title": "Connect from outside the cluster",
+  "db.outside.commandHint":
+    "Run it on your computer. It connects a local port to the database through the cluster and prints a connection string on 127.0.0.1. It keeps running until you press Ctrl-C.",
+  "db.outside.refused": (reason: string) =>
+    `The cluster will refuse this command for you. ${reason}.`,
+  "db.outside.docs": "Install zeaburctl",
   "db.noDatabase":
     "This cluster has no app database. Services connect as moco-writable, which can create one.",
   "db.noAuth": (engine: string) =>
@@ -3170,17 +3240,32 @@ export const en = {
   "db.backup.keepsEverything":
     "Every backup is kept. Set a lifecycle rule on the bucket to delete old ones.",
   "db.backup.fixedFolder": (folder: string) => `MOCO writes to ${folder} in the bucket.`,
-  "db.backup.startsEmpty":
-    "With one instance, Dragonfly restarts from the bucket, which is empty: the data so far stays in the snapshot on its volume.",
   "db.backup.retentionHours": (hours: string) => `${hours} of backups`,
-  "db.backup.snapshots":
-    "Dragonfly writes a snapshot there on its schedule and when it stops. Zeabur cannot list them.",
+  "db.backup.edit": "Edit",
+  "db.backup.change": "Change backups",
+  "db.backup.turnOff": "Turn off backups",
+  "db.backup.planEdit": (name: string) => `Change backups of ${name}`,
+  "db.backup.planOff": (name: string) => `Turn off backups of ${name}`,
+  "db.backup.keepKeys": (secret: string) =>
+    `Leave both empty to keep the keys in secret ${secret}.`,
+  "db.backup.keepRegion": "Leave empty to keep the one saved with the keys.",
+  "db.backup.offBody": "Backups are off. Backups already in the bucket stay there.",
+  "db.backup.saidNewKeys": (secret: string) => `Replace the access keys in secret ${secret}.`,
+  "db.backup.saidCopyKeys": (secret: string, destination: string) =>
+    `Replace the access keys in secret ${secret} with the keys of ${destination}.`,
+  "db.backup.moved": (where: string) =>
+    `Earlier backups stay at ${where}. Restoring from them needs these old settings.`,
+  "db.backup.movedPitr":
+    "Restoring to a point in time from the new destination works after the next scheduled backup. This change doesn't start one.",
+  "db.backup.saidOff": (name: string, where: string) => `Stop backing up ${name} to ${where}.`,
+  "db.backup.saidOffKept": (secret: string) =>
+    `The keys stay in secret ${secret}, and backups already in the bucket stay there.`,
+  "db.backup.saidOffRestart": (name: string) => `${name} restarts to stop backing up.`,
   "db.restore.action": "New database from a backup point",
   "db.restore.title": (name: string) => `New database from a backup point of ${name}`,
   "db.restore.body":
     "Zeabur creates a new database with the same settings, starting from the backup. The original is not changed.",
   "db.restore.point": "Backup",
-  "db.restore.latest": "Newest snapshot",
   "db.restore.name": "New database name",
   "db.restore.none": "No finished backup or point in time to restore from yet.",
   "db.restore.fromBackup": "A finished backup",
@@ -3555,6 +3640,9 @@ export const en = {
   "remove.done": (name: string) => `Removed ${name}`,
   "sentence.account.lastPasskey": () => "This is your only passkey",
   "sentence.account.lastPasskey.fix": () => "Add another passkey first, then remove this one.",
+  "sentence.apiTokens.taken": () => "There is already an API token with that name",
+  "sentence.apiTokens.noProjectRoles": () => "Zeabur was installed without the member roles",
+  "sentence.apiTokens.noProjectRoles.fix": () => "Install the chart with memberRoles.enabled=true.",
   "sentence.members.resetSelf": () => "You can't reset your own account",
   "sentence.members.resetSelf.fix": () =>
     "Add a passkey from your account instead, or ask another admin.",
@@ -3697,6 +3785,15 @@ export const en = {
   "fixer.clusterAdmin.lead": "This needs a cluster administrator: ",
   "diagnosis.copy": "Copy diagnosis",
   "diagnosis.copyFailed": "Could not copy the diagnosis. Try again.",
+  "wrongPort.cause": (port: number) => `The app isn't listening on port ${port}.`,
+  "wrongPort.why": (port: number) =>
+    `Zeabur sets PORT to ${port} and checks that port. Connections to it have been refused for over a minute.`,
+  "wrongPort.fix":
+    "Have the app read PORT, or use the port it listens on; its logs usually say which. If it listens on 127.0.0.1 only, make it listen on 0.0.0.0.",
+  "wrongPort.fixOffer": (port: number) =>
+    `The image declares port ${port}; use it, or have the app read PORT. If the app listens on 127.0.0.1 only, make it listen on 0.0.0.0.`,
+  "wrongPort.use": (port: number) => `Use port ${port}`,
+  "wrongPort.plan": (service: string, port: number) => `Use port ${port} for ${service}`,
   "diagnosis.lastSeen": "Last seen",
   "trace.title": "Connection checks",
   "trace.reachable": "Reachable",

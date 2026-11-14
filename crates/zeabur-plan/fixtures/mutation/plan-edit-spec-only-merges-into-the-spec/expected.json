@@ -1,0 +1,47 @@
+{
+  "objects": [
+    {
+      "changes": [
+        {
+          "after": "0 0 3 * * 0",
+          "before": "0 0 3 * * *",
+          "path": "spec.schedule"
+        },
+        {
+          "before": "true",
+          "path": "spec.suspend"
+        }
+      ],
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "12"
+          },
+          {
+            "op": "test",
+            "path": "/spec/schedule",
+            "value": "0 0 3 * * *"
+          },
+          {
+            "op": "replace",
+            "path": "/spec/schedule",
+            "value": "0 0 3 * * 0"
+          },
+          {
+            "op": "test",
+            "path": "/spec/suspend",
+            "value": true
+          },
+          {
+            "op": "remove",
+            "path": "/spec/suspend"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

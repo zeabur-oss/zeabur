@@ -1,0 +1,52 @@
+{
+  "objects": [
+    {
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "after": {
+        "spec": {
+          "template": {
+            "spec": {
+              "containers": [
+                {
+                  "env": [
+                    {
+                      "name": "PORT",
+                      "value": "3000"
+                    }
+                  ],
+                  "ports": [
+                    {
+                      "containerPort": 3000
+                    }
+                  ],
+                  "readinessProbe": {
+                    "tcpSocket": {
+                      "port": 3000
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        }
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web"
+      }
+    },
+    {
+      "target": {
+        "kind": "Service",
+        "name": "web-public-8080"
+      }
+    }
+  ]
+}

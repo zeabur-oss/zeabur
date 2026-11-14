@@ -1,0 +1,22 @@
+[
+  {
+    "root": {
+      "kind": "CronJob",
+      "name": "report",
+      "group": "batch",
+      "uid": "cron-1"
+    },
+    "read": true,
+    "database": null,
+    "members": [
+      {
+        "kind": "Pod",
+        "name": "report-29001-abcde"
+      },
+      {
+        "kind": "Job",
+        "name": "report-29001"
+      }
+    ]
+  }
+]
