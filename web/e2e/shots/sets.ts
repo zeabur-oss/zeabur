@@ -10,7 +10,7 @@
 export const locales = { en: "en-US", "zh-TW": "zh-TW", "zh-CN": "zh-CN" }
 export type Locale = keyof typeof locales
 export type Theme = "light" | "dark"
-export type App = "zeabur" | "installer"
+export type App = "zeabur" | "installer" | "desktop"
 
 type Set = {
   out?: string
@@ -45,6 +45,17 @@ export const sets: Record<string, Set> = {
     locales: ["en"],
     themes: ["light", "dark"],
     apps: ["zeabur"],
+  },
+  // The desktop app's pages (desktop/web) with the commands of demo.ts, for desktop/README.md.
+  desktop: {
+    out: "docs",
+    file: "{docs}images/desktop/{id}-{theme}.avif",
+    scale: 2,
+    budget: 150,
+    clean: true,
+    locales: ["en", "zh-TW", "zh-CN"],
+    themes: ["light", "dark"],
+    apps: ["desktop"],
   },
   // The plate of the README cover. It goes into design-system's covers/zeabur, which renders the
   // cover: scripts/docs-shots.sh cover <design-system>/covers/zeabur

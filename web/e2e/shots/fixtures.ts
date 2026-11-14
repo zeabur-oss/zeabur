@@ -100,12 +100,14 @@ async function freePort(): Promise<number> {
 }
 
 // The installer's is Vite's preview server with the responses of
-// crates/zeabur-installer/web/scripts/dev-api.ts, whose fixtures scripts/docs-shots.sh writes.
+// crates/zeabur-installer/web/scripts/dev-api.ts, whose fixtures scripts/docs-shots.sh writes. The
+// desktop's is Vite's preview server of the pages in desktop/web/dist, where demo.ts answers the
+// commands in the page.
 async function start(app: App, demo: Record<string, string>): Promise<Server> {
   const port = await freePort()
   const env = { ...process.env, ...demo }
   const child =
-    app === "installer"
+    app !== "zeabur"
       ? spawn(
           "bun",
           [
@@ -117,7 +119,7 @@ async function start(app: App, demo: Record<string, string>): Promise<Server> {
             String(port),
             "--strictPort",
           ],
-          { cwd: resolve(import.meta.dirname, "../../../crates/zeabur-installer/web"), env },
+          { cwd: resolve(import.meta.dirname, "../../..", webs[app]), env },
         )
       : spawn(demoServer(), [], { env: { ...env, ZEABUR_DEMO_ADDR: `127.0.0.1:${port}` } })
   let log = ""
@@ -141,6 +143,8 @@ async function start(app: App, demo: Record<string, string>): Promise<Server> {
   await stop()
   throw new Error(`the ${app} demo server did not start (${JSON.stringify(demo)}):\n${log}`)
 }
+
+const webs = { installer: "crates/zeabur-installer/web", desktop: "desktop/web" }
 
 function demoServer(): string {
   const demo = process.env.ZEABUR_SHOTS_DEMO
