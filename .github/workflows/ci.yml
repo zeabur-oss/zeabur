@@ -1,7 +1,7 @@
 name: CI
 
 # Each job runs scripts/ci/<job>.sh in the Nix dev shell, the same as locally. Pull requests and
-# pushes run lint, test and ui. The merge queue runs the jobs that gate a merge on the commit about
+# pushes run lint, test, ui, desktop and desktop-bundle. The merge queue runs the jobs that gate a merge on the commit about
 # to land. The nightly run runs everything, also fuzz and the canary, which are not in the merge
 # queue, and keeps main's caches for the merge queue's jobs. A failed nightly-only job (fuzz,
 # canary, e2e-full) opens or updates one issue (scripts/nightly-issues.sh), and closes it when the
@@ -70,6 +70,32 @@ jobs:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/ui.sh
+
+  # desktop/, its own Cargo workspace, with the main workspace's rules (scripts/check-desktop.sh).
+  desktop:
+    runs-on: ubuntu-26.04-arm
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+        with:
+          rust-cache: true
+      - uses: ./.github/actions/catalog-release
+      - run: nix develop .#desktop -c scripts/ci/desktop.sh
+
+  # The macOS app bundle, which must run on a Mac without Nix.
+  desktop-bundle:
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@64a6547509a1911f03c4b1e62965ef9f2b4c39b6 # main
+        with:
+          rust-cache: true
+      - uses: ./.github/actions/catalog-release
+      - run: nix develop .#desktop -c scripts/ci/desktop-bundle.sh
 
   # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
   fuzz:
@@ -211,7 +237,7 @@ jobs:
   ok:
     name: ci / ok
     if: always()
-    needs: [lint, test, ui, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, zizmor]
+    needs: [lint, test, ui, desktop, desktop-bundle, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, zizmor]
     runs-on: ubuntu-slim
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')

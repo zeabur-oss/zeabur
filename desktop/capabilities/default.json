@@ -1,0 +1,18 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "default",
+  "description": "The cluster chooser: its own commands and the file dialog.",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "dialog:allow-open",
+    "allow-snapshot",
+    "allow-add-paths",
+    "allow-add-pasted",
+    "allow-remove-source",
+    "allow-toggle-favourite",
+    "allow-probe",
+    "allow-open-cluster",
+    "allow-set-menu"
+  ]
+}

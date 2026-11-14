@@ -1,0 +1,144 @@
+[package]
+name = "zeabur-desktop"
+description = "Zeabur Desktop (Tauri 2): lists kubeconfig contexts and opens Zeabur for each with its local service"
+version = "0.0.0"
+edition = "2024"
+rust-version = "1.99"
+license = "Apache-2.0"
+repository = "https://github.com/zeabur-oss/zeabur"
+publish = false
+
+# Its own workspace and lock file, with the main workspace's rules (docs/internal/crates.md, "Apps
+# outside the workspace"). scripts/check-desktop.sh fails when the package fields, the lints or
+# the release profile below differ from the root Cargo.toml.
+[workspace]
+
+[dependencies]
+kube = { version = "4.2", default-features = false, features = ["config"] }
+# kube needs a Kubernetes version chosen; the same one as the workspace.
+k8s-openapi = { version = "0.28", default-features = false, features = ["v1_34"] }
+serde = { version = "1.0.229", features = ["derive"] }
+serde_json = "1.0.154"
+# All default features are in use: dynamic-acl for add_capability, x11 and dbus (the dark theme) on
+# Linux, common-controls-v6 for the Windows dialogs, compression for the embedded web interface.
+tauri = { version = "2", features = [] }
+tauri-plugin-dialog = "2"
+tauri-plugin-window-state = "2"
+# The local service each cluster window runs, with the web interface embedded (`ZEABUR_UI_DIST`,
+# required by a release build). The one workspace crate desktop/ may depend on
+# (scripts/check-desktop.sh).
+zeabur-local = { path = "../crates/zeabur-local", features = ["ui"] }
+
+# Set for a build that embeds desktop/web/dist instead of loading the dev server
+# (`--features custom-protocol`; `cargo tauri build` sets it).
+[features]
+custom-protocol = ["tauri/custom-protocol"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = ["codegen"] }
+
+# The window's key handler for the shortcuts; the same gtk as Tauri's.
+[target.'cfg(target_os = "linux")'.dependencies]
+gtk = "0.18"
+
+# A second launch shows the chooser of the running app. macOS already runs one instance per app.
+[target.'cfg(any(windows, target_os = "linux"))'.dependencies]
+tauri-plugin-single-instance = "2"
+
+# The shortcuts, through WebView2's accelerator key event, and the AppUserModelID; the same versions
+# as wry's.
+[target.'cfg(windows)'.dependencies]
+webview2-com = "0.39"
+windows = { version = "0.62", features = ["Win32_UI_Input_KeyboardAndMouse", "Win32_UI_Shell"] }
+
+# The login shell from the passwd entry.
+[target.'cfg(unix)'.dependencies]
+nix = { version = "0.31", default-features = false, features = ["user"] }
+
+# A copy of the root [workspace.lints]; only unsafe_code differs.
+[lints.rust]
+# The main workspace forbids it; `deny` lets the modules listed in
+# scripts/check-desktop.sh opt out with `#[expect(unsafe_code)]`.
+unsafe_code = "deny"
+non_ascii_idents = "forbid"
+rust_2018_idioms = { level = "warn", priority = -1 }
+missing_docs = "warn"
+missing_debug_implementations = "warn"
+unreachable_pub = "warn"
+unused_qualifications = "warn"
+unused_lifetimes = "warn"
+unused_macro_rules = "warn"
+redundant_lifetimes = "warn"
+single_use_lifetimes = "warn"
+trivial_casts = "warn"
+trivial_numeric_casts = "warn"
+let_underscore_drop = "warn"
+meta_variable_misuse = "warn"
+unit_bindings = "warn"
+
+[lints.rustdoc]
+broken_intra_doc_links = "warn"
+private_intra_doc_links = "warn"
+unescaped_backticks = "warn"
+
+[lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+cargo = { level = "warn", priority = -1 }
+nursery = { level = "warn", priority = -1 }
+# Duplicate versions are tracked by cargo-deny, not clippy.
+multiple_crate_versions = "allow"
+# Contradicts rustc's `unreachable_pub`, which we keep: items are `pub(crate)` unless exported.
+redundant_pub_crate = "allow"
+
+# Selected `restriction` lints.
+# Panics on attacker-controlled input are a denial-of-service bug in a server.
+unwrap_used = "warn"
+expect_used = "warn"
+panic = "warn"
+indexing_slicing = "warn"
+string_slice = "warn"
+get_unwrap = "warn"
+unwrap_in_result = "warn"
+todo = "warn"
+unimplemented = "warn"
+exit = "warn"
+# Security-relevant logic must handle every case explicitly.
+wildcard_enum_match_arm = "warn"
+# Errors must keep their cause.
+map_err_ignore = "warn"
+let_underscore_must_use = "warn"
+let_underscore_untyped = "warn"
+unused_result_ok = "warn"
+# Suppressions must be explicit and justified.
+allow_attributes = "warn"
+allow_attributes_without_reason = "warn"
+# Output goes through `tracing`; the CLI writes through one audited module.
+dbg_macro = "warn"
+print_stdout = "warn"
+print_stderr = "warn"
+# Hygiene.
+clone_on_ref_ptr = "warn"
+empty_structs_with_brackets = "warn"
+error_impl_error = "warn"
+format_push_string = "warn"
+if_then_some_else_none = "warn"
+infinite_loop = "warn"
+mem_forget = "warn"
+mod_module_files = "warn"
+multiple_inherent_impl = "warn"
+partial_pub_fields = "warn"
+rest_pat_in_fully_bound_structs = "warn"
+str_to_string = "warn"
+tests_outside_test_module = "warn"
+try_err = "warn"
+undocumented_unsafe_blocks = "warn"
+unneeded_field_pattern = "warn"
+unseparated_literal_suffix = "warn"
+verbose_file_reads = "warn"
+
+
+# A copy of the root [profile.release] (scripts/check-desktop.sh).
+[profile.release]
+codegen-units = 1
+lto = "thin"
+strip = true

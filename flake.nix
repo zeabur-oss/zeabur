@@ -147,6 +147,29 @@
             );
           };
 
+          # The desktop app (desktop/, scripts/ci/desktop.sh): the default shell, the Tauri CLI
+          # that bundles the app (`cargo tauri build`), and on Linux the GTK 3 and WebKitGTK
+          # libraries that Tauri links. They stay out of the default shell that every other CI job
+          # enters.
+          desktop = self.devShells.${system}.default.overrideAttrs (old: {
+            nativeBuildInputs =
+              old.nativeBuildInputs
+              ++ [ pkgs.cargo-tauri ]
+              ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux [ pkgs.pkg-config ];
+            buildInputs =
+              old.buildInputs
+              ++ pkgs.lib.optionals pkgs.stdenv.hostPlatform.isLinux (
+                with pkgs;
+                [
+                  webkitgtk_4_1
+                  gtk3
+                  libsoup_3
+                  dbus
+                  libx11
+                ]
+              );
+          });
+
           # Only for the zh-TW wording check: zhtw-mcp builds from source, so it stays out of the
           # default shell that every other CI job enters.
           zh = pkgs.mkShell {
