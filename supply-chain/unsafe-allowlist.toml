@@ -356,12 +356,6 @@ approved = "2026-10-28"
 
 # --- Kubernetes client (kube-rs, k8s-openapi) and its runtime dependencies. k8s-openapi is flagged native only because it declares `links` for version detection; it has no C code
 [[crate]]
-name = "ahash"
-kind = "unsafe"
-reason = "Kubernetes client"
-approved = "2026-10-28"
-
-[[crate]]
 name = "aho-corasick"
 kind = "unsafe"
 reason = "Kubernetes client"
@@ -664,6 +658,18 @@ name = "tungstenite"
 kind = "unsafe"
 reason = "WebSocket framing for the browser terminal: str::from_utf8_unchecked after its own UTF-8 validation, and align_to_mut for frame masking"
 approved = "2026-10-28"
+
+[[crate]]
+name = "chacha20"
+kind = "unsafe"
+reason = "rand 0.10's thread RNG, which tungstenite 0.30 (kube 5's WebSocket client) uses for frame masks and the handshake key. The unsafe lines pick a SIMD backend (SSE2, AVX2, AVX-512, NEON) after runtime CPU detection and call its intrinsics; no build script, no native code. Not a TLS backend"
+approved = "2026-11-15"
+
+[[crate]]
+name = "const-oid"
+kind = "unsafe"
+reason = "digest 0.11's default feature under sha1 0.11 (tungstenite 0.30's handshake hash). One unsafe line: a pointer cast from [u8] to its repr(transparent) ObjectIdentifierRef; no build script, no native code"
+approved = "2026-11-15"
 
 # --- Basic auth on a domain (bcrypt): Traefik reads a bcrypt htpasswd hash.
 # Approved by Yi-Jyun Pan.
