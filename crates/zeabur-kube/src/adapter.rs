@@ -21,7 +21,6 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status};
 use k8s_openapi::kube_aggregator::pkg::apis::apiregistration::v1::APIService;
 use kube::api::{Api, AttachParams, DynamicObject, ListParams, LogParams, PostParams};
-use kube::client::UpgradeConnectionError;
 use kube::core::{ApiResource, GroupVersionKind};
 use serde::de::DeserializeOwned;
 use zeabur_core::problem::{Denied, FieldCause, KubernetesStatus, StatusDetails};
@@ -78,9 +77,6 @@ impl From<kube::Error> for ClusterError {
                 ..KubernetesStatus::new(status.code, status.reason.clone(), status.message.clone())
             }),
             kube::Error::SerdeError(e) => Self::Decode(e.to_string()),
-            kube::Error::UpgradeConnection(UpgradeConnectionError::ProtocolSwitch(code)) => {
-                refused_upgrade(code)
-            }
             other => Self::Transport(other.to_string()),
         }
     }
@@ -190,19 +186,42 @@ pub(crate) fn exit_status(status: Option<Status>) -> ExitStatus {
     }
 }
 
-/// kube-rs reports a refused exec upgrade with the HTTP status only (the `Status` body is not
-/// read), so this is the closest answer: the code, and its reason phrase as the reason.
-fn refused_upgrade(code: http::StatusCode) -> ClusterError {
-    let reason: String = code
-        .canonical_reason()
-        .unwrap_or_default()
-        .split_whitespace()
-        .collect();
-    ClusterError::Status(KubernetesStatus::new(
-        code.as_u16(),
-        reason,
-        format!("kube-apiserver refused to open the stream ({code})"),
-    ))
+/// A process's standard input that closes when dropped, as [`ExecStream::input`] promises.
+/// kube's writer is one half of a pipe, and dropping a half alone does not close the pipe.
+struct Stdin(tokio::io::WriteHalf<tokio::io::SimplexStream>);
+
+impl tokio::io::AsyncWrite for Stdin {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        std::pin::Pin::new(&mut self.0).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.0).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.0).poll_shutdown(cx)
+    }
+}
+
+impl Drop for Stdin {
+    /// Shutting down the pipe's writer completes at once: it marks the pipe closed and wakes the
+    /// reader, which then sends the close signal.
+    fn drop(&mut self) {
+        let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
+        let _closed =
+            tokio::io::AsyncWrite::poll_shutdown(std::pin::Pin::new(&mut self.0), &mut cx);
+    }
 }
 
 fn dynamic(group: &str, version: &str, kind: &str, plural: &str) -> ApiResource {
@@ -518,7 +537,7 @@ impl Cluster for UserClient {
                 .await?;
             let missing =
                 |what: &str| ClusterError::Decode(format!("the exec stream has no {what}"));
-            let input = process.stdin().ok_or_else(|| missing("stdin"))?;
+            let input = Stdin(process.stdin().ok_or_else(|| missing("stdin"))?);
             let output = process.stdout().ok_or_else(|| missing("stdout"))?;
             let mut sizes = process.terminal_size().ok_or_else(|| missing("TTY"))?;
             let status = process.take_status().ok_or_else(|| missing("status"))?;
@@ -570,9 +589,10 @@ impl Cluster for UserClient {
             let status = process
                 .take_status()
                 .ok_or_else(|| ClusterError::Decode("the exec stream has no status".to_owned()))?;
-            let mut stdin = process
-                .stdin()
-                .ok_or_else(|| ClusterError::Decode("the exec stream has no stdin".to_owned()))?;
+            let mut stdin =
+                Stdin(process.stdin().ok_or_else(|| {
+                    ClusterError::Decode("the exec stream has no stdin".to_owned())
+                })?);
             stdin
                 .write_all(input)
                 .await
@@ -607,7 +627,7 @@ impl Cluster for UserClient {
                 .await?;
             let missing =
                 |what: &str| ClusterError::Decode(format!("the exec stream has no {what}"));
-            let input = process.stdin().ok_or_else(|| missing("stdin"))?;
+            let input = Stdin(process.stdin().ok_or_else(|| missing("stdin"))?);
             let output = process.stdout().ok_or_else(|| missing("stdout"))?;
             let error = process.stderr().ok_or_else(|| missing("stderr"))?;
             let status = process.take_status().ok_or_else(|| missing("status"))?;
@@ -1009,6 +1029,24 @@ async fn releases_and_workloads(
 mod tests {
     use super::*;
 
+    #[tokio::test]
+    async fn dropped_stdin_reaches_the_reader_as_end_of_file() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        let (mut reader, writer) = tokio::io::simplex(64);
+        let mut stdin = Stdin(writer);
+        stdin.write_all(b"kubeconfig").await.unwrap();
+        drop(stdin);
+        let mut read = Vec::new();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            reader.read_to_end(&mut read),
+        )
+        .await
+        .expect("end of file")
+        .unwrap();
+        assert_eq!(read, b"kubeconfig");
+    }
+
     #[test]
     fn only_charts_rke2_marks_as_its_own_count_as_rke2_packaged() {
         let chart = |name: &str, annotations: serde_json::Value| -> DynamicObject {
@@ -1072,17 +1110,6 @@ mod tests {
         }));
         assert_eq!(other, ExitStatus::Failed("container is paused".to_owned()));
         assert!(matches!(exit_status(None), ExitStatus::Failed(_)));
-    }
-
-    #[test]
-    fn a_refused_exec_upgrade_keeps_its_code() {
-        let error = kube::Error::UpgradeConnection(UpgradeConnectionError::ProtocolSwitch(
-            http::StatusCode::FORBIDDEN,
-        ));
-        let ClusterError::Status(status) = ClusterError::from(error) else {
-            panic!("not a status");
-        };
-        assert_eq!((status.code, status.reason.as_str()), (403, "Forbidden"));
     }
 
     #[test]

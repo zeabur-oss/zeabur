@@ -310,7 +310,7 @@ function ServiceRow({
       current={current}
       trailing={
         <Tooltip content={word(status)}>
-          <span className="flex size-4 items-center justify-center">
+          <span className="relative flex size-4 items-center justify-center">
             <StatusDot health={status.health} />
             <span className="sr-only">{word(status)}</span>
           </span>
@@ -386,7 +386,7 @@ function StoreItem({
       current={current}
       trailing={
         <Tooltip content={word}>
-          <span className="flex size-4 items-center justify-center">
+          <span className="relative flex size-4 items-center justify-center">
             <StatusDot health={stateHealth[state]} />
             <span className="sr-only">{word}</span>
           </span>

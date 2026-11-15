@@ -1016,7 +1016,13 @@ mod tests {
             ] {
                 file["metadata"][key] = json!(value);
             }
-            for input in file["inputs"].as_array_mut().into_iter().flatten() {
+            // `get_mut`, not `file["inputs"]`, which would add `inputs: null` to a case without it.
+            for input in file
+                .get_mut("inputs")
+                .and_then(Value::as_array_mut)
+                .into_iter()
+                .flatten()
+            {
                 input["description"] = json!("d");
             }
             let options = &case["options"];
