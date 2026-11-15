@@ -25,9 +25,9 @@ pub fn join(parts: &[&str]) -> String {
 /// For each setting that the kernel refused, a message. The other setting is still applied.
 ///
 /// [proc]: https://man7.org/linux/man-pages/man5/proc_pid.5.html
+#[cfg(unix)]
 pub fn forbid_core_dumps() -> Result<(), String> {
     let mut refused = Vec::new();
-    #[cfg(unix)]
     {
         use rustix::process::{Resource, Rlimit, setrlimit};
         let none = Rlimit {
@@ -50,6 +50,16 @@ pub fn forbid_core_dumps() -> Result<(), String> {
     } else {
         Err(refused.join("; "))
     }
+}
+
+/// Does nothing: outside Unix there is no core dump setting to change.
+///
+/// # Errors
+///
+/// Never.
+#[cfg(not(unix))]
+pub const fn forbid_core_dumps() -> Result<(), String> {
+    Ok(())
 }
 
 #[cfg(test)]

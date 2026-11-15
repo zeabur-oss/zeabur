@@ -1,13 +1,6 @@
 //! `zeaburctl ui`: the web interface on this machine, acting with the person's kubeconfig.
 
-use std::net::{Ipv4Addr, SocketAddr};
 use std::process::ExitCode;
-use std::sync::Arc;
-
-use axum::Router;
-use zeabur_api::access::SingleCluster;
-use zeabur_api::local::{Access, guard};
-use zeabur_kube::{Cluster as _, UserClient};
 
 use crate::output;
 
@@ -49,53 +42,21 @@ pub(crate) fn run(args: &UiArgs) -> ExitCode {
 
 async fn serve(args: &UiArgs) -> Result<(), String> {
     let settings = crate::in_process::settings(args.metrics_service.as_deref())?;
-    let cluster = UserClient::from_kubeconfig(args.context.as_deref())
+    let running = zeabur_local::start(args.context.as_deref(), settings)
         .await
         .map_err(|e| e.to_string())?;
-    let identity = cluster
-        .whoami()
-        .await
-        .map_err(|e| e.into_problem("your identity").detail)?;
-
-    // Loopback only, on a port the system picks.
-    let listener = tokio::net::TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)))
-        .await
-        .map_err(|e| format!("cannot listen on 127.0.0.1: {e}"))?;
-    let port = listener.local_addr().map_err(|e| e.to_string())?.port();
-    let access = Access::new(port).map_err(|e| e.to_string())?;
-    let url = access.launch_url();
-
-    let app = app(cluster, settings).layer(axum::middleware::from_fn_with_state(access, guard));
+    let url = running.url();
     output::info(&format!(
         "Zeabur is running on this machine as {}.\nOpen {url}\nPress Ctrl-C to stop.",
-        identity.username
+        running.username()
     ));
     if !args.no_browser {
-        open_browser(&url);
+        open_browser(url);
     }
-    axum::serve(listener, app)
-        .with_graceful_shutdown(async {
-            if tokio::signal::ctrl_c().await.is_err() {
-                std::future::pending::<()>().await;
-            }
-        })
-        .await
-        .map_err(|e| e.to_string())
-}
-
-/// The API, acting as the person whose kubeconfig this is, and the web interface.
-fn app(cluster: UserClient, settings: zeabur_api::Settings) -> Router {
-    let router = zeabur_api::router_with(
-        Arc::new(SingleCluster(Arc::new(cluster))),
-        zeabur_api::Options {
-            settings,
-            ..zeabur_api::Options::default()
-        },
-    );
-    #[cfg(feature = "ui")]
-    let router =
-        router.fallback_service(zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP));
-    router
+    if tokio::signal::ctrl_c().await.is_err() {
+        std::future::pending::<()>().await;
+    }
+    running.stop().await.map_err(|e| e.to_string())
 }
 
 /// Opens `url` in the default browser; failing that, the printed link is enough.

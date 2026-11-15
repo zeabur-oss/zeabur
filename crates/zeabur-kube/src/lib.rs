@@ -309,6 +309,27 @@ impl UserClient {
         Self::from_kube_config(config, kubeconfig_cluster(context))
     }
 
+    /// Acts as the person at this machine, with the context `context` of `kubeconfig`, already
+    /// read (the desktop app reads each file on its own instead of merging `KUBECONFIG`).
+    ///
+    /// # Errors
+    ///
+    /// When the kubeconfig names no usable context.
+    pub async fn from_kubeconfig_with(
+        kubeconfig: kube::config::Kubeconfig,
+        context: &str,
+    ) -> Result<Self, ConnectError> {
+        let options = kube::config::KubeConfigOptions {
+            context: Some(context.to_owned()),
+            ..kube::config::KubeConfigOptions::default()
+        };
+        let name = cluster_of(kubeconfig.clone(), Some(context));
+        let config = kube::Config::from_custom_kubeconfig(kubeconfig, &options)
+            .await
+            .map_err(|e| ConnectError::Kubeconfig(e.to_string()))?;
+        Self::from_kube_config(config, name)
+    }
+
     /// A kubeconfig may name a client certificate, which binds a connection itself to the
     /// person, so this client keeps a pool of its own.
     fn from_kube_config(config: kube::Config, name: Option<String>) -> Result<Self, ConnectError> {

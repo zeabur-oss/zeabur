@@ -1,0 +1,7 @@
+{
+  "$schema": "../gen/schemas/desktop-schema.json",
+  "identifier": "cluster",
+  "description": "A cluster window's own page (cluster.html), while its local service starts. The web interface it then loads from 127.0.0.1 is remote and gets none of this.",
+  "windows": ["cluster-*"],
+  "permissions": ["core:default", "allow-start-cluster", "allow-back-to-chooser"]
+}

@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>en</string>
+	<key>CFBundleLocalizations</key>
+	<array>
+		<string>en</string>
+		<string>zh-TW</string>
+		<string>zh-CN</string>
+	</array>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>Zeabur connects to the Kubernetes clusters in your kubeconfig, including the ones on your local network.</string>
+</dict>
+</plist>

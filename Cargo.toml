@@ -33,7 +33,8 @@ zeabur-plan = 3
 zeabur-catalog = 3
 zeabur-api = 4
 zeabur = 5
-zeaburctl = 5
+zeabur-local = 5
+zeaburctl = 6
 zeabur-test-support = 6
 zeabur-installer-plan = 0
 zeabur-installer-host = 1
@@ -74,6 +75,7 @@ zeabur-catalog = { path = "crates/zeabur-catalog" }
 zeabur-modules = { path = "crates/zeabur-modules" }
 zeabur-plan = { path = "crates/zeabur-plan" }
 zeabur-api = { path = "crates/zeabur-api" }
+zeabur-local = { path = "crates/zeabur-local" }
 zeabur-ui = { path = "crates/zeabur-ui" }
 zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }

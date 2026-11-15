@@ -1,4 +1,4 @@
-// Prints every zh-TW user string after its key, for scripts/check-zh-tw.sh. Each string is its own
+// Prints every zh-TW user string (web/ and desktop/web/) after its key, for scripts/check-zh-tw.sh. Each string is its own
 // paragraph so the linter reads no sentence across two; placeholders are Latin (`<service>`), which
 // it leaves alone. Imported by a computed path: tsconfig.node.json does not resolve `@/`.
 import { readFileSync } from "node:fs"
@@ -52,6 +52,13 @@ for (const [key, value] of Object.entries(zhTW)) {
       print(key, text)
   else print(key, call(value))
 }
+
+// Zeabur Desktop's own pages (desktop/web).
+const desktop = (await import(
+  resolve(import.meta.dirname, "../../desktop/web/src/i18n/zh-TW.ts")
+)) as { zhTW: Record<string, string | Message> }
+for (const [key, value] of Object.entries(desktop.zhTW))
+  print(key, typeof value === "string" ? value : call(value))
 
 // The sign-in pages: the string on a `Lang::ZhTw` arm, on its line or the next.
 const pages = readFileSync(

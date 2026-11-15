@@ -1,0 +1,8 @@
+# Contexts only: the clusters and users live in another file (a kubeconfig split across files).
+apiVersion: v1
+kind: Config
+contexts:
+  - name: lab
+    context:
+      cluster: lab
+      user: lab-admin
