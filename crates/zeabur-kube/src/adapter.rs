@@ -186,6 +186,44 @@ pub(crate) fn exit_status(status: Option<Status>) -> ExitStatus {
     }
 }
 
+/// A process's standard input that closes when dropped, as [`ExecStream::input`] promises.
+/// kube's writer is one half of a pipe, and dropping a half alone does not close the pipe.
+struct Stdin(tokio::io::WriteHalf<tokio::io::SimplexStream>);
+
+impl tokio::io::AsyncWrite for Stdin {
+    fn poll_write(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+        buf: &[u8],
+    ) -> std::task::Poll<std::io::Result<usize>> {
+        std::pin::Pin::new(&mut self.0).poll_write(cx, buf)
+    }
+
+    fn poll_flush(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.0).poll_flush(cx)
+    }
+
+    fn poll_shutdown(
+        mut self: std::pin::Pin<&mut Self>,
+        cx: &mut std::task::Context<'_>,
+    ) -> std::task::Poll<std::io::Result<()>> {
+        std::pin::Pin::new(&mut self.0).poll_shutdown(cx)
+    }
+}
+
+impl Drop for Stdin {
+    /// Shutting down the pipe's writer completes at once: it marks the pipe closed and wakes the
+    /// reader, which then sends the close signal.
+    fn drop(&mut self) {
+        let mut cx = std::task::Context::from_waker(std::task::Waker::noop());
+        let _closed =
+            tokio::io::AsyncWrite::poll_shutdown(std::pin::Pin::new(&mut self.0), &mut cx);
+    }
+}
+
 fn dynamic(group: &str, version: &str, kind: &str, plural: &str) -> ApiResource {
     ApiResource::from_gvk_with_plural(&GroupVersionKind::gvk(group, version, kind), plural)
 }
@@ -499,7 +537,7 @@ impl Cluster for UserClient {
                 .await?;
             let missing =
                 |what: &str| ClusterError::Decode(format!("the exec stream has no {what}"));
-            let input = process.stdin().ok_or_else(|| missing("stdin"))?;
+            let input = Stdin(process.stdin().ok_or_else(|| missing("stdin"))?);
             let output = process.stdout().ok_or_else(|| missing("stdout"))?;
             let mut sizes = process.terminal_size().ok_or_else(|| missing("TTY"))?;
             let status = process.take_status().ok_or_else(|| missing("status"))?;
@@ -551,9 +589,10 @@ impl Cluster for UserClient {
             let status = process
                 .take_status()
                 .ok_or_else(|| ClusterError::Decode("the exec stream has no status".to_owned()))?;
-            let mut stdin = process
-                .stdin()
-                .ok_or_else(|| ClusterError::Decode("the exec stream has no stdin".to_owned()))?;
+            let mut stdin =
+                Stdin(process.stdin().ok_or_else(|| {
+                    ClusterError::Decode("the exec stream has no stdin".to_owned())
+                })?);
             stdin
                 .write_all(input)
                 .await
@@ -588,7 +627,7 @@ impl Cluster for UserClient {
                 .await?;
             let missing =
                 |what: &str| ClusterError::Decode(format!("the exec stream has no {what}"));
-            let input = process.stdin().ok_or_else(|| missing("stdin"))?;
+            let input = Stdin(process.stdin().ok_or_else(|| missing("stdin"))?);
             let output = process.stdout().ok_or_else(|| missing("stdout"))?;
             let error = process.stderr().ok_or_else(|| missing("stderr"))?;
             let status = process.take_status().ok_or_else(|| missing("status"))?;
@@ -989,6 +1028,24 @@ async fn releases_and_workloads(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[tokio::test]
+    async fn dropped_stdin_reaches_the_reader_as_end_of_file() {
+        use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
+        let (mut reader, writer) = tokio::io::simplex(64);
+        let mut stdin = Stdin(writer);
+        stdin.write_all(b"kubeconfig").await.unwrap();
+        drop(stdin);
+        let mut read = Vec::new();
+        tokio::time::timeout(
+            std::time::Duration::from_secs(1),
+            reader.read_to_end(&mut read),
+        )
+        .await
+        .expect("end of file")
+        .unwrap();
+        assert_eq!(read, b"kubeconfig");
+    }
 
     #[test]
     fn only_charts_rke2_marks_as_its_own_count_as_rke2_packaged() {
