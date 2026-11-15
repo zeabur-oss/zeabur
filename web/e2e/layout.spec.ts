@@ -146,8 +146,8 @@ test("every settings card starts its values at one left edge", async ({ page }) 
 test.describe("in a project with many services", () => {
   test.skip(!crowded, "ZEABUR_E2E_CROWDED is not set")
 
-  for (const width of widths) {
-    test(`the document never scrolls, only the sidebar and main do, at ${width}px`, async ({
+  for (const width of [...widths, 1960]) {
+    test(`the document never scrolls, only the sidebar, the services and main do, at ${width}px`, async ({
       page,
     }) => {
       await page.setViewportSize({ width, height: 800 })
@@ -159,10 +159,14 @@ test.describe("in a project with many services", () => {
       expect(height).toBe(inner)
       expect(await mainOverflows(page)).toBe(false)
 
-      const main = page.locator("main")
-      await main.hover()
+      // A table scrolls inside its own frame; a phone lists the first few services, and all of
+      // them in the page, which main scrolls.
+      let scroller = page.locator("main")
+      if (width < 768) await page.getByRole("button", { name: /^Show all/ }).click()
+      else scroller = services(page).locator("..")
+      await scroller.hover()
       await page.mouse.wheel(0, 2000)
-      await expect.poll(() => main.evaluate((m) => m.scrollTop)).toBeGreaterThan(0)
+      await expect.poll(() => scroller.evaluate((element) => element.scrollTop)).toBeGreaterThan(0)
       expect(await page.evaluate(() => window.scrollY)).toBe(0)
 
       if (width < 768) return
