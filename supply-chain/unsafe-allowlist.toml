@@ -663,13 +663,13 @@ approved = "2026-10-28"
 name = "chacha20"
 kind = "unsafe"
 reason = "rand 0.10's thread RNG, which tungstenite 0.30 (kube 5's WebSocket client) uses for frame masks and the handshake key. The unsafe lines pick a SIMD backend (SSE2, AVX2, AVX-512, NEON) after runtime CPU detection and call its intrinsics; no build script, no native code. Not a TLS backend"
-approved = "pending"
+approved = "2026-11-15"
 
 [[crate]]
 name = "const-oid"
 kind = "unsafe"
 reason = "digest 0.11's default feature under sha1 0.11 (tungstenite 0.30's handshake hash). One unsafe line: a pointer cast from [u8] to its repr(transparent) ObjectIdentifierRef; no build script, no native code"
-approved = "pending"
+approved = "2026-11-15"
 
 # --- Basic auth on a domain (bcrypt): Traefik reads a bcrypt htpasswd hash.
 # Approved by Yi-Jyun Pan.
