@@ -20,7 +20,6 @@ use kube::api::DynamicObject;
 use serde::Serialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
-use zeabur_core::json_patch::apply_patch;
 use zeabur_core::problem::{Denied, KubernetesStatus};
 
 mod files;
@@ -1614,10 +1613,9 @@ fn patched(
             })
             .cloned()
             .collect();
-        return apply_patch(current, &tests).map_err(|_dropped_by_kube_apiserver| not_applied());
+        return apply_patch(current, &tests);
     }
-    let mut object =
-        apply_patch(current, operations).map_err(|_dropped_by_kube_apiserver| not_applied())?;
+    let mut object = apply_patch(current, operations)?;
     if let Some(field) = unknown_field(&target.kind, &object) {
         return Err(invalid(&field));
     }
@@ -1628,6 +1626,15 @@ fn patched(
         *generation = Value::from(value.saturating_add(1));
     }
     Ok(object)
+}
+
+/// `document` with the JSON Patch `operations` applied, all or nothing.
+fn apply_patch(document: &Value, operations: &[Value]) -> Result<Value, ClusterError> {
+    let patch: json_patch::Patch = serde_json::from_value(Value::Array(operations.to_vec()))
+        .map_err(|_malformed| not_applied())?;
+    let mut out = document.clone();
+    json_patch::patch(&mut out, &patch).map_err(|_dropped_by_kube_apiserver| not_applied())?;
+    Ok(out)
 }
 
 /// `patch` merged into `target` as RFC 7386 says: an object merges field by field, `null`
@@ -1660,7 +1667,7 @@ fn merge(target: &mut Value, patch: &Value) {
 /// [k8s-pod-strategy]: https://github.com/kubernetes/kubernetes/blob/master/pkg/registry/core/pod/strategy.go
 fn with_ephemeral_containers(current: &Value, operations: &Value) -> Result<Value, ClusterError> {
     let operations = operations.as_array().map_or(&[][..], Vec::as_slice);
-    let patched = apply_patch(current, operations).map_err(|_not_applied| not_applied())?;
+    let patched = apply_patch(current, operations)?;
     let list = |object: &Value, path: &str| -> Vec<Value> {
         object
             .pointer(path)

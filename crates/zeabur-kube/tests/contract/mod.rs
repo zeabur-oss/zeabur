@@ -11,12 +11,19 @@
 
 use base64::Engine as _;
 use serde_json::{Value, json};
-use zeabur_core::json_patch::apply_patch;
 use zeabur_core::problem::KubernetesStatus;
 use zeabur_kube::{
     Cluster, ClusterError, ClusterExt as _, ObjectTarget, Preconditions, ResourceRef, WriteBody,
     WriteRequest,
 };
+
+/// `document` with the JSON Patch `operations` applied.
+fn applied(document: &Value, operations: &Value) -> Value {
+    let patch: json_patch::Patch = serde_json::from_value(operations.clone()).unwrap();
+    let mut out = document.clone();
+    json_patch::patch(&mut out, &patch).unwrap();
+    out
+}
 
 fn target(
     namespace: &str,
@@ -180,7 +187,7 @@ pub(crate) async fn a_patch_whose_tests_hold_is_stored_as_computed(
         .await
         .expect("patch");
     let after = stored(cluster, &settings).await;
-    let computed = apply_patch(&before, operations.as_array().unwrap()).unwrap();
+    let computed = applied(&before, &operations);
     assert_eq!(content(&after), content(&computed));
     let version = text(&after, "/metadata/resourceVersion");
     assert_eq!(written.resource_version.as_deref(), Some(version.as_str()));
@@ -203,7 +210,7 @@ pub(crate) async fn a_patch_whose_tests_hold_is_stored_as_computed(
         .await
         .expect("patch");
     let after = stored(cluster, &web).await;
-    let computed = apply_patch(&before, operations.as_array().unwrap()).unwrap();
+    let computed = applied(&before, &operations);
     assert_eq!(content(&after), content(&computed));
     assert_eq!(generation(&after), generation(&before) + 1);
 

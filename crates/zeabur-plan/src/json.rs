@@ -1,4 +1,4 @@
-//! JSON helpers: RFC 6901 pointers, the subset of RFC 6902 JSON Patch Zeabur sends, and the
+//! JSON helpers: RFC 6901 pointers, builders for the RFC 6902 operations Zeabur sends, and the
 //! key fields of the lists Kubernetes keys by a field.
 //!
 //! The patch is applied locally to show the object as it will be after the write and to
@@ -73,9 +73,26 @@ pub fn remove(path: &str) -> Value {
     json!({"op": "remove", "path": path})
 }
 
-/// Applied here to show the object as it will be; shared with the in-memory cluster, which
-/// applies it to store the object.
-pub use zeabur_model::kernel::json_patch::{PatchError, apply_patch};
+/// Why a patch did not apply.
+#[derive(Debug, thiserror::Error)]
+#[error("{0}")]
+pub struct PatchError(String);
+
+/// `document` with `operations` applied, all or nothing [rfc6902]. A plan applies them to show
+/// the object as it will be after the write.
+///
+/// [rfc6902]: https://www.rfc-editor.org/rfc/rfc6902
+///
+/// # Errors
+///
+/// When an operation is malformed, a target is missing or a `test` fails.
+pub fn apply_patch(document: &Value, operations: &[Value]) -> Result<Value, PatchError> {
+    let patch: json_patch::Patch = serde_json::from_value(Value::Array(operations.to_vec()))
+        .map_err(|e| PatchError(e.to_string()))?;
+    let mut out = document.clone();
+    json_patch::patch(&mut out, &patch).map_err(|e| PatchError(e.to_string()))?;
+    Ok(out)
+}
 
 /// The key field of a list Kubernetes keys by a field (its merge key), by the list's name.
 ///
