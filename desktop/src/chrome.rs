@@ -160,14 +160,10 @@ fn next_zoom(current: f64, up: bool) -> f64 {
 /// Lets the strip move the window and zoom it on a double click. The page from the local service
 /// gets these two permissions and nothing else.
 #[cfg(target_os = "macos")]
-pub(crate) fn allow_title_bar(app: &AppHandle, dev_web: Option<&tauri::Url>) -> tauri::Result<()> {
-    let mut capability = tauri::ipc::CapabilityBuilder::new("title-bar")
+pub(crate) fn allow_title_bar(app: &AppHandle) -> tauri::Result<()> {
+    let capability = tauri::ipc::CapabilityBuilder::new("title-bar")
         .windows([CHOOSER, "cluster-*"])
-        .remote("http://127.0.0.1:*/*".to_owned());
-    if let Some(url) = dev_web {
-        capability = capability.remote(format!("{}/*", url.origin().ascii_serialization()));
-    }
-    let capability = capability
+        .remote("http://127.0.0.1:*/*".to_owned())
         .permission("core:window:allow-start-dragging")
         .permission("core:window:allow-internal-toggle-maximize");
     app.add_capability(capability)

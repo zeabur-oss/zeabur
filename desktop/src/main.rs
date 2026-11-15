@@ -48,9 +48,6 @@ struct App {
     /// The app's own environment until the login shell's has been read, then the merged one.
     env: RwLock<ChildEnv>,
     shell: Mutex<ShellRead>,
-    /// `ZEABUR_DESKTOP_WEB`, for development: cluster windows load this address (the web dev
-    /// server) instead of starting a local service.
-    dev_web: Option<tauri::Url>,
     clusters: cluster::Clusters,
 }
 
@@ -302,15 +299,11 @@ async fn open_cluster(
         saved.recents.insert(0, key.clone());
         saved.recents.truncate(5);
     })?;
-    let url = if let Some(dev) = &app.dev_web {
-        WebviewUrl::External(dev.clone())
-    } else {
-        let mut page = "tauri://localhost/cluster.html"
-            .parse::<tauri::Url>()
-            .map_err(|e| e.to_string())?;
-        page.query_pairs_mut().append_pair("name", &name);
-        WebviewUrl::App(format!("cluster.html?{}", page.query().unwrap_or_default()).into())
-    };
+    let mut page = "tauri://localhost/cluster.html"
+        .parse::<tauri::Url>()
+        .map_err(|e| e.to_string())?;
+    page.query_pairs_mut().append_pair("name", &name);
+    let url = WebviewUrl::App(format!("cluster.html?{}", page.query().unwrap_or_default()).into());
     app.clusters.set_target(
         &label,
         cluster::Target {
@@ -419,10 +412,6 @@ fn main() -> ExitCode {
                 saved: Mutex::new(saved),
                 env: RwLock::new(ChildEnv::from_process()),
                 shell: Mutex::new(ShellRead::Pending),
-                dev_web: match std::env::var("ZEABUR_DESKTOP_WEB") {
-                    Ok(url) => Some(url.parse::<tauri::Url>()?),
-                    Err(_) => None,
-                },
                 clusters: cluster::Clusters::default(),
             });
 
@@ -440,10 +429,7 @@ fn main() -> ExitCode {
             });
 
             #[cfg(target_os = "macos")]
-            chrome::allow_title_bar(
-                tauri_app.handle(),
-                tauri_app.state::<App>().dev_web.as_ref(),
-            )?;
+            chrome::allow_title_bar(tauri_app.handle())?;
             chrome::show_chooser(tauri_app.handle())?;
             Ok(())
         })
