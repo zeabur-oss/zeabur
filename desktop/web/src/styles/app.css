@@ -9,6 +9,6 @@
 /* Markup carries no arbitrary values (shadcn/lint no-arbitrary-values); each variable here makes
    its utility (`grid-cols-desktop-row`). */
 @theme {
-  --grid-template-columns-desktop-row: auto minmax(0, 1.3fr) minmax(0, 1fr) 11rem auto;
-  --grid-template-columns-desktop-row-narrow: auto minmax(0, 1fr) 9rem auto;
+  --grid-template-columns-desktop-row: minmax(0, 1.3fr) minmax(0, 1fr) 11rem auto;
+  --grid-template-columns-desktop-row-narrow: minmax(0, 1fr) 9rem auto;
 }

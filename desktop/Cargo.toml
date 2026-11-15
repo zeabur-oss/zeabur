@@ -19,11 +19,12 @@ kube = { version = "4.2", default-features = false, features = ["config"] }
 k8s-openapi = { version = "0.28", default-features = false, features = ["v1_34"] }
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.154"
+# Finds an exec plugin on the child environment's PATH, with PATHEXT on Windows.
+which = "8"
 # All default features are in use: dynamic-acl for add_capability, x11 and dbus (the dark theme) on
 # Linux, common-controls-v6 for the Windows dialogs, compression for the embedded web interface.
 tauri = { version = "2", features = [] }
 tauri-plugin-dialog = "2"
-tauri-plugin-window-state = "2"
 # The local service each cluster window runs, with the web interface embedded (`ZEABUR_UI_DIST`,
 # required by a release build). The one workspace crate desktop/ may depend on
 # (scripts/check-desktop.sh).

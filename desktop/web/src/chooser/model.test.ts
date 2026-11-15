@@ -1,15 +1,7 @@
 import { describe, expect, it } from "bun:test"
 
 import type { Auth, Context, ShellRead, Snapshot } from "./api"
-import {
-  authText,
-  baseName,
-  fileLabel,
-  recentContexts,
-  reachView,
-  sourceFilter,
-  visibleContexts,
-} from "./model"
+import { authText, baseName, fileLabel, sourceFilter, visibleContexts } from "./model"
 
 const t = ((key: string, ...args: unknown[]) => [key, ...args].join(" ")) as never
 
@@ -25,34 +17,20 @@ const context = (name: string, extra: Partial<Context> = {}): Context => ({
   user: "admin",
   namespace: null,
   current: false,
-  sameNameElsewhere: 0,
   auth: { state: "ok", method: "token" },
   ...extra,
 })
 
-const snapshot = (contexts: Context[], extra: Partial<Snapshot> = {}): Snapshot => ({
+const snapshot = (contexts: Context[]): Snapshot => ({
   sources: [],
   contexts,
-  favourites: [],
-  recents: [],
   shell: { state: "done" },
-  ...extra,
 })
 
 describe("desktop model", () => {
   it("names a file by its last one or two path parts", () => {
     expect(baseName("C:\\Users\\me\\config")).toBe("config")
     expect(fileLabel("/home/me/team/aks.yaml")).toBe("team/aks.yaml")
-  })
-
-  it("shows a pending check until the reach is known", () => {
-    expect(reachView(undefined, t)).toEqual({ variant: "idle", text: "desktop.reachChecking" })
-    expect(reachView({ state: "reachable", millis: 12 }, t)).toEqual({
-      variant: "ok",
-      text: "desktop.reachOk 12 ms",
-    })
-    expect(reachView({ state: "timedOut" }, t).variant).toBe("warn")
-    expect(reachView({ state: "refused" }, t).variant).toBe("fail")
   })
 
   it("explains each sign-in problem and stays silent when sign-in works", () => {
@@ -70,12 +48,13 @@ describe("desktop model", () => {
     expect(authText(plugin, { state: "pending" }, t)).toBe("desktop.authLooking aws")
   })
 
-  it("filters by source and search, and lists favourites first", () => {
-    const snap = snapshot(
-      [context("dev"), context("prod"), context("lab", { sourceId: "b", user: null })],
-      { favourites: ["prod"] },
-    )
-    expect(visibleContexts(snap, "", null).map((c) => c.name)).toEqual(["prod", "dev", "lab"])
+  it("filters by source and search", () => {
+    const snap = snapshot([
+      context("dev"),
+      context("prod"),
+      context("lab", { sourceId: "b", user: null }),
+    ])
+    expect(visibleContexts(snap, "", null).map((c) => c.name)).toEqual(["dev", "prod", "lab"])
     expect(visibleContexts(snap, " LAB ", null).map((c) => c.name)).toEqual(["lab"])
     expect(visibleContexts(snap, "", "b").map((c) => c.name)).toEqual(["lab"])
   })
@@ -85,12 +64,5 @@ describe("desktop model", () => {
     const snap = snapshot([context("dev")])
     expect(sourceFilter({ ...snap, sources: [source] }, "b")).toBe("b")
     expect(sourceFilter(snap, "b")).toBeNull()
-  })
-
-  it("lists recents only without a search or source filter", () => {
-    const snap = snapshot([context("dev"), context("prod")], { recents: ["prod", "gone"] })
-    expect(recentContexts(snap, "", null).map((c) => c.name)).toEqual(["prod"])
-    expect(recentContexts(snap, "d", null)).toEqual([])
-    expect(recentContexts(snap, "", "a")).toEqual([])
   })
 })

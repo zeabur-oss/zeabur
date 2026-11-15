@@ -3,6 +3,7 @@
 //! `std::env::set_var`.
 
 use std::ffi::{OsStr, OsString};
+#[cfg(any(unix, test))]
 use std::path::PathBuf;
 
 use serde::Serialize;
@@ -79,11 +80,6 @@ impl ChildEnv {
         self.vars.push((name, value));
     }
 
-    pub(crate) fn path_dirs(&self) -> Vec<PathBuf> {
-        self.get(OsStr::new("PATH"))
-            .map_or_else(Vec::new, |path| std::env::split_paths(path).collect())
-    }
-
     /// The variables that differ from `own`, for a kubeconfig's exec `env`. Names or values that
     /// are not UTF-8 are left out.
     pub(crate) fn changed_from(&self, own: &[(OsString, OsString)]) -> Vec<(String, String)> {
@@ -146,18 +142,6 @@ mod unix {
         })
     }
 
-    /// zsh reads `~/.zshrc` only in an interactive shell, also with `-l`. fish refuses `-i` with
-    /// `-c`.
-    pub(super) fn shell_args(shell: &Path, script: &str) -> Vec<String> {
-        let mut args = vec!["-l".to_owned()];
-        if shell.file_name().is_none_or(|name| name != "fish") {
-            args.push("-i".to_owned());
-        }
-        args.push("-c".to_owned());
-        args.push(script.to_owned());
-        args
-    }
-
     /// The text between the first and the last `marker`, read as `env -0` output. Shell files can
     /// print before the command runs, and `~/.zlogout` after it.
     pub(super) fn parse_env0(output: &[u8], marker: &[u8]) -> Option<Vec<(OsString, OsString)>> {
@@ -212,7 +196,8 @@ mod unix {
         let script = format!("printf %s {marker}; /usr/bin/env -0; printf %s {marker}");
         let mut command = Command::new(shell);
         command
-            .args(shell_args(shell, &script))
+            // zsh reads `~/.zshrc` only in an interactive shell, also with `-l`.
+            .args(["-l", "-i", "-c", &script])
             .env("DISABLE_AUTO_UPDATE", "true")
             .stdin(Stdio::null())
             .stdout(Stdio::piped())
@@ -306,7 +291,8 @@ mod tests {
             ("CLOUDSDK_CONFIG", "/home/a/gcloud"),
         ]);
         let env = ChildEnv::merge(own, &shell);
-        let path: Vec<PathBuf> = env.path_dirs();
+        let path: Vec<PathBuf> =
+            std::env::split_paths(env.get(OsStr::new("PATH")).unwrap()).collect();
         let want: Vec<PathBuf> = ["/opt/homebrew/bin", "/usr/bin", "/bin"]
             .iter()
             .map(PathBuf::from)
@@ -345,10 +331,9 @@ mod tests {
     #[cfg(unix)]
     mod unix_shell {
         use std::os::unix::fs::PermissionsExt;
-        use std::path::Path;
         use std::time::Duration;
 
-        use super::super::unix::{Failure, parse_env0, read_shell_env, shell_args};
+        use super::super::unix::{Failure, parse_env0, read_shell_env};
         use super::*;
 
         #[test]
@@ -360,18 +345,6 @@ mod tests {
                 vars(&[("A", "1"), ("MULTI", "line one\nline two"), ("EQ", "a=b")])
             );
             assert_eq!(parse_env0(b"no markers here", b"MARK"), None);
-        }
-
-        #[test]
-        fn fish_gets_no_interactive_flag() {
-            assert_eq!(
-                shell_args(Path::new("/opt/homebrew/bin/fish"), "x"),
-                ["-l", "-c", "x"]
-            );
-            assert_eq!(
-                shell_args(Path::new("/bin/zsh"), "x"),
-                ["-l", "-i", "-c", "x"]
-            );
         }
 
         fn fake_shell(name: &str, body: &str) -> PathBuf {

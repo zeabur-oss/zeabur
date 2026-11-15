@@ -7,10 +7,7 @@ fn main() {
     let manifest = tauri_build::AppManifest::new().commands(&[
         "snapshot",
         "add_paths",
-        "add_pasted",
         "remove_source",
-        "toggle_favourite",
-        "probe",
         "open_cluster",
         "start_cluster",
         "back_to_chooser",

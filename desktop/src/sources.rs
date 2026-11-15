@@ -1,31 +1,21 @@
 //! Kubeconfig sources and the contexts in them. Each file is parsed on its own (no merging), so a
 //! context name that appears in two files shows up twice, each with its file.
 
-use std::collections::HashMap;
 use std::ffi::OsString;
 use std::path::{Path, PathBuf};
 
 use kube::config::{AuthInfo, Kubeconfig};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 
 use crate::env::ChildEnv;
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "kebab-case")]
 pub(crate) enum SourceKind {
     /// `~/.kube/config`, or each path in `KUBECONFIG`.
     Default,
+    /// A file the person added.
     File,
-    Folder,
-    /// YAML pasted into the app, saved under the app's data folder.
-    Pasted,
-}
-
-/// A source the person added. Default sources are not stored; they come from the environment.
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub(crate) struct AddedSource {
-    pub(crate) kind: SourceKind,
-    pub(crate) path: PathBuf,
 }
 
 /// The default sources: each path in `KUBECONFIG`, or `~/.kube/config` when it is unset or empty.
@@ -51,18 +41,10 @@ pub(crate) struct SourceView {
     pub(crate) id: String,
     pub(crate) kind: SourceKind,
     pub(crate) path: String,
-    /// Files read from this source (one, or each file of a folder).
-    pub(crate) files: usize,
     pub(crate) contexts: usize,
-    /// Files that could not be read or parsed, with the reason.
-    pub(crate) errors: Vec<FileError>,
+    /// Why the file could not be read or parsed.
+    pub(crate) error: Option<String>,
     pub(crate) missing: bool,
-}
-
-#[derive(Debug, Serialize)]
-pub(crate) struct FileError {
-    pub(crate) file: String,
-    pub(crate) reason: String,
 }
 
 #[derive(Debug, Serialize)]
@@ -94,8 +76,6 @@ pub(crate) struct ContextView {
     pub(crate) user: Option<String>,
     pub(crate) namespace: Option<String>,
     pub(crate) current: bool,
-    /// Other files define a context with the same name.
-    pub(crate) same_name_elsewhere: usize,
     pub(crate) auth: Auth,
 }
 
@@ -105,60 +85,11 @@ pub(crate) struct SourceRef<'a> {
     pub(crate) path: &'a Path,
 }
 
-fn files_of(kind: SourceKind, path: &Path) -> std::io::Result<Vec<PathBuf>> {
-    if kind != SourceKind::Folder {
-        return Ok(vec![path.to_path_buf()]);
-    }
-    let mut files = Vec::new();
-    for entry in std::fs::read_dir(path)? {
-        let entry = entry?;
-        let name = entry.file_name();
-        if name.to_string_lossy().starts_with('.') || !entry.file_type()?.is_file() {
-            continue;
-        }
-        files.push(entry.path());
-    }
-    files.sort();
-    Ok(files)
-}
-
-/// The file names to try for a command. On Windows a name without an extension is tried with each
-/// extension in `PATHEXT`.
-fn file_names(command: &str, pathext: Option<&str>) -> Vec<String> {
-    let Some(pathext) = pathext else {
-        return vec![command.to_owned()];
-    };
-    if Path::new(command).extension().is_some() {
-        return vec![command.to_owned()];
-    }
-    pathext
-        .split(';')
-        .filter(|ext| !ext.is_empty())
-        .map(|ext| format!("{command}{ext}"))
-        .collect()
-}
-
 /// Whether the exec plugin exists: an absolute path as it is, a name on the child environment's
-/// `PATH`, which is the `PATH` the plugin runs with.
+/// `PATH`, which is the `PATH` the plugin runs with (and `PATHEXT` on Windows).
 fn find_command(command: &str, env: &ChildEnv) -> bool {
-    let pathext = cfg!(windows).then(|| {
-        env.get(std::ffi::OsStr::new("PATHEXT")).map_or_else(
-            || ".COM;.EXE;.BAT;.CMD".to_owned(),
-            |v| v.to_string_lossy().into_owned(),
-        )
-    });
-    let names = file_names(command, pathext.as_deref());
-    if Path::new(command).is_absolute() {
-        return names.iter().any(|name| Path::new(name).is_file());
-    }
-    for dir in env.path_dirs() {
-        for name in &names {
-            if dir.join(name).is_file() {
-                return true;
-            }
-        }
-    }
-    false
+    let path = env.get(std::ffi::OsStr::new("PATH"));
+    which::which_in(command, path, std::env::current_dir().unwrap_or_default()).is_ok()
 }
 
 fn check_auth(info: &AuthInfo, env: &ChildEnv) -> Auth {
@@ -227,54 +158,24 @@ pub(crate) fn read_all(
             id: source.id.clone(),
             kind: source.kind,
             path: source.path.display().to_string(),
-            files: 0,
             contexts: 0,
-            errors: Vec::new(),
+            error: None,
             missing: !source.path.exists(),
         };
-        if view.missing {
-            views.push(view);
-            continue;
-        }
-        let files = match files_of(source.kind, source.path) {
-            Ok(files) => files,
-            Err(err) => {
-                view.errors.push(FileError {
-                    file: view.path.clone(),
-                    reason: err.to_string(),
-                });
-                views.push(view);
-                continue;
-            }
-        };
-        for file in files {
-            view.files += 1;
-            let config = match Kubeconfig::read_from(&file) {
-                Ok(config) => config,
-                Err(err) => {
-                    view.errors.push(FileError {
-                        file: file.display().to_string(),
-                        reason: err.to_string(),
-                    });
-                    continue;
+        if !view.missing {
+            match Kubeconfig::read_from(source.path) {
+                Ok(config) => {
+                    view.contexts = config.contexts.len();
+                    contexts.extend(
+                        config.contexts.iter().map(|named| {
+                            context_view(&source.id, source.path, &config, named, env)
+                        }),
+                    );
                 }
-            };
-            for named in &config.contexts {
-                view.contexts += 1;
-                contexts.push(context_view(&source.id, &file, &config, named, env));
+                Err(err) => view.error = Some(err.to_string()),
             }
         }
         views.push(view);
-    }
-
-    let mut counts: HashMap<String, usize> = HashMap::new();
-    for context in &contexts {
-        *counts.entry(context.name.clone()).or_default() += 1;
-    }
-    for context in &mut contexts {
-        context.same_name_elsewhere = counts
-            .get(&context.name)
-            .map_or(0, |count| count.saturating_sub(1));
     }
     (views, contexts)
 }
@@ -322,13 +223,14 @@ fn context_view(
         user: context.user.clone(),
         namespace: context.namespace.clone(),
         current: config.current_context.as_deref() == Some(named.name.as_str()),
-        same_name_elsewhere: 0,
         auth,
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::collections::HashMap;
+
     use kube::config::ExecConfig;
 
     use super::*;
@@ -380,27 +282,30 @@ mod tests {
         assert_eq!(fallback, vec![PathBuf::from("/home/a/.kube/config")]);
     }
 
-    #[test]
-    fn windows_names_without_an_extension_try_each_pathext_entry() {
-        assert_eq!(
-            file_names("aws", Some(".COM;.EXE;")),
-            ["aws.COM", "aws.EXE"]
-        );
-        assert_eq!(file_names("aws.cmd", Some(".COM;.EXE")), ["aws.cmd"]);
-        assert_eq!(file_names("aws", None), ["aws"]);
+    #[cfg(unix)]
+    fn write_plugin(dir: &Path, name: &str) {
+        use std::os::unix::fs::PermissionsExt;
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(name), "").unwrap();
+        std::fs::set_permissions(dir.join(name), std::fs::Permissions::from_mode(0o755)).unwrap();
+    }
+
+    #[cfg(not(unix))]
+    fn write_plugin(dir: &Path, name: &str) {
+        std::fs::create_dir_all(dir).unwrap();
+        std::fs::write(dir.join(name), "").unwrap();
     }
 
     #[test]
     fn a_plugin_is_found_on_the_child_path() {
         let dir =
             std::env::temp_dir().join(format!("zeabur-desktop-plugin-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
         let name = if cfg!(windows) {
             "kubelogin.EXE"
         } else {
             "kubelogin"
         };
-        std::fs::write(dir.join(name), "").unwrap();
+        write_plugin(&dir, name);
         let env = ChildEnv::merge(
             Vec::new(),
             &[(OsString::from("PATH"), dir.into_os_string())],
@@ -413,13 +318,12 @@ mod tests {
     fn a_plugin_is_found_on_the_path_the_entry_sets() {
         let dir =
             std::env::temp_dir().join(format!("zeabur-desktop-execenv-{}", std::process::id()));
-        std::fs::create_dir_all(&dir).unwrap();
         let name = if cfg!(windows) {
             "kubelogin.EXE"
         } else {
             "kubelogin"
         };
-        std::fs::write(dir.join(name), "").unwrap();
+        write_plugin(&dir, name);
         let exec = ExecConfig {
             command: Some("kubelogin".into()),
             env: Some(vec![HashMap::from([
@@ -473,7 +377,7 @@ mod tests {
     fn same_context_names_in_two_files_stay_apart() {
         let fixtures = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures");
         let home = fixtures.join("home/.kube/config");
-        let team = fixtures.join("team");
+        let aks = fixtures.join("team/aks.yaml");
         let sources = [
             SourceRef {
                 id: "default".into(),
@@ -481,16 +385,15 @@ mod tests {
                 path: &home,
             },
             SourceRef {
-                id: "team".into(),
-                kind: SourceKind::Folder,
-                path: &team,
+                id: "aks".into(),
+                kind: SourceKind::File,
+                path: &aks,
             },
         ];
         let (views, contexts) = read_all(&sources, &ChildEnv::default());
-        assert_eq!(views[1].files, 3);
+        assert!(views.iter().all(|view| view.error.is_none()));
         let staging: Vec<_> = contexts.iter().filter(|c| c.name == "staging").collect();
         assert!(staging.iter().any(|c| c.file.ends_with("config")));
         assert!(staging.iter().any(|c| c.file.ends_with("aks.yaml")));
-        assert!(staging.iter().all(|c| c.same_name_elsewhere == 1));
     }
 }

@@ -4,32 +4,29 @@ import { useMemo, useState } from "react"
 import { useI18n } from "@/i18n"
 
 import type { Context, Snapshot } from "./api"
-import { DropOverlay, FirstRun, type AddActions } from "./chrome"
+import { FirstRun } from "./chrome"
 import { ContextPane, type RowActions } from "./contexts"
-import { useChanges, useDropTarget, useSnapshot } from "./hooks"
+import { useChanges, useSnapshot } from "./hooks"
 import { useMenuBar } from "./menu"
-import { recentContexts, sourceFilter, visibleContexts } from "./model"
-import { PasteDialog, type Paste } from "./paste-dialog"
+import { sourceFilter, visibleContexts } from "./model"
 import { Sidebar } from "./sources"
 
 interface BrowserProps {
   snap: Snapshot
-  reach: ReturnType<typeof useSnapshot>["reach"]
   query: string
   setQuery: (query: string) => void
   only: string | null
   setOnly: (id: string | null) => void
-  add: AddActions
+  addFiles: () => void
 }
 
-function Browser({ snap, reach, query, setQuery, only: chosen, setOnly, add }: BrowserProps) {
+function Browser({ snap, query, setQuery, only: chosen, setOnly, addFiles }: BrowserProps) {
   const { locale } = useI18n()
   const only = sourceFilter(snap, chosen)
   const visible = useMemo(() => visibleContexts(snap, query, only), [snap, query, only])
   const changes = useChanges()
   const rows: RowActions = {
     open: (c: Context) => changes.open.mutate({ key: c.key, name: c.name, lang: locale }),
-    toggleFavourite: (c: Context) => changes.toggleFavourite.mutate(c.key),
   }
   return (
     <>
@@ -39,13 +36,10 @@ function Browser({ snap, reach, query, setQuery, only: chosen, setOnly, add }: B
         only={only}
         setOnly={setOnly}
         removeSource={(id) => changes.removeSource.mutate(id)}
-        add={add}
+        addFiles={addFiles}
       />
       <ContextPane
         visible={visible}
-        recents={recentContexts(snap, query, only)}
-        favourites={new Set(snap.favourites)}
-        reach={reach}
         shell={snap.shell}
         actions={rows}
         query={query}
@@ -56,44 +50,34 @@ function Browser({ snap, reach, query, setQuery, only: chosen, setOnly, add }: B
 }
 
 export function App() {
-  const { snap, reach } = useSnapshot()
+  const snap = useSnapshot()
   const { addPaths } = useChanges()
   const [query, setQuery] = useState("")
   const [only, setOnly] = useState<string | null>(null)
-  const [paste, setPaste] = useState<Paste | null>(null)
-  const { dropping } = useDropTarget()
   useMenuBar()
 
   if (!snap) return null
 
-  const add: AddActions = {
-    addFiles: (directory) => void addFiles(directory),
-    newPaste: () => setPaste({ name: "", yaml: "", error: null }),
-  }
-
-  async function addFiles(directory: boolean) {
-    const picked = await pick({ multiple: !directory, directory })
+  async function addFiles() {
+    const picked = await pick({ multiple: true })
     if (!picked) return
-    addPaths.mutate(Array.isArray(picked) ? picked : [picked])
+    addPaths.mutate(picked)
   }
-
-  const browser = (
-    <Browser
-      snap={snap}
-      reach={reach}
-      query={query}
-      setQuery={setQuery}
-      only={only}
-      setOnly={setOnly}
-      add={add}
-    />
-  )
 
   return (
     <div data-titlebar-inset className="flex h-dvh bg-surface-page text-main select-none">
-      {snap.sources.length === 0 ? <FirstRun actions={add} /> : browser}
-      <PasteDialog paste={paste} setPaste={setPaste} />
-      <DropOverlay dropping={dropping} />
+      {snap.sources.length === 0 ? (
+        <FirstRun addFiles={() => void addFiles()} />
+      ) : (
+        <Browser
+          snap={snap}
+          query={query}
+          setQuery={setQuery}
+          only={only}
+          setOnly={setOnly}
+          addFiles={() => void addFiles()}
+        />
+      )}
     </div>
   )
 }

@@ -1,11 +1,10 @@
-//! How the windows look and behave as a desktop app: the macOS title bar, window sizes that are
-//! kept between launches, zoom, and what happens when the last window closes.
+//! How the windows look and behave as a desktop app: the macOS title bar, window size and place,
+//! zoom, and what happens when the last window closes.
 
 #[cfg(any(target_os = "macos", target_os = "linux"))]
 use std::sync::PoisonError;
 
 use tauri::{AppHandle, Manager, RunEvent, WebviewUrl, WebviewWindowBuilder, Wry};
-use tauri_plugin_window_state::StateFlags;
 
 /// The label of the cluster chooser window.
 pub(crate) const CHOOSER: &str = "main";
@@ -277,9 +276,8 @@ pub(crate) fn show_chooser(app: &AppHandle) -> tauri::Result<()> {
     Ok(())
 }
 
-/// Size, title bar and starting place of a cluster window. A window seen before gets its saved
-/// place back from the window-state plugin; a new one is set a little below and right of the
-/// last, so it does not hide it.
+/// Size, title bar and starting place of a cluster window: a little below and right of the last
+/// one, so it does not hide it.
 pub(crate) fn cluster_window<'a>(
     app: &AppHandle,
     builder: WebviewWindowBuilder<'a, Wry, AppHandle>,
@@ -299,14 +297,6 @@ pub(crate) fn cluster_window<'a>(
         builder = builder.inner_size(size.0, size.1).position(x, y);
     }
     zoom_keys(title_bar(builder))
-}
-
-/// Keeps each window's size, place and maximized state between launches, under its label: `main`
-/// for the chooser and `cluster-<hash>` for each context.
-pub(crate) fn window_state() -> tauri::plugin::TauriPlugin<Wry> {
-    tauri_plugin_window_state::Builder::new()
-        .with_state_flags(StateFlags::SIZE | StateFlags::POSITION | StateFlags::MAXIMIZED)
-        .build()
 }
 
 /// On macOS the app stays open with no windows, like other Mac apps, and a click on the Dock icon

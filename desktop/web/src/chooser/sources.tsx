@@ -1,22 +1,19 @@
 import { Button } from "@zeabur-oss/design-system/components/button"
-import ClipboardIcon from "~icons/ph/clipboard-text"
 import FileIcon from "~icons/ph/file-text"
-import FolderIcon from "~icons/ph/folder"
 import HouseIcon from "~icons/ph/house"
+import PlusIcon from "~icons/ph/plus"
 import XIcon from "~icons/ph/x"
 
 import { useI18n } from "@/i18n"
 
 import type { Source, SourceKind } from "./api"
-import { AddMenu, LanguageSelect, type AddActions } from "./chrome"
+import { LanguageSelect } from "./chrome"
 import { baseName, sourceKindKeys } from "./model"
 
 const iconClass = "size-3.5 shrink-0"
 
 const sourceIcons: Record<SourceKind, () => React.ReactElement> = {
   default: () => <HouseIcon className={iconClass} aria-hidden="true" />,
-  folder: () => <FolderIcon className={iconClass} aria-hidden="true" />,
-  pasted: () => <ClipboardIcon className={iconClass} aria-hidden="true" />,
   file: () => <FileIcon className={iconClass} aria-hidden="true" />,
 }
 
@@ -24,15 +21,14 @@ const rowBase = "flex items-center gap-2 rounded-md px-2 py-1.5 text-left type-b
 
 function SourceNotes({ source }: { source: Source }) {
   const { t } = useI18n()
-  const failed = source.errors.map((e) => `${e.file}: ${e.reason}`).join("\n")
   return (
     <>
       {source.missing ? (
         <span className="block type-meta text-fail-strong">{t("desktop.sourceMissing")}</span>
       ) : null}
-      {source.errors.length > 0 ? (
-        <span className="block type-meta text-warn-strong" title={failed}>
-          {t("desktop.sourceErrors", source.errors.length)}
+      {source.error ? (
+        <span className="block type-meta text-warn-strong" title={source.error}>
+          {t("desktop.sourceError")}
         </span>
       ) : null}
     </>
@@ -91,10 +87,10 @@ interface Props {
   only: string | null
   setOnly: (id: string | null) => void
   removeSource: (id: string) => void
-  add: AddActions
+  addFiles: () => void
 }
 
-export function Sidebar({ sources, total, only, setOnly, removeSource, add }: Props) {
+export function Sidebar({ sources, total, only, setOnly, removeSource, addFiles }: Props) {
   const { t } = useI18n()
   const allTone =
     only === null ? "bg-v2-surface-active text-main" : "text-secondary hover:bg-v2-surface-hover"
@@ -117,7 +113,10 @@ export function Sidebar({ sources, total, only, setOnly, removeSource, add }: Pr
         ))}
       </nav>
       <div className="px-2">
-        <AddMenu actions={add} />
+        <Button variant="secondary" size="sm" className="w-full" onClick={addFiles}>
+          <PlusIcon aria-hidden="true" />
+          {t("desktop.addSource")}
+        </Button>
       </div>
       <div className="mt-auto px-2">
         <LanguageSelect />

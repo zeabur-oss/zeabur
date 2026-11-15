@@ -11,9 +11,7 @@ mod env;
 mod keys;
 mod menu;
 mod output;
-mod probe;
 mod sources;
-mod store;
 #[cfg(target_os = "macos")]
 #[cfg(windows)]
 mod win32;
@@ -25,7 +23,7 @@ use std::sync::{Mutex, PoisonError, RwLock};
 
 use env::{ChildEnv, ShellRead};
 use serde::{Deserialize, Serialize};
-use sources::{AddedSource, ContextView, SourceKind, SourceRef, SourceView};
+use sources::{ContextView, SourceKind, SourceRef, SourceView};
 use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 
 /// What the app remembers between launches, in `settings.json`. Kubeconfig files are read in
@@ -33,17 +31,14 @@ use tauri::{Emitter, Manager, State, WebviewUrl, WebviewWindowBuilder};
 #[derive(Debug, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase", default)]
 struct Saved {
-    added: Vec<AddedSource>,
+    /// Files the person added.
+    added: Vec<PathBuf>,
     /// Default paths the person removed from the list.
     hidden_defaults: Vec<PathBuf>,
-    favourites: Vec<String>,
-    /// Most recent first, at most 5.
-    recents: Vec<String>,
 }
 
 struct App {
     config_dir: PathBuf,
-    kubeconfigs_dir: PathBuf,
     saved: Mutex<Saved>,
     /// The app's own environment until the login shell's has been read, then the merged one.
     env: RwLock<ChildEnv>,
@@ -71,8 +66,6 @@ impl App {
 struct Snapshot {
     sources: Vec<SourceView>,
     contexts: Vec<ContextView>,
-    favourites: Vec<String>,
-    recents: Vec<String>,
     shell: ShellRead,
 }
 
@@ -92,11 +85,11 @@ fn source_list(saved: &Saved, env: &ChildEnv) -> Vec<(String, SourceKind, PathBu
                 )
             }),
     );
-    list.extend(saved.added.iter().map(|added| {
+    list.extend(saved.added.iter().map(|path| {
         (
-            format!("added:{}", added.path.display()),
-            added.kind,
-            added.path.clone(),
+            format!("added:{}", path.display()),
+            SourceKind::File,
+            path.clone(),
         )
     }));
     list
@@ -117,14 +110,10 @@ fn read_snapshot(app: &App) -> Snapshot {
         .read()
         .unwrap_or_else(PoisonError::into_inner)
         .clone();
-    let (list, favourites, recents) = {
-        let saved = app.saved.lock().unwrap_or_else(PoisonError::into_inner);
-        (
-            source_list(&saved, &env),
-            saved.favourites.clone(),
-            saved.recents.clone(),
-        )
-    };
+    let list = source_list(
+        &app.saved.lock().unwrap_or_else(PoisonError::into_inner),
+        &env,
+    );
     let refs: Vec<_> = list
         .iter()
         .map(|(id, kind, path)| SourceRef {
@@ -137,8 +126,6 @@ fn read_snapshot(app: &App) -> Snapshot {
     Snapshot {
         sources,
         contexts,
-        favourites,
-        recents,
         shell: app
             .shell
             .lock()
@@ -147,7 +134,7 @@ fn read_snapshot(app: &App) -> Snapshot {
     }
 }
 
-/// Adds files and folders from the file picker or a drop.
+/// Adds kubeconfig files from the file picker.
 #[tauri::command]
 #[expect(
     clippy::needless_pass_by_value,
@@ -156,51 +143,11 @@ fn read_snapshot(app: &App) -> Snapshot {
 fn add_paths(app: State<'_, App>, paths: Vec<PathBuf>) -> Result<(), String> {
     app.update(|saved| {
         for path in paths {
-            let kind = if path.is_dir() {
-                SourceKind::Folder
-            } else {
-                SourceKind::File
-            };
             saved.hidden_defaults.retain(|p| p != &path);
-            if !saved.added.iter().any(|a| a.path == path) {
-                saved.added.push(AddedSource { kind, path });
+            if !saved.added.contains(&path) {
+                saved.added.push(path);
             }
         }
-    })
-}
-
-/// Checks pasted YAML, then keeps a copy in the app's `kubeconfigs` folder.
-#[tauri::command]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Tauri passes a command's arguments by value"
-)]
-fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), String> {
-    let config = kube::config::Kubeconfig::from_yaml(&yaml).map_err(|e| e.to_string())?;
-    if config.contexts.is_empty() {
-        return Err("no-contexts".into());
-    }
-    let mut slug: String = name
-        .trim()
-        .chars()
-        .map(|c| {
-            if c.is_alphanumeric() || c == '-' {
-                c
-            } else {
-                '-'
-            }
-        })
-        .collect();
-    if slug.is_empty() {
-        slug.push_str("pasted");
-    }
-    let path = store::write_new_private(&app.kubeconfigs_dir, &slug, yaml.as_bytes())
-        .map_err(|e| e.to_string())?;
-    app.update(|saved| {
-        saved.added.push(AddedSource {
-            kind: SourceKind::Pasted,
-            path,
-        });
     })
 }
 
@@ -210,68 +157,14 @@ fn add_pasted(app: State<'_, App>, name: String, yaml: String) -> Result<(), Str
     reason = "Tauri passes a command's arguments by value"
 )]
 fn remove_source(app: State<'_, App>, id: String) -> Result<(), String> {
-    let mut pasted = None;
     app.update(|saved| {
         if let Some(path) = id.strip_prefix("default:") {
             saved.hidden_defaults.push(PathBuf::from(path));
         } else if let Some(path) = id.strip_prefix("added:") {
             let path = PathBuf::from(path);
-            if let Some(index) = saved.added.iter().position(|a| a.path == path) {
-                let removed = saved.added.remove(index);
-                if removed.kind == SourceKind::Pasted {
-                    pasted = Some(removed.path);
-                }
-            }
-        }
-    })?;
-    if let Some(path) = pasted
-        && let Err(err) = std::fs::remove_file(&path)
-    {
-        output::warn(&format!("cannot remove {}: {err}", path.display()));
-    }
-    Ok(())
-}
-
-#[tauri::command]
-#[expect(
-    clippy::needless_pass_by_value,
-    reason = "Tauri passes a command's arguments by value"
-)]
-fn toggle_favourite(app: State<'_, App>, key: String) -> Result<(), String> {
-    app.update(|saved| {
-        if let Some(index) = saved.favourites.iter().position(|k| k == &key) {
-            saved.favourites.remove(index);
-        } else {
-            saved.favourites.push(key);
+            saved.added.retain(|added| added != &path);
         }
     })
-}
-
-#[derive(Serialize)]
-struct ProbeResult {
-    key: String,
-    reach: probe::Reach,
-}
-
-/// Probes every server at once on the blocking thread pool, so the async workers stay free.
-#[tauri::command]
-async fn probe(targets: Vec<(String, Option<String>)>) -> Vec<ProbeResult> {
-    let tasks: Vec<_> = targets
-        .into_iter()
-        .map(|(key, server)| {
-            tauri::async_runtime::spawn_blocking(move || ProbeResult {
-                reach: probe::probe(server.as_deref()),
-                key,
-            })
-        })
-        .collect();
-    let mut results = Vec::new();
-    for task in tasks {
-        if let Ok(result) = task.await {
-            results.push(result);
-        }
-    }
-    results
 }
 
 /// Opens a window for one context. The window starts the context's local service from
@@ -294,11 +187,6 @@ async fn open_cluster(
         .into_iter()
         .find(|c| c.key == key)
         .ok_or_else(|| format!("{name} is no longer in the kubeconfig"))?;
-    app.update(|saved| {
-        saved.recents.retain(|k| *k != key);
-        saved.recents.insert(0, key.clone());
-        saved.recents.truncate(5);
-    })?;
     let mut page = "tauri://localhost/cluster.html"
         .parse::<tauri::Url>()
         .map_err(|e| e.to_string())?;
@@ -392,23 +280,19 @@ fn main() -> ExitCode {
             output::warn(&format!("cannot open the chooser: {err}"));
         }
     }));
-    let builder = builder
-        .plugin(tauri_plugin_dialog::init())
-        .plugin(chrome::window_state());
+    let builder = builder.plugin(tauri_plugin_dialog::init());
     #[cfg(target_os = "macos")]
     let builder = builder.on_menu_event(menu::on_menu_event);
     let app = builder
         .setup(|tauri_app| {
             let paths = tauri_app.path();
             let config_dir = paths.app_config_dir()?;
-            let kubeconfigs_dir = paths.app_local_data_dir()?.join("kubeconfigs");
             let saved = std::fs::read(config_dir.join("settings.json"))
                 .ok()
                 .and_then(|bytes| serde_json::from_slice(&bytes).ok())
                 .unwrap_or_default();
             tauri_app.manage(App {
                 config_dir,
-                kubeconfigs_dir,
                 saved: Mutex::new(saved),
                 env: RwLock::new(ChildEnv::from_process()),
                 shell: Mutex::new(ShellRead::Pending),
@@ -436,10 +320,7 @@ fn main() -> ExitCode {
         .invoke_handler(tauri::generate_handler![
             snapshot,
             add_paths,
-            add_pasted,
             remove_source,
-            toggle_favourite,
-            probe,
             open_cluster,
             start_cluster,
             back_to_chooser,

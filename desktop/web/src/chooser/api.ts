@@ -1,14 +1,13 @@
 import { invoke } from "@tauri-apps/api/core"
 
-export type SourceKind = "default" | "file" | "folder" | "pasted"
+export type SourceKind = "default" | "file"
 
 export interface Source {
   id: string
   kind: SourceKind
   path: string
-  files: number
   contexts: number
-  errors: { file: string; reason: string }[]
+  error: string | null
   missing: boolean
 }
 
@@ -28,16 +27,8 @@ export interface Context {
   user: string | null
   namespace: string | null
   current: boolean
-  sameNameElsewhere: number
   auth: Auth
 }
-
-export type Reach =
-  | { state: "reachable"; millis: number }
-  | { state: "noAddress" }
-  | { state: "unresolved"; host: string }
-  | { state: "refused" }
-  | { state: "timedOut" }
 
 export type ShellRead =
   | { state: "pending" }
@@ -48,19 +39,13 @@ export type ShellRead =
 export interface Snapshot {
   sources: Source[]
   contexts: Context[]
-  favourites: string[]
-  recents: string[]
   shell: ShellRead
 }
 
 export const api = {
   snapshot: () => invoke<Snapshot>("snapshot"),
   addPaths: (paths: string[]) => invoke<void>("add_paths", { paths }),
-  addPasted: (name: string, yaml: string) => invoke<void>("add_pasted", { name, yaml }),
   removeSource: (id: string) => invoke<void>("remove_source", { id }),
-  toggleFavourite: (key: string) => invoke<void>("toggle_favourite", { key }),
-  probe: (targets: [string, string | null][]) =>
-    invoke<{ key: string; reach: Reach }[]>("probe", { targets }),
   open: (key: string, name: string, lang: string) =>
     invoke<void>("open_cluster", { key, name, lang }),
 }
