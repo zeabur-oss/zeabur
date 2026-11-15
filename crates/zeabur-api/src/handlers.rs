@@ -123,13 +123,11 @@ pub(crate) fn catch_panic() -> CatchPanicLayer<fn(Box<dyn Any + Send>) -> Respon
     reason = "the signature CatchPanicLayer calls"
 )]
 fn panicked(payload: Box<dyn Any + Send>) -> Response {
-    let message = if let Some(text) = payload.downcast_ref::<&str>() {
-        text
-    } else if let Some(text) = payload.downcast_ref::<String>() {
-        text.as_str()
-    } else {
-        "(not text)"
-    };
+    let message = payload
+        .downcast_ref::<&str>()
+        .copied()
+        .or_else(|| payload.downcast_ref::<String>().map(String::as_str))
+        .unwrap_or("(not text)");
     tracing::error!(panic = message, "a request handler panicked");
     ApiError::from(Problem::new(
         Kind::Internal,
