@@ -21,7 +21,6 @@ use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomRe
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, Status};
 use k8s_openapi::kube_aggregator::pkg::apis::apiregistration::v1::APIService;
 use kube::api::{Api, AttachParams, DynamicObject, ListParams, LogParams, PostParams};
-use kube::client::UpgradeConnectionError;
 use kube::core::{ApiResource, GroupVersionKind};
 use serde::de::DeserializeOwned;
 use zeabur_core::problem::{Denied, FieldCause, KubernetesStatus, StatusDetails};
@@ -78,9 +77,6 @@ impl From<kube::Error> for ClusterError {
                 ..KubernetesStatus::new(status.code, status.reason.clone(), status.message.clone())
             }),
             kube::Error::SerdeError(e) => Self::Decode(e.to_string()),
-            kube::Error::UpgradeConnection(UpgradeConnectionError::ProtocolSwitch(code)) => {
-                refused_upgrade(code)
-            }
             other => Self::Transport(other.to_string()),
         }
     }
@@ -188,21 +184,6 @@ pub(crate) fn exit_status(status: Option<Status>) -> ExitStatus {
     } else {
         ExitStatus::Failed(message)
     }
-}
-
-/// kube-rs reports a refused exec upgrade with the HTTP status only (the `Status` body is not
-/// read), so this is the closest answer: the code, and its reason phrase as the reason.
-fn refused_upgrade(code: http::StatusCode) -> ClusterError {
-    let reason: String = code
-        .canonical_reason()
-        .unwrap_or_default()
-        .split_whitespace()
-        .collect();
-    ClusterError::Status(KubernetesStatus::new(
-        code.as_u16(),
-        reason,
-        format!("kube-apiserver refused to open the stream ({code})"),
-    ))
 }
 
 fn dynamic(group: &str, version: &str, kind: &str, plural: &str) -> ApiResource {
@@ -1072,17 +1053,6 @@ mod tests {
         }));
         assert_eq!(other, ExitStatus::Failed("container is paused".to_owned()));
         assert!(matches!(exit_status(None), ExitStatus::Failed(_)));
-    }
-
-    #[test]
-    fn a_refused_exec_upgrade_keeps_its_code() {
-        let error = kube::Error::UpgradeConnection(UpgradeConnectionError::ProtocolSwitch(
-            http::StatusCode::FORBIDDEN,
-        ));
-        let ClusterError::Status(status) = ClusterError::from(error) else {
-            panic!("not a status");
-        };
-        assert_eq!((status.code, status.reason.as_str()), (403, "Forbidden"));
     }
 
     #[test]
