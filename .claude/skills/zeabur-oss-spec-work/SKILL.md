@@ -3,7 +3,7 @@ name: zeabur-oss-spec-work
 description: Implement or change a security- or protocol-relevant behaviour in any zeabur-oss repository (Kubernetes API semantics, server-side apply, RBAC, admission, OAuth and OpenID Connect, WebAuthn, HTTP caching) from the specification text, with citations in rustdoc, fail-closed handling and adversarial tests. Use for any such feature or fix.
 ---
 
-<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-spec-work/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+<!-- Edit this in zeabur-oss/.github (skills/zeabur-oss-spec-work/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # Zeabur OSS specification-driven work
 

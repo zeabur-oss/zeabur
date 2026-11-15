@@ -3,7 +3,7 @@ name: zeabur-oss-dependencies
 description: The supply-chain policy every zeabur-oss repository shares for Rust crates and Bun packages — OSI licences, aws-lc-rs as the only crypto backend, a seven-day publish age, unsafe and native-code review, no install scripts, committed lock files, the design system from npm, fallow through bunx. Use whenever Cargo.toml, Cargo.lock, deny.toml, a package.json, a bun.lock, bunfig.toml or flake.nix changes in any zeabur-oss repository.
 ---
 
-<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-dependencies/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+<!-- Edit this in zeabur-oss/.github (skills/zeabur-oss-dependencies/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # Zeabur OSS dependencies
 
@@ -32,8 +32,9 @@ its frontend directory and its exceptions. Run every command inside `nix develop
   the lock file (`registry.global-min-publish-age` in `.cargo/config.toml`). For an urgent
   security fix, override it for one command:
   `CARGO_REGISTRY_GLOBAL_MIN_PUBLISH_AGE="0 days" cargo update -p <crate>`.
-- **Unsafe and native code.** Run the unsafe report (`./scripts/unsafe-report.sh`, or
-  `zeabur-oss-unsafe-report <package>…` from the `zeabur-oss/.github` flake). Every shipped crate
+- **Unsafe and native code.** Run the unsafe report from the Cargo workspace:
+  `zeabur-oss-unsafe-report <package>…`, the bin of `@zeabur-oss/release` (a Git dependency on
+  `zeabur-oss/.github` in `package.json`), with the packages whose binaries ship. Every shipped crate
   that contains `unsafe` or builds native code needs an entry in
   `supply-chain/unsafe-allowlist.toml`: `kind`, a concrete `reason` (where the unsafe is,
   whether it runs only at build time), and `approved = "pending"` until a maintainer reviews it

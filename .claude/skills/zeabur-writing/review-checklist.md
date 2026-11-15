@@ -1,11 +1,11 @@
-<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/review-checklist.md); the weekly skills sync overwrites the copy in other repositories. -->
+<!-- Edit this in zeabur-oss/.github (skills/zeabur-writing/review-checklist.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # Review checklist
 
 Work through every item for every changed string or paragraph. The review is done when each item holds; a clean Vale run alone is not the review.
 
 1. **Vale.** `vale <changed files>` reports no errors. Each warning is fixed, or you read the sentence and the rule does not fit it. A silenced rule has a comment saying why.
-2. **Repo checks.** The repo's own wording checks pass (zeabur: `nix develop .#zh -c ./scripts/check-zh-tw.sh`). Take a suggestion only when it fits the technical meaning.
+2. **Repo checks.** The repo's own wording checks pass (`scripts/check-zh-tw.sh` of this skill; zeabur runs it as `nix develop .#zh -c`). Take a suggestion only when it fits the technical meaning.
 3. **Alone.** Each Chinese string makes sense without the English next to it. Each label is a word or phrase a person would say.
 4. **Aloud.** Read each Chinese sentence aloud. No clause ends on a clipped one-syllable verb; no 它 where the subject has not changed; no condition or *until* clause after the result.
 5. **As sure as the facts.** Outcomes say how likely they are (不一定能、通常); 不保證 only for a commitment the project does not make. Every warning changes what the reader does.

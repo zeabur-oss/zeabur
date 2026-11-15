@@ -3,13 +3,13 @@ name: zeabur-writing
 description: Write or review text people read in any zeabur-oss repo, in English, zh-TW or zh-CN. Use for docs (.md/.mdx), landing and product page copy, interface strings and i18n catalogues, translations between the three languages, READMEs, CLI output, error messages, and PR or issue text. Includes a Vale style that checks punctuation, spacing, cross-strait terms and wording tells.
 ---
 
-<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
+<!-- Edit this in zeabur-oss/.github (skills/zeabur-writing/SKILL.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # Zeabur writing
 
 Text should read like a careful person wrote it in that language: plain words, the reader's task first, natural rhythm. Translation-ese (歐化), filler and defensive hedging are the failures to fix.
 
-Each repo keeps its own term list (zeabur: `docs/internal/wording.md`). Read it before writing; a term listed there beats anything here. [`localization.md`](localization.md) gives the lookup order for the rest and the sources behind these rules.
+Each repo keeps its own term list (zeabur: `docs/internal/wording.md`). Read it before writing; a term listed there beats anything here. [`wording.md`](wording.md) is a copy of Zeabur's list for text shown in the Zeabur interface or docs; a repo whose text is not about Zeabur's screens does not take its terms from it. [`localization.md`](localization.md) gives the lookup order for the rest and the sources behind these rules.
 
 ## Order of work
 
@@ -21,7 +21,7 @@ Each repo keeps its own term list (zeabur: `docs/internal/wording.md`). Read it 
    - Landing, product and release pages: also [`landing-copy.md`](landing-copy.md)
 3. **Write every other locale as its own text.** Each one reads naturally on its own, as if it had been written first. zh-TW and zh-CN each use their own terms; neither is a character conversion of the other. English is natural US English, and Chinese keeps Chinese word order. All three state the same facts, limits and conditions, and change together in the same pull request. Done when each string makes sense read alone, without the other languages beside it.
 4. **Sweep for AI tells** with [`ai-tells.md`](ai-tells.md). Code comments and visuals follow the `no-ai-flavour` skill; a blog post, launch note or technical article also follows `story-writing`.
-5. **Check** with Vale (below) and the repo's own checks (zeabur: `scripts/check-zh-tw.sh`), then review with [`review-checklist.md`](review-checklist.md). Done when Vale reports no errors, each warning is fixed or judged wrong for that sentence, and every item of the checklist holds.
+5. **Check** with Vale (below) and for zh-TW the vocabulary check [`scripts/check-zh-tw.sh`](scripts/check-zh-tw.sh) (needs `zhtw-mcp`; reads the repo's `.zhtw-mcp.toml` when it has one), then review with [`review-checklist.md`](review-checklist.md). Done when Vale reports no errors, each warning is fixed or judged wrong for that sentence, and every item of the checklist holds.
 6. **Have a model from another vendor read it.** Interface strings, CLI output, error messages, docs, changesets and pull request text get a second read by a model from a different vendor than the one that wrote them. Give it the text, where the reader sees it, and this skill's references for that language; ask for problems with the sentence, not a rewrite. Fix each finding that holds. Done when a fresh pass finds nothing that holds.
 
 When revising someone's text, change the fewest sentences that fix a real problem and report each change as before → after.

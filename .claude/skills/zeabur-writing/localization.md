@@ -1,4 +1,4 @@
-<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/localization.md); the weekly skills sync overwrites the copy in other repositories. -->
+<!-- Edit this in zeabur-oss/.github (skills/zeabur-writing/localization.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # Localization practice
 
@@ -11,7 +11,7 @@ Where the terms and rules in this skill come from, and which source wins when th
 
 Take the first source that has it:
 
-1. **The repo's own glossary** (zeabur: `docs/internal/wording.md`).
+1. **The repo's own glossary** (zeabur: `docs/internal/wording.md`), then, for text about Zeabur's screens, [`wording.md`](wording.md).
 2. **The platform's own localized term**, for an operating system or browser feature. Use the word the reader sees in the system dialog, not a translation of the English. A passkey is 通行密鑰 on Apple zh-TW and 通行密钥 on zh-CN; iCloud Keychain is iCloud 鑰匙圈 and iCloud 钥匙串 (Apple Support, "About the security of passkeys": https://support.apple.com/zh-tw/102195, https://support.apple.com/zh-cn/102195).
 3. **Microsoft Terminology**, for general software terms, searchable or as a .tbx download: https://learn.microsoft.com/en-us/globalization/reference/microsoft-terminology
 4. **The generic table** in [`zh.md`](zh.md), "Common terms".
