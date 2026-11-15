@@ -12,7 +12,8 @@ followSystemTheme()
 const root = document.getElementById("root")
 // A non-English catalogue loads before the first render, so it never flashes English.
 if (root) {
-  void prepareI18n().then(() =>
+  void prepareI18n().then((catalogue) => {
+    document.documentElement.lang = catalogue.locale
     createRoot(root).render(
       <StrictMode>
         <I18nProvider>
@@ -21,6 +22,6 @@ if (root) {
           </TooltipProvider>
         </I18nProvider>
       </StrictMode>,
-    ),
-  )
+    )
+  })
 }

@@ -17,7 +17,7 @@ Level 0: depends on no other workspace crate.
 
 - `kernel`: the names Zeabur and Kubernetes must agree on (label keys under `zeabur.com/`, the
   field manager `zeabur`, and `Conventions`, which lets another tool use its own), Kubernetes
-  quantities, the subset of JSON Patch Zeabur sends, the SHA-256 that derives short names, and
+  quantities, the SHA-256 that derives short names, and
   the shared value types: `Message`, `Origin`, `Tool`, `DataStore`, `Denied`. The
   `NetworkPolicy` of a new project namespace (`isolation`). Nothing here performs I/O or holds a
   key.

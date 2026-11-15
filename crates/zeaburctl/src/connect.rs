@@ -1,9 +1,9 @@
-//! `zeaburctl connect`: forwards a port on this computer to a database of a project, and prints
-//! a connection URI on `127.0.0.1`.
+//! `zeaburctl connect`: forwards a port on this computer to a database or a service of a
+//! project. For a database it prints a connection URI on `127.0.0.1`, for a service the address.
 //!
-//! The database is read as in the web interface, with the API in this process ([`InProcess`]).
-//! The forward goes through kube-apiserver with the kubeconfig's own rights ([`forward`]). The
-//! password comes from the database's Secret when the kubeconfig may read it.
+//! The database or service is read as in the web interface, with the API in this process
+//! ([`InProcess`]). The forward goes through kube-apiserver with the kubeconfig's own rights
+//! ([`forward`]). A database's password comes from its Secret when the kubeconfig may read it.
 
 use std::collections::BTreeMap;
 use std::process::ExitCode;
@@ -21,8 +21,9 @@ use crate::output;
 /// Options of `zeaburctl connect`.
 #[derive(Debug, clap::Args)]
 pub(crate) struct ConnectArgs {
-    /// The database, as `<project>/<database>`.
-    database: String,
+    /// The database or service, as `<project>/<name>`; `<project>/<name>:<port>` picks one of a
+    /// service's ports.
+    target: String,
     /// The port to listen on, on 127.0.0.1. Default: a free port.
     #[arg(long, default_value_t = 0)]
     port: u16,
@@ -36,6 +37,35 @@ pub(crate) struct ConnectArgs {
 struct ProjectDatabases {
     items: Vec<Database>,
     unreadable: Vec<Unreadable>,
+}
+
+/// The part of `getProject` this command reads.
+#[derive(Debug, Deserialize)]
+struct ProjectDocument {
+    services: Vec<Service>,
+    endpoints: Vec<Endpoint>,
+    unreadable: Vec<Unreadable>,
+}
+
+#[derive(Debug, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Service {
+    name: String,
+    endpoint_names: Vec<String>,
+}
+
+/// A Kubernetes Service.
+#[derive(Debug, Deserialize)]
+struct Endpoint {
+    name: String,
+    ports: Vec<EndpointPort>,
+}
+
+#[derive(Debug, Deserialize)]
+struct EndpointPort {
+    port: i32,
+    /// The transport, `TCP` or `UDP`: the forwarder opens a TCP listener only.
+    protocol: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -116,34 +146,22 @@ pub(crate) fn run(args: &ConnectArgs) -> ExitCode {
 }
 
 async fn connect(args: &ConnectArgs) -> Result<(), String> {
-    let Some((project, name)) = args
-        .database
-        .split_once('/')
-        .filter(|(p, n)| !p.is_empty() && !n.is_empty())
-    else {
-        return Err(format!(
-            "Name the database as <project>/<database>, not {}.",
-            args.database
-        ));
-    };
+    let (project, name, port) = parse(&args.target)?;
     let client = UserClient::from_kubeconfig(args.context.as_deref())
         .await
         .map_err(|e| e.to_string())?;
     let api = InProcess::with_client(client.clone(), zeabur_api::Settings::default());
-    let listed: ProjectDatabases = read(
-        api.get(&format!("/api/v1/projects/{project}/databases"))
-            .await,
-    )?;
-    let database = find(listed, project, name)?;
-    let connection = &database.connection;
-    let service = ServiceAddress::parse(&format!("{}:{}", connection.host, connection.port))
-        .ok_or_else(|| {
-            format!(
-                "{name} has no Service in the cluster to forward to ({}).",
-                connection.host
-            )
-        })?;
+    let (database, service) = target(&api, project, name, port).await?;
     let local = forward::start(client.kube().clone(), &service, args.port).await?;
+    let Some(database) = database else {
+        output::info(&format!(
+            "Forwarding 127.0.0.1:{local} to {name}:{} in {project}. Press Ctrl-C to stop.",
+            service.port
+        ));
+        output::report(&format!("127.0.0.1:{local}\n"));
+        return wait().await;
+    };
+    let connection = &database.connection;
     let secret = &connection.secret;
     // A Dragonfly without `passwordFromSecret` names no Secret: it takes no password.
     let sign_in = if secret.is_empty() {
@@ -182,9 +200,61 @@ async fn connect(args: &ConnectArgs) -> Result<(), String> {
         "{}\n",
         uri(database.engine, connection, &sign_in, local)
     ));
+    wait().await
+}
+
+/// The database `name` of `project` and its Service port, or else the service `name` and the
+/// port to forward to.
+async fn target(
+    api: &InProcess,
+    project: &str,
+    name: &str,
+    port: Option<u16>,
+) -> Result<(Option<Database>, ServiceAddress), String> {
+    let databases: ProjectDatabases = read(
+        api.get(&format!("/api/v1/projects/{project}/databases"))
+            .await,
+    )?;
+    let database = find(databases.items, project, name)?;
+    let ports = if let Some(database) = &database {
+        let connection = &database.connection;
+        vec![
+            ServiceAddress::parse(&format!("{}:{}", connection.host, connection.port)).ok_or_else(
+                || {
+                    format!(
+                        "{name} has no Service in the cluster to forward to ({}).",
+                        connection.host
+                    )
+                },
+            )?,
+        ]
+    } else {
+        let document: ProjectDocument =
+            read(api.get(&format!("/api/v1/projects/{project}")).await)?;
+        service_ports(document, &databases.unreadable, project, name)?
+    };
+    Ok((database, pick(&ports, project, name, port)?))
+}
+
+async fn wait() -> Result<(), String> {
     tokio::signal::ctrl_c()
         .await
         .map_err(|e| format!("cannot wait for Ctrl-C: {e}"))
+}
+
+/// `<project>/<name>[:<port>]`.
+fn parse(target: &str) -> Result<(&str, &str, Option<u16>), String> {
+    let invalid =
+        || format!("Name it as <project>/<name> or <project>/<name>:<port>, not {target}.");
+    let (project, rest) = target.split_once('/').ok_or_else(invalid)?;
+    let (name, port) = match rest.split_once(':') {
+        Some((name, port)) => (name, Some(port.parse().ok().ok_or_else(invalid)?)),
+        None => (rest, None),
+    };
+    if project.is_empty() || name.is_empty() {
+        return Err(invalid());
+    }
+    Ok((project, name, port))
 }
 
 /// The API's answer as `T`, or the problem's words.
@@ -200,26 +270,113 @@ fn read<T: DeserializeOwned>(answer: Result<Value, Value>) -> Result<T, String> 
     }
 }
 
-/// The database `name` of the API's list of databases.
-fn find(listed: ProjectDatabases, project: &str, name: &str) -> Result<Database, String> {
-    let ProjectDatabases { items, unreadable } = listed;
-    let mut found = items.into_iter().filter(|d| d.name == name);
+/// The database `name` of the API's list of databases, if there is one.
+fn find(databases: Vec<Database>, project: &str, name: &str) -> Result<Option<Database>, String> {
+    let mut found = databases.into_iter().filter(|d| d.name == name);
     match (found.next(), found.next()) {
-        (Some(one), None) => Ok(one),
-        (None, _) if unreadable.is_empty() => {
-            Err(format!("Project {project} has no database named {name}."))
-        }
-        (None, _) => Err(format!(
-            "Project {project} has no database named {name} that you can read. You cannot list {} there.",
-            unreadable
-                .iter()
-                .map(|u| u.resource.as_str())
-                .collect::<Vec<_>>()
-                .join(", ")
-        )),
         (Some(_), Some(_)) => Err(format!(
             "Project {project} has more than one database named {name}. Connect to it from the cluster instead."
         )),
+        (one, _) => Ok(one),
+    }
+}
+
+/// The ports of the Kubernetes Services of the service `name`, each with the Service it is of.
+fn service_ports(
+    document: ProjectDocument,
+    databases_unreadable: &[Unreadable],
+    project: &str,
+    name: &str,
+) -> Result<Vec<ServiceAddress>, String> {
+    let ProjectDocument {
+        services,
+        endpoints,
+        unreadable,
+    } = document;
+    let services: Vec<Service> = services.into_iter().filter(|s| s.name == name).collect();
+    if services.len() > 1 {
+        return Err(format!(
+            "Project {project} has more than one service named {name}. Connect to it from the cluster instead."
+        ));
+    }
+    if services.is_empty() {
+        let mut refused: Vec<&str> = databases_unreadable
+            .iter()
+            .chain(&unreadable)
+            .map(|u| u.resource.as_str())
+            .collect();
+        refused.sort_unstable();
+        refused.dedup();
+        return Err(if refused.is_empty() {
+            format!("Project {project} has no database or service named {name}.")
+        } else {
+            format!(
+                "Project {project} has no database or service named {name} that you can read. You cannot list {} there.",
+                refused.join(", ")
+            )
+        });
+    }
+    let mut ports: Vec<ServiceAddress> = endpoints
+        .into_iter()
+        .filter(|e| services.iter().any(|s| s.endpoint_names.contains(&e.name)))
+        .flat_map(|e| {
+            e.ports
+                .into_iter()
+                .filter(|p| p.protocol != "UDP")
+                .filter_map(move |p| {
+                    Some(ServiceAddress {
+                        namespace: project.to_owned(),
+                        name: e.name.clone(),
+                        port: u16::try_from(p.port).ok()?,
+                    })
+                })
+        })
+        .collect();
+    ports.sort_by(|a, b| (a.port, &a.name).cmp(&(b.port, &b.name)));
+    Ok(ports)
+}
+
+/// The one destination of `ports` that `port` names, or the only one there is. A port number that
+/// two Kubernetes Services offer may lead to different pod ports, so it is not picked for the
+/// person.
+fn pick(
+    ports: &[ServiceAddress],
+    project: &str,
+    name: &str,
+    port: Option<u16>,
+) -> Result<ServiceAddress, String> {
+    let mut numbers: Vec<String> = ports.iter().map(|p| p.port.to_string()).collect();
+    numbers.dedup();
+    let list = numbers.join(", ");
+    let Some(first) = ports.first() else {
+        return Err(format!(
+            "{name} has no Kubernetes Service, so no port to forward to."
+        ));
+    };
+    let wanted = match port {
+        Some(port) => port,
+        None if numbers.len() == 1 => first.port,
+        None => {
+            return Err(format!(
+                "{name} has more than one port: {list}. Pick one with {project}/{name}:<port>."
+            ));
+        }
+    };
+    let mut found = ports.iter().filter(|p| p.port == wanted);
+    match (found.next(), found.next()) {
+        (Some(one), None) => Ok(one.clone()),
+        (None, _) => Err(format!("{name} has no port {wanted}. Its ports: {list}.")),
+        (Some(_), Some(_)) => {
+            let services: Vec<&str> = ports
+                .iter()
+                .filter(|p| p.port == wanted)
+                .map(|p| p.name.as_str())
+                .collect();
+            Err(format!(
+                "Port {wanted} of {name} is offered by more than one Kubernetes Service ({}), which may lead to different ports of its pods. Connect to one of them from the cluster instead.",
+                services.join(", ")
+            ))
+        }
     }
 }
 
@@ -298,6 +455,14 @@ fn encode(text: &str) -> String {
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use zeabur_api::access::SingleCluster;
+    use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
+    use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Service as KubeService};
+    use zeabur_kube::memory::{MemoryCluster, State};
+    use zeabur_kube::{Identity, NamespaceObjects};
+
     use super::*;
 
     fn database(engine: &str, name: &str, connection: &Value) -> Value {
@@ -384,35 +549,215 @@ mod tests {
     #[test]
     fn a_database_is_found_by_its_name_alone_once() {
         let pg = json!({"host": "h", "port": 5432, "secret": "s", "passwordKey": "password"});
-        let listed = || -> ProjectDatabases {
-            serde_json::from_value(json!({"operators": [], "unreadable": [], "items": [
+        let listed = || -> Vec<Database> {
+            serde_json::from_value(json!([
                 database("postgresql", "orders", &pg),
                 database("postgresql", "shared", &pg),
                 database("mysql", "shared", &pg),
-            ]}))
+            ]))
             .unwrap()
         };
         assert_eq!(
-            find(listed(), "shop", "orders").unwrap().engine,
+            find(listed(), "shop", "orders").unwrap().unwrap().engine,
             Engine::Postgresql
         );
-        assert_eq!(
-            find(listed(), "shop", "missing").unwrap_err(),
-            "Project shop has no database named missing."
-        );
+        assert!(find(listed(), "shop", "web").unwrap().is_none());
         assert!(find(listed(), "shop", "shared").is_err());
     }
 
-    #[test]
-    fn a_database_the_person_cannot_list_names_what_was_refused() {
-        let listed: ProjectDatabases = serde_json::from_value(json!({"items": [], "unreadable": [
-            {"resource": "clusters.postgresql.cnpg.io", "kubernetes": {}},
-        ]}))
+    /// Project `shop` with the Deployment `web`, reached through the Services `web` (80, 9090)
+    /// and `web-admin` (8081, 80), and the Deployment `worker` with no Service.
+    fn shop() -> MemoryCluster {
+        let deployment = |name: &str| -> Deployment {
+            serde_json::from_value(json!({
+                "metadata": {"name": name, "namespace": "shop"},
+                "spec": {"selector": {"matchLabels": {"app": name}},
+                         "template": {"metadata": {"labels": {"app": name}},
+                                      "spec": {"containers": [{"name": name, "image": "nginx"}]}}},
+            }))
+            .unwrap()
+        };
+        let service = |name: &str, ports: &[u16]| -> KubeService {
+            serde_json::from_value(json!({
+                "metadata": {"name": name, "namespace": "shop"},
+                "spec": {"selector": {"app": "web"},
+                         "ports": ports.iter().map(|p| json!({"name": format!("p{p}"), "port": p}))
+                             .collect::<Vec<_>>()},
+            }))
+            .unwrap()
+        };
+        let namespace: Namespace = serde_json::from_value(
+            json!({"metadata": {"name": "shop", "labels": {"zeabur.com/project": "true"}}}),
+        )
         .unwrap();
+        MemoryCluster::new(State {
+            identity: Identity {
+                username: "alice".to_owned(),
+                groups: Vec::new(),
+            },
+            namespaces: vec![namespace],
+            objects: [(
+                "shop".to_owned(),
+                NamespaceObjects {
+                    namespace: "shop".to_owned(),
+                    deployments: vec![deployment("web"), deployment("worker")],
+                    services: vec![
+                        service("web", &[80, 9090]),
+                        service("web-admin", &[8081, 80]),
+                    ],
+                    ..NamespaceObjects::default()
+                },
+            )]
+            .into(),
+            ..State::default()
+        })
+    }
+
+    fn api(cluster: &MemoryCluster) -> InProcess {
+        InProcess::new(zeabur_api::router_with(
+            Arc::new(SingleCluster(Arc::new(cluster.clone()))),
+            zeabur_api::Options::default(),
+        ))
+    }
+
+    #[tokio::test]
+    async fn a_name_that_is_no_database_is_a_service_reached_through_its_ports() {
+        let shop = api(&shop());
+        let to = |port| target(&shop, "shop", "web", port);
         assert_eq!(
-            find(listed, "shop", "orders").unwrap_err(),
-            "Project shop has no database named orders that you can read. You cannot list clusters.postgresql.cnpg.io there."
+            to(None).await.unwrap_err(),
+            "web has more than one port: 80, 8081, 9090. Pick one with shop/web:<port>."
         );
+        let (database, admin) = to(Some(8081)).await.unwrap();
+        assert!(database.is_none());
+        assert_eq!(admin, address("web-admin", 8081));
+        assert_eq!(
+            to(Some(80)).await.unwrap_err(),
+            "Port 80 of web is offered by more than one Kubernetes Service (web, web-admin), which may lead to different ports of its pods. Connect to one of them from the cluster instead."
+        );
+        assert_eq!(to(Some(9090)).await.unwrap().1, address("web", 9090));
+        assert!(
+            target(&shop, "shop", "worker", None)
+                .await
+                .unwrap_err()
+                .contains("no Kubernetes Service")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_name_that_is_neither_a_database_nor_a_service_is_refused() {
+        let cluster = shop();
+        assert_eq!(
+            target(&api(&cluster), "shop", "missing", None)
+                .await
+                .unwrap_err(),
+            "Project shop has no database or service named missing."
+        );
+        cluster.update(|s| {
+            s.forbidden_in_namespaces
+                .insert("deployments.apps".to_owned());
+        });
+        let refused = target(&api(&cluster), "shop", "web", None)
+            .await
+            .unwrap_err();
+        assert!(
+            refused.starts_with("Project shop has no database or service named web that you can read. You cannot list ")
+                && refused.contains("deployments.apps"),
+            "{refused}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_name_two_workloads_share_is_refused() {
+        let cluster = shop();
+        cluster.update(|s| {
+            let set = serde_json::from_value(json!({
+                "metadata": {"name": "web", "namespace": "shop"},
+                "spec": {"serviceName": "web", "selector": {"matchLabels": {"app": "web"}},
+                         "template": {"metadata": {"labels": {"app": "web"}},
+                                      "spec": {"containers": [{"name": "web", "image": "nginx"}]}}},
+            }))
+            .unwrap();
+            if let Some(objects) = s.objects.get_mut("shop") {
+                objects.stateful_sets.push(set);
+            }
+        });
+        assert_eq!(
+            target(&api(&cluster), "shop", "web", Some(9090))
+                .await
+                .unwrap_err(),
+            "Project shop has more than one service named web. Connect to it from the cluster instead."
+        );
+    }
+
+    #[tokio::test]
+    async fn a_udp_port_is_not_offered() {
+        let cluster = shop();
+        cluster.update(|s| {
+            let dns = serde_json::from_value(json!({
+                "metadata": {"name": "web-dns", "namespace": "shop"},
+                "spec": {"selector": {"app": "web"},
+                         "ports": [{"name": "dns", "port": 53, "protocol": "UDP"}]},
+            }))
+            .unwrap();
+            if let Some(objects) = s.objects.get_mut("shop") {
+                objects.services.push(dns);
+            }
+        });
+        assert_eq!(
+            target(&api(&cluster), "shop", "web", Some(53))
+                .await
+                .unwrap_err(),
+            "web has no port 53. Its ports: 80, 8081, 9090."
+        );
+    }
+
+    fn address(name: &str, port: u16) -> ServiceAddress {
+        ServiceAddress {
+            namespace: "shop".to_owned(),
+            name: name.to_owned(),
+            port,
+        }
+    }
+
+    #[test]
+    fn one_port_is_taken_and_several_need_one_named() {
+        let both = || vec![address("web", 80), address("web", 9090)];
+        assert_eq!(
+            pick(&[address("web", 80)], "shop", "web", None).unwrap(),
+            address("web", 80)
+        );
+        assert_eq!(
+            pick(&both(), "shop", "web", None).unwrap_err(),
+            "web has more than one port: 80, 9090. Pick one with shop/web:<port>."
+        );
+        assert_eq!(
+            pick(&both(), "shop", "web", Some(9090)).unwrap(),
+            address("web", 9090)
+        );
+        assert_eq!(
+            pick(&both(), "shop", "web", Some(443)).unwrap_err(),
+            "web has no port 443. Its ports: 80, 9090."
+        );
+        assert!(pick(&[], "shop", "cron", None).is_err());
+    }
+
+    #[test]
+    fn a_port_number_two_kubernetes_services_offer_is_not_picked_for_the_person() {
+        let twice = [address("web", 80), address("web-admin", 80)];
+        for port in [None, Some(80)] {
+            let refused = pick(&twice, "shop", "web", port).unwrap_err();
+            assert!(refused.contains("(web, web-admin)"), "{refused}");
+        }
+    }
+
+    #[test]
+    fn the_target_is_a_project_a_name_and_maybe_a_port() {
+        assert_eq!(parse("shop/web").unwrap(), ("shop", "web", None));
+        assert_eq!(parse("shop/web:8080").unwrap(), ("shop", "web", Some(8080)));
+        for wrong in ["web", "shop/", "/web", "shop/web:http", "shop/web:"] {
+            assert!(parse(wrong).is_err(), "{wrong}");
+        }
     }
 
     #[test]

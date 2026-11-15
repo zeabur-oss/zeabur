@@ -27,6 +27,7 @@ hyper.workspace = true
 hyper-rustls.workspace = true
 hyper-timeout.workspace = true
 hyper-util.workspace = true
+json-patch.workspace = true
 k8s-openapi.workspace = true
 kube.workspace = true
 secrecy.workspace = true

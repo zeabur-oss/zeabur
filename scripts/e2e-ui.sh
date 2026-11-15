@@ -14,7 +14,7 @@ source "$root/scripts/wait.sh"
 # The write tests start from the manifest as applied: what an earlier run added (a variable, a
 # volume, a policy) goes with the namespace.
 wait_for "$namespace" kubectl delete namespace "$namespace" "$namespace-adopt" "$namespace-files" \
-  --ignore-not-found --wait --timeout=180s
+  "$namespace-crowded" --ignore-not-found --wait --timeout=180s
 kubectl apply -f "$root/web/e2e/manifests/talker.yaml" \
   -f "$root/web/e2e/manifests/second-project.yaml" \
   -f "$root/web/e2e/manifests/files.yaml" >/dev/null
@@ -23,6 +23,16 @@ wait_for "$namespace" kubectl -n "$namespace" rollout status deployment/editor -
 wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/keeper --timeout=180s
 wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/distroless --timeout=180s
 wait_for "$namespace-files" kubectl -n "$namespace-files" rollout status deployment/noshell --timeout=180s
+# A project of 40 services for the layout test, each a pause container.
+{
+  printf 'apiVersion: v1\nkind: Namespace\nmetadata:\n  name: %s-crowded\n  labels:\n    zeabur.com/project: "true"\n' "$namespace"
+  for i in $(seq -w 1 40); do
+    printf -- '---\napiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: service-%s\n  namespace: %s-crowded\n' "$i" "$namespace"
+    printf 'spec:\n  replicas: 1\n  selector:\n    matchLabels:\n      app: service-%s\n  template:\n    metadata:\n      labels:\n        app: service-%s\n' "$i" "$i"
+    printf '    spec:\n      containers:\n        - name: pause\n          image: registry.k8s.io/pause:3.10\n'
+  done
+} | kubectl apply -f - >/dev/null
+wait_for "$namespace-crowded" kubectl -n "$namespace-crowded" wait --for=condition=available deployment --all --timeout=300s
 pod=$(kubectl -n "$namespace" get pods -l app=talker -o jsonpath='{.items[0].metadata.name}')
 # The crashing Deployment must have crashed a few times before the Overview test looks for it.
 # Between restarts the kubelet reports the container as `waiting: CrashLoopBackOff`,
@@ -59,6 +69,6 @@ fi
 
 cd "$root/web"
 ZEABUR_E2E_URL="$url" ZEABUR_E2E_NAMESPACE="$namespace" ZEABUR_E2E_POD="$pod" \
-  ZEABUR_E2E_ADOPT="$namespace-adopt" \
+  ZEABUR_E2E_ADOPT="$namespace-adopt" ZEABUR_E2E_CROWDED="$namespace-crowded" \
   ZEABUR_E2E_UNCHECKED=Deployment/talker ZEABUR_E2E_NO_SHELL="$namespace-files/noshell" \
   bunx playwright test --reporter=line --output="$out/results"

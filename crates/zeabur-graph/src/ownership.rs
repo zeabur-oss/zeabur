@@ -113,19 +113,37 @@ impl OwnerGraph {
     /// cycle the least node on the cycle. An unknown key is its own root.
     #[must_use]
     pub fn root<'a>(&'a self, key: &'a ObjectKey) -> &'a ObjectKey {
+        let path = self.walk(key);
+        let last = path.last().copied().unwrap_or(key);
+        self.parent(last)
+            .and_then(|parent| path.iter().position(|seen| *seen == parent))
+            .and_then(|start| path.get(start..))
+            .and_then(|cycle| cycle.iter().min().copied())
+            .unwrap_or(last)
+    }
+
+    /// The owners of `key`, from its parent up, each once.
+    #[must_use]
+    pub fn owners<'a>(&'a self, key: &'a ObjectKey) -> Vec<&'a ObjectKey> {
+        self.walk(key).into_iter().skip(1).collect()
+    }
+
+    /// `key`, then its owners until the walk ends or comes back to a node it passed.
+    fn walk<'a>(&'a self, key: &'a ObjectKey) -> Vec<&'a ObjectKey> {
         let mut path = vec![key];
         let mut at = key;
-        while let Some(Some(parent)) = self.parents.get(at) {
-            if let Some(start) = path.iter().position(|seen| *seen == parent) {
-                return path
-                    .get(start..)
-                    .and_then(|cycle| cycle.iter().min().copied())
-                    .unwrap_or(parent);
+        while let Some(parent) = self.parent(at) {
+            if path.contains(&parent) {
+                break;
             }
             path.push(parent);
             at = parent;
         }
-        at
+        path
+    }
+
+    fn parent(&self, key: &ObjectKey) -> Option<&ObjectKey> {
+        self.parents.get(key).and_then(Option::as_ref)
     }
 
     /// Every root, in key order.

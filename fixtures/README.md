@@ -80,7 +80,6 @@ Comparison rules:
 | `mutation.probeConfig` | the workload | `container`, `probe: {handler: "HTTPGet" \| "TCPSocket" \| "GRPC" \| "Exec", port?, path?, scheme?, command?}` | the Kubernetes `Probe`, or `{error}`: `missing_probe_port`, `invalid_probe_port`, `undeclared_probe_port`, `invalid_probe_path`, `invalid_probe_scheme`, `missing_probe_command`, `invalid_probe_timing` |
 | `mutation.resourceAllowed` | — | `group`, `version`, `resource` | `{allowed: true}` or `{allowed: false, reason}`; reasons: `controller_managed`, `shared_infrastructure`, `tenant_level`, `privilege` |
 | `mutation.reconcileIdentity` | — | `resource: {group, version, resource}`, `kind`, `namespace`, `name`, `body` (the raw apply document) | `{ok: true}` or `{error}`: `missing_api_version_or_kind`, `api_version_mismatch`, `kind_mismatch`, `name_mismatch`, `namespace_mismatch` |
-| `mutation.ownedByStatefulSet` | — | `claim`, `statefulSet` | a boolean |
 | `mutation.validateHostname` | — | `hostname` | `{ok: true}` or `{error}`: `hostname_required`, `invalid_hostname` |
 | `mutation.routeName` | — | `workload`, `hostname` | the HTTPRoute name, a string |
 | `mutation.diff` | before and after, in that order; a single object is a creation | — | `[{path, before?, after?}]` sorted by path; server-maintained fields and `status` omitted; Secret `data`/`stringData` values shown as `(hidden)` |

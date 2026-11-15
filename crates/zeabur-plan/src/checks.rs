@@ -154,20 +154,6 @@ pub fn is_dns_subdomain(name: &str) -> bool {
         })
 }
 
-/// Whether the claim `claim` belongs to StatefulSet `stateful_set` (`mutation.ownedByStatefulSet`):
-/// a StatefulSet names the claims of its `volumeClaimTemplates` `<template>-<set>-<ordinal>`
-/// [k8s-sts-identity].
-///
-/// [k8s-sts-identity]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#stable-storage
-#[must_use]
-pub fn owned_by_stateful_set(claim: &str, stateful_set: &str) -> bool {
-    claim
-        .rsplit_once('-')
-        .filter(|(_, ordinal)| !ordinal.is_empty() && ordinal.bytes().all(|b| b.is_ascii_digit()))
-        .and_then(|(rest, _)| rest.strip_suffix(stateful_set))
-        .is_some_and(|template| template.len() > 1 && template.ends_with('-'))
-}
-
 // ── Probes ───────────────────────────────────────────────────────────────────────────────────
 
 /// How a probe checks the container.

@@ -37,14 +37,14 @@ use std::collections::BTreeMap;
 use k8s_openapi::api::core::v1::{Container, PersistentVolumeClaim};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Map, Value, json};
-use zeabur_graph::Workload;
+use zeabur_graph::{ObjectKey, OwnerGraph, Workload, workloads};
 use zeabur_model::kernel::quantity;
 use zeabur_model::{SourceKind, WorkloadKind, WorkloadRef};
 
 use crate::change::{DataKind, ProbeKind, Target, Warning};
 use crate::checks::{
-    AccessMode, COMPUTE, ProbeRequest, ResourceRef, VolumeRequest, owned_by_stateful_set,
-    probe_config, reconcile_identity, resource_allowed, validate_mount_path, validate_resources,
+    AccessMode, COMPUTE, ProbeRequest, ResourceRef, VolumeRequest, probe_config,
+    reconcile_identity, resource_allowed, validate_mount_path, validate_resources,
     validate_storage,
 };
 use crate::edit::{edit_operations, editable};
@@ -330,8 +330,8 @@ impl<'a> Planner<'a> {
             add("/spec/resources", json!({"requests": {"storage": size}}))
         };
         self.patch(index, vec![operation])?;
-        // Who mounts it.
-        let readers: Vec<WorkloadRef> = self
+        // Who mounts it, and the workloads it belongs to.
+        let mounting = self
             .project
             .services
             .iter()
@@ -343,15 +343,20 @@ impl<'a> Planner<'a> {
                                 o.kind == "PersistentVolumeClaim" && o.name == name
                             })
                     })
-                }) || (s.workload.kind == WorkloadKind::StatefulSet
-                    && owned_by_stateful_set(name, &s.workload.name))
+                })
             })
             .map(|s| WorkloadRef {
                 kind: s.workload.kind,
                 name: s.workload.name.clone(),
-            })
-            .collect();
-        self.impact.extend(readers);
+            });
+        let graph = OwnerGraph::new(self.input.snapshot);
+        let key = ObjectKey::of(&claim);
+        let owners = graph.owners(&key);
+        let owning = workloads(self.input.snapshot)
+            .into_iter()
+            .filter(|w| owners.contains(&&w.key()))
+            .map(Workload::reference);
+        self.impact.extend(mounting.chain(owning));
         Ok(())
     }
 

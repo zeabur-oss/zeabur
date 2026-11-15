@@ -1,0 +1,58 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: db-replica
+  namespace: demo
+  uid: set-db-replica
+spec:
+  serviceName: db-replica
+  selector:
+    matchLabels: {app: db-replica}
+  template:
+    metadata:
+      labels: {app: db-replica}
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+  volumeClaimTemplates:
+    - metadata: {name: data}
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: replica
+  namespace: demo
+  uid: set-replica
+spec:
+  serviceName: replica
+  selector:
+    matchLabels: {app: replica}
+  template:
+    metadata:
+      labels: {app: replica}
+    spec:
+      containers:
+        - name: cache
+          image: valkey/valkey:8
+          volumeMounts:
+            - name: cache
+              mountPath: /data
+  volumeClaimTemplates:
+    - metadata: {name: cache}
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: data-db-replica-0
+  namespace: demo
+  uid: claim-data-db-replica-0
+  resourceVersion: "60"
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: local-path
+  resources:
+    requests: {storage: 10Gi}

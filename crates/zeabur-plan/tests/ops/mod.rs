@@ -8,8 +8,8 @@ use serde_json::{Value, from_value, json, to_value};
 use zeabur_graph::Snapshot;
 use zeabur_model::WorkloadRef;
 use zeabur_plan::checks::{
-    ProbeRequest, ResourceRef, VolumeRequest, owned_by_stateful_set, probe_config,
-    reconcile_identity, resource_allowed, validate_storage,
+    ProbeRequest, ResourceRef, VolumeRequest, probe_config, reconcile_identity, resource_allowed,
+    validate_storage,
 };
 use zeabur_plan::rules::{EnvEdit, diff, route_name, validate_env, validate_hostname};
 use zeabur_plan::{
@@ -33,7 +33,6 @@ pub(crate) fn run(fixture: &Fixture) -> Result<Value, String> {
         ProbeConfig::NAME => run_op::<ProbeConfig>(fixture),
         ResourceAllowed::NAME => run_op::<ResourceAllowed>(fixture),
         ReconcileIdentity::NAME => run_op::<ReconcileIdentity>(fixture),
-        OwnedByStatefulSet::NAME => run_op::<OwnedByStatefulSet>(fixture),
         Plan::NAME => run_op::<Plan>(fixture),
         other => Err(format!("{}: no runner for operation {other}", fixture.name)),
     }
@@ -213,27 +212,6 @@ impl FixtureOp for ReconcileIdentity {
             &params.namespace,
             &params.name,
             &params.body,
-        )))
-    }
-}
-
-struct OwnedByStatefulSet;
-
-#[derive(Deserialize)]
-#[serde(deny_unknown_fields, rename_all = "camelCase")]
-struct OwnedByStatefulSetParams {
-    claim: String,
-    stateful_set: String,
-}
-
-impl FixtureOp for OwnedByStatefulSet {
-    const NAME: &'static str = "mutation.ownedByStatefulSet";
-    type Params = OwnedByStatefulSetParams;
-
-    fn run(_: &[Value], params: Self::Params) -> Result<Value, String> {
-        Ok(json!(owned_by_stateful_set(
-            &params.claim,
-            &params.stateful_set
         )))
     }
 }
