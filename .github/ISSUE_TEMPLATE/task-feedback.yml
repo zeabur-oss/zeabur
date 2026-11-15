@@ -1,0 +1,44 @@
+name: Task feedback
+description: Tell us which task you tried and where it stopped.
+title: "Task feedback: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tell us which task you tried and where it stopped. Please do not paste a kubeconfig, a token, a cluster address, logs or manifests.
+  - type: dropdown
+    id: task
+    attributes:
+      label: Which task
+      options:
+        - Deploy an image
+        - Change the number of replicas
+        - Change environment variables
+        - Find why a service is failing
+        - Install on my own server
+        - Connect with a kubeconfig
+        - Something else
+    validations:
+      required: true
+  - type: dropdown
+    id: route
+    attributes:
+      label: Which way you started
+      options:
+        - Existing cluster with a kubeconfig (zeaburctl ui)
+        - Existing cluster with Helm
+        - My own server with the installer
+    validations:
+      required: true
+  - type: textarea
+    id: where
+    attributes:
+      label: Where it stopped, and what you expected
+      description: The step, what the screen said, and what you expected instead.
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Zeabur version
+      placeholder: "0.2.0"

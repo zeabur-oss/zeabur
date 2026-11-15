@@ -3,7 +3,7 @@
 # translations' nav.yaml refers to it, and it is part of each page's URL.
 - group: get-started
   label: Get started
-  pages: [quickstart, ai-agent, first-project, how-it-works]
+  pages: [kubeconfig, quickstart, ai-agent, first-project, what-zeabur-does, how-it-works]
 - group: install
   label: More ways to install
   pages: [config-file, personal, existing-cluster]

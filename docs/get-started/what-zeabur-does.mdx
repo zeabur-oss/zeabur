@@ -1,0 +1,43 @@
+---
+title: What Zeabur does and doesn't do
+description: The work Zeabur supports, how it sits next to CI/CD and GitOps, what it writes to the cluster, what leaving looks like, and the known limits.
+---
+
+Zeabur reads and changes the Kubernetes objects your cluster already has, and keeps no data of its own. This page lists what it can do for you, what it writes into the cluster, and where it stops.
+
+## Supported work
+
+| Work | Where |
+| --- | --- |
+| Deploy an image, a Git repository, an uploaded folder or a Docker Compose file | [Image](../deploy/image.mdx), [Git](../deploy/git.mdx), [upload a folder](../deploy/upload.mdx), [Docker Compose](../deploy/compose.mdx) |
+| Deploy from a template, create a database, object storage or a scheduled job | [Templates](../deploy/templates.mdx), [databases](../deploy/databases.mdx), [object storage](../deploy/object-storage.mdx), [scheduled jobs](../deploy/cron-jobs.mdx) |
+| Change replicas, resources, environment variables, domains and volumes | [Replicas and resources](../configure/service-settings.mdx), [environment variables](../configure/variables.mdx), [domains](../configure/domains.mdx), [volumes](../configure/volumes.mdx) |
+| Restart, roll back and pause services | [Restart and roll back](../configure/restart-rollback.mdx) |
+| Find why a service is failing | [Status and diagnoses](../cluster/diagnosis.mdx), [logs and events](../configure/logs-terminal.mdx) |
+| Backups, nodes, components and notifications | [Backups](../cluster/backups.mdx), [nodes](../cluster/nodes.mdx), [components](../cluster/components.mdx), [notifications](../cluster/notifications.mdx) |
+
+Every change lists what it will write under **Review changes** first, and applies only after you confirm.
+
+## Next to CI/CD and GitOps
+
+Zeabur shows services that Helm, Argo CD or Flux manages, and can restart them. Their replicas, environment variables, domains and volumes are read-only in Zeabur, and rollback and delete are refused. Make those changes in the original values or Git repository, or the next sync overwrites them.
+
+After CI pushes an image to a registry, deploy that image with Zeabur and use a fixed version tag, so you can tell which version is running. Zeabur also sees objects that you create or change with kubectl outside Zeabur. When both change the same object, Zeabur asks you to review again and doesn't overwrite the other change.
+
+## What Zeabur writes
+
+- A project is a Namespace with the `zeabur.com/project: "true"` label. Its name, description and icon go in annotations that start with `zeabur.com/`.
+- Deploying a service creates a plain Deployment, Service and Ingress, each with an `app.kubernetes.io/name` label.
+- There is no database and there are no custom resources (CRDs).
+- `zeaburctl ui` installs no components in the cluster and writes only the changes you apply. Zeabur installed in a cluster also has its own Deployment, configuration and member roles.
+
+## Leaving
+
+Removing Zeabur doesn't stop services. Deployments, Services, Ingresses, environment variables and volumes stay in their Namespaces, and the websites keep answering. For the steps and the components to keep, see [Remove Zeabur and keep services running](../leave/uninstall.mdx).
+
+## Known limits
+
+- Reads and changes use your own rights. What you can't read, Zeabur can't read.
+- The Helm chart for installing in a cluster needs Kubernetes 1.30 or later.
+- A personal installation (KubeSolo) has no members and no network isolation between projects, and no Zeabur Builder by default, so it deploys only existing images.
+- `zeaburctl` has no Intel Mac build, and on Windows it runs in WSL.

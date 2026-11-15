@@ -1,26 +1,54 @@
 ---
 title: 开始使用 Zeabur
-description: 从一台服务器或已有的 Kubernetes 集群开始管理服务。
+description: 看 Zeabur 适不适合你，选一条路开始，完成第一件工作。
 ---
 
-用 Zeabur 查看 Kubernetes 中的服务、日志和域名。调整配置时，先**检查变更**再应用。根据现有环境选择起点。
+Zeabur 适合在 Kubernetes 上运行应用、却没有专职运维的小团队，适合替客户管理集群的服务商，也适合在家里自己搭集群的人。它把集群显示成项目和服务，修改配置前先列出将要写入的内容，服务出问题时用白话说明原因。
 
-## 从一台服务器开始
+## 第一件工作
 
-准备一台使用 systemd 的 Linux 服务器、root 权限，以及指向这台主机的登录和管理域名。Zeabur Installer 的网页界面会引导你逐步检查服务器、选择组件，再安装 K3s（或 RKE2）、Zeabur Identity 和 Zeabur。
+照着[部署第一个服务](get-started/first-project.mdx)走一遍：部署一个 Nginx 示例，确认它已上线，故意弄坏它，再从界面上找出原因。
 
-完成后，界面会显示 Zeabur 网址和首位管理员的通行密钥注册链接。登录后就能创建第一个项目。
+## 选一条路
+
+### 用 kubeconfig 连接已有集群
+
+准备：
+
+- 能连到集群的 kubeconfig。
+- 你电脑上的 `zeaburctl`。
+- 读取权限可以查看服务，修改权限才能部署，两者都由集群的 RBAC 决定。
+
+不需要 Zeabur Identity，集群里也不会安装任何东西。一开始会看到集群里已有的 Namespace，读不到的部分，界面会写出缺少哪些权限。
+
+[用 kubeconfig 连接已有集群](get-started/kubeconfig.mdx)
+
+### 在自己的服务器上开始
+
+准备：
+
+- 使用 systemd 的 Linux 服务器，amd64 或 arm64，需要 root 权限。
+- 团队使用至少 4 GiB 内存，只有你自己用的小机器至少 1.5 GiB。
+- 指向这台主机的登录域名和管理域名。
+
+Zeabur Installer 的网页界面会逐步检查服务器、选择组件，再安装 K3s（或 RKE2）、Zeabur Identity 和 Zeabur。完成后，界面会显示 Zeabur 的网址，以及第一位管理员注册通行密钥的链接，之后都用通行密钥登录。接着就能部署、调整和诊断服务。
 
 [在一台服务器上安装 Zeabur](get-started/quickstart.mdx)
 
-## 使用已有的 Kubernetes 集群
+## 能做什么、不做什么
 
-准备集群管理权限、Helm，以及 kube-apiserver 已信任的 Zeabur Identity。Zeabur 网址必须能通过 HTTPS 打开，浏览器才会提供通行密钥。
+支持的工作、和 CI/CD 与 GitOps 并用的方式、Zeabur 写入集群的内容、如何离开，以及已知的限制，见 [Zeabur 能做什么、不做什么](get-started/what-zeabur-does.mdx)。
 
-完成后，用通行密钥登录 Zeabur，在**项目**中找到已有的 Namespace，或新建项目部署服务。
+## 需要时再加
 
-[将 Zeabur 安装到已有集群](install/existing-cluster.mdx)
+- **Zeabur Identity**：让每个人各自登录，并按项目分角色。用 kubeconfig 连接已有集群时不需要。见 [Zeabur Identity 入门](https://oss.zeabur.com/docs/identity/get-started?utm_source=zeabur)。
+- **Zeabur Builder**：从 Git 仓库或文件夹构建镜像。见[从 Git 构建并部署服务](deploy/git.mdx)。
+- **Zeabur Catalog**：经过测试的组件版本和应用模板。见[从应用模板部署](deploy/templates.mdx)和[查看和安装集群组件](cluster/components.mdx)。
 
-## 下一步
+## 告诉我们哪里卡住了
 
-能登录 Zeabur 后，接着[部署第一个服务](get-started/first-project.mdx)。
+做完或卡住时，请告诉我们你想完成哪一项工作、卡在哪一步，用[反馈表单](https://github.com/zeabur-oss/zeabur/issues/new?template=task-feedback.yml)。不要贴 kubeconfig、令牌或日志。
+
+## 体验计划
+
+加入体验计划后，Zeabur 会发送版本和使用情况，内容只有固定的值。域名、名称、日志、kubeconfig 和集群里的内容都不会发送。用安装程序安装时默认加入，可以在确认页取消；用 Helm 安装时默认不加入。设置 `DO_NOT_TRACK=1` 就会全部关闭。详见[体验计划](reference/telemetry.mdx)。

@@ -1,26 +1,54 @@
 ---
 title: Get started with Zeabur
-description: Start managing services on a single server or an existing Kubernetes cluster.
+description: See whether Zeabur fits you, choose a route, and finish your first task.
 ---
 
-Use Zeabur to see the services, logs, and domains in your Kubernetes cluster. When you change a setting, **Review changes** comes before anything is applied. Pick the starting point that matches your environment.
+Zeabur is for small teams that run applications on Kubernetes without dedicated operations staff, for providers that manage clusters for their customers, and for people who run a cluster at home. It shows a cluster as projects and services, lists what a change will write before it applies it, and says in plain words what's wrong when something breaks.
 
-## Start with one server
+## Your first task
 
-You need a Linux server that uses systemd, root access, and sign-in and admin domains that point to the host. The Zeabur Installer web interface checks the server step by step, lets you choose components, and installs K3s (or RKE2), Zeabur Identity, and Zeabur.
+Follow [Deploy your first service](get-started/first-project.mdx): deploy a sample Nginx application, confirm it's up, break it on purpose, then find the evidence on screen.
 
-When it finishes, the screen shows the Zeabur address and a passkey registration link for the first admin. After you sign in, you can create your first project.
+## Choose a route
+
+### Connect an existing cluster with a kubeconfig
+
+Prepare:
+
+- A kubeconfig that reaches the cluster.
+- `zeaburctl` for your computer.
+- Rights to read let you see services, and rights to change let you deploy. The cluster's RBAC decides both.
+
+You don't need Zeabur Identity and nothing is installed in the cluster. You first see the cluster's existing Namespaces, and where something can't be read, the screen says which rights are missing.
+
+[Connect an existing cluster with a kubeconfig](get-started/kubeconfig.mdx)
+
+### Start on your own server
+
+Prepare:
+
+- A Linux server that uses systemd, on amd64 or arm64, with root access.
+- At least 4 GiB of memory for a team, or at least 1.5 GiB for a small machine only you use.
+- Sign-in and admin domains that point to the host.
+
+The Zeabur Installer web interface checks the server step by step, lets you choose components, then installs K3s (or RKE2), Zeabur Identity and Zeabur. When it finishes, the screen shows Zeabur's address and a link for the first administrator to register a passkey. After that you sign in with a passkey, and you can deploy, change and diagnose services.
 
 [Install Zeabur on a single server](get-started/quickstart.mdx)
 
-## Use an existing Kubernetes cluster
+## What it does and doesn't do
 
-You need cluster admin access, Helm, and a Zeabur Identity that kube-apiserver already trusts. The Zeabur address must open over HTTPS so the browser offers passkeys.
+The supported work, how Zeabur sits next to CI/CD and GitOps, what it writes to the cluster, what leaving looks like and the known limits are in [What Zeabur does and doesn't do](get-started/what-zeabur-does.mdx).
 
-When the install finishes, sign in to Zeabur with a passkey, then find an existing Namespace under **Projects** or add a project to deploy services.
+## Add more when you need it
 
-[Install Zeabur in an existing cluster](install/existing-cluster.mdx)
+- **Zeabur Identity**: lets each person sign in and gives roles per project. You don't need it to connect an existing cluster with a kubeconfig. See [Zeabur Identity's get started guide](https://oss.zeabur.com/docs/identity/get-started?utm_source=zeabur).
+- **Zeabur Builder**: builds images from a Git repository or a folder. See [Build and deploy a service from Git](deploy/git.mdx).
+- **Zeabur Catalog**: tested component versions and application templates. See [Templates](deploy/templates.mdx) and [Cluster components](cluster/components.mdx).
 
-## Next steps
+## Tell us where it failed
 
-Once you can sign in to Zeabur, [deploy your first service](get-started/first-project.mdx).
+When you finish or get stuck, tell us which task you tried and where it stopped, using the [feedback form](https://github.com/zeabur-oss/zeabur/issues/new?template=task-feedback.yml). Don't paste a kubeconfig, a token or logs.
+
+## Experience program
+
+When you join the experience program, Zeabur sends the version and how it is used, as fixed values only. It never sends domains, names, logs, kubeconfigs or the contents of your cluster. The installer joins by default and you can uncheck the box on its review page. Installing with Helm stays out until you turn it on. Set `DO_NOT_TRACK=1` to turn everything off. See [Experience program](reference/telemetry.mdx).

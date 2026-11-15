@@ -1,9 +1,11 @@
 - group: get-started
   label: 開始使用
   pages:
+    kubeconfig: 用 kubeconfig 連接既有叢集
     quickstart: 在一台伺服器安裝 Zeabur
     ai-agent: 請 AI Agent 幫你安裝
     first-project: 部署第一個服務
+    what-zeabur-does: Zeabur 能做什麼、不做什麼
     how-it-works: Zeabur 如何管理服務
 - group: install
   label: 其他安裝方式

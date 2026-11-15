@@ -1,11 +1,11 @@
 ---
 title: 部署第一個服務
-description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽器打開網址。
+description: 用一個 Nginx 範例，從部署、確認上線，到故意弄壞並找出原因。
 ---
 
-這一頁會把一個 Nginx 網頁放上網路：建立專案、填入映像檔、檢查變更、套用，最後在瀏覽器看到 Nginx 的歡迎頁。不需要 Git repository，大約五分鐘。
+這一頁用一個 Nginx 範例走完第一件工作：部署、確認上線，接著故意弄壞它，再從畫面找出原因。不需要 Git repository。
 
-開始前需要一個能登入的 Zeabur，以及一個能指向叢集的網域，例如 `web.example.com`。如果管理員已經設好應用程式網域，表單會直接建議一個網址，DNS 也不用自己設。
+開始前需要一個能用的 Zeabur，從[自己的伺服器](quickstart.mdx)或[kubeconfig](kubeconfig.mdx) 開始都可以，還要有一個能指向叢集的網域，例如 `web.example.com`。如果管理員已經設好應用程式網域，表單會直接建議一個網址，DNS 也不用自己設。
 
 ## 建立專案
 
@@ -73,6 +73,41 @@ kubectl -n hello get deploy,svc,ingress -l app.kubernetes.io/name=web
 Namespace 帶 `zeabur.com/project=true`，Deployment 的 `READY` 是 `1/1`，Ingress 的 `HOSTS` 是你的網域。
 
 這些都是一般的 Kubernetes 物件，不用 Zeabur 也能用 `kubectl apply` 建出一模一樣的服務，完整的 YAML 見[部署容器映像檔](../deploy/image.mdx)的「用 kubectl 做同樣的事」。
+
+## 故意弄壞它
+
+換一個不存在的映像檔版本，看 Zeabur 怎麼告訴你出了問題。
+
+1. 打開 `web` 服務的**設定**，把上方的切換從**設定**改成 **YAML**，按**編輯**。
+2. 把 `image` 的版本 `1.30.5-alpine-slim` 改成 `no-such-tag`，按**檢查變更**，看過差異後套用。
+
+Deployment 預設先啟動新副本、就緒後才停掉舊的，所以舊副本會繼續服務，網址仍然打得開。新副本拉不到映像檔，上線不了。
+
+## 找出原因
+
+在服務的**概覽**可以依序看到：
+
+- 狀態變成**部署卡住**。
+- **出了什麼問題**寫出原因：新副本無法下載映像檔。下面的**部署卡住**顯示「1 個新副本中 0 個就緒」，旁邊有**回滾**。
+- 到**部署紀錄**切換到**事件**，最上面是 Kubernetes 拉不到映像檔的紀錄。
+
+用 kubectl 也看得到同一份證據：
+
+```sh
+kubectl -n hello rollout status deployment/web --timeout=30s
+kubectl -n hello get events --sort-by=.lastTimestamp
+```
+
+找到原因後，在**出了什麼問題**按**回滾**，檢查變更後套用。新副本就緒後，**概覽**會回到 `1/1` **就緒**。
+
+## 各種結果長什麼樣
+
+| 結果 | 你會看到 | 該怎麼做 |
+| --- | --- | --- |
+| 成功 | **概覽**顯示 `1/1` **就緒**，沒有舊副本，也沒有寫出問題 | 打開網址確認 |
+| 失敗 | **部署卡住**，**出了什麼問題**寫出原因，**事件**有對應的紀錄 | 修正後套用，或按**回滾** |
+| 沒有權限讀取 | 畫面寫著**這需要更多權限。**，並列出**缺少的權限** | 把清單交給叢集管理員 |
+| 還不知道 | 新副本還沒就緒，也沒有寫出原因 | 過幾分鐘再看，用 `kubectl rollout status` 自己確認；不要當成成功 |
 
 ## 網頁沒有出來
 

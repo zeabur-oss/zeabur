@@ -7,15 +7,40 @@
 
 **Simple, secure deployments on your own Kubernetes.**
 
-Zeabur is an open-source platform you host yourself. It runs in your cluster (or on your
-machine), shows the cluster as projects and services, explains what is wrong in plain words, and lets you
-change things safely. It works with the objects you already have, never acts with more rights
-than you have, and keeps no state of its own: no database, no custom resources.
+Zeabur is an open-source platform you host yourself. It is for small teams that run applications on Kubernetes without dedicated operations staff, for providers that manage clusters for their customers, and for people who run a cluster at home. It shows the cluster as projects and services, lists what a change will write before it applies it, and says in plain words what is wrong when something breaks. It works with the objects you already have, never acts with more rights than you have, and keeps no state of its own: no database, no custom resources.
 
-**[oss.zeabur.com/zeabur](https://oss.zeabur.com/zeabur/)** shows what Zeabur does, and
-**[the documentation](https://oss.zeabur.com/docs/zeabur/)** covers installing, deploying,
-configuring and operating the cluster, and leaving Zeabur, in English,
-[繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/) and [简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/).
+## Your first task
+
+Deploy a sample Nginx application, confirm it is up, break it on purpose with an image version that does not exist, then find the evidence on screen: the rollout is stuck, a new replica cannot download its image, and the events say so. [Deploy your first service](https://oss.zeabur.com/docs/zeabur/get-started/first-project/?utm_source=zeabur) follows it step by step and shows what success, failure, "this needs more rights" and "not known yet" look like.
+
+## Choose a route
+
+- **An existing cluster, with your kubeconfig.** You need a kubeconfig that reaches the cluster and `zeaburctl` on your computer. Rights to read let you see services, and rights to change let you deploy; the cluster's RBAC decides both. You don't need Zeabur Identity and nothing is installed in the cluster. `zeaburctl ui` opens Zeabur in your browser on your own computer, lists the cluster's Namespaces first, and says which rights are missing where it can't read. [Connect with a kubeconfig](https://oss.zeabur.com/docs/zeabur/get-started/kubeconfig/?utm_source=zeabur)
+- **Your own server.** You need a Linux server with systemd and root access, at least 4 GiB of memory for a team (1.5 GiB if only you use it), and sign-in and admin domains that point to it. The installer checks the server, installs K3s (or RKE2), Zeabur Identity and Zeabur, and shows a link for the first administrator to register a passkey. [Install on a single server](https://oss.zeabur.com/docs/zeabur/get-started/quickstart/?utm_source=zeabur)
+
+To put Zeabur in an existing cluster with sign-in for a team, see [Install in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/?utm_source=zeabur).
+
+## What it does and doesn't do
+
+The supported work, how Zeabur sits next to CI/CD and GitOps (services that Helm, Argo CD or Flux manage are read-only), what it writes to the cluster, what leaving looks like and the known limits are in [What Zeabur does and doesn't do](https://oss.zeabur.com/docs/zeabur/get-started/what-zeabur-does/?utm_source=zeabur). The [documentation](https://oss.zeabur.com/docs/zeabur/?utm_source=zeabur) is also in [繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/?utm_source=zeabur) and [简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/?utm_source=zeabur), and [oss.zeabur.com/zeabur](https://oss.zeabur.com/zeabur/?utm_source=zeabur) shows what Zeabur does.
+
+## Add more when you need it
+
+- **Zeabur Identity** lets each person sign in, with roles per project. You don't need it to connect with a kubeconfig.
+- **Zeabur Builder** builds images from a Git repository or a folder.
+- **Zeabur Catalog** holds tested component versions and application templates.
+
+## Tell us where it failed
+
+Open the [feedback form](https://github.com/zeabur-oss/zeabur/issues/new?template=task-feedback.yml) and say which task you tried and where it stopped. Don't paste a kubeconfig, a token or logs.
+
+## Experience program
+
+When you join, Zeabur sends the version and how it is used, as fixed values only. It never sends domains, names, logs, kubeconfigs or the contents of your cluster. The installer joins by default and you can uncheck the box on its review page. Installing with Helm stays out until you turn it on. Set `DO_NOT_TRACK=1` to turn everything off. [Experience program](https://oss.zeabur.com/docs/zeabur/reference/telemetry/?utm_source=zeabur) lists every event and property.
+
+[Releases](https://oss.zeabur.com/docs/zeabur/reference/releases/?utm_source=zeabur) lists what a release contains and how to verify it.
+
+## What it looks like
 
 <table>
 <tr>
@@ -33,19 +58,6 @@ configuring and operating the cluster, and leaving Zeabur, in English,
 </table>
 
 <sub>Screenshots of the built-in demo data (`cargo run -p zeabur-api --example demo`), taken by `scripts/docs-shots.sh readme`.</sub>
-
-## Get started
-
-- **One Linux server**: the installer sets up K3s (or RKE2), Zeabur Identity and Zeabur.
-  [Install on a single server](https://oss.zeabur.com/docs/zeabur/get-started/quickstart/)
-- **An existing Kubernetes cluster**: install the Helm chart, with sign-in through Zeabur Identity.
-  [Install in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/)
-- **Just you, with your kubeconfig**: `zeaburctl ui` opens Zeabur in your browser on your own
-  computer. [Personal use](https://oss.zeabur.com/docs/zeabur/install/personal/) and
-  [zeaburctl](https://oss.zeabur.com/docs/zeabur/reference/zeaburctl/)
-
-[Releases](https://oss.zeabur.com/docs/zeabur/reference/releases/) lists what a release contains
-and how to verify it.
 
 ## Build from source
 

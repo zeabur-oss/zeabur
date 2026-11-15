@@ -1,11 +1,11 @@
 ---
 title: Deploy your first service
-description: Deploy a public Nginx image, from creating a project to opening it in a browser.
+description: Deploy a sample Nginx application, confirm it's up, break it on purpose, and find the evidence on screen.
 ---
 
-Put an Nginx page online: create a project, enter an image, review the changes, apply them, and open the Nginx welcome page in a browser. You don't need a Git repository. It takes about five minutes.
+Follow one sample Nginx application through its first task: deploy it, confirm it's up, break it on purpose, then find the evidence on screen. You don't need a Git repository.
 
-Before you start, you need a Zeabur installation you can sign in to and a domain that can point to the cluster, such as `web.example.com`. If an administrator has already configured an application domain, the form suggests an address, and you don't need to configure DNS yourself.
+Before you start, you need a Zeabur you can use, whether you started on [your own server](quickstart.mdx) or with a [kubeconfig](kubeconfig.mdx), and a domain that can point to the cluster, such as `web.example.com`. If an administrator has already configured an application domain, the form suggests an address, and you don't need to configure DNS yourself.
 
 ## Create a project
 
@@ -73,6 +73,41 @@ kubectl -n hello get deploy,svc,ingress -l app.kubernetes.io/name=web
 The Namespace has `zeabur.com/project=true`, the Deployment's `READY` value is `1/1`, and the Ingress's `HOSTS` value is the domain you entered.
 
 These are standard Kubernetes objects. You can create the same service with `kubectl apply` without Zeabur. For the full YAML, see “Do the same with kubectl” in [Deploy a container image](../deploy/image.mdx).
+
+## Break it on purpose
+
+Switch to an image version that doesn't exist and see how Zeabur tells you something is wrong.
+
+1. Open the `web` service's **Settings**, switch from **Settings** to **YAML** at the top, and click **Edit**.
+2. Change the `image` version `1.30.5-alpine-slim` to `no-such-tag`, click **Review changes**, check the diff, and apply.
+
+By default a Deployment starts the new replica and stops the old one only after the new one is ready, so the old replica keeps serving and the address still opens. The new replica can't download its image, so it never comes up.
+
+## Find the evidence
+
+In the service's **Overview** you can see, in order:
+
+- The status becomes **Rollout stuck**.
+- **What's wrong** says why: a new replica can't download its image. Under it, **Deployment stuck** shows "0 of 1 new replicas ready", with **Roll back** next to it.
+- In **Deployments**, switch to **Events**. The newest entry at the top is Kubernetes failing to pull the image.
+
+You can see the same evidence with kubectl:
+
+```sh
+kubectl -n hello rollout status deployment/web --timeout=30s
+kubectl -n hello get events --sort-by=.lastTimestamp
+```
+
+Once you've found the cause, click **Roll back** in **What's wrong**, check the changes, and apply. When the new replica is ready, **Overview** is back to `1/1` **Ready**.
+
+## What each result looks like
+
+| Result | What you see | What to do |
+| --- | --- | --- |
+| Success | **Overview** shows `1/1` **Ready**, with no old replica and no problem written | Open the address to check |
+| Failure | **Rollout stuck**, **What's wrong** says why, and **Events** has a matching entry | Fix it and apply, or click **Roll back** |
+| No right to read this | The screen says **This needs more rights.** and lists the **Missing rights** | Give the list to a cluster administrator |
+| Unknown | The new replica isn't ready yet and no cause is written | Look again in a few minutes and check with `kubectl rollout status`; don't treat it as success |
 
 ## If the page doesn't load
 

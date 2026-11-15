@@ -1,0 +1,43 @@
+---
+title: Zeabur 能做什麼、不做什麼
+description: Zeabur 支援的工作、和 CI/CD 與 GitOps 並用的方式、它會寫入叢集的內容、怎麼離開，以及已知的限制。
+---
+
+Zeabur 讀取和修改的都是叢集裡原本就有的 Kubernetes 物件，自己不存任何資料。下面列出它能代你做的事、會寫進叢集的東西，以及做不到的地方。
+
+## 支援的工作
+
+| 工作 | 在哪裡做 |
+| --- | --- |
+| 部署映像檔、Git 儲存庫、上傳的資料夾或 Docker Compose 檔 | [映像檔](../deploy/image.mdx)、[Git](../deploy/git.mdx)、[上傳資料夾](../deploy/upload.mdx)、[Docker Compose](../deploy/compose.mdx) |
+| 從範本部署，建立資料庫、物件儲存和排程工作 | [範本](../deploy/templates.mdx)、[資料庫](../deploy/databases.mdx)、[物件儲存](../deploy/object-storage.mdx)、[排程工作](../deploy/cron-jobs.mdx) |
+| 調整副本數、資源、環境變數、網域和磁碟區 | [副本與資源](../configure/service-settings.mdx)、[環境變數](../configure/variables.mdx)、[網域](../configure/domains.mdx)、[磁碟區](../configure/volumes.mdx) |
+| 重新啟動、回滾和暫停服務 | [重新啟動與回滾](../configure/restart-rollback.mdx) |
+| 找出服務出問題的原因 | [狀態與診斷](../cluster/diagnosis.mdx)、[日誌與事件](../configure/logs-terminal.mdx) |
+| 備份、節點、元件和通知 | [備份](../cluster/backups.mdx)、[節點](../cluster/nodes.mdx)、[元件](../cluster/components.mdx)、[通知](../cluster/notifications.mdx) |
+
+每一項變更都先用**檢查變更**列出會寫入的內容，確認後才套用。
+
+## 和 CI/CD、GitOps 並用
+
+Zeabur 看得到由 Helm、Argo CD 或 Flux 管理的服務，也能重新啟動它們，但副本數、環境變數、網域和磁碟區在 Zeabur 裡是唯讀的，回滾和刪除也不行。這些變更要回到原本的 values 或 Git 儲存庫去改，否則下一次同步就會蓋掉。
+
+CI 把映像檔推到 registry 之後，可以用 Zeabur 部署那個映像檔，用固定的版本標籤，才看得出現在跑的是哪一版。在 Zeabur 之外用 kubectl 建立或修改的物件，Zeabur 也看得到。兩邊同時改同一個物件時，Zeabur 會要求重新檢查，不會蓋掉對方的變更。
+
+## Zeabur 寫入什麼
+
+- 專案是加了 `zeabur.com/project: "true"` 標籤的 Namespace，名稱、描述和圖示放在 `zeabur.com/` 開頭的註解。
+- 部署服務時建立一般的 Deployment、Service 和 Ingress，都帶 `app.kubernetes.io/name` 標籤。
+- 沒有資料庫，也沒有自訂資源（CRD）。
+- `zeaburctl ui` 不在叢集裡安裝元件，寫入的只有你套用的變更。裝進叢集的 Zeabur 另外會有自己的 Deployment、設定和成員角色。
+
+## 離開
+
+移除 Zeabur 不會停掉服務。Deployment、Service、Ingress、環境變數和磁碟區都留在原本的 Namespace，網站照常運作。完整的步驟和該保留的元件，見[移除 Zeabur，保留服務](../leave/uninstall.mdx)。
+
+## 已知的限制
+
+- 讀取和修改都用你自己的權限。你讀不到的東西，Zeabur 也讀不到。
+- 裝進叢集的 Helm chart 需要 Kubernetes 1.30 以上。
+- 自己用的安裝（KubeSolo）沒有成員和專案之間的網路隔離，也沒有 Zeabur Builder，預設只能部署現成的映像檔。
+- `zeaburctl` 沒有 Intel Mac 的版本，Windows 要在 WSL 執行。

@@ -1,26 +1,54 @@
 ---
 title: 開始使用 Zeabur
-description: 從一台伺服器或既有 Kubernetes 叢集開始管理服務。
+description: 看 Zeabur 適不適合你，選一條路開始，完成第一件工作。
 ---
 
-用 Zeabur 查看 Kubernetes 裡的服務、日誌與網域。調整設定時，先**檢查變更**再套用。依手上的環境選一個起點。
+Zeabur 給在 Kubernetes 上執行應用程式、卻沒有專職維運的小團隊，也給替客戶管理叢集的服務商，以及在家自己架叢集的人。它把叢集顯示成專案和服務，改設定前先列出會寫入的內容，服務出問題時用白話說明原因。
 
-## 從一台伺服器開始
+## 第一件工作
 
-準備一台使用 systemd 的 Linux 伺服器、root 權限，以及指向這台主機的登入與管理網域。Zeabur Installer 的網頁介面會一步步檢查伺服器、選元件，再安裝 K3s（或 RKE2）、Zeabur Identity 和 Zeabur。
+照著[部署第一個服務](get-started/first-project.mdx)走一遍：部署一個 Nginx 範例，確認它上線，故意弄壞它，再從畫面找出原因。
 
-完成後，畫面會顯示 Zeabur 網址與第一位管理員的通行密鑰註冊連結。登入後就能建立第一個專案。
+## 選一條路
+
+### 用 kubeconfig 連接既有叢集
+
+準備：
+
+- 能連到叢集的 kubeconfig。
+- 你電腦用的 `zeaburctl`。
+- 讀取權限可以看服務，修改權限才能部署，兩者都由叢集的 RBAC 決定。
+
+不需要 Zeabur Identity，叢集裡也不會安裝任何東西。一開始會看到叢集裡既有的 Namespace，讀不到的部分，畫面會寫出缺少哪些權限。
+
+[用 kubeconfig 連接既有叢集](get-started/kubeconfig.mdx)
+
+### 在自己的伺服器開始
+
+準備：
+
+- 使用 systemd 的 Linux 伺服器，amd64 或 arm64，要有 root 權限。
+- 團隊使用至少 4 GiB 記憶體，只有你自己用的小機器至少 1.5 GiB。
+- 指向這台主機的登入網域與管理網域。
+
+Zeabur Installer 的網頁介面會一步步檢查伺服器、選元件，再安裝 K3s（或 RKE2）、Zeabur Identity 和 Zeabur。完成後，畫面會顯示 Zeabur 的網址，以及第一位管理員註冊通行密鑰的連結，之後都用通行密鑰登入。接著就能部署、調整和診斷服務。
 
 [在一台伺服器安裝 Zeabur](get-started/quickstart.mdx)
 
-## 使用既有 Kubernetes 叢集
+## 能做什麼、不做什麼
 
-準備叢集管理權限、Helm，以及 kube-apiserver 已信任的 Zeabur Identity。Zeabur 的網址要能用 HTTPS 開啟，瀏覽器才會提供通行密鑰。
+支援的工作、和 CI/CD 與 GitOps 並用的方式、Zeabur 寫入叢集的內容、怎麼離開，以及已知的限制，見[Zeabur 能做什麼、不做什麼](get-started/what-zeabur-does.mdx)。
 
-完成後，用通行密鑰登入 Zeabur，在**專案**找到既有的 Namespace，或新增專案部署服務。
+## 需要時再加
 
-[把 Zeabur 裝進既有叢集](install/existing-cluster.mdx)
+- **Zeabur Identity**：讓每個人各自登入，並依專案分角色。用 kubeconfig 連接既有叢集時不需要。見 [Zeabur Identity 入門](https://oss.zeabur.com/docs/identity/get-started?utm_source=zeabur)。
+- **Zeabur Builder**：從 Git 儲存庫或資料夾建置映像檔。見[從 Git 建置並部署](deploy/git.mdx)。
+- **Zeabur Catalog**：已測試的元件版本和應用程式範本。見[範本](deploy/templates.mdx)和[叢集元件](cluster/components.mdx)。
 
-## 下一步
+## 告訴我們哪裡卡住
 
-已有可登入的 Zeabur 後，接著[部署第一個服務](get-started/first-project.mdx)。
+做完或卡住時，請說你想完成哪一項工作、卡在哪一步，用[回饋表單](https://github.com/zeabur-oss/zeabur/issues/new?template=task-feedback.yml)。不用貼 kubeconfig、權杖或日誌。
+
+## 體驗計畫
+
+加入體驗計畫後，Zeabur 會傳送版本和使用情形，內容只有固定的值。網域、名稱、日誌、kubeconfig 和叢集裡的內容都不會傳。用 installer 安裝時預設加入，可以在確認頁取消；用 Helm 安裝時預設不加入。設定 `DO_NOT_TRACK=1` 就會全部關閉。詳見[體驗計畫](reference/telemetry.mdx)。
