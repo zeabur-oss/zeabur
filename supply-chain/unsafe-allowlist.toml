@@ -751,3 +751,9 @@ name = "compression-core"
 kind = "unsafe"
 reason = "gzip of API answers; the uninitialised-buffer type the codecs write into"
 approved = "2026-11-01"
+
+[[crate]]
+name = "jsonptr"
+kind = "unsafe"
+reason = "JSON Pointer of json-patch, which kube's `jsonpatch` feature uses for JSON Patch; casts a validated `str` to its `Pointer` and `Token` newtypes (pointer.rs, token.rs); no native code, runs in the server and in the planner"
+approved = "pending"

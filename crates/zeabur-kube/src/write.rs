@@ -1,9 +1,9 @@
-//! Writes as the person: one request per object. Creations and patches are built by hand, so the
-//! body is exactly what the plan computed and the query asks for strict field validation, which
-//! kube's `PostParams` cannot.
+//! Writes as the person: one request per object. Patches go through kube's `Api::patch` with
+//! `PatchParams`; a creation is built by hand, because kube's `PostParams` cannot ask for strict
+//! field validation.
 //!
-//! - **A change** is a `PATCH` with `application/json-patch+json` [rfc6902]; its `test` operations
-//!   make it all-or-nothing against what the plan read.
+//! - **A change** is a `PATCH` with `application/json-patch+json` [rfc6902] (kube's `Patch::Json`);
+//!   its `test` operations make it all-or-nothing against what the plan read.
 //! - **A debug container** is the same `PATCH` of a Pod's `ephemeralcontainers` subresource
 //!   [k8s-ephemeral], the only way to add one.
 //! - **A new object** is a `POST` to its collection.
@@ -27,7 +27,7 @@
 //! [k8s-delete-options]: https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/delete-options/
 //! [k8s-gc]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/#background-deletion
 
-use kube::api::{Api, DeleteParams, DynamicObject};
+use kube::api::{Api, DeleteParams, DynamicObject, Patch, PatchParams};
 use kube::core::{ApiResource, GroupVersionKind};
 
 use crate::names;
@@ -52,11 +52,6 @@ pub(crate) fn collection_path(target: &ObjectTarget) -> String {
         encode(&target.namespace),
         encode(&target.plural)
     )
-}
-
-/// The URL path of `target` itself.
-pub(crate) fn object_path(target: &ObjectTarget) -> String {
-    format!("{}/{}", collection_path(target), encode(&target.name))
 }
 
 /// Refuses a target whose path would leave its segments, as reads do ([`crate::names`]):
@@ -100,9 +95,9 @@ fn encode(segment: &str) -> String {
     out
 }
 
-/// The query string of a creation or a patch. A deletion writes no fields, so it names no field
-/// manager and no field validation, and its dry run goes in its body ([`delete_params`]).
-pub(crate) fn query(request: &WriteRequest) -> String {
+/// The query string of a creation. A deletion writes no fields, so it names no field manager and
+/// no field validation, and its dry run goes in its body ([`delete_params`]).
+fn query(request: &WriteRequest) -> String {
     let mut parts = vec![
         format!("fieldManager={FIELD_MANAGER}"),
         "fieldValidation=Strict".to_owned(),
@@ -122,79 +117,83 @@ pub(crate) async fn write(
         &request.target,
         !matches!(request.body, WriteBody::Create(_)),
     )?;
-    let (builder, content_type, body) = match &request.body {
-        WriteBody::Create(object) => (
-            http::Request::post(format!(
+    let api = api(client, &request.target);
+    let name = request.target.name.as_str();
+    let patch_params = patch_params(request);
+    let answer = match &request.body {
+        WriteBody::Create(object) => {
+            let http_request = http::Request::post(format!(
                 "{}?{}",
                 collection_path(&request.target),
                 query(request)
-            )),
-            "application/json",
-            object,
-        ),
-        WriteBody::JsonPatch(operations) => (
-            http::Request::patch(format!(
-                "{}?{}",
-                object_path(&request.target),
-                query(request)
-            )),
-            "application/json-patch+json",
-            operations,
-        ),
-        WriteBody::MergePatch(body) => (
-            http::Request::patch(format!(
-                "{}?{}",
-                object_path(&request.target),
-                query(request)
-            )),
-            "application/merge-patch+json",
-            body,
-        ),
-        WriteBody::EphemeralContainers(operations) => (
-            http::Request::patch(format!(
-                "{}/ephemeralcontainers?{}",
-                object_path(&request.target),
-                query(request)
-            )),
-            "application/json-patch+json",
-            operations,
-        ),
+            ))
+            .header(http::header::CONTENT_TYPE, "application/json")
+            .header(http::header::ACCEPT, "application/json")
+            .body(serde_json::to_vec(object).map_err(|e| ClusterError::Decode(e.to_string()))?)
+            .map_err(|e| ClusterError::Transport(e.to_string()))?;
+            client.request::<DynamicObject>(http_request).await?
+        }
+        WriteBody::JsonPatch(operations) => {
+            api.patch(name, &patch_params, &json_patch(operations)?)
+                .await?
+        }
+        WriteBody::MergePatch(body) => api.patch(name, &patch_params, &Patch::Merge(body)).await?,
+        WriteBody::EphemeralContainers(operations) => {
+            api.patch_subresource(
+                "ephemeralcontainers",
+                name,
+                &patch_params,
+                &json_patch(operations)?,
+            )
+            .await?
+        }
         WriteBody::Delete(preconditions) => {
-            let target = &request.target;
-            let (group, version) = target
-                .api_version
-                .split_once('/')
-                .unwrap_or(("", target.api_version.as_str()));
-            let resource = ApiResource::from_gvk_with_plural(
-                &GroupVersionKind::gvk(group, version, &target.kind),
-                &target.plural,
-            );
-            let api = if target.namespace.is_empty() {
-                Api::<DynamicObject>::all_with(client.clone(), &resource)
-            } else {
-                Api::<DynamicObject>::namespaced_with(client.clone(), &target.namespace, &resource)
-            };
             let answer = api
-                .delete(&target.name, &delete_params(preconditions, request.dry_run))
+                .delete(name, &delete_params(preconditions, request.dry_run))
                 .await?;
             return Ok(Written {
                 resource_version: answer.left().and_then(|o| o.metadata.resource_version),
             });
         }
     };
-    let bytes = serde_json::to_vec(body).map_err(|e| ClusterError::Decode(e.to_string()))?;
-    let http_request = builder
-        .header(http::header::CONTENT_TYPE, content_type)
-        .header(http::header::ACCEPT, "application/json")
-        .body(bytes)
-        .map_err(|e| ClusterError::Transport(e.to_string()))?;
-    let answer: serde_json::Value = client.request(http_request).await?;
     Ok(Written {
-        resource_version: answer
-            .pointer("/metadata/resourceVersion")
-            .and_then(serde_json::Value::as_str)
-            .map(str::to_owned),
+        resource_version: answer.metadata.resource_version,
     })
+}
+
+/// The client of `target`'s kind, namespaced unless the object is cluster-scoped.
+fn api(client: &kube::Client, target: &ObjectTarget) -> Api<DynamicObject> {
+    let (group, version) = target
+        .api_version
+        .split_once('/')
+        .unwrap_or(("", target.api_version.as_str()));
+    let resource = ApiResource::from_gvk_with_plural(
+        &GroupVersionKind::gvk(group, version, &target.kind),
+        &target.plural,
+    );
+    if target.namespace.is_empty() {
+        Api::all_with(client.clone(), &resource)
+    } else {
+        Api::namespaced_with(client.clone(), &target.namespace, &resource)
+    }
+}
+
+/// Names the field manager and asks for strict field validation, so a field the object's schema
+/// does not know fails the request instead of being dropped silently; a dry run adds `dryRun=All`.
+fn patch_params(request: &WriteRequest) -> PatchParams {
+    let params = PatchParams {
+        dry_run: request.dry_run,
+        field_manager: Some(FIELD_MANAGER.to_owned()),
+        ..PatchParams::default()
+    };
+    params.validation_strict()
+}
+
+/// The operations of a plan as kube's JSON Patch.
+fn json_patch(operations: &serde_json::Value) -> Result<Patch<()>, ClusterError> {
+    serde_json::from_value(operations.clone())
+        .map(Patch::Json)
+        .map_err(|e| ClusterError::Decode(e.to_string()))
 }
 
 /// The options of a deletion [k8s-delete-options], which kube sends as its body, the dry run
@@ -278,14 +277,10 @@ mod tests {
     }
 
     #[test]
-    fn paths_follow_the_api_group() {
+    fn a_creation_is_posted_to_its_collection() {
         assert_eq!(
-            object_path(&target("v1", "configmaps")),
-            "/api/v1/namespaces/shop/configmaps/web"
-        );
-        assert_eq!(
-            object_path(&target("apps/v1", "deployments")),
-            "/apis/apps/v1/namespaces/shop/deployments/web"
+            collection_path(&target("v1", "configmaps")),
+            "/api/v1/namespaces/shop/configmaps"
         );
         assert_eq!(
             collection_path(&target("networking.k8s.io/v1", "ingresses")),
@@ -296,7 +291,7 @@ mod tests {
             namespace: String::new(),
             ..target("v1", "namespaces")
         };
-        assert_eq!(object_path(&namespace), "/api/v1/namespaces/web");
+        assert_eq!(collection_path(&namespace), "/api/v1/namespaces");
     }
 
     #[test]
@@ -311,7 +306,18 @@ mod tests {
             "fieldManager=zeabur&fieldValidation=Strict&dryRun=All"
         );
         request.body = WriteBody::JsonPatch(serde_json::json!([]));
+        let params = patch_params(&request);
+        assert_eq!(params.field_manager.as_deref(), Some("zeabur"));
+        assert_eq!(
+            params
+                .field_validation
+                .as_ref()
+                .map(kube::api::ValidationDirective::as_str),
+            Some("Strict")
+        );
+        assert!(params.dry_run);
         request.dry_run = false;
+        assert!(!patch_params(&request).dry_run);
         assert_eq!(
             query(&request),
             "fieldManager=zeabur&fieldValidation=Strict"
