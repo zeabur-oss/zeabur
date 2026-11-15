@@ -12,7 +12,6 @@ mod keys;
 mod menu;
 mod output;
 mod sources;
-#[cfg(target_os = "macos")]
 #[cfg(windows)]
 mod win32;
 
