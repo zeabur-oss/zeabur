@@ -3,15 +3,15 @@ info:
   title: Zeabur API
   description: |-
     Kubernetes made simple and secure by default. Every request acts as the person making it; errors are RFC 9457 problems that keep kube-apiserver's own answer.
-    
+
     **Shapes.** A get returns the resource itself, with `unreadable` naming the kinds the person may not list. A list returns `{items}` with every item; events take a `limit` (100 by default, 500 at most) and say in `totalSize` how many matched. Every value names the Kubernetes object it came from (`origin`), every top-level node has an `id` in the shape of its path, and times are RFC 3339.
-    
+
     **Caching.** Every answer carries `Cache-Control: no-store`.
-    
+
     **Consistency.** A project is read with one consistent LIST per kind, issued concurrently. Kinds are not read at one shared resourceVersion, which Kubernetes does not offer across kinds, so a response can briefly show, for example, a pod that a just-deleted workload owned; the next read corrects it. Zeabur promises freshness (nothing older than the request), not a single-revision snapshot.
-    
+
     **Errors.** The problem `kind` and `reason` are open enumerations: expect new values, treat an unknown `kind` by its HTTP status and ignore an unknown `reason`. `429` and `503` carry kube-apiserver's `Retry-After` when it gave one.
-    
+
     **Compatibility.** The embedded web interface ships with the API; other clients are not yet promised a stable `/api/v1`.
   license:
     name: Apache-2.0
@@ -746,7 +746,7 @@ paths:
         [metrics-server]). Each node's disk comes from the metrics store (see `disks`), and `disk`
         says when it could not. `403` when nodes cannot be listed; a refusal of pods, metrics or the
         store leaves those parts out and says so.
-        
+
         [metrics-server]: https://github.com/kubernetes-sigs/metrics-server
       operationId: listNodes
       responses:
@@ -4195,11 +4195,11 @@ components:
       type: string
       description: |-
         How the nodes may mount a new claim [k8s-access-modes].
-        
+
         Whether a mode works is up to the `StorageClass`'s provisioner (k3s's local-path provisioner
         offers only `ReadWriteOnce` and `ReadWriteOncePod`), so no mode is refused here: the plan's
         dry run and the provisioner decide.
-        
+
         [k8s-access-modes]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#access-modes
       enum:
       - ReadWriteOnce
@@ -6060,7 +6060,7 @@ components:
       - type: object
         description: |-
           Replace one object of the project with an edited copy, written as YAML.
-          
+
           Fields the server sets (`status`, `resourceVersion`, `managedFields`, …) are kept whatever
           the copy says. A ConfigMap's or Secret's edit becomes key changes: a Secret value shown
           masked and sent back unchanged is kept.
@@ -7179,11 +7179,11 @@ components:
       description: |-
         What a workload's Reloader annotations ask for [reloader]: its pods are replaced when one of
         these ConfigMaps or Secrets changes, whoever changed it, while Reloader runs in the cluster.
-        
+
         Reloader also reads `reloader.stakater.com/search` with `reloader.stakater.com/match` on the
         ConfigMap or Secret, and `reloader.stakater.com/ignore`; those live on the data objects and
         are not part of this.
-        
+
         [reloader]: https://github.com/stakater/Reloader#how-to-use-reloader
       required:
       - auto
@@ -7236,7 +7236,7 @@ components:
       type: object
       description: |-
         One service appearing to call another.
-        
+
         Kubernetes has no field for "this workload talks to that one", so every connection is read
         from evidence and says which. It describes configuration, never observed traffic.
       required:
@@ -7402,7 +7402,7 @@ components:
       description: |-
         A container's `resources`, as written: requests are what the scheduler reserves, limits what
         the kubelet enforces [k8s-resources].
-        
+
         [k8s-resources]: https://kubernetes.io/docs/concepts/configuration/manage-resources-containers/
       properties:
         limits:
@@ -7415,7 +7415,7 @@ components:
       type: object
       description: |-
         One container's state in a pod [k8s-container-states].
-        
+
         [k8s-container-states]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-states
       required:
       - name
@@ -8154,11 +8154,11 @@ components:
       type: object
       description: |-
         The request kube-apiserver refused with `403`, as Zeabur made it.
-        
+
         These are the attributes its authorizers decide on [k8s-authz]. kube-apiserver's `Status` names
         the object (`details.kind`, `details.group`, `details.name`) but not the verb [api-conventions],
         and its message is not an interface, so these come from the request, not from the answer.
-        
+
         [k8s-authz]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/#review-your-request-attributes
         [api-conventions]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#response-status-kind
       required:
@@ -8898,7 +8898,7 @@ components:
       description: |-
         A field kube-apiserver, or an admission webhook, found invalid: one of the `causes` in its
         `Status` details [api-conventions].
-        
+
         [api-conventions]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#response-status-kind
       required:
       - field
@@ -11097,7 +11097,7 @@ components:
       type: object
       description: |-
         A sentence a client words in its own language: a stable key and the values it names.
-        
+
         Zeabur never sends prose for diagnoses, gaps and the plain-language parts of a problem, so
         every interface translates them the same way and a key's meaning is part of the contract.
       required:
@@ -12331,19 +12331,19 @@ components:
       type: object
       description: |-
         Where a value is *declared* or read from: the Kubernetes object and the field inside it.
-        
+
         Every value the API returns carries one, so a client can always show which object to open,
         and a change plan knows which field it writes. It is the one provenance type of the API: the
         projection's values, events, logs, ConfigMaps, Secrets and projects all use it.
-        
+
         Inside a project document `apiVersion` and `namespace` are left out: every object is in the
         project's namespace, and the kind names one API group. Responses that stand alone (an event,
         a log, a ConfigMap) carry both, so the reference is complete without its context; that is
         Kubernetes' `ObjectReference` shape [k8s-api-conventions].
-        
+
         `field_path` names JSON fields with dots. A list whose entries Kubernetes merges by a key is
         addressed by that key, `containers[name=app]`; an atomic list by index, `envFrom[0]`.
-        
+
         [k8s-api-conventions]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#object-references
       required:
       - kind
@@ -12457,14 +12457,14 @@ components:
       type: object
       description: |-
         A variable's ConfigMap or Secret was written after the oldest running pod started.
-        
+
         That pod may still hold the old value: a container reads its variables once, when it starts
         [k8s-configmap-env].
-        
+
         `managedFields` keep one time per field manager [k8s-ssa-fields], the time of its last write
         to any field it owns, so a manager owning this key that later wrote another key also counts:
         the pod *may* hold an old value, a restart settles it.
-        
+
         [k8s-configmap-env]: https://kubernetes.io/docs/concepts/configuration/configmap/#configmaps-and-pods
         [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
       required:
@@ -12824,7 +12824,7 @@ components:
         description: |-
           The deleted object owns these objects, as far as the person could read them; the garbage
           collector deletes them after it [k8s-gc].
-          
+
           [k8s-gc]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/
         required:
         - target
@@ -12865,7 +12865,7 @@ components:
           Deleting the claim may lose its data: what happens to its PersistentVolume is the volume's
           reclaim policy, `Delete` (the volume and its data go) or `Retain` (they stay until an
           administrator removes them) [k8s-reclaim].
-          
+
           [k8s-reclaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
         required:
         - claim
@@ -12946,7 +12946,7 @@ components:
           These workloads still use the deleted ConfigMap, Secret or claim: their pods that start
           after it is gone fail to start, and a claim in use stays until no pod uses it
           [k8s-in-use].
-          
+
           [k8s-in-use]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#storage-object-in-use-protection
         required:
         - target
@@ -13697,7 +13697,7 @@ components:
       type: string
       description: |-
         The probes of a container [k8s-probes].
-        
+
         [k8s-probes]: https://kubernetes.io/docs/concepts/configuration/liveness-readiness-startup-probes/
       enum:
       - liveness
@@ -13782,10 +13782,10 @@ components:
       type: object
       description: |-
         A container's probes [k8s-probes].
-        
+
         Liveness restarts the container when it fails, readiness takes the pod out of its Services'
         endpoints, and startup holds the other two back until the application has started.
-        
+
         [k8s-probes]: https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#container-probes
       properties:
         liveness:
@@ -14256,7 +14256,7 @@ components:
             description: Kinds the person could not list; the projection is missing what they hide.
       description: |-
         A project: its services, the resources they use and how they relate, read as the person.
-        
+
         The one document a client needs for a project: the service, variables and objects views are
         cut from it rather than read again.
     ProjectExtensions:
@@ -15529,7 +15529,7 @@ components:
           description: |-
             Its class: `spec.ingressClassName`, else the older `kubernetes.io/ingress.class`
             annotation [k8s-ingress-class].
-            
+
             [k8s-ingress-class]: https://kubernetes.io/docs/concepts/services-networking/ingress/#deprecated-annotation
         errorPages:
           oneOf:
@@ -15556,7 +15556,7 @@ components:
             The cert-manager issuer the Ingress names in `cert-manager.io/cluster-issuer` or
             `cert-manager.io/issuer`: cert-manager issues a certificate for each of its `spec.tls`
             entries [cm-ingress].
-            
+
             [cm-ingress]: https://cert-manager.io/docs/usage/ingress/
         maintenance:
           type: array
@@ -16361,7 +16361,7 @@ components:
       description: |-
         One service of a project, as the project document holds it, with the details of its own
         endpoints and routes.
-        
+
         In both documents `endpoints` and `routes` hold the details and a service's
         `endpointNames` and `routeNames` name its own; here they are only the service's, so the
         document stays the size of one workload.
@@ -16774,7 +16774,7 @@ components:
       type: string
       description: |-
         What an environment variable's value is read from.
-        
+
         This is the *value's* source, which is what a client needs to show or change it: a literal is
         edited in place, a Secret or ConfigMap key is edited in that object.
       enum:
@@ -16972,7 +16972,7 @@ components:
       type: string
       description: |-
         A CronJob's `concurrencyPolicy` [k8s-concurrency].
-        
+
         [k8s-concurrency]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#concurrency-policy
       enum:
       - forbid
@@ -17030,7 +17030,7 @@ components:
       type: object
       description: |-
         When a CronJob runs [k8s-cronjob].
-        
+
         [k8s-cronjob]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/
       required:
       - cron
@@ -18339,7 +18339,7 @@ components:
       type: string
       description: |-
         The workload kinds Zeabur projects.
-        
+
         Declared in alphabetical order, so the derived [`Ord`] sorts as the kind names do.
       enum:
       - CronJob
@@ -18370,7 +18370,7 @@ components:
       type: object
       description: |-
         A workload, by kind and name.
-        
+
         The derived order is kind, then name, as strings: [`WorkloadKind`]'s variants are declared
         in alphabetical order.
       required:
