@@ -278,10 +278,12 @@ pub fn distribution(facts: &ClusterFacts) -> Option<&'static str> {
 
 /// A component's `defaults` on a profile; a value Zeabur does not know counts as unsupported.
 fn default_on<'a>(component: &'a Component, profile: &str) -> &'a str {
-    match component.defaults.get(profile).map(String::as_str) {
-        Some(known @ ("recommended" | "optional")) => known,
-        _ => "unsupported",
-    }
+    component
+        .defaults
+        .get(profile)
+        .map(String::as_str)
+        .filter(|known| matches!(*known, "recommended" | "optional"))
+        .unwrap_or("unsupported")
 }
 
 /// The components of a capability that can run here: on the cluster's distribution, when the

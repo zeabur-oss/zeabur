@@ -2,7 +2,7 @@
 #![cfg_attr(
     feature = "openapi",
     expect(
-        clippy::large_stack_frames,
+        clippy::large_unopt_stack_frames,
         reason = "the derived schema of `Change` builds every variant in one function"
     )
 )]

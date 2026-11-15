@@ -12,14 +12,13 @@ The repository's dev skill has its crate table, binaries, extra checks and gener
 ## Toolchain
 
 - Everything runs inside the Nix dev shell: prefix commands with `nix develop -c …` (or enter
-  `nix develop`). Do not use system-installed toolchains or rustup; there is no
-  `rust-toolchain.toml`.
-- `flake.lock` is the only place the compiler version is set: `nix develop` takes the newest
-  nightly in the locked rust-overlay that has every component and target listed in `flake.nix`.
+  `nix develop`). Do not use system-installed toolchains.
+- `rust-toolchain.toml` is the one place the compiler is set: the nightly by date, components and
+  targets. `flake.nix` builds it with `rust-bin.fromRustupToolchainFile`; rustup reads the same file.
   The nightly enables the parallel front end (`-Zthreads`), current clippy lints and rustfmt's
   import ordering. No `#![feature]` is used.
-- Renovate's lock file maintenance moves `flake.lock`, and with it the nightly, every Monday. A
-  new nightly can bring new clippy lints; fix those on that pull request before merging.
+- Renovate cannot move the nightly date. Change `channel` by hand (`nix flake update rust-overlay` if the
+  locked overlay lacks that date) and fix new clippy lints on that pull request.
 - Release binaries are built with `trim-paths = "all"`, so they carry no build-host paths.
 - Optional compiler cache: install [kache](https://ninja.kunobi.com/docs/kache/getting-started/c-cpp)
   and set `RUSTC_WRAPPER=kache` in your shell profile; `nix develop` keeps it. Release and image

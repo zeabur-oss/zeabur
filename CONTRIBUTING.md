@@ -126,16 +126,14 @@ verify again](docs/internal/releasing.md#fix-the-check-and-verify-again) shows.
 
 ## Toolchain
 
-- `flake.lock` is the only place the compiler version is set. `nix develop` takes the newest
-  nightly in the locked rust-overlay that has every component and target listed in `flake.nix`.
-  There is no `rust-toolchain.toml`; use `nix develop`, not rustup.
+- `rust-toolchain.toml` sets the compiler: the nightly (by date), components and targets. `nix develop`
+  builds exactly that toolchain, and rustup, which reads the same file, installs it outside Nix.
 - The pinned nightly enables the parallel front end (`-Zthreads`), current clippy lints and
   rustfmt's import ordering. No `#![feature]` is used. Moving to stable is a configuration
-  change: use `rust-bin.stable.latest` in `flake.nix`, drop `-Zthreads` from `.cargo/config.toml`
+  change: set `channel = "stable"` in `rust-toolchain.toml`, drop `-Zthreads` from `.cargo/config.toml`
   and the nightly-only `rustfmt.toml` options.
-- Renovate's lock file maintenance (`renovate.json`) updates `flake.lock` every Monday, and with it
-  the nightly. A new nightly can bring new clippy lints or change a nightly-only setting; fix those
-  on that pull request before merging.
+- Renovate proposes the new nightly date in `rust-toolchain.toml` (its `rust-toolchain` manager, after the preset's seven-day wait). On that pull request, check that `nix flake update rust-overlay` resolves the date and fix any new clippy lints or nightly-only setting changes.
+  The date is the same in every zeabur-oss Rust repository, so the four bump pull requests merge together.
 
 Release binaries are built with `trim-paths = "all"`, so they carry no build-host paths.
 
