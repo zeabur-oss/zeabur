@@ -1,4 +1,4 @@
-<!-- Edit this in zeabur-oss/skills (skills/zeabur-oss-ci/RELEASE-RECOVERY.md); the weekly skills sync overwrites the copy in other repositories. -->
+<!-- Edit this in zeabur-oss/.github (skills/zeabur-oss-ci/RELEASE-RECOVERY.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # When a release run fails
 

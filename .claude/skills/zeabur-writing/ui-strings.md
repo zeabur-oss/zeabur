@@ -1,11 +1,11 @@
-<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/ui-strings.md); the weekly skills sync overwrites the copy in other repositories. -->
+<!-- Edit this in zeabur-oss/.github (skills/zeabur-writing/ui-strings.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # Interface strings
 
 <!-- This file quotes the patterns it describes. -->
 <!-- vale ZeaburEn.Please = NO -->
 
-Applies to labels, buttons, titles, status words, errors, empty states, placeholders and toasts in every language. The repo's own element table (zeabur: `docs/internal/wording.md`, "Element conventions") sets case and punctuation per element.
+Applies to labels, buttons, titles, status words, errors, empty states, placeholders and toasts in every language. The repo's own element table (zeabur: `docs/internal/wording.md`, "Element conventions"; a copy is in [`wording.md`](wording.md)) sets case and punctuation per element.
 
 ## Each string stands alone
 

@@ -1,4 +1,4 @@
-<!-- Edit this in zeabur-oss/skills (skills/zeabur-writing/en.md); the weekly skills sync overwrites the copy in other repositories. -->
+<!-- Edit this in zeabur-oss/.github (skills/zeabur-writing/en.md); the weekly skills sync overwrites the copy in other repositories. -->
 
 # English
 
