@@ -3,7 +3,7 @@ title: 体验计划
 description: 加入体验计划后，Zeabur、`zeaburctl ui` 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；以及如何分别关闭。
 ---
 
-体验计划会发送版本、每天的使用人数、用过哪些功能，以及 `zeaburctl ui` 有没有连上集群，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启；`zeaburctl ui` 也默认不加入。
+体验计划会发送版本、每天的使用人数、用过哪些功能，以及 `zeaburctl ui` 有没有连上集群，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启；`zeaburctl ui` 默认加入，每次启动都会提示，并说明如何关闭。
 
 ## 会发送什么
 
@@ -55,14 +55,14 @@ description: 加入体验计划后，Zeabur、`zeaburctl ui` 和安装程序会�
 
 以下任何一种都有效，其中 `DO_NOT_TRACK` 优先于其他设置。
 
-- 在安装程序或 Zeabur 的环境变量中设置 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
+- 在安装程序、Zeabur 或 `zeaburctl ui` 的环境变量中设置 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
 - 在安装程序的确认页取消勾选，运行 `zeabur-installer --no-telemetry apply`（或 `--no-telemetry gui`），或在 `/etc/zeabur-installer/config.yaml` 中写 `telemetry: false`。
 - 用 Helm 安装时，保持默认的 `telemetry.enabled=false`。没有安装代码时，chart 不接受 `telemetry.enabled=true`。
-- `zeaburctl ui` 不要设置 `ZEABUR_TELEMETRY_ENABLED`，默认就不加入。
+- `zeaburctl ui` 在 `local-id` 所在的 `zeabur` 文件夹里的 `config.yaml` 写上 `telemetry: false`，或设置 `ZEABUR_TELEMETRY=off`。`config.yaml` 无法解析时，`zeaburctl ui` 什么都不发送。
 
 要删掉 `zeaburctl ui` 的代码，运行 `zeaburctl telemetry reset`。下次要发送事件时，它会生成新的代码。
 
-`zeaburctl ui` 要加入，就在它的环境变量设置 `ZEABUR_TELEMETRY_ENABLED=true`。用 Helm 加入时，传入一个新的安装代码：
+用 Helm 加入时，传入一个新的安装代码：
 
 ```sh
 helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \

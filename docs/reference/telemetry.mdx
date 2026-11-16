@@ -3,7 +3,7 @@ title: Experience program
 description: What Zeabur, `zeaburctl ui` and the installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, and how to turn each off.
 ---
 
-The experience program sends the version, how many people use Zeabur each day, which features they use, and whether `zeaburctl ui` could connect to a cluster, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on, and so does `zeaburctl ui`.
+The experience program sends the version, how many people use Zeabur each day, which features they use, and whether `zeaburctl ui` could connect to a cluster, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on. `zeaburctl ui` joins by default and says so, with how to turn it off, each time it starts.
 
 ## What is sent
 
@@ -55,14 +55,14 @@ Domains, host names, IP addresses, Git URLs, image or service names, project nam
 
 Any one of these is enough, and `DO_NOT_TRACK` wins over all the others.
 
-- Set `DO_NOT_TRACK=1` in the environment of the installer or of Zeabur. Any value but empty or `0` counts.
+- Set `DO_NOT_TRACK=1` in the environment of the installer, of Zeabur or of `zeaburctl ui`. Any value but empty or `0` counts.
 - In the installer, uncheck the box on the review page, run `zeabur-installer --no-telemetry apply` (or `--no-telemetry gui`), or set `telemetry: false` in `/etc/zeabur-installer/config.yaml`.
 - With Helm, keep `telemetry.enabled=false`, the default. The chart refuses `telemetry.enabled=true` without an ID.
-- For `zeaburctl ui`, leave `ZEABUR_TELEMETRY_ENABLED` unset, the default.
+- For `zeaburctl ui`, put `telemetry: false` in `config.yaml` in the same `zeabur` folder as `local-id`, or set `ZEABUR_TELEMETRY=off`. If `config.yaml` can't be read, `zeaburctl ui` sends nothing.
 
 To delete the ID of `zeaburctl ui`, run `zeaburctl telemetry reset`. It makes a new one the next time it is about to send an event.
 
-To join with `zeaburctl ui`, set `ZEABUR_TELEMETRY_ENABLED=true` in its environment. To join with Helm, pass in a new ID:
+To join with Helm, pass in a new ID:
 
 ```sh
 helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \

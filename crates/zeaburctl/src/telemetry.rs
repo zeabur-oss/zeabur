@@ -1,7 +1,8 @@
 //! The experience program for a local run (docs/reference/telemetry.mdx): `zeaburctl ui` sends
-//! `cluster_connected` when the person joined, and `zeaburctl telemetry reset` deletes the
+//! `cluster_connected` unless the person left, and `zeaburctl telemetry reset` deletes the
 //! random ID the run keeps.
 
+use std::path::Path;
 use std::sync::Arc;
 
 use clap::Subcommand;
@@ -59,27 +60,76 @@ fn random() -> Option<[u8; 16]> {
     zeabur_core::crypto::random().ok()
 }
 
-/// What `zeaburctl ui` sends. It does nothing unless the person joined with
-/// `ZEABUR_TELEMETRY_ENABLED=true`, and `DO_NOT_TRACK` turns it off.
+/// The file in which the person can leave the program with `telemetry: false`.
+const CONFIG: &str = "config.yaml";
+
+#[derive(serde::Deserialize)]
+struct Config {
+    #[serde(default = "joined")]
+    telemetry: bool,
+}
+
+const fn joined() -> bool {
+    true
+}
+
+/// Whether `config.yaml` in `directory` leaves the program in. A file that can't be read as
+/// YAML leaves it, so a typo never sends.
+fn joined_in(directory: &Path) -> bool {
+    let Ok(text) = std::fs::read_to_string(directory.join(CONFIG)) else {
+        return true;
+    };
+    if text.trim().is_empty() {
+        return true;
+    }
+    match serde_saphyr::from_str::<Config>(&text) {
+        Ok(config) => config.telemetry,
+        Err(error) => {
+            output::error(&format!(
+                "cannot read {}: {error}. zeaburctl ui sends nothing until it is fixed.",
+                directory.join(CONFIG).display()
+            ));
+            false
+        }
+    }
+}
+
+/// What `zeaburctl ui` sends. It is on by default; `DO_NOT_TRACK`, `ZEABUR_TELEMETRY=off` or
+/// `telemetry: false` in `config.yaml` turns it off.
 pub(crate) struct Local {
     on: Option<(Sender, LocalId)>,
     is_internal: bool,
 }
 
 impl Local {
+    /// The program as this environment and `config.yaml` set it. When it is on, says so and
+    /// how to turn it off.
     pub(crate) fn from_env() -> Self {
-        let var = |name| std::env::var(name).ok();
-        let is_true = |name| var(name).is_some_and(|v| matches!(v.trim(), "1" | "true"));
-        let switch = Switch::from_env(is_true("ZEABUR_TELEMETRY_ENABLED"));
-        let on = standard_dir()
-            .filter(|_| switch != Switch::Off)
-            .map(|directory| {
-                let show: Show = Arc::new(|body| output::info(&format!("telemetry: {body}")));
-                (Sender::new(switch, show), LocalId::new(&directory, random))
-            });
+        let is_internal = std::env::var("ZEABUR_TELEMETRY_INTERNAL")
+            .is_ok_and(|v| matches!(v.trim(), "1" | "true"));
+        let Some(directory) = standard_dir() else {
+            return Self {
+                on: None,
+                is_internal,
+            };
+        };
+        let switch = Switch::from_env(joined_in(&directory));
+        if switch == Switch::Off {
+            return Self {
+                on: None,
+                is_internal,
+            };
+        }
+        output::info(&format!(
+            "zeaburctl ui sends its version and whether it could connect to the cluster, to help \
+             improve Zeabur. To turn it off, set DO_NOT_TRACK=1 or put `telemetry: false` in {}.\n\
+             What is sent: https://oss.zeabur.com/docs/zeabur/reference/telemetry/",
+            directory.join(CONFIG).display()
+        ));
+        let show: Show = Arc::new(|body| output::info(&format!("telemetry: {body}")));
         Self {
-            on,
-            is_internal: is_true("ZEABUR_TELEMETRY_INTERNAL"),
+            on: Some((Sender::new(switch, show), LocalId::new(&directory, random))),
+            is_internal,
         }
     }
 
@@ -115,6 +165,23 @@ mod tests {
     fn status(code: u16) -> ClusterError {
         let status = serde_json::json!({"code": code, "reason": "", "message": ""});
         ClusterError::Status(serde_json::from_value(status).unwrap())
+    }
+
+    #[test]
+    fn config_yaml_leaves_the_program_only_when_it_says_so() {
+        let directory = tempfile::tempdir().unwrap();
+        let with = |text: Option<&str>| {
+            if let Some(text) = text {
+                std::fs::write(directory.path().join(CONFIG), text).unwrap();
+            }
+            joined_in(directory.path())
+        };
+        assert!(with(None));
+        assert!(with(Some("")));
+        assert!(with(Some("telemetry: true\n")));
+        assert!(with(Some("other: 1\n")));
+        assert!(!with(Some("telemetry: false\n")));
+        assert!(!with(Some("telemetry: [")));
     }
 
     #[test]
