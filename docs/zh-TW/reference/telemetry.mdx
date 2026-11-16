@@ -47,7 +47,7 @@ description: 加入體驗計畫後，Zeabur、`zeaburctl ui` 和 installer 會�
 
 事件不會說明是誰。`person` 是用金鑰算出的使用者名稱加日期的雜湊值。金鑰從 Zeabur 的 plan key 衍生，留在叢集的 Secret 裡，從不送出，所以我們無法從雜湊值反推使用者名稱。同一個人一整天的 `person` 都一樣，Zeabur 重新啟動也不變；隔天就換成另一個，所以不同天無法串在一起。
 
-變更被接受後，Zeabur 會用你自己的憑證讀取 Deployment，直到部署結束，最多讀到部署期限過後一分鐘（Deployment 沒有設定時是 10 分鐘）。有更新的變更或 Zeabur 重新啟動時就停止讀取，這時不會傳送 `rollout_finished`。
+變更被接受後，Zeabur 會用你自己的憑證讀取 Deployment，直到部署結束，最多讀到部署期限過後一分鐘（Deployment 沒有設定時是 10 分鐘）。憑證快到期時，Zeabur 會在登入狀態允許的範圍內更新它，但不會因此延長登入。有更新的變更、你登出或 Zeabur 重新啟動時就停止讀取，這時不會傳送 `rollout_finished`。
 
 `feature_used` 沒有 `person`，只表示今天用過某項功能，不說是誰、用了幾次。瀏覽器不會傳送任何東西，是 Zeabur 的伺服器在操作成功之後傳送的。
 

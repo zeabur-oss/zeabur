@@ -12,6 +12,7 @@ use zeabur_model::WorkloadKind;
 use zeabur_plan::{Change, Plan};
 use zeabur_telemetry::{ChangeId, Operation, Rollout, Submitted};
 
+use crate::access::Later;
 use crate::error::ApiError;
 use crate::handlers::AppState;
 
@@ -29,6 +30,9 @@ pub enum Fact {
 pub struct Report {
     /// The person's user name, which the receiver hashes and never sends.
     pub user: String,
+    /// When the change was submitted, in Unix seconds. Both facts of a change are hashed with
+    /// this day, so one change never links two days of the same person.
+    pub submitted_at: i64,
     /// The change.
     pub id: ChangeId,
     /// What the change does.
@@ -85,12 +89,21 @@ pub(crate) fn measured(changes: &[Change], plan: &Plan) -> Option<Measured> {
     })
 }
 
-/// Reports how the cluster answered the change `measured` of `user`. An accepted write that left
-/// `generation` is then read until its rollout ends.
+/// Who made a change, and how to read the cluster as them.
+pub(crate) struct Person<'a> {
+    /// Their user name.
+    pub(crate) user: &'a str,
+    /// The connection of their request.
+    pub(crate) now: Arc<dyn Cluster>,
+    /// Their connection after the request, where the request's one expires.
+    pub(crate) later: Option<Later>,
+}
+
+/// Reports how the cluster answered the change `measured` of `person`. An accepted write that
+/// left `generation` is then read, as the person, until its rollout ends.
 pub(crate) fn submitted(
     state: &AppState,
-    cluster: &Arc<dyn Cluster>,
-    user: &str,
+    person: Person<'_>,
     namespace: &str,
     measured: Measured,
     answer: Result<Option<i64>, &ApiError>,
@@ -99,7 +112,8 @@ pub(crate) fn submitted(
         return;
     };
     let submitted = Report {
-        user: user.to_owned(),
+        user: person.user.to_owned(),
+        submitted_at: (state.clock)().as_second(),
         id: ChangeId::from_random(bytes),
         operation: measured.operation,
         fact: Fact::Submitted(answer.map_or_else(|e| refusal(e.0.status), |_| Submitted::Accepted)),
@@ -110,11 +124,16 @@ pub(crate) fn submitted(
         return;
     };
     let changes = Arc::clone(changes);
-    let cluster = Arc::clone(cluster);
+    let later = person.later.unwrap_or_else(|| {
+        let now = person.now;
+        Arc::new(move || {
+            let now = Arc::clone(&now);
+            Box::pin(async move { Some(now) })
+        })
+    });
     let namespace = namespace.to_owned();
     tokio::spawn(async move {
-        if let Some(result) = follow(cluster.as_ref(), &namespace, &measured.name, generation).await
-        {
+        if let Some(result) = follow(&later, &namespace, &measured.name, generation).await {
             changes(Report {
                 fact: Fact::Finished(result),
                 ..finished
@@ -135,19 +154,15 @@ const fn refusal(status: u16) -> Submitted {
 }
 
 /// Reads the Deployment until the rollout of `generation` ends, as `kubectl rollout status`
-/// does. `None` when a newer change replaced it, the person can no longer read it, or the
-/// progress deadline passed by [`GRACE`] with no result.
-async fn follow(
-    cluster: &dyn Cluster,
-    namespace: &str,
-    name: &str,
-    generation: i64,
-) -> Option<Rollout> {
+/// does. `None` when a newer change replaced it, the person signed out or can no longer read
+/// it, or the progress deadline passed by [`GRACE`] with no result.
+async fn follow(person: &Later, namespace: &str, name: &str, generation: i64) -> Option<Rollout> {
     let started = Instant::now();
     let mut deadline = PROGRESS_DEADLINE;
     while started.elapsed() < deadline + GRACE {
         tokio::time::sleep(POLL).await;
-        let deployment = match read(cluster, namespace, name).await {
+        let cluster = person().await?;
+        let deployment = match read(cluster.as_ref(), namespace, name).await {
             Ok(Some(deployment)) => deployment,
             Ok(None) => return None,
             Err(error) if error.is_refused() => return None,

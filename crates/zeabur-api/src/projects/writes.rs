@@ -62,7 +62,7 @@ use zeabur_plan::{Change, ErrorKind, Input, Plan, PlanError, PlanRequest, Write}
 use crate::cluster::s3_destinations;
 use crate::error::{ApiError, project_read, read_problem};
 use crate::extract::{Json, Path};
-use crate::handlers::{AppState, Credential, Person};
+use crate::handlers::{AppState, Credential, Later, Person};
 use crate::plan_token::{self as token, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
 use crate::projects::{deploy_keys, snapshot, templates};
 use crate::settings::Settings;
@@ -435,6 +435,7 @@ pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
     Credential(handoff): Credential,
+    Later(later): Later,
     Path(project): Path<String>,
     Json(request): Json<ApplyRequest>,
 ) -> Result<Json<ApplyResponse>, ApiError> {
@@ -486,11 +487,24 @@ pub(crate) async fn apply(
     .await?;
     let (namespace, target_cluster) =
         planner.writer(&claims.request, &project, cluster.as_ref())?;
+    let measured = crate::measure::measured(&claims.request.changes, &plan);
+    let submitted = |answer: Result<Option<i64>, &ApiError>| {
+        if let Some(measured) = measured.clone() {
+            let person = crate::measure::Person {
+                user: &identity.username,
+                now: Arc::clone(&cluster),
+                later: later.clone(),
+            };
+            crate::measure::submitted(&state, person, namespace, measured, answer);
+        }
+    };
     if zeabur_plan::versions(&plan) != claims.versions {
-        return Err(ApiError::from(Problem::new(
+        let changed = ApiError::from(Problem::new(
             Kind::Conflict,
             "Someone changed an object in this plan after the plan was made.",
-        )));
+        ));
+        submitted(Err(&changed));
+        return Err(changed);
     }
     if claims
         .request
@@ -502,17 +516,7 @@ pub(crate) async fn apply(
         return Ok(Json(ApplyResponse { applied }));
     }
     let written = write_plan(target_cluster, namespace, &plan).await;
-    if let Some(measured) = crate::measure::measured(&claims.request.changes, &plan) {
-        let answer = written.as_ref().map(|(_, generation)| *generation);
-        crate::measure::submitted(
-            &state,
-            &cluster,
-            &identity.username,
-            namespace,
-            measured,
-            answer,
-        );
-    }
+    submitted(written.as_ref().map(|(_, generation)| *generation));
     let (applied, _) = written?;
     report_used(
         &state,

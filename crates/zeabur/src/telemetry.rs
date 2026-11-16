@@ -174,8 +174,9 @@ impl Telemetry {
         }));
     }
 
-    /// Sends what happened to a change, at `now` (Unix seconds), in the background.
-    pub(crate) fn changed(&self, report: Report, now: i64) {
+    /// Sends what happened to a change in the background. `person` is of the day the change
+    /// was submitted.
+    pub(crate) fn changed(&self, report: Report) {
         let Some((daily, sender, id)) = &self.on else {
             return;
         };
@@ -183,7 +184,7 @@ impl Telemetry {
             zeabur_version: env!("CARGO_PKG_VERSION"),
             mode: Mode::InCluster,
             is_internal: self.is_internal,
-            person: crypto::hex(&daily.person(&report.user, now)),
+            person: crypto::hex(&daily.person(&report.user, report.submitted_at)),
             id: report.id,
             operation: report.operation,
         };

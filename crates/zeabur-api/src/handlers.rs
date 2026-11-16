@@ -106,6 +106,25 @@ where
     }
 }
 
+/// How to reach the cluster as the person after the request (see [`ClusterAccess::later`]).
+pub(crate) struct Later(pub(crate) Option<crate::access::Later>);
+
+impl<S> FromRequestParts<S> for Later
+where
+    S: Send + Sync,
+    AppState: FromRef<S>,
+{
+    type Rejection = std::convert::Infallible;
+
+    fn from_request_parts(
+        parts: &mut Parts,
+        state: &S,
+    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
+        let state = AppState::from_ref(state);
+        std::future::ready(Ok(Self(state.access.later(parts))))
+    }
+}
+
 /// An unknown API path.
 pub(crate) async fn not_found() -> ApiError {
     ApiError::from(Problem::new(

@@ -7,6 +7,8 @@
 //! There is one way to the cluster for a request, [`ClusterAccess::for_request`]. An admin
 //! account acts with its full rights directly.
 
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 
 use axum::http::request::Parts;
@@ -31,6 +33,11 @@ impl std::fmt::Debug for Handoff {
     }
 }
 
+/// The person's connection again, after their request has ended: renewed when due, without
+/// counting as something they did. `None` once their session is over.
+pub type Later =
+    Arc<dyn Fn() -> Pin<Box<dyn Future<Output = Option<Arc<dyn Cluster>>> + Send>> + Send + Sync>;
+
 /// Gives each request the cluster connection of the person who made it.
 pub trait ClusterAccess: Send + Sync + 'static {
     /// The connection for this request, or the problem that prevents one (not signed in, …).
@@ -46,6 +53,13 @@ pub trait ClusterAccess: Send + Sync + 'static {
     /// its own to hand over (local mode, where the kubeconfig's credential may be anything, and
     /// tests).
     fn handoff(&self, _parts: &Parts) -> Option<Handoff> {
+        None
+    }
+
+    /// How to get the connection of [`ClusterAccess::for_request`] again for reads that outlive
+    /// the request, such as following a rollout. `None` where that connection keeps working:
+    /// local mode, a bearer token the request presented, tests.
+    fn later(&self, _parts: &Parts) -> Option<Later> {
         None
     }
 

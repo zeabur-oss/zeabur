@@ -146,6 +146,34 @@ mod tests {
     }
 
     #[tokio::test(start_paused = true)]
+    async fn a_plan_made_before_someone_else_changed_the_deployment_is_a_conflict() {
+        let cluster = cluster();
+        let (app, reports) = api(&cluster);
+        let (status, planned) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({"changes": [{"op": "scale",
+                "workload": {"kind": "Deployment", "name": "web"}, "replicas": 2}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        cluster.update(|state| {
+            let web = &mut state.objects.get_mut("shop").unwrap().deployments[0];
+            web.metadata.generation = Some(2);
+        });
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(facts(&reports), [Fact::Submitted(Submitted::Conflict)]);
+    }
+
+    #[tokio::test(start_paused = true)]
     async fn a_newer_change_ends_the_wait_without_a_result() {
         let cluster = cluster();
         let (app, reports) = api(&cluster);
