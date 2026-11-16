@@ -36,6 +36,7 @@ zeaburctl components export certificates/cert-manager
 | `up` | 将文件夹上传到通过文件夹创建的服务，并开始构建 | 修改该服务的 Build，将文件夹推送到 registry |
 | `connect` | 把本机端口转发到数据库或服务，并打印连接方式 | 不修改集群中的任何内容 |
 | `components export` | 输出安装 Catalog 组件的 manifest 或 Helm 命令 | 不连接集群，不做任何修改 |
+| `telemetry reset` | 删除 `zeaburctl ui` 为体验计划保存的随机代码 | 不连接集群，不做任何修改 |
 
 ## `ui`
 
@@ -198,6 +199,14 @@ kubectl apply -f velero.yaml
 ```
 
 也可以将文件提交到 GitOps 仓库，让 Flux 或 Argo CD 应用。后续调整和移除都通过这个文件完成。
+
+## `telemetry reset`
+
+```sh
+zeaburctl telemetry reset
+```
+
+删除 `zeaburctl ui` 在你加入体验计划后生成的 `local-id` 文件。`zeaburctl ui` 下次要发送事件时，会生成新的代码。文件放在哪里、发送哪些内容，见[体验计划](./telemetry.mdx)。
 
 ## 连接与权限问题
 

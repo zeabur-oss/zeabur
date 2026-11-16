@@ -1,8 +1,13 @@
 //! `zeaburctl ui`: the web interface on this machine, acting with the person's kubeconfig.
 
 use std::process::ExitCode;
+use std::sync::Arc;
+
+use zeabur_kube::{Cluster as _, UserClient};
+use zeabur_telemetry::Connection;
 
 use crate::output;
+use crate::telemetry::{Local, outcome};
 
 /// Options of `zeaburctl ui`.
 #[derive(Debug, clap::Args)]
@@ -42,7 +47,15 @@ pub(crate) fn run(args: &UiArgs) -> ExitCode {
 
 async fn serve(args: &UiArgs) -> Result<(), String> {
     let settings = crate::in_process::settings(args.metrics_service.as_deref())?;
-    let running = zeabur_local::start(args.context.as_deref(), settings)
+    let connected = connect(args.context.as_deref()).await;
+    Local::from_env()
+        .connected(match &connected {
+            Ok(_) => Connection::Connected,
+            Err((outcome, _)) => *outcome,
+        })
+        .await;
+    let cluster = connected.map_err(|(_, message)| message)?;
+    let running = zeabur_local::start_with(Arc::new(cluster), settings)
         .await
         .map_err(|e| e.to_string())?;
     let url = running.url();
@@ -57,6 +70,18 @@ async fn serve(args: &UiArgs) -> Result<(), String> {
         std::future::pending::<()>().await;
     }
     running.stop().await.map_err(|e| e.to_string())
+}
+
+/// The client for the kubeconfig once the cluster has said who it signs in as, or how the
+/// connection ended and what to tell the person.
+async fn connect(context: Option<&str>) -> Result<UserClient, (Connection, String)> {
+    let cluster = UserClient::from_kubeconfig(context)
+        .await
+        .map_err(|e| (Connection::Other, e.to_string()))?;
+    match cluster.whoami().await {
+        Ok(_) => Ok(cluster),
+        Err(error) => Err((outcome(&error), error.into_problem("your identity").detail)),
+    }
 }
 
 /// Opens `url` in the default browser; failing that, the printed link is enough.

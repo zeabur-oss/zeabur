@@ -10,5 +10,8 @@ A [`Sender`] sends nothing unless its [`Switch`] is `On`. `DO_NOT_TRACK` (any va
 `ZEABUR_TELEMETRY=debug` hands the exact request body to a callback instead of sending it. A
 send is one try with a short timeout; a failure is a debug log line and nothing else.
 
+A local run has no installation ID. [`Sender::send_local`] reads its [`LocalId`], a file in the
+platform's configuration directory, and makes it only when an event is about to be posted.
+
 [`do_not_track`] is the one reading of `DO_NOT_TRACK`; the update checks of the interface and
 `zeaburctl` use it too.

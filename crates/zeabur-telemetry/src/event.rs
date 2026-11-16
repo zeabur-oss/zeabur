@@ -501,6 +501,11 @@ impl Event {
     /// identity, no person profile is made, and `PostHog` is told not to look up a location.
     #[must_use]
     pub fn body(&self, key: &str, id: &InstallationId) -> String {
+        self.body_as(key, id.as_str())
+    }
+
+    /// [`Event::body`] with `distinct_id` as given.
+    pub(crate) fn body_as(&self, key: &str, distinct_id: &str) -> String {
         let mut properties = match self.properties() {
             Value::Object(map) => map,
             Value::Null
@@ -515,7 +520,7 @@ impl Event {
             "api_key": key,
             "batch": [{
                 "event": self.name(),
-                "distinct_id": id.as_str(),
+                "distinct_id": distinct_id,
                 "properties": properties,
             }],
         })
