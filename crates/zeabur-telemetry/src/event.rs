@@ -9,22 +9,10 @@ use serde_json::{Map, Value, json};
 pub struct InstallationId(String);
 
 impl InstallationId {
-    /// A version 4 UUID made from 16 random bytes: version 4 in the high bits of octet 6 and
-    /// variant `10` in octet 8, as RFC 9562 §5.4 (<https://www.rfc-editor.org/rfc/rfc9562#section-5.4>)
-    /// lays out. The bytes should come from a CSPRNG (§6.9).
+    /// A version 4 UUID made from 16 random bytes (RFC 9562 §5.4), which should come from a CSPRNG.
     #[must_use]
-    pub fn from_random(mut bytes: [u8; 16]) -> Self {
-        bytes[6] = (bytes[6] & 0x0F) | 0x40;
-        bytes[8] = (bytes[8] & 0x3F) | 0x80;
-        let mut text = String::with_capacity(36);
-        for (i, byte) in bytes.iter().enumerate() {
-            if matches!(i, 4 | 6 | 8 | 10) {
-                text.push('-');
-            }
-            text.extend(char::from_digit(u32::from(byte >> 4), 16));
-            text.extend(char::from_digit(u32::from(byte & 0x0F), 16));
-        }
-        Self(text)
+    pub fn from_random(bytes: [u8; 16]) -> Self {
+        Self(uuid_v4(bytes))
     }
 
     /// Reads a UUID in the hex-and-dash form of RFC 9562 §4, in any case.
@@ -45,6 +33,23 @@ impl InstallationId {
     pub fn as_str(&self) -> &str {
         &self.0
     }
+}
+
+/// A version 4 UUID made from 16 random bytes: version 4 in the high bits of octet 6 and
+/// variant `10` in octet 8, as RFC 9562 §5.4 (<https://www.rfc-editor.org/rfc/rfc9562#section-5.4>)
+/// lays out. The bytes should come from a CSPRNG (§6.9).
+fn uuid_v4(mut bytes: [u8; 16]) -> String {
+    bytes[6] = (bytes[6] & 0x0F) | 0x40;
+    bytes[8] = (bytes[8] & 0x3F) | 0x80;
+    let mut text = String::with_capacity(36);
+    for (i, byte) in bytes.iter().enumerate() {
+        if matches!(i, 4 | 6 | 8 | 10) {
+            text.push('-');
+        }
+        text.extend(char::from_digit(u32::from(byte >> 4), 16));
+        text.extend(char::from_digit(u32::from(byte & 0x0F), 16));
+    }
+    text
 }
 
 /// A day in UTC.
@@ -92,6 +97,8 @@ impl Serialize for Day {
 pub enum Mode {
     /// In the cluster it manages.
     InCluster,
+    /// On the person's computer with their kubeconfig: `zeaburctl ui` or Zeabur Desktop.
+    Local,
 }
 
 /// What the installer was asked to install.
@@ -318,6 +325,127 @@ pub struct Failure {
     pub error: ErrorCode,
 }
 
+/// How connecting to a cluster with a kubeconfig ended, by the cluster's answer to the first
+/// request.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Connection {
+    /// The cluster said who the credential signs in as.
+    Connected,
+    /// No answer: a network error or a timeout.
+    Unreachable,
+    /// 401: the credential was refused.
+    CredentialRefused,
+    /// 403: the credential cannot read what Zeabur needs.
+    NoReadRight,
+    /// Anything else.
+    Other,
+}
+
+/// Someone connected to a cluster with a kubeconfig, or tried to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ClusterConnected {
+    /// The version of Zeabur.
+    pub zeabur_version: &'static str,
+    /// How Zeabur runs.
+    pub mode: Mode,
+    /// Set only on the project's own development, test and demonstration installs.
+    pub is_internal: bool,
+    /// How it ended.
+    pub result: Connection,
+}
+
+/// The random identifier of one change, shared by its two events. It means nothing else.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct ChangeId(String);
+
+impl ChangeId {
+    /// A version 4 UUID made from 16 random bytes (RFC 9562 §5.4), which should come from a CSPRNG.
+    #[must_use]
+    pub fn from_random(bytes: [u8; 16]) -> Self {
+        Self(uuid_v4(bytes))
+    }
+}
+
+/// What a change does to one Deployment.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Operation {
+    /// A new image, or a new Deployment.
+    DeployImage,
+    /// A new replica count.
+    ScaleReplicas,
+    /// A change of environment variables.
+    ChangeEnv,
+}
+
+/// One change someone made, on both of its events.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct Change {
+    /// The version of Zeabur.
+    pub zeabur_version: &'static str,
+    /// How Zeabur runs.
+    pub mode: Mode,
+    /// Set only on the project's own development, test and demonstration installs.
+    pub is_internal: bool,
+    /// The person, as `zeabur_active` hashes them for the UTC day of this event.
+    pub person: String,
+    /// Ties the change's two events together.
+    #[serde(rename = "change_id")]
+    pub id: ChangeId,
+    /// What it does.
+    pub operation: Operation,
+}
+
+/// The answer Zeabur gave the person for a change, by HTTP status class.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Submitted {
+    /// The cluster accepted the write.
+    Accepted,
+    /// 403: the person may not write it.
+    Forbidden,
+    /// 422: the cluster or Zeabur refused the values.
+    Invalid,
+    /// 409: something else changed it first.
+    Conflict,
+    /// 502, 503 or 504: the cluster did not answer.
+    Unreachable,
+    /// Any other status.
+    Other,
+}
+
+/// A change was sent to the cluster and answered.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct AppChangeSubmitted {
+    /// The change.
+    #[serde(flatten)]
+    pub change: Change,
+    /// The answer.
+    pub result: Submitted,
+}
+
+/// How the rollout of an accepted change ended, in the terms `kubectl rollout status` uses
+/// (<https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#deployment-status>).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Rollout {
+    /// Every replica runs the change and is available.
+    Available,
+    /// The `Progressing` condition turned `False` with the reason `ProgressDeadlineExceeded`.
+    ProgressDeadlineExceeded,
+}
+
+/// The rollout of an accepted change ended.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct RolloutFinished {
+    /// The change.
+    #[serde(flatten)]
+    pub change: Change,
+    /// How it ended.
+    pub result: Rollout,
+}
+
 /// Everything that can be sent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
@@ -331,6 +459,12 @@ pub enum Event {
     InstallFinished(Install),
     /// An install stopped.
     InstallFailed(Failure),
+    /// Someone connected to a cluster with a kubeconfig, or tried to.
+    ClusterConnected(ClusterConnected),
+    /// A change was sent to the cluster and answered.
+    AppChangeSubmitted(AppChangeSubmitted),
+    /// The rollout of an accepted change ended.
+    RolloutFinished(RolloutFinished),
 }
 
 impl Event {
@@ -343,6 +477,9 @@ impl Event {
             Self::InstallStarted(_) => "install_started",
             Self::InstallFinished(_) => "install_finished",
             Self::InstallFailed(_) => "install_failed",
+            Self::ClusterConnected(_) => "cluster_connected",
+            Self::AppChangeSubmitted(_) => "app_change_submitted",
+            Self::RolloutFinished(_) => "rollout_finished",
         }
     }
 
@@ -355,6 +492,9 @@ impl Event {
                 serde_json::to_value(install)
             }
             Self::InstallFailed(failure) => serde_json::to_value(failure),
+            Self::ClusterConnected(connected) => serde_json::to_value(connected),
+            Self::AppChangeSubmitted(submitted) => serde_json::to_value(submitted),
+            Self::RolloutFinished(finished) => serde_json::to_value(finished),
         };
         value.unwrap_or_else(|_| json!({}))
     }
@@ -404,6 +544,30 @@ mod tests {
         assert_eq!(serialized(Day::from_unix(1_782_863_999)), "2026-06-30");
         assert_eq!(serialized(Day::from_unix(951_782_400)), "2000-02-29");
         assert_eq!(serialized(Day::from_unix(-1)), "1969-12-31");
+    }
+
+    #[test]
+    fn a_change_is_sent_as_flat_properties() {
+        let change = Change {
+            zeabur_version: "1.0.0",
+            mode: Mode::InCluster,
+            is_internal: false,
+            person: "ab".to_owned(),
+            id: ChangeId::from_random([1; 16]),
+            operation: Operation::ScaleReplicas,
+        };
+        let event = Event::RolloutFinished(RolloutFinished {
+            change,
+            result: Rollout::ProgressDeadlineExceeded,
+        });
+        let properties = event.properties();
+        assert_eq!(properties["operation"], "scale_replicas");
+        assert_eq!(
+            properties["change_id"],
+            "01010101-0101-4101-8101-010101010101"
+        );
+        assert_eq!(properties["result"], "progress_deadline_exceeded");
+        assert!(properties.get("change").is_none());
     }
 
     #[test]
