@@ -73,24 +73,28 @@ const fn joined() -> bool {
     true
 }
 
-/// Whether `config.yaml` in `directory` leaves the program in. A file that can't be read as
-/// YAML leaves it, so a typo never sends.
+/// Whether `config.yaml` in `directory` leaves the program in. Only a missing file means the
+/// default; a file that can't be read or parsed leaves it, so an opt-out is never lost.
 fn joined_in(directory: &Path) -> bool {
-    let Ok(text) = std::fs::read_to_string(directory.join(CONFIG)) else {
-        return true;
+    let path = directory.join(CONFIG);
+    let unusable = |error: &dyn std::fmt::Display| {
+        output::error(&format!(
+            "cannot read {}: {error}. zeaburctl ui sends nothing until it is fixed.",
+            path.display()
+        ));
+        false
+    };
+    let text = match std::fs::read_to_string(&path) {
+        Ok(text) => text,
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return true,
+        Err(error) => return unusable(&error),
     };
     if text.trim().is_empty() {
         return true;
     }
     match serde_saphyr::from_str::<Config>(&text) {
         Ok(config) => config.telemetry,
-        Err(error) => {
-            output::error(&format!(
-                "cannot read {}: {error}. zeaburctl ui sends nothing until it is fixed.",
-                directory.join(CONFIG).display()
-            ));
-            false
-        }
+        Err(error) => unusable(&error),
     }
 }
 
@@ -182,6 +186,8 @@ mod tests {
         assert!(with(Some("other: 1\n")));
         assert!(!with(Some("telemetry: false\n")));
         assert!(!with(Some("telemetry: [")));
+        std::fs::write(directory.path().join(CONFIG), [0xFF, 0xFE]).unwrap();
+        assert!(!joined_in(directory.path()));
     }
 
     #[test]
