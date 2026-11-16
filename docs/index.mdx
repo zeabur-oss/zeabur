@@ -28,12 +28,14 @@ You don't need Zeabur Identity and nothing is installed in the cluster. You firs
 Prepare:
 
 - A Linux server that uses systemd, on amd64 or arm64, with root access.
-- At least 4 GiB of memory for a team, or at least 1.5 GiB for a small machine only you use.
+- At least 4 GiB of memory.
 - Sign-in and admin domains that point to the host.
 
 The Zeabur Installer web interface checks the server step by step, lets you choose components, then installs K3s (or RKE2), Zeabur Identity and Zeabur. When it finishes, the screen shows Zeabur's address and a link for the first administrator to register a passkey. After that you sign in with a passkey, and you can deploy, change and diagnose services.
 
 [Install Zeabur on a single server](get-started/quickstart.mdx)
+
+A small machine only you use needs 1.5 GiB. There the installer sets up KubeSolo with no Zeabur dashboard, Zeabur Identity or domains, and you open Zeabur with `zeaburctl ui` on your own computer and the server's kubeconfig. See [Personal use](install/personal.mdx).
 
 ## What it does and doesn't do
 

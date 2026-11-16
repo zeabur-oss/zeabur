@@ -28,12 +28,14 @@ Zeabur 适合在 Kubernetes 上运行应用、却没有专职运维的小团队�
 准备：
 
 - 使用 systemd 的 Linux 服务器，amd64 或 arm64，需要 root 权限。
-- 团队使用至少 4 GiB 内存，只有你自己用的小机器至少 1.5 GiB。
+- 至少 4 GiB 内存。
 - 指向这台主机的登录域名和管理域名。
 
 Zeabur Installer 的网页界面会逐步检查服务器、选择组件，再安装 K3s（或 RKE2）、Zeabur Identity 和 Zeabur。完成后，界面会显示 Zeabur 的网址，以及第一位管理员注册通行密钥的链接，之后都用通行密钥登录。接着就能部署、调整和诊断服务。
 
 [在一台服务器上安装 Zeabur](get-started/quickstart.mdx)
+
+只有你自己用的小机器，1.5 GiB 就够。这时安装程序会装 KubeSolo，没有 Zeabur 控制台、Zeabur Identity，也不需要域名。你在自己的电脑上用服务器的 kubeconfig 运行 `zeaburctl ui` 打开 Zeabur。见[个人使用](install/personal.mdx)。
 
 ## 能做什么、不做什么
 
