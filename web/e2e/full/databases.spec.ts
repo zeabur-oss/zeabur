@@ -143,7 +143,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
     })
 
     await test.step(`the Developer connects ${db.name} to ${service}`, async () => {
-      const connect = developer.getByRole("region", { name: "Connect" })
+      const connect = developer.getByRole("region", { name: "Connect", exact: true })
       await connect.getByRole("button", { name: "Connect to a service" }).click()
       const drawer = developer.getByRole("dialog", { name: `Connect ${db.name} to services` })
       await drawer.getByRole("checkbox", { name: service }).click()
@@ -237,7 +237,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       await expect(viewer.locator("main header").first()).toContainText("Ready", {
         timeout: 60_000,
       })
-      const connect = viewer.getByRole("region", { name: "Connect" })
+      const connect = viewer.getByRole("region", { name: "Connect", exact: true })
       // Closed, naming the role that opens it, rather than refused after a click.
       await expect(connect.getByRole("button", { name: "Reveal" })).toBeDisabled()
       await expect(connect).toContainText("Needs Developer access")
