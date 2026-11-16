@@ -16,6 +16,10 @@ use zeabur_auth::url::BaseUrl;
 ///
 /// People sign in through Zeabur Identity; register Zeabur there as a confidential client with the
 /// redirect URI `<public URL>/auth/callback` and the audience kube-apiserver accepts.
+#[expect(
+    clippy::struct_excessive_bools,
+    reason = "one flag per command-line switch"
+)]
 #[derive(Debug, clap::Parser)]
 #[command(version)]
 pub(crate) struct Args {
@@ -130,6 +134,10 @@ pub(crate) struct Args {
     /// The random installation ID the program sends, a UUID. Needed with `--telemetry-enabled`.
     #[arg(long, env = "ZEABUR_INSTALLATION_ID", default_value = "")]
     pub(crate) installation_id: String,
+    /// Mark every event as the project's own: development, tests and demonstrations
+    /// (docs/internal/measurement.md). `true` or `false`.
+    #[arg(long, env = "ZEABUR_TELEMETRY_INTERNAL")]
+    pub(crate) telemetry_internal: bool,
     /// Let the interface check GitHub's releases for a newer Zeabur, from the person's browser
     /// (docs/reference/telemetry.mdx). `true` or `false`. `DO_NOT_TRACK` turns it off.
     #[arg(long, env = "ZEABUR_UPDATE_CHECK", default_value_t = true, action = clap::ArgAction::Set)]

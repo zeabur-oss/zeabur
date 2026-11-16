@@ -1231,6 +1231,7 @@ impl Cluster for MemoryCluster {
     ///
     /// [k8s-validation]: https://kubernetes.io/docs/reference/using-api/api-concepts/#field-validation
     /// [k8s-generation]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
+    #[expect(clippy::too_many_lines, reason = "the steps of one write, in order")]
     fn write<'a>(&'a self, request: &'a WriteRequest) -> Answer<'a, Written> {
         Box::pin(async move {
             let target = &request.target;
@@ -1263,6 +1264,7 @@ impl Cluster for MemoryCluster {
                 drop(state);
                 return Ok(Written {
                     resource_version: version,
+                    generation: None,
                 });
             }
             let mut object = match (&request.body, &current) {
@@ -1311,6 +1313,7 @@ impl Cluster for MemoryCluster {
                 drop(state);
                 return Ok(Written {
                     resource_version: version,
+                    generation: None,
                 });
             }
             let next = version
@@ -1327,11 +1330,15 @@ impl Cluster for MemoryCluster {
                     );
                 }
             }
+            let generation = object
+                .pointer("/metadata/generation")
+                .and_then(Value::as_i64);
             state.store(target, object)?;
             state.writes.push(request.clone());
             drop(state);
             Ok(Written {
                 resource_version: Some(next),
+                generation,
             })
         })
     }

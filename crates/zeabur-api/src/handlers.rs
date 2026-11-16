@@ -56,6 +56,8 @@ pub struct AppState {
     pub terminals: Option<Arc<dyn Cluster>>,
     /// Receives each feature a successful write used (see [`crate::used`]).
     pub used: Option<crate::used::Used>,
+    /// Receives what happens to each change of one Deployment (see [`crate::measure`]).
+    pub changes: Option<crate::measure::Changes>,
 }
 
 impl std::fmt::Debug for AppState {

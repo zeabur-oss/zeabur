@@ -1,13 +1,15 @@
 //! The experience program (docs/reference/telemetry.mdx): one event the first time each person
-//! uses Zeabur's web interface in a UTC day, and one the first time each feature with its values
-//! is used.
+//! uses Zeabur's web interface in a UTC day, one the first time each feature with its values
+//! is used, and the two events of each change of one Deployment.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
 
+use zeabur_api::measure::{Fact, Report};
 use zeabur_core::crypto;
 use zeabur_telemetry::{
-    Day, Event, Feature, FeatureUsed, InstallationId, Mode, Sender, Switch, ZeaburActive,
+    AppChangeSubmitted, Change, Day, Event, Feature, FeatureUsed, InstallationId, Mode,
+    RolloutFinished, Sender, Switch, ZeaburActive,
 };
 
 /// The people seen in the current UTC day, in memory only. A restart forgets them, but the
@@ -43,11 +45,14 @@ impl Daily {
     fn first(&self, person: &str, now: i64) -> Option<(Day, [u8; 16])> {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let day = state.today(now);
-        let mut input = day.since_epoch().to_be_bytes().to_vec();
-        input.extend_from_slice(person.as_bytes());
-        let mut hash = [0_u8; 16];
-        hash.copy_from_slice(&crypto::hmac_sha256(&state.key, &input)[..16]);
+        let hash = hash(&state.key, day, person);
         state.seen.insert(hash).then_some((day, hash))
+    }
+
+    /// `person`'s hash for the day of `now`, as [`Daily::first`] gives it.
+    fn person(&self, person: &str, now: i64) -> [u8; 16] {
+        let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        hash(&state.key, Day::from_unix(now), person)
     }
 
     /// The day of `now`, when it is the first time `feature` is used in that day.
@@ -56,6 +61,14 @@ impl Daily {
         let day = state.today(now);
         state.features.insert(feature).then_some(day)
     }
+}
+
+fn hash(key: &[u8; 32], day: Day, person: &str) -> [u8; 16] {
+    let mut input = day.since_epoch().to_be_bytes().to_vec();
+    input.extend_from_slice(person.as_bytes());
+    let mut hash = [0_u8; 16];
+    hash.copy_from_slice(&crypto::hmac_sha256(key, &input)[..16]);
+    hash
 }
 
 impl State {
@@ -74,11 +87,18 @@ impl State {
 /// The program as the server runs it.
 pub(crate) struct Telemetry {
     on: Option<(Daily, Arc<Sender>, InstallationId)>,
+    is_internal: bool,
 }
 
 impl Telemetry {
     /// Off when not joined, when `DO_NOT_TRACK` is set, or when there is no valid ID.
-    pub(crate) fn new(enabled: bool, installation_id: &str, key: [u8; 32]) -> Self {
+    /// `is_internal` marks the project's own installs.
+    pub(crate) fn new(
+        enabled: bool,
+        installation_id: &str,
+        key: [u8; 32],
+        is_internal: bool,
+    ) -> Self {
         let id = InstallationId::parse(installation_id);
         if enabled && id.is_none() && !installation_id.is_empty() {
             tracing::warn!(
@@ -97,7 +117,7 @@ impl Telemetry {
         let on = id
             .filter(|_| sender.active())
             .map(|id| (Daily::new(key), Arc::new(sender), id));
-        Self { on }
+        Self { on, is_internal }
     }
 
     /// Whether anything is sent.
@@ -107,7 +127,10 @@ impl Telemetry {
 
     #[cfg(test)]
     pub(crate) const fn off() -> Self {
-        Self { on: None }
+        Self {
+            on: None,
+            is_internal: false,
+        }
     }
 
     /// Notes that `person` used Zeabur at `now` (Unix seconds), and sends an event in the
@@ -150,12 +173,38 @@ impl Telemetry {
             sender.send(&id, &event).await;
         }));
     }
+
+    /// Sends what happened to a change, at `now` (Unix seconds), in the background.
+    pub(crate) fn changed(&self, report: Report, now: i64) {
+        let Some((daily, sender, id)) = &self.on else {
+            return;
+        };
+        let change = Change {
+            zeabur_version: env!("CARGO_PKG_VERSION"),
+            mode: Mode::InCluster,
+            is_internal: self.is_internal,
+            person: crypto::hex(&daily.person(&report.user, now)),
+            id: report.id,
+            operation: report.operation,
+        };
+        let event = match report.fact {
+            Fact::Submitted(result) => {
+                Event::AppChangeSubmitted(AppChangeSubmitted { change, result })
+            }
+            Fact::Finished(result) => Event::RolloutFinished(RolloutFinished { change, result }),
+        };
+        let (sender, id) = (Arc::clone(sender), id.clone());
+        drop(tokio::spawn(async move {
+            sender.send(&id, &event).await;
+        }));
+    }
 }
 
 impl std::fmt::Debug for Telemetry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Telemetry")
             .field("on", &self.on.is_some())
+            .field("is_internal", &self.is_internal)
             .finish()
     }
 }
@@ -219,7 +268,11 @@ mod tests {
     #[test]
     fn nothing_is_counted_when_the_program_is_off() {
         let id = "8f14e45f-ceea-467a-9575-0123456789ab";
-        assert!(Telemetry::new(false, id, [7; 32]).on.is_none());
-        assert!(Telemetry::new(true, "not-a-uuid", [7; 32]).on.is_none());
+        assert!(Telemetry::new(false, id, [7; 32], false).on.is_none());
+        assert!(
+            Telemetry::new(true, "not-a-uuid", [7; 32], false)
+                .on
+                .is_none()
+        );
     }
 }

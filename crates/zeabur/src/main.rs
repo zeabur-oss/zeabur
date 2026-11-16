@@ -156,6 +156,7 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
             args.telemetry_enabled,
             &args.installation_id,
             config.plan_key.derive("zeabur telemetry person"),
+            args.telemetry_internal,
         )),
     });
     let zeabur_proxy = config.proxy.map(|proxy| {

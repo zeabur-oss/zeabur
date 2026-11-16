@@ -3,7 +3,7 @@ title: 体验计划
 description: 加入体验计划后，Zeabur、`zeaburctl ui` 和安装程序会发送什么、绝不发送什么；Zeabur 和 zeaburctl 如何检查新版本；以及如何分别关闭。
 ---
 
-体验计划会发送版本、每天的使用人数、用过哪些功能，以及 `zeaburctl ui` 有没有连上集群，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启；`zeaburctl ui` 默认加入，每次启动都会提示，并说明如何关闭。
+体验计划会发送版本、每天的使用人数、用过哪些功能、`zeaburctl ui` 有没有连上集群，以及 Deployment 的变更有没有部署完成，让我们知道有多少人在用、该先修哪里。用安装程序安装时默认加入，可以在确认页取消勾选；用 Helm 安装时默认不加入，需要自己开启；`zeaburctl ui` 默认加入，每次启动都会提示，并说明如何关闭。
 
 ## 会发送什么
 
@@ -14,6 +14,8 @@ description: 加入体验计划后，Zeabur、`zeaburctl ui` 和安装程序会�
 | `zeabur_active` | Zeabur | 每个人每天（UTC）第一次使用 Zeabur 网页界面时 |
 | `feature_used` | Zeabur | 成功创建服务、数据库或域名，打开日志流或终端，邀请成员，或应用 Docker Compose 导入之后；同一项功能、同一组值每天（UTC）只发送一次 |
 | `cluster_connected` | `zeaburctl ui` | 用你的 kubeconfig 连上集群，或连不上时 |
+| `app_change_submitted` | Zeabur | 集群回应了一个 Deployment 的变更：换镜像、改副本数或改环境变量 |
+| `rollout_finished` | Zeabur | 被接受的变更部署结束时，结果和 `kubectl rollout status` 一致 |
 | `install_started` | 安装程序 | `apply` 开始 |
 | `install_finished` | 安装程序 | `apply` 顺利结束 |
 | `install_failed` | 安装程序 | `apply` 中途停止 |
@@ -22,10 +24,15 @@ description: 加入体验计划后，Zeabur、`zeaburctl ui` 和安装程序会�
 |---|---|---|
 | `zeabur_version` | `zeabur_active`、`feature_used` | Zeabur 的版本，例如 `0.1.1` |
 | `day` | `zeabur_active`、`feature_used` | UTC 日期，例如 `2026-10-30` |
-| `person` | `zeabur_active` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
+| `person` | `zeabur_active`、`app_change_submitted`、`rollout_finished` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
 | `zeabur_version` | `cluster_connected` | `zeaburctl` 的版本，例如 `0.1.1` |
-| `mode` | `zeabur_active`、`cluster_connected` | 集群里的 Zeabur 是 `in-cluster`，`zeaburctl ui` 是 `local` |
+| `zeabur_version` | `app_change_submitted`、`rollout_finished` | Zeabur 的版本 |
+| `mode` | `zeabur_active`、`cluster_connected`、`app_change_submitted`、`rollout_finished` | 集群里的 Zeabur 是 `in-cluster`，`zeaburctl ui` 是 `local` |
 | `result` | `cluster_connected` | `connected`、`unreachable`、`credential_refused`、`no_read_right` 或 `other` |
+| `change_id` | `app_change_submitted`、`rollout_finished` | 随机 UUID，用来把同一个变更的两条事件连起来 |
+| `operation` | `app_change_submitted`、`rollout_finished` | `deploy_image`、`scale_replicas` 或 `change_env` |
+| `result` | `app_change_submitted` | `accepted`；没被接受时按你收到的 HTTP 状态码：`forbidden`（403）、`invalid`（422）、`conflict`（409）、`unreachable`（502、503 或 504）或 `other` |
+| `result` | `rollout_finished` | `available`（所有副本都运行这次变更）或 `progress_deadline_exceeded`（超过 Deployment 的部署期限） |
 | `feature` | `feature_used` | `service_created`、`database_created`、`domain_added`、`logs_viewed`、`terminal_opened`、`member_invited` 或 `compose` |
 | `source` | `service_created` 的 `feature_used` | 服务怎么创建：`git`、`upload`、`image` 或 `template` |
 | `template` | `source` 为 `template` 的 `feature_used` | 模板在 Zeabur Catalog 里的 ID，例如 `wordpress`；Catalog 里没有的 ID 不会发送 |
@@ -39,6 +46,8 @@ description: 加入体验计划后，Zeabur、`zeaburctl ui` 和安装程序会�
 | `$geoip_disable` | 全部 | 固定为 `true`：不查询所在位置 |
 
 事件不会说明是谁。`person` 是用密钥算出的用户名加日期的哈希值。密钥从 Zeabur 的 plan key 派生，保存在集群的 Secret 里，从不发送，所以我们无法从哈希值反推用户名。同一个人一整天的 `person` 都一样，Zeabur 重启也不变；第二天就换成另一个，所以不同天无法关联起来。
+
+变更被接受后，Zeabur 会用你自己的凭据读取 Deployment，直到部署结束，最多读到部署期限过后一分钟（Deployment 没有设置时是 10 分钟）。有更新的变更或 Zeabur 重启时就停止读取，这时不会发送 `rollout_finished`。
 
 `feature_used` 没有 `person`，只表示今天用过某项功能，不说是谁、用了几次。浏览器不会发送任何东西，是 Zeabur 的服务器在操作成功之后发送的。
 

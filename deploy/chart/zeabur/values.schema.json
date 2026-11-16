@@ -175,6 +175,7 @@
       "additionalProperties": false,
       "properties": {
         "enabled": { "type": "boolean" },
+        "internal": { "type": "boolean" },
         "installationId": {
           "description": "A UUID, such as the output of uuidgen in lower case.",
           "type": "string",

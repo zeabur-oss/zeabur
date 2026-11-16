@@ -140,6 +140,13 @@ pub(crate) fn app(
                 Arc::new(move |feature| telemetry.used(feature, clock()));
             used
         }),
+        changes: auth.telemetry.is_on().then(|| {
+            let telemetry = Arc::clone(&auth.telemetry);
+            let clock = Arc::clone(&auth.clock);
+            let changes: zeabur_api::measure::Changes =
+                Arc::new(move |report| telemetry.changed(report, clock()));
+            changes
+        }),
         reach: zeabur_http::Reach::Public,
         ..zeabur_api::Options::default()
     };

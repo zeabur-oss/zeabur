@@ -132,6 +132,7 @@ pub mod identity;
 pub mod images;
 pub mod incidents;
 pub mod local;
+pub mod measure;
 pub mod members;
 pub mod notifications;
 pub mod page;
@@ -427,6 +428,9 @@ pub struct Options {
     /// Receives each feature a successful write used, for the experience program; `None` when
     /// the program is off, so nothing is classified.
     pub used: Option<used::Used>,
+    /// Receives what happens to each change of one Deployment, for the experience program;
+    /// `None` when the program is off, so nothing is read for a change.
+    pub changes: Option<measure::Changes>,
 }
 
 impl Default for Options {
@@ -444,6 +448,7 @@ impl Default for Options {
             reach: zeabur_http::Reach::Any,
             terminals: None,
             used: None,
+            changes: None,
         }
     }
 }
@@ -476,6 +481,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         reach,
         terminals,
         used,
+        changes,
     } = options;
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let tls = zeabur_http::tls(settings.trusted_ca.as_deref());
@@ -503,6 +509,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         releases: Arc::new(cluster::update::Releases::default()),
         terminals,
         used,
+        changes,
     };
     routes()
         .method_not_allowed_fallback(handlers::method_not_allowed)

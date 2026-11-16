@@ -501,6 +501,36 @@ pub(crate) async fn apply(
         let applied = project_deletion::apply(&planner, cluster.as_ref(), &project, &plan).await?;
         return Ok(Json(ApplyResponse { applied }));
     }
+    let written = write_plan(target_cluster, namespace, &plan).await;
+    if let Some(measured) = crate::measure::measured(&claims.request.changes, &plan) {
+        let answer = written.as_ref().map(|(_, generation)| *generation);
+        crate::measure::submitted(
+            &state,
+            &cluster,
+            &identity.username,
+            namespace,
+            measured,
+            answer,
+        );
+    }
+    let (applied, _) = written?;
+    report_used(
+        &state,
+        cluster.as_ref(),
+        &claims.request.changes,
+        request.via,
+    )
+    .await;
+    Ok(Json(ApplyResponse { applied }))
+}
+
+/// Dry-runs and then writes every object of `plan`, in order. Also gives the
+/// `metadata.generation` the last write left.
+async fn write_plan(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    plan: &Plan,
+) -> Result<(Vec<Applied>, Option<i64>), ApiError> {
     let writes: Vec<(zeabur_plan::Target, WriteRequest)> = plan
         .objects
         .iter()
@@ -511,28 +541,25 @@ pub(crate) async fn apply(
             )
         })
         .collect();
-    dry_run(target_cluster, namespace, &plan, &writes).await?;
+    dry_run(cluster, namespace, plan, &writes).await?;
     let mut applied = Vec::new();
+    let mut generation = None;
     for (target, write) in writes {
-        match write_once(target_cluster, &target, &write).await {
-            Ok(written) => applied.push(Applied {
-                target,
-                resource_version: written.resource_version,
-            }),
+        match write_once(cluster, &target, &write).await {
+            Ok(written) => {
+                generation = written.generation;
+                applied.push(Applied {
+                    target,
+                    resource_version: written.resource_version,
+                });
+            }
             Err(error) => {
-                let problem = refused(target_cluster, namespace, &target, &write, error).await;
-                return Err(ApiError::from(refusal(problem, &plan, &target, &applied)));
+                let problem = refused(cluster, namespace, &target, &write, error).await;
+                return Err(ApiError::from(refusal(problem, plan, &target, &applied)));
             }
         }
     }
-    report_used(
-        &state,
-        cluster.as_ref(),
-        &claims.request.changes,
-        request.via,
-    )
-    .await;
-    Ok(Json(ApplyResponse { applied }))
+    Ok((applied, generation))
 }
 
 /// Tells the experience program what a finished apply used; nothing runs when it is off.

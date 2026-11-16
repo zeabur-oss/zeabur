@@ -681,6 +681,8 @@ impl std::fmt::Debug for IssuedToken {
 pub struct Written {
     /// The object's `resourceVersion` after the write.
     pub resource_version: Option<String>,
+    /// The object's `metadata.generation` after the write, for the kinds that keep one.
+    pub generation: Option<i64>,
 }
 
 pub use zeabur_core::names::GatewayRef;
