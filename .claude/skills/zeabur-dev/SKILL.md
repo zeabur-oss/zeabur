@@ -1,12 +1,11 @@
 ---
 name: zeabur-dev
-description: Day-to-day development loop for the Zeabur repository — environment, the checks CI runs, lint conventions, commits. Use before changing any Rust, TypeScript, Nix or CI file in this repo.
+description: What is special about the Zeabur repository — crates and binaries, the checks CI runs, API, tests, fixtures and scale rules. Use before changing any Rust, TypeScript, Nix or CI file in this repo.
 ---
 
 # Zeabur development loop
 
-What is Zeabur's own. Review standards: [`STANDARDS.md`](STANDARDS.md). Commits and pull
-requests: `zeabur-workflow`.
+What is Zeabur's own. Commits and pull requests: `zeabur-workflow`.
 
 ## Crates and binaries
 - Each crate has a level in `Cargo.toml` `[workspace.metadata.levels]` (table in
@@ -19,37 +18,28 @@ requests: `zeabur-workflow`.
   impersonate.
 
 ## Checks (what CI runs)
-```sh
-nix develop -c bash -c 'bun install --frozen-lockfile && node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer'
-nix develop -c ./scripts/check-levels.sh
-nix develop -c cargo build --release --locked --no-default-features -p zeabur -p zeaburctl
-```
-The installer's web interface (`crates/zeabur-installer/web`) is not in CI: run
-`nix develop -c bash -c 'cd crates/zeabur-installer/web && bun install && bun run fmt:check && bun run lint && bun run typecheck'`
-and `nix develop -c scripts/build-installer-ui.sh`.
+Each CI job is `nix develop -c scripts/ci/<job>.sh`, the same on GitHub and on any Linux machine
+with Nix (the jobs: `zeabur-ci`). `scripts/ci-local.sh [job…]` runs several, each in its own copy
+of the checkout, and prints a result line per job. Cluster tests: `zeabur-cluster-tests`. Web
+interface: `zeabur-ui`.
+
 The screenshots are kept in git and not taken in CI: after changing a page that
-`web/e2e/shots/docs.ts` covers, run `nix develop -c scripts/docs-shots.sh` on aarch64 Linux, as CI
-does, and commit `docs/images/shots` (`docs/internal/screenshots.md`). The README and cover images
-take the same script with their set, `readme` or `cover`.
-Cluster tests: see `zeabur-cluster-tests`. Web interface: see `zeabur-ui`. Each CI job is
-`nix develop -c scripts/ci/<job>.sh`, the same on GitHub and on any Linux machine with Nix; `scripts/ci-local.sh [job…]` runs several and prints a result line per job (in
-`target/ci-local/*.result`), each in its own copy of the checkout but in the machine's own
-environment; on a VM, snapshot its clean state and restore it after every run (see
-`zeabur-cluster-tests`). When a check fails on GitHub, see `zeabur-ci`.
+`web/e2e/shots/docs.ts` covers, run `nix develop -c scripts/docs-shots.sh` on aarch64 Linux and
+commit `docs/images/shots` (`docs/internal/screenshots.md`). The README and cover images take the
+same script with their set, `readme` or `cover`.
 
 ## Lint conventions
 - The installer's output module is `out`.
 - Integration tests wrap their tests in `#[cfg(test)] mod tests` (clippy
   `tests_outside_test_module`).
 
-## Comments
-- In Rust, TypeScript, CSS and scripts alike: only what the code cannot say; decisions go in
-  `docs/internal/`.
+## Decisions
+- Design decisions go in `docs/internal/`, not in comments.
 
 ## API
 - Handlers live in `zeabur-api`, described with `#[utoipa::path]`, registered with `routes!`.
   After changing one, regenerate the committed description:
-  `nix develop -c cargo xtask openapi` (also regenerates `web/src/api/schema.d.ts`).
+  `nix develop -c cargo xtask openapi` (also regenerates `web/src/api/zeabur.ts`).
 - Every response item carries its `origin` (`zeabur_model::Origin`); errors are
   `zeabur_core::problem::Problem`. Gets return the resource itself, lists
   `{items}` with every item; event lists take a `limit` and add `totalSize`. Every answer is
@@ -58,9 +48,21 @@ environment; on a VM, snapshot its clean state and restore it after every run (s
 ## Tests
 - Read `docs/internal/testing.md` before adding, changing or removing a test: the level each behaviour
   belongs at, what not to test, the promises that must keep a test, polling and isolation.
+  Published contracts include the OpenAPI description and the rendered chart.
 
 ## Fixtures
 - `crates/<crate>/fixtures/<area>/<case>/` holds language-neutral cases (format in
   `fixtures/README.md`), loaded with `zeabur_test_support::load!`. A new
   operation is documented in the README's table first; `zeabur-test-support`'s test fails on an
   undocumented one. Expected errors are snake_case codes, never message text.
+
+## Scale
+- Watch with kube-rs `watcher`, `reflector` or `Controller`. One LIST of the namespace, selected by
+  label, replaces a GET per object.
+- The installer (`zeabur-installer`, on one host) bounds parallel work (downloads, `kubectl`
+  calls) with a fixed number of worker threads, never one `thread::spawn` per item of an
+  open-ended list. One-shot LISTs and GETs during `apply` and bounded fan-out over the fixed set
+  of components are fine.
+- It waits for a condition with a deadline and backoff, and reports what it last saw.
+- What it writes into one object (a `HelmChart`, a Secret, a ConfigMap) stays under the object
+  limits. Required state lives in the cluster or on disk, never only in memory.
