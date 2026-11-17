@@ -27,13 +27,13 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -47,20 +47,20 @@ jobs:
           retention-days: 14
 
   test:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -68,7 +68,7 @@ jobs:
           persist-credentials: false
           # fallow audit compares HEAD with HEAD^.
           fetch-depth: 2
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -76,13 +76,13 @@ jobs:
 
   # desktop/, its own Cargo workspace, with the main workspace's rules (scripts/check-desktop.sh).
   desktop:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -91,13 +91,13 @@ jobs:
   # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
   fuzz:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -105,13 +105,13 @@ jobs:
 
   no-ui:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -119,13 +119,13 @@ jobs:
 
   wording:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
       # zhtw-mcp builds from source; main's scheduled run keeps it, keyed on the lock file.
       - id: zhtw-mcp
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -152,7 +152,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -166,7 +166,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -189,7 +189,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -204,7 +204,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@3e2e5ba4210b60c1e97fa53e2029e1ea9f5e468e # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -229,15 +229,13 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: scripts/nightly-issues.sh
 
-
   # The check rulesets require.
   ok:
     name: ci / ok
     if: always()
     needs: [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full]
-    runs-on: ubuntu-slim
+    runs-on: instabox-small
     timeout-minutes: 5
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
-
