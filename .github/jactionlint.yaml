@@ -1,7 +1,4 @@
-# GitHub-hosted labels newer than the ones jactionlint knows, and the Instabox runner.
-# https://github.com/actions/runner-images#available-images
+# The Instabox runners, which jactionlint does not know.
 self-hosted-runner:
   labels:
-    - ubuntu-26.04
-    - ubuntu-26.04-arm
     - instabox-small
