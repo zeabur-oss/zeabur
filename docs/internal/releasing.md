@@ -3,35 +3,80 @@
 How a maintainer publishes a release. What a release contains and how to verify it is in
 [Releases](../reference/releases.mdx).
 
-`.github/workflows/release.yml` calls the shared release workflow of
-[zeabur-oss/.github](https://github.com/zeabur-oss/.github), pinned by commit, which runs every
-stage as `bun scripts/release.ts <stage>` in this repository's Nix dev shell, after
-`bun install`. `@zeabur-oss/release` (`package.json`, pinned in `bun.lock`) pushes, signs and
-verifies; the shared workflow checks the `CHANGELOG.md` section, signs `SHA256SUMS`, writes the
-notes and verifies the assets.
+`.github/workflows/release.yml` runs on a `v*` tag. Its jobs run each stage as
+`bun scripts/release.ts <stage>` in this repository's Nix dev shell, after `bun install`.
+`@zeabur-oss/release` (`package.json`, pinned in `bun.lock`) pushes, signs and verifies; the
+workflow checks the `CHANGELOG.md` section, signs `SHA256SUMS` and verifies the assets. The draft
+release, with its title and notes, is made by the Release pull request workflow when it tags.
+
+Jobs that are not per platform run on Instabox (`instabox-small`). The platform builds run on
+GitHub's runners: Linux amd64 and arm64, macOS arm64, and Windows for Zeabur Desktop.
+
+Zeabur Desktop builds in the same workflow, and `publish` waits for it, so nothing is published
+until every package is built (see [Zeabur Desktop](#zeabur-desktop)).
 
 | Stage | Where | Does |
 |---|---|---|
-| `bump` | once, in the release pull request | After knope set `Cargo.toml`, sets `Cargo.lock`'s workspace crates, the chart (`version`, `appVersion`), `web/package.json` and the installer's `package.json`, then regenerates `openapi.yaml` and `web/src/api/zeabur.ts` with `cargo xtask openapi`. |
-| `check` | once | The tag is SemVer without build metadata, and the version of every crate, `Cargo.lock`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. The catalog commit and the Zeabur Identity pin carry a release tag that this version may pin. |
+| `bump` | once, in the release pull request | After knope set `Cargo.toml`, sets `Cargo.lock`'s workspace crates and `desktop/Cargo.lock`'s copies of them and of `zeabur-desktop` (knope sets `desktop/Cargo.toml`), the chart (`version`, `appVersion`), `web/package.json` and the installer's `package.json`, then regenerates `openapi.yaml` and `web/src/api/zeabur.ts` with `cargo xtask openapi`. |
+| `check` | once | The tag is SemVer without build metadata, and the version of every crate, `Cargo.lock`, `desktop/Cargo.toml`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. The catalog commit and the Zeabur Identity pin carry a release tag that this version may pin. |
 | `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve. Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. A rehearsal also builds a development installer on Linux, which it does not keep. |
 | `sign` | macOS arm64, after `build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
-| `publish` | once, tag only | Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms; writes `published/subjects.json`, which the shared workflow attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
+| `publish` | once, tag only, after every build | Refuses when the release is already published. Its token cannot see a draft; the `release` job adds the assets to the draft and fails when there is none. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms; writes `published/subjects.json`, which `attest` attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
 | `finish` | Linux amd64 and arm64, tag only | Builds `zeabur-installer`, pinned to the catalog, Zeabur Identity and what `publish` pushed. |
-| `assets` | once, tag only | Copies the assets into the release; the shared workflow adds the signed `SHA256SUMS` and the notes from `CHANGELOG.md` with a link to the documentation, attests them and creates the draft. |
-| `verify` | every platform | After the shared workflow has checked `SHA256SUMS` and each asset's attestation, checks that the draft has exactly the expected assets, each image and the chart as a user would, that the chart runs exactly the images in `digests.txt`, and that `digests.txt` names the debug and tools images the code pins (`crates/zeabur-api/src/settings.rs`), then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS, where a Developer ID signature must be notarized (`spctl`). |
+| `assets` | once, tag only | Copies the assets into `assets/`; the `release` job adds the signed `SHA256SUMS`, attests them and uploads them to the draft. |
+| `verify` | every platform | After the workflow has checked `SHA256SUMS` and each asset's attestation, checks that the draft has exactly the expected assets, each image and the chart as a user would, that the chart runs exactly the images in `digests.txt`, and that `digests.txt` names the debug and tools images the code pins (`crates/zeabur-api/src/settings.rs`), then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS, where a Developer ID signature must be notarized (`spctl`), and checks Zeabur Desktop's `.dmg` the same way. |
 
-The pins come from the releases of zeabur-oss/catalog and zeabur-oss/identity: the `SHA256SUMS`
-that the shared workflow signed for each, checked with cosign. The catalog files the build embeds
-must be the ones its `SHA256SUMS` lists; Zeabur Identity's image is the `index` line of its
+The pins come from the releases of zeabur-oss/catalog and zeabur-oss/identity: the `SHA256SUMS` that
+each signed, checked with cosign. Their signer is that repository's own `release.yml` or, for their
+older releases, the shared release workflow of zeabur-oss/.github. The catalog files the build
+embeds must be the ones its `SHA256SUMS` lists; Zeabur Identity's image is the `index` line of its
 `digests.txt`, and its pods' memory request is `requestMemoryMiB` in its `resources.json`, which the
 installer counts toward the least memory of a team install.
 
-Every signature and attestation names the shared workflow,
-`https://github.com/zeabur-oss/.github/.github/workflows/release.yml@…`, not this repository's
-file; the certificate's repository (`zeabur-oss/zeabur`) and ref (`refs/tags/v<version>`) say
-which release it is. `verify` gets these in `RELEASE_CERT_IDENTITY_REGEXP`,
-`RELEASE_SIGNER_WORKFLOW`, `RELEASE_SOURCE_REPOSITORY` and `RELEASE_SOURCE_REF`.
+Every signature and attestation names this repository's workflow,
+`https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v<version>`.
+`verify` gets the repository and the ref in `RELEASE_SOURCE_REPOSITORY` and `RELEASE_SOURCE_REF`.
+Releases before this one were signed by the shared release workflow of zeabur-oss/.github
+([Releases](../reference/releases.mdx) shows how to verify both).
+
+## Zeabur Desktop
+
+The `desktop-*` jobs of `release.yml` run beside the server's builds, and `publish` needs them;
+a failed desktop build stops the release before anything is published. The app's
+version is the repository's: knope sets `desktop/Cargo.toml`, `bump` its lock file, and Tauri reads
+it from there (`desktop/tauri.conf.json` has none). `scripts/check-desktop.sh` fails in CI when it
+differs from the root `Cargo.toml`.
+
+| Job | Where | Does |
+|---|---|---|
+| `desktop-prepare` | Instabox, in the dev shell | Builds `web/dist` and `desktop/web/dist`, copies the catalog, and names the dev shell's nightly and `tauri-cli` (`scripts/ci/desktop-inputs.sh`). |
+| `desktop-build` | macOS arm64, Windows amd64, Linux amd64 and arm64 (Ubuntu 24.04, for its older glibc) | Outside the Nix shell, with the runner's compiler, linker and libraries, the same nightly through rustup and `tauri-cli` from crates.io: compiles the app, then packages and signs it in a step of its own (`scripts/package-desktop.sh`). The compile step fails if the binary links anything from `/nix/store` (`otool -L` on macOS, `readelf -d` on Linux); the packages themselves are not scanned for libraries. |
+| `desktop-updater` | Instabox, `main` and tags, once `desktop/tauri.conf.json` has an updater public key | Signs the `.app.tar.gz`, the `-setup.exe` and the `.AppImage` with `cargo tauri signer sign` and writes `latest.json` from the `.sig` files, with the `CHANGELOG.md` section as its notes (`scripts/desktop-release.ts`). It is the only job in the `desktop-updater` environment, which alone holds the updater key; a build job has one environment, the platform's signing one, so it cannot sign these files. The signature is not checked against `desktop/tauri.conf.json`'s public key before the release; a key that does not match shows when the first update is refused, so test one update after changing the key. |
+
+| Platform | Files | The updater installs |
+|---|---|---|
+| macOS arm64 | `zeabur-desktop-v<version>-darwin-arm64.dmg`, `.app.tar.gz` | `.app.tar.gz` |
+| Windows amd64 | `zeabur-desktop-v<version>-windows-amd64-setup.exe` (NSIS, per user), `-portable.exe` | `-setup.exe` |
+| Linux amd64, arm64 | `zeabur-desktop-v<version>-linux-<arch>.deb`, `.rpm`, `.AppImage` | `.AppImage` |
+
+The app reads `https://github.com/zeabur-oss/zeabur/releases/latest/download/latest.json`.
+GitHub never makes a pre-release latest, so a pre-release's `latest.json` reaches nobody, and
+publishing the draft is what offers an update. A `.deb`, `.rpm` or portable `.exe` finds its
+platform in `latest.json` but cannot replace itself; the app offers the release page instead
+(`desktop/src/update.rs`). The signed `SHA256SUMS`, its attestation and the checksums cover every
+desktop file like the others. The organization makes releases immutable once published, so the draft must hold `latest.json` and `SHA256SUMS` with every other asset before it is published; neither can be added afterwards.
+
+On macOS, the Tauri bundler signs the app with the Developer ID and the hardened runtime and no
+entitlements, then notarizes and staples it; `package-desktop.sh` signs, notarizes and staples the
+`.dmg`. On Windows, signtool signs the portable `.exe` and, as the bundler's `signCommand`, the app and
+the installer, through Microsoft's
+Artifact Signing plug-in (the `Microsoft.ArtifactSigning.Client` NuGet package, pinned by version
+and SHA-256 in `package-desktop.sh`), after `azure/login` with OIDC. Linux packages are not signed
+on their own; the signed `SHA256SUMS` and the attestation cover them.
+
+Rehearsals on other branches build every platform unsigned: the
+environments' deployment branches keep the credentials to `main` and `v*` tags, and the workflow
+skips the Windows login and the updater job elsewhere.
 
 ## Pre-releases
 
@@ -131,13 +176,39 @@ These are repository and organization settings, not files; a maintainer sets the
     with the Developer role (**Users and Access → Integrations**): the `.p8` file's text, its key
     ID and the issuer ID.
 
-  Without them, releases go on with `zeaburctl` signed ad hoc only.
+  Without them, releases go on with `zeaburctl` and Zeabur Desktop signed ad hoc only. Zeabur
+  Desktop's macOS build uses the same environment and secrets.
+- **Windows signing.** An Azure Artifact Signing account with a certificate profile for public
+  trust, and a Microsoft Entra app registration whose service principal has the **Artifact
+  Signing Certificate Profile Signer** role on that profile. The app registration has a federated
+  credential for GitHub Actions with the subject
+  `repo:zeabur-oss/zeabur:environment:windows-signing`. An environment `windows-signing` whose
+  deployment branches are `main` and `v*` tags, with these variables (none is secret):
+  - `AZURE_CLIENT_ID`, `AZURE_TENANT_ID`, `AZURE_SUBSCRIPTION_ID`: the app registration and the
+    subscription of the signing account.
+  - `AZURE_SIGNING_ENDPOINT`: the account's region endpoint, such as
+    `https://eus.codesigning.azure.net`.
+  - `AZURE_SIGNING_ACCOUNT`, `AZURE_SIGNING_PROFILE`: the account's and the certificate profile's
+    names.
+
+  Without `AZURE_CLIENT_ID`, the Windows files are released unsigned.
+- **Updater key.** Zeabur Desktop's updates are signed with a minisign key of their own. Made
+  once, on a maintainer's machine, with a password:
+  `cargo tauri signer generate -w ~/.tauri/zeabur-desktop.key` (in `nix develop .#desktop`).
+  Commit the public key (`~/.tauri/zeabur-desktop.key.pub`, one line) as
+  `plugins.updater.pubkey` in `desktop/tauri.conf.json`, and create an environment
+  `desktop-updater` whose deployment branches are `main` and `v*` tags, with the secrets
+  `TAURI_SIGNING_PRIVATE_KEY` (the private key file's text) and
+  `TAURI_SIGNING_PRIVATE_KEY_PASSWORD`. Keep the key file somewhere safe: an app only accepts
+  updates signed with the key it was built with, so losing it means people must download the next
+  version by hand. The public key (key id `C2994A9A6B0BA88C`) is committed and the environment holds
+  the private key, so every release has a `latest.json`. A build without a public key, a fork's
+  for one, has no `latest.json` and the app does not check for updates.
 - **Telemetry key.** A repository variable `POSTHOG_KEY`, the PostHog project key of the
   experience program (docs/reference/telemetry.mdx). Tag builds compile it in as
   `ZEABUR_TELEMETRY_KEY`; every other build, local ones included, has none and sends nothing.
-- **Workflow permissions** can stay read-only by default: the caller grants the shared
-  workflow `contents: write`, `packages: write`, `id-token: write` and `attestations: write`,
-  and each of its jobs asks for what it needs. `publish` has `packages: write` and
+- **Workflow permissions** can stay read-only by default: each job of `release.yml` asks for
+  what it needs. `desktop-build` has `id-token: write` for `azure/login`. `publish` has `packages: write` and
   `id-token: write` (keyless signing); `attest` has `attestations: write`; `release` has
   `contents: write` (the draft), `id-token: write` and `attestations: write`; `verify` has
   `contents: write`, because GitHub shows a draft release only to a token that can push, and
@@ -146,8 +217,8 @@ These are repository and organization settings, not files; a maintainer sets the
 ## When a release run fails
 
 Never move a published tag and never replace a published asset or image tag:
-`scripts/release.ts publish` refuses when the release, an image tag or the chart version
-already exists.
+`scripts/release.ts publish` refuses when the release is already published, or an image tag or
+the chart version already exists.
 
 - **Before `publish`** (CI, a build, a smoke test): nothing was published. Fix it on `main`; if
   the fix changes the release commit, delete the tag (`git push git@github.com:zeabur-oss/zeabur.git :refs/tags/v0.1.1`) and tag
@@ -167,9 +238,7 @@ From a checkout with the fixed check, in `nix develop`, after `bun install`, on 
 whose `verify` failed (Linux amd64 or arm64, or macOS arm64):
 
 ```sh
-export RELEASE_CERT_IDENTITY_REGEXP='^https://github\.com/zeabur-oss/\.github/\.github/workflows/release\.yml@' \
-  RELEASE_SIGNER_WORKFLOW=zeabur-oss/.github/.github/workflows/release.yml \
-  RELEASE_SOURCE_REPOSITORY=zeabur-oss/zeabur RELEASE_SOURCE_REF=refs/tags/v0.1.1
+export RELEASE_SOURCE_REPOSITORY=zeabur-oss/zeabur RELEASE_SOURCE_REF=refs/tags/v0.1.1
 gh release download v0.1.1 --repo zeabur-oss/zeabur --dir downloaded
 node_modules/.bin/zeabur-oss-release verify-assets downloaded
 bun scripts/release.ts verify v0.1.1 linux arm64 downloaded

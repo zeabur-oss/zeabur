@@ -1,5 +1,5 @@
 import { open as pick } from "@tauri-apps/plugin-dialog"
-import { useMemo, useState } from "react"
+import { useMemo, useState, type ReactElement } from "react"
 
 import { useI18n } from "@/i18n"
 
@@ -10,6 +10,7 @@ import { useChanges, useSnapshot } from "./hooks"
 import { useMenuBar } from "./menu"
 import { sourceFilter, visibleContexts } from "./model"
 import { Sidebar } from "./sources"
+import { useUpdates } from "./update"
 
 interface BrowserProps {
   snap: Snapshot
@@ -18,9 +19,10 @@ interface BrowserProps {
   only: string | null
   setOnly: (id: string | null) => void
   addFiles: () => void
+  update: ReactElement
 }
 
-function Browser({ snap, query, setQuery, only: chosen, setOnly, addFiles }: BrowserProps) {
+function Browser({ snap, query, setQuery, only: chosen, setOnly, addFiles, update }: BrowserProps) {
   const { locale } = useI18n()
   const only = sourceFilter(snap, chosen)
   const visible = useMemo(() => visibleContexts(snap, query, only), [snap, query, only])
@@ -37,6 +39,7 @@ function Browser({ snap, query, setQuery, only: chosen, setOnly, addFiles }: Bro
         setOnly={setOnly}
         removeSource={(id) => changes.removeSource.mutate(id)}
         addFiles={addFiles}
+        update={update}
       />
       <ContextPane
         visible={visible}
@@ -55,6 +58,7 @@ export function App() {
   const [query, setQuery] = useState("")
   const [only, setOnly] = useState<string | null>(null)
   useMenuBar()
+  const updates = useUpdates()
 
   if (!snap) return null
 
@@ -67,7 +71,7 @@ export function App() {
   return (
     <div data-titlebar-inset className="flex h-dvh bg-surface-page text-main select-none">
       {snap.sources.length === 0 ? (
-        <FirstRun addFiles={() => void addFiles()} />
+        <FirstRun addFiles={() => void addFiles()} update={updates.button} />
       ) : (
         <Browser
           snap={snap}
@@ -76,8 +80,10 @@ export function App() {
           only={only}
           setOnly={setOnly}
           addFiles={() => void addFiles()}
+          update={updates.button}
         />
       )}
+      {updates.dialog}
     </div>
   )
 }

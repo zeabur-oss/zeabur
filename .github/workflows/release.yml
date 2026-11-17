@@ -1,52 +1,429 @@
 name: Release
 
-# Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: the shared release builds, publishes and signs the
-# image, chart and installers, then leaves a draft (docs/internal/releasing.md). Manual run: rehearse.
+# Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: build and smoke the server and zeaburctl on every
+# platform and package Zeabur Desktop, then push the images and the chart by digest, sign and
+# attest them, build the installers that pin them, add every file to the draft release that the
+# Release pull request workflow left when it tagged, and verify the draft. A maintainer publishes
+# the draft (docs/internal/releasing.md). Manual run: rehearse, which builds and publishes nothing.
+#
+# Each stage of Zeabur's own is `bun scripts/release.ts <stage>`; Zeabur Desktop's packages build
+# outside Nix with scripts/package-desktop.sh.
 on:
   push:
-    tags: ['v[0-9]*']
+    tags: ["v[0-9]*"]
   workflow_dispatch:
     inputs:
       version:
-        description: 'Version to rehearse, as in Cargo.toml (v0.1.1); a rehearsal never publishes'
+        description: "Version to rehearse, as in Cargo.toml (v0.1.1); a rehearsal never publishes"
         required: true
 
 permissions:
   contents: read
 
+defaults:
+  run:
+    shell: nix develop --command bash -eo pipefail {0}
+
 concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 
+env:
+  CARGO_TERM_COLOR: always
+  VERSION: ${{ inputs.version || github.ref_name }}
+
 jobs:
-  release:
-    uses: zeabur-oss/.github/.github/workflows/release.yml@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+  check:
+    runs-on: instabox-small
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - name: Install the packages
+        run: bun install --frozen-lockfile
+      - name: The version is the manifests', with a CHANGELOG.md section, on main
+        run: |
+          # The manifests take only SemVer; an image tag cannot hold the + of build metadata.
+          [[ "$VERSION" == v* && "$VERSION" != *+* ]] ||
+            { echo "::error::$VERSION is not v and SemVer without build metadata"; exit 1; }
+          bun scripts/release.ts check "$VERSION"
+          bun x zeabur-oss-release notes CHANGELOG.md "$VERSION" >/dev/null
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            git merge-base --is-ancestor HEAD origin/main ||
+              { echo "::error::$VERSION is not on main"; exit 1; }
+          fi
+
+  build:
+    name: build (${{ matrix.os }}-${{ matrix.arch }})
+    needs: check
+    strategy:
+      fail-fast: false
+      matrix:
+        # zeaburctl for macOS on Apple silicon; the server, its image and the installer are Linux
+        # only. Each build is native.
+        include:
+          - { os: linux, arch: amd64, runner: ubuntu-26.04 }
+          - { os: linux, arch: arm64, runner: ubuntu-26.04-arm }
+          - { os: darwin, arch: arm64, runner: macos-26 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    # The environment's branch rules keep the Developer ID to main and tags; a rehearsal on any
+    # other branch builds unsigned.
+    environment: >-
+      ${{ matrix.os == 'darwin' && (github.ref == 'refs/heads/main' ||
+          startsWith(github.ref, 'refs/tags/v')) && 'apple-signing' || '' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - name: Install the packages
+        run: bun install --frozen-lockfile
+      - name: Build and smoke
+        env:
+          # The experience program's PostHog key, in tag builds only (docs/internal/releasing.md).
+          ZEABUR_TELEMETRY_KEY: ${{ startsWith(github.ref, 'refs/tags/v') && vars.POSTHOG_KEY || '' }}
+          OS: ${{ matrix.os }}
+          ARCH: ${{ matrix.arch }}
+          CI_ARTIFACTS: ${{ runner.temp }}/ci-artifacts
+        run: bun scripts/release.ts build "$VERSION" "$OS" "$ARCH" dist
+      # A step of its own, so the build never sees the secrets. Without them sign leaves the build
+      # as it is.
+      - name: Sign and notarize
+        if: matrix.os == 'darwin'
+        env:
+          OS: ${{ matrix.os }}
+          ARCH: ${{ matrix.arch }}
+          APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
+          APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
+          APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+        run: bun scripts/release.ts sign "$VERSION" "$OS" "$ARCH" dist
+      - if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: logs-build-${{ matrix.os }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/ci-artifacts/
+          if-no-files-found: ignore
+          retention-days: 14
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidate-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # What Zeabur Desktop's build needs from the dev shell: the web pages, the catalog, and the
+  # versions of the toolchain and the Tauri CLI.
+  desktop-prepare:
+    needs: check
+    runs-on: instabox-small
+    timeout-minutes: 30
+    defaults:
+      run:
+        shell: nix develop .#desktop --command bash -eo pipefail {0}
+    outputs:
+      toolchain: ${{ steps.versions.outputs.toolchain }}
+      tauri-cli: ${{ steps.versions.outputs.tauri-cli }}
+      catalog-commit: ${{ steps.versions.outputs.catalog-commit }}
+      updater: ${{ steps.versions.outputs.updater }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - id: versions
+        name: Build the pages, copy the catalog, and name the versions and the updater key
+        run: scripts/ci/desktop-inputs.sh | tee -a "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-inputs
+          path: |
+            web/dist/
+            desktop/web/dist/
+            target/desktop-inputs/
+          if-no-files-found: error
+          retention-days: 1
+
+  # Zeabur Desktop's packages build outside Nix, with each runner's own compiler, linker and system
+  # libraries; the compile step fails if the binary links anything from /nix/store.
+  desktop-build:
+    name: desktop-build (${{ matrix.os }}-${{ matrix.arch }})
+    needs: desktop-prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: darwin, arch: arm64, runner: macos-26, signing: apple-signing }
+          - { os: windows, arch: amd64, runner: windows-2025, signing: windows-signing }
+          # The oldest supported Ubuntu, so the packages run on its glibc and newer.
+          - { os: linux, arch: amd64, runner: ubuntu-24.04, signing: "" }
+          - { os: linux, arch: arm64, runner: ubuntu-24.04-arm, signing: "" }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
     permissions:
-      contents: write
+      contents: read
+      id-token: write # azure/login
+    # The environments' branch rules keep the credentials to main and tags.
+    environment: >-
+      ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+          matrix.signing || '' }}
+    # bash with pipefail on every runner, Windows too.
+    defaults:
+      run:
+        shell: bash
+    env:
+      OS: ${{ matrix.os }}
+      ARCH: ${{ matrix.arch }}
+      RUSTUP_TOOLCHAIN: ${{ needs.desktop-prepare.outputs.toolchain }}
+      ZEABUR_CATALOG_COMMIT: ${{ needs.desktop-prepare.outputs.catalog-commit }}
+      ZEABUR_CATALOG_RELEASE: ${{ github.workspace }}/target/desktop-inputs/catalog
+      ZEABUR_UI_DIST: ${{ github.workspace }}/web/dist
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-inputs
+      - name: Install the toolchain and the system libraries
+        env:
+          TAURI_CLI: ${{ needs.desktop-prepare.outputs.tauri-cli }}
+        run: |
+          if [[ "$OS" == linux ]]; then
+            sudo apt-get update
+            sudo apt-get install --yes --no-install-recommends libwebkit2gtk-4.1-dev \
+              libgtk-3-dev librsvg2-dev libxdo-dev libssl-dev file
+          fi
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
+          cargo install tauri-cli --version "=$TAURI_CLI" --locked
+      - name: Build
+        run: scripts/package-desktop.sh compile "$VERSION" "$OS" "$ARCH" dist
+      # Signing logs in right before packaging, so the short-lived token is still valid.
+      - if: matrix.os == 'windows' && vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Package and sign
+        env:
+          APPLE_CERTIFICATE_P12: ${{ matrix.os == 'darwin' && secrets.APPLE_CERTIFICATE_P12 || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.os == 'darwin' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_P8: ${{ matrix.os == 'darwin' && secrets.APPLE_API_KEY_P8 || '' }}
+          APPLE_API_KEY_ID: ${{ matrix.os == 'darwin' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER_ID: ${{ matrix.os == 'darwin' && secrets.APPLE_API_ISSUER_ID || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ matrix.os == 'windows' && vars.AZURE_CLIENT_ID != '' && vars.AZURE_SIGNING_ENDPOINT || '' }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+        run: scripts/package-desktop.sh package "$VERSION" "$OS" "$ARCH" dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  # Signs each file the updater installs and writes latest.json, once the app has an updater key
+  # (desktop/tauri.conf.json), for main and tags. Only this job's environment holds the key.
+  desktop-updater:
+    if: >-
+      needs.desktop-prepare.outputs.updater == 'true' &&
+      (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v'))
+    needs: [desktop-prepare, desktop-build]
+    runs-on: instabox-small
+    timeout-minutes: 15
+    environment: desktop-updater
+    defaults:
+      run:
+        shell: nix develop .#desktop --command bash -eo pipefail {0}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: desktop-*-*
+          path: packages
+          merge-multiple: true
+      - name: Sign the updates and write latest.json
+        env:
+          TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
+          TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+        run: |
+          mkdir updater
+          bun install --frozen-lockfile
+          bun x zeabur-oss-release notes CHANGELOG.md "$VERSION" >notes.md
+          bun scripts/desktop-release.ts updater "$VERSION" packages notes.md updater/latest.json
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: desktop-updater
+          path: updater/latest.json
+          if-no-files-found: error
+          retention-days: 7
+
+  # Nothing is pushed until every platform and every Zeabur Desktop package is built.
+  publish:
+    if: >-
+      ${{ !cancelled() && github.event_name == 'push' && needs.build.result == 'success' &&
+          needs.desktop-build.result == 'success' && needs.desktop-updater.result != 'failure' }}
+    needs: [build, desktop-build, desktop-updater]
+    runs-on: instabox-small
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      packages: write # images and the chart on ghcr.io
+      id-token: write # keyless signatures
+    outputs:
+      subjects: ${{ steps.publish.outputs.subjects }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - name: Install the packages
+        run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: candidate-*
+          path: artifacts
+      - id: publish
+        name: Push the images and the chart by digest and sign them
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          bun scripts/release.ts publish "$VERSION" artifacts published
+          echo "subjects=$(jq -c . published/subjects.json)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: published
+          path: published/
+          if-no-files-found: error
+          retention-days: 7
+
+  attest:
+    name: attest (${{ matrix.name }}@${{ matrix.digest }})
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.publish.outputs.subjects) }}
+    runs-on: instabox-small
+    timeout-minutes: 15
+    permissions:
       packages: write
       id-token: write
       attestations: write
-    with:
-      name: Zeabur
-      docs: https://oss.zeabur.com/docs/zeabur/
-      version: ${{ inputs.version }}
-      # The experience program's PostHog key (docs/internal/releasing.md).
-      telemetry-key: ${{ vars.POSTHOG_KEY }}
-      # zeaburctl for macOS on Apple silicon; the server, its image and the installer are Linux only.
-      platforms: >-
-        [{"os": "linux", "arch": "amd64", "runner": "ubuntu-26.04"},
-         {"os": "linux", "arch": "arm64", "runner": "ubuntu-26.04-arm"},
-         {"os": "darwin", "arch": "arm64", "runner": "macos-26"}]
-      # The installers pin the image and the chart that publish pushed; they run on Linux servers.
-      finish: true
-      finish-platforms: >-
-        [{"os": "linux", "arch": "amd64", "runner": "ubuntu-26.04"},
-         {"os": "linux", "arch": "arm64", "runner": "ubuntu-26.04-arm"}]
-      # zeaburctl for macOS signed with the Developer ID and notarized (docs/internal/releasing.md).
-      signing-environment: apple-signing
-    secrets:
-      APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
-      APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
-      APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
-      APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
-      APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
+    steps:
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-name: ${{ matrix.name }}
+          subject-digest: ${{ matrix.digest }}
+
+  # The installers pin the image and the chart that publish pushed; they run on Linux servers.
+  finish:
+    name: finish (linux-${{ matrix.arch }})
+    needs: publish
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-26.04 }
+          - { arch: arm64, runner: ubuntu-26.04-arm }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - name: Install the packages
+        run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: published
+          path: artifacts/published
+      - name: Build the installer with the published pins
+        env:
+          ZEABUR_TELEMETRY_KEY: ${{ vars.POSTHOG_KEY }}
+          ARCH: ${{ matrix.arch }}
+        run: bun scripts/release.ts finish "$VERSION" linux "$ARCH" artifacts dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: finish-linux-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
+  release:
+    if: >-
+      ${{ !cancelled() && needs.publish.result == 'success' && needs.attest.result == 'success' &&
+          needs.finish.result == 'success' && needs.desktop-updater.result != 'failure' }}
+    needs: [publish, attest, finish, desktop-updater]
+    runs-on: instabox-small
+    timeout-minutes: 30
+    permissions:
+      contents: write # the draft
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - name: Install the packages
+        run: bun install --frozen-lockfile
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          path: artifacts
+      - name: Make the release assets and their signed checksums
+        run: |
+          bun scripts/release.ts assets "$VERSION" artifacts assets
+          bun x zeabur-oss-release checksums assets
+      - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
+        with:
+          subject-checksums: assets/SHA256SUMS
+      - name: Add the assets to the draft release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$VERSION" assets/* --repo "$GITHUB_REPOSITORY" --clobber
+
+  verify:
+    name: verify (${{ matrix.os }}-${{ matrix.arch }})
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: linux, arch: amd64, runner: ubuntu-26.04 }
+          - { os: linux, arch: arm64, runner: ubuntu-26.04-arm }
+          - { os: darwin, arch: arm64, runner: macos-26 }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 30
+    permissions:
+      # GitHub shows a draft release only to a token that can push.
+      contents: write
+      attestations: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - name: Install the packages
+        run: bun install --frozen-lockfile
+      - name: Download the draft's assets and verify them as a user gets them
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OS: ${{ matrix.os }}
+          ARCH: ${{ matrix.arch }}
+          RELEASE_SOURCE_REPOSITORY: ${{ github.repository }}
+          RELEASE_SOURCE_REF: refs/tags/${{ env.VERSION }}
+        run: |
+          gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir downloaded
+          bun x zeabur-oss-release verify-assets downloaded
+          bun scripts/release.ts verify "$VERSION" "$OS" "$ARCH" downloaded

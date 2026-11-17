@@ -20,11 +20,12 @@ nightly and by hand, where a failure opens or updates the issue "Nightly <job> f
 (`scripts/nightly-issues.sh`); the cluster jobs run on `scripts/dev-cluster.sh`. What each cluster job runs is in
 `zeabur-cluster-tests`.
 
-`.github/workflows/release.yml` runs on a `vX.Y.Z` or `vX.Y.Z-<pre-release>` tag: zeabur-oss/.github's
-shared release workflow, each stage `bun scripts/release.ts <stage>`: `build`
+`.github/workflows/release.yml` runs on a `vX.Y.Z` or `vX.Y.Z-<pre-release>` tag. Each stage is
+`bun scripts/release.ts <stage>`: `build`
 (Linux amd64/arm64, macOS arm64: `scripts/release-build.sh`, then `scripts/release-smoke.sh` on
 Linux), `sign` (macOS), `publish`, `attest`, `finish` (the installers),
-`release` (`assets`, the draft release) and `verify` (on the draft's assets);
+`release` (`assets`, uploaded to the draft that the Release pull request workflow made) and `verify`
+(on the draft's assets). The `desktop-*` jobs build Zeabur Desktop in the same run;
 `@zeabur-oss/release` (`package.json`) pushes, signs and verifies. A failed release run:
 [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md).
 

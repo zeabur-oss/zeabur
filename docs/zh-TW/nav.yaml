@@ -11,6 +11,7 @@
     config-file: 用設定檔和指令安裝
     personal: 自己用：在小機器上安裝
     existing-cluster: 把 Zeabur 裝進既有叢集
+    desktop: Zeabur Desktop：在自己的電腦開啟叢集
 - group: upgrade
   label: 升級
   pages:

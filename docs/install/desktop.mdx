@@ -1,0 +1,36 @@
+---
+title: "Zeabur Desktop: open your clusters from your computer"
+description: Install Zeabur Desktop on macOS, Windows or Linux to open Zeabur for any cluster in your kubeconfig, and keep it up to date.
+---
+
+Zeabur Desktop lists the contexts in the kubeconfig files on your computer and opens Zeabur for the one you pick, in its own window. It does what `zeaburctl ui` does, without a terminal.
+
+## Download
+
+Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) and download the file for your computer:
+
+| Computer | File |
+|---|---|
+| Mac with Apple silicon | `zeabur-desktop-v<version>-darwin-arm64.dmg` |
+| Windows on x64 | `zeabur-desktop-v<version>-windows-amd64-setup.exe`, or `-portable.exe` to run it without installing |
+| Debian or Ubuntu | `zeabur-desktop-v<version>-linux-<arch>.deb` |
+| Fedora, RHEL or openSUSE | `zeabur-desktop-v<version>-linux-<arch>.rpm` |
+| Other Linux | `zeabur-desktop-v<version>-linux-<arch>.AppImage` |
+
+On Linux, `<arch>` is `amd64` or `arm64`. There's no build for Intel Macs or Windows on Arm. The release's `SHA256SUMS` covers these files too; [Release files and verification](../reference/releases.mdx) shows how to check them.
+
+## Install
+
+- **macOS**: open the `.dmg` and drag Zeabur into Applications.
+- **Windows**: run the `-setup.exe`. It installs Zeabur for your account only, without asking for administrator rights.
+- **Debian or Ubuntu**: `sudo apt install ./zeabur-desktop-v<version>-linux-<arch>.deb`
+- **Fedora, RHEL or openSUSE**: `sudo dnf install ./zeabur-desktop-v<version>-linux-<arch>.rpm`, or `zypper install` on openSUSE.
+- **AppImage**: `chmod +x` the file and run it.
+
+## Updates
+
+Zeabur Desktop looks for a new version each time it starts. When there's one, the sidebar says so, for example **Version 0.3.1 is available**. To look yourself, click **Check for updates** in the sidebar, or on macOS choose **Zeabur > Check for Updates…**.
+
+The update shows what changed and installs only after you click **Update and restart**. Zeabur then closes its windows and restarts in the new version. Pre-releases are never offered.
+
+The macOS app, the Windows installer and the AppImage update themselves. A `.deb`, `.rpm` or portable `.exe` can't: Zeabur tells you there's a new version, and you download it from the release page and install it the way you installed the first one.

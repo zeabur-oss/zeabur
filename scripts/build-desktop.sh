@@ -2,7 +2,8 @@
 # Builds Zeabur Desktop on this machine for local use: the web interface the local service embeds
 # (web/dist), the app's own pages (desktop/web/dist), the binary, then the bundles under
 # target/desktop/release/bundle/. Run inside `nix develop .#desktop`. The bundle is not meant to
-# run on another Mac; releases are built on runners by .github/workflows/desktop.yml.
+# run on another Mac; releases are built on runners by the desktop-* jobs of
+# .github/workflows/release.yml.
 #   scripts/build-desktop.sh            # macOS: app,dmg
 #   scripts/build-desktop.sh deb        # the bundles to make, as `cargo tauri bundle --bundles` takes
 set -euo pipefail
