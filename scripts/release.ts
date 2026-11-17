@@ -478,16 +478,16 @@ async function publish(version: Version, artifacts: string, out: string) {
 
   // Everything that can refuse does so before the first write; recovering from a failed run is a
   // maintainer's decision (docs/internal/releasing.md).
-  // The Release pull request workflow left a draft when it tagged; a published release is final.
-  const draft =
+  // A published release is final. This job's token cannot see the draft that the Release pull
+  // request workflow left; the release job, which can, adds the assets to it.
+  const published =
     await $`gh release view ${version.tag} --repo ${repository} --json isDraft --jq .isDraft`
       .nothrow()
       .quiet();
-  if (draft.exitCode !== 0)
-    fail(
-      `release ${version.tag} has no draft; the Release pull request workflow makes it`,
-    );
-  if (draft.stdout.toString().trim() !== "true")
+  if (
+    published.exitCode === 0 &&
+    published.stdout.toString().trim() === "false"
+  )
     fail(`release ${version.tag} is already published`);
   const missing = assetSources(version, artifacts)
     .filter(([, from]) => from.includes("/candidate-") && !existsSync(from))
