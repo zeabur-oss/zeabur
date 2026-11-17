@@ -1,8 +1,8 @@
-// One stage of a release, as the shared release workflow of zeabur-oss/.github runs it, in the dev
-// shell of the commit being released: `bun scripts/release.ts <stage> <version> ...`
-// (docs/internal/releasing.md). @zeabur-oss/release (zeabur-oss/.github, release/) pushes, signs
-// and verifies; the workflow itself checks the CHANGELOG.md section, signs SHA256SUMS and writes
-// the notes. This script keeps what is Zeabur's own.
+// One stage of a release, as .github/workflows/release.yml runs it, in the dev shell of the commit
+// being released: `bun scripts/release.ts <stage> <version> ...` (docs/internal/releasing.md).
+// @zeabur-oss/release (zeabur-oss/.github, release/) pushes, signs and verifies; the workflow
+// itself checks the CHANGELOG.md section and signs SHA256SUMS, and the Release pull request
+// workflow writes the draft's title and notes when it tags. This script keeps what is Zeabur's own.
 //
 //   bump    <version>                                 after knope set Cargo.toml: Cargo.lock, the
 //                                                     chart, the web packages and the API document
@@ -22,8 +22,9 @@
 //                                                     user gets them
 //
 // <artifacts> holds the workflow's earlier artifacts: candidate-<os>-<arch>/ from build,
-// published/ from publish and finish-<os>-<arch>/ from finish. The platforms are linux-amd64,
-// linux-arm64 and darwin-arm64 (zeaburctl only); each build is native.
+// published/ from publish, finish-<os>-<arch>/ from finish, and desktop-<os>-<arch>/ and
+// desktop-updater/ from Zeabur Desktop's jobs. The platforms are linux-amd64, linux-arm64 and
+// darwin-arm64 (zeaburctl only); each build is native.
 import {
   Failure,
   absent,
@@ -43,6 +44,7 @@ import { existsSync } from "node:fs";
 import { appendFile, cp, mkdir, readdir, rm } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import { readDefaultImages, type DefaultImage } from "./default-images";
+import { desktopAssets, updaterKey } from "./desktop-release";
 import { parseVersion, pinTag, type Version } from "./versions";
 
 const root = resolve(import.meta.dir, "..");
@@ -105,6 +107,9 @@ function assetSources(version: Version, artifacts: string): [string, string][] {
       [`zeabur-${v}-linux-${arch}.tar.gz`, `candidate-linux-${arch}`],
       [`zeabur-installer-${v}-linux-${arch}.tar.gz`, `finish-linux-${arch}`],
     );
+  // Zeabur Desktop, from the desktop-* jobs of release.yml; latest.json once the app has an
+  // updater key.
+  files.push(...desktopAssets(version, updaterKey() !== ""));
   return files.map(([file, dir]) => [file, join(artifacts, dir, file)]);
 }
 
@@ -255,6 +260,21 @@ async function bump(version: Version) {
       ],
     ),
   );
+  // desktop/ is a workspace of its own (knope sets its Cargo.toml): its lock file has the app and
+  // the workspace crates it builds from.
+  const desktopLock = await Bun.file(join(root, "desktop/Cargo.lock")).text();
+  await edit(
+    "desktop/Cargo.lock",
+    ...[
+      "zeabur-desktop",
+      ...(metadata.packages as { name: string }[]).map((p) => p.name),
+    ]
+      .filter((name) => desktopLock.includes(`\nname = "${name}"\n`))
+      .map((name): [RegExp, string] => [
+        new RegExp(`(\nname = "${name}"\nversion = )"[^"]*"`),
+        `$1"${plain}"`,
+      ]),
+  );
   await edit(
     "deploy/chart/zeabur/Chart.yaml",
     [/^version: .*$/m, `version: ${plain}`],
@@ -280,6 +300,13 @@ async function check(version: Version) {
   for (const p of metadata.packages as { name: string; version: string }[])
     if (p.version !== plain)
       problems.push(`crate ${p.name} is ${p.version}, not ${plain}`);
+  const desktop =
+    await $`cargo metadata --manifest-path ${join(root, "desktop/Cargo.toml")} --locked --no-deps --format-version 1`.json();
+  for (const p of desktop.packages as { name: string; version: string }[])
+    if (p.version !== plain)
+      problems.push(
+        `desktop/Cargo.toml: ${p.name} is ${p.version}, not ${plain}`,
+      );
   const yaml = async (file: string) =>
     Bun.YAML.parse(await Bun.file(join(root, file)).text()) as Record<
       string,
@@ -354,7 +381,7 @@ async function build(version: Version, os: string, arch: string, dist: string) {
 async function sign(version: Version, os: string, arch: string, dist: string) {
   platform(os, arch);
   if (os !== "darwin") fail("only the macOS build is signed");
-  // The shared workflow passes the secrets only on main and tags. Without them zeaburctl keeps
+  // release.yml passes the secrets only on main and tags. Without them zeaburctl keeps
   // the linker's ad hoc signature, and the release goes on.
   if (!process.env.APPLE_CERTIFICATE_P12) {
     console.log(
@@ -451,16 +478,17 @@ async function publish(version: Version, artifacts: string, out: string) {
 
   // Everything that can refuse does so before the first write; recovering from a failed run is a
   // maintainer's decision (docs/internal/releasing.md).
-  if (
-    (
-      await $`gh release view ${version.tag} --repo ${repository}`
-        .nothrow()
-        .quiet()
-    ).exitCode === 0
-  )
+  // The Release pull request workflow left a draft when it tagged; a published release is final.
+  const draft =
+    await $`gh release view ${version.tag} --repo ${repository} --json isDraft --jq .isDraft`
+      .nothrow()
+      .quiet();
+  if (draft.exitCode !== 0)
     fail(
-      `release ${version.tag} already exists; inspect it before trying again`,
+      `release ${version.tag} has no draft; the Release pull request workflow makes it`,
     );
+  if (draft.stdout.toString().trim() !== "true")
+    fail(`release ${version.tag} is already published`);
   const missing = assetSources(version, artifacts)
     .filter(([, from]) => from.includes("/candidate-") && !existsSync(from))
     .map(([file]) => file);
@@ -625,6 +653,33 @@ async function verify(
         fail(`zeaburctl is not notarized: ${text}`);
     } else console.log("zeaburctl is not signed with a Developer ID");
     if (said !== `zeaburctl ${version.plain}`) fail(`zeaburctl says '${said}'`);
+
+    // Zeabur Desktop's .dmg, notarized and stapled when it has a Developer ID.
+    const dmg = join(
+      downloaded,
+      `zeabur-desktop-${version.tag}-${os}-${arch}.dmg`,
+    );
+    const dmgSignature = await $`/usr/bin/codesign -dvv ${dmg}`
+      .nothrow()
+      .quiet();
+    if (
+      /^Authority=Developer ID Application: /m.test(
+        dmgSignature.stderr.toString(),
+      )
+    ) {
+      await $`/usr/bin/xcrun stapler validate ${dmg}`;
+      const assessed =
+        await $`/usr/sbin/spctl --assess -vvv --type open --context context:primary-signature ${dmg}`
+          .nothrow()
+          .quiet();
+      const text = `${assessed.stdout}${assessed.stderr}`;
+      if (
+        assessed.exitCode !== 0 ||
+        !text.includes("source=Notarized Developer ID")
+      )
+        fail(`the Zeabur Desktop .dmg is not notarized: ${text}`);
+    } else
+      console.log("the Zeabur Desktop .dmg is not signed with a Developer ID");
   }
   console.log(`release ${version.tag} verified on ${os}-${arch}`);
 }

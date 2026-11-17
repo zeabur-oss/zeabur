@@ -3,6 +3,7 @@ import FileIcon from "~icons/ph/file-text"
 import HouseIcon from "~icons/ph/house"
 import PlusIcon from "~icons/ph/plus"
 import XIcon from "~icons/ph/x"
+import type { ReactElement } from "react"
 
 import { useI18n } from "@/i18n"
 
@@ -88,9 +89,10 @@ interface Props {
   setOnly: (id: string | null) => void
   removeSource: (id: string) => void
   addFiles: () => void
+  update: ReactElement
 }
 
-export function Sidebar({ sources, total, only, setOnly, removeSource, addFiles }: Props) {
+export function Sidebar({ sources, total, only, setOnly, removeSource, addFiles, update }: Props) {
   const { t } = useI18n()
   const allTone =
     only === null ? "bg-v2-surface-active text-main" : "text-secondary hover:bg-v2-surface-hover"
@@ -118,7 +120,8 @@ export function Sidebar({ sources, total, only, setOnly, removeSource, addFiles 
           {t("desktop.addSource")}
         </Button>
       </div>
-      <div className="mt-auto px-2">
+      <div className="mt-auto flex flex-col gap-2 px-2">
+        {update}
         <LanguageSelect />
       </div>
     </aside>

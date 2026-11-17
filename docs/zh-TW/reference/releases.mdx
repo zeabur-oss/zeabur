@@ -3,7 +3,7 @@ title: 發行檔與驗證
 description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章與建置來源後再執行。
 ---
 
-在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為 zeabur-oss 共用的 release workflow，且是為本 repository 該版本 tag 執行的那一次，通過了才解壓縮、執行。
+在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為 Zeabur 的 release workflow，且是為本 repository 該版本 tag 執行的那一次，通過了才解壓縮、執行。
 
 ## 檔案與平台
 
@@ -30,7 +30,7 @@ description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章�
 version=0.1.1
 platform=darwin-arm64
 binary=zeaburctl
-signer='^https://github\.com/zeabur-oss/\.github/\.github/workflows/release\.yml@'
+signer='^https://github\.com/zeabur-oss/(zeabur|\.github)/\.github/workflows/release\.yml@'
 
 gh release download "v$version" --repo zeabur-oss/zeabur \
   --dir "zeabur-$version" \
@@ -41,7 +41,7 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
 
 `platform` 可以換成 `linux-amd64` 或 `linux-arm64`。下載 installer 時，把 `binary` 改成 `zeabur-installer`，並選 Linux 平台。
 
-zeabur-oss 的每個版本都由 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) 裡共用的 release workflow 建置與簽署，所以簽署者是那個 workflow（下面的 `signer`），憑證上另外記著這次執行是為了哪個 repository、哪個 tag。進入下載目錄，依序驗證 checksum 清單的簽署者、檔案內容和建置來源：
+每個版本都由本 repository 的 release workflow（`.github/workflows/release.yml`）建置與簽署，所以簽署者是那個 workflow（下面的 `signer`）。v0.2.0 以前的版本由 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) 裡共用的 release workflow 簽署，`signer` 也接受它。憑證上另外記著這次執行是為了哪個 repository、哪個 tag。進入下載目錄，依序驗證 checksum 清單的簽署者、檔案內容和建置來源：
 
 ```sh
 cd "zeabur-$version"
@@ -58,7 +58,7 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 gh attestation verify "$binary-v$version-$platform.tar.gz" \
   --repo zeabur-oss/zeabur \
-  --signer-workflow zeabur-oss/.github/.github/workflows/release.yml \
+  --cert-identity-regex "$signer" \
   --source-ref "refs/tags/v$version"
 ```
 
@@ -148,8 +148,8 @@ awk '$(NF-1) == "index" { print $NF }' digests.txt
 
 ## 發行流程
 
-維護者推送 `v<version>` tag 後，release workflow（本 repository 的 `release.yml`，會呼叫 `zeabur-oss/.github` 裡共用的那一個）建置 Linux 和 macOS 版本、做 smoke test、發布映像檔和 chart，再以 Sigstore keyless 簽署映像檔、chart 和 checksum 清單，並為三者產生建置來源 attestation。
+維護者推送 `v<version>` tag 後，release workflow（本 repository 的 `release.yml`）建置 Linux 和 macOS 版本與 Zeabur Desktop、做 smoke test、發布映像檔和 chart，再以 Sigstore keyless 簽署映像檔、chart 和 checksum 清單，並為三者產生建置來源 attestation。
 
-Workflow 最後建立 GitHub release 草稿，維護者檢查後才公開。Releases 頁面上看得到的版本，才有可下載的檔案。
+Workflow 最後把檔案加到 GitHub release 草稿，維護者檢查後才公開。Releases 頁面上看得到的版本，才有可下載的檔案。
 
 下載和驗證都不會動到叢集，用完的下載目錄可以直接刪掉。要移除已安裝的 Zeabur，見[移除流程](../leave/uninstall.mdx)。

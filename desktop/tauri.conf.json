@@ -1,7 +1,6 @@
 {
   "$schema": "https://schema.tauri.app/config/2",
   "productName": "Zeabur",
-  "version": "../web/package.json",
   "identifier": "com.zeabur.oss.desktop",
   "build": {
     "devUrl": "http://localhost:5174",
@@ -37,6 +36,30 @@
     ],
     "targets": "all",
     "category": "DeveloperTool",
-    "shortDescription": "Zeabur for the clusters in your kubeconfig"
+    "shortDescription": "Zeabur for the clusters in your kubeconfig",
+    "macOS": {
+      "hardenedRuntime": true
+    },
+    "windows": {
+      "nsis": {
+        "languages": [
+          "English",
+          "TradChinese",
+          "SimpChinese"
+        ]
+      }
+    }
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMyOTk0QTlBNkIwQkE4OEMKUldTTXFBdHJta3Fad3VDVHZtK2xDR1hLT2tyWTJYbXY3Y3ZOd3lhbW1zbmlDc0JtQWpXYmNlWnYK",
+      "endpoints": [
+        "https://github.com/zeabur-oss/zeabur/releases/latest/download/latest.json"
+      ],
+      "requireSignedVersion": true,
+      "windows": {
+        "installMode": "passive"
+      }
+    }
   }
 }

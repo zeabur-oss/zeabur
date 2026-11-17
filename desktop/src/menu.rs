@@ -33,15 +33,16 @@ mod mac {
 
     use serde::Deserialize;
     use tauri::menu::{AboutMetadata, Menu, MenuItem, PredefinedMenuItem, Submenu, SubmenuBuilder};
-    use tauri::{AppHandle, Manager, WebviewWindow};
+    use tauri::{AppHandle, Manager, WebviewWindow, Wry};
 
-    use crate::{chrome, output};
+    use crate::{chrome, output, update};
 
     /// Every word in the menu bar (`desktop.menu.*` in `web/src/i18n`).
     #[derive(Debug, Deserialize)]
     #[serde(rename_all = "camelCase")]
     pub(crate) struct MenuLabels {
         about: String,
+        check_updates: String,
         services: String,
         hide: String,
         hide_others: String,
@@ -73,7 +74,7 @@ mod mac {
 
     pub(crate) static DOCS: Mutex<String> = Mutex::new(String::new());
 
-    pub(crate) fn set(app: &AppHandle, l: &MenuLabels) -> tauri::Result<()> {
+    fn app_menu(app: &AppHandle, l: &MenuLabels) -> tauri::Result<Submenu<Wry>> {
         let info = app.package_info();
         let about = AboutMetadata {
             name: Some(info.name.clone()),
@@ -81,11 +82,18 @@ mod mac {
             icon: app.default_window_icon().cloned(),
             ..Default::default()
         };
-        let app_menu = SubmenuBuilder::new(app, &info.name)
+        SubmenuBuilder::new(app, &info.name)
             .item(&PredefinedMenuItem::about(
                 app,
                 Some(&l.about),
                 Some(about),
+            )?)
+            .item(&MenuItem::with_id(
+                app,
+                "check-updates",
+                &l.check_updates,
+                true,
+                None::<&str>,
             )?)
             .separator()
             .item(&PredefinedMenuItem::services(app, Some(&l.services))?)
@@ -95,7 +103,11 @@ mod mac {
             .item(&PredefinedMenuItem::show_all(app, Some(&l.show_all))?)
             .separator()
             .item(&PredefinedMenuItem::quit(app, Some(&l.quit))?)
-            .build()?;
+            .build()
+    }
+
+    pub(crate) fn set(app: &AppHandle, l: &MenuLabels) -> tauri::Result<()> {
+        let app_menu = app_menu(app, l)?;
         let file = SubmenuBuilder::new(app, &l.file)
             .item(&MenuItem::with_id(
                 app,
@@ -188,6 +200,7 @@ mod mac {
                     output::warn(&format!("cannot open the chooser: {err}"));
                 }
             }
+            "check-updates" => update::check_from_menu(app),
             "docs" => {
                 let url = DOCS.lock().unwrap_or_else(PoisonError::into_inner).clone();
                 if url.starts_with("https://oss.zeabur.com/")

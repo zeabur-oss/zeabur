@@ -12,6 +12,7 @@ mod keys;
 mod menu;
 mod output;
 mod sources;
+mod update;
 #[cfg(windows)]
 mod win32;
 
@@ -267,6 +268,40 @@ fn label_hash(key: &str) -> String {
     format!("{hash:016x}")
 }
 
+fn setup(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
+    let config_dir = tauri_app.path().app_config_dir()?;
+    let saved = std::fs::read(config_dir.join("settings.json"))
+        .ok()
+        .and_then(|bytes| serde_json::from_slice(&bytes).ok())
+        .unwrap_or_default();
+    tauri_app.manage(App {
+        config_dir,
+        saved: Mutex::new(saved),
+        env: RwLock::new(ChildEnv::from_process()),
+        shell: Mutex::new(ShellRead::Pending),
+        clusters: cluster::Clusters::default(),
+    });
+
+    // A login shell can take seconds; the window opens without waiting and reloads on the
+    // event.
+    let handle = tauri_app.handle().clone();
+    std::thread::spawn(move || {
+        let (merged, read) = env::load(ChildEnv::from_process());
+        let app = handle.state::<App>();
+        *app.env.write().unwrap_or_else(PoisonError::into_inner) = merged;
+        *app.shell.lock().unwrap_or_else(PoisonError::into_inner) = read;
+        if let Err(err) = handle.emit("shell-env", ()) {
+            output::warn(&format!("cannot reload the window: {err}"));
+        }
+    });
+
+    #[cfg(target_os = "macos")]
+    chrome::allow_title_bar(tauri_app.handle())?;
+    chrome::show_chooser(tauri_app.handle())?;
+    update::check_on_start(tauri_app.handle());
+    Ok(())
+}
+
 fn main() -> ExitCode {
     let context = context();
     #[cfg(windows)]
@@ -279,43 +314,14 @@ fn main() -> ExitCode {
             output::warn(&format!("cannot open the chooser: {err}"));
         }
     }));
-    let builder = builder.plugin(tauri_plugin_dialog::init());
+    let builder = builder
+        .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .manage(update::Updates::default());
     #[cfg(target_os = "macos")]
     let builder = builder.on_menu_event(menu::on_menu_event);
     let app = builder
-        .setup(|tauri_app| {
-            let paths = tauri_app.path();
-            let config_dir = paths.app_config_dir()?;
-            let saved = std::fs::read(config_dir.join("settings.json"))
-                .ok()
-                .and_then(|bytes| serde_json::from_slice(&bytes).ok())
-                .unwrap_or_default();
-            tauri_app.manage(App {
-                config_dir,
-                saved: Mutex::new(saved),
-                env: RwLock::new(ChildEnv::from_process()),
-                shell: Mutex::new(ShellRead::Pending),
-                clusters: cluster::Clusters::default(),
-            });
-
-            // A login shell can take seconds; the window opens without waiting and reloads on the
-            // event.
-            let handle = tauri_app.handle().clone();
-            std::thread::spawn(move || {
-                let (merged, read) = env::load(ChildEnv::from_process());
-                let app = handle.state::<App>();
-                *app.env.write().unwrap_or_else(PoisonError::into_inner) = merged;
-                *app.shell.lock().unwrap_or_else(PoisonError::into_inner) = read;
-                if let Err(err) = handle.emit("shell-env", ()) {
-                    output::warn(&format!("cannot reload the window: {err}"));
-                }
-            });
-
-            #[cfg(target_os = "macos")]
-            chrome::allow_title_bar(tauri_app.handle())?;
-            chrome::show_chooser(tauri_app.handle())?;
-            Ok(())
-        })
+        .setup(setup)
         .invoke_handler(tauri::generate_handler![
             snapshot,
             add_paths,
@@ -323,7 +329,12 @@ fn main() -> ExitCode {
             open_cluster,
             start_cluster,
             back_to_chooser,
-            menu::set_menu
+            menu::set_menu,
+            update::found_update,
+            update::take_check_request,
+            update::check_update,
+            update::install_update,
+            update::open_releases
         ])
         .build(context);
     match app {

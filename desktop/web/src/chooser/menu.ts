@@ -6,6 +6,7 @@ import { docsUrl } from "@/lib/docs"
 
 const keys = [
   "about",
+  "checkUpdates",
   "services",
   "hide",
   "hideOthers",

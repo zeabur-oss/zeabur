@@ -6,7 +6,7 @@
   pages: [quickstart, ai-agent, first-project, how-it-works]
 - group: install
   label: More ways to install
-  pages: [config-file, personal, existing-cluster]
+  pages: [config-file, personal, existing-cluster, desktop]
 - group: upgrade
   label: Upgrade
   pages: [steps, notes]

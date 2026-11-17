@@ -12,6 +12,11 @@ fn main() {
         "start_cluster",
         "back_to_chooser",
         "set_menu",
+        "found_update",
+        "take_check_request",
+        "check_update",
+        "install_update",
+        "open_releases",
     ]);
     let attributes = tauri_build::Attributes::new()
         .codegen(tauri_build::CodegenContext::new())

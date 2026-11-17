@@ -27,7 +27,19 @@ nix develop .#desktop -c scripts/build-desktop.sh
 
 On macOS this makes `Zeabur.app` and a `.dmg` under `target/desktop/release/bundle/`. Signing and
 notarization follow the Tauri bundler's `APPLE_*` variables; without them the app is signed ad
-hoc. Releases are built by the release workflow ([releasing](../docs/internal/releasing.md)).
+hoc. The version is `desktop/Cargo.toml`'s, which the release sets with the rest of the repository.
+Release packages are built outside the Nix shell with `scripts/package-desktop.sh`
+([releasing](../docs/internal/releasing.md#zeabur-desktop)).
+
+## Updates
+
+`src/update.rs` and `web/src/chooser/update.tsx`, with Tauri's updater plugin. The app checks the
+newest release's `latest.json` once at start, quietly, and when asked (the sidebar's button, on
+macOS also **Zeabur > Check for Updates…**); it shows the version and the notes and installs only
+after **Update and restart**. What it can do depends on how it was installed: the macOS app, the
+NSIS install and the AppImage replace themselves; a `.deb`, `.rpm`, the portable `.exe` and a
+development build offer the release page. An update must carry a signature of the key in
+`tauri.conf.json` for that exact version; while the key is empty the app does not check.
 
 ## Build for Windows
 

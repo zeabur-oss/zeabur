@@ -3,7 +3,7 @@ title: Release files and verification
 description: Choose Zeabur release files for your operating system, then verify checksums, signatures, and build provenance before running them.
 ---
 
-Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases), then download the matching archive, `SHA256SUMS`, and signature. When verifying, accept only the shared zeabur-oss release workflow as the signer, and only when it ran for this repository at that version's tag. Extract and run the files only after verification passes.
+Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases), then download the matching archive, `SHA256SUMS`, and signature. When verifying, accept only Zeabur's release workflow as the signer, and only when it ran for this repository at that version's tag. Extract and run the files only after verification passes.
 
 ## Files and platforms
 
@@ -30,7 +30,7 @@ You'll need GitHub CLI `gh`, cosign 3, and GNU `sha256sum`. Set `version` to the
 version=0.1.1
 platform=darwin-arm64
 binary=zeaburctl
-signer='^https://github\.com/zeabur-oss/\.github/\.github/workflows/release\.yml@'
+signer='^https://github\.com/zeabur-oss/(zeabur|\.github)/\.github/workflows/release\.yml@'
 
 gh release download "v$version" --repo zeabur-oss/zeabur \
   --dir "zeabur-$version" \
@@ -41,7 +41,7 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
 
 You can set `platform` to `linux-amd64` or `linux-arm64`. To download the installer, set `binary` to `zeabur-installer` and choose a Linux platform.
 
-The shared release workflow in [zeabur-oss/.github](https://github.com/zeabur-oss/.github) builds and signs every zeabur-oss release, so that workflow is the signer (`signer` below). The certificate also names the repository and tag it ran for. Open the download directory, then verify the checksum list's signer, the file contents, and the build provenance in that order:
+This repository's release workflow, `.github/workflows/release.yml`, builds and signs every release, so that workflow is the signer (`signer` below). Releases up to v0.2.0 were signed by the shared release workflow in [zeabur-oss/.github](https://github.com/zeabur-oss/.github), so `signer` accepts that one too. The certificate also names the repository and tag it ran for. Open the download directory, then verify the checksum list's signer, the file contents, and the build provenance in that order:
 
 ```sh
 cd "zeabur-$version"
@@ -58,7 +58,7 @@ sha256sum --check --ignore-missing SHA256SUMS
 
 gh attestation verify "$binary-v$version-$platform.tar.gz" \
   --repo zeabur-oss/zeabur \
-  --signer-workflow zeabur-oss/.github/.github/workflows/release.yml \
+  --cert-identity-regex "$signer" \
   --source-ref "refs/tags/v$version"
 ```
 
@@ -148,8 +148,8 @@ Copy each reference with the tool you mirror with, and keep its digest so the ch
 
 ## Release process
 
-When a maintainer pushes a `v<version>` tag, the release workflow (this repository's `release.yml`, which calls the shared one in `zeabur-oss/.github`) builds the Linux and macOS binaries, runs smoke tests, and publishes the image and chart. It then signs the image, chart, and checksum list with Sigstore keyless signing and generates build provenance attestations for all three.
+When a maintainer pushes a `v<version>` tag, the release workflow (this repository's `release.yml`) builds the Linux and macOS binaries and Zeabur Desktop, runs smoke tests, and publishes the image and chart. It then signs the image, chart, and checksum list with Sigstore keyless signing and generates build provenance attestations for all three.
 
-The workflow finishes by creating a draft GitHub release. A maintainer checks the draft before publishing it. Downloadable files are available only for versions visible on the Releases page.
+The workflow finishes by adding the files to a draft GitHub release. A maintainer checks the draft before publishing it. Downloadable files are available only for versions visible on the Releases page.
 
 Downloading and verifying files don't change the cluster. You can delete the download directory when you're done. To remove an installed copy of Zeabur, see [Uninstall](../leave/uninstall.mdx).
