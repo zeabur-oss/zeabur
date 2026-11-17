@@ -1,7 +1,7 @@
 # When a Zeabur release run fails
 
-Start with `zeabur-oss-ci`'s RELEASE-RECOVERY.md (what was published stays; access failures)
-and `docs/internal/releasing.md` ("When a release run fails"). These are Zeabur's own cases.
+Start with `docs/internal/releasing.md` ("When a release run fails"). These are Zeabur's own
+cases.
 
 ## A pin without a release tag
 

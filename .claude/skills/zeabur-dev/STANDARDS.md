@@ -1,6 +1,6 @@
 # Engineering standards: Zeabur's part
 
-Apply `zeabur-oss-standards`' STANDARDS.md first. Zeabur adds these items to its sections.
+What Zeabur checks in review, by section.
 
 ## 1. Comments, doc comments and commit messages
 

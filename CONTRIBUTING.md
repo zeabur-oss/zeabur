@@ -51,9 +51,7 @@ a dev shell of its own (it builds from source; the pin and how to bump it are in
 CI's `wording` job does: `nix develop .#zh -c ./scripts/check-zh-tw.sh`. `web/scripts/zh-tw-strings.ts` prints every zh-TW
 string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen terms and the reason
 for each rule or term it relaxes. Any warning fails the check. The term chosen for each concept
-and how each interface element reads are in [docs/internal/wording.md](docs/internal/wording.md);
-the general writing rules for all three locales are in the `zeabur-writing` skill of
-[zeabur-oss/skills](https://github.com/zeabur-oss/skills).
+and how each interface element reads are in [docs/internal/wording.md](docs/internal/wording.md).
 
 Zeabur Catalog comes in as a flake input: `flake.lock` pins its commit, and the dev shell builds
 the catalog's `release` output there, the same `bundle.tar.gz` and `index.json` that its release

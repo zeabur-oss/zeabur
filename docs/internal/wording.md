@@ -5,10 +5,6 @@ and the rules that come from Zeabur's screens. It covers `web/src/i18n/` (`en.ts
 `zh-TW.ts` and `zh-CN.ts` are typed against it), the English messages the API sends with a
 problem, the sign-in pages `zeabur` serves, `zeaburctl`'s output and the docs.
 
-The general rules for English, zh-TW and zh-CN (sentence order, plain words, punctuation, spacing,
-AI tells) are in the `zeabur-writing` skill of [zeabur-oss/skills](https://github.com/zeabur-oss/skills). Where the two
-differ, a term or convention here wins.
-
 ## Zeabur's rules
 
 1. **Alert titles describe the situation; buttons name the result.** Never "Error" as a title;

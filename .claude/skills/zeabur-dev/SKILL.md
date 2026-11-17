@@ -5,10 +5,8 @@ description: Day-to-day development loop for the Zeabur repository — environme
 
 # Zeabur development loop
 
-Follow the shared skills (zeabur-oss/skills): `zeabur-oss-rust`
-(Nix toolchain, workspace, lints, common checks), `zeabur-oss-standards` (with
-[`STANDARDS.md`](STANDARDS.md) here), `zeabur-oss-workflow` (commits and pull requests; Zeabur's
-part in `zeabur-workflow`). This skill adds what is Zeabur's own.
+What is Zeabur's own. Review standards: [`STANDARDS.md`](STANDARDS.md). Commits and pull
+requests: `zeabur-workflow`.
 
 ## Crates and binaries
 - Each crate has a level in `Cargo.toml` `[workspace.metadata.levels]` (table in
@@ -20,7 +18,7 @@ part in `zeabur-workflow`). This skill adds what is Zeabur's own.
   exception is tools pods in the terminal namespace, `zeabur_api::tools`), and never
   impersonate.
 
-## Checks (what CI runs, beyond `zeabur-oss-rust`'s)
+## Checks (what CI runs)
 ```sh
 nix develop -c bash -c 'bun install --frozen-lockfile && node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer'
 nix develop -c ./scripts/check-levels.sh
@@ -39,14 +37,14 @@ Cluster tests: see `zeabur-cluster-tests`. Web interface: see `zeabur-ui`. Each 
 environment; on a VM, snapshot its clean state and restore it after every run (see
 `zeabur-cluster-tests`). When a check fails on GitHub, see `zeabur-ci`.
 
-## Lint conventions beyond `zeabur-oss-rust`
+## Lint conventions
 - The installer's output module is `out`.
 - Integration tests wrap their tests in `#[cfg(test)] mod tests` (clippy
   `tests_outside_test_module`).
 
 ## Comments
-- `zeabur-oss-standards`, section 1, in Rust, TypeScript, CSS and scripts alike: only what the
-  code cannot say; decisions go in `docs/internal/`.
+- In Rust, TypeScript, CSS and scripts alike: only what the code cannot say; decisions go in
+  `docs/internal/`.
 
 ## API
 - Handlers live in `zeabur-api`, described with `#[utoipa::path]`, registered with `routes!`.
