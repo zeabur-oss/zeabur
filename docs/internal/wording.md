@@ -5,10 +5,6 @@ and the rules that come from Zeabur's screens. It covers `web/src/i18n/` (`en.ts
 `zh-TW.ts` and `zh-CN.ts` are typed against it), the English messages the API sends with a
 problem, the sign-in pages `zeabur` serves, `zeaburctl`'s output and the docs.
 
-The general rules for English, zh-TW and zh-CN (sentence order, plain words, punctuation, spacing,
-AI tells) are in the `zeabur-writing` skill, `.claude/skills/zeabur-writing/`. Where the two
-differ, a term or convention here wins.
-
 ## Zeabur's rules
 
 1. **Alert titles describe the situation; buttons name the result.** Never "Error" as a title;
@@ -82,9 +78,8 @@ place to say what the feature is for and how to start [A1][N1].
 - Use `common.colon` instead of a literal colon. A placeholder that may hold Chinese or Latin
   text takes its space from `latinStart` / `latinEnd` (`web/src/i18n/zh-TW.ts`), never a
   hard-coded one.
-- `scripts/check-zh-tw.sh` checks zh-TW interface vocabulary and punctuation;
-  Vale (`.vale.ini`) checks docs and all three catalogues. Take a suggestion only when it
-  fits the technical meaning.
+- `scripts/check-zh-tw.sh` checks zh-TW interface vocabulary and punctuation. Take a
+  suggestion only when it fits the technical meaning.
 
 ## Element conventions
 
@@ -248,8 +243,8 @@ is read as `p.name ?? ""`. Test a branch that is easy to get wrong in `web/src/i
 
 Read changed text on the rendered page, in every locale, at desktop and narrow widths: wrapping,
 truncation, mixed CJK and Latin, buttons that overflow. Check that the three locales state the
-same facts, limits and conditions. `bun run typecheck`, `bun run test`,
-`vale` and `scripts/check-zh-tw.sh` must pass; a passing check is not the
+same facts, limits and conditions. `bun run typecheck`, `bun run test` and
+`scripts/check-zh-tw.sh` must pass; a passing check is not the
 review.
 
 ## Sources

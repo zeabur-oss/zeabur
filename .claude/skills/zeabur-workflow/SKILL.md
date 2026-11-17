@@ -5,9 +5,8 @@ description: How work moves through the Zeabur repository — branches, commits,
 
 # Workflow
 
-Follow `zeabur-oss-workflow` (copied from zeabur-oss/.github by the Update workflow): branches,
-signed-off Conventional Commits, pull requests, `gh pr checks --watch`, squash merging, issues and
-the text rules. This skill adds what is Zeabur's own.
+What is Zeabur's own about branches, commits, pull requests and issues. `CONTRIBUTING.md` has the
+rules.
 
 ## Pull requests
 
@@ -20,7 +19,7 @@ the text rules. This skill adds what is Zeabur's own.
 A maintainer releases: they bump the version (`Cargo.toml`, `Chart.yaml`, a `CHANGELOG.md`
 section), merge it, push the tag `v<version>`, check the draft release the workflow leaves and
 publish it by hand (`docs/internal/releasing.md`). A change to `scripts/release.ts` is checked with `bun check scripts/` and `bun test scripts/`, a
-`scripts/release-*.sh` with `shellcheck`, the workflow with `actionlint`, and on Linux by running
+`scripts/release-*.sh` with `shellcheck`, the workflow with `jactionlint`, and on Linux by running
 `release-build.sh` and `release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.
 
 ## Issues

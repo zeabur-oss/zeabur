@@ -5,7 +5,7 @@ name: CI
 # to land. The nightly run runs everything, also fuzz and the canary, which are not in the merge
 # queue, and keeps main's caches for the merge queue's jobs. A failed nightly-only job (fuzz,
 # canary, e2e-full) opens or updates one issue (scripts/nightly-issues.sh), and closes it when the
-# job passes again.
+# job passes again. Jobs that compile Rust run on instabox-medium, the others on instabox-small.
 on:
   push:
     branches: [main]
@@ -27,16 +27,22 @@ env:
 
 jobs:
   lint:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-medium
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
-      - run: nix develop -c scripts/ci/lint.sh
+      - run: nix develop -c bun install --frozen-lockfile
+      - parallel:
+          - name: Static checks
+            run: nix develop -c scripts/ci/lint.sh static
+          - name: Cargo checks
+            run: nix develop -c scripts/ci/lint.sh cargo
       - if: always()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -46,26 +52,28 @@ jobs:
           retention-days: 14
 
   test:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-medium
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-medium
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
           # fallow audit compares HEAD with HEAD^.
           fetch-depth: 2
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -73,12 +81,13 @@ jobs:
 
   # desktop/, its own Cargo workspace, with the main workspace's rules (scripts/check-desktop.sh).
   desktop:
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-medium
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -87,12 +96,13 @@ jobs:
   # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
   fuzz:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-medium
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -100,12 +110,13 @@ jobs:
 
   no-ui:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-medium
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -113,12 +124,13 @@ jobs:
 
   wording:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: ubuntu-26.04-arm
+    runs-on: instabox-small
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
       # zhtw-mcp builds from source; main's scheduled run keeps it, keyed on the lock file.
       - id: zhtw-mcp
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
@@ -140,11 +152,12 @@ jobs:
   cluster:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
     runs-on: ubuntu-26.04-arm
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -153,11 +166,12 @@ jobs:
   e2e:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
     runs-on: ubuntu-26.04-arm
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -175,11 +189,12 @@ jobs:
   e2e-full:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-26.04-arm
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -189,11 +204,12 @@ jobs:
   canary:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-26.04-arm
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
         with:
           rust-cache: true
       - uses: ./.github/actions/catalog-release
@@ -204,6 +220,7 @@ jobs:
     if: always() && github.event_name == 'schedule'
     needs: [fuzz, canary, e2e-full]
     runs-on: ubuntu-slim
+    timeout-minutes: 120
     permissions:
       contents: read
       issues: write
@@ -217,18 +234,13 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: scripts/nightly-issues.sh
 
-  zizmor:
-    uses: zeabur-oss/.github/.github/workflows/zizmor.yml@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
-
   # The check rulesets require.
   ok:
     name: ci / ok
     if: always()
-    needs: [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, zizmor]
-    runs-on: ubuntu-slim
+    needs: [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full]
+    runs-on: instabox-small
+    timeout-minutes: 5
     steps:
       - if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
         run: exit 1
-
-  dco:
-    uses: zeabur-oss/.github/.github/workflows/dco.yml@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main

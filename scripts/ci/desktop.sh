@@ -5,6 +5,7 @@
 # on Linux. `--all-features` embeds desktop/web/dist, so the pages are built first.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+source scripts/lib.sh
 # Under target/, which CI caches.
 export CARGO_TARGET_DIR="$PWD/target/desktop"
 

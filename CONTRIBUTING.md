@@ -18,7 +18,7 @@ messages follow [Conventional Commits](https://www.conventionalcommits.org/).
 Run what CI runs (the jobs in `.github/workflows/ci.yml` that need no cluster), inside `nix develop`:
 
 ```sh
-cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh scripts/ci/*.sh && actionlint
+cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh scripts/ci/*.sh && jactionlint
 bun install --frozen-lockfile && bun fmt --check scripts/*.ts && bun check scripts/ && bun test scripts/
 cargo lint                                   # clippy, all targets and features, -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked
@@ -51,13 +51,7 @@ a dev shell of its own (it builds from source; the pin and how to bump it are in
 CI's `wording` job does: `nix develop .#zh -c ./scripts/check-zh-tw.sh`. `web/scripts/zh-tw-strings.ts` prints every zh-TW
 string after its key; `.zhtw-mcp.toml` holds the rules, the catalogue's chosen terms and the reason
 for each rule or term it relaxes. Any warning fails the check. The term chosen for each concept
-and how each interface element reads are in [docs/internal/wording.md](docs/internal/wording.md);
-the general writing rules for all three locales are in the `zeabur-writing` skill
-(`.claude/skills/zeabur-writing/`, copied from
-[zeabur-oss/.github](https://github.com/zeabur-oss/.github/tree/main/skills) by `.github/workflows/update.yml`), and
-Vale checks docs and catalogs against them: `nix develop -c vale docs README.md web/src/i18n`
-(`.vale.ini`). A rule that is wrong for one passage is silenced there with a Vale comment that
-says why.
+and how each interface element reads are in [docs/internal/wording.md](docs/internal/wording.md).
 
 Zeabur Catalog comes in as a flake input: `flake.lock` pins its commit, and the dev shell builds
 the catalog's `release` output there, the same `bundle.tar.gz` and `index.json` that its release

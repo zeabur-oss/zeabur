@@ -6,6 +6,7 @@
 # ZEABUR_IDENTITY_PINNED names). The cluster is deleted at the end; ZEABUR_CI_KEEP=1 keeps it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+source scripts/lib.sh
 
 # As k3d's cluster admin, with no Zeabur dashboard and no Zeabur Identity: nothing critical, the Identity
 # checks skipped; the exit code is

@@ -5,9 +5,8 @@ description: Zeabur's own terms and steps for any text people read in Zeabur —
 
 # Wording
 
-Follow `zeabur-writing` (copied from zeabur-oss/.github by the Update workflow) for how text reads
-in English, zh-TW and zh-CN. This skill adds Zeabur's terms and conventions;
-`docs/internal/wording.md` is the rulebook, and its term beats anything in `zeabur-writing`.
+Zeabur's terms and conventions for English, zh-TW and zh-CN. `docs/internal/wording.md` is the
+rulebook.
 
 1. **Name the thing by its plain term first**; the Kubernetes term follows as secondary text only
    where a professional needs it (`docs/internal/wording.md`, "Terms"). Never invent a term; use the
@@ -24,11 +23,10 @@ in English, zh-TW and zh-CN. This skill adds Zeabur's terms and conventions;
 4. **Errors** keep the raw cause available (details, copy) but out of the headline.
 5. **Check**, inside `nix develop`:
    ```sh
-   vale <changed files>
    (cd web && bun run typecheck && bun run test)
    nix develop .#zh -c ./scripts/check-zh-tw.sh
    ```
-   plus the `zeabur-writing` checks. Then read the strings on the rendered page in all three
+   Then read the strings on the rendered page in all three
    locales at desktop and narrow widths (`zeabur-ui` for the demo server).
 
 Moving a hard-coded string into the catalogues is part of the change, not a follow-up.

@@ -5,9 +5,8 @@ description: Investigate a failed or flaky CI or release run of Zeabur (GitHub A
 
 # When CI fails
 
-Follow `zeabur-oss-ci` (copied from zeabur-oss/.github by the Update workflow): how CI runs
-`scripts/ci/<job>.sh`, reading the log, finding the cause, reproducing, fixing, and its release
-recovery notes. This skill adds Zeabur's jobs and tools.
+Read the job's log, find the cause, reproduce it on a machine sized like the runner, and fix the
+test or the code rather than retrying.
 
 ## Jobs
 
@@ -27,7 +26,7 @@ shared release workflow, each stage `bun scripts/release.ts <stage>`: `build`
 Linux), `sign` (macOS), `publish`, `attest`, `finish` (the installers),
 `release` (`assets`, the draft release) and `verify` (on the draft's assets);
 `@zeabur-oss/release` (`package.json`) pushes, signs and verifies. A failed release run:
-`zeabur-oss-ci`'s RELEASE-RECOVERY.md, then [RELEASE-RECOVERY.md](RELEASE-RECOVERY.md) here.
+[RELEASE-RECOVERY.md](RELEASE-RECOVERY.md).
 
 ## Reading a failure
 

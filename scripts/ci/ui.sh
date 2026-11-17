@@ -6,6 +6,7 @@
 # the job.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+source scripts/lib.sh
 
 ./scripts/check-ui-styles.sh
 ./scripts/build-ui.sh
