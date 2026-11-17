@@ -83,8 +83,7 @@ place to say what the feature is for and how to start [A1][N1].
   text takes its space from `latinStart` / `latinEnd` (`web/src/i18n/zh-TW.ts`), never a
   hard-coded one.
 - `scripts/check-zh-tw.sh` checks zh-TW interface vocabulary and punctuation;
-  Vale (`.vale.ini`) checks docs and all three catalogues. Take a suggestion only when it
-  fits the technical meaning.
+  Take a suggestion only when it fits the technical meaning.
 
 ## Element conventions
 
@@ -249,7 +248,7 @@ is read as `p.name ?? ""`. Test a branch that is easy to get wrong in `web/src/i
 Read changed text on the rendered page, in every locale, at desktop and narrow widths: wrapping,
 truncation, mixed CJK and Latin, buttons that overflow. Check that the three locales state the
 same facts, limits and conditions. `bun run typecheck`, `bun run test`,
-`vale` and `scripts/check-zh-tw.sh` must pass; a passing check is not the
+`scripts/check-zh-tw.sh` must pass; a passing check is not the
 review.
 
 ## Sources

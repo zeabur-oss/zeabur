@@ -24,7 +24,6 @@ in English, zh-TW and zh-CN. This skill adds Zeabur's terms and conventions;
 4. **Errors** keep the raw cause available (details, copy) but out of the headline.
 5. **Check**, inside `nix develop`:
    ```sh
-   vale <changed files>
    (cd web && bun run typecheck && bun run test)
    nix develop .#zh -c ./scripts/check-zh-tw.sh
    ```
