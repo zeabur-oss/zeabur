@@ -12,6 +12,6 @@ permissions:
 
 jobs:
   update:
-    uses: zeabur-oss/.github/.github/workflows/update.yml@3efa9e88a66e5a355574fe708fd4ed4106e87fcd # main
+    uses: zeabur-oss/.github/.github/workflows/update.yml@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
     secrets:
       private-key: ${{ secrets.ZEABUR_OSS_BOT_PRIVATE_KEY }}
