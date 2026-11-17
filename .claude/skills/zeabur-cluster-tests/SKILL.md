@@ -5,7 +5,7 @@ description: Run Zeabur's Kubernetes integration and end-to-end tests on a dispo
 
 # Cluster tests
 
-Follow `zeabur-oss-cluster-tests` (copied from zeabur-oss/.github by the Update workflow): a
+Follow `zeabur-oss-cluster-tests` (zeabur-oss/skills): a
 disposable cluster on a Linux machine or VM, a snapshot restored after every run, assertions through
 a person, and the common failures. Sync with `rsync -a --delete --exclude target --exclude
 node_modules --exclude web/dist ./ host:zeabur/`.

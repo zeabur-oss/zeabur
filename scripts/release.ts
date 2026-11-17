@@ -180,12 +180,12 @@ async function pins(version: Version): Promise<Record<string, string>> {
     await $`curl --fail --silent --show-error --location --retry 3 --create-dirs --output ${to} https://github.com/zeabur-oss/${repository}/releases/download/${tag}/${file}`;
     return to;
   };
-  // Signed by zeabur-oss/.github's shared release workflow, run for that repository's tag (the
-  // signer of every zeabur-oss release from v0.1.1 on).
+  // Signed by that repository's own release workflow, or by zeabur-oss/.github's shared one for
+  // the releases before it, run for that repository's tag.
   const signedList = async (repository: string, tag: string, file: string) => {
     const list = await download(repository, tag, file);
     const bundle = await download(repository, tag, `${file}.sigstore.json`);
-    await $`cosign verify-blob --bundle ${bundle} --certificate-identity-regexp ${"^https://github\\.com/zeabur-oss/\\.github/\\.github/workflows/release\\.yml@"} --certificate-github-workflow-repository zeabur-oss/${repository} --certificate-github-workflow-ref refs/tags/${tag} --certificate-oidc-issuer https://token.actions.githubusercontent.com ${list}`;
+    await $`cosign verify-blob --bundle ${bundle} --certificate-identity-regexp ${`^https://github\\.com/zeabur-oss/(\\.github|${repository})/\\.github/workflows/release\\.yml@`} --certificate-github-workflow-repository zeabur-oss/${repository} --certificate-github-workflow-ref refs/tags/${tag} --certificate-oidc-issuer https://token.actions.githubusercontent.com ${list}`;
     return list;
   };
 

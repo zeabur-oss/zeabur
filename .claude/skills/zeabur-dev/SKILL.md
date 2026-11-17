@@ -5,7 +5,7 @@ description: Day-to-day development loop for the Zeabur repository — environme
 
 # Zeabur development loop
 
-Follow the shared skills (copied from zeabur-oss/.github by the Update workflow): `zeabur-oss-rust`
+Follow the shared skills (zeabur-oss/skills): `zeabur-oss-rust`
 (Nix toolchain, workspace, lints, common checks), `zeabur-oss-standards` (with
 [`STANDARDS.md`](STANDARDS.md) here), `zeabur-oss-workflow` (commits and pull requests; Zeabur's
 part in `zeabur-workflow`). This skill adds what is Zeabur's own.

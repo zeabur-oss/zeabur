@@ -5,7 +5,7 @@ description: How work moves through the Zeabur repository — branches, commits,
 
 # Workflow
 
-Follow `zeabur-oss-workflow` (copied from zeabur-oss/.github by the Update workflow): branches,
+Follow `zeabur-oss-workflow` (zeabur-oss/skills): branches,
 signed-off Conventional Commits, pull requests, `gh pr checks --watch`, squash merging, issues and
 the text rules. This skill adds what is Zeabur's own.
 

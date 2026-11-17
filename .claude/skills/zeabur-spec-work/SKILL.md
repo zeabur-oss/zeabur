@@ -5,7 +5,7 @@ description: Implement or change a security- or protocol-relevant behaviour in Z
 
 # Specification-driven work
 
-Follow `zeabur-oss-spec-work` (copied from zeabur-oss/.github by the Update workflow): read the
+Follow `zeabur-oss-spec-work` (zeabur-oss/skills): read the
 source, cite it in rustdoc, fail closed, test the attack. In Zeabur also:
 
 1. **Plans.** A plan is applied only against the resource versions it was computed from;

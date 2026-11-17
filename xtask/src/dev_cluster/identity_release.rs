@@ -12,9 +12,10 @@ use super::DevCluster;
 
 const REPOSITORY: &str = "zeabur-oss/identity";
 const IMAGE: &str = "ghcr.io/zeabur-oss/identity@sha256:";
-/// The signer of every zeabur-oss release from v0.1.1 on: zeabur-oss/.github's shared release
-/// workflow.
-const SIGNER: &str = r"^https://github\.com/zeabur-oss/\.github/\.github/workflows/release\.yml@";
+/// The signer: Zeabur Identity's own release workflow, or zeabur-oss/.github's shared one for the
+/// releases before it.
+const SIGNER: &str =
+    r"^https://github\.com/zeabur-oss/(\.github|identity)/\.github/workflows/release\.yml@";
 
 /// The image and identityctl of one release.
 #[derive(Debug)]
