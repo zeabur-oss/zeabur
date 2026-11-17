@@ -5,7 +5,8 @@
 //   bun scripts/homebrew.ts <version> <sums-dir> <out-dir>
 //
 // <sums-dir> holds the release's SHA256SUMS and SHA256SUMS.sigstore.json. The command checks that
-// the shared release workflow signed SHA256SUMS for this repository at the tag, then writes
+// the release workflow (this repository's, or the shared one before v0.3.0) signed SHA256SUMS for
+// this repository at the tag, then writes
 // <out-dir>/Formula/zeaburctl.rb and, when the release has the macOS app,
 // <out-dir>/Casks/zeabur-desktop.rb.
 import { Failure, sums } from "@zeabur-oss/release";
@@ -140,7 +141,7 @@ if (import.meta.main) {
   const list = join(dir, "SHA256SUMS");
   await $`cosign verify-blob --bundle ${join(dir, "SHA256SUMS.sigstore.json")} \
     --certificate-oidc-issuer https://token.actions.githubusercontent.com \
-    --certificate-identity-regexp ${"^https://github\\.com/zeabur-oss/\\.github/\\.github/workflows/release\\.yml@"} \
+    --certificate-identity-regexp ${"^https://github\\.com/zeabur-oss/(zeabur|\\.github)/\\.github/workflows/release\\.yml@"} \
     --certificate-github-workflow-repository ${repository} \
     --certificate-github-workflow-ref refs/tags/${version.tag} ${list}`;
   await write(version, sums(await Bun.file(list).text()), out);

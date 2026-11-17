@@ -87,7 +87,7 @@ its `SHA256SUMS` lists, so Homebrew installs the same signed files and checks th
 
 `scripts/homebrew.ts` writes both files; do not edit them in the tap by hand. Publishing a normal
 release starts `.github/workflows/homebrew.yml` (`release: released`; pre-releases do not). It
-checks that the shared release workflow signed the release's `SHA256SUMS` for this tag, installs
+checks that the release workflow signed the release's `SHA256SUMS` for this tag, installs
 the files on macOS and Linux (and `spctl` must accept the app), and then zeabur-oss-bot commits
 them to the tap's `main`. Nothing is committed when a check fails or the tap already has the
 version. To redo it for a published release, run **Actions → Homebrew → Run workflow** with the
