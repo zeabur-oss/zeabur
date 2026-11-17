@@ -5,7 +5,7 @@ name: CI
 # to land. The nightly run runs everything, also fuzz and the canary, which are not in the merge
 # queue, and keeps main's caches for the merge queue's jobs. A failed nightly-only job (fuzz,
 # canary, e2e-full) opens or updates one issue (scripts/nightly-issues.sh), and closes it when the
-# job passes again.
+# job passes again. Jobs that compile Rust run on instabox-medium, the others on instabox-small.
 on:
   push:
     branches: [main]
@@ -27,7 +27,7 @@ env:
 
 jobs:
   lint:
-    runs-on: instabox-small
+    runs-on: instabox-medium
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -51,7 +51,6 @@ jobs:
           if-no-files-found: ignore
           retention-days: 14
 
-  # Linking every test binary of the workspace runs instabox-small out of room (lld: Bus error).
   test:
     runs-on: instabox-medium
     timeout-minutes: 30
@@ -66,7 +65,7 @@ jobs:
       - run: nix develop -c scripts/ci/test.sh
 
   ui:
-    runs-on: instabox-small
+    runs-on: instabox-medium
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -82,7 +81,7 @@ jobs:
 
   # desktop/, its own Cargo workspace, with the main workspace's rules (scripts/check-desktop.sh).
   desktop:
-    runs-on: instabox-small
+    runs-on: instabox-medium
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -97,7 +96,7 @@ jobs:
   # Four to six minutes, set up included: nightly and by hand, not in the merge queue.
   fuzz:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: instabox-small
+    runs-on: instabox-medium
     timeout-minutes: 120
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -111,7 +110,7 @@ jobs:
 
   no-ui:
     if: github.event_name != 'pull_request' && !(github.event_name == 'push' && github.ref_type == 'branch')
-    runs-on: instabox-small
+    runs-on: instabox-medium
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
