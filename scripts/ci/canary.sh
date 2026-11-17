@@ -4,6 +4,7 @@
 # Helm commands Zeabur Catalog gives. The cluster is deleted at the end; ZEABUR_CI_KEEP=1 keeps it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+source scripts/lib.sh
 
 # The catalog's commands for `$1` (<capability>/<id>), then the deployments of namespace `$2`.
 install() {

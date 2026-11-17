@@ -3,6 +3,7 @@
 # shell but much less to run.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+source scripts/lib.sh
 
 cargo fmt --all --check
 nixfmt --check flake.nix

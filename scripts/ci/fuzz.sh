@@ -3,6 +3,7 @@
 # stable toolchain builds it; the target's own assertions are what it checks.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
+source scripts/lib.sh
 
 cd crates/zeabur-proxy/fuzz
 cargo fuzz run parse --sanitizer none -- -max_total_time=60
