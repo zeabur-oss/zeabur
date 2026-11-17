@@ -21,7 +21,7 @@ concurrency:
 
 jobs:
   release-pr:
-    uses: zeabur-oss/.github/.github/workflows/release-pr.yml@3efa9e88a66e5a355574fe708fd4ed4106e87fcd # main
+    uses: zeabur-oss/.github/.github/workflows/release-pr.yml@cb333d6e0f4250e3b2ca3625dffca106d5ea2713 # main
     with:
       version: ${{ inputs.version }}
       prerelease: ${{ inputs.prerelease }}
