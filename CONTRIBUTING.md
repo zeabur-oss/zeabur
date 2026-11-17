@@ -18,7 +18,7 @@ messages follow [Conventional Commits](https://www.conventionalcommits.org/).
 Run what CI runs (the jobs in `.github/workflows/ci.yml` that need no cluster), inside `nix develop`:
 
 ```sh
-cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh scripts/ci/*.sh && actionlint
+cargo fmt --all --check && nixfmt --check flake.nix && shellcheck scripts/*.sh scripts/ci/*.sh && jactionlint
 bun install --frozen-lockfile && bun fmt --check scripts/*.ts && bun check scripts/ && bun test scripts/
 cargo lint                                   # clippy, all targets and features, -D warnings
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked

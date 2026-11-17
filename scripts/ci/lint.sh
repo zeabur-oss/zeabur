@@ -7,7 +7,7 @@ cd "$(dirname "$0")/../.."
 cargo fmt --all --check
 nixfmt --check flake.nix
 shellcheck scripts/*.sh scripts/ci/*.sh
-actionlint
+jactionlint
 (cd web; bun ci; bun run fmt:check)
 (cd crates/zeabur-installer/web; bun ci; bun run fmt:check)
 bun install --frozen-lockfile
