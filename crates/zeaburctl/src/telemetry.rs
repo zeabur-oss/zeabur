@@ -102,27 +102,18 @@ fn joined_in(directory: &Path) -> bool {
 /// `telemetry: false` in `config.yaml` turns it off.
 pub(crate) struct Local {
     on: Option<(Sender, LocalId)>,
-    is_internal: bool,
 }
 
 impl Local {
     /// The program as this environment and `config.yaml` set it. When it is on, says so and
     /// how to turn it off.
     pub(crate) fn from_env() -> Self {
-        let is_internal = std::env::var("ZEABUR_TELEMETRY_INTERNAL")
-            .is_ok_and(|v| matches!(v.trim(), "1" | "true"));
         let Some(directory) = standard_dir() else {
-            return Self {
-                on: None,
-                is_internal,
-            };
+            return Self { on: None };
         };
         let switch = Switch::from_env(joined_in(&directory));
         if switch == Switch::Off {
-            return Self {
-                on: None,
-                is_internal,
-            };
+            return Self { on: None };
         }
         output::info(&format!(
             "zeaburctl ui sends its version and whether it could connect to the cluster, to help \
@@ -133,7 +124,6 @@ impl Local {
         let show: Show = Arc::new(|body| output::info(&format!("telemetry: {body}")));
         Self {
             on: Some((Sender::new(switch, show), LocalId::new(&directory, random))),
-            is_internal,
         }
     }
 
@@ -145,7 +135,6 @@ impl Local {
         let event = Event::ClusterConnected(ClusterConnected {
             zeabur_version: env!("CARGO_PKG_VERSION"),
             mode: Mode::Local,
-            is_internal: self.is_internal,
             result,
         });
         sender.send_local(id, &event).await;

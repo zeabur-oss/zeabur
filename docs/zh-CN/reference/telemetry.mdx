@@ -25,7 +25,6 @@ description: 加入体验计划后，Zeabur、`zeaburctl ui` 和安装程序会�
 | `person` | `zeabur_active` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
 | `zeabur_version` | `cluster_connected` | `zeaburctl` 的版本，例如 `0.1.1` |
 | `mode` | `zeabur_active`、`cluster_connected` | 集群里的 Zeabur 是 `in-cluster`，`zeaburctl ui` 是 `local` |
-| `is_internal` | `cluster_connected` | 只有项目团队自己为了开发或测试而运行时是 `true` |
 | `result` | `cluster_connected` | `connected`、`unreachable`、`credential_refused`、`no_read_right` 或 `other` |
 | `feature` | `feature_used` | `service_created`、`database_created`、`domain_added`、`logs_viewed`、`terminal_opened`、`member_invited` 或 `compose` |
 | `source` | `service_created` 的 `feature_used` | 服务怎么创建：`git`、`upload`、`image` 或 `template` |

@@ -284,7 +284,6 @@ mod tests {
             Event::ClusterConnected(ClusterConnected {
                 zeabur_version: "0.1.0",
                 mode: Mode::Local,
-                is_internal: false,
                 result: Connection::NoReadRight,
             }),
         ]
@@ -422,7 +421,6 @@ mod tests {
             "distribution",
             "step",
             "error",
-            "is_internal",
             "result",
             "$process_person_profile",
             "$geoip_disable",

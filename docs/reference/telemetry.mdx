@@ -25,7 +25,6 @@ Zeabur sends one event the first time each person uses it in a UTC day, and one 
 | `person` | `zeabur_active` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `zeabur_version` | `cluster_connected` | The version of `zeaburctl`, such as `0.1.1` |
 | `mode` | `zeabur_active`, `cluster_connected` | `in-cluster` for Zeabur in a cluster, `local` for `zeaburctl ui` |
-| `is_internal` | `cluster_connected` | `true` only when the Zeabur team runs it for development or tests |
 | `result` | `cluster_connected` | `connected`, `unreachable`, `credential_refused`, `no_read_right` or `other` |
 | `feature` | `feature_used` | `service_created`, `database_created`, `domain_added`, `logs_viewed`, `terminal_opened`, `member_invited` or `compose` |
 | `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
