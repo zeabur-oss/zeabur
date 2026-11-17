@@ -7,6 +7,11 @@ lint = "clippy --workspace --all-targets --all-features --locked -- -D warnings"
 # Development tasks (xtask/, https://github.com/matklad/cargo-xtask).
 xtask = "run --locked --package xtask --"
 
+[profile.dev]
+# Line tables keep backtraces readable and make target/ much smaller. For a debugger that needs
+# variables: CARGO_PROFILE_DEV_DEBUG=2.
+debug = "line-tables-only"
+
 [profile.release]
 # No build-host paths in release binaries (reproducible builds). Kept here rather than in Cargo.toml
 # because cargo-geiger embeds an older Cargo that rejects the key in manifests.

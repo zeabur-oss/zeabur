@@ -24,9 +24,6 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
-  # Full debuginfo in every test binary fills the runner's disk (lld then fails with a Bus error).
-  # Line tables keep file and line in a backtrace.
-  CARGO_PROFILE_DEV_DEBUG: line-tables-only
 
 jobs:
   lint:
