@@ -233,12 +233,9 @@ resources:
 
 # The experience program (docs/reference/telemetry.mdx). Off by default. installationId: a random
 # UUID you make, such as `uuidgen | tr A-Z a-z`; required when enabled. DO_NOT_TRACK=1 turns it off.
-# internal: set it only on the project's own development, test and demonstration installs; its
-# events are then left out of the measure.
 telemetry:
   enabled: false
   installationId: ""
-  internal: false
 
 # The update check (docs/reference/telemetry.mdx): at most once an hour, Zeabur asks GitHub whether
 # a newer Zeabur is out, and the interface says how to upgrade. DO_NOT_TRACK=1 turns it off too.

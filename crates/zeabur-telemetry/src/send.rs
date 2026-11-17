@@ -302,7 +302,6 @@ mod tests {
         Change {
             zeabur_version: "0.1.0",
             mode: Mode::InCluster,
-            is_internal: false,
             person: "0123456789abcdef0123456789abcdef".to_owned(),
             id: ChangeId::from_random([5; 16]),
             operation: Operation::DeployImage,

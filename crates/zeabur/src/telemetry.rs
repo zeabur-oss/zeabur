@@ -87,18 +87,11 @@ impl State {
 /// The program as the server runs it.
 pub(crate) struct Telemetry {
     on: Option<(Daily, Arc<Sender>, InstallationId)>,
-    is_internal: bool,
 }
 
 impl Telemetry {
     /// Off when not joined, when `DO_NOT_TRACK` is set, or when there is no valid ID.
-    /// `is_internal` marks the project's own installs.
-    pub(crate) fn new(
-        enabled: bool,
-        installation_id: &str,
-        key: [u8; 32],
-        is_internal: bool,
-    ) -> Self {
+    pub(crate) fn new(enabled: bool, installation_id: &str, key: [u8; 32]) -> Self {
         let id = InstallationId::parse(installation_id);
         if enabled && id.is_none() && !installation_id.is_empty() {
             tracing::warn!(
@@ -117,7 +110,7 @@ impl Telemetry {
         let on = id
             .filter(|_| sender.active())
             .map(|id| (Daily::new(key), Arc::new(sender), id));
-        Self { on, is_internal }
+        Self { on }
     }
 
     /// Whether anything is sent.
@@ -127,10 +120,7 @@ impl Telemetry {
 
     #[cfg(test)]
     pub(crate) const fn off() -> Self {
-        Self {
-            on: None,
-            is_internal: false,
-        }
+        Self { on: None }
     }
 
     /// Notes that `person` used Zeabur at `now` (Unix seconds), and sends an event in the
@@ -183,7 +173,6 @@ impl Telemetry {
         let change = Change {
             zeabur_version: env!("CARGO_PKG_VERSION"),
             mode: Mode::InCluster,
-            is_internal: self.is_internal,
             person: crypto::hex(&daily.person(&report.user, report.submitted_at)),
             id: report.id,
             operation: report.operation,
@@ -205,7 +194,6 @@ impl std::fmt::Debug for Telemetry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Telemetry")
             .field("on", &self.on.is_some())
-            .field("is_internal", &self.is_internal)
             .finish()
     }
 }
@@ -269,11 +257,7 @@ mod tests {
     #[test]
     fn nothing_is_counted_when_the_program_is_off() {
         let id = "8f14e45f-ceea-467a-9575-0123456789ab";
-        assert!(Telemetry::new(false, id, [7; 32], false).on.is_none());
-        assert!(
-            Telemetry::new(true, "not-a-uuid", [7; 32], false)
-                .on
-                .is_none()
-        );
+        assert!(Telemetry::new(false, id, [7; 32]).on.is_none());
+        assert!(Telemetry::new(true, "not-a-uuid", [7; 32]).on.is_none());
     }
 }
