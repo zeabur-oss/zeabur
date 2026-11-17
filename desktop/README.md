@@ -29,6 +29,15 @@ On macOS this makes `Zeabur.app` and a `.dmg` under `target/desktop/release/bund
 notarization follow the Tauri bundler's `APPLE_*` variables; without them the app is signed ad
 hoc. Releases are built by the release workflow ([releasing](../docs/internal/releasing.md)).
 
+## Screenshots
+
+The images of the chooser and the cluster error page are an image set, `desktop`, taken with
+Chromium from the pages of `desktop/web` with mocked commands (`docs/internal/screenshots.md`):
+
+```sh
+nix develop -c scripts/docs-shots.sh desktop
+```
+
 ## Build for Windows
 
 From macOS or Linux with [cargo-xwin](https://github.com/rust-cross/cargo-xwin):

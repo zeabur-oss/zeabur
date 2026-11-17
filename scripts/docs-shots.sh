@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
 # Takes the screenshots of one image set (docs/internal/screenshots.md), the Playwright tests in
-# web/e2e/shots/<set>.ts, from the demo server (crates/zeabur-api/examples/demo.rs) or the
-# installer's pages with captured responses, in each locale and theme, as AVIF. Run inside
-# `nix develop`.
+# web/e2e/shots/<set>.ts, from the demo server (crates/zeabur-api/examples/demo.rs), the installer's
+# pages with captured responses or the desktop app's pages with mocked commands, in each locale and
+# theme, as AVIF. Run inside `nix develop`.
 #   scripts/docs-shots.sh [set] [out] [-- playwright arguments]
 # <set> defaults to docs. <out> defaults to the set's `out`, else target/docs-shots/<set>. Images
 # in <out> that this run does not take stay, unless the set sets `clean`.
@@ -39,9 +39,13 @@ if jq -e '.apps | index("installer")' <<<"$settings" >/dev/null; then
   (cd "$root/crates/zeabur-installer/web" &&
     bun -e 'import { generated } from "./scripts/dev-api.ts"; import { writeFixtures } from "./scripts/fixtures.ts"; writeFixtures(generated)')
 fi
+if jq -e '.apps | index("desktop")' <<<"$settings" >/dev/null; then
+  (cd "$root/desktop/web" && bun ci && bun run build)
+fi
 
 (
   cd "$root/web"
+  bun ci
   ZEABUR_SHOTS_OUT="$work/png" bunx playwright test -c playwright.shots.config.ts \
     --project "$set/*" --output="$root/target/docs-shots-results" "$@"
 )
