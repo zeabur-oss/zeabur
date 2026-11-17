@@ -349,8 +349,6 @@ pub struct ClusterConnected {
     pub zeabur_version: &'static str,
     /// How Zeabur runs.
     pub mode: Mode,
-    /// Set only on the project's own development, test and demonstration installs.
-    pub is_internal: bool,
     /// How it ended.
     pub result: Connection,
 }
@@ -386,8 +384,6 @@ pub struct Change {
     pub zeabur_version: &'static str,
     /// How Zeabur runs.
     pub mode: Mode,
-    /// Set only on the project's own development, test and demonstration installs.
-    pub is_internal: bool,
     /// The person, as `zeabur_active` hashes them for the UTC day of this event.
     pub person: String,
     /// Ties the change's two events together.
@@ -551,7 +547,6 @@ mod tests {
         let change = Change {
             zeabur_version: "1.0.0",
             mode: Mode::InCluster,
-            is_internal: false,
             person: "ab".to_owned(),
             id: ChangeId::from_random([1; 16]),
             operation: Operation::ScaleReplicas,

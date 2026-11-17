@@ -24,7 +24,7 @@ longer read the Deployment, or when the progress deadline has passed by a minute
 result. A restart forgets the change. A missing `rollout_finished` therefore means "no result",
 and the analysis treats it so.
 
-Every event also carries `zeabur_version`, `mode` and `is_internal`; the two change events carry
+Every event also carries `zeabur_version` and `mode`; the two change events carry
 the per-day `person` hash of `zeabur_active`. Nothing links a person across days.
 
 What these events add up to (weekly returning instances, time to a first available rollout,
