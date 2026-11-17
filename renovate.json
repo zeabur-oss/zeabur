@@ -15,6 +15,16 @@
   ],
   "packageRules": [
     {
+      "description": "The desktop's gtk must stay the one Tauri's wry and tao link; it moves with tauri.",
+      "matchManagers": [
+        "cargo"
+      ],
+      "matchPackageNames": [
+        "gtk"
+      ],
+      "enabled": false
+    },
+    {
       "description": "One pull request for compatible web/ package updates; majors stay separate.",
       "matchManagers": [
         "bun"
