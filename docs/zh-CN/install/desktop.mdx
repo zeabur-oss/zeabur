@@ -5,6 +5,17 @@ description: 在 macOS、Windows 或 Linux 上安装 Zeabur Desktop，为 kubeco
 
 Zeabur Desktop 会列出你电脑上 kubeconfig 文件里的 context，你选哪一个，它就在新窗口里为那个集群打开 Zeabur。它做的事和 `zeaburctl ui` 一样，只是不用打开终端。
 
+## 用 Homebrew 安装
+
+在装了 [Homebrew](https://brew.sh) 的 Apple 芯片 Mac 上，不用自己下载，直接用它安装：
+
+```sh
+brew tap zeabur-oss/tap
+brew install --cask zeabur-oss/tap/zeabur-desktop
+```
+
+Homebrew 安装的是发布页面上同一个已签名的 `.dmg`，并用该版本的校验和核对文件。
+
 ## 下载
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 选择一个版本，下载适合你电脑的文件：
@@ -33,4 +44,4 @@ Zeabur Desktop 每次启动都会检查有没有新版本。有的话，侧边�
 
 更新会先列出更新内容，你点击“更新并重启”后才会安装。接着 Zeabur 会关闭窗口，以新版本重新启动。预发布版本不会出现在更新里。
 
-macOS 的 App、用 Windows 安装程序装的 Zeabur 和 AppImage 都能自行更新。`.deb`、`.rpm` 和免安装的 `.exe` 不行：Zeabur 会告诉你有新版本，请到发布页面下载，用第一次安装的方式再装一次。
+macOS 的 App、用 Windows 安装程序装的 Zeabur 和 AppImage 都能自行更新，用 Homebrew 装的 App 也一样；`brew upgrade --greedy` 也能更新它。`.deb`、`.rpm` 和免安装的 `.exe` 不行：Zeabur 会告诉你有新版本，请到发布页面下载，用第一次安装的方式再装一次。
