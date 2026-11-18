@@ -1,11 +1,14 @@
 // Zeabur Desktop's release files and its update manifest, latest.json, which the app's updater
 // reads from the newest release (.github/workflows/release.yml, docs/internal/releasing.md).
 //
+//   bun scripts/desktop-release.ts assets <version>
 //   bun scripts/desktop-release.ts updater <version> <dir> <notes.md> <latest.json>
 //
-// <dir> holds the packages of every build. The command signs each file the updater installs with
-// `cargo tauri signer sign` (the key in TAURI_SIGNING_PRIVATE_KEY and its password) and writes the
-// manifest from the `.sig` files next to them.
+// `assets` prints each release file of the app and the workflow artifact it comes from, one
+// `<file> <artifact>` line each (scripts/release-assets.sh). For `updater`, <dir> holds the
+// packages of every build; the command signs each file the updater installs with `cargo tauri
+// signer sign` (the key in TAURI_SIGNING_PRIVATE_KEY and its password) and writes the manifest from
+// the `.sig` files next to them.
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseVersion, type Version } from "./versions";
@@ -119,15 +122,12 @@ export function manifest(
   };
 }
 
-if (import.meta.main) {
-  const [command, tag, dir, notes, out] = process.argv.slice(2);
-  const version = tag ? parseVersion(tag) : undefined;
-  if (command !== "updater" || !version || !dir || !notes || !out) {
-    console.error(
-      "usage: bun scripts/desktop-release.ts updater <version> <dir> <notes.md> <latest.json>",
-    );
-    process.exit(2);
-  }
+async function updater(
+  version: Version,
+  dir: string,
+  notes: string,
+  out: string,
+) {
   for (const build of desktopBuilds(version)) {
     const signer = Bun.spawnSync(
       [
@@ -155,4 +155,20 @@ if (import.meta.main) {
   console.log(
     `${out}: ${version.plain}, ${Object.keys(result.platforms).join(", ")}`,
   );
+}
+
+if (import.meta.main) {
+  const [command, tag, dir, notes, out] = process.argv.slice(2);
+  const version = tag ? parseVersion(tag) : undefined;
+  if (command === "assets" && version && !dir)
+    for (const [file, artifact] of desktopAssets(version, updaterKey() !== ""))
+      console.log(`${file} ${artifact}`);
+  else if (command === "updater" && version && dir && notes && out)
+    await updater(version, dir, notes, out);
+  else {
+    console.error(
+      "usage: bun scripts/desktop-release.ts assets <version>\n       bun scripts/desktop-release.ts updater <version> <dir> <notes.md> <latest.json>",
+    );
+    process.exit(2);
+  }
 }

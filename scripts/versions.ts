@@ -1,6 +1,8 @@
-// Release versions and the release tags a release pins (scripts/release.ts). A version is
+// Release versions and the release tags a release pins (scripts/release-pins.sh). A version is
 // vX.Y.Z or vX.Y.Z-<pre-release> (SemVer 2.0.0 §9); build metadata (§10) is refused, as an image
 // tag cannot hold its `+`.
+//
+//   git ls-remote --tags <url> | bun scripts/versions.ts pin-tag <repository> <version> <pin>
 import { Failure } from "@zeabur-oss/release";
 
 const number = "(0|[1-9]\\d*)";
@@ -69,4 +71,22 @@ export function pinTag(
       `${repository} ${pin} has no release tag that a ${kind} can pin: tag it, or move the pin`,
     );
   return tag.tag;
+}
+
+if (import.meta.main) {
+  const [command, repository, tag, pin] = process.argv.slice(2);
+  const version = tag ? parseVersion(tag) : undefined;
+  if (command !== "pin-tag" || !repository || !version || !pin) {
+    console.error(
+      "usage: git ls-remote --tags <url> | bun scripts/versions.ts pin-tag <repository> <version> <pin>",
+    );
+    process.exit(2);
+  }
+  try {
+    console.log(pinTag(repository, version, pin, await Bun.stdin.text()));
+  } catch (e) {
+    if (!(e instanceof Failure)) throw e;
+    console.error(e.message);
+    process.exit(1);
+  }
 }

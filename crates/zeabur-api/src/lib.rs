@@ -168,6 +168,8 @@ use crate::plan_token::PlanKey;
 #[openapi(
     info(
         title = "Zeabur API",
+        // The API's own version, not Zeabur's: it changes only with an incompatible change.
+        version = "1",
         description = "Kubernetes made simple and secure by default. Every request acts as the \
 person making it; errors are RFC 9457 problems that keep kube-apiserver's own answer.
 

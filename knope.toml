@@ -2,7 +2,49 @@
 [package]
 versioned_files = [
   "Cargo.toml",
+  { path = "Cargo.lock", dependency = "xtask" },
+  { path = "Cargo.lock", dependency = "zeabur" },
+  { path = "Cargo.lock", dependency = "zeabur-api" },
+  { path = "Cargo.lock", dependency = "zeabur-auth" },
+  { path = "Cargo.lock", dependency = "zeabur-catalog" },
+  { path = "Cargo.lock", dependency = "zeabur-core" },
+  { path = "Cargo.lock", dependency = "zeabur-embed" },
+  { path = "Cargo.lock", dependency = "zeabur-gaps" },
+  { path = "Cargo.lock", dependency = "zeabur-graph" },
+  { path = "Cargo.lock", dependency = "zeabur-http" },
+  { path = "Cargo.lock", dependency = "zeabur-installer" },
+  { path = "Cargo.lock", dependency = "zeabur-installer-host" },
+  { path = "Cargo.lock", dependency = "zeabur-installer-plan" },
+  { path = "Cargo.lock", dependency = "zeabur-kube" },
+  { path = "Cargo.lock", dependency = "zeabur-local" },
+  { path = "Cargo.lock", dependency = "zeabur-model" },
+  { path = "Cargo.lock", dependency = "zeabur-modules" },
+  { path = "Cargo.lock", dependency = "zeabur-plan" },
+  { path = "Cargo.lock", dependency = "zeabur-proxy" },
+  { path = "Cargo.lock", dependency = "zeabur-telemetry" },
+  { path = "Cargo.lock", dependency = "zeabur-test-support" },
+  { path = "Cargo.lock", dependency = "zeabur-ui" },
+  { path = "Cargo.lock", dependency = "zeaburctl" },
   "desktop/Cargo.toml",
+  { path = "desktop/Cargo.lock", dependency = "zeabur-api" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-catalog" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-core" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-desktop" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-embed" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-gaps" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-graph" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-http" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-installer-plan" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-kube" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-local" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-model" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-modules" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-plan" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-telemetry" },
+  { path = "desktop/Cargo.lock", dependency = "zeabur-ui" },
+  { path = "deploy/chart/zeabur/Chart.yaml", regex = '(?m)^version: (?<version>\S+)$' },
+  "web/package.json",
+  "crates/zeabur-installer/web/package.json",
 ]
 changelog = "CHANGELOG.md"
 # The update check looks for ### Security in the release notes (docs/reference/telemetry.mdx).
@@ -16,11 +58,6 @@ name = "prepare-release"
 
 [[workflows.steps]]
 type = "PrepareRelease"
-
-[[workflows.steps]]
-type = "Command"
-command = "bun scripts/release.ts bump v$version"
-variables = { "$version" = "Version" }
 
 [[workflows]]
 name = "document-change"

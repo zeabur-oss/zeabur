@@ -4,10 +4,11 @@ name: Release
 # platform and package Zeabur Desktop, then push the images and the chart by digest, sign and
 # attest them, build the installers that pin them, add every file to the draft release that the
 # Release pull request workflow left when it tagged, and verify the draft. A maintainer publishes
-# the draft (docs/internal/releasing.md). Manual run: rehearse, which builds and publishes nothing.
+# the draft (docs/internal/releasing.md). Manual run: rehearse, which builds and smokes every
+# platform and publishes nothing.
 #
-# Each stage of Zeabur's own is `bun scripts/release.ts <stage>`; Zeabur Desktop's packages build
-# outside Nix with scripts/package-desktop.sh.
+# Zeabur's own steps are scripts/release-*.sh; the rest calls zeabur-oss-release directly. Zeabur
+# Desktop's packages build outside Nix with scripts/package-desktop.sh.
 on:
   push:
     tags: ["v[0-9]*"]
@@ -44,12 +45,11 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
       - name: Install the packages
         run: bun install --frozen-lockfile
-      - name: The version is the manifests', with a CHANGELOG.md section, on main
+      - name: The version is SemVer, with a CHANGELOG.md section, on main
         run: |
-          # The manifests take only SemVer; an image tag cannot hold the + of build metadata.
+          # An image tag cannot hold the + of build metadata.
           [[ "$VERSION" == v* && "$VERSION" != *+* ]] ||
             { echo "::error::$VERSION is not v and SemVer without build metadata"; exit 1; }
-          bun scripts/release.ts check "$VERSION"
           bun x zeabur-oss-release notes CHANGELOG.md "$VERSION" >/dev/null
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then
             git merge-base --is-ancestor HEAD origin/main ||
@@ -89,20 +89,37 @@ jobs:
           OS: ${{ matrix.os }}
           ARCH: ${{ matrix.arch }}
           CI_ARTIFACTS: ${{ runner.temp }}/ci-artifacts
-        run: bun scripts/release.ts build "$VERSION" "$OS" "$ARCH" dist
-      # A step of its own, so the build never sees the secrets. Without them sign leaves the build
-      # as it is.
+        run: |
+          # A tag's binaries embed the catalog bundle, which must be the one the catalog's release
+          # signed, and its installer installs the pinned Zeabur Identity release: both pins must
+          # resolve before anything is built. A rehearsal builds whatever the pins name.
+          if [[ "$GITHUB_EVENT_NAME" == push ]]; then
+            scripts/release-pins.sh "$VERSION" >/dev/null
+          fi
+          scripts/release-build.sh "$VERSION" "$ARCH" dist
+          if [[ "$OS" == linux ]]; then
+            # The archive, the chart and the image as built, on the development cluster with
+            # Zeabur Identity at ZEABUR_IDENTITY_PINNED.
+            scripts/release-smoke.sh "dist/zeaburctl-$VERSION-linux-$ARCH.tar.gz" \
+              deploy/chart/zeabur "zeabur:release-$ARCH"
+            # A rehearsal publishes nothing, so finish never runs: a development installer, without
+            # pins, shows that it builds. It is not kept.
+            if [[ "$GITHUB_EVENT_NAME" != push ]]; then
+              scripts/release-build.sh "$VERSION" "$ARCH" "$RUNNER_TEMP/installer" installer
+            fi
+          fi
+          ls -l dist
+      # A step of its own, so the build never sees the secrets. Without them the build stays as it
+      # is.
       - name: Sign and notarize
         if: matrix.os == 'darwin'
         env:
-          OS: ${{ matrix.os }}
-          ARCH: ${{ matrix.arch }}
           APPLE_CERTIFICATE_P12: ${{ secrets.APPLE_CERTIFICATE_P12 }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
           APPLE_API_KEY_P8: ${{ secrets.APPLE_API_KEY_P8 }}
           APPLE_API_KEY_ID: ${{ secrets.APPLE_API_KEY_ID }}
           APPLE_API_ISSUER_ID: ${{ secrets.APPLE_API_ISSUER_ID }}
-        run: bun scripts/release.ts sign "$VERSION" "$OS" "$ARCH" dist
+        run: scripts/release-sign.sh "$VERSION" dist
       - if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -297,7 +314,51 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          bun scripts/release.ts publish "$VERSION" artifacts published
+          owner=${GITHUB_REPOSITORY_OWNER,,}
+          plain=${VERSION#v}
+          release() { bun x zeabur-oss-release "$@"; }
+          # image <name> <label in digests.txt> <chart value that pins it> <archive>: the index of
+          # both architectures, signed, pinned by digest in the chart.
+          image() {
+            release push-image --out published --label "$2" --pin "chart/values.yaml:$3" \
+              "ghcr.io/$owner/$1:$plain" \
+              "linux/amd64=artifacts/candidate-linux-amd64/$4" \
+              "linux/arm64=artifacts/candidate-linux-arm64/$4"
+          }
+
+          # Everything that can refuse does so before the first write; recovering from a failed run
+          # is a maintainer's decision (docs/internal/releasing.md). A published release is final.
+          if gh release view "$VERSION" --json isDraft --jq '.isDraft' | grep -qx false; then
+            echo "::error::release $VERSION is already published"; exit 1
+          fi
+          assets=$(scripts/release-assets.sh "$VERSION")
+          while read -r file artifact; do
+            [[ "$artifact" != candidate-* || -f "artifacts/$artifact/$file" ]] ||
+              { echo "::error::missing the build of $file"; exit 1; }
+          done <<<"$assets"
+          crane auth login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<<"$GH_TOKEN"
+          release absent "ghcr.io/$owner/zeabur:$plain" "ghcr.io/$owner/proxy:$plain" \
+            "ghcr.io/$owner/charts/zeabur:$plain"
+          scripts/release-default-images.sh >"$RUNNER_TEMP/default-images.txt"
+
+          cp -r deploy/chart/zeabur chart
+          zeabur=$(image zeabur "" image image.tar | tail -n 1)
+          proxy=$(image proxy proxy proxy.image proxy-image.tar | tail -n 1)
+          cat "$RUNNER_TEMP/default-images.txt" >>published/digests.txt
+          # The chart runs each image pinned to its index, and no other.
+          [[ "$(scripts/chart-images.sh chart)" == "$(printf '%s\n' "$zeabur" "$proxy" | sort)" ]] ||
+            { echo "::error::the chart does not run the images just pushed"; exit 1; }
+          helm lint --strict chart --set publicUrl=https://zeabur.example.com \
+            --set issuer.url=https://identity.example.com \
+            --set issuer.clientSecret.existingSecret=zeabur-oidc
+          helm package chart --destination published
+          release push-chart --out published "oci://ghcr.io/$owner/charts" "published/zeabur-$plain.tgz"
+          # What the installer pins (finish).
+          {
+            echo "ZEABUR_PIN_ZEABUR_IMAGE=$zeabur"
+            echo "ZEABUR_PIN_ZEABUR_CHART_SHA256=$(sha256sum "published/zeabur-$plain.tgz" | cut -d' ' -f1)"
+          } >published/outputs.env
+          cat published/subjects.json published/digests.txt
           echo "subjects=$(jq -c . published/subjects.json)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
@@ -352,7 +413,16 @@ jobs:
         env:
           ZEABUR_TELEMETRY_KEY: ${{ vars.POSTHOG_KEY }}
           ARCH: ${{ matrix.arch }}
-        run: bun scripts/release.ts finish "$VERSION" linux "$ARCH" artifacts dist
+        run: |
+          # ZEABUR_PIN_*=<value> lines, exported and never evaluated.
+          pins=$(scripts/release-pins.sh "$VERSION")
+          pins+=$'\n'$(<artifacts/published/outputs.env)
+          while IFS='=' read -r name value; do
+            [[ "$name" =~ ^ZEABUR_PIN_[A-Z0-9_]+$ ]] ||
+              { echo "::error::unexpected pin line: $name=$value"; exit 1; }
+            export "$name=$value"
+          done <<<"$pins"
+          scripts/release-build.sh "$VERSION" "$ARCH" dist installer
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: finish-linux-${{ matrix.arch }}
@@ -383,7 +453,11 @@ jobs:
           path: artifacts
       - name: Make the release assets and their signed checksums
         run: |
-          bun scripts/release.ts assets "$VERSION" artifacts assets
+          mkdir assets
+          files=$(scripts/release-assets.sh "$VERSION")
+          while read -r file artifact; do
+            cp "artifacts/$artifact/$file" assets/
+          done <<<"$files"
           bun x zeabur-oss-release checksums assets
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
@@ -419,11 +493,9 @@ jobs:
       - name: Download the draft's assets and verify them as a user gets them
         env:
           GH_TOKEN: ${{ github.token }}
-          OS: ${{ matrix.os }}
-          ARCH: ${{ matrix.arch }}
           RELEASE_SOURCE_REPOSITORY: ${{ github.repository }}
           RELEASE_SOURCE_REF: refs/tags/${{ env.VERSION }}
         run: |
           gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir downloaded
           bun x zeabur-oss-release verify-assets downloaded
-          bun scripts/release.ts verify "$VERSION" "$OS" "$ARCH" downloaded
+          scripts/release-verify.sh "$VERSION" downloaded

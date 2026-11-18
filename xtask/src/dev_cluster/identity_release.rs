@@ -1,6 +1,6 @@
 //! A published Zeabur Identity release: its image and `zeabur-identityctl`, checked as
-//! `scripts/release.ts` checks the pins of a Zeabur release. cosign checks the signature of the
-//! release's `SHA256SUMS`, which then gives the sums of `digests.txt` and of the identityctl
+//! `scripts/release-pins.sh` checks the pins of a Zeabur release. cosign checks the signature of
+//! the release's `SHA256SUMS`, which then gives the sums of `digests.txt` and of the identityctl
 //! archive; `digests.txt` gives the image by its digest.
 
 use std::fs;

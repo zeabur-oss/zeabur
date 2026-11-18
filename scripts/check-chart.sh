@@ -153,14 +153,19 @@ expect full "$out" '[select(.kind == "Secret")] | length' 0
 expect full "$out" 'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.volumes[] | select(.name == "plan-key") | .secret.secretName' \
   zeabur-plan-key
 
-# The image: the published one at the chart's appVersion, or exactly the digest a release pins
-# (`scripts/release.ts publish`).
+# The image: the published one at the chart's version, or exactly the digest a release pins
+# (the `publish` job of release.yml).
 image='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].image'
-app_version=$(yq '.appVersion' "$chart/Chart.yaml")
-expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/zeabur-oss/zeabur:$app_version"
+chart_version=$(yq '.version' "$chart/Chart.yaml")
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/zeabur-oss/zeabur:$chart_version"
 digest="sha256:$(printf '%064d' 0)"
 expect digest "$(render -f "$chart/ci/minimal-values.yaml" --set image.tag=ignored --set image.digest="$digest")" \
   "$image" "ghcr.io/zeabur-oss/zeabur@$digest"
+# The release publishes only these two images, so a chart that runs any other cannot install.
+expected_images="ghcr.io/zeabur-oss/proxy:$chart_version
+ghcr.io/zeabur-oss/zeabur:$chart_version"
+images=$("$root/scripts/chart-images.sh" "$chart")
+[[ "$images" == "$expected_images" ]] || fail "the chart runs $images, not only Zeabur and Zeabur Proxy"
 
 # Everyone signed in reads the settings unless that is turned off.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \

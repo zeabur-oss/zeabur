@@ -102,7 +102,7 @@ spec:
           {{- if $proxy.image.digest }}
           image: "{{ $proxy.image.repository }}@{{ $proxy.image.digest }}"
           {{- else }}
-          image: "{{ $proxy.image.repository }}:{{ $proxy.image.tag | default .Chart.AppVersion }}"
+          image: "{{ $proxy.image.repository }}:{{ $proxy.image.tag | default .Chart.Version }}"
           {{- end }}
           imagePullPolicy: {{ $proxy.image.pullPolicy }}
           env:
