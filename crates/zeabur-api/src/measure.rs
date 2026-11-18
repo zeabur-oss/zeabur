@@ -179,14 +179,13 @@ async fn follow(person: &Later, namespace: &str, name: &str, version: &Version) 
             continue;
         };
         let cluster = cluster?;
-        let deployment = match tokio::time::timeout(READ, read(cluster.as_ref(), namespace, name))
-            .await
-        {
-            Ok(Ok(Some(deployment))) => deployment,
-            Ok(Ok(None)) => return None,
-            Ok(Err(error)) if error.is_refused() => return None,
-            Ok(Err(_)) | Err(_) => continue,
-        };
+        let deployment =
+            match tokio::time::timeout(READ, read(cluster.as_ref(), namespace, name)).await {
+                Ok(Ok(Some(deployment))) => deployment,
+                Ok(Ok(None)) => return None,
+                Ok(Err(error)) if error.is_refused() => return None,
+                Ok(Err(_)) | Err(_) => continue,
+            };
         match seen(&deployment, version) {
             Seen::Finished(result) => return Some(result),
             Seen::Replaced => return None,
@@ -325,7 +324,10 @@ mod tests {
         assert_eq!(at(not_yet_seen), Seen::Rolling);
         let scaled_to_zero = deployment(json!({"metadata": {"generation": 2},
             "spec": {"replicas": 0}, "status": {"observedGeneration": 2}}));
-        assert_eq!(seen(&scaled_to_zero, &version(2)), Seen::Finished(Rollout::Available));
+        assert_eq!(
+            seen(&scaled_to_zero, &version(2)),
+            Seen::Finished(Rollout::Available)
+        );
     }
 
     #[test]
