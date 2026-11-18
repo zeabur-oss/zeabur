@@ -55,11 +55,12 @@ fn test_s3(dev: &DevCluster) -> Result<(), String> {
         .quiet()?;
     dev.rollout("s3-test", "deployment/seaweedfs", Duration::from_secs(180))?;
     wait_for("the test S3's bucket", Duration::from_secs(120), || {
-        // weed shell answers on stderr.
+        // weed shell answers on stderr, and can wait for the master for ever; `timeout` makes
+        // that one failed try.
         let output = dev
             .kubectl()
             .args(["-n", "s3-test", "exec", "deploy/seaweedfs", "--", "sh", "-c"])
-            .arg("echo s3.bucket.create -name backups | weed shell -master=localhost:9333 -filer=localhost:8888")
+            .arg("echo s3.bucket.create -name backups | timeout 20 weed shell -master=localhost:9333 -filer=localhost:8888")
             .output()?;
         let said =
             String::from_utf8_lossy(&output.stdout) + String::from_utf8_lossy(&output.stderr);
