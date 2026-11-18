@@ -78,6 +78,28 @@ Rehearsals on other branches build every platform unsigned: the
 environments' deployment branches keep the credentials to `main` and `v*` tags, and the workflow
 skips the Windows login and the updater job elsewhere.
 
+## Homebrew
+
+The `zeabur-oss/homebrew-tap` repository holds `Formula/zeaburctl.rb`, which installs `zeaburctl`
+on macOS arm64 and Linux amd64 and arm64, and `Casks/zeabur-desktop.rb`, which installs Zeabur
+Desktop's `.dmg` on macOS arm64. Both point at the newest normal release's files, with the SHA-256
+its `SHA256SUMS` lists, so Homebrew installs the same signed files and checks them.
+
+`scripts/homebrew.ts` writes both files; do not edit them in the tap by hand. Publishing a normal
+release starts `.github/workflows/homebrew.yml` (`release: released`; pre-releases do not). It
+checks that the release workflow signed the release's `SHA256SUMS` for this tag, installs
+the files on macOS and Linux (and `spctl` must accept the app), and then zeabur-oss-bot commits
+them to the tap's `main`. Nothing is committed when a check fails or the tap already has the
+version. To redo it for a published release, run **Actions → Homebrew → Run workflow** with the
+version.
+
+The workflow needs the `ZEABUR_OSS_BOT_CLIENT_ID` variable and the `ZEABUR_OSS_BOT_PRIVATE_KEY`
+secret to reach this repository, and the bot's GitHub App to be installed on the tap with
+contents write.
+
+The cask declares `auto_updates true`: the app's own updater stays on, and `brew upgrade` leaves it
+to the app unless run with `--greedy`.
+
 ## Pre-releases
 
 A tag with a pre-release part (`v0.1.2-beta.1`, `v1.0.0-rc.1`) is a

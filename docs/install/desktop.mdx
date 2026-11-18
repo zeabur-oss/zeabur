@@ -5,6 +5,17 @@ description: Install Zeabur Desktop on macOS, Windows or Linux to open Zeabur fo
 
 Zeabur Desktop lists the contexts in the kubeconfig files on your computer and opens Zeabur for the one you pick, in its own window. It does what `zeaburctl ui` does, without a terminal.
 
+## Install with Homebrew
+
+On a Mac with Apple silicon and [Homebrew](https://brew.sh), install the app without downloading it yourself:
+
+```sh
+brew tap zeabur-oss/tap
+brew install --cask zeabur-oss/tap/zeabur-desktop
+```
+
+Homebrew installs the same signed `.dmg` as the release page and checks it against the release's checksum.
+
 ## Download
 
 Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) and download the file for your computer:
@@ -33,4 +44,4 @@ Zeabur Desktop looks for a new version each time it starts. When there's one, th
 
 The update shows what changed and installs only after you click **Update and restart**. Zeabur then closes its windows and restarts in the new version. Pre-releases are never offered.
 
-The macOS app, the Windows installer and the AppImage update themselves. A `.deb`, `.rpm` or portable `.exe` can't: Zeabur tells you there's a new version, and you download it from the release page and install it the way you installed the first one.
+The macOS app, the Windows installer and the AppImage update themselves. That includes an app Homebrew installed; `brew upgrade --greedy` updates it too. A `.deb`, `.rpm` or portable `.exe` can't: Zeabur tells you there's a new version, and you download it from the release page and install it the way you installed the first one.
