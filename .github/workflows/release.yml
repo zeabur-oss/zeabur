@@ -2,9 +2,9 @@ name: Release
 
 # Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: build and smoke the server and zeaburctl on every
 # platform and package Zeabur Desktop, then push the images and the chart by digest, sign and
-# attest them, add every file to the draft release that the Release pull request workflow left when
-# it tagged, and verify the draft. A maintainer publishes the draft (docs/internal/releasing.md).
-# Manual run: rehearse, which builds and smokes every platform and publishes nothing.
+# attest them, create the draft release with every file, and verify the draft. A maintainer
+# publishes the draft (docs/internal/releasing.md). Manual run: rehearse, which builds and smokes
+# every platform and publishes nothing.
 #
 # Zeabur's own steps are scripts/release-*.sh; the rest calls zeabur-oss-release directly. Zeabur
 # Desktop's packages build outside Nix with scripts/package-desktop.sh.
@@ -41,7 +41,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
       - name: Install the packages
         run: bun install --frozen-lockfile
       - name: The version is SemVer, with a CHANGELOG.md section, on main
@@ -78,7 +78,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
       - name: Install the packages
         run: bun install --frozen-lockfile
       - name: Build and smoke
@@ -145,7 +145,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
       - id: versions
         name: Build the pages, copy the catalog, and name the versions and the updater key
         run: scripts/ci/desktop-inputs.sh | tee -a "$GITHUB_OUTPUT"
@@ -255,7 +255,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: desktop-*-*
@@ -295,7 +295,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
       - name: Install the packages
         run: bun install --frozen-lockfile
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -389,7 +389,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
       - name: Install the packages
         run: bun install --frozen-lockfile
       - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
@@ -406,10 +406,11 @@ jobs:
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: assets/SHA256SUMS
-      - name: Add the assets to the draft release
+      # The draft is created with its files, never before: a published release takes no more files.
+      - name: Create the draft release with the assets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$VERSION" assets/* --repo "$GITHUB_REPOSITORY" --clobber
+        run: bun x zeabur-oss-release draft CHANGELOG.md "$VERSION" assets --name "Zeabur" --docs https://oss.zeabur.com/docs/zeabur/
 
   verify:
     name: verify (${{ matrix.os }}-${{ matrix.arch }})
@@ -431,7 +432,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
       - name: Install the packages
         run: bun install --frozen-lockfile
       - name: Download the draft's assets and verify them as a user gets them
