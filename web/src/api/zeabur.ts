@@ -10190,13 +10190,9 @@ export type ZeaburVersion = {
 }
 
 export type ListClusterEventsParams = {
-  /**
-   * Only events of this type: `Normal` or `Warning` (any case).
-   */
+  /** Only events of this type: `Normal` or `Warning` (any case). */
   type?: string
-  /**
-   * Only events that last happened within this many seconds.
-   */
+  /** Only events that last happened within this many seconds. */
   sinceSeconds?: number
   /**
    * `cluster`: only events about the cluster itself (no namespace, a Node, or a `kube-`
@@ -10211,16 +10207,12 @@ export type ListClusterEventsParams = {
 }
 
 export type GetGitHubAppFormParams = {
-  /**
-   * The state `manifest` answered
-   */
+  /** The state `manifest` answered */
   state: string
 }
 
 export type UploadBuildSourceParams = {
-  /**
-   * The upload token request the Build has answered
-   */
+  /** The upload token request the Build has answered */
   request: string
 }
 
@@ -10238,9 +10230,7 @@ export type ListProjectEventsParams = {
 }
 
 export type ListNetworkPolicyPresetsParams = {
-  /**
-   * The service, `<kind>/<name>` (`deployment/api`; any case).
-   */
+  /** The service, `<kind>/<name>` (`deployment/api`; any case). */
   service: string
 }
 
@@ -10250,20 +10240,14 @@ export type ListObjectsParams = {
    * group), comma-separated: `apps/replicasets,cert-manager.io/certificates`.
    */
   kinds?: string
-  /**
-   * `true`: read every kind that controllers do not generate ("scan all kinds").
-   */
+  /** `true`: read every kind that controllers do not generate ("scan all kinds"). */
   all?: boolean
-  /**
-   * Keep only the objects with this label, as `<key>=<value>`: `zeabur.com/database=pg`.
-   */
+  /** Keep only the objects with this label, as `<key>=<value>`: `zeabur.com/database=pg`. */
   label?: string
 }
 
 export type GetDebugContainerParams = {
-  /**
-   * The container it shares processes with; by default the pod's default container.
-   */
+  /** The container it shares processes with; by default the pod's default container. */
   container?: string
 }
 
@@ -10273,211 +10257,123 @@ export type OpenPodTerminalParams = {
    * annotation names, or its first.
    */
   container?: string
-  /**
-   * The command, one argument per parameter (`command=ls&command=-l`); `/bin/sh` by default.
-   */
+  /** The command, one argument per parameter (`command=ls&command=-l`); `/bin/sh` by default. */
   command?: string[]
 }
 
 export type GetFilesParams = {
-  /**
-   * The container; by default the pod's default container.
-   */
+  /** The container; by default the pod's default container. */
   container?: string
-  /**
-   * Zeabur's debug container to read through (`reader.via`).
-   */
+  /** Zeabur's debug container to read through (`reader.via`). */
   via?: string
-  /**
-   * The absolute path.
-   */
+  /** The absolute path. */
   path?: string
-  /**
-   * Only names that contain this, ignoring case (a listing).
-   */
+  /** Only names that contain this, ignoring case (a listing). */
   filter?: string
-  /**
-   * Replace a file of the same name (an upload).
-   */
+  /** Replace a file of the same name (an upload). */
   replace?: boolean
 }
 
 export type DownloadFileParams = {
-  /**
-   * The container; by default the pod's default container.
-   */
+  /** The container; by default the pod's default container. */
   container?: string
-  /**
-   * Zeabur's debug container to read through (`reader.via`).
-   */
+  /** Zeabur's debug container to read through (`reader.via`). */
   via?: string
-  /**
-   * The absolute path.
-   */
+  /** The absolute path. */
   path?: string
-  /**
-   * Only names that contain this, ignoring case (a listing).
-   */
+  /** Only names that contain this, ignoring case (a listing). */
   filter?: string
-  /**
-   * Replace a file of the same name (an upload).
-   */
+  /** Replace a file of the same name (an upload). */
   replace?: boolean
 }
 
 export type UploadFileParams = {
-  /**
-   * The container; by default the pod's default container.
-   */
+  /** The container; by default the pod's default container. */
   container?: string
-  /**
-   * Zeabur's debug container to read through (`reader.via`).
-   */
+  /** Zeabur's debug container to read through (`reader.via`). */
   via?: string
-  /**
-   * The absolute path.
-   */
+  /** The absolute path. */
   path?: string
-  /**
-   * Only names that contain this, ignoring case (a listing).
-   */
+  /** Only names that contain this, ignoring case (a listing). */
   filter?: string
-  /**
-   * Replace a file of the same name (an upload).
-   */
+  /** Replace a file of the same name (an upload). */
   replace?: boolean
 }
 
 export type ListFilesParams = {
-  /**
-   * The container; by default the pod's default container.
-   */
+  /** The container; by default the pod's default container. */
   container?: string
-  /**
-   * Zeabur's debug container to read through (`reader.via`).
-   */
+  /** Zeabur's debug container to read through (`reader.via`). */
   via?: string
-  /**
-   * The absolute path.
-   */
+  /** The absolute path. */
   path?: string
-  /**
-   * Only names that contain this, ignoring case (a listing).
-   */
+  /** Only names that contain this, ignoring case (a listing). */
   filter?: string
-  /**
-   * Replace a file of the same name (an upload).
-   */
+  /** Replace a file of the same name (an upload). */
   replace?: boolean
 }
 
 export type DeleteFileParams = {
-  /**
-   * The container; by default the pod's default container.
-   */
+  /** The container; by default the pod's default container. */
   container?: string
-  /**
-   * Zeabur's debug container to read through (`reader.via`).
-   */
+  /** Zeabur's debug container to read through (`reader.via`). */
   via?: string
-  /**
-   * The absolute path.
-   */
+  /** The absolute path. */
   path?: string
-  /**
-   * Only names that contain this, ignoring case (a listing).
-   */
+  /** Only names that contain this, ignoring case (a listing). */
   filter?: string
-  /**
-   * Replace a file of the same name (an upload).
-   */
+  /** Replace a file of the same name (an upload). */
   replace?: boolean
 }
 
 export type PreviewFileParams = {
-  /**
-   * The container; by default the pod's default container.
-   */
+  /** The container; by default the pod's default container. */
   container?: string
-  /**
-   * Zeabur's debug container to read through (`reader.via`).
-   */
+  /** Zeabur's debug container to read through (`reader.via`). */
   via?: string
-  /**
-   * The absolute path.
-   */
+  /** The absolute path. */
   path?: string
-  /**
-   * Only names that contain this, ignoring case (a listing).
-   */
+  /** Only names that contain this, ignoring case (a listing). */
   filter?: string
-  /**
-   * Replace a file of the same name (an upload).
-   */
+  /** Replace a file of the same name (an upload). */
   replace?: boolean
 }
 
 export type GetPodLogsParams = {
-  /**
-   * The container; required when the pod has several.
-   */
+  /** The container; required when the pod has several. */
   container?: string
-  /**
-   * Only the last lines (default 500).
-   */
+  /** Only the last lines (default 500). */
   tailLines?: number
-  /**
-   * Only lines newer than this many seconds.
-   */
+  /** Only lines newer than this many seconds. */
   sinceSeconds?: number
-  /**
-   * The previous instance of the container, after a restart.
-   */
+  /** The previous instance of the container, after a restart. */
   previous?: boolean
-  /**
-   * Prefix each line with its timestamp.
-   */
+  /** Prefix each line with its timestamp. */
   timestamps?: boolean
 }
 
 export type FollowPodLogsParams = {
-  /**
-   * The container; required when the pod has several.
-   */
+  /** The container; required when the pod has several. */
   container?: string
-  /**
-   * Only the last lines (default 500).
-   */
+  /** Only the last lines (default 500). */
   tailLines?: number
-  /**
-   * Only lines newer than this many seconds.
-   */
+  /** Only lines newer than this many seconds. */
   sinceSeconds?: number
-  /**
-   * The previous instance of the container, after a restart.
-   */
+  /** The previous instance of the container, after a restart. */
   previous?: boolean
-  /**
-   * Prefix each line with its timestamp.
-   */
+  /** Prefix each line with its timestamp. */
   timestamps?: boolean
 }
 
 export type GetServiceHistoryParams = {
-  /**
-   * `1h` (the default, a point every 15 s), `6h` (1 min), `24h` (5 min) or `7d` (30 min).
-   */
+  /** `1h` (the default, a point every 15 s), `6h` (1 min), `24h` (5 min) or `7d` (30 min). */
   range?: string
 }
 
 export type GetServiceLogHistoryParams = {
-  /**
-   * `1h` (the default), `6h`, `24h` or `7d`.
-   */
+  /** `1h` (the default), `6h`, `24h` or `7d`. */
   range?: string
-  /**
-   * Only this container's lines.
-   */
+  /** Only this container's lines. */
   container?: string
   /**
    * The most lines, 1,000 at most (the default).
