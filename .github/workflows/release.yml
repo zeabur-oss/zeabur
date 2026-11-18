@@ -2,9 +2,9 @@ name: Release
 
 # Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: build and smoke the server and zeaburctl on every
 # platform and package Zeabur Desktop, then push the images and the chart by digest, sign and
-# attest them, add every file to the draft release that the Release pull request workflow left when
-# it tagged, and verify the draft. A maintainer publishes the draft (docs/internal/releasing.md).
-# Manual run: rehearse, which builds and smokes every platform and publishes nothing.
+# attest them, create the draft release with every file, and verify the draft. A maintainer
+# publishes the draft (docs/internal/releasing.md). Manual run: rehearse, which builds and smokes
+# every platform and publishes nothing.
 #
 # Zeabur's own steps are scripts/release-*.sh; the rest calls zeabur-oss-release directly. Zeabur
 # Desktop's packages build outside Nix with scripts/package-desktop.sh.
@@ -406,10 +406,11 @@ jobs:
       - uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
         with:
           subject-checksums: assets/SHA256SUMS
-      - name: Add the assets to the draft release
+      # The draft is created with its files, never before: a published release takes no more files.
+      - name: Create the draft release with the assets
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "$VERSION" assets/* --repo "$GITHUB_REPOSITORY" --clobber
+        run: bun x zeabur-oss-release draft CHANGELOG.md "$VERSION" assets --name "Zeabur" --docs https://oss.zeabur.com/docs/zeabur/
 
   verify:
     name: verify (${{ matrix.os }}-${{ matrix.arch }})
