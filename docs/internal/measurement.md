@@ -19,10 +19,25 @@ replica runs the change and is available, or the Deployment's `Progressing` cond
 `False` with the reason `ProgressDeadlineExceeded` after its `progressDeadlineSeconds`.
 
 After an accepted change, Zeabur reads the Deployment as the person until one of those two
-happens. It stops without an event when a newer change replaces this one, when the person can no
-longer read the Deployment, or when the progress deadline has passed by a minute with neither
-result. A restart forgets the change. A missing `rollout_finished` therefore means "no result",
-and the analysis treats it so.
+happens. The rollout belongs to the Deployment's `uid` and the `generation` the write left, so a
+Deployment deleted and made again with the same name is not the same change. Each read has a time
+limit, and the whole watch ends at the progress deadline plus a minute, never later than 30
+minutes after the change.
+
+An accepted change can end with no `rollout_finished`:
+
+- a newer change replaced it,
+- the person signed out or can no longer read the Deployment,
+- the Deployment was deleted or made again,
+- the watch ran out of time,
+- Zeabur restarted, which forgets the change,
+- or the event was not delivered.
+
+A missing `rollout_finished` therefore means "no result", never success or failure. Every view
+of rollouts shows three outcomes of accepted changes side by side, for each `operation`:
+`available`, `progress_deadline_exceeded` and no result, and the coverage, the share of accepted
+changes that have a `rollout_finished`. A success rate counted only over changes with a result
+leaves out the missing ones, so it is shown only next to its coverage.
 
 Every event also carries `zeabur_version` and `mode`; the two change events carry
 the per-day `person` hash of `zeabur_active`, for the day the change was submitted. A rollout
