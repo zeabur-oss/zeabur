@@ -219,7 +219,7 @@ jobs:
   nightly-issues:
     if: always() && github.event_name == 'schedule'
     needs: [fuzz, canary, e2e-full]
-    runs-on: ubuntu-slim
+    runs-on: instabox-small
     timeout-minutes: 120
     permissions:
       contents: read
