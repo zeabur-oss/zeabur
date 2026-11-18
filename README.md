@@ -1,6 +1,6 @@
 <picture>
   <source media="(prefers-color-scheme: dark)" srcset="docs/images/cover-dark.avif">
-  <img alt="Zeabur: deploy like a PaaS, get standard Kubernetes; the review of a new service lists a Deployment, a Service and an Ingress with their YAML before it creates them" src="docs/images/cover-light.avif">
+  <img alt="Zeabur: deploy on your own server, the Zeabur way. Deploy from Git, Docker Compose or an app template, and it is running." src="docs/images/cover-light.avif">
 </picture>
 
 # Zeabur
