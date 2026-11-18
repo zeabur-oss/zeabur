@@ -3,9 +3,8 @@ name: Release
 # Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: build and smoke the server and zeaburctl on every
 # platform and package Zeabur Desktop, then push the images and the chart by digest, sign and
 # attest them, add every file to the draft release that the Release pull request workflow left when
-# it tagged, and verify the draft. A maintainer publishes
-# the draft (docs/internal/releasing.md). Manual run: rehearse, which builds and smokes every
-# platform and publishes nothing.
+# it tagged, and verify the draft. A maintainer publishes the draft (docs/internal/releasing.md).
+# Manual run: rehearse, which builds and smokes every platform and publishes nothing.
 #
 # Zeabur's own steps are scripts/release-*.sh; the rest calls zeabur-oss-release directly. Zeabur
 # Desktop's packages build outside Nix with scripts/package-desktop.sh.
