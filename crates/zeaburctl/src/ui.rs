@@ -4,7 +4,7 @@ use std::process::ExitCode;
 use std::sync::Arc;
 
 use zeabur_kube::UserClient;
-use zeabur_local::ServiceError;
+use zeabur_local::{ServiceError, Settings};
 use zeabur_telemetry::Connection;
 
 use crate::output;
@@ -37,32 +37,41 @@ pub(crate) fn run(args: &UiArgs) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    match runtime.block_on(serve(args)) {
-        Ok(()) => ExitCode::SUCCESS,
+    let settings = match crate::in_process::settings(args.metrics_service.as_deref()) {
+        Ok(settings) => settings,
         Err(message) => {
             output::error(&message);
-            ExitCode::FAILURE
+            return ExitCode::FAILURE;
         }
+    };
+    let telemetry = Local::from_env();
+    let served = runtime.block_on(serve(args, settings, &telemetry));
+    if let Err(message) = &served {
+        output::error(message);
+    }
+    // The event goes out while the interface runs; only a start that failed waits for it here,
+    // after the error is shown.
+    runtime.block_on(telemetry.finish());
+    if served.is_ok() {
+        ExitCode::SUCCESS
+    } else {
+        ExitCode::FAILURE
     }
 }
 
-async fn serve(args: &UiArgs) -> Result<(), String> {
-    let settings = crate::in_process::settings(args.metrics_service.as_deref())?;
-    let telemetry = Local::from_env();
+async fn serve(args: &UiArgs, settings: Settings, telemetry: &Local) -> Result<(), String> {
     let cluster = match UserClient::from_kubeconfig(args.context.as_deref()).await {
         Ok(cluster) => cluster,
         Err(error) => {
-            telemetry.connected(Connection::Other).await;
+            telemetry.connected(Connection::Other);
             return Err(error.to_string());
         }
     };
     let started = zeabur_local::start_with(Arc::new(cluster), settings).await;
-    telemetry
-        .connected(match &started {
-            Err(ServiceError::Identity(error)) => outcome(error),
-            Ok(_) | Err(_) => Connection::Connected,
-        })
-        .await;
+    telemetry.connected(match &started {
+        Err(ServiceError::Identity(error)) => outcome(error),
+        Ok(_) | Err(_) => Connection::Connected,
+    });
     let running = started.map_err(|e| e.to_string())?;
     let url = running.url();
     output::info(&format!(

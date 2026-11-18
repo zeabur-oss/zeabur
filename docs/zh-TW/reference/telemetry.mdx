@@ -44,7 +44,7 @@ description: 加入體驗計畫後，Zeabur、`zeaburctl ui` 和 installer 會�
 
 `zeaburctl ui` 沒有安裝代碼，所以在第一次要傳事件時才產生一組隨機代碼，關閉時不會產生。這組代碼存在設定目錄裡 `zeabur` 資料夾中名為 `local-id` 的檔案：Linux 是 `$XDG_CONFIG_HOME` 或 `~/.config`，macOS 是 `~/Library/Application Support`，Windows 是 `%APPDATA%`。只有你能讀取它，裡面不含機器、kubeconfig、權杖或使用者名稱的任何資訊。
 
-事件用 HTTPS 送到 PostHog（經由 `oss-nori.zeabur.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur 或安裝。PostHog 不保存 IP 位址。
+事件用 HTTPS 送到 PostHog（經由 `oss-nori.zeabur.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur 或安裝。PostHog 不保存 IP 位址。`zeaburctl ui` 在背景傳送，不會延遲印出連結或開啟瀏覽器。
 
 ## 絕不傳送
 
@@ -57,7 +57,7 @@ description: 加入體驗計畫後，Zeabur、`zeaburctl ui` 和 installer 會�
 - 在 installer、Zeabur 或 `zeaburctl ui` 的環境變數設定 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
 - 在 installer 的確認頁取消勾選，執行 `zeabur-installer --no-telemetry apply`（或 `--no-telemetry gui`），或在 `/etc/zeabur-installer/config.yaml` 寫 `telemetry: false`。
 - 用 Helm 安裝時，維持預設的 `telemetry.enabled=false`。沒有安裝代碼時，chart 不接受 `telemetry.enabled=true`。
-- `zeaburctl ui` 在 `local-id` 所在的 `zeabur` 資料夾裡的 `config.yaml` 寫上 `telemetry: false`，或設定 `ZEABUR_TELEMETRY=off`。`config.yaml` 讀不懂時，`zeaburctl ui` 什麼都不送。
+- `zeaburctl ui` 執行 `zeaburctl telemetry disable`，它會在 `local-id` 所在的 `zeabur` 資料夾裡的 `config.yaml` 寫上 `telemetry: false`；或設定 `ZEABUR_TELEMETRY=off`。`config.yaml` 讀不懂時，`zeaburctl ui` 什麼都不送。`zeaburctl telemetry status` 會顯示目前生效的設定。
 
 要刪掉 `zeaburctl ui` 的代碼，執行 `zeaburctl telemetry reset`。下次要傳事件時，它會產生新的代碼。
 

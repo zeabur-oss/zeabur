@@ -36,6 +36,8 @@ zeaburctl components export certificates/cert-manager
 | `up` | Uploads a folder to a service created from a folder and starts a build | Updates the service's Build and pushes the folder to the registry |
 | `connect` | Forwards a local port to a database or service and prints how to reach it | Changes nothing in the cluster |
 | `components export` | Prints manifests or Helm commands to install Catalog components | Doesn't connect to the cluster or change anything |
+| `telemetry status` | Shows whether `zeaburctl ui` sends events, and which setting decides it | Doesn't connect to the cluster or change anything |
+| `telemetry disable`, `telemetry enable` | Leaves or joins the experience program | Writes `telemetry: false` or `true` to `config.yaml` on this computer |
 | `telemetry reset` | Deletes the random ID that `zeaburctl ui` keeps for the experience program | Doesn't connect to the cluster or change anything |
 
 ## `ui`
@@ -199,6 +201,22 @@ kubectl apply -f velero.yaml
 ```
 
 You can also commit the file to a GitOps repository for Flux or Argo CD to apply. Make later changes and removals in this file.
+
+## `telemetry status`
+
+```sh
+zeaburctl telemetry status
+```
+
+Shows whether `zeaburctl ui` sends events, then what decides it: `config.yaml`, `DO_NOT_TRACK`, `ZEABUR_TELEMETRY`, and whether the random ID exists.
+
+## `telemetry disable` and `telemetry enable`
+
+```sh
+zeaburctl telemetry disable
+```
+
+`disable` writes `telemetry: false` to `config.yaml`, so `zeaburctl ui` sends nothing. `enable` writes `telemetry: true`. The other lines of the file stay. Neither deletes the random ID; `telemetry reset` does. If `config.yaml` can't be read, both stop and change nothing.
 
 ## `telemetry reset`
 

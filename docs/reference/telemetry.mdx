@@ -44,7 +44,7 @@ The event doesn't say who the person is. `person` is a keyed hash of the user na
 
 `zeaburctl ui` has no installation ID, so it makes a random one the first time it is about to send an event, never when it is off. The ID is kept in a file named `local-id` in the `zeabur` folder of the configuration directory: `$XDG_CONFIG_HOME` or `~/.config` on Linux, `~/Library/Application Support` on macOS, `%APPDATA%` on Windows. Only you can read it, and nothing about your machine, kubeconfig, token or user name goes into it.
 
-Events go to PostHog through `oss-nori.zeabur.com` over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. PostHog doesn't keep IP addresses.
+Events go to PostHog through `oss-nori.zeabur.com` over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. `zeaburctl ui` sends in the background, so it never delays the link or the browser. PostHog doesn't keep IP addresses.
 
 ## What is never sent
 
@@ -57,7 +57,7 @@ Any one of these is enough, and `DO_NOT_TRACK` wins over all the others.
 - Set `DO_NOT_TRACK=1` in the environment of the installer, of Zeabur or of `zeaburctl ui`. Any value but empty or `0` counts.
 - In the installer, uncheck the box on the review page, run `zeabur-installer --no-telemetry apply` (or `--no-telemetry gui`), or set `telemetry: false` in `/etc/zeabur-installer/config.yaml`.
 - With Helm, keep `telemetry.enabled=false`, the default. The chart refuses `telemetry.enabled=true` without an ID.
-- For `zeaburctl ui`, put `telemetry: false` in `config.yaml` in the same `zeabur` folder as `local-id`, or set `ZEABUR_TELEMETRY=off`. If `config.yaml` can't be read, `zeaburctl ui` sends nothing.
+- For `zeaburctl ui`, run `zeaburctl telemetry disable`, which writes `telemetry: false` to `config.yaml` in the same `zeabur` folder as `local-id`, or set `ZEABUR_TELEMETRY=off`. If `config.yaml` can't be read, `zeaburctl ui` sends nothing. `zeaburctl telemetry status` shows which setting is in effect.
 
 To delete the ID of `zeaburctl ui`, run `zeaburctl telemetry reset`. It makes a new one the next time it is about to send an event.
 

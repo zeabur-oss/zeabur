@@ -36,6 +36,8 @@ zeaburctl components export certificates/cert-manager
 | `up` | 把資料夾上傳到從資料夾建立的服務，並開始建置 | 修改該服務的 Build，把資料夾推到 registry |
 | `connect` | 把本機連接埠轉發到資料庫或服務，並印出連線方式 | 不改叢集裡的任何東西 |
 | `components export` | 印出安裝 Catalog 元件的 manifest 或 Helm 指令 | 不連叢集，什麼都不改 |
+| `telemetry status` | 顯示 `zeaburctl ui` 會不會傳送事件，以及是哪個設定決定的 | 不連叢集，什麼都不改 |
+| `telemetry disable`、`telemetry enable` | 退出或加入體驗計畫 | 在這台電腦的 `config.yaml` 寫入 `telemetry: false` 或 `true` |
 | `telemetry reset` | 刪除 `zeaburctl ui` 為體驗計畫保存的隨機代碼 | 不連叢集，什麼都不改 |
 
 ## `ui`
@@ -199,6 +201,22 @@ kubectl apply -f velero.yaml
 ```
 
 也可以把檔案提交到 GitOps 儲存庫，讓 Flux 或 Argo CD 套用。之後的調整和移除都在這個檔案上做。
+
+## `telemetry status`
+
+```sh
+zeaburctl telemetry status
+```
+
+顯示 `zeaburctl ui` 會不會傳送事件，再列出決定這件事的設定：`config.yaml`、`DO_NOT_TRACK`、`ZEABUR_TELEMETRY`，以及隨機代碼存不存在。
+
+## `telemetry disable` 和 `telemetry enable`
+
+```sh
+zeaburctl telemetry disable
+```
+
+`disable` 在 `config.yaml` 寫入 `telemetry: false`，之後 `zeaburctl ui` 什麼都不傳。`enable` 寫入 `telemetry: true`。檔案裡的其他內容不變。兩個指令都不會刪掉隨機代碼，要刪請用 `telemetry reset`。`config.yaml` 讀不懂時，兩個指令都會停下來，什麼都不改。
 
 ## `telemetry reset`
 
