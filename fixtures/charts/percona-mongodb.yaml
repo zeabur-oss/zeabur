@@ -237,11 +237,16 @@ spec:
     spec:
       serviceAccountName: psmdb-operator
       securityContext:
-        {}
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: psmdb-operator
           securityContext:
-            {}
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
           image: "percona/percona-server-mongodb-operator:1.23.1@sha256:78c87b933e184b9af36dbb0078751862c75934c1521c33d3be4d0a38aa58dd0a"
           imagePullPolicy: IfNotPresent
           ports:

@@ -5,6 +5,7 @@ import {
   covers,
   hourOf,
   insideCluster,
+  installedOf,
   lastGood,
   locationForm,
   locationProblems,
@@ -235,5 +236,32 @@ test("the project's line comes from its own read of Velero", () => {
     as: "last",
     at: "2026-10-23T03:05:00Z",
     outcome: "succeeded",
+  })
+})
+
+describe("installedOf", () => {
+  const capability = (name: string, installed: string[]): Schemas.Capability => ({
+    name,
+    components: [],
+    evidence: [],
+    existing: installed.length > 0,
+    installations: installed.map((component) => ({
+      component,
+      displayName: component,
+      source: "helm",
+    })),
+  })
+
+  test("finds a component by its id, whatever capability it provides", () => {
+    const items = [
+      capability("databases", ["cloudnative-pg"]),
+      capability("volume-backup", ["k8up"]),
+    ]
+    expect(installedOf(items, "k8up")).toBe(true)
+    expect(installedOf(items, "velero")).toBe(false)
+  })
+
+  test("is unknown when the capabilities cannot be read", () => {
+    expect(installedOf(undefined, "k8up")).toBeUndefined()
   })
 })

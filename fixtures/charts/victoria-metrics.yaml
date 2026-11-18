@@ -1024,7 +1024,9 @@ spec:
           successThreshold: 1
           timeoutSeconds: 5
         resources:
-          {}
+          requests:
+            cpu: 10m
+            memory: 64Mi
         securityContext:
           allowPrivilegeEscalation: false
           capabilities:
@@ -1064,7 +1066,7 @@ spec:
       memory: 256Mi
     requests:
       cpu: 20m
-      memory: 64Mi
+      memory: 128Mi
   scrapeInterval: 30s
   selectAllByDefault: true
 
@@ -1105,7 +1107,7 @@ spec:
       memory: 128Mi
     requests:
       cpu: 10m
-      memory: 32Mi
+      memory: 64Mi
   selectAllByDefault: true
 
 ---
@@ -1425,7 +1427,7 @@ spec:
       memory: 512Mi
     requests:
       cpu: 50m
-      memory: 128Mi
+      memory: 224Mi
   retentionPeriod: 7d
   storage:
     accessModes:
@@ -1561,17 +1563,18 @@ spec:
           annotations:
             summary: "{{ $labels.deployment }} is deployed."
             description: "All replicas of {{ $labels.deployment }} in {{ $labels.namespace }} run the new version."
+        # The kubelet's back-off waiting reason shows only for a moment between two runs
+        # on K3s 1.36, so the alert counts restarts, as Zeabur's status light does.
         - alert: ZeaburCrashLooping
           expr: |
             max by (namespace, pod, container) (
-              kube_pod_container_status_waiting_reason{reason="CrashLoopBackOff"}
-            ) == 1
+              increase(kube_pod_container_status_restarts_total[10m])
+            ) >= 2
             and on (namespace) kube_namespace_labels{label_zeabur_com_project!=""}
-          for: 5m
           labels: {zeabur_event: crash-loop, zeabur_kind: state, severity: warning}
           annotations:
             summary: "{{ $labels.pod }} keeps crashing."
-            description: "Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.namespace }} has been in CrashLoopBackOff for 5 minutes."
+            description: "Container {{ $labels.container }} of {{ $labels.pod }} in {{ $labels.namespace }} restarted at least twice in 10 minutes."
         - alert: ZeaburOutOfMemory
           expr: |
             max by (namespace, pod, container) (

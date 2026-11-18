@@ -5,10 +5,10 @@ kind: ServiceAccount
 metadata:
   name: mariadb-operator
   labels:
-    helm.sh/chart: mariadb-operator-26.10.1
+    helm.sh/chart: mariadb-operator-26.10.2
     app.kubernetes.io/name: mariadb-operator
     app.kubernetes.io/instance: mariadb-operator
-    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/version: "26.10.2"
     app.kubernetes.io/managed-by: Helm
 ---
 # Source: mariadb-operator/templates/webhook/serviceaccount.yaml
@@ -17,10 +17,10 @@ kind: ServiceAccount
 metadata:
   name: mariadb-operator-webhook
   labels:
-    helm.sh/chart: mariadb-operator-26.10.1
+    helm.sh/chart: mariadb-operator-26.10.2
     app.kubernetes.io/name: mariadb-operator-webhook
     app.kubernetes.io/instance: mariadb-operator
-    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/version: "26.10.2"
     app.kubernetes.io/managed-by: Helm
 ---
 # Source: mariadb-operator/templates/operator/configmap.yaml
@@ -411,10 +411,10 @@ kind: Service
 metadata:
   name: mariadb-operator-webhook
   labels:
-    helm.sh/chart: mariadb-operator-26.10.1
+    helm.sh/chart: mariadb-operator-26.10.2
     app.kubernetes.io/name: mariadb-operator-webhook
     app.kubernetes.io/instance: mariadb-operator
-    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/version: "26.10.2"
     app.kubernetes.io/managed-by: Helm
 spec:
   ports:
@@ -431,10 +431,10 @@ kind: Deployment
 metadata:
   name: mariadb-operator
   labels:
-    helm.sh/chart: mariadb-operator-26.10.1
+    helm.sh/chart: mariadb-operator-26.10.2
     app.kubernetes.io/name: mariadb-operator
     app.kubernetes.io/instance: mariadb-operator
-    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/version: "26.10.2"
     app.kubernetes.io/managed-by: Helm
 spec:
   revisionHistoryLimit: 10
@@ -485,6 +485,8 @@ spec:
                   fieldPath: metadata.namespace
             - name: MARIADB_OPERATOR_SA_PATH
               value: /var/run/secrets/kubernetes.io/serviceaccount/token
+            - name: KUBE_FEATURE_WatchListClient
+              value: "false"
           
           resources:
             
@@ -511,10 +513,10 @@ kind: Deployment
 metadata:
   name: mariadb-operator-webhook
   labels:
-    helm.sh/chart: mariadb-operator-26.10.1
+    helm.sh/chart: mariadb-operator-26.10.2
     app.kubernetes.io/name: mariadb-operator-webhook
     app.kubernetes.io/instance: mariadb-operator
-    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/version: "26.10.2"
     app.kubernetes.io/managed-by: Helm
 spec:
   revisionHistoryLimit: 10
@@ -596,10 +598,10 @@ kind: ValidatingWebhookConfiguration
 metadata:
   name: mariadb-operator-webhook
   labels:
-    helm.sh/chart: mariadb-operator-26.10.1
+    helm.sh/chart: mariadb-operator-26.10.2
     app.kubernetes.io/name: mariadb-operator-webhook
     app.kubernetes.io/instance: mariadb-operator
-    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/version: "26.10.2"
     app.kubernetes.io/managed-by: Helm
   annotations:
     cert-manager.io/inject-ca-from: mariadb-operator/mariadb-operator-webhook-cert
@@ -833,10 +835,10 @@ metadata:
   name: mariadb-operator-webhook-cert
   labels:
     
-    helm.sh/chart: mariadb-operator-26.10.1
+    helm.sh/chart: mariadb-operator-26.10.2
     app.kubernetes.io/name: mariadb-operator-webhook
     app.kubernetes.io/instance: mariadb-operator
-    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/version: "26.10.2"
     app.kubernetes.io/managed-by: Helm
 spec:
   commonName: mariadb-operator-webhook.mariadb-operator.svc
@@ -859,10 +861,10 @@ metadata:
   name: mariadb-operator-selfsigned-issuer
   labels:
     
-    helm.sh/chart: mariadb-operator-26.10.1
+    helm.sh/chart: mariadb-operator-26.10.2
     app.kubernetes.io/name: mariadb-operator-webhook
     app.kubernetes.io/instance: mariadb-operator
-    app.kubernetes.io/version: "26.10.1"
+    app.kubernetes.io/version: "26.10.2"
     app.kubernetes.io/managed-by: Helm
 spec:
   selfSigned: {}

@@ -106,6 +106,9 @@ spec:
       automountServiceAccountToken: false
       serviceAccountName: blackbox-exporter-prometheus-blackbox-exporter
       restartPolicy: Always
+      securityContext:
+        seccompProfile:
+          type: RuntimeDefault
       
       containers:
       

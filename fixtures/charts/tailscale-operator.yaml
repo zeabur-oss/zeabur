@@ -199,7 +199,7 @@ spec:
             requests:
               cpu: 20m
               memory: 64Mi
-          image: tailscale/k8s-operator:v1.104.2@sha256:9cddfcbe75a7eab2b46d610966d519a28699a5e38235a2cb3aec960487c4aa48
+          image: tailscale/k8s-operator:v1.104.4@sha256:68fc0aa4e1c3d7ba19ca41c0bc27f17b2a5a8dca6c10efcdd18020a6bf97768d
           imagePullPolicy: IfNotPresent
           env:
             - name: OPERATOR_INITIAL_TAGS
@@ -227,7 +227,7 @@ spec:
             - name: CLIENT_SECRET_FILE
               value: /oauth/client_secret
             - name: PROXY_IMAGE
-              value: tailscale/tailscale:v1.104.2@sha256:b11583ad2e93e4671128538c88cf11f460444a5d7e449311dd1933a400ab849d
+              value: tailscale/tailscale:v1.104.4@sha256:ed6480b33c6eb67c9cbd203ed42b9fb57e361986725b6856def71b7a3d9e276c
             - name: PROXY_TAGS
               value: tag:k8s
             - name: APISERVER_PROXY

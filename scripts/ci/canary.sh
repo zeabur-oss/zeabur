@@ -6,7 +6,7 @@ set -euo pipefail
 cd "$(dirname "$0")/../.."
 source scripts/lib.sh
 
-# The catalog's commands for `$1` (<capability>/<id>), then the deployments of namespace `$2`.
+# The catalog's commands for `$1` (its id), then the deployments of namespace `$2`.
 install() {
   local work
   work=$(mktemp -d)
@@ -22,8 +22,8 @@ fi
 # Zeabur and its proxy, with cert-manager, which the operator takes its certificate from.
 ./scripts/dev-cluster.sh up
 export KUBECONFIG="$PWD/target/dev-cluster/kubeconfig"
-install observability-operator/victoria-metrics-operator observability
-install logs/victoria-logs observability
+install victoria-metrics-operator observability
+install victoria-logs observability
 # The log store and its collector report operational once they are up.
 kubectl -n observability wait vlsingle/victoria-logs --for=jsonpath='{.status.updateStatus}'=operational --timeout=300s
 kubectl -n observability wait vlagent/collector --for=jsonpath='{.status.updateStatus}'=operational --timeout=300s

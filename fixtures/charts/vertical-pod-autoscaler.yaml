@@ -427,6 +427,8 @@ spec:
       securityContext:
         runAsNonRoot: true
         runAsUser: 65534
+        seccompProfile:
+          type: RuntimeDefault
       containers:
         - name: recommender
           image: registry.k8s.io/autoscaling/vpa-recommender:1.8.1@sha256:edf874b830984d1df9d60f839874eba42de3465051922b929754edc42ea0f69b
@@ -464,6 +466,11 @@ spec:
               scheme: HTTP
             periodSeconds: 10
             failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
       affinity:
         podAntiAffinity:
           preferredDuringSchedulingIgnoredDuringExecution:

@@ -6954,7 +6954,7 @@ components:
       properties:
         capability:
           type: string
-          description: The capability it provides (`ingress`).
+          description: The capability it provides (`ingress`), from `provides.capability`.
         defaults:
           type: object
           description: |-

@@ -522,6 +522,9 @@ spec:
       serviceAccountName: keda-add-ons-http-interceptor
       securityContext:
         fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
         supplementalGroups:
         - 1000
       containers:
@@ -624,6 +627,9 @@ spec:
       serviceAccountName: keda-add-ons-http
       securityContext:
         fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
         supplementalGroups:
         - 1000
       containers:
@@ -719,6 +725,9 @@ spec:
       serviceAccountName: keda-add-ons-http-external-scaler
       securityContext:
         fsGroup: 1000
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
         supplementalGroups:
         - 1000
       containers:

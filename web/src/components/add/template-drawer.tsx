@@ -348,7 +348,7 @@ function About({ template }: { template: AppTemplate }) {
 function Missing({ template }: { template: AppTemplate }) {
   const t = useT()
   const absent = missing(template).map((r) => ({
-    id: r.component ? `${r.capability}/${r.component}` : r.capability,
+    id: r.component ?? r.capability,
     name: r.name,
   }))
   return (

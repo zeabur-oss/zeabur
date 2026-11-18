@@ -113,7 +113,6 @@ function GapRow({
 }) {
   const t = useT()
   const write = useSentence()
-  const install = gap.fix.kind === "install" ? gap.fix.id.split("/") : undefined
   return (
     <li className="flex flex-col gap-1.5 border-t border-rule py-3 first:border-t-0">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
@@ -132,7 +131,7 @@ function GapRow({
             {t(form.label)}
           </Link>
         ) : null}
-        {install && install.length === 2 ? (
+        {gap.fix.kind === "install" ? (
           <Link
             to="/cluster/components"
             search={{ component: gap.fix.id }}

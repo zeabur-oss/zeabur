@@ -35,9 +35,9 @@ pub(crate) fn install(dev: &DevCluster, builder_src: Option<&Path>) -> Result<()
     dev.apply(issuer.to_string())?;
     let stop_at = catalog::stop_at_from_env();
     for (component, namespace) in [
-        ("databases/cloudnative-pg", "cnpg-system"),
-        ("databases/percona-mongodb", "psmdb-operator"),
-        ("image-updates/keel", "keel"),
+        ("cloudnative-pg", "cnpg-system"),
+        ("percona-mongodb", "psmdb-operator"),
+        ("keel", "keel"),
     ] {
         catalog::install(dev, component, namespace, &[], stop_at.as_deref())?;
     }
@@ -78,7 +78,7 @@ fn test_s3(dev: &DevCluster) -> Result<(), String> {
 fn zot(dev: &DevCluster) -> Result<(), String> {
     catalog::install(
         dev,
-        "builds/zeabur-builder",
+        "zeabur-builder",
         "zot",
         &[&format!("clusterIp={ZOT_IP}")],
         Some("builder"),

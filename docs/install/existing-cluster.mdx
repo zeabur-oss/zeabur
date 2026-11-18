@@ -160,7 +160,7 @@ Set `planKey.existingSecret` to `zeabur-plan-key`. To view all chart settings, r
 Zeabur's components page only shows status; it doesn't install components. Use [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) to print a component's manifests, then apply them with `kubectl` or commit them to a GitOps repository:
 
 ```sh
-zeaburctl components export certificates/cert-manager --format flux > cert-manager.yaml
+zeaburctl components export cert-manager --format flux > cert-manager.yaml
 ```
 
 For K3s or RKE2 clusters, use the default `helmchart` format so the built-in helm-controller handles installation. For other clusters, use `helm`, `flux`, or `argocd`.

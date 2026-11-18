@@ -45,7 +45,7 @@ const userNote = (t: Translate, user: BackupUser) =>
       ? t("backups.volume.imageUser")
       : t("backups.volume.user", user.user)
 
-const K8UP_COMPONENT = "volume-backup/k8up"
+const K8UP_COMPONENT = "k8up"
 const RUNS_SHOWN = 5
 const BACKUP_COMMAND = "https://docs.k8up.io/k8up/2.16/how-tos/application-aware-backups.html"
 

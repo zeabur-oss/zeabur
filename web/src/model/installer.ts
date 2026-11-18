@@ -3,21 +3,20 @@ import type { Schemas } from "@/api/client"
 
 /** A component to install: its argument to `zeaburctl components export` and its name. */
 export interface Needed {
-  /** `capability/id`, or the capability alone when the catalogue has no component for it. */
+  /** The component's id, or the capability when the catalogue has no component for it. */
   id: string
   name: string
 }
 
-/** `id` with the catalogue's name for it, else the last part of the id. A bare capability becomes
- * the component the catalogue offers for it: a recommended one, else the first. */
+/** `id` with the catalogue's name for it. As in the catalogue, `id` names a component first, then a
+ * capability, which becomes the component the catalogue offers for it: a recommended one, else
+ * the first. */
 export function needed(id: string, capabilities: Schemas.Capability[] | undefined): Needed {
-  const [capability = id, component] = id.split("/")
-  const components = capabilities?.find((c) => c.name === capability)?.components ?? []
-  const found = component
-    ? components.find((c) => c.id === component)
-    : (components.find((c) => Object.values(c.defaults).includes("recommended")) ?? components[0])
-  return {
-    id: found ? `${capability}/${found.id}` : id,
-    name: found?.displayName ?? component ?? id,
-  }
+  const all = capabilities?.flatMap((c) => c.components) ?? []
+  const offered = capabilities?.find((c) => c.name === id)?.components ?? []
+  const found =
+    all.find((c) => c.id === id) ??
+    offered.find((c) => Object.values(c.defaults).includes("recommended")) ??
+    offered[0]
+  return { id: found?.id ?? id, name: found?.displayName ?? id }
 }

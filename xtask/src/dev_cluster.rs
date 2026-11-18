@@ -266,7 +266,7 @@ pub(crate) fn up(options: &Up) -> Result<(), String> {
     // address, and the full profile's certificates.
     catalog::install(
         &dev,
-        "certificates/cert-manager",
+        "cert-manager",
         "cert-manager",
         &[],
         catalog::stop_at_from_env().as_deref(),

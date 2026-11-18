@@ -19,20 +19,20 @@ const capabilities = [
 describe("what to install", () => {
   test("a capability becomes the component the catalogue recommends for it", () => {
     expect(needed("databases", capabilities)).toEqual({
-      id: "databases/cloudnative-pg",
+      id: "cloudnative-pg",
       name: "CloudNativePG",
     })
   })
 
   test("without a recommended one, the first", () => {
     expect(needed("image-updates", capabilities)).toEqual({
-      id: "image-updates/keel",
+      id: "keel",
       name: "Keel",
     })
   })
 
   test("a component keeps its id", () => {
-    expect(needed("databases/moco", capabilities)).toEqual({ id: "databases/moco", name: "MOCO" })
+    expect(needed("moco", capabilities)).toEqual({ id: "moco", name: "MOCO" })
   })
 
   test("an unknown capability stays as it is", () => {

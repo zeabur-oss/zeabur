@@ -105,19 +105,20 @@ pub struct InstallInput {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct InstallGuide {
-    /// `<capability>/<id>`.
+    /// Its id (`traefik`).
     pub component: String,
     /// The profile the texts are for.
     pub profile: String,
     /// Every profile the catalogue sizes it for.
     pub profiles: Vec<String>,
-    /// What it needs installed first: `<capability>` (any provider) or `<capability>/<id>`.
+    /// What it needs installed first: a component id, or a capability that any of its
+    /// components provides.
     pub requires: Vec<String>,
     /// Its RBAC and network access.
     pub security: Security,
     /// Values asked for or generated.
     pub inputs: Vec<InstallInput>,
-    /// Other components whose releases it adds values to (`<capability>/<id>`); those values
+    /// Other components whose releases it adds values to, by id; those values
     /// are not in these texts.
     pub contributes_to: Vec<String>,
     /// K3s packaged components of the same kind (`traefik`, `metrics-server`) that must be
@@ -355,7 +356,7 @@ impl File {
     }
 }
 
-/// How to install `component` (`<capability>/<id>`) for `profile`.
+/// How to install the component `id` for `profile`.
 ///
 /// # Errors
 ///
@@ -364,13 +365,10 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
     if !PROFILES.contains(&profile) {
         return Err(InstallError::UnknownProfile(profile.to_owned()));
     }
-    let (capability, id) = component
-        .split_once('/')
-        .ok_or_else(|| InstallError::UnknownComponent(component.to_owned()))?;
     let text = bundle::FILES
         .iter()
-        .find(|(c, i, _)| *c == capability && *i == id)
-        .map(|(_, _, text)| *text)
+        .find(|(id, _)| *id == component)
+        .map(|(_, text)| *text)
         .ok_or_else(|| InstallError::UnknownComponent(component.to_owned()))?;
     let catalogue = |message: String| InstallError::Catalogue(component.to_owned(), message);
     let file: File = serde_saphyr::from_str(text).map_err(|e| catalogue(e.to_string()))?;
@@ -1220,10 +1218,9 @@ mod tests {
 
     #[test]
     fn every_component_renders_in_every_form_and_profile_as_valid_yaml() {
-        for (capability, id, _) in bundle::FILES {
+        for (component, _) in bundle::FILES {
             for profile in PROFILES {
-                let component = format!("{capability}/{id}");
-                let guide = guide(&component, profile)
+                let guide = guide(component, profile)
                     .unwrap_or_else(|e| panic!("{component} {profile}: {e}"));
                 for text in &guide.formats {
                     assert!(
@@ -1249,9 +1246,9 @@ mod tests {
 
     #[test]
     fn a_privileged_component_gets_a_privileged_namespace() {
-        let (_, _, text) = bundle::FILES
+        let (_, text) = bundle::FILES
             .iter()
-            .find(|(capability, id, _)| *capability == "databases" && *id == "cloudnative-pg")
+            .find(|(id, _)| *id == "cloudnative-pg")
             .unwrap();
         let mut file: File = serde_saphyr::from_str(text).unwrap();
         file.security.pod_security = "privileged".to_owned();
@@ -1259,8 +1256,8 @@ mod tests {
         let k3s = rendered.k3s();
         let namespace = k3s.find("kind: Namespace").unwrap();
         assert!(namespace < k3s.find("kind: HelmChart").unwrap());
-        for (capability, id, _) in bundle::FILES {
-            let guide = guide(&format!("{capability}/{id}"), "multi-node").unwrap();
+        for (id, _) in bundle::FILES {
+            let guide = guide(id, "multi-node").unwrap();
             if guide.security.pod_security != "privileged" {
                 continue;
             }
@@ -1270,18 +1267,14 @@ mod tests {
                 } else {
                     "pod-security.kubernetes.io/enforce: privileged"
                 };
-                assert!(
-                    text.text.contains(level),
-                    "{capability}/{id} {:?}",
-                    text.format
-                );
+                assert!(text.text.contains(level), "{id} {:?}", text.format);
             }
         }
     }
 
     #[test]
     fn a_baseline_component_gets_a_baseline_namespace_in_every_form() {
-        let guide = guide("volume-backup/k8up", "single-node").unwrap();
+        let guide = guide("k8up", "single-node").unwrap();
         assert_eq!(guide.security.pod_security, "baseline");
         for text in &guide.formats {
             let label = if text.format == InstallFormat::Helm {
@@ -1298,7 +1291,7 @@ mod tests {
         // Argo CD leaves no Helm release Secret, and a release named otherwise than its chart
         // (`cnpg`) hides the Secret k3s or Flux leaves: the chart label is what every form leaves.
         let components = crate::catalogue().unwrap();
-        for (capability, id, text) in bundle::FILES {
+        for (id, text) in bundle::FILES {
             let file: File = serde_saphyr::from_str(text).unwrap();
             if !file.releases.iter().all(Release::is_chart) {
                 continue;
@@ -1325,19 +1318,18 @@ mod tests {
                 found
                     .iter()
                     .any(|c| c.installations.iter().any(|i| i.component == *id)),
-                "{capability}/{id}"
+                "{id}"
             );
         }
     }
 
     #[test]
     fn components_k3s_also_packages_say_to_disable_its_copy_first() {
-        for (capability, id, _) in bundle::FILES {
-            let component = format!("{capability}/{id}");
-            let guide = guide(&component, "single-node").unwrap();
-            let expected: &[&str] = match component.as_str() {
-                "ingress/traefik" => &["traefik"],
-                "metrics/metrics-server" => &["metrics-server"],
+        for (component, _) in bundle::FILES {
+            let guide = guide(component, "single-node").unwrap();
+            let expected: &[&str] = match *component {
+                "traefik" => &["traefik"],
+                "metrics-server" => &["metrics-server"],
                 _ => &[],
             };
             assert_eq!(guide.replaces_k3s_packaged, expected, "{component}");
@@ -1356,14 +1348,13 @@ mod tests {
     /// Representative cases: an OCI chart with a profile (cert-manager), an HTTP repository with
     /// asked inputs (velero), generated inputs stored in Secrets (crowdsec), a manifest
     /// release before a chart (traefik), and the k3s packaged notes (traefik, metrics-server).
-    const GOLDEN: [(&str, &str); 7] = [
-        ("certificates/cert-manager", "single-node"),
-        ("certificates/cert-manager", "multi-node"),
-        ("volume-backup/velero", "single-node"),
-        ("intrusion-prevention/crowdsec", "single-node"),
-        ("ingress/traefik", "multi-node"),
-        ("metrics/metrics-server", "single-node"),
-        ("volume-backup/velero", "single-node"),
+    const GOLDEN: [(&str, &str); 6] = [
+        ("cert-manager", "single-node"),
+        ("cert-manager", "multi-node"),
+        ("velero", "single-node"),
+        ("crowdsec", "single-node"),
+        ("traefik", "multi-node"),
+        ("metrics-server", "single-node"),
     ];
 
     #[test]
@@ -1379,10 +1370,7 @@ mod tests {
                     InstallFormat::Flux => "flux.yaml",
                     InstallFormat::ArgoCd => "argocd.yaml",
                 };
-                let path = dir.join(format!(
-                    "{}-{profile}-{format}",
-                    component.replace('/', "-")
-                ));
+                let path = dir.join(format!("{component}-{profile}-{format}"));
                 if update {
                     std::fs::create_dir_all(&dir).unwrap();
                     std::fs::write(&path, &text.text).unwrap();

@@ -36,11 +36,11 @@ description: 查看集群安装了哪些组件、状态如何、还缺什么，�
 用 `zeaburctl components export` 输出组件的 manifest，或输出安装它的 Helm 命令：
 
 ```sh
-zeaburctl components export volume-backup/velero > velero.yaml
-zeaburctl components export volume-backup/velero --format helm
+zeaburctl components export velero > velero.yaml
+zeaburctl components export velero --format helm
 ```
 
-一次要装多个时，把 ID 都写上，例如 `zeaburctl components export builds/zeabur-builder image-updates/keel`，内容会依次接在一起。
+一次要装多个时，把 ID 都写上，例如 `zeaburctl components export zeabur-builder keel`，内容会依次接在一起。
 
 默认输出 K3s/RKE2 的 `HelmChart`，由集群内置的 helm-controller 安装。其他集群用 `--format` 改成 `helm`、`flux` 或 `argocd`。组件要填的值会留成 `<名称>`，先换成实际的值，再用 `kubectl apply -f` 应用，或提交到 GitOps 仓库。命令说明见 [zeaburctl](../reference/zeaburctl.mdx#components-export)。
 

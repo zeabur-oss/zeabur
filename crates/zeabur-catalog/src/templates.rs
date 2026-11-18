@@ -255,7 +255,7 @@ impl RenderError {
 pub enum Reference {
     /// Any component of the capability (`databases`).
     Capability(String),
-    /// The component `<capability>/<component>` (`databases/cloudnative-pg`).
+    /// The component with this id (`cloudnative-pg`).
     Component(String),
 }
 

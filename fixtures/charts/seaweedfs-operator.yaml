@@ -6,10 +6,10 @@ metadata:
   name: seaweedfs-operator
   namespace: seaweedfs-operator
   labels:
-    helm.sh/chart: seaweedfs-operator-0.1.43
+    helm.sh/chart: seaweedfs-operator-0.1.46
     app.kubernetes.io/name: seaweedfs-operator
     app.kubernetes.io/instance: seaweedfs-operator
-    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/version: "1.0.43"
     app.kubernetes.io/managed-by: Helm
 automountServiceAccountToken: true
 
@@ -45,11 +45,11 @@ rules:
 - apiGroups:
   - ""
   resources:
-  - namespaces
   - pods
   verbs:
   - get
   - list
+  - patch
   - watch
 - apiGroups:
   - apps
@@ -121,12 +121,14 @@ rules:
   resources:
   - adminscripts
   - bucketlifecyclepolicies
+  - bucketnotifications
   - buckets
   - s3credentials
   - s3identities
   - s3oidcproviders
   - s3policies
   - s3policybindings
+  - s3roles
   - seaweedbackups
   - seaweedrestores
   - seaweeds
@@ -143,12 +145,14 @@ rules:
   resources:
   - adminscripts/finalizers
   - bucketlifecyclepolicies/finalizers
+  - bucketnotifications/finalizers
   - buckets/finalizers
   - s3credentials/finalizers
   - s3identities/finalizers
   - s3oidcproviders/finalizers
   - s3policies/finalizers
   - s3policybindings/finalizers
+  - s3roles/finalizers
   - seaweedbackups/finalizers
   - seaweedrestores/finalizers
   - seaweeds/finalizers
@@ -159,12 +163,14 @@ rules:
   resources:
   - adminscripts/status
   - bucketlifecyclepolicies/status
+  - bucketnotifications/status
   - buckets/status
   - s3credentials/status
   - s3identities/status
   - s3oidcproviders/status
   - s3policies/status
   - s3policybindings/status
+  - s3roles/status
   - seaweedbackups/status
   - seaweedrestores/status
   - seaweeds/status
@@ -189,6 +195,14 @@ rules:
   - list
   - patch
   - update
+  - watch
+- apiGroups:
+  - ""
+  resources:
+  - namespaces
+  verbs:
+  - get
+  - list
   - watch
 - apiGroups:
   - storage.k8s.io
@@ -373,10 +387,10 @@ metadata:
   name: seaweedfs-operator
   namespace: seaweedfs-operator
   labels:
-    helm.sh/chart: seaweedfs-operator-0.1.43
+    helm.sh/chart: seaweedfs-operator-0.1.46
     app.kubernetes.io/name: seaweedfs-operator
     app.kubernetes.io/instance: seaweedfs-operator
-    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/version: "1.0.43"
     app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
@@ -408,21 +422,37 @@ spec:
             - ALL
           readOnlyRootFilesystem: true
           runAsNonRoot: true
-        image: "chrislusf/seaweedfs-operator:1.0.40@sha256:41c72bcfa39f4f8f7ae0d384d70c87ad81118834a189876ca0f22824eddee752"
+        image: "chrislusf/seaweedfs-operator:1.0.43@sha256:d17e9a623d9e19812e1533c9ab63bb1535bd21a50367c6e9e6830f14a52610d9"
         imagePullPolicy: IfNotPresent
         command:
         - /manager
         args:
         - --leader-elect
         - --metrics-bind-address=:8080
+        - --health-probe-bind-address=:8081
         env:
         ports:
         - name: http
           containerPort: 8080
           protocol: TCP
         - name: https
-          containerPort: 443
+          containerPort: 9443
           protocol: TCP
+        - name: health
+          containerPort: 8081
+          protocol: TCP
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: health
+          initialDelaySeconds: 15
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /readyz
+            port: health
+          initialDelaySeconds: 5
+          periodSeconds: 10
         resources:
             limits:
               cpu: 500m
@@ -454,10 +484,10 @@ metadata:
   creationTimestamp: null
   name: seaweedfs-operator-mutating-webhook-configuration
   labels:
-    helm.sh/chart: seaweedfs-operator-0.1.43
+    helm.sh/chart: seaweedfs-operator-0.1.46
     app.kubernetes.io/name: seaweedfs-operator
     app.kubernetes.io/instance: seaweedfs-operator
-    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/version: "1.0.43"
     app.kubernetes.io/managed-by: Helm
   annotations:
     cert-manager.io/inject-ca-from: seaweedfs-operator/seaweedfs-operator-webhook-cert
@@ -492,10 +522,10 @@ metadata:
   creationTimestamp: null
   name: seaweedfs-operator-validating-webhook-configuration
   labels:
-    helm.sh/chart: seaweedfs-operator-0.1.43
+    helm.sh/chart: seaweedfs-operator-0.1.46
     app.kubernetes.io/name: seaweedfs-operator
     app.kubernetes.io/instance: seaweedfs-operator
-    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/version: "1.0.43"
     app.kubernetes.io/managed-by: Helm
   annotations:
     cert-manager.io/inject-ca-from: seaweedfs-operator/seaweedfs-operator-webhook-cert
@@ -533,10 +563,10 @@ metadata:
   name: seaweedfs-operator-webhook-cert
   namespace: seaweedfs-operator
   labels:
-    helm.sh/chart: seaweedfs-operator-0.1.43
+    helm.sh/chart: seaweedfs-operator-0.1.46
     app.kubernetes.io/name: seaweedfs-operator
     app.kubernetes.io/instance: seaweedfs-operator
-    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/version: "1.0.43"
     app.kubernetes.io/managed-by: Helm
 spec:
   dnsNames:
@@ -558,10 +588,10 @@ metadata:
   name: seaweedfs-operator-webhook-selfsigned-issuer
   namespace: seaweedfs-operator
   labels:
-    helm.sh/chart: seaweedfs-operator-0.1.43
+    helm.sh/chart: seaweedfs-operator-0.1.46
     app.kubernetes.io/name: seaweedfs-operator
     app.kubernetes.io/instance: seaweedfs-operator
-    app.kubernetes.io/version: "1.0.40"
+    app.kubernetes.io/version: "1.0.43"
     app.kubernetes.io/managed-by: Helm
 spec:
   selfSigned: {}

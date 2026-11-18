@@ -37,11 +37,11 @@ export const engines: Engine[] = ["postgresql", "mongodb", "mysql", "mariadb", "
 
 /** The catalogue component whose operator runs each engine. */
 export const engineOperator: Record<Engine, string> = {
-  postgresql: "databases/cloudnative-pg",
-  mongodb: "databases/percona-mongodb",
-  mysql: "databases/moco",
-  mariadb: "databases/mariadb-operator",
-  dragonfly: "databases/dragonfly-operator",
+  postgresql: "cloudnative-pg",
+  mongodb: "percona-mongodb",
+  mysql: "moco",
+  mariadb: "mariadb-operator",
+  dragonfly: "dragonfly-operator",
 }
 
 const ENGINE_NAMES: Record<Engine, string> = {

@@ -9,7 +9,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
 automountServiceAccountToken: true
 
@@ -23,7 +23,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
 rules:
 - nonResourceURLs: 
@@ -240,7 +240,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
 rules: 
@@ -338,7 +338,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
     rbac.authorization.k8s.io/aggregate-to-view: "true"
 rules: 
@@ -438,7 +438,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
 subjects:
 - kind: ServiceAccount
@@ -459,7 +459,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
   namespace: observability
 rules:
@@ -483,7 +483,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
 subjects:
 - kind: ServiceAccount
@@ -503,7 +503,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
   name: victoria-metrics-operator
 spec:
@@ -531,7 +531,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
 spec:
   replicas: 1
@@ -559,9 +559,11 @@ spec:
       serviceAccountName: victoria-metrics-operator
       containers:
         - name: operator
-          image: victoriametrics/operator:v0.75.0@sha256:78da26b41a819093707be2ab6a65a5dc19f43d58ec52f30b49a545c2c6b7bd55
+          image: victoriametrics/operator:v0.75.2@sha256:237fac68b608c7ed7bc4c47ad25ebcb1cbe973c9a789661d2b6cfaa83093f87a
           imagePullPolicy: IfNotPresent
           env:
+            - name: VM_CONFIG_RELOADER_REQUEST_MEMORY
+              value: "16Mi"
             - name: POD_NAME
               valueFrom:
                 fieldRef:
@@ -610,13 +612,17 @@ spec:
               memory: 256Mi
             requests:
               cpu: 10m
-              memory: 48Mi
+              memory: 72Mi
           securityContext: 
             allowPrivilegeEscalation: false
             capabilities:
               drop:
               - ALL
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
       terminationGracePeriodSeconds: 30
       volumes:
         - name: cert
@@ -637,7 +643,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
 webhooks:
   - clientConfig:
@@ -1382,7 +1388,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
   annotations: 
     "helm.sh/hook": pre-delete
@@ -1400,7 +1406,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
   annotations: 
     "helm.sh/hook": pre-delete
@@ -1502,7 +1508,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
   annotations: 
     "helm.sh/hook": pre-delete
@@ -1528,7 +1534,7 @@ metadata:
     app.kubernetes.io/instance: victoria-metrics-operator
     app.kubernetes.io/managed-by: Helm
     app.kubernetes.io/name: victoria-metrics-operator
-    app.kubernetes.io/version: v0.75.0
+    app.kubernetes.io/version: v0.75.2
     helm.sh/chart: victoria-metrics-operator-0.68.1
   annotations: 
     "helm.sh/hook": pre-delete
@@ -1542,7 +1548,7 @@ spec:
         app.kubernetes.io/instance: victoria-metrics-operator
         app.kubernetes.io/managed-by: Helm
         app.kubernetes.io/name: victoria-metrics-operator
-        app.kubernetes.io/version: v0.75.0
+        app.kubernetes.io/version: v0.75.2
         helm.sh/chart: victoria-metrics-operator-0.68.1
     spec:
       serviceAccountName: victoria-metrics-operator-cleanup-hook
@@ -1563,6 +1569,10 @@ spec:
               drop:
               - ALL
             readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 65534
+            seccompProfile:
+              type: RuntimeDefault
           command:
             - kubectl
           args:

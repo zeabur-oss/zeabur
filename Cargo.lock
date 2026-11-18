@@ -2873,6 +2873,7 @@ dependencies = [
  "thiserror",
  "utoipa",
  "zeabur-kube",
+ "zeabur-model",
 ]
 
 [[package]]

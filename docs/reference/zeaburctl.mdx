@@ -24,7 +24,7 @@ zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
 zeaburctl connect shop/orders
 zeaburctl connect shop/api:8080
-zeaburctl components export certificates/cert-manager
+zeaburctl components export cert-manager
 ```
 
 `ui`, `doctor`, `up`, and `connect` each accept `--context`. If omitted, they use the current context in kubeconfig. The commands don't modify kubeconfig.
@@ -183,7 +183,7 @@ You need `create pods/portforward` in the project, and for a database also `list
 ## `components export`
 
 ```sh
-zeaburctl components export <capability>/<id>... [--format helmchart|helm|flux|argocd] [--profile single-node|multi-node]
+zeaburctl components export <id>... [--format helmchart|helm|flux|argocd] [--profile single-node|multi-node]
 ```
 
 Prints installation manifests or commands for Catalog components for clusters. You can name several components; their output comes one after another. The output comes from zeaburctl's built-in Catalog, with pinned versions and configuration values. The command doesn't connect to the cluster, so it doesn't need `--context`.
@@ -196,7 +196,7 @@ Prints installation manifests or commands for Catalog components for clusters. Y
 Values you need to supply appear as `<name>` placeholders. Replace them with actual values first. If a component needs host access, the output first sets its namespace to `privileged`. If K3s or RKE2 includes the same component, the start of the output explains how to disable the built-in version first.
 
 ```sh
-zeaburctl components export volume-backup/velero > velero.yaml
+zeaburctl components export velero > velero.yaml
 kubectl apply -f velero.yaml
 ```
 

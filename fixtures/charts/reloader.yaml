@@ -11,11 +11,11 @@ metadata:
     release: "reloader"
     app.kubernetes.io/name: reloader
     app.kubernetes.io/instance: "reloader"
-    helm.sh/chart: "reloader-2.2.18"
-    chart: "reloader-2.2.18"
+    helm.sh/chart: "reloader-2.2.19"
+    chart: "reloader-2.2.19"
     heritage: "Helm"
     app.kubernetes.io/managed-by: "Helm"
-    app.kubernetes.io/version: "v1.4.22"
+    app.kubernetes.io/version: "v1.4.23"
   name: reloader-reloader
   namespace: reloader
 
@@ -33,11 +33,11 @@ metadata:
     release: "reloader"
     app.kubernetes.io/name: reloader
     app.kubernetes.io/instance: "reloader"
-    helm.sh/chart: "reloader-2.2.18"
-    chart: "reloader-2.2.18"
+    helm.sh/chart: "reloader-2.2.19"
+    chart: "reloader-2.2.19"
     heritage: "Helm"
     app.kubernetes.io/managed-by: "Helm"
-    app.kubernetes.io/version: "v1.4.22"
+    app.kubernetes.io/version: "v1.4.23"
   name: reloader-reloader-role
 rules:
   - apiGroups:
@@ -82,11 +82,11 @@ metadata:
     release: "reloader"
     app.kubernetes.io/name: reloader
     app.kubernetes.io/instance: "reloader"
-    helm.sh/chart: "reloader-2.2.18"
-    chart: "reloader-2.2.18"
+    helm.sh/chart: "reloader-2.2.19"
+    chart: "reloader-2.2.19"
     heritage: "Helm"
     app.kubernetes.io/managed-by: "Helm"
-    app.kubernetes.io/version: "v1.4.22"
+    app.kubernetes.io/version: "v1.4.23"
   name: reloader-reloader-role-binding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -110,11 +110,11 @@ metadata:
     release: "reloader"
     app.kubernetes.io/name: reloader
     app.kubernetes.io/instance: "reloader"
-    helm.sh/chart: "reloader-2.2.18"
-    chart: "reloader-2.2.18"
+    helm.sh/chart: "reloader-2.2.19"
+    chart: "reloader-2.2.19"
     heritage: "Helm"
     app.kubernetes.io/managed-by: "Helm"
-    app.kubernetes.io/version: "v1.4.22"
+    app.kubernetes.io/version: "v1.4.23"
   name: reloader-reloader-metadata-role
   namespace: reloader
 rules:
@@ -142,11 +142,11 @@ metadata:
     release: "reloader"
     app.kubernetes.io/name: reloader
     app.kubernetes.io/instance: "reloader"
-    helm.sh/chart: "reloader-2.2.18"
-    chart: "reloader-2.2.18"
+    helm.sh/chart: "reloader-2.2.19"
+    chart: "reloader-2.2.19"
     heritage: "Helm"
     app.kubernetes.io/managed-by: "Helm"
-    app.kubernetes.io/version: "v1.4.22"
+    app.kubernetes.io/version: "v1.4.23"
   name: reloader-reloader-metadata-role-binding
   namespace: reloader
 roleRef:
@@ -170,14 +170,14 @@ metadata:
     release: "reloader"
     app.kubernetes.io/name: reloader
     app.kubernetes.io/instance: "reloader"
-    helm.sh/chart: "reloader-2.2.18"
-    chart: "reloader-2.2.18"
+    helm.sh/chart: "reloader-2.2.19"
+    chart: "reloader-2.2.19"
     heritage: "Helm"
     app.kubernetes.io/managed-by: "Helm"
-    app.kubernetes.io/version: "v1.4.22"
+    app.kubernetes.io/version: "v1.4.23"
     group: com.stakater.platform
     provider: stakater
-    version: v1.4.22
+    version: v1.4.23
   name: reloader-reloader
   namespace: reloader
 spec:
@@ -194,14 +194,14 @@ spec:
         release: "reloader"
         app.kubernetes.io/name: reloader
         app.kubernetes.io/instance: "reloader"
-        helm.sh/chart: "reloader-2.2.18"
-        chart: "reloader-2.2.18"
+        helm.sh/chart: "reloader-2.2.19"
+        chart: "reloader-2.2.19"
         heritage: "Helm"
         app.kubernetes.io/managed-by: "Helm"
-        app.kubernetes.io/version: "v1.4.22"
+        app.kubernetes.io/version: "v1.4.23"
         group: com.stakater.platform
         provider: stakater
-        version: v1.4.22
+        version: v1.4.23
     spec:
       containers:
       - image: "ghcr.io/stakater/reloader:v1.4.22@sha256:def2480040adc164b3a57340e77674eadfd88fb7f0593df25e93297f29c7fd7c"
@@ -249,7 +249,10 @@ spec:
           initialDelaySeconds: 10
 
         securityContext:
-          {}
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
         args:
           - "--log-level=info"
           - "--ignored-workload-types=jobs,cronjobs"

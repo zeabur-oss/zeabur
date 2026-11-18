@@ -27,8 +27,7 @@ enum ComponentsCommand {
 
 #[derive(Debug, clap::Args)]
 struct ExportArgs {
-    /// The components, `<capability>/<id>`, such as `certificates/cert-manager`, printed one after
-    /// another.
+    /// The components, by id, such as `cert-manager`, printed one after another.
     #[arg(required = true)]
     components: Vec<String>,
     /// `helmchart`: K3s/RKE2 `HelmChart` objects, which helm-controller installs. `helm`: shell
@@ -120,24 +119,20 @@ mod tests {
 
     #[test]
     fn export_prints_helm_charts_by_default_and_helm_commands_on_request() {
-        let charts = text(&export(&["certificates/cert-manager"])).unwrap();
+        let charts = text(&export(&["cert-manager"])).unwrap();
         assert!(charts.contains("kind: HelmChart"), "{charts}");
-        let commands = text(&export(&["certificates/cert-manager", "--format", "helm"])).unwrap();
+        let commands = text(&export(&["cert-manager", "--format", "helm"])).unwrap();
         assert!(commands.contains("helm upgrade --install"), "{commands}");
     }
 
     #[test]
     fn export_prints_each_component_named() {
-        let both = text(&export(&[
-            "certificates/cert-manager",
-            "image-updates/keel",
-        ]))
-        .unwrap();
+        let both = text(&export(&["cert-manager", "keel"])).unwrap();
         let one = |c: &str| text(&export(&[c])).unwrap();
-        assert!(both.contains(&one("certificates/cert-manager")), "{both}");
-        assert!(both.contains(&one("image-updates/keel")), "{both}");
+        assert!(both.contains(&one("cert-manager")), "{both}");
+        assert!(both.contains(&one("keel")), "{both}");
         assert!(
-            text(&export(&["certificates/cert-manager", "certificates/nope"])).is_err(),
+            text(&export(&["cert-manager", "nope"])).is_err(),
             "an unknown one fails the whole export"
         );
     }
@@ -145,18 +140,12 @@ mod tests {
     #[test]
     fn export_refuses_an_unknown_component_or_profile() {
         assert!(matches!(
-            text(&export(&["certificates/nope"])),
+            text(&export(&["nope"])),
             Err(InstallError::UnknownComponent(_))
         ));
         assert!(
-            Cli::try_parse_from([
-                "components",
-                "export",
-                "certificates/cert-manager",
-                "--profile",
-                "huge"
-            ])
-            .is_err()
+            Cli::try_parse_from(["components", "export", "cert-manager", "--profile", "huge"])
+                .is_err()
         );
     }
 }

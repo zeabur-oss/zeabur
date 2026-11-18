@@ -98,7 +98,7 @@
               # discovery and token endpoints); pinned with nixpkgs.
               ZEABUR_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
               # Zeabur Catalog at the commit in flake.lock: its source (scripts/render-chart-corpus.sh)
-              # and its release files, bundle.tar.gz, index.json and checksums.txt (zeabur-catalog).
+              # and its release file, bundle.tar.gz (zeabur-catalog).
               ZEABUR_CATALOG = "${inputs.catalog}";
               ZEABUR_CATALOG_COMMIT = inputs.catalog.rev or "dirty";
               ZEABUR_CATALOG_RELEASE = "${inputs.catalog.packages.${system}.release}";
