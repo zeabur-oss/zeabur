@@ -13,6 +13,9 @@
 #[cfg(test)]
 mod common;
 #[cfg(test)]
+#[path = "kubernetes/components.rs"]
+mod components;
+#[cfg(test)]
 #[path = "kubernetes/creations.rs"]
 mod creations;
 #[cfg(test)]
