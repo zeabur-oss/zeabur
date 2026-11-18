@@ -2,20 +2,18 @@
 // commands answered by desktop/web/scripts/shots-demo.ts. A window's size is the app's, so the
 // pages are not fitted.
 import { execFileSync } from "node:child_process"
-import { join } from "node:path"
+import { fileURLToPath } from "node:url"
 import type { Page } from "@playwright/test"
 import { expect, test } from "./fixtures.ts"
 
 type Scenario = { sources: boolean; failure?: string }
 
-// desktop/web/scripts/shots-demo.ts as one script for the page. It is bundled from desktop/web,
-// which has the Tauri packages; `web` has none.
-const web = join(import.meta.dirname, "../../../desktop/web")
-const script = execFileSync(
-  "bun",
-  ["build", "--target=browser", "--format=iife", "scripts/shots-demo.ts"],
-  { cwd: web, encoding: "utf8" },
-)
+// desktop/web/scripts/shots-demo.ts as one script for the page. Playwright runs the specs in Node,
+// so Bun bundles it in a child process.
+const demo = fileURLToPath(import.meta.resolve("zeabur-desktop-web/shots-demo"))
+const script = execFileSync("bun", ["build", "--target=browser", "--format=iife", demo], {
+  encoding: "utf8",
+})
 
 // A Mac's user agent: the first-run page names the kubeconfig path by the system.
 const mac =

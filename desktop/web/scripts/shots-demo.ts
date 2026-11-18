@@ -1,5 +1,5 @@
 // What the desktop screenshots show: the answers of the app's Tauri commands, which `install`
-// mocks in the page with `mockIPC`. web/e2e/shots/desktop.ts bundles this file for the browser.
+// mocks in the page with `mockIPC`. scripts/shots/desktop.ts bundles this file for the browser.
 import { mockIPC, mockWindows } from "@tauri-apps/api/mocks"
 
 import type { Context, Snapshot } from "../src/chooser/api.ts"

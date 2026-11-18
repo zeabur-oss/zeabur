@@ -76,7 +76,7 @@
               cargo-cyclonedx
               # Zeabur Proxy's parser fuzz target (crates/zeabur-proxy/fuzz)
               cargo-fuzz
-              # Web interface (web/: dependencies come from bun.lock)
+              # Web interfaces (the Bun workspace: dependencies come from the root bun.lock)
               brotli
               # Documentation screenshots (scripts/docs-shots.sh)
               libavif

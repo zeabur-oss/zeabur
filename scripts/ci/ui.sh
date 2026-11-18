@@ -1,8 +1,8 @@
 #!/usr/bin/env bash
-# The web interface: banned styles, lint, unused code and
-# layer boundaries, new findings in the changed files, build, unit tests, generated API types up to
-# date, the installer's interface built and linted, no use of a deprecated declaration in either,
-# size budget, and a build that embeds it. The health and duplication report after it does not fail
+# The web interface: banned styles, lint, unused code and layer boundaries, new findings in the
+# changed files, build, unit tests, generated API types up to date, the screenshot specs
+# type-checked, the installer's interface built and linted, no use of a deprecated declaration in
+# either, size budget, and a build that embeds it. The health and duplication report after it does not fail
 # the job.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
@@ -20,6 +20,7 @@ source scripts/lib.sh
   bun run gen:api
 )
 git diff --exit-code -- web/src/api/zeabur.ts
+(cd scripts/shots; bun run typecheck)
 ./scripts/build-installer-ui.sh
 (cd crates/zeabur-installer/web; bun run lint)
 (cd web; bun scripts/check-deprecated.ts . ../crates/zeabur-installer/web)

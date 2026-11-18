@@ -1,5 +1,5 @@
 // The image sets (docs/internal/screenshots.md): each is a spec here, <set>.ts, with one test for
-// each shot. `bun e2e/shots/sets.ts <set>` prints a set's settings as JSON for
+// each shot. `bun scripts/shots/sets.ts <set>` prints a set's settings as JSON for
 // scripts/docs-shots.sh.
 //   out     where the images are kept, from the repository's root; without it target/docs-shots/<set>
 //   file    the path in <out>; {docs} is the locale's docs folder, empty for en, else <locale>/

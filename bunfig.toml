@@ -5,3 +5,8 @@ minimumReleaseAge = 604800
 # Our own package, published from zeabur-oss/design-system's version tags.
 minimumReleaseAgeExcludes = ["@zeabur-oss/design-system"]
 exact = true
+# Each package sees only the packages it declares.
+linker = "isolated"
+# The store in node_modules/.bun, not in Bun's cache: a dependency that loads an optional peer by
+# name (unplugin-icons loads @svgr/core through local-pkg) finds it in node_modules/.bun/node_modules.
+globalStore = false

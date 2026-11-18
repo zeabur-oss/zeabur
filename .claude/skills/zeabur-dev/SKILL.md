@@ -24,7 +24,7 @@ of the checkout, and prints a result line per job. Cluster tests: `zeabur-cluste
 interface: `zeabur-ui`.
 
 The screenshots are kept in git and not taken in CI: after changing a page that
-`web/e2e/shots/docs.ts` covers, run `nix develop -c scripts/docs-shots.sh` on aarch64 Linux and
+`scripts/shots/docs.ts` covers, run `nix develop -c scripts/docs-shots.sh` on aarch64 Linux and
 commit `docs/images/shots` (`docs/internal/screenshots.md`). The README and cover images take the
 same script with their set, `readme` or `cover`.
 

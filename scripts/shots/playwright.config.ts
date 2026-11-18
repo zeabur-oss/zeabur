@@ -1,11 +1,10 @@
-// Documentation screenshots (e2e/shots/), run by scripts/docs-shots.sh: one project for each set,
-// locale and theme (e2e/shots/sets.ts), such as docs/en/light. The demo servers are fixtures
-// (e2e/shots/fixtures.ts).
+// Documentation screenshots, run by scripts/docs-shots.sh: one project for each set, locale and
+// theme (sets.ts), such as docs/en/light. The demo servers are fixtures (fixtures.ts).
 import { defineConfig, devices } from "@playwright/test"
-import { locales, sets, type Locale } from "./e2e/shots/sets.ts"
+import { locales, sets, type Locale } from "./sets.ts"
 
 export default defineConfig({
-  testDir: "e2e/shots",
+  testDir: ".",
   fullyParallel: true,
   forbidOnly: Boolean(process.env.CI),
   retries: 0,

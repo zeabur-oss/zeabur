@@ -196,12 +196,15 @@ allowlist entry below is added and reviewed, so those pull requests are never me
 
 ### Web interface
 
-The web interface's packages are managed with Bun: `web/package.json` pins exact versions,
-`web/bun.lock` is committed, and CI installs with `bun ci`, which fails if the two disagree.
-`web/bunfig.toml` sets `minimumReleaseAge` to seven days, the same delay as Cargo's, and exempts
-`@zeabur-oss/design-system`, our own package; `crates/zeabur-installer/web` has the same settings.
-No package is listed in `trustedDependencies`, so no install script runs. Add a package with
-`bun add` from `web/`.
+The JavaScript packages are one Bun workspace: `web`, `desktop/web`,
+`crates/zeabur-installer/web`, `scripts/shots` (the screenshots) and the release scripts at the
+root. Each `package.json` pins exact versions; a version that more than one package uses is in the
+root `package.json`'s `catalog` and the package names it as `catalog:`. The root `bun.lock` is
+committed, and CI installs with `bun ci`, which fails if a `package.json` and the lock file
+disagree. The root `bunfig.toml` sets `minimumReleaseAge` to seven days, the same delay as Cargo's,
+and exempts `@zeabur-oss/design-system`, our own package; its isolated linker lets a package import
+only what its own `package.json` lists. No package is listed in `trustedDependencies`, so no
+install script runs. Add a package with `bun add` from the package's directory.
 
 Icons are Phosphor's, from `@iconify-json/ph`, built in by unplugin-icons with svgr. Components
 come from the shadcn registry (`bunx --bun shadcn@latest add <component>`), on Base UI. After
@@ -328,7 +331,7 @@ ZEABUR_INSTALLER_UI_DIST="$PWD/crates/zeabur-installer/web/dist" cargo build --r
 
 A release build embeds the web interface and stops without `ZEABUR_INSTALLER_UI_DIST`; a debug
 build embeds a placeholder page instead. The interface is in `crates/zeabur-installer/web`, with
-its own `package.json`, `bun.lock` and the same lint and format rules as `web/`. CI installs
+its own `package.json` in the workspace and the same lint and format rules as `web/`. CI installs
 exactly the lock file (`bun ci`), checks the format in the `format` job, and builds and lints it in
 the `ui` job. To check it by hand:
 

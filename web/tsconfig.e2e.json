@@ -20,10 +20,5 @@
     "erasableSyntaxOnly": true,
     "noFallthroughCasesInSwitch": true
   },
-  "include": [
-    "playwright.config.ts",
-    "playwright.full.config.ts",
-    "playwright.shots.config.ts",
-    "e2e"
-  ]
+  "include": ["playwright.config.ts", "playwright.full.config.ts", "e2e"]
 }

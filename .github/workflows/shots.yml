@@ -1,6 +1,6 @@
 name: Screenshots
 
-# Takes the docs screenshots (web/e2e/shots/docs.ts) again for each release: when zeabur-oss-bot
+# Takes the docs screenshots (scripts/shots/docs.ts) again for each release: when zeabur-oss-bot
 # pushes release/next, the release pull request's branch, this runs next to its CI and commits the
 # images that changed onto release/next, so the release carries them. A release does not wait for
 # it (docs/internal/screenshots.md, docs/internal/releasing.md). It pushes as the organization's
