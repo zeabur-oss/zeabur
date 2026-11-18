@@ -1,13 +1,15 @@
 //! The experience program (docs/reference/telemetry.mdx): one event the first time each person
-//! uses Zeabur's web interface in a UTC day, and one the first time each feature with its values
-//! is used.
+//! uses Zeabur's web interface in a UTC day, one the first time each feature with its values
+//! is used, and the two events of each change of one Deployment.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
 
+use zeabur_api::measure::{Fact, Report};
 use zeabur_core::crypto;
 use zeabur_telemetry::{
-    Day, Event, Feature, FeatureUsed, InstallationId, Mode, Sender, Switch, ZeaburActive,
+    AppChangeSubmitted, Change, Day, Event, Feature, FeatureUsed, InstallationId, Mode,
+    RolloutFinished, Sender, Switch, ZeaburActive,
 };
 
 /// The people seen in the current UTC day, in memory only. A restart forgets them, but the
@@ -43,11 +45,14 @@ impl Daily {
     fn first(&self, person: &str, now: i64) -> Option<(Day, [u8; 16])> {
         let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
         let day = state.today(now);
-        let mut input = day.since_epoch().to_be_bytes().to_vec();
-        input.extend_from_slice(person.as_bytes());
-        let mut hash = [0_u8; 16];
-        hash.copy_from_slice(&crypto::hmac_sha256(&state.key, &input)[..16]);
+        let hash = hash(&state.key, day, person);
         state.seen.insert(hash).then_some((day, hash))
+    }
+
+    /// `person`'s hash for the day of `now`, as [`Daily::first`] gives it.
+    fn person(&self, person: &str, now: i64) -> [u8; 16] {
+        let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        hash(&state.key, Day::from_unix(now), person)
     }
 
     /// The day of `now`, when it is the first time `feature` is used in that day.
@@ -56,6 +61,14 @@ impl Daily {
         let day = state.today(now);
         state.features.insert(feature).then_some(day)
     }
+}
+
+fn hash(key: &[u8; 32], day: Day, person: &str) -> [u8; 16] {
+    let mut input = day.since_epoch().to_be_bytes().to_vec();
+    input.extend_from_slice(person.as_bytes());
+    let mut hash = [0_u8; 16];
+    hash.copy_from_slice(&crypto::hmac_sha256(key, &input)[..16]);
+    hash
 }
 
 impl State {
@@ -145,6 +158,31 @@ impl Telemetry {
             day,
             feature,
         });
+        let (sender, id) = (Arc::clone(sender), id.clone());
+        drop(tokio::spawn(async move {
+            sender.send(&id, &event).await;
+        }));
+    }
+
+    /// Sends what happened to a change in the background. `person` is of the day the change
+    /// was submitted.
+    pub(crate) fn changed(&self, report: Report) {
+        let Some((daily, sender, id)) = &self.on else {
+            return;
+        };
+        let change = Change {
+            zeabur_version: env!("CARGO_PKG_VERSION"),
+            mode: Mode::InCluster,
+            person: crypto::hex(&daily.person(&report.user, report.submitted_at)),
+            id: report.id,
+            operation: report.operation,
+        };
+        let event = match report.fact {
+            Fact::Submitted(result) => {
+                Event::AppChangeSubmitted(AppChangeSubmitted { change, result })
+            }
+            Fact::Finished(result) => Event::RolloutFinished(RolloutFinished { change, result }),
+        };
         let (sender, id) = (Arc::clone(sender), id.clone());
         drop(tokio::spawn(async move {
             sender.send(&id, &event).await;

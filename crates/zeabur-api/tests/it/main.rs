@@ -7,6 +7,7 @@ mod api;
 mod api_tokens;
 mod backups;
 mod certificates;
+mod change_events;
 mod cluster_name;
 mod cluster_tools;
 #[cfg(test)]

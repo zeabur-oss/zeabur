@@ -184,8 +184,9 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        ClusterConnected, Connection, DatabaseKind, Day, Distribution, DomainKind, ErrorCode,
-        Failure, Feature, FeatureUsed, Install, Mode, Profile, Source, Step, ZeaburActive,
+        AppChangeSubmitted, Change, ChangeId, ClusterConnected, Connection, DatabaseKind, Day,
+        Distribution, DomainKind, ErrorCode, Failure, Feature, FeatureUsed, Install, Mode,
+        Operation, Profile, Rollout, RolloutFinished, Source, Step, Submitted, ZeaburActive,
     };
 
     /// A receiver on a free port that records each request body.
@@ -286,7 +287,25 @@ mod tests {
                 mode: Mode::Local,
                 result: Connection::NoReadRight,
             }),
+            Event::AppChangeSubmitted(AppChangeSubmitted {
+                change: change(),
+                result: Submitted::Conflict,
+            }),
+            Event::RolloutFinished(RolloutFinished {
+                change: change(),
+                result: Rollout::Available,
+            }),
         ]
+    }
+
+    fn change() -> Change {
+        Change {
+            zeabur_version: "0.1.0",
+            mode: Mode::InCluster,
+            person: "0123456789abcdef0123456789abcdef".to_owned(),
+            id: ChangeId::from_random([5; 16]),
+            operation: Operation::DeployImage,
+        }
     }
 
     fn nobody() -> Show {
@@ -422,6 +441,8 @@ mod tests {
             "step",
             "error",
             "result",
+            "change_id",
+            "operation",
             "$process_person_profile",
             "$geoip_disable",
         ];

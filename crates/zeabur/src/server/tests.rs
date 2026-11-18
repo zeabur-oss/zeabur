@@ -75,6 +75,24 @@ fn cluster(user: &str) -> MemoryCluster {
     cluster
 }
 
+/// A session store that holds nothing, for tests of [`super::SessionAccess`] alone.
+fn no_sessions() -> Arc<Sessions<Connection>> {
+    let oauth = OAuthClient::new(ClientConfig {
+        issuer: BaseUrl::parse_root("https://issuer.invalid").unwrap(),
+        public_url: BaseUrl::parse_root(PUBLIC).unwrap(),
+        client_id: CLIENT_ID.to_owned(),
+        client_secret: SecretString::from(CLIENT_SECRET.to_owned()),
+        issuer_tls: ExtraRoots::default().client_config().unwrap(),
+    })
+    .unwrap();
+    Arc::new(Sessions::new(
+        Arc::new(oauth),
+        Arc::new(|_| Err("no cluster".to_owned())),
+        Limits::default(),
+        Arc::new(|| NOW),
+    ))
+}
+
 struct Rig {
     issuer: FakeIssuer,
     app: Router,
@@ -613,6 +631,7 @@ fn a_bearer_token_is_never_handed_on() {
 
     let access = SessionAccess {
         origin: PUBLIC.to_owned(),
+        sessions: no_sessions(),
     };
     let mut parts = Request::builder().body(()).unwrap().into_parts().0;
     parts.extensions.insert(Signed::Token(Connection {
@@ -621,6 +640,7 @@ fn a_bearer_token_is_never_handed_on() {
     }));
     assert!(access.for_request(&parts).is_ok());
     assert!(access.handoff(&parts).is_none());
+    assert!(access.later(&parts).is_none());
 }
 
 #[tokio::test]
@@ -855,6 +875,7 @@ fn every_request_goes_with_the_session_token() {
     };
     let access = SessionAccess {
         origin: PUBLIC.to_owned(),
+        sessions: no_sessions(),
     };
     let mut parts = Request::builder().body(()).unwrap().into_parts().0;
     assert!(access.for_request(&parts).is_err());

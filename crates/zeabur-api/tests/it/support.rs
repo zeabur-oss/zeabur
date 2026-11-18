@@ -113,6 +113,12 @@ impl TestApi {
         self
     }
 
+    /// What happens to each change of one Deployment goes to `changes`.
+    pub(crate) fn with_changes(mut self, changes: zeabur_api::measure::Changes) -> Self {
+        self.options.changes = Some(changes);
+        self
+    }
+
     pub(crate) fn router(self) -> Router {
         let access: Arc<dyn ClusterAccess> = match self.token {
             Some(token) => Arc::new(Signed {

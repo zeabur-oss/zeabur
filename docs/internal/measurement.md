@@ -19,7 +19,8 @@ replica runs the change and is available, or the Deployment's `Progressing` cond
 `False` with the reason `ProgressDeadlineExceeded` after its `progressDeadlineSeconds`.
 
 After an accepted change, Zeabur reads the Deployment as the person until one of those two
-happens. The rollout belongs to the Deployment's `uid` and the `generation` the write left, so a
+happens, renewing their credential through the session as a background request does. The
+rollout belongs to the Deployment's `uid` and the `generation` the write left, so a
 Deployment deleted and made again with the same name is not the same change. Each read has a time
 limit, and the whole watch ends at the progress deadline plus a minute, never later than 30
 minutes after the change.

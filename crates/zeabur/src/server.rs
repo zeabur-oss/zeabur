@@ -41,7 +41,7 @@ use secrecy::ExposeSecret as _;
 use tower_http::compression::CompressionLayer;
 use tower_http::compression::predicate::{Predicate, SizeAbove};
 use zeabur_api::ApiError;
-use zeabur_api::access::{ClusterAccess, Handoff};
+use zeabur_api::access::{ClusterAccess, Handoff, Later};
 use zeabur_api::account::SignInPage;
 use zeabur_api::plan_token::PlanKey;
 use zeabur_api::services::proxy::ZeaburProxy;
@@ -126,6 +126,7 @@ pub(crate) fn app(
 ) -> Router {
     let access = Arc::new(SessionAccess {
         origin: auth.public.origin(),
+        sessions: Arc::clone(&auth.sessions),
     });
     let options = zeabur_api::Options {
         terminals: zeabur_api::tools::connect(&settings.terminal),
@@ -139,6 +140,12 @@ pub(crate) fn app(
             let used: zeabur_api::used::Used =
                 Arc::new(move |feature| telemetry.used(feature, clock()));
             used
+        }),
+        changes: auth.telemetry.is_on().then(|| {
+            let telemetry = Arc::clone(&auth.telemetry);
+            let changes: zeabur_api::measure::Changes =
+                Arc::new(move |report| telemetry.changed(report));
+            changes
         }),
         reach: zeabur_http::Reach::Public,
         ..zeabur_api::Options::default()
@@ -304,6 +311,7 @@ fn bearer(headers: &HeaderMap) -> Option<secrecy::SecretString> {
 struct SessionAccess {
     /// The public URL's origin, which a terminal's handshake must come from.
     origin: String,
+    sessions: Arc<Sessions<Connection>>,
 }
 
 fn signed_out() -> Box<Problem> {
@@ -359,6 +367,23 @@ impl ClusterAccess for SessionAccess {
 
     fn signed_out(&self, parts: &Parts) -> Option<tokio::sync::watch::Receiver<bool>> {
         Some(credentials(parts)?.signed_out.clone())
+    }
+
+    fn later(&self, parts: &Parts) -> Option<Later> {
+        credentials(parts)?;
+        let id = cookie::get(&parts.headers, cookie::SESSION)?.to_owned();
+        let sessions = Arc::clone(&self.sessions);
+        Some(Arc::new(move || {
+            let (sessions, id) = (Arc::clone(&sessions), id.clone());
+            Box::pin(async move {
+                match sessions.current(&id, Activity::Background).await {
+                    Lookup::Active(credentials) => {
+                        Some(Arc::clone(&credentials.base.value.cluster))
+                    }
+                    Lookup::SignedOut | Lookup::IssuerUnavailable => None,
+                }
+            })
+        }))
     }
 
     fn signs_in(&self) -> bool {

@@ -67,6 +67,17 @@ pub struct Recorded {
     pub refresh_expires_in: Option<i64>,
     /// Whether the token endpoint fails with `503`.
     pub down: bool,
+    /// When set, the token endpoint holds the answer to each refresh: see [`Hold`].
+    pub hold: Option<Hold>,
+}
+
+/// Holds the answer to a refresh, which the issuer has already rotated, until the test says.
+#[derive(Debug, Clone, Default)]
+pub struct Hold {
+    /// Notified when a refresh arrives.
+    pub arrived: Arc<tokio::sync::Notify>,
+    /// The answer goes out when this is notified.
+    pub release: Arc<tokio::sync::Notify>,
 }
 
 /// The issuer.
@@ -209,7 +220,21 @@ fn authenticated(headers: &HeaderMap) -> bool {
 }
 
 async fn token(State(shared): State<Shared>, headers: HeaderMap, body: String) -> Response {
-    if !authenticated(&headers) {
+    let refresh = form_urlencoded::parse(body.as_bytes())
+        .any(|(name, value)| name == "grant_type" && value == "refresh_token");
+    let hold = refresh
+        .then(|| shared.state.lock().unwrap().recorded.hold.clone())
+        .flatten();
+    let response = answer(&shared, &headers, &body);
+    if let Some(hold) = hold {
+        hold.arrived.notify_one();
+        hold.release.notified().await;
+    }
+    response
+}
+
+fn answer(shared: &Shared, headers: &HeaderMap, body: &str) -> Response {
+    if !authenticated(headers) {
         return oauth_error(StatusCode::UNAUTHORIZED, "invalid_client");
     }
     let params: HashMap<String, String> = form_urlencoded::parse(body.as_bytes())

@@ -153,11 +153,15 @@ pub(crate) async fn write(
                 .await?;
             return Ok(Written {
                 resource_version: answer.left().and_then(|o| o.metadata.resource_version),
+                generation: None,
+                uid: None,
             });
         }
     };
     Ok(Written {
         resource_version: answer.metadata.resource_version,
+        generation: answer.metadata.generation,
+        uid: answer.metadata.uid,
     })
 }
 
