@@ -557,12 +557,12 @@ fn offerable(id: &str, source: Source) -> Result<Source, String> {
 
 /// Whether this build carries a component `wanted` names.
 fn carries(wanted: &Reference) -> bool {
-    bundle::FILES
-        .iter()
-        .any(|(capability, id, _)| match wanted {
-            Reference::Capability(name) => name == capability,
-            Reference::Component(name) => name.split_once('/') == Some((capability, id)),
+    crate::catalogue().is_ok_and(|components| {
+        components.iter().any(|c| match wanted {
+            Reference::Capability(name) => c.capability == *name,
+            Reference::Component(name) => c.id == *name,
         })
+    })
 }
 
 /// The ID of the template `id` as the embedded catalogue spells it; `None` for a name it does not
@@ -1297,8 +1297,8 @@ mod tests {
         assert!(objects.iter().any(|o| o["kind"] == "Deployment"));
     }
 
-    /// Zeabur Catalog's API as `catalog api` writes it (zeabur-oss/catalog#293 at 2c8d7c7):
-    /// `catalog.json`, two template files, and the two files of Miniflux they were made from.
+    /// Zeabur Catalog's API from its v0.5.3 release (`api-v1.tar.gz`): `catalog.json`, two
+    /// template files, and the two files of Miniflux they were made from, at the same commit.
     const INDEX: &str = include_str!("../tests/catalog-api/v1/catalog.json");
     const MINIFLUX: &str = include_str!("../tests/catalog-api/v1/templates/miniflux.json");
     const OLLAMA: &str = include_str!("../tests/catalog-api/v1/templates/ollama.json");
@@ -1402,12 +1402,8 @@ mod tests {
     #[test]
     fn a_fetched_template_that_needs_components_this_build_carries_is_offered() {
         let embedded = Catalog::embedded();
-        let carried = MINIFLUX
-            .replace(r#""traefik""#, r#""ingress/traefik""#)
-            .replace(r#""cert-manager""#, r#""certificates/cert-manager""#)
-            .replace(r#""cloudnative-pg""#, r#""databases/cloudnative-pg""#);
         let index = listed(&[("miniflux", "h1:newer")]);
-        let files = BTreeMap::from([("miniflux".to_owned(), carried.into_bytes())]);
+        let files = BTreeMap::from([("miniflux".to_owned(), MINIFLUX.as_bytes().to_vec())]);
         let (catalog, dropped) = embedded.updated(&index, &files);
 
         assert_eq!(dropped, []);
@@ -1415,6 +1411,25 @@ mod tests {
         assert_eq!(
             catalog.template("miniflux").unwrap().revision,
             miniflux.source_digest
+        );
+    }
+
+    #[test]
+    fn a_fetched_template_that_needs_a_component_this_build_lacks_keeps_the_one_offered() {
+        let embedded = Catalog::embedded();
+        let unknown = MINIFLUX.replace(r#""cloudnative-pg""#, r#""not-in-this-build""#);
+        let index = listed(&[("miniflux", "h1:newer")]);
+        let files = BTreeMap::from([("miniflux".to_owned(), unknown.into_bytes())]);
+        let (catalog, dropped) = embedded.updated(&index, &files);
+
+        assert_eq!(dropped.len(), 1, "{dropped:?}");
+        assert!(
+            dropped[0].reason.contains("not-in-this-build"),
+            "{dropped:?}"
+        );
+        assert_eq!(
+            catalog.template("miniflux").unwrap().revision,
+            embedded.template("miniflux").unwrap().revision
         );
     }
 }

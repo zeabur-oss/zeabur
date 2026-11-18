@@ -1,7 +1,7 @@
 {
   "catalog": {
-    "version": "0.0.0",
-    "commit": "2c8d7c7d849f52cddd95bfa21285d9c8fb210e37"
+    "version": "0.5.3",
+    "commit": "9c489e070dbc917fb0e224929f93ba342cfa27e1"
   },
   "profiles": [
     "single-node",
@@ -148,11 +148,11 @@
     },
     {
       "id": "cliproxyapi",
-      "sourceDigest": "h1:lDRWlS+3ChbrAiECKNsPupYTWrrfeohMizaJrIMmVpU="
+      "sourceDigest": "h1:vMlq9x6B9zDsqnhDsujjujm8edQjOC34l2YosblrJq4="
     },
     {
       "id": "dify",
-      "sourceDigest": "h1:fLhQdmbBrX2nagiOD48hN3OlpJ1iV5L53Sz/iECOkPI="
+      "sourceDigest": "h1:riTAR9aVyJh7fTkuiACCxBmBTRE8R3tLxYnfoP8655w="
     },
     {
       "id": "error-pages",
@@ -224,7 +224,7 @@
     },
     {
       "id": "ollama",
-      "sourceDigest": "h1:/UdgbWYlf4hkxosOC5zurSHy4b4lzoUh3n8DJhYdv1Q="
+      "sourceDigest": "h1:Hem9jYN+NXQCeOCYGOINFRcowurogbpyYLkDVwMv1b4="
     },
     {
       "id": "open-webui",
