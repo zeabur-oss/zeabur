@@ -6,7 +6,7 @@ input the projection covers. One file per component of the
 `<component>.yaml`, each holding every release of the component in install
 order as one multi-document YAML stream.
 
-- Source: `zeabur-oss/catalog` at commit `ef85ba8004af12abfe69a38ae11886f7d2483c66`.
+- Source: `zeabur-oss/catalog` at commit `9c489e070dbc917fb0e224929f93ba342cfa27e1`.
 - Profile: `single-node`, Kubernetes version `1.37.0` (the newest in its
   `config/kubernetes.yaml`).
 - Rendered by the catalogue's own `catalog render`: `helm template --include-crds` with the
