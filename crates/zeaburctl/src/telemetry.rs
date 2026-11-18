@@ -109,14 +109,15 @@ fn set(directory: &Path, joined: bool) -> Result<(), String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => String::new(),
         Err(error) => return Err(failed(&error)),
     };
-    std::fs::create_dir_all(directory).map_err(|e| failed(&e))?;
-    std::fs::write(&path, with_telemetry(&text, joined)).map_err(|e| failed(&e))?;
-    if read_config(directory) != Ok(Some(joined)) {
+    let changed = with_telemetry(&text, joined);
+    if parse(&changed) != Ok(Some(joined)) {
         return Err(format!(
-            "{} does not say `telemetry: {joined}` after the change. Edit the file by hand.",
+            "cannot change {} in its present form. Write `telemetry: {joined}` in it by hand.",
             path.display()
         ));
     }
+    std::fs::create_dir_all(directory).map_err(|e| failed(&e))?;
+    std::fs::write(&path, changed).map_err(|e| failed(&e))?;
     if !joined {
         output::info("You left the experience program. zeaburctl ui sends nothing.");
         if LocalId::new(directory, random).peek().is_some() {
@@ -191,12 +192,17 @@ fn read_config(directory: &Path) -> Result<Option<bool>, String> {
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
         Err(error) => return Err(unusable(&error)),
     };
+    parse(&text).map_err(|error| unusable(&error))
+}
+
+/// The `telemetry` value of the text of a `config.yaml`.
+fn parse(text: &str) -> Result<Option<bool>, String> {
     if text.trim().is_empty() {
         return Ok(None);
     }
-    serde_saphyr::from_str::<Config>(&text)
+    serde_saphyr::from_str::<Config>(text)
         .map(|config| config.telemetry)
-        .map_err(|error| unusable(&error))
+        .map_err(|error| error.to_string())
 }
 
 /// Whether `config.yaml` in `directory` leaves the program in. A file that can't be read or
@@ -323,6 +329,12 @@ mod tests {
         );
         std::fs::write(directory.path().join(CONFIG), "telemetry: [").unwrap();
         assert!(set(directory.path(), false).is_err());
+        std::fs::write(directory.path().join(CONFIG), "{telemetry: true}\n").unwrap();
+        assert!(set(directory.path(), false).is_err());
+        assert_eq!(
+            std::fs::read_to_string(directory.path().join(CONFIG)).unwrap(),
+            "{telemetry: true}\n"
+        );
     }
 
     #[test]
