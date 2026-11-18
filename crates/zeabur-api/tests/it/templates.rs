@@ -314,7 +314,9 @@ mod tests {
         let ollama =
             include_str!("../../../zeabur-catalog/tests/catalog-api/v1/templates/ollama.json")
                 .replacen(r#""version": ""#, r#""version": "0.0.1-"#, 1);
-        let files = [("ollama".to_owned(), ollama.into_bytes())].into();
+        let mut ollama: Value = serde_json::from_str(&ollama).unwrap();
+        ollama["sourceDigest"] = json!("h1:newer");
+        let files = [("ollama".to_owned(), serde_json::to_vec(&ollama).unwrap())].into();
         let (catalog, dropped) = embedded.updated(&index, &files);
         assert_eq!(dropped, []);
         catalog

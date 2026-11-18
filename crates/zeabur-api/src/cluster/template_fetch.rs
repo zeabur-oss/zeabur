@@ -6,7 +6,8 @@
 //! `ETag`, then for `templates/<id>.json` of each template whose `sourceDigest` is not the
 //! revision offered now ([`Catalog::stale`]). The files are trusted as the HTTPS origin, or the
 //! mirror configured in its place, serves them. The templates of [`Catalog::updated`] are offered
-//! until the server stops; a failure keeps what is offered.
+//! until the server stops; a failure keeps what is offered. When a file is dropped, the `ETag` is
+//! not kept, so the next fetch asks for that file again.
 
 use std::collections::BTreeMap;
 use std::sync::{Arc, RwLock};
@@ -152,6 +153,7 @@ impl Fetch {
         for dropped in &dropped {
             tracing::warn!(template = %dropped.id, reason = %dropped.reason, "a fetched template is not offered");
         }
+        let etag = etag.filter(|_| dropped.is_empty());
         Ok(Some((catalog, etag)))
     }
 
@@ -197,14 +199,14 @@ mod tests {
     /// The files asked for, with the `If-None-Match` each request named.
     type Asked = Arc<std::sync::Mutex<Vec<(String, Option<String>)>>>;
 
-    /// `catalog.json` with every embedded template at its revision, and Ollama at the API's.
-    fn index() -> String {
+    /// `catalog.json` with every embedded template at its revision, and Ollama at `ollama`.
+    fn index(ollama: &str) -> String {
         let embedded = Catalog::embedded().templates().unwrap();
         let templates: Vec<serde_json::Value> = embedded
             .iter()
             .map(|t| {
                 let digest = if t.id == "ollama" {
-                    "h1:newer"
+                    ollama
                 } else {
                     &t.revision
                 };
@@ -216,14 +218,14 @@ mod tests {
 
     /// Serves an API under `/v1/` as GitHub Pages does: each file with an `ETag`, and `304` to a
     /// request that names it.
-    async fn serve() -> (String, Asked) {
+    async fn serve(index: String) -> (String, Asked) {
         use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
 
         let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
         let url = format!("http://{}/v1/", listener.local_addr().unwrap());
         let asked = Asked::default();
         let log = Arc::clone(&asked);
-        let (index, ollama) = (index(), ollama());
+        let ollama = ollama();
         tokio::spawn(async move {
             loop {
                 let (mut socket, _) = listener.accept().await.unwrap();
@@ -276,9 +278,15 @@ mod tests {
         templates.current().template("ollama").unwrap().revision
     }
 
+    /// The revision `ollama()` names.
+    fn newer() -> String {
+        let file: serde_json::Value = serde_json::from_str(&ollama()).unwrap();
+        file["sourceDigest"].as_str().unwrap().to_owned()
+    }
+
     #[tokio::test]
     async fn a_changed_template_is_fetched_and_offered_then_asked_for_again_with_its_etag() {
-        let (url, asked) = serve().await;
+        let (url, asked) = serve(index(&newer())).await;
         let templates = fetching(&url);
         let start = Instant::now();
 
@@ -310,7 +318,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_failed_fetch_keeps_the_templates_and_is_tried_again() {
-        let (url, asked) = serve().await;
+        let (url, asked) = serve(index(&newer())).await;
         let templates = fetching(&format!("{url}missing/"));
         let embedded = templates.current();
         let start = Instant::now();
@@ -328,6 +336,30 @@ mod tests {
             take(&asked).first(),
             Some(&("missing/catalog.json".to_owned(), None)),
             "a failed fetch leaves no ETag behind"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_file_of_another_revision_than_listed_is_asked_for_again_without_the_etag() {
+        let (url, asked) = serve(index("h1:newest")).await;
+        let templates = fetching(&url);
+        let embedded = templates.current();
+        let start = Instant::now();
+
+        templates.refresh(start).await;
+        assert_eq!(
+            ollama_revision(&templates),
+            embedded.template("ollama").unwrap().revision
+        );
+        take(&asked);
+
+        templates.refresh(start + EVERY).await;
+        assert_eq!(
+            take(&asked),
+            [
+                ("catalog.json".to_owned(), None),
+                ("templates/ollama.json".to_owned(), None)
+            ]
         );
     }
 }

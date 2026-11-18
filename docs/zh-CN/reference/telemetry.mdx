@@ -106,7 +106,7 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **获取什么**。从 `https://oss-catalog.zeabur.com/v1/` 获取 `catalog.json`，其中列出每个模板及其文件的哈希值。哈希值与 Zeabur 当前提供的不同时，才再获取该模板的 `templates/<id>.json`。
 
-**信任什么**。Zeabur 信任它获取文件的地址：会检查 HTTPS 证书的 `https://oss-catalog.zeabur.com/v1/`，或你设置的镜像站。这些文件没有签名，所以控制这个地址的人决定 Zeabur 提供哪些模板。然后 Zeabur 逐个检查模板：要能读取，需要的组件也要是这个 Zeabur 认识的。没通过的模板不会出现，原先提供的同一个模板会保留。获取失败时，什么都不会改变。
+**信任什么**。Zeabur 信任它获取文件的地址：会检查 HTTPS 证书的 `https://oss-catalog.zeabur.com/v1/`，或你设置的镜像站。这些文件没有签名，所以控制这个地址的人决定 Zeabur 提供哪些模板。然后 Zeabur 逐个检查模板：要能读取，要是 `catalog.json` 列出的那个版本，需要的组件也要是这个 Zeabur 认识的。没通过的模板不会出现，原先提供的同一个模板会保留，下次获取时 Zeabur 会再请求一次。获取失败时，什么都不会改变。
 
 **什么时候运行**。有人打开模板列表时才会获取，每 6 小时最多一次，失败时 10 分钟后再试。获取的是 Zeabur 服务器，浏览器不会访问。模板只保存在内存中，重启后，在下次获取前先用内置的模板。`zeaburctl ui` 不会获取。打开模板表单或规划好之后，如果模板有了新版本，Zeabur 会拒绝这次变更，请重新打开表单。
 

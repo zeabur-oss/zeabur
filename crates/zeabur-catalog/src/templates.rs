@@ -434,8 +434,9 @@ impl Catalog {
     }
 
     /// The templates `index` lists, each from its `templates/<id>.json` in `files` when it is
-    /// there and as offered here otherwise. A file is dropped when it does not read or requires a
-    /// component this build does not carry, and the template offered here stays in its place.
+    /// there and as offered here otherwise. A file is dropped when it does not read, is not the
+    /// revision `index` lists, or requires a component this build does not carry, and the
+    /// template offered here stays in its place.
     #[must_use]
     pub fn updated(
         &self,
@@ -444,10 +445,12 @@ impl Catalog {
     ) -> (Self, Vec<Dropped>) {
         let mut sources = BTreeMap::new();
         let mut dropped = Vec::new();
-        for IndexEntry { id, .. } in &index.templates {
-            let fetched = files
-                .get(id)
-                .map(|file| read_fetched(id, file).and_then(|source| offerable(id, source)));
+        for IndexEntry { id, source_digest } in &index.templates {
+            let fetched = files.get(id).map(|file| {
+                read_fetched(id, file)
+                    .and_then(|source| listed_revision(source, source_digest))
+                    .and_then(|source| offerable(id, source))
+            });
             if let Some(Err(reason)) = &fetched {
                 dropped.push(Dropped {
                     id: id.clone(),
@@ -539,6 +542,19 @@ fn read_fetched(id: &str, file: &[u8]) -> Result<Source, String> {
         manifests: Cow::Owned(file.manifests),
         revision: file.source_digest,
     })
+}
+
+/// `source`, when it is the revision `catalog.json` lists. A mirror updated file by file can
+/// serve a newer list with an older template.
+fn listed_revision(source: Source, listed: &str) -> Result<Source, String> {
+    if source.revision == listed {
+        Ok(source)
+    } else {
+        Err(format!(
+            "its file is revision {}, but catalog.json lists {listed}",
+            source.revision
+        ))
+    }
 }
 
 /// `source`, once it reads and needs only components this build carries.
@@ -1331,6 +1347,13 @@ mod tests {
         );
     }
 
+    /// The `sourceDigest` that `templates/<id>.json` names.
+    fn digest(file: &str) -> String {
+        serde_json::from_str::<TemplateFile>(file)
+            .unwrap()
+            .source_digest
+    }
+
     fn listed(entries: &[(&str, &str)]) -> Index {
         let templates = entries
             .iter()
@@ -1361,8 +1384,8 @@ mod tests {
         let embedded = Catalog::embedded();
         let revision = |id: &str| embedded.template(id).unwrap().revision;
         let index = listed(&[
-            ("ollama", "h1:newer"),
-            ("miniflux", "h1:newer"),
+            ("ollama", &digest(OLLAMA)),
+            ("miniflux", &digest(MINIFLUX)),
             ("ghost", "h1:newer"),
             ("error-pages", &revision("error-pages")),
             ("brand-new", "h1:new"),
@@ -1402,7 +1425,7 @@ mod tests {
     #[test]
     fn a_fetched_template_that_needs_components_this_build_carries_is_offered() {
         let embedded = Catalog::embedded();
-        let index = listed(&[("miniflux", "h1:newer")]);
+        let index = listed(&[("miniflux", &digest(MINIFLUX))]);
         let files = BTreeMap::from([("miniflux".to_owned(), MINIFLUX.as_bytes().to_vec())]);
         let (catalog, dropped) = embedded.updated(&index, &files);
 
@@ -1418,7 +1441,7 @@ mod tests {
     fn a_fetched_template_that_needs_a_component_this_build_lacks_keeps_the_one_offered() {
         let embedded = Catalog::embedded();
         let unknown = MINIFLUX.replace(r#""cloudnative-pg""#, r#""not-in-this-build""#);
-        let index = listed(&[("miniflux", "h1:newer")]);
+        let index = listed(&[("miniflux", &digest(MINIFLUX))]);
         let files = BTreeMap::from([("miniflux".to_owned(), unknown.into_bytes())]);
         let (catalog, dropped) = embedded.updated(&index, &files);
 
@@ -1431,5 +1454,21 @@ mod tests {
             catalog.template("miniflux").unwrap().revision,
             embedded.template("miniflux").unwrap().revision
         );
+    }
+
+    #[test]
+    fn a_fetched_file_of_another_revision_than_listed_keeps_the_one_offered() {
+        let embedded = Catalog::embedded();
+        let older = OLLAMA.replacen(r#""sourceDigest": ""#, r#""sourceDigest": "h1:older-"#, 1);
+        let index = listed(&[("ollama", "h1:newer-than-the-file")]);
+        let files = BTreeMap::from([("ollama".to_owned(), older.into_bytes())]);
+        let (catalog, dropped) = embedded.updated(&index, &files);
+
+        assert_eq!(dropped.len(), 1, "{dropped:?}");
+        assert!(
+            dropped[0].reason.contains("h1:newer-than-the-file"),
+            "{dropped:?}"
+        );
+        assert_eq!(catalog.template("ollama"), embedded.template("ollama"));
     }
 }

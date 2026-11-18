@@ -106,7 +106,7 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **取得什麼**。從 `https://oss-catalog.zeabur.com/v1/` 取得 `catalog.json`，裡面列出每個範本和它的檔案雜湊值。雜湊值和 Zeabur 現在提供的不同時，才再取得那個範本的 `templates/<id>.json`。
 
-**信任什麼**。Zeabur 信任它取得檔案的網址：會檢查 HTTPS 憑證的 `https://oss-catalog.zeabur.com/v1/`，或你設定的鏡像站。這些檔案沒有簽章，所以掌控這個網址的人決定 Zeabur 提供哪些範本。接著 Zeabur 逐一檢查每個範本：要能讀取，需要的元件也要是這個 Zeabur 認得的。沒通過的範本不會出現，原本提供的同一個範本會留著。取得失敗時，什麼都不會改變。
+**信任什麼**。Zeabur 信任它取得檔案的網址：會檢查 HTTPS 憑證的 `https://oss-catalog.zeabur.com/v1/`，或你設定的鏡像站。這些檔案沒有簽章，所以掌控這個網址的人決定 Zeabur 提供哪些範本。接著 Zeabur 逐一檢查每個範本：要能讀取，要是 `catalog.json` 列出的那個版本，需要的元件也要是這個 Zeabur 認得的。沒通過的範本不會出現，原本提供的同一個範本會留著，下次取得時 Zeabur 會再要一次。取得失敗時，什麼都不會改變。
 
 **什麼時候執行**。有人打開範本清單時才會取得，每 6 小時最多一次，失敗時 10 分鐘後再試。取得的是 Zeabur 伺服器，瀏覽器不會連過去。範本只放在記憶體裡，重新啟動後，下次取得前先用內建的範本。`zeaburctl ui` 不會取得。打開範本表單或規劃好之後，範本如果有了新版，Zeabur 會拒絕這次變更，請重新打開表單。
 
