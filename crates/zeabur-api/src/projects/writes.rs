@@ -488,7 +488,7 @@ pub(crate) async fn apply(
     let (namespace, target_cluster) =
         planner.writer(&claims.request, &project, cluster.as_ref())?;
     let measured = crate::measure::measured(&claims.request.changes, &plan);
-    let submitted = |answer: Result<Option<i64>, &ApiError>| {
+    let submitted = |answer: Result<Option<&crate::measure::Version>, &ApiError>| {
         if let Some(measured) = measured.clone() {
             let person = crate::measure::Person {
                 user: &identity.username,
@@ -516,7 +516,7 @@ pub(crate) async fn apply(
         return Ok(Json(ApplyResponse { applied }));
     }
     let written = write_plan(target_cluster, namespace, &plan).await;
-    submitted(written.as_ref().map(|(_, generation)| *generation));
+    submitted(written.as_ref().map(|(_, version)| version.as_ref()));
     let (applied, _) = written?;
     report_used(
         &state,
@@ -528,13 +528,13 @@ pub(crate) async fn apply(
     Ok(Json(ApplyResponse { applied }))
 }
 
-/// Dry-runs and then writes every object of `plan`, in order. Also gives the
+/// Dry-runs and then writes every object of `plan`, in order. Also gives the `metadata.uid` and
 /// `metadata.generation` the last write left.
 async fn write_plan(
     cluster: &dyn Cluster,
     namespace: &str,
     plan: &Plan,
-) -> Result<(Vec<Applied>, Option<i64>), ApiError> {
+) -> Result<(Vec<Applied>, Option<crate::measure::Version>), ApiError> {
     let writes: Vec<(zeabur_plan::Target, WriteRequest)> = plan
         .objects
         .iter()
@@ -547,11 +547,14 @@ async fn write_plan(
         .collect();
     dry_run(cluster, namespace, plan, &writes).await?;
     let mut applied = Vec::new();
-    let mut generation = None;
+    let mut version = None;
     for (target, write) in writes {
         match write_once(cluster, &target, &write).await {
             Ok(written) => {
-                generation = written.generation;
+                version = written
+                    .uid
+                    .zip(written.generation)
+                    .map(|(uid, generation)| crate::measure::Version { uid, generation });
                 applied.push(Applied {
                     target,
                     resource_version: written.resource_version,
@@ -563,7 +566,7 @@ async fn write_plan(
             }
         }
     }
-    Ok((applied, generation))
+    Ok((applied, version))
 }
 
 /// Tells the experience program what a finished apply used; nothing runs when it is off.

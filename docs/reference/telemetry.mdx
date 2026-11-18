@@ -47,7 +47,7 @@ Zeabur sends one event the first time each person uses it in a UTC day, and one 
 
 The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur restarts, and a different one the next day, so their days can't be linked.
 
-After an accepted change, Zeabur reads the Deployment with your own credential until the rollout ends, for at most a minute past its progress deadline (10 minutes unless the Deployment says otherwise). Zeabur renews your credential for it as your session allows, without keeping the session alive. A newer change, signing out or a restart ends the reading, and then `rollout_finished` is not sent.
+After an accepted change, Zeabur reads the Deployment with your own credential until the rollout ends, for at most a minute past its progress deadline (10 minutes unless the Deployment says otherwise) and never more than 30 minutes. Zeabur renews your credential for it as your session allows, without keeping the session alive. A newer change, a Deployment deleted and made again with the same name, signing out or a restart ends the reading, and then `rollout_finished` is not sent.
 
 `feature_used` has no `person`. It says that something was used today, not by whom or how often. Nothing is sent from your browser: Zeabur's server sends it after the call succeeds.
 

@@ -47,7 +47,7 @@ description: 加入体验计划后，Zeabur、`zeaburctl ui` 和安装程序会�
 
 事件不会说明是谁。`person` 是用密钥算出的用户名加日期的哈希值。密钥从 Zeabur 的 plan key 派生，保存在集群的 Secret 里，从不发送，所以我们无法从哈希值反推用户名。同一个人一整天的 `person` 都一样，Zeabur 重启也不变；第二天就换成另一个，所以不同天无法关联起来。
 
-变更被接受后，Zeabur 会用你自己的凭据读取 Deployment，直到部署结束，最多读到部署期限过后一分钟（Deployment 没有设置时是 10 分钟）。凭据快到期时，Zeabur 会在登录状态允许的范围内更新它，但不会因此延长登录。有更新的变更、你退出登录或 Zeabur 重启时就停止读取，这时不会发送 `rollout_finished`。
+变更被接受后，Zeabur 会用你自己的凭据读取 Deployment，直到部署结束，最多读到部署期限过后一分钟（Deployment 没有设置时是 10 分钟），而且不超过 30 分钟。凭据快到期时，Zeabur 会在登录状态允许的范围内更新它，但不会因此延长登录。有更新的变更、Deployment 被删除后用同一个名称重建、你退出登录或 Zeabur 重启时就停止读取，这时不会发送 `rollout_finished`。
 
 `feature_used` 没有 `person`，只表示今天用过某项功能，不说是谁、用了几次。浏览器不会发送任何东西，是 Zeabur 的服务器在操作成功之后发送的。
 
