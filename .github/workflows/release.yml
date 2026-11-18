@@ -45,12 +45,11 @@ jobs:
       - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
       - name: Install the packages
         run: bun install --frozen-lockfile
-      - name: The version is the manifests', with a CHANGELOG.md section, on main
+      - name: The version is SemVer, with a CHANGELOG.md section, on main
         run: |
-          # The manifests take only SemVer; an image tag cannot hold the + of build metadata.
+          # An image tag cannot hold the + of build metadata.
           [[ "$VERSION" == v* && "$VERSION" != *+* ]] ||
             { echo "::error::$VERSION is not v and SemVer without build metadata"; exit 1; }
-          scripts/release-check.sh "$VERSION"
           bun x zeabur-oss-release notes CHANGELOG.md "$VERSION" >/dev/null
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then
             git merge-base --is-ancestor HEAD origin/main ||

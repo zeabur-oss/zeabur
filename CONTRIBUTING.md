@@ -117,7 +117,7 @@ becomes the release body as it is.
 To release, run the Release pull request workflow, with `prerelease: rc` for a release candidate.
 knope turns the change files into the next `CHANGELOG.md` section and sets the version in every
 file that `knope.toml` lists, and zeabur-oss-bot opens `chore(release): vX.Y.Z`. A new crate goes
-into that list, or the release check stops at its lock file. Merging it tags the merge
+into that list, or CI on the release pull request stops at its lock file. Merging it tags the merge
 commit and starts the release. If a draft's verify job fails because of the check itself, fix the
 check and run `verify` again from a checkout, as [Fix the check and
 verify again](docs/internal/releasing.md#fix-the-check-and-verify-again) shows.

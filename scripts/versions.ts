@@ -1,5 +1,4 @@
-// Release versions and the release tags a release pins (scripts/release-check.sh,
-// scripts/release-pins.sh). A version is
+// Release versions and the release tags a release pins (scripts/release-pins.sh). A version is
 // vX.Y.Z or vX.Y.Z-<pre-release> (SemVer 2.0.0 §9); build metadata (§10) is refused, as an image
 // tag cannot hold its `+`.
 //

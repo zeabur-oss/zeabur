@@ -21,7 +21,7 @@ nightly and by hand, where a failure opens or updates the issue "Nightly <job> f
 `zeabur-cluster-tests`.
 
 `.github/workflows/release.yml` runs on a `vX.Y.Z` or `vX.Y.Z-<pre-release>` tag, and rehearses
-without publishing when run by hand. Its jobs are `check` (`scripts/release-check.sh`), `build`
+without publishing when run by hand. Its jobs are `check` (SemVer, changelog, on `main`), `build`
 (Linux amd64/arm64, macOS arm64: `scripts/release-build.sh`, then `scripts/release-smoke.sh` on
 Linux and `scripts/release-sign.sh` on macOS), `publish`, `attest`, `finish` (the installers, with
 `scripts/release-pins.sh`), `release` (the files `scripts/release-assets.sh` lists, uploaded to the
