@@ -1,31 +1,41 @@
 #!/usr/bin/env bash
-# The rest of a version bump, after knope has set Cargo.toml and desktop/Cargo.toml (knope.toml's
-# prepare-release workflow): the workspace crates in both lock files, the chart, the web packages,
-# and openapi.yaml with the web client generated from it. Run inside `nix develop`.
-#   scripts/release-bump.sh v0.2.0
+# Sets the release version everywhere that knope does not.
+#
+#   scripts/release-bump.sh <vX.Y.Z>
+#
+# knope runs it after it sets Cargo.toml and desktop/Cargo.toml (knope.toml, prepare-release).
 set -euo pipefail
 
-version=${1:?usage: release-bump.sh <vVERSION>}
+version=${1:?usage: release-bump.sh <vX.Y.Z>}
 plain=${version#v}
 root=$(cd "$(dirname "$0")/.." && pwd)
 cd "$root"
 source scripts/lib.sh
 
-# Each edit must change its file: a file that no longer has the line stops the bump.
-set_line() {
-  local file=$1 pattern=$2 line=$3
-  grep -qE "$pattern" "$file" || { echo "$file has no line matching $pattern" >&2; exit 1; }
-  sed -E -i.bak "s|$pattern|$line|" "$file"
+# Replaces one line of a file. Stops when the line is not there, so a moved line is not missed.
+replace_line() {
+  local file=$1
+  local pattern=$2
+  local new_line=$3
+  if ! grep -qE "$pattern" "$file"; then
+    echo "$file has no line that matches $pattern" >&2
+    exit 1
+  fi
+  sed -E -i.bak "s|$pattern|$new_line|" "$file"
   rm "$file.bak"
 }
 
+# The workspace crates in both lock files.
 cargo update --workspace --offline
 cargo update --workspace --offline --manifest-path desktop/Cargo.toml
-set_line deploy/chart/zeabur/Chart.yaml '^version: .*$' "version: $plain"
-set_line deploy/chart/zeabur/Chart.yaml '^appVersion: .*$' "appVersion: \"$plain\""
-for manifest in web/package.json crates/zeabur-installer/web/package.json; do
-  set_line "$manifest" '^  "version": "[^"]*"' "  \"version\": \"$plain\""
+
+replace_line deploy/chart/zeabur/Chart.yaml '^version: .*$' "version: $plain"
+replace_line deploy/chart/zeabur/Chart.yaml '^appVersion: .*$' "appVersion: \"$plain\""
+
+for package in web/package.json crates/zeabur-installer/web/package.json; do
+  replace_line "$package" '^  "version": "[^"]*"' "  \"version\": \"$plain\""
 done
-# Both take the version from CARGO_PKG_VERSION; the release job has only the root's packages.
+
+# openapi.yaml and the web client take the version from CARGO_PKG_VERSION.
 (cd web && bun ci)
 cargo xtask openapi

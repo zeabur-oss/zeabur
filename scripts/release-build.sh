@@ -1,24 +1,9 @@
 #!/usr/bin/env bash
-# Builds one platform's release candidates; publishes nothing. The `build` job of release.yml runs
-# it on a runner of each platform, then smokes what it built (release-smoke.sh) before anything is
-# published (the `publish` job). Run inside `nix develop`, from a git checkout: archive
-# entries carry the commit's time (SOURCE_DATE_EPOCH), not the build's.
-#   scripts/release-build.sh v0.0.2 arm64 dist
+# Builds the release files of this machine's platform. It publishes nothing.
 #
-# On Linux (native architecture only; Docker for the image):
-#   zeaburctl-<version>-linux-<arch>.tar.gz, zeabur-<version>-linux-<arch>.tar.gz: one static musl
-#     binary each, with LICENSE;
-#   image.tar: the image of Containerfile around that same `zeabur` binary (`docker image save`);
-#   proxy-image.tar: Zeabur Proxy's, of Containerfile.proxy around `zeabur-proxy`.
-# On macOS, arm64 only (Apple silicon):
-#   zeaburctl-<version>-darwin-arm64.tar.gz. The server only runs in a pod
-#   (`ClusterEndpoint::in_cluster`), so there is no macOS `zeabur`.
+#   scripts/release-build.sh <vX.Y.Z> <amd64|arm64> <dist> [installer]
 #
-# With `installer` (Linux only): zeabur-installer-<version>-linux-<arch>.tar.gz. The installer pins
-# the image and the chart that the `publish` job published, so the `finish` job builds it after
-# that step. It compiles in the ZEABUR_PIN_* variables (release-pins.sh and published/outputs.env):
-# all of them, or none for a development build.
-#   scripts/release-build.sh v0.0.2 arm64 dist installer
+# docs/internal/releasing.md, "Build files", lists what it writes.
 set -euo pipefail
 
 if [[ $# != 3 && ! ($# == 4 && "$4" == installer) ]]; then

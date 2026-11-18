@@ -1,23 +1,45 @@
 #!/usr/bin/env bash
-# The images Zeabur runs by default and does not publish, as the code pins them
-# (crates/zeabur-api/src/settings.rs), as digests.txt lines: `<label> index  <ref>`. Each must be a
-# reference by digest to an index that the registry still serves for linux/amd64 and linux/arm64.
-# digests.txt lists them for mirroring; they are neither signed nor attested. Run inside
-# `nix develop`.
+# Prints the digests.txt lines of the debug and tools images that Zeabur uses by default.
+#
 #   scripts/release-default-images.sh
+#
+# The release does not publish these images. It lists them so that people can mirror them.
 set -euo pipefail
 
 root=$(cd "$(dirname "$0")/.." && pwd)
 settings=$root/crates/zeabur-api/src/settings.rs
-for pair in debug:DEBUG_IMAGE tools:TOOLS_IMAGE; do
-  label=${pair%%:*}
-  constant=${pair#*:}
-  ref=$(sed -nE "s/^pub const $constant: &str = \"([^\"]+)\";$/\1/p" "$settings")
-  [[ "$ref" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]] ||
-    { echo "settings.rs has no $constant by digest: '$ref'" >&2; exit 1; }
-  platforms=$(crane manifest "$ref" | jq -r '.manifests[]?.platform | "\(.os)/\(.architecture)"')
-  for want in linux/amd64 linux/arm64; do
-    grep -qx "$want" <<<"$platforms" || { echo "$ref has no $want image" >&2; exit 1; }
+
+fail() {
+  echo "$*" >&2
+  exit 1
+}
+
+# image_of <constant>: the image that settings.rs pins in a constant.
+image_of() {
+  sed -nE "s/^pub const $1: &str = \"([^\"]+)\";$/\1/p" "$settings"
+}
+
+# check_platforms <image>: the registry still serves the image for both platforms.
+check_platforms() {
+  local platforms
+  platforms=$(crane manifest "$1" | jq -r '.manifests[]?.platform | "\(.os)/\(.architecture)"')
+  for platform in linux/amd64 linux/arm64; do
+    if ! grep -qx "$platform" <<<"$platforms"; then
+      fail "$1 has no $platform image"
+    fi
   done
-  echo "$label index  $ref"
-done
+}
+
+# print_image <label> <constant>
+print_image() {
+  local image
+  image=$(image_of "$2")
+  if [[ ! "$image" =~ ^[^[:space:]@]+@sha256:[0-9a-f]{64}$ ]]; then
+    fail "settings.rs does not pin $2 by digest: '$image'"
+  fi
+  check_platforms "$image"
+  echo "$1 index  $image"
+}
+
+print_image debug DEBUG_IMAGE
+print_image tools TOOLS_IMAGE

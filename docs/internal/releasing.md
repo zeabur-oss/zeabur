@@ -41,6 +41,21 @@ Every signature and attestation names this repository's workflow,
 Releases before this one were signed by the shared release workflow of zeabur-oss/.github
 ([Releases](../reference/releases.mdx) shows how to verify both).
 
+## Build files
+
+`scripts/release-build.sh` builds on the platform it runs on, never for another one. The archive
+entries carry the commit's time, so the same commit gives the same archives.
+
+| Platform | Files |
+|---|---|
+| Linux amd64, arm64 | `zeaburctl-<version>-linux-<arch>.tar.gz` and `zeabur-<version>-linux-<arch>.tar.gz`, one static musl binary each with `LICENSE`; `image.tar` (Zeabur's image) and `proxy-image.tar` (Zeabur Proxy's) |
+| macOS arm64 | `zeaburctl-<version>-darwin-arm64.tar.gz`. The server runs only in a pod, so there is no macOS `zeabur`. |
+| Linux, with `installer` | `zeabur-installer-<version>-linux-<arch>.tar.gz`, built with all the `ZEABUR_PIN_*` variables (`release-pins.sh` and `published/outputs.env`) or, for a development build, none |
+
+`scripts/release-smoke.sh` tries these files as they will ship, on the development cluster
+(`scripts/dev-cluster.sh`). In `build` it runs the local image; in `verify` the node pulls the
+published one. It never touches your kubeconfig.
+
 ## Zeabur Desktop
 
 The `desktop-*` jobs of `release.yml` run beside the server's builds, and `publish` needs them;
