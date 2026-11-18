@@ -5,7 +5,6 @@ description: >-
   acting with their own credentials.
 type: application
 version: 0.2.0
-appVersion: "0.2.0"
 home: https://github.com/zeabur-oss/zeabur
 icon: https://oss.zeabur.com/favicon.svg
 sources:

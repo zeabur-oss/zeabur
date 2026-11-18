@@ -16,9 +16,9 @@ rules.
 
 ## Releases
 
-A maintainer releases: they bump the version (`Cargo.toml`, `Chart.yaml`, a `CHANGELOG.md`
-section), merge it, push the tag `v<version>`, check the draft release the workflow leaves and
-publish it by hand (`docs/internal/releasing.md`). A change to a `scripts/release-*.sh` is
+A maintainer releases: they run the Release pull request workflow (knope sets the versions that
+`knope.toml` lists and writes the `CHANGELOG.md` section), merge its pull request, which tags it,
+check the draft release the workflow leaves and publish it by hand (`docs/internal/releasing.md`). A change to a `scripts/release-*.sh` is
 checked with `shellcheck`, to `scripts/*.ts` with `bun check scripts/` and `bun test scripts/`, to
 the workflow with `jactionlint` and a manual run of the Release workflow, which rehearses, and on
 Linux by running `release-build.sh` and `release-smoke.sh`; the macOS build runs on a Mac. A failed release run: `zeabur-ci`.

@@ -71,7 +71,6 @@ check_crates desktop/Cargo.toml
 
 chart=deploy/chart/zeabur/Chart.yaml
 expect_version "$chart" version "$(yq .version "$chart")"
-expect_version "$chart" appVersion "$(yq .appVersion "$chart")"
 
 for package in web/package.json crates/zeabur-installer/web/package.json; do
   expect_version "$package" version "$(jq -r .version "$package")"

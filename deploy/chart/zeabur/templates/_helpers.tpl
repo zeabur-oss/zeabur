@@ -15,7 +15,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* https://kubernetes.io/docs/concepts/overview/working-with-objects/common-labels/ */}}
 {{- define "zeabur.labels" -}}
 {{ include "zeabur.selectorLabels" . }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/version: {{ .Chart.Version | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
@@ -51,7 +51,7 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 
 {{- define "zeabur.proxyLabels" -}}
 {{ include "zeabur.proxySelectorLabels" . }}
-app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
+app.kubernetes.io/version: {{ .Chart.Version | quote }}
 app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
