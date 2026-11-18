@@ -88,10 +88,10 @@ for values in "$chart"/ci/*-values.yaml; do
     zeabur-project-developer-rules
   expect "$name" "$out" \
     "[select(.kind == \"RoleBinding\") | (.metadata.namespace + \"/\" + .metadata.name + \">\" + .roleRef.name) as \$b | .subjects[] | select(.kind == \"ServiceAccount\") | \$b + \">\" + .namespace + \"/\" + .name] | join(\",\")" \
-    "$terminals/zeabur-terminals>zeabur-terminals>zeabur/zeabur"
+    "zeabur/zeabur-catalog>zeabur-catalog>zeabur/zeabur,$terminals/zeabur-terminals>zeabur-terminals>zeabur/zeabur"
   expect "$name" "$out" \
     "[select(.kind == \"Role\" and .metadata.namespace != \"$terminals\") | .metadata.namespace + \"/\" + .metadata.name + \":\" + (.rules[] | [.apiGroups, .resources, .resourceNames // [], .verbs] | map(join(\",\")) | join(\"|\"))] | sort | join(\" \")" \
-    'kube-public/zeabur-info-reader:|configmaps|zeabur-info|get zeabur-s3-destinations/zeabur-s3-destinations-reader:|configmaps||get,list zeabur/zeabur-settings-reader:|configmaps|zeabur-settings|get'
+    'kube-public/zeabur-info-reader:|configmaps|zeabur-info|get zeabur-s3-destinations/zeabur-s3-destinations-reader:|configmaps||get,list zeabur/zeabur-catalog:|configmaps|zeabur-catalog|get,patch zeabur/zeabur-settings-reader:|configmaps|zeabur-settings|get'
   expect "$name" "$out" \
     "[select(.kind == \"Role\" and .metadata.namespace == \"$terminals\") | .metadata.name + \":\" + (.rules[] | [.apiGroups, .resources, .resourceNames // [], .verbs] | map(join(\",\")) | join(\"|\"))] | join(\" \")" \
     'zeabur-terminals:|pods||create,get,list,delete zeabur-terminals:|pods/exec||create,get'
@@ -140,6 +140,8 @@ done
 # The update check is on unless turned off, and Zeabur knows its own Deployment's name.
 update_env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_UPDATE_CHECK") | .value'
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$update_env" true
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
+  'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_CATALOG_URL") | .value' https://oss-catalog.zeabur.com/v1/
 expect "updateCheck=false" "$(render -f "$chart/ci/minimal-values.yaml" --set updateCheck.enabled=false)" "$update_env" false
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
   'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_DEPLOYMENT") | .value' zeabur
@@ -278,6 +280,7 @@ refuse "an issuer with a trailing slash" --set issuer.url=https://identity.examp
 refuse "no client secret" --set issuer.clientSecret.existingSecret=
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm
+refuse "a plain http catalog" --set catalog.url=http://catalog.example.test/v1/
 refuse "an unknown value" --set replicas=2
 refuse "an outbound proxy with no address" --set outboundProxy.enabled=true
 refuse "an outbound proxy over https" --set outboundProxy.enabled=true --set outboundProxy.httpsProxy=https://p.example.test

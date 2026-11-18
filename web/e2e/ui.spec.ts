@@ -940,11 +940,12 @@ test("the project's suggestions list what it misses, and a fix is planned and ap
   await expect(limits).toHaveCount(0, { timeout: 15_000 })
 })
 
-test("a component is installed with its manifests, not from the panel", async ({ page }) => {
+test("a component's install plan lists its steps before anything is written", async ({ page }) => {
   await page.goto("/cluster/components?component=reloader")
-  const sheet = page.getByRole("dialog", { name: /Reloader/ })
-  await expect(sheet).toContainText("zeaburctl components export reloader")
-  await expect(sheet.getByRole("button", { name: /install/i })).toHaveCount(0)
+  const sheet = page.getByRole("dialog", { name: "Install Reloader" })
+  await expect(sheet.getByText("Steps")).toBeVisible({ timeout: 30_000 })
+  await expect(sheet.getByText("Not started").first()).toBeVisible()
+  await expect(sheet.getByRole("button", { name: "Install" })).toBeEnabled()
 })
 
 // `<namespace>/<name>` of a Deployment whose container has no shell.

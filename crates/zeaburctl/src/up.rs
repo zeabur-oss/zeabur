@@ -800,6 +800,7 @@ mod tests {
                 WriteBody::JsonPatch(operations) => Some(operations.to_string()),
                 WriteBody::Create(_)
                 | WriteBody::MergePatch(_)
+                | WriteBody::Apply(_)
                 | WriteBody::EphemeralContainers(_)
                 | WriteBody::Delete(_) => None,
             })
@@ -817,6 +818,7 @@ mod tests {
                 WriteBody::Create(_)
                 | WriteBody::JsonPatch(_)
                 | WriteBody::MergePatch(_)
+                | WriteBody::Apply(_)
                 | WriteBody::EphemeralContainers(_)
                 | WriteBody::Delete(_) => None,
             })

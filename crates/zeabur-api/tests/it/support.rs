@@ -119,6 +119,14 @@ impl TestApi {
         self
     }
 
+    pub(crate) fn with_catalog(
+        mut self,
+        fetch: Arc<dyn zeabur_api::cluster::catalog::Fetch>,
+    ) -> Self {
+        self.options.catalog = Some(fetch);
+        self
+    }
+
     pub(crate) fn router(self) -> Router {
         let access: Arc<dyn ClusterAccess> = match self.token {
             Some(token) => Arc::new(Signed {

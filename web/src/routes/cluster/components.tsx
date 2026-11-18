@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { lazy, Suspense, useState } from "react"
 import ArchiveIcon from "~icons/ph/archive"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import ArrowsClockwiseIcon from "~icons/ph/arrows-clockwise"
@@ -25,24 +25,29 @@ import SignpostIcon from "~icons/ph/signpost"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { isStatus, type Schemas } from "@/api/client"
-import { capabilitiesQuery, clusterIncidentsQuery } from "@/api/queries"
+import { capabilitiesQuery, catalogQuery, clusterIncidentsQuery } from "@/api/queries"
 import { useCapabilityLabel } from "@/components/capabilities"
 import { Segmented } from "@/components/bits"
-import { LazyInstallerSheet } from "@/components/lazy-installer-sheet"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
 import { buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { type Locale, useI18n, useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
+import { formatAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { componentsRole, Forbidden } from "@/routes/cluster/forbidden"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Section } from "@/routes/cluster/section"
 
 const route = getRouteApi("/cluster/components")
+
+const ComponentPlan = lazy(() =>
+  import("@/components/component-plan").then((m) => ({ default: m.ComponentPlan })),
+)
 
 const categories: {
   key: "traffic" | "observability" | "scaling" | "security" | "data" | "operations"
@@ -139,14 +144,22 @@ export function ComponentsPage() {
   return (
     <ClusterFrame tab="components">
       {open ? (
-        <LazyInstallerSheet
-          components={[{ id: open, name: opened?.displayName ?? open }]}
-          remove={list.some((c) => opened !== undefined && isInstalled(c, opened))}
-          onClose={() =>
-            void navigate({ search: (previous) => ({ ...previous, component: undefined }) })
-          }
-        />
+        <Suspense fallback={null}>
+          <ComponentPlan
+            id={open}
+            name={opened?.displayName ?? open}
+            action={
+              list.some((c) => opened !== undefined && isInstalled(c, opened))
+                ? "remove"
+                : "install"
+            }
+            onClose={() =>
+              void navigate({ search: (previous) => ({ ...previous, component: undefined }) })
+            }
+          />
+        </Suspense>
       ) : null}
+      <CatalogStatus />
       <InstalledSection />
 
       <section aria-labelledby="components-catalogue" className="flex flex-col gap-4">
@@ -249,6 +262,37 @@ function useDown() {
   return (capability: string, component: string) => down.has(capability) || down.has(component)
 }
 
+/** Which Zeabur Catalog release the page shows, and why Zeabur could not read a newer one. */
+function CatalogStatus() {
+  const { t, locale } = useI18n()
+  const catalog = useQuery(catalogQuery).data
+  if (!catalog) return null
+  if (!catalog.version)
+    return (
+      <Alert variant="warn">
+        <AlertTitle>{t("components.catalogUnreachable", catalog.url)}</AlertTitle>
+        <AlertDescription>
+          {catalog.error ? (
+            <p className="font-mono break-all" translate="no">
+              {catalog.error}
+            </p>
+          ) : null}
+          <p>{t("components.catalogMirror")}</p>
+        </AlertDescription>
+      </Alert>
+    )
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t(
+        "components.catalog",
+        catalog.version,
+        catalog.fetchedAt ? formatAgo(catalog.fetchedAt, locale) : "",
+      )}
+      {catalog.error ? `${t("common.sep")}${t("components.catalogKept", catalog.error)}` : ""}
+    </p>
+  )
+}
+
 function ComponentCard({
   capability,
   component,
@@ -263,6 +307,8 @@ function ComponentCard({
   const installed = isInstalled(capability, component)
   const down = installed && isDown(capability.name, component.id)
   const state = down ? "down" : installed ? "installed" : (capability.suggestion ?? "optional")
+  const catalog = useQuery(catalogQuery).data
+  const offline = catalog !== undefined && !catalog.version
   return (
     <article className="flex w-full flex-col gap-3 rounded-xl border border-v2-border bg-card p-4 transition-colors hover:border-foreground/20">
       <div className="flex items-start gap-3">
@@ -298,7 +344,12 @@ function ComponentCard({
             ...previous,
             component: component.id,
           })}
-          className={cn(buttonVariants({ variant: "outline", size: "xs" }), "ml-auto")}
+          disabled={offline}
+          aria-disabled={offline}
+          className={cn(
+            buttonVariants({ variant: "outline", size: "xs" }),
+            "ml-auto aria-disabled:pointer-events-none aria-disabled:opacity-50",
+          )}
         >
           {installed ? (
             <MinusCircleIcon aria-hidden="true" data-icon="inline-start" />

@@ -91,6 +91,9 @@ pub struct Settings {
     /// Whether Zeabur checks GitHub for a newer release (see [`crate::cluster::update`]): the
     /// chart's `updateCheck.enabled`, off under `DO_NOT_TRACK`.
     pub update_check: bool,
+    /// Where Zeabur reads Zeabur Catalog's API (`ZEABUR_CATALOG_URL`), an `https://` URL ending
+    /// in `/`.
+    pub catalog_url: String,
 }
 
 /// The GitHub the cluster's GitHub App is made on: github.com by default.
@@ -182,6 +185,7 @@ impl Default for Settings {
             upload_address: None,
             deployment: None,
             update_check: false,
+            catalog_url: zeabur_catalog::api::DEFAULT_URL.to_owned(),
         }
     }
 }
@@ -517,6 +521,7 @@ pub(crate) mod store {
             WriteBody::Create(_) => "create",
             WriteBody::JsonPatch(_)
             | WriteBody::MergePatch(_)
+            | WriteBody::Apply(_)
             | WriteBody::Delete(_)
             | WriteBody::EphemeralContainers(_) => "patch",
         };

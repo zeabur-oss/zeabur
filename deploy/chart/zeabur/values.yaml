@@ -248,6 +248,10 @@ telemetry:
 updateCheck:
   enabled: true
 
+# Where Zeabur reads the components it installs: the Zeabur Catalog API, over HTTPS.
+catalog:
+  url: https://oss-catalog.zeabur.com/v1/
+
 podAnnotations: {}
 podLabels: {}
 nodeSelector: {}

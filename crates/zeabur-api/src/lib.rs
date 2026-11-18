@@ -21,6 +21,7 @@
 //! | `GET /api/v1/cluster/tools/{name}/terminal` | a terminal in it, `kubectl` and `helm` acting as you, over a WebSocket |
 //! | `GET /api/v1/cluster/backups` | Velero's backup locations (and whether Velero reaches them), schedules and newest backups, or that Velero is not installed |
 //! | `GET /api/v1/cluster/capabilities` | what is installed (with versions), and what to install |
+//! | `GET /api/v1/cluster/catalog` | the Zeabur Catalog release Zeabur reads, when it was read, and why the last read failed |
 //! | `GET /api/v1/cluster/templates` | the catalogue's templates: what each asks for and requests, and whether its components are there |
 //! | `GET /api/v1/cluster/templates/{template}` | one of them, with what its pods use when idle |
 //! | `GET /api/v1/settings/metrics-store` | the metrics store history is read from, whether it answers, who may change it |
@@ -78,6 +79,8 @@
 //! | `POST /api/v1/cluster/notifications/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/node-shells/plan` | what opening a shell on a node, or removing a shell pod, writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/node-shells/apply` | carries out that plan by its token |
+//! | `POST /api/v1/cluster/components/{id}/plan` | what installing or removing a component writes, step by step, and how far each step has come; writes nothing |
+//! | `POST /api/v1/cluster/components/{id}/apply` | writes the next step of that plan (see `cluster::components`) |
 //! | `POST /api/v1/cluster/tools/plan` | what starting a kubectl terminal for the whole cluster writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/tools/apply` | carries out that plan by its token |
 //! | `POST /api/v1/cluster/nodes/{node}/maintenance/plan` | what stopping or resuming scheduling does to a node, and a token; writes nothing |
@@ -159,6 +162,7 @@ pub use settings::Settings;
 use utoipa::OpenApi;
 use utoipa_axum::router::OpenApiRouter;
 use utoipa_axum::routes;
+pub use zeabur_catalog::api::DEFAULT_URL as CATALOG_URL;
 
 use crate::access::ClusterAccess;
 use crate::plan_token::PlanKey;
@@ -228,6 +232,9 @@ macro_rules! handlers {
             cluster::zeabur::get,
             cluster::update::get,
             cluster::capabilities,
+            cluster::catalog::get,
+            cluster::components::plan,
+            cluster::components::apply,
             cluster::backups::get,
             cluster::backups::plan,
             cluster::backups::apply,
@@ -433,6 +440,8 @@ pub struct Options {
     /// Receives what happens to each change of one Deployment, for the experience program;
     /// `None` when the program is off, so nothing is read for a change.
     pub changes: Option<measure::Changes>,
+    /// Reads Zeabur Catalog's API; `None` reads it over HTTPS at `settings.catalog_url`.
+    pub catalog: Option<Arc<dyn cluster::catalog::Fetch>>,
 }
 
 impl Default for Options {
@@ -451,6 +460,7 @@ impl Default for Options {
             terminals: None,
             used: None,
             changes: None,
+            catalog: None,
         }
     }
 }
@@ -484,6 +494,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         terminals,
         used,
         changes,
+        catalog,
     } = options;
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let tls = zeabur_http::tls(settings.trusted_ca.as_deref());
@@ -492,9 +503,28 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         .as_ref()
         .ok()
         .map(|tls| zeabur_http::Https::new(reach, tls));
+    let catalog = catalog.map_or_else(
+        || {
+            tls.as_ref()
+                .map(|tls| {
+                    let fetch: Arc<dyn cluster::catalog::Fetch> =
+                        Arc::new(cluster::catalog::Https(zeabur_http::Https::new(reach, tls)));
+                    fetch
+                })
+                .map_err(Clone::clone)
+        },
+        Ok,
+    );
+    let cache = terminals.clone().zip(settings.namespace.clone());
+    let catalog = Arc::new(cluster::catalog::Catalog::new(
+        settings.catalog_url.clone(),
+        catalog,
+        cache,
+    ));
     let state = AppState {
         access,
         catalogue,
+        catalog,
         template_idle,
         plan_key,
         clock,

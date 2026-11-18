@@ -208,6 +208,7 @@ mod tests {
                     WriteBody::Delete(_) => "delete",
                     WriteBody::JsonPatch(_)
                     | WriteBody::MergePatch(_)
+                    | WriteBody::Apply(_)
                     | WriteBody::EphemeralContainers(_) => "patch",
                 };
                 format!("{verb} {}/{}", w.target.kind, w.target.name)

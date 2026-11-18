@@ -54,6 +54,8 @@
 pub mod backup_download;
 pub mod backups;
 pub(crate) mod capacity;
+pub mod catalog;
+pub mod components;
 pub mod config_reload;
 pub(crate) mod disks;
 pub mod github_app;

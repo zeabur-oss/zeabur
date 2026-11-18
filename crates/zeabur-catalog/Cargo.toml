@@ -11,6 +11,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+flate2.workspace = true
 zeabur-kube.workspace = true
 zeabur-model.workspace = true
 regex.workspace = true

@@ -1,0 +1,39 @@
+# The last Zeabur Catalog release Zeabur read, kept so a restart or an outage of the catalog
+# does not lose it. Zeabur's ServiceAccount may read and patch this one ConfigMap and no other.
+# https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: zeabur-catalog
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "zeabur.fullname" . }}-catalog
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["zeabur-catalog"]
+    verbs: ["get", "patch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "zeabur.fullname" . }}-catalog
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "zeabur.fullname" . }}-catalog
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "zeabur.fullname" . }}
+    namespace: {{ .Release.Namespace }}

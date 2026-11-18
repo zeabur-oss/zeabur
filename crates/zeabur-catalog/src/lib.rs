@@ -9,6 +9,8 @@ use zeabur_kube::ClusterFacts;
 mod bundle {
     include!(concat!(env!("OUT_DIR"), "/bundle.rs"));
 }
+pub mod api;
+pub mod engine;
 pub mod install;
 pub mod installed;
 mod kube_version;

@@ -155,6 +155,8 @@ spec:
             - name: ZEABUR_INSTALLATION_ID
               value: {{ required "telemetry.installationId is required with telemetry.enabled" .Values.telemetry.installationId | quote }}
             {{- end }}
+            - name: ZEABUR_CATALOG_URL
+              value: {{ .Values.catalog.url | quote }}
             - name: ZEABUR_UPDATE_CHECK
               value: {{ .Values.updateCheck.enabled | quote }}
             - name: ZEABUR_DEPLOYMENT

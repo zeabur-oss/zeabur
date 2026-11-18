@@ -134,6 +134,9 @@ pub(crate) struct Args {
     /// (docs/reference/telemetry.mdx). `true` or `false`. `DO_NOT_TRACK` turns it off.
     #[arg(long, env = "ZEABUR_UPDATE_CHECK", default_value_t = true, action = clap::ArgAction::Set)]
     pub(crate) update_check: bool,
+    /// Where Zeabur reads Zeabur Catalog's API: an `https://` URL, such as a mirror.
+    #[arg(long, env = "ZEABUR_CATALOG_URL", default_value = zeabur_api::CATALOG_URL)]
+    pub(crate) catalog_url: String,
     /// Zeabur's own Deployment in `--namespace`, read as the person to tell how Zeabur was
     /// installed. Empty: not known.
     #[arg(long, env = "ZEABUR_DEPLOYMENT", default_value = "")]
@@ -226,6 +229,7 @@ impl Args {
         settings.identity.issuer = Some(issuer.to_string());
         settings.identity.project_roles = self.member_roles;
         settings.update_check = self.update_check && !zeabur_telemetry::do_not_track();
+        settings.catalog_url = catalog_url(&self.catalog_url)?;
         if !self.deployment.is_empty() {
             settings.deployment = Some(self.deployment.clone());
         }
@@ -433,6 +437,19 @@ fn plan_key(bytes: &[u8]) -> Option<PlanKey> {
         *byte = u8::from_str_radix(pair, 16).ok()?;
     }
     Some(PlanKey::from_bytes(key))
+}
+
+/// `--catalog-url` as Zeabur reads it: `https://`, ending in `/`.
+fn catalog_url(text: &str) -> Result<String, String> {
+    let url: axum::http::Uri = text.parse().map_err(|e| format!("--catalog-url: {e}"))?;
+    if url.scheme_str() != Some("https") || url.host().is_none() {
+        return Err("--catalog-url: must be an https:// URL".to_owned());
+    }
+    Ok(if text.ends_with('/') {
+        text.to_owned()
+    } else {
+        format!("{text}/")
+    })
 }
 
 #[cfg(test)]

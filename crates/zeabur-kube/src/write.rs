@@ -7,6 +7,8 @@
 //! - **A debug container** is the same `PATCH` of a Pod's `ephemeralcontainers` subresource
 //!   [k8s-ephemeral], the only way to add one.
 //! - **A new object** is a `POST` to its collection.
+//! - **An applied object** is a server-side apply `PATCH` [k8s-ssa] (kube's `Patch::Apply`), never
+//!   forced.
 //! - **A deletion** is kube's `Api::delete` with `DeleteOptions` in its body [k8s-delete-options]:
 //!   `propagationPolicy: Background`, as `kubectl delete` does by default, so kube-apiserver
 //!   removes the object at once and the garbage collector removes what it owns (a Deployment's
@@ -25,6 +27,7 @@
 //! [k8s-validation]: https://kubernetes.io/docs/reference/using-api/api-concepts/#field-validation
 //! [k8s-dry-run]: https://kubernetes.io/docs/reference/using-api/api-concepts/#dry-run
 //! [k8s-delete-options]: https://kubernetes.io/docs/reference/kubernetes-api/common-definitions/delete-options/
+//! [k8s-ssa]: https://kubernetes.io/docs/reference/using-api/server-side-apply/
 //! [k8s-gc]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/#background-deletion
 
 use kube::api::{Api, DeleteParams, DynamicObject, Patch, PatchParams};
@@ -138,6 +141,10 @@ pub(crate) async fn write(
                 .await?
         }
         WriteBody::MergePatch(body) => api.patch(name, &patch_params, &Patch::Merge(body)).await?,
+        WriteBody::Apply(object) => {
+            api.patch(name, &patch_params, &Patch::Apply(object))
+                .await?
+        }
         WriteBody::EphemeralContainers(operations) => {
             api.patch_subresource(
                 "ephemeralcontainers",

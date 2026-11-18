@@ -618,6 +618,13 @@ pub enum WriteBody {
     ///
     /// [rfc7386]: https://www.rfc-editor.org/rfc/rfc7386
     MergePatch(serde_json::Value),
+    /// A server-side apply of the whole object [k8s-ssa], `apiVersion`, `kind` and `metadata`
+    /// included: it creates the object or sets the fields it names, and kube-apiserver records
+    /// them as Zeabur's. Never forced, so a field another manager owns fails the write with
+    /// `409 Conflict` and names that manager.
+    ///
+    /// [k8s-ssa]: https://kubernetes.io/docs/reference/using-api/server-side-apply/
+    Apply(serde_json::Value),
     /// An RFC 6902 JSON Patch of a Pod's `ephemeralcontainers` subresource
     /// [k8s-ephemeral]: kube-apiserver keeps only the change to `spec.ephemeralContainers` and
     /// refuses one that changes or removes a container already there. RBAC sees a `patch` of

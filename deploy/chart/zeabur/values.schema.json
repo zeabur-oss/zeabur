@@ -184,6 +184,11 @@
       "if": { "properties": { "enabled": { "const": true } }, "required": ["enabled"] },
       "then": { "properties": { "installationId": { "minLength": 36 } }, "required": ["installationId"] }
     },
+    "catalog": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": { "url": { "type": "string", "pattern": "^https://[^/]+" } }
+    },
     "updateCheck": {
       "type": "object",
       "additionalProperties": false,

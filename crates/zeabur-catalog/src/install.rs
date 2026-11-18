@@ -1027,7 +1027,7 @@ fn placeholder(input: &Input) -> Value {
     )
 }
 
-fn parse_values(text: Option<&str>) -> Result<Value, String> {
+pub(crate) fn parse_values(text: Option<&str>) -> Result<Value, String> {
     match text.map(str::trim).filter(|t| !t.is_empty()) {
         None => Ok(Value::Object(Map::new())),
         Some(text) => {
@@ -1043,7 +1043,7 @@ fn parse_values(text: Option<&str>) -> Result<Value, String> {
 
 /// Merges `over` into `base` as Helm merges values files: maps merge key by key, anything else
 /// (lists included) replaces.
-fn merge(base: &mut Value, over: Value) {
+pub(crate) fn merge(base: &mut Value, over: Value) {
     match (base, over) {
         (Value::Object(base), Value::Object(over)) => {
             for (key, value) in over {

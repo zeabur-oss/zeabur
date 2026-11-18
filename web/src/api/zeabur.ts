@@ -1173,6 +1173,34 @@ export type CapabilityList = {
 }
 
 /**
+ * The catalog release Zeabur reads.
+ */
+export type CatalogView = {
+  /**
+   * The release's commit.
+   * @nullable
+   */
+  commit?: string | null
+  /**
+   * Why the last read failed.
+   * @nullable
+   */
+  error?: string | null
+  /**
+   * When it was read, RFC 3339.
+   * @nullable
+   */
+  fetchedAt?: string | null
+  /** Where Zeabur reads it. */
+  url: string
+  /**
+   * The release, `0.5.3`; absent when Zeabur has never read one.
+   * @nullable
+   */
+  version?: string | null
+}
+
+/**
  * A [`Change::Certificate`].
  */
 export type CertificateChange = {
@@ -3556,6 +3584,139 @@ export type ClusterUsage = {
    * @nullable
    */
   window?: string | null
+}
+
+/**
+ * Install or remove.
+ */
+export type ComponentAction = (typeof ComponentAction)[keyof typeof ComponentAction]
+
+export const ComponentAction = {
+  install: "install",
+  remove: "remove",
+} as const
+
+/**
+ * How far a step or check has come.
+ */
+export type StepState = (typeof StepState)[keyof typeof StepState]
+
+export const StepState = {
+  pending: "pending",
+  waiting: "waiting",
+  ready: "ready",
+  failed: "failed",
+} as const
+
+/**
+ * One health check of the catalog, run once every step is ready.
+ */
+export type ComponentCheck = {
+  /** What to do when it does not pass in time. */
+  advice: string
+  /** The component. */
+  component: string
+  /** The check. */
+  name: string
+  /** How far it has come; `pending` until every step is ready. */
+  state: StepState
+  /** How long it may take once every step is ready, in seconds. */
+  timeoutSeconds: number
+}
+
+/**
+ * One write of a step.
+ */
+export type ObjectWrite = {
+  /** The object's kind. */
+  kind: string
+  /** Its name. */
+  name: string
+  /**
+   * Its namespace, for a namespaced object.
+   * @nullable
+   */
+  namespace?: string | null
+  /**
+   * The object as it is written, YAML; absent for a deletion.
+   * @nullable
+   */
+  yaml?: string | null
+}
+
+/**
+ * One step: a release's objects.
+ */
+export type ComponentStep = {
+  /** The component. */
+  component: string
+  /**
+   * Why it failed.
+   * @nullable
+   */
+  message?: string | null
+  /** The release. */
+  release: string
+  /** How far it has come. */
+  state: StepState
+  /** What it writes or deletes. */
+  writes: ObjectWrite[]
+}
+
+/**
+ * What to know before installing.
+ */
+export type ComponentWarning =
+  | {
+      /** The component. */
+      component: string
+      kind: "untested"
+    }
+  | {
+      /** The component. */
+      component: string
+      kind: "privileged"
+      /** `baseline` or `privileged`. */
+      level: string
+    }
+
+/**
+ * What installing or removing a component writes, and how far it has come.
+ */
+export type ComponentPlan = {
+  /** Install or remove. */
+  action: ComponentAction
+  /** The catalog release it is made from; send it to `apply`. */
+  catalogVersion: string
+  /** The health checks; none for a removal. */
+  checks: ComponentCheck[]
+  /** The components it installs, the ones needed first; the one it removes. */
+  components: string[]
+  /** Every step and check is ready. */
+  done: boolean
+  /**
+   * What a removal leaves, as the catalog lists it (`customresourcedefinitions`,
+   * `secrets/<name>`).
+   */
+  leftovers: string[]
+  /** The steps, in order. */
+  steps: ComponentStep[]
+  /** What to know. */
+  warnings: ComponentWarning[]
+}
+
+/**
+ * What to plan.
+ */
+export type ComponentRequest = {
+  /** Install or remove. */
+  action: ComponentAction
+  /**
+   * For `apply`: the catalog release the plan was made from; `409` when Zeabur has read
+   * another since.
+   * @nullable
+   */
+  catalogVersion?: string | null
 }
 
 /**
@@ -10583,6 +10744,104 @@ export const listCapabilities = async (
   return zeaburFetch<CapabilityList>(getListCapabilitiesUrl(), {
     ...options,
     method: "GET",
+  })
+}
+
+export const getGetCatalogUrl = () => {
+  return `/api/v1/cluster/catalog`
+}
+
+/**
+ * @summary The catalog release Zeabur reads, when it was read, and why the last read failed.
+ */
+export const getCatalog = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<CatalogView> => {
+  return zeaburFetch<CatalogView>(getGetCatalogUrl(), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getApplyComponentUrl = (id: string) => {
+  return `/api/v1/cluster/components/${encodeURIComponent(String(id))}/apply`
+}
+
+/**
+ * @summary Writes the next step of the plan whose earlier steps are ready, dry run first, and answers as
+`plan` does. `409` when Zeabur has read another catalog release than the plan's.
+ */
+export const applyComponent = async (
+  id: string,
+  componentRequest: ComponentRequest,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ComponentPlan> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return zeaburFetch<ComponentPlan>(getApplyComponentUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    body: JSON.stringify(componentRequest),
+  })
+}
+
+export const getPlanComponentUrl = (id: string) => {
+  return `/api/v1/cluster/components/${encodeURIComponent(String(id))}/plan`
+}
+
+/**
+ * @summary What installing or removing component `id` writes, and how far each step has come; writes
+nothing. `403` unless the person may do everything everywhere; `503` while Zeabur has never
+read the catalog; `409` when the component was installed by someone else, or another
+component needs it; `422` when Zeabur cannot install it on this cluster.
+ */
+export const planComponent = async (
+  id: string,
+  componentRequest: ComponentRequest,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ComponentPlan> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return zeaburFetch<ComponentPlan>(getPlanComponentUrl(id), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    body: JSON.stringify(componentRequest),
   })
 }
 

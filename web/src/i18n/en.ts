@@ -1190,9 +1190,31 @@ export const en = {
   "installer.how": "How to install",
   "installer.installTitle": (names: string) => `Install ${names}`,
   "installer.removeTitle": (name: string) => `Remove ${name}`,
-  "installer.elsewhere": "If Helm, K3s or a GitOps tool installed it, remove it with that tool.",
   "installer.export":
     "Print the manifests, then apply them with kubectl or commit them to your GitOps repository. Add --format helm for Helm commands.",
+  "components.installing": "Installing…",
+  "components.removing": "Removing…",
+  "components.installed": "Installed, and every health check passes.",
+  "components.removed": "Removed.",
+  "components.untested": (name: string) =>
+    `Zeabur Catalog has not tested ${name} on a cluster like this one.`,
+  "components.privileged": (name: string, level: string) =>
+    `${name} runs pods that need the ${level} Pod Security level.`,
+  "components.steps": "Steps",
+  "components.checks": "Health checks",
+  "components.leftovers": "Stays on the cluster",
+  "components.leftoversWhy":
+    "Removing does not delete these. Delete them yourself when nothing needs them.",
+  "components.state.pending": "Not started",
+  "components.state.waiting": "In progress",
+  "components.state.ready": "Ready",
+  "components.state.failed": "Failed",
+  "components.catalog": (version: string, when: string) =>
+    when ? `Zeabur Catalog ${version}, read ${when}` : `Zeabur Catalog ${version}`,
+  "components.catalogKept": (error: string) => `could not read a newer one: ${error}`,
+  "components.catalogUnreachable": (url: string) => `Zeabur cannot reach Zeabur Catalog at ${url}`,
+  "components.catalogMirror":
+    "Components can be installed once it can. To read the catalog from a mirror, set catalog.url in the Helm chart.",
   "settings.homepage": "Home page",
   "settings.opensInNewTab": "(opens in a new tab)",
   "category.traffic": "Traffic",

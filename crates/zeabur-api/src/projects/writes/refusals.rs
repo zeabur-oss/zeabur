@@ -171,7 +171,7 @@ pub(super) fn denied(write: &WriteRequest) -> Denied {
     let target = &write.target;
     let (verb, name, subresource) = match write.body {
         WriteBody::Create(_) => ("create", None, ""),
-        WriteBody::JsonPatch(_) | WriteBody::MergePatch(_) => {
+        WriteBody::JsonPatch(_) | WriteBody::MergePatch(_) | WriteBody::Apply(_) => {
             ("patch", Some(target.name.clone()), "")
         }
         WriteBody::EphemeralContainers(_) => {
