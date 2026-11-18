@@ -50,7 +50,7 @@ export function ComponentPlan({
     mutationFn: (version: string) => applyComponent(id, { action, catalogVersion: version }),
     onSuccess: (next) => {
       setLatest(next)
-      if (next.done || next.steps.some((s) => s.state === "failed")) {
+      if (next.done || [...next.steps, ...next.checks].some((s) => s.state === "failed")) {
         setRunning(false)
         void refresh(capabilitiesQuery)
       }

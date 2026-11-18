@@ -100,7 +100,7 @@ zeaburctl components export velero --format helm
 
 ## 目录从哪里下载
 
-Zeabur 从 `https://oss-catalog.zeabur.com/v1/` 下载 Zeabur Catalog，每 10 分钟检查一次是否有新版本。最后下载的版本保存在它所在 Namespace 的 ConfigMap `zeabur-catalog` 中，重启或目录暂时无法访问时仍可使用。组件页会显示当前使用的版本和下载时间。
+Zeabur 从 `https://oss-catalog.zeabur.com/v1/` 下载 Zeabur Catalog，手上的版本超过 10 分钟就重新下载。最后下载的版本保存在它所在 Namespace 的 ConfigMap `zeabur-catalog` 中，重启或目录暂时无法访问时仍可使用。组件页会显示当前使用的版本和下载时间。
 
 如果 Zeabur 下载不到目录，也没有保存的版本，页面会说明原因，并提供**重试**。已安装的组件和所有服务照常运行，只有安装组件时才需要目录。
 

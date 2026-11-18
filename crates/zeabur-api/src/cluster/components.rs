@@ -56,7 +56,7 @@ const WHY: &str = "installing a chart runs Helm as a cluster administrator.";
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ComponentAction {
-    /// Install the component and what it needs, or bring it to the catalog's version.
+    /// Install the component and what it needs.
     Install,
     /// Remove the component.
     Remove,
@@ -255,8 +255,17 @@ pub(crate) async fn apply(
     if first.state == StepState::Failed {
         return Ok(Json(plan));
     }
-    for dry_run in [true, false] {
-        for object in step {
+    // A dry run of an object in a namespace that does not exist yet fails, so namespaces go
+    // first.
+    let (namespaces, rest): (Vec<&Placed>, Vec<&Placed>) =
+        step.iter().partition(|o| o.target.kind == "Namespace");
+    for (dry_run, group) in [
+        (true, &namespaces),
+        (false, &namespaces),
+        (true, &rest),
+        (false, &rest),
+    ] {
+        for object in group {
             match request.action {
                 ComponentAction::Install => {
                     let target = object.target.clone();
@@ -314,6 +323,16 @@ struct Placed {
     body: Value,
     /// For a removal: the uid of the object found, `None` when it is gone.
     uid: Option<String>,
+}
+
+/// One install step against the cluster.
+struct PlannedStep {
+    view: ComponentStep,
+    placed: Vec<Placed>,
+    /// Zeabur wrote an object of the step.
+    ours: bool,
+    /// An object of the step that exists and that Zeabur did not write.
+    foreign: Option<String>,
 }
 
 /// What a plan is made against.
@@ -424,12 +443,22 @@ impl World {
             let earlier_ready = steps
                 .iter()
                 .all(|s: &ComponentStep| s.state == StepState::Ready);
-            let (view, placed, ours) = self.install_step(cluster, step, earlier_ready).await?;
-            if ours {
+            let planned = self.install_step(cluster, step, earlier_ready).await?;
+            if let Some(object) = planned.foreign {
+                return Err(ApiError::from(Problem::new(
+                    Kind::Conflict,
+                    format!(
+                        "{object} of {} already exists, and Zeabur did not write it. Zeabur does \
+                         not change a component it did not install.",
+                        step.component
+                    ),
+                )));
+            }
+            if planned.ours {
                 managed.insert(step.component.clone());
             }
-            steps.push(view);
-            placed_steps.push(placed);
+            steps.push(planned.view);
+            placed_steps.push(planned.placed);
         }
         // A Helm release of the same name that no `HelmChart` of Zeabur's made: removing the
         // chart would uninstall someone else's release.
@@ -499,11 +528,12 @@ impl World {
         cluster: &dyn Cluster,
         step: &engine::Step,
         earlier_ready: bool,
-    ) -> Result<(ComponentStep, Vec<Placed>, bool), ApiError> {
+    ) -> Result<PlannedStep, ApiError> {
         let mut progress = Vec::new();
         let mut writes = Vec::new();
         let mut placed = Vec::new();
         let mut zeaburs = false;
+        let mut foreign = None;
         for desired in &step.objects {
             let Some(target) = self.place(desired) else {
                 let kind = text(&desired.object, "/kind");
@@ -515,9 +545,17 @@ impl World {
                 writes.push(view(&desired.object, None, Some(&desired.namespace)));
                 continue;
             };
-            let body = with_namespace(&desired.object, &target);
+            let mut body = with_namespace(&desired.object, &target);
             let found = read(cluster, &target).await?;
-            zeaburs |= found.as_ref().is_some_and(|o| ours(o, &step.component));
+            if let Some(found) = &found {
+                if target.kind == "Namespace" {
+                    keep_looser_level(&mut body, found);
+                } else if ours(found, &step.component) {
+                    zeaburs = true;
+                } else {
+                    foreign.get_or_insert_with(|| format!("{} {}", target.kind, target.name));
+                }
+            }
             progress.push(self.progress(cluster, &target, found.as_ref()).await?);
             writes.push(view(&body, Some(&target), None));
             placed.push(Placed {
@@ -534,7 +572,12 @@ impl World {
             message,
             writes,
         };
-        Ok((view, placed, zeaburs))
+        Ok(PlannedStep {
+            view,
+            placed,
+            ours: zeaburs,
+            foreign,
+        })
     }
 
     async fn remove(&self, cluster: &dyn Cluster, id: &str) -> Result<Planned, ApiError> {
@@ -869,6 +912,28 @@ async fn read(cluster: &dyn Cluster, target: &ObjectTarget) -> Result<Option<Val
         .await
         .map_err(|e| ApiError::from(e.into_problem(&format!("{} {}", target.kind, target.name))))?;
     Ok(found.and_then(|o| serde_json::to_value(o).ok()))
+}
+
+const ENFORCE: &str = "pod-security.kubernetes.io/enforce";
+
+/// Keeps a namespace's Pod Security level when it is looser than the desired one: components
+/// share namespaces, and one that needs `privileged` must not lose it to one that needs less.
+fn keep_looser_level(desired: &mut Value, found: &Value) {
+    let rank = |level: Option<&str>| match level {
+        Some("privileged") => 2,
+        Some("baseline") => 1,
+        _ => 0,
+    };
+    let Some(current) = label(found, ENFORCE) else {
+        return;
+    };
+    if rank(Some(current)) > rank(label(desired, ENFORCE))
+        && let Some(labels) = desired
+            .pointer_mut("/metadata/labels")
+            .and_then(Value::as_object_mut)
+    {
+        labels.insert(ENFORCE.to_owned(), Value::from(current));
+    }
 }
 
 /// Whether Zeabur wrote `object` for `component`.

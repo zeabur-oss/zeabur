@@ -41,6 +41,8 @@ const KEY: &str = "snapshot.json.gz";
 const FRESH: Duration = Duration::from_mins(10);
 /// How long to wait after a failed read.
 const RETRY: Duration = Duration::from_mins(1);
+/// How long a failed first read waits before the next one: short, as there is nothing to serve.
+const RETRY_FIRST: Duration = Duration::from_secs(5);
 
 /// One answer of the API.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -161,9 +163,9 @@ impl Catalog {
         &self.url
     }
 
-    /// The snapshot, read again when the last read is older than the API's `max-age`, a minute
-    /// after a failed read, or on every call while there is none. One read goes at a time, and
-    /// the others wait for it.
+    /// The snapshot, read again when the last read is older than the API's `max-age`, or a
+    /// minute after a failed read (5 seconds while there is no snapshot). One read goes at a
+    /// time, and the others wait for it.
     pub async fn current(&self, now: Instant, fetched_at: &str) -> Current {
         let mut kept = self.kept.lock().await;
         if !kept.cache_read {
@@ -175,9 +177,8 @@ impl Catalog {
                 }
             }
         }
-        // Without a snapshot there is nothing to serve, so every request tries again.
         if let Some(fetch) = &self.fetch
-            && (kept.snapshot.is_none() || kept.next.is_none_or(|next| now >= next))
+            && kept.next.is_none_or(|next| now >= next)
         {
             let mut answer = self.refresh(fetch.as_ref(), &kept, fetched_at).await;
             if matches!(answer, Err(Refusal::Catalog(CatalogError::Mismatch(_)))) {
@@ -202,7 +203,12 @@ impl Catalog {
                     kept.error = None;
                 }
                 Err(e) => {
-                    kept.next = Some(now + RETRY);
+                    let wait = if kept.snapshot.is_some() {
+                        RETRY
+                    } else {
+                        RETRY_FIRST
+                    };
+                    kept.next = Some(now + wait);
                     kept.error = Some(e.to_string());
                 }
             }
@@ -462,6 +468,22 @@ mod tests {
         let never = catalog(&fresh, None).current(start, "t0").await;
         assert!(never.snapshot.is_none());
         assert!(never.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn a_failed_first_read_is_tried_again_after_a_few_seconds() {
+        let fake = Fake::new();
+        *fake.down.lock().unwrap() = true;
+        let catalog = catalog(&fake, None);
+        let start = Instant::now();
+        catalog.current(start, "t0").await;
+        catalog.current(start + Duration::from_secs(1), "t1").await;
+        assert_eq!(fake.reads.lock().unwrap().len(), 1);
+
+        *fake.down.lock().unwrap() = false;
+        let now = catalog.current(start + RETRY_FIRST, "t2").await;
+        assert!(now.snapshot.is_some());
+        assert!(now.error.is_none());
     }
 
     #[tokio::test]

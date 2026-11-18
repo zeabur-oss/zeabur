@@ -100,7 +100,7 @@ Zeabur 裝的元件，在卡片按**移除**，檢查步驟後再按**移除**�
 
 ## 目錄從哪裡下載
 
-Zeabur 從 `https://oss-catalog.zeabur.com/v1/` 下載 Zeabur Catalog，每 10 分鐘檢查一次有沒有新版。最後下載到的版本會存在它所在 Namespace 的 ConfigMap `zeabur-catalog`，重新啟動或目錄暫時連不上時都還在。元件頁會顯示目前用的版本和下載時間。
+Zeabur 從 `https://oss-catalog.zeabur.com/v1/` 下載 Zeabur Catalog，手上的版本超過 10 分鐘就重新下載。最後下載到的版本會存在它所在 Namespace 的 ConfigMap `zeabur-catalog`，重新啟動或目錄暫時連不上時都還在。元件頁會顯示目前用的版本和下載時間。
 
 Zeabur 下載不到目錄、手上也沒有存好的版本時，頁面會說明原因，並提供**重試**。已安裝的元件和所有服務照常運作，只有安裝元件時才需要目錄。
 

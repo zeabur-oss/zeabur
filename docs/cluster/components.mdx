@@ -100,7 +100,7 @@ After removal, the component's namespace and volumes remain. Some charts also de
 
 ## Where the catalog comes from
 
-Zeabur downloads Zeabur Catalog from `https://oss-catalog.zeabur.com/v1/` and checks for a new release every 10 minutes. It keeps the last release it downloaded in the ConfigMap `zeabur-catalog` in its namespace, so it stays available after a restart or while the catalog is down. The components page shows the release and when it was downloaded.
+Zeabur downloads Zeabur Catalog from `https://oss-catalog.zeabur.com/v1/`, and again once its copy is more than 10 minutes old. It keeps the last release it downloaded in the ConfigMap `zeabur-catalog` in its namespace, so it stays available after a restart or while the catalog is down. The components page shows the release and when it was downloaded.
 
 If Zeabur can't download the catalog and has no saved copy, the page says why and offers **Try again**. Installed components and every service keep working; only installing a component needs the catalog.
 

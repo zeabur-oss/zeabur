@@ -344,6 +344,48 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_chart_zeabur_did_not_write_is_not_taken_over() {
+        let cluster = cluster();
+        put(
+            &cluster,
+            json!({
+                "apiVersion": "helm.cattle.io/v1",
+                "kind": "HelmChart",
+                "metadata": {"name": "cert-manager", "namespace": "kube-system"},
+                "spec": {"chart": "cert-manager"},
+            }),
+        );
+        let (status, problem) = call(&app(&cluster, false), "plan", "install", "").await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert!(
+            problem["detail"]
+                .as_str()
+                .unwrap()
+                .contains("HelmChart cert-manager")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_shared_namespace_keeps_its_looser_pod_security_level() {
+        let cluster = cluster();
+        put(
+            &cluster,
+            json!({
+                "apiVersion": "v1",
+                "kind": "Namespace",
+                "metadata": {"name": "cert-manager",
+                             "labels": {"pod-security.kubernetes.io/enforce": "privileged"}},
+            }),
+        );
+        call(&app(&cluster, false), "apply", "install", "0.5.3").await;
+        let namespace = dynamic(&cluster, "Namespace", "cert-manager").unwrap();
+        assert_eq!(
+            namespace["metadata"]["labels"]["pod-security.kubernetes.io/enforce"],
+            "privileged"
+        );
+    }
+
+    #[tokio::test]
     async fn a_certificate_outside_cert_managers_namespace_keeps_it() {
         let cluster = cluster();
         let app = app(&cluster, false);
