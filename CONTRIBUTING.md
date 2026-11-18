@@ -206,7 +206,9 @@ and exempts `@zeabur-oss/design-system`, our own package; its isolated linker le
 only what its own `package.json` lists. No package is listed in `trustedDependencies`, so no
 install script runs. Add a package with `bun add` from the package's directory.
 
-Icons are Phosphor's, from `@iconify-json/ph`, built in by unplugin-icons with svgr. Components
+Icons are Phosphor's, from `@iconify-json/ph`, built in by unplugin-icons with svgr. Each app's
+`scripts/icons.ts` imports svgr itself: under the isolated linker a tool cannot load a package by
+name that only the app lists. Components
 come from the shadcn registry (`bunx --bun shadcn@latest add <component>`), on Base UI. After
 adding a runtime package, check the first-load size: `./scripts/build-ui.sh &&
 ./scripts/ui-budget.sh`.

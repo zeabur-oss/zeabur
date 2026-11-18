@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import Icons from "unplugin-icons/vite"
 import { defineConfig } from "vite"
+import { icons } from "./scripts/icons.ts"
 
 // The Rust server the dev server forwards `/api` to (`cargo run -p zeabur-api --example demo`).
 const api = process.env.ZEABUR_API ?? "http://127.0.0.1:8080"
@@ -39,7 +40,7 @@ export default defineConfig({
       exclude: /\/node_modules\/(?!@zeabur-oss\/design-system\/)/,
     }),
     tailwindcss(),
-    Icons({ scale: 1, compiler: "jsx", jsx: "react" }),
+    Icons(icons),
   ],
   resolve: {
     alias: {
