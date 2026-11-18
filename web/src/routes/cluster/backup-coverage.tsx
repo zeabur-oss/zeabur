@@ -7,20 +7,11 @@ import type { Schemas } from "@/api/client"
 import { capabilitiesQuery } from "@/api/queries"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
-import { verdict, verdictHealth, VELERO_COMPONENT } from "@/model/cluster-backups"
+import { installedOf, verdict, verdictHealth, VELERO_COMPONENT } from "@/model/cluster-backups"
 import type { Health } from "@/model/service"
 import { Section } from "@/routes/cluster/section"
 
 const K8UP_COMPONENT = "k8up"
-
-/** Whether `id` (`k8up`) is installed; unknown when the person cannot read what is. */
-function installedOf(items: Schemas.Capability[] | undefined, id: string) {
-  if (!items) return undefined
-  const [capability, component] = id.split("/")
-  return items
-    .find((c) => c.name === capability)
-    ?.installations.some((i) => i.component === component)
-}
 
 export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
   const t = useT()

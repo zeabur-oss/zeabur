@@ -255,3 +255,9 @@ export function projectCoverage(data: Schemas.ProjectBackups): ProjectCoverage |
  * them, so no signed URL or key reaches the page. */
 export const backupDownloadUrl = (backup: string) =>
   `/api/v1/cluster/backups/${encodeURIComponent(backup)}/download`
+
+/** Whether the component `id` (`k8up`) is installed under any capability; unknown when the
+ * person cannot read what is. */
+export function installedOf(items: Schemas.Capability[] | undefined, id: string) {
+  return items?.some((c) => c.installations.some((i) => i.component === id))
+}
