@@ -41,6 +41,15 @@ NSIS install and the AppImage replace themselves; a `.deb`, `.rpm`, the portable
 development build offer the release page. An update must carry a signature of the key in
 `tauri.conf.json` for that exact version; while the key is empty the app does not check.
 
+## Screenshots
+
+The images of the chooser and the cluster error page are an image set, `desktop`, taken with
+Chromium from the pages of `desktop/web` with mocked commands (`docs/internal/screenshots.md`):
+
+```sh
+nix develop -c scripts/docs-shots.sh desktop
+```
+
 ## Build for Windows
 
 From macOS or Linux with [cargo-xwin](https://github.com/rust-cross/cargo-xwin):
