@@ -190,9 +190,10 @@ fn identity_ingress() -> Value {
 /// CA in the full profile, and Zeabur Proxy when its image is built here.
 fn values(image: &str, full: bool, proxy_image: Option<&str>) -> Value {
     let (repository, tag) = split_tag(image);
+    // The templates prefer a digest: an empty one clears the one a released chart pins.
+    let digest = image.split_once('@').map_or("", |(_, digest)| digest);
     let mut values = json!({
-        // An empty digest clears the one a released chart pins, which the templates prefer.
-        "image": {"repository": repository, "tag": tag.unwrap_or("latest"), "digest": "",
+        "image": {"repository": repository, "tag": tag.unwrap_or("latest"), "digest": digest,
                   "pullPolicy": "IfNotPresent"},
         "clusterName": cluster::NAME,
         "publicUrl": format!("https://{ZEABUR_HOST}"),
@@ -314,6 +315,13 @@ mod tests {
         assert_eq!(values["issuer"]["url"], "https://identity.localhost");
         assert!(values.get("builds").is_none());
         assert!(values.get("proxy").is_none());
+    }
+
+    #[test]
+    fn a_digest_reference_keeps_its_digest() {
+        let values = values("ghcr.io/zeabur-oss/zeabur@sha256:0123", false, None);
+        assert_eq!(values["image"]["repository"], "ghcr.io/zeabur-oss/zeabur");
+        assert_eq!(values["image"]["digest"], "sha256:0123");
     }
 
     #[test]

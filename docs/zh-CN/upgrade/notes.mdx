@@ -7,6 +7,21 @@ description: 每一版不兼容的变更，以及升级前要先做的事。一�
 
 一次跨好几版升级时，从你当前的版本开始，依次看过到目标版本为止的每一节。新的版本写在最上面。
 
+## v0.2 → v0.3
+
+zeabur-installer 已经移除。Zeabur 用 Helm chart 装进现有的集群；全新的服务器见 [zeabur-oss/zeabur#430](https://github.com/zeabur-oss/zeabur/issues/430)。
+
+chart 现在自带 `zeabur-system-hosts` 准入策略。在没有标上 `zeabur.com/platform: "true"` 的命名空间里，新增或修改的 Ingress 规则都要写主机名，HTTPRoute 都要写 hostnames，而且不能用 Zeabur 或 Zeabur Identity 的域名。已经存在的对象照常运行，直到改了 `spec` 为止。不想要这个策略，就设置 `systemHosts.enabled: false`。
+
+### 用 zeabur-installer 安装的集群
+
+zeabur-installer 在 chart 之外应用过同一个策略，Helm 不会接管它。升级前先删掉，chart 会重新创建：
+
+```sh
+kubectl delete validatingadmissionpolicybinding zeabur-system-hosts-zeabur zeabur-system-hosts-zeabur-identity
+kubectl delete validatingadmissionpolicy zeabur-system-hosts
+```
+
 ## v0.1 → v0.2
 
 用 zeabur-installer 安装的服务器，要先改配置文件、移除 v0.1 装的 zot，再运行 `plan` 和 `apply`。有后来加入的节点时，例如工作节点或 RKE2 的其他服务器，服务器升级完要让每个节点重新加入。
