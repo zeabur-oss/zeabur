@@ -5340,6 +5340,13 @@ components:
       required:
       - url
       properties:
+        cacheError:
+          type:
+          - string
+          - "null"
+          description: |-
+            Why the release read is kept in memory only, not in the ConfigMap `zeabur-catalog`, so
+            a restart reads the catalog again.
         commit:
           type:
           - string

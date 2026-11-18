@@ -118,14 +118,27 @@ async fn an_administrator_installs_cert_manager_and_removes_it() {
         .map(|w| w["name"].as_str().unwrap())
         .collect();
     assert!(!names.is_empty(), "{installed}");
+    // The plan needs an issuer to exist; cert-manager reports it Ready a moment later.
     for name in &names {
-        let issuer = issuers.get(name).await.unwrap();
-        let ready = issuer.data["status"]["conditions"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .any(|c| c["type"] == "Ready" && c["status"] == "True");
-        assert!(ready, "{name} is not Ready");
+        let deadline = Instant::now() + Duration::from_secs(120);
+        loop {
+            let issuer = issuers.get(name).await.unwrap();
+            let ready = issuer.data["status"]["conditions"]
+                .as_array()
+                .is_some_and(|c| {
+                    c.iter()
+                        .any(|c| c["type"] == "Ready" && c["status"] == "True")
+                });
+            if ready {
+                break;
+            }
+            assert!(
+                Instant::now() < deadline,
+                "{name} is not Ready: {}",
+                issuer.data
+            );
+            tokio::time::sleep(Duration::from_secs(2)).await;
+        }
     }
 
     apply_all(&app, "remove").await;

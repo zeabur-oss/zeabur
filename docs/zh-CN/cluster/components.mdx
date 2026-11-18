@@ -1,9 +1,9 @@
 ---
 title: 查看与安装集群组件
-description: 查看集群安装了哪些组件、状态如何、还缺什么，再用 zeaburctl 输出组件的 manifest 并应用。
+description: 查看集群安装了哪些组件、状态如何、还缺什么，再在页面上或用 zeaburctl 安装。
 ---
 
-打开**集群** → **组件**，**已安装**列出检测到的组件，**目录**列出 Zeabur Catalog 中的组件。Zeabur 只显示状态和要运行的命令。`zeaburctl components export` 会输出 manifest 或 Helm 命令，由你应用到集群。
+打开**集群** → **组件**，**已安装**列出检测到的组件，**目录**列出 Zeabur Catalog 中的组件。在 K3s 和 RKE2 上，集群管理员可以直接在这里安装和移除组件。其他集群，或者想把组件放在 GitOps 仓库中管理时，用 `zeaburctl components export` 输出 manifest，自行应用。
 
 ![集群组件页的已安装列表和目录](../images/shots/cluster-components.avif)
 
@@ -19,14 +19,37 @@ description: 查看集群安装了哪些组件、状态如何、还缺什么，�
 
 如果备份、通知这类功能页已经能用，组件卡片却还显示**安装**，说明组件页没有检测到它，通常是因为安装时使用了其他名称或方式。先找到现有部署，不要重复安装。
 
-## 安装组件
+## 在页面上安装
+
+只有能在集群中执行任何操作的人（`cluster-admin`）可以在这里安装：Zeabur 会把每个 Chart 交给集群的 helm-controller，由它以完整权限安装。集群需要有 helm-controller，K3s 和 RKE2 都已内置。
+
+<Steps>
+<Step>
+
+### 检查步骤
+
+在组件卡片上点击**安装**，弹窗会列出每个步骤和它要写入的对象，点击对象可以查看 YAML。如果集群缺少这个组件依赖的其他组件，会先安装缺少的组件。此时还不会写入任何内容。
+
+</Step>
+<Step>
+
+### 安装
+
+点击**安装**。Zeabur 用你的账号一次写入一个步骤，上一步就绪后才写入下一步。保持弹窗打开，等每个步骤和健康检查都显示**就绪**；如果中途关闭，再点一次**安装**会从停下的地方继续。健康检查用时比预期长时，弹窗会说明要检查什么。
+
+</Step>
+</Steps>
+
+如果弹窗显示组件已经安装、但不是 Zeabur 安装的，Zeabur 不会改动它。升级或移除请用当初安装它的工具。
+
+## 用 zeaburctl 安装
 
 <Steps>
 <Step>
 
 ### 查看要运行的命令
 
-在组件卡片上点击**安装**，弹窗会列出要运行的命令。**新建**菜单、模板、构建设置或数据库备份缺少组件时，点击**安装方式**也会打开同一个弹窗，一次列出这件事缺的所有组件，命令可以直接复制。
+**新建**菜单、模板、构建设置或数据库备份缺少组件时，点击**安装方式**会打开弹窗，一次列出这件事缺的所有组件和要运行的命令，命令可以直接复制。
 
 </Step>
 <Step>
@@ -67,13 +90,39 @@ zeaburctl components export velero --format helm
 
 ## 移除组件
 
-Zeabur 不会移除组件。请用当初安装它的文件或工具移除，例如 `kubectl delete -f`、`helm uninstall`、Flux 或 Argo CD。
+对于 Zeabur 安装的组件，在卡片上点击**移除**，检查步骤后再点击**移除**。Zeabur 会按相反的顺序删除组件的对象；删除 Chart 后，helm-controller 会卸载这个 Chart。弹窗会列出会保留的内容，例如 CRD 和密钥。如果还有其他已安装的组件依赖这个组件，或者它的自定义资源在其自身 Namespace 之外仍有对象在使用，Zeabur 会拒绝移除，并列出具体是哪些。
+
+不是 Zeabur 安装的组件，请用当初安装它的文件或工具移除，例如 `kubectl delete -f`、`helm uninstall`、Flux 或 Argo CD。
 
 移除前先确认没有东西还在使用它，例如仍有该组件的自定义资源、仍有 Longhorn 的卷，或仍有副本从 zot 拉取镜像。Longhorn 这类保存数据的组件，移除时会连数据一起删除，先备份。
 
 移除后，组件的 Namespace 和卷会保留。有些 Chart 会连 CRD 和它们的所有对象一起删除，其他 CRD 会保留。确定用不到留下的内容后，再手动删除。
 
+## 目录从哪里下载
+
+Zeabur 从 `https://oss-catalog.zeabur.com/v1/` 下载 Zeabur Catalog，每 10 分钟检查一次是否有新版本。最后下载的版本保存在它所在 Namespace 的 ConfigMap `zeabur-catalog` 中，重启或目录暂时无法访问时仍可使用。组件页会显示当前使用的版本和下载时间。
+
+如果 Zeabur 下载不到目录，也没有保存的版本，页面会说明原因，并提供**重试**。已安装的组件和所有服务照常运行，只有安装组件时才需要目录。
+
+### 使用镜像
+
+集群无法访问互联网时，自行通过 HTTPS 提供一份目录：
+
+1. 从 [Zeabur Catalog 的发布版本](https://github.com/zeabur-oss/catalog/releases)下载 `api-v1.tar.gz` 并解压，里面是 `v1` 文件夹。
+2. 用任意 Web 服务器提供包含 `v1` 的文件夹，使用 HTTPS，且集群要信任它的证书。使用私有 CA 时，参见[信任私有 CA](../install/existing-cluster.mdx#信任私有-ca)。
+3. 让 Zeabur 改从镜像下载：
+
+   ```sh
+   helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
+     --version <版本> \
+     --namespace zeabur --reset-then-reuse-values \
+     --set catalog.url=https://catalog.example.internal/v1/
+   ```
+
+地址必须以 `https://` 开头。目录只说明要安装哪些 Chart 和镜像，helm-controller 和节点仍会从原来的镜像仓库拉取，所以这些也需要准备镜像。
+
 ## 常见失败
 
 - 组件页显示权限不足：将页面列出的缺失权限交给集群管理员。
+- 步骤显示**失败**：查看它的消息。如果是 Chart，也查看 `kube-system` 中 `helm-install-<名称>` Job 的日志。
 - 安装后一直没有出现在**已安装**中：查看 `kube-system` 中 `helm-install-<名称>` Job 的日志，以及组件的工作负载是否已启动。

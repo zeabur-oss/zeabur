@@ -1212,9 +1212,12 @@ export const en = {
   "components.catalog": (version: string, when: string) =>
     when ? `Zeabur Catalog ${version}, read ${when}` : `Zeabur Catalog ${version}`,
   "components.catalogKept": (error: string) => `could not read a newer one: ${error}`,
-  "components.catalogUnreachable": (url: string) => `Zeabur cannot reach Zeabur Catalog at ${url}`,
-  "components.catalogMirror":
-    "Components can be installed once it can. To read the catalog from a mirror, set catalog.url in the Helm chart.",
+  "components.catalogUnreachable": "Zeabur could not download Zeabur Catalog",
+  "components.catalogUnaffected":
+    "Installed components and every service keep working. Only installing a component needs the catalog.",
+  "components.catalogInMemory": (error: string) =>
+    `kept in memory only, so a restart downloads it again: ${error}`,
+  "components.catalogMirror": "To download it from a mirror, set catalog.url in the Helm chart.",
   "settings.homepage": "Home page",
   "settings.opensInNewTab": "(opens in a new tab)",
   "category.traffic": "Traffic",

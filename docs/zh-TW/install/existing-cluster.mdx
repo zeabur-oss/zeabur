@@ -157,13 +157,15 @@ kubectl -n zeabur create secret generic zeabur-plan-key \
 
 ## 安裝 Zeabur 需要的元件
 
-Zeabur 的元件頁只會顯示狀態，不會替你安裝。用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 印出元件的 manifest，再用 `kubectl` 套用，或提交到 GitOps 儲存庫：
+在 K3s 和 RKE2 上，叢集管理員可以在**叢集** → **元件**安裝元件，見[從頁面安裝](../cluster/components.mdx#從頁面安裝)。Zeabur 會從 Zeabur Catalog 下載元件清單；叢集連不上網際網路時，見[改用鏡像](../cluster/components.mdx#改用鏡像)。
+
+其他叢集，或想把元件放在 GitOps 儲存庫管理時，用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 印出元件的 manifest，再用 `kubectl` 套用，或提交到儲存庫：
 
 ```sh
 zeaburctl components export cert-manager --format flux > cert-manager.yaml
 ```
 
-叢集是 K3s 或 RKE2 時，用預設的 `helmchart` 格式，交給內建的 helm-controller 安裝。其他叢集用 `helm`、`flux` 或 `argocd`。
+預設的 `helmchart` 格式交給 K3s 和 RKE2 內建的 helm-controller 安裝。其他叢集用 `helm`、`flux` 或 `argocd`。
 
 ## 移除管理介面
 

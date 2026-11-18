@@ -116,6 +116,7 @@ struct Kept {
     etag: Option<String>,
     next: Option<Instant>,
     error: Option<String>,
+    cache_error: Option<String>,
     cache_read: bool,
 }
 
@@ -126,6 +127,8 @@ pub struct Current {
     pub snapshot: Option<Arc<Snapshot>>,
     /// Why the last read failed.
     pub error: Option<String>,
+    /// Why the last snapshot read is not kept in the cluster, only in memory.
+    pub cache_error: Option<String>,
 }
 
 impl Catalog {
@@ -158,8 +161,9 @@ impl Catalog {
         &self.url
     }
 
-    /// The snapshot, read again when the last read is older than the API's `max-age`. One read
-    /// goes at a time, and the others wait for it.
+    /// The snapshot, read again when the last read is older than the API's `max-age`, a minute
+    /// after a failed read, or on every call while there is none. One read goes at a time, and
+    /// the others wait for it.
     pub async fn current(&self, now: Instant, fetched_at: &str) -> Current {
         let mut kept = self.kept.lock().await;
         if !kept.cache_read {
@@ -171,8 +175,9 @@ impl Catalog {
                 }
             }
         }
+        // Without a snapshot there is nothing to serve, so every request tries again.
         if let Some(fetch) = &self.fetch
-            && kept.next.is_none_or(|next| now >= next)
+            && (kept.snapshot.is_none() || kept.next.is_none_or(|next| now >= next))
         {
             let mut answer = self.refresh(fetch.as_ref(), &kept, fetched_at).await;
             if matches!(answer, Err(Refusal::Catalog(CatalogError::Mismatch(_)))) {
@@ -184,10 +189,12 @@ impl Catalog {
                     kept.error = None;
                 }
                 Ok(Some((snapshot, etag))) => {
-                    if let Some((cluster, namespace)) = &self.cache
-                        && let Err(e) = write_cache(cluster.as_ref(), namespace, &snapshot).await
-                    {
-                        tracing::warn!(error = %e, "the Zeabur Catalog was not cached");
+                    if let Some((cluster, namespace)) = &self.cache {
+                        let written = write_cache(cluster.as_ref(), namespace, &snapshot).await;
+                        if let Err(e) = &written {
+                            tracing::warn!(error = %e, "the Zeabur Catalog was not cached");
+                        }
+                        kept.cache_error = written.err();
                     }
                     kept.snapshot = Some(Arc::new(snapshot));
                     kept.etag = etag;
@@ -203,6 +210,7 @@ impl Catalog {
         Current {
             snapshot: kept.snapshot.clone(),
             error: kept.error.clone(),
+            cache_error: kept.cache_error.clone(),
         }
     }
 
@@ -321,6 +329,10 @@ pub struct CatalogView {
     /// Why the last read failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// Why the release read is kept in memory only, not in the ConfigMap `zeabur-catalog`, so
+    /// a restart reads the catalog again.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cache_error: Option<String>,
 }
 
 /// The catalog release Zeabur reads, when it was read, and why the last read failed.
@@ -339,6 +351,7 @@ pub(crate) async fn get(
         commit: release.map(|r| r.commit.clone()),
         fetched_at: current.snapshot.as_ref().map(|s| s.fetched_at.clone()),
         error: current.error,
+        cache_error: current.cache_error,
     }))
 }
 
@@ -478,5 +491,17 @@ mod tests {
             .await;
         assert_eq!(now.snapshot.unwrap().fetched_at, "t0");
         assert!(now.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn a_cache_that_cannot_be_written_is_named() {
+        let mut state = zeabur_kube::memory::State::default();
+        state.forbidden_writes.insert(format!("ConfigMap/{CACHE}"));
+        let cluster: Arc<dyn Cluster> = Arc::new(zeabur_kube::memory::MemoryCluster::new(state));
+        let now = catalog(&Fake::new(), Some(cluster))
+            .current(Instant::now(), "t0")
+            .await;
+        assert!(now.snapshot.is_some());
+        assert!(now.cache_error.unwrap().contains(CACHE));
     }
 }

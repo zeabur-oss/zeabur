@@ -1177,6 +1177,12 @@ export type CapabilityList = {
  */
 export type CatalogView = {
   /**
+   * Why the release read is kept in memory only, not in the ConfigMap `zeabur-catalog`, so
+   * a restart reads the catalog again.
+   * @nullable
+   */
+  cacheError?: string | null
+  /**
    * The release's commit.
    * @nullable
    */

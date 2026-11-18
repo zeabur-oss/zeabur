@@ -1124,9 +1124,10 @@ export const zhCN: Messages = {
   "components.catalog": (version, when) =>
     when ? `Zeabur Catalog ${version}，${when}读取` : `Zeabur Catalog ${version}`,
   "components.catalogKept": (error) => `读不到更新的版本：${error}`,
-  "components.catalogUnreachable": (url) => `Zeabur 连不到 ${url} 的 Zeabur Catalog`,
-  "components.catalogMirror":
-    "连上之后才能安装组件。要改从镜像站读取，请设置 Helm chart 的 catalog.url。",
+  "components.catalogUnreachable": "Zeabur 下载不到 Zeabur Catalog",
+  "components.catalogUnaffected": "已安装的组件和所有服务都照常运行，只有安装组件时才需要目录。",
+  "components.catalogInMemory": (error) => `只保存在内存里，重启后会再下载一次：${error}`,
+  "components.catalogMirror": "要改从镜像站下载，请设置 Helm chart 的 catalog.url。",
   "settings.homepage": "主页",
   "settings.opensInNewTab": "（在新标签页打开）",
   "category.traffic": "流量",

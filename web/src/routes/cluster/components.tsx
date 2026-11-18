@@ -31,7 +31,7 @@ import { Segmented } from "@/components/bits"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
@@ -265,19 +265,28 @@ function useDown() {
 /** Which Zeabur Catalog release the page shows, and why Zeabur could not read a newer one. */
 function CatalogStatus() {
   const { t, locale } = useI18n()
-  const catalog = useQuery(catalogQuery).data
+  const query = useQuery(catalogQuery)
+  const catalog = query.data
   if (!catalog) return null
   if (!catalog.version)
     return (
       <Alert variant="warn">
-        <AlertTitle>{t("components.catalogUnreachable", catalog.url)}</AlertTitle>
+        <AlertTitle>{t("components.catalogUnreachable")}</AlertTitle>
         <AlertDescription>
-          {catalog.error ? (
-            <p className="font-mono break-all" translate="no">
-              {catalog.error}
-            </p>
-          ) : null}
+          <p>{t("components.catalogUnaffected")}</p>
+          <p className="font-mono break-all" translate="no">
+            {catalog.url}
+            {catalog.error ? `: ${catalog.error}` : ""}
+          </p>
           <p>{t("components.catalogMirror")}</p>
+          <Button
+            variant="outline"
+            size="xs"
+            loading={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            {t("common.retry")}
+          </Button>
         </AlertDescription>
       </Alert>
     )
@@ -289,6 +298,9 @@ function CatalogStatus() {
         catalog.fetchedAt ? formatAgo(catalog.fetchedAt, locale) : "",
       )}
       {catalog.error ? `${t("common.sep")}${t("components.catalogKept", catalog.error)}` : ""}
+      {catalog.cacheError
+        ? `${t("common.sep")}${t("components.catalogInMemory", catalog.cacheError)}`
+        : ""}
     </p>
   )
 }
