@@ -384,7 +384,9 @@ pub struct Change {
     pub zeabur_version: &'static str,
     /// How Zeabur runs.
     pub mode: Mode,
-    /// The person, as `zeabur_active` hashes them for the UTC day of this event.
+    /// The person, as `zeabur_active` hashes them for the UTC day the change was submitted. Both
+    /// events of a change carry the same hash, also when the rollout ends on the next day, so a
+    /// change never links two days of one person.
     pub person: String,
     /// Ties the change's two events together.
     #[serde(rename = "change_id")]

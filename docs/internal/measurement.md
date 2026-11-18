@@ -25,7 +25,8 @@ result. A restart forgets the change. A missing `rollout_finished` therefore mea
 and the analysis treats it so.
 
 Every event also carries `zeabur_version` and `mode`; the two change events carry
-the per-day `person` hash of `zeabur_active`. Nothing links a person across days.
+the per-day `person` hash of `zeabur_active`, for the day the change was submitted. A rollout
+that ends after midnight UTC keeps that day's hash, so nothing links a person across days.
 
 What these events add up to (weekly returning instances, time to a first available rollout,
 where changes stop) is computed in PostHog, not here.
