@@ -1,0 +1,13 @@
+# Tests, fixtures, fuzz targets, build scripts and xtask take only input that we write.
+paths-ignore:
+  - "**/tests/**"
+  - "**/fixtures/**"
+  - "**/testdata/**"
+  - "**/fuzz/**"
+  - "**/*.test.ts"
+  - "web/e2e/**"
+  - "web/src/test/**"
+  - "xtask/**"
+  - "crates/zeabur-test-support/**"
+  - "crates/*/build.rs"
+  - "desktop/build.rs"
