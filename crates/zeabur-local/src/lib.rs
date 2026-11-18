@@ -15,7 +15,7 @@ pub use zeabur_api::Settings;
 use zeabur_api::access::SingleCluster;
 use zeabur_api::local::{Access, guard};
 use zeabur_core::crypto::RandomError;
-use zeabur_kube::{Cluster, ConnectError, UserClient};
+use zeabur_kube::{Cluster, ClusterError, ConnectError, UserClient};
 
 /// Why the local service did not start, or stopped with an error.
 #[derive(Debug, thiserror::Error)]
@@ -23,10 +23,9 @@ pub enum ServiceError {
     /// The kubeconfig or its context is not usable.
     #[error(transparent)]
     Kubeconfig(#[from] ConnectError),
-    /// The cluster did not say who the kubeconfig signs in as. The text is the detail of the
-    /// problem.
-    #[error("{0}")]
-    Identity(String),
+    /// The cluster did not say who the kubeconfig signs in as.
+    #[error("{}", .0.clone().into_problem("your identity").detail)]
+    Identity(ClusterError),
     /// The service cannot listen on a loopback port.
     #[error("cannot listen on 127.0.0.1: {0}")]
     Listen(#[source] io::Error),
@@ -119,10 +118,7 @@ pub async fn start_with(
     cluster: Arc<dyn Cluster>,
     settings: Settings,
 ) -> Result<Running, ServiceError> {
-    let identity = cluster
-        .whoami()
-        .await
-        .map_err(|e| ServiceError::Identity(e.into_problem("your identity").detail))?;
+    let identity = cluster.whoami().await.map_err(ServiceError::Identity)?;
 
     let listener = TcpListener::bind(SocketAddr::from((Ipv4Addr::LOCALHOST, 0)))
         .await

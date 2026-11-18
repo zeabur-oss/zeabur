@@ -10,6 +10,7 @@ mod in_process;
 mod output;
 mod pack;
 mod server;
+mod telemetry;
 mod ui;
 mod up;
 mod update;
@@ -54,6 +55,8 @@ enum Command {
     /// Print Zeabur Catalog components' manifests, for a cluster that zeabur-installer did not
     /// install.
     Components(components::ComponentsArgs),
+    /// Manage the ID that zeaburctl ui keeps for the experience program.
+    Telemetry(telemetry::TelemetryArgs),
 }
 
 fn main() -> ExitCode {
@@ -69,6 +72,7 @@ fn main() -> ExitCode {
         Command::Up(up_args) => up::run(&up_args),
         Command::Connect(connect_args) => connect::run(&connect_args),
         Command::Components(components_args) => components::run(&components_args),
+        Command::Telemetry(telemetry_args) => telemetry::run(&telemetry_args),
     };
     if let Some(check) = check {
         check.finish();

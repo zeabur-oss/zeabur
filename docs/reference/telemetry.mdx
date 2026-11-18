@@ -1,9 +1,9 @@
 ---
 title: Experience program
-description: What Zeabur and its installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, and how to turn each off.
+description: What Zeabur, `zeaburctl ui` and the installer send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, and how to turn each off.
 ---
 
-The experience program sends the version, how many people use Zeabur each day and which features they use, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on.
+The experience program sends the version, how many people use Zeabur each day, which features they use, and whether `zeaburctl ui` could connect to a cluster, so we know how many installations are in use and what to fix first. The installer joins by default, and you can uncheck the box on its review page. With Helm, Zeabur stays out until you turn it on. `zeaburctl ui` joins by default and says so, with how to turn it off, each time it starts.
 
 ## What is sent
 
@@ -13,6 +13,7 @@ Zeabur sends one event the first time each person uses it in a UTC day, and one 
 |---|---|---|
 | `zeabur_active` | Zeabur | The first time each person uses Zeabur's web interface in a UTC day |
 | `feature_used` | Zeabur | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import; once per UTC day for each feature and set of values |
+| `cluster_connected` | `zeaburctl ui` | It connected to a cluster with your kubeconfig, or could not |
 | `install_started` | Installer | `apply` begins |
 | `install_finished` | Installer | `apply` succeeds |
 | `install_failed` | Installer | `apply` stops |
@@ -22,7 +23,9 @@ Zeabur sends one event the first time each person uses it in a UTC day, and one 
 | `zeabur_version` | `zeabur_active`, `feature_used` | Zeabur's version, such as `0.1.1` |
 | `day` | `zeabur_active`, `feature_used` | The UTC date, such as `2026-10-30` |
 | `person` | `zeabur_active` | 32 hexadecimal digits that tell people apart within one installation and one day |
-| `mode` | `zeabur_active` | `in-cluster` |
+| `zeabur_version` | `cluster_connected` | The version of `zeaburctl`, such as `0.1.1` |
+| `mode` | `zeabur_active`, `cluster_connected` | `in-cluster` for Zeabur in a cluster, `local` for `zeaburctl ui` |
+| `result` | `cluster_connected` | `connected`, `unreachable`, `credential_refused`, `no_read_right` or `other` |
 | `feature` | `feature_used` | `service_created`, `database_created`, `domain_added`, `logs_viewed`, `terminal_opened`, `member_invited` or `compose` |
 | `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
 | `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID not in the catalog is left out |
@@ -39,19 +42,24 @@ The event doesn't say who the person is. `person` is a keyed hash of the user na
 
 `feature_used` has no `person`. It says that something was used today, not by whom or how often. Nothing is sent from your browser: Zeabur's server sends it after the call succeeds.
 
-Events go to PostHog through `oss-nori.zeabur.com` over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. PostHog doesn't keep IP addresses.
+`zeaburctl ui` has no installation ID, so it makes a random one the first time it is about to send an event, never when it is off. The ID is kept in a file named `local-id` in the `zeabur` folder of the configuration directory: `$XDG_CONFIG_HOME` or `~/.config` on Linux, `~/Library/Application Support` on macOS, `%APPDATA%` on Windows. Only you can read it, and nothing about your machine, kubeconfig, token or user name goes into it.
+
+Events go to PostHog through `oss-nori.zeabur.com` over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur or the install. `zeaburctl ui` sends in the background, so it never delays the link or the browser. PostHog doesn't keep IP addresses.
 
 ## What is never sent
 
-Domains, host names, IP addresses, Git URLs, image or service names, project names, emails, user names, logs, and the contents of your cluster.
+Domains, host names, IP addresses, Git URLs, image or service names, project names, namespace or resource names, emails, user names, logs, credentials, kubeconfigs, cluster addresses, error messages, and the contents of your cluster.
 
 ## Turn it off
 
 Any one of these is enough, and `DO_NOT_TRACK` wins over all the others.
 
-- Set `DO_NOT_TRACK=1` in the environment of the installer or of Zeabur. Any value but empty or `0` counts.
+- Set `DO_NOT_TRACK=1` in the environment of the installer, of Zeabur or of `zeaburctl ui`. Any value but empty or `0` counts.
 - In the installer, uncheck the box on the review page, run `zeabur-installer --no-telemetry apply` (or `--no-telemetry gui`), or set `telemetry: false` in `/etc/zeabur-installer/config.yaml`.
 - With Helm, keep `telemetry.enabled=false`, the default. The chart refuses `telemetry.enabled=true` without an ID.
+- For `zeaburctl ui`, run `zeaburctl telemetry disable`, which writes `telemetry: false` to `config.yaml` in the same `zeabur` folder as `local-id`, or set `ZEABUR_TELEMETRY=off`. If `config.yaml` can't be read, `zeaburctl ui` sends nothing. `zeaburctl telemetry status` shows which setting is in effect.
+
+To delete the ID of `zeaburctl ui`, run `zeaburctl telemetry reset`. It makes a new one the next time it is about to send an event.
 
 To join with Helm, pass in a new ID:
 

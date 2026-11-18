@@ -36,6 +36,9 @@ zeaburctl components export certificates/cert-manager
 | `up` | 将文件夹上传到通过文件夹创建的服务，并开始构建 | 修改该服务的 Build，将文件夹推送到 registry |
 | `connect` | 把本机端口转发到数据库或服务，并打印连接方式 | 不修改集群中的任何内容 |
 | `components export` | 输出安装 Catalog 组件的 manifest 或 Helm 命令 | 不连接集群，不做任何修改 |
+| `telemetry status` | 显示 `zeaburctl ui` 是否发送事件，以及由哪个设置决定 | 不连接集群，不做任何修改 |
+| `telemetry disable`、`telemetry enable` | 退出或加入体验计划 | 在这台电脑的 `config.yaml` 中写入 `telemetry: false` 或 `true` |
+| `telemetry reset` | 删除 `zeaburctl ui` 为体验计划保存的随机代码 | 不连接集群，不做任何修改 |
 
 ## `ui`
 
@@ -198,6 +201,30 @@ kubectl apply -f velero.yaml
 ```
 
 也可以将文件提交到 GitOps 仓库，让 Flux 或 Argo CD 应用。后续调整和移除都通过这个文件完成。
+
+## `telemetry status`
+
+```sh
+zeaburctl telemetry status
+```
+
+显示 `zeaburctl ui` 是否发送事件，再列出决定这件事的设置：`config.yaml`、`DO_NOT_TRACK`、`ZEABUR_TELEMETRY`，以及随机代码是否存在。
+
+## `telemetry disable` 和 `telemetry enable`
+
+```sh
+zeaburctl telemetry disable
+```
+
+`disable` 在 `config.yaml` 中写入 `telemetry: false`，之后 `zeaburctl ui` 什么都不发送。`enable` 写入 `telemetry: true`。文件中的其他内容不变。两个命令都不会删除随机代码，要删除请用 `telemetry reset`。`config.yaml` 无法解析时，两个命令都会停止，不做任何修改。
+
+## `telemetry reset`
+
+```sh
+zeaburctl telemetry reset
+```
+
+删除 `zeaburctl ui` 在你加入体验计划后生成的 `local-id` 文件。`zeaburctl ui` 下次要发送事件时，会生成新的代码。文件放在哪里、发送哪些内容，见[体验计划](./telemetry.mdx)。
 
 ## 连接与权限问题
 

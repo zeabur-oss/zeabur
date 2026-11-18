@@ -10,6 +10,7 @@ use http_body_util::Full;
 use zeabur_http::{Https, Reach};
 
 use crate::event::{Event, InstallationId};
+use crate::local::LocalId;
 
 /// `PostHog`'s batch endpoint, through our own domain.
 pub const ENDPOINT: &str = "https://oss-nori.zeabur.com/batch/";
@@ -137,6 +138,25 @@ impl Sender {
         }
     }
 
+    /// Sends `event` as [`Sender::send`] does, under a local run's ID. The ID is read, or made,
+    /// only when the event is about to be posted; debug shows `local-id` until it exists.
+    pub async fn send_local(&self, local: &LocalId, event: &Event) {
+        match self.switch {
+            Switch::Off => {}
+            Switch::Debug => {
+                let id = local.peek();
+                let distinct_id = id.as_ref().map_or("local-id", InstallationId::as_str);
+                let body = event.body_as(self.key, distinct_id);
+                (self.show)(&body);
+            }
+            Switch::On if self.key.is_empty() => {}
+            Switch::On => match local.get() {
+                Ok(id) => self.send(&id, event).await,
+                Err(error) => tracing::debug!(event = "telemetry.failed", %error, "no local ID"),
+            },
+        }
+    }
+
     /// Posts `body` and waits for the answer's head, within [`TIMEOUT`]. The endpoint is
     /// fixed in the binary, so any address may be reached.
     async fn post(&self, body: &str) -> Result<(), String> {
@@ -164,8 +184,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        DatabaseKind, Day, Distribution, DomainKind, ErrorCode, Failure, Feature, FeatureUsed,
-        Install, Mode, Profile, Source, Step, ZeaburActive,
+        ClusterConnected, Connection, DatabaseKind, Day, Distribution, DomainKind, ErrorCode,
+        Failure, Feature, FeatureUsed, Install, Mode, Profile, Source, Step, ZeaburActive,
     };
 
     /// A receiver on a free port that records each request body.
@@ -261,6 +281,11 @@ mod tests {
                 step: Step::Cluster,
                 error: ErrorCode::Download,
             }),
+            Event::ClusterConnected(ClusterConnected {
+                zeabur_version: "0.1.0",
+                mode: Mode::Local,
+                result: Connection::NoReadRight,
+            }),
         ]
     }
 
@@ -333,6 +358,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_local_id_is_made_only_to_post() {
+        let receiver = receiver();
+        let directory = crate::local::tests::tempdir();
+        let local = LocalId::new(&directory, || Some([3; 16]));
+        let event = &events()[0];
+        for switch in [Switch::Off, Switch::Debug] {
+            Sender::to(switch, &receiver.url, "phc_test", nobody())
+                .send_local(&local, event)
+                .await;
+        }
+        Sender::to(Switch::On, &receiver.url, "", nobody())
+            .send_local(&local, event)
+            .await;
+        assert_eq!(local.peek(), None);
+        Sender::to(Switch::On, &receiver.url, "phc_test", nobody())
+            .send_local(&local, event)
+            .await;
+        let id = local.peek().unwrap();
+        let requests = receiver.requests();
+        let body: Value = serde_json::from_str(&requests[0]).unwrap();
+        assert_eq!(body["batch"][0]["distinct_id"], id.as_str());
+    }
+
+    #[tokio::test]
     async fn a_receiver_that_never_answers_holds_the_caller_no_longer_than_the_timeout() {
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let url = format!("http://{}/batch/", listener.local_addr().unwrap());
@@ -372,6 +421,7 @@ mod tests {
             "distribution",
             "step",
             "error",
+            "result",
             "$process_person_profile",
             "$geoip_disable",
         ];
