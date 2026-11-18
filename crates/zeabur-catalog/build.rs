@@ -1,6 +1,6 @@
 //! Embeds Zeabur Catalog's `bundle.tar.gz` from `ZEABUR_CATALOG_RELEASE`, which the Nix dev shell
 //! sets to the catalog's `release` output at the commit in flake.lock. The components
-//! (`components/<capability>/<id>.yaml`), the templates (`templates/<id>/template.yaml` and
+//! (`components/<id>.yaml`), the templates (`templates/<id>/template.yaml` and
 //! `manifests.yaml`) and the template measurements (`measurements/templates/<id>.json`) become
 //! sorted tables of `include_str!` entries, so the binary carries the catalogue it was built with
 //! and reads nothing at run time. `crosscheck.json`, the catalogue's own render of each template,
@@ -33,11 +33,11 @@ fn main() {
             process::exit(1);
         }
     };
-    let mut code = String::from("pub(crate) static FILES: &[(&str, &str, &str)] = &[\n");
-    for (capability, id, path) in &components {
+    let mut code = String::from("pub(crate) static FILES: &[(&str, &str)] = &[\n");
+    for (id, path) in &components {
         let _ignored = writeln!(
             code,
-            "    ({capability:?}, {id:?}, include_str!({:?})),",
+            "    ({id:?}, include_str!({:?})),",
             path.display().to_string()
         );
     }
@@ -67,7 +67,7 @@ fn main() {
     }
 }
 
-type Components = Vec<(String, String, PathBuf)>;
+type Components = Vec<(String, PathBuf)>;
 type Templates = Vec<(String, PathBuf)>;
 type Measurements = Vec<(String, PathBuf)>;
 
@@ -83,12 +83,17 @@ fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Templates, Meas
         let parts: Vec<&str> = path.iter().filter_map(|part| part.to_str()).collect();
         let dest = dir.join(parts.join("/"));
         match parts.as_slice() {
-            ["components", capability, file] => match file.strip_suffix(".yaml") {
-                Some(id) => {
-                    components.push(((*capability).to_owned(), id.to_owned(), dest.clone()));
-                }
+            ["components", file] => match file.strip_suffix(".yaml") {
+                Some(id) => components.push((id.to_owned(), dest.clone())),
                 None => continue,
             },
+            // A layout this build does not know would leave the catalogue silently empty.
+            ["components", _, _, ..] => {
+                return Err(io::Error::other(format!(
+                    "{} is not components/<id>.yaml",
+                    path.display()
+                )));
+            }
             ["measurements", "templates", file] => match file.strip_suffix(".json") {
                 Some(id) => measurements.push((id.to_owned(), dest.clone())),
                 None => continue,

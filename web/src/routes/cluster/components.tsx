@@ -135,7 +135,7 @@ export function ComponentsPage() {
 
   const open = search.component
   const opened = open
-    ? list.flatMap((c) => c.components).find((x) => `${x.capability}/${x.id}` === open)
+    ? list.flatMap((c) => c.components).find((x) => x.id === open)
     : undefined
 
   return (
@@ -232,14 +232,14 @@ const summaryOf = (component: Schemas.Component, locale: Locale) =>
 const isInstalled = (capability: Schemas.Capability, component: Schemas.Component) =>
   capability.installations.some((i) => i.component === component.id)
 
-/** What a component incident names, as the catalogue's capability or `capability/component`. */
+/** What a component incident names, as the catalogue's capability or a component id. */
 const incidentComponents: Record<string, string> = {
   "ingress-controller": "ingress",
   "cert-manager": "certificates",
-  "metrics-server": "metrics/metrics-server",
+  "metrics-server": "metrics-server",
 }
 
-/** The installed components an incident says are down, by capability or `capability/component`. */
+/** The installed components an incident says are down, by capability or component id. */
 function useDown() {
   const incidents = useQuery(clusterIncidentsQuery).data?.items ?? []
   const down = new Set(
@@ -249,7 +249,7 @@ function useDown() {
       .filter((key): key is string => !!key),
   )
   return (capability: string, component: string) =>
-    down.has(capability) || down.has(`${capability}/${component}`)
+    down.has(capability) || down.has(component)
 }
 
 function ComponentCard({
@@ -299,7 +299,7 @@ function ComponentCard({
           from="/cluster/components"
           search={(previous) => ({
             ...previous,
-            component: `${capability.name}/${component.id}`,
+            component: component.id,
           })}
           className={cn(buttonVariants({ variant: "outline", size: "xs" }), "ml-auto")}
         >

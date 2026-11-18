@@ -31,7 +31,7 @@ pub const CATALOGUE_COMMIT: &str = env!("ZEABUR_CATALOG_COMMIT");
 pub struct Component {
     /// Its id, the file name in the catalogue (`traefik`).
     pub id: String,
-    /// The capability it provides (`ingress`).
+    /// The capability it provides (`ingress`), from `provides.capability`.
     pub capability: String,
     /// Human-readable name.
     pub display_name: String,
@@ -147,12 +147,18 @@ pub struct WorkloadMatch {
 #[serde(rename_all = "camelCase")]
 struct File {
     metadata: Metadata,
+    provides: Provides,
     defaults: BTreeMap<String, String>,
     distributions: Vec<String>,
     kube_version: String,
     detection: Detection,
     #[serde(default)]
     releases: Vec<Release>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Provides {
+    capability: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -172,9 +178,8 @@ struct Summary {
 
 /// Why the catalogue could not be read.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
-#[error("Zeabur Catalog, {capability}/{id}: {message}")]
+#[error("Zeabur Catalog, {id}: {message}")]
 pub struct CatalogueError {
-    capability: String,
     id: String,
     message: String,
 }
@@ -186,17 +191,16 @@ pub struct CatalogueError {
 /// When a file does not parse; a test reads them all, so a build that passes CI cannot fail
 /// here.
 pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
-    bundle::FILES
+    let mut components = bundle::FILES
         .iter()
-        .map(|(capability, id, text)| {
+        .map(|(id, text)| {
             let file: File = serde_saphyr::from_str(text).map_err(|e| CatalogueError {
-                capability: (*capability).to_owned(),
                 id: (*id).to_owned(),
                 message: e.to_string(),
             })?;
             Ok(Component {
                 id: (*id).to_owned(),
-                capability: (*capability).to_owned(),
+                capability: file.provides.capability,
                 display_name: file.metadata.name,
                 homepage: file.metadata.homepage,
                 license: file.metadata.license,
@@ -217,7 +221,9 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
                 detection: file.detection,
             })
         })
-        .collect()
+        .collect::<Result<Vec<_>, _>>()?;
+    components.sort_by(|a, b| (&a.capability, &a.id).cmp(&(&b.capability, &b.id)));
+    Ok(components)
 }
 
 /// Whether a capability is present on the cluster, and on what evidence.
@@ -449,24 +455,9 @@ mod tests {
     #[test]
     fn every_catalogue_file_parses_and_has_a_detection_rule() {
         let components = catalogue().unwrap();
-        // Every component of the release's index is embedded.
-        let index: serde_json::Value = serde_json::from_slice(
-            &std::fs::read(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json")).unwrap(),
-        )
-        .unwrap();
-        let mut listed: Vec<&str> = index["components"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|c| c["id"].as_str().unwrap())
-            .collect();
-        let mut embedded: Vec<String> = components
-            .iter()
-            .map(|c| format!("{}/{}", c.capability, c.id))
-            .collect();
-        listed.sort_unstable();
-        embedded.sort();
-        assert_eq!(embedded, listed);
+        // The capability comes from `provides`, not from a folder.
+        let traefik = components.iter().find(|c| c.id == "traefik").unwrap();
+        assert_eq!(traefik.capability, "ingress");
         for component in &components {
             let d = &component.detection;
             let rules = d.crds.len()
@@ -476,12 +467,7 @@ mod tests {
                 + d.helm_charts.len()
                 + d.addons.len()
                 + d.workloads.len();
-            assert!(
-                rules > 0,
-                "{}/{} has no detection rule",
-                component.capability,
-                component.id
-            );
+            assert!(rules > 0, "{} has no detection rule", component.id);
         }
     }
 

@@ -11,7 +11,7 @@ pub(crate) fn stop_at_from_env() -> Option<String> {
         .filter(|release| !release.is_empty())
 }
 
-/// Runs the catalog's commands for `component` (`<capability>/<id>`) with `inputs`
+/// Runs the catalog's commands for `component` (its id) with `inputs`
 /// (`<input>=<value>`), leaving out the releases from `stop_at` on, then waits for the
 /// deployments in `namespace`.
 pub(crate) fn install(

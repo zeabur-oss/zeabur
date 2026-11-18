@@ -124,7 +124,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
             {t("usage.needsMetricsServer")}
             <Link
               to="/cluster/components"
-              search={{ component: "metrics/metrics-server" }}
+              search={{ component: "metrics-server" }}
               className="font-medium text-foreground hover:underline"
             >
               {t("usage.install")}
@@ -579,7 +579,7 @@ function HistoryBody({
           {t("usage.needsStore")}
           <Link
             to="/cluster/components"
-            search={{ component: "metrics/victoria-metrics" }}
+            search={{ component: "victoria-metrics" }}
             className="font-medium text-foreground hover:underline"
           >
             {t("usage.installVm")}

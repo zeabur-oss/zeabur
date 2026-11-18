@@ -72,56 +72,56 @@ filter() {
 licence() {
   local gh=https://github.com catalog="[Apache-2.0](https://github.com/zeabur-oss/catalog/blob/main/LICENSE) (catalogue)"
   case $1 in
-  builds/zeabur-builder)
+  zeabur-builder)
     echo "tls: $catalog; zot: [Apache-2.0]($gh/project-zot/helm-charts/blob/main/LICENSE); builder: [Apache-2.0]($gh/zeabur-oss/builder/blob/main/LICENSE)"
     ;;
-  certificates/cert-manager) echo "[Apache-2.0]($gh/cert-manager/cert-manager/blob/master/LICENSE)" ;;
-  config-reload/reloader) echo "[Apache-2.0]($gh/stakater/Reloader/blob/master/LICENSE)" ;;
-  databases/cloudnative-pg) echo "[Apache-2.0]($gh/cloudnative-pg/charts/blob/main/LICENSE)" ;;
-  databases/dragonfly-operator)
+  cert-manager) echo "[Apache-2.0]($gh/cert-manager/cert-manager/blob/master/LICENSE)" ;;
+  reloader) echo "[Apache-2.0]($gh/stakater/Reloader/blob/master/LICENSE)" ;;
+  cloudnative-pg) echo "[Apache-2.0]($gh/cloudnative-pg/charts/blob/main/LICENSE)" ;;
+  dragonfly-operator)
     echo "[Apache-2.0]($gh/dragonflydb/dragonfly-operator/blob/main/LICENSE)"
     ;;
-  databases/mariadb-operator)
+  mariadb-operator)
     echo "[MIT]($gh/mariadb-operator/mariadb-operator/blob/main/LICENSE), notice in \`LICENSE-mariadb-operator.txt\`"
     ;;
-  databases/moco) echo "[Apache-2.0]($gh/cybozu-go/moco/blob/main/LICENSE)" ;;
-  databases/percona-mongodb) echo "[Apache-2.0]($gh/percona/percona-helm-charts/blob/main/LICENSE)" ;;
-  event-autoscaling/keda | event-autoscaling/keda-http-add-on)
+  moco) echo "[Apache-2.0]($gh/cybozu-go/moco/blob/main/LICENSE)" ;;
+  percona-mongodb) echo "[Apache-2.0]($gh/percona/percona-helm-charts/blob/main/LICENSE)" ;;
+  keda | keda-http-add-on)
     echo "[Apache-2.0]($gh/kedacore/charts/blob/main/LICENSE)"
     ;;
-  external-secrets/external-secrets) echo "[Apache-2.0]($gh/external-secrets/external-secrets/blob/main/LICENSE)" ;;
-  image-updates/keel) echo "[MPL-2.0]($gh/keel-hq/keel/blob/master/LICENSE)" ;;
-  ingress/traefik)
+  external-secrets) echo "[Apache-2.0]($gh/external-secrets/external-secrets/blob/main/LICENSE)" ;;
+  keel) echo "[MPL-2.0]($gh/keel-hq/keel/blob/master/LICENSE)" ;;
+  traefik)
     echo "gateway-api-crds: [Apache-2.0]($gh/kubernetes-sigs/gateway-api/blob/main/LICENSE); traefik: [Apache-2.0]($gh/traefik/traefik-helm-chart/blob/master/LICENSE)"
     ;;
-  intrusion-prevention/crowdsec)
+  crowdsec)
     echo "crowdsec: [MIT]($gh/crowdsecurity/helm-charts/blob/main/LICENSE), notice in \`LICENSE-crowdsec-helm-charts.txt\`; bouncer-middleware: $catalog"
     ;;
-  logs/victoria-logs) echo "$catalog" ;;
-  metrics/metrics-server) echo "[Apache-2.0]($gh/kubernetes-sigs/metrics-server/blob/master/LICENSE)" ;;
-  metrics/victoria-metrics | observability-operator/victoria-metrics-operator)
+  victoria-logs) echo "$catalog" ;;
+  metrics-server) echo "[Apache-2.0]($gh/kubernetes-sigs/metrics-server/blob/master/LICENSE)" ;;
+  victoria-metrics | victoria-metrics-operator)
     echo "[Apache-2.0]($gh/VictoriaMetrics/helm-charts/blob/master/LICENSE)"
     ;;
-  node-updates/system-upgrade-controller)
+  system-upgrade-controller)
     echo "[Apache-2.0]($gh/rancher/system-upgrade-controller/blob/master/LICENSE)"
     ;;
-  object-storage/seaweedfs-operator)
+  seaweedfs-operator)
     echo "[Apache-2.0]($gh/seaweedfs/seaweedfs-operator/blob/master/LICENSE)"
     ;;
-  remote-access/tailscale-operator) echo "[BSD-3-Clause]($gh/tailscale/tailscale/blob/main/LICENSE)" ;;
-  replicated-storage/longhorn)
+  tailscale-operator) echo "[BSD-3-Clause]($gh/tailscale/tailscale/blob/main/LICENSE)" ;;
+  longhorn)
     echo "longhorn: [Apache-2.0]($gh/longhorn/charts/blob/v1.13.x/LICENSE); ui-policy: $catalog"
     ;;
-  resource-recommendations/vertical-pod-autoscaler)
+  vertical-pod-autoscaler)
     echo "[Apache-2.0]($gh/kubernetes/autoscaler/blob/master/LICENSE)"
     ;;
-  runtime-security/falco) echo "[Apache-2.0]($gh/falcosecurity/charts/blob/master/LICENSE)" ;;
-  uptime-probes/blackbox-exporter)
+  falco) echo "[Apache-2.0]($gh/falcosecurity/charts/blob/master/LICENSE)" ;;
+  blackbox-exporter)
     echo "[Apache-2.0]($gh/prometheus-community/helm-charts/blob/main/LICENSE)"
     ;;
-  volume-backup/k8up) echo "[Apache-2.0]($gh/k8up-io/k8up/blob/master/LICENSE)" ;;
-  volume-backup/velero) echo "[Apache-2.0]($gh/vmware-tanzu/helm-charts/blob/main/LICENSE)" ;;
-  vulnerability-scanning/trivy-operator)
+  k8up) echo "[Apache-2.0]($gh/k8up-io/k8up/blob/master/LICENSE)" ;;
+  velero) echo "[Apache-2.0]($gh/vmware-tanzu/helm-charts/blob/main/LICENSE)" ;;
+  trivy-operator)
     echo "[Apache-2.0]($gh/aquasecurity/trivy-operator/blob/main/LICENSE), NOTICE in \`LICENSE-trivy-operator-NOTICE.txt\`"
     ;;
   *) return 1 ;;
@@ -134,33 +134,32 @@ rm -f "$out_dir"/*.yaml "$out_dir/README.md"
 rows=$work/rows
 failed=()
 : >"$rows"
-for path in "$src"/components/*/*.yaml; do
-  capability=$(basename "$(dirname "$path")")
+for path in "$src"/components/*.yaml; do
   component=$(basename "$path" .yaml)
-  rel=components/$capability/$component.yaml
+  rel=components/$component.yaml
   if [[ $(yq -r ".defaults.\"$PROFILE\"" "$rel") == unsupported ]]; then
     continue
   fi
-  file=${capability}__${component}.yaml
+  file=$component.yaml
   rendered=()
   missing=0
   while IFS= read -r release; do
-    f=$work/render-1/$kube_version/$PROFILE/$capability/$component/$release.yaml
+    f=$work/render-1/$kube_version/$PROFILE/$component/$release.yaml
     if [[ -f $f ]]; then rendered+=("$f"); else missing=1; fi
   done < <(yq -r '.releases[].name' "$rel")
   if ((missing)); then
-    failed+=("$capability/$component")
+    failed+=("$component")
     continue
   fi
-  if ! licence_cell=$(licence "$capability/$component"); then
-    failed+=("$capability/$component (no licence entry)")
+  if ! licence_cell=$(licence "$component"); then
+    failed+=("$component (no licence entry)")
     continue
   fi
   filter "${rendered[@]}" >"$out_dir/$file"
   versions=$(yq -r '[.releases[] | .name + "@" + (.version // "inline")] | join(", ")' "$rel")
   docs=$(grep -c '^---$' "$out_dir/$file" || true)
   bytes=$(wc -c <"$out_dir/$file")
-  printf '| %s/%s | %s | %s | %s | %s | %s |\n' "$capability" "$component" "\`$file\`" \
+  printf '| %s | %s | %s | %s | %s | %s |\n' "$component" "\`$file\`" \
     "$versions" "$licence_cell" "$docs" "$bytes" >>"$rows"
 done
 
@@ -172,7 +171,7 @@ total=$(cat "$out_dir"/*.yaml | wc -c)
 Rendered Kubernetes manifests of real Helm charts, used to measure how much of real-world
 input the projection covers. One file per component of the
 [Zeabur Catalog](https://github.com/zeabur-oss/catalog), named
-\`<capability>__<component>.yaml\`, each holding every release of the component in install
+\`<component>.yaml\`, each holding every release of the component in install
 order as one multi-document YAML stream.
 
 - Source: \`zeabur-oss/catalog\` at commit \`$ZEABUR_CATALOG_COMMIT\`.

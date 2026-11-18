@@ -1,5 +1,4 @@
-# Profile: single-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/
-# (K3s) or /var/lib/rancher/rke2/server/manifests/ (RKE2).
+# Profile: single-node. Commit to the repository Flux reconciles.
 # Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
 # cloud: Velero reads the bucket's credentials from this AWS-style credentials file.
 apiVersion: v1
@@ -30,18 +29,34 @@ metadata:
 stringData:
   key: "<random: openssl rand -base64 24 | tr '+/' '-_' | tr -d '='>"
 ---
-apiVersion: helm.cattle.io/v1
-kind: HelmChart
+apiVersion: source.toolkit.fluxcd.io/v1
+kind: HelmRepository
 metadata:
   name: velero
-  namespace: kube-system
+  namespace: flux-system
 spec:
-  chart: velero
-  repo: https://vmware-tanzu.github.io/helm-charts
-  version: 12.2.1
+  interval: 1h
+  url: https://vmware-tanzu.github.io/helm-charts
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: velero
+  namespace: flux-system
+spec:
+  interval: 1h
+  releaseName: velero
   targetNamespace: velero
-  createNamespace: true
-  valuesContent: |-
+  install:
+    createNamespace: true
+  chart:
+    spec:
+      chart: velero
+      version: 12.2.3
+      sourceRef:
+        kind: HelmRepository
+        name: velero
+  values:
     configuration:
       backupStorageLocation:
       - bucket: <bucket>

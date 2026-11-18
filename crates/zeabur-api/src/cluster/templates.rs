@@ -198,16 +198,12 @@ fn requirement(
     wanted: &Reference,
     served: Option<&[ServedResource]>,
 ) -> Requirement {
-    let (capability, component) = match wanted {
-        Reference::Component(id) => {
-            let (capability, component) = id.split_once('/').unwrap_or((id, ""));
-            (capability, Some(component))
-        }
-        Reference::Capability(capability) => (capability.as_str(), None),
-    };
     let components: Vec<&Component> = catalogue
         .iter()
-        .filter(|c| c.capability == capability && component.is_none_or(|id| c.id == id))
+        .filter(|c| match wanted {
+            Reference::Component(id) => c.id == *id,
+            Reference::Capability(capability) => c.capability == *capability,
+        })
         .collect();
     let crds: Vec<&String> = components.iter().flat_map(|c| &c.detection.crds).collect();
     let state = match served {
@@ -218,12 +214,16 @@ fn requirement(
         }
         Some(_) => RequirementState::Missing,
     };
+    let (capability, component) = match wanted {
+        Reference::Component(id) => (components.first().map_or(id, |c| &c.capability), Some(id)),
+        Reference::Capability(capability) => (capability, None),
+    };
     Requirement {
-        capability: capability.to_owned(),
-        component: component.map(str::to_owned),
+        capability: capability.clone(),
+        component: component.cloned(),
         name: match components.as_slice() {
             [one] => one.display_name.clone(),
-            _ => capability.to_owned(),
+            _ => capability.clone(),
         },
         state,
     }
@@ -251,7 +251,7 @@ mod tests {
 
     fn component(case: &Value) -> Component {
         let id = case["id"].as_str().unwrap();
-        let (capability, name) = id.split_once('/').unwrap();
+        let capability = case["provides"]["capability"].as_str().unwrap();
         let crds = case["detection"]["crds"]
             .as_array()
             .into_iter()
@@ -259,7 +259,7 @@ mod tests {
             .map(|crd| crd.as_str().unwrap().to_owned())
             .collect();
         Component {
-            id: name.to_owned(),
+            id: id.to_owned(),
             capability: capability.to_owned(),
             display_name: id.to_owned(),
             homepage: String::new(),
@@ -330,7 +330,7 @@ mod tests {
         assert_eq!(
             requirement(
                 &catalogue,
-                &Reference::Component("databases/cloudnative-pg".to_owned()),
+                &Reference::Component("cloudnative-pg".to_owned()),
                 None
             )
             .name,

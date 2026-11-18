@@ -310,7 +310,7 @@ fn volume_fix(claim: &str, installed: Installed) -> Fix {
     } else {
         Fix {
             kind: FixKind::Install,
-            id: "volume-backup/k8up".to_owned(),
+            id: "k8up".to_owned(),
             params: BTreeMap::new(),
         }
     }

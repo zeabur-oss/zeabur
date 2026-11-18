@@ -11,9 +11,9 @@ import { verdict, verdictHealth, VELERO_COMPONENT } from "@/model/cluster-backup
 import type { Health } from "@/model/service"
 import { Section } from "@/routes/cluster/section"
 
-const K8UP_COMPONENT = "volume-backup/k8up"
+const K8UP_COMPONENT = "k8up"
 
-/** Whether `id` (`volume-backup/k8up`) is installed; unknown when the person cannot read what is. */
+/** Whether `id` (`k8up`) is installed; unknown when the person cannot read what is. */
 function installedOf(items: Schemas.Capability[] | undefined, id: string) {
   if (!items) return undefined
   const [capability, component] = id.split("/")

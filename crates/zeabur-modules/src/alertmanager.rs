@@ -2,7 +2,7 @@
 //!
 //! # Where alerts come from
 //!
-//! Zeabur Catalog's `metrics/victoria-metrics` installs the rule set `zeabur-notifications`
+//! Zeabur Catalog's `victoria-metrics` installs the rule set `zeabur-notifications`
 //! (a `VMRule` in `observability`). Each alert names its event in the label `zeabur_event`
 //! ([`AlertmanagerEvent`]). A project's alerts keep the namespace of the object they are about;
 //! the cluster's set the namespace to `observability`.

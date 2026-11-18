@@ -24,7 +24,7 @@ zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
 zeaburctl connect shop/orders
 zeaburctl connect shop/api:8080
-zeaburctl components export certificates/cert-manager
+zeaburctl components export cert-manager
 ```
 
 `ui`、`doctor`、`up`、`connect` 各自接受 `--context`。省略時使用 kubeconfig 的目前 context，指令不會改動 kubeconfig。
@@ -183,7 +183,7 @@ zeaburctl connect <project>/<name>[:<port>] [--port <port>] [--context <name>]
 ## `components export`
 
 ```sh
-zeaburctl components export <capability>/<id>... [--format helmchart|helm|flux|argocd] [--profile single-node|multi-node]
+zeaburctl components export <id>... [--format helmchart|helm|flux|argocd] [--profile single-node|multi-node]
 ```
 
 印出安裝 Catalog 元件的內容。可以一次寫好幾個元件，內容依序接在一起。內容來自 zeaburctl 內建的 Catalog，版本和設定值都已釘選。指令不連叢集，所以不用 `--context`。
@@ -196,7 +196,7 @@ zeaburctl components export <capability>/<id>... [--format helmchart|helm|flux|a
 元件要填的值會留成 `<名稱>`，先換成實際的值。元件需要存取主機時，內容會先把元件的 Namespace 設為 `privileged`。K3s 或 RKE2 內建同一種元件時，內容開頭會說怎麼先停用內建版本。
 
 ```sh
-zeaburctl components export volume-backup/velero > velero.yaml
+zeaburctl components export velero > velero.yaml
 kubectl apply -f velero.yaml
 ```
 

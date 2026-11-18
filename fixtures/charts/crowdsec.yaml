@@ -1,4 +1,28 @@
 ---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata: {name: crowdsec-selfsigned, namespace: crowdsec}
+spec: {selfSigned: {}}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: crowdsec-ca, namespace: crowdsec}
+spec:
+  isCA: true
+  commonName: crowdsec-ca
+  secretName: crowdsec-ca
+  # Ten years, like the certificates it signs.
+  duration: 87600h
+  renewBefore: 720h
+  privateKey: {algorithm: ECDSA, size: 256}
+  issuerRef: {name: crowdsec-selfsigned, kind: Issuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata: {name: crowdsec-ca, namespace: crowdsec}
+spec:
+  ca: {secretName: crowdsec-ca}
+---
 # Source: crowdsec/templates/acquis-configmap.yaml
 apiVersion: v1
 kind: ConfigMap
@@ -404,16 +428,11 @@ metadata:
   name: crowdsec-config-local
 data:
   config.yaml.local: |
-    api:
-      server:
-        auto_registration: # Activate if not using TLS for authentication
-          enabled: true
-          token: "${REGISTRATION_TOKEN}" # /!\ Do not modify this variable (auto-generated and handled by the chart)
-          allowed_ranges: # /!\ Make sure to adapt to the pod IP ranges used by your cluster
-            - "127.0.0.1/32"
-            - "192.168.0.0/16"
-            - "10.0.0.0/8"
-            - "172.16.0.0/12"
+    db_config:
+      flush:
+        agents_autodelete:
+          # Deletes the machine a restarted agent leaves behind.
+          cert: 7d
     
 
 
@@ -435,23 +454,6 @@ spec:
     requests:
       storage: "1Gi"
 
-
----
-# Source: crowdsec/templates/lapi-persistentVolume.yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: crowdsec-config-pvc
-  labels:
-    k8s-app: crowdsec
-    type: lapi
-    version: v1
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: "100Mi"
 
 ---
 # Source: crowdsec/templates/agent-service.yaml
@@ -522,10 +524,10 @@ spec:
         version: v1
     spec:
       initContainers:
-      - name: wait-for-lapi-and-register
-        image: "crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a"
+      - name: wait-for-lapi
+        image: "crowdsecurity/crowdsec:v1.8.2@sha256:65b74942f7e7ed5c60fde4ac15fc4ba715904c398c8b16dd451f4907d90347d4"
         imagePullPolicy: IfNotPresent
-        command: ['sh', '-c', 'until nc "$LAPI_HOST" "$LAPI_PORT" -z; do echo waiting for lapi to start; sleep 5; done; ln -s /staging/etc/crowdsec /etc/crowdsec && cscli lapi register --machine "$USERNAME" -u "$LAPI_URL" --token "$REGISTRATION_TOKEN" && cp /etc/crowdsec/local_api_credentials.yaml /tmp_config/local_api_credentials.yaml']
+        command: ['sh', '-c', 'until nc "$LAPI_HOST" "$LAPI_PORT" -z; do echo waiting for lapi to start; sleep 5; done']
         resources:
           limits:
             memory: 50Mi
@@ -535,30 +537,15 @@ spec:
         securityContext:
           allowPrivilegeEscalation: false
           privileged: false
-        volumeMounts:
-          - name: crowdsec-config
-            mountPath: /tmp_config
         env:
-          - name: REGISTRATION_TOKEN
-            valueFrom:
-              secretKeyRef:
-                name: crowdsec-lapi
-                key: registrationToken
-          - name: USERNAME
-            valueFrom:
-              fieldRef:
-                fieldPath: metadata.name
-          - name: LAPI_URL
-            value: "http://crowdsec-service.crowdsec:8080"
           - name: LAPI_HOST
             value: "crowdsec-service.crowdsec"
           - name: LAPI_PORT
             value: "8080"
       containers:
       - name: crowdsec-agent
-        image: "crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a"
+        image: "crowdsecurity/crowdsec:v1.8.2@sha256:65b74942f7e7ed5c60fde4ac15fc4ba715904c398c8b16dd451f4907d90347d4"
         imagePullPolicy: IfNotPresent
-        command: ['sh', '-c', 'cp /tmp_config/local_api_credentials.yaml /staging/etc/crowdsec/local_api_credentials.yaml && ./docker_start.sh']
         env:
           - name: DISABLE_LOCAL_API
             value: "true"
@@ -569,7 +556,15 @@ spec:
 
           # agent - lapi authentication, with TLS or password
           - name: LOCAL_API_URL
-            value: "http://crowdsec-service.crowdsec:8080"
+            value: "https://crowdsec-service.crowdsec:8080"
+          - name: USE_TLS
+            value: "true"
+          - name: CLIENT_CERT_FILE
+            value: /etc/ssl/crowdsec-agent/tls.crt
+          - name: CLIENT_KEY_FILE
+            value: /etc/ssl/crowdsec-agent/tls.key
+          - name: CACERT_FILE
+            value: /etc/ssl/crowdsec-agent/ca.crt
           - name: COLLECTIONS
             value: crowdsecurity/traefik
         resources:
@@ -628,8 +623,6 @@ spec:
           privileged: false
 
         volumeMounts:
-          - name: crowdsec-config
-            mountPath: /tmp_config
           
           
           
@@ -639,20 +632,23 @@ spec:
           - name: varlog
             mountPath: /var/log
             readOnly: true
+          - name: crowdsec-agent-tls
+            mountPath: /etc/ssl/crowdsec-agent
 
       terminationGracePeriodSeconds: 30
       volumes:
       - name: acquis-config-volume
         configMap:
           name: acquis-configmap
-      - name: crowdsec-config
-        emptyDir: {}
       - name: varlog
         hostPath:
           path: /var/log
       
       
       
+      - name: crowdsec-agent-tls
+        secret:
+          secretName: crowdsec-agent-tls
       
 ---
 # Source: crowdsec/templates/lapi-deployment.yaml
@@ -676,7 +672,7 @@ spec:
     metadata:
       annotations:
         checksum/lapi-secret: e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855
-        checksum/lapi-configmap: 5f81bdc08f32bc76fdb8210fa8afd96c741d1bb334f2cbf5d3a76cd7cd8e4ba7
+        checksum/lapi-configmap: 7269c1e3f60863d9ca623b2464c86a41fdb9b6ac82a2a47ec2af0dafda9992a3
       labels:
         k8s-app: crowdsec
         type: lapi
@@ -684,13 +680,25 @@ spec:
     spec:
       containers:
       - name: crowdsec-lapi
-        image: "crowdsecurity/crowdsec:v1.8.1@sha256:0f2523fa61ef507f15d953045cface490cc880670c62f2755ced17524107f71a"
+        image: "crowdsecurity/crowdsec:v1.8.2@sha256:65b74942f7e7ed5c60fde4ac15fc4ba715904c398c8b16dd451f4907d90347d4"
         imagePullPolicy: IfNotPresent
         env:
           - name: LOCAL_API_URL
-            value: http://localhost:8080
+            value: https://localhost:8080
           - name: DISABLE_AGENT
             value: "true"
+          - name: USE_TLS
+            value: "true"
+          - name: LAPI_CERT_FILE
+            value: /etc/ssl/crowdsec-lapi/tls.crt
+          - name: LAPI_KEY_FILE
+            value: /etc/ssl/crowdsec-lapi/tls.key
+          - name: CLIENT_CERT_FILE
+            value: /etc/ssl/crowdsec-agent/tls.crt
+          - name: CLIENT_KEY_FILE
+            value: /etc/ssl/crowdsec-agent/tls.key
+          - name: CACERT_FILE
+            value: /etc/ssl/crowdsec-lapi/ca.crt
           - name: INSECURE_SKIP_VERIFY
             value: "false"
           
@@ -731,7 +739,7 @@ spec:
           httpGet:
             path: /health
             port: lapi
-            scheme: HTTP
+            scheme: HTTPS
         readinessProbe:
           failureThreshold: 3
           periodSeconds: 10
@@ -740,7 +748,7 @@ spec:
           httpGet:
             path: /health
             port: lapi
-            scheme: HTTP
+            scheme: HTTPS
         startupProbe:
           failureThreshold: 30
           periodSeconds: 10
@@ -749,7 +757,7 @@ spec:
           httpGet:
             path: /health
             port: lapi
-            scheme: HTTP
+            scheme: HTTPS
 
         securityContext:
           allowPrivilegeEscalation: false
@@ -763,24 +771,25 @@ spec:
             containerPort: 6060
             protocol: TCP
         
-        command: ['sh', '-c', 'cp -nR /staging/etc/crowdsec/* /etc/crowdsec_data/ && ln -s /etc/crowdsec_data /etc/crowdsec && bash /docker_start.sh']
-        
         volumeMounts:
           - name: crowdsec-docker-start-script
             mountPath: /docker_start.sh
             subPath: docker_start.sh
+          - name: crowdsec-lapi-tls
+            mountPath: /etc/ssl/crowdsec-lapi
+          - name: crowdsec-agent-tls
+            mountPath: /etc/ssl/crowdsec-agent
           
           - name: crowdsec-db
             mountPath: /var/lib/crowdsec/data
             subPath: crowdsec
-          - name: crowdsec-config
-            mountPath: /etc/crowdsec_data
+          
           
           
           
           
           - name: crowdsec-config-local-volume
-            mountPath: /etc/crowdsec_data/config.yaml.local
+            mountPath: /etc/crowdsec/config.yaml.local
             subPath: config.yaml.local
           
 
@@ -792,9 +801,6 @@ spec:
       - name: crowdsec-db
         persistentVolumeClaim:
           claimName: crowdsec-db-pvc
-      - name: crowdsec-config
-        persistentVolumeClaim:
-          claimName: crowdsec-config-pvc
       
       
       
@@ -802,7 +808,115 @@ spec:
       - name: crowdsec-config-local-volume
         configMap:
           name: crowdsec-config-local
-      priorityClassName:
+      - name: crowdsec-lapi-tls
+        secret:
+          secretName: crowdsec-lapi-tls
+      - name: crowdsec-agent-tls
+        secret:
+          secretName: crowdsec-agent-tls
+      priorityClassName: 
+
+---
+# Source: crowdsec/templates/tls/agent-certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: crowdsec-agent
+  namespace: crowdsec
+spec:
+  commonName: CrowdSec Agent
+  secretName: crowdsec-agent-tls
+  duration: 87600h
+  renewBefore: 720h
+  secretTemplate:
+    
+    
+    labels:
+    
+      app.kubernetes.io/part-of: crowdsec
+    
+  issuerRef:
+    
+    name: crowdsec-ca
+    kind: Issuer
+    
+  subject:
+    organizationalUnits:
+      - agent-ou
+
+
+---
+# Source: crowdsec/templates/tls/bouncer-certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: crowdsec-bouncer
+  namespace: crowdsec
+spec:
+  commonName: CrowdSec Bouncer
+  secretName: crowdsec-bouncer-tls
+  duration: 87600h
+  renewBefore: 720h
+  secretTemplate:
+    
+    
+    labels:
+    
+      app.kubernetes.io/part-of: crowdsec
+    
+  issuerRef:
+    
+    name: crowdsec-ca
+    kind: Issuer
+    
+  subject:
+    organizationalUnits:
+      - bouncer-ou
+
+
+---
+# Source: crowdsec/templates/tls/lapi-certificate.yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: crowdsec-lapi
+  namespace: crowdsec
+spec:
+  dnsNames:
+    - crowdsec-service.crowdsec
+    - crowdsec-service.crowdsec.svc.cluster.local
+    - localhost
+  secretName: crowdsec-lapi-tls
+  duration: 87600h
+  renewBefore: 720h
+  issuerRef:
+    
+    name: crowdsec-ca
+    kind: Issuer
+    
+  
+  secretTemplate:
+    
+    
+    
+    labels:
+    
+      app.kubernetes.io/part-of: crowdsec
+---
+# Source: crowdsec/templates/serviceaccount.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  namespace: crowdsec
+  name: crowdsec-configmap-updater-sa
+  labels:
+    k8s-app: crowdsec
+    type: capi-register-job
+    version: v1
+  annotations:
+    "helm.sh/hook": "pre-install,pre-upgrade"
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+    "helm.sh/hook-weight": "-1"
 ---
 # Source: crowdsec/templates/tests/test_agent_up.yaml
 apiVersion: v1
@@ -854,8 +968,10 @@ spec:
       enabled: true
       # Local copy of decisions; requests never wait on LAPI.
       crowdsecMode: stream
-      crowdsecLapiScheme: http
+      crowdsecLapiScheme: https
       crowdsecLapiHost: crowdsec-service.crowdsec.svc.cluster.local:8080
+      # The CA from the ca release, which signs the LAPI certificate.
+      crowdsecLapiTlsCertificateAuthority: urn:k8s:secret:crowdsec-lapi-tls:ca.crt
       # Read from the Secret in the Middleware's namespace.
       crowdsecLapiKey: urn:k8s:secret:crowdsec-bouncer-key:key
       # Fail open: if LAPI is unreachable, keep serving traffic.

@@ -1052,7 +1052,7 @@ mod tests {
         assert!(
             gaps.fix
                 .as_deref()
-                .is_some_and(|f| f.starts_with("install ingress/traefik (https://")),
+                .is_some_and(|f| f.starts_with("install traefik (https://")),
             "{gaps:#?}"
         );
     }

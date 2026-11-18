@@ -86,7 +86,7 @@ configuration:
 ZEABUR_VALUES
 helm upgrade --install velero velero \
   --repo https://vmware-tanzu.github.io/helm-charts \
-  --version 12.2.1 \
+  --version 12.2.3 \
   --namespace velero --create-namespace \
   --values velero-values.yaml \
   --values velero-single-node.yaml \

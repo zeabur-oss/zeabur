@@ -6,8 +6,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-controller-manager
   namespace: 'moco-system'
 
@@ -19,8 +19,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
     rbac.authorization.k8s.io/aggregate-to-edit: "true"
   name: moco-backuppolicy-editor-role
@@ -52,8 +52,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
     rbac.authorization.k8s.io/aggregate-to-view: "true"
   name: moco-backuppolicy-viewer-role
 rules:
@@ -80,8 +80,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-manager-role
 rules:
   - apiGroups:
@@ -243,8 +243,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
     rbac.authorization.k8s.io/aggregate-to-admin: "true"
     rbac.authorization.k8s.io/aggregate-to-edit: "true"
   name: moco-mysqlcluster-editor-role
@@ -276,8 +276,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
     rbac.authorization.k8s.io/aggregate-to-view: "true"
   name: moco-mysqlcluster-viewer-role
 rules:
@@ -304,8 +304,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-manager-rolebinding
 roleRef:
   apiGroup: rbac.authorization.k8s.io
@@ -324,8 +324,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-leader-election-role
   namespace: 'moco-system'
 rules:
@@ -359,8 +359,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-leader-election-rolebinding
   namespace: 'moco-system'
 roleRef:
@@ -380,8 +380,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-webhook-service
   namespace: 'moco-system'
 spec:
@@ -401,9 +401,9 @@ metadata:
   namespace: moco-system
   labels:
     app.kubernetes.io/component: moco-controller
-    helm.sh/chart: moco-0.27.0
+    helm.sh/chart: moco-0.28.0
     app.kubernetes.io/name: moco
-    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/version: "0.38.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   replicas: 1
@@ -436,11 +436,11 @@ spec:
           name: moco-controller
           args:
             - --agent-image
-            - "ghcr.io/cybozu-go/moco-agent:0.16.0"
+            - "ghcr.io/cybozu-go/moco-agent:0.17.0"
             - --fluent-bit-image
-            - "ghcr.io/cybozu-go/moco/fluent-bit:5.0.2.1"
+            - "ghcr.io/cybozu-go/moco/fluent-bit:5.1.4.1"
             - --mysqld-exporter-image
-            - "ghcr.io/cybozu-go/moco/mysqld_exporter:0.19.0.1"
+            - "ghcr.io/cybozu-go/moco/mysqld_exporter:0.20.0.1"
           ports:
             - containerPort: 9443
               name: webhook-server
@@ -497,8 +497,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-mutating-webhook-configuration
 webhooks:
   - admissionReviewVersions:
@@ -555,8 +555,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-validating-webhook-configuration
 webhooks:
   - admissionReviewVersions:
@@ -611,9 +611,9 @@ metadata:
   name: moco-controller-grpc
   namespace: moco-system
   labels:
-    helm.sh/chart: moco-0.27.0
+    helm.sh/chart: moco-0.28.0
     app.kubernetes.io/name: moco
-    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/version: "0.38.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   commonName: moco-controller
@@ -634,9 +634,9 @@ metadata:
   name: moco-grpc-ca
   namespace: moco-system
   labels:
-    helm.sh/chart: moco-0.27.0
+    helm.sh/chart: moco-0.28.0
     app.kubernetes.io/name: moco
-    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/version: "0.38.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   commonName: MOCO gRPC CA
@@ -656,9 +656,9 @@ metadata:
   name: moco-serving-cert
   namespace: moco-system
   labels:
-    helm.sh/chart: moco-0.27.0
+    helm.sh/chart: moco-0.28.0
     app.kubernetes.io/name: moco
-    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/version: "0.38.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   dnsNames:
@@ -677,9 +677,9 @@ metadata:
   name: moco-grpc-issuer
   namespace: moco-system
   labels:
-    helm.sh/chart: moco-0.27.0
+    helm.sh/chart: moco-0.28.0
     app.kubernetes.io/name: moco
-    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/version: "0.38.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   ca:
@@ -693,9 +693,9 @@ metadata:
   name: moco-selfsigned-issuer
   namespace: moco-system
   labels:
-    helm.sh/chart: moco-0.27.0
+    helm.sh/chart: moco-0.28.0
     app.kubernetes.io/name: moco
-    app.kubernetes.io/version: "0.37.0"
+    app.kubernetes.io/version: "0.38.0"
     app.kubernetes.io/managed-by: Helm
 spec:
   selfSigned: {}
@@ -708,8 +708,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-delete-validator
 spec:
   failurePolicy: Fail
@@ -738,8 +738,8 @@ metadata:
   labels:
     app.kubernetes.io/managed-by: 'Helm'
     app.kubernetes.io/name: 'moco'
-    app.kubernetes.io/version: '0.37.0'
-    helm.sh/chart: 'moco-0.27.0'
+    app.kubernetes.io/version: '0.38.0'
+    helm.sh/chart: 'moco-0.28.0'
   name: moco-delete-validator
 spec:
   policyName: moco-delete-validator

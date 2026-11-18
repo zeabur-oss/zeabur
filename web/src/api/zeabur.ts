@@ -1052,7 +1052,7 @@ export type ComponentSummary = { [key: string]: string }
  * One component of the catalogue: an upstream project that provides a capability.
  */
 export type Component = {
-  /** The capability it provides (`ingress`). */
+  /** The capability it provides (`ingress`), from `provides.capability`. */
   capability: string
   /**
    * Whether the catalogue installs it by default, per profile (`single-node`, `multi-node`):

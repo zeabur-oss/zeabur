@@ -4,7 +4,7 @@
 //! them:
 //!
 //! ```sh
-//! cargo run -q -p zeabur-catalog --example install -- image-updates/keel single-node | bash
+//! cargo run -q -p zeabur-catalog --example install -- keel single-node | bash
 //! ```
 
 use std::error::Error;
@@ -15,7 +15,7 @@ use zeabur_catalog::install::{InstallFormat, guide};
 fn main() -> Result<(), Box<dyn Error>> {
     let args: Vec<String> = std::env::args().skip(1).collect();
     let [component, profile, inputs @ ..] = args.as_slice() else {
-        return Err("usage: install <capability>/<id> <profile> [<input>=<value>...]".into());
+        return Err("usage: install <id> <profile> [<input>=<value>...]".into());
     };
     let mut text = guide(component, profile)?
         .formats

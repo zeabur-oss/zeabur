@@ -9,7 +9,7 @@ type Backup = Schemas.VeleroBackup
 type Location = Schemas.VeleroLocation
 type Schedule = Schemas.VeleroSchedule
 
-export const VELERO_COMPONENT = "volume-backup/velero"
+export const VELERO_COMPONENT = "velero"
 export type Verdict =
   | { as: "notInstalled" }
   | { as: "refused" }

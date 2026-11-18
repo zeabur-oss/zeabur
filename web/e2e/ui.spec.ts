@@ -941,9 +941,9 @@ test("the project's suggestions list what it misses, and a fix is planned and ap
 })
 
 test("a component is installed with its manifests, not from the panel", async ({ page }) => {
-  await page.goto("/cluster/components?component=config-reload/reloader")
+  await page.goto("/cluster/components?component=reloader")
   const sheet = page.getByRole("dialog", { name: /Reloader/ })
-  await expect(sheet).toContainText("zeaburctl components export config-reload/reloader")
+  await expect(sheet).toContainText("zeaburctl components export reloader")
   await expect(sheet.getByRole("button", { name: /install/i })).toHaveCount(0)
 })
 

@@ -654,7 +654,7 @@ pub fn cluster_gaps(classes: &[IngressClassFact], namespaces: &[NamespaceFact]) 
                 .with("controller", &class.controller),
             fix: Fix {
                 kind: FixKind::Install,
-                id: "ingress/traefik".to_owned(),
+                id: "traefik".to_owned(),
                 params: std::collections::BTreeMap::new(),
             },
             citations: rule.citations(),
@@ -711,7 +711,7 @@ mod tests {
         assert_eq!(gaps.len(), 1);
         assert_eq!(gaps[0].subject, Origin::object("IngressClass", "nginx"));
         assert_eq!(gaps[0].fix.kind, FixKind::Install);
-        assert_eq!(gaps[0].fix.id, "ingress/traefik");
+        assert_eq!(gaps[0].fix.id, "traefik");
         assert_eq!(
             retired_classes(&classes).into_iter().collect::<Vec<_>>(),
             ["nginx"]

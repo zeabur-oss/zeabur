@@ -118,21 +118,19 @@ mod tests {
             .filter(|p| p.extension().is_some_and(|e| e == "yaml"))
             .collect();
         files.sort();
-        // One chart per component of the bundled catalogue, named `<capability>__<id>`.
+        // One chart per component of the pinned catalogue (`components/<id>.yaml`), named `<id>`.
         let mut charts: Vec<String> = files
             .iter()
             .map(|f| f.file_stem().unwrap().to_string_lossy().into_owned())
             .collect();
-        let index: Value = serde_json::from_slice(
-            &std::fs::read(concat!(env!("ZEABUR_CATALOG_RELEASE"), "/index.json")).unwrap(),
-        )
-        .unwrap();
-        let mut components: Vec<String> = index["components"]
-            .as_array()
-            .unwrap()
-            .iter()
-            .map(|c| c["id"].as_str().unwrap().replace('/', "__"))
-            .collect();
+        let mut components: Vec<String> =
+            std::fs::read_dir(concat!(env!("ZEABUR_CATALOG"), "/components"))
+                .unwrap()
+                .filter_map(Result::ok)
+                .map(|e| e.path())
+                .filter(|p| p.extension().is_some_and(|e| e == "yaml"))
+                .map(|p| p.file_stem().unwrap().to_string_lossy().into_owned())
+                .collect();
         charts.sort();
         components.sort();
         assert_eq!(

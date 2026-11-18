@@ -1057,7 +1057,7 @@ spec:
               memory: 128Mi
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 48Mi
       nodeSelector:
         kubernetes.io/os: "linux"
 
@@ -1147,7 +1147,7 @@ spec:
               memory: 128Mi
             requests:
               cpu: 10m
-              memory: 32Mi
+              memory: 56Mi
           # LivenessProbe settings are based on those used for the Kubernetes
           # controller-manager. See:
           # https://github.com/kubernetes/kubernetes/blob/806b30170c61a38fedd54cc9ede4cd6275a1ad3b/cmd/kubeadm/app/util/staticpod/utils.go#L241-L245
