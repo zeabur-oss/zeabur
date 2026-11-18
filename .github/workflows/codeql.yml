@@ -7,7 +7,6 @@ on:
   push:
     branches: [main]
   pull_request:
-  merge_group:
   schedule:
     - cron: "0 18 * * 1"
 
