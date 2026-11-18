@@ -89,7 +89,7 @@ test("without metrics-server, the reserved amounts stay and Install is offered",
   await expect(panel).toContainText("Live usage needs metrics-server.")
   await expect(panel.getByRole("link", { name: "Install" })).toHaveAttribute(
     "href",
-    /\/cluster\/components\?component=metrics%2Fmetrics-server/,
+    /\/cluster\/components\?component=metrics-server/,
   )
   await expect(panel).toContainText(/Each replica \(×\d+\)/)
   await page.goto(`/projects/${encodeURIComponent(namespace)}?view=list`)
