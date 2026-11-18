@@ -19,12 +19,11 @@ until every package is built (see [Zeabur Desktop](#zeabur-desktop)).
 
 | Step | Where | Does |
 |---|---|---|
-| knope's `prepare-release` | once, in the release pull request | Sets the version in every file of `versioned_files` in `knope.toml`: both `Cargo.toml` files, each workspace crate in both lock files, the chart's `version`, `web/package.json` and the installer's `package.json`. The chart has no `appVersion`; its templates use the chart's `version`. `openapi.yaml` carries the API's own version, which a release does not change. |
+| knope's `prepare-release` | once, in the release pull request | Sets the version in every file of `versioned_files` in `knope.toml`: both `Cargo.toml` files, each workspace crate in both lock files, the chart's `version` and `web/package.json`. The chart has no `appVersion`; its templates use the chart's `version`. `openapi.yaml` carries the API's own version, which a release does not change. |
 | `check` job | once | The tag is SemVer without build metadata, `CHANGELOG.md` has its section, and a tag is on `main`. |
-| `build` job | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. A rehearsal also builds a development installer on Linux, which it does not keep. |
+| `build` job | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog pin resolves (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. |
 | `scripts/release-sign.sh` | macOS arm64, in the `build` job | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
-| `publish` job | once, tag only, after every build | Refuses when the release is already published. Its token cannot see a draft; the `release` job adds the assets to the draft and fails when there is none. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms (`release-default-images.sh`); writes `published/subjects.json`, which `attest` attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
-| `finish` job | Linux amd64 and arm64, tag only | Builds `zeabur-installer`, pinned to the catalog, Zeabur Identity (`release-pins.sh`) and what `publish` pushed. |
+| `publish` job | once, tag only, after every build | Refuses when the release is already published. Its token cannot see a draft; the `release` job adds the assets to the draft and fails when there is none. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms (`release-default-images.sh`) and writes `published/subjects.json`, which `attest` attests. |
 | `release` job | once, tag only | Copies the assets that `release-assets.sh` lists into `assets/`, adds the signed `SHA256SUMS`, attests them and uploads them to the draft. |
 | `verify` job, `scripts/release-verify.sh` | every platform | After the workflow has checked `SHA256SUMS` and each asset's attestation, checks that the draft has exactly the expected assets, each image and the chart as a user would, that the chart runs exactly the images in `digests.txt`, and that `digests.txt` names the debug and tools images the code pins (`crates/zeabur-api/src/settings.rs`), then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS, where a Developer ID signature must be notarized (`spctl`), and checks Zeabur Desktop's `.dmg` the same way. |
 
@@ -32,8 +31,7 @@ The pins come from the releases of zeabur-oss/catalog and zeabur-oss/identity: t
 each signed, checked with cosign. Their signer is that repository's own `release.yml` or, for their
 older releases, the shared release workflow of zeabur-oss/.github. The catalog files the build
 embeds must be the ones its `SHA256SUMS` lists; Zeabur Identity's image is the `index` line of its
-`digests.txt`, and its pods' memory request is `requestMemoryMiB` in its `resources.json`, which the
-installer counts toward the least memory of a team install.
+`digests.txt`.
 
 Every signature and attestation names this repository's workflow,
 `https://github.com/zeabur-oss/zeabur/.github/workflows/release.yml@refs/tags/v<version>`.
@@ -50,7 +48,6 @@ entries carry the commit's time, so the same commit gives the same archives.
 |---|---|
 | Linux amd64, arm64 | `zeaburctl-<version>-linux-<arch>.tar.gz` and `zeabur-<version>-linux-<arch>.tar.gz`, one static musl binary each with `LICENSE`; `image.tar` (Zeabur's image) and `proxy-image.tar` (Zeabur Proxy's) |
 | macOS arm64 | `zeaburctl-<version>-darwin-arm64.tar.gz`. The server runs only in a pod, so there is no macOS `zeabur`. |
-| Linux, with `installer` | `zeabur-installer-<version>-linux-<arch>.tar.gz`, built with all the `ZEABUR_PIN_*` variables (`release-pins.sh` and `published/outputs.env`) or, for a development build, none |
 
 `scripts/release-smoke.sh` tries these files as they will ship, on the development cluster
 (`scripts/dev-cluster.sh`). In `build` it runs the local image; in `verify` the node pulls the
@@ -152,7 +149,7 @@ not `sort -V`.
    on: release Identity before the next Zeabur release and move the pin to it.
 2. Rehearse: **Actions → Release → Run workflow** on `release/next` with the version, `v<version>`. It
    runs the three builds with their smoke tests and publishes nothing; the pins are
-   not checked and no pinned installer is built.
+   not checked.
 3. Before the first release only, see [Settings the workflow needs](#settings-the-workflow-needs).
 4. **Screenshots** starts on its own with the release pull request and commits the docs screenshots
    that changed onto `release/next`, which runs **CI** again. Look at the images in the diff. The

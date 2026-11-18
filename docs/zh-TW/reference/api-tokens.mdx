@@ -25,7 +25,7 @@ source: "5f7bb07ea1d9"
 
 每個請求要三樣東西：API 位址、CA 憑證和權杖。
 
-**位址**：kube-apiserver 在每個 server 節點的 TCP 6443 上，例如 `https://203.0.113.10:6443`。你平常用 kubectl 的 kubeconfig 裡，`server` 那一行就是這個位址。要用網域或其他位址連 API 時，把它加到 [`host.tlsSan`](./installer-configuration.mdx)，憑證才會涵蓋它。
+**位址**：kube-apiserver 在每個 server 節點的 TCP 6443 上，例如 `https://203.0.113.10:6443`。你平常用 kubectl 的 kubeconfig 裡，`server` 那一行就是這個位址。要用網域或其他位址連 API 時，把它加到 K3s 或 RKE2 設定檔的 `tls-san`，憑證才會涵蓋它。
 
 **CA 憑證**：建立或更新權杖後，視窗裡會顯示。在專案有角色的權杖，也可以從專案的 `kube-root-ca.crt` 設定檔讀出來：
 

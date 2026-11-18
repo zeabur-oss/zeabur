@@ -74,8 +74,7 @@ describe("componentsBehind", () => {
 })
 
 describe("upgradeCommands", () => {
-  test("give the installer's and Helm's steps, the latter to the new version", () => {
-    expect(upgradeCommands("installer", "0.2.0")[0]).toContain("zeabur-installer apply")
+  test("give Helm's steps to the new version", () => {
     expect(upgradeCommands("helm", "0.2.0")[0]).toContain("--version 0.2.0")
     for (const by of ["argo-cd", "flux", "zeaburctl", undefined] as const)
       expect(upgradeCommands(by, "0.2.0")).toEqual([])

@@ -101,76 +101,6 @@ pub enum Mode {
     Local,
 }
 
-/// What the installer was asked to install.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Profile {
-    /// One server.
-    SingleNode,
-    /// Several nodes.
-    MultiNode,
-    /// One person's install.
-    Personal,
-}
-
-/// The Kubernetes distribution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Distribution {
-    /// K3s.
-    K3s,
-    /// RKE2.
-    Rke2,
-    /// `KubeSolo`.
-    KubeSolo,
-}
-
-/// Where in an install it stopped.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum Step {
-    /// Reading the configuration and planning.
-    Plan,
-    /// Checks of the host.
-    Preflight,
-    /// Installing what the node needs before components run.
-    NodePrep,
-    /// The Kubernetes distribution itself.
-    Cluster,
-    /// Namespaces, network policies and storage.
-    ClusterSetup,
-    /// Zeabur Catalog components.
-    Components,
-    /// Zeabur Identity.
-    Identity,
-    /// Zeabur.
-    Zeabur,
-    /// Recording what was installed.
-    Record,
-}
-
-/// Why an install stopped, from a fixed list; never a message.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "kebab-case")]
-pub enum ErrorCode {
-    /// The configuration is invalid.
-    Config,
-    /// The plan cannot be made.
-    Plan,
-    /// A file or directory.
-    Io,
-    /// A command failed.
-    Command,
-    /// A download failed.
-    Download,
-    /// A download did not match its digest.
-    Digest,
-    /// Output did not parse.
-    Parse,
-    /// Anything else.
-    Other,
-}
-
 /// Someone used Zeabur for the first time in a UTC day. It names nobody.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ZeaburActive {
@@ -302,29 +232,6 @@ pub struct FeatureUsed {
     pub feature: Feature,
 }
 
-/// What an install is, on every installer event.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Install {
-    /// The version of the installer.
-    pub installer_version: &'static str,
-    /// What was asked for.
-    pub profile: Profile,
-    /// The distribution.
-    pub distribution: Distribution,
-}
-
-/// An install that stopped.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Failure {
-    /// The install.
-    #[serde(flatten)]
-    pub install: Install,
-    /// Where it stopped.
-    pub step: Step,
-    /// Why.
-    pub error: ErrorCode,
-}
-
 /// How connecting to a cluster with a kubeconfig ended, by the cluster's answer to the first
 /// request.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
@@ -451,12 +358,6 @@ pub enum Event {
     ZeaburActive(ZeaburActive),
     /// A feature was used.
     FeatureUsed(FeatureUsed),
-    /// An install began.
-    InstallStarted(Install),
-    /// An install ended well.
-    InstallFinished(Install),
-    /// An install stopped.
-    InstallFailed(Failure),
     /// Someone connected to a cluster with a kubeconfig, or tried to.
     ClusterConnected(ClusterConnected),
     /// A change was sent to the cluster and answered.
@@ -472,9 +373,6 @@ impl Event {
         match self {
             Self::ZeaburActive(_) => "zeabur_active",
             Self::FeatureUsed(_) => "feature_used",
-            Self::InstallStarted(_) => "install_started",
-            Self::InstallFinished(_) => "install_finished",
-            Self::InstallFailed(_) => "install_failed",
             Self::ClusterConnected(_) => "cluster_connected",
             Self::AppChangeSubmitted(_) => "app_change_submitted",
             Self::RolloutFinished(_) => "rollout_finished",
@@ -486,10 +384,6 @@ impl Event {
         let value = match self {
             Self::ZeaburActive(active) => serde_json::to_value(active),
             Self::FeatureUsed(used) => serde_json::to_value(used),
-            Self::InstallStarted(install) | Self::InstallFinished(install) => {
-                serde_json::to_value(install)
-            }
-            Self::InstallFailed(failure) => serde_json::to_value(failure),
             Self::ClusterConnected(connected) => serde_json::to_value(connected),
             Self::AppChangeSubmitted(submitted) => serde_json::to_value(submitted),
             Self::RolloutFinished(finished) => serde_json::to_value(finished),

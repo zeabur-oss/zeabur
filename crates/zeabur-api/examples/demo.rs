@@ -64,9 +64,8 @@
 //! under `apps.example.com` with HTTPS from the `ClusterIssuer` `letsencrypt`;
 //! `ZEABUR_DEMO_NO_DOMAINS=1` leaves both unset.
 //!
-//! `ZEABUR_DEMO_RKE2=1` makes the cluster an RKE2 one installed by Zeabur Installer: the nodes
-//! have addresses and a location, the control plane runs as static pods, and the installer's
-//! record `kube-system/zeabur-installer` exists, so install steps name the installer.
+//! `ZEABUR_DEMO_RKE2=1` makes the cluster an RKE2 one: the nodes have addresses and a location,
+//! and the control plane runs as static pods.
 //!
 //! The `web` pods have no shell, so their terminal offers a debug container, which starts a moment
 //! after it is added, as do tools pods and node shells. With `ZEABUR_DEMO_RKE2=1`, `vps-2` also has
@@ -2393,7 +2392,6 @@ impl ClusterAccess for Demo {
 }
 
 /// Starts what the in-memory cluster leaves waiting: added debug containers and tools pods.
-/// The demo as an RKE2 cluster from Zeabur Installer (`ZEABUR_DEMO_RKE2`).
 /// A node shell Bob opened on `vps-2` earlier, which ended when its half hour ran out.
 fn leftover_shell(s: &mut State) {
     let image = zeabur_api::settings::DEBUG_IMAGE;
@@ -2424,6 +2422,7 @@ fn leftover_shell(s: &mut State) {
         .push(pod);
 }
 
+/// The demo as an RKE2 cluster (`ZEABUR_DEMO_RKE2`).
 fn rke2(s: &mut State) {
     leftover_shell(s);
     let rke2 = |v: &str| v.replace("+k3s1", "+rke2r1").replace("-k3s1", "");
@@ -2460,10 +2459,6 @@ fn rke2(s: &mut State) {
             namespace: "kube-system".to_owned(),
             ..NamespaceObjects::default()
         });
-    system.config_maps.push(from(json!({
-        "metadata": {"name": "zeabur-installer", "namespace": "kube-system"},
-        "data": {"version": "v0.1.0"}
-    })));
     // RKE2 runs the control plane as static pods; kube-apiserver shows each as a mirror pod.
     for component in ["etcd", "kube-apiserver"] {
         system.pods.push(from(json!({

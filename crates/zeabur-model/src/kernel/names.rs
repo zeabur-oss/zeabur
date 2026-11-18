@@ -71,8 +71,8 @@ pub fn admin_only_namespace(namespace: &str) -> Option<&'static str> {
     }
 }
 
-/// The label `zeabur-installer` puts on the namespace of each component it sets up, with the
-/// value `"true"`. Such a namespace is never deleted as a project.
+/// The label, with the value `"true"`, on the namespace of each platform component. Such a
+/// namespace is never deleted as a project.
 pub const LABEL_BASELINE: &str = "zeabur.com/platform";
 
 /// The name of every debug container Zeabur adds starts with this.

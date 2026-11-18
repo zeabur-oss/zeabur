@@ -1,6 +1,6 @@
 [package]
 name = "zeabur-telemetry"
-description = "zeabur: the usage data Zeabur and its installer may send, and the one sender"
+description = "zeabur: the usage data Zeabur may send, and the one sender"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

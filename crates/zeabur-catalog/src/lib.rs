@@ -4,7 +4,6 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
-use zeabur_installer_plan::kube_version;
 use zeabur_kube::ClusterFacts;
 
 mod bundle {
@@ -12,6 +11,7 @@ mod bundle {
 }
 pub mod install;
 pub mod installed;
+mod kube_version;
 pub mod measured;
 pub mod templates;
 pub mod versions;

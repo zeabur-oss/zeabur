@@ -92,7 +92,7 @@ data:
 kubectl -n zeabur patch configmap zeabur-settings --type json -p '[{"op":"remove","path":"/data/cluster-name"}]'
 ```
 
-安裝時的值來自 Chart 的 `clusterName`、`metricsStore.service` 和 `domains.suffixes`。用 Installer 安裝時，網域來自設定檔的 `suffixes`，見 [Installer 設定](../reference/installer-configuration.mdx)。
+安裝時的值來自 Chart 的 `clusterName`、`metricsStore.service` 和 `domains.suffixes`。
 
 ## 確認結果
 

@@ -1168,12 +1168,6 @@ export type Capability = {
 export type CapabilityList = {
   /** Zeabur Catalog's commit. */
   catalogueCommit: string
-  /**
-   * Whether zeabur-installer set up the cluster, by its record, the ConfigMap
-   * `kube-system/zeabur-installer`, read as the person. `None` when it cannot be read.
-   * @nullable
-   */
-  installer?: boolean | null
   /** Each capability, sorted by name: existing (with evidence) or not (with what to install). */
   items: Capability[]
 }
@@ -6227,7 +6221,6 @@ export type InspectRequest = {
 export type InstallMethod = (typeof InstallMethod)[keyof typeof InstallMethod]
 
 export const InstallMethod = {
-  installer: "installer",
   helm: "helm",
   "argo-cd": "argo-cd",
   flux: "flux",
@@ -11622,10 +11615,9 @@ export const getGetZeaburUrl = () => {
 }
 
 /**
- * @summary Zeabur's version, whether the interface checks for a newer one, and how Zeabur was installed:
-from its Deployment's marks (Helm, Argo CD, Flux) and, for a Helm release, zeabur-installer's
-`HelmChart` of that name in `kube-system`. Both are read as the person; a refused read leaves
-`installedBy` out.
+ * @summary Zeabur's version, whether the interface checks for a newer one, and how Zeabur was installed,
+from its Deployment's marks (Helm, Argo CD, Flux). The Deployment is read as the person; a
+refused read leaves `installedBy` out.
  */
 export const getZeabur = async (
   options?: Parameters<typeof zeaburFetch>[1],

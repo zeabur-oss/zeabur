@@ -73,8 +73,7 @@ fn test_s3(dev: &DevCluster) -> Result<(), String> {
 }
 
 /// zot from Zeabur Builder's component, with the fixed ClusterIP the node's mirror points at.
-/// zot's CA goes where the mirror reads it, as zeabur-installer copies it; containerd reads it on
-/// each pull.
+/// zot's CA goes where the mirror reads it; containerd reads it on each pull.
 fn zot(dev: &DevCluster) -> Result<(), String> {
     catalog::install(
         dev,

@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
 # The web interface: banned styles, lint, unused code and layer boundaries, new findings in the
 # changed files, build, unit tests, generated API types up to date, the screenshot specs
-# type-checked, the installer's interface built and linted, no use of a deprecated declaration in
-# either, size budget, and a build that embeds it. The health and duplication report after it does not fail
-# the job.
+# type-checked, no use of a deprecated declaration, size budget, and a build that embeds it. The
+# health and duplication report after it does not fail the job.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source scripts/lib.sh
@@ -21,9 +20,7 @@ source scripts/lib.sh
 )
 git diff --exit-code -- web/src/api/zeabur.ts
 (cd scripts/shots; bun run typecheck)
-./scripts/build-installer-ui.sh
-(cd crates/zeabur-installer/web; bun run lint)
-(cd web; bun scripts/check-deprecated.ts . ../crates/zeabur-installer/web)
+(cd web; bun scripts/check-deprecated.ts .)
 ./scripts/ui-budget.sh
 ZEABUR_UI_DIST="$PWD/web/dist" cargo build --profile ci --locked -p zeabur -p zeaburctl
 ZEABUR_UI_DIST="$PWD/web/dist" cargo nextest run --cargo-profile ci --locked -p zeabur-ui --features interface

@@ -6,8 +6,8 @@
 //! zone itself (`example.com`). `<address>.sslip.io` resolves to `<address>` with no record.
 //!
 //! The suffixes the server was started with (`ZEABUR_DOMAIN_SUFFIXES`, the chart's
-//! `domains.suffixes`, which the installer fills) are the default. A list chosen on the cluster
-//! page replaces it, kept in the settings ConfigMap under [`DOMAIN_SUFFIXES_KEY`].
+//! `domains.suffixes`) are the default. A list chosen on the cluster page replaces it, kept in the
+//! settings ConfigMap under [`DOMAIN_SUFFIXES_KEY`].
 //!
 //! The check looks up a name no one uses, `zeabur-check-<random>.<suffix>`, from where Zeabur
 //! runs: only a wildcard record answers it. It points here when one of the addresses is one the
@@ -36,8 +36,8 @@ use crate::views::UnreadableView;
 /// The most suffixes a cluster may have.
 pub const SUFFIXES_MAX: usize = 20;
 
-/// A suffix as a person or an installer wrote it: trimmed, lower case, without `*.` or the final
-/// dot, a domain name with at least two labels.
+/// A suffix as a person or the chart's values wrote it: trimmed, lower case, without `*.` or the
+/// final dot, a domain name with at least two labels.
 ///
 /// # Errors
 ///

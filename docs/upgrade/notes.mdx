@@ -70,7 +70,7 @@ kubectl -n observability annotate pvc vmsingle-vm-victoria-metrics-k8s-stack ope
 kubectl -n observability rollout restart deployment victoria-metrics-operator
 ```
 
-Download the v0.2 installer, run `plan`, review it, then run `apply`. See [Upgrade Zeabur](steps.mdx#upgrade-with-zeabur-installer) for the steps.
+Download the v0.2 installer, run `plan`, review it, then run `apply`.
 
 `plan` lists the components this upgrade adds. System Upgrade Controller is no longer a default component. `apply` doesn't remove it but stops updating it, and `plan` shows it as `not removed, no longer updated`. The installer already pins the K3s and RKE2 release, so you don't need it. To keep it, add `node-updates/system-upgrade-controller` to `enable`. Otherwise, delete it after `apply`:
 

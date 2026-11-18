@@ -1,9 +1,9 @@
-// Components an action needs and the cluster lacks, as zeabur-installer names them.
+// Components an action needs and the cluster lacks, as `zeaburctl components export` names them.
 import type { Schemas } from "@/api/client"
 
-/** A component to install: its entry in the installer's `enable` and its name. */
+/** A component to install: its argument to `zeaburctl components export` and its name. */
 export interface Needed {
-  /** `capability/id`, or a capability for the installer to fill. */
+  /** `capability/id`, or the capability alone when the catalogue has no component for it. */
   id: string
   name: string
 }

@@ -232,7 +232,6 @@ export const zhCN: Messages = {
   "update.current": (version) => `当前是 v${version}。`,
   "update.upToDate": "已是最新版本",
   "update.download": "下载",
-  "update.how.installer": "下载新版 zeabur-installer，用原来的配置运行 plan 和 apply。",
   "update.how.helm": "用新版 chart 运行 helm upgrade。",
   "update.how.argoCd": "把 Argo CD Application 里的 chart 改成新版本。",
   "update.how.flux": "把 Flux HelmRelease 里的 chart 改成新版本。",
@@ -322,13 +321,11 @@ export const zhCN: Messages = {
   "node.reservedMemory": (n, node, share) =>
     n === 1 ? `${node}：内存已预留 ${share}` : `${n} 个节点可预留的内存快用完了`,
   "node.reservedMemory.why": "请求内存的新副本可能要等到有空间。",
-  "node.reservedMemory.fix":
-    "调低上面服务的内存预留量，或加一台节点：用 Zeabur Installer 安装的集群，在服务器运行 sudo zeabur-installer node add。",
+  "node.reservedMemory.fix": "调低上面服务的内存预留量，或加一台节点。",
   "node.reservedCpu": (n, node, share) =>
     n === 1 ? `${node}：CPU 已预留 ${share}` : `${n} 个节点可预留的 CPU 快用完了`,
   "node.reservedCpu.why": "请求 CPU 的新副本可能要等到有空间。",
-  "node.reservedCpu.fix":
-    "调低上面服务的 CPU 预留量，或加一台节点：用 Zeabur Installer 安装的集群，在服务器运行 sudo zeabur-installer node add。",
+  "node.reservedCpu.fix": "调低上面服务的 CPU 预留量，或加一台节点。",
   "unreachable.title": (name) => `连不上 ${name}`,
   "unreachable.zeabur": "Zeabur 没有响应",
   "unreachable.lastHeard": "上次响应",
@@ -1108,21 +1105,9 @@ export const zhCN: Messages = {
   "installer.how": "安装方式",
   "installer.installTitle": (names) => `安装 ${names}`,
   "installer.removeTitle": (name) => `移除 ${name}`,
-  "installer.intro": "组件由 zeabur-installer 安装和移除，要在当初装集群的那台服务器上运行。",
-  "installer.gui": (names) => `打开安装程序的页面，在“组件”勾选 ${names}，然后安装：`,
-  "installer.guiRemove": (name) => `打开安装程序的页面，在“组件”取消勾选 ${name}，然后安装：`,
-  "installer.guiReach": "页面只开在服务器的 127.0.0.1:8085，用 ssh -L 8085:127.0.0.1:8085 连过去。",
-  "installer.config": (path, many) =>
-    `或在 ${path} 的 enable 加上${many ? "这些组件" : "这个组件"}，再运行 apply：`,
-  "installer.configRemove": (path) =>
-    `或从 ${path} 的 enable 去掉这个组件，默认就会安装的组件则加到 disable，再运行 apply：`,
-  "installer.stays":
-    "组件的 Namespace 和存储卷会保留。有些 Chart 会连同 CRD 和所有对应的对象一起删除，安装程序的确认页面会列出来。要删除保留的对象，见安装程序文档。",
   "installer.elsewhere": "如果是用 Helm、K3s 或 GitOps 工具装的，就用同一个工具移除。",
-  "installer.otherCluster":
-    "如果集群不是用 zeabur-installer 安装的，可以打印 manifests，用 kubectl 应用，或提交到 GitOps 仓库。加上 --format helm 会改为打印 Helm 命令。",
-  "installer.notHere":
-    "这个集群不是用 zeabur-installer 装的。打印 manifests 后用 kubectl 应用，或提交到 GitOps 仓库。加上 --format helm 会改为打印 Helm 命令。",
+  "installer.export":
+    "打印 manifests 后用 kubectl 应用，或提交到 GitOps 仓库。加上 --format helm 会改为打印 Helm 命令。",
   "settings.homepage": "主页",
   "settings.opensInNewTab": "（在新标签页打开）",
   "category.traffic": "流量",

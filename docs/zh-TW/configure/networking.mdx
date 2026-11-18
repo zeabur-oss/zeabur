@@ -11,7 +11,7 @@ description: 用私有位址連到同叢集的服務，把資料庫這類不走 
 
 - 有權修改專案裡的服務。由 Helm、Argo CD 或 Flux 管理的服務不能從這裡開放連接埠或加規則，要回到那個工具修改。
 - 連線規則要靠叢集的網路外掛（CNI）執行。K3s 內建的控制器支援，外掛不支援時規則建得起來，但不會擋任何連線。
-- 開放連接埠要有負載平衡器。K3s 內建的 ServiceLB 和 Zeabur 安裝程式裝的 RKE2 都有。
+- 開放連接埠要有負載平衡器，例如 K3s 內建的 ServiceLB。
 
 ## 用私有位址連到其他服務
 
@@ -208,7 +208,7 @@ spec:
               app.kubernetes.io/name: web
 ```
 
-**允許來自公開網域的流量**。規則允許兩個地方的 Traefik：K3s 內建的在 `kube-system`，Zeabur 安裝程式裝的在有 `zeabur.com/platform: "true"` 標籤的 Namespace：
+**允許來自公開網域的流量**。規則允許兩個地方的 Traefik：K3s 內建的在 `kube-system`，另一個在有 `zeabur.com/platform: "true"` 標籤的 Namespace：
 
 ```yaml
 apiVersion: networking.k8s.io/v1

@@ -9,9 +9,8 @@ What is Zeabur's own. Commits and pull requests: `zeabur-workflow`.
 
 ## Crates and binaries
 - Each crate has a level in `Cargo.toml` `[workspace.metadata.levels]` (table in
-  `docs/internal/crates.md`). Binaries: `zeabur` (in-cluster server), `zeaburctl` (CLI: `ui`,
-  `doctor`) and `zeabur-installer` (runs as root on a Linux server; crates `zeabur-installer-*`,
-  guide in `docs/get-started/quickstart.md` and `docs/reference/installer*.md`).
+  `docs/internal/crates.md`). Binaries: `zeabur` (in-cluster server) and `zeaburctl` (CLI: `ui`,
+  `doctor`). Servers get their cluster from Zeatend (zeabur-oss/zeatend), not from this repo.
 - `zeabur-kube` is the only crate that talks to kube-apiserver, and only through clients bound to
   a person's credential. Never build a client from Zeabur's service account token (the one
   exception is tools pods in the terminal namespace, `zeabur_api::tools`), and never
@@ -29,7 +28,6 @@ commit `docs/images/shots` (`docs/internal/screenshots.md`). The README and cove
 same script with their set, `readme` or `cover`.
 
 ## Lint conventions
-- The installer's output module is `out`.
 - Integration tests wrap their tests in `#[cfg(test)] mod tests` (clippy
   `tests_outside_test_module`).
 
@@ -59,10 +57,4 @@ same script with their set, `readme` or `cover`.
 ## Scale
 - Watch with kube-rs `watcher`, `reflector` or `Controller`. One LIST of the namespace, selected by
   label, replaces a GET per object.
-- The installer (`zeabur-installer`, on one host) bounds parallel work (downloads, `kubectl`
-  calls) with a fixed number of worker threads, never one `thread::spawn` per item of an
-  open-ended list. One-shot LISTs and GETs during `apply` and bounded fan-out over the fixed set
-  of components are fine.
-- It waits for a condition with a deadline and backoff, and reports what it last saw.
-- What it writes into one object (a `HelmChart`, a Secret, a ConfigMap) stays under the object
-  limits. Required state lives in the cluster or on disk, never only in memory.
+- What Zeabur writes into one object (a Secret, a ConfigMap) stays under the object limits. Required state lives in the cluster or on disk, never only in memory.

@@ -24,7 +24,7 @@ cargo lint                                   # clippy, all targets and features,
 RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked
 cargo nextest run --workspace --all-features --locked
 cargo deny --locked check
-node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer
+node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy
 ./scripts/check-levels.sh
 ./scripts/check-chart.sh                     # the Helm chart: lint, renderings, refused values
 ./scripts/build-without-ui.sh                # the API-only build, without bun
@@ -94,8 +94,8 @@ scripts; the steps every zeabur-oss release shares call `zeabur-oss-release` fro
 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) directly.
 [docs/internal/releasing.md](docs/internal/releasing.md) has the steps.
 
-A pull request that changes what users of Zeabur, `zeaburctl`, the installer or the chart see adds
-a change file. `nix develop -c knope document-change` asks for its level and summary and writes it
+A pull request that changes what users of Zeabur, `zeaburctl` or the chart see adds a
+change file. `nix develop -c knope document-change` asks for its level and summary and writes it
 to `.changeset/`; add paragraphs under the summary when it needs them:
 
 ```md
@@ -152,12 +152,11 @@ compiles locally, and `cargo lint` turns every warning into an error in CI.
   out in two listed modules only (`scripts/check-desktop.sh`).
 - clippy `pedantic`, `cargo` and `nursery` are on.
 - A selection of `restriction` lints targets what matters in a server that handles other
-  people's credentials and in an installer that runs as root on someone's server: no panics on
-  input (`unwrap_used`, `expect_used`, `indexing_slicing`, …; tests may
-  unwrap), exhaustive matches in security logic (`wildcard_enum_match_arm`), no silently dropped
+  people's credentials: no panics on input (`unwrap_used`, `expect_used`, `indexing_slicing`, …;
+  tests may unwrap), exhaustive matches in security logic (`wildcard_enum_match_arm`), no silently dropped
   errors (`map_err_ignore`, `let_underscore_must_use`, …), and no unexplained suppressions:
   use `#[expect(lint, reason = "…")]`, which also fails once it is no longer needed.
-- Only the binaries' `output` modules (`out` in `zeabur-installer`) write to stdout or stderr;
+- Only the binaries' `output` modules write to stdout or stderr;
   everything else logs through `tracing`.
 
 `rustfmt.toml` groups and orders imports, wraps comments at 100 columns and fails on code it
@@ -171,8 +170,7 @@ cannot format.
   [OSI](https://opensource.org/licenses)); crates come from crates.io only; no `*` versions.
 - TLS uses rustls with [aws-lc-rs](https://aws.github.io/aws-lc-rs/) as the only cryptographic
   backend. `ring`, OpenSSL, `native-tls`, the FIPS build of aws-lc and `webpki-roots` (whose
-  CDLA licence is not OSI-approved; the image ships a CA bundle instead, and the installer uses
-  the system's CA store) are banned.
+  CDLA licence is not OSI-approved; the image ships a CA bundle instead) are banned.
 - [RustSec](https://rustsec.org/) advisories and yanked versions fail the check. Every ignored
   advisory carries its reason in `deny.toml`.
 
@@ -196,9 +194,8 @@ allowlist entry below is added and reviewed, so those pull requests are never me
 
 ### Web interface
 
-The JavaScript packages are one Bun workspace: `web`, `desktop/web`,
-`crates/zeabur-installer/web`, `scripts/shots` (the screenshots) and the release scripts at the
-root. Each `package.json` pins exact versions; a version that more than one package uses is in the
+The JavaScript packages are one Bun workspace: `web`, `desktop/web`, `scripts/shots` (the
+screenshots) and the release scripts at the root. Each `package.json` pins exact versions; a version that more than one package uses is in the
 root `package.json`'s `catalog` and the package names it as `catalog:`. The root `bun.lock` is
 committed, and CI installs with `bun ci`, which fails if a `package.json` and the lock file
 disagree. The root `bunfig.toml` sets `minimumReleaseAge` to seven days, the same delay as Cargo's,
@@ -219,7 +216,7 @@ A dependency that reaches the shipped binaries and contains `unsafe` code or bui
 needs an entry in `supply-chain/unsafe-allowlist.toml` with a reason and the date a maintainer
 approved it. `zeabur-oss-unsafe-report` (from zeabur-oss/.github, run by
 `scripts/ci/lint.sh`) scans the shipped dependency graph (normal and build dependencies of `zeabur`,
-`zeaburctl`, `zeabur-proxy` and `zeabur-installer` for the image target), lists every such crate and
+`zeaburctl` and `zeabur-proxy` for the image target), lists every such crate and
 fails on one that is not approved; an entry marked `pending` is a proposal awaiting review. The
 count is a review signal, not an audit.
 
@@ -235,8 +232,8 @@ What to test, at which level, and what not to test: [docs/internal/testing.md](d
 
 ### Development cluster
 
-Three commands give a k3d cluster with Zeabur Identity and Zeabur, installed with the installer's
-own objects and values, at <https://zeabur.localhost>. Run them from the Zeabur checkout on a Linux
+Three commands give a k3d cluster with Zeabur Identity and Zeabur, installed from their
+manifests and chart, at <https://zeabur.localhost>. Run them from the Zeabur checkout on a Linux
 machine or VM with Docker running, Nix with flakes, and permission to use Docker; the cluster
 uses port 443. Do not point anything at a production cluster: the tests create and delete
 namespaces, service accounts and RBAC.
@@ -313,39 +310,3 @@ A release binary embeds the built interface; see the `zeabur-ui` crate documenta
 Motion work follows the `zeabur-ui` skill and the transitions.dev skills that `skills-lock.json`
 pins; install those with `npx skills experimental_install` (they are not kept in this repository).
 
-## Installer
-
-`zeabur-installer` installs K3s or RKE2, Zeabur Catalog components, Zeabur Identity and Zeabur on a
-Linux server ([guide](https://oss.zeabur.com/docs/zeabur/get-started/quickstart/)). It is three crates, each depending only on the
-ones above it:
-
-- `zeabur-installer-plan`: configuration, catalog, selection, values and the plan. No I/O.
-- `zeabur-installer-host`: facts, preflight, downloads, files, systemd and `kubectl`.
-- `zeabur-installer`: the command line, the steps of `apply` and the web interface.
-
-Build on Linux for the server's architecture:
-
-```sh
-nix develop
-./scripts/build-installer-ui.sh
-ZEABUR_INSTALLER_UI_DIST="$PWD/crates/zeabur-installer/web/dist" cargo build --release --locked -p zeabur-installer
-```
-
-A release build embeds the web interface and stops without `ZEABUR_INSTALLER_UI_DIST`; a debug
-build embeds a placeholder page instead. The interface is in `crates/zeabur-installer/web`, with
-its own `package.json` in the workspace and the same lint and format rules as `web/`. CI installs
-exactly the lock file (`bun ci`), checks the format in the `format` job, and builds and lints it in
-the `ui` job. To check it by hand:
-
-```sh
-(cd crates/zeabur-installer/web && bun ci && bun run fmt:check && bun run lint && bun run typecheck)
-```
-
-`crates/zeabur-installer-plan/src/pins.rs` names the RKE2 release and its SHA-256 digests.
-`scripts/bump-rke2.sh <version>` rewrites both from the release's checksum lists. Review the
-diff, and run the catalog's tests on that Kubernetes minor before you move to it.
-
-`cargo nextest run --workspace` runs the planning code against the pinned catalog's `index.json` and
-the host helpers against temporary directories. To run `apply`, use a disposable Linux VM with
-systemd, 4 GB of memory and nothing else installed: RKE2 takes over the machine. Never run it on
-a machine you need.

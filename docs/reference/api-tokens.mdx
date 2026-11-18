@@ -24,7 +24,7 @@ The list shows each token's roles, who created it, and when it expires. If the c
 
 A request needs three things: the API address, the CA certificate, and the token.
 
-**Address**: kube-apiserver listens on TCP 6443 on each server node, for example `https://203.0.113.10:6443`. The `server` line in the kubeconfig you use with kubectl has the same address. If you reach the API through a domain or another address, add it to [`host.tlsSan`](./installer-configuration.mdx) so the certificate covers it.
+**Address**: kube-apiserver listens on TCP 6443 on each server node, for example `https://203.0.113.10:6443`. The `server` line in the kubeconfig you use with kubectl has the same address. If you reach the API through a domain or another address, add it to the `tls-san` list in the K3s or RKE2 configuration file so the certificate covers it.
 
 **CA certificate**: The dialog shows it after you create or renew a token. A token with a role in a project can also read it from the project's `kube-root-ca.crt` config file:
 

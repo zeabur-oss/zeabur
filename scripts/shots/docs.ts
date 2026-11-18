@@ -1,143 +1,10 @@
 // The screenshots of the documentation and oss.zeabur.com (sets.ts), from the in-memory demo
-// (crates/zeabur-api/examples/demo.rs), or with `app: "installer"` from the installer's pages and
-// responses built from the pinned catalog (crates/zeabur-installer/web/scripts/dev-api.ts). Each
-// test is one image, named by its title. Kept in git in each locale's docs folder, light only:
-// docs/images/shots/<id>.avif for English, docs/zh-TW/images/shots/<id>.avif for a translation. A
-// page links its locale's image by a relative path, such as ../images/shots/<id>.avif.
+// (crates/zeabur-api/examples/demo.rs). Each test is one image, named by its title. Kept in git in
+// each locale's docs folder, light only: docs/images/shots/<id>.avif for English,
+// docs/zh-TW/images/shots/<id>.avif for a translation. A page links its locale's image by a
+// relative path, such as ../images/shots/<id>.avif.
 // Selectors never use visible text: it changes with the locale.
-import type { Page } from "@playwright/test"
-import { clickUntil, expect, test } from "./fixtures.ts"
-
-const next = (page: Page) => page.locator('[data-testid="step-next"] button:last-child')
-const toStep = (page: Page, step: string) =>
-  clickUntil(next(page), page.locator(`main[data-step="${step}"]`))
-
-test.describe(() => {
-  test.use({ app: "installer" })
-
-  // The installer (docs/zh-TW/get-started/quickstart.mdx). Each step's last button continues.
-  test("installer-host", async ({ page, shot }) => {
-    await page.goto("/", { waitUntil: "networkidle" })
-    await expect(page.locator('[data-testid="step-next"]')).toBeVisible()
-    await shot()
-  })
-  test("installer-distribution", async ({ page, shot }) => {
-    await page.goto("/", { waitUntil: "networkidle" })
-    await expect(page.locator('section:has(p ~ [role="radiogroup"])')).toBeVisible()
-    await shot({ clip: 'section:has(p ~ [role="radiogroup"])' })
-  })
-  test("installer-access", async ({ page, shot }) => {
-    await page.goto("/", { waitUntil: "networkidle" })
-    await toStep(page, "access")
-    await expect(page.locator('[data-slot="field"] .text-ok-strong').first()).toBeVisible()
-    await expect(
-      page.locator('[data-slot="field"] ~ [data-slot="field"] .text-ok-strong'),
-    ).toBeVisible()
-    await shot()
-  })
-  test("installer-components", async ({ page, shot }) => {
-    await page.goto("/", { waitUntil: "networkidle" })
-    await toStep(page, "components")
-    await expect(page.locator('[data-slot="checkbox"][data-checked]').first()).toBeVisible()
-    await shot()
-  })
-  test("installer-review", async ({ page, shot }) => {
-    await page.goto("/", { waitUntil: "networkidle" })
-    await toStep(page, "review")
-    await expect(page.locator('[data-slot="alert"]')).toBeVisible()
-    await shot()
-  })
-  test.describe(() => {
-    test.use({ demo: { ZEABUR_DEMO_INSTALL: "running" } })
-    // Stopped before Zeabur: the folded timeline then shows five items.
-    test("installer-install", async ({ page, shot }) => {
-      await page.goto("/", { waitUntil: "networkidle" })
-      await toStep(page, "review")
-      await next(page).click()
-      await expect(page.locator('[data-slot="timeline-item"]:nth-of-type(5)')).toBeVisible()
-      await shot()
-    })
-  })
-  test.describe(() => {
-    test.use({ demo: { ZEABUR_DEMO_INSTALL: "done" } })
-    test("installer-done", async ({ page, shot }) => {
-      await page.goto("/", { waitUntil: "networkidle" })
-      await toStep(page, "review")
-      await next(page).click()
-      await expect(page.locator('[data-slot="copy-input"]').first()).toBeVisible()
-      await shot()
-    })
-  })
-  test.describe(() => {
-    test.use({ demo: { ZEABUR_DEMO_INSTALL: "fail" } })
-    test("installer-failed", async ({ page, shot }) => {
-      await page.goto("/", { waitUntil: "networkidle" })
-      await toStep(page, "review")
-      await next(page).click()
-      await expect(page.locator('[data-slot="timeline-item"]').first()).toBeVisible()
-      await expect(page.locator('[role="alert"]')).toBeVisible()
-      await shot()
-    })
-  })
-
-  // Personal install (docs/zh-TW/install/personal.mdx). ZEABUR_DEMO_HOST: small has 1.5 GiB, docker has Docker.
-  test("installer-personal-choose", async ({ page, shot }) => {
-    await page.goto("/", { waitUntil: "networkidle" })
-    await page.locator('[data-slot="radio-option"]').first().click()
-    await expect(page.locator('[data-slot="radio-option"][data-checked]')).toBeVisible()
-    await shot()
-  })
-  test.describe(() => {
-    test.use({ demo: { ZEABUR_DEMO_HOST: "small" } })
-    test("installer-personal-small", async ({ page, shot }) => {
-      await page.goto("/", { waitUntil: "networkidle" })
-      await expect(page.locator('[data-slot="radio-option"][data-checked]')).toBeVisible()
-      await shot()
-    })
-  })
-  test.describe(() => {
-    test.use({ demo: { ZEABUR_DEMO_HOST: "docker" } })
-    test("installer-personal-docker", async ({ page, shot }) => {
-      await page.goto("/", { waitUntil: "networkidle" })
-      await page.locator('[data-slot="radio-option"]').first().click()
-      await expect(page.locator('[data-slot="radio-option"][data-checked]')).toBeVisible()
-      await shot()
-    })
-  })
-  test("installer-personal-components", async ({ page, shot }) => {
-    await page.goto("/", { waitUntil: "networkidle" })
-    await page.locator('[data-slot="radio-option"]').first().click()
-    await toStep(page, "components")
-    await page
-      .locator('[data-slot="checkbox"]:not([data-checked]):not([data-disabled])')
-      .first()
-      .click()
-    await expect(
-      page.locator('[data-slot="checkbox"][data-disabled][data-checked]').first(),
-    ).toBeVisible()
-    await shot()
-  })
-  test.describe(() => {
-    test.use({ demo: { ZEABUR_DEMO_HOST: "small" } })
-    test("installer-personal-components-small", async ({ page, shot }) => {
-      await page.goto("/", { waitUntil: "networkidle" })
-      await toStep(page, "components")
-      await expect(page.locator('[data-slot="checkbox"][data-checked]').first()).toBeVisible()
-      await shot()
-    })
-  })
-  test.describe(() => {
-    test.use({ demo: { ZEABUR_DEMO_INSTALL: "done" } })
-    test("installer-personal-done", async ({ page, shot }) => {
-      await page.goto("/", { waitUntil: "networkidle" })
-      await page.locator('[data-slot="radio-option"]').first().click()
-      await toStep(page, "review")
-      await next(page).click()
-      await expect(page.locator('[data-slot="copy-input"]').first()).toBeVisible()
-      await shot()
-    })
-  })
-})
+import { expect, test } from "./fixtures.ts"
 
 // Zeabur pages, from the demo.
 test("git-builds", async ({ page, shot }) => {
@@ -877,15 +744,6 @@ test("cluster", async ({ page, shot }) => {
   await page.goto("/cluster", { waitUntil: "networkidle" })
   await expect(page.locator("main h1")).toBeVisible()
   await shot({ clip: "main", until: "#cluster-nodes" })
-})
-test.describe(() => {
-  test.use({ app: "installer" })
-  test("installer", async ({ page, shot }) => {
-    await page.goto("/", { waitUntil: "networkidle" })
-    await toStep(page, "review")
-    await expect(page.locator('[data-slot="alert"]')).toBeVisible()
-    await shot()
-  })
 })
 // Change NODE_ENV, save, and open the technical details of the review.
 test("change-review", async ({ page, shot }) => {

@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # Builds the release files of this machine's platform. It publishes nothing.
 #
-#   scripts/release-build.sh <vX.Y.Z> <amd64|arm64> <dist> [installer]
+#   scripts/release-build.sh <vX.Y.Z> <amd64|arm64> <dist>
 #
 # docs/internal/releasing.md, "Build files", lists what it writes.
 set -euo pipefail
 
-if [[ $# != 3 && ! ($# == 4 && "$4" == installer) ]]; then
-  echo "usage: release-build.sh <vVERSION> <amd64|arm64> <output-dir> [installer]" >&2
+if [[ $# != 3 ]]; then
+  echo "usage: release-build.sh <vVERSION> <amd64|arm64> <output-dir>" >&2
   exit 2
 fi
 version="$1"
@@ -27,24 +27,6 @@ case "$(uname -s):$arch:$(uname -m)" in
 esac
 binaries=(zeaburctl)
 [[ "$os" == linux ]] && binaries+=(zeabur)
-installer="${4:-}"
-if [[ -n "$installer" ]]; then
-  [[ "$os" == linux ]] || { echo "the installer installs on a Linux server only" >&2; exit 2; }
-  binaries=(zeabur-installer)
-  pins=(ZEABUR_PIN_CATALOG_VERSION ZEABUR_PIN_CATALOG_SHA256 ZEABUR_PIN_IDENTITY_VERSION
-    ZEABUR_PIN_IDENTITY_IMAGE ZEABUR_PIN_IDENTITYCTL_AMD64_SHA256 ZEABUR_PIN_IDENTITYCTL_ARM64_SHA256
-    ZEABUR_PIN_IDENTITY_REQUEST_MEMORY_MIB
-    ZEABUR_PIN_ZEABUR_IMAGE ZEABUR_PIN_ZEABUR_CHART_SHA256)
-  # The compiler reads an empty variable as a value, so an empty one is removed.
-  set_pins=0
-  for pin in "${pins[@]}"; do
-    if [[ -n "${!pin:-}" ]]; then set_pins=$((set_pins + 1)); else unset "$pin"; fi
-  done
-  if [[ "$set_pins" != 0 && "$set_pins" != "${#pins[@]}" ]]; then
-    echo "set all of ${pins[*]}, or none" >&2
-    exit 2
-  fi
-fi
 
 mkdir -p "$3"
 output="$(cd "$3" && pwd)"
@@ -52,20 +34,16 @@ work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 target_dir="${CARGO_TARGET_DIR:-$root/target}"
 
-# Zeabur's web interface is embedded in zeabur and zeaburctl, the installer's in zeabur-installer.
-if [[ -n "$installer" ]]; then
-  "$root/scripts/build-installer-ui.sh"
-else
-  "$root/scripts/build-ui.sh"
-fi
+# Zeabur's web interface is embedded in zeabur and zeaburctl.
+"$root/scripts/build-ui.sh"
 # Release binaries are always compiled, never taken from a compiler cache (CONTRIBUTING.md).
 unset RUSTC_WRAPPER
 # cargo-auditable records the dependency tree in the binary, so a scanner reads exactly what was
 # compiled in (https://github.com/rust-secure-code/cargo-auditable).
 packages=()
 for binary in "${binaries[@]}"; do packages+=(-p "$binary"); done
-[[ "$os" == linux && -z "$installer" ]] && packages+=(-p zeabur-proxy)
-ZEABUR_UI_DIST="$root/web/dist" ZEABUR_INSTALLER_UI_DIST="$root/crates/zeabur-installer/web/dist" \
+[[ "$os" == linux ]] && packages+=(-p zeabur-proxy)
+ZEABUR_UI_DIST="$root/web/dist" \
   cargo auditable build --release --locked --target "$target" \
   --target-dir "$target_dir" --manifest-path "$root/Cargo.toml" "${packages[@]}"
 
@@ -108,7 +86,7 @@ for binary in "${binaries[@]}"; do
     gzip -n -9 >"$output/$binary-$version-$os-$arch.tar.gz"
 done
 
-if [[ "$os" == linux && -z "$installer" ]]; then
+if [[ "$os" == linux ]]; then
   # The same context as scripts/build-image.sh: explicit modes, which COPY keeps.
   context="$work/image"
   install -D -m 0555 "$target_dir/$target/release/zeabur" "$context/zeabur"

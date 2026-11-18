@@ -62,7 +62,7 @@ description: 将电脑上的文件夹或 .zip 文件交给 Zeabur Builder 构建
 
 ## 用 zeaburctl 上传
 
-在终端和脚本中可以使用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，无需知道 registry 或 Zeabur 的地址。使用 Zeabur Identity 登录时，文件夹会交给集群中的 Zeabur。使用安装程序提供的管理员 kubeconfig 等其他凭证时，命令会在你的电脑上运行相同的步骤，凭证不会离开你的电脑。
+在终端和脚本中可以使用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，无需知道 registry 或 Zeabur 的地址。使用 Zeabur Identity 登录时，文件夹会交给集群中的 Zeabur。使用管理员 kubeconfig 等其他凭证时，命令会在你的电脑上运行相同的步骤，凭证不会离开你的电脑。
 
 ```sh
 zeaburctl up ./site --project shop --service site

@@ -5,7 +5,7 @@
 import { spawn } from "node:child_process"
 import { connect, createServer } from "node:net"
 import { resolve } from "node:path"
-import type { Locator, Page } from "@playwright/test"
+import type { Page } from "@playwright/test"
 import { expect, test as base } from "zeabur-web/e2e/fixtures"
 import type { App } from "./sets.ts"
 
@@ -83,14 +83,6 @@ export const test = base.extend<
   },
 })
 
-// Clicks `click` until `until` shows, so a flow need not count the pages before it.
-export async function clickUntil(click: Locator, until: Locator) {
-  for (let i = 0; !(await until.isVisible()); i++) {
-    if (i === 10) throw new Error(`${until} did not show after ${i} clicks of ${click}`)
-    await click.click()
-  }
-}
-
 async function freePort(): Promise<number> {
   const server = createServer()
   await new Promise<void>((done) => server.listen(0, "127.0.0.1", done))
@@ -99,10 +91,8 @@ async function freePort(): Promise<number> {
   return port
 }
 
-// The installer's is Vite's preview server with the responses of
-// crates/zeabur-installer/web/scripts/dev-api.ts, whose fixtures scripts/docs-shots.sh writes. The
-// desktop's is Vite's preview server of the pages in desktop/web/dist, where desktop/web/scripts/shots-demo.ts answers the
-// commands in the page.
+// The desktop's is Vite's preview server of the pages in desktop/web/dist, where
+// desktop/web/scripts/shots-demo.ts answers the commands in the page.
 async function start(app: App, demo: Record<string, string>): Promise<Server> {
   const port = await freePort()
   const env = { ...process.env, ...demo }
@@ -119,7 +109,7 @@ async function start(app: App, demo: Record<string, string>): Promise<Server> {
             String(port),
             "--strictPort",
           ],
-          { cwd: resolve(import.meta.dirname, "../..", webs[app]), env },
+          { cwd: resolve(import.meta.dirname, "../../desktop/web"), env },
         )
       : spawn(demoServer(), [], { env: { ...env, ZEABUR_DEMO_ADDR: `127.0.0.1:${port}` } })
   let log = ""
@@ -143,8 +133,6 @@ async function start(app: App, demo: Record<string, string>): Promise<Server> {
   await stop()
   throw new Error(`the ${app} demo server did not start (${JSON.stringify(demo)}):\n${log}`)
 }
-
-const webs = { installer: "crates/zeabur-installer/web", desktop: "desktop/web" }
 
 function demoServer(): string {
   const demo = process.env.ZEABUR_SHOTS_DEMO

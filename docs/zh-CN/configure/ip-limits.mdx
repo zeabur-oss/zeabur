@@ -41,7 +41,7 @@ description: 只允许指定的 IP 访问服务的域名，并限制服务的副
 
 Traefik 默认按连接的源地址匹配。集群入口会修改源地址时，匹配的就不再是访客的 IP，限制可能会阻止所有人，也可能放行所有人。
 
-- 使用 Zeabur 安装程序安装的 Traefik，其 Service 的 `externalTrafficPolicy` 为 `Local`，连接到 Traefik 所在节点的请求会保留访客地址。这项配置来自 Zeabur Catalog 的 Traefik 模板。ServiceLB 从其他节点转发请求时是否保留地址，尚未验证。
+- 使用 Zeabur Catalog 安装的 Traefik，其 Service 的 `externalTrafficPolicy` 为 `Local`，连接到 Traefik 所在节点的请求会保留访客地址。这项配置来自 Zeabur Catalog 的 Traefik 模板。ServiceLB 从其他节点转发请求时是否保留地址，尚未验证。
 - 前面还有 CDN、反向代理或云负载均衡器时，Traefik 看到的是这些代理的地址。这时需要在 Middleware 中配置 `ipStrategy`，读取 `X-Forwarded-For`，并让 Traefik 的 entry point 信任该层代理的地址（`forwardedHeaders.trustedIPs`）。Zeabur 不会替你修改这些配置。
 - 后续修改列表时，Zeabur 只修改 `sourceRange`，你在 Middleware 上添加的 `ipStrategy` 会保留。
 

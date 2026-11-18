@@ -289,7 +289,7 @@ pub fn parse_service_port(text: &str) -> Result<ServicePort, String> {
 /// The most characters a cluster's name may have.
 pub const CLUSTER_NAME_MAX: usize = 63;
 
-/// A cluster's name as a person or an installer wrote it: trimmed, at most
+/// A cluster's name as a person or the chart's values wrote it: trimmed, at most
 /// [`CLUSTER_NAME_MAX`] characters, no control characters.
 ///
 /// # Errors

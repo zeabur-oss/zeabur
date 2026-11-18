@@ -185,8 +185,8 @@ mod tests {
     use super::*;
     use crate::event::{
         AppChangeSubmitted, Change, ChangeId, ClusterConnected, Connection, DatabaseKind, Day,
-        Distribution, DomainKind, ErrorCode, Failure, Feature, FeatureUsed, Install, Mode,
-        Operation, Profile, Rollout, RolloutFinished, Source, Step, Submitted, ZeaburActive,
+        DomainKind, Feature, FeatureUsed, Mode, Operation, Rollout, RolloutFinished, Source,
+        Submitted, ZeaburActive,
     };
 
     /// A receiver on a free port that records each request body.
@@ -246,14 +246,6 @@ mod tests {
         InstallationId::from_random([7; 16])
     }
 
-    fn install() -> Install {
-        Install {
-            installer_version: "0.1.0",
-            profile: Profile::SingleNode,
-            distribution: Distribution::K3s,
-        }
-    }
-
     fn used(feature: Feature) -> FeatureUsed {
         FeatureUsed {
             zeabur_version: "0.1.0",
@@ -275,13 +267,6 @@ mod tests {
             Event::FeatureUsed(used(Feature::DatabaseCreated(DatabaseKind::ObjectStorage))),
             Event::FeatureUsed(used(Feature::DomainAdded(DomainKind::Custom))),
             Event::FeatureUsed(used(Feature::LogsViewed)),
-            Event::InstallStarted(install()),
-            Event::InstallFinished(install()),
-            Event::InstallFailed(Failure {
-                install: install(),
-                step: Step::Cluster,
-                error: ErrorCode::Download,
-            }),
             Event::ClusterConnected(ClusterConnected {
                 zeabur_version: "0.1.0",
                 mode: Mode::Local,
@@ -435,11 +420,6 @@ mod tests {
             "source",
             "template",
             "kind",
-            "installer_version",
-            "profile",
-            "distribution",
-            "step",
-            "error",
             "result",
             "change_id",
             "operation",

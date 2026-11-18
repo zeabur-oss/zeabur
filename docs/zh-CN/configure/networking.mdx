@@ -11,7 +11,7 @@ description: 通过私有地址连接同一集群内的服务，将数据库等�
 
 - 有权限修改项目内的服务。Helm、Argo CD 或 Flux 管理的服务不能在这里开放端口或添加规则，需要在对应工具中修改。
 - 连接规则需要集群的网络插件（CNI）执行。K3s 内置的控制器支持这些规则；插件不支持时，规则仍能创建，但不会阻止任何连接。
-- 开放端口需要负载均衡器。K3s 内置的 ServiceLB 和 Zeabur 安装程序安装的 RKE2 都提供负载均衡器。
+- 开放端口需要负载均衡器，例如 K3s 内置的 ServiceLB。
 
 ## 通过私有地址连接其他服务
 
@@ -208,7 +208,7 @@ spec:
               app.kubernetes.io/name: web
 ```
 
-**允许来自公开域名的流量**。规则允许两个位置的 Traefik：K3s 内置的 Traefik 位于 `kube-system`，Zeabur 安装程序安装的 Traefik 位于带有 `zeabur.com/platform: "true"` 标签的 Namespace：
+**允许来自公开域名的流量**。规则允许两个位置的 Traefik：K3s 内置的 Traefik 位于 `kube-system`，另一个位于带有 `zeabur.com/platform: "true"` 标签的 Namespace：
 
 ```yaml
 apiVersion: networking.k8s.io/v1

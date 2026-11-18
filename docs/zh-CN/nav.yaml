@@ -2,14 +2,11 @@
   label: 开始使用
   pages:
     quickstart: 在一台服务器上安装 Zeabur
-    ai-agent: 让 AI Agent 帮你安装
     first-project: 部署第一个服务
     how-it-works: Zeabur 如何管理服务
 - group: install
   label: 其他安装方式
   pages:
-    config-file: 使用配置文件和命令安装
-    personal: 个人使用：在小型服务器上安装
     existing-cluster: 将 Zeabur 安装到已有集群
     desktop: Zeabur Desktop：在自己的电脑上打开集群
 - group: upgrade
@@ -61,8 +58,6 @@
   label: 参考
   pages:
     zeaburctl: zeaburctl
-    installer-configuration: Installer 配置
-    installer: Installer 命令
     permissions: 权限
     api-tokens: API 令牌
     architecture: 架构

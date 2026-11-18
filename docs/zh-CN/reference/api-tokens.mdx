@@ -25,7 +25,7 @@ source: "5f7bb07ea1d9"
 
 每个请求需要三样东西：API 地址、CA 证书和令牌。
 
-**地址**：kube-apiserver 监听每个 server 节点的 TCP 6443，比如 `https://203.0.113.10:6443`。你平时用 kubectl 的 kubeconfig 中，`server` 那一行就是这个地址。要通过域名或其他地址访问 API 时，把它加到 [`host.tlsSan`](./installer-configuration.mdx)，证书才会覆盖它。
+**地址**：kube-apiserver 监听每个 server 节点的 TCP 6443，比如 `https://203.0.113.10:6443`。你平时用 kubectl 的 kubeconfig 中，`server` 那一行就是这个地址。要通过域名或其他地址访问 API 时，把它加到 K3s 或 RKE2 配置文件的 `tls-san`，证书才会覆盖它。
 
 **CA 证书**：创建或续期令牌后，窗口中会显示。在项目中有角色的令牌，也可以从项目的 `kube-root-ca.crt` 配置文件读取：
 

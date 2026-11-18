@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Zeabur in a cluster, end to end, on the development cluster (scripts/dev-cluster.sh: Zeabur
-# Identity and Zeabur from zeabur-installer's objects, behind Traefik over HTTPS): a browser
+# Identity from its manifests and Zeabur from its chart, behind Traefik over HTTPS): a browser
 # (web/e2e/full) enrols a passkey, signs in, confirms a terminal with the passkey again, runs a
 # command, then reads and changes with admin rights; an admin invites a Developer and a Viewer,
 # who each see what their role allows. Then, from the outside: Zeabur's service account can do
@@ -167,7 +167,7 @@ kubectl -n zeabur-api-tokens delete serviceaccount "$token_name" --wait >/dev/nu
 rm -f "$token_config"
 echo "API token: Developer work in its project, refused elsewhere"
 
-# --- Domains of the system namespaces (crates/zeabur-installer/manifests/system-hosts.yaml) -------
+# --- Domains of the system namespaces (the chart's templates/system-hosts.yaml) -------------------
 # A project cannot take Zeabur's or Zeabur Identity's domain, or every domain; it can use its own.
 admit() { # $1 = kind, $2 = spec as JSON
   jq -n --arg ns "$project" --arg kind "$1" --argjson spec "$2" '{kind: $kind, spec: $spec,
@@ -207,9 +207,8 @@ fi
 
 # --- Removal leaves the cluster as it was -----------------------------------------------------------
 [[ -z "${ZEABUR_E2E_KEEP:-}" ]] || exit 0
-# As `zeabur-installer uninstall` removes Zeabur, and the values only this cluster sets.
-wait_for kube-system kubectl -n kube-system delete helmchart.helm.cattle.io zeabur --wait --timeout=180s
-kubectl -n kube-system delete helmchartconfig.helm.cattle.io zeabur --wait
+# As docs/leave/uninstall.mdx removes a chart install.
+wait_for "$namespace" helm uninstall zeabur -n "$namespace" --wait --timeout=180s
 wait_for "$namespace" kubectl delete namespace "$namespace" --wait --timeout=180s
 wait_for zeabur-terminals kubectl wait --for=delete namespace/zeabur-terminals --timeout=180s
 wait_for zeabur-api-tokens kubectl wait --for=delete namespace/zeabur-api-tokens --timeout=180s

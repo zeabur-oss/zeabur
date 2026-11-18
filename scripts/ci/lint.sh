@@ -13,7 +13,6 @@ static() {
   shellcheck scripts/*.sh scripts/ci/*.sh
   jactionlint
   (cd web; bun run fmt:check)
-  (cd crates/zeabur-installer/web; bun run fmt:check)
   (cd scripts/shots; bun run fmt:check)
   bun fmt --check scripts/*.ts
   bun check scripts/
@@ -25,7 +24,7 @@ cargo_checks() {
   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked
   cargo deny --locked check
   # Writes target/unsafe-report.md, which the workflow uploads.
-  node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy zeabur-installer
+  node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy
   ./scripts/check-levels.sh
   # The Helm chart: lint, what every rendering promises, and the values it refuses.
   ./scripts/check-chart.sh

@@ -34,7 +34,7 @@ enum Command {
     /// Check the cluster version, the Zeabur Identity setup and the components Zeabur Catalog
     /// recommends.
     ///
-    /// Exit codes, as monitoring plugins (Nagios) and `zeabur-installer doctor` use them: 0 when
+    /// Exit codes, as monitoring plugins (Nagios) use them: 0 when
     /// all is well, 1 for a warning, 2 for something critical, 3 when the cluster cannot be
     /// reached or a check cannot run. An invalid command line also exits 2.
     Doctor(doctor::DoctorArgs),
@@ -52,8 +52,8 @@ enum Command {
     /// port-forward` does, and needs `create` on `pods/portforward` in the project. It runs until
     /// Ctrl-C.
     Connect(connect::ConnectArgs),
-    /// Print Zeabur Catalog components' manifests, for a cluster that zeabur-installer did not
-    /// install.
+    /// Print Zeabur Catalog components' manifests or Helm commands, to install them on a
+    /// cluster.
     Components(components::ComponentsArgs),
     /// Manage the ID that zeaburctl ui keeps for the experience program.
     Telemetry(telemetry::TelemetryArgs),

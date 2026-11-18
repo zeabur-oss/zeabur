@@ -36,9 +36,6 @@ zeabur = 5
 zeabur-local = 5
 zeaburctl = 6
 zeabur-test-support = 6
-zeabur-installer-plan = 0
-zeabur-installer-host = 1
-zeabur-installer = 5
 # Development tasks (`cargo xtask`); nothing depends on it.
 xtask = 7
 
@@ -81,8 +78,6 @@ zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
 zeabur-embed = { path = "crates/zeabur-embed" }
 zeabur-telemetry = { path = "crates/zeabur-telemetry" }
-zeabur-installer-plan = { path = "crates/zeabur-installer-plan" }
-zeabur-installer-host = { path = "crates/zeabur-installer-host" }
 
 # Third-party crates.
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }
@@ -90,18 +85,16 @@ aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sy
 base64 = { version = "0.23", default-features = false, features = ["alloc"] }
 # The htpasswd hash of a basic auth password (zeabur-plan); Traefik reads bcrypt.
 bcrypt = { version = "0.19", default-features = false, features = ["alloc"] }
-# `ws` and `tracing` are added where they are used (zeabur-api), so the installer's page leaves them out.
+# `ws` and `tracing` are added where they are used (zeabur-api).
 axum = { version = "0.8", default-features = false, features = ["http1", "tokio", "json"] }
 clap = { version = "4", default-features = false, features = ["std", "derive", "env", "help", "usage", "error-context"] }
-# Unpacking the RKE2 release and packing a local chart (zeabur-installer-host), and reading
-# Velero backups (zeabur-api).
+# Reading Velero backups (zeabur-api) and the catalog bundle (zeabur-catalog).
 flate2 = { version = "1", default-features = false, features = ["rust_backend"] }
 form_urlencoded = "1"
 futures-util = { version = "0.3", default-features = false, features = ["std", "io", "async-await-macro"] }
 hex = "0.4"
 http = "1"
 http-body = "1"
-httpdate = "1"
 http-body-util = "0.1"
 # The HTTP client stack kube-rs already ships, used directly for the OAuth client (zeabur-auth).
 bytes = "1"

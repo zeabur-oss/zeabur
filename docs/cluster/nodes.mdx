@@ -1,6 +1,6 @@
 ---
 title: Add and maintain nodes
-description: Add nodes with zeabur-installer, stop scheduling, use kubectl to move replicas and remove nodes, and safely open a node terminal when needed.
+description: Add nodes, stop scheduling, use kubectl to move replicas and remove nodes, and safely open a node terminal when needed.
 ---
 
 Go to **Cluster** → **Overview** → **Nodes** to check each host's status. To run services on another host, see [Add a node](#add-a-node). Before taking a host down for maintenance, select **Stop scheduling** from the node's action menu. Use kubectl's `drain` when you also need to move replicas off the node.
@@ -9,8 +9,7 @@ Go to **Cluster** → **Overview** → **Nodes** to check each host's status. To
 
 ## Before you begin
 
-- `zeabur-installer node add` works on K3s and RKE2 clusters that Zeabur Installer created. On K3s you can add workers only. On RKE2 you can add workers and servers, and three servers keep the control plane running when one goes down. For other clusters, use the tool you originally installed them with.
-- Prepare a new VM with root access and the same `zeabur-installer` binary that installed the first server.
+- Prepare a new VM with root access. On K3s you can add workers only. On RKE2 you can add workers and servers, and three servers keep the control plane running when one goes down.
 - Keep all nodes with the same hosting provider in the same region. Different availability zones within that region are fine. Across providers or regions, latency slows down etcd, the Kubernetes API, and storage.
 - Stopping and resuming scheduling requires permission to modify Node objects. Run `drain` and `delete node` in the kubectl terminal with your own permissions. Opening a node terminal requires an admin account.
 
@@ -22,70 +21,11 @@ Open these firewall ports between nodes:
 | Between all nodes | TCP 10250, UDP 4789 (Calico VXLAN) | TCP 10250, 9099, UDP 8472 (Canal VXLAN) |
 | Between servers | None | TCP 2379–2381 |
 
-Allow the UDP port only between cluster nodes. Don't expose it to the internet. The installer's connection check can't test UDP. If the port is blocked, replicas on different nodes can't reach each other.
+Allow the UDP port only between cluster nodes. Don't expose it to the internet. If the port is blocked, replicas on different nodes can't reach each other.
 
 ## Add a node
 
-Node-joining commands are part of `zeabur-installer`. For all options, see [Installer commands](../reference/installer.mdx#node-add-and-node-sync).
-
-<Steps>
-<Step>
-
-### Generate the join configuration on an existing server
-
-Sign in to an existing server as root and run:
-
-```sh
-sudo zeabur-installer node add --ttl 1h
-```
-
-The command prints what to run on the new VM: the configuration to write to `/etc/zeabur-installer/config.yaml`, followed by `plan` and `apply`. Treat the token in the output like a password. Don't post it publicly.
-
-Worker nodes join with an expiring bootstrap token. `--ttl` defaults to 1 hour and can be at most 24 hours. On RKE2, include `--role server` to add a server (control plane). This uses the cluster's server token, which doesn't expire. K3s refuses `--role server` because it runs one server with SQLite. If the new VM can't reach the server's private address, use `--address` to specify an address it can reach.
-
-If the cluster runs Longhorn or a zot mirror, the output automatically includes the corresponding configuration. If the config file still has `profile: single-node`, the output reminds you to change it to `multi-node` and run `apply` again.
-
-</Step>
-<Step>
-
-### Run on the new VM
-
-Copy the `zeabur-installer` binary that installed the first server to the new VM. As root, paste the output from the previous step. It writes the config file, then runs:
-
-```sh
-zeabur-installer plan
-zeabur-installer apply
-```
-
-`plan` only lists network checks and warnings. It doesn't change anything. Resolve any warnings before continuing. `apply` installs the K3s agent or RKE2 and waits for the node to be ready before exiting.
-
-</Step>
-<Step>
-
-### Verify on the server
-
-```sh
-sudo zeabur-installer node sync
-# K3s
-sudo k3s kubectl get nodes -o wide
-# RKE2
-sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes -o wide
-```
-
-`node sync` adds the new node's addresses to the baseline network policies that the installer created. Newly joined servers sync automatically. After a worker node joins, you must run this command manually on a server. Until then, network policies block traffic from the new node. Once the new node shows `Ready`, revoke the worker node's token. Replace `<ID>` with the ID from the last line of the `node add` output:
-
-```sh
-# K3s
-sudo k3s kubectl -n kube-system delete secret bootstrap-token-<ID>
-# RKE2
-sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml \
-  -n kube-system delete secret bootstrap-token-<ID>
-```
-
-Nodes that have already joined aren't affected, and no new node can join with this token.
-
-</Step>
-</Steps>
+Zeabur doesn't add nodes. Join the new VM with your distribution's own steps: a K3s worker, or an RKE2 worker or server. Open the firewall ports above first. When the node shows `Ready` under **Nodes**, new replicas can run on it.
 
 On RKE2, etcd needs a majority of servers to operate. To keep running with one server down, you need at least three servers. With only two, taking either server down stops the entire cluster. A K3s cluster has one server; when it goes down, the control plane stops until it returns.
 
@@ -166,28 +106,19 @@ Next, sign in to the removed VM and run these as `root`, with the uninstall scri
 ```sh
 /usr/local/bin/k3s-agent-uninstall.sh   # K3s
 /usr/local/bin/rke2-uninstall.sh        # RKE2
-zeabur-installer uninstall --purge
 ```
 
 **After deleting the Kubernetes node, you must also complete the uninstall on the VM.** Until you do, the VM rejoins the cluster whenever `k3s-agent` or RKE2 restarts.
 
 Volumes under `/var/lib/zeabur/storage` remain on the VM. Delete them manually only after confirming you no longer need the data.
 
-If the cluster runs Longhorn, it keeps a node entry for the deleted node, and `zeabur-installer doctor` lists it. Longhorn won't delete a node that still has replicas. Make sure every volume has a healthy replica on another node, then run:
+If the cluster runs Longhorn, it keeps a node entry for the deleted node. Longhorn won't delete a node that still has replicas. Make sure every volume has a healthy replica on another node, then run:
 
 ```sh
 kubectl -n longhorn-system patch nodes.longhorn.io <node> --type=merge -p '{"spec":{"allowScheduling":false}}'
 for r in $(kubectl -n longhorn-system get replicas.longhorn.io -o jsonpath='{range .items[?(@.spec.nodeID=="<node>")]}{.metadata.name}{"\n"}{end}'); do kubectl -n longhorn-system delete replicas.longhorn.io "$r" --wait=false; done
 kubectl -n longhorn-system delete nodes.longhorn.io <node>
 ```
-
-Finally, return to the server where you run zeabur-installer and run:
-
-```sh
-sudo zeabur-installer node sync
-```
-
-This removes the deleted node's addresses from the baseline network policies.
 
 ## Open a node terminal
 
@@ -203,13 +134,8 @@ When you close the terminal, Zeabur removes the terminal replica. A terminal rep
 
 ## Common failures
 
-- Can't reach the server when joining: Check that the new VM can reach the server address printed by `node add` on TCP 6443 (K3s) or TCP 9345 and 6443 (RKE2), along with the other ports in the table above.
+- Can't reach the server when joining: Check that the new VM can reach the server's address on TCP 6443 (K3s) or TCP 9345 and 6443 (RKE2), along with the other ports in the table above.
 - The new node is ready, but services on different nodes can't reach each other: Check UDP 4789 (K3s) or 8472 (RKE2) and whether network policies allow traffic from the new node.
-- On K3s, UDP 4789 is open and `apply` still fails on a webhook, or a node can't reach a service on another node: a cluster installed by an earlier zeabur-installer sends a node's traffic to pods on other nodes in the same subnet from the node's own address, which the baseline network policy blocks. Run this on the server to always use VXLAN; it takes effect within seconds:
-
-  ```bash
-  sudo k3s kubectl patch ippools.crd.projectcalico.org default-ipv4-ippool --type merge -p '{"spec":{"vxlanMode":"Always"}}'
-  ```
 - `drain` is stuck: It's waiting for PodDisruptionBudget to allow eviction or has stopped at a replica that isn't managed by a controller. Run `kubectl get pdb -A` to see which budget is blocking eviction, resolve it, and run the command again.
 - A replica is `Pending` on the new node: It uses a `local-path` volume on the old node and must wait for that node to return.
 - A terminal replica **Can't start**: Check its events. A failed image download is a common cause.

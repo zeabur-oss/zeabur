@@ -1,8 +1,0 @@
-# A test machine without public DNS: a CA made on the server signs the certificates, and browsers
-# trust them once /var/lib/rancher/zeabur-installer/local-ca.crt is imported.
-# The names must still resolve to the server, for browsers and for the server itself; names such
-# as <address>.sslip.io do so without setting up DNS.
-access:
-  mode: local
-  identity: login.192.0.2.20.sslip.io
-  zeabur: zeabur.192.0.2.20.sslip.io

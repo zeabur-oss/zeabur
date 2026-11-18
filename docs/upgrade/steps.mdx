@@ -1,6 +1,6 @@
 ---
 title: Upgrade Zeabur
-description: See which Zeabur version you run, upgrade with zeabur-installer, Helm, Argo CD, Flux or zeaburctl, and confirm the new version afterwards.
+description: See which Zeabur version you run, upgrade with Helm, Argo CD, Flux or zeaburctl, and confirm the new version afterwards.
 ---
 
 Find how you installed Zeabur, then follow that section. Nothing upgrades on its own. Zeabur only tells you when a newer version is out.
@@ -17,51 +17,6 @@ Under `zeaburctl ui`, the page shows `zeaburctl`'s own version. For the details 
 - Read the [upgrade notes](notes.mdx). Read one section for each version you skip, and finish what each one asks before you upgrade.
 - Take a snapshot of the server or cluster. To go back to an older version, you can only restore a snapshot taken before the upgrade. See [Go back](#go-back).
 - Back up project data separately with Velero. See [Back up a cluster and restore from a backup](../cluster/backups.mdx).
-
-## Upgrade with zeabur-installer
-
-Team and personal installs work the same way.
-
-1. Download the new `zeabur-installer-v<version>-linux-<arch>.tar.gz` from [Release files and verification](../reference/releases.mdx), verify it, extract it, and replace the server's old `zeabur-installer` with it, such as `/usr/local/bin/zeabur-installer`. If the server has no `gh` or `cosign`, download and verify it on your own computer, then copy the archive to the server.
-2. Preview the changes with the same configuration file:
-
-   ```sh
-   sudo zeabur-installer plan
-   ```
-
-   When the cluster has an install record, `plan` starts with `Changes since the last apply`. It lists the new K3s, RKE2 or KubeSolo release, the Zeabur and Zeabur Identity releases, host files that change, components added or removed, and charts that move to a new version.
-3. Apply them:
-
-   ```sh
-   sudo zeabur-installer apply
-   ```
-
-When the K3s, RKE2 or KubeSolo release or a host file changes, `apply` restarts `k3s`, `rke2-server` or `kubesolo`. The Kubernetes API stops answering for about 10 seconds. Running apps keep serving.
-
-Each installer pins one K3s, RKE2 or KubeSolo release, and `apply` installs it. Upgrade Kubernetes only this way: if something else upgrades it, such as a System Upgrade Controller Plan, the next `apply` puts the pinned release back.
-
-If the cluster has other nodes and `plan` lists `replicated-storage/longhorn` as added, put the new installer on each of those nodes and run `sudo zeabur-installer apply` there too. It installs the packages and kernel modules Longhorn needs on that node and restarts the node's Longhorn manager, which only checks the node when it starts.
-
-If the server has less memory than a team install now needs, an install that already runs is still upgraded. `plan` shows a warning, and the components it has stay.
-
-### Upgrade with AI Agents
-
-You can also have an AI Agent such as Claude Code or Codex follow the steps above for you. Take a snapshot of the server first. Then let the AI Agent reach the server over SSH with a key, as an account that can run `sudo`.
-
-Paste the text below to the AI Agent and replace `<user>@<server>` with your server:
-
-```text
-Upgrade Zeabur on the server <user>@<server>. Connect over SSH and use sudo for commands that need root.
-
-1. Run zeabur-installer --version to find the current version. The target version is the latest release on https://github.com/zeabur-oss/zeabur/releases unless I name another one. Tell me both versions.
-2. Make a backup copy of /etc/zeabur-installer/config.yaml.
-3. Follow "Download and verify binaries" on https://oss.zeabur.com/docs/zeabur/reference/releases/ to download the target version's zeabur-installer, picking linux-amd64 or linux-arm64 from the server's `uname -m`. Verify the signature on SHA256SUMS, the file's SHA-256 and its build provenance, and extract it only when all three pass. If any of them fails, stop and tell me, and don't change the verification parameters to make it pass. If the server has no gh or cosign, verify on this computer, then copy the archive to the server. After extracting, rename the old zeabur-installer to keep it, and put the new one in its place.
-4. Read https://oss.zeabur.com/docs/zeabur/upgrade/notes/. For every section between the current and target versions, change the configuration file as "Installed with zeabur-installer" says, and show me what you changed. Before any step that deletes components or data, tell me and wait for my approval.
-5. Run sudo zeabur-installer plan with the new version. Summarize the components added and removed, what changes version, the warnings and any failed checks, and wait for me to confirm.
-6. Once I approve, run sudo zeabur-installer apply. If it fails partway, fix the cause, then run it again with the same configuration.
-7. If the upgrade notes say other nodes must join again, ask me how to reach each of them over SSH, then do it.
-8. Run sudo zeabur-installer doctor and report the result. Exit code 1 means warnings only.
-```
 
 ## Upgrade with Helm
 
@@ -91,9 +46,9 @@ Zeabur runs on your own computer, so there is no server to upgrade. Download the
 ## After you upgrade
 
 - Everyone signs in again once the Zeabur replica is replaced. The chart runs one replica, and sessions live in its memory.
-- Run `zeabur-installer --version` or `zeaburctl --version`, or open the cluster page, to confirm the version.
+- Run `zeaburctl --version`, or open the cluster page, to confirm the version.
 - With Helm, Argo CD or Flux, run `kubectl -n zeabur rollout status deployment/zeabur` to wait for the new replica.
 
 ## Go back
 
-To go back to an older installer, restore a snapshot taken before the upgrade. Once a newer installer has written the install record, an older one stops at `plan` and `apply` and names the version to use. See [Installer commands](../reference/installer.mdx#on-an-installed-server).
+To go back to an older version, restore a snapshot taken before the upgrade.

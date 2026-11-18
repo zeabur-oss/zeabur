@@ -34,9 +34,8 @@ issuer:
     # stays out of Helm's release records.
     existingSecret: ""
     key: client-secret
-  # A ConfigMap with extra CA certificates (PEM) to trust for the issuer only. zeabur-installer
-  # sets it to its local CA; set extraTrustedCA for your own private CA. Empty: extraTrustedCA
-  # and the image's Mozilla CA bundle.
+  # A ConfigMap with extra CA certificates (PEM) to trust for the issuer only; set extraTrustedCA
+  # for a CA every connection trusts. Empty: extraTrustedCA and the image's Mozilla CA bundle.
   caBundle:
     configMap: ""
     key: ca.crt
@@ -59,8 +58,7 @@ domains:
 # catalog's Zot. Empty: "Deploy from Git" is turned off.
 # caBundle: a ConfigMap in this namespace with the CA (PEM) that signed the registry's certificate,
 # which Zeabur trusts when it reads an image from the registry. Zot serves HTTPS, so without it
-# the image form cannot read the registry. zeabur-installer copies zot's CA here. Empty: the
-# image's Mozilla CA bundle only.
+# the image form cannot read the registry. Empty: the image's Mozilla CA bundle only.
 builds:
   registry: zot.zot.svc:5000
   caBundle:
@@ -71,7 +69,7 @@ builds:
 # HTTPS connection it makes: signing in with the issuer, reading images from registries, reading
 # backups from object stores, and GitHub. Use it when one of them, or a proxy that inspects TLS, presents a certificate a
 # private CA signed. Name a ConfigMap or a Secret in this namespace, not both; Zeabur reads it when
-# it starts. issuer.caBundle and builds.caBundle, which zeabur-installer sets, are trusted on top. Empty: the Mozilla CA bundle only.
+# it starts. issuer.caBundle and builds.caBundle are trusted on top. Empty: the Mozilla CA bundle only.
 extraTrustedCA:
   configMap: ""
   secret: ""
@@ -99,6 +97,14 @@ outboundProxy:
 # rights.
 memberRoles:
   enabled: true
+
+# The ValidatingAdmissionPolicy zeabur-system-hosts (Kubernetes 1.30+): a domain of an Ingress in
+# a system namespace, this one or one in `namespaces`, is that namespace's only, and each Ingress or
+# HTTPRoute in another namespace names its domains, so a project cannot take over Zeabur's address.
+# A namespace labelled zeabur.com/platform=true is a system namespace too, and is not checked.
+systemHosts:
+  enabled: true
+  namespaces: [zeabur-identity]
 
 # The key that signs plan tokens. Empty `existingSecret`: the chart creates a Secret with a random
 # key on install and keeps it on upgrades. A new key only invalidates plans not yet applied.

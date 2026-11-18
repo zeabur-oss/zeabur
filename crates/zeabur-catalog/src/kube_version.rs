@@ -8,7 +8,7 @@
 /// Whether `range` admits the server version `version` (`v1.36.5+k3s1`); `None` when either does
 /// not read.
 #[must_use]
-pub fn admits(range: &str, version: &str) -> Option<bool> {
+pub(crate) fn admits(range: &str, version: &str) -> Option<bool> {
     let version = release(version)?;
     let mut any = false;
     for alternative in range.split("||") {
@@ -19,7 +19,7 @@ pub fn admits(range: &str, version: &str) -> Option<bool> {
 
 /// The release of a version, without its `v`, pre-release and build metadata.
 #[must_use]
-pub fn release(version: &str) -> Option<(u64, u64, u64)> {
+pub(crate) fn release(version: &str) -> Option<(u64, u64, u64)> {
     let version = version.trim();
     let version = version.strip_prefix('v').unwrap_or(version);
     let version = version.split(['+', '-']).next()?;

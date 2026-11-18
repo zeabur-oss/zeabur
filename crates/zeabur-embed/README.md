@@ -1,7 +1,7 @@
 # zeabur-embed
 
-The build-script side of embedding a built web interface, shared by `zeabur-ui` and
-`zeabur-installer`. Only ever a build-dependency: nothing here reaches a binary.
+The build-script side of embedding a built web interface, for `zeabur-ui`. Only ever a
+build-dependency: nothing here reaches a binary.
 
 [`generate`] reads the directory named by an environment variable, which a `scripts/build-*ui.sh`
 fills with the built interface, its brotli encodings and `manifest.tsv`, and writes the table

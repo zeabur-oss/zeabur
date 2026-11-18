@@ -79,9 +79,9 @@ for values in "$chart"/ci/*-values.yaml; do
     "zeabur-project-developer-rules patch"
   vap='select(.kind == "ValidatingAdmissionPolicy")'
   expect "$name" "$out" "$vap | [.metadata.name, .spec.failurePolicy, (.spec.matchConstraints.resourceRules[] | .resources + .operations | join(\"/\"))] | join(\",\")" \
-    "zeabur-project-namespace,Fail,namespaces/UPDATE"
-  expect "$name" "$out" 'select(.kind == "ValidatingAdmissionPolicyBinding") | [.spec.policyName, (.spec.validationActions | join("/"))] | join(",")' \
-    "zeabur-project-namespace,Deny"
+    "zeabur-project-namespace,Fail,namespaces/UPDATE,zeabur-system-hosts,Fail,ingresses/CREATE/UPDATE,httproutes/CREATE/UPDATE"
+  expect "$name" "$out" 'select(.kind == "ValidatingAdmissionPolicyBinding") | [.spec.policyName, (.spec.validationActions | join("/")), .spec.paramRef.namespace // ""] | join(",")' \
+    "zeabur-project-namespace,Deny,,zeabur-system-hosts,Deny,zeabur,zeabur-system-hosts,Deny,zeabur-identity"
   # Secret values and shells in containers belong to developers only.
   expect "$name" "$out" \
     '[select(.kind == "ClusterRole") | select(.rules | any_c(.resources | any_c(test("^(secrets|pods/(exec|attach|portforward|ephemeralcontainers))$")))) | .metadata.name] | join(",")' \
@@ -176,9 +176,13 @@ expect "everyoneReads=false" "$(render -f "$chart/ci/minimal-values.yaml" --set 
 
 # Without the member roles there is no ClusterRole, and Zeabur offers only admin or no rights.
 out=$(render -f "$chart/ci/minimal-values.yaml" --set memberRoles.enabled=false)
-expect "memberRoles=false" "$out" '[select(.kind == "ClusterRole" or .kind == "ValidatingAdmissionPolicy" or .kind == "ValidatingAdmissionPolicyBinding")] | length' 0
+expect "memberRoles=false" "$out" '[select(.kind == "ClusterRole" or .metadata.name == "zeabur-project-namespace")] | length' 0
 expect "memberRoles=false" "$out" \
   'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_MEMBER_ROLES") | .value' false
+
+# Without systemHosts, projects may use any domain.
+out=$(render -f "$chart/ci/minimal-values.yaml" --set systemHosts.enabled=false)
+expect "systemHosts=false" "$out" '[select(.metadata.name | test("^zeabur-system-hosts"))] | length' 0
 
 # The terminal settings reach Zeabur as its flags; empty images stay Zeabur's pinned defaults.
 terminal_env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name | test("^ZEABUR_(DEBUG|TOOLS)_")) | .name + "=" + .value'

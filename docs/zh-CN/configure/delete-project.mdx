@@ -10,7 +10,7 @@ description: 删除项目的 Namespace 和里面的所有内容，先看清楚�
 ## 开始前
 
 - 你要能删除这个 Namespace（`delete namespaces/<项目>`），也要能删除里面的数据库对象。少了哪一项，检查页面会列出来，应用时集群也会拒绝。
-- Zeabur 自己的 Namespace、`kube-` 开头的系统 Namespace、installer 安装的组件（标有 `zeabur.com/platform=true`）和 `zeabur-terminals` 都不能从这里删除。
+- Zeabur 自己的 Namespace、`kube-` 开头的系统 Namespace、平台组件（标有 `zeabur.com/platform=true` 的 Namespace）和 `zeabur-terminals` 都不能从这里删除。
 
 ## 检查要删除的内容
 

@@ -7,10 +7,10 @@ mod tests {
     use axum::http::StatusCode;
     use serde_json::{Value, json};
     use zeabur_api::Settings;
+    use zeabur_kube::NamespaceObjects;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{NamespaceObjects, ServedResource};
 
     use crate::common::send;
     use crate::support::TestApi;
@@ -24,11 +24,7 @@ mod tests {
         }
     }
 
-    fn deployed(
-        labels: &[(&str, &str)],
-        annotations: &[(&str, &str)],
-        helm_chart: Option<&str>,
-    ) -> MemoryCluster {
+    fn deployed(labels: &[(&str, &str)], annotations: &[(&str, &str)]) -> MemoryCluster {
         let map = |pairs: &[(&str, &str)]| {
             Some(
                 pairs
@@ -47,7 +43,7 @@ mod tests {
             },
             ..Deployment::default()
         };
-        let mut state = State {
+        let state = State {
             objects: [(
                 "zeabur".to_owned(),
                 NamespaceObjects {
@@ -59,23 +55,6 @@ mod tests {
             .into(),
             ..State::default()
         };
-        state.served.push(ServedResource::readable(
-            "helm.cattle.io",
-            "v1",
-            "helmcharts",
-            "HelmChart",
-            true,
-        ));
-        if let Some(manager) = helm_chart {
-            state.dynamic.push(
-                serde_json::from_value(json!({
-                    "apiVersion": "helm.cattle.io/v1", "kind": "HelmChart",
-                    "metadata": {"name": "zeabur", "namespace": "kube-system",
-                        "labels": {"app.kubernetes.io/managed-by": manager}},
-                }))
-                .unwrap(),
-            );
-        }
         MemoryCluster::new(state)
     }
 
@@ -95,41 +74,33 @@ mod tests {
 
     #[tokio::test]
     async fn the_version_and_the_switch_come_from_the_server() {
-        let answer = about(&deployed(&[], &[], None), in_cluster()).await;
+        let answer = about(&deployed(&[], &[]), in_cluster()).await;
         assert_eq!(answer["version"], env!("CARGO_PKG_VERSION"));
         assert_eq!(answer["updateCheck"], true);
         let off = Settings {
             update_check: false,
             ..in_cluster()
         };
-        assert_eq!(
-            about(&deployed(&[], &[], None), off).await["updateCheck"],
-            false
-        );
+        assert_eq!(about(&deployed(&[], &[]), off).await["updateCheck"], false);
     }
 
     #[tokio::test]
     async fn the_install_method_follows_the_deployments_manager() {
         let cases = [
+            (deployed(&[], &[HELM]), json!("helm")),
             (
-                deployed(&[], &[HELM], Some("zeabur-installer")),
-                json!("installer"),
-            ),
-            (deployed(&[], &[HELM], Some("someone-else")), json!("helm")),
-            (deployed(&[], &[HELM], None), json!("helm")),
-            (
-                deployed(&[("app.kubernetes.io/managed-by", "Helm")], &[], None),
+                deployed(&[("app.kubernetes.io/managed-by", "Helm")], &[]),
                 json!("helm"),
             ),
             (
-                deployed(&[], &[HELM, ("argocd.argoproj.io/tracking-id", "x")], None),
+                deployed(&[], &[HELM, ("argocd.argoproj.io/tracking-id", "x")]),
                 json!("argo-cd"),
             ),
             (
-                deployed(&[("helm.toolkit.fluxcd.io/name", "zeabur")], &[HELM], None),
+                deployed(&[("helm.toolkit.fluxcd.io/name", "zeabur")], &[HELM]),
                 json!("flux"),
             ),
-            (deployed(&[], &[], None), Value::Null),
+            (deployed(&[], &[]), Value::Null),
         ];
         for (cluster, expected) in cases {
             assert_eq!(about(&cluster, in_cluster()).await["installedBy"], expected);
@@ -138,7 +109,7 @@ mod tests {
 
     #[tokio::test]
     async fn on_this_machine_it_is_zeaburctl_and_refused_reads_say_nothing() {
-        let cluster = deployed(&[], &[HELM], Some("zeabur-installer"));
+        let cluster = deployed(&[], &[HELM]);
         assert_eq!(
             about(&cluster, Settings::default()).await["installedBy"],
             "zeaburctl"
@@ -154,7 +125,7 @@ mod tests {
             deployment: None,
             ..in_cluster()
         };
-        let cluster = deployed(&[], &[HELM], Some("zeabur-installer"));
+        let cluster = deployed(&[], &[HELM]);
         assert_eq!(about(&cluster, unnamed).await["installedBy"], Value::Null);
     }
 }

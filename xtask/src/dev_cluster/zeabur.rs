@@ -1,4 +1,4 @@
-//! Zeabur, from zeabur-installer's HelmChart, with what only this cluster sets.
+//! Zeabur from its chart, with the values of this cluster.
 
 use std::path::Path;
 use std::time::Duration;
@@ -15,7 +15,6 @@ use crate::process::{random_hex, wait_for};
 #[derive(Debug)]
 pub(crate) struct Install<'a> {
     pub(crate) profile: Profile,
-    pub(crate) identity_image: &'a str,
     pub(crate) zeabur_image: &'a str,
     /// Zeabur Proxy's image, when it was built here; otherwise Zeabur Proxy stays off.
     pub(crate) proxy_image: Option<&'a str>,
@@ -23,15 +22,6 @@ pub(crate) struct Install<'a> {
 }
 
 pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), String> {
-    // The domain policy, as zeabur-installer writes it with Zeabur. It stays when Zeabur is
-    // removed.
-    dev.kubectl()
-        .args(["apply", "--server-side", "-f"])
-        .arg(
-            dev.root
-                .join("crates/zeabur-installer/manifests/system-hosts.yaml"),
-        )
-        .quiet()?;
     // The projects the browser opens come first: their namespaces stay after Zeabur's removal.
     dev.kubectl()
         .arg("apply")
@@ -41,14 +31,8 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
         .arg(dev.root.join("web/e2e/manifests/second-project.yaml"))
         .quiet()?;
     let installed = dev
-        .kubectl()
-        .args([
-            "get",
-            "helmchart.helm.cattle.io",
-            "-n",
-            "kube-system",
-            "zeabur",
-        ])
+        .cmd("helm")
+        .args(["-n", "zeabur", "status", "zeabur"])
         .attempt();
     if !installed {
         dev.write("before.txt", &snapshot::take(dev)?)?;
@@ -57,33 +41,24 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
     dev.apply_created("zeabur", &["namespace", "zeabur"])?;
     dev.platform("zeabur")?;
     secrets(dev, install.profile)?;
+    dev.apply(identity_ingress().to_string())?;
 
-    let install_yaml = dev.write(
-        "install.yaml",
-        &install_config(
-            install.identity_image,
-            &dev.identityctl(),
+    let values = dev.write(
+        "values.json",
+        &values(
             install.zeabur_image,
-            install.chart,
-        ),
+            install.profile == Profile::Full,
+            install.proxy_image,
+        )
+        .to_string(),
     )?;
-    dev.cmd("cargo")
-        .current_dir(&dev.root)
-        .args(["build", "-q", "--locked", "-p", "zeabur-installer"])
-        .run()?;
-    let manifests = dev
-        .cmd(dev.root.join("target/debug/zeabur-installer"))
-        .arg("--config")
-        .arg(&install_yaml)
-        .args(["manifests", "--cluster-name", cluster::NAME])
-        .read()?;
-    // The values come first: k3s restarts the chart's install Job when the values change.
-    let values = chart_values(install.profile == Profile::Full, install.proxy_image);
-    dev.apply(helm_chart_config(&values).to_string())?;
-    dev.kubectl()
-        .args(["apply", "--server-side", "--force-conflicts", "-f", "-"])
-        .input(manifests)
-        .quiet()?;
+    dev.cmd("helm")
+        .args(["upgrade", "--install", "zeabur"])
+        .arg(install.chart)
+        .args(["-n", "zeabur", "-f"])
+        .arg(&values)
+        .quiet()
+        .map_err(|e| format!("installing Zeabur: {e}"))?;
 
     let image = install.zeabur_image;
     let waited = wait_for(
@@ -92,15 +67,6 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
         || running(dev, image),
     );
     if let Err(e) = waited {
-        dev.kubectl()
-            .args([
-                "-n",
-                "kube-system",
-                "logs",
-                "job/helm-install-zeabur",
-                "--tail=50",
-            ])
-            .report();
         dev.diagnose("zeabur");
         return Err(e);
     }
@@ -165,7 +131,7 @@ fn secrets(dev: &DevCluster, profile: Profile) -> Result<(), String> {
             &format!("--from-file=ca.crt={}", tls.join("ca.crt").display()),
         ],
     )?;
-    // Zeabur reads zot over HTTPS against its CA, as zeabur-installer sets it up.
+    // Zeabur reads zot over HTTPS against its CA.
     if profile == Profile::Full {
         dev.apply_created(
             "zeabur",
@@ -192,50 +158,74 @@ fn secret(name: &str, key: &str, value: &str) -> Value {
     })
 }
 
-/// zeabur-installer's configuration for objects from images and a chart of this cluster.
-fn install_config(identity_image: &str, identityctl: &Path, image: &str, chart: &Path) -> String {
-    let quote = |s: &str| Value::from(s).to_string();
-    format!(
-        "access: {{mode: local, identity: {}, zeabur: {}}}\nsources:\n  identityImage: {}\n  identityctl: {}\n  zeaburImage: {}\n  zeaburChart: {}\n",
-        quote(IDENTITY_HOST),
-        quote(ZEABUR_HOST),
-        quote(identity_image),
-        quote(&identityctl.display().to_string()),
-        quote(image),
-        quote(&chart.display().to_string()),
-    )
-}
+/// The `ClusterIssuer` of this cluster's CA, which the full profile installs.
+const ISSUER: &str = "zeabur-local-ca";
 
-/// The values only this cluster sets: the registry's CA in the full profile, and Zeabur Proxy
-/// when its image is built here.
-fn chart_values(full: bool, proxy_image: Option<&str>) -> Value {
-    let mut values = serde_json::Map::new();
-    if full {
-        values.insert(
-            "builds".to_owned(),
-            json!({"caBundle": {"configMap": "zeabur-registry-ca"}}),
-        );
-    }
-    if let Some(image) = proxy_image {
-        let (repository, tag) = split_tag(image);
-        values.insert(
-            "proxy".to_owned(),
-            json!({
-                "enabled": true,
-                "image": {"repository": repository, "tag": tag.unwrap_or("latest")},
-            }),
-        );
-    }
-    Value::Object(values)
-}
-
-fn helm_chart_config(values: &Value) -> Value {
+/// Zeabur Identity's Ingress at `IDENTITY_HOST`.
+fn identity_ingress() -> Value {
     json!({
-        "apiVersion": "helm.cattle.io/v1",
-        "kind": "HelmChartConfig",
-        "metadata": {"name": "zeabur", "namespace": "kube-system"},
-        "spec": {"valuesContent": values.to_string()},
+        "apiVersion": "networking.k8s.io/v1",
+        "kind": "Ingress",
+        "metadata": {
+            "name": "zeabur-identity",
+            "namespace": "zeabur-identity",
+            "annotations": {"cert-manager.io/cluster-issuer": ISSUER},
+        },
+        "spec": {
+            "ingressClassName": "traefik",
+            "tls": [{"hosts": [IDENTITY_HOST], "secretName": "zeabur-identity-tls"}],
+            "rules": [{
+                "host": IDENTITY_HOST,
+                "http": {"paths": [{
+                    "path": "/",
+                    "pathType": "Prefix",
+                    "backend": {"service": {"name": "zeabur-identity", "port": {"name": "http"}}},
+                }]},
+            }],
+        },
     })
+}
+
+/// The chart's values for this cluster (docs/install/existing-cluster.mdx), with the registry's
+/// CA in the full profile, and Zeabur Proxy when its image is built here.
+fn values(image: &str, full: bool, proxy_image: Option<&str>) -> Value {
+    let (repository, tag) = split_tag(image);
+    let mut values = json!({
+        // An empty digest clears the one a released chart pins, which the templates prefer.
+        "image": {"repository": repository, "tag": tag.unwrap_or("latest"), "digest": "",
+                  "pullPolicy": "IfNotPresent"},
+        "clusterName": cluster::NAME,
+        "publicUrl": format!("https://{ZEABUR_HOST}"),
+        "issuer": {
+            "url": format!("https://{IDENTITY_HOST}"),
+            "clientSecret": {"existingSecret": "zeabur-oidc"},
+            "caBundle": {"configMap": "zeabur-identity-ca"},
+        },
+        "planKey": {"existingSecret": "zeabur-plan-key"},
+        "domains": {"suffixes": [], "clusterIssuer": ISSUER},
+        "ingress": {
+            "enabled": true,
+            "className": "traefik",
+            "annotations": {"cert-manager.io/cluster-issuer": ISSUER},
+            "tls": {"secretName": "zeabur-tls"},
+        },
+    });
+    let builds = full.then(|| json!({"caBundle": {"configMap": "zeabur-registry-ca"}}));
+    let proxy = proxy_image.map(|image| {
+        let (repository, tag) = split_tag(image);
+        json!({
+            "enabled": true,
+            "image": {"repository": repository, "tag": tag.unwrap_or("latest")},
+        })
+    });
+    if let Some(map) = values.as_object_mut() {
+        map.extend(
+            [("builds", builds), ("proxy", proxy)]
+                .into_iter()
+                .filter_map(|(key, value)| Some((key.to_owned(), value?))),
+        );
+    }
+    values
 }
 
 /// Whether Zeabur runs `image` and answers over HTTPS.
@@ -309,20 +299,27 @@ fn identity_setup_link(dev: &DevCluster) -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use std::path::Path;
+    use serde_json::json;
 
-    use serde_json::{Value, json};
-
-    use super::{chart_values, helm_chart_config, install_config};
+    use super::values;
 
     #[test]
-    fn the_default_profile_sets_no_values() {
-        assert_eq!(chart_values(false, None), json!({}));
+    fn the_default_profile_sets_neither_builds_nor_the_proxy() {
+        let values = values("zeabur:dev-0123456789ab", false, None);
+        assert_eq!(
+            values["image"],
+            json!({"repository": "zeabur", "tag": "dev-0123456789ab", "digest": "",
+                   "pullPolicy": "IfNotPresent"})
+        );
+        assert_eq!(values["issuer"]["url"], "https://identity.localhost");
+        assert!(values.get("builds").is_none());
+        assert!(values.get("proxy").is_none());
     }
 
     #[test]
     fn a_proxy_built_here_is_enabled_with_its_image() {
-        let values = chart_values(
+        let values = values(
+            "zeabur:dev-1",
             true,
             Some("docker.io/library/zeabur-proxy:dev-0123456789ab"),
         );
@@ -336,40 +333,6 @@ mod tests {
         assert_eq!(
             values["builds"]["caBundle"]["configMap"],
             "zeabur-registry-ca"
-        );
-    }
-
-    #[test]
-    fn the_helm_chart_config_carries_the_values_as_text() {
-        let values = chart_values(false, Some("zeabur-proxy:dev-1"));
-        let config = helm_chart_config(&values);
-        assert_eq!(config["metadata"]["name"], "zeabur");
-        assert_eq!(config["metadata"]["namespace"], "kube-system");
-        let content: Value =
-            serde_json::from_str(config["spec"]["valuesContent"].as_str().unwrap()).unwrap();
-        assert_eq!(content, values);
-    }
-
-    #[test]
-    fn install_yaml_names_the_local_sources() {
-        let yaml = install_config(
-            "docker.io/library/zeabur-identity:dev-0123456789ab",
-            Path::new("/repo/target/dev-cluster/identityctl"),
-            "ghcr.io/zeabur-oss/zeabur:0.1.1",
-            Path::new("/charts/zeabur 0.1.1.tgz"),
-        );
-        let config: Value = serde_saphyr::from_str(&yaml).unwrap();
-        assert_eq!(
-            config,
-            json!({
-                "access": {"mode": "local", "identity": "identity.localhost", "zeabur": "zeabur.localhost"},
-                "sources": {
-                    "identityImage": "docker.io/library/zeabur-identity:dev-0123456789ab",
-                    "identityctl": "/repo/target/dev-cluster/identityctl",
-                    "zeaburImage": "ghcr.io/zeabur-oss/zeabur:0.1.1",
-                    "zeaburChart": "/charts/zeabur 0.1.1.tgz",
-                },
-            })
         );
     }
 }

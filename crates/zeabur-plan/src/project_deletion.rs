@@ -18,9 +18,9 @@
 //! - **Tools that put objects back.** Objects Helm, Argo CD or Flux manages are deleted with the
 //!   namespace, and the tool can create them again ([`Warning::Recreated`]).
 //! - **Refused**: a namespace Kubernetes keeps for itself (`kube-` prefix), Zeabur's own namespaces
-//!   (its own, its members', its terminals', its node shells'), a namespace of a component the
-//!   installer set up (label [`LABEL_BASELINE`]), a namespace that is not a project, and one that
-//!   is already `Terminating`.
+//!   (its own, its members', its terminals', its node shells'), a namespace of a platform component
+//!   (label [`LABEL_BASELINE`]), a namespace that is not a project, and one that is already
+//!   `Terminating`.
 //!
 //! # Force deletion
 //!
@@ -370,7 +370,7 @@ fn refuse_namespace(
     if label(LABEL_BASELINE).is_some_and(|v| v == "true") {
         return Err(refusal(
             "component_namespace",
-            format!("{name} holds a component the installer set up; remove the component instead."),
+            format!("{name} holds a platform component; remove the component instead."),
         ));
     }
     if label(project_label).is_none() {

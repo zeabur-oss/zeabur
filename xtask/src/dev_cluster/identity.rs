@@ -1,4 +1,4 @@
-//! Zeabur Identity, as zeabur-installer installs it, and kube-apiserver trusting it.
+//! Zeabur Identity from its manifests, and kube-apiserver trusting it.
 
 use std::time::Duration;
 

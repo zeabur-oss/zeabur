@@ -3,15 +3,15 @@ title: 移除 Zeabur，保留服务
 description: 移除 Zeabur 管理界面，保留应用、数据和仍在使用的 Kubernetes 组件。
 ---
 
-只移除 Zeabur 的 chart 或运行 `zeabur-installer uninstall zeabur`，现有服务会留在 Kubernetes，继续由原生控制器和 operator 运行。保留 ingress、证书、存储和备份等依赖组件后，就能改用 kubectl、Helm 或原来的 GitOps 工具管理服务。
+只移除 Zeabur 的 chart，现有服务会留在 Kubernetes，继续由原生控制器和 operator 运行。保留 ingress、证书、存储和备份等依赖组件后，就能改用 kubectl、Helm 或原来的 GitOps 工具管理服务。
 
 用 `zeaburctl ui` 在本地打开界面时，按 `Ctrl-C` 关闭即可。`zeaburctl ui` 不会在集群中安装任何东西，已应用的变更会留在集群中。
 
 ## 移除前的准备
 
-需要能管理 Zeabur 安装对象的 kubeconfig。如果通过 installer 安装，还需要原服务器的 root 权限。先确认移除管理界面后，仍有不依赖该界面的集群访问方式。
+需要能管理 Zeabur 安装对象的 kubeconfig。先确认移除管理界面后，仍有不依赖该界面的集群访问方式。
 
-1. 用 kubectl 连接目标集群，确认 context 和当前权限。installer 主机可使用 root 保管的 `/etc/rancher/k3s/k3s.yaml`（K3s）或 `/etc/rancher/rke2/rke2.yaml`（RKE2），不要把这份管理员凭证交给普通成员。
+1. 用 kubectl 连接目标集群，确认 context 和当前权限。K3s 或 RKE2 服务器可使用 root 保管的 `/etc/rancher/k3s/k3s.yaml`（K3s）或 `/etc/rancher/rke2/rke2.yaml`（RKE2），不要把这份管理员凭证交给普通成员。
 2. 记下 Zeabur 的安装方式、release 名称和 Namespace。下文 Helm 示例使用 release `zeabur`、Namespace `zeabur`，自行安装时要替换为实际名称。
 3. 关闭已打开的容器终端、kubectl 终端和节点终端，并应用或放弃已检查的变更。移除后，这些连接会中断，尚未应用的变更也会失效。
 4. 如果成员仍需要以 Zeabur Identity 身份操作，保留 Identity，并提前安排[替代 RBAC 和准入策略](#成员权限和准入策略)。Chart 提供的成员角色和 Zeabur 创建的成员 binding 都会在移除时删除。
@@ -29,7 +29,7 @@ kubectl get deployments,statefulsets,daemonsets,cronjobs,services,ingresses,pvc 
 
 将 `shop` 替换为要保留的项目。记下重要服务的公开网址，移除前后都打开一次。数据库和对象存储也要用现有客户端确认能否连接。
 
-如果使用 installer，且主机上没有另行安装 kubectl，可在该主机上这样运行后文的 kubectl 操作：
+K3s 或 RKE2 服务器上没有另行安装 kubectl 时，可在该服务器上这样运行后文的 kubectl 操作：
 
 ```sh
 # K3s
@@ -51,7 +51,7 @@ sudo /var/lib/rancher/rke2/bin/kubectl \
 | 备份定时配置、备份凭证和已保存的备份 | 保留，仍需各数据库 operator、K8up 或 Velero，以及备份目标位置 |
 | Reloader、监控、告警、通知配置 | 各自保留，由原控制器继续运行 |
 | 项目的 `zeabur.com/project` 标签和显示信息 | 保留，不影响工作负载运行 |
-| 成员的 RoleBinding／ClusterRoleBinding | installer 移除时会一起删除。`helm uninstall` 会保留，需要自行删除 |
+| 成员的 RoleBinding／ClusterRoleBinding | `helm uninstall` 会保留，需要自行删除 |
 | `zeabur-s3-destinations` | Chart 标记为保留的 Namespace，已添加的目的地和密钥留在其中 |
 | Zeabur Identity | 只移除 Zeabur 时会保留，用户和其他 OAuth client 继续留在原 Namespace |
 
@@ -65,23 +65,7 @@ sudo /var/lib/rancher/rke2/bin/kubectl \
 
 ## 移除管理界面
 
-根据原安装方式选择一种流程。如果 Flux 或 Argo CD 仍在同步 Zeabur，先从 Flux 或 Argo CD 的配置源中移除 Zeabur 安装项，再用原工具卸载，控制器才不会重新创建 Zeabur。
-
-### Installer 安装
-
-在最初创建集群的服务器上运行：
-
-```sh
-sudo zeabur-installer \
-  --config /etc/zeabur-installer/config.yaml \
-  uninstall zeabur
-```
-
-该命令会删除 `kube-system` 中的 `HelmChart zeabur`、`zeabur` Namespace，以及 Zeabur 创建的成员 RoleBinding 和 ClusterRoleBinding。K3s/RKE2、Zeabur Identity、Catalog 组件和项目 Namespace 都会保留。
-
-`zeabur` Namespace 内的 OAuth client 机密变量、变更令牌密钥、`zeabur-settings` 和其他对象会一起删除。如果曾把额外的工作负载放入此 Namespace，先迁出。需要保留集群显示名称或 metrics store 选择时，先记下配置。
-
-保留 installer 配置和下载目录后，可以继续管理节点。此时不要运行 `uninstall --purge`。之后用原来 `zeabur: true` 的配置重新运行 `apply`，会再次安装 Zeabur。
+用原来的安装工具移除。如果 Flux 或 Argo CD 仍在同步 Zeabur，先从 Flux 或 Argo CD 的配置源中移除 Zeabur 安装项，再用原工具卸载，控制器才不会重新创建 Zeabur。
 
 ### Helm 安装
 
@@ -120,9 +104,9 @@ kubectl get storageclasses
 
 ## 成员权限和准入策略
 
-卸载 Chart 会移除 `zeabur-member`、项目的聚合 ClusterRole、其规则集，以及 `zeabur-project-namespace` ValidatingAdmissionPolicy 和 binding。`zeabur-installer uninstall zeabur` 还会删除 Zeabur 创建的成员 binding。
+卸载 Chart 会移除 `zeabur-member`、项目的聚合 ClusterRole、其规则集，以及 `zeabur-project-namespace` ValidatingAdmissionPolicy 和 binding。
 
-installer 添加的 `zeabur-system-hosts` 策略和 binding 会保留，Zeabur Identity 的域名会继续受到保护。删除 `zeabur` Namespace 后，这个策略的 binding 找不到 Ingress，不再拦截任何路由。不再需要时，按 [Zeabur 和 Zeabur Identity 的域名](../reference/security.mdx#zeabur-和-zeabur-identity-的域名)删除或改为 `Warn`。
+Chart 也会移除 `zeabur-system-hosts` 策略和它的 binding，之后项目可以使用 Zeabur 或 Zeabur Identity 的域名。见 [Zeabur 和 Zeabur Identity 的域名](../reference/security.mdx#zeabur-和-zeabur-identity-的域名)。
 
 如果仍需让成员访问集群，先用自己的 RBAC 配置接管，确认每个角色实际能读写的范围。如果替代角色保留 `patch namespaces`，也要保留同等的字段限制。移除 chart 策略后，仅靠 RBAC 无法将 patch 限定在显示名称、描述和图标上。现有的 Pod Security 和 NetworkPolicy 标签会保留。
 
@@ -176,19 +160,7 @@ kubectl delete namespace zeabur-s3-destinations
 
 ## 同时移除 Zeabur Identity
 
-如果其他 client、用户 kubeconfig 或自动化仍在使用 Zeabur Identity，先保留 Identity。将这些登录来源迁移到替代认证系统，确认不依赖 Identity 也能管理集群后，在一台服务器上运行：
-
-```sh
-sudo zeabur-installer uninstall identity
-```
-
-<Callout type="warn">
-此命令会同时移除 Zeabur 和整个 `zeabur-identity` Namespace，删除其中的用户、通行密钥数据和 client，并让运行命令的服务器停止信任 Identity 令牌。先确认替代管理登录方式可用。Identity 的 CRD 会保留。
-</Callout>
-
-多服务器集群还需要在其他每台服务器上运行 `sudo zeabur-installer apply`，对应服务器才会停止信任 Identity 令牌。命令结束时会列出这些服务器的名称。命令也会清空 `kube-system/zeabur-identity-authn` 配置文件，之后加入的服务器不会信任 Identity。
-
-自行安装 Identity 的集群应按原安装来源处理。卸载 Zeabur chart 不会移除 Identity 的 OAuth client 或 Kubernetes API 的 issuer 配置。
+如果其他 client、用户 kubeconfig 或自动化仍在使用 Zeabur Identity，先保留 Identity。把这些登录来源迁到替代认证系统，确认不依赖 Identity 也能管理集群后，再按当初安装 Identity 的来源移除。卸载 Zeabur chart 不会移除 Identity 的 OAuth client 或 Kubernetes API 的 issuer 配置。
 
 ## 不再使用整个集群时
 
@@ -197,13 +169,11 @@ sudo zeabur-installer uninstall identity
 ```sh
 sudo /usr/local/bin/k3s-uninstall.sh    # K3s
 sudo /usr/local/bin/rke2-uninstall.sh   # RKE2
-sudo zeabur-installer uninstall
-sudo zeabur-installer uninstall --purge
 ```
 
-K3s 或 RKE2 的脚本会移除 Kubernetes 和数据，所有依赖 Kubernetes 的工作负载都会停止。接下来的 `uninstall` 会列出 installer 残留文件，`--purge` 会清除下载缓存、本地 CA 副本、配置、installer 为 Longhorn 写入的 module／multipath 配置文件，以及为 containerd 写入的 AppArmor 配置文件。Longhorn 主机软件包会保留。
+K3s 或 RKE2 的脚本会移除 Kubernetes 和数据，所有依赖 Kubernetes 的工作负载都会停止。
 
-`--purge` 不会删除 `/var/lib/zeabur/storage` 中的 local-path 数据和 `/var/lib/longhorn` 中的 replica 数据。即使保留原始数据目录，也仍需要对应的 PV／PVC 和存储系统信息，才能重新接入服务。确认已有可还原的备份后，再决定如何处理这些目录。
+脚本不会删除 `/var/lib/zeabur/storage` 中的 local-path 数据和 `/var/lib/longhorn` 中的 replica 数据。即使保留原始数据目录，也仍需要对应的 PV／PVC 和存储系统信息，才能重新接入服务。确认已有可还原的备份后，再决定如何处理这些目录。
 
 只需要移除一台已加入的节点时，按[移除节点](../cluster/nodes.mdx#移除节点)的步骤，用 kubectl 迁移副本并删除节点，再到那台 VM 上卸载。如果服务仍需使用该节点的 local-path 数据，不要直接让节点退出集群。
 
@@ -214,4 +184,4 @@ K3s 或 RKE2 的脚本会移除 Kubernetes 和数据，所有依赖 Kubernetes �
 - 服务网址在移除后失效：对比 Ingress／HTTPRoute、ingress controller、Gateway、证书和后端副本，确认没有一起删除共同依赖的组件。
 - 成员无法操作，但服务正常：chart 的成员角色和 binding 已移除，按替代 RBAC 重新授权。
 
-需要重新安装管理界面时，使用[单机 installer 流程](../get-started/quickstart.mdx)或[已有集群流程](../install/existing-cluster.mdx)，不要删除现有项目后再重新创建。
+需要重新安装管理界面时，使用[已有集群流程](../install/existing-cluster.mdx)，不要删除现有项目后再重新创建。

@@ -1,6 +1,6 @@
-//! `zeaburctl components export`: Zeabur Catalog components' manifests or Helm commands, for a
-//! cluster that zeabur-installer did not install. The text comes from the catalogue in this
-//! binary ([`zeabur_catalog::install`]); no cluster is read.
+//! `zeaburctl components export`: Zeabur Catalog components' manifests or Helm commands, to
+//! install them on a cluster. The text comes from the catalogue in this binary
+//! ([`zeabur_catalog::install`]); no cluster is read.
 
 use std::process::ExitCode;
 
