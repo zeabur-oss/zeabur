@@ -6188,6 +6188,7 @@ dependencies = [
  "thiserror 2.0.21",
  "utoipa",
  "zeabur-kube",
+ "zeabur-model",
 ]
 
 [[package]]

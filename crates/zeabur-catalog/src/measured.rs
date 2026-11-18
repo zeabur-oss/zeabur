@@ -1,7 +1,8 @@
-//! What a template's pods use when idle, from Zeabur Catalog's
-//! `measurements/templates/<id>.json`, which its nightly end-to-end run writes. Only passed
-//! runs count. A run lists one pod of each workload; every template runs one pod per workload,
-//! so the rows add up to the template.
+//! What a template's pods use when idle.
+//!
+//! The numbers come from Zeabur Catalog's `measurements/templates/<id>.json`, which its nightly
+//! end-to-end run writes. Only passed runs count. A run lists one pod of each workload; every
+//! template runs one pod per workload, so the rows add up to the template.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;

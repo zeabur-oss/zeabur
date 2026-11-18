@@ -134,9 +134,7 @@ export function ComponentsPage() {
     .filter((g) => g.items.length > 0)
 
   const open = search.component
-  const opened = open
-    ? list.flatMap((c) => c.components).find((x) => x.id === open)
-    : undefined
+  const opened = open ? list.flatMap((c) => c.components).find((x) => x.id === open) : undefined
 
   return (
     <ClusterFrame tab="components">
@@ -248,8 +246,7 @@ function useDown() {
       .map((i) => incidentComponents[i.fault.component ?? ""])
       .filter((key): key is string => !!key),
   )
-  return (capability: string, component: string) =>
-    down.has(capability) || down.has(component)
+  return (capability: string, component: string) => down.has(capability) || down.has(component)
 }
 
 function ComponentCard({
