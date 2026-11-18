@@ -1,13 +1,13 @@
 ---
 title: 體驗計畫
-description: 加入體驗計畫後，Zeabur、`zeaburctl ui` 和 installer 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；以及怎麼分別關閉。
+description: 加入體驗計畫後，Zeabur 和 `zeaburctl ui` 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；以及怎麼分別關閉。
 ---
 
-體驗計畫會傳送版本、每天的使用人數、用過哪些功能、`zeaburctl ui` 有沒有連上叢集，以及 Deployment 的變更有沒有部署完成，讓我們知道有多少人在用、該先修哪裡。用 installer 安裝時預設加入，可以在確認頁取消勾選；用 Helm 安裝時預設不加入，要自己開啟；`zeaburctl ui` 預設加入，每次啟動都會提醒，並說明怎麼關閉。
+體驗計畫會傳送版本、每天的使用人數、用過哪些功能、`zeaburctl ui` 有沒有連上叢集，以及 Deployment 的變更有沒有部署完成，讓我們知道有多少人在用、該先修哪裡。用 Helm 安裝時預設不加入，要自己開啟；`zeaburctl ui` 預設加入，每次啟動都會提醒，並說明怎麼關閉。
 
 ## 會傳送什麼
 
-每個人每天（UTC）第一次使用 Zeabur 時，Zeabur 會傳一筆事件；同一項功能、同一組值每天（UTC）第一次出現時，Zeabur 也會傳一筆；installer 在安裝開始、完成或失敗時各傳一筆。每筆事件只有隨機的安裝代碼和下表列出的屬性。安裝代碼由 installer 產生一次，或由你用 `uuidgen` 產生，不含任何機器的資訊。資料保留 13 個月。
+每個人每天（UTC）第一次使用 Zeabur 時，Zeabur 會傳一筆事件；同一項功能、同一組值每天（UTC）第一次出現時，Zeabur 也會傳一筆。每筆事件只有隨機的安裝代碼和下表列出的屬性。安裝代碼由你用 `uuidgen` 產生，不含任何機器的資訊。資料保留 13 個月。
 
 | 事件 | 由誰傳送 | 時機 |
 |---|---|---|
@@ -16,9 +16,6 @@ description: 加入體驗計畫後，Zeabur、`zeaburctl ui` 和 installer 會�
 | `cluster_connected` | `zeaburctl ui` | 用你的 kubeconfig 連上叢集，或連不上時 |
 | `app_change_submitted` | Zeabur | 叢集回應了一個 Deployment 的變更：換映像檔、改副本數或改環境變數 |
 | `rollout_finished` | Zeabur | 被接受的變更部署結束時，結果和 `kubectl rollout status` 一致 |
-| `install_started` | Installer | `apply` 開始 |
-| `install_finished` | Installer | `apply` 順利結束 |
-| `install_failed` | Installer | `apply` 中途停止 |
 
 | 屬性 | 事件 | 值 |
 |---|---|---|
@@ -37,11 +34,6 @@ description: 加入體驗計畫後，Zeabur、`zeaburctl ui` 和 installer 會�
 | `source` | `service_created` 的 `feature_used` | 服務怎麼建立：`git`、`upload`、`image` 或 `template` |
 | `template` | `source` 為 `template` 的 `feature_used` | 範本在 Zeabur Catalog 裡的 ID，例如 `wordpress`；Catalog 沒有的 ID 不會傳送 |
 | `kind` | `database_created` 或 `domain_added` 的 `feature_used` | 資料庫或物件儲存：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。網域：名稱用的是 Zeabur 提供給新服務的網域後綴時是 `generated`，其他是 `custom` |
-| `installer_version` | installer 的事件 | Installer 的版本 |
-| `profile` | installer 的事件 | `single-node`、`multi-node` 或 `personal` |
-| `distribution` | installer 的事件 | `k3s`、`rke2` 或 `kube-solo` |
-| `step` | `install_failed` | 停在哪一步：`plan`、`preflight`、`node-prep`、`cluster`、`cluster-setup`、`components`、`identity`、`zeabur` 或 `record` |
-| `error` | `install_failed` | `config`、`plan`、`io`、`command`、`download`、`digest`、`parse` 或 `other`，不會是錯誤訊息 |
 | `$process_person_profile` | 全部 | 固定為 `false`：不建立個人檔案 |
 | `$geoip_disable` | 全部 | 固定為 `true`：不查詢所在位置 |
 
@@ -53,7 +45,7 @@ description: 加入體驗計畫後，Zeabur、`zeaburctl ui` 和 installer 會�
 
 `zeaburctl ui` 沒有安裝代碼，所以在第一次要傳事件時才產生一組隨機代碼，關閉時不會產生。這組代碼存在設定目錄裡 `zeabur` 資料夾中名為 `local-id` 的檔案：Linux 是 `$XDG_CONFIG_HOME` 或 `~/.config`，macOS 是 `~/Library/Application Support`，Windows 是 `%APPDATA%`。只有你能讀取它，裡面不含機器、kubeconfig、權杖或使用者名稱的任何資訊。
 
-事件用 HTTPS 送到 PostHog（經由 `oss-nori.zeabur.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur 或安裝。PostHog 不保存 IP 位址。`zeaburctl ui` 在背景傳送，不會延遲印出連結或開啟瀏覽器。
+事件用 HTTPS 送到 PostHog（經由 `oss-nori.zeabur.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur。PostHog 不保存 IP 位址。`zeaburctl ui` 在背景傳送，不會延遲印出連結或開啟瀏覽器。
 
 ## 絕不傳送
 
@@ -63,8 +55,7 @@ description: 加入體驗計畫後，Zeabur、`zeaburctl ui` 和 installer 會�
 
 以下任何一種都有效，其中 `DO_NOT_TRACK` 優先於其他設定。
 
-- 在 installer、Zeabur 或 `zeaburctl ui` 的環境變數設定 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
-- 在 installer 的確認頁取消勾選，執行 `zeabur-installer --no-telemetry apply`（或 `--no-telemetry gui`），或在 `/etc/zeabur-installer/config.yaml` 寫 `telemetry: false`。
+- 在 Zeabur 或 `zeaburctl ui` 的環境變數設定 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
 - 用 Helm 安裝時，維持預設的 `telemetry.enabled=false`。沒有安裝代碼時，chart 不接受 `telemetry.enabled=true`。
 - `zeaburctl ui` 執行 `zeaburctl telemetry disable`，它會在 `local-id` 所在的 `zeabur` 資料夾裡的 `config.yaml` 寫上 `telemetry: false`；或設定 `ZEABUR_TELEMETRY=off`。`config.yaml` 讀不懂時，`zeaburctl ui` 什麼都不送。`zeaburctl telemetry status` 會顯示目前生效的設定。
 
@@ -78,11 +69,9 @@ helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
   --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
 ```
 
-Installer 把安裝代碼存在 `/etc/zeabur-installer/installation-id`（權限 `0600`），並交給 Zeabur 的 chart。
-
 ## 檢視會傳送的內容
 
-設定 `ZEABUR_TELEMETRY=debug`，Zeabur 或 installer 會印出實際的請求內容，但不會送出。用除錯模式安裝時，Zeabur 不會加入體驗計畫。Zeabur 會把內容寫在日誌裡：
+設定 `ZEABUR_TELEMETRY=debug`，Zeabur 會印出實際的請求內容，但不會送出。內容寫在日誌裡：
 
 ```sh
 kubectl -n zeabur set env deployment/zeabur ZEABUR_TELEMETRY=debug
@@ -99,7 +88,7 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **在哪裡執行。**
 
-- 叢集頁一律顯示 `Zeabur v<版本>`。不管多少人打開 Zeabur，Zeabur 伺服器每小時最多問 GitHub 一次。頁面每次打開時讀它的結果，一直開著時每小時再讀一次。伺服器會留著上次的結果。連不到 GitHub 時先沿用，一分鐘後再試。GitHub 拒絕時，等 GitHub 重新計算後再試。瀏覽器不會連到 GitHub。「設定」›「關於」也會顯示版本，按「升級方式」會依 Zeabur 的安裝方式列出步驟，分為 zeabur-installer、Helm、Argo CD 和 Flux。請參閱[升級 Zeabur](../upgrade/steps.mdx)。用 `zeaburctl ui` 開啟時，頁面顯示的是 `zeaburctl` 本身的版本和更新方式。
+- 叢集頁一律顯示 `Zeabur v<版本>`。不管多少人打開 Zeabur，Zeabur 伺服器每小時最多問 GitHub 一次。頁面每次打開時讀它的結果，一直開著時每小時再讀一次。伺服器會留著上次的結果。連不到 GitHub 時先沿用，一分鐘後再試。GitHub 拒絕時，等 GitHub 重新計算後再試。瀏覽器不會連到 GitHub。「設定」›「關於」也會顯示版本，按「升級方式」會依 Zeabur 的安裝方式列出步驟，分為 Helm、Argo CD 和 Flux。請參閱[升級 Zeabur](../upgrade/steps.mdx)。用 `zeaburctl ui` 開啟時，頁面顯示的是 `zeaburctl` 本身的版本和更新方式。
 - `zeaburctl` 每次執行指令都會檢查。檢查和指令同時進行，指令結束後 `zeaburctl` 最多再等一秒。有新版時，會在 stderr 印出一行。它不在磁碟上存任何東西。stderr 不是終端機，或設定了 `CI` 時，不會檢查。
 - 沒有權杖時，GitHub 每小時只回應同一個 IP 位址 60 次，共用這個位址的人一起算。用完時，`zeaburctl` 會印出提示。把 GitHub 權杖設在 `GH_TOKEN` 或 `GITHUB_TOKEN`（和 `gh` 讀的變數相同），`zeaburctl` 就會帶上它，改用你自己的額度。不給任何權限的 fine-grained 權杖就夠了。
 
@@ -107,7 +96,6 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 **關閉**。以下任何一種都有效。關閉後，Zeabur 伺服器完全不會連到 GitHub。
 
-- 用 installer 安裝時，在確認頁取消勾選，或在 `/etc/zeabur-installer/config.yaml` 設定 `updateCheck: false`。執行 `apply` 時設定了 `DO_NOT_TRACK=1` 或 `NO_UPDATE_NOTIFIER` 也會關閉。
 - 用 Helm 安裝時，設定 `updateCheck.enabled=false`。叢集頁就只顯示版本。
 - 在 Zeabur 的環境變數設定 `DO_NOT_TRACK=1`。`zeaburctl` 則是在你自己的環境變數設定。這也會關閉體驗計畫。
 - 為 `zeaburctl`（包括 `zeaburctl ui`）在你的環境變數設定 `NO_UPDATE_NOTIFIER`，任何值都可以。這只關閉檢查更新。

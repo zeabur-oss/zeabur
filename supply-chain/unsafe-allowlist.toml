@@ -679,7 +679,7 @@ kind = "unsafe"
 reason = "bcrypt -> blowfish, for the Traefik basic-auth hashes. Reads and writes integers of fixed byte order through pointer copies over slices it has checked for length"
 approved = "2026-10-28"
 
-# --- Installer: unpacking the RKE2 release and packing a local chart. Pending a maintainer's review.
+# --- Archives: reading the catalog bundle (zeabur-catalog) and Velero backups (zeabur-api).
 
 [[crate]]
 name = "crc32fast"
@@ -690,7 +690,7 @@ approved = "2026-10-28"
 [[crate]]
 name = "filetime"
 kind = "unsafe"
-reason = "file times when unpacking the RKE2 tarball"
+reason = "file times of tar entries"
 approved = "2026-10-28"
 
 [[crate]]
@@ -708,7 +708,7 @@ approved = "2026-10-28"
 [[crate]]
 name = "tar"
 kind = "unsafe"
-reason = "unpacking the RKE2 tarball"
+reason = "reading the catalog bundle and Velero backups"
 approved = "2026-10-28"
 
 # --- Web interface: decoding the embedded brotli files for clients without brotli (zeabur-ui).

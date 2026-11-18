@@ -1,12 +1,17 @@
 # Old path: new path, both without .md. Add a line when a published page moves or is removed.
 install: install/existing-cluster
 installer/README: get-started/quickstart
-installer/configuration: reference/installer-configuration
-installer/how-it-works: reference/installer
+installer/configuration: get-started/quickstart
+installer/how-it-works: get-started/quickstart
 architecture: reference/architecture
 releases: reference/releases
-get-started/advanced-install: install/config-file
-get-started/personal: install/personal
+get-started/advanced-install: get-started/quickstart
+get-started/personal: get-started/quickstart
 get-started/install: install/existing-cluster
 get-started/upgrade: upgrade/steps
 get-started/upgrade-notes: upgrade/notes
+install/config-file: get-started/quickstart
+install/personal: get-started/quickstart
+reference/installer: get-started/quickstart
+reference/installer-configuration: get-started/quickstart
+get-started/ai-agent: get-started/quickstart

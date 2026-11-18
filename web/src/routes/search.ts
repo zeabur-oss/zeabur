@@ -147,7 +147,7 @@ export const objectsSearch = z.object({
 })
 
 export const componentsSearch = z.object({
-  /** `capability/id` of the component whose installer commands are open. */
+  /** `capability/id` of the component whose install steps are open. */
   component: text,
 })
 

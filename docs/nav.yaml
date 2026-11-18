@@ -3,10 +3,10 @@
 # translations' nav.yaml refers to it, and it is part of each page's URL.
 - group: get-started
   label: Get started
-  pages: [quickstart, ai-agent, first-project, how-it-works]
+  pages: [quickstart, first-project, how-it-works]
 - group: install
   label: More ways to install
-  pages: [config-file, personal, existing-cluster, desktop]
+  pages: [existing-cluster, desktop]
 - group: upgrade
   label: Upgrade
   pages: [steps, notes]
@@ -21,7 +21,7 @@
   pages: [settings, members, github-app, notifications, backups, nodes, components, external-secrets, s3-destinations, diagnosis]
 - group: reference
   label: Reference
-  pages: [zeaburctl, installer-configuration, installer, permissions, api-tokens, architecture, releases, security, telemetry]
+  pages: [zeaburctl, permissions, api-tokens, architecture, releases, security, telemetry]
 - group: leave
   label: Leave Zeabur
   pages: [uninstall]

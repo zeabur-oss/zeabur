@@ -1,11 +1,11 @@
 ---
 title: 安全性
-description: 了解登录、机密、应用变更、终端和 installer 的权限及数据边界。
+description: 了解登录、机密、应用变更、终端和主机的权限及数据边界。
 ---
 
 把同事设为**开发者**之前，先检查项目里有哪些 Secret 和 ServiceAccount：开发者都能访问。打开**节点终端**就等于获得整台主机的 root 权限。Zeabur 沿用 Kubernetes 的身份和准入规则，下面按功能说明各类访问的范围。
 
-角色对照见[权限](./permissions.mdx)，安装配置见[在已有集群中安装](../install/existing-cluster.mdx)和 [installer 配置](./installer-configuration.mdx)。
+角色对照见[权限](./permissions.mdx)，安装配置见[在已有集群中安装](../install/existing-cluster.mdx)。
 
 ## 登录与凭证
 
@@ -17,9 +17,9 @@ Zeabur 自身持有的机密只有 OAuth client secret 和变更令牌密钥。C
 
 ### Zeabur Identity 的内部证书
 
-API server 从集群内部连接 Zeabur Identity，获取验证令牌所需的公钥。这条连接的证书由 cert-manager 签发，默认有效期为 90 天，到期前 30 天自动续期，不用重新运行 `apply`。API server 只信任一个有效期为 10 年的根 CA，续期时根 CA 不变，也不用修改 API server 的配置。
+API server 从集群内部连接 Zeabur Identity，获取验证令牌所需的公钥。这条连接的证书由 cert-manager 签发，默认有效期为 90 天，到期前 30 天自动续期。API server 只信任一个有效期为 10 年的根 CA，续期时根 CA 不变，也不用修改 API server 的配置。
 
-用集群管理员的 kubeconfig 检查，两张证书的 `READY` 都应为 `True`。`sudo zeabur-installer doctor` 也会检查：
+用集群管理员的 kubeconfig 检查，两张证书的 `READY` 都应为 `True`：
 
 ```sh
 kubectl -n zeabur-identity get certificate
@@ -34,10 +34,9 @@ kubectl -n zeabur-identity delete secret zeabur-identity-internal-ca
 kubectl -n zeabur-identity wait certificate/zeabur-identity-internal-ca --for=condition=Ready --timeout=2m
 kubectl -n zeabur-identity delete secret zeabur-identity-internal-tls
 kubectl -n zeabur-identity wait certificate/zeabur-identity-internal-tls --for=condition=Ready --timeout=2m
-sudo zeabur-installer apply
 ```
 
-从删除 `zeabur-identity-internal-tls` 到 `apply` 完成，使用 Zeabur Identity 登录的 kubectl 和 Zeabur 会暂时无法使用。集群有多台 server 时，其他 server 也要各运行一次 `sudo zeabur-installer apply`。
+从删除 `zeabur-identity-internal-tls` 到 API server 信任新的根 CA 之前，使用 Zeabur Identity 登录的 kubectl 和 Zeabur 会暂时无法使用。
 
 ## 本地界面
 
@@ -123,7 +122,7 @@ kubectl label namespace <ns> \
   pod-security.kubernetes.io/warn=baseline --overwrite
 ```
 
-installer 创建的 K3s 和 RKE2 集群，对未加标签的 Namespace 仍默认使用 `restricted`，项目自身的 `baseline` 标签会覆盖这个默认值。`kube-system` 和 Zeabur 自身的 Namespace 保持原配置。
+如果集群把未加标签的 Namespace 默认设为 `restricted`（K3s 和 RKE2 应用 CIS 配置时就是如此），项目自身的 `baseline` 标签会覆盖这个默认值。`kube-system` 和 Zeabur 自身的 Namespace 保持原配置。
 
 Pod Security 不管理网络，项目之间的连接见下一节。
 
@@ -133,7 +132,7 @@ Zeabur 的信任范围是整个集群：能登录的人都是可信用户，Zeab
 
 ### 新项目里有什么
 
-使用 installer 安装的集群，平台组件所在的 Namespace 都有 `zeabur.com/platform: "true"` 标签。集群中存在这个标签时，Zeabur 创建项目会写入三个对象：
+平台组件所在的 Namespace 带有 `zeabur.com/platform: "true"` 标签。集群中存在这个标签时，Zeabur 创建项目会写入三个对象：
 
 - Namespace，带有 `zeabur.com/project` 标签和 Pod Security 标签。
 - ServiceAccount `default`，`automountServiceAccountToken: false`。未指定 ServiceAccount 的副本不会获得 token；需要调用 Kubernetes API 的工作负载应自行指定 ServiceAccount。
@@ -168,7 +167,7 @@ spec:
 kubectl label namespace traefik cert-manager zeabur.com/platform=true
 ```
 
-NetworkPolicy 需要集群的网络插件（CNI）支持才会生效。installer 安装的 K3s 使用 Calico、RKE2 使用 Canal，都支持；普通 K3s 内置的 kube-router 也支持。KubeSolo 的 bridge CNI 不支持，即使写入也不会阻断任何连接。
+NetworkPolicy 需要集群的网络插件（CNI）支持才会生效。K3s 内置的网络策略控制器和 RKE2 的 Canal 都支持。KubeSolo 的 bridge CNI 不支持，即使写入也不会阻断任何连接。
 
 ### 允许另一个项目连入
 
@@ -239,22 +238,22 @@ tools 副本默认最多运行 30 分钟。最后一个终端关闭时，Zeabur 
 
 启用 Zeabur Proxy 后，用量历史改由 Proxy 读取默认的 metrics store。用户必须在该 Namespace 中拥有 `get metrics.proxy.zeabur.com` 权限，每次查询也会添加 VictoriaMetrics 的 `extra_label=namespace=<Namespace>`，因此只能获取这个 Namespace 的 series。Proxy 只开放查询、范围查询、series、label 名称和 label 值这几个 API，拒绝导出、federate 和 TSDB 状态请求。
 
-启用 Zeabur Proxy 后（chart 默认关闭，安装器在安装 VictoriaLogs 或 VictoriaMetrics 时会开启；未安装 VictoriaLogs 时，`proxy.logs.enabled` 设为 false，Proxy 只提供用量历史），用户必须在该 Namespace 中拥有 `get logs.proxy.zeabur.com` 权限，才能读取这个 Namespace 的历史日志，查询也仅限于这个 Namespace。如果能直接连接 VictoriaLogs 本身，就能绕过这层检查，需要单独限制。
+启用 Zeabur Proxy 后（chart 默认关闭，安装了 VictoriaLogs 或 VictoriaMetrics 时用 `proxy.enabled` 开启；未安装 VictoriaLogs 时，把 `proxy.logs.enabled` 设为 false，Proxy 只提供用量历史），用户必须在该 Namespace 中拥有 `get logs.proxy.zeabur.com` 权限，才能读取这个 Namespace 的历史日志，查询也仅限于这个 Namespace。如果能直接连接 VictoriaLogs 本身，就能绕过这层检查，需要单独限制。
 
 ## 机密的加密与访问记录
 
 ### 存储的 Secret 如何加密
 
-K3s 和 RKE2 一律加密存储的 Secret，加密方式为 AES-CBC（`aescbc`）。K3s 存在 SQLite 中，RKE2 存在 etcd 中。即使有人复制了数据库、上传到 S3 的 etcd 快照或数据目录，只要没有密钥和 server token，看到的机密就都是密文，值以 `k8s:enc:aescbc:v1:<密钥名称>:` 开头。
+K3s 和 RKE2 开启机密加密后，会加密存储的 Secret，加密方式为 AES-CBC（`aescbc`）。K3s 存在 SQLite 中，RKE2 存在 etcd 中。即使有人复制了数据库、上传到 S3 的 etcd 快照或数据目录，只要没有密钥和 server token，看到的机密就都是密文，值以 `k8s:enc:aescbc:v1:<密钥名称>:` 开头。
 
 密钥保存在每台 server 上，权限为 `0600`，与数据位于同一块磁盘：
 
 - K3s：`/var/lib/rancher/k3s/server/cred/encryption-config.json`
 - RKE2：`/var/lib/rancher/rke2/server/cred/encryption-config.json`
 
-获得 server 磁盘或 root 权限的人也能获得密钥，这部分依靠磁盘加密（`host.requireEncryptedDisk`）保护。通过 API 读取时，Kubernetes 会自动解密；RBAC 允许 `get`、`list` 或 `watch` Secret 的人都能看到值，这部分依靠[成员权限](./permissions.mdx)控制。
+获得 server 磁盘或 root 权限的人也能获得密钥，这部分依靠磁盘加密保护。通过 API 读取时，Kubernetes 会自动解密；RBAC 允许 `get`、`list` 或 `watch` Secret 的人都能看到值，这部分依靠[成员权限](./permissions.mdx)控制。
 
-`sudo zeabur-installer doctor` 会检查加密状态：找不到密钥文件，或 Secret 的第一个 provider 为 `identity` 时报告 `CRITICAL`，已加密时显示 `Secrets are stored encrypted (aescbc)`。也可以在 server 上运行：
+要检查加密状态，在 server 上运行：
 
 ```sh
 sudo k3s secrets-encrypt status    # K3s
@@ -320,7 +319,7 @@ sudo grep '"resource":"secrets"' /var/lib/rancher/k3s/server/logs/audit.log \
 
 RKE2 需要把路径中的 `k3s` 换成 `rke2`。`watch` 开始时记录一条 `ResponseStarted`，结束时才有 `ResponseComplete`。一次 `list` 或 `watch` 整个 Namespace 的 Secret 时，记录中没有名称，需要去掉按名称筛选的那一行，改用 Namespace 筛选。
 
-installer 写入审计策略（权限为 `0600`），K3s 或 RKE2 按该策略在每台 server 上记录，只有 root 能读取。
+应用下面的审计策略后，K3s 或 RKE2 会在每台 server 上记录，只有 root 能读取。
 
 | | K3s | RKE2 |
 |---|---|---|
@@ -335,13 +334,13 @@ installer 写入审计策略（权限为 `0600`），K3s 或 RKE2 按该策略�
 
 ## Zeabur 和 Zeabur Identity 的域名
 
-开发者可以在项目中创建 Ingress 和 HTTPRoute。如果不加限制，只要在 Zeabur 的域名上写一条路径更长的规则，就能抢占 Zeabur 的部分网址，将请求转发到自己的服务。因此，installer 安装 Zeabur 时，会同时添加 `zeabur-system-hosts` 准入策略。项目创建或修改 Ingress、HTTPRoute 时，策略会检查：
+开发者可以在项目中创建 Ingress 和 HTTPRoute。如果不加限制，只要在 Zeabur 的域名上写一条路径更长的规则，就能抢占 Zeabur 的部分网址，将请求转发到自己的服务。因此，chart 会添加 `zeabur-system-hosts` 准入策略（`systemHosts.enabled`，默认开启）。项目创建或修改 Ingress、HTTPRoute 时，策略会检查：
 
 - 不能使用 `zeabur` 和 `zeabur-identity` Namespace 中的 Ingress 正在使用的域名，写在 `spec.tls` 中也不行。
 - 不能使用涵盖这些域名的通配符域名。例如 Zeabur 使用 `zeabur.example.com` 时，策略会阻止 `*.example.com`。
 - Ingress 的每条规则都必须填写 `host`，HTTPRoute 至少要有一个 `hostnames`。路由未填写域名时，会接收每个域名的请求，包括 Zeabur 的域名。
 
-策略直接读取这两个 Namespace 的 Ingress，Zeabur 或 Zeabur Identity 更换域名时，不用修改策略。installer 创建的 Namespace（标签为 `zeabur.com/platform: "true"`）可以不填写域名，但同样不能使用 Zeabur 和 Zeabur Identity 的域名。只修改标签或 annotation、未改动 `spec` 的更新不检查。管理员也受这条策略限制。
+策略直接读取这两个 Namespace 的 Ingress，Zeabur 或 Zeabur Identity 更换域名时，不用修改策略。带有 `zeabur.com/platform: "true"` 标签的 Namespace 可以不填写域名，但同样不能使用 Zeabur 和 Zeabur Identity 的域名。只修改标签或 annotation、未改动 `spec` 的更新不检查。管理员也受这条策略限制。
 
 策略只在写入时检查，安装前已有的路由会保留。使用以下命令找出使用 Zeabur 域名或未填写域名的 Ingress，再自行处理：
 
@@ -350,14 +349,14 @@ kubectl get ingress --all-namespaces \
   -o custom-columns='NAMESPACE:.metadata.namespace,NAME:.metadata.name,HOSTS:.spec.rules[*].host'
 ```
 
-要让策略只警告、不阻止请求，将 binding 改为 `Warn`。Zeabur Identity 的 binding 是 `zeabur-system-hosts-zeabur-identity`，修改方式相同。之后再次运行 `apply`，installer 不会改回：
+要让策略只警告、不阻止请求，将 binding 改为 `Warn`。Zeabur Identity 的 binding 是 `zeabur-system-hosts-zeabur-identity`，修改方式相同：
 
 ```sh
 kubectl patch validatingadmissionpolicybinding zeabur-system-hosts-zeabur \
   --type merge -p '{"spec":{"validationActions":["Warn"]}}'
 ```
 
-也可以删除 binding 或策略，但下次 `apply` 会重新创建；要长期关闭，就改为 `Warn`。移除 Zeabur 时会保留策略，Zeabur Identity 的域名继续受到保护。未安装 Zeabur（`zeabur: false`）时，installer 不会添加这条策略。
+要关闭策略，把 chart 的 `systemHosts.enabled` 设为 `false`。只删除 binding 或策略的话，下次升级 chart 会重新创建。移除 chart 时，策略也会一并移除。
 
 ### 确认策略仍在阻止请求
 
@@ -371,8 +370,8 @@ kubectl get validatingadmissionpolicybinding \
 
 两行的 `ACTIONS` 都应为 `[Deny]`。
 
-- 显示 `Warn`：有人将其改为只警告，策略不会阻止请求。`apply` 不会改回，使用以下命令改回 `Deny`。
-- 显示 `NotFound`：binding 已不存在。运行 `sudo zeabur-installer apply`，installer 会重新创建。
+- 显示 `Warn`：有人将其改为只警告，策略不会阻止请求。使用以下命令改回 `Deny`。
+- 显示 `NotFound`：binding 已不存在。升级 chart 会重新创建，见[用 Helm 升级](../upgrade/steps.mdx#用-helm-升级)。
 
 ```sh
 kubectl patch validatingadmissionpolicybinding zeabur-system-hosts-zeabur \
@@ -380,33 +379,6 @@ kubectl patch validatingadmissionpolicybinding zeabur-system-hosts-zeabur \
 ```
 
 `zeabur-system-hosts-zeabur-identity` 的修改方式相同。
-
-## Installer 的主机与下载权限
-
-installer 以 root 身份写入 K3s 或 RKE2 的配置和 systemd unit、调整 kernel 参数。使用 RKE2 时还会创建 `etcd` 用户。选择 Longhorn 时，还会安装主机软件包。GUI 通过明文 HTTP 提供，应只监听 loopback，通过 SSH tunnel 连接。
-
-默认的 K3s 或 RKE2 版本使用编译进 installer 的 SHA-256 digest 验证，信任来自 installer 自身的签名。指定其他 `k3sVersion` 或 `rke2Version` 时，只能使用该 release 页面上的 checksum 列表验证。`sources` 指定的文件、镜像和 chart 不在锁定范围内，使用前先按[发行文件与验证](./releases.mdx)确认来源。
-
-对于 Catalog 组件的 chart 和 manifest 文件，installer 会先下载，再与 Catalog 中的 SHA-256 比对，不一致就停止安装。比对通过的 chart 直接放入 `HelmChart`，helm-controller 不会再次自行下载。Catalog 中的组件镜像也使用 digest 指定，即使上游更换同一 tag 的内容，也不会安装到替换后的镜像。
-
-K3s 和 RKE2 都做同样的 CIS 加固，也都加密存储的 Secret，见[机密的加密与访问记录](#机密的加密与访问记录)。RKE2 使用自带的 CIS profile；K3s 则由 installer 按 [K3s 的 CIS 加固指南](https://docs.k3s.io/security/hardening-guide)配置：
-
-- CIS 要求的 kernel 参数，用 `protect-kernel-defaults` 强制检查。
-- 启用 `NodeRestriction` 和 `EventRateLimit` 准入插件。没有自己标签的 Namespace 默认使用 Pod Security `restricted`，`kube-system` 除外。
-- 审计记录的策略和轮换方式都与 RKE2 相同。
-- kubelet 的流式连接空闲 5 分钟后关闭，只使用安全的 TLS 加密套件。
-- 在 `kube-system`、`kube-public`、`default` 三个 Namespace 中添加 NetworkPolicy，只允许同一 Namespace 的副本连入，所有副本都能访问 CoreDNS；默认 ServiceAccount 不挂载令牌。
-- 管理员 kubeconfig 和 TLS 证书只有 root 能读取。
-
-K3s 改用 Calico 替代 flannel，由 Calico 执行 NetworkPolicy。
-
-主机磁盘是否加密会单独检查。设置 `host.requireEncryptedDisk: true` 时，未加密就不安装。
-
-### 个人使用的安装
-
-个人使用的安装运行在 KubeSolo 上，没有上述保护。获得 `/etc/zeabur-installer/kubeconfig.yaml` 的人可以控制整个集群。KubeSolo 不执行网络策略，Zeabur 为项目创建的网络策略不会生效，项目之间也就没有隔离。KubeSolo 将数据保存在 SQLite 中，installer 不会另外加密 Secret，也不应用 CIS profile。这种安装只适合个人使用，见[个人使用：在小型机器上安装](../install/personal.mdx)。
-
-helm-controller 按上游配置运行，ServiceAccount 拥有整个集群的权限，安装组件的 Job 也使用同一身份。
 
 ## 私下报告漏洞
 

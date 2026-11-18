@@ -7,6 +7,21 @@ description: 每一版不相容的變更，以及升級前要先做的事。一�
 
 一次跨好幾版升級時，從你目前的版本開始，依序看過到目標版本為止的每一節。新的版本寫在最上面。
 
+## v0.2 → v0.3
+
+zeabur-installer 已經移除。Zeabur 用 Helm chart 裝進既有的叢集；全新的伺服器見 [zeabur-oss/zeabur#430](https://github.com/zeabur-oss/zeabur/issues/430)。
+
+chart 現在自帶 `zeabur-system-hosts` 准入政策。在沒有標上 `zeabur.com/platform: "true"` 的命名空間裡，新增或修改的 Ingress 規則都要寫主機名稱，HTTPRoute 都要寫 hostnames，而且不能用 Zeabur 或 Zeabur Identity 的網域。已經存在的物件照常運作，直到改了 `spec` 為止。不想要這個政策，就設定 `systemHosts.enabled: false`。
+
+### 用 zeabur-installer 安裝的叢集
+
+zeabur-installer 在 chart 之外套用過同一個政策，Helm 不會接手它。升級前先刪掉，chart 會重新建立：
+
+```sh
+kubectl delete validatingadmissionpolicybinding zeabur-system-hosts-zeabur zeabur-system-hosts-zeabur-identity
+kubectl delete validatingadmissionpolicy zeabur-system-hosts
+```
+
 ## v0.1 → v0.2
 
 用 zeabur-installer 安裝的伺服器，要先改設定檔、移除 v0.1 裝的 zot，再執行 `plan` 和 `apply`。有後來加入的節點時，例如工作節點或 RKE2 的其他伺服器，伺服器升級完要讓每個節點重新加入。
@@ -70,7 +85,7 @@ kubectl -n observability annotate pvc vmsingle-vm-victoria-metrics-k8s-stack ope
 kubectl -n observability rollout restart deployment victoria-metrics-operator
 ```
 
-下載 v0.2 的 installer，執行 `plan`，確認後再 `apply`，步驟見[升級 Zeabur](steps.mdx#用-zeabur-installer-升級)。
+下載 v0.2 的 installer，執行 `plan`，確認後再 `apply`。
 
 `plan` 會列出這次新增的元件。System Upgrade Controller 不再是預設元件，`apply` 不會移除，只是不再更新，`plan` 會寫成 `not removed, no longer updated`。installer 本來就固定 K3s 和 RKE2 的版本，不需要 System Upgrade Controller。要留著，在 `enable` 加上 `node-updates/system-upgrade-controller`。不要的話，`apply` 完再刪掉：
 

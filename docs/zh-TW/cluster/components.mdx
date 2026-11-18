@@ -1,17 +1,15 @@
 ---
 title: 檢視與安裝叢集元件
-description: 檢視叢集裝了哪些元件、狀態如何、還缺什麼，再到伺服器上用 zeabur-installer 安裝或移除。
+description: 檢視叢集裝了哪些元件、狀態如何、還缺什麼，再用 zeaburctl 印出元件的 manifest 並套用。
 ---
 
-打開**叢集** → **元件**，**已安裝**列出偵測到的元件，**目錄**列出 Zeabur Catalog 裡的元件。元件由 zeabur-installer 在伺服器上安裝和移除，Zeabur 只顯示狀態和要執行的指令。
+打開**叢集** → **元件**，**已安裝**列出偵測到的元件，**目錄**列出 Zeabur Catalog 裡的元件。Zeabur 只顯示狀態和要執行的指令。`zeaburctl components export` 會印出 manifest 或 Helm 指令，由你套用到叢集。
 
 ![叢集元件頁的已安裝清單和目錄](../images/shots/cluster-components.avif)
 
 ## 開始之前
 
-- 你能讀取整個叢集的 CRD、IngressClass 和各 Namespace 的工作負載，元件頁才偵測得到已安裝的元件。
-- 要安裝或移除元件，你要能用 root 登入當初執行 zeabur-installer 的伺服器。
-- 叢集不是用 zeabur-installer 裝的，改看[用自己的工具安裝](#用自己的工具安裝)。
+你能讀取整個叢集的 CRD、IngressClass 和各 Namespace 的工作負載，元件頁才偵測得到已安裝的元件。
 
 ## 確認叢集裡有什麼
 
@@ -28,78 +26,14 @@ description: 檢視叢集裝了哪些元件、狀態如何、還缺什麼，再�
 
 ### 看要執行的指令
 
-在元件卡片按**安裝**，視窗會列出要在伺服器上執行的指令。**新增**選單、範本、建置設定或資料庫備份缺少元件時，按**安裝方式**也會開啟同一個視窗，一次列出這件事缺的所有元件，`enable` 的內容可以直接複製。
-
-Zeabur 從 `kube-system` 的 ConfigMap `zeabur-installer` 判斷叢集是不是 zeabur-installer 裝的。找不到時，視窗只列出 `zeaburctl components export` 的指令；讀不到時，兩種方式都列出來。
+在元件卡片按**安裝**，視窗會列出要執行的指令。**新增**選單、範本、建置設定或資料庫備份缺少元件時，按**安裝方式**也會開啟同一個視窗，一次列出這件事缺的所有元件，指令可以直接複製。
 
 </Step>
 <Step>
 
-### 在伺服器上安裝
+### 印出 manifest 並套用
 
-用 SSH 登入伺服器，選一種方式：
-
-<Tabs items={["安裝程式的頁面", "設定檔"]}>
-<Tab value="安裝程式的頁面">
-
-```sh
-sudo zeabur-installer gui
-```
-
-在自己的電腦開 SSH tunnel，再開啟伺服器印出的連結：
-
-```sh
-ssh -L 8085:127.0.0.1:8085 root@server.example.com
-```
-
-在**元件**勾選要裝的元件，到**確認**看過內容後按**安裝**。
-
-</Tab>
-<Tab value="設定檔">
-
-在 `/etc/zeabur-installer/config.yaml` 的 `enable` 加上元件 ID，一次可以加好幾個：
-
-```yaml
-enable:
-  - volume-backup/velero
-```
-
-元件需要填值時，照 [Installer 設定](../reference/installer-configuration.mdx#元件選擇)寫 `inputs` 和 `secretFiles`。先看 `plan`，再執行 `apply`：
-
-```sh
-sudo zeabur-installer plan
-sudo zeabur-installer apply
-```
-
-</Tab>
-</Tabs>
-
-</Step>
-<Step>
-
-### 確認安裝結果
-
-回到**叢集** → **元件**，**已安裝**會出現這個元件和版本。再到需要它的功能頁確認，例如 Velero 對應**叢集** → **備份**，VictoriaMetrics 對應**叢集** → **通知**。
-
-</Step>
-</Steps>
-
-## 移除元件
-
-已安裝的元件卡片上有**移除**，視窗會列出指令。在安裝程式的頁面取消勾選，或從設定檔的 `enable` 拿掉，預設就會裝的元件則加到 `disable`，再執行 `apply`。
-
-`plan` 和安裝程式的**確認**會列出要移除的元件、會留下什麼，以及會一起刪掉的 CRD。遇到下面兩種情況，`apply` 會停下，什麼都不改：
-
-- 還有東西在用這個元件，例如還有這個元件的自訂資源（包括會一起刪掉的 CRD 的物件）、還有 Longhorn 的磁碟區，或還有副本從 zot 拉映像檔。畫面會列出是哪些，先刪掉或搬走。
-- 移除會連同元件保存的資料一起刪掉，例如 Longhorn。先備份，再把元件 ID 寫進設定檔的 `allowDataLoss`，或在**確認**勾選同意。
-
-移除後，元件的 Namespace 和磁碟區會留著。有些 Chart 會連 CRD 和它們的所有物件一起刪掉，其他 CRD 會留著。確定用不到留下的物件後，手動刪除的方法見 [Installer 指令](../reference/installer.mdx#移除元件)。
-
-zeabur-installer 只移除自己裝的元件。用 Helm、Flux 或 Argo CD 裝的，從原本的工具移除。
-
-## 用自己的工具安裝
-
-叢集不是用 zeabur-installer 裝的，或想用 GitOps 管理元件時，用 `zeaburctl components export` 印出元件的 manifest：
+用 `zeaburctl components export` 印出元件的 manifest，或印出安裝它的 Helm 指令：
 
 ```sh
 zeaburctl components export volume-backup/velero > velero.yaml
@@ -110,7 +44,15 @@ zeaburctl components export volume-backup/velero --format helm
 
 預設印出 K3s/RKE2 的 `HelmChart`，由叢集內建的 helm-controller 安裝。其他叢集用 `--format` 改成 `helm`、`flux` 或 `argocd`。元件要填的值會留成 `<名稱>`，先換成實際的值，再用 `kubectl apply -f` 套用，或提交到 GitOps 儲存庫。指令說明見 [zeaburctl](../reference/zeaburctl.mdx#components-export)。
 
-用這種方式裝的元件，之後的調整和移除都在原本的檔案或工具上做。
+</Step>
+<Step>
+
+### 確認安裝結果
+
+回到**叢集** → **元件**，**已安裝**會出現這個元件和版本。再到需要它的功能頁確認，例如 Velero 對應**叢集** → **備份**，VictoriaMetrics 對應**叢集** → **通知**。
+
+</Step>
+</Steps>
 
 ### 替換 K3s/RKE2 內建元件
 
@@ -123,9 +65,15 @@ zeaburctl components export volume-backup/velero --format helm
 停用內建的 Traefik 會刪除 Traefik 的 CRD 和所有 IngressRoute、Middleware 物件，新的元件開始執行前，Ingress 流量會中斷。停用內建的 metrics-server 時，新版本開始執行前 metrics API 無法使用。挑可以中斷的時段切換。
 </Callout>
 
+## 移除元件
+
+Zeabur 不會移除元件。要用當初安裝它的檔案或工具移除，例如 `kubectl delete -f`、`helm uninstall`、Flux 或 Argo CD。
+
+移除前先確認沒有東西還在用它，例如還有這個元件的自訂資源、還有 Longhorn 的磁碟區，或還有副本從 zot 拉映像檔。Longhorn 這類保存資料的元件，移除時會連資料一起刪掉，先備份。
+
+移除後，元件的 Namespace 和磁碟區會留著。有些 Chart 會連 CRD 和它們的所有物件一起刪掉，其他 CRD 會留著。確定用不到留下的東西後，再手動刪除。
+
 ## 常見失敗
 
 - 元件頁顯示權限不足：把畫面列出的缺少權限交給叢集管理員。
-- `apply` 說元件還在使用：照列出的物件處理，再執行一次 `apply`。
-- `apply` 要你寫 `allowDataLoss`：先備份元件的資料，確定要刪再寫。
 - 裝完一直沒出現在**已安裝**：看 `kube-system` 裡 `helm-install-<名稱>` Job 的日誌，以及元件的工作負載有沒有啟動。

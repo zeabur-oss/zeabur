@@ -11,14 +11,13 @@ description: 按操作系统选择 Zeabur 发行文件，验证校验和、签�
 |---|---|---|
 | `zeaburctl` | `zeaburctl-v<version>-<os>-<arch>.tar.gz` | Linux `amd64`、`arm64`，macOS `arm64` |
 | `zeabur` 服务器 | `zeabur-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
-| `zeabur-installer` | `zeabur-installer-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
 | 多平台容器镜像 | `ghcr.io/zeabur-oss/zeabur:<version>` | Linux `amd64`、`arm64` |
 | Zeabur Proxy 容器镜像 | `ghcr.io/zeabur-oss/proxy:<version>` | Linux `amd64`、`arm64` |
 | Helm chart | `oci://ghcr.io/zeabur-oss/charts/zeabur`，也提供 `zeabur-<version>.tgz` | 安装到 Kubernetes 集群 |
 | 产物摘要 | `digests.txt` | 每个镜像的索引、各平台镜像和 chart |
 | 文件校验和与签名 | `SHA256SUMS`、`SHA256SUMS.sigstore.json` | 同一 release 的附件 |
 
-每个压缩包都包含可执行文件和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，没有 Intel Mac 版本。`zeabur` 和 installer 只能在 Linux 上运行，macOS 上只需要 `zeaburctl`。Windows 请在 WSL 中使用 Linux 版的 `zeaburctl`。
+每个压缩包都包含可执行文件和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，没有 Intel Mac 版本。`zeabur` 只能在 Linux 上运行，macOS 上只需要 `zeaburctl`。Windows 请在 WSL 中使用 Linux 版的 `zeaburctl`。
 
 发布时，chart 的 `image.digest` 和 `proxy.image.digest` 会固定为本次发布的镜像索引，用 chart 默认值安装就会得到同一批镜像。镜像 tag 和 chart 版本号不带开头的 `v`，GitHub release tag 和压缩包文件名带有 `v`。
 
@@ -39,7 +38,7 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
   --pattern "$binary-v$version-$platform.tar.gz"
 ```
 
-`platform` 可以换成 `linux-amd64` 或 `linux-arm64`。下载 installer 时，把 `binary` 改成 `zeabur-installer`，并选择 Linux 平台。
+`platform` 可以换成 `linux-amd64` 或 `linux-arm64`。
 
 每个版本都由本仓库的 release workflow（`.github/workflows/release.yml`）构建并签名，所以签名者是该 workflow（下面的 `signer`）。v0.2.0 及之前的版本由 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) 中共用的 release workflow 签名，`signer` 也接受它。证书上还记录了这次运行是为了哪个仓库、哪个 tag。进入下载目录，依次验证校验和清单的签名者、文件内容和构建来源：
 

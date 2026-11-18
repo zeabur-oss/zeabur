@@ -109,8 +109,6 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 Zeabur 登录 Identity、读取镜像、读取对象存储中的备份、连接 GitHub 时，除了内置的 Mozilla CA，也会信任这些证书。Zeabur 只在启动时读取这个文件，修改配置文件后需要运行 `kubectl -n zeabur rollout restart deployment/zeabur`。
 
-`issuer.caBundle` 和 `builds.caBundle` 由 zeabur-installer 设置，分别指向签发 Identity 证书的本地 CA 和 Zot 的 CA。Zeabur 会同时信任这两个 CA 和 `extraTrustedCA`，无需自行配置。
-
 ## 让对外连接经过代理
 
 集群只能通过代理连到互联网时，开启 `outboundProxy`。Zeabur 自己发出的请求会改走这个代理，包括从镜像仓库读取镜像、读取对象存储中的备份，以及连接 GitHub。
@@ -159,7 +157,7 @@ kubectl -n zeabur create secret generic zeabur-plan-key \
 
 ## 安装 Zeabur 需要的组件
 
-如果集群不是用 zeabur-installer 安装的，Zeabur 的组件页只会显示状态，不会替你安装。用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 输出组件的 manifest，再用 `kubectl` 应用，或提交到 GitOps 仓库：
+Zeabur 的组件页只会显示状态，不会替你安装。用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 输出组件的 manifest，再用 `kubectl` 应用，或提交到 GitOps 仓库：
 
 ```sh
 zeaburctl components export certificates/cert-manager --format flux > cert-manager.yaml

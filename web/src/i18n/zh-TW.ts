@@ -231,7 +231,6 @@ export const zhTW: Messages = {
   "update.current": (version) => `目前是 v${version}。`,
   "update.upToDate": "已是最新版",
   "update.download": "下載",
-  "update.how.installer": "下載新版 zeabur-installer，用原本的設定執行 plan 和 apply。",
   "update.how.helm": "用新版 chart 執行 helm upgrade。",
   "update.how.argoCd": "把 Argo CD Application 裡的 chart 改成新版本。",
   "update.how.flux": "把 Flux HelmRelease 裡的 chart 改成新版本。",
@@ -321,13 +320,11 @@ export const zhTW: Messages = {
   "node.reservedMemory": (n, node, share) =>
     n === 1 ? `${node}：記憶體已保留 ${share}` : `${n} 個節點可保留的記憶體快用完了`,
   "node.reservedMemory.why": "要求記憶體的新副本可能要等到有空間。",
-  "node.reservedMemory.fix":
-    "調低上面服務的記憶體保留量，或加一台節點：用 Zeabur Installer 安裝的叢集，在伺服器執行 sudo zeabur-installer node add。",
+  "node.reservedMemory.fix": "調低上面服務的記憶體保留量，或加一台節點。",
   "node.reservedCpu": (n, node, share) =>
     n === 1 ? `${node}：CPU 已保留 ${share}` : `${n} 個節點可保留的 CPU 快用完了`,
   "node.reservedCpu.why": "要求 CPU 的新副本可能要等到有空間。",
-  "node.reservedCpu.fix":
-    "調低上面服務的 CPU 保留量，或加一台節點：用 Zeabur Installer 安裝的叢集，在伺服器執行 sudo zeabur-installer node add。",
+  "node.reservedCpu.fix": "調低上面服務的 CPU 保留量，或加一台節點。",
   "unreachable.title": (name) => `連不到 ${name}`,
   "unreachable.zeabur": "Zeabur 沒有回應",
   "unreachable.lastHeard": "上次回應",
@@ -1111,21 +1108,9 @@ export const zhTW: Messages = {
   "installer.how": "安裝方式",
   "installer.installTitle": (names) => `安裝 ${names}`,
   "installer.removeTitle": (name) => `移除 ${name}`,
-  "installer.intro": "元件由 zeabur-installer 安裝和移除，要在當初裝叢集的那台伺服器上執行。",
-  "installer.gui": (names) => `開啟安裝程式的頁面，在「元件」勾選 ${names}，然後安裝：`,
-  "installer.guiRemove": (name) => `開啟安裝程式的頁面，在「元件」取消勾選 ${name}，然後安裝：`,
-  "installer.guiReach": "頁面只開在伺服器的 127.0.0.1:8085，用 ssh -L 8085:127.0.0.1:8085 連過去。",
-  "installer.config": (path, many) =>
-    `或在 ${path} 的 enable 加上${many ? "這些元件" : "這個元件"}，再執行 apply：`,
-  "installer.configRemove": (path) =>
-    `或從 ${path} 的 enable 拿掉這個元件，預設就會安裝的元件則加到 disable，再執行 apply：`,
-  "installer.stays":
-    "元件的 Namespace 和磁碟區會留下。有些 Chart 會連同 CRD 和所有對應的物件一起刪除，安裝程式的確認畫面會列出來。要刪除留下的物件，見安裝程式文件。",
   "installer.elsewhere": "如果是用 Helm、K3s 或 GitOps 工具裝的，就用同一個工具移除。",
-  "installer.otherCluster":
-    "如果叢集不是用 zeabur-installer 安裝的，可以印出 manifests，用 kubectl 套用，或提交到 GitOps 儲存庫。加上 --format helm 會改印 Helm 指令。",
-  "installer.notHere":
-    "這個叢集不是用 zeabur-installer 裝的。印出 manifests 後用 kubectl 套用，或提交到 GitOps 儲存庫。加上 --format helm 會改印 Helm 指令。",
+  "installer.export":
+    "印出 manifests 後用 kubectl 套用，或提交到 GitOps 儲存庫。加上 --format helm 會改印 Helm 指令。",
   "settings.homepage": "首頁",
   "settings.opensInNewTab": "（在新分頁開啟）",
   "category.traffic": "流量",

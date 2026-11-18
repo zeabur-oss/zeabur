@@ -7,6 +7,21 @@ This page lists each version's breaking changes and what to do before you upgrad
 
 If you're skipping versions, start at the version you run now and read every section up to the version you're moving to. The newest version is at the top.
 
+## v0.2 → v0.3
+
+zeabur-installer is gone. Zeabur installs onto an existing cluster with the Helm chart; for a bare server, see [zeabur-oss/zeabur#430](https://github.com/zeabur-oss/zeabur/issues/430).
+
+The chart now carries the `zeabur-system-hosts` admission policy. Outside namespaces labelled `zeabur.com/platform: "true"`, a new or changed Ingress rule needs a host and an HTTPRoute needs hostnames, and neither can use Zeabur's or Zeabur Identity's domain. Objects that already exist keep working until their `spec` changes. To leave the policy out, set `systemHosts.enabled: false`.
+
+### Installed with zeabur-installer
+
+zeabur-installer applied the same policy outside the chart, so Helm refuses to take it over. Delete it before you upgrade, and the chart creates it again:
+
+```sh
+kubectl delete validatingadmissionpolicybinding zeabur-system-hosts-zeabur zeabur-system-hosts-zeabur-identity
+kubectl delete validatingadmissionpolicy zeabur-system-hosts
+```
+
 ## v0.1 → v0.2
 
 On a server installed with zeabur-installer, change the configuration file and remove the zot that v0.1 installed, then run `plan` and `apply`. If other nodes joined later, worker nodes or RKE2 servers, have each one join again after the server is upgraded.
@@ -70,7 +85,7 @@ kubectl -n observability annotate pvc vmsingle-vm-victoria-metrics-k8s-stack ope
 kubectl -n observability rollout restart deployment victoria-metrics-operator
 ```
 
-Download the v0.2 installer, run `plan`, review it, then run `apply`. See [Upgrade Zeabur](steps.mdx#upgrade-with-zeabur-installer) for the steps.
+Download the v0.2 installer, run `plan`, review it, then run `apply`.
 
 `plan` lists the components this upgrade adds. System Upgrade Controller is no longer a default component. `apply` doesn't remove it but stops updating it, and `plan` shows it as `not removed, no longer updated`. The installer already pins the K3s and RKE2 release, so you don't need it. To keep it, add `node-updates/system-upgrade-controller` to `enable`. Otherwise, delete it after `apply`:
 

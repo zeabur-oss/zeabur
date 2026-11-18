@@ -10,7 +10,7 @@ To stop showing a namespace in Zeabur without deleting anything, use **Remove fr
 ## Before you start
 
 - You need permission to delete the namespace (`delete namespaces/<project>`) and the database objects in it. The review lists any permissions you lack, and the cluster also rejects the changes when you apply them.
-- Zeabur's own namespace, system namespaces starting with `kube-`, components installed by the installer (labeled `zeabur.com/platform=true`), and `zeabur-terminals` can't be deleted here.
+- Zeabur's own namespace, system namespaces starting with `kube-`, platform components (namespaces labeled `zeabur.com/platform=true`), and `zeabur-terminals` can't be deleted here.
 
 ## Review what will be deleted
 

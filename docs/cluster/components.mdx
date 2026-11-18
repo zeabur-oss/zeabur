@@ -1,17 +1,15 @@
 ---
 title: View and install cluster components
-description: Check which components are installed, their status, and what's missing, then use zeabur-installer on the server to install or remove them.
+description: Check which components are installed, their status, and what's missing, then print their manifests with zeaburctl and apply them.
 ---
 
-Open **Cluster** → **Components**. **Installed** lists detected components, and **Catalog** lists components in Zeabur Catalog. zeabur-installer installs and removes components on the server. Zeabur only shows their status and the commands to run.
+Open **Cluster** → **Components**. **Installed** lists detected components, and **Catalog** lists components in Zeabur Catalog. Zeabur only shows their status and the command to run. `zeaburctl components export` prints the manifests or Helm commands, and you apply them to the cluster.
 
 ![Installed components and the catalog on the cluster components page](../images/shots/cluster-components.avif)
 
 ## Before you begin
 
-- To detect installed components, the components page needs permission to read CRDs and IngressClasses across the cluster and workloads in every namespace.
-- To install or remove components, you need root access to the server where zeabur-installer originally ran.
-- If you didn't install the cluster with zeabur-installer, see [Install with your own tools](#install-with-your-own-tools).
+To detect installed components, the components page needs permission to read CRDs and IngressClasses across the cluster and workloads in every namespace.
 
 ## Check what's in the cluster
 
@@ -26,80 +24,16 @@ If a feature such as backups or notifications already works, but its component c
 <Steps>
 <Step>
 
-### View the commands to run
+### View the command
 
-Click **Install** on a component card to open a dialog with the commands to run on the server. When the **Add** menu, a template, a build setting or database backups need a missing component, **How to install** opens the same dialog. It lists every component that action is missing, so you can copy the `enable` list as is.
-
-Zeabur checks the ConfigMap `zeabur-installer` in `kube-system` to tell whether zeabur-installer set up the cluster. If it isn't there, the dialog only shows the `zeaburctl components export` command. If Zeabur can't read it, the dialog shows both.
+Click **Install** on a component card to open a dialog with the command to run. When the **Add** menu, a template, a build setting or database backups need a missing component, **How to install** opens the same dialog. It lists every component that action is missing, so you can copy the command as is.
 
 </Step>
 <Step>
 
-### Install on the server
+### Print the manifests and apply them
 
-Connect to the server over SSH and choose a method:
-
-<Tabs items={["Installer page", "Config file"]}>
-<Tab value="Installer page">
-
-```sh
-sudo zeabur-installer gui
-```
-
-Open an SSH tunnel from your computer, then open the link the server prints:
-
-```sh
-ssh -L 8085:127.0.0.1:8085 root@server.example.com
-```
-
-Under **Components**, select the components to install. Go to **Review**, review the changes, and click **Install**.
-
-</Tab>
-<Tab value="Config file">
-
-Add the component IDs to `enable` in `/etc/zeabur-installer/config.yaml`. You can add several at once:
-
-```yaml
-enable:
-  - volume-backup/velero
-```
-
-If the component requires values, set `inputs` and `secretFiles` as described in [Installer configuration](../reference/installer-configuration.mdx#component-selection). Review `plan` before running `apply`:
-
-```sh
-sudo zeabur-installer plan
-sudo zeabur-installer apply
-```
-
-</Tab>
-</Tabs>
-
-</Step>
-<Step>
-
-### Check the installation
-
-Return to **Cluster** → **Components**. The component and its version should appear under **Installed**. Then check the feature that uses it. For example, check **Cluster** → **Backups** for Velero or **Cluster** → **Notifications** for VictoriaMetrics.
-
-</Step>
-</Steps>
-
-## Remove components
-
-Click **Remove** on an installed component's card to open a dialog with the commands. Clear its checkbox on the installer page, or remove it from `enable` in the config file. For components installed by default, add them to `disable` instead. Then run `apply`.
-
-`plan` and the installer's **Review** page list the components to remove, what stays, and any CRDs that are deleted along with them. In either of the following cases, `apply` stops without making changes:
-
-- Something still uses the component. For example, custom resources still exist (including objects of CRDs that will also be deleted), Longhorn volumes remain, or replicas still pull images from zot. The installer lists these resources. Delete or move them first.
-- Removing the component also deletes the data it stores, as with Longhorn. Back up the data first, then add the component ID to `allowDataLoss` in the config file or select the consent checkbox under **Review**.
-
-After removal, the component's namespace and volumes remain. Some Charts also delete CRDs and all their objects; other CRDs remain. Once you're sure you no longer need these resources, follow [Installer commands](../reference/installer.mdx#remove-components) to delete them by hand.
-
-zeabur-installer only removes components it installed. If you installed a component with Helm, Flux, or Argo CD, remove it with the same tool.
-
-## Install with your own tools
-
-If you didn't install the cluster with zeabur-installer, or you want to manage components with GitOps, use `zeaburctl components export` to print a component's manifest:
+Use `zeaburctl components export` to print a component's manifest, or to print the Helm command that installs it:
 
 ```sh
 zeaburctl components export volume-backup/velero > velero.yaml
@@ -110,7 +44,15 @@ To install several at once, list all their IDs, for example `zeaburctl component
 
 By default, the command prints a K3s/RKE2 `HelmChart`, which the cluster's built-in helm-controller installs. For other clusters, use `--format` to choose `helm`, `flux`, or `argocd`. Required component values appear as `<name>` placeholders. Replace them with actual values, then apply the manifest with `kubectl apply -f` or commit it to a GitOps repository. For command details, see [zeaburctl](../reference/zeaburctl.mdx#components-export).
 
-Manage later changes and removal through the same files or tools you used to install the component.
+</Step>
+<Step>
+
+### Check the installation
+
+Return to **Cluster** → **Components**. The component and its version should appear under **Installed**. Then check the feature that uses it. For example, check **Cluster** → **Backups** for Velero or **Cluster** → **Notifications** for VictoriaMetrics.
+
+</Step>
+</Steps>
 
 ### Replace built-in K3s/RKE2 components
 
@@ -123,9 +65,15 @@ If the exported manifest starts with instructions to disable a built-in version,
 Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middleware objects. Ingress traffic stops until the replacement component starts. Disabling the built-in metrics-server makes the metrics API unavailable until the new version starts. Schedule the switch for a time when an interruption is acceptable.
 </Callout>
 
+## Remove components
+
+Zeabur doesn't remove components. Remove a component through the same files or tools you used to install it, such as `kubectl delete -f`, `helm uninstall`, Flux, or Argo CD.
+
+Before you remove one, check that nothing still uses it. For example, custom resources may still exist, Longhorn volumes may remain, or replicas may still pull images from zot. Removing a component that stores data, such as Longhorn, also deletes that data, so back it up first.
+
+After removal, the component's namespace and volumes remain. Some charts also delete CRDs and all their objects; other CRDs remain. Delete what remains by hand once you're sure you no longer need it.
+
 ## Common failures
 
 - The components page reports insufficient permissions: Give the cluster administrator the list of missing permissions shown on the page.
-- `apply` reports that a component is still in use: Resolve the listed objects, then run `apply` again.
-- `apply` asks you to set `allowDataLoss`: Back up the component's data first. Only set it once you're sure you want to delete the data.
 - The component still doesn't appear under **Installed** after installation: Check the logs for the `helm-install-<name>` Job in `kube-system` and whether the component's workloads have started.

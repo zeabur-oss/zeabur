@@ -1,6 +1,6 @@
 ---
 title: 新增與維護節點
-description: 用 zeabur-installer 加入新節點，停止排程，用 kubectl 移走副本與移除節點，並在需要時安全地開啟節點終端機。
+description: 加入新節點，停止排程，用 kubectl 移走副本與移除節點，並在需要時安全地開啟節點終端機。
 ---
 
 到**叢集** → **概覽**的**節點**查看每台主機的狀況。要多一台主機執行服務，見[加入節點](#加入節點)。主機要停機維護時，在該節點的操作選單選**停止排程**，需要移走副本時再用 kubectl 的 `drain`。
@@ -9,8 +9,7 @@ description: 用 zeabur-installer 加入新節點，停止排程，用 kubectl �
 
 ## 開始之前
 
-- Zeabur Installer 建立的 K3s 和 RKE2 叢集都能用 `zeabur-installer node add` 加節點。K3s 只能加工作節點；RKE2 可以加工作節點和伺服器，三台伺服器時壞一台控制平面也不會停。其他叢集用原本的安裝工具。
-- 準備一台能用 root 操作的新 VM，以及安裝第一台伺服器時用的同一個 `zeabur-installer` 執行檔。
+- 準備一台能用 root 操作的新 VM。K3s 只能加工作節點；RKE2 可以加工作節點和伺服器，三台伺服器時壞一台控制平面也不會停。
 - 所有節點放在同一家主機服務商的同一個區域，同區域內不同的可用區域沒有問題。跨服務商或跨區域時，延遲會拖慢 etcd、Kubernetes API 和儲存。
 - 停止排程和恢復排程需要修改 Node 的權限。`drain` 和 `delete node` 在 kubectl 終端機執行，用的是你自己的權限。節點終端機要用管理員帳號開啟。
 
@@ -22,70 +21,11 @@ description: 用 zeabur-installer 加入新節點，停止排程，用 kubectl �
 | 所有節點之間 | TCP 10250，UDP 4789（Calico VXLAN） | TCP 10250、9099，UDP 8472（Canal VXLAN） |
 | 伺服器之間 | 不用 | TCP 2379–2381 |
 
-UDP 連接埠只對叢集節點開放，不要對網際網路開放。Installer 的連線檢查測不到 UDP，防火牆擋住 UDP 時，不同節點上的副本會連不到彼此。
+UDP 連接埠只對叢集節點開放，不要對網際網路開放。防火牆擋住 UDP 時，不同節點上的副本會連不到彼此。
 
 ## 加入節點
 
-加入節點的指令都在 `zeabur-installer`，完整選項見 [Installer 指令](../reference/installer.mdx#node-add-與-node-sync)。
-
-<Steps>
-<Step>
-
-### 在現有的伺服器產生加入設定
-
-以 root 登入現有的伺服器，執行：
-
-```sh
-sudo zeabur-installer node add --ttl 1h
-```
-
-指令印出新 VM 要執行的內容：寫入 `/etc/zeabur-installer/config.yaml` 的設定，以及 `plan` 和 `apply`。輸出裡的權杖等同密碼，不要貼到公開的地方。
-
-加入工作節點用會過期的 bootstrap 權杖，`--ttl` 預設 1 小時，最長 24 小時。在 RKE2 要加入伺服器（控制平面），加上 `--role server`，用的是叢集的 server 權杖，不會過期。K3s 只執行一台用 SQLite 的伺服器，所以會拒絕 `--role server`。新 VM 連不到伺服器的內部位址時，用 `--address` 指定新 VM 連得到的位址。
-
-叢集執行 Longhorn 或 zot 鏡像站時，輸出會自動帶上對應的設定。設定檔還寫著 `profile: single-node` 時，輸出會提醒你改成 `multi-node` 並重新 `apply`。
-
-</Step>
-<Step>
-
-### 在新 VM 執行
-
-把安裝第一台伺服器用的 `zeabur-installer` 複製到新 VM，以 root 貼上上一步的輸出。這段指令會寫好設定檔，再執行：
-
-```sh
-zeabur-installer plan
-zeabur-installer apply
-```
-
-`plan` 只列出網路檢查和警告，不改任何東西。有警告時先處理再繼續。`apply` 安裝 K3s agent 或 RKE2，等節點就緒才結束。
-
-</Step>
-<Step>
-
-### 回到伺服器確認
-
-```sh
-sudo zeabur-installer node sync
-# K3s
-sudo k3s kubectl get nodes -o wide
-# RKE2
-sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml get nodes -o wide
-```
-
-`node sync` 把新節點的位址加進 Installer 建立的基準網路政策。新加入的伺服器會自己同步。工作節點加入後，一定要在伺服器手動執行一次，執行之前，網路政策會擋掉新節點的流量。看到新節點 `Ready` 後，撤銷工作節點的權杖，把 `<ID>` 換成 `node add` 輸出最後一行裡的 ID：
-
-```sh
-# K3s
-sudo k3s kubectl -n kube-system delete secret bootstrap-token-<ID>
-# RKE2
-sudo /var/lib/rancher/rke2/bin/kubectl --kubeconfig /etc/rancher/rke2/rke2.yaml \
-  -n kube-system delete secret bootstrap-token-<ID>
-```
-
-已加入的節點不受影響，之後也不能再用這份權杖加入。
-
-</Step>
-</Steps>
+Zeabur 不負責加入節點。照你所用發行版自己的步驟，把新 VM 加進來：K3s 加工作節點，RKE2 加工作節點或伺服器。先開好上面的防火牆連接埠。節點在**節點**清單顯示 `Ready` 後，新的副本就能排到它上面。
 
 RKE2 的 etcd 需要過半數的伺服器才能運作。要在少一台時繼續運作，至少要三台伺服器。只有兩台時，任一台停機整個叢集就會停擺。K3s 叢集只有一台伺服器，這台停機時控制平面也會停止，伺服器回來後才會恢復。
 
@@ -166,28 +106,19 @@ kubectl delete node <node>
 ```sh
 /usr/local/bin/k3s-agent-uninstall.sh   # K3s
 /usr/local/bin/rke2-uninstall.sh        # RKE2
-zeabur-installer uninstall --purge
 ```
 
 **刪除 Kubernetes 節點後，還要完成 VM 上的解除安裝**。在執行解除安裝前，只要 `k3s-agent` 或 RKE2 重新啟動，這台 VM 就會再次加入叢集。
 
 `/var/lib/zeabur/storage` 底下的磁碟區會留在 VM 上。確認不再需要這些資料後，再手動刪除。
 
-如果叢集使用 Longhorn，Longhorn 會替已刪除的節點留著節點資料，`zeabur-installer doctor` 會列出這個節點。節點上還有副本時，Longhorn 不會讓你刪除。請先確認每個磁碟區在其他節點都有健康的副本，再執行：
+如果叢集使用 Longhorn，Longhorn 會替已刪除的節點留著節點資料。節點上還有副本時，Longhorn 不會讓你刪除。請先確認每個磁碟區在其他節點都有健康的副本，再執行：
 
 ```sh
 kubectl -n longhorn-system patch nodes.longhorn.io <node> --type=merge -p '{"spec":{"allowScheduling":false}}'
 for r in $(kubectl -n longhorn-system get replicas.longhorn.io -o jsonpath='{range .items[?(@.spec.nodeID=="<node>")]}{.metadata.name}{"\n"}{end}'); do kubectl -n longhorn-system delete replicas.longhorn.io "$r" --wait=false; done
 kubectl -n longhorn-system delete nodes.longhorn.io <node>
 ```
-
-最後，回到執行 Zeabur Installer 的伺服器，執行：
-
-```sh
-sudo zeabur-installer node sync
-```
-
-這會把已移除節點的位址從基準網路政策中拿掉。
 
 ## 開啟節點終端機
 
@@ -203,13 +134,8 @@ sudo zeabur-installer node sync
 
 ## 常見失敗
 
-- 加入時連不到伺服器：確認新 VM 連得到 `node add` 印出的伺服器位址。K3s 要通 TCP 6443，RKE2 要通 TCP 9345 和 6443，上面表格的其他連接埠也要開。
+- 加入時連不到伺服器：確認新 VM 連得到伺服器的位址。K3s 要通 TCP 6443，RKE2 要通 TCP 9345 和 6443，上面表格的其他連接埠也要開。
 - 新節點已就緒，但不同節點上的服務連不到彼此：檢查 UDP 4789（K3s）或 8472（RKE2），以及網路政策是否已放行新節點。
-- K3s 的 UDP 4789 已開，`apply` 還是卡在 webhook，或節點連不到其他節點上的服務：舊版 zeabur-installer 裝的叢集，節點連同一個子網路裡其他節點的 Pod 時用的是節點自己的位址，會被基本網路政策擋掉。在伺服器上執行下面的指令，改成一律走 VXLAN，幾秒內就會生效：
-
-  ```bash
-  sudo k3s kubectl patch ippools.crd.projectcalico.org default-ipv4-ippool --type merge -p '{"spec":{"vxlanMode":"Always"}}'
-  ```
 - `drain` 一直停著：`drain` 在等 PodDisruptionBudget 放行，或停在不屬於任何控制器的副本上。用 `kubectl get pdb -A` 看哪個預算擋住了，處理後再執行一次。
 - 副本在新節點 `Pending`：副本用的是舊節點的 `local-path` 磁碟區，要等舊節點回來。
 - 終端機副本**無法啟動**：看該副本的事件，常見原因是映像檔下載失敗。

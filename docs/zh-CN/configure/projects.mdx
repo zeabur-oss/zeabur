@@ -32,7 +32,7 @@ description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目�
 
 - Namespace `hello`，带有项目标签和三个 Pod Security 标签，级别均为 `baseline`。服务可以以 root 身份运行，但不能访问宿主机。
 - `default` ServiceAccount 设为 `automountServiceAccountToken: false`，未指定 ServiceAccount 的副本不会获得 Kubernetes API 的令牌。
-- 如果集群中有带 `zeabur.com/platform: "true"` 标签的 Namespace（通过 Zeabur 安装程序安装的集群都有），还会创建 NetworkPolicy `zeabur-project`，阻止其他项目的副本连接进来。
+- 如果集群中有带 `zeabur.com/platform: "true"` 标签的 Namespace，还会创建 NetworkPolicy `zeabur-project`，阻止其他项目的副本连接进来。
 
 ![创建项目 hello 前的确认页面，说明将创建的 Namespace 和安全配置](../images/shots/project-new-review.avif)
 

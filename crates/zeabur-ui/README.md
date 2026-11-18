@@ -8,9 +8,7 @@ Level 1: no workspace dependency. The `ui` feature of the binaries pulls it in w
 `interface` feature, which embeds Zeabur's interface; building with `--no-default-features`
 leaves it out and needs no JavaScript toolchain.
 
-Without `interface`, the crate embeds nothing and needs no `ZEABUR_UI_DIST`: it serves a table
-another crate embeds with [`router_for`] and that crate's own Content Security Policy.
-`zeabur-installer` serves its `gui` page that way.
+Without `interface`, the crate embeds nothing and needs no `ZEABUR_UI_DIST`.
 
 ## Embedding
 

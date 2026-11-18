@@ -27,9 +27,9 @@
 //!   server has added to every namespace since Kubernetes 1.21 [k8s-ns-label]; other namespace
 //!   labels are not read, so a `namespaceSelector` on another label is [`Access::Limited`].
 //! - The ingress controller is Traefik, pods labelled `app.kubernetes.io/name: traefik`, in one of
-//!   two namespaces: `kube-system` (k3s's packaged Traefik [k3s-traefik]) or `traefik`, which
-//!   zeabur-installer labels [`PLATFORM_LABEL`]. The project cannot see which one, so when the two
-//!   give different answers, the ingress controller is [`Access::Limited`].
+//!   two namespaces: `kube-system` (k3s's packaged Traefik [k3s-traefik]) or `traefik`, labelled
+//!   [`PLATFORM_LABEL`]. The project cannot see which one, so when the two give different answers,
+//!   the ingress controller is [`Access::Limited`].
 //! - Cluster DNS runs in `kube-system`, pods labelled `k8s-app: kube-dns`, port 53 [k8s-dns].
 //!
 //! # What is not known
@@ -605,8 +605,8 @@ fn service(policies: &[NetworkPolicy], input: Input<'_>, w: &Workload) -> Servic
                     },
                 )
             };
-            let (k3s, installer) = (from("kube-system", None), from("traefik", Some(true)));
-            if k3s == installer {
+            let (k3s, platform) = (from("kube-system", None), from("traefik", Some(true)));
+            if k3s == platform {
                 k3s
             } else {
                 Access::Limited
@@ -1083,7 +1083,7 @@ fn policy(namespace: &str, name: &str, spec: &Value) -> Value {
 /// - `isolate`: only the project's own pods reach it, and it reaches only the project and cluster
 ///   DNS (port 53, UDP and TCP) — without the DNS rule every name lookup would fail;
 /// - `allow-from-ingress-controller`: Traefik's pods may reach it, in `kube-system` (k3s) or in a
-///   namespace labelled [`PLATFORM_LABEL`] (zeabur-installer);
+///   namespace labelled [`PLATFORM_LABEL`];
 /// - `allow-from-service`, one per other service: that service's pods may reach it.
 ///
 /// Allow rules add to an isolation; on their own they also isolate the service for ingress
@@ -1224,7 +1224,7 @@ mod tests {
     }
 
     #[test]
-    fn the_ingress_preset_admits_traefik_where_k3s_or_zeabur_installer_runs_it() {
+    fn the_ingress_preset_admits_traefik_where_k3s_or_the_platform_runs_it() {
         let workloads = [workload("web", "web")];
         let preset = |kind: &str| {
             let found = presets("shop", &workloads[0], &workloads)

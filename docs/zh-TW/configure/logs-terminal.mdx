@@ -28,7 +28,7 @@ description: 看服務的日誌和 Kubernetes 事件、確認 CPU 和記憶體�
 
 ### 歷史紀錄
 
-**歷史紀錄**列出所有副本寫過的日誌，包含已經替換的副本。這裡讀的是日誌儲存服務，需要叢集管理員在 Zeabur 的 Helm chart 開啟 `proxy.enabled`。預設讀取 VictoriaLogs，位址設在 `proxy.logs.url`。用安裝器裝了 VictoriaLogs 就會自動開啟。叢集沒有 VictoriaLogs 時，把 `proxy.logs.enabled` 設為 false。沒開啟時，畫面寫**還沒有開啟日誌歷史紀錄**。
+**歷史紀錄**列出所有副本寫過的日誌，包含已經替換的副本。這裡讀的是日誌儲存服務，需要叢集管理員在 Zeabur 的 Helm chart 開啟 `proxy.enabled`。預設讀取 VictoriaLogs，位址設在 `proxy.logs.url`。叢集沒有 VictoriaLogs 時，把 `proxy.logs.enabled` 設為 false。沒開啟時，畫面寫**還沒有開啟日誌歷史紀錄**。
 
 ## 看事件
 

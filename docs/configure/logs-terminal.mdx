@@ -28,7 +28,7 @@ When a replica is replaced, its logs disappear from the cluster. Use **History**
 
 ### History
 
-**History** lists logs from all replicas, including those that have been replaced. It reads from a log storage service and requires a cluster administrator to enable `proxy.enabled` in Zeabur's Helm chart. By default, it reads from VictoriaLogs at the address set in `proxy.logs.url`. Installing VictoriaLogs with the installer enables this automatically. If the cluster doesn't have VictoriaLogs, set `proxy.logs.enabled` to false. When log history isn't enabled, the screen shows **Log history isn't turned on**.
+**History** lists logs from all replicas, including those that have been replaced. It reads from a log storage service and requires a cluster administrator to enable `proxy.enabled` in Zeabur's Helm chart. By default, it reads from VictoriaLogs at the address set in `proxy.logs.url`. If the cluster doesn't have VictoriaLogs, set `proxy.logs.enabled` to false. When log history isn't enabled, the screen shows **Log history isn't turned on**.
 
 ## View events
 

@@ -9,7 +9,7 @@
 //! | Endpoint | Reads (as the person) | Needs |
 //! |---|---|---|
 //! | `GET /cluster` | `/version` | nothing: every signed-in person (`system:public-info-viewer`) |
-//! | `GET /cluster/zeabur` | Zeabur's Deployment; zeabur-installer's `HelmChart` in `kube-system` | nothing; without them, how Zeabur was installed is not known |
+//! | `GET /cluster/zeabur` | Zeabur's Deployment | nothing; without them, how Zeabur was installed is not known |
 //! | `GET /cluster/zeabur/update` | nothing in the cluster: GitHub's releases, at most once an hour (see [`update`]) | nothing: every signed-in person |
 //! | `GET /cluster/upgrades` | `/version`; nodes and Plans when allowed | nothing; nodes and Plans add skew and progress |
 //! | `GET /cluster/nodes` | nodes; pods, node metrics and the metrics store when allowed | `list nodes`; `list pods` (all namespaces) for requests; `list nodes.metrics.k8s.io` for usage; `get` on the metrics store's `services/proxy` for disks |
@@ -99,9 +99,6 @@ use crate::views::{
 
 /// The most pods or events a cluster-wide read takes.
 pub(crate) const WIDE_LIMIT: usize = 5_000;
-
-/// The ConfigMap in `kube-system` where zeabur-installer records what it installed.
-const INSTALLER_RECORD: &str = "zeabur-installer";
 
 /// The distribution a kube-apiserver version names (`v1.36.5+k3s1`), as the API names it.
 fn distribution(version: &str) -> Option<String> {
@@ -225,20 +222,9 @@ pub(crate) async fn capabilities(
     }
     let mut capabilities = zeabur_catalog::detect(&state.catalogue, &facts);
     capabilities.sort_by(|a, b| a.name.cmp(&b.name));
-    // Read as the person; whoever may not read it, or any failed read, leaves it unknown.
-    let installer = cluster
-        .find_object(
-            &zeabur_kube::ResourceRef::new("", "v1", "configmaps", "ConfigMap"),
-            Some("kube-system"),
-            INSTALLER_RECORD,
-        )
-        .await
-        .ok()
-        .map(|found| found.is_some());
     Ok(Json(CapabilityList {
         catalogue_commit: zeabur_catalog::CATALOGUE_COMMIT.to_owned(),
         items: capabilities,
-        installer,
     }))
 }
 

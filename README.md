@@ -36,13 +36,13 @@ configuring and operating the cluster, and leaving Zeabur, in English,
 
 ## Get started
 
-- **One Linux server**: the installer sets up K3s (or RKE2), Zeabur Identity and Zeabur.
-  [Install on a single server](https://oss.zeabur.com/docs/zeabur/get-started/quickstart/)
 - **An existing Kubernetes cluster**: install the Helm chart, with sign-in through Zeabur Identity.
   [Install in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/)
 - **Just you, with your kubeconfig**: `zeaburctl ui` opens Zeabur in your browser on your own
-  computer. [Personal use](https://oss.zeabur.com/docs/zeabur/install/personal/) and
-  [zeaburctl](https://oss.zeabur.com/docs/zeabur/reference/zeaburctl/)
+  computer. [zeaburctl](https://oss.zeabur.com/docs/zeabur/reference/zeaburctl/)
+- **A bare Linux server**: not yet. [Zeatend](https://github.com/zeabur-oss/zeatend) will set up
+  Kubernetes there, and one command will install Zeabur
+  ([#430](https://github.com/zeabur-oss/zeabur/issues/430)).
 
 [Releases](https://oss.zeabur.com/docs/zeabur/reference/releases/) lists what a release contains
 and how to verify it.

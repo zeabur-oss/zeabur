@@ -235,8 +235,6 @@ export const en = {
   "update.current": (version: string) => `You have v${version}.`,
   "update.upToDate": "Up to date",
   "update.download": "Download",
-  "update.how.installer":
-    "Download the new zeabur-installer, then run plan and apply with the same configuration.",
   "update.how.helm": "Run helm upgrade with the new chart version.",
   "update.how.argoCd": "Change the chart version in your Argo CD Application.",
   "update.how.flux": "Change the chart version in your Flux HelmRelease.",
@@ -346,13 +344,11 @@ export const en = {
   "node.reservedMemory": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: memory ${share} reserved` : `${n} nodes have almost all memory reserved`,
   "node.reservedMemory.why": "New replicas that ask for memory may wait for room.",
-  "node.reservedMemory.fix":
-    "Lower the memory requests of the services there, or add a node. On a cluster installed with Zeabur Installer, run sudo zeabur-installer node add on the server.",
+  "node.reservedMemory.fix": "Lower the memory requests of the services there, or add a node.",
   "node.reservedCpu": (n: number, node: string, share: string) =>
     n === 1 ? `${node}: CPU ${share} reserved` : `${n} nodes have almost all CPU reserved`,
   "node.reservedCpu.why": "New replicas that ask for CPU may wait for room.",
-  "node.reservedCpu.fix":
-    "Lower the CPU requests of the services there, or add a node. On a cluster installed with Zeabur Installer, run sudo zeabur-installer node add on the server.",
+  "node.reservedCpu.fix": "Lower the CPU requests of the services there, or add a node.",
   "unreachable.title": (name: string) => `Cannot reach ${name}`,
   "unreachable.zeabur": "Zeabur does not respond",
   "unreachable.lastHeard": "Last answered",
@@ -1194,25 +1190,9 @@ export const en = {
   "installer.how": "How to install",
   "installer.installTitle": (names: string) => `Install ${names}`,
   "installer.removeTitle": (name: string) => `Remove ${name}`,
-  "installer.intro":
-    "zeabur-installer installs and removes components. Run it on the server it installed the cluster on.",
-  "installer.gui": (names: string) =>
-    `Open the installer's page, tick ${names} under Components, and install:`,
-  "installer.guiRemove": (name: string) =>
-    `Open the installer's page, untick ${name} under Components, and install:`,
-  "installer.guiReach":
-    "The page listens on 127.0.0.1:8085 on the server. Reach it with ssh -L 8085:127.0.0.1:8085.",
-  "installer.config": (path: string, many: boolean) =>
-    `Or add ${many ? "them" : "it"} to enable in ${path}, then apply:`,
-  "installer.configRemove": (path: string) =>
-    `Or take it out of enable in ${path} (for a component installed by default, add it to disable), then apply:`,
-  "installer.stays":
-    "Its namespace and volumes stay. Some charts also delete their CRDs and all their objects; the installer's review lists them. The installer docs say how to delete what stays.",
   "installer.elsewhere": "If Helm, K3s or a GitOps tool installed it, remove it with that tool.",
-  "installer.otherCluster":
-    "For a cluster that zeabur-installer didn't install, print the manifests. Apply them with kubectl, or commit them to your GitOps repository. Add --format helm for Helm commands.",
-  "installer.notHere":
-    "zeabur-installer didn't set up this cluster. Print the manifests, then apply them with kubectl or commit them to your GitOps repository. Add --format helm for Helm commands.",
+  "installer.export":
+    "Print the manifests, then apply them with kubectl or commit them to your GitOps repository. Add --format helm for Helm commands.",
   "settings.homepage": "Home page",
   "settings.opensInNewTab": "(opens in a new tab)",
   "category.traffic": "Traffic",

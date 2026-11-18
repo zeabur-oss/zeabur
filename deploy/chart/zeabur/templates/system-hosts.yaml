@@ -1,14 +1,15 @@
+{{- if .Values.systemHosts.enabled }}
 # Only the system namespace that serves a domain can use that domain. Each route outside the
 # system namespaces must name a domain: Traefik serves a rule without a host on all domains, and a
 # longer path or `router.priority` puts it before Zeabur's rule. Each binding names one system
-# namespace. Its Ingresses are the parameters, so this file does not change when a domain changes.
+# namespace. Its Ingresses are the parameters, so nothing here changes when a domain changes.
 # A wildcard covers all names below it, because Traefik and Gateway API match more than one label.
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicy
 metadata:
   name: zeabur-system-hosts
   labels:
-    app.kubernetes.io/managed-by: zeabur-installer
+    {{- include "zeabur.labels" . | nindent 4 }}
 spec:
   failurePolicy: Fail
   paramKind:
@@ -71,31 +72,20 @@ spec:
       messageExpression: >-
         'The ' + params.metadata.namespace + ' namespace serves this domain, so no other
         namespace can use it or a wildcard that covers it. Choose another domain.'
+{{- range uniq (prepend .Values.systemHosts.namespaces .Release.Namespace) }}
 ---
 apiVersion: admissionregistration.k8s.io/v1
 kind: ValidatingAdmissionPolicyBinding
 metadata:
-  name: zeabur-system-hosts-zeabur
+  name: zeabur-system-hosts-{{ . }}
   labels:
-    app.kubernetes.io/managed-by: zeabur-installer
+    {{- include "zeabur.labels" $ | nindent 4 }}
 spec:
   policyName: zeabur-system-hosts
   validationActions: [Deny]
   paramRef:
-    namespace: zeabur
+    namespace: {{ . }}
     selector: {}
     parameterNotFoundAction: Allow
----
-apiVersion: admissionregistration.k8s.io/v1
-kind: ValidatingAdmissionPolicyBinding
-metadata:
-  name: zeabur-system-hosts-zeabur-identity
-  labels:
-    app.kubernetes.io/managed-by: zeabur-installer
-spec:
-  policyName: zeabur-system-hosts
-  validationActions: [Deny]
-  paramRef:
-    namespace: zeabur-identity
-    selector: {}
-    parameterNotFoundAction: Allow
+{{- end }}
+{{- end }}

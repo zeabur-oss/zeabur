@@ -92,7 +92,7 @@ To restore a default, delete its key:
 kubectl -n zeabur patch configmap zeabur-settings --type json -p '[{"op":"remove","path":"/data/cluster-name"}]'
 ```
 
-The installation values come from the Chart's `clusterName`, `metricsStore.service`, and `domains.suffixes`. When you install with zeabur-installer, the domains come from `suffixes` in the config file. See [Installer configuration](../reference/installer-configuration.mdx).
+The installation values come from the Chart's `clusterName`, `metricsStore.service`, and `domains.suffixes`.
 
 ## Verify the changes
 

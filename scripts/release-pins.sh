@@ -1,9 +1,8 @@
 #!/usr/bin/env bash
-# Prints the catalog and Zeabur Identity pins of the installer as ZEABUR_PIN_*=<value> lines.
+# Checks that the Zeabur Catalog bundle this build embeds is the one the catalog's release at the
+# pinned commit signed (flake.lock), and prints that release's tag.
 #
 #   scripts/release-pins.sh <vX.Y.Z>
-#
-# Every value comes from a SHA256SUMS that cosign has verified.
 set -euo pipefail
 
 version=${1:?usage: release-pins.sh <vX.Y.Z>}
@@ -68,38 +67,8 @@ check_listed() {
 }
 
 catalog=$(pin_tag catalog "${ZEABUR_CATALOG_COMMIT:?run inside nix develop}")
-identity=$(pin_tag identity "$(<"$root/ZEABUR_IDENTITY_PINNED")")
-
-# The catalog that this build embeds must be the released one.
 download_sums catalog "$catalog"
 for file in "${ZEABUR_CATALOG_RELEASE:?run inside nix develop}"/*; do
   check_listed catalog "$file" "$(basename "$file")"
 done
-catalog_sha256=$(listed catalog index.json)
-
-download_sums identity "$identity"
-
-download identity "$identity" digests.txt
-check_listed identity "$work/identity/digests.txt" digests.txt
-identity_image=$(awk 'NF == 2 && $1 == "index" { print $2 }' "$work/identity/digests.txt")
-if [[ ! "$identity_image" =~ ^ghcr\.io/zeabur-oss/identity@sha256:[0-9a-f]{64}$ ]]; then
-  fail "digests.txt of Zeabur Identity names '$identity_image' as its index"
-fi
-
-download identity "$identity" resources.json
-check_listed identity "$work/identity/resources.json" resources.json
-request_memory=$(jq -r .requestMemoryMiB "$work/identity/resources.json")
-if [[ ! "$request_memory" =~ ^[1-9][0-9]{0,8}$ ]]; then
-  fail "resources.json gives $request_memory as requestMemoryMiB"
-fi
-
-identityctl_amd64=$(listed identity "zeabur-identityctl-$identity-linux-amd64.tar.gz")
-identityctl_arm64=$(listed identity "zeabur-identityctl-$identity-linux-arm64.tar.gz")
-
-echo "ZEABUR_PIN_CATALOG_VERSION=$catalog"
-echo "ZEABUR_PIN_CATALOG_SHA256=$catalog_sha256"
-echo "ZEABUR_PIN_IDENTITY_VERSION=$identity"
-echo "ZEABUR_PIN_IDENTITY_IMAGE=$identity_image"
-echo "ZEABUR_PIN_IDENTITYCTL_AMD64_SHA256=$identityctl_amd64"
-echo "ZEABUR_PIN_IDENTITYCTL_ARM64_SHA256=$identityctl_arm64"
-echo "ZEABUR_PIN_IDENTITY_REQUEST_MEMORY_MIB=$request_memory"
+echo "Zeabur Catalog $catalog"

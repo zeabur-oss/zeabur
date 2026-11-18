@@ -1,6 +1,6 @@
 //! With the `interface` feature, generates the table of Zeabur's web-interface files from
 //! `ZEABUR_UI_DIST`, which `scripts/build-ui.sh` fills ([`zeabur_embed`]). Without it, the crate
-//! only serves a table another crate embeds, and needs no `ZEABUR_UI_DIST`.
+//! embeds nothing and needs no `ZEABUR_UI_DIST`.
 
 use proc_macro2::TokenStream;
 use quote::quote;

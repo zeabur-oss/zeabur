@@ -6,9 +6,7 @@ use axum::extract::State;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
 use zeabur_model::Tool;
-use zeabur_model::adapters::provenance::{
-    HELM_RELEASE_NAME_ANNOTATION, MANAGED_BY_LABEL, detect_tool,
-};
+use zeabur_model::adapters::provenance::detect_tool;
 
 use crate::error::ApiError;
 use crate::extract::Json;
@@ -16,13 +14,9 @@ use crate::handlers::{AppState, Person};
 use crate::settings::Settings;
 use crate::views::{InstallMethod, ZeaburVersion};
 
-/// The `app.kubernetes.io/managed-by` value on zeabur-installer's `HelmChart` objects.
-const INSTALLER: &str = "zeabur-installer";
-
-/// Zeabur's version, whether the interface checks for a newer one, and how Zeabur was installed:
-/// from its Deployment's marks (Helm, Argo CD, Flux) and, for a Helm release, zeabur-installer's
-/// `HelmChart` of that name in `kube-system`. Both are read as the person; a refused read leaves
-/// `installedBy` out.
+/// Zeabur's version, whether the interface checks for a newer one, and how Zeabur was installed,
+/// from its Deployment's marks (Helm, Argo CD, Flux). The Deployment is read as the person; a
+/// refused read leaves `installedBy` out.
 #[utoipa::path(get, path = "/api/v1/cluster/zeabur", tag = "cluster", operation_id = "getZeabur",
     responses((status = 200, body = ZeaburVersion), (status = 401, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
@@ -48,39 +42,9 @@ async fn installed_by(cluster: &dyn Cluster, settings: &Settings) -> Option<Inst
         )
         .await
         .ok()??;
-    match detect_tool(&deployment.metadata)? {
-        Tool::ArgoCd => Some(InstallMethod::ArgoCd),
-        Tool::Flux => Some(InstallMethod::Flux),
-        Tool::Helm => {
-            let release = deployment
-                .metadata
-                .annotations
-                .as_ref()
-                .and_then(|a| a.get(HELM_RELEASE_NAME_ANNOTATION));
-            let Some(release) = release else {
-                return Some(InstallMethod::Helm);
-            };
-            let chart = cluster
-                .find_object(
-                    &ResourceRef::new("helm.cattle.io", "v1", "helmcharts", "HelmChart"),
-                    Some("kube-system"),
-                    release,
-                )
-                .await
-                .ok()?;
-            let by_installer = chart.is_some_and(|chart| {
-                chart
-                    .metadata
-                    .labels
-                    .as_ref()
-                    .and_then(|l| l.get(MANAGED_BY_LABEL))
-                    .is_some_and(|v| v == INSTALLER)
-            });
-            Some(if by_installer {
-                InstallMethod::Installer
-            } else {
-                InstallMethod::Helm
-            })
-        }
-    }
+    Some(match detect_tool(&deployment.metadata)? {
+        Tool::ArgoCd => InstallMethod::ArgoCd,
+        Tool::Flux => InstallMethod::Flux,
+        Tool::Helm => InstallMethod::Helm,
+    })
 }

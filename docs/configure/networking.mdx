@@ -11,7 +11,7 @@ The service's **Networking** tab covers three things: **Private network** lists 
 
 - You need permission to modify services in the project. For services managed by Helm, Argo CD, or Flux, use that tool to expose ports or add rules instead.
 - Connection rules depend on the cluster's network plugin (CNI) to enforce them. K3s's built-in controller supports them. If the plugin doesn't, you can still create rules, but they block nothing.
-- Exposing ports requires a load balancer. K3s's built-in ServiceLB and the RKE2 setup installed by the Zeabur installer both include one.
+- Exposing ports requires a load balancer, such as K3s's built-in ServiceLB.
 
 ## Connect to other services with private addresses
 
@@ -208,7 +208,7 @@ spec:
               app.kubernetes.io/name: web
 ```
 
-**Allow traffic from public domains**. The rule allows Traefik from two locations: K3s's built-in Traefik in `kube-system` and Traefik installed by the Zeabur installer in a namespace labeled `zeabur.com/platform: "true"`:
+**Allow traffic from public domains**. The rule allows Traefik from two locations: K3s's built-in Traefik in `kube-system` and Traefik in a namespace labeled `zeabur.com/platform: "true"`:
 
 ```yaml
 apiVersion: networking.k8s.io/v1

@@ -58,7 +58,7 @@ The chart doesn't bind roles to anyone. When an admin invites or updates a membe
 | `ClusterRoleBinding zeabur-member-<username>` | Binds `zeabur-member` to `zeabur:<username>` |
 | `RoleBinding zeabur-member-<username>` in each project | Binds the project's developer or viewer role to the same user |
 
-These bindings have the labels `zeabur.com/member: <username>` and `app.kubernetes.io/managed-by: zeabur`. `zeabur-installer uninstall` deletes them too. If you remove Zeabur with `helm uninstall`, you must delete them yourself. See [Permissions after uninstalling](../leave/uninstall.mdx#member-permissions-and-admission-policies).
+These bindings have the labels `zeabur.com/member: <username>` and `app.kubernetes.io/managed-by: zeabur`. If you remove Zeabur with `helm uninstall`, you must delete them yourself. See [Permissions after uninstalling](../leave/uninstall.mdx#member-permissions-and-admission-policies).
 
 When `memberRoles.enabled` is off, the chart doesn't create these roles or the namespace policy. When inviting a member, the only role choice is whether to make them an **Admin**.
 
@@ -114,7 +114,7 @@ When a regular account lacks permissions, the interface says more permissions ar
 
 After a member becomes an **Admin**, they can only sign in with a passkey. Existing GitHub or Google sessions end the next time they refresh their tokens.
 
-The first admin comes from the setup link generated during installation (`zeabur-installer setup-link`). You can also invite admins or change an existing account's type from the command line:
+The first admin registers through a Zeabur Identity setup link. You can also invite admins or change an existing account's type from the command line:
 
 ```sh
 zeabur-identityctl invite --username alice --admin
@@ -163,7 +163,7 @@ If the config file or a key is missing, Zeabur Identity uses the default.
 
 With AAL3 enabled, admin accounts can only use passkeys that don't sync to other devices, such as security keys or passkeys stored on a single device. Zeabur Identity rejects synced passkeys stored in services such as iCloud Keychain or Google Password Manager at sign-in. The interface explains that the passkey syncs and that admin accounts require a security key or a passkey stored on a single device. Anyone already signed in with a synced passkey is signed out at the next token refresh.
 
-Before enabling AAL3, make sure every admin has a device-bound passkey. Zeabur won't let you enable it until you have one yourself, so you can't lock yourself out. Other admins without one won't be able to sign in after you enable it. Use `sudo zeabur-installer setup-link --username <admin> --reset` to generate a new link so they can register a security key. For steps to check each passkey, see [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins) in the Zeabur Identity docs.
+Before enabling AAL3, make sure every admin has a device-bound passkey. Zeabur won't let you enable it until you have one yourself, so you can't lock yourself out. Other admins without one won't be able to sign in after you enable it. Generate a new Zeabur Identity setup link for each of them so they can register a security key. For steps to check each passkey, see [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins) in the Zeabur Identity docs.
 
 ## Using kubectl
 

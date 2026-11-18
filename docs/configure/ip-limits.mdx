@@ -41,7 +41,7 @@ To remove the restriction, return to the same panel and turn off the setting. Ea
 
 By default, Traefik checks the connection's source address. If the cluster's entry point changes that address, Traefik never sees the visitor's IP. The restriction may then block everyone or allow everyone.
 
-- For Traefik installed with the Zeabur installer, the Service's `externalTrafficPolicy` is `Local`. Requests sent to a node running Traefik retain the visitor's address. This setting comes from the Traefik template in Zeabur Catalog. Whether the address is preserved when ServiceLB forwards requests from other nodes hasn't been verified.
+- For Traefik installed from Zeabur Catalog, the Service's `externalTrafficPolicy` is `Local`. Requests sent to a node running Traefik retain the visitor's address. This setting comes from the Traefik template in Zeabur Catalog. Whether the address is preserved when ServiceLB forwards requests from other nodes hasn't been verified.
 - If a CDN, reverse proxy, or cloud load balancer sits in front of Traefik, Traefik sees its address. In that case, configure `ipStrategy` on the Middleware to read `X-Forwarded-For`, and configure Traefik's entry point to trust that proxy's addresses (`forwardedHeaders.trustedIPs`). Zeabur doesn't change these settings for you.
 - When you update the list later, Zeabur changes only `sourceRange`. It preserves any `ipStrategy` you've added to the Middleware.
 

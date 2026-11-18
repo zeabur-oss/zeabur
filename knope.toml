@@ -12,9 +12,6 @@ versioned_files = [
   { path = "Cargo.lock", dependency = "zeabur-gaps" },
   { path = "Cargo.lock", dependency = "zeabur-graph" },
   { path = "Cargo.lock", dependency = "zeabur-http" },
-  { path = "Cargo.lock", dependency = "zeabur-installer" },
-  { path = "Cargo.lock", dependency = "zeabur-installer-host" },
-  { path = "Cargo.lock", dependency = "zeabur-installer-plan" },
   { path = "Cargo.lock", dependency = "zeabur-kube" },
   { path = "Cargo.lock", dependency = "zeabur-local" },
   { path = "Cargo.lock", dependency = "zeabur-model" },
@@ -34,7 +31,6 @@ versioned_files = [
   { path = "desktop/Cargo.lock", dependency = "zeabur-gaps" },
   { path = "desktop/Cargo.lock", dependency = "zeabur-graph" },
   { path = "desktop/Cargo.lock", dependency = "zeabur-http" },
-  { path = "desktop/Cargo.lock", dependency = "zeabur-installer-plan" },
   { path = "desktop/Cargo.lock", dependency = "zeabur-kube" },
   { path = "desktop/Cargo.lock", dependency = "zeabur-local" },
   { path = "desktop/Cargo.lock", dependency = "zeabur-model" },
@@ -44,7 +40,6 @@ versioned_files = [
   { path = "desktop/Cargo.lock", dependency = "zeabur-ui" },
   { path = "deploy/chart/zeabur/Chart.yaml", regex = '(?m)^version: (?<version>\S+)$' },
   "web/package.json",
-  "crates/zeabur-installer/web/package.json",
 ]
 changelog = "CHANGELOG.md"
 # The update check looks for ### Security in the release notes (docs/reference/telemetry.mdx).

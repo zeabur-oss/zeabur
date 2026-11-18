@@ -58,7 +58,7 @@ Chart 本身不綁定任何人。管理員在 Zeabur 邀請或變更成員時，
 | `ClusterRoleBinding zeabur-member-<username>` | 綁定 `zeabur-member` 給 `zeabur:<username>` |
 | 各專案中的 `RoleBinding zeabur-member-<username>` | 綁定該專案的 developer 或 viewer 角色給同一位使用者 |
 
-這些 binding 帶 `zeabur.com/member: <username>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。`zeabur-installer uninstall` 會一起刪掉這些 binding。用 `helm uninstall` 移除時要自己刪，見[移除後的權限](../leave/uninstall.mdx#成員權限與准入政策)。
+這些 binding 帶 `zeabur.com/member: <username>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。用 `helm uninstall` 移除時要自己刪，見[移除後的權限](../leave/uninstall.mdx#成員權限與准入政策)。
 
 關閉 `memberRoles.enabled` 時，chart 不建立這些角色和 Namespace 政策，邀請成員時只能選要不要給**管理員**。
 
@@ -114,7 +114,7 @@ Zeabur Identity 的帳號分成兩種。在**成員**把某人設為**管理員*
 
 把成員設為**管理員**後，他之後只能用通行密鑰登入，原本用 GitHub 或 Google 登入的工作階段會在下次換權杖時結束。
 
-第一位管理員來自安裝時的設定連結（`zeabur-installer setup-link`）。在命令列也能邀請管理員，或改變既有帳號的類型：
+第一位管理員透過 Zeabur Identity 的設定連結註冊。在命令列也能邀請管理員，或改變既有帳號的類型：
 
 ```sh
 zeabur-identityctl invite --username alice --admin
@@ -163,7 +163,7 @@ kubectl -n zeabur-identity patch configmap zeabur-identity-settings --type merge
 
 開啟 AAL3 後，管理員帳號只能用不會同步到其他裝置的通行密鑰，例如安全金鑰，或只存在一台裝置上的通行密鑰。存在 iCloud 鑰匙圈、Google 密碼管理工具這類會同步的通行密鑰，登入時 Zeabur Identity 會拒絕，畫面會直接說這把通行密鑰會同步、管理員帳號要用安全金鑰或只存在一台裝置上的通行密鑰。已經用會同步的通行密鑰登入的人，下次換權杖時就會登出。
 
-開啟前，先確認每位管理員都有不會同步的通行密鑰。你自己沒有時，Zeabur 不會讓你開啟，避免把自己鎖在外面。其他沒有的管理員開啟後就登不進來，要用 `sudo zeabur-installer setup-link --username <管理員> --reset` 產生新連結，讓他註冊安全金鑰。檢查每把通行密鑰的方式見 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
+開啟前，先確認每位管理員都有不會同步的通行密鑰。你自己沒有時，Zeabur 不會讓你開啟，避免把自己鎖在外面。其他沒有的管理員開啟後就登不進來，要為他們各產生一條新的 Zeabur Identity 設定連結，讓他註冊安全金鑰。檢查每把通行密鑰的方式見 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
 
 ## 用 kubectl 操作
 

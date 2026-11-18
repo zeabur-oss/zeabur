@@ -10,7 +10,7 @@
 export const locales = { en: "en-US", "zh-TW": "zh-TW", "zh-CN": "zh-CN" }
 export type Locale = keyof typeof locales
 export type Theme = "light" | "dark"
-export type App = "zeabur" | "installer" | "desktop"
+export type App = "zeabur" | "desktop"
 
 type Set = {
   out?: string
@@ -33,7 +33,7 @@ export const sets: Record<string, Set> = {
     clean: true,
     locales: ["en", "zh-TW", "zh-CN"],
     themes: ["light"],
-    apps: ["zeabur", "installer"],
+    apps: ["zeabur"],
   },
   // The README: English, one pixel per CSS pixel, at most 30 KB each.
   readme: {

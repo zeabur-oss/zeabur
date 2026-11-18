@@ -11,14 +11,13 @@ Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/relea
 |---|---|---|
 | `zeaburctl` | `zeaburctl-v<version>-<os>-<arch>.tar.gz` | Linux `amd64` and `arm64`, macOS `arm64` |
 | `zeabur` server | `zeabur-v<version>-linux-<arch>.tar.gz` | Linux `amd64` and `arm64` |
-| `zeabur-installer` | `zeabur-installer-v<version>-linux-<arch>.tar.gz` | Linux `amd64` and `arm64` |
 | Multi-platform container image | `ghcr.io/zeabur-oss/zeabur:<version>` | Linux `amd64` and `arm64` |
 | Zeabur Proxy's container image | `ghcr.io/zeabur-oss/proxy:<version>` | Linux `amd64` and `arm64` |
 | Helm chart | `oci://ghcr.io/zeabur-oss/charts/zeabur`; also available as `zeabur-<version>.tgz` | Install on a Kubernetes cluster |
 | Artifact digests | `digests.txt` | Each image's index and platform images, and the chart |
 | File checksums and signature | `SHA256SUMS`, `SHA256SUMS.sigstore.json` | Assets from the same release |
 
-Every archive holds the binary and `LICENSE`. macOS builds are for Apple silicon (`arm64`) only; there's no Intel Mac build. `zeabur` and the installer run only on Linux. On macOS, you only need `zeaburctl`. On Windows, run the Linux `zeaburctl` in WSL.
+Every archive holds the binary and `LICENSE`. macOS builds are for Apple silicon (`arm64`) only; there's no Intel Mac build. `zeabur` runs only on Linux. On macOS, you only need `zeaburctl`. On Windows, run the Linux `zeaburctl` in WSL.
 
 At release time, the workflow pins the chart's `image.digest` and `proxy.image.digest` to that release's image indexes. Installing with the chart's defaults gives you the same images. Image tags and chart versions have no leading `v`; GitHub release tags and archive filenames do.
 
@@ -39,7 +38,7 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
   --pattern "$binary-v$version-$platform.tar.gz"
 ```
 
-You can set `platform` to `linux-amd64` or `linux-arm64`. To download the installer, set `binary` to `zeabur-installer` and choose a Linux platform.
+You can set `platform` to `linux-amd64` or `linux-arm64`.
 
 This repository's release workflow, `.github/workflows/release.yml`, builds and signs every release, so that workflow is the signer (`signer` below). Releases up to v0.2.0 were signed by the shared release workflow in [zeabur-oss/.github](https://github.com/zeabur-oss/.github), so `signer` accepts that one too. The certificate also names the repository and tag it ran for. Open the download directory, then verify the checksum list's signer, the file contents, and the build provenance in that order:
 

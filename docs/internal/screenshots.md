@@ -30,7 +30,7 @@ GitHub and the website both follow; from `docs/zh-TW/deploy/databases.mdx`:
 nix develop -c scripts/docs-shots.sh                  # docs into docs/[<locale>/]images/shots
 nix develop -c scripts/docs-shots.sh readme           # into docs/images
 nix develop -c scripts/docs-shots.sh cover ../design-system/covers/zeabur
-nix develop -c scripts/docs-shots.sh docs target/try -- -g installer   # some of them, elsewhere
+nix develop -c scripts/docs-shots.sh docs target/try -- -g <title>   # some of them, elsewhere
 ```
 
 The script builds the web interface and the demo (`crates/zeabur-api/examples/demo.rs`), runs the
@@ -74,12 +74,12 @@ The demo a shot runs on is set with `test.use`, in a `test.describe` around the 
 
 ```ts
 test.describe(() => {
-  test.use({ app: "installer", demo: { ZEABUR_DEMO_INSTALL: "done" } })
+  test.use({ demo: { ZEABUR_DEMO_VELERO: "none" } })
   // …
 })
 ```
 
-- `app`: `zeabur` (default), `installer` or `desktop`.
+- `app`: `zeabur` (default) or `desktop`.
 - `demo`: the demo's `ZEABUR_DEMO_*` variables, listed at the top of
   `crates/zeabur-api/examples/demo.rs`. The shots with the same `app` and `demo` share a server in
   each Playwright worker.
@@ -89,10 +89,6 @@ test.describe(() => {
 A shot ends where its content does. The window grows or shrinks to the height of the page, or of
 `clip` when it is a scroll area such as `main`, so the image shows all of it and no empty space
 below. To stop higher, at the end of a section, name that section in `until`.
-
-With `app: "installer"` the shots use the installer's pages, served by `vite preview` with the
-captured responses in `crates/zeabur-installer/web/scripts/dev-api.ts`. `ZEABUR_DEMO_INSTALL` shows
-the install as `running`, `done` or `fail` at once.
 
 ## Same input, same pixels
 

@@ -6187,7 +6187,6 @@ dependencies = [
  "tar",
  "thiserror 2.0.21",
  "utoipa",
- "zeabur-installer-plan",
  "zeabur-kube",
 ]
 
@@ -6272,17 +6271,6 @@ dependencies = [
  "tokio",
  "tokio-rustls",
  "tower",
-]
-
-[[package]]
-name = "zeabur-installer-plan"
-version = "0.2.0"
-dependencies = [
- "semver",
- "serde",
- "serde-saphyr",
- "serde_json",
- "thiserror 2.0.21",
 ]
 
 [[package]]

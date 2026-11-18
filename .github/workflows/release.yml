@@ -2,10 +2,9 @@ name: Release
 
 # Tag vX.Y.Z or vX.Y.Z-<pre-release> on main: build and smoke the server and zeaburctl on every
 # platform and package Zeabur Desktop, then push the images and the chart by digest, sign and
-# attest them, build the installers that pin them, add every file to the draft release that the
-# Release pull request workflow left when it tagged, and verify the draft. A maintainer publishes
-# the draft (docs/internal/releasing.md). Manual run: rehearse, which builds and smokes every
-# platform and publishes nothing.
+# attest them, add every file to the draft release that the Release pull request workflow left when
+# it tagged, and verify the draft. A maintainer publishes the draft (docs/internal/releasing.md).
+# Manual run: rehearse, which builds and smokes every platform and publishes nothing.
 #
 # Zeabur's own steps are scripts/release-*.sh; the rest calls zeabur-oss-release directly. Zeabur
 # Desktop's packages build outside Nix with scripts/package-desktop.sh.
@@ -62,8 +61,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # zeaburctl for macOS on Apple silicon; the server, its image and the installer are Linux
-        # only. Each build is native.
+        # zeaburctl for macOS on Apple silicon; the server and its image are Linux only. Each build
+        # is native.
         include:
           - { os: linux, arch: amd64, runner: ubuntu-26.04 }
           - { os: linux, arch: arm64, runner: ubuntu-26.04-arm }
@@ -91,10 +90,9 @@ jobs:
           CI_ARTIFACTS: ${{ runner.temp }}/ci-artifacts
         run: |
           # A tag's binaries embed the catalog bundle, which must be the one the catalog's release
-          # signed, and its installer installs the pinned Zeabur Identity release: both pins must
-          # resolve before anything is built. A rehearsal builds whatever the pins name.
+          # signed. A rehearsal builds whatever the pin names.
           if [[ "$GITHUB_EVENT_NAME" == push ]]; then
-            scripts/release-pins.sh "$VERSION" >/dev/null
+            scripts/release-pins.sh "$VERSION"
           fi
           scripts/release-build.sh "$VERSION" "$ARCH" dist
           if [[ "$OS" == linux ]]; then
@@ -102,11 +100,6 @@ jobs:
             # Zeabur Identity at ZEABUR_IDENTITY_PINNED.
             scripts/release-smoke.sh "dist/zeaburctl-$VERSION-linux-$ARCH.tar.gz" \
               deploy/chart/zeabur "zeabur:release-$ARCH"
-            # A rehearsal publishes nothing, so finish never runs: a development installer, without
-            # pins, shows that it builds. It is not kept.
-            if [[ "$GITHUB_EVENT_NAME" != push ]]; then
-              scripts/release-build.sh "$VERSION" "$ARCH" "$RUNNER_TEMP/installer" installer
-            fi
           fi
           ls -l dist
       # A step of its own, so the build never sees the secrets. Without them the build stays as it
@@ -353,11 +346,6 @@ jobs:
             --set issuer.clientSecret.existingSecret=zeabur-oidc
           helm package chart --destination published
           release push-chart --out published "oci://ghcr.io/$owner/charts" "published/zeabur-$plain.tgz"
-          # What the installer pins (finish).
-          {
-            echo "ZEABUR_PIN_ZEABUR_IMAGE=$zeabur"
-            echo "ZEABUR_PIN_ZEABUR_CHART_SHA256=$(sha256sum "published/zeabur-$plain.tgz" | cut -d' ' -f1)"
-          } >published/outputs.env
           cat published/subjects.json published/digests.txt
           echo "subjects=$(jq -c . published/subjects.json)" >> "$GITHUB_OUTPUT"
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
@@ -386,55 +374,11 @@ jobs:
           subject-name: ${{ matrix.name }}
           subject-digest: ${{ matrix.digest }}
 
-  # The installers pin the image and the chart that publish pushed; they run on Linux servers.
-  finish:
-    name: finish (linux-${{ matrix.arch }})
-    needs: publish
-    strategy:
-      fail-fast: false
-      matrix:
-        include:
-          - { arch: amd64, runner: ubuntu-26.04 }
-          - { arch: arm64, runner: ubuntu-26.04-arm }
-    runs-on: ${{ matrix.runner }}
-    timeout-minutes: 30
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-        with:
-          persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@01d7c04f44028272077eaf4ab97f4de5257aad65 # main
-      - name: Install the packages
-        run: bun install --frozen-lockfile
-      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
-        with:
-          name: published
-          path: artifacts/published
-      - name: Build the installer with the published pins
-        env:
-          ZEABUR_TELEMETRY_KEY: ${{ vars.POSTHOG_KEY }}
-          ARCH: ${{ matrix.arch }}
-        run: |
-          # ZEABUR_PIN_*=<value> lines, exported and never evaluated.
-          pins=$(scripts/release-pins.sh "$VERSION")
-          pins+=$'\n'$(<artifacts/published/outputs.env)
-          while IFS='=' read -r name value; do
-            [[ "$name" =~ ^ZEABUR_PIN_[A-Z0-9_]+$ ]] ||
-              { echo "::error::unexpected pin line: $name=$value"; exit 1; }
-            export "$name=$value"
-          done <<<"$pins"
-          scripts/release-build.sh "$VERSION" "$ARCH" dist installer
-      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
-        with:
-          name: finish-linux-${{ matrix.arch }}
-          path: dist/
-          if-no-files-found: error
-          retention-days: 7
-
   release:
     if: >-
       ${{ !cancelled() && needs.publish.result == 'success' && needs.attest.result == 'success' &&
-          needs.finish.result == 'success' && needs.desktop-updater.result != 'failure' }}
-    needs: [publish, attest, finish, desktop-updater]
+          needs.desktop-updater.result != 'failure' }}
+    needs: [publish, attest, desktop-updater]
     runs-on: instabox-small
     timeout-minutes: 30
     permissions:

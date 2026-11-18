@@ -4,7 +4,6 @@
     "packages": [
       "web",
       "desktop/web",
-      "crates/zeabur-installer/web",
       "scripts/shots"
     ],
     "catalog": {

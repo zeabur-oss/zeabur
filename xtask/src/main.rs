@@ -44,9 +44,9 @@ enum Task {
 
 #[derive(Debug, PartialEq, Eq, Subcommand)]
 enum DevCluster {
-    /// Create the cluster, installed with zeabur-installer's own objects and values. Runs on Linux
-    /// with Docker and Nix inside `nix develop`; uses this machine's port 443. A second `up` on a
-    /// running cluster brings it in line with the checkout.
+    /// Create the cluster, with Zeabur from its chart. Runs on Linux with Docker and Nix inside
+    /// `nix develop`; uses this machine's port 443. A second `up` on a running cluster brings it in
+    /// line with the checkout.
     Up(dev_cluster::Up),
     /// Delete the cluster, its volume and its images.
     Down,

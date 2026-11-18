@@ -133,8 +133,6 @@ pub struct ZeaburRelease {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum InstallMethod {
-    /// zeabur-installer, through its `HelmChart` in `kube-system`.
-    Installer,
     /// A Helm release.
     Helm,
     /// An Argo CD Application.
@@ -409,9 +407,6 @@ pub struct CapabilityList {
     pub catalogue_commit: String,
     /// Each capability, sorted by name: existing (with evidence) or not (with what to install).
     pub items: Vec<zeabur_catalog::Capability>,
-    /// Whether zeabur-installer set up the cluster, by its record, the ConfigMap
-    /// `kube-system/zeabur-installer`, read as the person. `None` when it cannot be read.
-    pub installer: Option<bool>,
 }
 
 /// CPU, memory and pods in plain units.

@@ -49,9 +49,9 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 |---|---|---|
 | 1 | [`zeabur-core`](../../crates/zeabur-core) | error categories, request guards, cryptography |
 | 0 | [`zeabur-model`](../../crates/zeabur-model) | the projected view clients see (projects, services, endpoints, routes, sources), the names and quantities shared with Kubernetes (`kernel`), conventions of Helm, Argo CD, Flux, operators and Gateway API (`adapters`) |
-| 0 | [`zeabur-embed`](../../crates/zeabur-embed) | **build-dependency**: reading a built interface's `manifest.tsv` into the table `zeabur-ui` and `zeabur-installer` embed |
-| 1 | [`zeabur-telemetry`](../../crates/zeabur-telemetry) | the usage data Zeabur and the installer may send (types with no free text) and the one sender |
-| 1 | [`zeabur-ui`](../../crates/zeabur-ui) | embedding and serving the web interface; with its `interface` feature off, only the serving (the installer's page) |
+| 0 | [`zeabur-embed`](../../crates/zeabur-embed) | **build-dependency**: reading a built interface's `manifest.tsv` into the table `zeabur-ui` embeds |
+| 1 | [`zeabur-telemetry`](../../crates/zeabur-telemetry) | the usage data Zeabur may send (types with no free text) and the one sender |
+| 1 | [`zeabur-ui`](../../crates/zeabur-ui) | embedding and serving the web interface |
 | 2 | [`zeabur-kube`](../../crates/zeabur-kube) | how a request reaches kube-apiserver, always as the person |
 | 0 | [`zeabur-http`](../../crates/zeabur-http) | the outbound HTTP client: address guard, `HTTPS_PROXY` with `CONNECT`, trusted CAs |
 | 2 | [`zeabur-auth`](../../crates/zeabur-auth) | signing in through Zeabur Identity (OAuth client), sessions, cross-site checks |
@@ -65,9 +65,6 @@ Arrows point from a crate to what it may depend on (transitive edges omitted).
 | 5 | [`zeabur`](../../crates/zeabur) | **binary**: the in-cluster server |
 | 6 | [`zeaburctl`](../../crates/zeaburctl) | **binary**: the command-line tool |
 | 6 | [`zeabur-test-support`](../../crates/zeabur-test-support) | test helpers: loading the fixture cases, the cluster tests' sandbox |
-| 0 | [`zeabur-installer-plan`](../../crates/zeabur-installer-plan) | the installer's configuration, component selection and install plan; no I/O |
-| 1 | [`zeabur-installer-host`](../../crates/zeabur-installer-host) | what the installer does to a host: facts, preflight, downloads, files, systemd, `kubectl` |
-| 5 | [`zeabur-installer`](../../crates/zeabur-installer) | **binary**: installs RKE2, Zeabur Identity and Zeabur on a server ([guide](../get-started/quickstart.md)) |
 | 7 | [`xtask`](../../xtask) | **binary**, not shipped: development tasks run as `cargo xtask`: the development cluster (`scripts/dev-cluster.sh`) and Zeabur Proxy's canary (`scripts/e2e-proxy.sh`) |
 
 Every crate has a README that is also its crate-level documentation (`cargo doc --open`).
@@ -107,8 +104,7 @@ this script. The macOS and Windows code is linted on a Mac
 The interface's sources live in [`web/`](../../web) (React, TanStack Router and Query, shadcn/ui on
 Base UI with its own theme, Phosphor icons). Its build output is not committed:
 `scripts/build-ui.sh` builds it, and `zeabur-ui` (with its `interface` feature, which the binaries'
-`ui` feature turns on) embeds it when `ZEABUR_UI_DIST` points at it. `zeabur-installer` serves its
-own page with `zeabur-ui` and leaves Zeabur's interface out.
+`ui` feature turns on) embeds it when `ZEABUR_UI_DIST` points at it.
 `cargo build --no-default-features` builds the API alone with Cargo only.
 
 ## Fixtures

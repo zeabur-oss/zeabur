@@ -2872,7 +2872,6 @@ dependencies = [
  "tar",
  "thiserror",
  "utoipa",
- "zeabur-installer-plan",
  "zeabur-kube",
 ]
 
@@ -2943,65 +2942,6 @@ dependencies = [
  "tokio-rustls",
  "tower",
  "zeabur-test-support",
-]
-
-[[package]]
-name = "zeabur-installer"
-version = "0.2.0"
-dependencies = [
- "axum",
- "base64 0.23.1",
- "clap",
- "form_urlencoded",
- "hex",
- "serde-saphyr",
- "serde_json",
- "tempfile",
- "thiserror",
- "tokio",
- "tower",
- "zeabur-embed",
- "zeabur-installer-host",
- "zeabur-installer-plan",
- "zeabur-telemetry",
- "zeabur-ui",
-]
-
-[[package]]
-name = "zeabur-installer-host"
-version = "0.2.0"
-dependencies = [
- "base64 0.23.1",
- "bytes",
- "flate2",
- "form_urlencoded",
- "hex",
- "http",
- "http-body-util",
- "httpdate",
- "hyper",
- "serde",
- "serde-saphyr",
- "serde_json",
- "sha2",
- "tar",
- "tempfile",
- "thiserror",
- "tokio",
- "zeabur-http",
- "zeabur-installer-plan",
- "zeabur-test-support",
-]
-
-[[package]]
-name = "zeabur-installer-plan"
-version = "0.2.0"
-dependencies = [
- "semver",
- "serde",
- "serde-saphyr",
- "serde_json",
- "thiserror",
 ]
 
 [[package]]

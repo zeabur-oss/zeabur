@@ -32,7 +32,7 @@ description: 建立專案、把既有的 Namespace 加進 Zeabur、修改專案�
 
 - Namespace `hello`，帶專案標籤和三個 Pod Security 標籤，等級都是 `baseline`。服務可以用 root 執行，但不能存取主機。
 - `default` ServiceAccount 設成 `automountServiceAccountToken: false`，沒有指定 ServiceAccount 的副本不會拿到 Kubernetes API 的 token。
-- 叢集有標了 `zeabur.com/platform: "true"` 的 Namespace 時（用 Zeabur 安裝程式裝的叢集都有），還有 NetworkPolicy `zeabur-project`，其他專案的副本連不進來。
+- 叢集有標了 `zeabur.com/platform: "true"` 的 Namespace 時，還有 NetworkPolicy `zeabur-project`，其他專案的副本連不進來。
 
 ![建立專案 hello 前的確認畫面，說明會建立的 Namespace 與安全性設定](../images/shots/project-new-review.avif)
 

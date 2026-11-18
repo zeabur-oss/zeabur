@@ -1262,10 +1262,9 @@ paths:
       tags:
       - cluster
       summary: |-
-        Zeabur's version, whether the interface checks for a newer one, and how Zeabur was installed:
-        from its Deployment's marks (Helm, Argo CD, Flux) and, for a Helm release, zeabur-installer's
-        `HelmChart` of that name in `kube-system`. Both are read as the person; a refused read leaves
-        `installedBy` out.
+        Zeabur's version, whether the interface checks for a newer one, and how Zeabur was installed,
+        from its Deployment's marks (Helm, Argo CD, Flux). The Deployment is read as the person; a
+        refused read leaves `installedBy` out.
       operationId: getZeabur
       responses:
         "200":
@@ -5217,13 +5216,6 @@ components:
         catalogueCommit:
           type: string
           description: Zeabur Catalog's commit.
-        installer:
-          type:
-          - boolean
-          - "null"
-          description: |-
-            Whether zeabur-installer set up the cluster, by its record, the ConfigMap
-            `kube-system/zeabur-installer`, read as the person. `None` when it cannot be read.
         items:
           type: array
           items:
@@ -10171,7 +10163,6 @@ components:
       type: string
       description: How Zeabur was installed, which says how to upgrade it.
       enum:
-      - installer
       - helm
       - argo-cd
       - flux

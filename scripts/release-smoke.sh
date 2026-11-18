@@ -67,8 +67,8 @@ else
   image="$(helm show values "$chart" | yq '.image.repository + "@" + .image.digest')"
 fi
 
-# The chart on the development cluster, with zeabur-installer's values, Zeabur Identity, and Zeabur
-# Proxy off as the chart's default.
+# The chart on the development cluster, with the values of xtask dev-cluster, Zeabur Identity,
+# and Zeabur Proxy off as the chart's default.
 "$root/scripts/dev-cluster.sh" up --zeabur-chart "$chart" --zeabur-image "$image"
 export KUBECONFIG="$state/kubeconfig"
 running="$(kubectl -n zeabur get pods -l app.kubernetes.io/name=zeabur \

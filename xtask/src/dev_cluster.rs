@@ -1,5 +1,5 @@
-//! A k3d cluster with Zeabur Identity and Zeabur, installed with zeabur-installer's own objects
-//! and values, at <https://zeabur.localhost> (`scripts/dev-cluster.sh`).
+//! A k3d cluster with Zeabur Identity and Zeabur, installed from Zeabur Identity's manifests and
+//! Zeabur's chart, at <https://zeabur.localhost> (`scripts/dev-cluster.sh`).
 
 mod catalog;
 pub(crate) mod certificates;
@@ -23,7 +23,7 @@ use crate::process::{Cmd, on_path};
 pub(crate) const IDENTITY_HOST: &str = "identity.localhost";
 /// Zeabur's host name.
 pub(crate) const ZEABUR_HOST: &str = "zeabur.localhost";
-/// The catalog's zot, as zeabur-installer sets it up: the node's containerd pulls `ZOT_HOST`
+/// The catalog's zot: the node's containerd pulls `ZOT_HOST`
 /// through a mirror to zot's fixed ClusterIP, checked against zot's CA.
 const ZOT_HOST: &str = "zot.zot.svc:5000";
 const ZOT_IP: &str = "10.43.0.50";
@@ -135,8 +135,8 @@ impl DevCluster {
         self.apply(yaml)
     }
 
-    /// Marks namespaces as the platform's, as zeabur-installer does: a project's NetworkPolicy
-    /// lets them in, and only then does Zeabur write one.
+    /// Marks namespaces as the platform's: a project's NetworkPolicy lets them in, and only then
+    /// does Zeabur write one.
     fn platform(&self, namespace: &str) -> Result<(), String> {
         self.kubectl()
             .args(["label", "namespace", namespace, "zeabur.com/platform=true"])
@@ -280,7 +280,6 @@ pub(crate) fn up(options: &Up) -> Result<(), String> {
         &dev,
         &zeabur::Install {
             profile: options.profile,
-            identity_image: &built.identity,
             zeabur_image: &built.zeabur,
             proxy_image: built.proxy.as_deref(),
             chart: &chart,
@@ -340,7 +339,7 @@ pub(crate) fn down() -> Result<(), String> {
         "before.txt",
         "after.txt",
         "registries.yaml",
-        "install.yaml",
+        "values.json",
         "identityctl",
         "identity-release",
     ] {

@@ -1,6 +1,6 @@
 # zeabur-telemetry
 
-The usage data Zeabur and `zeabur-installer` may send, and the one sender they share. An
+The usage data Zeabur may send, and the one sender for it. An
 [`Event`] holds only numbers, enum strings and the random [`InstallationId`]; there is no field
 for free text, so nothing else can be added by accident. The page that lists every event and
 property for readers is `docs/reference/telemetry.mdx`.

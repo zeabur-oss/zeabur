@@ -70,7 +70,6 @@ export function OutLink({ href, children }: { href: string; children: string }) 
 }
 
 export const HOW = {
-  installer: "update.how.installer",
   helm: "update.how.helm",
   "argo-cd": "update.how.argoCd",
   flux: "update.how.flux",
@@ -80,8 +79,6 @@ export const HOW = {
 /** The commands of an upgrade to `version`, where the way Zeabur was installed has them. */
 export function upgradeCommands(by: Schemas.InstallMethod | undefined, version: string): string[] {
   switch (by) {
-    case "installer":
-      return ["sudo zeabur-installer plan\nsudo zeabur-installer apply"]
     case "helm":
       return [
         `helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \\\n  --version ${version} \\\n  --namespace zeabur --reset-then-reuse-values`,
