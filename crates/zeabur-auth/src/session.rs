@@ -11,7 +11,9 @@
 //!   access token's expiry renews it with the refresh token first. Zeabur Identity rotates refresh
 //!   tokens and revokes the whole family when a rotated one is used again ([rfc9700] §4.14.2), so
 //!   two concurrent renewals of one session would end it: each session has its own async lock, and
-//!   a request that waited on it finds the token already renewed. An issuer that refuses
+//!   a request that waited on it finds the token already renewed. The renewal runs on a task of its
+//!   own, so a caller that goes away (a closed connection, a timeout) cannot stop it after the
+//!   issuer rotated the refresh token and before the new one is stored. An issuer that refuses
 //!   (`invalid_grant`: revoked, expired, user disabled) ends the session; an issuer that cannot be
 //!   reached does not, while the current token lasts.
 //! - **Idle and absolute limits** ([`Limits`]): a session unused for `idle`, or older than
@@ -282,9 +284,18 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
         }
     }
 
+    /// Whether the session's token is far enough from its expiry to use without renewal.
+    fn fresh(&self, entry: &Entry<T>, now: i64) -> bool {
+        now < entry
+            .state()
+            .base
+            .expires_at
+            .saturating_sub(self.limits.refresh_margin)
+    }
+
     /// The session `id` names, its token renewed when it is about to expire. A request of the
     /// person's ([`Activity::Person`]) counts as use.
-    pub async fn current(&self, id: &str, activity: Activity) -> Lookup<T> {
+    pub async fn current(self: &Arc<Self>, id: &str, activity: Activity) -> Lookup<T> {
         let Some(entry) = self.find(id) else {
             return Lookup::SignedOut;
         };
@@ -293,21 +304,23 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
             self.end(&entry);
             return Lookup::SignedOut;
         }
-        let fresh = |entry: &Entry<T>, now: i64| {
-            now < entry
-                .state()
-                .base
-                .expires_at
-                .saturating_sub(self.limits.refresh_margin)
-        };
-        if fresh(&entry, now) {
+        if self.fresh(&entry, now) {
             return Lookup::Active(Self::credentials(&entry, now, activity));
         }
+        let sessions = Arc::clone(self);
+        // An error only when the renewal panicked.
+        tokio::spawn(async move { sessions.renew(&entry, activity).await })
+            .await
+            .unwrap_or(Lookup::IssuerUnavailable)
+    }
+
+    /// Renews the token of `entry`, one renewal at a time.
+    async fn renew(&self, entry: &Entry<T>, activity: Activity) -> Lookup<T> {
         let _renewing = entry.renewing.lock().await;
         let now = self.now();
         // Another request renewed it while this one waited.
-        if fresh(&entry, now) {
-            return Lookup::Active(Self::credentials(&entry, now, activity));
+        if self.fresh(entry, now) {
+            return Lookup::Active(Self::credentials(entry, now, activity));
         }
         let (refresh, expires_at) = {
             let state = entry.state();
@@ -316,9 +329,9 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
         let still_valid = now < expires_at;
         let Some(refresh) = refresh else {
             return if still_valid {
-                Lookup::Active(Self::credentials(&entry, now, activity))
+                Lookup::Active(Self::credentials(entry, now, activity))
             } else {
-                self.end(&entry);
+                self.end(entry);
                 Lookup::SignedOut
             };
         };
@@ -334,23 +347,23 @@ impl<T: Clone + Send + Sync + 'static> Sessions<T> {
                         state.refresh = Some(next);
                     }
                     drop(state);
-                    Lookup::Active(Self::credentials(&entry, self.now(), activity))
+                    Lookup::Active(Self::credentials(entry, self.now(), activity))
                 }
                 Err(error) => {
                     tracing::warn!(event = "session.renew", %error, "cannot use the renewed token");
-                    self.end(&entry);
+                    self.end(entry);
                     Lookup::SignedOut
                 }
             },
             Err(error @ AuthError::Refused { .. }) => {
                 tracing::info!(event = "session.renew", %error, "the issuer ended the session");
-                self.end(&entry);
+                self.end(entry);
                 Lookup::SignedOut
             }
             Err(error @ (AuthError::Unreachable(_) | AuthError::Invalid(_))) => {
                 tracing::warn!(event = "session.renew", %error, "cannot renew the token");
                 if still_valid {
-                    Lookup::Active(Self::credentials(&entry, now, activity))
+                    Lookup::Active(Self::credentials(entry, now, activity))
                 } else {
                     Lookup::IssuerUnavailable
                 }
@@ -551,6 +564,29 @@ mod tests {
         assert_eq!(rig.issuer.with(|r| r.refreshes), 1);
         tokens.dedup();
         assert_eq!(tokens.len(), 1);
+    }
+
+    /// A caller that goes away while the issuer answers a renewal (a closed connection, a
+    /// timeout) must not lose the rotated refresh token: the old one, used again, would end the
+    /// session.
+    #[tokio::test]
+    async fn a_caller_that_goes_away_during_a_renewal_keeps_the_session() {
+        let rig = Rig::new(Limits::default()).await;
+        let id = rig.sign_in("alice").await;
+        let hold = crate::testing::Hold::default();
+        rig.issuer.with(|r| r.hold = Some(hold.clone()));
+        rig.advance(590);
+        tokio::select! {
+            _ = rig.sessions.current(&id, Activity::Background) => panic!("the issuer answered"),
+            () = hold.arrived.notified() => {}
+        }
+        rig.issuer.with(|r| r.hold = None);
+        hold.release.notify_one();
+        assert!(rig.base(&id).await.is_some());
+        assert_eq!(rig.issuer.with(|r| r.refreshes), 1);
+        rig.advance(600);
+        assert!(rig.base(&id).await.is_some());
+        assert_eq!(rig.issuer.with(|r| r.refreshes), 2);
     }
 
     #[tokio::test]
