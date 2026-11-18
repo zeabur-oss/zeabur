@@ -17,7 +17,7 @@
     };
     # Zeabur Catalog. flake.lock pins its commit: zeabur-catalog embeds the bundle that the
     # catalog's `release` output builds there, and a release build checks that bundle against the
-    # signed release at that commit (scripts/release.ts).
+    # signed release at that commit (scripts/release-pins.sh).
     catalog = {
       url = "github:zeabur-oss/catalog";
       inputs.nixpkgs.follows = "nixpkgs";

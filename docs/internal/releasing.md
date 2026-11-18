@@ -3,10 +3,12 @@
 How a maintainer publishes a release. What a release contains and how to verify it is in
 [Releases](../reference/releases.mdx).
 
-`.github/workflows/release.yml` runs on a `v*` tag. Its jobs run each stage as
-`bun scripts/release.ts <stage>` in this repository's Nix dev shell, after `bun install`.
-`@zeabur-oss/release` (`package.json`, pinned in `bun.lock`) pushes, signs and verifies; the
-workflow checks the `CHANGELOG.md` section, signs `SHA256SUMS` and verifies the assets. The draft
+`.github/workflows/release.yml` runs on a `v*` tag. Its jobs run in this repository's Nix dev
+shell, after `bun install`: Zeabur's own steps are `scripts/release-*.sh`, and the steps every
+zeabur-oss release shares are `bun x zeabur-oss-release <command>` of `@zeabur-oss/release`
+(`package.json`, pinned in `bun.lock`), which pushes, signs and verifies images and charts, checks
+the `CHANGELOG.md` section, and writes and verifies `SHA256SUMS`. A manual run of the workflow
+rehearses: it checks, builds and smokes every platform, and publishes nothing. The draft
 release, with its title and notes, is made by the Release pull request workflow when it tags.
 
 Jobs that are not per platform run on Instabox (`instabox-small`). The platform builds run on
@@ -15,16 +17,16 @@ GitHub's runners: Linux amd64 and arm64, macOS arm64, and Windows for Zeabur Des
 Zeabur Desktop builds in the same workflow, and `publish` waits for it, so nothing is published
 until every package is built (see [Zeabur Desktop](#zeabur-desktop)).
 
-| Stage | Where | Does |
+| Step | Where | Does |
 |---|---|---|
-| `bump` | once, in the release pull request | After knope set `Cargo.toml`, sets `Cargo.lock`'s workspace crates and `desktop/Cargo.lock`'s copies of them and of `zeabur-desktop` (knope sets `desktop/Cargo.toml`), the chart (`version`, `appVersion`), `web/package.json` and the installer's `package.json`, then regenerates `openapi.yaml` and `web/src/api/zeabur.ts` with `cargo xtask openapi`. |
-| `check` | once | The tag is SemVer without build metadata, and the version of every crate, `Cargo.lock`, `desktop/Cargo.toml`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. The catalog commit and the Zeabur Identity pin carry a release tag that this version may pin. |
-| `build` | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve. Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. A rehearsal also builds a development installer on Linux, which it does not keep. |
-| `sign` | macOS arm64, after `build` | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
-| `publish` | once, tag only, after every build | Refuses when the release is already published. Its token cannot see a draft; the `release` job adds the assets to the draft and fails when there is none. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms; writes `published/subjects.json`, which `attest` attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
-| `finish` | Linux amd64 and arm64, tag only | Builds `zeabur-installer`, pinned to the catalog, Zeabur Identity and what `publish` pushed. |
-| `assets` | once, tag only | Copies the assets into `assets/`; the `release` job adds the signed `SHA256SUMS`, attests them and uploads them to the draft. |
-| `verify` | every platform | After the workflow has checked `SHA256SUMS` and each asset's attestation, checks that the draft has exactly the expected assets, each image and the chart as a user would, that the chart runs exactly the images in `digests.txt`, and that `digests.txt` names the debug and tools images the code pins (`crates/zeabur-api/src/settings.rs`), then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS, where a Developer ID signature must be notarized (`spctl`), and checks Zeabur Desktop's `.dmg` the same way. |
+| `scripts/release-bump.sh` | once, in the release pull request (knope's `prepare-release`) | After knope set `Cargo.toml`, sets `Cargo.lock`'s workspace crates and `desktop/Cargo.lock`'s copies of them and of `zeabur-desktop` (knope sets `desktop/Cargo.toml`), the chart (`version`, `appVersion`), `web/package.json` and the installer's `package.json`, then regenerates `openapi.yaml` and `web/src/api/zeabur.ts` with `cargo xtask openapi`. |
+| `check` job, `scripts/release-check.sh` | once | The tag is SemVer without build metadata, and the version of every crate, `Cargo.lock`, `desktop/Cargo.toml`, the chart (`version`, `appVersion`), `web/package.json`, the installer's `package.json` and `openapi.yaml`. Every `ghcr.io/zeabur-oss` image the chart runs is one the release publishes. The catalog commit and the Zeabur Identity pin carry a release tag that this version may pin. |
+| `build` job | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog and Zeabur Identity pins resolve (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. A rehearsal also builds a development installer on Linux, which it does not keep. |
+| `scripts/release-sign.sh` | macOS arm64, in the `build` job | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
+| `publish` job | once, tag only, after every build | Refuses when the release is already published. Its token cannot see a draft; the `release` job adds the assets to the draft and fails when there is none. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms (`release-default-images.sh`); writes `published/subjects.json`, which `attest` attests, and `published/outputs.env`, the installer's pins of Zeabur's image and the chart. |
+| `finish` job | Linux amd64 and arm64, tag only | Builds `zeabur-installer`, pinned to the catalog, Zeabur Identity (`release-pins.sh`) and what `publish` pushed. |
+| `release` job | once, tag only | Copies the assets that `release-assets.sh` lists into `assets/`, adds the signed `SHA256SUMS`, attests them and uploads them to the draft. |
+| `verify` job, `scripts/release-verify.sh` | every platform | After the workflow has checked `SHA256SUMS` and each asset's attestation, checks that the draft has exactly the expected assets, each image and the chart as a user would, that the chart runs exactly the images in `digests.txt`, and that `digests.txt` names the debug and tools images the code pins (`crates/zeabur-api/src/settings.rs`), then installs the published chart on Linux (`release-smoke.sh`) or runs `zeaburctl` on macOS, where a Developer ID signature must be notarized (`spctl`), and checks Zeabur Desktop's `.dmg` the same way. |
 
 The pins come from the releases of zeabur-oss/catalog and zeabur-oss/identity: the `SHA256SUMS` that
 each signed, checked with cosign. Their signer is that repository's own `release.yml` or, for their
@@ -43,7 +45,7 @@ Releases before this one were signed by the shared release workflow of zeabur-os
 
 The `desktop-*` jobs of `release.yml` run beside the server's builds, and `publish` needs them;
 a failed desktop build stops the release before anything is published. The app's
-version is the repository's: knope sets `desktop/Cargo.toml`, `bump` its lock file, and Tauri reads
+version is the repository's: knope sets `desktop/Cargo.toml`, `release-bump.sh` its lock file, and Tauri reads
 it from there (`desktop/tauri.conf.json` has none). `scripts/check-desktop.sh` fails in CI when it
 differs from the root `Cargo.toml`.
 
@@ -239,8 +241,8 @@ These are repository and organization settings, not files; a maintainer sets the
 ## When a release run fails
 
 Never move a published tag and never replace a published asset or image tag:
-`scripts/release.ts publish` refuses when the release is already published, or an image tag or
-the chart version already exists.
+the `publish` job refuses when the release is already published, or an image tag or the chart
+version already exists.
 
 - **Before `publish`** (CI, a build, a smoke test): nothing was published. Fix it on `main`; if
   the fix changes the release commit, delete the tag (`git push git@github.com:zeabur-oss/zeabur.git :refs/tags/v0.1.1`) and tag
@@ -262,8 +264,8 @@ whose `verify` failed (Linux amd64 or arm64, or macOS arm64):
 ```sh
 export RELEASE_SOURCE_REPOSITORY=zeabur-oss/zeabur RELEASE_SOURCE_REF=refs/tags/v0.1.1
 gh release download v0.1.1 --repo zeabur-oss/zeabur --dir downloaded
-node_modules/.bin/zeabur-oss-release verify-assets downloaded
-bun scripts/release.ts verify v0.1.1 linux arm64 downloaded
+bun x zeabur-oss-release verify-assets downloaded
+scripts/release-verify.sh v0.1.1 downloaded
 ```
 
 On Linux the last step installs the published chart on the development cluster, so it needs

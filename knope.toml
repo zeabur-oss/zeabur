@@ -19,7 +19,7 @@ type = "PrepareRelease"
 
 [[workflows.steps]]
 type = "Command"
-command = "bun scripts/release.ts bump v$version"
+command = "scripts/release-bump.sh v$version"
 variables = { "$version" = "Version" }
 
 [[workflows]]

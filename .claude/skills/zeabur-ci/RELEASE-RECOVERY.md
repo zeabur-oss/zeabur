@@ -13,9 +13,9 @@ stops it too.
 
 ## A private package in `verify`
 
-The first run creates `zeabur` and `charts/zeabur` private on ghcr.io. `scripts/release.ts
-verify` uses an empty registry configuration on purpose, so a login cannot hide a private package.
-`scripts/release.ts publish` refuses an existing release, image tag or chart version on purpose.
+The first run creates `zeabur` and `charts/zeabur` private on ghcr.io. `scripts/release-verify.sh`
+uses an empty registry configuration on purpose, so a login cannot hide a private package. The
+`publish` job refuses an existing release, image tag or chart version on purpose.
 
 ## An image import that reports success
 

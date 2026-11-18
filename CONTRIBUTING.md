@@ -58,7 +58,7 @@ the catalog's `release` output there, the same `bundle.tar.gz` and `index.json` 
 signs. `zeabur-catalog` embeds that bundle. To move the pin, run `nix flake update catalog`; to try
 an unpushed catalog, add `--override-input catalog git+file://$PWD/../catalog` to `nix develop`.
 A release checks the bundle against the catalog's signed release at that commit
-(`scripts/release.ts`). Tests read the catalog at the pin too, so moving it goes in a pull
+(`scripts/release-pins.sh`). Tests read the catalog at the pin too, so moving it goes in a pull
 request of its own, with no change in behaviour: `flake.lock`, the `fixtures/charts` corpus
 (`scripts/render-chart-corpus.sh`) and the files generated from the catalog
 (`ZEABUR_UPDATE_GOLDEN=1 cargo nextest run`, then `cargo xtask openapi`). The files vendored for
@@ -89,9 +89,9 @@ first in any of them, and change all three in the same pull request.
 
 ## Releases
 
-The release workflow is the shared one of
-[zeabur-oss/.github](https://github.com/zeabur-oss/.github); its stages are `bun scripts/release.ts
-bump|check|build|sign|publish|finish|assets|verify`, and
+`.github/workflows/release.yml` releases Zeabur. Zeabur's own steps are the `scripts/release-*.sh`
+scripts; the steps every zeabur-oss release shares call `zeabur-oss-release` from
+[zeabur-oss/.github](https://github.com/zeabur-oss/.github) directly.
 [docs/internal/releasing.md](docs/internal/releasing.md) has the steps.
 
 A pull request that changes what users of Zeabur, `zeaburctl`, the installer or the chart see adds
@@ -116,7 +116,7 @@ becomes the release body as it is.
 
 To release, run the Release pull request workflow, with `prerelease: rc` for a release candidate.
 knope turns the change files into the next `CHANGELOG.md` section and sets `Cargo.toml`;
-`bun scripts/release.ts bump` sets `Cargo.lock`, the chart and the web packages and regenerates
+`scripts/release-bump.sh` sets `Cargo.lock`, the chart and the web packages and regenerates
 the API document, and zeabur-oss-bot opens `chore(release): vX.Y.Z`. Merging it tags the merge
 commit and starts the release. If a draft's verify job fails because of the check itself, fix the
 check and run `verify` again from a checkout, as [Fix the check and
