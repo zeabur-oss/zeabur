@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Takes the screenshots of one image set (docs/internal/screenshots.md), the Playwright tests in
-# web/e2e/shots/<set>.ts, from the demo server (crates/zeabur-api/examples/demo.rs), the installer's
+# scripts/shots/<set>.ts, from the demo server (crates/zeabur-api/examples/demo.rs), the installer's
 # pages with captured responses or the desktop app's pages with mocked commands, in each locale and
 # theme, as AVIF. Run inside `nix develop`.
 #   scripts/docs-shots.sh [set] [out] [-- playwright arguments]
@@ -19,7 +19,7 @@ export ZEABUR_DEMO_NOW="${ZEABUR_DEMO_NOW:-2026-10-26T09:00:00Z}"
 work="$(mktemp -d)"
 trap 'rm -rf "$work"' EXIT
 
-settings="$(cd "$root/web" && bun e2e/shots/sets.ts "$set")"
+settings="$(bun "$root/scripts/shots/sets.ts" "$set")"
 kept="$(jq -r '.out // ""' <<<"$settings")"
 file="$(jq -r .file <<<"$settings")"
 budget=$(($(jq -r .budget <<<"$settings") * 1024))
@@ -44,9 +44,9 @@ if jq -e '.apps | index("desktop")' <<<"$settings" >/dev/null; then
 fi
 
 (
-  cd "$root/web"
+  cd "$root/scripts/shots"
   bun ci
-  ZEABUR_SHOTS_OUT="$work/png" bunx playwright test -c playwright.shots.config.ts \
+  ZEABUR_SHOTS_OUT="$work/png" bunx playwright test \
     --project "$set/*" --output="$root/target/docs-shots-results" "$@"
 )
 

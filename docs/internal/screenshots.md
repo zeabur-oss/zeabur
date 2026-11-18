@@ -1,15 +1,15 @@
 # Screenshots
 
-Every screenshot is a Playwright test in `web/e2e/shots`, taken from the demo server with Chromium
+Every screenshot is a Playwright test in `scripts/shots`, taken from the demo server with Chromium
 from nixpkgs by `scripts/docs-shots.sh`. Each spec is one image set, with its settings in
-`web/e2e/shots/sets.ts`:
+`scripts/shots/sets.ts`:
 
 | Set      | Spec                      | Images                                 | Where                                    |
 | -------- | ------------------------- | -------------------------------------- | ---------------------------------------- |
-| `docs`   | `web/e2e/shots/docs.ts`   | The documentation and oss.zeabur.com   | `docs/[<locale>/]images/shots/<id>.avif` |
-| `readme` | `web/e2e/shots/readme.ts` | The README, English, 1×, at most 30 KB | `docs/images/<id>-<theme>.avif`          |
-| `desktop` | `web/e2e/shots/desktop.ts` | The Desktop app's pages, 2×, light and dark | `docs/[<locale>/]images/desktop/<id>-<theme>.avif` |
-| `cover`  | `web/e2e/shots/cover.ts`  | The plate of the README cover          | design-system's `covers/zeabur`          |
+| `docs`   | `scripts/shots/docs.ts`   | The documentation and oss.zeabur.com   | `docs/[<locale>/]images/shots/<id>.avif` |
+| `readme` | `scripts/shots/readme.ts` | The README, English, 1×, at most 30 KB | `docs/images/<id>-<theme>.avif`          |
+| `desktop` | `scripts/shots/desktop.ts` | The Desktop app's pages, 2×, light and dark | `docs/[<locale>/]images/desktop/<id>-<theme>.avif` |
+| `cover`  | `scripts/shots/cover.ts`  | The plate of the README cover          | design-system's `covers/zeabur`          |
 
 All of them are kept in git. Run the script after changing a page a shot covers, and commit the
 images. For each release, `.github/workflows/shots.yml` takes the `docs` set again when
@@ -110,7 +110,7 @@ Two runs give the same files, so a run changes in git only the images whose page
 
 ## Sets
 
-A set in `web/e2e/shots/sets.ts` has `out`, where its images are kept from the repository's root;
+A set in `scripts/shots/sets.ts` has `out`, where its images are kept from the repository's root;
 `file`, the path in `<out>`, with `{id}`, `{locale}`, `{docs}` (the locale's docs folder, empty for
 `en`, else `<locale>/`) and `{theme}`; `scale`, 1 or 2 pixels for each CSS pixel; `budget`, the
 largest AVIF in KB; `clean`; its `locales` and `themes`; and the `apps` its shots use, which the

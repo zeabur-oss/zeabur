@@ -4,6 +4,7 @@ import tailwindcss from "@tailwindcss/vite"
 import react from "@vitejs/plugin-react"
 import Icons from "unplugin-icons/vite"
 import { defineConfig } from "vite"
+import { icons } from "./scripts/icons.ts"
 
 // The pages the app bundles (tauri.conf.json `frontendDist`): the chooser, and the page a cluster
 // window shows while its local service starts or when it cannot. The cluster's web interface
@@ -37,7 +38,7 @@ export default defineConfig({
       exclude: /\/node_modules\/(?!@zeabur-oss\/design-system\/)/,
     }),
     tailwindcss(),
-    Icons({ scale: 1, compiler: "jsx", jsx: "react" }),
+    Icons(icons),
   ],
   resolve: {
     alias: {

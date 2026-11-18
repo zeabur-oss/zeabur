@@ -1,7 +1,8 @@
 {
   "$schema": "https://raw.githubusercontent.com/fallow-rs/fallow/v3.33.1/schema.json",
   "entry": ["e2e/**/*.ts", "orval.config.ts", "playwright*.config.ts", "scripts/*.ts"],
-  // unplugin-icons loads these by name; `~icons/…` is its virtual module.
+  // scripts/icons.ts requires @svgr/plugin-jsx, which fallow does not follow; unplugin-icons loads
+  // the icon set by name; `~icons/…` is its virtual module.
   "ignoreDependencies": ["@svgr/plugin-jsx", "@iconify-json/ph", "~icons"],
   // zeabur.ts is generated, a function per operation. router.tsx loads each page with
   // lazyRouteComponent(() => import(…), "<name>"), which fallow does not follow.
@@ -26,13 +27,9 @@
     { "file": "src/routes/service/page.tsx", "exports": ["ServicePage"] },
     { "file": "src/routes/settings.tsx", "exports": ["SettingsPage"] }
   ],
-  // Generated files, the catalogs, which repeat the same keys in each language, and the shots,
-  // each a few steps of the same kind.
+  // Generated files and the catalogs, which repeat the same keys in each language.
   "duplicates": {
     "ignore": [
-      "e2e/shots/cover.ts",
-      "e2e/shots/docs.ts",
-      "e2e/shots/readme.ts",
       "src/api/zeabur.ts",
       "src/i18n/server/**",
       "src/i18n/en.ts",

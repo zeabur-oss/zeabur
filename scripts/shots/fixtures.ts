@@ -6,7 +6,7 @@ import { spawn } from "node:child_process"
 import { connect, createServer } from "node:net"
 import { resolve } from "node:path"
 import type { Locator, Page } from "@playwright/test"
-import { expect, test as base } from "../fixtures.ts"
+import { expect, test as base } from "zeabur-web/e2e/fixtures"
 import type { App } from "./sets.ts"
 
 export { expect }
@@ -119,7 +119,7 @@ async function start(app: App, demo: Record<string, string>): Promise<Server> {
             String(port),
             "--strictPort",
           ],
-          { cwd: resolve(import.meta.dirname, "../../..", webs[app]), env },
+          { cwd: resolve(import.meta.dirname, "../..", webs[app]), env },
         )
       : spawn(demoServer(), [], { env: { ...env, ZEABUR_DEMO_ADDR: `127.0.0.1:${port}` } })
   let log = ""

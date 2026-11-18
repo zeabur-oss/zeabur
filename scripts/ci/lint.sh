@@ -12,8 +12,9 @@ static() {
   nixfmt --check flake.nix
   shellcheck scripts/*.sh scripts/ci/*.sh
   jactionlint
-  (cd web; bun ci; bun run fmt:check)
-  (cd crates/zeabur-installer/web; bun ci; bun run fmt:check)
+  (cd web; bun run fmt:check)
+  (cd crates/zeabur-installer/web; bun run fmt:check)
+  (cd scripts/shots; bun run fmt:check)
   bun fmt --check scripts/*.ts
   bun check scripts/
   bun test scripts/

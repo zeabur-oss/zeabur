@@ -1,0 +1,20 @@
+{
+  "name": "zeabur-shots",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "typecheck": "tsc",
+    "fmt": "oxfmt",
+    "fmt:check": "oxfmt --check"
+  },
+  "dependencies": {
+    "zeabur-desktop-web": "workspace:*",
+    "zeabur-web": "workspace:*"
+  },
+  "devDependencies": {
+    "@playwright/test": "catalog:",
+    "@types/node": "catalog:",
+    "oxfmt": "catalog:",
+    "typescript": "catalog:"
+  }
+}

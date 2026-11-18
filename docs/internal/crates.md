@@ -92,8 +92,9 @@ main workspace's rules:
   (checked by the same script), which each cluster window starts; nothing in the workspace depends
   on `desktop/`.
 - **Its own pages.** The chooser and the cluster window's start page are `desktop/web/`, a Vite
-  project with its own `package.json` and `bun.lock` under the same package policy as `web/`. The
-  app bundles their build; the cluster's web interface is `web/dist`, embedded in `zeabur-local`.
+  project with its own `package.json` in the root Bun workspace, under the same package policy as
+  `web/`. The app bundles their build; the cluster's web interface is `web/dist`, embedded in
+  `zeabur-local`.
 
 CI's `desktop` job (`scripts/ci/desktop.sh`) runs the script, the checks and build of
 `desktop/web`, `cargo fmt`, `cargo lint`, the tests and `cargo deny` for `desktop/` on Linux.
