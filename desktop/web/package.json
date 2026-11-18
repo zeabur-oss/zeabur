@@ -18,7 +18,7 @@
     "@tauri-apps/plugin-dialog": "2.8.4",
     "@zeabur-oss/design-system": "0.1.4",
     "class-variance-authority": "0.7.1",
-    "cn": "0.5.0",
+    "cn": "0.5.2",
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "recharts": "3.10.1",
