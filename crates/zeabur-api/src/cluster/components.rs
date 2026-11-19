@@ -3,7 +3,7 @@
 //! | Route | What it does |
 //! |---|---|
 //! | `POST /api/v1/cluster/components/{id}/plan` | what installing or removing the component writes, step by step, and how far each step has come; writes nothing |
-//! | `POST /api/v1/cluster/components/{id}/apply` | writes the next step whose earlier steps are ready, and answers as `plan` |
+//! | `POST /api/v1/cluster/components/{id}/apply` | writes the next step whose earlier steps are ready, and answers with each write's result and the plan |
 //!
 //! An install is the steps of [`zeabur_catalog::engine::install`]: each release's objects,
 //! server-side applied with field manager `zeabur` and never forced, so a field someone else owns
@@ -106,6 +106,38 @@ pub struct ObjectWrite {
     /// The object as it is written, YAML; absent for a deletion.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub yaml: Option<String>,
+}
+
+/// What one write of `apply` left on the cluster.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectWritten {
+    /// The object's kind.
+    pub kind: String,
+    /// Its name.
+    pub name: String,
+    /// Its namespace, for a namespaced object.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub namespace: Option<String>,
+    /// `metadata.uid` after the write; absent for a deletion.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub uid: Option<String>,
+    /// `metadata.resourceVersion` after the write, when the cluster answered with the object.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub resource_version: Option<String>,
+    /// `metadata.generation` after the write, for the kinds that keep one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub generation: Option<i64>,
+}
+
+/// What `apply` wrote, and the plan as it is after the writes.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentApplied {
+    /// The plan after the writes, as `plan` answers it.
+    pub plan: ComponentPlan,
+    /// Each object written, in order; empty when no step was due.
+    pub written: Vec<ObjectWritten>,
 }
 
 /// One step: a release's objects.
@@ -225,12 +257,13 @@ pub(crate) async fn plan(
     Ok(Json(plan))
 }
 
-/// Writes the next step of the plan whose earlier steps are ready, dry run first, and answers as
-/// `plan` does. `409` when Zeabur has read another catalog release than the plan's.
+/// Writes the next step of the plan whose earlier steps are ready, dry run first, and answers with
+/// each write's result and the plan after it. `409` when Zeabur has read another catalog release
+/// than the plan's.
 #[utoipa::path(post, path = "/api/v1/cluster/components/{id}/apply", tag = "cluster",
     operation_id = "applyComponent", request_body = ComponentRequest,
     params(("id" = String, Path)),
-    responses((status = 200, body = ComponentPlan),
+    responses((status = 200, body = ComponentApplied),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 409, body = Problem, content_type = PROBLEM),
               (status = 422, body = Problem, content_type = PROBLEM),
@@ -240,7 +273,7 @@ pub(crate) async fn apply(
     Person(cluster): Person,
     Path(id): Path<String>,
     Json(request): Json<ComponentRequest>,
-) -> Result<Json<ComponentPlan>, ApiError> {
+) -> Result<Json<ComponentApplied>, ApiError> {
     require_admin(cluster.as_ref(), WHAT, WHY).await?;
     let world = World::read(&state, cluster.as_ref()).await?;
     let version = &world.snapshot.index.catalog.version;
@@ -256,16 +289,23 @@ pub(crate) async fn apply(
         .iter()
         .zip(&objects)
         .find(|(s, _)| s.state != StepState::Ready);
+    let unwritten = |plan| {
+        Json(ComponentApplied {
+            plan,
+            written: Vec::new(),
+        })
+    };
     let Some((first, step)) = next else {
-        return Ok(Json(plan));
+        return Ok(unwritten(plan));
     };
     if first.state == StepState::Failed {
-        return Ok(Json(plan));
+        return Ok(unwritten(plan));
     }
     // A dry run of an object in a namespace that does not exist yet fails, so namespaces go
     // first.
     let (namespaces, rest): (Vec<&Placed>, Vec<&Placed>) =
         step.iter().partition(|o| o.target.kind == Namespace::KIND);
+    let mut written = Vec::new();
     for (dry_run, group) in [
         (true, &namespaces),
         (false, &namespaces),
@@ -273,45 +313,47 @@ pub(crate) async fn apply(
         (false, &rest),
     ] {
         for object in group {
-            match request.action {
+            let (body, verb) = match request.action {
                 ComponentAction::Install => {
                     let Some(body) = &object.body else {
                         continue;
                     };
                     let body = serde_json::to_value(body)
                         .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e.to_string())))?;
-                    let target = object.target.clone();
-                    let refused = right("patch", &target);
-                    send(
-                        cluster.as_ref(),
-                        target,
-                        WriteBody::Apply(body),
-                        dry_run,
-                        refused,
-                    )
-                    .await?;
+                    (WriteBody::Apply(body), "patch")
                 }
                 ComponentAction::Remove => {
                     let Some(uid) = object.uid.clone() else {
                         continue;
                     };
-                    let target = object.target.clone();
-                    let refused = right("delete", &target);
-                    let body = WriteBody::Delete(Preconditions {
+                    let preconditions = Preconditions {
                         uid: Some(uid),
+                        resource_version: object.resource_version.clone(),
                         ..Preconditions::default()
-                    });
-                    send(cluster.as_ref(), target, body, dry_run, refused).await?;
+                    };
+                    (WriteBody::Delete(preconditions), "delete")
                 }
+            };
+            let target = object.target.clone();
+            let refused = right(verb, &target);
+            let result = send(cluster.as_ref(), target, body, dry_run, refused).await?;
+            if !dry_run {
+                written.push(ObjectWritten {
+                    kind: object.target.kind.clone(),
+                    name: object.target.name.clone(),
+                    namespace: object.target.namespace().map(str::to_owned),
+                    uid: result.uid,
+                    resource_version: result.resource_version,
+                    generation: result.generation,
+                });
             }
         }
     }
-    Ok(Json(
-        world
-            .plan(cluster.as_ref(), &id, request.action)
-            .await?
-            .plan,
-    ))
+    let plan = world
+        .plan(cluster.as_ref(), &id, request.action)
+        .await?
+        .plan;
+    Ok(Json(ComponentApplied { plan, written }))
 }
 
 fn right(verb: &str, target: &ObjectTarget) -> Denied {
@@ -336,6 +378,8 @@ struct Placed {
     body: Option<DynamicObject>,
     /// For a removal: the uid of the object found, `None` when it is gone.
     uid: Option<String>,
+    /// For a removal: the `resourceVersion` of the object found.
+    resource_version: Option<String>,
 }
 
 /// One install step against the cluster.
@@ -616,6 +660,7 @@ impl World {
                 target,
                 body: Some(body),
                 uid: None,
+                resource_version: None,
             });
         }
         let (state, message) = combine(&progress);
@@ -676,8 +721,12 @@ impl World {
                 let mut write = view(&desired.object, Some(&target), None);
                 write.yaml = None;
                 writes.push(write);
+                let (uid, resource_version) = found.map_or((None, None), |o| {
+                    (o.metadata.uid, o.metadata.resource_version)
+                });
                 placed.push(Placed {
-                    uid: found.and_then(|o| o.metadata.uid),
+                    uid,
+                    resource_version,
                     target,
                     body: None,
                 });

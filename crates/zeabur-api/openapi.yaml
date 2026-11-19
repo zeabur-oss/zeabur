@@ -299,8 +299,9 @@ paths:
       tags:
       - cluster
       summary: |-
-        Writes the next step of the plan whose earlier steps are ready, dry run first, and answers as
-        `plan` does. `409` when Zeabur has read another catalog release than the plan's.
+        Writes the next step of the plan whose earlier steps are ready, dry run first, and answers with
+        each write's result and the plan after it. `409` when Zeabur has read another catalog release
+        than the plan's.
       operationId: applyComponent
       parameters:
       - name: id
@@ -319,7 +320,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/ComponentPlan"
+                $ref: "#/components/schemas/ComponentApplied"
         "403":
           content:
             application/problem+json:
@@ -2038,14 +2039,14 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  "/api/v1/projects/{project}/deploy-keys":
+  "/api/v1/projects/{project}/deploy-keys/host-keys":
     post:
       tags:
       - projects
       summary: |-
-        Makes an SSH deploy key for a repository on `host`: the public key to add there, and the
-        private key sealed for the plan that creates its Secret.
-      operationId: createDeployKey
+        The host keys a deploy key for `host` will trust: the pinned ones for GitHub and GitLab, else
+        those of the `known_hosts` lines given. Makes no key.
+      operationId: inspectDeployKeyHost
       parameters:
       - name: project
         in: path
@@ -2064,7 +2065,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: "#/components/schemas/DeployKeyResponse"
+                $ref: "#/components/schemas/DeployKeyHost"
         "400":
           content:
             application/problem+json:
@@ -6317,19 +6318,28 @@ components:
           runs the image it builds (see the `upload_service` module).
       - type: object
         description: |-
-          Create the Secret that holds an SSH deploy key Zeabur generated, for Zeabur Builder to
-          fetch a private repository: a `kubernetes.io/ssh-auth` Secret with the private key and the
-          Git host's `known_hosts`, labelled `builder.zeabur.com/git-credentials: "true"`. The key is
-          sealed by the server that made it; the API opens it and plans the Secret as a `create`,
-          so the private key never travels in the clear.
+          Create the Secret that holds an SSH deploy key, for Zeabur Builder to fetch a private
+          repository: a `kubernetes.io/ssh-auth` Secret with the private key and the Git host's
+          `known_hosts`, labelled `builder.zeabur.com/git-credentials: "true"`. The API plans the
+          Secret as a `create` with its values hidden and makes the key pair at apply, so the
+          private key never leaves the server.
         required:
         - name
-        - key
+        - host
         - op
         properties:
-          key:
+          host:
             type: string
-            description: The sealed key, as `POST /projects/{p}/deploy-keys` returned it.
+            description: >-
+              The Git host as the repository's SSH URL names it, with `:port` when it is not
+              22.
+          knownHosts:
+            type:
+            - string
+            - "null"
+            description: |-
+              The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+              `github.com` and `gitlab.com`, whose keys Zeabur pins.
           name:
             type: string
             description: The Secret's name.
@@ -7214,6 +7224,21 @@ components:
       enum:
       - install
       - remove
+    ComponentApplied:
+      type: object
+      description: What `apply` wrote, and the plan as it is after the writes.
+      required:
+      - plan
+      - written
+      properties:
+        plan:
+          $ref: "#/components/schemas/ComponentPlan"
+          description: The plan after the writes, as `plan` answers it.
+        written:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectWritten"
+          description: Each object written, in order; empty when no step was due.
     ComponentCheck:
       type: object
       description: One health check of the catalog, run once every step is ready.
@@ -8570,6 +8595,17 @@ components:
         verb:
           type: string
           description: The request verb (`create`, `patch`, …).
+    DeployKeyHost:
+      type: object
+      description: The host keys a deploy key's Secret will trust.
+      required:
+      - hostKeys
+      properties:
+        hostKeys:
+          type: array
+          items:
+            $ref: "#/components/schemas/TrustedHostKey"
+          description: Each host key, to compare with the fingerprints the host publishes.
     DeployKeyPublic:
       type: object
       description: The public half of a deploy key Zeabur made.
@@ -8597,29 +8633,6 @@ components:
           description: |-
             The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
             `github.com` and `gitlab.com`, whose keys Zeabur pins.
-    DeployKeyResponse:
-      type: object
-      description: A new deploy key.
-      required:
-      - publicKey
-      - key
-      - expiresAt
-      - hostKeys
-      properties:
-        expiresAt:
-          type: string
-          description: When the sealed key stops working, RFC 3339.
-        hostKeys:
-          type: array
-          items:
-            $ref: "#/components/schemas/TrustedHostKey"
-          description: The host keys the Secret will trust.
-        key:
-          type: string
-          description: "The private key, sealed: give it back in a plan's `deployKey` change."
-        publicKey:
-          type: string
-          description: The public key, one `ssh-ed25519 …` line, to add on the Git host.
     Diagnosis:
       type: object
       description: One explained failure of a service's container.
@@ -12784,6 +12797,40 @@ components:
           - string
           - "null"
           description: The object as it is written, YAML; absent for a deletion.
+    ObjectWritten:
+      type: object
+      description: What one write of `apply` left on the cluster.
+      required:
+      - kind
+      - name
+      properties:
+        generation:
+          type:
+          - integer
+          - "null"
+          format: int64
+          description: "`metadata.generation` after the write, for the kinds that keep one."
+        kind:
+          type: string
+          description: The object's kind.
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type:
+          - string
+          - "null"
+          description: Its namespace, for a namespaced object.
+        resourceVersion:
+          type:
+          - string
+          - "null"
+          description: "`metadata.resourceVersion` after the write, when the cluster answered with the object."
+        uid:
+          type:
+          - string
+          - "null"
+          description: "`metadata.uid` after the write; absent for a deletion."
     Origin:
       type: object
       description: |-

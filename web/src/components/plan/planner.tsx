@@ -41,17 +41,12 @@ export interface PlanHooks {
   where?: (at: Schemas.ProblemAt) => string
   /** An apply refused after it created some of the objects. */
   onPartial?: (problem: Problem) => void
+  /** An apply that did not write everything it was asked to. */
+  onFailed?: () => void
 }
 
-/** Inside a service's Configure page, an edit waits in its draft instead; `direct` plans at once. */
-export function usePlanner(
-  project: string,
-  onApplied?: () => void,
-  direct = false,
-  hooks: PlanHooks = {},
-) {
-  const draft = useDraft()
-  usePreloadPlan()
+/** The plan on screen, and how to show one again: here while mounted, else in the shell's. */
+function useOpenPlan(project: string) {
   const [open, setOpen] = useState<Open | null>(null)
   const [refusal, setRefusal] = useState<Problem | undefined>(undefined)
   const mounted = useRef(false)
@@ -65,14 +60,27 @@ export function usePlanner(
     setRefusal(undefined)
     setOpen(next(project, ask, reviewed))
   }
+  const reopen = (ask: PlanAsk, reviewed?: Reviewed) =>
+    mounted.current ? show(ask, reviewed) : fallback.open(project, ask, reviewed)
+  return { open, setOpen, refusal, setRefusal, show, reopen }
+}
+
+/** Inside a service's Configure page, an edit waits in its draft instead; `direct` plans at once. */
+export function usePlanner(
+  project: string,
+  onApplied?: () => void,
+  direct = false,
+  hooks: PlanHooks = {},
+) {
+  const draft = useDraft()
+  usePreloadPlan()
+  const { open, setOpen, refusal, setRefusal, show, reopen } = useOpenPlan(project)
   /** True when the ask waits in the draft instead of opening the dialog. */
   const plan = (ask: PlanAsk): boolean => {
     if (!direct && draft?.stage(ask)) return true
     show(ask)
     return false
   }
-  const reopen = (ask: PlanAsk, reviewed?: Reviewed) =>
-    mounted.current ? show(ask, reviewed) : fallback.open(project, ask, reviewed)
   const dialog = open ? (
     <Suspense fallback={<PlanDialogPending title={open.ask.title} onClose={() => setOpen(null)} />}>
       <PlanDialog
@@ -93,25 +101,16 @@ export function usePlanner(
 
 /** A plan shown as a drawer's second step (`PlanDrawer`), not a dialog over it. Once the apply
  * starts the step closes and `onDone` runs, which usually closes the drawer. */
-export function usePlanStep(project: string, onDone: () => void, onApplied?: () => void) {
-  const [open, setOpen] = useState<Open | null>(null)
-  const [refusal, setRefusal] = useState<Problem | undefined>(undefined)
+export function usePlanStep(
+  project: string,
+  onDone: () => void,
+  onApplied?: () => void,
+  onFailed?: () => void,
+) {
+  const { open, setOpen, refusal, setRefusal, show, reopen } = useOpenPlan(project)
   usePreloadPlan()
   const [footer, setFooter] = useState<HTMLElement | null>(null)
-  const mounted = useRef(false)
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-  const show = (ask: PlanAsk, reviewed?: Reviewed) => {
-    setRefusal(undefined)
-    setOpen(next(project, ask, reviewed))
-  }
   const plan = (ask: PlanAsk) => show(ask)
-  const reopen = (ask: PlanAsk, reviewed?: Reviewed) =>
-    mounted.current ? show(ask, reviewed) : fallback.open(project, ask, reviewed)
   const view = open ? (
     <Suspense fallback={<PlanStepPending />}>
       <PlanStep
@@ -128,6 +127,7 @@ export function usePlanStep(project: string, onDone: () => void, onApplied?: () 
         onApplied={onApplied}
         reopen={reopen}
         onRefused={setRefusal}
+        hooks={{ onFailed }}
       />
     </Suspense>
   ) : null

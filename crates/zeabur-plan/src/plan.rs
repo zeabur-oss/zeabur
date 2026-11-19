@@ -553,7 +553,7 @@ impl<'a> Planner<'a> {
             Change::DeployKey { .. } => Err(error(
                 ErrorKind::BadRequest,
                 "unopened_deploy_key",
-                "A deploy key is planned by the server that sealed it.",
+                "A deploy key is planned by the API server, which makes it.",
             )),
             Change::PageServer(_) | Change::Template(_) => Err(error(
                 ErrorKind::BadRequest,

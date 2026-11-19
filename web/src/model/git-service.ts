@@ -56,8 +56,8 @@ export interface GitService extends Pick<
   /** For `token`. */
   username: string
   token: string
-  /** For `deployKey`: the sealed key `POST /deploy-keys` answered. */
-  sealedKey?: string
+  /** For `deployKey` on a host Zeabur does not pin: its `known_hosts` lines. */
+  knownHosts: string
   /** For `githubApp`. */
   installationId?: number
 }
@@ -89,6 +89,7 @@ export const newGitService = (): GitService => ({
   access: "public",
   username: "",
   token: "",
+  knownHosts: "",
   name: "",
   port: DEFAULT_BUILT_PORT,
   publicUrl: true,
@@ -233,14 +234,14 @@ export function gitProblems(
     taken,
     badEnv,
     badBuildEnv,
-    hasKey,
-  }: { taken: readonly string[]; badEnv: boolean; badBuildEnv: boolean; hasKey: boolean },
+    hostChecked,
+  }: { taken: readonly string[]; badEnv: boolean; badBuildEnv: boolean; hostChecked: boolean },
 ) {
   return {
     ...builtProblems(form, { taken, badEnv, badBuildEnv }),
     url: urlProblem(form.url),
     branch: branchProblem(form.branch),
-    key: form.access === "deployKey" && !hasKey,
+    hostKeys: form.access === "deployKey" && !hostChecked,
     token: form.access === "token" && (form.token.trim() === "" || form.username.trim() === ""),
     installation: form.access === "githubApp" && !form.installationId,
   }
@@ -250,7 +251,7 @@ export function gitProblems(
 const imageRepository = (registry: string, project: string, name: string) =>
   `${registry.replace(/\/+$/, "")}/${project}/${name}`
 
-const credentialsName = (name: string) => `${name}-git`
+export const credentialsName = (name: string) => `${name}-git`
 /** The Secret that holds a Build's variables. */
 export const buildEnvSecret = (build: string) => `${build}-build-env`
 
@@ -374,7 +375,8 @@ function builtObjects(
   return objects
 }
 
-/** The objects the form creates, the deploy key aside: it is a change of its own. */
+/** The objects the form creates, the deploy key aside: it is a change of its own, made at
+ * apply. */
 export function gitObjects(
   form: GitService,
   project: string,
@@ -412,8 +414,14 @@ export function createGitService(
     op: "create",
     object: { ...object },
   }))
-  if (form.access === "deployKey" && form.sealedKey)
-    changes.push({ op: "deployKey", name: credentialsName(form.name), key: form.sealedKey })
+  const host = form.access === "deployKey" ? deployKeyHost(form.url) : undefined
+  if (host)
+    changes.push({
+      op: "deployKey",
+      name: credentialsName(form.name),
+      host,
+      ...(pinnedHost(host) ? {} : { knownHosts: form.knownHosts }),
+    })
   return changes
 }
 

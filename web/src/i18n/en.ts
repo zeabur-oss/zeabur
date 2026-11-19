@@ -2845,7 +2845,11 @@ export const en = {
   "add.problem.githubRepository": "Pick a repository.",
   "add.access.noSecrets":
     "Your role can't add secrets in this project, so only public repositories work.",
-  "add.deployKeyMake": "Create deploy key",
+  "add.deployKeyLater":
+    "Zeabur makes the key when it creates the service. Then you add its public key to the repository.",
+  "add.deployKeyMaking": "Creating the service. Its public key shows here next.",
+  "add.deployKeyMade": "The service is created. It builds once the repository has this key.",
+  "add.hostKeysRead": "Check host keys",
   "add.deployKeyPublic": "Public key",
   "add.deployKeyAdd": "Add this key to the repository's deploy keys, without write access.",
   "add.deployKeyOpen": (host: string) => `Open deploy keys on ${host}`,
@@ -2857,8 +2861,8 @@ export const en = {
     "Paste what the command prints. Zeabur Builder connects only to a host that holds one of these keys.",
   "add.hostKeys": "Host keys Zeabur Builder trusts",
   "add.hostKeysCheck":
-    "Compare these fingerprints with the ones the Git host's admin publishes. Add the public key only when they match.",
-  "add.problem.deployKey": "Create the deploy key and add it to the repository.",
+    "Compare these fingerprints with the ones the Git host's admin publishes. Continue only when they match.",
+  "add.problem.deployKey": "Check the host keys first.",
   "add.token": "Token",
   "add.problem.token": "Enter the username and token.",
   "add.gitMoreSummary": "Root directory, variables, build variables, size and security.",

@@ -11,7 +11,7 @@ import * as zeabur from "@/api/zeabur"
 import { refreshProject, refreshProjects } from "@/api/queries"
 import { failureOf } from "@/components/plan/describe"
 import { markCreated } from "@/lib/created"
-import type { PlanAsk } from "@/components/plan/planner"
+import type { PlanAsk, PlanHooks } from "@/components/plan/planner"
 import { replansOn, type Reviewed } from "@/components/plan/replan"
 import type { Locale, Translate } from "@/i18n"
 import { namespaceOps } from "@/model/project"
@@ -46,8 +46,7 @@ export interface Confirmed {
   /** The plan the person confirmed. */
   reviewed?: Reviewed
   onApplied?: () => void
-  /** The apply was refused after it created some of the objects. */
-  onPartial?: (problem: Schemas.Problem) => void
+  hooks?: PlanHooks
 }
 
 /** Applies a confirmed plan and reports the outcome in a toast. */
@@ -80,11 +79,13 @@ export async function carryOut(confirmed: Confirmed): Promise<void> {
           : undefined,
     })
   } catch (error) {
+    confirmed.hooks?.onFailed?.()
     const problem = toProblem(error)
-    if (problem.applied?.length && confirmed.onPartial) {
+    const onPartial = confirmed.hooks?.onPartial
+    if (problem.applied?.length && onPartial) {
       toast.dismiss(id)
       void refreshProject(project)
-      confirmed.onPartial(problem)
+      onPartial(problem)
       return
     }
     if (replansOn(problem)) {

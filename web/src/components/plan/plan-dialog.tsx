@@ -136,7 +136,7 @@ function usePlan(
       reopen,
       reviewed: plan.data,
       onApplied,
-      onPartial: hooks?.onPartial,
+      hooks,
     })
     ;(onConfirmed ?? onClose)()
   }

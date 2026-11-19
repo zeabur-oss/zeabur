@@ -1,23 +1,20 @@
-//! Deploy keys for Zeabur Builder: `POST /projects/{p}/deploy-keys`.
+//! Deploy keys for Zeabur Builder.
 //!
-//! It makes an SSH key pair whose public half the person adds to the repository on its Git host;
-//! the private half never leaves the server in the clear.
-//!
-//! The answer carries the private key sealed (AES-256-GCM under the plan key, as plan tokens
-//! are), bound to the person, the project and the Git host. A plan's
-//! [`Change::DeployKey`] hands it back; `open` turns it into
-//! the `create` of a `kubernetes.io/ssh-auth` Secret with the private key and the host's
-//! `known_hosts`, which Zeabur Builder requires. The plan shows the Secret with its values hidden,
-//! like every Secret it writes.
+//! A plan's [`Change::DeployKey`] names the Secret and the Git host. The plan shows the `create`
+//! of a `kubernetes.io/ssh-auth` Secret with its values hidden, like every Secret it writes; the
+//! apply makes the SSH key pair and writes the private key and the host's `known_hosts`, which
+//! Zeabur Builder requires, into that Secret. The private key never leaves the server. The person
+//! then reads the public key from the Secret (`POST /projects/{p}/deploy-keys/{name}/public`) and
+//! adds it to the repository on its Git host.
 //!
 //! GitHub's and GitLab's host keys are pinned here. For any other host the person gives its
 //! `known_hosts` lines, from `ssh-keyscan` and checked against the fingerprints the host
-//! publishes; the answer repeats each key's fingerprint. Zeabur does not fetch a host key over the
-//! network, since a first connection cannot tell a real host from one in between.
+//! publishes (`POST /projects/{p}/deploy-keys/host-keys` repeats each key's fingerprint). Zeabur
+//! does not fetch a host key over the network, since a first connection cannot tell a real host
+//! from one in between.
 
 use std::collections::BTreeMap;
 
-use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
@@ -26,12 +23,8 @@ use zeabur_plan::{Change, PlanRequest};
 
 use crate::error::{ApiError, get_read, read_problem};
 use crate::extract::{Json, Path};
-use crate::handlers::{AppState, Person};
-use crate::plan_token::{self as token, PlanKey, TokenError};
+use crate::handlers::Person;
 
-const PREFIX: &str = "k1.";
-/// How long a sealed key may wait for its plan: long enough to add the key on the Git host.
-const LIFETIME_SECONDS: i64 = 24 * 60 * 60;
 /// The label Zeabur Builder reads credentials by.
 pub const GIT_CREDENTIALS_LABEL: &str = "builder.zeabur.com/git-credentials";
 
@@ -73,17 +66,11 @@ pub struct TrustedHostKey {
     pub fingerprint: String,
 }
 
-/// A new deploy key.
+/// The host keys a deploy key's Secret will trust.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
-pub struct DeployKeyResponse {
-    /// The public key, one `ssh-ed25519 …` line, to add on the Git host.
-    pub public_key: String,
-    /// The private key, sealed: give it back in a plan's `deployKey` change.
-    pub key: String,
-    /// When the sealed key stops working, RFC 3339.
-    pub expires_at: String,
-    /// The host keys the Secret will trust.
+pub struct DeployKeyHost {
+    /// Each host key, to compare with the fingerprints the host publishes.
     pub host_keys: Vec<TrustedHostKey>,
 }
 
@@ -93,18 +80,6 @@ pub struct DeployKeyResponse {
 pub struct DeployKeyPublic {
     /// One `ssh-ed25519 …` line, to add on the Git host again.
     pub public_key: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Claims {
-    person: String,
-    project: String,
-    host: String,
-    private: String,
-    expires_at: i64,
-    /// The person's `known_hosts` lines, for a host whose keys are not pinned.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    known_hosts: Option<String>,
 }
 
 fn known_hosts(host: &str) -> Option<&'static str> {
@@ -180,58 +155,22 @@ fn trusted(host: &str, given: Option<&str>) -> Result<(String, Vec<TrustedHostKe
     Ok((lines, shown))
 }
 
-fn key_of(state: &AppState) -> Result<std::sync::Arc<PlanKey>, ApiError> {
-    state.plan_key.clone().ok_or_else(|| {
-        ApiError::from(Problem::new(
-            Kind::Internal,
-            "Zeabur could not make a token key when it started, so it cannot seal a deploy key.",
-        ))
-    })
-}
-
-/// Makes an SSH deploy key for a repository on `host`: the public key to add there, and the
-/// private key sealed for the plan that creates its Secret.
-#[utoipa::path(post, path = "/api/v1/projects/{project}/deploy-keys", tag = "projects",
-    operation_id = "createDeployKey",
+/// The host keys a deploy key for `host` will trust: the pinned ones for GitHub and GitLab, else
+/// those of the `known_hosts` lines given. Makes no key.
+#[utoipa::path(post, path = "/api/v1/projects/{project}/deploy-keys/host-keys", tag = "projects",
+    operation_id = "inspectDeployKeyHost",
     params(("project" = String, Path, description = "The project's namespace")),
     request_body = DeployKeyRequest,
-    responses((status = 200, body = DeployKeyResponse),
+    responses((status = 200, body = DeployKeyHost),
               (status = 400, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn create(
-    State(state): State<AppState>,
-    Person(cluster): Person,
-    Path(project): Path<String>,
+pub(crate) async fn host_keys(
+    Person(_): Person,
+    Path(_project): Path<String>,
     Json(request): Json<DeployKeyRequest>,
-) -> Result<Json<DeployKeyResponse>, ApiError> {
+) -> Result<Json<DeployKeyHost>, ApiError> {
     let host = request.host.trim().to_ascii_lowercase();
-    let (lines, host_keys) = trusted(&host, request.known_hosts.as_deref())?;
-    let pinned =
-        split_port(&host).is_some_and(|(name, port)| port == 22 && known_hosts(name).is_some());
-    let sealing = key_of(&state)?;
-    let identity = cluster
-        .whoami()
-        .await
-        .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
-    let pair = zeabur_core::ssh::deploy_key(&format!("zeabur {project}")).map_err(random)?;
-    let now = (state.clock)().as_second();
-    let expires_at = now.saturating_add(LIFETIME_SECONDS);
-    let claims = Claims {
-        person: identity.username,
-        project,
-        host,
-        private: pair.private,
-        expires_at,
-        known_hosts: (!pinned).then_some(lines),
-    };
-    let key = token::sign_as(&sealing, PREFIX, &claims).map_err(random)?;
-    Ok(Json(DeployKeyResponse {
-        public_key: pair.public,
-        key,
-        expires_at: zeabur_kube::k8s_openapi::jiff::Timestamp::from_second(expires_at)
-            .unwrap_or(zeabur_kube::k8s_openapi::jiff::Timestamp::UNIX_EPOCH)
-            .to_string(),
-        host_keys,
-    }))
+    let (_, host_keys) = trusted(&host, request.known_hosts.as_deref())?;
+    Ok(Json(DeployKeyHost { host_keys }))
 }
 
 /// The public key of the deploy key in Secret `name`, read as the person, for adding it to the
@@ -274,17 +213,34 @@ fn refused(detail: &str) -> ApiError {
     ApiError::from(Problem::new(Kind::BadRequest, detail))
 }
 
-/// `request` with each `deployKey` change opened into the `create` of its Secret; the request
-/// as it is when it has none.
+/// Whether [`open`] makes the key pair.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum KeyPair {
+    /// For a plan: the Secret holds [`PLANNED_KEY`] in place of a key, and its values are hidden
+    /// anyway.
+    Hidden,
+    /// For an apply: a new key pair.
+    New,
+}
+
+/// What a planned Secret holds in place of the private key. Kubernetes refuses an
+/// `kubernetes.io/ssh-auth` Secret with an empty `ssh-privatekey` [k8s-ssh-auth], and the plan's
+/// dry run sends it.
+///
+/// [k8s-ssh-auth]: https://github.com/kubernetes/kubernetes/blob/v1.34.0/pkg/apis/core/validation/validation.go#L7407-L7411
+const PLANNED_KEY: &str = "<made at apply>";
+
+/// `request` with each `deployKey` change turned into the `create` of its Secret; the request as
+/// it is when it has none.
 ///
 /// # Errors
 ///
-/// `400` for a key that does not open, has expired, or was made for another person or project.
+/// `400` for a host that is not pinned and has no valid `known_hosts` lines; `500` when the
+/// random number generator fails.
 pub(crate) fn open(
-    state: &AppState,
-    person: &str,
     project: &str,
     request: &PlanRequest,
+    pair: KeyPair,
 ) -> Result<PlanRequest, ApiError> {
     if !request
         .changes
@@ -293,39 +249,30 @@ pub(crate) fn open(
     {
         return Ok(request.clone());
     }
-    let sealing = key_of(state)?;
-    let now = (state.clock)().as_second();
     let changes = request
         .changes
         .iter()
         .map(|change| {
-            let Change::DeployKey { name, key } = change else {
+            let Change::DeployKey {
+                name,
+                host,
+                known_hosts,
+            } = change
+            else {
                 return Ok(change.clone());
             };
-            let claims: Claims = token::open_as(&sealing, PREFIX, key).map_err(|e| match e {
-                TokenError::Expired | TokenError::Malformed => {
-                    refused("The deploy key is not one Zeabur made. Make a new one.")
+            let host = host.trim().to_ascii_lowercase();
+            let (lines, _) = trusted(&host, known_hosts.as_deref())?;
+            let private = match pair {
+                KeyPair::Hidden => PLANNED_KEY.to_owned(),
+                KeyPair::New => {
+                    zeabur_core::ssh::deploy_key(&format!("zeabur {project}"))
+                        .map_err(random)?
+                        .private
                 }
-                TokenError::Altered => refused(
-                    "The deploy key was altered, or is not from this server. Make a new one.",
-                ),
-            })?;
-            if now >= claims.expires_at {
-                return Err(refused(
-                    "The deploy key expired before it was used. Make a new one and add it again.",
-                ));
-            }
-            if claims.person != person || claims.project != project {
-                return Err(refused(
-                    "This deploy key was made for someone else or another project.",
-                ));
-            }
-            let hosts = match claims.known_hosts {
-                Some(lines) => lines,
-                None => trusted(&claims.host, None)?.0,
             };
             Ok(Change::Create {
-                object: secret(name, &claims.private, &hosts),
+                object: secret(name, &private, &lines),
                 yaml: None,
             })
         })
@@ -369,6 +316,22 @@ mod tests {
         );
         assert_eq!(split_port("git.example.com:x"), None);
         assert_eq!(split_port("2001:db8::1"), None);
+    }
+
+    #[test]
+    fn a_planned_secret_holds_a_key_kubernetes_accepts() {
+        let request = PlanRequest {
+            changes: vec![Change::DeployKey {
+                name: "web-git".to_owned(),
+                host: "github.com".to_owned(),
+                known_hosts: None,
+            }],
+        };
+        let planned = open("shop", &request, KeyPair::Hidden).unwrap();
+        let [Change::Create { object, .. }] = planned.changes.as_slice() else {
+            panic!("{:?}", planned.changes);
+        };
+        assert_eq!(object["stringData"]["ssh-privatekey"], PLANNED_KEY);
     }
 
     #[test]

@@ -324,7 +324,7 @@ macro_rules! handlers {
             projects::volume_restores::get,
             projects::builds::get,
             projects::source_upload::upload,
-            projects::deploy_keys::create,
+            projects::deploy_keys::host_keys,
             cluster::github_app::project,
             images::inspect,
             projects::compose::convert_compose,
