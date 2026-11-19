@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 372" width="480" height="372" role="img"><title>訪客的請求從瀏覽器經過網域和 HTTPS 憑證，送到服務</title><style>
+svg{--bg:#FAFAFB;--card:#FFFFFF;--line:#E8E7EB;--line2:#D0CED4;--text:#18171B;--muted:#5C5962;--acc:#6300FF;--accs:rgba(99,0,255,.07)}
+@media (prefers-color-scheme: dark){svg{--bg:#1D1C20;--card:#1F1E22;--line:#34313A;--line2:#4C4851;--text:#F0EFF2;--muted:#B0ADB6;--acc:#A469FF;--accs:rgba(164,105,255,.14)}}
+text{font-family:-apple-system,"Segoe UI","PingFang TC","Noto Sans CJK TC",sans-serif;fill:var(--text)}
+.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--line2);stroke-width:1}
+.soft{fill:var(--bg);stroke:var(--line);stroke-width:1}
+.acc{fill:var(--accs);stroke:var(--acc);stroke-width:1}
+.t{font-size:17px;font-weight:600}.m{font-size:14px;fill:var(--muted)}.a{fill:var(--acc)}
+.ln{stroke:var(--line2);stroke-width:1;fill:none}.lna{stroke:var(--acc);stroke-width:1.5;fill:none}
+.hd{fill:var(--line2)}.hda{fill:var(--acc)}
+</style><rect class="bg" width="480" height="372" rx="6"/><rect class="card" x="110" y="16" width="260" height="52" rx="6"/><text class="t" x="240.0" y="47.0" text-anchor="middle">瀏覽器</text><path class="ln" d="M240 68V97"/><path class="hd" d="M240 104l-4 -8h8z"/><text class="m" x="254" y="91">DNS 紀錄</text><rect class="card" x="110" y="104" width="260" height="64" rx="6"/><text class="t" x="240.0" y="132.0" text-anchor="middle">app.example.com</text><text class="m" x="240.0" y="152.0" text-anchor="middle">網域</text><path class="lna" d="M240 168V197"/><path class="hda" d="M240 204l-4 -8h8z"/><text class="m a" x="254" y="191">HTTPS</text><rect class="acc" x="110" y="204" width="260" height="52" rx="6"/><text class="t" x="240.0" y="235.0" text-anchor="middle">憑證</text><path class="ln" d="M240 256V285"/><path class="hd" d="M240 292l-4 -8h8z"/><rect class="card" x="110" y="292" width="260" height="64" rx="6"/><text class="t" x="240.0" y="320.0" text-anchor="middle">web</text><text class="m" x="240.0" y="340.0" text-anchor="middle">服務</text></svg>

@@ -943,6 +943,7 @@ function AccessButton({ route, host, ...rest }: RowDrawerProps) {
       {...rest}
       label={t("domainAccess.open", host)}
       icon={<SlidersHorizontalIcon aria-hidden="true" />}
+      testid="domain-access"
     >
       {(onClose) => (
         <DomainAccess
@@ -995,6 +996,7 @@ function CertificateButton({ route, host, ...rest }: RowDrawerProps) {
       label={t("domainCert.open", host)}
       off={route ? undefined : t("domainCert.gateway")}
       icon={<CertificateIcon aria-hidden="true" />}
+      testid="domain-cert"
     >
       {(onClose) =>
         route ? (

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 288" width="480" height="288" role="img"><title>变更先放进草稿，检查过后才应用到集群</title><style>
+svg{--bg:#FAFAFB;--card:#FFFFFF;--line:#E8E7EB;--line2:#D0CED4;--text:#18171B;--muted:#5C5962;--acc:#6300FF;--accs:rgba(99,0,255,.07)}
+@media (prefers-color-scheme: dark){svg{--bg:#1D1C20;--card:#1F1E22;--line:#34313A;--line2:#4C4851;--text:#F0EFF2;--muted:#B0ADB6;--acc:#A469FF;--accs:rgba(164,105,255,.14)}}
+text{font-family:-apple-system,"Segoe UI","PingFang SC","Noto Sans CJK SC",sans-serif;fill:var(--text)}
+.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--line2);stroke-width:1}
+.soft{fill:var(--bg);stroke:var(--line);stroke-width:1}
+.acc{fill:var(--accs);stroke:var(--acc);stroke-width:1}
+.t{font-size:17px;font-weight:600}.m{font-size:14px;fill:var(--muted)}.a{fill:var(--acc)}
+.ln{stroke:var(--line2);stroke-width:1;fill:none}.lna{stroke:var(--acc);stroke-width:1.5;fill:none}
+.hd{fill:var(--line2)}.hda{fill:var(--acc)}
+</style><rect class="bg" width="480" height="288" rx="6"/><rect class="card" x="90" y="16" width="300" height="64" rx="6"/><text class="t" x="240.0" y="44.0" text-anchor="middle">修改</text><text class="m" x="240.0" y="64.0" text-anchor="middle">变更先放进草稿</text><path class="ln" d="M240 80V105"/><path class="hd" d="M240 112l-4 -8h8z"/><rect class="acc" x="90" y="112" width="300" height="64" rx="6"/><text class="t" x="240.0" y="140.0" text-anchor="middle">检查变更</text><text class="m" x="240.0" y="160.0" text-anchor="middle">先看清楚每一项</text><path class="lna" d="M240 176V201"/><path class="hda" d="M240 208l-4 -8h8z"/><rect class="card" x="90" y="208" width="300" height="64" rx="6"/><text class="t" x="240.0" y="236.0" text-anchor="middle">应用</text><text class="m" x="240.0" y="256.0" text-anchor="middle">集群才会改变</text></svg>

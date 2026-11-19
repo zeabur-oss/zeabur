@@ -1,14 +1,16 @@
 ---
 title: 建立與管理專案
-description: 建立專案、把既有的 Namespace 加進 Zeabur、修改專案名稱和圖示，並控制其他專案能不能連進來。
+description: 建立專案，把叢集裡已有的應用程式加進 Zeabur，修改名稱和圖示，並決定其他專案能不能連進來。
 ---
 
-專案就是一個帶 `zeabur.com/project: "true"` 標籤的 Kubernetes Namespace。在**專案**頁按**新增專案**建立新的，或把叢集裡既有的 Namespace 加進來。專案的名稱、描述、圖示和網路隔離，都在專案**設定**修改。
+做完這一頁，**專案**頁會多出一個專案，你可以在裡面部署服務。專案把一組相關的服務放在一起，用法和 zeabur.com 的專案一樣。專案的名稱、描述、圖示和網路隔離，都在專案的**設定**修改。
+
+![一個專案放一組服務，每個服務可以有自己的網域](../images/diagrams/project.svg)
 
 ## 開始前
 
-- 建立專案要能建立 Namespace。把既有 Namespace 加進 Zeabur 或移出，要有那個 Namespace 的 `zeabur-manage` 權限，通常只有管理員有，見[專案 Namespace 的保護](../reference/permissions.mdx#專案-namespace-的保護)。
-- 專案名稱也是 Namespace 名稱，建立後不能改。只能用小寫字母、數字和連字號，開頭和結尾是字母或數字，最多 63 個字元，也不能用 `kube-` 開頭。
+- 你要有建立專案的權限。找不到**新增專案**時，請管理員幫你建立專案，再把你加進去。
+- 想好專案名稱。名稱只能用小寫英文字母、數字和連字號，開頭和結尾要是字母或數字，最多 63 個字元，也不能用 `kube-` 開頭。
 
 ## 建立專案
 
@@ -17,68 +19,97 @@ description: 建立專案、把既有的 Namespace 加進 Zeabur、修改專案�
 
 ### 填入名稱
 
-到**專案**頁，按**新增專案**。**名稱**填 `hello`，**顯示名稱**可以留白，填了就會取代名稱顯示在畫面上。
+到**專案**頁，按**新增專案**。**名稱**填 `hello`。**顯示名稱**可以留白，填了就會取代名稱顯示在畫面上。
 
 ![新增專案視窗，名稱填了 hello](../images/shots/project-new.avif)
 
-同名的 Namespace 已經存在時，表單會提示你改用既有的 Namespace，做法見[下一節](#把既有的-namespace-加進-zeabur)。
+專案在叢集裡是一個 Namespace，也就是 Kubernetes 用來分開放置一組服務的空間。專案名稱就是 Namespace 的名稱，所以建立後不能改。同名的 Namespace 已經存在時，表單會提示你改用它，做法見[下一節](#把既有的-namespace-加進-zeabur)。
 
 </Step>
 <Step>
 
 ### 檢查並建立
 
-送出後，檢查畫面列出要建立的物件：
+按**檢查變更**，畫面會列出 Zeabur 要做的事：
 
-- Namespace `hello`，帶專案標籤和三個 Pod Security 標籤，等級都是 `baseline`。服務可以用 root 執行，但不能存取主機。
-- `default` ServiceAccount 設成 `automountServiceAccountToken: false`，沒有指定 ServiceAccount 的副本不會拿到 Kubernetes API 的 token。
-- 叢集有標了 `zeabur.com/platform: "true"` 的 Namespace 時，還有 NetworkPolicy `zeabur-project`，其他專案的副本連不進來。
+- 建立 `hello` Namespace，加上專案標籤。安全等級設為 `baseline`：服務可以用 root 執行，但不能存取主機。
+- 沒有另外設定的服務，拿不到連 Kubernetes API 用的權杖。
+- 叢集裡有標了 `zeabur.com/platform: "true"` 的 Namespace 時，還會[隔離這個專案](#隔離其他專案)，其他專案的服務連不進來。
 
 ![建立專案 hello 前的確認畫面，說明會建立的 Namespace 與安全性設定](../images/shots/project-new-review.avif)
 
-確認後套用，畫面會進入新的專案。
+確認後按**建立**，畫面會進入新的專案。
 
 </Step>
 </Steps>
 
 ## 把既有的 Namespace 加進 Zeabur
 
-**專案**頁的**其他 Namespace** 列出還不是專案的 Namespace。在那一列打開選單，選**使用這個 Namespace**，檢查後套用。
+叢集裡已經有應用程式時，可以把它所在的 Namespace 變成專案，不用重新部署。這要有那個 Namespace 的 `zeabur-manage` 權限，通常只有管理員有，見[專案 Namespace 的保護](../reference/permissions.mdx#專案-namespace-的保護)。
 
-Zeabur 只替 Namespace 加上 `zeabur.com/project: "true"` 標籤，裡面的物件、Pod Security 標籤和 NetworkPolicy 都不會改變。
+1. 到**專案**頁的**其他 Namespace**，找到那個 Namespace。
 
-不想再在 Zeabur 看到這個 Namespace 時，到專案**設定**的**危險區域**按**從 Zeabur 移除**。這只會拿掉專案標籤，Namespace 和裡面的一切都會保留。要連同內容一起刪掉，見[刪除專案](./delete-project.mdx)。
+   ![專案頁的其他 Namespace 列出叢集裡還不是專案的 Namespace](../images/shots/existing-namespaces.avif)
+
+2. 在那一列打開選單，選**使用這個 Namespace**，檢查後套用。
+
+Zeabur 只替 Namespace 加上專案標籤 `zeabur.com/project: "true"`。裡面的服務、資料和安全性設定都保持原樣。
+
+不想再在 Zeabur 看到它時，到專案**設定**的**危險區域**按**從 Zeabur 移除**。這只會拿掉專案標籤，Namespace 和裡面的一切都會保留。要連同內容一起刪掉，見[刪除專案](./delete-project.mdx)。
 
 ## 修改名稱、描述和圖示
 
-到專案**設定**的**基本資訊**：
+1. 到專案**設定**的**基本資訊**，修改這三項：
+   - **專案名稱**：取代 Namespace 名稱顯示在畫面上，最多 64 個字元。
+   - **描述**：專案的用途，顯示在名稱下方，最多 500 個字元。
+   - **圖示**：按**更換圖示**，從 16 個圖示選一個。
 
-- **專案名稱**：取代 Namespace 名稱顯示，最多 64 個字元。
-- **描述**：專案的用途，顯示在名稱下方，最多 500 個字元。
-- **圖示**：按**更換圖示**從 16 個圖示選一個。
+   ![專案設定的基本資訊，有專案名稱、描述和圖示](../images/shots/project-details.avif)
 
-按**儲存詳細資料**，檢查後套用。這三項存在 Namespace 的 annotation 上。專案的開發者可以改這三項，其他 label 和 annotation 只有管理員能改。
+2. 按**儲存詳細資料**，檢查後套用。
+
+專案的開發者可以改這三項。Namespace 上的其他標籤和註解只有管理員能改。
 
 ## 設定建置的記憶體和 CPU
 
-在專案**設定**的**建置**，可以設定這個專案每次建置最多能用的記憶體和 CPU，例如 `2Gi` 和 `2`。留空就用 Zeabur Builder 的預設值。填的數量不能超過叢集裡最大的節點能給的量。按**儲存建置上限**並套用，之後開始的建置就會用新的值。
+建置因為記憶體不夠而失敗時，失敗訊息會連到這一節。
 
-建置因為記憶體不夠而失敗時，失敗訊息會連到這一節。改建置上限要有那個 Namespace 的 `patch` 和 `zeabur-manage` 權限，所以開發者看得到，但不能儲存。
+1. 到專案**設定**的**建置**，填這個專案每次建置最多能用的記憶體和 CPU，例如 `2Gi` 和 `2`。留空就用 Zeabur Builder 的預設值。填的數量不能超過叢集裡最大的節點能給的量。節點就是叢集裡的一台主機。
+2. 按**儲存建置上限**，檢查後套用。之後開始的建置就會用新的值。
 
-這兩個值就是 Namespace 的 `builder.zeabur.com/build-memory` 和 `builder.zeabur.com/build-cpu` 註解。
+改建置上限要有那個 Namespace 的 `patch` 和 `zeabur-manage` 權限。開發者看得到這兩個欄位，但不能儲存。
 
 ## 隔離其他專案
 
-到專案**設定**的**網路**，**其他專案**一列說明目前的狀態：
+隔離後，其他專案的服務就連不到這個專案的服務。
 
-- **叢集裡任何副本都連得到這個專案的服務。**：還沒有隔離。按**隔離**，檢查後套用，Zeabur 會建立 NetworkPolicy `zeabur-project`。
-- **連不到這個專案的服務。專案內的服務和 Zeabur 元件不受影響。**：已經隔離。
+1. 到專案**設定**的**網路**，看**其他專案**這一列：
+   - **叢集裡任何副本都連得到這個專案的服務。**：還沒有隔離。
+   - **連不到這個專案的服務。專案內的服務和 Zeabur 元件不受影響。**：已經隔離。
 
-隔離後，專案內的副本互相連得到，標了 `zeabur.com/platform: "true"` 的 Namespace（例如 Traefik 和資料庫 operator 所在的 Namespace）和 `kube-system` 也連得到。
+   ![專案設定的網路，其他專案一列說明目前是否隔離](../images/shots/project-network.avif)
 
-要讓另一個專案連進來，按**允許其他專案連入**，選擇專案，按**允許**，檢查後套用。Zeabur 建立 NetworkPolicy `zeabur-allow-from-<那個專案>`，對方的所有副本都能連到這個專案的所有服務。要取消，在那一列按**移除**。
+2. 還沒隔離時，按**隔離**，檢查後套用。
 
-畫面上沒有取消隔離的按鈕，要用 kubectl 刪除 `zeabur-project`，見下一節。規則是否真的生效，取決於叢集的網路外掛（CNI）是否支援 NetworkPolicy。
+隔離後，專案裡的服務仍然互相連得到。Traefik、資料庫 operator 這類 Zeabur 元件也連得到，因為它們所在的 Namespace 標了 `zeabur.com/platform: "true"`，`kube-system` 也一樣。
+
+要讓另一個專案連進來，按**允許其他專案連入**，選擇專案，按**允許**，檢查後套用。那個專案的所有服務就連得到這個專案的所有服務。要取消，在那一列按**移除**。
+
+畫面上沒有取消隔離的按鈕，要用 kubectl 處理，見頁面最後的[隔離和允許其他專案](#隔離和允許其他專案)。隔離是否真的生效，要看叢集的網路外掛（CNI）支不支援 NetworkPolicy。
+
+## 確認結果
+
+**專案**頁會列出這個專案，顯示你設定的名稱、描述和圖示。專案**設定**的**網路**寫出目前是否隔離，以及哪些專案能連進來。
+
+## 遇到問題
+
+| 畫面或結果 | 接著處理 |
+| --- | --- |
+| **已經有同名的 Namespace，可以改為使用既有的 Namespace。** | 換一個名稱，或到**其他 Namespace** 把那個 Namespace 加進 Zeabur。 |
+| 加入或移出專案時，叢集回覆 **Only an admin can change the namespace's labels** | 只有管理員能改 Namespace 的標籤，請管理員操作。 |
+| **這是 Kubernetes 留給自身元件的 Namespace，不能當作專案。** | `kube-` 開頭的 Namespace 和節點終端機用的 `zeabur-node-shell` 都不能當作專案。 |
+| 建立專案時，檢查畫面沒有隔離這一項 | 叢集裡沒有標了 `zeabur.com/platform: "true"` 的 Namespace。Zeabur 找不到 Ingress controller 在哪裡，所以不隔離，以免公開網域打不開。Ingress controller 是把網域的流量轉給服務的元件。請管理員替它所在的 Namespace 加上標籤，再到**網路**按**隔離**。 |
+| 隔離後公開網域打不開 | Ingress controller 所在的 Namespace 沒有 `zeabur.com/platform: "true"` 標籤。替那個 Namespace 加上標籤，或在 `zeabur-project` 加一條允許連入的規則。 |
 
 ## 用 kubectl 做同樣的事
 
@@ -119,6 +150,16 @@ automountServiceAccountToken: false
 kubectl label namespace demo zeabur.com/project=true
 kubectl label namespace demo zeabur.com/project-
 kubectl annotate namespace demo --overwrite zeabur.com/display-name='Demo shop'
+```
+
+專案名稱、描述和圖示存在 Namespace 的 annotation 上。
+
+### 建置上限
+
+建置上限是 Namespace 的 `builder.zeabur.com/build-memory` 和 `builder.zeabur.com/build-cpu` 註解：
+
+```sh
+kubectl annotate namespace demo --overwrite builder.zeabur.com/build-memory=2Gi builder.zeabur.com/build-cpu=2
 ```
 
 ### 調整 Pod Security 等級
@@ -186,9 +227,7 @@ spec:
 kubectl -n demo delete networkpolicy zeabur-project
 ```
 
-## 確認結果
-
-**專案**頁會列出這個專案，顯示你設定的名稱、描述和圖示。專案**設定**的**網路**寫出目前是否隔離，以及哪些專案能連進來。
+### 確認設定
 
 ```sh
 kubectl get namespace demo --show-labels
@@ -198,13 +237,3 @@ kubectl -n demo get serviceaccount default -o jsonpath='{.automountServiceAccoun
 ```
 
 第一行的標籤裡有 `zeabur.com/project=true` 和 `pod-security.kubernetes.io/enforce=baseline`。第二行列出所有專案。隔離後，第三行會列出 `zeabur-project`。最後一行印出 `false`。
-
-## 遇到問題
-
-| 畫面或結果 | 接著處理 |
-| --- | --- |
-| **已經有同名的 Namespace，可以改為使用既有的 Namespace。** | 換一個名稱，或到**其他 Namespace** 把那個 Namespace 加進 Zeabur。 |
-| 加入或移出專案時，叢集回覆 **Only an admin can change the namespace's labels** | 只有管理員能改 Namespace 的標籤，請管理員操作。 |
-| **這是 Kubernetes 留給自身元件的 Namespace，不能當作專案。** | `kube-` 開頭的 Namespace 和節點終端機用的 `zeabur-node-shell` 都不能當作專案。 |
-| 建立專案時沒有列出 `zeabur-project` | 叢集沒有標了 `zeabur.com/platform: "true"` 的 Namespace，Zeabur 分不出 Ingress controller 在哪裡，所以不建立。請管理員替這些 Namespace 加上標籤，再到**網路**按**隔離**。 |
-| 隔離後公開網域打不開 | Ingress controller 所在的 Namespace 沒有 `zeabur.com/platform: "true"` 標籤。替那個 Namespace 加上標籤，或在 `zeabur-project` 加一條允許連入的規則。 |

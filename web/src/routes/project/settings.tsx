@@ -74,7 +74,7 @@ export function ProjectSettings({ namespace }: { namespace: Schemas.ProjectNames
   return (
     <>
       {namespace.adopted ? (
-        <Group label={t("projectSettings.basic")}>
+        <Group id="details" label={t("projectSettings.basic")}>
           {readOnly ? (
             <p className="mb-3 flex flex-wrap items-center gap-2 text-sm text-secondary">
               {t("projectSettings.readOnly")}
@@ -196,9 +196,9 @@ function DeleteProjectButton({ project }: { project: string }) {
   )
 }
 
-function Group({ label, children }: { label: string; children: ReactNode }) {
+function Group({ id, label, children }: { id?: string; label: string; children: ReactNode }) {
   return (
-    <section>
+    <section id={id}>
       <SectionLabel>{label}</SectionLabel>
       {children}
     </section>

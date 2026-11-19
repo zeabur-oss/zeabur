@@ -3,13 +3,13 @@ title: Deploy from an application template
 description: Choose an application template from Zeabur Catalog, enter a domain and the required values, and deploy it to a project.
 ---
 
-In a project, select **Add** → **App template**, choose an application, enter a domain and the required values, and click **Review changes**, then apply. Templates come from the [Zeabur Catalog](https://github.com/zeabur-oss/catalog) bundled with this version of Zeabur. Zeabur doesn't download templates from an external source during deployment.
+When you finish this page, the project has a new application, such as Miniflux, with its services, databases, and public domain. Open the domain to start using it. Templates come from the [Zeabur Catalog](https://github.com/zeabur-oss/catalog) bundled with this version of Zeabur. Zeabur doesn't download templates from an external source during deployment.
 
 ## Before you start
 
-- You need an existing project and permission to create services. Zeabur creates template objects with your own permissions. Review changes lists any objects you don't have permission to create.
+- You need an existing project and permission to create services. Zeabur creates the template's contents with your own permissions. Review changes lists any items you don't have permission to create.
 - Install the components the template requires. For example, templates that use PostgreSQL need CloudNativePG. The template list shows **Install first…** below each template that requires components.
-- If the template needs a public domain, prepare a domain that points to the cluster's ingress. For templates that require HTTPS, configure a certificate issuer in Zeabur first.
+- If the template needs a public domain, prepare a domain that points to the cluster's entry point. For templates that require HTTPS, a cluster administrator must set a certificate issuer first. See [Add public domains and HTTPS](../configure/domains.mdx).
 
 ## Deploy a template
 
@@ -47,7 +47,7 @@ Passwords and keys are generated in your browser and stored in the secret specif
 
 ### Review and apply
 
-Click **Review changes**, check the objects to be created, then apply. **What starts** lists the template's services, databases, and domains, with peak CPU and memory requirements below. If the same template has already been deployed in this project, the review shows the objects that already exist. Delete them first, or deploy to another project. All template objects are created in this project's namespace.
+Click **Review changes**, check the items to be created, then apply. **What starts** lists the template's services, databases, and domains, with peak CPU and memory requirements below. If the same template has already been deployed in this project, the review shows the items that already exist. Delete them first, or deploy to another project. Every item is created in this project.
 
 ![Miniflux deployment review listing the secrets, services, databases, and domains to create, and whether enough resources are available](../images/shots/template-review.avif)
 
@@ -58,17 +58,17 @@ Click **Review changes**, check the objects to be created, then apply. **What st
 
 After you apply the changes, the template's services and databases appear in the project. Open each service's **Overview**, wait for its replicas to be ready, then open the template's public domain and confirm that the application's page loads.
 
-Every template object, including the generated password secrets, has three labels: `app.kubernetes.io/instance` and `templates.zeabur.com/template` contain the template ID, and `app.kubernetes.io/version` contains the application version. Use kubectl to list the objects from this deployment:
+## Troubleshooting
 
-```sh
-kubectl -n shop get deploy,statefulset,svc,ingress,pvc,secret -l app.kubernetes.io/instance=miniflux
-```
-
-For templates that use a database, also confirm that the operator's objects are ready. For example, check that `kubectl -n shop get clusters.postgresql.cnpg.io -l app.kubernetes.io/instance=miniflux` shows `Cluster in healthy state` in `STATUS`.
+- Name already exists: Templates use fixed names. If the same template has already been deployed in the project, or a secret with the same name exists, Review changes lists the conflicts. Deploy to another project.
+- Field format doesn't match: The required format appears below the field. Update the value to match, then review changes again.
+- Review changes says the cluster doesn't support an object type: A required component isn't installed or is still starting. Check its status on the **Components** page.
 
 ## Do the same with kubectl
 
-Zeabur uses its bundled [Zeabur Catalog](https://github.com/zeabur-oss/catalog) to render templates as YAML. This happens inside Zeabur and has no corresponding cluster object, but you can use Catalog's `catalog` command to generate the same YAML and apply it with kubectl.
+### Generate the YAML yourself and apply it
+
+Zeabur uses its bundled Zeabur Catalog to render templates as Kubernetes YAML. This happens inside Zeabur and has no corresponding cluster object, but you can use Catalog's `catalog` command to generate the same YAML and apply it with kubectl.
 
 First, find the Catalog version Zeabur uses: open **About** in **Settings**. The **Zeabur Catalog** row shows its commit. Check out that commit in the Catalog source, enter `nix develop`, then run:
 
@@ -93,9 +93,19 @@ kubectl -n shop delete all,ingress,pvc,secret,configmap,networkpolicy -l app.kub
 
 Operator objects, such as databases, have the same labels. Find them with `kubectl -n shop get <kind> -l app.kubernetes.io/instance=miniflux`, then delete them. Deleting volumes and databases also deletes their data.
 
-## Connection rules
+### Check the deployed objects
 
-Templates don't block traffic across the entire project. The project's `zeabur-project` determines who can connect to replicas in the project. See [Security](../reference/security.mdx). Outbound connections aren't blocked, so applications can connect to model services, webhooks, mail servers, and S3 for backups.
+Every template object, including the secrets that hold generated passwords, has three labels: `app.kubernetes.io/instance` and `templates.zeabur.com/template` contain the template ID, and `app.kubernetes.io/version` contains the application version. List the objects from this deployment:
+
+```sh
+kubectl -n shop get deploy,statefulset,svc,ingress,pvc,secret -l app.kubernetes.io/instance=miniflux
+```
+
+For templates that use a database, also confirm that the operator's objects are ready. For example, check that `kubectl -n shop get clusters.postgresql.cnpg.io -l app.kubernetes.io/instance=miniflux` shows `Cluster in healthy state` in `STATUS`. An operator is the cluster component that manages a database.
+
+### Limit outbound connections from an application
+
+Templates don't block traffic across the entire project. The project's NetworkPolicy `zeabur-project` determines who can connect to replicas in the project. See [Security](../reference/security.mdx). Outbound connections aren't blocked, so applications can connect to model services, webhooks, mail servers, and S3 for backups.
 
 To restrict an application's outbound connections, add a NetworkPolicy. This example lets Umami query DNS and connect only to its database:
 
@@ -130,9 +140,3 @@ spec:
 ```
 
 Apply it with `kubectl apply -n <project-namespace> -f umami-egress.yaml`. Make sure `podSelector` selects only the application's replicas, not the database's. The database needs to connect to the Kubernetes API and S3 for backups. Blocking those connections stops the database from working and causes backups to fail.
-
-## Common failures
-
-- Name already exists: Templates use fixed object names. If the same template has already been deployed in the project, or a secret with the same name exists, Review changes lists the conflicts. Deploy to another project.
-- Field format doesn't match: The required format appears below the field. Update the value to match, then review changes again.
-- Review changes says the cluster doesn't support an object type: A required component isn't installed or is still starting. Check its status on the **Components** page.

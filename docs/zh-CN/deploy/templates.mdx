@@ -3,13 +3,13 @@ title: 从应用模板部署
 description: 从 Zeabur Catalog 的模板中选择应用，填写域名和必要字段后部署到项目。
 ---
 
-在项目中选择**新建** → **应用模板**，选择应用，填写域名和必要字段，点击**检查变更**后应用。模板来自当前 Zeabur 版本内置的 [Zeabur Catalog](https://github.com/zeabur-oss/catalog)，部署时不会从外部下载模板。
+完成这一页后，项目中会多出一个应用，例如 Miniflux，连同它的服务、数据库和公开域名。打开域名就能使用。模板来自当前 Zeabur 版本内置的 [Zeabur Catalog](https://github.com/zeabur-oss/catalog)，部署时不会从外部下载模板。
 
 ## 开始前
 
-- 已有项目，并有创建服务的权限。模板中的对象使用你自己的权限创建，检查变更时会列出权限不足、无法创建的对象。
+- 已有项目，并有创建服务的权限。模板的内容使用你自己的权限创建，检查变更时会列出权限不足、无法创建的内容。
 - 已安装模板需要的组件，例如使用 PostgreSQL 的模板需要 CloudNativePG。模板列表会在模板下方显示**需要先安装…**。
-- 如果模板需要公开域名，准备一个指向集群 Ingress 的域名。如果模板需要 HTTPS，Zeabur 必须先指定证书签发者。
+- 如果模板需要公开域名，准备一个指向集群入口的域名。如果模板需要 HTTPS，集群管理员要先指定证书签发者，见[添加公开域名与 HTTPS](../configure/domains.mdx)。
 
 ## 部署模板
 
@@ -47,7 +47,7 @@ description: 从 Zeabur Catalog 的模板中选择应用，填写域名和必要
 
 ### 检查并应用
 
-点击**检查变更**，确认要创建的对象后应用。**会启动的服务**会列出模板的服务、数据库和域名，下方显示峰值所需的 CPU 和内存。如果项目中已经部署过同一模板，页面会列出已存在的对象，需要先删除这些对象，或改为部署到其他项目。模板中的所有对象都会创建在当前项目的 Namespace 中。
+点击**检查变更**，确认要创建的内容后应用。**会启动的服务**会列出模板的服务、数据库和域名，下方显示峰值所需的 CPU 和内存。如果项目中已经部署过同一模板，页面会列出已存在的内容，需要先删除，或改为部署到其他项目。所有内容都创建在这个项目中。
 
 ![部署 Miniflux 的检查页面，列出将创建的机密变量、服务、数据库和域名，以及资源是否充足](../images/shots/template-review.avif)
 
@@ -58,17 +58,17 @@ description: 从 Zeabur Catalog 的模板中选择应用，填写域名和必要
 
 应用变更后，模板的服务和数据库会出现在项目中。打开各服务的**概览**，等待副本就绪，再打开模板的公开域名，确认能看到应用页面。
 
-模板中的每个对象，以及存放生成密码的机密变量，都带有三个标签：`app.kubernetes.io/instance` 和 `templates.zeabur.com/template` 是模板 ID，`app.kubernetes.io/version` 是应用版本。用 kubectl 列出本次部署的对象：
+## 遇到问题
 
-```sh
-kubectl -n shop get deploy,statefulset,svc,ingress,pvc,secret -l app.kubernetes.io/instance=miniflux
-```
-
-如果模板使用数据库，还要确认 operator 的对象已就绪，例如 `kubectl -n shop get clusters.postgresql.cnpg.io -l app.kubernetes.io/instance=miniflux` 的 `STATUS` 是 `Cluster in healthy state`。
+- 名称已存在：模板使用固定的名称。如果同一项目中已经部署过相同模板，或存在同名的机密变量，检查变更时会列出冲突。改为在其他项目中部署。
+- 字段格式不符：字段下方会说明要求的格式，按要求修改后重新检查。
+- 检查变更提示集群不支持某种对象：模板需要的组件尚未安装完成，或仍在启动。到**组件**页面确认状态。
 
 ## 用 kubectl 完成相同操作
 
-Zeabur 使用内置的 [Zeabur Catalog](https://github.com/zeabur-oss/catalog) 将模板转换为 YAML。转换在 Zeabur 内部完成，没有对应的集群对象，但你可以用 Catalog 的 `catalog` 命令生成相同的 YAML，再用 kubectl 应用。
+### 自己生成 YAML 再应用
+
+Zeabur 使用内置的 Zeabur Catalog 将模板转换为 Kubernetes 的 YAML。转换在 Zeabur 内部完成，没有对应的集群对象，但你可以用 Catalog 的 `catalog` 命令生成相同的 YAML，再用 kubectl 应用。
 
 先查看 Zeabur 使用的 Catalog 版本：打开**设置**中的**关于**，**Zeabur Catalog** 一行显示的就是 Catalog 的提交。在 Catalog 源码中切换到该提交，进入 `nix develop` 后运行：
 
@@ -93,9 +93,19 @@ kubectl -n shop delete all,ingress,pvc,secret,configmap,networkpolicy -l app.kub
 
 数据库等 operator 的对象也带有相同标签，用 `kubectl -n shop get <种类> -l app.kubernetes.io/instance=miniflux` 找到后再删除。删除卷和数据库时，也会删除其中的数据。
 
-## 网络规则
+### 确认部署
 
-模板不会拦截整个项目的流量。哪些来源能连接项目中的副本，由项目的 `zeabur-project` 决定，见[安全性](../reference/security.mdx)。出站连接不受限制，应用可以连接模型服务、Webhook、邮件服务器和用于备份的 S3。
+模板中的每个对象，以及存放生成密码的 Secret，都带有三个标签：`app.kubernetes.io/instance` 和 `templates.zeabur.com/template` 是模板 ID，`app.kubernetes.io/version` 是应用版本。列出本次部署的对象：
+
+```sh
+kubectl -n shop get deploy,statefulset,svc,ingress,pvc,secret -l app.kubernetes.io/instance=miniflux
+```
+
+如果模板使用数据库，还要确认 operator 的对象已就绪，例如 `kubectl -n shop get clusters.postgresql.cnpg.io -l app.kubernetes.io/instance=miniflux` 的 `STATUS` 是 `Cluster in healthy state`。operator 是在集群中管理数据库的组件。
+
+### 限制应用向外连接
+
+模板不会拦截整个项目的流量。哪些来源能连接项目中的副本，由项目的 NetworkPolicy `zeabur-project` 决定，见[安全性](../reference/security.mdx)。出站连接不受限制，应用可以连接模型服务、Webhook、邮件服务器和用于备份的 S3。
 
 要限制某个应用的出站连接，自行添加 NetworkPolicy。下面的示例只允许 Umami 查询 DNS 和连接自己的数据库：
 
@@ -130,9 +140,3 @@ spec:
 ```
 
 用 `kubectl apply -n <项目的命名空间> -f umami-egress.yaml` 应用。`podSelector` 只选择应用的副本，不要选中数据库：数据库需要连接 Kubernetes API 和用于备份的 S3，拦截这些连接会导致数据库停止运行，备份也会失败。
-
-## 常见失败情况
-
-- 名称已存在：模板使用固定的对象名称。如果同一项目中已经部署过相同模板，或存在同名的机密变量，检查变更时会列出冲突。改为在其他项目中部署。
-- 字段格式不符：字段下方会说明要求的格式，按要求修改后重新检查。
-- 检查变更提示集群不支持某种对象：模板需要的组件尚未安装完成，或仍在启动。到**组件**页面确认状态。

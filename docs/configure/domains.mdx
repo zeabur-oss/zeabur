@@ -3,16 +3,18 @@ title: Add public domains and HTTPS
 description: Connect a domain to a service, and configure HTTPS certificates, redirects, and visitor passwords.
 ---
 
-In the service's **Networking** tab, under **Public domains**, click **Add domain**, enter the domain, and add it to the changes. Review and apply the changes, then add the DNS records shown on screen at your DNS provider. Visitors can open the site once the address reaches the service and the HTTPS certificate is ready.
+When you finish this page, visitors who open `https://app.example.com` see your service, with no certificate warning in the browser. The domain is listed under **Public domains** on the service's **Networking** tab, with its DNS and certificate status beside it.
+
+![A visitor's request goes from the browser through the domain and an HTTPS certificate to the service](../images/diagrams/domain-path.svg)
+
+![The web service's Networking tab, showing public domains and the private network](../images/shots/service-networking.avif)
 
 ## Before you begin
 
 - The service has a port that accepts HTTP traffic, and its private address appears under **Private network**. The domain forwards requests to this address. If it doesn't have one, follow the on-screen instructions to expose a port first.
-- You have permission to manage the domain's DNS, or someone can update it for you.
-- You have permission to change the project's domains. If Helm, Argo CD, or Flux manages the route, update the original values or Git repository instead.
-- The cluster has cert-manager and a working issuer installed so certificates can be issued and renewed automatically. Wildcard domains, such as `*.example.com`, need an issuer that supports DNS-01.
-
-![The web service's Networking tab, showing public domains and the private network](../images/shots/service-networking.avif)
+- You can change the domain's DNS, or someone can change it for you.
+- You have permission to change the project's domains. If Helm, Argo CD, or Flux manages the domain, update the original values or Git repository instead.
+- The cluster has cert-manager and a working issuer, so HTTPS certificates are issued and renewed automatically. cert-manager is the cluster component that requests certificates, and the issuer is where it requests them from. Wildcard domains, such as `*.example.com`, need an issuer that supports DNS-01 validation.
 
 ## Add a domain
 
@@ -27,18 +29,18 @@ Open the service's **Networking** tab. Under **Public domains**, click **Add dom
 
 If the cluster has multiple issuers, the form shows an **Issuer** field. Keep the default or choose another issuer. If the domain can't get a certificate, the change review warns that it'll use HTTP only.
 
-If the cluster has a Gateway that accepts routes from this project, the form also shows a **Route** field. The default is **Ingress (default)**. You can also select a Gateway's listener to attach the domain to that Gateway through an HTTPRoute. When you select a Gateway, the issuer field disappears because the listener provides the HTTPS certificate. Only accounts that can read the cluster's Gateways see this option. If you don't see it, ask a cluster administrator for help.
+A cluster administrator may also have set up a Gateway, a shared entry point for the cluster's traffic. If a Gateway accepts this project's domains, the form also shows a **Route** field. The default is **Ingress (default)**, the cluster's usual entry point. You can also select a Gateway's listener so the domain comes in through that entry point. When you select a Gateway, the issuer field disappears because the Gateway provides the HTTPS certificate. Only accounts that can read the cluster's Gateways see this option. If you don't see it, ask a cluster administrator for help.
 
 </Step>
 <Step>
 
-### Add to the draft, then review changes
+### Add to changes, then review
 
-Click **Add to changes** to add the domain to this service's draft. The cluster hasn't changed yet. Click **Review changes** at the bottom of the page, check the domain, forwarding destination, and certificate settings, then apply.
+Click **Add to changes** to add the domain to this service's draft. The cluster hasn't changed yet. Click **Review changes** at the bottom of the page. Check the domain, the service and port under **Sends to**, and the certificate settings, then apply.
 
 ![Reviewing changes to web before saving: app.example.com will connect to web over HTTPS](../images/shots/domain-review.avif)
 
-The form has no port field, so check the service and port under **Sends to** during the review. If the service already has an Ingress, the new domain uses that Ingress and its existing backend. If it only has an HTTPRoute, the new domain uses that HTTPRoute. If it has neither, Zeabur creates an Ingress that forwards to the first port of the service's first Kubernetes Service. When you select a Gateway, the new domain uses the HTTPRoute on that Gateway that forwards to this service. If none exists, Zeabur creates one.
+The form has no port field. Zeabur reuses the service's existing route, If it has none, Zeabur creates one that forwards to the first port of the service's first Kubernetes Service, the service's address inside the cluster. A route is the rule the cluster uses to send a domain's requests to a service.
 
 </Step>
 <Step>
@@ -60,7 +62,7 @@ If the screen says **Zeabur doesn't know the cluster's entry address. Ask an adm
 
 ### Open the address to check it
 
-Return to **Public domains** to check the DNS and certificate status. If DNS doesn't point to the cluster yet or the certificate is still being issued, the domain row shows the next step. If issuance fails, expand **cert-manager says** to see why. cert-manager also retries on its own.
+Return to **Public domains** to check the DNS and certificate status. If DNS doesn't point to the cluster yet, or the certificate is still being issued, the domain row shows the next step. If issuance fails, expand **cert-manager says** to see why. cert-manager also retries on its own.
 
 Once the status is **Valid configuration**, open the address in a browser. Confirm that it shows this service and that the browser has no certificate warnings. If the application generates absolute URLs, update settings such as `APP_URL` under [Environment variables](./variables.mdx).
 
@@ -79,15 +81,17 @@ If the project doesn't have a [page server](./maintenance.mdx#page-server) yet, 
 
 In the domain row, click **Certificate for app.example.com** to open the side panel.
 
+![The certificate panel for app.example.com, with a choice between an issuer that renews automatically and your own certificate](../images/shots/domain-cert.avif)
+
 ### Use an issuer with automatic renewal
 
-Select **From an issuer, renewed automatically**, choose an **Issuer**, and click **Add to changes**. Domains on the same Ingress share an issuer, so the other domains listed in the panel also switch to this issuer.
+Select **From an issuer, renewed automatically**, choose an **Issuer**, and click **Add to changes**. Domains on the same route share an issuer, so the other domains listed in the panel also switch to this issuer.
 
 If a wildcard domain says it needs DNS-01, ask a cluster administrator to create an issuer by following the [next section](#create-an-issuer-for-wildcard-domains), then return to the domain and select it.
 
 ### Create an issuer for wildcard domains
 
-Let's Encrypt only issues wildcard certificates through DNS-01 validation. A cluster administrator needs to create a DNS-01 issuer with `kubectl` so cert-manager's DNS-01 solver can validate the domain using the DNS provider's API token. The token stays in a secret in the cluster; Zeabur doesn't handle it. The **Certificates** section under **Cluster** → **Overview** only lists issuers and their status. It can't create them.
+Let's Encrypt only issues wildcard certificates through DNS-01 validation. A cluster administrator needs to create a DNS-01 issuer with `kubectl` so cert-manager's DNS-01 solver can validate the domain using the DNS provider's API token. The token stays in a secret, where the cluster keeps confidential data. Zeabur doesn't handle it. The **Certificates** section under **Cluster** → **Overview** only lists issuers and their status. It can't create them.
 
 The following example uses Cloudflare. First, create an API token with DNS edit permission limited to the zone you plan to use. Then replace the placeholder below with the token:
 
@@ -138,37 +142,39 @@ Select **My own certificate**, then paste the following or click **Upload file**
 - **Certificate (PEM)**: Put the site certificate first, followed by the intermediate certificates.
 - **Private key (PEM)**: Provide an unencrypted private key that matches the certificate.
 
-Click **Add to changes**, then review and apply from the bottom of the page. Zeabur checks the certificate's validity dates, domain names, and matching key, then stores the certificate and key in a secret. Zeabur doesn't show the key again. Your own certificate doesn't renew automatically, so upload a new one before it expires.
+Click **Add to changes**, then review and apply from the bottom of the page. Zeabur checks the certificate's validity dates, domain names, and matching key, then stores the certificate and key in the cluster. Zeabur doesn't show the key again. Your own certificate doesn't renew automatically, so upload a new one before it expires.
 
-If other domains on the same Ingress are still requesting certificates from cert-manager, this domain moves to its own Ingress. The new Ingress keeps the original rules, class, labels, annotations, and error pages. The change review lists this move. If the original Ingress has a password, redirect, or maintenance mode configured, the domain can't move. The panel tells you which setting to turn off first.
+If other domains on the same route are still requesting certificates from cert-manager, this domain moves to its own route. The new route keeps the original rules, Ingress class, labels, annotations, and error pages. The change review lists this move. If the original route has a password, redirect, or maintenance mode configured, the domain can't move. The panel tells you which setting to turn off first.
 
-If an HTTPRoute serves the domain, the certificate is configured on the cluster's Gateway, and the domain row shows **HTTPS decided by the Gateway**. To change the certificate, ask a cluster administrator to update the Gateway.
+If the domain is on a Gateway, the certificate is configured on the Gateway, and the domain row shows **HTTPS decided by the Gateway**. To change the certificate, ask a cluster administrator to update the Gateway.
 
 ## Redirect one domain to another
 
-Redirects are available for Ingress routes served by Traefik and for HTTPRoute. In the source domain's row, click **Redirect or password for app.example.com**, select **Send them to another domain**, and enter the **Domain to send them to**.
+You can set a redirect when the cluster serves domains with Traefik, or when the domain is on a Gateway. In the source domain's row, click **Redirect or password for app.example.com**, select **Send them to another domain**, and enter the **Domain to send them to**.
 
 Enter only the destination hostname, such as `www.example.com`. The redirect uses HTTPS and preserves the path: `app.example.com/docs` redirects to `https://www.example.com/docs`. The destination domain must already have its own DNS, route, and valid certificate.
 
 For **Redirect type**, choose **Temporary (302)** or **Permanent (301)**. Browsers remember permanent redirects and keep redirecting even after you turn them off, so test the destination with a temporary redirect first.
 
-Click **Add to changes**, review and apply from the bottom of the page, then open the source domain to test it. The redirect only applies to this domain. Other domains on the same Ingress still show the original service. Wildcard domains can't be a redirect's source or destination.
+![The redirect or password panel for app.example.com, with a choice between Show web and Send them to another domain, and Ask for a password below](../images/shots/domain-access.avif)
 
-An HTTPRoute redirect applies to the entire route. If the same HTTPRoute has other domains, this domain moves to its own route, and the others stay where they are. Zeabur adds a redirect rule at the start of the route that matches the paths of all the original rules. The original rules stay unchanged. Turning off the redirect only removes this added rule.
+Click **Add to changes**, review and apply from the bottom of the page, then open the source domain to test it. The redirect only applies to this domain. Other domains on the same route still show the original service. Wildcard domains can't be a redirect's source or destination.
+
+If the domain is on a Gateway, the redirect applies to the entire route. If the same route has other domains, this domain moves to its own route, and the others stay where they are.
 
 To turn off a redirect, select **Show web** (`web` is the service name) in the same panel, then add and apply the change.
 
 ## Require a password for visitors
 
-In the domain row, click **Redirect or password for app.example.com**, turn on **Ask for a password**, and enter a **Username** and **Password**. The username can't contain spaces or colons. The password must be at least 8 characters and no more than 72 bytes. Password protection is only available for Ingress routes served by Traefik. You can't currently set a password here for HTTPRoute domains.
+In the domain row, click **Redirect or password for app.example.com**, turn on **Ask for a password**, and enter a **Username** and **Password**. The username can't contain spaces or colons. The password must be at least 8 characters and no more than 72 bytes. Only domains the cluster serves with Traefik can have a password. You can't currently set one here for domains on a Gateway.
 
 <Callout type="warn">
-First, confirm that all protected domains use HTTPS. Basic auth over HTTP sends sign-in credentials in plain text.
+First, confirm that all protected domains use HTTPS. Over HTTP alone, the username and password travel in plain text.
 </Callout>
 
-The password applies to the entire Ingress. If the panel lists domains such as `www.example.com` that share the same Ingress, they require the same username and password. After adding, reviewing, and applying the change, open the address in a private browsing window. Confirm that it prompts for a password and shows the service after you enter it.
+The password applies to the entire route. If the panel lists domains such as `www.example.com` that share the same route, they require the same username and password. After adding, reviewing, and applying the change, open the address in a private browsing window. Confirm that it prompts for a password and shows the service after you enter it.
 
-The cluster only stores the password's bcrypt hash. If you forget the password, you must replace it. If a password is already set, click **Change** to replace the username and password. Turn off **Ask for a password** and apply the change to remove password protection from this Ingress.
+The cluster only stores the password's hash. If you forget the password, you must replace it. If a password is already set, click **Change** to replace the username and password. Turn off **Ask for a password** and apply the change to remove password protection from this route.
 
 Redirects run before password checks. If the source domain also has a redirect, visitors go straight to the destination without entering a password. To protect the destination, set a password in the destination domain's own panel.
 
@@ -176,15 +182,33 @@ Redirects run before password checks. If the source domain also has a redirect, 
 
 - Rename a domain: Click the edit button in the domain row, enter the new name, click **Add to changes**, then review and apply from the bottom of the page. Next, configure DNS for the new domain. If you uploaded your own certificate, replace it with one that covers the new name.
 - Remove one domain: Click the remove button in its row, review and apply from the bottom of the page, then delete unused records at your DNS provider.
-- Remove the last domain from a route: The remove button names the route that will also be removed, such as **Remove app.example.com and route web, which has no other domains**. The change review lists the Ingress or HTTPRoute to delete.
+- Remove the last domain from a route: The remove button names the route that will also be removed, such as **Remove app.example.com and route web, which has no other domains**. The change review lists the route to delete.
 
 For domain changes you haven't applied yet, click **Undo** in the row, or click **Discard** at the bottom of the page to discard the entire draft. Closing a side panel before clicking **Add to changes** leaves no changes in the draft.
+
+## Verify the result
+
+In the service's **Networking** tab, under **Public domains**, each domain row shows its DNS and certificate status, along with the service and port under **Sends to**. For domains with a redirect or password, the button beside the domain shows the current setting.
+
+## Troubleshooting
+
+| What you see | What to do next |
+| --- | --- |
+| No **Add domain** button | Check for a private address under **Private network**, then confirm that you have permission to change domains. |
+| **Points elsewhere** | Compare the DNS records with the destination shown on screen. A CDN or proxy in front of the cluster can also cause this status. In that case, confirm that the CDN's origin points to the cluster. |
+| DNS is correct, but the certificate stays pending or shows **Certificate failed** | Expand **cert-manager says**. Check the issuer and the DNS records or entry point settings needed for validation. |
+| No redirect or password button | An Ingress controller other than Traefik serves the domain. The Ingress controller is the cluster component that receives outside requests. Configure these settings in that component's own settings. |
+| **Not confirmed** status, or the browser can't connect | Check DNS, the entry address, service readiness, and connection rules, in that order. Zeabur checks from inside the cluster, so its results may differ from your browser's. |
+
+To temporarily block visitors while keeping the domain and service, use [maintenance mode](./maintenance.mdx).
 
 ## Do the same with kubectl
 
 Domains, certificates, redirects, and passwords use standard Ingress, HTTPRoute, secret, and Traefik Middleware objects. Zeabur has no custom CRDs or controllers. After you remove Zeabur, Traefik and cert-manager continue serving the site. The examples below use project `demo`, service `web` (Service port `8080`), and domain `app.example.com`.
 
 ### Add a domain
+
+If the service already has an Ingress, the new domain uses that Ingress and its existing backend. If it only has an HTTPRoute, the new domain uses that HTTPRoute. When you select a Gateway, the new domain uses the HTTPRoute on that Gateway that forwards to this service. If none exists, Zeabur creates one.
 
 If the service has no route, Zeabur creates an Ingress named `<service>-<domain-with-dashes>`. cert-manager issues a certificate based on the annotation and stores it in `<Ingress name>-tls`:
 
@@ -250,7 +274,9 @@ The last line deletes the Certificate that cert-manager previously created for t
 
 ### Redirects and passwords
 
-Redirects and passwords use Traefik Middleware objects. Their `ownerReferences` point to the Ingress, so deleting the Ingress also deletes them. The Ingress annotation `traefik.ingress.kubernetes.io/router.middlewares` lists them in order as comma-separated entries in the format `<project>-<Middleware name>@kubernetescrd`. The redirect comes first, and the password check comes last.
+On an HTTPRoute, a redirect is a rule at the start of the route that matches the paths of all the original rules. The original rules stay unchanged. Turning off the redirect only removes this added rule.
+
+On an Ingress, redirects and passwords use Traefik Middleware objects. Their `ownerReferences` point to the Ingress, so deleting the Ingress also deletes them. The Ingress annotation `traefik.ingress.kubernetes.io/router.middlewares` lists them in order as comma-separated entries in the format `<project>-<Middleware name>@kubernetescrd`. The redirect comes first, and the password check comes last.
 
 The redirect is named `<Ingress name>-redirect-<source-domain-with-dashes>`. It only matches the source domain and preserves the path. `permanent: true` means 301, and `false` means 302:
 
@@ -305,11 +331,7 @@ kubectl -n demo delete ingress web-app-example-com
 
 If the Ingress has other domains, use `kubectl edit` to remove only this domain's entries from `rules` and `tls.hosts`.
 
-## Verify the result
-
-In the service's **Networking** tab, under **Public domains**, each domain row shows its DNS and certificate status, along with the service and port under **Sends to**. For domains with a redirect or password, the button beside the domain shows the current setting.
-
-Check the routes and certificates with kubectl:
+### Verify the settings
 
 ```sh
 kubectl -n demo get ingress
@@ -324,15 +346,3 @@ curl -sI https://app.example.com/
 ```
 
 The status code comes from the service, such as `200`. With a redirect, it's `301` or `302`, and `location` points to the destination domain. With a password, it's `401`.
-
-## Troubleshooting
-
-| What you see | What to do next |
-| --- | --- |
-| No **Add domain** button | Check for a private address under **Private network**, then confirm that you have permission to change domains. |
-| **Points elsewhere** | Compare the DNS records with the destination shown on screen. A CDN or proxy in front of the cluster can also cause this status. In that case, confirm that the CDN's origin points to the cluster. |
-| DNS is correct, but the certificate stays pending or shows **Certificate failed** | Expand **cert-manager says**. Check the issuer and the DNS records or entry point settings needed for validation. |
-| No redirect or password button | An Ingress controller other than Traefik serves the domain. Configure these settings in that controller. |
-| **Not confirmed** status, or the browser can't connect | Check DNS, the entry address, service readiness, and connection rules, in that order. Zeabur checks from inside the cluster, so its results may differ from your browser's. |
-
-To temporarily block visitors while keeping the domain and service, use [maintenance mode](./maintenance.mdx).

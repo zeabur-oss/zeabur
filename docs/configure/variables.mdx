@@ -3,15 +3,17 @@ title: Configure environment variables
 description: Change the settings a service reads at startup, or let multiple services read the same set of shared variables.
 ---
 
-Open the service's **Variables** tab and click **Edit**. When you're done, click **Review changes** at the bottom of the page and apply them. Variables set directly on the service take effect when new replicas start. If a value comes from a shared config file or secret, edit the source and check which services need a restart.
+When you finish this page, the service starts with the environment variables you set, such as `APP_URL` or `LOG_LEVEL`. When several services need the same values, put them in shared variables, and let each service choose which keys to read.
+
+![A change waits in a draft, you review it, and only then is it applied to the cluster](../images/diagrams/plan.svg)
+
+![Variables tab for the web service](../images/shots/service-variables.avif)
 
 ## Before you begin
 
 - You have a service and permission to edit it. If the service is marked as managed by Helm, Argo CD, or Flux, make changes in the original values or Git repository.
-- You know the variable names and values the app needs, such as `APP_URL` or `LOG_LEVEL`. These settings are environment variables for the container at runtime. For [Git deployments](../deploy/git.mdx), edit build variables in the build settings.
-- Store passwords and API keys in secrets. Values under **Set directly** appear in the service settings. When you choose **Secret** for shared variables, only people with permission to read secrets can reveal the values.
-
-![Variables tab for the web service](../images/shots/service-variables.avif)
+- You know the variable names and values the app needs. These are the environment variables the service reads while it runs. For [Git deployments](../deploy/git.mdx), edit build variables in the build settings.
+- Store passwords and API keys in secrets. Values under **Set directly** appear in the service settings. When you choose **Secret** for shared variables, only people with permission to read secrets can see the values.
 
 ## Edit variables for this service
 
@@ -38,21 +40,23 @@ The `.env` editor supports quotes, `export`, and `#` comments. Removing an exist
 
 ### Review and apply
 
-Check the rows marked **New**, **Changed**, or **Removed**, then click **Review changes** at the bottom of the page. Confirm the containers, variable names, and any other pending settings, then apply the changes.
+Check the rows marked **New**, **Changed**, or **Removed**, then click **Review changes** at the bottom of the page. Confirm the containers, variable names, and any other pending settings, then apply.
 
-Editing variables directly updates the service's replica template. Long-running services, such as Deployment and StatefulSet, replace their replicas with the new settings. CronJob reads the new values starting with its next run.
+![Review screen before changing NODE_ENV to staging](../images/shots/variables-review.avif)
+
+Services that keep running replace their replicas with the new settings. Scheduled jobs read the new values starting with their next run.
 
 </Step>
 <Step>
 
 ### Confirm the app reads the new settings
 
-Return to **Overview** and wait for the replicas to be ready. Then check the app's behavior or **Logs** to confirm the change. For example, check whether newly generated links use the new `APP_URL`. The environment variable list shows the saved settings.
+Return to **Overview** and wait for the replicas to be ready. Then check the app's behavior or **Logs**, for example whether newly generated links use the new `APP_URL`.
 
 </Step>
 </Steps>
 
-Before applying, click **Discard** to discard the draft changes. To undo changes you've already applied, restore the previous values, then review and apply again.
+Before applying, click **Discard** to drop the changes. To undo changes you've already applied, restore the previous values, then review and apply again.
 
 ## Edit values from config files or secrets
 
@@ -64,10 +68,10 @@ After editing a key or clicking **Add key**, submit the changes for review. When
 
 ### Let running services read the new values
 
-After you edit a config file or secret, environment variables in containers that are already running keep their old values. The change review lists services that need a restart and services that Reloader may restart automatically.
+After you edit a config file or secret, replicas that are already running keep reading the old values. The change review lists services that need a restart and services that may restart automatically.
 
 - To handle restarts manually, click **Restart** for each service that needs the new values, then check that its replicas are ready.
-- To handle restarts automatically, open the service's **Settings** → **Compute**, enable **Restart when its config files or secrets change**, then review and apply. Stakater Reloader must be running in the cluster. The option alone restarts nothing.
+- To handle restarts automatically, open the service's **Settings** → **Compute**, enable **Restart when its config files or secrets change**, then review and apply. The cluster needs Stakater Reloader, the component that restarts services when their settings change. Without it, the option alone restarts nothing.
 - Once enabled, the service restarts when the source changes, whether you edit it in Zeabur or with another tool. If every service that reads the source has this option enabled, they'll restart together.
 
 **May still use the old value until restarted** means the source changed after a replica started. Expand the notice to see which replicas are affected. A completed Job doesn't run again when its source changes.
@@ -81,6 +85,8 @@ After you edit a config file or secret, environment variables in containers that
 
 Open **Shared variables** in the project's **Settings** and click **Add shared variables**. Enter a **Name**, choose **Secret** or **Plain text** under **Store values as**, then enter one `NAME=value` per line under **Variables**.
 
+![The panel for adding shared variables, named app-config, with APP_URL and LOG_LEVEL on two lines](../images/shots/shared-variables-add.avif)
+
 Click **Review changes**, confirm the changes, then click **Create**. This only creates the shared variables. The service doesn't read them yet.
 
 </Step>
@@ -89,6 +95,8 @@ Click **Review changes**, confirm the changes, then click **Create**. This only 
 ### Choose which keys the service reads
 
 Return to the service's **Variables** tab and click **Use shared variables**. Select the set you just created. If the service has multiple containers, select a container too.
+
+![The panel for using shared variables, where you choose the shared variables and keys to read](../images/shots/shared-variables-use.avif)
 
 - **All keys**: Every key becomes an environment variable, including keys added later.
 - **One key**: Select a **Key**, then set the **Variable name** in the container. For example, read `api-token` as `API_TOKEN`.
@@ -105,9 +113,35 @@ Check the source name under **From config files and secrets** in the service. Th
 </Step>
 </Steps>
 
+## Stop reading variables or remove settings
+
+For a variable set directly, click its row's remove button in **Edit**, then review and apply.
+
+For variables imported as a set, select **Stop reading** on the source row, then review and apply. This disconnects the service from the source but keeps the shared source.
+
+For a variable that reads a single key, select **Remove variable** next to the source, then review and apply. This removes only the variable from the service. The shared source and all its keys remain.
+
+To delete an entire set of shared variables, first confirm that **Used by** is empty in the project's **Settings** → **Shared variables**. In the cluster, shared variables are a ConfigMap (plain text) or a Secret (secret). Open the one with the same name in the project's **Objects**, click **Delete** under **YAML**, review, and apply. If a service still reads keys from this source, new replicas fail to start because they can't find the source.
+
+## Verify the result
+
+On the **Variables** tab, variables set directly appear under **Set directly**. Variables read from shared sources appear under **From config files and secrets**, along with their source names. In the project's **Settings** → **Shared variables**, **Used by** lists the services that read each source.
+
+## Troubleshooting
+
+| Message or result | What to do next |
+| --- | --- |
+| **Another variable already uses this name** or **A config file, secret, or Kubernetes already sets this name** | Edit the variable at its source, or choose another name. Only one value takes effect for variables with the same name in a container. |
+| **Use shared variables** is missing | Create at least one set of shared variables in the project's **Settings** first. This button also doesn't appear while you're editing the service's variables or when another tool manages the service. |
+| **You don't have permission to read secrets, so values are hidden.** | Revealing secret values needs its own permission, separate from permission to edit the service. See [Permissions](../reference/permissions.mdx). |
+| The shared source changed, but the app still uses old values | Restart the services that read it. If automatic restarts are on, ask a cluster administrator to check that Reloader is running. |
+| The changes are marked as expired | Review the current source and values again, then apply the new changes. |
+
+If the app's public URL changes, also check its [domains](./domains.mdx) and variables such as `APP_URL`. Use [maintenance mode](./maintenance.mdx) to handle visitor traffic during maintenance.
+
 ## Do the same with kubectl
 
-Environment variables are stored in the workload's replica template. Shared variables are standard config files or secrets. Zeabur doesn't store a separate copy of this data. The examples below use project `demo` and service `web`.
+Environment variables are stored in the workload's Pod template, the settings the cluster follows to create each replica. Shared variables are standard config files or secrets. Zeabur doesn't store a separate copy of this data. The examples below use project `demo` and service `web`.
 
 Setting and removing a variable directly changes the container's `env`:
 
@@ -204,11 +238,9 @@ kubectl -n demo rollout restart deployment/web
 
 After you remove Zeabur, Kubernetes continues to inject these variables into containers. Reloader is an independent component and continues to restart services based on the annotation.
 
-## Verify the result
+### Verify the settings
 
-On the **Variables** tab, variables set directly appear under **Set directly**. Variables read from shared sources appear under **From config files and secrets**, along with their source names. In the project's **Settings** → **Shared variables**, **Used by** lists the services that read each source.
-
-Use kubectl to check the settings in the replica template and the actual value in the container:
+Check the settings in the Pod template and the actual value in the container:
 
 ```sh
 kubectl -n demo get deployment web -o jsonpath='{.spec.template.spec.containers[0].env}'
@@ -217,25 +249,3 @@ kubectl -n demo exec deploy/web -- printenv NODE_ENV
 ```
 
 If `printenv` prints the new value, the replica started with the new settings. If it prints the old value, wait for the new replica to be ready, or restart it using the steps above.
-
-## Troubleshooting
-
-| Message or result | What to do next |
-| --- | --- |
-| **Another variable already uses this name** or **A config file, secret, or Kubernetes already sets this name** | Edit the variable at its source, or choose another name. Only one value takes effect for variables with the same name in a container. |
-| **Use shared variables** is missing | Create at least one set of shared variables in the project's **Settings** first. This button also doesn't appear while you're editing the service's variables or when another tool manages the service. |
-| **You don't have permission to read secrets, so values are hidden.** | Revealing secret values requires permission to read secrets, which is separate from permission to edit the service. See [Permissions](../reference/permissions.mdx). |
-| The shared source changed, but the app still uses old values | Restart the services that read it. If automatic restarts are enabled, open the service's **Settings** → **Compute** to check whether Reloader is running. |
-| The changes are marked as expired | Review the current source and values again, then apply the new changes. |
-
-## Stop reading variables or remove settings
-
-For a variable set directly, click its row's remove button in **Edit**, then review and apply.
-
-For variables imported as a set, select **Stop reading** on the source row, then review and apply. This disconnects the service from the source but keeps the shared source.
-
-For a variable that reads a single key, select **Remove variable** next to the source, then review and apply. This removes only the variable from the service. The shared source and all its keys remain.
-
-To delete an entire set of shared variables, first confirm that **Used by** is empty in the project's **Settings** → **Shared variables**. Then open the corresponding ConfigMap or Secret in the project's **Objects**, click **Delete** under **YAML**, review, and apply. If a service still reads keys from this source, new replicas fail to start because they can't find the source.
-
-If the app's public URL changes, also check its [domains](./domains.mdx) and variables such as `APP_URL`. Use [maintenance mode](./maintenance.mdx) to handle visitor traffic during maintenance.
