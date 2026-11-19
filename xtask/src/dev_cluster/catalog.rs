@@ -1,6 +1,7 @@
 //! Components installed with the Helm commands Zeabur Catalog gives (Cluster → Components).
 
 use std::fs;
+use std::time::Duration;
 
 use super::DevCluster;
 
@@ -12,8 +13,8 @@ pub(crate) fn stop_at_from_env() -> Option<String> {
 }
 
 /// Runs the catalog's commands for `component` (its id) with `inputs`
-/// (`<input>=<value>`), leaving out the releases from `stop_at` on, then waits for the
-/// deployments in `namespace`.
+/// (`<input>=<value>`), leaving out the releases from `stop_at` on, then waits for the rollout of
+/// each Deployment in `namespace`.
 pub(crate) fn install(
     dev: &DevCluster,
     component: &str,
@@ -44,15 +45,11 @@ pub(crate) fn install(
         .kubectl()
         .args(["-n", namespace, "get", "deployment", "-o", "name"])
         .read()?;
-    if deployments.trim().is_empty() {
-        return Ok(());
+    for deployment in deployments.lines().filter(|line| !line.trim().is_empty()) {
+        dev.rollout(namespace, deployment.trim(), Duration::from_secs(300))
+            .map_err(|e| format!("waiting for {component} in {namespace}: {e}"))?;
     }
-    dev.kubectl()
-        .args(["-n", namespace, "wait", "deployment", "--all"])
-        .args(["--for=condition=Available", "--timeout=300s"])
-        .run()
-        .inspect_err(|_| dev.diagnose(namespace))
-        .map_err(|e| format!("waiting for {component} in {namespace}: {e}"))
+    Ok(())
 }
 
 /// The script up to the line `# <stop_at>` that starts that release's commands.

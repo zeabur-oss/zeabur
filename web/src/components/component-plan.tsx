@@ -397,7 +397,14 @@ function Check({ check, readySince }: { check: Schemas.ComponentCheck; readySinc
           {t(`components.state.${check.state}`)}
         </StatusPill>
       </div>
-      {late ? <p className="type-meta text-pretty text-muted-foreground">{check.advice}</p> : null}
+      {check.message ? (
+        <p className="type-meta text-pretty break-words text-destructive" translate="no">
+          {check.message}
+        </p>
+      ) : null}
+      {late || check.state === "failed" ? (
+        <p className="type-meta text-pretty text-muted-foreground">{check.advice}</p>
+      ) : null}
     </li>
   )
 }

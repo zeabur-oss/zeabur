@@ -1,26 +1,34 @@
-//! Whether a workload or a pod has reached the state its spec asks for, as kstatus computes it
-//! [kstatus-core].
+//! Whether an object has reached the state its spec asks for, as kstatus computes it
+//! [kstatus-status].
 //!
-//! Each function follows the rule of one kind in kstatus's `core.go`, after the generation check
-//! of `generic.go` [kstatus-generic]: if `status.observedGeneration` is present and differs from
-//! `metadata.generation`, the object is in progress. The deletion check and the `Reconciling`
-//! and `Stalled` conditions of `generic.go` are not used: the built-in controllers do not set
-//! those conditions. Zeabur's own states (paused, waits for deletion, stuck but still serving)
-//! map on top of this result in `zeabur-graph` and `zeabur-api`.
+//! The functions of the built-in kinds follow the rule of one kind in kstatus's `core.go`
+//! [kstatus-core], after the generation check of `generic.go` [kstatus-generic]: if
+//! `status.observedGeneration` is present and differs from `metadata.generation`, the object is in
+//! progress. The built-in controllers do not set the `Reconciling` and `Stalled` conditions, so
+//! those functions do not read them. [`generic`] is the rule for every other kind, custom
+//! resources first among them, and [`custom_resource_definition`] the rule of a CRD. Zeabur's own
+//! states (paused, waits for deletion, stuck but still serving) map on top of this result in
+//! `zeabur-graph`, `zeabur-modules` and `zeabur-api`.
 //!
 //! # References
 //!
+//! - [kstatus-status] Kubernetes SIG CLI, `pkg/kstatus/status/status.go`, cli-utils v0.37.2. <https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/status.go>
 //! - [kstatus-core] Kubernetes SIG CLI, `pkg/kstatus/status/core.go`, cli-utils v0.37.2. <https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/core.go>
 //! - [kstatus-generic] Kubernetes SIG CLI, `pkg/kstatus/status/generic.go`, cli-utils v0.37.2. <https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/generic.go>
 //!
+//! [kstatus-status]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/status.go
 //! [kstatus-core]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/core.go
 //! [kstatus-generic]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/generic.go
+
+use std::fmt;
 
 use k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use k8s_openapi::api::batch::v1::Job;
 use k8s_openapi::api::core::v1::Pod;
+use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
+use serde::Deserialize;
 
 /// The kstatus status of an object.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -99,6 +107,33 @@ pub enum Reason {
     JobComplete,
     /// A Job has started.
     JobRunning,
+    /// `metadata.deletionTimestamp` is set; kstatus calls this status `Terminating`.
+    Terminating,
+    /// The `Reconciling` condition is `True`.
+    Reconciling,
+    /// The `Stalled` condition is `True`.
+    Stalled,
+    /// The `Ready` condition is `False` or `Unknown`.
+    NotReady,
+    /// The `Ready` condition is `True`.
+    Ready,
+    /// No condition that [`generic`] reads is set, so kstatus counts the object as current.
+    NoReadyCondition,
+    /// A CRD's `NamesAccepted` condition is `False`.
+    NamesNotAccepted,
+    /// A CRD's `Established` condition is `False` for a reason other than `Installing`.
+    NotEstablished,
+    /// A CRD is not established yet.
+    Installing,
+    /// A CRD's `Established` condition is `True`.
+    Established,
+}
+
+impl fmt::Display for Reason {
+    /// The kstatus reason name, such as `ProgressDeadlineExceeded`.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Debug::fmt(self, f)
+    }
 }
 
 /// The [`Status`] of an object and why.
@@ -136,6 +171,99 @@ impl Readiness {
     #[must_use]
     pub fn is_current(self) -> bool {
         self.status == Status::Current
+    }
+}
+
+/// A status condition, with the fields [`generic`] reads.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+pub struct Condition {
+    /// Its type, such as `Ready`.
+    #[serde(rename = "type")]
+    pub type_: String,
+    /// `True`, `False` or `Unknown`.
+    pub status: String,
+    /// Why, as one CamelCase word.
+    #[serde(default)]
+    pub reason: Option<String>,
+    /// Why, in words.
+    #[serde(default)]
+    pub message: Option<String>,
+}
+
+/// The fields of `status` that [`generic`] reads; a custom resource's view embeds it with
+/// `#[serde(flatten)]`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GenericStatus {
+    /// The generation the controller last acted on.
+    #[serde(default)]
+    pub observed_generation: Option<i64>,
+    /// The conditions.
+    #[serde(default)]
+    pub conditions: Vec<Condition>,
+}
+
+/// The condition that decided a [`Readiness`], as `kubectl describe` shows it.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Cause<'a> {
+    /// The condition's type.
+    pub condition: &'a str,
+    /// The condition's reason.
+    pub reason: Option<&'a str>,
+    /// The condition's message.
+    pub message: Option<&'a str>,
+}
+
+impl fmt::Display for Cause<'_> {
+    /// `<type>: <reason>: <message>`, without the parts the condition does not set.
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str(self.condition)?;
+        for part in [self.reason, self.message].into_iter().flatten() {
+            if !part.is_empty() {
+                write!(f, ": {part}")?;
+            }
+        }
+        Ok(())
+    }
+}
+
+/// A [`Readiness`] and the condition that decided it, when one did.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Explained<'a> {
+    /// The status and its reason.
+    pub readiness: Readiness,
+    /// The condition behind it.
+    pub cause: Option<Cause<'a>>,
+}
+
+impl<'a> Explained<'a> {
+    const fn plain(readiness: Readiness) -> Self {
+        Self {
+            readiness,
+            cause: None,
+        }
+    }
+
+    const fn by(
+        readiness: Readiness,
+        condition: &'a str,
+        reason: Option<&'a str>,
+        message: Option<&'a str>,
+    ) -> Self {
+        Self {
+            readiness,
+            cause: Some(Cause {
+                condition,
+                reason,
+                message,
+            }),
+        }
+    }
+}
+
+impl From<Readiness> for Explained<'_> {
+    fn from(readiness: Readiness) -> Self {
+        Self::plain(readiness)
     }
 }
 
@@ -382,6 +510,99 @@ pub fn job(job: &Job) -> Readiness {
     Readiness::current(Reason::JobRunning)
 }
 
+/// Any object without a rule of its own, custom resources among them: kstatus `Compute` for a
+/// kind that `core.go` does not list [kstatus-status] [kstatus-generic].
+///
+/// In order: an object with `metadata.deletionTimestamp` is in progress ([`Reason::Terminating`]).
+/// An object whose `status.observedGeneration` is present and differs from `metadata.generation`
+/// is in progress. A `Reconciling` condition that is `True` makes it in progress, and a `Stalled`
+/// condition that is `True` fails it. Then a `Ready` condition decides: `True` is current, `False`
+/// or `Unknown` in progress. With none of these, kstatus counts the object as current
+/// ([`Reason::NoReadyCondition`]); a caller that knows its controller sets `Ready` reads that
+/// reason as "not observed yet".
+#[must_use]
+pub fn generic<'a>(metadata: &ObjectMeta, status: &'a GenericStatus) -> Explained<'a> {
+    if metadata.deletion_timestamp.is_some() {
+        return Explained::plain(Readiness::in_progress(Reason::Terminating));
+    }
+    if let Some(unobserved) = generation_unobserved(metadata, status.observed_generation) {
+        return Explained::plain(unobserved);
+    }
+    let because = |readiness, condition: &'a Condition| {
+        Explained::by(
+            readiness,
+            &condition.type_,
+            condition.reason.as_deref(),
+            condition.message.as_deref(),
+        )
+    };
+    for condition in &status.conditions {
+        if condition.status != "True" {
+            continue;
+        }
+        if condition.type_ == "Reconciling" {
+            return because(Readiness::in_progress(Reason::Reconciling), condition);
+        }
+        if condition.type_ == "Stalled" {
+            return because(Readiness::failed(Reason::Stalled), condition);
+        }
+    }
+    for condition in &status.conditions {
+        if condition.type_ != "Ready" {
+            continue;
+        }
+        match condition.status.as_str() {
+            "True" => return because(Readiness::current(Reason::Ready), condition),
+            "False" | "Unknown" => {
+                return because(Readiness::in_progress(Reason::NotReady), condition);
+            }
+            _ => {}
+        }
+    }
+    Explained::plain(Readiness::current(Reason::NoReadyCondition))
+}
+
+/// A CustomResourceDefinition, by kstatus `crdConditions` [kstatus-core], after the deletion
+/// check of `generic.go`.
+///
+/// A `NamesAccepted` condition that is `False` fails it, and so does an `Established` condition
+/// that is `False` for a reason other than `Installing`. An `Established` condition that is
+/// `True` makes it current. Otherwise it is installing.
+#[must_use]
+pub fn custom_resource_definition(crd: &CustomResourceDefinition) -> Explained<'_> {
+    if crd.metadata.deletion_timestamp.is_some() {
+        return Explained::plain(Readiness::in_progress(Reason::Terminating));
+    }
+    let conditions = crd
+        .status
+        .as_ref()
+        .and_then(|status| status.conditions.as_deref())
+        .unwrap_or_default();
+    for condition in conditions {
+        let reason = condition.reason.as_deref();
+        let because = |readiness| {
+            Explained::by(
+                readiness,
+                &condition.type_,
+                reason,
+                condition.message.as_deref(),
+            )
+        };
+        if condition.type_ == "NamesAccepted" && condition.status == "False" {
+            return because(Readiness::failed(Reason::NamesNotAccepted));
+        }
+        if condition.type_ == "Established" {
+            if condition.status == "False" && reason != Some("Installing") {
+                return because(Readiness::failed(Reason::NotEstablished));
+            }
+            if condition.status == "True" {
+                return because(Readiness::current(Reason::Established));
+            }
+        }
+    }
+    Explained::plain(Readiness::in_progress(Reason::Installing))
+}
+
 #[cfg(test)]
 mod tests {
     use serde_json::{Value, json};
@@ -583,6 +804,130 @@ mod tests {
         ];
         for (name, object, expected) in &cases {
             assert_eq!(super::deployment(object), *expected, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_custom_resource_follows_deletion_generation_reconciling_stalled_then_ready() {
+        let object = |metadata: Value, status: Value| -> (ObjectMeta, GenericStatus) {
+            (typed(metadata), typed(status))
+        };
+        let current = json!({"name": "pg", "generation": 2});
+        let ready = json!({"type": "Ready", "status": "True", "reason": "ClusterIsReady"});
+        let cases = [
+            (
+                "deleted",
+                object(
+                    json!({"name": "pg", "deletionTimestamp": "2026-11-13T11:00:00Z"}),
+                    json!({"conditions": [ready]}),
+                ),
+                of(Status::InProgress, Reason::Terminating),
+                None,
+            ),
+            (
+                "older generation",
+                object(
+                    current.clone(),
+                    json!({"observedGeneration": 1, "conditions": [ready]}),
+                ),
+                of(Status::InProgress, Reason::LatestGenerationNotObserved),
+                None,
+            ),
+            (
+                "reconciling",
+                object(
+                    current.clone(),
+                    json!({"conditions": [ready,
+                        {"type": "Reconciling", "status": "True", "reason": "Scaling"}]}),
+                ),
+                of(Status::InProgress, Reason::Reconciling),
+                Some("Scaling"),
+            ),
+            (
+                "stalled",
+                object(
+                    current.clone(),
+                    json!({"observedGeneration": 2, "conditions": [
+                        {"type": "Stalled", "status": "True", "reason": "BadSpec",
+                         "message": "no such storage class"}]}),
+                ),
+                of(Status::Failed, Reason::Stalled),
+                Some("BadSpec"),
+            ),
+            (
+                "ready",
+                object(current.clone(), json!({"conditions": [ready]})),
+                of(Status::Current, Reason::Ready),
+                Some("ClusterIsReady"),
+            ),
+            (
+                "not ready",
+                object(
+                    current.clone(),
+                    json!({"conditions": [
+                        {"type": "Ready", "status": "False", "reason": "Pending"}]}),
+                ),
+                of(Status::InProgress, Reason::NotReady),
+                Some("Pending"),
+            ),
+            (
+                "no conditions",
+                object(current, json!({})),
+                of(Status::Current, Reason::NoReadyCondition),
+                None,
+            ),
+        ];
+        for (name, (metadata, status), expected, reason) in &cases {
+            let explained = generic(metadata, status);
+            assert_eq!(explained.readiness, *expected, "{name}");
+            assert_eq!(explained.cause.and_then(|c| c.reason), *reason, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_crd_is_current_once_established_and_fails_when_its_names_are_refused() {
+        let crd = |conditions: Value| -> CustomResourceDefinition {
+            typed(json!({"metadata": {"name": "clusters.postgresql.cnpg.io"},
+                "spec": {"group": "postgresql.cnpg.io", "scope": "Namespaced",
+                    "names": {"plural": "clusters", "kind": "Cluster"}, "versions": []},
+                "status": {"conditions": conditions}}))
+        };
+        let cases = [
+            (
+                "no conditions",
+                crd(json!([])),
+                of(Status::InProgress, Reason::Installing),
+            ),
+            (
+                "installing",
+                crd(json!([{"type": "Established", "status": "False", "reason": "Installing"}])),
+                of(Status::InProgress, Reason::Installing),
+            ),
+            (
+                "established",
+                crd(json!([{"type": "NamesAccepted", "status": "True"},
+                    {"type": "Established", "status": "True"}])),
+                of(Status::Current, Reason::Established),
+            ),
+            (
+                "names refused",
+                crd(json!([{"type": "NamesAccepted", "status": "False",
+                    "reason": "ListKindConflict", "message": "\"ClusterList\" is already in use"}])),
+                of(Status::Failed, Reason::NamesNotAccepted),
+            ),
+            (
+                "not established",
+                crd(json!([{"type": "Established", "status": "False",
+                    "reason": "NotAccepted"}])),
+                of(Status::Failed, Reason::NotEstablished),
+            ),
+        ];
+        for (name, object, expected) in &cases {
+            assert_eq!(
+                custom_resource_definition(object).readiness,
+                *expected,
+                "{name}"
+            );
         }
     }
 }

@@ -3639,6 +3639,11 @@ export type ComponentCheck = {
   advice: string
   /** The component. */
   component: string
+  /**
+   * Why it failed: the object, and its kstatus reason or the condition that says so.
+   * @nullable
+   */
+  message?: string | null
   /** The check. */
   name: string
   /** How far it has come; `pending` until every step is ready. */

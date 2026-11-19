@@ -29,7 +29,6 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_catalog::InstallSource;
 use zeabur_catalog::api::{ComponentFile, Snapshot};
@@ -138,6 +137,9 @@ pub struct ComponentCheck {
     pub state: StepState,
     /// What to do when it does not pass in time.
     pub advice: String,
+    /// Why it failed: the object, and its kstatus reason or the condition that says so.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
     /// How long it may take once every step is ready, in seconds.
     pub timeout_seconds: i64,
 }
@@ -846,7 +848,16 @@ impl World {
             return Ok(Progress::Pending);
         };
         if target.kind != HelmChart::KIND {
-            return Ok(engine::object_progress(Some(found)));
+            let (group, _) = target
+                .api_version
+                .split_once('/')
+                .unwrap_or(("", &target.api_version));
+            return Ok(engine::object_progress(
+                group,
+                &target.kind,
+                Some(found),
+                self.now,
+            ));
         }
         let chart: HelmChart = found.clone().try_parse().unwrap_or_default();
         let job_name = chart.status.as_ref().and_then(|s| s.job_name.clone());
@@ -873,21 +884,27 @@ impl World {
         let now = self.now;
         let mut checks = Vec::new();
         for check in &file.declaration.health {
-            let state = if ready {
-                let objects = self.check_objects(cluster, file, check).await?;
-                match engine::check_progress(check, &objects, now) {
-                    Progress::Ready => StepState::Ready,
-                    Progress::Failed(_) => StepState::Failed,
-                    Progress::Pending | Progress::Waiting => StepState::Waiting,
+            let resource = engine::health_resource(&check.resource.kind, &self.served);
+            let progress = match resource {
+                Some(resource) if ready => {
+                    let objects = self.check_objects(cluster, file, check, resource).await?;
+                    engine::check_progress(check, resource, &objects, now)
                 }
-            } else {
-                StepState::Pending
+                None if ready => Progress::Waiting,
+                Some(_) | None => Progress::Pending,
+            };
+            let (state, message) = match progress {
+                Progress::Ready => (StepState::Ready, None),
+                Progress::Failed(why) => (StepState::Failed, Some(why)),
+                Progress::Waiting => (StepState::Waiting, None),
+                Progress::Pending => (StepState::Pending, None),
             };
             checks.push(ComponentCheck {
                 component: file.id.clone(),
                 name: check.name.clone(),
                 state,
                 advice: check.advice.clone(),
+                message,
                 timeout_seconds: engine::timeout_seconds(&check.timeout),
             });
         }
@@ -899,30 +916,29 @@ impl World {
         cluster: &dyn Cluster,
         file: &ComponentFile,
         check: &zeabur_catalog::api::Health,
-    ) -> Result<Vec<Value>, ApiError> {
+        served: &ServedResource,
+    ) -> Result<Vec<DynamicObject>, ApiError> {
         let r = &check.resource;
-        let Some((group, version, plural, kind)) = engine::health_resource(&r.kind) else {
-            return Ok(Vec::new());
-        };
-        let resource = ResourceRef::new(group, version, plural, kind);
+        let resource = ResourceRef::new(
+            &served.group,
+            &served.version,
+            &served.resource,
+            &served.kind,
+        );
         let namespace = r.namespace.clone().or_else(|| {
             file.declaration
                 .releases
                 .first()
                 .map(|x| x.namespace.clone())
         });
-        let namespaced = !matches!(kind, "APIService" | "GatewayClass");
-        let namespace = namespaced.then_some(namespace).flatten();
-        let what = format!("{kind} objects of {}", file.id);
+        let namespace = served.namespaced.then_some(namespace).flatten();
+        let what = format!("{} objects of {}", served.kind, file.id);
         if let Some(name) = &r.name {
             let found = cluster
                 .find_object(&resource, namespace.as_deref(), name)
                 .await
                 .map_err(|e| ApiError::from(e.into_problem(&what)))?;
-            return Ok(found
-                .and_then(|o| serde_json::to_value(o).ok())
-                .into_iter()
-                .collect());
+            return Ok(found.into_iter().collect());
         }
         let objects = cluster
             .list_objects(&resource, namespace.as_deref())
@@ -936,7 +952,6 @@ impl World {
                 let labels = o.metadata.labels.clone().unwrap_or_default();
                 selector.iter().all(|(k, v)| labels.get(k) == Some(v))
             })
-            .filter_map(|o| serde_json::to_value(o).ok())
             .collect())
     }
 }

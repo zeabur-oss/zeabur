@@ -7162,6 +7162,11 @@ components:
         component:
           type: string
           description: The component.
+        message:
+          type:
+          - string
+          - "null"
+          description: "Why it failed: the object, and its kstatus reason or the condition that says so."
         name:
           type: string
           description: The check.

@@ -9,6 +9,7 @@ use zeabur_core::crypto;
 use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef};
 use zeabur_model::WorkloadKind;
+use zeabur_model::readiness::{self, Status};
 use zeabur_plan::{Change, Plan};
 use zeabur_telemetry::{ChangeId, Operation, Rollout, Submitted};
 
@@ -244,43 +245,20 @@ pub(crate) enum Seen {
     Rolling,
 }
 
-/// The checks of `kubectl rollout status` for a Deployment
-/// ([deployment status](https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#deployment-status)):
-/// once the controller has seen the generation, a `Progressing` condition that is `False` with
-/// `ProgressDeadlineExceeded` ends it as failed, and it is available when every replica is
-/// updated and available. An absent `spec.replicas` is 1, the default kube-apiserver sets.
+/// The rollout of `version` by [`readiness::deployment`]: current is available, a passed
+/// progress deadline fails it, and anything else rolls on. A newer generation or a new object
+/// with the same name replaces it.
 pub(crate) fn seen(deployment: &Deployment, version: &Version) -> Seen {
-    let generation = version.generation;
     if deployment.metadata.uid.as_deref() != Some(version.uid.as_str())
-        || deployment.metadata.generation.unwrap_or(0) > generation
+        || deployment.metadata.generation.unwrap_or(0) > version.generation
     {
         return Seen::Replaced;
     }
-    let status = deployment.status.clone().unwrap_or_default();
-    if status.observed_generation.unwrap_or(0) < generation {
-        return Seen::Rolling;
-    }
-    let exceeded = status.conditions.unwrap_or_default().iter().any(|c| {
-        c.type_ == "Progressing"
-            && c.status == "False"
-            && c.reason.as_deref() == Some("ProgressDeadlineExceeded")
-    });
-    if exceeded {
-        return Seen::Finished(Rollout::ProgressDeadlineExceeded);
-    }
-    let wanted = deployment
-        .spec
-        .as_ref()
-        .and_then(|spec| spec.replicas)
-        .unwrap_or(1);
-    let updated = status.updated_replicas.unwrap_or(0);
-    let available = updated >= wanted
-        && status.replicas.unwrap_or(0) <= updated
-        && status.available_replicas.unwrap_or(0) >= updated;
-    if available {
-        Seen::Finished(Rollout::Available)
-    } else {
-        Seen::Rolling
+    let state = readiness::deployment(deployment);
+    match state.status {
+        Status::Current => Seen::Finished(Rollout::Available),
+        Status::Failed => Seen::Finished(Rollout::ProgressDeadlineExceeded),
+        Status::InProgress => Seen::Rolling,
     }
 }
 
@@ -305,29 +283,29 @@ mod tests {
     }
 
     #[test]
-    fn available_means_every_replica_is_updated_and_available() {
-        let at = |status: Value| {
+    fn available_means_the_deployment_is_current_by_kstatus() {
+        let at = |replicas: i64, status: Value| {
             seen(
                 &deployment(json!({"metadata": {"generation": 5},
-                    "spec": {"replicas": 3}, "status": status})),
+                    "spec": {"replicas": replicas}, "status": status})),
                 &version(5),
             )
         };
+        let available = json!([{"type": "Available", "status": "True"}]);
         let all = json!({"observedGeneration": 5, "replicas": 3, "updatedReplicas": 3,
-                         "availableReplicas": 3});
-        assert_eq!(at(all), Seen::Finished(Rollout::Available));
-        let old_pod_left = json!({"observedGeneration": 5, "replicas": 4, "updatedReplicas": 3,
-                                  "availableReplicas": 3});
-        assert_eq!(at(old_pod_left), Seen::Rolling);
-        let not_yet_seen = json!({"observedGeneration": 4, "replicas": 3, "updatedReplicas": 3,
-                                  "availableReplicas": 3});
-        assert_eq!(at(not_yet_seen), Seen::Rolling);
-        let scaled_to_zero = deployment(json!({"metadata": {"generation": 2},
-            "spec": {"replicas": 0}, "status": {"observedGeneration": 2}}));
-        assert_eq!(
-            seen(&scaled_to_zero, &version(2)),
-            Seen::Finished(Rollout::Available)
-        );
+                         "readyReplicas": 3, "availableReplicas": 3, "conditions": available});
+        assert_eq!(at(3, all.clone()), Seen::Finished(Rollout::Available));
+        let mut old_pod_left = all.clone();
+        old_pod_left["replicas"] = json!(4);
+        assert_eq!(at(3, old_pod_left), Seen::Rolling);
+        let mut not_yet_seen = all.clone();
+        not_yet_seen["observedGeneration"] = json!(4);
+        assert_eq!(at(3, not_yet_seen), Seen::Rolling);
+        let mut no_condition = all;
+        no_condition["conditions"] = json!([]);
+        assert_eq!(at(3, no_condition), Seen::Rolling);
+        let scaled_to_zero = json!({"observedGeneration": 5, "conditions": available});
+        assert_eq!(at(0, scaled_to_zero), Seen::Finished(Rollout::Available));
     }
 
     #[test]
