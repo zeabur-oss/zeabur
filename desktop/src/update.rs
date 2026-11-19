@@ -5,7 +5,7 @@
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, PoisonError};
 
-use serde::Serialize;
+use serde::{Deserialize as _, Serialize};
 use tauri::utils::config::BundleType;
 use tauri::{AppHandle, Emitter, Manager, State};
 use tauri_plugin_updater::{Update, UpdaterExt};
@@ -101,9 +101,8 @@ fn configured(app: &AppHandle) -> bool {
         .plugins
         .0
         .get("updater")
-        .and_then(|updater| updater.get("pubkey"))
-        .and_then(serde_json::Value::as_str)
-        .is_some_and(|key| !key.is_empty())
+        .and_then(|updater| tauri_plugin_updater::Config::deserialize(updater).ok())
+        .is_some_and(|config| !config.pubkey.is_empty())
 }
 
 async fn check(app: &AppHandle) -> Result<Option<Available>, String> {
