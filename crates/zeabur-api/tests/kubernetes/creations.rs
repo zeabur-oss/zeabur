@@ -472,3 +472,61 @@ async fn a_quota_refuses_at_the_plan_or_part_way_with_a_cleanup() {
         tokio::time::sleep(Duration::from_millis(500)).await;
     }
 }
+
+/// A Deployment without requests, in a namespace whose `LimitRange` defaults each container to
+/// 256Mi: three pods go past a quota of 600Mi and the plan is refused; two fit.
+#[tokio::test]
+#[ignore = "needs a disposable cluster"]
+async fn the_pods_a_plan_starts_carry_the_limit_range_defaults_into_the_quota() {
+    let mut rules = rules();
+    if let Some(list) = rules.as_array_mut() {
+        list.push(json!({"apiGroups": [""], "resources": ["pods"], "verbs": ["create"]}));
+    }
+    let sandbox = Sandbox::new("zeabur-create-pod-quota", rules).await;
+    let (ns, admin) = (sandbox.namespace().to_owned(), sandbox.admin().clone());
+    create(
+        &namespaced(&admin, &ns, "", "LimitRange"),
+        json!({"apiVersion": "v1", "kind": "LimitRange", "metadata": {"name": "defaults"},
+               "spec": {"limits": [{"type": "Container",
+                   "defaultRequest": {"memory": "256Mi"}, "default": {"memory": "256Mi"}}]}}),
+    )
+    .await;
+    let quotas = namespaced(&admin, &ns, "", "ResourceQuota");
+    create(
+        &quotas,
+        json!({"apiVersion": "v1", "kind": "ResourceQuota", "metadata": {"name": "memory"},
+               "spec": {"hard": {"requests.memory": "600Mi"}}}),
+    )
+    .await;
+    let deadline = Instant::now() + Duration::from_secs(60);
+    while quotas
+        .get("memory")
+        .await
+        .unwrap()
+        .data
+        .pointer("/status/used/requests.memory")
+        .is_none()
+    {
+        assert!(Instant::now() < deadline, "no quota status");
+        tokio::time::sleep(Duration::from_millis(500)).await;
+    }
+    let app = app(sandbox.user());
+    let deployment = |replicas: u32| {
+        DEPLOYMENT
+            .replace("replicas: 0", &format!("replicas: {replicas}"))
+            .replace(
+                "          envFrom:\n            - configMapRef: {name: hello-config}\n            \
+                 - secretRef: {name: hello-env}\n",
+                "",
+            )
+    };
+
+    let (status, problem) = plan(&app, &ns, &creates(&[&deployment(3)])).await;
+    assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
+    assert_eq!(problem["kind"], "quota-exceeded", "{problem}");
+    assert_eq!(problem["at"]["change"], 0, "{problem}");
+    assert_eq!(problem["why"]["params"]["resource"], "requests.memory");
+
+    let (status, planned) = plan(&app, &ns, &creates(&[&deployment(2)])).await;
+    assert_eq!(status, StatusCode::OK, "{planned}");
+}

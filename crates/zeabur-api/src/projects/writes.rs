@@ -28,6 +28,7 @@ mod creations;
 mod deletions;
 mod edits;
 mod namespace;
+mod pods;
 pub(crate) mod preview;
 mod project_deletion;
 mod refusals;
@@ -396,6 +397,7 @@ pub(crate) async fn plan(
     if creations::creates(&opened) {
         creations::dry_run(cluster.as_ref(), &project, &plan).await?;
     }
+    pods::dry_run(cluster.as_ref(), &project, &opened, &plan).await?;
     let from_yaml = creations::from_yaml(&opened);
     let preview = preview::read(cluster.as_ref(), &project, &plan, &opened).await;
     let risk = risk::weigh(&request.changes, &ready);

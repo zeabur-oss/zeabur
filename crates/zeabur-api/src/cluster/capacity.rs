@@ -66,6 +66,14 @@ impl Amount {
         }
     }
 
+    /// `count` times this amount.
+    pub(crate) const fn times(self, count: u64) -> Self {
+        Self {
+            cpu: self.cpu.saturating_mul(count),
+            memory: self.memory.saturating_mul(count),
+        }
+    }
+
     pub(crate) const fn add(&mut self, other: Self) {
         *self = self.plus(other);
     }
