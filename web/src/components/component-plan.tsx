@@ -85,7 +85,7 @@ export function ComponentPlan({
       {install.isError ? (
         <div className="flex flex-col gap-5">
           <Problem error={install.error} />
-          {installed ? null : <GitOpsExport id={id} />}
+          {installed ? null : <GitOpsExport id={id} action="install" />}
         </div>
       ) : (
         <LoadingRows label={t("plan.planning")} rows={3} />
@@ -139,7 +139,7 @@ function PlanDialog({
         <PlanBody plan={shown} readySince={readySince} />
       ) : null}
       {apply.isError ? <Problem error={apply.error} /> : null}
-      {action === "install" && !shown?.done ? <GitOpsExport id={id} /> : null}
+      <GitOpsExport id={id} action={action} plan={shown} />
     </Frame>
   )
 }
@@ -239,9 +239,18 @@ function Footer({
 }
 
 /** The commands that print the component for Flux or Argo CD, which Zeabur does not install
- * through. */
-function GitOpsExport({ id }: { id: string }) {
+ * through, until the install is done. */
+function GitOpsExport({
+  id,
+  action,
+  plan,
+}: {
+  id: string
+  action: Schemas.ComponentAction
+  plan?: Schemas.ComponentPlan
+}) {
   const t = useT()
+  if (action !== "install" || plan?.done) return null
   return (
     <section className="flex flex-col gap-2">
       <h3 className="type-meta font-medium text-muted-foreground">{t("components.gitops")}</h3>
