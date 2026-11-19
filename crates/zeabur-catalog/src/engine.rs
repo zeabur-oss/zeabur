@@ -59,6 +59,8 @@ pub struct Target<'a> {
     pub distribution: Option<&'a str>,
     /// The nodes' platform, `linux/amd64`.
     pub platform: &'a str,
+    /// kube-apiserver's `gitVersion`, `v1.36.5+k3s1`.
+    pub kube_version: &'a str,
     /// The capabilities the cluster has.
     pub capabilities: &'a BTreeSet<String>,
     /// The components the cluster has.
@@ -262,6 +264,12 @@ fn check(file: &ComponentFile, target: &Target<'_>) -> Result<(), Refusal> {
         return Err(Refusal::NotHere {
             component: file.id.clone(),
             place: distribution.to_owned(),
+        });
+    }
+    if !crate::kube_version::admits(&d.kube_version, target.kube_version).unwrap_or(false) {
+        return Err(Refusal::NotHere {
+            component: file.id.clone(),
+            place: format!("Kubernetes {}", target.kube_version),
         });
     }
     if !d.inputs.is_empty() {
@@ -822,6 +830,7 @@ mod tests {
             profile: "single-node",
             distribution: Some("k3s"),
             platform: "linux/amd64",
+            kube_version: "v1.36.5+k3s1",
             capabilities: &capabilities,
             components: &components,
             written: &written,
@@ -942,12 +951,33 @@ mod tests {
             profile: "single-node",
             distribution: Some("minikube"),
             platform: "linux/amd64",
+            kube_version: "v1.36.5+k3s1",
             capabilities: &capabilities,
             components: &components,
             written: &BTreeSet::new(),
         };
         let refusal = install(&snapshot(), "cert-manager", &target).unwrap_err();
         assert!(matches!(refusal, Refusal::NotHere { place, .. } if place == "minikube"));
+    }
+
+    #[test]
+    fn a_kubernetes_version_outside_the_components_range_is_refused() {
+        let capabilities = set(&["ingress"]);
+        let components = set(&[]);
+        let target = Target {
+            profile: "single-node",
+            distribution: Some("k3s"),
+            platform: "linux/amd64",
+            kube_version: "v1.33.4+k3s1",
+            capabilities: &capabilities,
+            components: &components,
+            written: &BTreeSet::new(),
+        };
+        let refusal = install(&snapshot(), "victoria-logs", &target).unwrap_err();
+        assert!(
+            matches!(refusal, Refusal::NotHere { component, place } if component == "victoria-logs" && place == "Kubernetes v1.33.4+k3s1")
+        );
+        assert!(install(&snapshot(), "cert-manager", &target).is_ok());
     }
 
     #[test]

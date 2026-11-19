@@ -98,6 +98,9 @@ pub struct Declaration {
     /// The distributions it may be installed on.
     #[serde(default)]
     pub distributions: Vec<String>,
+    /// The Kubernetes versions it supports, as a Helm chart's `kubeVersion` range.
+    #[serde(rename = "kubeVersion")]
+    pub kube_version: String,
     /// What it needs installed first.
     #[serde(default)]
     pub requires: Vec<Reference>,

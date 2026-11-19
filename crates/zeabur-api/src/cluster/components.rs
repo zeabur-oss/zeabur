@@ -353,6 +353,8 @@ struct World {
     profile: &'static str,
     distribution: Option<&'static str>,
     platform: String,
+    /// kube-apiserver's `gitVersion`.
+    kube_version: String,
     /// The capabilities a running component gives.
     capabilities: BTreeSet<String>,
     /// The components found by more than CRDs a removal left.
@@ -432,6 +434,7 @@ impl World {
             profile: zeabur_catalog::profile(&facts),
             distribution: zeabur_catalog::distribution(&facts),
             platform,
+            kube_version: facts.version.clone(),
             capabilities,
             running,
             sources,
@@ -458,6 +461,7 @@ impl World {
             profile: self.profile,
             distribution: self.distribution,
             platform: &self.platform,
+            kube_version: &self.kube_version,
             capabilities: &self.capabilities,
             components: &self.running,
             written: &self.written,
