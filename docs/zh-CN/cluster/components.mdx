@@ -90,7 +90,7 @@ zeaburctl components export velero --format helm
 
 ## 移除组件
 
-要移除 Zeabur 安装的组件，在卡片上点击**管理**。所有步骤完成后，弹窗会改为移除：检查步骤后点击**移除**。Zeabur 会按相反的顺序删除组件的对象；删除 Chart 后，helm-controller 会卸载这个 Chart。弹窗会列出会保留的内容，例如 CRD 和密钥。如果还有其他已安装的组件依赖这个组件，或者它的自定义资源在其自身 Namespace 之外仍有对象在使用，Zeabur 会拒绝移除，并列出具体是哪些。
+要移除 Zeabur 安装的组件，在卡片上点击**管理**。所有步骤和健康检查都就绪后，弹窗会改为移除；安装尚未完成时，例如健康检查失败，弹窗会在**安装**旁边显示**移除**。检查步骤后点击**移除**。Zeabur 会按相反的顺序删除组件的对象；删除 Chart 后，helm-controller 会卸载这个 Chart。弹窗会列出会保留的内容，例如 CRD 和密钥。如果还有其他已安装的组件依赖这个组件，或者它的自定义资源在其自身 Namespace 之外仍有对象在使用，Zeabur 会拒绝移除，并列出具体是哪些。
 
 不是 Zeabur 安装的组件，请用当初安装它的文件或工具移除，例如 `kubectl delete -f`、`helm uninstall`、Flux 或 Argo CD。
 

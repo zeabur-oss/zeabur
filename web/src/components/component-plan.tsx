@@ -34,7 +34,8 @@ const planQuery = (id: string, action: Schemas.ComponentAction) => ({
 
 /** Installs the component until its install plan is done, then removes it. The server's plan
  * decides, since only it sees every object Zeabur wrote; the action stays while the dialog is
- * open, so a failed install is tried again rather than removed. */
+ * open, so a failed install is tried again rather than removed. Once Zeabur wrote a step, the
+ * install dialog also offers removal, for an install that cannot finish. */
 export function ComponentPlan({
   id,
   name,
@@ -48,7 +49,17 @@ export function ComponentPlan({
   const install = useQuery(planQuery(id, "install"))
   const [action, setAction] = useState<Schemas.ComponentAction>()
   if (action === undefined && install.data) setAction(install.data.done ? "remove" : "install")
-  if (action) return <PlanDialog id={id} name={name} action={action} onClose={onClose} />
+  if (action)
+    return (
+      <PlanDialog
+        key={action}
+        id={id}
+        name={name}
+        action={action}
+        onClose={onClose}
+        onRemove={action === "install" ? () => setAction("remove") : undefined}
+      />
+    )
   return (
     <Frame
       title={t("installer.installTitle", name)}
@@ -74,11 +85,13 @@ function PlanDialog({
   name,
   action,
   onClose,
+  onRemove,
 }: {
   id: string
   name: string
   action: Schemas.ComponentAction
   onClose: () => void
+  onRemove?: () => void
 }) {
   const t = useT()
   const plan = useQuery(planQuery(id, action))
@@ -92,7 +105,16 @@ function PlanDialog({
       wide
       onClose={onClose}
       footer={
-        <Footer action={action} plan={shown} running={running} onClose={onClose} onStart={start} />
+        <Footer
+          action={action}
+          plan={shown}
+          running={running}
+          onClose={onClose}
+          onStart={start}
+          onRemove={
+            !running && shown?.steps.some((s) => s.state !== "pending") ? onRemove : undefined
+          }
+        />
       }
     >
       {plan.isPending ? (
@@ -148,18 +170,26 @@ function useApplying(
   return { shown, running, readySince, start, apply }
 }
 
+/** The footer button of each action: before it starts, and while it runs. */
+const labels = {
+  install: ["settings.installCommand", "components.installing"],
+  remove: ["settings.removeCommand", "components.removing"],
+} as const
+
 function Footer({
   action,
   plan,
   running,
   onClose,
   onStart,
+  onRemove,
 }: {
   action: Schemas.ComponentAction
   plan?: Schemas.ComponentPlan
   running: boolean
   onClose: () => void
   onStart: (version: string) => void
+  onRemove?: () => void
 }) {
   const t = useT()
   if (plan?.done)
@@ -169,13 +199,17 @@ function Footer({
       </Button>
     )
   const install = action === "install"
-  const idle = install ? t("settings.installCommand") : t("settings.removeCommand")
-  const busy = install ? t("components.installing") : t("components.removing")
+  const [idle, busy] = labels[action]
   return (
     <>
       <Button variant="ghost" size="sm" onClick={onClose}>
         {t("plan.cancel")}
       </Button>
+      {onRemove ? (
+        <Button variant="outline" size="sm" onClick={onRemove}>
+          {t("settings.removeCommand")}
+        </Button>
+      ) : null}
       <Button
         size="sm"
         variant={install ? "default" : "destructive"}
@@ -183,7 +217,7 @@ function Footer({
         loading={running}
         onClick={() => plan && onStart(plan.catalogVersion)}
       >
-        {running ? busy : idle}
+        {t(running ? busy : idle)}
       </Button>
     </>
   )

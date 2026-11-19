@@ -90,7 +90,7 @@ Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middlew
 
 ## Remove components
 
-To remove a component Zeabur installed, click **Manage** on its card. Once every step is done, the dialog offers removal: check the steps, then click **Remove**. Zeabur deletes its objects in the reverse order; deleting a chart makes helm-controller uninstall it. The dialog lists what stays, such as CRDs and keys. Zeabur refuses while another installed component needs it, or while objects of its custom resources are still in use outside its own namespace, and names them.
+To remove a component Zeabur installed, click **Manage** on its card. When every step and health check is ready, the dialog removes; while an install is unfinished, for example when a health check fails, the dialog shows **Remove** next to **Install**. Check the steps, then click **Remove**. Zeabur deletes its objects in the reverse order; deleting a chart makes helm-controller uninstall it. The dialog lists what stays, such as CRDs and keys. Zeabur refuses while another installed component needs it, or while objects of its custom resources are still in use outside its own namespace, and names them.
 
 Remove a component Zeabur didn't install through the same files or tools you used to install it, such as `kubectl delete -f`, `helm uninstall`, Flux, or Argo CD.
 
