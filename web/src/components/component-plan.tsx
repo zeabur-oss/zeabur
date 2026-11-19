@@ -6,6 +6,7 @@ import { useEffect, useState } from "react"
 import type { Schemas } from "@/api/client"
 import { applyComponent, planComponent } from "@/api/zeabur"
 import { capabilitiesQuery, refresh, reviewOnce } from "@/api/queries"
+import { Command } from "@/components/bits"
 import { Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
@@ -82,7 +83,10 @@ export function ComponentPlan({
       }
     >
       {install.isError ? (
-        <Problem error={install.error} />
+        <div className="flex flex-col gap-5">
+          <Problem error={install.error} />
+          {installed ? null : <GitOpsExport id={id} />}
+        </div>
       ) : (
         <LoadingRows label={t("plan.planning")} rows={3} />
       )}
@@ -135,6 +139,7 @@ function PlanDialog({
         <PlanBody plan={shown} readySince={readySince} />
       ) : null}
       {apply.isError ? <Problem error={apply.error} /> : null}
+      {action === "install" && !shown?.done ? <GitOpsExport id={id} /> : null}
     </Frame>
   )
 }
@@ -230,6 +235,20 @@ function Footer({
         {t(running ? busy : idle)}
       </Button>
     </>
+  )
+}
+
+/** The commands that print the component for Flux or Argo CD, which Zeabur does not install
+ * through. */
+function GitOpsExport({ id }: { id: string }) {
+  const t = useT()
+  return (
+    <section className="flex flex-col gap-2">
+      <h3 className="type-meta font-medium text-muted-foreground">{t("components.gitops")}</h3>
+      <p className="text-pretty text-muted-foreground">{t("components.gitopsHow")}</p>
+      <Command text={`zeaburctl components export ${id} --format flux`} />
+      <Command text={`zeaburctl components export ${id} --format argocd`} />
+    </section>
   )
 }
 

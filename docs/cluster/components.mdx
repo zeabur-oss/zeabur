@@ -23,6 +23,8 @@ If a feature such as backups or notifications already works, but its component c
 
 Only someone allowed to do everything in the cluster (`cluster-admin`) can install here: Zeabur hands each chart to the cluster's helm-controller, which installs it with full rights. The cluster must run helm-controller, as K3s and RKE2 do.
 
+If you manage the cluster with Flux or Argo CD, install the component through it instead. The install dialog shows the `zeaburctl components export` commands that print the component's manifests for Flux or Argo CD. Run one and commit its output to the repository the cluster reads, as [Install with zeaburctl](#install-with-zeaburctl) describes.
+
 <Steps>
 <Step>
 

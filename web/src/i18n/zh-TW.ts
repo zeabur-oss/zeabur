@@ -1111,6 +1111,9 @@ export const zhTW: Messages = {
   "installer.removeTitle": (name) => `移除 ${name}`,
   "installer.export":
     "印出 manifests 後用 kubectl 套用，或提交到 GitOps 儲存庫。加上 --format helm 會改印 Helm 指令。",
+  "components.gitops": "用 Flux 或 Argo CD",
+  "components.gitopsHow":
+    "叢集用 Flux 或 Argo CD 管理的話，改用下面的指令印出元件的 manifest，再提交到叢集讀取的儲存庫。",
   "components.manage": "管理",
   "components.installing": "安裝中…",
   "components.removing": "移除中…",

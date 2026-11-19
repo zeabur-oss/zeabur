@@ -416,7 +416,8 @@ impl World {
             return Err(ApiError::from(Problem::new(
                 Kind::Invalid,
                 "Zeabur installs components with helm-controller, which K3s and RKE2 run, and \
-                 this cluster has none.",
+                 this cluster has none. To install with Helm, Flux or Argo CD, print the \
+                 component with `zeaburctl components export <id> --format helm|flux|argocd`.",
             )));
         }
         let nodes: Vec<Node> = cluster
