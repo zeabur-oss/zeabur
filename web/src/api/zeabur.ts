@@ -5411,6 +5411,22 @@ export type Fault = {
 }
 
 /**
+ * What diagnoses of several services share when they fail the same way.
+ */
+export type DiagnosisGroup = {
+  /**
+   * The same for diagnoses of one kind and cause whose values differ only where they name
+   * the service itself (its container, pods, address, restart count).
+   */
+  key: string
+  /**
+   * The cause names the service only by its container, so a group can say it once, with
+   * the container replaced by words for each service.
+   */
+  sharedCause?: boolean
+}
+
+/**
  * One explained failure of a service's container.
  */
 export type Diagnosis = {
@@ -5427,6 +5443,8 @@ export type Diagnosis = {
   fault?: Fault
   /** What to do about it, in one sentence. */
   fix: Message
+  /** What it shares with the diagnoses of other services that fail the same way. */
+  group: DiagnosisGroup
   /**
    * The cluster incident this is a symptom of ([`Incident::id`]); set only in answers that
    * read the incidents too.
@@ -6063,6 +6081,38 @@ export const FixKind = {
 } as const
 
 /**
+ * The values a fix's plan sets in one container.
+ */
+export type FixValues =
+  | {
+      /** The container. */
+      container: string
+      /** Limits, the same way. */
+      limits: { [key: string]: string }
+      /** Requests, by resource (`cpu`, `memory`). */
+      requests: { [key: string]: string }
+      set: "resources"
+    }
+  | {
+      /** The container. */
+      container: string
+      /** Seconds between checks. */
+      periodSeconds: number
+      /** The port. */
+      port: number
+      set: "tcpReadiness"
+    }
+  | {
+      /** The container. */
+      container: string
+      /** Where the container sees the disk. */
+      mountPath: string
+      set: "volume"
+      /** The disk's size, a Kubernetes quantity. */
+      size: string
+    }
+
+/**
  * The fix of a gap.
  */
 export type Fix = {
@@ -6072,6 +6122,8 @@ export type Fix = {
   kind: FixKind
   /** What the template or component is filled in with. */
   params?: FixParams
+  values?: FixValues | null
+  workload?: WorkloadRef | null
 }
 
 /**
@@ -8190,6 +8242,58 @@ export type Preview = {
 }
 
 /**
+ * How much a change can hurt.
+ */
+export type RiskLevel = (typeof RiskLevel)[keyof typeof RiskLevel]
+
+export const RiskLevel = {
+  low: "low",
+  normal: "normal",
+  high: "high",
+} as const
+
+/**
+ * Why a change is high risk.
+ */
+export type RiskReason = (typeof RiskReason)[keyof typeof RiskReason]
+
+export const RiskReason = {
+  fewPods: "fewPods",
+  scaleToZero: "scaleToZero",
+  deletesKeys: "deletesKeys",
+  rollback: "rollback",
+  storage: "storage",
+  yamlEdit: "yamlEdit",
+  removesDomain: "removesDomain",
+  isolates: "isolates",
+  opensPort: "opensPort",
+  deletes: "deletes",
+} as const
+
+/**
+ * One reason of a high risk, with the workloads it names.
+ */
+export type RiskCause = {
+  /** The reason. */
+  reason: RiskReason
+  /**
+   * For `fewPods`, the restarted workloads with fewer than two ready pods; for
+   * `scaleToZero`, the stopped workloads; empty otherwise.
+   */
+  workloads?: WorkloadRef[]
+}
+
+/**
+ * The risk of a plan's changes.
+ */
+export type Risk = {
+  /** The highest of the changes. */
+  level: RiskLevel
+  /** The reasons of the high-risk changes, each once, in the order of the changes. */
+  reasons: RiskCause[]
+}
+
+/**
  * A plan and the token that applies it.
  */
 export type PlanResponse = Plan & {
@@ -8202,6 +8306,8 @@ export type PlanResponse = Plan & {
    * and fields it removes.
    */
   preview: Preview
+  /** How much the asked changes can hurt, which decides how they are confirmed. */
+  risk: Risk
   /** Send this to `apply` to carry out exactly this plan. */
   token: string
 }

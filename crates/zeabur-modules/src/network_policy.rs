@@ -859,28 +859,18 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
                         ..NetworkPolicySpec::default()
                     },
                 );
-                Fix {
-                    kind: FixKind::Plan,
-                    id: "networkPolicy.allowEgress".to_owned(),
-                    params: BTreeMap::from([
-                        ("from".to_owned(), from.id.clone()),
-                        ("to".to_owned(), to.id.clone()),
-                        ("object".to_owned(), serde_json::to_string(&object).ok()?),
-                    ]),
-                }
+                Fix::new(FixKind::Plan, "networkPolicy.allowEgress")
+                    .with("from", from.id.clone())
+                    .with("to", to.id.clone())
+                    .with("object", serde_json::to_string(&object).ok()?)
             } else {
                 let preset = presets(namespace, to, std::slice::from_ref(from))
                     .into_iter()
                     .find(|p| p.from.as_deref() == Some(from.id.as_str()))?;
-                Fix {
-                    kind: FixKind::Plan,
-                    id: "networkPolicy.allowFrom".to_owned(),
-                    params: BTreeMap::from([
-                        ("from".to_owned(), from.id.clone()),
-                        ("to".to_owned(), to.id.clone()),
-                        ("object".to_owned(), serde_json::to_string(&preset.object).ok()?),
-                    ]),
-                }
+                Fix::new(FixKind::Plan, "networkPolicy.allowFrom")
+                    .with("from", from.id.clone())
+                    .with("to", to.id.clone())
+                    .with("object", serde_json::to_string(&preset.object).ok()?)
             };
             Some(Finding {
                 gap: Gap {
@@ -965,14 +955,8 @@ pub fn unprotected(input: Input<'_>, exposed: Exposed<'_>) -> Option<Finding> {
                     "cuts",
                     cuts(&before, &after, &open, exposed, after_input).join(","),
                 ),
-            fix: Fix {
-                kind: FixKind::Plan,
-                id: "networkPolicy.isolateProject".to_owned(),
-                params: BTreeMap::from([(
-                    "objects".to_owned(),
-                    Value::Array(objects).to_string(),
-                )]),
-            },
+            fix: Fix::new(FixKind::Plan, "networkPolicy.isolateProject")
+                .with("objects", Value::Array(objects).to_string()),
             citations: vec![
                 Citation {
                     title: "Network Policies: the two sorts of pod isolation".to_owned(),

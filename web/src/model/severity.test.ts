@@ -28,6 +28,7 @@ const ago = (ms: number) => new Date(now - ms).toISOString()
 
 const diagnosis = (kind: Diagnosis["kind"], pods: string[] = []): Diagnosis => ({
   kind,
+  group: { key: kind },
   cause: { key: `diagnosis.${kind}.cause.x` },
   why: { key: "w" },
   fix: { key: "f" },

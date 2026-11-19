@@ -35,6 +35,7 @@ const issuing: DomainCheck = {
 
 const diagnosis = (kind: Diagnosis["kind"]): Diagnosis => ({
   kind,
+  group: { key: kind },
   cause: { key: `diagnosis.${kind}.cause.x` },
   why: { key: "w" },
   fix: { key: "f" },

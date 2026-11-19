@@ -15,6 +15,7 @@ const diagnosis = (
   more: Partial<Diagnosis> = {},
 ): Diagnosis => ({
   kind,
+  group: { key: kind },
   cause: { key: `diagnosis.${kind}.cause.${cause}` },
   why: { key: "w" },
   fix: { key: "f" },

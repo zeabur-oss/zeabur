@@ -23,7 +23,7 @@ import {
   projectTitle,
   restartsIn,
 } from "@/model/project"
-import { destinationOf, weigh } from "@/model/risk"
+import { destinationOf } from "@/model/destination"
 
 const english: Translate = (key, ...args) => {
   const message = en[key] as string | ((...a: unknown[]) => string)
@@ -76,13 +76,6 @@ describe("adopting and letting go, as a plan", () => {
     const adopt = describePlan(english, { changes: [{ op: "adopt" }] }, empty, () => undefined)
     expect(adopt.lines.join(" ")).toMatch(/Nothing in it changes/)
     expect(actionOf(english, { changes: [{ op: "details" }] })).toBe("Save details")
-  })
-
-  test("adopting and details are light; letting go is confirmed in full", () => {
-    const none = () => undefined
-    expect(weigh([{ op: "adopt" }], none).risk).toBe("low")
-    expect(weigh([{ op: "details", displayName: "Shop" }], none).risk).toBe("low")
-    expect(weigh([{ op: "unadopt" }], none).risk).toBe("normal")
   })
 
   test("after the change, View goes to the project, the list or the settings", () => {

@@ -1,6 +1,6 @@
 // Carrying out a confirmed plan, after its dialog has closed: one toast follows it from "Applying…"
 // to the outcome. Success names what changed and offers View (where to see it) or Undo (where the
-// change can be taken back, model/risk.ts). When the project moved on since the review and nothing
+// change can be taken back, model/undo.ts). When the project moved on since the review and nothing
 // was written, the change is planned again and shown with what is new (replan.ts). Other failures
 // give the reason in plain words and, when the plan ran out, "Review again"; when Helm would undo
 // it, the kubectl terminal with `helm list` typed in.

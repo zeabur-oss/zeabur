@@ -70,6 +70,55 @@ pub struct Diagnosis {
     /// read the incidents too.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub incident: Option<String>,
+    /// What it shares with the diagnoses of other services that fail the same way.
+    pub group: DiagnosisGroup,
+}
+
+/// The cause's values that name the service itself; the others (an image, a Secret) are shared.
+const OWN_VALUES: [&str; 7] = [
+    "container",
+    "service",
+    "pod",
+    "endpoint",
+    "address",
+    "restarts",
+    "route",
+];
+
+/// What diagnoses of several services share when they fail the same way.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct DiagnosisGroup {
+    /// The same for diagnoses of one kind and cause whose values differ only where they name
+    /// the service itself (its container, pods, address, restart count).
+    pub key: String,
+    /// The cause names the service only by its container, so a group can say it once, with
+    /// the container replaced by words for each service.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub shared_cause: bool,
+}
+
+impl DiagnosisGroup {
+    /// The group of a diagnosis of `kind` with `cause`.
+    #[must_use]
+    pub fn of(kind: DiagnosisKind, cause: &Message) -> Self {
+        let own = |name: &str| OWN_VALUES.contains(&name);
+        let shared: Vec<String> = cause
+            .params
+            .iter()
+            .filter(|(name, _)| !own(name))
+            .map(|(name, value)| format!("{name}={value}"))
+            .collect();
+        Self {
+            key: format!("{kind:?}/{}/{}", cause.key, shared.join("&")),
+            shared_cause: cause.params.contains_key("container")
+                && cause
+                    .params
+                    .keys()
+                    .all(|name| !own(name) || matches!(name.as_str(), "container" | "restarts")),
+        }
+    }
 }
 
 /// Where the cause of a failure lies, so a cluster's fault never reads as the reader's.
@@ -209,4 +258,38 @@ pub struct Incident {
     /// Since when, in RFC 3339, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub since: Option<String>,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn services_failing_the_same_way_share_a_group_apart_from_their_own_names() {
+        let pull = |container: &str, image: &str| {
+            Message::new("diagnosis.imagePull.cause.notFound")
+                .with("container", container)
+                .with("image", image)
+        };
+        let api = DiagnosisGroup::of(DiagnosisKind::ImagePull, &pull("api", "shop:1"));
+        let worker = DiagnosisGroup::of(DiagnosisKind::ImagePull, &pull("worker", "shop:1"));
+        assert_eq!(api.key, worker.key);
+        assert!(api.shared_cause);
+        let other = DiagnosisGroup::of(DiagnosisKind::ImagePull, &pull("api", "shop:2"));
+        assert_ne!(api.key, other.key);
+        let crash = DiagnosisGroup::of(DiagnosisKind::CrashLoop, &pull("api", "shop:1"));
+        assert_ne!(api.key, crash.key);
+    }
+
+    #[test]
+    fn a_cause_that_names_a_pod_is_not_said_once_for_a_group() {
+        let restarts = Message::new("diagnosis.crashLoop.cause.exitCode")
+            .with("container", "api")
+            .with("restarts", "4");
+        assert!(DiagnosisGroup::of(DiagnosisKind::CrashLoop, &restarts).shared_cause);
+        let pod = restarts.with("pod", "api-1");
+        assert!(!DiagnosisGroup::of(DiagnosisKind::CrashLoop, &pod).shared_cause);
+        let service = Message::new("diagnosis.unreachable.cause.noService").with("service", "api");
+        assert!(!DiagnosisGroup::of(DiagnosisKind::Unreachable, &service).shared_cause);
+    }
 }

@@ -510,7 +510,7 @@ mod tests {
             "kind": "crashLoop", "container": "app", "pods": ["web-2-abcde"],
             "cause": {"key": "diagnosis.crashLoop.cause.exitCode", "params": {}},
             "why": {"key": "w", "params": {}}, "fix": {"key": "f", "params": {}},
-            "evidence": []}))
+            "evidence": [], "group": {"key": "crashLoop"}}))
         .unwrap();
         let (status, reason, mine, _) = progress(
             web,

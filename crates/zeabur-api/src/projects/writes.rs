@@ -32,6 +32,7 @@ pub(crate) mod preview;
 mod project_deletion;
 mod refusals;
 pub(crate) mod releases;
+pub(crate) mod risk;
 mod secrets;
 pub(crate) mod terminal;
 mod volumes;
@@ -49,6 +50,7 @@ use namespace::compute_namespace;
 pub(super) use namespace::node_capacity;
 use refusals::refused;
 use releases::releases_to_roll_back;
+use risk::ReadyPods;
 use secrets::secret_values;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -81,6 +83,8 @@ pub struct PlanResponse {
     /// What the plan does once applied: the pods it replaces, whether new ones fit, the data
     /// and fields it removes.
     pub preview: preview::Preview,
+    /// How much the asked changes can hurt, which decides how they are confirmed.
+    pub risk: risk::Risk,
     /// What the workloads it creates miss: resource requests and limits, health checks.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub gaps: Vec<zeabur_model::Gap>,
@@ -158,7 +162,7 @@ fn key(state: &AppState) -> Result<Arc<PlanKey>, ApiError> {
     })
 }
 
-/// Reads what a plan needs and computes it.
+/// Reads what a plan needs and computes it, with the ready pods of the workloads it restarts.
 async fn compute(
     cluster: &dyn Cluster,
     project: &str,
@@ -167,9 +171,10 @@ async fn compute(
     read_at: Timestamp,
     cluster_issuer: Option<&str>,
     build_registry: Option<&str>,
-) -> Result<Plan, ApiError> {
+) -> Result<(Plan, ReadyPods), ApiError> {
     if request.changes.iter().any(Change::is_namespace_change) {
-        return compute_namespace(cluster, project, request, now).await;
+        let plan = compute_namespace(cluster, project, request, now).await?;
+        return Ok((plan, ReadyPods::new()));
     }
     let objects = cluster
         .namespace_objects(project)
@@ -255,11 +260,32 @@ async fn compute(
         .extend(network_policies_opened(cluster, &snapshot, &policies).await?);
     plan.warnings
         .extend(public_ports_blocked(cluster, &snapshot, request).await?);
-    Ok(plan)
+    Ok((plan, ready_pods(&snapshot, request)))
+}
+
+/// The ready pods of the workloads `request` restarts.
+fn ready_pods(snapshot: &zeabur_graph::Snapshot, request: &PlanRequest) -> ReadyPods {
+    let restarted: Vec<&zeabur_model::WorkloadRef> = request
+        .changes
+        .iter()
+        .filter_map(|c| {
+            if let Change::Restart { workload } = c {
+                Some(workload)
+            } else {
+                None
+            }
+        })
+        .collect();
+    zeabur_graph::workloads(snapshot)
+        .into_iter()
+        .filter(|w| restarted.contains(&&w.reference()))
+        .filter_map(|w| Some((w.reference(), zeabur_graph::replicas(w)?.ready)))
+        .collect()
 }
 
 /// [`compute`], or [`terminal::compute`] for a terminal's change. `now` is when the plan was
-/// made; `read_at` is the server's clock as the cluster is read.
+/// made; `read_at` is the server's clock as the cluster is read. Only [`compute`] reads ready
+/// pods: the other plans restart nothing.
 async fn compute_any(
     planner: &terminal::Planner<'_>,
     cluster: &dyn Cluster,
@@ -268,9 +294,12 @@ async fn compute_any(
     now: &str,
     read_at: Timestamp,
     settings: &Settings,
-) -> Result<Plan, ApiError> {
+) -> Result<(Plan, ReadyPods), ApiError> {
+    let none = |plan| (plan, ReadyPods::new());
     if request.changes.iter().any(Change::is_terminal_change) {
-        terminal::compute(planner, cluster, project, request, now).await
+        terminal::compute(planner, cluster, project, request, now)
+            .await
+            .map(none)
     } else if request
         .changes
         .iter()
@@ -284,6 +313,7 @@ async fn compute_any(
             project_deletion::zeabur_namespaces(settings),
         )
         .await
+        .map(none)
     } else if request.changes.iter().any(Change::is_project_deletion) {
         project_deletion::compute(
             planner,
@@ -295,6 +325,7 @@ async fn compute_any(
             project_deletion::zeabur_namespaces(settings),
         )
         .await
+        .map(none)
     } else {
         compute(
             cluster,
@@ -352,7 +383,7 @@ pub(crate) async fn plan(
         state.settings.domains.cluster_issuer.as_deref(),
         opened,
     )?;
-    let plan = compute_any(
+    let (plan, ready) = compute_any(
         &planner,
         cluster.as_ref(),
         &project,
@@ -367,6 +398,7 @@ pub(crate) async fn plan(
     }
     let from_yaml = creations::from_yaml(&opened);
     let preview = preview::read(cluster.as_ref(), &project, &plan, &opened).await;
+    let risk = risk::weigh(&request.changes, &ready);
     let gaps = if from_yaml {
         creations::gaps(&project, &plan)
     } else {
@@ -396,6 +428,7 @@ pub(crate) async fn plan(
             .to_string(),
         plan: plan.without_secret_values(),
         preview,
+        risk,
         gaps,
     }))
 }
@@ -484,7 +517,7 @@ pub(crate) async fn apply(
         opened,
         claims.templates.as_deref(),
     )?;
-    let plan = compute_any(
+    let (plan, _) = compute_any(
         &planner,
         cluster.as_ref(),
         &project,

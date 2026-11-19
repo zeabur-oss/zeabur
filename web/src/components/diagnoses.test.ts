@@ -10,6 +10,7 @@ const withLogs = (canReadLogs: Schemas.Permission) => ({ canReadLogs })
 
 const diagnosis = (kind: Diagnosis["kind"], cause: string): Diagnosis => ({
   kind,
+  group: { key: kind },
   cause: { key: cause },
   why: { key: `${cause}.why` },
   fix: { key: `${cause}.fix` },

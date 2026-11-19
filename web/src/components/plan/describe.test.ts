@@ -12,7 +12,7 @@ import {
 import { translator, type Translate } from "@/i18n"
 import { en } from "@/i18n/en"
 import { zhTW } from "@/i18n/zh-TW"
-import type { Pods, PodsOf } from "@/model/risk"
+import type { Pods, PodsOf } from "@/model/undo"
 
 // Messages render as key and arguments (`confirm.scale(api, 2, 4)`), so copy edits change no test.
 const show = (value: unknown): string =>
@@ -22,7 +22,9 @@ const t = ((key: string, ...args: unknown[]) =>
 
 const english = translator(en)
 
-type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings">
+type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings"> & {
+  risk?: Schemas.Risk
+}
 const api = { kind: "Deployment", name: "api" } as const
 const web = { kind: "Deployment", name: "web" } as const
 const worker = { kind: "Deployment", name: "worker" } as const
@@ -86,9 +88,11 @@ group("describe", () => {
     const d = describe(
       t,
       { changes: [{ op: "restart", workload: api }] },
-      plan({ objects: [templated("api")] }),
+      plan({
+        objects: [templated("api")],
+        risk: { level: "high", reasons: [{ reason: "fewPods", workloads: [api] }] },
+      }),
       pods({ api: { desired: 1, ready: 1 } }),
-      ["fewPods"],
     )
     expect(d.lines).toStrictEqual(["confirm.restartSingle(api)"])
     expect(d.consequence).toBe(undefined)
@@ -186,7 +190,6 @@ group("describe", () => {
         warnings: [{ code: "configNotRolledBack", workload: api }],
       }),
       pods({ api: { desired: 1, ready: 1 } }),
-      ["rollback"],
     )
     expect(d.lines).toStrictEqual([
       "confirm.rollback(5)",
@@ -213,7 +216,6 @@ group("describe", () => {
       { changes: [{ op: "expandVolume", claim: "data", size: "20Gi" }] },
       plan(),
       pods({}),
-      ["storage"],
     )
     // Said once, as what happens; the title already says the new size.
     expect(d.lines).toStrictEqual(["confirm.noShrink"])
@@ -300,7 +302,6 @@ group("describe", () => {
       },
       plan(),
       pods({}),
-      ["removesDomain"],
     )
     expect(d.lines).toStrictEqual(["confirm.removeDomain(shop.example.com)"])
     expect(d.consequence).toBe(undefined)
@@ -315,9 +316,8 @@ group("describe", () => {
     const d = describe(
       t,
       { changes: [{ op: "create", object: policy }], service: api },
-      plan(),
+      plan({ risk: { level: "high", reasons: [{ reason: "isolates" }] } }),
       pods({}),
-      ["isolates"],
     )
     expect(d.consequence).toBe("common.sentences([confirm.isolates(api)])")
     expect(d.lines).toStrictEqual(["confirm.create(NetworkPolicy, zeabur-isolate-api)"])
@@ -340,7 +340,6 @@ group("deletion", () => {
       },
       plan({ impact: [web] }),
       pods({}),
-      ["deletes"],
     )
     expect(d.lines).toStrictEqual(["confirm.delete(web)"])
     expect(d.consequence).toBe(undefined)
@@ -357,7 +356,6 @@ group("deletion", () => {
         { changes: [{ op: "delete", resource, name: "db" }] },
         plan({}),
         pods({}),
-        ["deletes"],
       )
       expect(d.lines).toStrictEqual(["confirm.deleteDatabase(db)"])
     }

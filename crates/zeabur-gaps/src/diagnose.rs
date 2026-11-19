@@ -59,8 +59,8 @@ use k8s_openapi::jiff::{SignedDuration, Timestamp};
 use serde_json::Value;
 use zeabur_graph::{Snapshot, Workload, workloads};
 use zeabur_model::{
-    ContainerStatusSummary, ContainerTermination, Diagnosis, DiagnosisKind, Health, Message,
-    Origin, PodSummary, Service, StatusWord, WorkloadKind,
+    ContainerStatusSummary, ContainerTermination, Diagnosis, DiagnosisGroup, DiagnosisKind, Health,
+    Message, Origin, PodSummary, Service, StatusWord, WorkloadKind,
 };
 
 use crate::event::Event;
@@ -351,6 +351,7 @@ impl Found {
                 container,
                 pods: gathered.pods.into_iter().collect(),
                 fault: fault::fault(kind, &gathered.cause),
+                group: DiagnosisGroup::of(kind, &gathered.cause),
                 cause: gathered.cause,
                 why: gathered.why,
                 fix: gathered.fix,
@@ -1347,6 +1348,7 @@ fn unexplained<'e, 's>(
         container: container.unwrap_or_default().to_owned(),
         pods: affected.iter().map(|pod| pod.name.clone()).collect(),
         fault: fault::fault(DiagnosisKind::Unexplained, &cause),
+        group: DiagnosisGroup::of(DiagnosisKind::Unexplained, &cause),
         cause,
         why,
         fix,

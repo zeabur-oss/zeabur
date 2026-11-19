@@ -6,7 +6,7 @@ import { kindName } from "@/i18n/kind-name"
 import type { Dimension } from "@/lib/amount"
 import { plainAmount } from "@/lib/quantity"
 import { partOrder } from "@/model/draft"
-import type { PodsOf } from "@/model/risk"
+import type { PodsOf } from "@/model/undo"
 import type { DraftPart } from "@/routes/search"
 
 type Change = Schemas.Change

@@ -210,7 +210,7 @@ export function growObjectStorage(store: ObjectStorage, storage: string): Change
   const volume = ((object.spec ??= {}).volume ??= {})
   volume.requests = { ...volume.requests, storage: storage.trim() }
   const { name, ...resource } = storeAddress(store)
-  return [{ op: "edit", resource, name, yaml: JSON.stringify(object) }]
+  return [{ op: "edit", resource, name, yaml: JSON.stringify(object), specOnly: true }]
 }
 
 /** Events about the store, its pods and its buckets. */

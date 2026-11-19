@@ -15,7 +15,13 @@
     "fix": {
       "kind": "plan",
       "id": "compute.resources",
-      "params": {"service": "projects/demo/services/deployment/api", "container": "api"}
+      "workload": {"kind": "Deployment", "name": "api"},
+      "values": {
+        "set": "resources",
+        "container": "api",
+        "requests": {"cpu": "100m", "memory": "128Mi"},
+        "limits": {"memory": "256Mi"}
+      }
     },
     "citations": [
       {

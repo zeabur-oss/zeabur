@@ -212,6 +212,7 @@ impl FixtureOp for BackupGaps {
         wire(backups::gaps(
             &coverage(input, &params.namespace)?,
             installed,
+            |_| None,
         ))
     }
 }

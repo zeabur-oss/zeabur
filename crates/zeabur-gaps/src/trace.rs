@@ -47,8 +47,9 @@ use serde::de::DeserializeOwned;
 use serde_json::Value;
 use zeabur_graph::Snapshot;
 use zeabur_model::{
-    AddressKind, CertificateCheck, CertificateState, Diagnosis, DiagnosisKind, DnsState,
-    DomainCheck, Health, Hop, HopStatus, HopStep, HttpRoute, Message, Origin, RouteTrace, Service,
+    AddressKind, CertificateCheck, CertificateState, Diagnosis, DiagnosisGroup, DiagnosisKind,
+    DnsState, DomainCheck, Health, Hop, HopStatus, HopStep, HttpRoute, Message, Origin, RouteTrace,
+    Service,
 };
 
 use crate::diagnose::fault::fault;
@@ -1059,6 +1060,7 @@ pub fn diagnoses(traces: &[RouteTrace], service: &Service) -> Vec<Diagnosis> {
             container: String::new(),
             pods: Vec::new(),
             fault: fault(DiagnosisKind::Unreachable, &cause),
+            group: DiagnosisGroup::of(DiagnosisKind::Unreachable, &cause),
             cause,
             why: sentence("why"),
             fix: sentence("fix"),

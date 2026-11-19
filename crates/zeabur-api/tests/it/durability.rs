@@ -50,9 +50,10 @@ mod tests {
         assert_eq!(gap["message"]["key"], "gap.ephemeralData.none");
         assert_eq!(
             gap["fix"],
-            json!({"kind": "plan", "id": "storage.addVolume", "params": {
-                "service": "projects/shop/services/deployment/db", "container": "mysql",
-                "mountPath": "/var/lib/mysql"}})
+            json!({"kind": "plan", "id": "storage.addVolume",
+                "workload": {"kind": "Deployment", "name": "db"},
+                "values": {"set": "volume", "container": "mysql",
+                    "mountPath": "/var/lib/mysql", "size": "1Gi"}})
         );
     }
 }
