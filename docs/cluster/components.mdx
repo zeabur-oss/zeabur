@@ -88,6 +88,39 @@ If the exported manifest starts with instructions to disable a built-in version,
 Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middleware objects. Ingress traffic stops until the replacement component starts. Disabling the built-in metrics-server makes the metrics API unavailable until the new version starts. Schedule the switch for a time when an interruption is acceptable.
 </Callout>
 
+## Change settings of built-in components
+
+K3s and RKE2 install some components themselves, such as Traefik. **Installed** shows K3s or RKE2 as their source, and their cards have no **Install** or **Manage** button, because Zeabur changes only components it installed. Don't edit their manifest files in the server's manifests directory: K3s rewrites them every time it starts.
+
+When the distribution installs a component as a Helm chart, its card names its `HelmChart`, for example `traefik` on K3s and `rke2-traefik` on RKE2. To change the chart's values, write a `HelmChartConfig` with the same name in `kube-system`. helm-controller passes its `valuesContent` to Helm as an extra values file and upgrades the chart. On K3s, metrics-server is plain manifests, not a chart, so its card names no chart and a `HelmChartConfig` doesn't change it.
+
+For example, to make Traefik on K3s trust `X-Forwarded-*` headers on its `web` entry point from a load balancer in `10.0.0.0/8`, save this on a server as `/var/lib/rancher/k3s/server/manifests/traefik-config.yaml`:
+
+```yaml
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        forwardedHeaders:
+          trustedIPs:
+            - 10.0.0.0/8
+```
+
+Replace `10.0.0.0/8` with your load balancer's addresses. On RKE2, set `metadata.name` to `rke2-traefik` and save the file as `/var/lib/rancher/rke2/server/manifests/rke2-traefik-config.yaml`. The chart's values are in its own documentation; RKE2's charts are in the [RKE2 charts repository](https://github.com/rancher/rke2-charts/tree/main/charts).
+
+To undo it, delete the file, then delete the object (`rke2-traefik` on RKE2). Deleting the file alone leaves the object in the cluster:
+
+```sh
+kubectl delete helmchartconfig traefik -n kube-system
+```
+
+helm-controller then upgrades the chart again with the distribution's values.
+
 ## Remove components
 
 To remove a component Zeabur installed, click **Manage** on its card. When every step and health check is ready, the dialog removes; while an install is unfinished, for example when a health check fails, the dialog shows **Remove** next to **Install**. Check the steps, then click **Remove**. Zeabur deletes its objects in the reverse order; deleting a chart makes helm-controller uninstall it. The dialog lists what stays, such as CRDs and keys. Zeabur refuses while another installed component needs it, or while objects of its custom resources are still in use, and names them. Objects in use are ones Zeabur wrote for another component, and others outside the component's own namespace.

@@ -88,6 +88,39 @@ zeaburctl components export velero --format helm
 停用內建的 Traefik 會刪除 Traefik 的 CRD 和所有 IngressRoute、Middleware 物件，新的元件開始執行前，Ingress 流量會中斷。停用內建的 metrics-server 時，新版本開始執行前 metrics API 無法使用。挑可以中斷的時段切換。
 </Callout>
 
+## 修改內建元件的設定
+
+K3s 和 RKE2 會自己安裝一些元件，例如 Traefik。**已安裝**裡這些元件的來源是 K3s 或 RKE2，卡片上沒有**安裝**或**管理**按鈕，因為 Zeabur 只管理自己安裝的元件。不要改 server 上 manifests 目錄裡內建元件的 manifest 檔案，K3s 每次啟動都會重新寫一次。
+
+發行版用 Helm chart 安裝的元件，卡片上會寫出它的 `HelmChart` 名稱，例如 K3s 上是 `traefik`，RKE2 上是 `rke2-traefik`。要改 chart 的值，就在 `kube-system` 寫一個同名的 `HelmChartConfig`。helm-controller 會把它的 `valuesContent` 當成額外的 values 檔交給 Helm，再升級 chart。K3s 的 metrics-server 是一般的 manifest，不是 chart，所以卡片上沒有 chart 名稱，`HelmChartConfig` 也改不到它。
+
+例如要讓 K3s 上的 Traefik 在 `web` 入口信任來自 `10.0.0.0/8` 負載平衡器的 `X-Forwarded-*` 標頭，在一台 server 上存成 `/var/lib/rancher/k3s/server/manifests/traefik-config.yaml`：
+
+```yaml
+apiVersion: helm.cattle.io/v1
+kind: HelmChartConfig
+metadata:
+  name: traefik
+  namespace: kube-system
+spec:
+  valuesContent: |-
+    ports:
+      web:
+        forwardedHeaders:
+          trustedIPs:
+            - 10.0.0.0/8
+```
+
+把 `10.0.0.0/8` 換成你的負載平衡器位址。RKE2 上把 `metadata.name` 改成 `rke2-traefik`，存成 `/var/lib/rancher/rke2/server/manifests/rke2-traefik-config.yaml`。chart 有哪些值，請看它自己的文件；RKE2 的 chart 都在 [RKE2 charts 儲存庫](https://github.com/rancher/rke2-charts/tree/main/charts)。
+
+要還原，先刪掉這個檔案，再刪掉物件（RKE2 上是 `rke2-traefik`）。只刪檔案不會刪掉叢集裡的物件：
+
+```sh
+kubectl delete helmchartconfig traefik -n kube-system
+```
+
+helm-controller 接著會用發行版原本的值再升級一次 chart。
+
 ## 移除元件
 
 要移除 Zeabur 裝的元件，在卡片按**管理**。每個步驟和健康檢查都就緒後，視窗會改成移除；安裝還沒完成時，例如健康檢查失敗，視窗會在**安裝**旁邊顯示**移除**。檢查步驟後按**移除**。Zeabur 會照相反的順序刪除元件的物件；刪掉 Chart 後，helm-controller 會解除安裝。視窗會列出會留下的東西，例如 CRD 和金鑰。還有其他已安裝的元件需要這個元件，或它的自訂資源還有物件在用時，Zeabur 會拒絕移除，並列出是哪些。在用的物件包括 Zeabur 為其他元件寫入的物件，以及在這個元件自己的 Namespace 以外的物件。

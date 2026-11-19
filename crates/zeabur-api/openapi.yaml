@@ -10509,6 +10509,16 @@ components:
           - string
           - "null"
           description: "The tool that manages it and upgrades it (`k3s`, `RKE2`): never flagged for an upgrade."
+        packagedChart:
+          type:
+          - string
+          - "null"
+          description: |-
+            The packaged `HelmChart` in `kube-system` (`traefik`, `rke2-traefik`). A `HelmChartConfig`
+            of the same name changes its values [k3s-helmchartconfig]. Absent when the distribution
+            deploys the component as plain manifests, as k3s does with metrics-server.
+
+            [k3s-helmchartconfig]: https://github.com/k3s-io/docs/blob/ecbbc13dce8d347cac529d6db585e5f647074edb/docs/add-ons/helm.md#customizing-packaged-components-with-helmchartconfig
         running:
           type: boolean
           description: |-
