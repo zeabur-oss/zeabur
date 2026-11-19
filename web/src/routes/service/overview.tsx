@@ -609,7 +609,7 @@ function Replicas({
                       <button
                         type="button"
                         onClick={() => onTab("logs", pod.name)}
-                        className="shrink-0 rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                        className="shrink-0 rounded px-1 text-muted-foreground hit-area hover:bg-muted hover:text-foreground"
                         aria-label={t("pod.logsOf", pod.name)}
                       >
                         {t("tab.logs")}
@@ -617,7 +617,7 @@ function Replicas({
                     ) : null}
                     <Link
                       {...podObjectLink(project, pod.name)}
-                      className="shrink-0 rounded px-1 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      className="shrink-0 rounded px-1 text-muted-foreground hit-area hover:bg-muted hover:text-foreground"
                       aria-label={t("yaml.label", pod.name)}
                     >
                       {t("pod.yaml")}

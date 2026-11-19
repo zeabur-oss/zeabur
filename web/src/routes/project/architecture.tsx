@@ -354,7 +354,7 @@ function Graph({
                 d={edge.path}
                 fill="none"
                 stroke="transparent"
-                strokeWidth={14}
+                strokeWidth={24 / view.k}
                 className="pointer-events-auto cursor-help"
                 onPointerEnter={() => setHoverEdge(edge.id)}
                 onPointerLeave={() => setHoverEdge(undefined)}
