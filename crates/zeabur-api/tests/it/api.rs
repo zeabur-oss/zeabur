@@ -2035,6 +2035,13 @@ mod tests {
 
     #[test]
     fn the_committed_description_is_current() {
+        let clashes = zeabur_api::schema_clashes();
+        assert!(
+            clashes.is_empty(),
+            "two types share a schema name, so the description would keep only one of them; \
+             rename one with #[schema(as = …)]:\n{}",
+            clashes.join("\n")
+        );
         let committed =
             std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/openapi.yaml"))
                 .unwrap_or_default();

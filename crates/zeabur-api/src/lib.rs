@@ -409,6 +409,59 @@ fn openapi_router() -> OpenApiRouter<AppState> {
     handlers!(describe)
 }
 
+/// The schema names that two different shapes share.
+///
+/// utoipa names a schema after its type and keeps only one of two types with the same name, so
+/// the other type's fields get the wrong schema without an error. Each clash names the handlers
+/// that reach each shape; rename one type with `#[schema(as = …)]`.
+#[must_use]
+pub fn schema_clashes() -> Vec<String> {
+    macro_rules! collect {
+        ($($($segment:ident)::+),+ $(,)?) => {{
+            let mut found = Vec::new();
+            $({
+                let mut schemas = Vec::new();
+                <described!($($segment)::+) as utoipa::__dev::SchemaReferences>::schemas(
+                    &mut schemas,
+                );
+                let handler = stringify!($($segment)::+);
+                found.extend(schemas.into_iter().map(|(name, schema)| (handler, name, schema)));
+            })+
+            found
+        }};
+    }
+    clashes(handlers!(collect))
+}
+
+/// The names in `found` (handler, schema name, schema) that have more than one shape.
+fn clashes(
+    found: Vec<(
+        &str,
+        String,
+        utoipa::openapi::RefOr<utoipa::openapi::schema::Schema>,
+    )>,
+) -> Vec<String> {
+    let mut shapes: std::collections::BTreeMap<String, Vec<_>> = std::collections::BTreeMap::new();
+    for (handler, name, schema) in found {
+        let seen = shapes.entry(name).or_default();
+        if !seen.iter().any(|(shape, _)| *shape == schema) {
+            seen.push((schema, handler.replace(' ', "")));
+        }
+    }
+    shapes
+        .into_iter()
+        .filter(|(_, seen)| seen.len() > 1)
+        .map(|(name, seen)| {
+            let handlers: Vec<&str> = seen.iter().map(|(_, handler)| handler.as_str()).collect();
+            format!(
+                "`{name}` has {} shapes, reached from {}",
+                seen.len(),
+                handlers.join(" and ")
+            )
+        })
+        .collect()
+}
+
 /// What [`router_with`] builds the API with.
 ///
 /// [`Options::default`] is what [`router`] uses: the system clock and resolver, a plan key made at
@@ -576,4 +629,27 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
 #[must_use]
 pub fn openapi() -> utoipa::openapi::OpenApi {
     openapi_router().split_for_parts().1
+}
+
+#[cfg(test)]
+mod schema_tests {
+    use utoipa::openapi::schema::{ObjectBuilder, Type};
+
+    use super::clashes;
+
+    #[test]
+    fn two_shapes_under_one_name_clash_and_one_shape_twice_does_not() {
+        let text = ObjectBuilder::new().schema_type(Type::String).build();
+        let number = ObjectBuilder::new().schema_type(Type::Number).build();
+        let found = vec![
+            ("a :: get", "Fit".to_owned(), text.clone().into()),
+            ("b :: plan", "Fit".to_owned(), number.into()),
+            ("a :: get", "Tool".to_owned(), text.clone().into()),
+            ("c :: get", "Tool".to_owned(), text.into()),
+        ];
+        assert_eq!(
+            clashes(found),
+            ["`Fit` has 2 shapes, reached from a::get and b::plan"]
+        );
+    }
 }
