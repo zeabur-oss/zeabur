@@ -27,12 +27,16 @@
 //! [psmdb-users]: https://docs.percona.com/percona-operator-for-mongodb/users.html
 //! [psmdb-backups]: https://docs.percona.com/percona-operator-for-mongodb/backups.html
 
+use std::collections::BTreeMap;
+
+use k8s_openapi::api::core::v1::PersistentVolumeClaimSpec;
+use serde::Deserialize;
 use serde_json::Value;
 use zeabur_kube::DynamicObject;
 
 use crate::backups::{Outcome, Run, Schedule, Target, TargetKind, newest};
 use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
-use crate::{Module, Read, text};
+use crate::{Module, Read, filled, read_as};
 
 /// The module.
 pub static MODULE: Module = Module {
@@ -80,20 +84,154 @@ fn outcome(word: Option<&str>) -> Outcome {
     }
 }
 
-fn first_replset(object: &DynamicObject) -> Option<&Value> {
-    object.data.pointer("/spec/replsets/0")
+/// The fields of a `PerconaServerMongoDB` that Zeabur reads [psmdb-cr].
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct ClusterView {
+    spec: ClusterSpec,
+    status: ClusterStatus,
 }
 
-fn s3_store(name: &str, storage: &Value, enabled: bool, retention: Option<String>) -> Store {
-    let s3 = |key: &str| {
-        storage
-            .pointer(&format!("/s3/{key}"))
-            .and_then(Value::as_str)
-            .filter(|s| !s.is_empty())
-            .map(str::to_owned)
-    };
-    let destination = s3("bucket").map(|bucket| {
-        s3("prefix").map_or_else(
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct ClusterSpec {
+    image: Option<String>,
+    replsets: Vec<Replset>,
+    secrets: Secrets,
+    backup: BackupSpec,
+    users: Vec<User>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct Replset {
+    name: Option<String>,
+    size: Option<i64>,
+    volume_spec: Option<VolumeSpec>,
+    resources: Option<Value>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct VolumeSpec {
+    persistent_volume_claim: Option<PersistentVolumeClaimSpec>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct Secrets {
+    users: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct BackupSpec {
+    enabled: bool,
+    tasks: Vec<Task>,
+    storages: BTreeMap<String, Storage>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct Task {
+    name: Option<String>,
+    schedule: Option<String>,
+    enabled: Option<bool>,
+    storage_name: Option<String>,
+    retention: Option<Retention>,
+    keep: Option<i64>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct Retention {
+    count: Option<i64>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct Storage {
+    s3: S3,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct S3 {
+    bucket: Option<String>,
+    prefix: Option<String>,
+    endpoint_url: Option<String>,
+    credentials_secret: Option<String>,
+    region: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct User {
+    name: Option<String>,
+    db: Option<String>,
+    password_secret_ref: Option<PasswordRef>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct PasswordRef {
+    name: Option<String>,
+    key: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct ClusterStatus {
+    state: Option<String>,
+    message: Option<String>,
+    mongo_version: Option<String>,
+    observed_generation: Option<i64>,
+    replsets: BTreeMap<String, ReplsetStatus>,
+    conditions: Vec<Condition>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct ReplsetStatus {
+    ready: Option<i64>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct Condition {
+    #[serde(rename = "type")]
+    type_: String,
+    status: String,
+}
+
+/// The fields of a `PerconaServerMongoDBBackup` that Zeabur reads [psmdb-backups].
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct BackupView {
+    spec: BackupObjectSpec,
+    status: BackupStatus,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct BackupObjectSpec {
+    cluster_name: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct BackupStatus {
+    state: Option<String>,
+    start: Option<String>,
+    completed: Option<String>,
+    error: Option<String>,
+    destination: Option<String>,
+}
+
+fn s3_store(name: &str, storage: &Storage, enabled: bool, retention: Option<String>) -> Store {
+    let s3 = &storage.s3;
+    let destination = filled(s3.bucket.as_ref()).map(|bucket| {
+        filled(s3.prefix.as_ref()).map_or_else(
             || format!("s3://{bucket}"),
             |prefix| format!("s3://{bucket}/{prefix}"),
         )
@@ -101,9 +239,9 @@ fn s3_store(name: &str, storage: &Value, enabled: bool, retention: Option<String
     Store {
         name: name.to_owned(),
         destination,
-        endpoint: s3("endpointUrl"),
-        secret: s3("credentialsSecret"),
-        region: s3("region"),
+        endpoint: filled(s3.endpoint_url.as_ref()),
+        secret: filled(s3.credentials_secret.as_ref()),
+        region: filled(s3.region.as_ref()),
         retention,
         in_use: enabled,
     }
@@ -113,35 +251,29 @@ fn s3_store(name: &str, storage: &Value, enabled: bool, retention: Option<String
 fn backups_of(
     namespace: &str,
     cluster: &DynamicObject,
+    view: &ClusterView,
     name: &str,
     backups: &[DynamicObject],
 ) -> Backups {
-    let enabled = cluster
-        .data
-        .pointer("/spec/backup/enabled")
-        .and_then(Value::as_bool)
-        .unwrap_or(false);
-    let tasks: Vec<&Value> = cluster
-        .data
-        .pointer("/spec/backup/tasks")
-        .and_then(Value::as_array)
-        .map_or_else(Vec::new, |t| t.iter().collect());
+    let backup = &view.spec.backup;
+    let enabled = backup.enabled;
     let target = Target {
         kind: TargetKind::Database,
         name: name.to_owned(),
     };
-    let mut schedules: Vec<Schedule> = tasks
+    let mut schedules: Vec<Schedule> = backup
+        .tasks
         .iter()
         .filter_map(|task| {
-            let cron = task["schedule"].as_str()?;
+            let cron = task.schedule.as_ref()?;
             Some(Schedule {
                 name: format!(
                     "{namespace}/{name}/{}",
-                    task["name"].as_str().unwrap_or_default()
+                    task.name.as_deref().unwrap_or_default()
                 ),
                 provider: MODULE.id.to_owned(),
-                cron: cron.to_owned(),
-                paused: !enabled || task["enabled"] == false,
+                cron: cron.clone(),
+                paused: !enabled || task.enabled == Some(false),
                 targets: vec![target.clone()],
                 note: None,
                 ..Schedule::default()
@@ -149,59 +281,57 @@ fn backups_of(
         })
         .collect();
     schedules.sort_by(|a, b| a.name.cmp(&b.name));
-    let storages = cluster
-        .data
-        .pointer("/spec/backup/storages")
-        .and_then(Value::as_object);
-    let store = storages.and_then(|all| {
-        let (storage_name, storage) = all.get_key_value(STORAGE).or_else(|| all.iter().next())?;
-        let retention = tasks
-            .iter()
-            .find(|t| t["storageName"].as_str() == Some(storage_name))
-            .and_then(|t| {
-                t.pointer("/retention/count")
-                    .or_else(|| t.get("keep"))
-                    .and_then(Value::as_i64)
-            })
-            .map(|count| count.to_string());
-        Some(s3_store(storage_name, storage, enabled, retention))
-    });
+    let store = backup
+        .storages
+        .get_key_value(STORAGE)
+        .or_else(|| backup.storages.iter().next())
+        .map(|(storage_name, storage)| {
+            let retention = backup
+                .tasks
+                .iter()
+                .find(|t| t.storage_name.as_ref() == Some(storage_name))
+                .and_then(|t| t.retention.as_ref().and_then(|r| r.count).or(t.keep))
+                .map(|count| count.to_string());
+            s3_store(storage_name, storage, enabled, retention)
+        });
     let mut runs: Vec<Run> = backups
         .iter()
-        .filter(|b| text(b, "/spec/clusterName").as_deref() == Some(name))
-        .map(|b| Run {
-            name: b.metadata.name.clone().unwrap_or_default(),
-            provider: MODULE.id.to_owned(),
-            targets: vec![target.clone()],
-            outcome: outcome(text(b, "/status/state").as_deref()),
-            started: text(b, "/status/start").or_else(|| {
-                b.metadata
-                    .creation_timestamp
-                    .as_ref()
-                    .map(|t| t.0.to_string())
-            }),
-            finished: text(b, "/status/completed"),
-            message: text(b, "/status/error"),
-            restore_from: (outcome(text(b, "/status/state").as_deref()) == Outcome::Succeeded)
-                .then(|| text(b, "/status/destination"))
-                .flatten(),
+        .filter_map(|b| {
+            let run: BackupView = read_as(b);
+            (run.spec.cluster_name.as_deref() == Some(name)).then_some((b, run.status))
+        })
+        .map(|(b, status)| {
+            let outcome = outcome(status.state.as_deref());
+            Run {
+                name: b.metadata.name.clone().unwrap_or_default(),
+                provider: MODULE.id.to_owned(),
+                targets: vec![target.clone()],
+                outcome,
+                started: filled(status.start.as_ref()).or_else(|| {
+                    b.metadata
+                        .creation_timestamp
+                        .as_ref()
+                        .map(|t| t.0.to_string())
+                }),
+                finished: filled(status.completed.as_ref()),
+                message: filled(status.error.as_ref()),
+                restore_from: (outcome == Outcome::Succeeded)
+                    .then(|| filled(status.destination.as_ref()))
+                    .flatten(),
+            }
         })
         .collect();
     newest(&mut runs, 20);
     // The operator has seen this spec, restarted the members with the backup agents and given
     // them the storage: `PBMReady` is "PBMConfigurationIsUpToDate".
     let seen = cluster.metadata.generation.is_some()
-        && databases::int(cluster, "/status/observedGeneration") == cluster.metadata.generation;
-    let pbm = cluster
-        .data
-        .pointer("/status/conditions")
-        .and_then(Value::as_array)
-        .is_some_and(|all| {
-            all.iter()
-                .any(|c| c["type"] == "PBMReady" && c["status"] == "True")
-        });
-    let ready =
-        enabled && seen && pbm && text(cluster, "/status/state").as_deref() == Some("ready");
+        && view.status.observed_generation == cluster.metadata.generation;
+    let pbm = view
+        .status
+        .conditions
+        .iter()
+        .any(|c| c.type_ == "PBMReady" && c.status == "True");
+    let ready = enabled && seen && pbm && view.status.state.as_deref() == Some("ready");
     Backups {
         store,
         schedules,
@@ -214,17 +344,17 @@ fn backups_of(
 /// The first user of `spec.users`. Without `passwordSecretRef` the operator keeps its password in
 /// `<cluster>-custom-user-secret` under the user's name, letters and digits only
 /// (`pkg/controller/perconaservermongodb/custom_users.go`, `pkg/psmdb/secret/secret.go`, v1.23.1).
-fn app_user(cluster: &DynamicObject, name: &str) -> Option<AppUser> {
-    let user = cluster.data.pointer("/spec/users/0")?;
-    let username = user["name"].as_str()?.to_owned();
-    let database = Some(user["db"].as_str().unwrap_or("admin").to_owned());
-    let reference = user.get("passwordSecretRef");
+fn app_user(view: &ClusterView, name: &str) -> Option<AppUser> {
+    let user = view.spec.users.first()?;
+    let username = user.name.clone()?;
+    let database = Some(user.db.clone().unwrap_or_else(|| "admin".to_owned()));
+    let reference = user.password_secret_ref.as_ref();
     let secret = reference
-        .and_then(|r| r["name"].as_str())
-        .map_or_else(|| format!("{name}-custom-user-secret"), str::to_owned);
+        .and_then(|r| r.name.clone())
+        .unwrap_or_else(|| format!("{name}-custom-user-secret"));
     let password_key = reference.map_or_else(
         || username.clone(),
-        |r| r["key"].as_str().unwrap_or("password").to_owned(),
+        |r| r.key.clone().unwrap_or_else(|| "password".to_owned()),
     );
     Some(AppUser {
         username,
@@ -241,19 +371,27 @@ const OPERATOR_USERS_SECRET: &str = "percona-server-mongodb-users";
 #[must_use]
 pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObject]) -> Database {
     let name = cluster.metadata.name.clone().unwrap_or_default();
-    let replset = first_replset(cluster);
+    let read: ClusterView = read_as(cluster);
+    let replset = read.spec.replsets.first();
     let rs = replset
-        .and_then(|r| r["name"].as_str())
-        .unwrap_or("rs0")
-        .to_owned();
-    let members = replset.and_then(|r| r["size"].as_i64()).unwrap_or(3);
-    let ready = databases::int(cluster, &format!("/status/replsets/{rs}/ready")).unwrap_or(0);
-    let word = text(cluster, "/status/state");
-    let image = text(cluster, "/spec/image");
-    let version = text(cluster, "/status/mongoVersion")
+        .and_then(|r| r.name.clone())
+        .unwrap_or_else(|| "rs0".to_owned());
+    let members = replset.and_then(|r| r.size).unwrap_or(3);
+    let ready = read
+        .status
+        .replsets
+        .get(&rs)
+        .and_then(|r| r.ready)
+        .unwrap_or(0);
+    let word = filled(read.status.state.as_ref());
+    let image = filled(read.spec.image.as_ref());
+    let version = filled(read.status.mongo_version.as_ref())
         .or_else(|| image.as_deref().and_then(databases::tag).map(str::to_owned));
-    let secret =
-        text(cluster, "/spec/secrets/users").unwrap_or_else(|| OPERATOR_USERS_SECRET.to_owned());
+    let secret = filled(read.spec.secrets.users.as_ref())
+        .unwrap_or_else(|| OPERATOR_USERS_SECRET.to_owned());
+    let claim = replset
+        .and_then(|r| r.volume_spec.as_ref())
+        .and_then(|v| v.persistent_volume_claim.as_ref());
     let claims = (0..members.max(0))
         .map(|i| format!("mongod-data-{name}-{rs}-{i}"))
         .collect();
@@ -271,22 +409,20 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
         resource: "perconaservermongodbs".to_owned(),
         state: state(word.as_deref(), members, ready),
         phase: word,
-        message: text(cluster, "/status/message"),
+        message: filled(read.status.message.as_ref()),
         members,
         ready,
         primary: None,
         version,
         image,
-        storage: replset
-            .and_then(|r| r.pointer("/volumeSpec/persistentVolumeClaim/resources/requests/storage"))
-            .and_then(Value::as_str)
-            .map(str::to_owned),
-        storage_class: replset
-            .and_then(|r| r.pointer("/volumeSpec/persistentVolumeClaim/storageClassName"))
-            .and_then(Value::as_str)
-            .map(str::to_owned),
+        storage: claim
+            .and_then(|c| c.resources.as_ref())
+            .and_then(|r| r.requests.as_ref())
+            .and_then(|r| r.get("storage"))
+            .map(|q| q.0.clone()),
+        storage_class: claim.and_then(|c| c.storage_class_name.clone()),
         claims,
-        resources: replset.and_then(|r| r.get("resources")).cloned(),
+        resources: replset.and_then(|r| r.resources.clone()),
         connection: Connection {
             host: format!("{name}-{rs}.{namespace}.svc"),
             port: 27017,
@@ -297,8 +433,8 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
             password_key: "MONGODB_DATABASE_ADMIN_PASSWORD".to_owned(),
             options: Some(format!("replicaSet={rs}")),
         },
-        app: app_user(cluster, &name),
-        backups: backups_of(namespace, cluster, &name, backups),
+        app: app_user(&read, &name),
+        backups: backups_of(namespace, cluster, &read, &name, backups),
         created: cluster
             .metadata
             .creation_timestamp

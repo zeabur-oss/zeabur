@@ -9,12 +9,13 @@
 //!
 //! [builder]: https://github.com/zeabur-oss/builder
 
+use k8s_openapi::api::core::v1::EnvVar;
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 
-use crate::{Module, Read, text};
+use crate::{Module, Read, filled, read_as};
 
 /// The module.
 pub static MODULE: Module = Module {
@@ -117,23 +118,21 @@ pub struct ZeaburBuilderEnv {
     pub key: Option<String>,
 }
 
-fn env(object: &DynamicObject) -> Vec<ZeaburBuilderEnv> {
-    object
-        .data
-        .pointer("/spec/env")
-        .and_then(serde_json::Value::as_array)
-        .map_or_else(Vec::new, |env| {
-            env.iter()
-                .filter_map(|e| {
-                    let from = e.pointer("/valueFrom/secretKeyRef");
-                    Some(ZeaburBuilderEnv {
-                        name: e["name"].as_str()?.to_owned(),
-                        secret: field(from, "name"),
-                        key: field(from, "key"),
-                    })
-                })
-                .collect()
+fn env(spec: &BuildSpec) -> Vec<ZeaburBuilderEnv> {
+    spec.env
+        .iter()
+        .map(|e| {
+            let from = e
+                .value_from
+                .as_ref()
+                .and_then(|v| v.secret_key_ref.as_ref());
+            ZeaburBuilderEnv {
+                name: e.name.clone(),
+                secret: from.and_then(|r| filled(Some(&r.name))),
+                key: from.and_then(|r| filled(Some(&r.key))),
+            }
         })
+        .collect()
 }
 
 /// A `Build` that cannot build: the ref cannot be resolved (`SourceReady`) or its
@@ -160,19 +159,24 @@ pub const TRANSIENT: SignedDuration = SignedDuration::from_mins(5);
 /// The reason of `SourceReady` while an uploaded folder has no digest yet.
 const WAITING_FOR_UPLOAD: &str = "WaitingForUpload";
 
-fn awaiting_upload(object: &DynamicObject) -> bool {
-    object.data.pointer("/spec/source/archive").is_some()
-        && object.data.pointer("/spec/source/archive/digest").is_none()
+fn awaiting_upload(build: &BuildView) -> bool {
+    build
+        .spec
+        .source
+        .archive
+        .as_ref()
+        .is_some_and(|a| a.digest.is_none())
 }
 
-fn problem(object: &DynamicObject, now: Option<Timestamp>) -> Option<ZeaburBuilderProblem> {
+fn problem(build: &BuildView, now: Option<Timestamp>) -> Option<ZeaburBuilderProblem> {
     ["SourceReady", "BuilderReady"]
         .into_iter()
         .find_map(|kind| {
-            let found = condition(object, kind)
-                .filter(|c| c["status"] == "False" && c["reason"] != WAITING_FOR_UPLOAD)?;
-            let reason = field(Some(found), "reason");
-            let since = field(Some(found), "lastTransitionTime");
+            let found = build.condition(kind).filter(|c| {
+                c.status == "False" && c.reason.as_deref() != Some(WAITING_FOR_UPLOAD)
+            })?;
+            let reason = filled(found.reason.as_ref());
+            let since = filled(found.last_transition_time.as_ref());
             let lasting = reason.as_deref() != Some("ResolveFailed")
                 || match (
                     now,
@@ -184,7 +188,7 @@ fn problem(object: &DynamicObject, now: Option<Timestamp>) -> Option<ZeaburBuild
             Some(ZeaburBuilderProblem {
                 condition: kind.to_owned(),
                 reason,
-                message: field(Some(found), "message"),
+                message: filled(found.message.as_ref()),
                 since,
                 lasting,
             })
@@ -233,31 +237,135 @@ pub fn repository(image: &str) -> &str {
     }
 }
 
-fn condition<'a>(object: &'a DynamicObject, kind: &str) -> Option<&'a serde_json::Value> {
-    object
-        .data
-        .pointer("/status/conditions")
-        .and_then(serde_json::Value::as_array)?
-        .iter()
-        .find(|c| c["type"] == kind)
+/// The fields of a `Build` that Zeabur reads [builder].
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct BuildView {
+    spec: BuildSpec,
+    status: BuildStatus,
 }
 
-fn strings(object: &DynamicObject, pointer: &str) -> Option<Vec<String>> {
-    let found: Vec<String> = object
-        .data
-        .pointer(pointer)?
-        .as_array()?
-        .iter()
-        .filter_map(|v| v.as_str().map(str::to_owned))
-        .collect();
-    (!found.is_empty()).then_some(found)
+impl BuildView {
+    fn condition(&self, kind: &str) -> Option<&Condition> {
+        self.status.conditions.iter().find(|c| c.type_ == kind)
+    }
 }
 
-fn field(value: Option<&serde_json::Value>, key: &str) -> Option<String> {
-    value
-        .and_then(|v| v[key].as_str())
-        .filter(|s| !s.is_empty())
-        .map(str::to_owned)
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct BuildSpec {
+    output: Output,
+    source: Source,
+    env: Vec<EnvVar>,
+    builder_ref: Option<String>,
+    suspend: bool,
+    notify: Vec<NotifyTarget>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct Output {
+    image: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct Source {
+    git: Option<GitSource>,
+    archive: Option<ArchiveSource>,
+    credentials_ref: Option<NameRef>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct GitSource {
+    url: Option<String>,
+    #[serde(rename = "ref")]
+    ref_: Option<String>,
+    context_dir: Option<String>,
+    dockerfile: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct ArchiveSource {
+    digest: Option<String>,
+    context_dir: Option<String>,
+    dockerfile: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct NameRef {
+    name: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct NotifyTarget {
+    #[serde(rename = "type")]
+    type_: String,
+    url: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct BuildStatus {
+    latest_image: Option<String>,
+    resolved_ref: Option<String>,
+    upload_token: Option<UploadToken>,
+    exposed_ports: Vec<String>,
+    latest_revision: Option<String>,
+    remote_revision: Option<String>,
+    conditions: Vec<Condition>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct UploadToken {
+    request: Option<String>,
+    expires_at: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct Condition {
+    #[serde(rename = "type")]
+    type_: String,
+    status: String,
+    reason: Option<String>,
+    message: Option<String>,
+    last_transition_time: Option<String>,
+}
+
+/// The fields of a `BuildRun` that Zeabur reads [builder].
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct RunView {
+    spec: RunSpec,
+    status: RunStatus,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct RunSpec {
+    build_ref: Option<String>,
+    revision: Option<String>,
+    #[serde(rename = "ref")]
+    ref_: Option<String>,
+    trigger: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct RunStatus {
+    phase: Option<String>,
+    reason: Option<String>,
+    message: Option<String>,
+    start_time: Option<String>,
+    completion_time: Option<String>,
+    tags: Vec<String>,
+    image_digest: Option<String>,
 }
 
 /// The `Build`s, sorted by name, read at `now` (see [`ZeaburBuilderProblem::lasting`]).
@@ -266,51 +374,62 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
     let mut out: Vec<ZeaburBuilderBuild> = objects
         .iter()
         .map(|b| {
-            let latest_image = text(b, "/status/latestImage");
-            let ready = condition(b, "Ready");
+            let build: BuildView = read_as(b);
+            let (spec, status) = (&build.spec, &build.status);
+            let git = spec.source.git.as_ref();
+            let archive = spec.source.archive.as_ref();
+            let latest_image = filled(status.latest_image.as_ref());
+            let ready = build.condition("Ready");
             ZeaburBuilderBuild {
                 name: b.metadata.name.clone().unwrap_or_default(),
-                repository: text(b, "/spec/output/image")
+                repository: filled(spec.output.image.as_ref())
                     .or_else(|| latest_image.as_deref().map(|i| repository(i).to_owned())),
-                git_url: text(b, "/spec/source/git/url"),
-                git_ref: text(b, "/spec/source/git/ref"),
-                resolved_ref: text(b, "/status/resolvedRef"),
-                credentials: text(b, "/spec/source/credentialsRef/name"),
-                archive: b.data.pointer("/spec/source/archive").is_some(),
-                archive_digest: text(b, "/spec/source/archive/digest"),
-                awaiting_upload: awaiting_upload(b),
-                upload_request: text(b, "/status/uploadToken/request"),
-                upload_expires: text(b, "/status/uploadToken/expiresAt"),
-                context_dir: text(b, "/spec/source/git/contextDir")
-                    .or_else(|| text(b, "/spec/source/archive/contextDir")),
-                dockerfile: text(b, "/spec/source/git/dockerfile")
-                    .or_else(|| text(b, "/spec/source/archive/dockerfile")),
-                env: env(b),
-                builder: text(b, "/spec/builderRef"),
-                suspended: b
-                    .data
-                    .pointer("/spec/suspend")
-                    .and_then(serde_json::Value::as_bool)
-                    .unwrap_or(false),
+                git_url: filled(git.and_then(|g| g.url.as_ref())),
+                git_ref: filled(git.and_then(|g| g.ref_.as_ref())),
+                resolved_ref: filled(status.resolved_ref.as_ref()),
+                credentials: filled(
+                    spec.source
+                        .credentials_ref
+                        .as_ref()
+                        .and_then(|c| c.name.as_ref()),
+                ),
+                archive: archive.is_some(),
+                archive_digest: filled(archive.and_then(|a| a.digest.as_ref())),
+                awaiting_upload: awaiting_upload(&build),
+                upload_request: filled(
+                    status
+                        .upload_token
+                        .as_ref()
+                        .and_then(|t| t.request.as_ref()),
+                ),
+                upload_expires: filled(
+                    status
+                        .upload_token
+                        .as_ref()
+                        .and_then(|t| t.expires_at.as_ref()),
+                ),
+                context_dir: filled(git.and_then(|g| g.context_dir.as_ref()))
+                    .or_else(|| filled(archive.and_then(|a| a.context_dir.as_ref()))),
+                dockerfile: filled(git.and_then(|g| g.dockerfile.as_ref()))
+                    .or_else(|| filled(archive.and_then(|a| a.dockerfile.as_ref()))),
+                env: env(spec),
+                builder: filled(spec.builder_ref.as_ref()),
+                suspended: spec.suspend,
                 latest_image,
-                exposed_ports: strings(b, "/status/exposedPorts"),
-                latest_revision: text(b, "/status/latestRevision"),
-                remote_revision: text(b, "/status/remoteRevision"),
-                ready: field(ready, "status"),
-                reason: field(ready, "reason"),
-                message: field(ready, "message"),
-                problem: problem(b, now),
-                keel_webhooks: b
-                    .data
-                    .pointer("/spec/notify")
-                    .and_then(serde_json::Value::as_array)
-                    .map_or_else(Vec::new, |targets| {
-                        targets
-                            .iter()
-                            .filter(|t| t["type"] == "keel")
-                            .filter_map(|t| t["url"].as_str().map(str::to_owned))
-                            .collect()
-                    }),
+                exposed_ports: (!status.exposed_ports.is_empty())
+                    .then(|| status.exposed_ports.clone()),
+                latest_revision: filled(status.latest_revision.as_ref()),
+                remote_revision: filled(status.remote_revision.as_ref()),
+                ready: ready.and_then(|c| filled(Some(&c.status))),
+                reason: filled(ready.and_then(|c| c.reason.as_ref())),
+                message: filled(ready.and_then(|c| c.message.as_ref())),
+                problem: problem(&build, now),
+                keel_webhooks: spec
+                    .notify
+                    .iter()
+                    .filter(|t| t.type_ == "keel")
+                    .filter_map(|t| t.url.clone())
+                    .collect(),
                 rebuild_requested: b
                     .metadata
                     .annotations
@@ -329,24 +448,25 @@ pub fn runs(objects: &[DynamicObject]) -> Vec<ZeaburBuilderRun> {
     let mut out: Vec<ZeaburBuilderRun> = objects
         .iter()
         .filter_map(|r| {
+            let RunView { spec, status } = read_as(r);
             Some(ZeaburBuilderRun {
                 name: r.metadata.name.clone()?,
-                build: text(r, "/spec/buildRef")?,
-                revision: text(r, "/spec/revision"),
-                git_ref: text(r, "/spec/ref"),
-                trigger: text(r, "/spec/trigger"),
-                phase: text(r, "/status/phase"),
-                reason: text(r, "/status/reason"),
-                message: text(r, "/status/message"),
+                build: filled(spec.build_ref.as_ref())?,
+                revision: filled(spec.revision.as_ref()),
+                git_ref: filled(spec.ref_.as_ref()),
+                trigger: filled(spec.trigger.as_ref()),
+                phase: filled(status.phase.as_ref()),
+                reason: filled(status.reason.as_ref()),
+                message: filled(status.message.as_ref()),
                 created: r
                     .metadata
                     .creation_timestamp
                     .as_ref()
                     .map(|t| t.0.to_string()),
-                started: text(r, "/status/startTime"),
-                finished: text(r, "/status/completionTime"),
-                tags: crate::strings(r, "/status/tags"),
-                digest: text(r, "/status/imageDigest"),
+                started: filled(status.start_time.as_ref()),
+                finished: filled(status.completion_time.as_ref()),
+                tags: status.tags,
+                digest: filled(status.image_digest.as_ref()),
             })
         })
         .collect();

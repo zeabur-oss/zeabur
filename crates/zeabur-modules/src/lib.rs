@@ -131,6 +131,17 @@ pub fn modules() -> Vec<&'static Module> {
     ]
 }
 
+/// `object` read as the view `T` of the fields a module reads; an object of another shape reads
+/// as the default.
+pub(crate) fn read_as<T: Default + serde::de::DeserializeOwned>(object: &DynamicObject) -> T {
+    T::deserialize(&object.data).unwrap_or_default()
+}
+
+/// `value` unless it is empty, as [`text`] reads a string.
+pub(crate) fn filled(value: Option<&String>) -> Option<String> {
+    value.filter(|s| !s.is_empty()).cloned()
+}
+
 /// A string field of an object, by JSON pointer; `None` when missing or empty.
 pub(crate) fn text(object: &DynamicObject, pointer: &str) -> Option<String> {
     object
