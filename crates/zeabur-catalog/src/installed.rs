@@ -86,6 +86,9 @@ pub struct Installation {
     pub display_name: String,
     /// How it was installed.
     pub source: InstallSource,
+    /// Something of it other than its CRDs is on the cluster. A removal keeps the CRDs, so CRDs
+    /// alone are what is left of a component, not a component that works.
+    pub running: bool,
     /// The installed chart version, when it can be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
@@ -152,6 +155,7 @@ pub fn installation(
         component: component.id.clone(),
         display_name: component.display_name.clone(),
         source: InstallSource::Other,
+        running: false,
         version: None,
         managed_by: None,
         tested: component.tested_version.clone(),

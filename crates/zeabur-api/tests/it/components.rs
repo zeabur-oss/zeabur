@@ -357,6 +357,28 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn crds_a_removal_left_do_not_stand_in_for_a_needed_component() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.facts
+                .crds
+                .insert("certificates.cert-manager.io".to_owned());
+        });
+        let (status, plan) = send(
+            &app(&cluster, false),
+            "POST",
+            "/api/v1/cluster/components/cloudnative-pg/plan",
+            Some(&json!({"action": "install"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(
+            plan["components"],
+            json!(["cert-manager", "cloudnative-pg"])
+        );
+    }
+
+    #[tokio::test]
     async fn a_component_helm_installed_is_not_installed_again() {
         let cluster = cluster();
         cluster.update(|s| {

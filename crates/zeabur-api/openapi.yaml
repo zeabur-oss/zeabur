@@ -10496,6 +10496,7 @@ components:
       - component
       - displayName
       - source
+      - running
       properties:
         component:
           type: string
@@ -10508,6 +10509,11 @@ components:
           - string
           - "null"
           description: "The tool that manages it and upgrades it (`k3s`, `RKE2`): never flagged for an upgrade."
+        running:
+          type: boolean
+          description: |-
+            Something of it other than its CRDs is on the cluster. A removal keeps the CRDs, so CRDs
+            alone are what is left of a component, not a component that works.
         source:
           $ref: "#/components/schemas/InstallSource"
           description: How it was installed.

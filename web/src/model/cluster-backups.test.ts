@@ -249,6 +249,7 @@ describe("installedOf", () => {
       component,
       displayName: component,
       source: "helm",
+      running: true,
     })),
   })
 

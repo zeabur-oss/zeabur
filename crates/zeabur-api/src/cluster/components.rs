@@ -353,8 +353,10 @@ struct World {
     profile: &'static str,
     distribution: Option<&'static str>,
     platform: String,
+    /// The capabilities a running component gives.
     capabilities: BTreeSet<String>,
-    installed: BTreeSet<String>,
+    /// The components found by more than CRDs a removal left.
+    running: BTreeSet<String>,
     /// How each installed component was installed.
     sources: BTreeMap<String, InstallSource>,
     /// The components Zeabur wrote.
@@ -381,9 +383,15 @@ impl World {
             .await
             .map_err(|e| ApiError::from(e.into_problem("the cluster's installed components")))?;
         let detected = zeabur_catalog::detect(&state.catalogue, &facts);
+        let running: BTreeSet<String> = detected
+            .iter()
+            .flat_map(|c| &c.installations)
+            .filter(|i| i.running)
+            .map(|i| i.component.clone())
+            .collect();
         let capabilities = detected
             .iter()
-            .filter(|c| c.existing)
+            .filter(|c| c.installations.iter().any(|i| i.running))
             .map(|c| c.name.clone())
             .collect();
         let sources: BTreeMap<String, InstallSource> = detected
@@ -394,7 +402,6 @@ impl World {
                     .map(|i| (i.component.clone(), i.source))
             })
             .collect();
-        let installed = sources.keys().cloned().collect();
         let written = engine::written(&facts).into_values().collect();
         let served = cluster
             .served_resources()
@@ -426,7 +433,7 @@ impl World {
             distribution: zeabur_catalog::distribution(&facts),
             platform,
             capabilities,
-            installed,
+            running,
             sources,
             written,
             helm_releases: facts.helm_releases.clone(),
@@ -452,7 +459,7 @@ impl World {
             distribution: self.distribution,
             platform: &self.platform,
             capabilities: &self.capabilities,
-            components: &self.installed,
+            components: &self.running,
             written: &self.written,
         }
     }
@@ -626,15 +633,8 @@ impl World {
             .components
             .get(id)
             .ok_or_else(|| refusal(&Refusal::Unknown(id.to_owned())))?;
-        // What another install left behind, such as CRDs, is not a component that needs this one;
-        // the check of its custom resources below covers the objects that still do.
-        let running = self
-            .sources
-            .iter()
-            .filter(|(_, source)| **source != InstallSource::Other)
-            .map(|(id, _)| id.clone())
-            .collect();
-        let needing = engine::needed_by(&self.snapshot, id, &running);
+        let needing: BTreeSet<String> = self.running.union(&self.written).cloned().collect();
+        let needing = engine::needed_by(&self.snapshot, id, &needing);
         if !needing.is_empty() {
             return Err(ApiError::from(Problem::new(
                 Kind::Conflict,

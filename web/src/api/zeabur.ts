@@ -1117,6 +1117,11 @@ export type Installation = {
    * @nullable
    */
   managedBy?: string | null
+  /**
+   * Something of it other than its CRDs is on the cluster. A removal keeps the CRDs, so CRDs
+   * alone are what is left of a component, not a component that works.
+   */
+  running: boolean
   /** How it was installed. */
   source: InstallSource
   /**
