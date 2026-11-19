@@ -341,7 +341,10 @@ mod tests {
         assert_eq!(traefik.packaged_chart.as_deref(), Some("rke2-traefik"));
         let metrics = installation(&component("metrics-server"), &facts, Some("rke2"));
         assert_eq!(metrics.source, InstallSource::Rke2);
-        assert_eq!(metrics.packaged_chart.as_deref(), Some("rke2-metrics-server"));
+        assert_eq!(
+            metrics.packaged_chart.as_deref(),
+            Some("rke2-metrics-server")
+        );
         assert_eq!(metrics.version, None);
         assert_eq!(metrics.upgrade, None);
     }
