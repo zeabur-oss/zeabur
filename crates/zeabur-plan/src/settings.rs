@@ -82,19 +82,13 @@ fn bad(refusal: Refusal, detail: &str) -> PlanError {
 impl<'a> Planner<'a> {
     // ── Shared lookups ───────────────────────────────────────────────────────────────────────
 
-    /// The workload, refused when its template cannot change or a tool manages it.
+    /// The workload, refused when a tool manages it. A change the API server will not take, such
+    /// as a Job's pod template, is refused by the dry run.
     pub(crate) fn editable_workload(
         &self,
         reference: &WorkloadRef,
     ) -> Result<Workload<'a>, PlanError> {
         let found = self.workload(reference)?;
-        if found.kind() == WorkloadKind::Job {
-            return Err(error(
-                ErrorKind::Invalid,
-                "immutable_field",
-                "A Job's pod template cannot change after it is created.",
-            ));
-        }
         Self::refuse_managed(found.meta(), reference.kind.as_str(), &reference.name)?;
         Ok(found)
     }

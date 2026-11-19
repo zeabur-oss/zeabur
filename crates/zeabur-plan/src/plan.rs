@@ -720,13 +720,6 @@ impl<'a> Planner<'a> {
         validate_env(edits)
             .map_err(|r| error(ErrorKind::BadRequest, &r.0, "The variables are not valid."))?;
         let found = self.workload(reference)?;
-        if found.kind() == WorkloadKind::Job {
-            return Err(error(
-                ErrorKind::Invalid,
-                "immutable_field",
-                "A Job's pod template cannot change after it is created.",
-            ));
-        }
         Self::refuse_managed(found.meta(), reference.kind.as_str(), &reference.name)?;
         let (name, position) = container_at(found, reference, container)?;
         let object = workload_json(found)?;
@@ -1699,15 +1692,6 @@ impl<'a> Planner<'a> {
         let object = workload_json(found)?;
         let target = workload_target(found);
         let now = self.input.now.to_owned();
-        if reference.kind == WorkloadKind::Job {
-            // A Job's pod template cannot change after creation:
-            // https://kubernetes.io/docs/concepts/workloads/controllers/job/#pod-template
-            return Err(error(
-                ErrorKind::Invalid,
-                "immutable_field",
-                "A Job cannot be restarted: its pod template cannot change. Run it again instead.",
-            ));
-        }
         let index = self.working(target, object);
         let template = reference.kind.pod_template_path();
         let current = self.current(index);
