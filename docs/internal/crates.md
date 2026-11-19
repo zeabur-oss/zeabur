@@ -9,7 +9,7 @@ The code is split into small crates in one flat `crates/` directory:
 
 - **Dependencies only point downwards**, with no cycles ([Kladov][matklad-workspaces]; Lakos and
   Martin, see [References](#references)). Each crate has a *level* in `Cargo.toml`
-  (`[workspace.metadata.levels]`); `scripts/check-levels.sh` fails CI when a crate depends on one
+  (`[workspace.metadata.levels]`); `zeabur-oss-levels` fails CI when a crate depends on one
   of the same or a higher level.
 - **Each crate hides one design decision** behind a narrow interface ([Parnas][parnas]).
 - **External systems are traits** with an in-memory and a Kubernetes implementation (ports and
@@ -19,11 +19,11 @@ The code is split into small crates in one flat `crates/` directory:
 - **Integrations with installed components are modules** (`zeabur-modules`, one module per
   provider): they declare the resources they read and turn the objects into their own views.
   Only the composing crates (`zeabur-api`, the binaries) may depend on a module
-  crate (`[workspace.metadata.modules]`, also checked by `scripts/check-levels.sh`), so the core
+  crate (`[workspace.metadata.modules]`, also checked by `zeabur-oss-levels`), so the core
   never knows which integrations exist.
 - **The rules are pure crates**: `zeabur-model`, `zeabur-graph`, `zeabur-gaps` and `zeabur-plan`
   perform no I/O and hold no key and depend only on each other (`[workspace.metadata.pure]`, also
-  checked by `scripts/check-levels.sh`).
+  checked by `zeabur-oss-levels`).
 
 ```mermaid
 flowchart BT

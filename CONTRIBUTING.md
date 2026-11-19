@@ -25,7 +25,7 @@ RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-it
 cargo nextest run --workspace --all-features --locked
 cargo deny --locked check
 node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy
-./scripts/check-levels.sh
+node_modules/.bin/zeabur-oss-levels          # crate levels, modules, pure and isolated crates
 ./scripts/check-chart.sh                     # the Helm chart: lint, renderings, refused values
 ./scripts/build-without-ui.sh                # the API-only build, without bun
 (cd web && bun ci && bun run fmt:check)
