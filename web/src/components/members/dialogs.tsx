@@ -119,8 +119,8 @@ export function InviteDialog({
 }: {
   members: readonly Member[]
   projectRoles: boolean
-  /** A project picked to start with, as Developer. */
-  project?: string
+  /** A project picked to start with, and the role it starts with there. */
+  project?: { name: string; role: Schemas.ProjectRole }
   onClose: () => void
 }) {
   const t = useT()
@@ -130,7 +130,7 @@ export function InviteDialog({
   const [displayName, setDisplayName] = useState("")
   const [admin, setAdmin] = useState(false)
   const [chosen, setChosen] = useState<Chosen>(
-    () => new Map(project && projectRoles ? [[project, "developer"]] : []),
+    () => new Map(project && projectRoles ? [[project.name, project.role]] : []),
   )
   const [reviewing, setReviewing] = useState(false)
   const [link, setLink] = useState<SetupLink | undefined>(undefined)

@@ -78,7 +78,7 @@ export function ProjectMembers({ namespace }: { namespace: { name: string; adopt
         <InviteDialog
           members={data.items}
           projectRoles={data.projectRoles}
-          project={project}
+          project={{ name: project, role: data.defaultRole }}
           onClose={() => setInviting(false)}
         />
       ) : null}

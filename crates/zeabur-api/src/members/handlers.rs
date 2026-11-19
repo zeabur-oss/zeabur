@@ -288,6 +288,8 @@ impl MembersView {
             setup_links,
             can_manage,
             project_roles: false,
+            assignable_roles: access::ProjectRole::ALL.to_vec(),
+            default_role: access::ProjectRole::DEFAULT,
             api_tokens: Vec::new(),
             can_manage_tokens: crate::projects::namespace::Permission::Unknown,
             unreadable: Vec::new(),

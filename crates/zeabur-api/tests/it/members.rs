@@ -392,6 +392,8 @@ mod tests {
         let cluster = signed_in("zeabur:ada");
         let (_, body) = call(&cluster, "GET", "/api/v1/members", None).await;
         assert_eq!(body["projectRoles"], true);
+        assert_eq!(body["assignableRoles"], json!(["developer", "viewer"]));
+        assert_eq!(body["defaultRole"], "developer");
         assert_eq!(body["items"][0].get("projects"), None);
         assert_eq!(
             body["items"][1]["projects"],

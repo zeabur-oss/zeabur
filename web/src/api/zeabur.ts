@@ -6970,6 +6970,8 @@ export type SetupLinks = {
 export type MembersView = {
   /** API tokens, by name: machine accounts with the access of a member. */
   apiTokens: ApiTokenView[]
+  /** The roles a member can be given in a project, in the order to offer them. */
+  assignableRoles: ProjectRole[]
   /** Whether the person may create invitations, as far as their rules tell. */
   canManage: Permission
   /**
@@ -6977,6 +6979,8 @@ export type MembersView = {
    * namespace.
    */
   canManageTokens: Permission
+  /** The role a new member gets in a project unless another is chosen. */
+  defaultRole: ProjectRole
   /** `members`. */
   id: string
   /** Whether Zeabur Identity is installed; when not, everything else is empty. */

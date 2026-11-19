@@ -11422,6 +11422,8 @@ components:
       - canManage
       - canManageTokens
       - projectRoles
+      - assignableRoles
+      - defaultRole
       - unreadable
       properties:
         apiTokens:
@@ -11429,6 +11431,11 @@ components:
           items:
             $ref: "#/components/schemas/ApiTokenView"
           description: "API tokens, by name: machine accounts with the access of a member."
+        assignableRoles:
+          type: array
+          items:
+            $ref: "#/components/schemas/ProjectRole"
+          description: The roles a member can be given in a project, in the order to offer them.
         canManage:
           $ref: "#/components/schemas/Permission"
           description: Whether the person may create invitations, as far as their rules tell.
@@ -11437,6 +11444,9 @@ components:
           description: |-
             Whether the person may create API tokens: `create serviceaccounts` in the token
             namespace.
+        defaultRole:
+          $ref: "#/components/schemas/ProjectRole"
+          description: The role a new member gets in a project unless another is chosen.
         id:
           type: string
           description: "`members`."
