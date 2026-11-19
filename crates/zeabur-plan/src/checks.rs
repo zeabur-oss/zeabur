@@ -4,6 +4,7 @@ use k8s_openapi::api::core::v1::{ExecAction, GRPCAction, HTTPGetAction, Probe, T
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use zeabur_model::kernel::dns::{is_dns_label, is_dns_subdomain};
 use zeabur_model::kernel::quantity;
 
 use crate::json::value_of;
@@ -132,42 +133,6 @@ fn is_under(path: &str, parent: &str) -> bool {
         || path
             .strip_prefix(parent)
             .is_some_and(|r| r.starts_with('/'))
-}
-
-/// Whether `name` is an RFC 1123 label: lower-case letters, digits and `-`, at most 63, starting
-/// and ending with a letter or digit [k8s-names].
-///
-/// [k8s-names]: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-label-names
-#[must_use]
-pub fn is_dns_label(name: &str) -> bool {
-    let bytes = name.as_bytes();
-    !bytes.is_empty()
-        && bytes.len() <= 63
-        && bytes
-            .iter()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
-        && bytes.first().is_some_and(u8::is_ascii_alphanumeric)
-        && bytes.last().is_some_and(u8::is_ascii_alphanumeric)
-}
-
-/// Whether `name` is an RFC 1123 subdomain, the form of a PersistentVolumeClaim's name.
-///
-/// At most 253 characters, lower-case letters, digits, `-` and `.`, each part between dots
-/// starting and ending with a letter or digit [k8s-subdomain]. Kubernetes does not limit a part to
-/// 63 characters here, unlike a label.
-///
-/// [k8s-subdomain]: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-subdomain-names
-#[must_use]
-pub fn is_dns_subdomain(name: &str) -> bool {
-    name.len() <= 253
-        && name.split('.').all(|part| {
-            let bytes = part.as_bytes();
-            bytes
-                .iter()
-                .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-')
-                && bytes.first().is_some_and(u8::is_ascii_alphanumeric)
-                && bytes.last().is_some_and(u8::is_ascii_alphanumeric)
-        })
 }
 
 // ── Probes ───────────────────────────────────────────────────────────────────────────────────

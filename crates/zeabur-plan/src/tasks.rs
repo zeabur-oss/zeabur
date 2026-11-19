@@ -23,6 +23,7 @@ use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec, Volume};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use serde_json::{Value, json};
 use zeabur_model::adapters::LABEL_TASK_OF;
+use zeabur_model::kernel::dns::is_dns_label;
 use zeabur_model::{WorkloadKind, WorkloadRef};
 
 use crate::TaskConcurrency;
@@ -391,7 +392,7 @@ fn task_pod(
 
 /// The checks that need no cluster state.
 fn check_request(task: &TaskRequest<'_>) -> Result<(), PlanError> {
-    if !dns_label(task.name, NAME_MAX) {
+    if task.name.len() > NAME_MAX || !is_dns_label(task.name) {
         return Err(field_error(
             "invalid_name",
             format!(
@@ -512,16 +513,6 @@ fn manual_job_name(cron_job: &str, now: &str) -> String {
     let mut base = cron_job.to_owned();
     base.truncate(63 - "-manual-".len() - stamp.len());
     format!("{}-manual-{stamp}", base.trim_end_matches('-'))
-}
-
-fn dns_label(name: &str, max: usize) -> bool {
-    !name.is_empty()
-        && name.len() <= max
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        && !name.starts_with('-')
-        && !name.ends_with('-')
 }
 
 fn field_error(code: &str, detail: impl Into<String>, field: &str) -> PlanError {

@@ -18,6 +18,7 @@ use std::collections::BTreeMap;
 use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort, ServiceSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_model::Message;
+use zeabur_model::kernel::dns::is_dns_label;
 
 use crate::change::{PublicPortChange, Target, Warning};
 use crate::owned::SERVICE_LABEL;
@@ -95,7 +96,7 @@ impl<'a> Planner<'a> {
                 Message::new("problem.publicPort.fix.alreadyPublic"),
             ));
         }
-        if name.len() > 63 {
+        if !is_dns_label(&name) {
             return Err(refusal(
                 ErrorKind::BadRequest,
                 "name_too_long",

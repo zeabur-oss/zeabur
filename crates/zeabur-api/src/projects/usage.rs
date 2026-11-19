@@ -190,7 +190,7 @@ pub(crate) async fn volumes(
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<VolumeUsageList>, ApiError> {
-    if !zeabur_plan::checks::is_dns_label(&project) {
+    if !zeabur_core::dns::is_dns_label(&project) {
         return Err(ApiError::from(Problem::new(
             Kind::BadRequest,
             format!("{project:?} is not a project's name."),

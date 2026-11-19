@@ -43,6 +43,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
+use zeabur_core::dns::is_dns_label;
 use zeabur_core::message::Message;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::ByteString;
@@ -393,15 +394,6 @@ fn grant_of(value: &str) -> (Vec<String>, bool) {
         }
     }
     (namespaces.into_iter().collect(), every)
-}
-
-fn dns_label(name: &str) -> bool {
-    (1..=63).contains(&name.len())
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        && !name.starts_with('-')
-        && !name.ends_with('-')
 }
 
 /// Builder's message for an `api-url` that is not https.
@@ -894,7 +886,7 @@ pub(crate) async fn plan(
         .collect();
     if request.installation_id <= 0
         || namespaces.len() > 500
-        || !namespaces.iter().all(|n| dns_label(n))
+        || !namespaces.iter().all(|n| is_dns_label(n))
     {
         return Err(problem(
             Kind::Invalid,

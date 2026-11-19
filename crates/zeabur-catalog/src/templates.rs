@@ -18,6 +18,7 @@ use serde_json::value::RawValue;
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
+use zeabur_model::kernel::dns::{is_dns_label, is_hostname};
 
 use crate::bundle;
 
@@ -770,14 +771,14 @@ fn check(template: &Template, options: &RenderOptions<'_>) -> Result<(), RenderE
         return Err(RenderError::Namespace(options.namespace.to_owned()));
     }
     match options.domain.filter(|d| !d.is_empty()) {
-        Some(domain) if !is_dns_name(domain) || domain.parse::<IpAddr>().is_ok() => {
+        Some(domain) if !is_hostname(domain) || domain.parse::<IpAddr>().is_ok() => {
             return Err(RenderError::Domain(domain.to_owned()));
         }
         None if template.needs_domain => return Err(RenderError::NoDomain),
         Some(_) | None => {}
     }
     match options.cluster_issuer.filter(|i| !i.is_empty()) {
-        Some(issuer) if !is_dns_name(issuer) => {
+        Some(issuer) if !is_hostname(issuer) => {
             return Err(RenderError::ClusterIssuer(issuer.to_owned()));
         }
         None if template.needs_cluster_issuer => return Err(RenderError::NoClusterIssuer),
@@ -815,21 +816,6 @@ fn check(template: &Template, options: &RenderOptions<'_>) -> Result<(), RenderE
         return Err(RenderError::UnknownInput(unknown.clone()));
     }
     Ok(())
-}
-
-fn is_dns_label(name: &str) -> bool {
-    name.len() <= 63
-        && !name.is_empty()
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        && !name.starts_with('-')
-        && !name.ends_with('-')
-}
-
-/// A lowercase DNS subdomain: labels of at most 63 characters, at most 253 in all.
-fn is_dns_name(name: &str) -> bool {
-    name.len() <= 253 && name.split('.').all(is_dns_label)
 }
 
 /// A field of the data a template reads.

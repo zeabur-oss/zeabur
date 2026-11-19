@@ -18,6 +18,7 @@ use std::io::{Read as _, Write as _};
 use serde::{Deserialize, Serialize};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_model::PodSecurityLevel;
+use zeabur_model::kernel::dns::is_dns_label;
 
 /// Where the API is when no mirror is set.
 pub const DEFAULT_URL: &str = "https://oss-catalog.zeabur.com/v1/";
@@ -406,7 +407,7 @@ pub fn index(bytes: &[u8]) -> Result<Index, ApiError> {
             version: index.catalog.version,
         });
     }
-    if let Some(bad) = index.components.iter().find(|c| !dns_label(&c.id)) {
+    if let Some(bad) = index.components.iter().find(|c| !is_dns_label(&c.id)) {
         return Err(ApiError::BadId(bad.id.clone()));
     }
     Ok(index)
@@ -437,17 +438,6 @@ pub fn component(index: &Index, id: &str, bytes: &[u8]) -> Result<ComponentFile,
 fn series(version: &str) -> Option<(u64, u64)> {
     let mut parts = version.trim_start_matches('v').split('.');
     Some((parts.next()?.parse().ok()?, parts.next()?.parse().ok()?))
-}
-
-/// An RFC 1123 label, so an id is safe in a URL path and an object name.
-fn dns_label(id: &str) -> bool {
-    !id.is_empty()
-        && id.len() <= 63
-        && id
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        && !id.starts_with('-')
-        && !id.ends_with('-')
 }
 
 /// One catalog release as Zeabur read it: `catalog.json` and every component file it lists.

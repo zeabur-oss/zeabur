@@ -27,6 +27,7 @@ use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use serde::Serialize;
 use serde_json::Value;
 use zeabur_model::PodSecurityLevel;
+use zeabur_model::kernel::dns::{is_hostname, is_rfc1035_label};
 
 use crate::builds::{
     BUILDER_GROUP, BUILDER_VERSION, KEEL_FORCE, KEEL_POLICY, UPLOAD_TOKEN_REQUEST, build_path,
@@ -50,30 +51,8 @@ fn refused(code: &str, detail: &str, field: &str) -> PlanError {
     refused
 }
 
-fn dns_label(name: &str) -> bool {
-    let mut chars = name.chars();
-    name.len() <= NAME_MAX
-        && chars.next().is_some_and(|c| c.is_ascii_lowercase())
-        && !name.ends_with('-')
-        && chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-')
-}
-
-fn hostname(host: &str) -> bool {
-    host.len() <= 253
-        && host.contains('.')
-        && host.split('.').all(|label| {
-            !label.is_empty()
-                && label.len() <= 63
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-                && label
-                    .bytes()
-                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        })
-}
-
 fn check(change: &UploadServiceChange) -> Result<(), PlanError> {
-    if !dns_label(&change.name) {
+    if !is_rfc1035_label(&change.name, NAME_MAX) {
         return Err(refused(
             "invalid_name",
             "A service name is lower case letters, digits and hyphens, starts with a letter and has at most 40 characters.",
@@ -118,7 +97,8 @@ fn check(change: &UploadServiceChange) -> Result<(), PlanError> {
                 "host",
             ));
         }
-        if !hostname(host.trim()) {
+        let host = host.trim();
+        if !(host.contains('.') && is_hostname(host)) {
             return Err(refused(
                 "invalid_host",
                 "Use a hostname like app.example.com.",

@@ -17,21 +17,13 @@
 //! [rfc3986-path]: https://www.rfc-editor.org/rfc/rfc3986#section-3.3
 //! [k8s-names]: https://kubernetes.io/docs/concepts/overview/working-with-objects/names/
 
+use zeabur_core::dns::is_dns_label;
+
 use crate::port::ClusterError;
 
-/// `Ok` when `namespace` is a DNS-1123 label: at most 63 lower-case letters, digits and `-`,
-/// starting and ending with a letter or digit.
+/// `Ok` when `namespace` is a DNS-1123 label.
 pub(crate) fn namespace(namespace: &str) -> Result<(), ClusterError> {
-    let bytes = namespace.as_bytes();
-    let edge =
-        |byte: Option<&u8>| byte.is_some_and(|b| b.is_ascii_lowercase() || b.is_ascii_digit());
-    let valid = bytes.len() <= 63
-        && edge(bytes.first())
-        && edge(bytes.last())
-        && bytes
-            .iter()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || *b == b'-');
-    if valid {
+    if is_dns_label(namespace) {
         Ok(())
     } else {
         Err(ClusterError::InvalidName(format!(

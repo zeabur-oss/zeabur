@@ -305,7 +305,7 @@ pub(crate) fn steps(holder: &Holder, current: &[Binding], wanted: &[ProjectGrant
 pub(crate) fn check(projects: &[ProjectGrant]) -> Result<Vec<ProjectGrant>, String> {
     let mut seen = BTreeMap::new();
     for grant in projects {
-        if !zeabur_plan::checks::is_dns_label(&grant.project) {
+        if !zeabur_core::dns::is_dns_label(&grant.project) {
             return Err(format!("{:?} is not a project's name.", grant.project));
         }
         if let Some(holds) = admin_only_namespace(&grant.project) {
