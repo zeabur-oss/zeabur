@@ -63,6 +63,13 @@
 
 use std::collections::BTreeMap;
 
+use k8s_openapi::api::core::v1::{
+    Capabilities, ConfigMapProjection, Container, EmptyDirVolumeSource, EnvVar, EphemeralContainer,
+    KeyToPath, Pod, PodSecurityContext, PodSpec, ProjectedVolumeSource, ResourceRequirements,
+    SeccompProfile, SecurityContext, Volume, VolumeMount, VolumeProjection,
+};
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use zeabur_model::kernel::digest::{hex, sha256};
 pub use zeabur_model::kernel::names::{
@@ -71,6 +78,7 @@ pub use zeabur_model::kernel::names::{
 };
 
 use crate::change::{Plan, PlannedObject, Target, Warning, Write};
+use crate::json::value_of;
 use crate::plan::{ErrorKind, PlanError, error, shown, yaml};
 use crate::rules::diff;
 
@@ -260,20 +268,25 @@ pub fn target_container(pod: &Value, asked: Option<&str>) -> Result<String, Plan
         })
 }
 
+/// The first of the pod's containers named `target`.
+fn target_of<'a>(pod: &'a Pod, target: &str) -> Option<&'a Container> {
+    pod.spec
+        .iter()
+        .flat_map(|s| &s.containers)
+        .find(|c| c.name == target)
+}
+
 /// The volume mounts of a debug container for `target` in `pod` (see the module documentation).
-fn debug_mounts(pod: &Value, target: &str) -> Vec<Value> {
-    items(pod, "/spec/containers")
-        .filter(|c| name_of(c) == Some(target))
-        .flat_map(|c| items(c, "/volumeMounts"))
-        .filter(|m| m.get("subPath").is_none() && m.get("subPathExpr").is_none())
-        .filter_map(|m| {
-            let mut mount = json!({"name": m.get("name")?, "mountPath": m.get("mountPath")?});
-            if m.get("readOnly").and_then(Value::as_bool) == Some(true)
-                && let Some(object) = mount.as_object_mut()
-            {
-                object.insert("readOnly".to_owned(), json!(true));
-            }
-            Some(mount)
+fn debug_mounts(pod: &Pod, target: &str) -> Vec<VolumeMount> {
+    target_of(pod, target)
+        .into_iter()
+        .flat_map(|c| c.volume_mounts.iter().flatten())
+        .filter(|m| m.sub_path.is_none() && m.sub_path_expr.is_none())
+        .map(|m| VolumeMount {
+            name: m.name.clone(),
+            mount_path: m.mount_path.clone(),
+            read_only: (m.read_only == Some(true)).then_some(true),
+            ..VolumeMount::default()
         })
         .collect()
 }
@@ -282,15 +295,13 @@ fn debug_mounts(pod: &Value, target: &str) -> Vec<Value> {
 fn reusable(
     pod: &Value,
     target: &str,
-    mounts: &[Value],
+    mounts: &[VolumeMount],
     conventions: &Conventions,
 ) -> Option<DebugContainer> {
     let mounted = |c: &DebugContainer| {
-        mounts.iter().all(|m| {
-            m.get("mountPath")
-                .and_then(Value::as_str)
-                .is_some_and(|path| c.mounts.iter().any(|p| p == path))
-        })
+        mounts
+            .iter()
+            .all(|m| c.mounts.iter().any(|p| *p == m.mount_path))
     };
     debug_containers_with(pod, conventions)
         .into_iter()
@@ -298,56 +309,52 @@ fn reusable(
 }
 
 /// The ephemeral container `name` for `target` in `pod`.
-fn debug_spec(pod: &Value, name: &str, image: &str, target: &str, mounts: Vec<Value>) -> Value {
-    let mut container = json!({
-        "name": name,
-        "image": image,
-        "imagePullPolicy": "IfNotPresent",
-        "command": ["sh"],
-        "stdin": true,
-        "tty": true,
-        "targetContainerName": target,
-        "terminationMessagePolicy": "File",
-        "securityContext": debug_security_context(pod, target),
-    });
-    if !mounts.is_empty()
-        && let Some(object) = container.as_object_mut()
-    {
-        object.insert("volumeMounts".to_owned(), Value::Array(mounts));
+fn debug_spec(
+    pod: &Pod,
+    name: &str,
+    image: &str,
+    target: &str,
+    mounts: Vec<VolumeMount>,
+) -> EphemeralContainer {
+    EphemeralContainer {
+        name: name.to_owned(),
+        image: Some(image.to_owned()),
+        image_pull_policy: Some("IfNotPresent".to_owned()),
+        command: Some(vec!["sh".to_owned()]),
+        stdin: Some(true),
+        tty: Some(true),
+        target_container_name: Some(target.to_owned()),
+        termination_message_policy: Some("File".to_owned()),
+        security_context: Some(debug_security_context(pod, target)),
+        volume_mounts: (!mounts.is_empty()).then_some(mounts),
+        ..EphemeralContainer::default()
     }
-    container
 }
 
 /// The security context of a debug container for `target` in `pod` (see the module
 /// documentation).
-fn debug_security_context(pod: &Value, target: &str) -> Value {
-    let container = items(pod, "/spec/containers").find(|c| name_of(c) == Some(target));
-    let field = |name: &str| {
-        container
-            .and_then(|c| c.pointer(&format!("/securityContext/{name}")))
-            .or_else(|| pod.pointer(&format!("/spec/securityContext/{name}")))
-    };
-    let mut context = json!({
-        "allowPrivilegeEscalation": false,
-        "capabilities": {"drop": ["ALL"]},
-        "seccompProfile": {"type": "RuntimeDefault"},
-    });
-    let non_root = field("runAsNonRoot").and_then(Value::as_bool) == Some(true);
-    let user = field("runAsUser")
-        .and_then(Value::as_i64)
+fn debug_security_context(pod: &Pod, target: &str) -> SecurityContext {
+    let container = target_of(pod, target).and_then(|c| c.security_context.as_ref());
+    let shared = pod.spec.as_ref().and_then(|s| s.security_context.as_ref());
+    let non_root = container
+        .and_then(|c| c.run_as_non_root)
+        .or_else(|| shared.and_then(|c| c.run_as_non_root))
+        == Some(true);
+    let user = container
+        .and_then(|c| c.run_as_user)
+        .or_else(|| shared.and_then(|c| c.run_as_user))
         .or_else(|| non_root.then_some(NOBODY));
-    if let Some(object) = context.as_object_mut() {
-        if let Some(user) = user {
-            object.insert("runAsUser".to_owned(), json!(user));
-            if user != 0 {
-                object.insert("runAsNonRoot".to_owned(), json!(true));
-            }
-        }
-        if let Some(group) = field("runAsGroup").and_then(Value::as_i64) {
-            object.insert("runAsGroup".to_owned(), json!(group));
-        }
+    SecurityContext {
+        allow_privilege_escalation: Some(false),
+        capabilities: Some(drop_all()),
+        seccomp_profile: Some(runtime_default()),
+        run_as_user: user,
+        run_as_non_root: user.filter(|u| *u != 0).map(|_| true),
+        run_as_group: container
+            .and_then(|c| c.run_as_group)
+            .or_else(|| shared.and_then(|c| c.run_as_group)),
+        ..SecurityContext::default()
     }
-    context
 }
 
 /// The plan that adds a debug container with `image` for `asked` (or the default container).
@@ -396,7 +403,8 @@ pub fn debug_container_with(
             format!("Pod {pod_name} has stopped, so no container can start in it."),
         ));
     }
-    let mounts = debug_mounts(pod, &target);
+    let typed: Pod = serde_json::from_value(pod.clone()).unwrap_or_default();
+    let mounts = debug_mounts(&typed, &target);
     if let Some(reused) = reusable(pod, &target, &mounts, conventions) {
         return Ok(Plan {
             objects: Vec::new(),
@@ -415,7 +423,7 @@ pub fn debug_container_with(
     let digest = sha256(format!("{uid}\n{target}\n{made_at}").as_bytes());
     let prefix = &conventions.debug_prefix;
     let name = format!("{prefix}{}", hex(digest.get(..3).unwrap_or_default()));
-    let container = debug_spec(pod, &name, image, &target, mounts);
+    let container = value_of(&debug_spec(&typed, &name, image, &target, mounts));
     let existing = pod.pointer("/spec/ephemeralContainers").cloned();
     let mut operations = vec![json!({"op": "test", "path": "/metadata/uid", "value": uid})];
     match &existing {
@@ -444,7 +452,7 @@ pub fn debug_container_with(
     let shown_after = shown(&after);
     Ok(Plan {
         objects: vec![PlannedObject {
-            target: Target::of::<k8s_openapi::api::core::v1::Pod>(&pod_name),
+            target: Target::of::<Pod>(&pod_name),
             before_yaml: yaml(Some(&before)),
             after_yaml: yaml(Some(&shown_after)),
             changes: diff(Some(pod), &after),
@@ -596,89 +604,160 @@ pub fn tools_pod_body_with(request: &ToolsPod<'_>, conventions: &Conventions) ->
         hex(digest.get(..3).unwrap_or_default())
     );
     let home = TOOLS_HOME;
-    let mut annotations = json!({(&*conventions.tools_person_annotation): request.person});
-    let mut labels = json!({
-        "app.kubernetes.io/name": conventions.tools_prefix.trim_end_matches('-'),
-        "app.kubernetes.io/managed-by": conventions.field_manager,
-        (&*conventions.tools_label): request.scope.label(),
-        (&*conventions.tools_person_label): key,
-    });
+    let mut annotations = BTreeMap::from([(
+        conventions.tools_person_annotation.to_string(),
+        request.person.to_owned(),
+    )]);
+    let mut labels = BTreeMap::from([
+        (
+            "app.kubernetes.io/name".to_owned(),
+            conventions.tools_prefix.trim_end_matches('-').to_owned(),
+        ),
+        (
+            "app.kubernetes.io/managed-by".to_owned(),
+            conventions.field_manager.to_string(),
+        ),
+        (
+            conventions.tools_label.to_string(),
+            request.scope.label().to_owned(),
+        ),
+        (conventions.tools_person_label.to_string(), key),
+    ]);
     if let ToolsScope::Project(project) = request.scope {
-        if let Some(map) = annotations.as_object_mut() {
-            map.insert(
-                conventions.tools_project_annotation.to_string(),
-                json!(project),
-            );
-        }
-        if let Some(map) = labels.as_object_mut() {
-            map.insert(conventions.project_label.to_string(), json!(project));
-        }
+        annotations.insert(
+            conventions.tools_project_annotation.to_string(),
+            project.to_owned(),
+        );
+        labels.insert(conventions.project_label.to_string(), project.to_owned());
     }
-    json!({
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": {
-            "name": name,
-            "namespace": request.namespace,
-            "labels": labels,
-            "annotations": annotations,
+    let quantities = |map: &BTreeMap<String, String>| {
+        map.iter()
+            .map(|(k, v)| (k.clone(), Quantity(v.clone())))
+            .collect()
+    };
+    let env = |name: &str, value: String| EnvVar {
+        name: name.to_owned(),
+        value: Some(value),
+        value_from: None,
+    };
+    let mount = |name: &str, path: String, read_only: bool| VolumeMount {
+        name: name.to_owned(),
+        mount_path: path,
+        read_only: read_only.then_some(true),
+        ..VolumeMount::default()
+    };
+    let scratch = |name: &str, medium: Option<&str>, size: &str| Volume {
+        name: name.to_owned(),
+        empty_dir: Some(EmptyDirVolumeSource {
+            medium: medium.map(str::to_owned),
+            size_limit: Some(Quantity(size.to_owned())),
+        }),
+        ..Volume::default()
+    };
+    value_of(&Pod {
+        metadata: ObjectMeta {
+            name: Some(name),
+            namespace: Some(request.namespace.to_owned()),
+            labels: Some(labels),
+            annotations: Some(annotations),
+            ..ObjectMeta::default()
         },
-        "spec": {
-            "automountServiceAccountToken": false,
-            "enableServiceLinks": false,
-            "restartPolicy": "Never",
-            "activeDeadlineSeconds": request.deadline_seconds,
-            "terminationGracePeriodSeconds": 5,
-            "securityContext": {
-                "runAsUser": TOOLS_USER,
-                "runAsGroup": TOOLS_USER,
-                "runAsNonRoot": true,
-                "fsGroup": TOOLS_USER,
-                "seccompProfile": {"type": "RuntimeDefault"},
-            },
-            "containers": [{
-                "name": TOOLS_CONTAINER,
-                "image": request.image,
-                "imagePullPolicy": "IfNotPresent",
-                "command": ["sleep", request.deadline_seconds.to_string()],
-                "workingDir": home,
-                "env": [
-                    {"name": "HOME", "value": home},
-                    {"name": "KUBECONFIG", "value": format!("{home}/.kube/config")},
-                    {"name": "KUBECACHEDIR", "value": format!("{home}/.cache/kube")},
-                    {"name": "PATH", "value": format!("{home}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin")},
-                ],
-                "resources": {
-                    "requests": request.resources.requests,
-                    "limits": request.resources.limits,
-                },
-                "securityContext": {
-                    "allowPrivilegeEscalation": false,
-                    "readOnlyRootFilesystem": true,
-                    "runAsNonRoot": true,
-                    "capabilities": {"drop": ["ALL"]},
-                },
-                "volumeMounts": [
-                    {"name": "home", "mountPath": home},
-                    {"name": "credential", "mountPath": format!("{home}/.kube")},
-                    {"name": "tmp", "mountPath": "/tmp"},
-                    {"name": "kube-api", "mountPath": "/var/run/zeabur/kube-api", "readOnly": true},
-                ],
+        spec: Some(PodSpec {
+            automount_service_account_token: Some(false),
+            enable_service_links: Some(false),
+            restart_policy: Some("Never".to_owned()),
+            active_deadline_seconds: Some(request.deadline_seconds),
+            termination_grace_period_seconds: Some(5),
+            security_context: Some(PodSecurityContext {
+                run_as_user: Some(TOOLS_USER),
+                run_as_group: Some(TOOLS_USER),
+                run_as_non_root: Some(true),
+                fs_group: Some(TOOLS_USER),
+                seccomp_profile: Some(runtime_default()),
+                ..PodSecurityContext::default()
+            }),
+            containers: vec![Container {
+                name: TOOLS_CONTAINER.to_owned(),
+                image: Some(request.image.to_owned()),
+                image_pull_policy: Some("IfNotPresent".to_owned()),
+                command: Some(vec![
+                    "sleep".to_owned(),
+                    request.deadline_seconds.to_string(),
+                ]),
+                working_dir: Some(home.to_owned()),
+                env: Some(vec![
+                    env("HOME", home.to_owned()),
+                    env("KUBECONFIG", format!("{home}/.kube/config")),
+                    env("KUBECACHEDIR", format!("{home}/.cache/kube")),
+                    env(
+                        "PATH",
+                        format!(
+                            "{home}/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+                        ),
+                    ),
+                ]),
+                resources: Some(ResourceRequirements {
+                    requests: Some(quantities(&request.resources.requests)),
+                    limits: Some(quantities(&request.resources.limits)),
+                    ..ResourceRequirements::default()
+                }),
+                security_context: Some(SecurityContext {
+                    allow_privilege_escalation: Some(false),
+                    read_only_root_filesystem: Some(true),
+                    run_as_non_root: Some(true),
+                    capabilities: Some(drop_all()),
+                    ..SecurityContext::default()
+                }),
+                volume_mounts: Some(vec![
+                    mount("home", home.to_owned(), false),
+                    mount("credential", format!("{home}/.kube"), false),
+                    mount("tmp", "/tmp".to_owned(), false),
+                    mount("kube-api", "/var/run/zeabur/kube-api".to_owned(), true),
+                ]),
+                ..Container::default()
             }],
-            "volumes": [
-                {"name": "home", "emptyDir": {"sizeLimit": "256Mi"}},
-                {"name": "credential", "emptyDir": {"medium": "Memory", "sizeLimit": "1Mi"}},
-                {"name": "tmp", "emptyDir": {"sizeLimit": "256Mi"}},
-                {"name": "kube-api", "projected": {
-                    "defaultMode": 0o444,
-                    "sources": [{"configMap": {
-                        "name": "kube-root-ca.crt",
-                        "items": [{"key": "ca.crt", "path": "ca.crt"}],
-                    }}],
-                }},
-            ],
-        },
+            volumes: Some(vec![
+                scratch("home", None, "256Mi"),
+                scratch("credential", Some("Memory"), "1Mi"),
+                scratch("tmp", None, "256Mi"),
+                Volume {
+                    name: "kube-api".to_owned(),
+                    projected: Some(ProjectedVolumeSource {
+                        default_mode: Some(0o444),
+                        sources: Some(vec![VolumeProjection {
+                            config_map: Some(ConfigMapProjection {
+                                name: "kube-root-ca.crt".to_owned(),
+                                items: Some(vec![KeyToPath {
+                                    key: "ca.crt".to_owned(),
+                                    path: "ca.crt".to_owned(),
+                                    mode: None,
+                                }]),
+                                optional: None,
+                            }),
+                            ..VolumeProjection::default()
+                        }]),
+                    }),
+                    ..Volume::default()
+                },
+            ]),
+            ..PodSpec::default()
+        }),
+        ..Pod::default()
     })
+}
+
+fn runtime_default() -> SeccompProfile {
+    SeccompProfile {
+        type_: "RuntimeDefault".to_owned(),
+        localhost_profile: None,
+    }
+}
+
+fn drop_all() -> Capabilities {
+    Capabilities {
+        add: None,
+        drop: Some(vec!["ALL".to_owned()]),
+    }
 }
 
 /// The plan that creates the tools pod `request` describes.
@@ -699,7 +778,7 @@ pub fn tools_pod_with(request: &ToolsPod<'_>, conventions: &Conventions) -> Plan
     let after = shown(&body);
     Plan {
         objects: vec![PlannedObject {
-            target: Target::of::<k8s_openapi::api::core::v1::Pod>(&name),
+            target: Target::of::<Pod>(&name),
             before: None,
             before_yaml: None,
             after_yaml: yaml(Some(&after)),
