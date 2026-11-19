@@ -20,7 +20,7 @@
       "@types/react": "19.3.0",
       "@types/react-dom": "19.3.0",
       "@vitejs/plugin-react": "6.1.2",
-      "@zeabur-oss/design-system": "0.1.4",
+      "@zeabur-oss/design-system": "0.1.5",
       "class-variance-authority": "0.7.1",
       "cn": "0.5.2",
       "oxc-transform-react": "0.156.0",
