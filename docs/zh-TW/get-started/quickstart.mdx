@@ -3,7 +3,17 @@ title: 安裝 Zeabur
 description: 選一種安裝方式：交給 Claude 或 Codex、用 Zeatend 的安裝畫面，或自己用 Helm 安裝。
 ---
 
-![安裝 Zeabur 的三種方式：交給 Claude 或 Codex、用 Zeatend 的安裝畫面、手動安裝。三種方式都裝出同一個 Zeabur，有同樣的專案、服務和網域。](../images/diagrams/install-paths.svg)
+<Figure label="安裝 Zeabur 的三種方式：交給 Claude 或 Codex、用 Zeatend 的安裝畫面、手動安裝。三種方式都裝出同一個 Zeabur。">
+<FigFlow>
+<FigGroup label="安裝 Zeabur 的三種方式">
+<FigCard title="交給 Claude 或 Codex" note="貼上一段提示，它幫你裝好" tag="開發中" />
+<FigCard title="用 Zeatend 的安裝畫面" note="在伺服器上自己一步步操作" tag="開發中" />
+<FigCard title="手動安裝" note="用 Helm，每個物件都看得到" tag="現在可用" hot />
+</FigGroup>
+<FigArrow />
+<FigCard accent title="你的伺服器上的 Zeabur" note="同樣的專案、服務和網域" />
+</FigFlow>
+</Figure>
 
 三種方式裝出來的 Zeabur 都一樣。差別在於誰來動手，以及你想看到多少細節。
 
