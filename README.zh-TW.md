@@ -27,7 +27,7 @@
 - **由你維護**：升級 Zeabur、備份資料和維護主機，都由你或你的團隊負責。
 - **目前要先有 Kubernetes 叢集**：Kubernetes 是在一台或多台主機上執行容器的開源系統，Zeabur 就裝在它上面。在全新主機上用一個指令安裝的功能還在開發中，進度見 [#430](https://github.com/zeabur-oss/zeabur/issues/430)。
 
-[文件](https://oss.zeabur.com/zh-TW/docs/zeabur/)一步步說明安裝、部署和設定，每個步驟都附截圖。
+[從 zeabur.com 過來](https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com/)列出這些功能在文件的哪一頁，以及從哪裡開始。文件的每個步驟都附截圖。
 
 ## 能幫你做什麼
 
