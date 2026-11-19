@@ -547,8 +547,7 @@ impl Planner<'_> {
             let refs = &rule.backend_refs;
             let raw_refs = raw_rules
                 .get(r)
-                .map(|rule| array(rule, "/backendRefs"))
-                .unwrap_or_default();
+                .map_or_else(Vec::new, |rule| array(rule, "/backendRefs"));
             let page = page_refs(refs, server);
             for (b, backend) in refs.iter().enumerate() {
                 let path = format!("/spec/rules/{r}/backendRefs/{b}");

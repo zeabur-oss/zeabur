@@ -463,7 +463,7 @@ impl Planner<'_> {
         let metadata = ObjectMeta {
             name: Some(own.clone()),
             namespace: Some(self.input.snapshot.namespace.clone()),
-            labels: meta.labels.clone(),
+            labels: meta.labels,
             annotations: (!annotations.is_empty()).then_some(annotations),
             ..ObjectMeta::default()
         };

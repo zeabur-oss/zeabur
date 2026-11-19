@@ -298,11 +298,7 @@ fn reusable(
     mounts: &[VolumeMount],
     conventions: &Conventions,
 ) -> Option<DebugContainer> {
-    let mounted = |c: &DebugContainer| {
-        mounts
-            .iter()
-            .all(|m| c.mounts.iter().any(|p| *p == m.mount_path))
-    };
+    let mounted = |c: &DebugContainer| mounts.iter().all(|m| c.mounts.contains(&m.mount_path));
     debug_containers_with(pod, conventions)
         .into_iter()
         .find(|c| c.usable() && c.target.as_deref() == Some(target) && mounted(c))
@@ -595,6 +591,10 @@ pub fn tools_pod_body(request: &ToolsPod<'_>) -> Value {
 
 /// [`tools_pod_body`] under the names and labels of `conventions`.
 #[must_use]
+#[expect(
+    clippy::too_many_lines,
+    reason = "one object literal, read top to bottom"
+)]
 pub fn tools_pod_body_with(request: &ToolsPod<'_>, conventions: &Conventions) -> Value {
     let key = person_key(request.person);
     let digest = sha256(format!("{}\n{}", request.person, request.made_at).as_bytes());

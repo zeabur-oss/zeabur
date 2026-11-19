@@ -370,6 +370,65 @@ fn build(
     }
 }
 
+fn app_container(
+    change: &UploadServiceChange,
+    repository: &str,
+    security: SecurityContext,
+    port: Option<i32>,
+    env_secret: Option<&str>,
+) -> Container {
+    Container {
+        name: change.name.clone(),
+        image: Some(format!("{repository}:{PENDING_TAG}")),
+        resources: Some(resources(change.size.unwrap_or(ServiceSize::Small))),
+        security_context: Some(security),
+        ports: port.map(|p| {
+            vec![ContainerPort {
+                container_port: p,
+                ..ContainerPort::default()
+            }]
+        }),
+        readiness_probe: port.map(|p| Probe {
+            tcp_socket: Some(TCPSocketAction {
+                port: IntOrString::Int(p),
+                host: None,
+            }),
+            ..Probe::default()
+        }),
+        env_from: env_secret.map(|secret| {
+            vec![EnvFromSource {
+                secret_ref: Some(SecretEnvSource {
+                    name: secret.to_owned(),
+                    optional: None,
+                }),
+                ..EnvFromSource::default()
+            }]
+        }),
+        ..Container::default()
+    }
+}
+
+fn service_object(name: &str, labels: &BTreeMap<String, String>, port: i32) -> Service {
+    Service {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            labels: Some(labels.clone()),
+            ..ObjectMeta::default()
+        },
+        spec: Some(ServiceSpec {
+            selector: Some(labels.clone()),
+            ports: Some(vec![ServicePort {
+                name: Some("http".to_owned()),
+                port,
+                target_port: Some(IntOrString::Int(port)),
+                ..ServicePort::default()
+            }]),
+            ..ServiceSpec::default()
+        }),
+        ..Service::default()
+    }
+}
+
 /// The objects of `change` in project `project`, in the order they are created.
 fn objects(
     change: &UploadServiceChange,
@@ -397,35 +456,13 @@ fn objects(
     let env_secret = format!("{name}-env");
     let build_secret = format!("{name}-build-env");
     let port = change.port.map(i32::from);
-    let container = Container {
-        name: name.to_owned(),
-        image: Some(format!("{repository}:{PENDING_TAG}")),
-        resources: Some(resources(change.size.unwrap_or(ServiceSize::Small))),
-        security_context: Some(container_security),
-        ports: port.map(|p| {
-            vec![ContainerPort {
-                container_port: p,
-                ..ContainerPort::default()
-            }]
-        }),
-        readiness_probe: port.map(|p| Probe {
-            tcp_socket: Some(TCPSocketAction {
-                port: IntOrString::Int(p),
-                host: None,
-            }),
-            ..Probe::default()
-        }),
-        env_from: (!variables.is_empty()).then(|| {
-            vec![EnvFromSource {
-                secret_ref: Some(SecretEnvSource {
-                    name: env_secret.clone(),
-                    optional: None,
-                }),
-                ..EnvFromSource::default()
-            }]
-        }),
-        ..Container::default()
-    };
+    let container = app_container(
+        change,
+        &repository,
+        container_security,
+        port,
+        (!variables.is_empty()).then_some(env_secret.as_str()),
+    );
     pod.containers = vec![container];
 
     let mut out = Vec::new();
@@ -467,24 +504,7 @@ fn objects(
         ..Deployment::default()
     })?);
     if let Some(port) = port {
-        out.push(to_json(&Service {
-            metadata: ObjectMeta {
-                name: Some(name.to_owned()),
-                labels: Some(labels.clone()),
-                ..ObjectMeta::default()
-            },
-            spec: Some(ServiceSpec {
-                selector: Some(labels.clone()),
-                ports: Some(vec![ServicePort {
-                    name: Some("http".to_owned()),
-                    port,
-                    target_port: Some(IntOrString::Int(port)),
-                    ..ServicePort::default()
-                }]),
-                ..ServiceSpec::default()
-            }),
-            ..Service::default()
-        })?);
+        out.push(to_json(&service_object(name, &labels, port))?);
         if let (Some(host), Some(port)) = (change.host.as_deref().map(str::trim), change.port) {
             out.push(to_json(&ingress_object(
                 name,

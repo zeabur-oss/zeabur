@@ -51,8 +51,8 @@ pub(crate) struct ErrorsService {
 pub(crate) struct HttpRouteObject<S> {
     api_version: &'static str,
     kind: &'static str,
-    pub metadata: ObjectMeta,
-    pub spec: S,
+    metadata: ObjectMeta,
+    spec: S,
 }
 
 impl<S> HttpRouteObject<S> {

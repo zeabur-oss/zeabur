@@ -210,8 +210,7 @@ impl<'a> Planner<'a> {
         let template = cron_job
             .spec
             .as_ref()
-            .map(|s| s.job_template.clone())
-            .unwrap_or_default();
+            .map_or_else(Default::default, |s| s.job_template.clone());
         let template_meta = template.metadata.unwrap_or_default();
         let mut annotations = template_meta.annotations.unwrap_or_default();
         annotations.insert(

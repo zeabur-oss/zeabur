@@ -140,7 +140,7 @@ impl<'a> Planner<'a> {
         let body = KubeService {
             metadata: ObjectMeta {
                 name: Some(name.clone()),
-                namespace: Some(self.input.snapshot.namespace.to_string()),
+                namespace: Some(self.input.snapshot.namespace.clone()),
                 labels: Some(BTreeMap::from([(
                     SERVICE_LABEL.to_owned(),
                     reference.name.clone(),

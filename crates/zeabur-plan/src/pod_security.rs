@@ -63,8 +63,11 @@ where
         .flatten()
 }
 
-fn seccomp_type(profile: Option<&SeccompProfile>) -> Option<&str> {
-    profile.map(|p| p.type_.as_str())
+const fn seccomp_type(profile: Option<&SeccompProfile>) -> Option<&str> {
+    match profile {
+        Some(p) => Some(p.type_.as_str()),
+        None => None,
+    }
 }
 
 fn pod_context(before: Option<&Value>, profile: PodSecurityLevel) -> Option<Value> {
