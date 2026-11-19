@@ -149,7 +149,8 @@ async fn admitted(
 }
 
 /// A Pod of `workload`'s template named `name`. A StatefulSet's claim templates become empty
-/// volumes, so the containers' mounts resolve. A ServiceAccount that `plan` creates does not
+/// volumes, so the containers' mounts resolve; each replaces a template volume of its name, as
+/// the StatefulSet controller's `updateStorage` does. A ServiceAccount that `plan` creates does not
 /// exist yet, and the ServiceAccount admission plugin refuses a Pod that names a missing one, so
 /// the Pod runs as `default` instead: quotas, limit ranges and Pod Security do not read it.
 fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
@@ -190,6 +191,7 @@ fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
             .as_object_mut()
             .map(|s| s.entry("volumes").or_insert_with(|| json!([])));
         if let Some(Value::Array(volumes)) = volumes {
+            volumes.retain(|v| !claims.iter().any(|c| c.get("name") == v.get("name")));
             volumes.extend(claims);
         }
     }
@@ -328,5 +330,31 @@ mod tests {
         }))
         .unwrap();
         assert_eq!(account_of(&without).as_deref(), Some("worker"));
+    }
+
+    #[test]
+    fn a_claim_template_replaces_the_template_volume_of_its_name() {
+        let mut plan: Plan = serde_json::from_value(json!({
+            "objects": [planned("StatefulSet", "db", &json!({}))],
+            "impact": [], "warnings": []
+        }))
+        .unwrap();
+        plan.objects[0].raw_after =
+            json!({"spec": {"volumeClaimTemplates": [{"metadata": {"name": "data"}}]}});
+        let template = json!({"spec": {"containers": [], "volumes": [
+            {"name": "data", "configMap": {"name": "seed"}},
+            {"name": "tmp", "emptyDir": {}}
+        ]}});
+        let workload = Added {
+            object: &plan.objects[0],
+            template: &template,
+            pods: 1,
+            change: Some(0),
+        };
+        let pod = pod(&workload, "db-dry-run", &plan);
+        assert_eq!(
+            pod.pointer("/spec/volumes").unwrap(),
+            &json!([{"name": "tmp", "emptyDir": {}}, {"name": "data", "emptyDir": {}}])
+        );
     }
 }
