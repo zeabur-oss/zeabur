@@ -1133,6 +1133,10 @@ export const zhTW: Messages = {
   "components.catalogUnaffected": "已安裝的元件和所有服務都照常運作，只有安裝元件時才需要目錄。",
   "components.catalogInMemory": (error) => `只存在記憶體裡，重新啟動後會再下載一次：${error}`,
   "components.catalogMirror": "要改從鏡像站下載，請設定 Helm chart 的 catalog.url。",
+  "components.packaged": (by, chart) =>
+    `這是 ${by} 的內建元件。要改設定，請建立名為 ${chart} 的 HelmChartConfig。`,
+  "components.packagedHow": "範例",
+  "components.packagedAnchor": "修改內建元件的設定",
   "settings.homepage": "首頁",
   "settings.opensInNewTab": "（在新分頁開啟）",
   "category.traffic": "流量",

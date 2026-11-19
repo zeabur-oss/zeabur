@@ -95,6 +95,13 @@ pub struct Installation {
     /// The tool that manages it and upgrades it (`k3s`, `RKE2`): never flagged for an upgrade.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub managed_by: Option<String>,
+    /// The packaged `HelmChart` in `kube-system` (`traefik`, `rke2-traefik`). A `HelmChartConfig`
+    /// of the same name changes its values [k3s-helmchartconfig]. Absent when the distribution
+    /// deploys the component as plain manifests, as k3s does with metrics-server.
+    ///
+    /// [k3s-helmchartconfig]: https://github.com/k3s-io/docs/blob/ecbbc13dce8d347cac529d6db585e5f647074edb/docs/add-ons/helm.md#customizing-packaged-components-with-helmchartconfig
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub packaged_chart: Option<String>,
     /// The chart version the catalogue tested, when it pins one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tested: Option<String>,
@@ -158,6 +165,7 @@ pub fn installation(
         running: false,
         version: None,
         managed_by: None,
+        packaged_chart: None,
         tested: component.tested_version.clone(),
         upgrade: None,
     };
@@ -181,6 +189,7 @@ pub fn installation(
         {
             found.source = InstallSource::Rke2;
             found.managed_by = Some("RKE2".to_owned());
+            found.packaged_chart = Some(name.to_owned());
             found.version = packaged_chart_version(url, name);
             return found;
         }
@@ -193,6 +202,7 @@ pub fn installation(
         if chart.contains("/static/charts/") {
             found.source = InstallSource::K3s;
             found.managed_by = Some("k3s".to_owned());
+            found.packaged_chart = Some(addon.to_owned());
             found.version = packaged_chart_version(chart, addon);
             return found;
         }
@@ -267,8 +277,10 @@ mod tests {
         assert_eq!(found.managed_by.as_deref(), Some("k3s"));
         assert_eq!(found.version.as_deref(), Some("41.6.101+up41.6.1"));
         assert_eq!(found.upgrade, None);
+        assert_eq!(found.packaged_chart.as_deref(), Some("traefik"));
         let metrics = installation(&component("metrics-server"), &facts, Some("k3s"));
         assert_eq!(metrics.managed_by.as_deref(), Some("k3s"));
+        assert_eq!(metrics.packaged_chart, None);
         assert_eq!(metrics.upgrade, None);
     }
 
@@ -326,8 +338,13 @@ mod tests {
         assert_eq!(traefik.managed_by.as_deref(), Some("RKE2"));
         assert_eq!(traefik.version.as_deref(), Some("39.0.501+up39.0.5"));
         assert_eq!(traefik.upgrade, None);
+        assert_eq!(traefik.packaged_chart.as_deref(), Some("rke2-traefik"));
         let metrics = installation(&component("metrics-server"), &facts, Some("rke2"));
         assert_eq!(metrics.source, InstallSource::Rke2);
+        assert_eq!(
+            metrics.packaged_chart.as_deref(),
+            Some("rke2-metrics-server")
+        );
         assert_eq!(metrics.version, None);
         assert_eq!(metrics.upgrade, None);
     }

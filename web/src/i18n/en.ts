@@ -1220,6 +1220,10 @@ export const en = {
   "components.catalogInMemory": (error: string) =>
     `kept in memory only, so a restart downloads it again: ${error}`,
   "components.catalogMirror": "To download it from a mirror, set catalog.url in the Helm chart.",
+  "components.packaged": (by: string, chart: string) =>
+    `A built-in ${by} component. To change its settings, create a HelmChartConfig named ${chart}.`,
+  "components.packagedHow": "Example",
+  "components.packagedAnchor": "change-settings-of-built-in-components",
   "settings.homepage": "Home page",
   "settings.opensInNewTab": "(opens in a new tab)",
   "category.traffic": "Traffic",

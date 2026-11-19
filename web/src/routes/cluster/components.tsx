@@ -37,6 +37,7 @@ import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/c
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { type Locale, useI18n, useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
+import { docsUrl } from "@/lib/docs"
 import { formatAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { componentsRole, Forbidden } from "@/routes/cluster/forbidden"
@@ -368,6 +369,9 @@ function ComponentCard({
       <p className="line-clamp-3 type-body leading-normal text-muted-foreground">
         {summaryOf(component, locale)}
       </p>
+      {installation?.packagedChart ? (
+        <PackagedNote by={t(sourceKey[installation.source])} chart={installation.packagedChart} />
+      ) : null}
       <div className="mt-auto flex min-h-8 items-center gap-2 pt-1">
         <span className="type-meta text-muted-foreground" translate="no">
           {component.license}
@@ -385,6 +389,26 @@ function ComponentCard({
         <CardAction id={component.id} button={buttonOf(installation)} />
       </div>
     </article>
+  )
+}
+
+/** A component K3s or RKE2 deployed as a chart: its values change through a HelmChartConfig. */
+function PackagedNote({ by, chart }: { by: string; chart: string }) {
+  const { t, locale } = useI18n()
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t("components.packaged", by, chart)}{" "}
+      <a
+        href={docsUrl(locale, "cluster/components", t("components.packagedAnchor"))}
+        target="_blank"
+        rel="noreferrer noopener"
+        className="inline-flex items-center gap-1 underline underline-offset-2 hover:text-foreground"
+      >
+        {t("components.packagedHow")}
+        <ArrowSquareOutIcon className="size-3" aria-hidden="true" />
+        <span className="sr-only">{t("settings.opensInNewTab")}</span>
+      </a>
+    </p>
   )
 }
 

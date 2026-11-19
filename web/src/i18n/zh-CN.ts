@@ -1130,6 +1130,10 @@ export const zhCN: Messages = {
   "components.catalogUnaffected": "已安装的组件和所有服务都照常运行，只有安装组件时才需要目录。",
   "components.catalogInMemory": (error) => `只保存在内存里，重启后会再下载一次：${error}`,
   "components.catalogMirror": "要改从镜像站下载，请设置 Helm chart 的 catalog.url。",
+  "components.packaged": (by, chart) =>
+    `这是 ${by} 的内置组件。要修改设置，请创建名为 ${chart} 的 HelmChartConfig。`,
+  "components.packagedHow": "示例",
+  "components.packagedAnchor": "修改内置组件的设置",
   "settings.homepage": "主页",
   "settings.opensInNewTab": "（在新标签页打开）",
   "category.traffic": "流量",

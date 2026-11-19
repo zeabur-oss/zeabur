@@ -1118,6 +1118,15 @@ export type Installation = {
    */
   managedBy?: string | null
   /**
+   * The packaged `HelmChart` in `kube-system` (`traefik`, `rke2-traefik`). A `HelmChartConfig`
+   * of the same name changes its values [k3s-helmchartconfig]. Absent when the distribution
+   * deploys the component as plain manifests, as k3s does with metrics-server.
+   *
+   * [k3s-helmchartconfig]: https://github.com/k3s-io/docs/blob/ecbbc13dce8d347cac529d6db585e5f647074edb/docs/add-ons/helm.md#customizing-packaged-components-with-helmchartconfig
+   * @nullable
+   */
+  packagedChart?: string | null
+  /**
    * Something of it other than its CRDs is on the cluster. A removal keeps the CRDs, so CRDs
    * alone are what is left of a component, not a component that works.
    */
