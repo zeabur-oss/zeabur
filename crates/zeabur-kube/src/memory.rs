@@ -1277,7 +1277,7 @@ impl Cluster for MemoryCluster {
                         format!("{} \"{}\" already exists", target.plural, target.name),
                     )));
                 }
-                (WriteBody::Create(body), None) => created(target, body)?,
+                (WriteBody::Create(body) | WriteBody::Apply(body), None) => created(target, body)?,
                 (WriteBody::EphemeralContainers(_), _)
                     if state.without_ephemeral_containers || target.kind != "Pod" =>
                 {
@@ -1300,7 +1300,7 @@ impl Cluster for MemoryCluster {
                 (WriteBody::MergePatch(_), Some(current)) if target.kind == "Secret" => {
                     current.clone()
                 }
-                (WriteBody::MergePatch(body), Some(current)) => {
+                (WriteBody::MergePatch(body) | WriteBody::Apply(body), Some(current)) => {
                     let mut object = current.clone();
                     merge(&mut object, body);
                     object

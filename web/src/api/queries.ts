@@ -293,6 +293,13 @@ export const capabilitiesQuery = queryOptions({
   retryOnMount: false,
 })
 
+/** The Zeabur Catalog release Zeabur reads its components from. */
+export const catalogQuery = queryOptions({
+  queryKey: ["cluster", "catalog"],
+  queryFn: async ({ signal }) => await zeabur.getCatalog({ signal }),
+  staleTime: 60_000,
+})
+
 export const configReloadQuery = queryOptions({
   queryKey: ["cluster", "config-reload"],
   queryFn: async ({ signal }) => await zeabur.getConfigReload({ signal }),

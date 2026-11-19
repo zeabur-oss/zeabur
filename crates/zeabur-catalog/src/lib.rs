@@ -9,6 +9,8 @@ use zeabur_kube::ClusterFacts;
 mod bundle {
     include!(concat!(env!("OUT_DIR"), "/bundle.rs"));
 }
+pub mod api;
+pub mod engine;
 pub mod install;
 pub mod installed;
 mod kube_version;
@@ -337,15 +339,16 @@ pub fn detect(components: &[Component], facts: &ClusterFacts) -> Vec<Capability>
                 components: Vec::new(),
                 installations: Vec::new(),
             });
-        let evidence = evidence(&component.detection, facts);
-        capability.existing |= !evidence.is_empty();
-        if !evidence.is_empty() {
-            capability.installations.push(installed::installation(
-                component,
-                facts,
-                distribution(facts),
-            ));
+        let running = running(&component.detection, facts);
+        let mut evidence = crds(&component.detection, facts);
+        if !evidence.is_empty() || !running.is_empty() {
+            capability.existing = true;
+            capability.installations.push(Installation {
+                running: !running.is_empty(),
+                ..installed::installation(component, facts, distribution(facts))
+            });
         }
+        evidence.extend(running);
         capability.evidence.extend(
             evidence
                 .into_iter()
@@ -362,12 +365,19 @@ pub fn detect(components: &[Component], facts: &ClusterFacts) -> Vec<Capability>
     capabilities
 }
 
-/// Everything in `facts` that matches `detection`.
-fn evidence(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
+/// The CRDs in `facts` that `detection` names.
+fn crds(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
+    detection
+        .crds
+        .iter()
+        .filter(|c| facts.crds.contains(*c))
+        .map(|crd| format!("CustomResourceDefinition {crd}"))
+        .collect()
+}
+
+/// Everything else in `facts` that matches `detection`: what goes away with the component.
+fn running(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
     let mut found = Vec::new();
-    for crd in detection.crds.iter().filter(|c| facts.crds.contains(*c)) {
-        found.push(format!("CustomResourceDefinition {crd}"));
-    }
     for service in detection
         .api_services
         .iter()
@@ -466,6 +476,11 @@ mod tests {
                 + d.addons.len()
                 + d.workloads.len();
             assert!(rules > 0, "{} has no detection rule", component.id);
+            assert!(
+                rules > d.crds.len(),
+                "{} is found only by CRDs, which outlive it",
+                component.id
+            );
         }
     }
 
@@ -622,13 +637,13 @@ mod tests {
             .helm_releases
             .insert("cert-manager/cert-manager".to_owned());
         assert_eq!(
-            evidence(&detection, &facts),
+            running(&detection, &facts),
             ["Helm release cert-manager/cert-manager"]
         );
         // A release named otherwise says nothing about its chart, which is never decoded.
         let mut renamed = ClusterFacts::default();
         renamed.helm_releases.insert("security/certs".to_owned());
-        assert_eq!(evidence(&detection, &renamed), Vec::<String>::new());
+        assert_eq!(running(&detection, &renamed), Vec::<String>::new());
     }
 
     #[test]
@@ -645,7 +660,7 @@ mod tests {
             helm_charts: vec!["cert-manager".to_owned()],
             ..Detection::default()
         };
-        assert_eq!(evidence(&detection, &facts), ["Helm chart cert-manager"]);
+        assert_eq!(running(&detection, &facts), ["Helm chart cert-manager"]);
         // A different chart that shares the prefix does not count.
         let mut other = ClusterFacts::default();
         other.workload_labels.push((
@@ -655,6 +670,6 @@ mod tests {
                 "cert-manager-webhook-1.0.0".to_owned(),
             )]),
         ));
-        assert_eq!(evidence(&detection, &other), Vec::<String>::new());
+        assert_eq!(running(&detection, &other), Vec::<String>::new());
     }
 }

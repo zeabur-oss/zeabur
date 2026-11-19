@@ -275,6 +275,119 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/catalog:
+    get:
+      tags:
+      - cluster
+      summary: >-
+        The catalog release Zeabur reads, when it was read, and why the last read
+        failed.
+      operationId: getCatalog
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/CatalogView"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/components/{id}/apply":
+    post:
+      tags:
+      - cluster
+      summary: |-
+        Writes the next step of the plan whose earlier steps are ready, dry run first, and answers as
+        `plan` does. `409` when Zeabur has read another catalog release than the plan's.
+      operationId: applyComponent
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComponentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComponentPlan"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/cluster/components/{id}/plan":
+    post:
+      tags:
+      - cluster
+      summary: |-
+        What installing or removing component `id` writes, and how far each step has come; writes
+        nothing. `403` unless the person may do everything everywhere; `503` while Zeabur has never
+        read the catalog; `409` when the component was installed by someone else, or another
+        component needs it; `422` when Zeabur cannot install it on this cluster.
+      operationId: planComponent
+      parameters:
+      - name: id
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ComponentRequest"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ComponentPlan"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/config-reload:
     get:
       tags:
@@ -5221,6 +5334,43 @@ components:
           items:
             $ref: "#/components/schemas/Capability"
           description: "Each capability, sorted by name: existing (with evidence) or not (with what to install)."
+    CatalogView:
+      type: object
+      description: The catalog release Zeabur reads.
+      required:
+      - url
+      properties:
+        cacheError:
+          type:
+          - string
+          - "null"
+          description: |-
+            Why the release read is kept in memory only, not in the ConfigMap `zeabur-catalog`, so
+            a restart reads the catalog again.
+        commit:
+          type:
+          - string
+          - "null"
+          description: The release's commit.
+        error:
+          type:
+          - string
+          - "null"
+          description: Why the last read failed.
+        fetchedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: When it was read.
+        url:
+          type: string
+          description: Where Zeabur reads it.
+        version:
+          type:
+          - string
+          - "null"
+          description: The release, `0.5.3`; absent when Zeabur has never read one.
     CertificateChange:
       type: object
       description: A [`Change::Certificate`].
@@ -6990,6 +7140,131 @@ components:
             type: string
           propertyNames:
             type: string
+    ComponentAction:
+      type: string
+      description: Install or remove.
+      enum:
+      - install
+      - remove
+    ComponentCheck:
+      type: object
+      description: One health check of the catalog, run once every step is ready.
+      required:
+      - component
+      - name
+      - state
+      - advice
+      - timeoutSeconds
+      properties:
+        advice:
+          type: string
+          description: What to do when it does not pass in time.
+        component:
+          type: string
+          description: The component.
+        name:
+          type: string
+          description: The check.
+        state:
+          $ref: "#/components/schemas/StepState"
+          description: How far it has come; `pending` until every step is ready.
+        timeoutSeconds:
+          type: integer
+          format: int64
+          description: How long it may take once every step is ready, in seconds.
+    ComponentPlan:
+      type: object
+      description: What installing or removing a component writes, and how far it has come.
+      required:
+      - action
+      - catalogVersion
+      - components
+      - steps
+      - checks
+      - warnings
+      - leftovers
+      - done
+      properties:
+        action:
+          $ref: "#/components/schemas/ComponentAction"
+          description: Install or remove.
+        catalogVersion:
+          type: string
+          description: The catalog release it is made from; send it to `apply`.
+        checks:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentCheck"
+          description: The health checks; none for a removal.
+        components:
+          type: array
+          items:
+            type: string
+          description: The components it installs, the ones needed first; the one it removes.
+        done:
+          type: boolean
+          description: Every step and check is ready.
+        leftovers:
+          type: array
+          items:
+            type: string
+          description: |-
+            What a removal leaves, as the catalog lists it (`customresourcedefinitions`,
+            `secrets/<name>`).
+        steps:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentStep"
+          description: The steps, in order.
+        warnings:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentWarning"
+          description: What to know.
+    ComponentRequest:
+      type: object
+      description: What to plan.
+      required:
+      - action
+      properties:
+        action:
+          $ref: "#/components/schemas/ComponentAction"
+          description: Install or remove.
+        catalogVersion:
+          type:
+          - string
+          - "null"
+          description: |-
+            For `apply`: the catalog release the plan was made from; `409` when Zeabur has read
+            another since.
+    ComponentStep:
+      type: object
+      description: "One step: a release's objects."
+      required:
+      - component
+      - release
+      - state
+      - writes
+      properties:
+        component:
+          type: string
+          description: The component.
+        message:
+          type:
+          - string
+          - "null"
+          description: Why it failed.
+        release:
+          type: string
+          description: The release.
+        state:
+          $ref: "#/components/schemas/StepState"
+          description: How far it has come.
+        writes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ObjectWrite"
+          description: What it writes or deletes.
     ComponentUpgrade:
       type: string
       description: The installed version against the tested one. An open set.
@@ -7000,6 +7275,43 @@ components:
       - behind-major
       - ahead
       - unknown
+    ComponentWarning:
+      oneOf:
+      - type: object
+        description: >-
+          The catalog's tests have not passed the component on this distribution and
+          platform.
+        required:
+        - component
+        - kind
+        properties:
+          component:
+            type: string
+            description: The component.
+          kind:
+            type: string
+            enum:
+            - untested
+      - type: object
+        description: >-
+          The component's namespaces allow pods more than the `restricted` Pod Security
+          level.
+        required:
+        - component
+        - level
+        - kind
+        properties:
+          component:
+            type: string
+            description: The component.
+          kind:
+            type: string
+            enum:
+            - privileged
+          level:
+            $ref: "#/components/schemas/PodSecurityLevel"
+            description: "`baseline` or `privileged`."
+      description: What to know before installing.
     ComposeRequest:
       type: object
       description: A Compose file to convert.
@@ -10173,6 +10485,7 @@ components:
       enum:
       - k3s
       - rke2
+      - zeabur
       - helm-chart
       - helm
       - other
@@ -10183,6 +10496,7 @@ components:
       - component
       - displayName
       - source
+      - running
       properties:
         component:
           type: string
@@ -10195,6 +10509,11 @@ components:
           - string
           - "null"
           description: "The tool that manages it and upgrades it (`k3s`, `RKE2`): never flagged for an upgrade."
+        running:
+          type: boolean
+          description: |-
+            Something of it other than its CRDs is on the cluster. A removal keeps the CRDs, so CRDs
+            alone are what is left of a component, not a component that works.
         source:
           $ref: "#/components/schemas/InstallSource"
           description: How it was installed.
@@ -12318,6 +12637,29 @@ components:
           - string
           - "null"
           description: The kind of its controlling owner, when it has one (`ReplicaSet` for a pod).
+    ObjectWrite:
+      type: object
+      description: One write of a step.
+      required:
+      - kind
+      - name
+      properties:
+        kind:
+          type: string
+          description: The object's kind.
+        name:
+          type: string
+          description: Its name.
+        namespace:
+          type:
+          - string
+          - "null"
+          description: Its namespace, for a namespaced object.
+        yaml:
+          type:
+          - string
+          - "null"
+          description: The object as it is written, YAML; absent for a deletion.
     Origin:
       type: object
       description: |-
@@ -16794,6 +17136,14 @@ components:
       - unknown
       - building
       - waitingUpload
+    StepState:
+      type: string
+      description: How far a step or check has come.
+      enum:
+      - pending
+      - waiting
+      - ready
+      - failed
     StorageClassView:
       type: object
       description: A `StorageClass`.

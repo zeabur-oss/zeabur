@@ -48,6 +48,8 @@ pub enum InstallSource {
     K3s,
     /// Packaged and upgraded by RKE2.
     Rke2,
+    /// A `HelmChart` Zeabur wrote, which Zeabur can remove.
+    Zeabur,
     /// A k3s `HelmChart` object installing from a chart repository.
     HelmChart,
     /// A Helm release (found by its workloads' `helm.sh/chart` label).
@@ -84,6 +86,9 @@ pub struct Installation {
     pub display_name: String,
     /// How it was installed.
     pub source: InstallSource,
+    /// Something of it other than its CRDs is on the cluster. A removal keeps the CRDs, so CRDs
+    /// alone are what is left of a component, not a component that works.
+    pub running: bool,
     /// The installed chart version, when it can be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
@@ -150,11 +155,25 @@ pub fn installation(
         component: component.id.clone(),
         display_name: component.display_name.clone(),
         source: InstallSource::Other,
+        running: false,
         version: None,
         managed_by: None,
         tested: component.tested_version.clone(),
         upgrade: None,
     };
+    if let Some(key) = crate::engine::written(facts)
+        .into_iter()
+        .find_map(|(key, id)| (id == component.id).then_some(key))
+    {
+        found.source = InstallSource::Zeabur;
+        found.version = facts.k3s_helm_chart_versions.get(&key).cloned();
+        found.upgrade = found
+            .version
+            .as_deref()
+            .zip(found.tested.as_deref())
+            .map(|(installed, tested)| compare(installed, tested));
+        return found;
+    }
     for name in component.detection.addons_on("rke2") {
         if let Some(url) = facts
             .rke2_packaged_charts
@@ -251,6 +270,33 @@ mod tests {
         let metrics = installation(&component("metrics-server"), &facts, Some("k3s"));
         assert_eq!(metrics.managed_by.as_deref(), Some("k3s"));
         assert_eq!(metrics.upgrade, None);
+    }
+
+    #[test]
+    fn a_chart_zeabur_wrote_is_zeaburs_whatever_else_detection_finds() {
+        let mut facts = ClusterFacts::default();
+        facts.crds.insert("certificates.cert-manager.io".to_owned());
+        let found = installation(&component("cert-manager"), &facts, Some("k3s"));
+        assert_eq!(found.source, InstallSource::Other);
+
+        let key = "kube-system/cert-manager".to_owned();
+        facts.k3s_helm_chart_labels.insert(
+            key.clone(),
+            [
+                (crate::engine::MANAGED_BY.to_owned(), "zeabur".to_owned()),
+                (
+                    crate::engine::COMPONENT.to_owned(),
+                    "cert-manager".to_owned(),
+                ),
+            ]
+            .into(),
+        );
+        facts
+            .k3s_helm_chart_versions
+            .insert(key, "v1.21.3".to_owned());
+        let found = installation(&component("cert-manager"), &facts, Some("k3s"));
+        assert_eq!(found.source, InstallSource::Zeabur);
+        assert_eq!(found.version.as_deref(), Some("v1.21.3"));
     }
 
     #[test]

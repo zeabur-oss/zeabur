@@ -13,6 +13,7 @@ mod cluster_tools;
 #[cfg(test)]
 #[path = "../common/mod.rs"]
 mod common;
+mod components;
 mod creations;
 mod databases;
 mod deploy_from_git;

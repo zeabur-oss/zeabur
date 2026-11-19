@@ -1,0 +1,632 @@
+{
+  "id": "cloudnative-pg",
+  "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+  "declaration": {
+    "apiVersion": "catalog.zeabur.com/v1",
+    "defaults": {
+      "multi-node": "optional",
+      "single-node": "optional"
+    },
+    "detection": {
+      "crds": [
+        "clusters.postgresql.cnpg.io",
+        "objectstores.barmancloud.cnpg.io"
+      ],
+      "helmCharts": [
+        "cloudnative-pg",
+        "plugin-barman-cloud"
+      ],
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "labels": {
+            "app.kubernetes.io/name": "cloudnative-pg"
+          }
+        },
+        {
+          "kind": "Deployment",
+          "labels": {
+            "app.kubernetes.io/name": "plugin-barman-cloud"
+          }
+        }
+      ]
+    },
+    "distributions": [
+      "k3s",
+      "rke2",
+      "kubesolo"
+    ],
+    "kind": "Component",
+    "kubeVersion": "\u003e=1.29.0-0",
+    "leftovers": [
+      "customresourcedefinitions",
+      "persistentvolumeclaims"
+    ],
+    "metadata": {
+      "homepage": "https://cloudnative-pg.io",
+      "license": "Apache-2.0",
+      "locales": {
+        "zh-CN": {
+          "summary": "运行 PostgreSQL 数据库，支持故障切换和备份到 S3。"
+        },
+        "zh-TW": {
+          "summary": "執行 PostgreSQL 資料庫，支援故障切換和備份到 S3。"
+        }
+      },
+      "name": "CloudNativePG",
+      "summary": "Runs PostgreSQL databases with failover and backups to S3."
+    },
+    "persistsData": true,
+    "provides": {
+      "capability": "databases"
+    },
+    "releases": [
+      {
+        "chart": "cloudnative-pg",
+        "chartDigest": "sha256:b53d3991fe84bcf38767e7702cae78666265427a127a26fff168ab4207d2b1df",
+        "name": "cloudnative-pg",
+        "namespace": "cnpg-system",
+        "profiles": {
+          "multi-node": "# Leader election keeps one active; the webhook stays up during drains.\nreplicaCount: 2\nresources:\n  # Single-node's request; the leader uses about 45Mi on a two-node\n  # cluster with apps. The limit leaves room for more Clusters.\n  requests: {cpu: 10m, memory: 56Mi}\n  limits: {memory: 512Mi}\n",
+          "single-node": "resources:\n  # Idles near 40Mi; grows with Clusters. Chart sets none.\n  requests: {cpu: 10m, memory: 56Mi}\n  limits: {memory: 256Mi}\n"
+        },
+        "releaseName": "cnpg",
+        "repo": "https://cloudnative-pg.github.io/charts",
+        "type": "helm",
+        "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: ghcr.io/cloudnative-pg/cloudnative-pg\n  tag: 1.30.1@sha256:923c267ec29636db3bee20f993d0ec4973fa22998e1adad37da79e4d32b5bc07\nconfig:\n  # Reconcile Clusters in every namespace.\n  clusterWide: true\nmonitoring:\n  # No Prometheus operator assumed; metrics stay on the pod port.\n  podMonitorEnabled: false\n  grafanaDashboard:\n    create: false\n",
+        "version": "0.29.1"
+      },
+      {
+        "chart": "plugin-barman-cloud",
+        "chartDigest": "sha256:9ad0b9e56da2777a1a0269feaf7215e18297e9c8b5730e04acb27b5d462e9456",
+        "name": "plugin-barman-cloud",
+        "namespace": "cnpg-system",
+        "profiles": {
+          "multi-node": "resources:\n  # Uses about 30Mi on a two-node cluster with apps; the limit leaves\n  # room for more Clusters.\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 256Mi}\n",
+          "single-node": "resources:\n  # Idles near 18Mi, about 30Mi on a cluster with apps; backups run in\n  # the instance sidecar, not here.\n  requests: {cpu: 10m, memory: 32Mi}\n  limits: {memory: 128Mi}\n"
+        },
+        "repo": "https://cloudnative-pg.github.io/charts",
+        "type": "helm",
+        "values": "# Pinned by digest; a tag alone can move. The chart joins registry and\n# repository. registry comes second, so Renovate reads both.\nimage:\n  repository: cloudnative-pg/plugin-barman-cloud\n  registry: ghcr.io\n  tag: v0.15.1@sha256:c75acad19a36e8176cfe2885761ff1b836c6ef977d7257e298c99a28b5c302ef\ncertificate:\n  # Self-signed issuer for the operator-plugin mTLS, made by the chart.\n  createIssuer: true\n",
+        "version": "0.8.1"
+      }
+    ],
+    "requires": [
+      {
+        "capability": "certificates"
+      }
+    ],
+    "security": {
+      "podSecurity": "restricted",
+      "summary": "Manages pods, Services, Secrets and PVCs for Clusters in every namespace."
+    },
+    "smoke": [
+      {
+        "manifest": "apiVersion: postgresql.cnpg.io/v1\nkind: Cluster\nmetadata: {name: smoke, namespace: catalog-smoke}\nspec:\n  instances: 1\n  storage: {size: 1Gi}\n",
+        "name": "one-instance-cluster",
+        "timeout": "600s",
+        "wait": [
+          "-n catalog-smoke cluster/smoke --for=condition=Ready"
+        ]
+      },
+      {
+        "manifest": "apiVersion: barmancloud.cnpg.io/v1\nkind: ObjectStore\nmetadata: {name: smoke, namespace: catalog-smoke}\nspec:\n  retentionPolicy: 7d\n  configuration:\n    destinationPath: s3://smoke/\n    endpointURL: http://s3.invalid:9000\n    s3Credentials:\n      accessKeyId: {name: smoke-s3, key: ACCESS_KEY_ID}\n      secretAccessKey: {name: smoke-s3, key: ACCESS_SECRET_KEY}\n",
+        "name": "object-store",
+        "wait": [
+          "-n cnpg-system deployment/plugin-barman-cloud --for=condition=Available"
+        ]
+      }
+    ]
+  },
+  "render": {
+    "kubernetesVersion": "1.37.0",
+    "profiles": {
+      "multi-node": {
+        "workloads": [
+          {
+            "release": "cloudnative-pg",
+            "namespace": "cnpg-system",
+            "name": "cnpg-cloudnative-pg",
+            "kind": "Deployment",
+            "replicas": 2,
+            "containers": [
+              {
+                "name": "manager",
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "56Mi"
+                },
+                "limits": {
+                  "memory": "512Mi"
+                }
+              }
+            ]
+          },
+          {
+            "release": "plugin-barman-cloud",
+            "namespace": "cnpg-system",
+            "name": "plugin-barman-cloud",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "barman-cloud",
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "32Mi"
+                },
+                "limits": {
+                  "memory": "256Mi"
+                }
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      },
+      "single-node": {
+        "workloads": [
+          {
+            "release": "cloudnative-pg",
+            "namespace": "cnpg-system",
+            "name": "cnpg-cloudnative-pg",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "manager",
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "56Mi"
+                },
+                "limits": {
+                  "memory": "256Mi"
+                }
+              }
+            ]
+          },
+          {
+            "release": "plugin-barman-cloud",
+            "namespace": "cnpg-system",
+            "name": "plugin-barman-cloud",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "barman-cloud",
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "32Mi"
+                },
+                "limits": {
+                  "memory": "128Mi"
+                }
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      }
+    }
+  },
+  "measurements": [
+    {
+      "distribution": "k3s",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+k3s1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "21Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "12Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "k3s",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+k3s1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "20Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "11Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "measuredAt": "2026-11-13"
+    },
+    {
+      "distribution": "kind",
+      "profile": "multi-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "20Mi",
+          "cpu": "3m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "11Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "multi-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "21Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "11Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "20Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "11Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "21Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "11Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kubesolo",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.36.6",
+      "distributionVersion": "v1.3.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "20Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "11Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kubesolo",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.36.6",
+      "distributionVersion": "v1.3.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "20Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "11Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "24Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "11Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "cnpg-cloudnative-pg",
+          "kind": "Deployment",
+          "memory": "25Mi",
+          "cpu": "2m"
+        },
+        {
+          "workload": "plugin-barman-cloud",
+          "kind": "Deployment",
+          "memory": "12Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "cloudnative-pg",
+          "version": "0.29.1"
+        },
+        {
+          "release": "plugin-barman-cloud",
+          "version": "0.8.1"
+        }
+      ],
+      "sourceDigest": "h1:sfHDjsosLaiS7MassT/Z6A/IareJUQk+yPcGhX2Yyis=",
+      "dependencies": {
+        "cert-manager": "h1:w94jTQBx7HiT9H6Ej7rgk61WgdTJLM+URsT9tn59m4I=",
+        "traefik": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk="
+      },
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-12"
+    }
+  ]
+}

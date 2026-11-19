@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
-import { useState } from "react"
+import { lazy, Suspense, useState } from "react"
 import ArchiveIcon from "~icons/ph/archive"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import ArrowsClockwiseIcon from "~icons/ph/arrows-clockwise"
@@ -17,32 +17,39 @@ import HardDrivesIcon from "~icons/ph/hard-drives"
 import HeartbeatIcon from "~icons/ph/heartbeat"
 import LightningIcon from "~icons/ph/lightning"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
-import MinusCircleIcon from "~icons/ph/minus-circle"
 import PackageIcon from "~icons/ph/package"
 import PulseIcon from "~icons/ph/pulse"
 import ShieldCheckIcon from "~icons/ph/shield-check"
 import SignpostIcon from "~icons/ph/signpost"
+import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { isStatus, type Schemas } from "@/api/client"
-import { capabilitiesQuery, clusterIncidentsQuery } from "@/api/queries"
+import { capabilitiesQuery, catalogQuery, clusterIncidentsQuery } from "@/api/queries"
 import { useCapabilityLabel } from "@/components/capabilities"
 import { Segmented } from "@/components/bits"
-import { LazyInstallerSheet } from "@/components/lazy-installer-sheet"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
-import { buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { Skeleton } from "@zeabur-oss/design-system/components/skeleton"
+import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { type Locale, useI18n, useT } from "@/i18n"
 import type { Icon } from "@/lib/icon"
+import { formatAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
 import { componentsRole, Forbidden } from "@/routes/cluster/forbidden"
 import { ClusterFrame } from "@/routes/cluster/frame"
 import { Section } from "@/routes/cluster/section"
 
 const route = getRouteApi("/cluster/components")
+
+const ComponentPlan = lazy(() =>
+  import("@/components/component-plan").then((m) => ({
+    default: m.ComponentPlan,
+  })),
+)
 
 const categories: {
   key: "traffic" | "observability" | "scaling" | "security" | "data" | "operations"
@@ -58,7 +65,10 @@ const categories: {
     key: "security",
     names: ["intrusion-prevention", "runtime-security", "vulnerability-scanning"],
   },
-  { key: "data", names: ["databases", "postgres", "object-storage", "replicated-storage"] },
+  {
+    key: "data",
+    names: ["databases", "postgres", "object-storage", "replicated-storage"],
+  },
   {
     key: "operations",
     names: ["node-updates", "volume-backup", "builds", "image-updates"],
@@ -133,20 +143,21 @@ export function ComponentsPage() {
     .map((g) => ({ key: g.key, items: g.items.filter(keep) }))
     .filter((g) => g.items.length > 0)
 
-  const open = search.component
-  const opened = open ? list.flatMap((c) => c.components).find((x) => x.id === open) : undefined
-
   return (
     <ClusterFrame tab="components">
-      {open ? (
-        <LazyInstallerSheet
-          components={[{ id: open, name: opened?.displayName ?? open }]}
-          remove={list.some((c) => opened !== undefined && isInstalled(c, opened))}
+      {search.component && capabilities.data ? (
+        <OpenedPlan
+          key={search.component}
+          id={search.component}
+          list={list}
           onClose={() =>
-            void navigate({ search: (previous) => ({ ...previous, component: undefined }) })
+            void navigate({
+              search: (previous) => ({ ...previous, component: undefined }),
+            })
           }
         />
       ) : null}
+      <CatalogStatus />
       <InstalledSection />
 
       <section aria-labelledby="components-catalogue" className="flex flex-col gap-4">
@@ -204,7 +215,9 @@ export function ComponentsPage() {
                 {group.items.flatMap((capability) =>
                   capability.components
                     .filter(
-                      (component) => filter !== "installed" || isInstalled(capability, component),
+                      (component) =>
+                        filter !== "installed" ||
+                        installationOf(capability, component) !== undefined,
                     )
                     .map((component) => (
                       <li key={component.id} className="flex">
@@ -221,14 +234,23 @@ export function ComponentsPage() {
   )
 }
 
-/** This component itself, not another of its capability: metrics-server covers "metrics" without
- * VictoriaMetrics being installed. */
 /** What the component gives the cluster, in the catalogue's words for `locale`. */
 const summaryOf = (component: Schemas.Component, locale: Locale) =>
   component.summary[locale] ?? component.summary.en
 
-const isInstalled = (capability: Schemas.Capability, component: Schemas.Component) =>
-  capability.installations.some((i) => i.component === component.id)
+/** This component itself, not another of its capability: metrics-server covers "metrics" without
+ * VictoriaMetrics being installed. */
+const installationOf = (capability: Schemas.Capability, component: Schemas.Component) =>
+  capability.installations.find((i) => i.component === component.id)
+
+/** Install when nothing is installed, manage what Zeabur may have installed; nothing for a
+ * component K3s, RKE2 or Helm manages. The dialog's plan decides between installing and removing. */
+const buttonOf = (installation: Schemas.Installation | undefined) =>
+  !installation
+    ? "install"
+    : installation.source === "zeabur" || installation.source === "other"
+      ? "manage"
+      : undefined
 
 /** What a component incident names, as the catalogue's capability or a component id. */
 const incidentComponents: Record<string, string> = {
@@ -249,6 +271,73 @@ function useDown() {
   return (capability: string, component: string) => down.has(capability) || down.has(component)
 }
 
+/** The plan of the component in the address. */
+function OpenedPlan({
+  id,
+  list,
+  onClose,
+}: {
+  id: string
+  list: Schemas.Capability[]
+  onClose: () => void
+}) {
+  const opened = list.flatMap((c) => c.components).find((x) => x.id === id)
+  const installation = list.flatMap((c) => c.installations).find((i) => i.component === id)
+  return (
+    <Suspense fallback={null}>
+      <ComponentPlan
+        id={id}
+        name={opened?.displayName ?? id}
+        installed={buttonOf(installation) === "manage"}
+        onClose={onClose}
+      />
+    </Suspense>
+  )
+}
+
+/** Which Zeabur Catalog release the page shows, and why Zeabur could not read a newer one. */
+function CatalogStatus() {
+  const { t, locale } = useI18n()
+  const query = useQuery(catalogQuery)
+  const catalog = query.data
+  if (!catalog) return null
+  if (!catalog.version)
+    return (
+      <Alert variant="warn">
+        <AlertTitle>{t("components.catalogUnreachable")}</AlertTitle>
+        <AlertDescription>
+          <p>{t("components.catalogUnaffected")}</p>
+          <p className="font-mono break-all" translate="no">
+            {catalog.url}
+            {catalog.error ? `: ${catalog.error}` : ""}
+          </p>
+          <p>{t("components.catalogMirror")}</p>
+          <Button
+            variant="outline"
+            size="xs"
+            loading={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            {t("common.retry")}
+          </Button>
+        </AlertDescription>
+      </Alert>
+    )
+  return (
+    <p className="type-meta text-muted-foreground">
+      {t(
+        "components.catalog",
+        catalog.version,
+        catalog.fetchedAt ? formatAgo(catalog.fetchedAt, locale) : "",
+      )}
+      {catalog.error ? `${t("common.sep")}${t("components.catalogKept", catalog.error)}` : ""}
+      {catalog.cacheError
+        ? `${t("common.sep")}${t("components.catalogInMemory", catalog.cacheError)}`
+        : ""}
+    </p>
+  )
+}
+
 function ComponentCard({
   capability,
   component,
@@ -260,7 +349,8 @@ function ComponentCard({
   const capLabel = useCapabilityLabel()
   const CapIcon = icons[capability.name] ?? HardDrivesIcon
   const isDown = useDown()
-  const installed = isInstalled(capability, component)
+  const installation = installationOf(capability, component)
+  const installed = installation !== undefined
   const down = installed && isDown(capability.name, component.id)
   const state = down ? "down" : installed ? "installed" : (capability.suggestion ?? "optional")
   return (
@@ -292,23 +382,39 @@ function ComponentCard({
           <ArrowSquareOutIcon className="size-3" aria-hidden="true" />
           <span className="sr-only">{t("settings.opensInNewTab")}</span>
         </a>
-        <Link
-          from="/cluster/components"
-          search={(previous) => ({
-            ...previous,
-            component: component.id,
-          })}
-          className={cn(buttonVariants({ variant: "outline", size: "xs" }), "ml-auto")}
-        >
-          {installed ? (
-            <MinusCircleIcon aria-hidden="true" data-icon="inline-start" />
-          ) : (
-            <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
-          )}
-          {installed ? t("settings.removeCommand") : t("settings.installCommand")}
-        </Link>
+        <CardAction id={component.id} button={buttonOf(installation)} />
       </div>
     </article>
+  )
+}
+
+/** Opens the component's plan. */
+function CardAction({ id, button }: { id: string; button: "install" | "manage" | undefined }) {
+  const t = useT()
+  const catalog = useQuery(catalogQuery).data
+  const offline = catalog !== undefined && !catalog.version
+  if (!button) return null
+  return (
+    <Link
+      from="/cluster/components"
+      search={(previous) => ({
+        ...previous,
+        component: id,
+      })}
+      disabled={offline}
+      aria-disabled={offline}
+      className={cn(
+        buttonVariants({ variant: "outline", size: "xs" }),
+        "ml-auto aria-disabled:pointer-events-none aria-disabled:opacity-50",
+      )}
+    >
+      {button === "manage" ? (
+        <SlidersHorizontalIcon aria-hidden="true" data-icon="inline-start" />
+      ) : (
+        <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
+      )}
+      {button === "manage" ? t("components.manage") : t("settings.installCommand")}
+    </Link>
   )
 }
 
@@ -360,11 +466,6 @@ function UpgradeTag({ installation }: { installation: Schemas.Installation }) {
   const tested = installation.tested ?? ""
   switch (installation.upgrade) {
     case "behind-major":
-      return (
-        <StatusPill health="warn" size="sm">
-          {t("cluster.tested", tested)}
-        </StatusPill>
-      )
     case "behind-minor":
     case "behind-patch":
       return (
@@ -394,6 +495,7 @@ function UpgradeTag({ installation }: { installation: Schemas.Installation }) {
 const sourceKey = {
   k3s: "cluster.sourceK3s",
   rke2: "cluster.sourceRke2",
+  zeabur: "cluster.sourceZeabur",
   "helm-chart": "cluster.sourceHelmChart",
   helm: "cluster.sourceHelm",
   other: "cluster.sourceOther",

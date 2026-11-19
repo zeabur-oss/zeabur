@@ -1,0 +1,520 @@
+{
+  "id": "traefik",
+  "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+  "declaration": {
+    "apiVersion": "catalog.zeabur.com/v1",
+    "defaults": {
+      "multi-node": "recommended",
+      "single-node": "recommended"
+    },
+    "detection": {
+      "addons": [
+        {
+          "distribution": "k3s",
+          "name": "traefik"
+        },
+        {
+          "distribution": "rke2",
+          "name": "rke2-traefik"
+        }
+      ],
+      "crds": [
+        "ingressroutes.traefik.io",
+        "middlewares.traefik.io"
+      ],
+      "gatewayControllers": [
+        "traefik.io/gateway-controller"
+      ],
+      "helmCharts": [
+        "traefik"
+      ],
+      "ingressControllers": [
+        "traefik.io/ingress-controller"
+      ],
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "labels": {
+            "app.kubernetes.io/name": "traefik"
+          }
+        },
+        {
+          "kind": "DaemonSet",
+          "labels": {
+            "app.kubernetes.io/name": "traefik"
+          }
+        }
+      ]
+    },
+    "distributions": [
+      "k3s",
+      "rke2",
+      "kubesolo"
+    ],
+    "health": [
+      {
+        "advice": "No route is served until Traefik runs. Check its pods with kubectl -n traefik get pods.",
+        "condition": "Ready",
+        "name": "controller",
+        "resource": {
+          "kind": "Pod",
+          "namespace": "traefik",
+          "selector": {
+            "app.kubernetes.io/name": "traefik"
+          }
+        },
+        "timeout": "60s"
+      },
+      {
+        "advice": "Traefik hasn't accepted its GatewayClass. Read the reason with kubectl describe gatewayclass traefik.",
+        "condition": "Accepted",
+        "name": "gateway-class-accepted",
+        "resource": {
+          "kind": "GatewayClass",
+          "name": "traefik"
+        },
+        "timeout": "60s"
+      }
+    ],
+    "kind": "Component",
+    "kubeVersion": "\u003e=1.30.0-0",
+    "leftovers": [
+      "customresourcedefinitions"
+    ],
+    "metadata": {
+      "homepage": "https://traefik.io/traefik/",
+      "license": "MIT",
+      "locales": {
+        "zh-CN": {
+          "summary": "把域名的流量转发到你的服务。"
+        },
+        "zh-TW": {
+          "summary": "把網域的流量導向你的服務。"
+        }
+      },
+      "name": "Traefik Proxy",
+      "summary": "Routes traffic from your domains to your services."
+    },
+    "provides": {
+      "capability": "ingress"
+    },
+    "releases": [
+      {
+        "name": "gateway-api-crds",
+        "namespace": "kube-system",
+        "skipIfPresent": [
+          "httproutes.gateway.networking.k8s.io"
+        ],
+        "type": "manifest",
+        "urlDigests": [
+          "sha256:356c2b8e286a964dc20995435659ad1095386329974793af10bbfe3eff977fe5"
+        ],
+        "urls": [
+          "https://github.com/kubernetes-sigs/gateway-api/releases/download/{version}/standard-install.yaml"
+        ],
+        "version": "v1.6.3"
+      },
+      {
+        "chart": "oci://ghcr.io/traefik/helm/traefik",
+        "chartDigest": "sha256:49458ccd9673cd828ee0b091030f5747f5d95f205bbd0cf0b6c3bf757398cae1",
+        "name": "traefik",
+        "namespace": "traefik",
+        "profiles": {
+          "multi-node": "deployment:\n  # One pod per node, so every node keeps client addresses under the\n  # Local traffic policy; k3s ServiceLB source-NATs on nodes without one.\n  # From a Deployment, annotate it helm.sh/resource-policy=keep before the\n  # upgrade and delete it after, or ingress drops for a few seconds.\n  kind: DaemonSet\ntolerations:\n  # The taints k3s ServiceLB tolerates, so Traefik runs wherever it listens.\n  - key: node-role.kubernetes.io/control-plane\n    operator: Exists\n    effect: NoSchedule\n  - key: CriticalAddonsOnly\n    operator: Exists\nmetrics:\n  prometheus:\n    # Request rate and latency metrics.\n    service:\n      enabled: true\nresources:\n  # Headroom for higher request rates.\n  requests: {cpu: 100m, memory: 128Mi}\n  limits: {memory: 512Mi}\n",
+          "single-node": "deployment:\n  # A second copy gains nothing on one node.\n  replicas: 1\nresources:\n  # Idles near 40Mi; the limit contains leaks.\n  requests: {cpu: 50m, memory: 64Mi}\n  limits: {memory: 256Mi}\n"
+        },
+        "type": "helm",
+        "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: traefik\n  tag: v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2\nproviders:\n  kubernetesGateway:\n    # Route web services with HTTPRoute.\n    enabled: true\n  kubernetesIngress:\n    # Many charts still ship Ingress objects.\n    enabled: true\n  kubernetesCRD:\n    # Middleware objects, such as the CrowdSec bouncer.\n    enabled: true\n    # No references to other namespaces.\n    allowCrossNamespace: false\n    # Only the traefik namespace can set the default TLS store.\n    defaultTLSResourcesNamespace: traefik\ngatewayClass:\n  # Gateways reference GatewayClass \"traefik\".\n  enabled: true\n  name: traefik\ngateway:\n  # Gateways and listeners are created per domain, not by the chart.\n  enabled: false\napi:\n  # Unauthenticated surface; not needed.\n  dashboard: false\nservice:\n  spec:\n    # Skip source NAT so Traefik sees client addresses (CrowdSec, rate\n    # limits, logs); only nodes running Traefik serve traffic.\n    externalTrafficPolicy: Local\naccessLog:\n  # JSON access logs for metrics, log search and CrowdSec.\n  enabled: true\n  format: json\n  fields:\n    # Keep only the fields below; secrets live in headers and queries.\n    defaultMode: drop\n    names:\n      ClientHost: keep\n      RequestHost: keep\n      RequestMethod: keep\n      RequestPath: keep\n      RequestProtocol: keep\n      DownstreamStatus: keep\n      DownstreamContentSize: keep\n      RequestContentSize: keep\n      Duration: keep\n      RouterName: keep\n      StartUTC: keep\n    headers:\n      # Headers carry cookies and bearer tokens.\n      defaultMode: drop\n    queryParameters:\n      # Query strings carry OAuth codes and signed-URL secrets.\n      defaultMode: drop\n",
+        "version": "42.1.3"
+      }
+    ],
+    "security": {
+      "podSecurity": "restricted",
+      "summary": "Reads Services, Secrets and routes cluster-wide; writes route status."
+    }
+  },
+  "render": {
+    "kubernetesVersion": "1.37.0",
+    "profiles": {
+      "multi-node": {
+        "workloads": [
+          {
+            "release": "traefik",
+            "namespace": "traefik",
+            "name": "traefik",
+            "kind": "DaemonSet",
+            "containers": [
+              {
+                "name": "traefik",
+                "requests": {
+                  "cpu": "100m",
+                  "memory": "128Mi"
+                },
+                "limits": {
+                  "memory": "512Mi"
+                }
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      },
+      "single-node": {
+        "workloads": [
+          {
+            "release": "traefik",
+            "namespace": "traefik",
+            "name": "traefik",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "traefik",
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "64Mi"
+                },
+                "limits": {
+                  "memory": "256Mi"
+                }
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      }
+    }
+  },
+  "measurements": [
+    {
+      "distribution": "k3s",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+k3s1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "svclb-traefik-ec66927e",
+          "kind": "DaemonSet",
+          "memory": "1Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "23Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "k3s",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+k3s1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "svclb-traefik-73a7a7d5",
+          "kind": "DaemonSet",
+          "memory": "1Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "23Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "multi-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "DaemonSet",
+          "memory": "23Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "multi-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "DaemonSet",
+          "memory": "22Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "22Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "22Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kubesolo",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.36.6",
+      "distributionVersion": "v1.3.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "24Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kubesolo",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.36.6",
+      "distributionVersion": "v1.3.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "24Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "24Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "25Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-12"
+    }
+  ]
+}

@@ -157,13 +157,15 @@ Set `planKey.existingSecret` to `zeabur-plan-key`. To view all chart settings, r
 
 ## Install the components Zeabur needs
 
-Zeabur's components page only shows status; it doesn't install components. Use [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) to print a component's manifests, then apply them with `kubectl` or commit them to a GitOps repository:
+On K3s and RKE2, a cluster administrator installs components from **Cluster** → **Components**. See [Install from the page](../cluster/components.mdx#install-from-the-page). Zeabur downloads the list of components from Zeabur Catalog; for a cluster without internet access, see [Use a mirror](../cluster/components.mdx#use-a-mirror).
+
+On other clusters, or to keep components in a GitOps repository, use [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) to print a component's manifests, then apply them with `kubectl` or commit them:
 
 ```sh
 zeaburctl components export cert-manager --format flux > cert-manager.yaml
 ```
 
-For K3s or RKE2 clusters, use the default `helmchart` format so the built-in helm-controller handles installation. For other clusters, use `helm`, `flux`, or `argocd`.
+The default `helmchart` format is for the built-in helm-controller of K3s and RKE2. For other clusters, use `helm`, `flux`, or `argocd`.
 
 ## Remove the management interface
 

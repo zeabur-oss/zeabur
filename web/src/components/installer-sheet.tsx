@@ -11,18 +11,14 @@ import {
 import { useT } from "@/i18n"
 import type { Needed } from "@/model/installer"
 
-/** The `zeaburctl components export` command that prints the manifests of components to install,
- * or, to remove one, which tool removes it. */
+/** The `zeaburctl components export` command that prints the manifests of components to install. */
 export function InstallerSheet({
   components,
-  remove = false,
   reason,
   note,
   onClose,
 }: {
   components: Needed[]
-  /** Remove the one component instead. */
-  remove?: boolean
   /** What needs them, as a sentence. */
   reason?: string
   /** What else to do, which no component gives. */
@@ -38,9 +34,7 @@ export function InstallerSheet({
     <Dialog open onOpenChange={(open) => (open ? undefined : onClose())}>
       <DialogContent variant="panel">
         <div className="flex items-center gap-2 border-b px-6 py-3">
-          <DialogTitle className="min-w-0 flex-1">
-            {remove ? t("installer.removeTitle", names) : t("installer.installTitle", names)}
-          </DialogTitle>
+          <DialogTitle className="min-w-0 flex-1">{t("installer.installTitle", names)}</DialogTitle>
           <DialogClose
             render={
               <Button
@@ -56,20 +50,13 @@ export function InstallerSheet({
         </div>
         <div className="flex min-h-0 flex-1 flex-col gap-5 overflow-y-auto px-6 py-5">
           {reason ? <p className="text-pretty">{reason}</p> : null}
-          {remove ? null : (
-            <section className="flex flex-col gap-2">
-              <p className="text-pretty">{t("installer.export")}</p>
-              <Command
-                text={`zeaburctl components export ${components.map((c) => c.id).join(" ")}`}
-              />
-            </section>
-          )}
+          <section className="flex flex-col gap-2">
+            <p className="text-pretty">{t("installer.export")}</p>
+            <Command
+              text={`zeaburctl components export ${components.map((c) => c.id).join(" ")}`}
+            />
+          </section>
           {note ? <p className="type-meta text-pretty text-muted-foreground">{note}</p> : null}
-          {remove ? (
-            <p className="type-meta text-pretty text-muted-foreground">
-              {t("installer.elsewhere")}
-            </p>
-          ) : null}
         </div>
       </DialogContent>
     </Dialog>

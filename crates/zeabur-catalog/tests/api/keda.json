@@ -1,0 +1,609 @@
+{
+  "id": "keda",
+  "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+  "declaration": {
+    "apiVersion": "catalog.zeabur.com/v1",
+    "defaults": {
+      "multi-node": "recommended",
+      "single-node": "optional"
+    },
+    "detection": {
+      "apiServices": [
+        "v1beta1.external.metrics.k8s.io"
+      ],
+      "crds": [
+        "scaledobjects.keda.sh"
+      ],
+      "helmCharts": [
+        "keda"
+      ],
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "labels": {
+            "app.kubernetes.io/name": "keda-operator"
+          }
+        }
+      ]
+    },
+    "distributions": [
+      "k3s",
+      "rke2",
+      "kubesolo"
+    ],
+    "kind": "Component",
+    "kubeVersion": "\u003e=1.23.0-0",
+    "metadata": {
+      "homepage": "https://keda.sh",
+      "license": "Apache-2.0",
+      "locales": {
+        "zh-CN": {
+          "summary": "按队列、定时等事件调整服务的副本数，可缩到零。"
+        },
+        "zh-TW": {
+          "summary": "依佇列、排程等事件調整服務的副本數，可降到零。"
+        }
+      },
+      "name": "KEDA",
+      "summary": "Scales services on queues, schedules and other events, down to zero."
+    },
+    "provides": {
+      "capability": "event-autoscaling"
+    },
+    "releases": [
+      {
+        "chart": "keda",
+        "chartDigest": "sha256:a7da56bf41a33dad9d2fc82a6fdecee552fff947d80bf1e1dbcf4db0f9e26dee",
+        "name": "keda",
+        "namespace": "keda",
+        "profiles": {
+          "multi-node": "operator:\n  # Leader-elected standby survives node drains.\n  replicaCount: 2\nresources:\n  # Room for a few hundred ScaledObjects.\n  operator:\n    requests: {cpu: 50m, memory: 128Mi}\n    limits: {memory: 512Mi}\n  metricServer:\n    requests: {cpu: 50m, memory: 96Mi}\n    limits: {memory: 512Mi}\n  webhooks:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n",
+          "single-node": "resources:\n  # Chart defaults (100Mi/1000Mi) far exceed idle use.\n  operator:\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n  metricServer:\n    requests: {cpu: 20m, memory: 48Mi}\n    limits: {memory: 256Mi}\n  webhooks:\n    requests: {cpu: 10m, memory: 32Mi}\n    limits: {memory: 128Mi}\n"
+        },
+        "repo": "https://kedacore.github.io/charts",
+        "type": "helm",
+        "values": "# Pinned by digest; a tag alone can move. An empty registry lets\n# repository hold the full name, which Renovate looks up.\nimage:\n  keda:\n    registry: \"\"\n    repository: ghcr.io/kedacore/keda\n    tag: 2.21.0@sha256:81fe6547ce8d1cc29273f887b76507e9b853e5bc1f875ec23fe60061a38ed809\n  metricsApiServer:\n    registry: \"\"\n    repository: ghcr.io/kedacore/keda-metrics-apiserver\n    tag: 2.21.0@sha256:255375037fe592732eeb554743aae360c2da88cf0b9b1258d0a987ef885f0881\n  webhooks:\n    registry: \"\"\n    repository: ghcr.io/kedacore/keda-admission-webhooks\n    tag: 2.21.0@sha256:e1969628cca6123e32eea13c47c75817091af2657fa68d9d0d58a8620d1b75b1\n",
+        "version": "2.21.0"
+      }
+    ],
+    "security": {
+      "podSecurity": "restricted",
+      "summary": "Reads scale targets and trigger secrets cluster-wide; serves the external metrics API."
+    }
+  },
+  "render": {
+    "kubernetesVersion": "1.37.0",
+    "profiles": {
+      "multi-node": {
+        "workloads": [
+          {
+            "release": "keda",
+            "namespace": "keda",
+            "name": "keda-operator",
+            "kind": "Deployment",
+            "replicas": 2,
+            "containers": [
+              {
+                "name": "keda-operator",
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "128Mi"
+                },
+                "limits": {
+                  "cpu": "1",
+                  "memory": "512Mi"
+                }
+              }
+            ]
+          },
+          {
+            "release": "keda",
+            "namespace": "keda",
+            "name": "keda-operator-metrics-apiserver",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "keda-operator-metrics-apiserver",
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "96Mi"
+                },
+                "limits": {
+                  "cpu": "1",
+                  "memory": "512Mi"
+                }
+              }
+            ]
+          },
+          {
+            "release": "keda",
+            "namespace": "keda",
+            "name": "keda-admission-webhooks",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "keda-admission-webhooks",
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "48Mi"
+                },
+                "limits": {
+                  "cpu": "1",
+                  "memory": "256Mi"
+                }
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      },
+      "single-node": {
+        "workloads": [
+          {
+            "release": "keda",
+            "namespace": "keda",
+            "name": "keda-operator",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "keda-operator",
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "64Mi"
+                },
+                "limits": {
+                  "cpu": "1",
+                  "memory": "256Mi"
+                }
+              }
+            ]
+          },
+          {
+            "release": "keda",
+            "namespace": "keda",
+            "name": "keda-operator-metrics-apiserver",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "keda-operator-metrics-apiserver",
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "48Mi"
+                },
+                "limits": {
+                  "cpu": "1",
+                  "memory": "256Mi"
+                }
+              }
+            ]
+          },
+          {
+            "release": "keda",
+            "namespace": "keda",
+            "name": "keda-admission-webhooks",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "keda-admission-webhooks",
+                "requests": {
+                  "cpu": "10m",
+                  "memory": "32Mi"
+                },
+                "limits": {
+                  "cpu": "1",
+                  "memory": "128Mi"
+                }
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      }
+    }
+  },
+  "measurements": [
+    {
+      "distribution": "k3s",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+k3s1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "10Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "31Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "2m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "k3s",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+k3s1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "9Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "2m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "multi-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "9Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "32Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "28Mi",
+          "cpu": "2m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "multi-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "9Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "33Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "3m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "9Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "29Mi",
+          "cpu": "3m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "9Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "2m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kubesolo",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.36.6",
+      "distributionVersion": "v1.3.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "9Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "31Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "3m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kubesolo",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.36.6",
+      "distributionVersion": "v1.3.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "9Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "31Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "2m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "9Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "2m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "keda-admission-webhooks",
+          "kind": "Deployment",
+          "memory": "10Mi",
+          "cpu": "0"
+        },
+        {
+          "workload": "keda-operator",
+          "kind": "Deployment",
+          "memory": "31Mi",
+          "cpu": "1m"
+        },
+        {
+          "workload": "keda-operator-metrics-apiserver",
+          "kind": "Deployment",
+          "memory": "30Mi",
+          "cpu": "3m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "keda",
+          "version": "2.21.0"
+        }
+      ],
+      "sourceDigest": "h1:kUWDM7dkML7U76e8EbPQHoeFO0Ht2IB9zNgKv0qeuXI=",
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-12"
+    }
+  ]
+}

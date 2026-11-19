@@ -135,14 +135,13 @@ pub(crate) struct Args {
     /// (docs/reference/telemetry.mdx). `true` or `false`. `DO_NOT_TRACK` turns it off.
     #[arg(long, env = "ZEABUR_UPDATE_CHECK", default_value_t = true, action = clap::ArgAction::Set)]
     pub(crate) update_check: bool,
+    /// Where Zeabur reads Zeabur Catalog's API: an `https://` URL, such as a mirror.
+    #[arg(long, env = "ZEABUR_CATALOG_URL", default_value = zeabur_api::CATALOG_URL)]
+    pub(crate) catalog_url: String,
     /// Fetch newer templates from Zeabur Catalog (docs/reference/telemetry.mdx). `true` or
     /// `false`. `DO_NOT_TRACK` does not turn it off.
     #[arg(long, env = "ZEABUR_TEMPLATE_FETCH", default_value_t = true, action = clap::ArgAction::Set)]
     pub(crate) template_fetch: bool,
-    /// Where to fetch templates from: a copy of `https://oss-catalog.zeabur.com/v1/`, such as a
-    /// mirror. Empty: that address.
-    #[arg(long, env = "ZEABUR_TEMPLATE_FETCH_URL", default_value = "")]
-    pub(crate) template_fetch_url: String,
     /// Zeabur's own Deployment in `--namespace`, read as the person to tell how Zeabur was
     /// installed. Empty: not known.
     #[arg(long, env = "ZEABUR_DEPLOYMENT", default_value = "")]
@@ -221,21 +220,12 @@ impl Args {
         }
         (settings.domains, settings.builds) = (domains(self)?, builds(self)?);
         settings.trusted_ca = self.trusted_ca(&settings.builds)?;
-        let authority = public_url.authority();
-        settings.public_host = Some(
-            authority
-                .strip_prefix('[')
-                .and_then(|rest| rest.split_once(']'))
-                .map_or_else(
-                    || authority.split(':').next().unwrap_or(authority),
-                    |(host, _)| host,
-                )
-                .to_owned(),
-        );
+        settings.public_host = Some(host(public_url.authority()).to_owned());
         settings.identity.issuer = Some(issuer.to_string());
         settings.identity.project_roles = self.member_roles;
         settings.update_check = self.update_check && !zeabur_telemetry::do_not_track();
-        settings.template_fetch = template_fetch(self)?;
+        settings.catalog_url = catalog_url(&self.catalog_url)?;
+        settings.template_fetch = self.template_fetch;
         if !self.deployment.is_empty() {
             settings.deployment = Some(self.deployment.clone());
         }
@@ -315,27 +305,6 @@ fn domains(args: &Args) -> Result<zeabur_api::settings::DomainSettings, String> 
         domains.cluster_issuer = Some(issuer.to_owned());
     }
     Ok(domains)
-}
-
-/// Where templates are fetched from, ending in `/`; `None` when fetching is off.
-fn template_fetch(args: &Args) -> Result<Option<String>, String> {
-    if !args.template_fetch {
-        return Ok(None);
-    }
-    let url = args.template_fetch_url.trim();
-    if url.is_empty() {
-        return Ok(Some(zeabur_api::settings::TEMPLATE_FETCH_URL.to_owned()));
-    }
-    if !url.starts_with("https://") {
-        return Err(format!(
-            "--template-fetch-url: {url:?} is not an https:// URL"
-        ));
-    }
-    if url.ends_with('/') {
-        Ok(Some(url.to_owned()))
-    } else {
-        Ok(Some(format!("{url}/")))
-    }
 }
 
 /// Where services deployed from Git keep their images, from `args`.
@@ -464,6 +433,30 @@ fn plan_key(bytes: &[u8]) -> Option<PlanKey> {
         *byte = u8::from_str_radix(pair, 16).ok()?;
     }
     Some(PlanKey::from_bytes(key))
+}
+
+/// `--catalog-url` as Zeabur reads it: `https://`, ending in `/`.
+/// The host of an authority: without its port, and an IPv6 address without brackets.
+fn host(authority: &str) -> &str {
+    authority
+        .strip_prefix('[')
+        .and_then(|rest| rest.split_once(']'))
+        .map_or_else(
+            || authority.split(':').next().unwrap_or(authority),
+            |(host, _)| host,
+        )
+}
+
+fn catalog_url(text: &str) -> Result<String, String> {
+    let url: axum::http::Uri = text.parse().map_err(|e| format!("--catalog-url: {e}"))?;
+    if url.scheme_str() != Some("https") || url.host().is_none() {
+        return Err("--catalog-url: must be an https:// URL".to_owned());
+    }
+    Ok(if text.ends_with('/') {
+        text.to_owned()
+    } else {
+        format!("{text}/")
+    })
 }
 
 #[cfg(test)]
@@ -601,22 +594,18 @@ mod tests {
     }
 
     #[test]
-    fn templates_are_fetched_over_https_only_and_can_be_turned_off() {
-        let files = Files::new("template-fetch");
+    fn the_catalog_is_read_over_https_only_and_template_updates_can_be_turned_off() {
+        let files = Files::new("catalog-url");
         let config = args(&files, &["--template-fetch", "false"]).unwrap();
-        assert_eq!(config.settings.template_fetch, None);
-        let config = args(
-            &files,
-            &["--template-fetch-url", "https://catalog.mirror.svc/v1"],
-        )
-        .unwrap();
+        assert!(!config.settings.template_fetch);
+        let config = args(&files, &["--catalog-url", "https://catalog.mirror.svc/v1"]).unwrap();
         assert_eq!(
-            config.settings.template_fetch.as_deref(),
-            Some("https://catalog.mirror.svc/v1/")
+            config.settings.catalog_url,
+            "https://catalog.mirror.svc/v1/"
         );
         for url in ["catalog.example.com", "http://catalog.mirror.svc/v1/"] {
-            let error = args(&files, &["--template-fetch-url", url]).unwrap_err();
-            assert!(error.starts_with("--template-fetch-url:"), "{error}");
+            let error = args(&files, &["--catalog-url", url]).unwrap_err();
+            assert!(error.starts_with("--catalog-url:"), "{error}");
         }
     }
 
@@ -633,7 +622,7 @@ mod tests {
                     ..zeabur_api::settings::IdentitySettings::default()
                 },
                 update_check: !zeabur_telemetry::do_not_track(),
-                template_fetch: Some(zeabur_api::settings::TEMPLATE_FETCH_URL.to_owned()),
+                template_fetch: true,
                 ..zeabur_api::Settings::default()
             }
         );

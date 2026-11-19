@@ -741,6 +741,7 @@ impl Cluster for UserClient {
             let mut charts = Vec::new();
             take(k3s_charts?, &mut charts, &mut facts.unreadable);
             facts.k3s_helm_chart_versions = chart_versions(&charts);
+            facts.k3s_helm_chart_labels = chart_labels(&charts);
             facts.rke2_packaged_charts = rke2_packaged(&charts);
             facts.k3s_helm_charts = charts
                 .into_iter()
@@ -956,6 +957,21 @@ fn rke2_packaged(charts: &[DynamicObject]) -> BTreeMap<String, String> {
                     .cloned()
                     .unwrap_or_default(),
             ))
+        })
+        .collect()
+}
+
+/// The labels of each `HelmChart`, by `namespace/name`.
+fn chart_labels(charts: &[DynamicObject]) -> BTreeMap<String, BTreeMap<String, String>> {
+    charts
+        .iter()
+        .map(|c| {
+            let key = format!(
+                "{}/{}",
+                c.metadata.namespace.as_deref().unwrap_or_default(),
+                c.metadata.name.as_deref().unwrap_or_default()
+            );
+            (key, c.metadata.labels.clone().unwrap_or_default())
         })
         .collect()
 }

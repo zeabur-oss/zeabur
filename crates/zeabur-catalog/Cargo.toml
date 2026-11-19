@@ -11,6 +11,7 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+flate2.workspace = true
 zeabur-kube.workspace = true
 zeabur-model.workspace = true
 # A template's revision, Zeabur Catalog's `sourceDigest` (`templates::source_digest`).

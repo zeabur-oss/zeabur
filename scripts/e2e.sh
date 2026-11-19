@@ -51,7 +51,7 @@ restarted=$(kubectl -n "$project" get deployment/talker \
 [[ -n "$restarted" ]] || { echo "error: deployment/talker was not restarted" >&2; exit 1; }
 
 # --- Zeabur's and Zeabur Proxy's own rights: none beyond what any service account has, except -----
-# --- Zeabur's pods in the terminal namespace --------------------------------------------------------
+# --- Zeabur's pods in the terminal namespace and its catalog ConfigMap -----------------------------
 # kubectl adds no groups to --as; these are the ones a service account's token carries. A name
 # no object has stands for a fresh service account, to which only the cluster's defaults apply.
 groups=(--as-group=system:serviceaccounts "--as-group=system:serviceaccounts:$namespace"
@@ -65,7 +65,9 @@ for account in zeabur zeabur-proxy; do
     exit 1
   fi
   for scope in "$namespace" default "$project" kube-system; do
-    if ! diff <(kubectl auth can-i --list -n "$scope" "${as_account[@]}") \
+    # deploy/chart/zeabur/templates/catalog.yaml
+    if ! diff <(kubectl auth can-i --list -n "$scope" "${as_account[@]}" |
+      grep -vE '^configmaps +\[\] +\[zeabur-catalog\] +\[get patch\]') \
       <(kubectl auth can-i --list -n "$scope" "${as_fresh[@]}"); then
       echo "error: service account $account has rights a fresh one lacks (namespace $scope)" >&2
       exit 1
