@@ -15,12 +15,8 @@
 //!
 //! [k8s-pss]: https://kubernetes.io/docs/concepts/security/pod-security-standards/
 
-use k8s_openapi::api::core::v1::{
-    Capabilities, PodSecurityContext, PodSpec, SeccompProfile, SecurityContext,
-};
-use serde::Serialize;
-use serde::de::DeserializeOwned;
-use serde_json::{Value, json};
+use k8s_openapi::api::core::v1::PodSpec;
+use serde_json::{Map, Value, json};
 use zeabur_graph::fields::Step;
 use zeabur_graph::pod_security;
 use zeabur_model::{PodSecurityLevel, WorkloadKind, WorkloadRef};
@@ -40,80 +36,75 @@ struct Edit {
     after: Option<Value>,
 }
 
-/// `before` edited by `change`, or `before` itself when it is not a valid `T` or `change` leaves
-/// it as it is. An empty result is `None`.
-fn merged<T>(before: Option<&Value>, change: impl FnOnce(&mut T)) -> Option<Value>
-where
-    T: Default + PartialEq + Clone + Serialize + DeserializeOwned,
-{
-    let current: T = match before {
-        Some(value) => match serde_json::from_value(value.clone()) {
-            Ok(current) => current,
-            Err(_) => return before.cloned(),
-        },
-        None => T::default(),
-    };
-    let mut edited = current.clone();
-    change(&mut edited);
-    if edited == current {
-        return before.cloned();
-    }
-    (edited != T::default())
-        .then(|| serde_json::to_value(&edited).ok())
-        .flatten()
+fn object(value: Option<&Value>) -> Map<String, Value> {
+    value
+        .and_then(Value::as_object)
+        .cloned()
+        .unwrap_or_default()
 }
 
-const fn seccomp_type(profile: Option<&SeccompProfile>) -> Option<&str> {
-    match profile {
-        Some(p) => Some(p.type_.as_str()),
-        None => None,
-    }
+fn non_empty(map: Map<String, Value>) -> Option<Value> {
+    (!map.is_empty()).then_some(Value::Object(map))
+}
+
+fn seccomp(map: &Map<String, Value>) -> Option<&str> {
+    map.get("seccompProfile")
+        .and_then(|p| p.get("type"))
+        .and_then(Value::as_str)
 }
 
 fn pod_context(before: Option<&Value>, profile: PodSecurityLevel) -> Option<Value> {
-    merged(before, |context: &mut PodSecurityContext| {
-        if profile == PodSecurityLevel::Restricted {
-            context.run_as_non_root = Some(true);
-            if !matches!(
-                seccomp_type(context.seccomp_profile.as_ref()),
-                Some("RuntimeDefault" | "Localhost")
-            ) {
-                context.seccomp_profile = Some(SeccompProfile {
-                    type_: "RuntimeDefault".to_owned(),
-                    localhost_profile: None,
-                });
-            }
-        } else if context.run_as_non_root == Some(true) {
-            context.run_as_non_root = None;
+    let mut map = object(before);
+    if profile == PodSecurityLevel::Restricted {
+        map.insert("runAsNonRoot".to_owned(), json!(true));
+        if !matches!(seccomp(&map), Some("RuntimeDefault" | "Localhost")) {
+            map.insert(
+                "seccompProfile".to_owned(),
+                json!({"type": "RuntimeDefault"}),
+            );
         }
-    })
+    } else if map.get("runAsNonRoot") == Some(&json!(true)) {
+        map.remove("runAsNonRoot");
+    }
+    non_empty(map)
 }
 
 fn container_context(before: Option<&Value>, profile: PodSecurityLevel) -> Option<Value> {
-    merged(before, |context: &mut SecurityContext| {
-        let mut capabilities = context.capabilities.take().unwrap_or_default();
-        let mut drop = capabilities.drop.take().unwrap_or_default();
-        let all = "ALL".to_owned();
-        if profile == PodSecurityLevel::Restricted {
-            context.allow_privilege_escalation = Some(false);
-            if !drop.contains(&all) {
-                drop = vec![all];
-            }
-            if context.run_as_non_root == Some(false) {
-                context.run_as_non_root = None;
-            }
-            if seccomp_type(context.seccomp_profile.as_ref()) == Some("Unconfined") {
-                context.seccomp_profile = None;
-            }
-        } else {
-            drop.retain(|d| d != &all);
-            if context.run_as_non_root == Some(true) {
-                context.run_as_non_root = None;
-            }
+    let mut map = object(before);
+    let mut capabilities = object(map.get("capabilities"));
+    let mut drop: Vec<Value> = capabilities
+        .get("drop")
+        .and_then(Value::as_array)
+        .cloned()
+        .unwrap_or_default();
+    let all = json!("ALL");
+    if profile == PodSecurityLevel::Restricted {
+        map.insert("allowPrivilegeEscalation".to_owned(), json!(false));
+        if !drop.contains(&all) {
+            drop = vec![all];
         }
-        capabilities.drop = (!drop.is_empty()).then_some(drop);
-        context.capabilities = (capabilities != Capabilities::default()).then_some(capabilities);
-    })
+        if map.get("runAsNonRoot") == Some(&json!(false)) {
+            map.remove("runAsNonRoot");
+        }
+        if seccomp(&map) == Some("Unconfined") {
+            map.remove("seccompProfile");
+        }
+    } else {
+        drop.retain(|d| d != &all);
+        if map.get("runAsNonRoot") == Some(&json!(true)) {
+            map.remove("runAsNonRoot");
+        }
+    }
+    if drop.is_empty() {
+        capabilities.remove("drop");
+    } else {
+        capabilities.insert("drop".to_owned(), Value::Array(drop));
+    }
+    match non_empty(capabilities) {
+        Some(c) => map.insert("capabilities".to_owned(), c),
+        None => map.remove("capabilities"),
+    };
+    non_empty(map)
 }
 
 /// The `securityContext` edits of the pod and each of its containers, `spec` being the pod
