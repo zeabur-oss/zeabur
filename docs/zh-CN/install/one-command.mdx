@@ -1,0 +1,30 @@
+---
+title: 用 Zeatend 一条命令安装
+description: 开发中。以后在一台全新的 Linux 服务器上，用 Zeatend 的安装界面装好 Kubernetes，再用一条命令装上 Zeabur。
+---
+
+<Callout type="info" title="开发中">
+这个方式还不能用，进展见 [#430](https://github.com/zeabur-oss/zeabur/issues/430)。现在要安装，请[手动将 Zeabur 安装到已有集群](existing-cluster.mdx)。
+</Callout>
+
+想看清每个对象？现在可以[手动安装](existing-cluster.mdx)。[交给 Agent 安装](agent.mdx)也还在开发中。
+
+## 完成后你会得到
+
+- 一台 Linux 服务器，上面有一个 Kubernetes 集群。
+- 集群上的 Zeabur，以及负责登录的 Zeabur Identity。
+- 一个能用 HTTPS 打开的 Zeabur 网址。
+
+## 以后的流程
+
+[Zeatend](https://github.com/zeabur-oss/zeatend) 负责在服务器上装好 Kubernetes。它的安装界面有简体中文、繁体中文和英文，按 F2 切换。
+
+1. 在服务器上运行 Zeatend，打开安装界面。
+2. **服务器**：界面列出这台服务器的信息和检查结果。你选择装 K3s、RKE2 还是 KubeSolo，这三种都是 Kubernetes 发行版。检查没通过时，会停在这一页。
+3. **访问方式**：填入这台服务器 Kubernetes API 的地址，你的电脑之后用这个地址管理集群。域名和节点名称可以不填。
+4. **确认**：界面列出要安装的版本和配置。
+5. **安装**：界面显示每个步骤和日志。安装在后台运行，SSH 断开也不会中断。
+6. 再用一条命令装上 Zeabur。这条命令也会装好负责登录的 Zeabur Identity、处理网址的 Traefik、签发 HTTPS 证书的 cert-manager，以及读取用量的 metrics-server。集群里已经有的不会重复安装。
+7. 打开 Zeabur 的网址登录。以后还需要的组件，在**集群** → **组件**页面安装。
+
+每个安装界面的样子，见 Zeatend 的 [docs/screens](https://github.com/zeabur-oss/zeatend/tree/main/docs/screens)。

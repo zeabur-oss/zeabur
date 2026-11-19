@@ -1,0 +1,36 @@
+---
+title: 交给 Agent 安装或迁移
+description: 开发中。以后把一段提示词粘贴到 Claude 或 Codex，它会帮你准备服务器、装好 Zeabur，还能把 zeabur.com 的项目迁移过来。
+---
+
+<Callout type="info" title="开发中">
+这个方式还不能用，进展见 [#544](https://github.com/zeabur-oss/zeabur/issues/544) 和 [#430](https://github.com/zeabur-oss/zeabur/issues/430)。现在要安装，请[手动将 Zeabur 安装到已有集群](existing-cluster.mdx)。
+</Callout>
+
+想自己动手？现在可以[手动安装](existing-cluster.mdx)。[Zeatend 一条命令安装](one-command.mdx)也还在开发中。
+
+## 完成后你会得到
+
+- 一台你自己的服务器，上面运行着 Zeabur。
+- Zeabur 的网址，以及第一次登录的方式。
+- 如果要迁移，zeabur.com 上的服务和数据也会在新服务器上运行。
+
+## 以后的流程
+
+1. 你把一段提示词粘贴到 Claude Code 或 Codex。提示词只有一句话，里面附上这个页面的网址。
+2. Agent 读这个页面，问你要用哪家的服务器、哪个套餐，并列出价格。你确认之后，它才会购买。
+3. Agent 用 Zeatend 在新服务器上装好 Kubernetes 和 Zeabur。
+4. 要迁移时，Agent 按照 zeabur.com 的[迁移指南](https://zeabur.com/zh-CN/blogs/migrate-from-zeabur)列出你的服务、备份数据库，再在 Zeabur 上重建服务、还原数据。
+5. 最后，Agent 会告诉你 Zeabur 的网址，以及第一次怎么登录。
+
+提示词大致是这样。现在请先不要用，这个页面还没有写好给 Agent 的步骤：
+
+> 读〈这个页面的网址〉，在我自己的服务器上安装 Zeabur，并把 zeabur.com 上的〈项目名称〉迁移过去。
+
+## 你自己要做的事
+
+Agent 会在这几步停下来，等你处理：
+
+- 确认要买的服务器和价格。
+- 付款。
+- 修改域名的 DNS，把网址指向新服务器。

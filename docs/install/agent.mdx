@@ -1,0 +1,36 @@
+---
+title: Let an agent install or migrate for you
+description: In development. You will paste a prompt into Claude or Codex, and it will get a server, install Zeabur, and can also move your zeabur.com project over.
+---
+
+<Callout type="info" title="In development">
+You can't use this yet. Follow [#544](https://github.com/zeabur-oss/zeabur/issues/544) and [#430](https://github.com/zeabur-oss/zeabur/issues/430). To install today, [install Zeabur in an existing cluster by hand](existing-cluster.mdx).
+</Callout>
+
+Prefer to do it yourself? [Install by hand](existing-cluster.mdx) works today. The [one-command install with Zeatend](one-command.mdx) is also in development.
+
+## What you will have
+
+- A server of your own, running Zeabur.
+- Zeabur's address and a way to sign in for the first time.
+- If you move from zeabur.com, your services and data running on the new server.
+
+## How it will work
+
+1. You paste a prompt into Claude Code or Codex. It is one sentence with the address of this page.
+2. The agent reads this page and asks which provider and plan you want, with the price. It buys the server only after you confirm.
+3. The agent uses Zeatend to install Kubernetes and Zeabur on the new server.
+4. To move from zeabur.com, the agent follows zeabur.com's [migration guide](https://zeabur.com/blogs/migrate-from-zeabur): it lists your services and backs up the databases. Then it creates the services again in Zeabur and restores the data.
+5. At the end, the agent gives you Zeabur's address and how to sign in for the first time.
+
+The prompt will look about like this. Don't use it yet: this page doesn't have the steps for the agent.
+
+> Read 〈this page's address〉, install Zeabur on my own server, and move 〈project name〉 from zeabur.com to it.
+
+## What you do yourself
+
+The agent stops at these steps and waits for you:
+
+- Confirm the server and its price.
+- Pay for it.
+- Change your domain's DNS so the address points to the new server.

@@ -1,13 +1,15 @@
 - group: get-started
   label: 開始使用
   pages:
-    quickstart: 在一台伺服器安裝 Zeabur
+    quickstart: 安裝 Zeabur
     from-zeabur-com: 從 zeabur.com 過來
     first-project: 部署第一個服務
     how-it-works: Zeabur 如何管理服務
 - group: install
-  label: 其他安裝方式
+  label: 安裝方式
   pages:
+    agent: 交給 Agent 安裝或搬家
+    one-command: 用 Zeatend 一個指令安裝
     existing-cluster: 把 Zeabur 裝進既有叢集
     desktop: Zeabur Desktop：在自己的電腦開啟叢集
 - group: upgrade

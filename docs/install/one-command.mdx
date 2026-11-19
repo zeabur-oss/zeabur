@@ -1,0 +1,30 @@
+---
+title: One-command install with Zeatend
+description: In development. On a new Linux server, Zeatend's install screens will set up Kubernetes, and one command will install Zeabur.
+---
+
+<Callout type="info" title="In development">
+You can't use this yet. Follow [#430](https://github.com/zeabur-oss/zeabur/issues/430). To install today, [install Zeabur in an existing cluster by hand](existing-cluster.mdx).
+</Callout>
+
+Want to see every object? [Install by hand](existing-cluster.mdx) works today. [Letting an agent install for you](agent.mdx) is also in development.
+
+## What you will have
+
+- A Linux server with a Kubernetes cluster on it.
+- Zeabur on that cluster, and Zeabur Identity for sign-in.
+- An address that opens Zeabur over HTTPS.
+
+## How it will work
+
+[Zeatend](https://github.com/zeabur-oss/zeatend) sets up Kubernetes on the server. Its install screens are in English, Traditional Chinese and Simplified Chinese; F2 switches between them.
+
+1. Run Zeatend on the server to open the install screens.
+2. **Server**: the screen shows the server's details and the results of its checks. You choose K3s, RKE2 or KubeSolo, three Kubernetes distributions. If a check fails, you stay on this screen.
+3. **Access**: enter the address of the server's Kubernetes API. Your computer uses it to manage the cluster. A DNS name and a node name are optional.
+4. **Review**: the screen lists the version and the settings it will install.
+5. **Install**: the screen shows each step and its log. The install runs in the background, so it keeps going if your SSH session drops.
+6. One more command installs Zeabur. It also installs Zeabur Identity for sign-in, Traefik for addresses, cert-manager for HTTPS certificates, and metrics-server for usage. It skips any of them the cluster already has.
+7. Open Zeabur's address and sign in. Add the other components you need later on the **Cluster** → **Components** page.
+
+Zeatend's [docs/screens](https://github.com/zeabur-oss/zeatend/tree/main/docs/screens) has a picture of every install screen.

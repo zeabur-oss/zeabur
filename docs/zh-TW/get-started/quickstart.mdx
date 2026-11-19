@@ -1,8 +1,20 @@
 ---
-title: 在一台伺服器安裝 Zeabur
-description: Zeabur 用 Helm chart 裝進既有的 Kubernetes 叢集。在全新的伺服器上安裝，會隨 Zeatend 回來。
+title: 安裝 Zeabur
+description: 選一種安裝方式：交給 Claude 或 Codex、用 Zeatend 的安裝畫面，或自己用 Helm 安裝。
 ---
 
-Zeabur 用 Helm chart 裝進既有的 Kubernetes 叢集，步驟見[把 Zeabur 裝進既有叢集](../install/existing-cluster.mdx)。
+![安裝 Zeabur 的三種方式：交給 Claude 或 Codex、用 Zeatend 的安裝畫面、手動安裝。三種方式都裝出同一個 Zeabur，有同樣的專案、服務和網域。](../images/diagrams/install-paths.svg)
 
-在全新的伺服器上安裝 Zeabur，之後會回來。[Zeatend](https://github.com/zeabur-oss/zeatend) 負責在伺服器上裝好 Kubernetes，再由一行安裝指令裝上 Zeabur。進度見 [zeabur-oss/zeabur#430](https://github.com/zeabur-oss/zeabur/issues/430)。
+三種方式裝出來的 Zeabur 都一樣。差別在於誰來動手，以及你想看到多少細節。
+
+| 你是 | 選這個 | 現在能用嗎 |
+| --- | --- | --- |
+| 想要最省事，讓 AI 助手代勞 | [交給 Agent 安裝或搬家](../install/agent.mdx) | 開發中 |
+| 喜歡在伺服器上自己動手 | [用 Zeatend 一個指令安裝](../install/one-command.mdx) | 開發中 |
+| 管理叢集，想看清楚每個物件 | [手動把 Zeabur 裝進既有叢集](../install/existing-cluster.mdx) | 可以 |
+
+現在能用的是手動安裝：用 Helm 把 Zeabur 裝進已有的 Kubernetes 叢集。Kubernetes 是在一台或多台伺服器上執行容器的開源系統，叢集就是一組由它管理的伺服器。Helm 是 Kubernetes 的安裝工具。
+
+另外兩種方式完成後，這一頁的表格會改成「可以」，你可以先追蹤 [#430](https://github.com/zeabur-oss/zeabur/issues/430) 和 [#544](https://github.com/zeabur-oss/zeabur/issues/544)。
+
+只想在自己的電腦上看看叢集，不必安裝到叢集裡，見 [Zeabur Desktop](../install/desktop.mdx)。

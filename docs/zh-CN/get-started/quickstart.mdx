@@ -1,8 +1,20 @@
 ---
-title: 在一台服务器上安装 Zeabur
-description: Zeabur 通过 Helm chart 安装到已有的 Kubernetes 集群。在全新的服务器上安装，会随 Zeatend 回归。
+title: 安装 Zeabur
+description: 选一种安装方式：交给 Claude 或 Codex、用 Zeatend 的安装界面，或者自己用 Helm 安装。
 ---
 
-Zeabur 通过 Helm chart 安装到已有的 Kubernetes 集群，步骤见[将 Zeabur 安装到已有集群](../install/existing-cluster.mdx)。
+![安装 Zeabur 的三种方式：交给 Claude 或 Codex、用 Zeatend 的安装界面、手动安装。三种方式装出的是同一个 Zeabur，有同样的项目、服务和域名。](../images/diagrams/install-paths.svg)
 
-在全新的服务器上安装 Zeabur，之后会回归。[Zeatend](https://github.com/zeabur-oss/zeatend) 负责在服务器上装好 Kubernetes，再由一条安装命令装上 Zeabur。进度见 [zeabur-oss/zeabur#430](https://github.com/zeabur-oss/zeabur/issues/430)。
+三种方式装出来的 Zeabur 都一样，区别在于谁来动手，以及你想看到多少细节。
+
+| 你是 | 选这个 | 现在能用吗 |
+| --- | --- | --- |
+| 想省事，让 AI 助手代劳 | [交给 Agent 安装或迁移](../install/agent.mdx) | 开发中 |
+| 喜欢在服务器上自己动手 | [用 Zeatend 一条命令安装](../install/one-command.mdx) | 开发中 |
+| 管理集群，想看清每个对象 | [手动将 Zeabur 安装到已有集群](../install/existing-cluster.mdx) | 可以 |
+
+目前能用的是手动安装：用 Helm 把 Zeabur 装进已有的 Kubernetes 集群。Kubernetes 是在一台或多台服务器上运行容器的开源系统，集群就是由它管理的一组服务器。Helm 是 Kubernetes 的安装工具。
+
+另外两种方式完成后，这张表会改成“可以”。想跟进进展，可以关注 [#430](https://github.com/zeabur-oss/zeabur/issues/430) 和 [#544](https://github.com/zeabur-oss/zeabur/issues/544)。
+
+只想在自己的电脑上看看集群，不往集群里安装任何东西，见 [Zeabur Desktop](../install/desktop.mdx)。
