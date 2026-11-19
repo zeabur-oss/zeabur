@@ -55,6 +55,10 @@ pub enum MemberChange {
     #[serde(rename_all = "camelCase")]
     Invite {
         /// Login name: lower-case letters, digits, `-` and `.`, at most 63 characters.
+        #[schema(
+            max_length = 63,
+            pattern = r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+        )]
         username: String,
         /// Name shown in the interface, for a new member.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -89,6 +93,7 @@ pub enum MemberChange {
     #[serde(rename_all = "camelCase")]
     CreateToken {
         /// Its name: lower-case letters, digits and `-`, at most 63 characters.
+        #[schema(max_length = 63, pattern = "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")]
         name: String,
         /// Its roles in projects.
         #[serde(default)]

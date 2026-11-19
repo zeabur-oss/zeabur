@@ -1,6 +1,8 @@
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { kubeAmount } from "@/lib/amount"
 import { roleYaml } from "@/model/rbac"
+import { textProblem } from "@/model/rules"
 import { bytesOf } from "@/model/volume-edit"
 import { countsHealth, healthRank } from "@/model/service"
 
@@ -131,20 +133,17 @@ export function buildLimitsChange(values: {
   }
 }
 
-/** zeabur-model `DISPLAY_NAME_MAX`. */
-export const DISPLAY_NAME_MAX = 64
-const NAMESPACE_MAX = 63
-const DNS_LABEL = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
+export const DISPLAY_NAME_MAX = rules["Change.createProject.displayName"].maxLength
 
-/** Why a new project's name won't do, as zeabur-plan's `createProject` would refuse it. */
+/** Why a new project's name won't do, by the rule the server describes; the server refuses the
+ * names Kubernetes keeps for itself. */
 export function newProjectProblem(
   name: string,
   taken: readonly string[],
-): "empty" | "long" | "invalid" | "system" | "taken" | undefined {
+): "empty" | "long" | "invalid" | "taken" | undefined {
   if (name === "") return "empty"
-  if (name.length > NAMESPACE_MAX) return "long"
-  if (!DNS_LABEL.test(name)) return "invalid"
-  if (name.startsWith("kube-")) return "system"
+  const problem = textProblem(name, rules.ProjectName)
+  if (problem) return problem
   return taken.includes(name) ? "taken" : undefined
 }
 

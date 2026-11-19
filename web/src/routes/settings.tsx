@@ -10,6 +10,7 @@ import SunIcon from "~icons/ph/sun"
 import { type Schemas } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
 import { accountQuery } from "@/api/members"
+import { rules } from "@/api/rules"
 import {
   capabilitiesQuery,
   clusterNameQuery,
@@ -234,7 +235,7 @@ function NameForm({ setting, cluster }: { setting: NameSetting; cluster: Schemas
                 onChange={(event) => setDraft(event.target.value)}
                 disabled={save.isPending}
                 autoComplete="off"
-                maxLength={63}
+                maxLength={rules["ClusterNameChange.name"].maxLength}
                 className="min-w-64 flex-1"
                 aria-describedby={`${inputId}-who`}
                 translate="no"

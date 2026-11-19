@@ -23,6 +23,13 @@ pub const LABEL_TASK_OF: &str = "zeabur.com/task-of";
 /// share.
 pub const LABEL_SHARED_VARIABLES: &str = "zeabur.com/shared-variables";
 
+/// Label on every object made for a database, with the database's name.
+pub const LABEL_DATABASE: &str = "zeabur.com/database";
+
+/// The longest database name: short enough for every name the operators derive from it
+/// (`<name>-rs0-0`, `<name>-backups`, `moco-backup-<name>`).
+pub const DATABASE_NAME_MAX: usize = 30;
+
 /// Annotation on a project's namespace: the name to show instead of the namespace's.
 ///
 /// OpenShift keeps the same detail as `openshift.io/display-name`. Annotations, not labels: they

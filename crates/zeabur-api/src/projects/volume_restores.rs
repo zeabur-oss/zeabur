@@ -55,7 +55,7 @@ async fn k8up_objects(
 /// parts of a `Restore`, read as the person.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/volumes/{claim}/restores", tag = "projects",
     operation_id = "getVolumeRestores",
-    params(("project" = String, Path, description = "The project's namespace"),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace"),
            ("claim" = String, Path, description = "The claim")),
     responses((status = 200, body = VolumeRestores), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(

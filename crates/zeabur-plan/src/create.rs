@@ -17,6 +17,8 @@
 
 use serde_json::{Map, Value, json};
 use zeabur_graph::manifest::HIDDEN;
+use zeabur_model::kernel::dns::is_rfc1035_label;
+use zeabur_model::kernel::names::{DATABASE_NAME_MAX, LABEL_DATABASE};
 
 use crate::change::{Change, Plan, Target, Write};
 use crate::plan::{ErrorKind, PlanError, Planner, Working, error};
@@ -251,6 +253,7 @@ impl Planner<'_> {
             refused.field = Some("metadata.name".to_owned());
             return Err(refused);
         }
+        check_database_label(object)?;
         let namespace = &self.input.snapshot.namespace;
         if let Some(other) = text("/metadata/namespace").filter(|n| n != namespace) {
             let mut refused = error(
@@ -282,6 +285,27 @@ impl Planner<'_> {
         }
         Ok(target)
     }
+}
+
+/// Refuses an object whose `zeabur.com/database` label is not a database name: the operators
+/// derive longer names from it.
+fn check_database_label(object: &Value) -> Result<(), PlanError> {
+    let label = object
+        .pointer("/metadata/labels/zeabur.com~1database")
+        .and_then(Value::as_str);
+    let Some(database) = label.filter(|d| !is_rfc1035_label(d, DATABASE_NAME_MAX)) else {
+        return Ok(());
+    };
+    let mut refused = error(
+        ErrorKind::BadRequest,
+        "invalid_database_name",
+        format!(
+            "{database:?} is not a database name: use up to {DATABASE_NAME_MAX} lower-case \
+             letters, digits and hyphens, starting with a letter."
+        ),
+    );
+    refused.field = Some(format!("metadata.labels[{LABEL_DATABASE}]"));
+    Err(refused)
 }
 
 fn group_of(api_version: &str) -> &str {

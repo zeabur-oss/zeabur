@@ -7,4 +7,5 @@ pub mod message;
 pub mod names;
 pub mod origin;
 pub mod quantity;
+pub mod s3;
 pub mod tool;

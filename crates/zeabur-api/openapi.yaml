@@ -1647,7 +1647,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -1671,7 +1671,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -1695,7 +1695,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       requestBody:
         content:
           application/json:
@@ -1744,7 +1744,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -1770,7 +1770,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -1798,7 +1798,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: build
         in: path
         required: true
@@ -1862,7 +1862,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: secret
         in: path
         description: A kubernetes.io/tls Secret
@@ -1901,7 +1901,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       requestBody:
         content:
           application/json:
@@ -1930,7 +1930,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -1955,7 +1955,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -1982,7 +1982,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -2006,7 +2006,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: engine
         in: path
         description: "`postgresql`, `mongodb`, `mysql` or `mariadb`"
@@ -2053,7 +2053,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       requestBody:
         content:
           application/json:
@@ -2085,7 +2085,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: name
         in: path
         description: The Secret holding the key
@@ -2130,7 +2130,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: regarding
         in: query
         description: |-
@@ -2178,7 +2178,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -2202,7 +2202,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -2228,7 +2228,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -2254,7 +2254,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       requestBody:
         content:
           application/json:
@@ -2286,7 +2286,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -2310,7 +2310,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -2342,7 +2342,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: service
         in: query
         description: The service, `<kind>/<name>` (`deployment/api`; any case).
@@ -2375,7 +2375,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -2401,7 +2401,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       requestBody:
         content:
           application/json:
@@ -2448,7 +2448,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       requestBody:
         content:
           application/json:
@@ -2493,7 +2493,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -2520,7 +2520,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kinds
         in: query
         description: |-
@@ -2571,7 +2571,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: group
         in: path
         description: The API group; `core` for the core group
@@ -2624,7 +2624,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       requestBody:
         content:
           application/json:
@@ -2674,7 +2674,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -2722,7 +2722,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -2774,7 +2774,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -2847,7 +2847,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -2916,7 +2916,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -3000,7 +3000,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -3067,7 +3067,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -3132,7 +3132,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -3173,7 +3173,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -3221,7 +3221,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -3291,7 +3291,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -3359,7 +3359,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: pod
         in: path
         required: true
@@ -3427,7 +3427,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: name
         in: path
         required: true
@@ -3457,7 +3457,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: deployment, statefulset, daemonset, job or cronjob; any case
@@ -3494,7 +3494,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: deployment, statefulset, daemonset, job or cronjob; any case
@@ -3537,7 +3537,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: "`deployment`, `statefulset`, `daemonset`, `job` or `cronjob` (any case)"
@@ -3583,7 +3583,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: "`deployment`, `statefulset`, `daemonset`, `job` or `cronjob` (any case)"
@@ -3639,7 +3639,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: deployment, statefulset, daemonset, job or cronjob; any case
@@ -3676,7 +3676,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: deployment, statefulset or daemonset; any case
@@ -3715,7 +3715,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: cronjob; any case
@@ -3751,7 +3751,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: deployment, statefulset, daemonset, job or cronjob; any case
@@ -3787,7 +3787,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: kind
         in: path
         description: deployment, statefulset, daemonset, job or cronjob; any case
@@ -3826,7 +3826,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -3852,7 +3852,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -3877,7 +3877,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -3902,7 +3902,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: name
         in: path
         required: true
@@ -3944,7 +3944,7 @@ paths:
         in: path
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: name
         in: path
         required: true
@@ -3979,7 +3979,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -4009,7 +4009,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       responses:
         "200":
           content:
@@ -4035,7 +4035,7 @@ paths:
         description: The project's namespace
         required: true
         schema:
-          type: string
+          $ref: "#/components/schemas/ProjectName"
       - name: claim
         in: path
         description: The claim
@@ -5092,6 +5092,7 @@ components:
           bucket:
             type: string
             description: The bucket.
+            pattern: ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
           destination:
             type:
             - string
@@ -5118,17 +5119,17 @@ components:
       - type: object
         description: Set Zeabur's schedule.
         required:
-        - cron
-        - keepDays
         - op
         properties:
           cron:
             type: string
             description: Five cron fields, in the Velero server's clock.
+            default: 0 3 * * *
           keepDays:
             type: integer
             format: int32
             description: How many days each backup is kept.
+            default: 7
             maximum: 365
             minimum: 1
           namespaces:
@@ -5181,6 +5182,7 @@ components:
             - "null"
             description: The new namespace, needed while `namespace` exists.
             maxLength: 63
+            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
           namespace:
             type: string
             description: The namespace to restore.
@@ -5327,11 +5329,15 @@ components:
           description: |-
             The build context inside the repository, `spec.source.git.contextDir`. Empty: the
             repository's root.
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
         dockerfile:
           type:
           - string
           - "null"
           description: "The Dockerfile, relative to the context, `spec.source.git.dockerfile`. Empty: `Dockerfile`."
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
         env:
           type: array
           items:
@@ -6508,6 +6514,7 @@ components:
             - string
             - "null"
             description: The name to show instead of the namespace's.
+            maxLength: 64
           op:
             type: string
             enum:
@@ -6530,6 +6537,7 @@ components:
             - string
             - "null"
             description: The name to show instead of the namespace's.
+            maxLength: 64
           icon:
             oneOf:
             - $ref: "#/components/schemas/ProjectIcon"
@@ -6590,13 +6598,19 @@ components:
             type: integer
             format: int32
             description: How many failed runs to keep.
+            maximum: 100
+            minimum: 0
           keepSucceeded:
             type: integer
             format: int32
             description: How many succeeded runs to keep.
+            maximum: 100
+            minimum: 0
           name:
             type: string
             description: The CronJob's name.
+            maxLength: 52
+            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
           op:
             type: string
             enum:
@@ -6652,12 +6666,16 @@ components:
             - "null"
             format: int32
             description: How many failed runs to keep.
+            maximum: 100
+            minimum: 0
           keepSucceeded:
             type:
             - integer
             - "null"
             format: int32
             description: How many succeeded runs to keep.
+            maximum: 100
+            minimum: 0
           op:
             type: string
             enum:
@@ -7102,6 +7120,7 @@ components:
           description: >-
             The name, at most 63 characters; `null` goes back to the name Zeabur finds
             itself.
+          maxLength: 63
       additionalProperties: false
     ClusterNameSetting:
       type: object
@@ -8529,6 +8548,11 @@ components:
       - mysql
       - mariadb
       - dragonfly
+    DatabaseName:
+      type: string
+      description: A database's name, as the label zeabur.com/database of its objects carries it.
+      maxLength: 30
+      pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
     DatabaseOperator:
       type: object
       description: Whether an engine's operator, and its backup component, could be read.
@@ -11335,6 +11359,8 @@ components:
           username:
             type: string
             description: "Login name: lower-case letters, digits, `-` and `.`, at most 63 characters."
+            maxLength: 63
+            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
       - type: object
         description: |-
           Change what a member may do: an admin account, or roles in chosen projects (a project left
@@ -11388,6 +11414,8 @@ components:
           name:
             type: string
             description: "Its name: lower-case letters, digits and `-`, at most 63 characters."
+            maxLength: 63
+            pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
           op:
             type: string
             enum:
@@ -12814,6 +12842,8 @@ components:
           name:
             type: string
             description: Its name.
+            maxLength: 30
+            pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
           op:
             type: string
             enum:
@@ -15218,6 +15248,11 @@ components:
           items:
             $ref: "#/components/schemas/ProjectSummary"
           description: Adopted projects first, then the other namespaces, each sorted by name.
+    ProjectName:
+      type: string
+      description: "A project's namespace: a DNS label."
+      maxLength: 63
+      pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
     ProjectNamespace:
       allOf:
       - $ref: "#/components/schemas/ProjectDetails"
@@ -16673,12 +16708,15 @@ components:
         bucket:
           type: string
           description: The bucket.
+          pattern: ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
         endpoint:
           type: string
           description: The S3-compatible endpoint, `https://…`.
         name:
           type: string
           description: "Its name: lower-case letters, digits and `-`, at most 63."
+          maxLength: 63
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
         prefix:
           type: string
           description: A folder in the bucket.
@@ -17263,6 +17301,11 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: The settings ConfigMap or the store, when the person may not read it.
+    ServiceReplicas:
+      type: integer
+      description: How many replicas a new service may run.
+      maximum: 20
+      minimum: 1
     ServiceSize:
       type: string
       description: How much a new service asks for.
@@ -18542,11 +18585,15 @@ components:
           - string
           - "null"
           description: "The folder inside the upload to build. Left out: the whole upload."
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
         dockerfile:
           type:
           - string
           - "null"
           description: The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`].
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
         host:
           type:
           - string
@@ -18558,6 +18605,8 @@ components:
         name:
           type: string
           description: The service's name, which its `Build`, workload and Service share.
+          maxLength: 40
+          pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
         port:
           type:
           - integer
@@ -19047,12 +19096,16 @@ components:
           description: >-
             The claim's name; absent for `<workload>-<name>`. A claim that exists is never
             reused.
+          maxLength: 253
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
         mountPath:
           type: string
           description: Where the container sees it; absolute.
         name:
           type: string
           description: The volume's name in the pod.
+          maxLength: 63
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
         size:
           type: string
           description: The size, a Kubernetes quantity such as `5Gi`.

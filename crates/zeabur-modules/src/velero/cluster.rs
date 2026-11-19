@@ -59,6 +59,7 @@ use serde_json::{Map, Value, json};
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 use zeabur_model::kernel::dns::is_dns_label;
+use zeabur_model::kernel::s3::is_bucket_name;
 
 use crate::backups::Outcome;
 use crate::{Read, strings, text};
@@ -568,19 +569,10 @@ pub struct ScheduleRequest {
 
 const DEFAULT_REGION: &str = "us-east-1";
 
-fn bucket_ok(bucket: &str) -> bool {
-    (3..=63).contains(&bucket.len())
-        && bucket
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'.' || b == b'-')
-        && !bucket.starts_with(['.', '-'])
-        && !bucket.ends_with(['.', '-'])
-}
-
 /// Why a location request cannot be written, in a sentence; `None` when it can.
 #[must_use]
 pub fn location_problem(request: &LocationRequest) -> Option<String> {
-    if !bucket_ok(request.bucket.trim()) {
+    if !is_bucket_name(request.bucket.trim()) {
         return Some(
             "Enter a bucket name of 3 to 63 lowercase letters, digits, dots and hyphens.".into(),
         );
@@ -609,6 +601,12 @@ fn cron_ok(cron: &str) -> bool {
 
 /// How many days a schedule may keep each backup.
 pub const KEEP_DAYS: std::ops::RangeInclusive<u32> = 1..=365;
+
+/// The schedule a request without one gets: every day at 03:00 in the Velero server's clock.
+pub const DEFAULT_CRON: &str = "0 3 * * *";
+
+/// How many days a request without them keeps each backup.
+pub const DEFAULT_KEEP_DAYS: u32 = 7;
 
 /// The longest namespace name.
 pub const NAMESPACE_MAX: usize = 63;

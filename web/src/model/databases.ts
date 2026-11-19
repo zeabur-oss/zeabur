@@ -23,7 +23,9 @@
 // https://www.dragonflydb.io/docs/managing-dragonfly/backups
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
+import { rules } from "@/api/rules"
 import type { Translate } from "@/i18n"
+import { fits, textProblem } from "@/model/rules"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
 import type { Event, Health } from "@/model/service"
 
@@ -254,17 +256,16 @@ export const memberChoices: Record<Engine, number[]> = {
   dragonfly: [1, 2, 3],
 }
 
-const DNS_LABEL = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
-/** Short enough for every name the operators derive from it (`<name>-rs0-0`, `<name>-backups`,
- * `moco-backup-<name>`). */
-const NAME_MAX = 30
+/** The server refuses objects labelled with a longer name: the operators derive names from it
+ * (`<name>-rs0-0`, `<name>-backups`, `moco-backup-<name>`). */
+const NAME = rules.DatabaseName
 
 export type NameProblem = "empty" | "invalid" | "long" | "taken"
 
 export function nameProblem(name: string, taken: string[]): NameProblem | undefined {
   if (name === "") return "empty"
-  if (name.length > NAME_MAX) return "long"
-  if (!DNS_LABEL.test(name)) return "invalid"
+  const problem = textProblem(name, NAME)
+  if (problem) return problem
   if (taken.includes(name)) return "taken"
   return undefined
 }
@@ -551,6 +552,10 @@ export interface BackupTarget extends S3Target {
   keepDays: number
 }
 
+/** The days of backups a database keeps, as the cluster's backups. */
+const KEEP_DAYS = rules["BackupsPlanRequest.schedule.keepDays"]
+const MAX_KEEP_DAYS = KEEP_DAYS.maximum
+
 export const newBackupTarget = (): BackupTarget => ({
   endpoint: "",
   bucket: "",
@@ -559,21 +564,23 @@ export const newBackupTarget = (): BackupTarget => ({
   accessKey: "",
   secretKey: "",
   frequency: "daily",
-  keepDays: 7,
+  keepDays: KEEP_DAYS.default,
 })
 
 export type TargetProblem = "endpoint" | "bucket" | "keys" | "keep"
-
-/** The most days of backups the form keeps. */
-const MAX_KEEP_DAYS = 365
 
 /** What is wrong with the form; with `keysExist`, keys left empty keep the Secret's. */
 export function targetProblems(target: BackupTarget, keysExist = false): TargetProblem[] {
   const problems: TargetProblem[] = []
   if (!/^https?:\/\/[^\s/]+/.test(target.endpoint.trim())) problems.push("endpoint")
-  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(target.bucket.trim())) problems.push("bucket")
+  if (!fits(target.bucket.trim(), rules["BackupsPlanRequest.location.bucket"]))
+    problems.push("bucket")
   if (needsKeys(target) && !keepsKeys(target, keysExist)) problems.push("keys")
-  if (!Number.isInteger(target.keepDays) || target.keepDays < 1 || target.keepDays > MAX_KEEP_DAYS)
+  if (
+    !Number.isInteger(target.keepDays) ||
+    target.keepDays < KEEP_DAYS.minimum ||
+    target.keepDays > MAX_KEEP_DAYS
+  )
     problems.push("keep")
   return problems
 }

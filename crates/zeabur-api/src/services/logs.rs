@@ -199,7 +199,7 @@ fn lines(body: &[u8]) -> Vec<LogHistoryLine> {
 /// answer.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/logs/history",
     tag = "services", operation_id = "getServiceLogHistory",
-    params(("project" = String, Path, description = "The project's namespace"),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace"),
            ("kind" = String, Path, description = "`deployment`, `statefulset`, `daemonset`, `job` or `cronjob` (any case)"),
            ("name" = String, Path),
            LogHistoryParams),

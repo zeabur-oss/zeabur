@@ -2,6 +2,7 @@
 // backups go, when they run, and how each went.
 import type { Schemas } from "@/api/client"
 import { rules } from "@/api/rules"
+import { fits } from "@/model/rules"
 import { type Destination, joinFolder } from "@/model/s3-destinations"
 import type { Health } from "@/model/service"
 
@@ -81,7 +82,8 @@ export type LocationProblem = "bucket" | "endpoint" | "prefix" | "keys" | "bothK
 /** Keys are needed for a new location; when editing, both or neither (keep the ones it has). */
 export function locationProblems(form: LocationForm, editing: boolean): LocationProblem[] {
   const problems: LocationProblem[] = []
-  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(form.bucket.trim())) problems.push("bucket")
+  if (!fits(form.bucket.trim(), rules["BackupsPlanRequest.location.bucket"]))
+    problems.push("bucket")
   const endpoint = form.endpoint.trim()
   if (endpoint && !/^https?:\/\/[^\s/]+\S*$/.test(endpoint)) problems.push("endpoint")
   if (form.prefix.includes("..") || /\s/.test(form.prefix)) problems.push("prefix")
@@ -134,16 +136,20 @@ export interface ScheduleForm {
   namespaces: string[]
 }
 
-const DEFAULT_HOUR = 3
-const DEFAULT_KEEP_DAYS = 7
+const DEFAULT_CRON = rules["BackupsPlanRequest.schedule.cron"].default
 const KEEP_DAYS = rules["BackupsPlanRequest.schedule.keepDays"]
 
 export function scheduleForm(schedule: Schedule | undefined): ScheduleForm {
   if (!schedule)
-    return { hour: DEFAULT_HOUR, keepDays: DEFAULT_KEEP_DAYS, scope: "cluster", namespaces: [] }
+    return {
+      hour: hourOf(DEFAULT_CRON),
+      keepDays: KEEP_DAYS.default,
+      scope: "cluster",
+      namespaces: [],
+    }
   return {
     hour: hourOf(schedule.cron),
-    keepDays: schedule.keepDays ?? DEFAULT_KEEP_DAYS,
+    keepDays: schedule.keepDays ?? KEEP_DAYS.default,
     scope: schedule.namespaces.length === 0 ? "cluster" : "projects",
     namespaces: schedule.namespaces,
   }
@@ -166,8 +172,7 @@ export function scheduleRequest(
 ): Schemas.BackupsPlanRequest {
   return {
     op: "schedule",
-    cron:
-      form.hour === undefined ? (current?.cron ?? dailyCron(DEFAULT_HOUR)) : dailyCron(form.hour),
+    cron: form.hour === undefined ? (current?.cron ?? DEFAULT_CRON) : dailyCron(form.hour),
     keepDays: form.keepDays,
     namespaces: form.scope === "cluster" ? [] : [...form.namespaces].sort(),
   }

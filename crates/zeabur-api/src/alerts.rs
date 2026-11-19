@@ -65,7 +65,7 @@ async fn read(
 /// Falco's recent alerts about a project's pods, newest first, read as the person.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/alerts", tag = "projects",
     operation_id = "getProjectAlerts",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = RuntimeAlerts), (status = 401, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(
     Person(cluster): Person,

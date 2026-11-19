@@ -7,6 +7,7 @@ import WarningIcon from "~icons/ph/warning"
 
 import { type Schemas } from "@/api/client"
 import { volumeRestoresQuery } from "@/api/queries"
+import { rules } from "@/api/rules"
 import { Ago } from "@/components/bits"
 import { FormField, NameField } from "@/components/form-field"
 import { GateTip, useGate } from "@/components/gate"
@@ -19,6 +20,7 @@ import type { Messages } from "@/i18n/en"
 import { formatTime } from "@/lib/format"
 import { outcomeHealth } from "@/model/cluster-backups"
 import { restoredName } from "@/model/database-restore"
+import { fits } from "@/model/rules"
 import { restoreInPlace, restoreToNewVolume, swapToVolume } from "@/model/volume-backups"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -33,7 +35,7 @@ type Restore = Schemas.VolumeRestore
 type Mode = "new" | "inPlace"
 type Template = Parameters<typeof restoreToNewVolume>[0]
 
-const NAME_MAX = 63
+const VOLUME_NAME = rules["VolumeRequest.name"]
 const SHOWN = 5
 
 /** A volume's restores, and restoring it from a backup point. */
@@ -362,14 +364,13 @@ function NewVolumeField({
 
 function useChoice(data: Restores, claim: string) {
   const [snapshot, setSnapshot] = useState(data.snapshots[0]?.id ?? "")
-  const [into, setInto] = useState(() => restoredName(claim, new Date(), NAME_MAX))
+  const [into, setInto] = useState(() => restoredName(claim, new Date(), VOLUME_NAME.maxLength))
   const [understood, setUnderstood] = useState(false)
   const point = data.snapshots.find((s) => s.id === snapshot)
   return { snapshot, setSnapshot, point, into, setInto, understood, setUnderstood }
 }
 
-const badName = (name: string, claim: string) =>
-  !/^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/.test(name) || name === claim
+const badName = (name: string, claim: string) => !fits(name, VOLUME_NAME) || name === claim
 
 const sameAs = (t: Translate, mount: Mount | undefined) =>
   t(

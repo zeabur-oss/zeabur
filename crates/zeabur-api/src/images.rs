@@ -280,7 +280,7 @@ impl ImageInspection {
 /// as. A registry that cannot be read answers `200` with `unreadable`.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/images/inspect", tag = "projects",
     operation_id = "inspectImage",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     request_body = InspectRequest,
     responses((status = 200, body = ImageInspection),
               (status = 400, body = Problem, content_type = PROBLEM)))]

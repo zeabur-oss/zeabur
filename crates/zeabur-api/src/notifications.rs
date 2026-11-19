@@ -89,6 +89,7 @@ pub enum NotificationsPlanRequest {
     /// Add a channel.
     Add {
         /// Its name.
+        #[schema(max_length = 30, pattern = "^[a-z]([-a-z0-9]*[a-z0-9])?$")]
         name: String,
         /// The events it receives.
         events: Vec<AlertmanagerEvent>,
@@ -347,7 +348,7 @@ async fn answer(
 /// read.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/notifications", tag = "projects",
     operation_id = "getProjectNotifications",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = Notifications), (status = 401, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project_get(
     State(state): State<AppState>,
@@ -935,7 +936,7 @@ async fn apply_in(
 /// a token to apply it; writes nothing. Secrets never appear in the answer.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/notifications/plan", tag = "projects",
     operation_id = "planProjectNotifications", request_body = NotificationsPlanRequest,
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = NotificationsPlan),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM),
@@ -956,7 +957,7 @@ pub(crate) async fn project_plan(
 /// then writes.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/notifications/apply", tag = "projects",
     operation_id = "applyProjectNotifications", request_body = NotificationsApply,
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = NotificationsApplied),
               (status = 400, body = Problem, content_type = PROBLEM),
               (status = 403, body = Problem, content_type = PROBLEM),

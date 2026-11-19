@@ -76,7 +76,7 @@ pub struct TaskRuns {
 /// A CronJob's runs, newest first.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/runs", tag = "services",
     operation_id = "listTaskRuns",
-    params(("project" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path),
            ("kind" = String, Path, description = "cronjob; any case"),
            ("name" = String, Path)),
     responses((status = 200, body = TaskRuns), (status = 404, body = Problem, content_type = PROBLEM)))]

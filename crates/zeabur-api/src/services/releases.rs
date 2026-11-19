@@ -26,7 +26,7 @@ pub struct ReleaseList {
 /// `current`. A rollback is a plan (`rollback` change).
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/releases", tag = "services",
     operation_id = "listServiceReleases",
-    params(("project" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),
     responses((status = 200, body = ReleaseList), (status = 404, body = Problem, content_type = PROBLEM)))]

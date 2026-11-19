@@ -5,6 +5,7 @@ import PlusIcon from "~icons/ph/plus"
 
 import { projectQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { FormField, TrimmedInput } from "@/components/form-field"
 import { GateNote, GateTip, useGate } from "@/components/gate"
 import { useHold } from "@/components/plan/draft"
@@ -13,6 +14,7 @@ import { usePlanStep } from "@/components/plan/planner"
 import { useT, type Translate } from "@/i18n"
 import { describeCron } from "@/lib/cron"
 import { serviceLink } from "@/lib/place"
+import { fits } from "@/model/rules"
 import type { Service } from "@/model/service"
 import { ContainerField } from "@/routes/service/container-field"
 import { TaskWhen, zoned } from "@/routes/service/task-runs"
@@ -24,10 +26,10 @@ import { Select } from "@zeabur-oss/design-system/components/select"
 
 type Concurrency = Schemas.TaskConcurrency
 
-const NAME = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?$/
-const NAME_MAX = 52
+const NAME = rules["Change.scheduleTask.name"]
+const KEPT = rules["Change.scheduleTask.keepSucceeded"]
 
-const keepable = (value: string) => /^\d+$/.test(value) && Number(value) <= 100
+const keepable = (value: string) => /^\d+$/.test(value) && Number(value) <= KEPT.maximum
 
 /** The tasks made from a service, and the way to add one. */
 export function TasksSection({ project, service }: { project: string; service: Service }) {
@@ -91,9 +93,9 @@ function taskProblems(
     keepFailed: string
   },
 ) {
-  const nameFits = NAME.test(form.name) && form.name.length <= NAME_MAX
+  const nameFits = fits(form.name, NAME)
   return {
-    name: nameFits ? undefined : t("tasks.badName", NAME_MAX),
+    name: nameFits ? undefined : t("tasks.badName", NAME.maxLength),
     command: form.command.trim() ? undefined : t("tasks.needCommand"),
     schedule: form.schedule.trim() ? undefined : t("tasks.needSchedule"),
     keepSucceeded: keepable(form.keepSucceeded) ? undefined : t("tasks.badKeep"),
@@ -114,7 +116,7 @@ function ScheduleTaskDrawer({
   const step = usePlanStep(project, onClose)
   const containers = service.containers.filter((c) => !c.init)
   const [container, setContainer] = useState(containers[0]?.name ?? "")
-  const [name, setName] = useState(`${service.name}-task`.slice(0, NAME_MAX))
+  const [name, setName] = useState(`${service.name}-task`.slice(0, NAME.maxLength))
   const [command, setCommand] = useState("")
   const [schedule, setSchedule] = useState("0 3 * * *")
   const [zone, setZone] = useState(() => Intl.DateTimeFormat().resolvedOptions().timeZone)

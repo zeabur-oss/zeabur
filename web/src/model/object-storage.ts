@@ -2,7 +2,9 @@
 // one IAM user (`S3Identity`, `S3Credentials`, `S3Policy`, `S3PolicyBinding`) that services use.
 // https://github.com/seaweedfs/seaweedfs-operator/tree/seaweedfs-operator-0.1.43/api/v1
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import type { Connectable } from "@/model/connect"
+import { fits } from "@/model/rules"
 import type { Event } from "@/model/service"
 
 export type ObjectStorage = Schemas.SeaweedObjectStorage
@@ -143,13 +145,11 @@ export const deleteObjectStorage = (store: ObjectStorage): Change[] => [
 
 export type BucketProblem = "empty" | "invalid" | "taken"
 
-/** S3 names, kept to what is also a Kubernetes name: 3 to 63 lowercase letters, digits and
- * hyphens. */
-const BUCKET = /^[a-z0-9][a-z0-9-]{1,61}[a-z0-9]$/
+const BUCKET = rules["S3DestinationFields.bucket"]
 
 export function bucketProblem(bucket: string, taken: string[]): BucketProblem | undefined {
   if (bucket === "") return "empty"
-  if (!BUCKET.test(bucket)) return "invalid"
+  if (!fits(bucket, BUCKET)) return "invalid"
   if (taken.includes(bucket)) return "taken"
   return undefined
 }

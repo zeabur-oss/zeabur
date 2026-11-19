@@ -42,7 +42,7 @@ pub struct ProjectObjectStorage {
 /// The object storage of a project, read as the person.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/object-storage", tag = "projects",
     operation_id = "getProjectObjectStorage",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectObjectStorage), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
     State(state): State<AppState>,

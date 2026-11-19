@@ -13,6 +13,14 @@ use zeabur_plan::{
 use super::refusals::refused;
 use crate::error::{ApiError, get_read, read_problem};
 
+/// Whether `request` creates an object, from YAML or as a client built it.
+pub(super) fn creates(request: &PlanRequest) -> bool {
+    request
+        .changes
+        .iter()
+        .any(|c| matches!(c, Change::Create { .. }))
+}
+
 /// Whether `request` creates an object from a person's YAML.
 pub(super) fn from_yaml(request: &PlanRequest) -> bool {
     request
@@ -126,9 +134,9 @@ pub(super) async fn refuse_existing(
     Err(ApiError::from(problem))
 }
 
-/// Sends every write of a plan that creates objects from YAML as a dry run, as the person: what
-/// their rights, validation, quotas and admission policies would refuse is refused now, at the
-/// object it is about.
+/// Sends every write of a plan that creates objects as a dry run, as the person: what their
+/// rights, validation (an object's name too), quotas and admission policies would refuse is
+/// refused now, at the object it is about.
 pub(super) async fn dry_run(
     cluster: &dyn Cluster,
     project: &str,

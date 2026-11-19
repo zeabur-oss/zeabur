@@ -31,10 +31,10 @@ use crate::plan::{ErrorKind, PlanError, error};
 const MAX_YAML: usize = 256 * 1024;
 /// The most services made from one file.
 const MAX_SERVICES: usize = 50;
-/// The longest Kubernetes name a service gets, as the "Docker image" form allows.
-const NAME_MAX: usize = 40;
-/// The most replicas a service gets, as the "Docker image" form allows.
-const MAX_REPLICAS: u64 = 20;
+/// The longest service name: of a Compose service, an uploaded folder and the image form.
+pub const SERVICE_NAME_MAX: usize = 40;
+/// The most replicas a service gets, from a Compose file or the image form.
+pub const MAX_REPLICAS: u64 = 20;
 
 /// A Compose file to convert.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -369,12 +369,12 @@ impl Reader {
     }
 }
 
-/// DNS labels for the Compose names, unique, at most [`NAME_MAX`] long.
+/// DNS labels for the Compose names, unique, at most [`SERVICE_NAME_MAX`] long.
 fn kube_names<'a>(compose: impl Iterator<Item = &'a String>) -> Vec<String> {
     let mut taken = BTreeSet::new();
     compose
         .map(|name| {
-            let base = label(name, NAME_MAX - 3);
+            let base = label(name, SERVICE_NAME_MAX - 3);
             let base = if base.is_empty() {
                 "app".to_owned()
             } else {

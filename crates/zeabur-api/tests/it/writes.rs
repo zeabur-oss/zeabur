@@ -882,8 +882,8 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{applied}");
         let (writes, dry_runs) = cluster.inspect(|s| (s.writes.clone(), s.dry_runs)).unwrap();
         assert_eq!(
-            dry_runs, 2,
-            "the creation and the deletion are each dry-run first"
+            dry_runs, 3,
+            "the creation at its plan and its apply, and the deletion, are each dry-run first"
         );
         let WriteBody::Delete(preconditions) = &writes[1].body else {
             panic!("an undo of a creation is a deletion: {writes:?}");

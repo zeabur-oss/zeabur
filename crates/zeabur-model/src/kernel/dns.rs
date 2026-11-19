@@ -8,6 +8,16 @@ pub const LABEL_MAX: usize = 63;
 /// The longest DNS subdomain or hostname.
 pub const SUBDOMAIN_MAX: usize = 253;
 
+/// [`is_dns_label`] as an ECMA-262 pattern without the length, for the API's description.
+pub const DNS_LABEL_PATTERN: &str = "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$";
+
+/// [`is_rfc1035_label`] as a pattern without the length.
+pub const RFC1035_LABEL_PATTERN: &str = "^[a-z]([-a-z0-9]*[a-z0-9])?$";
+
+/// [`is_dns_subdomain`] as a pattern without the length.
+pub const DNS_SUBDOMAIN_PATTERN: &str =
+    r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$";
+
 const fn is_label_byte(b: u8) -> bool {
     b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-'
 }
@@ -107,5 +117,43 @@ mod tests {
         }
         assert!(is_rfc1035_label("abcd", 4));
         assert!(!is_rfc1035_label("abcde", 4));
+    }
+
+    #[test]
+    fn the_patterns_say_what_the_checks_do() {
+        let label = regex::Regex::new(DNS_LABEL_PATTERN).unwrap();
+        let rfc1035 = regex::Regex::new(RFC1035_LABEL_PATTERN).unwrap();
+        let subdomain = regex::Regex::new(DNS_SUBDOMAIN_PATTERN).unwrap();
+        let names = [
+            "web",
+            "a-1",
+            "1abc",
+            "a",
+            "",
+            "-web",
+            "web-",
+            "Web",
+            "we_b",
+            "a--b",
+            "shop.example.com",
+            "shop..com",
+            ".shop",
+            "shop.",
+            "shop.-x.com",
+            "1.2",
+        ];
+        for name in names {
+            assert_eq!(label.is_match(name), is_dns_label(name), "label {name:?}");
+            assert_eq!(
+                rfc1035.is_match(name),
+                is_rfc1035_label(name, LABEL_MAX),
+                "rfc1035 {name:?}"
+            );
+            assert_eq!(
+                subdomain.is_match(name),
+                is_dns_subdomain(name),
+                "subdomain {name:?}"
+            );
+        }
     }
 }

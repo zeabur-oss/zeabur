@@ -148,6 +148,7 @@ pub mod releases;
 pub mod resolve;
 pub mod resources;
 pub mod rights;
+pub mod rules;
 pub mod services;
 pub mod settings;
 pub mod timeline;
@@ -211,7 +212,13 @@ promised a stable `/api/v1`.",
         (name = "resources", description = "A project's resources and objects of any kind, as YAML"),
         (name = "settings", description = "Zeabur's own settings"),
     ),
-    components(schemas(pods::exec::ClientFrame, pods::exec::ServerFrame))
+    components(schemas(
+        pods::exec::ClientFrame,
+        pods::exec::ServerFrame,
+        rules::DatabaseName,
+        rules::ProjectName,
+        rules::ServiceReplicas
+    ))
 )]
 struct ApiDoc;
 

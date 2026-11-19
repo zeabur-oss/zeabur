@@ -312,7 +312,7 @@ async fn compute_any(
 /// Computes the writes a change needs and returns them with a token; writes nothing.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/plan", tag = "projects",
     operation_id = "planProject",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     request_body = PlanRequest,
     responses((status = 200, body = PlanResponse),
               (status = 400, body = Problem, content_type = PROBLEM),
@@ -362,10 +362,10 @@ pub(crate) async fn plan(
         &state.settings,
     )
     .await?;
-    let from_yaml = creations::from_yaml(&opened);
-    if from_yaml {
+    if creations::creates(&opened) {
         creations::dry_run(cluster.as_ref(), &project, &plan).await?;
     }
+    let from_yaml = creations::from_yaml(&opened);
     let preview = preview::read(cluster.as_ref(), &project, &plan, &opened).await?;
     let gaps = if from_yaml {
         creations::gaps(&project, &plan)
@@ -431,7 +431,7 @@ pub(crate) fn token_problem(error: TokenError) -> ApiError {
 /// Carries out a plan by its token: checks it, dry-runs every write, then writes.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/apply", tag = "projects",
     operation_id = "applyProject",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     request_body = ApplyRequest,
     responses((status = 200, body = ApplyResponse),
               (status = 400, body = Problem, content_type = PROBLEM),

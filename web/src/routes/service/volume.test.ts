@@ -1,6 +1,6 @@
 import { describe, test, expect } from "bun:test"
 
-import { defaultClaimName, subdomain, volumeRequest, type VolumeValues } from "./volume"
+import { defaultClaimName, volumeRequest, type VolumeValues } from "./volume"
 
 const values = (overrides: Partial<VolumeValues> = {}): VolumeValues => ({
   name: "uploads",
@@ -43,14 +43,5 @@ describe("the new-volume form", () => {
 
   test("does not send a claim name typed back to the default", () => {
     expect(volumeRequest("web", values({ claimName: "web-uploads" })).claimName).toBe(undefined)
-  })
-
-  test("accepts claim names Kubernetes accepts", () => {
-    for (const name of ["data", "web-uploads", "web.uploads-2", "a".repeat(253)]) {
-      expect(subdomain.test(name), name).toBeTruthy()
-    }
-    for (const name of ["", "Data", "web_uploads", "-web", "web.", "a..b", "a".repeat(254)]) {
-      expect(!subdomain.test(name), name).toBeTruthy()
-    }
   })
 })

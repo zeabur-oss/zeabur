@@ -1,12 +1,14 @@
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { AlertmanagerChannelKind } from "@/api/zeabur"
+import { fits } from "@/model/rules"
 
 type Settings = Schemas.AlertmanagerChannelSettings
 export type ChannelKind = Settings["kind"]
 export type Event = Schemas.AlertmanagerEvent
 
-/** `NAME_MAX` in zeabur-modules' alertmanager. */
-export const NAME_MAX = 30
+const NAME = rules["NotificationsPlanRequest.add.name"]
+export const NAME_MAX = NAME.maxLength
 
 export const KINDS = Object.values(AlertmanagerChannelKind).filter(
   (kind): kind is ChannelKind => kind !== "other",
@@ -67,7 +69,7 @@ export interface ChannelForm {
 }
 
 export function nameProblem(name: string): boolean {
-  return !/^[a-z]([a-z0-9-]*[a-z0-9])?$/.test(name) || name.length > NAME_MAX
+  return !fits(name, NAME)
 }
 
 /** The fields still needed, in order: required and empty, or a chat ID that is not a number. */

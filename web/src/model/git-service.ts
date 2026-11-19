@@ -2,7 +2,9 @@
 // whose image is the Build's (docs/design: basic create). The Deployment names the Build's
 // repository with a tag no build makes, and Keel moves it to each image the Build pushes.
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { KEEL_WEBHOOK, type Build } from "@/model/builds"
+import { textProblem } from "@/model/rules"
 import {
   hostProblem,
   imageObjects,
@@ -196,14 +198,9 @@ export const cleanPath = (path: string) =>
     .replace(/^\.?\/+/, "")
     .replace(/\/+$/, "")
 
-/** No segment may start with a dot, as the Build's schema says, so `..` cannot climb out. */
-const PATH_SEGMENT = /^[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*$/
-
-/** What is wrong with a directory or Dockerfile path; empty is fine. */
-export function pathProblem(path: string): "invalid" | undefined {
-  const value = cleanPath(path)
-  if (value === "") return undefined
-  return value.split("/").every((s) => PATH_SEGMENT.test(s)) ? undefined : "invalid"
+/** What is wrong with a directory or Dockerfile path, by the server's rule; empty is fine. */
+export function pathProblem(path: string): "long" | "invalid" | undefined {
+  return textProblem(cleanPath(path), rules["BuildOptionsChange.contextDir"])
 }
 
 /** What is wrong with the fields every service built by Zeabur Builder has. */

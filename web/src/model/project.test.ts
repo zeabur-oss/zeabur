@@ -192,7 +192,6 @@ describe("a new project's name", () => {
     expect(newProjectProblem("Shop", [])).toBe("invalid")
     expect(newProjectProblem("shop-", [])).toBe("invalid")
     expect(newProjectProblem("a".repeat(64), [])).toBe("long")
-    expect(newProjectProblem("kube-tools", [])).toBe("system")
     expect(newProjectProblem("web", ["web"])).toBe("taken")
   })
 })

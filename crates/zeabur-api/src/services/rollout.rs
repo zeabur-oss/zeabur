@@ -251,7 +251,7 @@ pub(crate) fn progress(
 /// back). Poll it while `status` is `progressing`.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/rollout", tag = "services",
     operation_id = "getServiceRollout",
-    params(("project" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path),
            ("kind" = String, Path, description = "deployment, statefulset or daemonset; any case"),
            ("name" = String, Path)),
     responses((status = 200, body = RolloutProgress), (status = 400, body = Problem, content_type = PROBLEM),

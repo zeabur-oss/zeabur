@@ -24,7 +24,7 @@ use crate::views::ServiceDocument;
 /// The web interface reads the project document instead.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}", tag = "services",
     operation_id = "getService",
-    params(("project" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),
     responses((status = 200, body = ServiceDocument), (status = 404, body = Problem, content_type = PROBLEM)))]

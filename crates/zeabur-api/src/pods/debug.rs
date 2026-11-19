@@ -170,7 +170,7 @@ fn status(container: &DebugContainer) -> (DebugContainerStatus, Option<Box<Probl
 /// image cannot be pulled or it cannot start.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/debug", tag = "pods",
     operation_id = "getDebugContainer",
-    params(("project" = String, Path), ("pod" = String, Path), DebugParams),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path), DebugParams),
     responses((status = 200, body = DebugStatus),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM)))]

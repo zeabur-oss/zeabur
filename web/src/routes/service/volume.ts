@@ -11,13 +11,6 @@ export const accessModes = [
   "ReadOnlyMany",
 ] as const satisfies readonly Schemas.AccessMode[]
 
-/**
- * A DNS subdomain, the form of a claim's name:
- * https://kubernetes.io/docs/concepts/overview/working-with-objects/names/#dns-subdomain-names
- */
-export const subdomain =
-  /^(?=.{1,253}$)[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/
-
 export interface VolumeValues {
   name: string
   mountPath: string

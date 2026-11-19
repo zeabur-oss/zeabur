@@ -61,9 +61,20 @@ impl AccessMode {
 pub struct VolumeRequest {
     /// The volume's name in the pod.
     #[serde(default)]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(max_length = 63, pattern = "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+    )]
     pub name: String,
     /// The claim's name; absent for `<workload>-<name>`. A claim that exists is never reused.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(
+            max_length = 253,
+            pattern = r"^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$"
+        )
+    )]
     pub claim_name: Option<String>,
     /// How the nodes may mount the claim; absent for `ReadWriteOnce`.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -145,7 +145,7 @@ pub struct ProjectNamespace {
 /// A project's Namespace: adopted or not, its details, and whether you may change them.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/namespace", tag = "projects",
     operation_id = "getProjectNamespace",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectNamespace),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM)))]
