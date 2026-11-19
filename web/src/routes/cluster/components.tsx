@@ -101,6 +101,17 @@ const icons: Record<string, Icon> = {
 
 type Filter = "all" | "installed" | "recommended"
 
+const NO_CAPABILITIES: Pick<Schemas.CapabilityList, "items" | "installed" | "recommended"> = {
+  items: [],
+  installed: 0,
+  recommended: 0,
+}
+
+const inFilter = (c: Schemas.Capability, filter: Filter) =>
+  filter === "all" ||
+  (filter === "installed" && c.existing) ||
+  (filter === "recommended" && c.suggestion === "recommended")
+
 export function ComponentsPage() {
   const { t, locale } = useI18n()
   const capLabel = useCapabilityLabel()
@@ -122,13 +133,9 @@ export function ComponentsPage() {
       </ClusterFrame>
     )
 
-  const list = capabilities.data?.items ?? []
-  const installed = list.filter((c) => c.existing).length
-  const recommended = list.filter((c) => !c.existing && c.suggestion === "recommended").length
+  const { items: list, installed, recommended } = capabilities.data ?? NO_CAPABILITIES
   const keep = (c: Schemas.Capability) =>
-    (filter === "all" ||
-      (filter === "installed" && c.existing) ||
-      (filter === "recommended" && !c.existing && c.suggestion === "recommended")) &&
+    inFilter(c, filter) &&
     (!query ||
       `${c.name} ${capLabel(c.name)} ${c.components.map((x) => `${x.displayName} ${summaryOf(x, locale)}`).join(" ")}`
         .toLowerCase()

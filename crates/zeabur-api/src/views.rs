@@ -407,6 +407,10 @@ pub struct CapabilityList {
     pub catalogue_commit: String,
     /// Each capability, sorted by name: existing (with evidence) or not (with what to install).
     pub items: Vec<zeabur_catalog::Capability>,
+    /// How many capabilities exist.
+    pub installed: usize,
+    /// How many missing capabilities the catalogue recommends.
+    pub recommended: usize,
 }
 
 /// CPU, memory and pods in plain units.

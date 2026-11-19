@@ -5325,15 +5325,25 @@ components:
       required:
       - catalogueCommit
       - items
+      - installed
+      - recommended
       properties:
         catalogueCommit:
           type: string
           description: Zeabur Catalog's commit.
+        installed:
+          type: integer
+          description: How many capabilities exist.
+          minimum: 0
         items:
           type: array
           items:
             $ref: "#/components/schemas/Capability"
           description: "Each capability, sorted by name: existing (with evidence) or not (with what to install)."
+        recommended:
+          type: integer
+          description: How many missing capabilities the catalogue recommends.
+          minimum: 0
     CatalogView:
       type: object
       description: The catalog release Zeabur reads.

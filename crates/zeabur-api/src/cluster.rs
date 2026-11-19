@@ -225,9 +225,16 @@ pub(crate) async fn capabilities(
     }
     let mut capabilities = zeabur_catalog::detect(&state.catalogue, &facts);
     capabilities.sort_by(|a, b| a.name.cmp(&b.name));
+    let installed = capabilities.iter().filter(|c| c.existing).count();
+    let recommended = capabilities
+        .iter()
+        .filter(|c| c.suggestion == Some(zeabur_catalog::Suggestion::Recommended))
+        .count();
     Ok(Json(CapabilityList {
         catalogue_commit: zeabur_catalog::CATALOGUE_COMMIT.to_owned(),
         items: capabilities,
+        installed,
+        recommended,
     }))
 }
 

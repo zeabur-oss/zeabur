@@ -1183,8 +1183,18 @@ export type Capability = {
 export type CapabilityList = {
   /** Zeabur Catalog's commit. */
   catalogueCommit: string
+  /**
+   * How many capabilities exist.
+   * @minimum 0
+   */
+  installed: number
   /** Each capability, sorted by name: existing (with evidence) or not (with what to install). */
   items: Capability[]
+  /**
+   * How many missing capabilities the catalogue recommends.
+   * @minimum 0
+   */
+  recommended: number
 }
 
 /**

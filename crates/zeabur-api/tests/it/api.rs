@@ -1197,6 +1197,14 @@ mod tests {
         sorted.sort();
         assert_eq!(names(&capabilities), sorted);
         assert!(capabilities["catalogueCommit"].is_string());
+        let items = capabilities["items"].as_array().unwrap();
+        let counted = |keep: fn(&Value) -> bool| items.iter().filter(|c| keep(c)).count();
+        assert_eq!(capabilities["installed"], counted(|c| c["existing"] == true));
+        assert_eq!(
+            capabilities["recommended"],
+            counted(|c| c["suggestion"] == "recommended")
+        );
+        assert!(capabilities["recommended"].as_u64().unwrap() > 0, "{capabilities}");
 
         cluster.update(|s| {
             s.facts.unreadable.push(zeabur_kube::Unreadable {
