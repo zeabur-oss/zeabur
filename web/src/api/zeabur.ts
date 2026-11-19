@@ -801,7 +801,7 @@ export type RestoreRoom = {
   /** The verdict. */
   fit: RestoreFit
   /**
-   * What the nodes have left: millicores.
+   * What the nodes have left in total: millicores.
    * @minimum 0
    */
   freeCpu: number

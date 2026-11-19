@@ -57,12 +57,12 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::k8s_openapi::api::core::v1::{Node, PodSpec, ResourceQuota};
-use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod, NamespaceObjects};
+use zeabur_kube::{Cluster, ClusterExt as _, NamespaceObjects};
 use zeabur_model::{WorkloadKind, WorkloadRef};
 use zeabur_plan::{Change, ObjectName, Plan, PlanRequest, PlannedObject, Warning, Write};
 
 use crate::cluster::WIDE_LIMIT;
-use crate::cluster::capacity::{Amount, bytes, millicores, pod_amounts, spec_amounts};
+use crate::cluster::capacity::{Amount, NodeRoom, bytes, millicores, node_room, spec_amounts};
 use crate::error::ApiError;
 use crate::incidents::allowed;
 use crate::views::UnreadableView;
@@ -250,64 +250,9 @@ pub struct Preview {
 pub(crate) struct Room {
     /// Per ready, schedulable node: CPU, memory and pods left. `None` when nodes or pods could
     /// not be read, or the pod read stopped early.
-    pub(crate) nodes: Option<Vec<(Amount, u64)>>,
+    pub(crate) nodes: Option<Vec<NodeRoom>>,
     /// The namespace's quotas; `None` when they could not be read.
     pub(crate) quotas: Option<Vec<ResourceQuota>>,
-}
-
-/// The room on each ready, schedulable node: allocatable less its pods' requests.
-pub(crate) fn node_room(nodes: &[Node], pods: &[ClusterPod]) -> Vec<(Amount, u64)> {
-    let mut used: BTreeMap<&str, (Amount, u64)> = BTreeMap::new();
-    for pod in pods {
-        if matches!(pod.phase.as_deref(), Some("Succeeded" | "Failed")) {
-            continue;
-        }
-        if let Some(node) = pod.node_name.as_deref() {
-            let entry = used.entry(node).or_default();
-            entry.0.add(pod_amounts(pod).0);
-            entry.1 += 1;
-        }
-    }
-    nodes
-        .iter()
-        .filter(|node| {
-            let spec_ok = !node
-                .spec
-                .as_ref()
-                .and_then(|s| s.unschedulable)
-                .unwrap_or(false);
-            let ready = node
-                .status
-                .as_ref()
-                .and_then(|s| s.conditions.as_ref())
-                .is_some_and(|c| c.iter().any(|c| c.type_ == "Ready" && c.status == "True"));
-            spec_ok && ready
-        })
-        .map(|node| {
-            let allocatable = node.status.as_ref().and_then(|s| s.allocatable.as_ref());
-            let quantity = |key: &str| allocatable.and_then(|a| a.get(key)).map(|q| q.0.as_str());
-            let (taken, count) = used
-                .get(node.metadata.name.as_deref().unwrap_or_default())
-                .copied()
-                .unwrap_or_default();
-            (
-                Amount {
-                    cpu: quantity("cpu")
-                        .and_then(millicores)
-                        .unwrap_or(0)
-                        .saturating_sub(taken.cpu),
-                    memory: quantity("memory")
-                        .and_then(bytes)
-                        .unwrap_or(0)
-                        .saturating_sub(taken.memory),
-                },
-                quantity("pods")
-                    .and_then(|p| p.parse::<u64>().ok())
-                    .unwrap_or(110)
-                    .saturating_sub(count),
-            )
-        })
-        .collect()
 }
 
 /// The workload a planned object is, when it is one.
@@ -705,22 +650,22 @@ fn quota_blockers(need: Need, quotas: &[ResourceQuota]) -> Vec<Blocker> {
 
 /// What keeps `need`'s new pods off the nodes: the resource one pod needs more of than any node
 /// has left, else the count of pods that fit.
-fn node_blockers(need: Need, nodes: &[(Amount, u64)]) -> Vec<Blocker> {
+fn node_blockers(need: Need, nodes: &[NodeRoom]) -> Vec<Blocker> {
     if need.placed == 0 {
         return Vec::new();
     }
-    let per_node = |(free, pods): &(Amount, u64)| -> u64 {
+    let per_node = |node: &NodeRoom| -> u64 {
         let by = |free: u64, one: u64| free.checked_div(one).unwrap_or(u64::MAX);
-        by(free.cpu, need.pod.cpu)
-            .min(by(free.memory, need.pod.memory))
-            .min(*pods)
+        by(node.free.cpu, need.pod.cpu)
+            .min(by(node.free.memory, need.pod.memory))
+            .min(node.pods)
     };
     let placeable: u64 = nodes.iter().map(per_node).fold(0, u64::saturating_add);
     if placeable >= need.placed {
         return Vec::new();
     }
     let most =
-        |pick: fn(&Amount) -> u64| nodes.iter().map(|(free, _)| pick(free)).max().unwrap_or(0);
+        |pick: fn(&Amount) -> u64| nodes.iter().map(|node| pick(&node.free)).max().unwrap_or(0);
     let short: Vec<Blocker> = [
         ("cpu", need.pod.cpu, most(|a| a.cpu)),
         ("memory", need.pod.memory, most(|a| a.memory)),
@@ -1041,13 +986,13 @@ mod tests {
         }))
         .unwrap();
         let room = Room {
-            nodes: Some(vec![(
-                Amount {
+            nodes: Some(vec![NodeRoom {
+                free: Amount {
                     cpu: 200,
                     memory: 1 << 30,
                 },
-                50,
-            )]),
+                pods: 50,
+            }]),
             quotas: Some(vec![quota]),
         };
         let fit = fit(need, &room);
@@ -1059,13 +1004,13 @@ mod tests {
         assert_eq!(fit.blockers[1].resource, "cpu");
 
         let roomy = Room {
-            nodes: Some(vec![(
-                Amount {
+            nodes: Some(vec![NodeRoom {
+                free: Amount {
                     cpu: 4000,
                     memory: 8 << 30,
                 },
-                50,
-            )]),
+                pods: 50,
+            }]),
             quotas: Some(Vec::new()),
         };
         assert_eq!(super::fit(need, &roomy).status, FitStatus::Fits);

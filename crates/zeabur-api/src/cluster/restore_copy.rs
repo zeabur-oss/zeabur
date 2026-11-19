@@ -6,8 +6,8 @@
 //!   as `<service>.<namespace>.svc` [k8s-dns], so a copy that keeps every value still reaches the
 //!   original's Services. The plan names them, the Secrets to check, the CronJobs that a copy
 //!   pauses, and the routes that come back in a last step.
-//! - **Room.** The copy's pods request what the original's running pods request. The room is what
-//!   every ready, schedulable node has left, as a plan's fit counts it.
+//! - **Room.** The copy's pods request what the original's running pods request. Each must fit on
+//!   one ready, schedulable node, with a pod slot, after the larger pods are placed.
 //! - **Deleted projects.** A backup of the whole cluster names no namespaces, so `GET
 //!   /api/v1/cluster/backups/{backup}/deleted-projects` reads them from the backup's list. Only the
 //!   archive holds their labels, so Zeabur downloads it only when a listed namespace is gone.
@@ -27,11 +27,10 @@ use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod, ResourceRef};
 use zeabur_modules::velero::cluster::Inventory;
 
 use crate::cluster::backup_download;
-use crate::cluster::capacity::{Amount, pod_amounts};
+use crate::cluster::capacity::{Amount, NodeRoom, node_room, place, pod_amounts};
 use crate::error::{ApiError, list_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
-use crate::projects::writes::preview::node_room;
 
 /// The most pods read to count the room.
 const PODS_READ: usize = 5000;
@@ -41,7 +40,7 @@ const PODS_READ: usize = 5000;
 #[serde(rename_all = "camelCase")]
 #[schema(as = RestoreFit)]
 pub enum Fit {
-    /// The nodes have room for what the original's pods request.
+    /// Each of the original's pods fits on a node, by what it requests.
     Fits,
     /// They do not.
     Short,
@@ -60,7 +59,7 @@ pub struct Room {
     pub need_cpu: u64,
     /// Bytes.
     pub need_memory: u64,
-    /// What the nodes have left: millicores.
+    /// What the nodes have left in total: millicores.
     pub free_cpu: u64,
     /// Bytes.
     pub free_memory: u64,
@@ -88,23 +87,21 @@ pub struct Copy {
     pub room: Option<Room>,
 }
 
-/// The room the running pods of `source` need against what `room` has left.
+/// The room the running pods of `source` need against what `nodes` have left.
 #[must_use]
-pub(crate) fn room(pods: &[ClusterPod], source: &str, room: Option<&[(Amount, u64)]>) -> Room {
-    let mut need = Amount::default();
-    for pod in pods.iter().filter(|p| p.namespace == source) {
-        if !matches!(pod.phase.as_deref(), Some("Succeeded" | "Failed")) {
-            need.add(pod_amounts(pod).0);
-        }
-    }
-    let mut free = Amount::default();
-    for (left, _) in room.unwrap_or_default() {
-        free.add(*left);
-    }
-    let fit = match room {
+pub(crate) fn room(pods: &[ClusterPod], source: &str, nodes: Option<&[NodeRoom]>) -> Room {
+    let copies: Vec<Amount> = pods
+        .iter()
+        .filter(|p| p.namespace == source)
+        .filter(|p| !matches!(p.phase.as_deref(), Some("Succeeded" | "Failed")))
+        .map(|p| pod_amounts(p).0)
+        .collect();
+    let need: Amount = copies.iter().copied().sum();
+    let free: Amount = nodes.unwrap_or_default().iter().map(|node| node.free).sum();
+    let fit = match nodes {
         None => Fit::Unknown,
-        Some(_) if need.cpu > free.cpu || need.memory > free.memory => Fit::Short,
-        Some(_) => Fit::Fits,
+        Some(nodes) if place(&copies, nodes) => Fit::Fits,
+        Some(_) => Fit::Short,
     };
     Room {
         fit,
@@ -230,20 +227,12 @@ mod tests {
             pod("blog", "4", "8Gi", "Succeeded"),
             pod("shop", "2", "2Gi", "Running"),
         ];
-        let roomy = [(
-            Amount {
-                cpu: 1000,
-                memory: 4 << 30,
-            },
-            10,
-        )];
-        let tight = [(
-            Amount {
-                cpu: 400,
-                memory: 4 << 30,
-            },
-            10,
-        )];
+        let node = |cpu, memory| NodeRoom {
+            free: Amount { cpu, memory },
+            pods: 10,
+        };
+        let roomy = [node(1000, 4 << 30)];
+        let tight = [node(400, 4 << 30)];
         let fits = room(&pods, "blog", Some(&roomy));
         assert_eq!(
             (fits.fit, fits.need_cpu, fits.need_memory),
@@ -251,5 +240,19 @@ mod tests {
         );
         assert_eq!(room(&pods, "blog", Some(&tight)).fit, Fit::Short);
         assert_eq!(room(&pods, "blog", None).fit, Fit::Unknown);
+    }
+
+    #[test]
+    fn room_spread_over_nodes_does_not_fit_a_pod_larger_than_any_one_of_them() {
+        let pods = [pod("blog", "100m", "2Gi", "Running")];
+        let gib = NodeRoom {
+            free: Amount {
+                cpu: 4000,
+                memory: 1 << 30,
+            },
+            pods: 10,
+        };
+        let copy = room(&pods, "blog", Some(&[gib, gib, gib]));
+        assert_eq!((copy.fit, copy.free_memory), (Fit::Short, 3 << 30));
     }
 }
