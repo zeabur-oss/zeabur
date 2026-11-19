@@ -17,9 +17,18 @@ use std::process::ExitCode;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use secrecy::ExposeSecret as _;
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use zeabur_api::projects::backups::ProviderState;
+use zeabur_api::projects::builds::ProjectBuilds;
+use zeabur_api::projects::source_upload::UploadedSource;
+use zeabur_api::projects::writes::{ApplyRequest, ApplyResponse, PlanResponse};
+use zeabur_api::views::ProjectList;
+use zeabur_core::problem::Problem;
 use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
 use zeabur_kube::{Cluster, UserClient, UserToken, ZeaburInfo};
+use zeabur_modules::zeabur_builder::ZeaburBuilderBuild;
+use zeabur_plan::{Change, PlanRequest, UploadMethod, UploadServiceChange};
 
 use crate::forward::{self, ServiceAddress};
 use crate::in_process::InProcess;
@@ -39,6 +48,15 @@ enum Method {
     Railpack,
     /// The Dockerfile at the top of the folder.
     Dockerfile,
+}
+
+impl Method {
+    const fn upload(self) -> UploadMethod {
+        match self {
+            Self::Railpack => UploadMethod::Railpack,
+            Self::Dockerfile => UploadMethod::Dockerfile,
+        }
+    }
 }
 
 /// Options of `zeaburctl up`.
@@ -262,30 +280,37 @@ enum Zeabur {
 }
 
 impl Zeabur {
-    async fn get(&self, path_and_query: &str) -> Result<Value, Value> {
+    async fn get<T: DeserializeOwned>(&self, path_and_query: &str) -> Result<T, String> {
         match self {
             Self::Server(server) => server.get(path_and_query).await,
             Self::Local(api) => api.get(path_and_query).await,
         }
+        .map_err(said)
     }
 
-    async fn post(&self, path_and_query: &str, body: &Value) -> Result<Value, Value> {
+    async fn post<B: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path_and_query: &str,
+        body: &B,
+    ) -> Result<T, String> {
         match self {
             Self::Server(server) => server.post(path_and_query, body).await,
             Self::Local(api) => api.post(path_and_query, body).await,
         }
+        .map_err(said)
     }
 
-    async fn post_bytes(
+    async fn post_bytes<T: DeserializeOwned>(
         &self,
         path_and_query: &str,
         content_type: &str,
         bytes: Vec<u8>,
-    ) -> Result<Value, Value> {
+    ) -> Result<T, String> {
         match self {
             Self::Server(server) => server.post_bytes(path_and_query, content_type, bytes).await,
             Self::Local(api) => api.post_bytes(path_and_query, content_type, bytes).await,
         }
+        .map_err(said)
     }
 }
 
@@ -326,52 +351,44 @@ fn folder_name(path: &Path) -> String {
 }
 
 /// What a problem says, for the terminal.
-fn said(problem: &Value) -> String {
-    problem
-        .get("detail")
-        .and_then(Value::as_str)
-        .unwrap_or("Zeabur gave no reason")
-        .to_owned()
+fn said(problem: Box<Problem>) -> String {
+    if problem.detail.is_empty() {
+        "Zeabur gave no reason".to_owned()
+    } else {
+        problem.detail
+    }
 }
 
-fn named<'a>(builds: &'a Value, name: &str) -> Option<&'a Value> {
-    builds
-        .get("builds")?
-        .as_array()?
-        .iter()
-        .find(|b| b.get("name").and_then(Value::as_str) == Some(name))
+fn named<'a>(builds: &'a ProjectBuilds, name: &str) -> Option<&'a ZeaburBuilderBuild> {
+    builds.builds.iter().find(|b| b.name == name)
 }
 
-async fn plan_and_apply(api: &Zeabur, project: &str, changes: Vec<Value>) -> Result<(), String> {
-    let planned = api
+async fn plan_and_apply(api: &Zeabur, project: &str, changes: Vec<Change>) -> Result<(), String> {
+    let planned: PlanResponse = api
         .post(
             &format!("/api/v1/projects/{project}/plan"),
-            &json!({"changes": changes}),
+            &PlanRequest { changes },
         )
-        .await
-        .map_err(|p| said(&p))?;
-    api.post(
+        .await?;
+    api.post::<_, ApplyResponse>(
         &format!("/api/v1/projects/{project}/apply"),
-        &json!({"token": planned.get("token")}),
+        &ApplyRequest {
+            token: planned.token,
+            via: None,
+        },
     )
-    .await
-    .map_err(|p| said(&p))?;
+    .await?;
     Ok(())
 }
 
 /// The projects the person may put a service in.
 async fn projects(api: &Zeabur) -> Result<Vec<String>, String> {
-    let list = api.get("/api/v1/projects").await.map_err(|p| said(&p))?;
-    let items = list
-        .get("items")
-        .and_then(Value::as_array)
-        .map_or(&[][..], Vec::as_slice);
-    Ok(items
-        .iter()
-        .filter(|p| {
-            p.get("adopted") == Some(&json!(true)) && p.get("deleting") != Some(&json!(true))
-        })
-        .filter_map(|p| p.get("name").and_then(Value::as_str).map(str::to_owned))
+    let list: ProjectList = api.get("/api/v1/projects").await?;
+    Ok(list
+        .items
+        .into_iter()
+        .filter(|p| p.adopted && !p.deleting)
+        .map(|p| p.name)
         .collect())
 }
 
@@ -444,19 +461,20 @@ async fn create_service(
     target: &Target,
     request: &str,
 ) -> Result<(), String> {
-    let mut change = json!({
-        "op": "createUploadService",
-        "name": name,
-        "request": request,
-        "method": match target.method {
-            Method::Railpack => "railpack",
-            Method::Dockerfile => "dockerfile",
-        },
-    });
-    if let (Some(port), Some(change)) = (target.port, change.as_object_mut()) {
-        change.insert("port".to_owned(), json!(port));
-    }
-    plan_and_apply(api, project, vec![change]).await
+    let change = UploadServiceChange {
+        name: name.to_owned(),
+        request: request.to_owned(),
+        method: target.method.upload(),
+        directory: None,
+        dockerfile: None,
+        port: target.port,
+        host: None,
+        variables: Vec::new(),
+        build_variables: Vec::new(),
+        size: None,
+        security: None,
+    };
+    plan_and_apply(api, project, vec![Change::CreateUploadService(change)]).await
 }
 
 /// Chooses the project and the service, makes the service when it is missing, then pushes the
@@ -471,17 +489,16 @@ async fn deploy(
 ) -> Result<String, String> {
     let project = choose_project(api, target.project.as_deref(), &mut ask).await?;
     let project = project.as_str();
-    let builds = api
+    let builds: ProjectBuilds = api
         .get(&format!("/api/v1/projects/{project}/builds"))
-        .await
-        .map_err(|p| said(&p))?;
-    if builds.get("state").and_then(Value::as_str) == Some("not-installed") {
+        .await?;
+    if builds.state == ProviderState::NotInstalled {
         return Err(NO_BUILDER.to_owned());
     }
     let service = choose_service(target, &mut ask)?;
     let service = service.as_str();
     match named(&builds, service) {
-        Some(build) if build.get("archive") != Some(&json!(true)) => {
+        Some(build) if !build.archive => {
             return Err(format!(
                 "{service} builds from Git. Pick another name to make a service from a folder."
             ));
@@ -491,7 +508,10 @@ async fn deploy(
             plan_and_apply(
                 api,
                 project,
-                vec![json!({"op": "uploadToken", "build": service, "request": request})],
+                vec![Change::UploadToken {
+                    build: service.to_owned(),
+                    request: request.to_owned(),
+                }],
             )
             .await?;
         }
@@ -513,18 +533,20 @@ async fn deploy(
     }
     wait_for_token(api, project, service, request, timing).await?;
     output::info("Uploading.");
-    let uploaded = api
+    let uploaded: UploadedSource = api
         .post_bytes(
             &format!("/api/v1/projects/{project}/builds/{service}/source?request={request}"),
             "application/gzip",
             folder,
         )
-        .await
-        .map_err(|p| said(&p))?;
+        .await?;
     plan_and_apply(
         api,
         project,
-        vec![json!({"op": "archiveDigest", "build": service, "digest": uploaded.get("digest")})],
+        vec![Change::ArchiveDigest {
+            build: service.to_owned(),
+            digest: uploaded.digest,
+        }],
     )
     .await?;
     Ok(service.to_owned())
@@ -539,12 +561,11 @@ async fn wait_for_token(
 ) -> Result<(), String> {
     let deadline = tokio::time::Instant::now() + timing.wait;
     loop {
-        let builds = api
+        let builds: ProjectBuilds = api
             .get(&format!("/api/v1/projects/{project}/builds"))
-            .await
-            .map_err(|p| said(&p))?;
+            .await?;
         let answered = named(&builds, service)
-            .and_then(|b| b.get("uploadRequest"))
+            .and_then(|b| b.upload_request.as_deref())
             .is_some_and(|asked| asked == request);
         if answered {
             return Ok(());
@@ -565,6 +586,7 @@ mod tests {
     use axum::http::{StatusCode, header};
     use axum::response::IntoResponse as _;
     use secrecy::SecretString;
+    use serde_json::{Value, json};
     use zeabur_api::access::SingleCluster;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};

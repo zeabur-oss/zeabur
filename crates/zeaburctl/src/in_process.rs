@@ -1,16 +1,20 @@
 //! The API in this process: requests go to `zeabur_api::router` as a service call, with no
-//! listener, so the answers are the web interface's, read with the person's kubeconfig.
+//! listener, so the answers are the web interface's, read with the person's kubeconfig. Requests
+//! and answers are the server's own types.
 
 use std::sync::Arc;
 
 use axum::Router;
 use axum::body::Body;
 use axum::http::{Method, Request};
-use serde_json::Value;
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use tower::ServiceExt as _;
 use zeabur_api::access::SingleCluster;
-use zeabur_core::problem::{Kind, Problem};
+use zeabur_core::problem::Problem;
 use zeabur_kube::UserClient;
+
+use crate::answer::{self, internal};
 
 /// The largest answer read: a project document of a large namespace, with room to spare.
 const MAX_BODY: usize = 64 * 1024 * 1024;
@@ -64,14 +68,21 @@ impl InProcess {
         Self { router }
     }
 
-    /// `GET` `path_and_query`: the JSON of a success, or the problem the API answered with.
-    pub(crate) async fn get(&self, path_and_query: &str) -> Result<Value, Value> {
+    /// `GET` `path_and_query`: the answer as `T`, or the problem the API answered with.
+    pub(crate) async fn get<T: DeserializeOwned>(
+        &self,
+        path_and_query: &str,
+    ) -> Result<T, Box<Problem>> {
         self.send(Method::GET, path_and_query, None, Body::empty())
             .await
     }
 
     /// `POST` `body` as JSON to `path_and_query`.
-    pub(crate) async fn post(&self, path_and_query: &str, body: &Value) -> Result<Value, Value> {
+    pub(crate) async fn post<B: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path_and_query: &str,
+        body: &B,
+    ) -> Result<T, Box<Problem>> {
         let bytes = serde_json::to_vec(body)
             .map_err(|e| internal(&format!("The request is not JSON: {e}")))?;
         self.send(
@@ -84,12 +95,12 @@ impl InProcess {
     }
 
     /// `POST` `bytes` to `path_and_query` as `content_type`.
-    pub(crate) async fn post_bytes(
+    pub(crate) async fn post_bytes<T: DeserializeOwned>(
         &self,
         path_and_query: &str,
         content_type: &str,
         bytes: Vec<u8>,
-    ) -> Result<Value, Value> {
+    ) -> Result<T, Box<Problem>> {
         let length = bytes.len();
         self.send(
             Method::POST,
@@ -100,13 +111,13 @@ impl InProcess {
         .await
     }
 
-    async fn send(
+    async fn send<T: DeserializeOwned>(
         &self,
         method: Method,
         path_and_query: &str,
         content: Option<(&str, usize)>,
         body: Body,
-    ) -> Result<Value, Value> {
+    ) -> Result<T, Box<Problem>> {
         let mut request = Request::builder().method(method).uri(path_and_query);
         if let Some((content_type, length)) = content {
             request = request
@@ -117,17 +128,10 @@ impl InProcess {
             .body(body)
             .map_err(|e| internal(&format!("{path_and_query} is not a request path: {e}")))?;
         let Ok(response) = self.router.clone().oneshot(request).await;
-        let success = response.status().is_success();
+        let status = response.status();
         let body = axum::body::to_bytes(response.into_body(), MAX_BODY)
             .await
             .map_err(|e| internal(&format!("Unable to read the answer: {e}")))?;
-        let value: Value = serde_json::from_slice(&body)
-            .map_err(|e| internal(&format!("The answer is not JSON: {e}")))?;
-        if success { Ok(value) } else { Err(value) }
+        answer::read(status, &body, "The API")
     }
-}
-
-/// A problem of `zeaburctl`'s own, in the API's shape.
-fn internal(detail: &str) -> Value {
-    serde_json::to_value(Problem::new(Kind::Internal, detail)).unwrap_or(Value::Null)
 }

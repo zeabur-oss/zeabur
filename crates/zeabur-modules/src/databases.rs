@@ -37,7 +37,7 @@ pub const RESTORED_BACKUP: &str = "zeabur.com/restored-backup";
 pub const RESTORED_TIME: &str = "zeabur.com/restored-time";
 
 /// A database engine.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseEngine)]
 pub enum Engine {
@@ -54,7 +54,7 @@ pub enum Engine {
 }
 
 /// How a database is, from its operator's status.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseState)]
 pub enum State {
@@ -73,7 +73,7 @@ pub enum State {
 }
 
 /// Where and as whom to connect, inside the cluster.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseConnection)]
 pub struct Connection {
@@ -100,7 +100,7 @@ pub struct Connection {
 }
 
 /// A database user for applications, and the Secret key holding its password.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseAppUser)]
 pub struct AppUser {
@@ -117,7 +117,7 @@ pub struct AppUser {
 }
 
 /// Where backups go: an S3-compatible bucket.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseBackupStore)]
 pub struct Store {
@@ -143,7 +143,7 @@ pub struct Store {
 }
 
 /// A database's backups.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseBackups)]
 pub struct Backups {
@@ -164,7 +164,7 @@ pub struct Backups {
 }
 
 /// The times a new database can recover to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseRecoveryWindow)]
 pub struct RecoveryWindow {
@@ -177,7 +177,7 @@ pub struct RecoveryWindow {
 
 /// The backup a database was made from, as Zeabur noted it on the object when it planned the
 /// restore.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseRestored)]
 pub struct Restored {
@@ -192,7 +192,7 @@ pub struct Restored {
 }
 
 /// One database cluster.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Database {
     /// The object it is read from.

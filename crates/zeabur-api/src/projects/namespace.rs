@@ -41,7 +41,7 @@ mod deleting;
 use axum::extract::State;
 pub(crate) use deleting::held_objects;
 pub use deleting::{HeldObject, ProjectDeleting, RemainingContent, RemainingFinalizer};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, MANAGE_VERB, is_system_namespace};
 use zeabur_core::problem::{Denied, MEDIA_TYPE as PROBLEM, Problem};
@@ -54,7 +54,7 @@ use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
 /// Whether the person may change something, as one `SelfSubjectAccessReview` answers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum Permission {
     /// kube-apiserver allows it.
@@ -87,7 +87,7 @@ impl From<Result<bool, ClusterError>> for Permission {
 }
 
 /// A project's Namespace.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectNamespace {
     /// The Namespace.

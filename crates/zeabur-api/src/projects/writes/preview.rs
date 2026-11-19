@@ -53,7 +53,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::k8s_openapi::api::core::v1::{Node, PodSpec, ResourceQuota};
@@ -68,7 +68,7 @@ use crate::incidents::allowed;
 use crate::views::UnreadableView;
 
 /// What happens to a workload's pods.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum RolloutAction {
     /// Its pods are replaced: the pod template changes.
@@ -85,7 +85,7 @@ pub enum RolloutAction {
 }
 
 /// One workload whose pods a plan changes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Rollout {
     /// The workload.
@@ -109,7 +109,7 @@ pub struct Rollout {
 }
 
 /// Whether the plan's new pods fit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum FitStatus {
     /// The plan adds no pod and grows none.
@@ -123,7 +123,7 @@ pub enum FitStatus {
 }
 
 /// What keeps a pod from being created or placed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum BlockerKind {
     /// A `ResourceQuota` of the namespace: kube-apiserver refuses the pod.
@@ -133,7 +133,7 @@ pub enum BlockerKind {
 }
 
 /// One limit the new pods exceed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Blocker {
     /// A quota or the nodes.
@@ -150,7 +150,7 @@ pub struct Blocker {
 }
 
 /// Whether the plan's new pods fit, and what blocks them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Fit {
     /// The verdict.
@@ -167,7 +167,7 @@ pub struct Fit {
 }
 
 /// What kind of data a plan loses.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum DataLossKind {
     /// A deleted PersistentVolumeClaim; its volume follows its reclaim policy.
@@ -180,7 +180,7 @@ pub enum DataLossKind {
 }
 
 /// Data a plan loses.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DataLoss {
     /// What kind.
@@ -200,7 +200,7 @@ pub struct DataLoss {
 }
 
 /// A field the plan removes.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Removal {
     /// The object.
@@ -214,7 +214,7 @@ pub struct Removal {
 }
 
 /// A CloudNativePG `Cluster` a plan creates: its operator starts its instances.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatabaseStart {
     /// The `Cluster`'s name.
@@ -226,7 +226,7 @@ pub struct DatabaseStart {
 }
 
 /// What a plan does once applied.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Preview {
     /// The workloads whose pods change, sorted.

@@ -21,7 +21,7 @@
 //! writes go with the person's credential.
 
 use axum::extract::State;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
@@ -37,7 +37,7 @@ use crate::projects::backups::{ProviderState, read_all};
 use crate::views::UnreadableView;
 
 /// Whether an engine's operator, and its backup component, could be read.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatabaseOperator {
     /// The engine.
@@ -54,7 +54,7 @@ pub struct DatabaseOperator {
 }
 
 /// A project's databases.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDatabases {
     /// One per engine this build knows.

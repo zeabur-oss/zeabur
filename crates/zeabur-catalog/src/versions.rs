@@ -35,10 +35,11 @@
 //! [k8s-skew]: https://kubernetes.io/releases/version-skew-policy/
 //! [gke-notifications]: https://docs.cloud.google.com/kubernetes-engine/docs/concepts/cluster-notifications
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::fmt;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_model::Health;
 
@@ -46,17 +47,17 @@ use zeabur_model::Health;
 pub const DATA_AS_OF: &str = "2026-10-14";
 
 /// One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Release {
     /// `1.34`.
-    pub minor: &'static str,
+    pub minor: Cow<'static, str>,
     /// Its first release.
-    pub released: &'static str,
+    pub released: Cow<'static, str>,
     /// From this day only critical fixes are made ("maintenance mode").
-    pub maintenance_from: &'static str,
+    pub maintenance_from: Cow<'static, str>,
     /// The last day it gets patches.
-    pub end_of_life: &'static str,
+    pub end_of_life: Cow<'static, str>,
 }
 
 /// Kubernetes minors still supported or recently ended, newest first.
@@ -67,34 +68,34 @@ pub struct Release {
 /// otherwise used: 1.33 is past its end of life.
 pub const RELEASES: &[Release] = &[
     Release {
-        minor: "1.37",
-        released: "2026-08-26",
-        maintenance_from: "2027-08-28",
-        end_of_life: "2027-10-28",
+        minor: Cow::Borrowed("1.37"),
+        released: Cow::Borrowed("2026-08-26"),
+        maintenance_from: Cow::Borrowed("2027-08-28"),
+        end_of_life: Cow::Borrowed("2027-10-28"),
     },
     Release {
-        minor: "1.36",
-        released: "2026-04-22",
-        maintenance_from: "2027-04-28",
-        end_of_life: "2027-06-28",
+        minor: Cow::Borrowed("1.36"),
+        released: Cow::Borrowed("2026-04-22"),
+        maintenance_from: Cow::Borrowed("2027-04-28"),
+        end_of_life: Cow::Borrowed("2027-06-28"),
     },
     Release {
-        minor: "1.35",
-        released: "2025-12-17",
-        maintenance_from: "2026-12-28",
-        end_of_life: "2027-02-28",
+        minor: Cow::Borrowed("1.35"),
+        released: Cow::Borrowed("2025-12-17"),
+        maintenance_from: Cow::Borrowed("2026-12-28"),
+        end_of_life: Cow::Borrowed("2027-02-28"),
     },
     Release {
-        minor: "1.34",
-        released: "2025-08-27",
-        maintenance_from: "2026-08-27",
-        end_of_life: "2026-10-27",
+        minor: Cow::Borrowed("1.34"),
+        released: Cow::Borrowed("2025-08-27"),
+        maintenance_from: Cow::Borrowed("2026-08-27"),
+        end_of_life: Cow::Borrowed("2026-10-27"),
     },
     Release {
-        minor: "1.33",
-        released: "2025-04-23",
-        maintenance_from: "2026-04-28",
-        end_of_life: "2026-06-28",
+        minor: Cow::Borrowed("1.33"),
+        released: Cow::Borrowed("2025-04-23"),
+        maintenance_from: Cow::Borrowed("2026-04-28"),
+        end_of_life: Cow::Borrowed("2026-06-28"),
     },
 ];
 
@@ -159,7 +160,7 @@ impl fmt::Display for Version {
 
 /// What the cluster's version calls for. An open set: clients must ignore values they do not
 /// know.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum UpgradeState {
     /// A newer build of the same minor exists.
@@ -195,7 +196,7 @@ impl UpgradeState {
 }
 
 /// A state of the cluster's version with how it shows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpgradeFinding {
     /// The state.
@@ -215,7 +216,7 @@ pub fn findings(states: &[UpgradeState]) -> impl Iterator<Item = UpgradeFinding>
 }
 
 /// A node whose kubelet minor differs from kube-apiserver's.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeSkew {
     /// The node.
@@ -273,7 +274,7 @@ pub struct Assessment {
 /// The table's row for `minor` (`1.34`).
 #[must_use]
 pub fn release(minor: &str) -> Option<Release> {
-    RELEASES.iter().find(|r| r.minor == minor).copied()
+    RELEASES.iter().find(|r| r.minor == minor).cloned()
 }
 
 /// The order of two minors (`1.34`), as [`Version::parse`] reads them.
@@ -290,17 +291,17 @@ pub fn assess(inputs: &Inputs<'_>) -> Assessment {
     };
     let minor = current.minor_label();
     out.release = release(&minor);
-    match out.release {
-        Some(row) if inputs.today > row.end_of_life => out.states.push(UpgradeState::EndOfLife),
-        Some(row) if inputs.today >= row.maintenance_from => {
+    match &out.release {
+        Some(row) if inputs.today > &*row.end_of_life => out.states.push(UpgradeState::EndOfLife),
+        Some(row) if inputs.today >= &*row.maintenance_from => {
             out.states.push(UpgradeState::Maintenance);
         }
         Some(_) => {}
         None => match (RELEASES.first(), RELEASES.last()) {
-            (Some(newest), _) if minor_order(&minor, newest.minor) == Ordering::Greater => {
+            (Some(newest), _) if minor_order(&minor, &newest.minor) == Ordering::Greater => {
                 out.states.push(UpgradeState::NewerThanData);
             }
-            (_, Some(oldest)) if minor_order(&minor, oldest.minor) == Ordering::Less => {
+            (_, Some(oldest)) if minor_order(&minor, &oldest.minor) == Ordering::Less => {
                 out.states.push(UpgradeState::EndOfLife);
             }
             _ => {}
@@ -404,7 +405,7 @@ mod tests {
     fn the_table_is_newest_first_and_dates_are_ordered() {
         for pair in RELEASES.windows(2) {
             let [newer, older] = pair else { unreachable!() };
-            assert_eq!(minor_order(newer.minor, older.minor), Ordering::Greater);
+            assert_eq!(minor_order(&newer.minor, &older.minor), Ordering::Greater);
         }
         for row in RELEASES {
             assert!(row.released < row.maintenance_from && row.maintenance_from < row.end_of_life);

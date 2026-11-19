@@ -68,7 +68,7 @@ use crate::projects::{deploy_keys, snapshot, templates};
 use crate::settings::Settings;
 
 /// A plan and the token that applies it.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PlanResponse {
     /// Send this to `apply` to carry out exactly this plan.
@@ -87,17 +87,17 @@ pub struct PlanResponse {
 }
 
 /// The token of a plan to apply.
-#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApplyRequest {
     /// The token `plan` returned.
     pub token: String,
     /// The form that made the plan, when it is one the experience program tells apart.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub via: Option<Via>,
 }
 
 /// The form that made a plan.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum Via {
     /// Docker Compose import.
@@ -105,7 +105,7 @@ pub enum Via {
 }
 
 /// One object an apply wrote.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Applied {
     /// The object.
@@ -116,7 +116,7 @@ pub struct Applied {
 }
 
 /// What an apply wrote.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 pub struct ApplyResponse {
     /// The objects, in the order written.
     pub applied: Vec<Applied>,

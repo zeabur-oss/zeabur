@@ -17,7 +17,7 @@
 //! service in the project document, see [`crate::projects`].
 
 use axum::extract::State;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::isolation::{PLATFORM_LABEL, PROJECT_POLICY};
 use zeabur_core::names::LABEL_PROJECT;
@@ -36,7 +36,7 @@ use crate::handlers::{AppState, Person};
 use crate::views::UnreadableView;
 
 /// What a project or the cluster is missing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct GapList {
     /// The findings: warnings first, then by rule and subject.

@@ -12,7 +12,7 @@
 use std::collections::BTreeMap;
 
 use axum::extract::State;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_graph::{ObjectKey, OwnerGraph, Snapshot};
@@ -30,7 +30,7 @@ use crate::handlers::{AppState, Person};
 use crate::views::UnreadableView;
 
 /// Whether a provider's objects could be read.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum ProviderState {
     /// Read.

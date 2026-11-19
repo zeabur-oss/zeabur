@@ -3149,6 +3149,9 @@ dependencies = [
  "zeabur-http",
  "zeabur-kube",
  "zeabur-local",
+ "zeabur-model",
+ "zeabur-modules",
+ "zeabur-plan",
  "zeabur-telemetry",
 ]
 
