@@ -6,7 +6,8 @@
 //!
 //! | Method and path | Returns |
 //! |---|---|
-//! | `GET /api/v1/whoami` | who the cluster says you are |
+//! | `GET /api/v1/whoami` | who the cluster says you are, and whether you are a Zeabur Identity member or admin |
+//! | `GET /api/v1/rights` | the rights the interface gates actions by, the role and rule behind each |
 //! | `GET /api/v1/session` | how you are signed in to Zeabur, and whether you can sign out |
 //! | `GET /api/v1/cluster` | the cluster: its Kubernetes version and distribution |
 //! | `GET /api/v1/cluster/upgrades` | end of life, version skew and newer versions from Plans |
@@ -146,6 +147,7 @@ mod query;
 pub mod releases;
 pub mod resolve;
 pub mod resources;
+pub mod rights;
 pub mod services;
 pub mod settings;
 pub mod timeline;
@@ -227,6 +229,7 @@ macro_rules! handlers {
     ($then:ident) => {
         $then! {
             identity::whoami,
+            rights::list,
             identity::get,
             cluster::get,
             cluster::zeabur::get,

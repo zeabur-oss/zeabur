@@ -59,6 +59,10 @@ pub struct WhoAmI {
     pub username: String,
     /// Groups.
     pub groups: Vec<String>,
+    /// Signed in with Zeabur Identity, whose roles the interface can name.
+    pub member: bool,
+    /// In Zeabur Identity's admins group.
+    pub admin: bool,
 }
 
 /// The cluster.

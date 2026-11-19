@@ -193,6 +193,29 @@ mod tests {
             .collect()
     }
 
+    /// Someone signed in with a kubeconfig is no Zeabur Identity member; a member in the admins
+    /// group is an admin.
+    #[tokio::test]
+    async fn whoami_says_whether_you_are_a_zeabur_identity_member_or_admin() {
+        let you = get(&cluster(), "/api/v1/whoami").await;
+        assert_eq!(
+            (&you["member"], &you["admin"]),
+            (&json!(false), &json!(false))
+        );
+        let admin = cluster();
+        admin.update(|s| {
+            s.identity = Identity {
+                username: "zeabur:ada".to_owned(),
+                groups: vec!["zeabur:admins".to_owned()],
+            };
+        });
+        let you = get(&admin, "/api/v1/whoami").await;
+        assert_eq!(
+            (&you["member"], &you["admin"]),
+            (&json!(true), &json!(true))
+        );
+    }
+
     /// On this machine nobody signs in, so there is no signing out.
     #[tokio::test]
     async fn the_local_session_offers_no_sign_out() {

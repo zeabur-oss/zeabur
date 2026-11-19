@@ -15,6 +15,7 @@ use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use crate::error::ApiError;
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
+use crate::members::{ADMINS_GROUP, USER_PREFIX};
 use crate::views::WhoAmI;
 
 /// How the person is signed in to Zeabur.
@@ -66,6 +67,8 @@ pub(crate) async fn whoami(Person(cluster): Person) -> Result<Json<WhoAmI>, ApiE
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     Ok(Json(WhoAmI {
+        member: identity.username.starts_with(USER_PREFIX),
+        admin: identity.groups.iter().any(|g| g == ADMINS_GROUP),
         username: identity.username,
         groups: identity.groups,
     }))

@@ -116,8 +116,14 @@ pub(crate) async fn list(
     };
     directory.projects = found.projects;
     directory.unreadable.extend(found.unreadable);
-    let mut view = directory.view(namespace, Some(&you), (state.clock)(), links, can);
-    view.project_roles = identity.project_roles;
+    let mut view = directory.view(
+        namespace,
+        Some(&you),
+        (state.clock)(),
+        links,
+        can,
+        identity.project_roles,
+    );
     view.api_tokens = found.api_tokens;
     view.can_manage_tokens = can_tokens;
     Ok(Json(view))

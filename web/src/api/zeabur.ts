@@ -385,7 +385,7 @@ export type ApiTokenView = {
    */
   createdAt?: string | null
   /**
-   * The Kubernetes user name of whoever made it.
+   * Whoever made it: a Zeabur Identity user name, or the Kubernetes user name of anyone else.
    * @nullable
    */
   createdBy?: string | null
@@ -6767,6 +6767,19 @@ export const ManagerTool = {
 } as const
 
 /**
+ * What the person asking may do to a member.
+ */
+export type MemberActions = {
+  /**
+   * Change their access: never your own, and not when their project roles could not be read,
+   * since saving would replace roles nobody saw.
+   */
+  canChangeAccess: boolean
+  /** Remove them: never yourself. */
+  canRemove: boolean
+}
+
+/**
  * A one-time setup link, shown once: only its hash is kept.
  */
 export type SetupLinkView = {
@@ -6965,7 +6978,7 @@ export type PasskeyView = {
 /**
  * A person who can sign in.
  */
-export type MemberView = {
+export type MemberView = MemberActions & {
   /** A disabled member cannot sign in. */
   disabled: boolean
   /**
@@ -7117,6 +7130,16 @@ export type MetricsStoreSetting = {
   /** What could not be read: the settings ConfigMap, or the store through the proxy. */
   unreadable: UnreadableView[]
 }
+
+/**
+ * The least product role that holds a right.
+ */
+export type NeededRole = (typeof NeededRole)[keyof typeof NeededRole]
+
+export const NeededRole = {
+  developer: "developer",
+  admin: "admin",
+} as const
 
 /**
  * How far a peer may reach.
@@ -9328,6 +9351,60 @@ export type Requirement = {
 }
 
 /**
+ * An action the interface gates.
+ */
+export type Right = (typeof Right)[keyof typeof Right]
+
+export const Right = {
+  deploy: "deploy",
+  changeServices: "changeServices",
+  deleteServices: "deleteServices",
+  scale: "scale",
+  readSecrets: "readSecrets",
+  changeSecrets: "changeSecrets",
+  changeConfig: "changeConfig",
+  changeDomains: "changeDomains",
+  createServices: "createServices",
+  changeStorage: "changeStorage",
+  changeDatabases: "changeDatabases",
+  changeObjectStorage: "changeObjectStorage",
+  backUpDatabases: "backUpDatabases",
+  backUpVolumes: "backUpVolumes",
+  restoreVolumes: "restoreVolumes",
+  openTerminal: "openTerminal",
+  portForward: "portForward",
+  readLogs: "readLogs",
+  build: "build",
+  deployFromGit: "deployFromGit",
+  changeNetworkPolicies: "changeNetworkPolicies",
+  changeMembers: "changeMembers",
+  changeApiTokens: "changeApiTokens",
+  changeNodes: "changeNodes",
+  changeBackups: "changeBackups",
+  restoreBackups: "restoreBackups",
+  changeDomainSuffixes: "changeDomainSuffixes",
+  changeNotifications: "changeNotifications",
+  testNotifications: "testNotifications",
+  changeClusterNotifications: "changeClusterNotifications",
+  testClusterNotifications: "testClusterNotifications",
+  changeS3Destinations: "changeS3Destinations",
+  changeGitHubApp: "changeGitHubApp",
+  changeBuildLimits: "changeBuildLimits",
+} as const
+
+/**
+ * The rights that change and delete objects of one resource.
+ */
+export type ResourceRights = {
+  /** The right to delete one. */
+  delete: Right
+  /** The right to change one. */
+  edit: Right
+  /** The resource (plural, `deployments`). */
+  resource: string
+}
+
+/**
  * One value of a revealed Secret.
  */
 export type SecretValue = {
@@ -9350,6 +9427,29 @@ export type RevealedSecret = {
   origin: Origin
   /** Its values by key. */
   values: RevealedSecretValues
+}
+
+/**
+ * What holds a right.
+ */
+export type RightNeeds = {
+  /** The right. */
+  right: Right
+  /** The least product role that holds it. */
+  role: NeededRole
+  /** The Kubernetes rule that grants it, for someone who is not a Zeabur Identity member. */
+  rule: string
+}
+
+/**
+ * Every right, and the resources a right covers. A resource not listed is left to the plan's
+ * dry run.
+ */
+export type Rights = {
+  /** The resources a right covers. */
+  resources: ResourceRights[]
+  /** Every right, with what holds it. */
+  rights: RightNeeds[]
 }
 
 /**
@@ -10346,8 +10446,12 @@ export type VolumeUsageList = {
  * Who the cluster says the person is.
  */
 export type WhoAmI = {
+  /** In Zeabur Identity's admins group. */
+  admin: boolean
   /** Groups. */
   groups: string[]
+  /** Signed in with Zeabur Identity, whose roles the interface can name. */
+  member: boolean
   /** User name. */
   username: string
 }
@@ -13704,6 +13808,22 @@ export const getVolumeRestores = async (
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<VolumeRestores> => {
   return zeaburFetch<VolumeRestores>(getGetVolumeRestoresUrl(project, claim), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getListRightsUrl = () => {
+  return `/api/v1/rights`
+}
+
+/**
+ * @summary The rights the interface gates actions by, what holds each, and the resources each covers.
+The same for everyone; whether you hold one is in the project's, the cluster's or the page's
+answer.
+ */
+export const listRights = async (options?: Parameters<typeof zeaburFetch>[1]): Promise<Rights> => {
+  return zeaburFetch<Rights>(getListRightsUrl(), {
     ...options,
     method: "GET",
   })

@@ -4053,6 +4053,21 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/rights:
+    get:
+      tags:
+      - identity
+      summary: |-
+        The rights the interface gates actions by, what holds each, and the resources each covers.
+        The same for everyone; whether you hold one is in the project's, the cluster's or the page's
+        answer.
+      operationId: listRights
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Rights"
   /api/v1/session:
     get:
       tags:
@@ -4652,7 +4667,7 @@ components:
           type:
           - string
           - "null"
-          description: The Kubernetes user name of whoever made it.
+          description: "Whoever made it: a Zeabur Identity user name, or the Kubernetes user name of anyone else."
         expiresAt:
           type:
           - string
@@ -11139,6 +11154,21 @@ components:
       - autoscaler
       - controller
       - other
+    MemberActions:
+      type: object
+      description: What the person asking may do to a member.
+      required:
+      - canRemove
+      - canChangeAccess
+      properties:
+        canChangeAccess:
+          type: boolean
+          description: |-
+            Change their access: never your own, and not when their project roles could not be read,
+            since saving would replace roles nobody saw.
+        canRemove:
+          type: boolean
+          description: "Remove them: never yourself."
     MemberApplied:
       type: object
       description: What an applied member plan made.
@@ -11340,81 +11370,84 @@ components:
       - admin
       - member
     MemberView:
-      type: object
-      description: A person who can sign in.
-      required:
-      - id
-      - username
-      - groups
-      - role
-      - disabled
-      - passkeys
-      - linked
-      - sessions
-      - invitations
-      - you
-      - origin
-      properties:
-        disabled:
-          type: boolean
-          description: A disabled member cannot sign in.
-        displayName:
-          type:
-          - string
-          - "null"
-          description: Name shown in the interface.
-        groups:
-          type: array
-          items:
+      allOf:
+      - $ref: "#/components/schemas/MemberActions"
+        description: What the person asking may do to this member.
+      - type: object
+        required:
+        - id
+        - username
+        - groups
+        - role
+        - disabled
+        - passkeys
+        - linked
+        - sessions
+        - invitations
+        - you
+        - origin
+        properties:
+          disabled:
+            type: boolean
+            description: A disabled member cannot sign in.
+          displayName:
+            type:
+            - string
+            - "null"
+            description: Name shown in the interface.
+          groups:
+            type: array
+            items:
+              type: string
+            description: Groups; Kubernetes sees each as `zeabur:<group>`.
+          id:
             type: string
-          description: Groups; Kubernetes sees each as `zeabur:<group>`.
-        id:
-          type: string
-          description: "`members/<username>`."
-        invitations:
-          type: integer
-          description: Pending setup links.
-          minimum: 0
-        lastSignInAt:
-          type:
-          - string
-          - "null"
-          description: "The latest sign-in Zeabur Identity knows of: from live sessions and recorded last use."
-        linked:
-          type: array
-          items:
-            $ref: "#/components/schemas/LinkedAccountView"
-          description: Linked GitHub or Google accounts.
-        origin:
-          $ref: "#/components/schemas/Origin"
-          description: The `User`.
-        passkeys:
-          type: array
-          items:
-            $ref: "#/components/schemas/PasskeyView"
-          description: Passkeys, oldest first.
-        projects:
-          type:
-          - array
-          - "null"
-          items:
-            $ref: "#/components/schemas/ProjectGrant"
-          description: |-
-            A member's roles in projects, by project; `None` when Zeabur could not read them. An
-            admin's are left out: their rights cover every project.
-        role:
-          $ref: "#/components/schemas/MemberRole"
-          description: Admin or member.
-        sessions:
-          type: integer
-          description: Signed-in sessions (grants) that can still renew.
-          minimum: 0
-        username:
-          type: string
-          description: Login name; Kubernetes sees `zeabur:<username>`.
-        you:
-          type: boolean
-          description: Whether this is the person asking.
+            description: "`members/<username>`."
+          invitations:
+            type: integer
+            description: Pending setup links.
+            minimum: 0
+          lastSignInAt:
+            type:
+            - string
+            - "null"
+            description: "The latest sign-in Zeabur Identity knows of: from live sessions and recorded last use."
+          linked:
+            type: array
+            items:
+              $ref: "#/components/schemas/LinkedAccountView"
+            description: Linked GitHub or Google accounts.
+          origin:
+            $ref: "#/components/schemas/Origin"
+            description: The `User`.
+          passkeys:
+            type: array
+            items:
+              $ref: "#/components/schemas/PasskeyView"
+            description: Passkeys, oldest first.
+          projects:
+            type:
+            - array
+            - "null"
+            items:
+              $ref: "#/components/schemas/ProjectGrant"
+            description: |-
+              A member's roles in projects, by project; `None` when Zeabur could not read them. An
+              admin's are left out: their rights cover every project.
+          role:
+            $ref: "#/components/schemas/MemberRole"
+            description: Admin or member.
+          sessions:
+            type: integer
+            description: Signed-in sessions (grants) that can still renew.
+            minimum: 0
+          username:
+            type: string
+            description: Login name; Kubernetes sees `zeabur:<username>`.
+          you:
+            type: boolean
+            description: Whether this is the person asking.
+      description: A person who can sign in.
     MemberWrite:
       type: object
       description: One object a member plan writes.
@@ -11779,6 +11812,12 @@ components:
               What its pods use now, with `pods` the number measured; absent unless `metrics` is
               `available`.
           - type: "null"
+    NeededRole:
+      type: string
+      description: The least product role that holds a right.
+      enum:
+      - developer
+      - admin
     NetworkPolicyAccess:
       type: string
       description: How far a peer may reach.
@@ -15650,6 +15689,23 @@ components:
         version:
           type: string
           description: The version.
+    ResourceRights:
+      type: object
+      description: The rights that change and delete objects of one resource.
+      required:
+      - resource
+      - edit
+      - delete
+      properties:
+        delete:
+          $ref: "#/components/schemas/Right"
+          description: The right to delete one.
+        edit:
+          $ref: "#/components/schemas/Right"
+          description: The right to change one.
+        resource:
+          type: string
+          description: The resource (plural, `deployments`).
     Resources:
       type: object
       description: CPU, memory and pods in plain units.
@@ -15763,6 +15819,82 @@ components:
             $ref: "#/components/schemas/SecretValue"
           propertyNames:
             type: string
+    Right:
+      type: string
+      description: An action the interface gates.
+      enum:
+      - deploy
+      - changeServices
+      - deleteServices
+      - scale
+      - readSecrets
+      - changeSecrets
+      - changeConfig
+      - changeDomains
+      - createServices
+      - changeStorage
+      - changeDatabases
+      - changeObjectStorage
+      - backUpDatabases
+      - backUpVolumes
+      - restoreVolumes
+      - openTerminal
+      - portForward
+      - readLogs
+      - build
+      - deployFromGit
+      - changeNetworkPolicies
+      - changeMembers
+      - changeApiTokens
+      - changeNodes
+      - changeBackups
+      - restoreBackups
+      - changeDomainSuffixes
+      - changeNotifications
+      - testNotifications
+      - changeClusterNotifications
+      - testClusterNotifications
+      - changeS3Destinations
+      - changeGitHubApp
+      - changeBuildLimits
+    RightNeeds:
+      type: object
+      description: What holds a right.
+      required:
+      - right
+      - role
+      - rule
+      properties:
+        right:
+          $ref: "#/components/schemas/Right"
+          description: The right.
+        role:
+          $ref: "#/components/schemas/NeededRole"
+          description: The least product role that holds it.
+        rule:
+          type: string
+          description: >-
+            The Kubernetes rule that grants it, for someone who is not a Zeabur Identity
+            member.
+    Rights:
+      type: object
+      description: |-
+        Every right, and the resources a right covers. A resource not listed is left to the plan's
+        dry run.
+      required:
+      - rights
+      - resources
+      properties:
+        resources:
+          type: array
+          items:
+            $ref: "#/components/schemas/ResourceRights"
+          description: The resources a right covers.
+        rights:
+          type: array
+          items:
+            $ref: "#/components/schemas/RightNeeds"
+          description: Every right, with what holds it.
     RiskLocale:
       type: object
       description: A risk's words in one language.
@@ -18768,12 +18900,20 @@ components:
       required:
       - username
       - groups
+      - member
+      - admin
       properties:
+        admin:
+          type: boolean
+          description: In Zeabur Identity's admins group.
         groups:
           type: array
           items:
             type: string
           description: Groups.
+        member:
+          type: boolean
+          description: Signed in with Zeabur Identity, whose roles the interface can name.
         username:
           type: string
           description: User name.

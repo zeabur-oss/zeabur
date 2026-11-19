@@ -56,11 +56,6 @@ export function passkeyKept(member: Pick<Member, "you" | "passkeys">): "last" | 
   return member.you && member.passkeys.length <= 1 ? "last" : undefined
 }
 
-/** Whether a member can be removed by the person asking: never yourself. */
-export function canRemoveMember(member: Pick<Member, "you">): boolean {
-  return !member.you
-}
-
 /** Whether setup links can be made, and whether they work once made. */
 export function linkState(links: SetupLinks): "ready" | "no-issuer" | "not-redeemed" {
   if (!links.issuer) return "no-issuer"
@@ -240,22 +235,14 @@ export function writeCounts(writes: readonly Pick<MemberWrite, "action">[]): {
   return counts
 }
 
-/** Whether a member's access can be changed from what is known: not when their roles could not be
- * read, since saving would replace roles nobody saw. */
-export function canChangeAccess(
-  member: Pick<Member, "you" | "role" | "projects">,
-  projectRoles: boolean,
-): boolean {
-  if (member.you) return false
-  return !projectRoles || member.role === "admin" || member.projects != null
-}
-
 /** Whether a refused project is one a Zeabur Identity member has no role in: they are told an
  * admin can give them one. An admin, or someone signed in with a kubeconfig, sees the refusal
  * and its rule instead. */
-export function lacksProjectRole(problem: Problem, whoami: Schemas.WhoAmI | undefined): boolean {
-  if (!whoami?.username.startsWith("zeabur:")) return false
-  if (whoami.groups.includes("zeabur:admins")) return false
+export function lacksProjectRole(
+  problem: Problem,
+  whoami: Pick<Schemas.WhoAmI, "member" | "admin"> | undefined,
+): boolean {
+  if (!whoami?.member || whoami.admin) return false
   return isRefusal(problem)
 }
 

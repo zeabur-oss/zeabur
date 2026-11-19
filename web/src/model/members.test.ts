@@ -5,8 +5,6 @@ import {
   accessGains,
   accessLosses,
   accessSummary,
-  canChangeAccess,
-  canRemoveMember,
   chosenOf,
   filterMembers,
   grantableProjects,
@@ -48,6 +46,8 @@ const member = (username: string, patch: Partial<Member> = {}): Member => ({
   sessions: 0,
   invitations: 0,
   you: false,
+  canRemove: true,
+  canChangeAccess: true,
   origin: { ...origin, kind: "User", name: username },
   ...patch,
 })
@@ -94,8 +94,6 @@ describe("members", () => {
       undefined,
     )
     expect(passkeyKept(member("a"))).toBe(undefined)
-    expect(canRemoveMember(member("a", { you: true }))).toBe(false)
-    expect(canRemoveMember(member("a"))).toBe(true)
   })
 
   it("says why links cannot be made or would not work", () => {
@@ -302,14 +300,6 @@ describe("project roles", () => {
     expect(accessLosses(member("ada", { role: "admin" }), false, new Map()).admin).toBe(true)
   })
 
-  it("changes access only when the member's roles are known, and never your own", () => {
-    expect(canChangeAccess(member("bob"), true)).toBe(false)
-    expect(canChangeAccess(member("bob"), false)).toBe(true)
-    expect(canChangeAccess(member("bob", { projects: [] }), true)).toBe(true)
-    expect(canChangeAccess(member("ada", { role: "admin" }), true)).toBe(true)
-    expect(canChangeAccess(member("ada", { role: "admin", you: true }), true)).toBe(false)
-  })
-
   it("tells a member without a role apart from an admin or a kubeconfig refused", () => {
     const refused = {
       type: "/problems/forbidden",
@@ -320,12 +310,10 @@ describe("project roles", () => {
       kind: "forbidden",
       kubernetes: { code: 403, reason: "Forbidden", message: "" },
     } as Problem
-    const bob = { username: "zeabur:bob", groups: [] }
+    const bob = { member: true, admin: false }
     expect(lacksProjectRole(refused, bob)).toBe(true)
-    expect(lacksProjectRole(refused, { username: "zeabur:ada", groups: ["zeabur:admins"] })).toBe(
-      false,
-    )
-    expect(lacksProjectRole(refused, { username: "kubernetes-admin", groups: [] })).toBe(false)
+    expect(lacksProjectRole(refused, { member: true, admin: true })).toBe(false)
+    expect(lacksProjectRole(refused, { member: false, admin: false })).toBe(false)
     expect(lacksProjectRole(refused, undefined)).toBe(false)
     expect(lacksProjectRole({ ...refused, kind: "unavailable", kubernetes: undefined }, bob)).toBe(
       false,

@@ -1,48 +1,33 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  askerOf,
-  gate,
-  neededRole,
-  projectPermission,
-  rightOfResource,
-  ruleOf,
-} from "@/model/rights"
+import type { Schemas } from "@/api/client"
+import { askerOf, gate, needsOf, projectPermission, rightOfResource } from "@/model/rights"
 
-const member = askerOf({ username: "zeabur:bob" })
-const admin = askerOf({ username: "zeabur:alice" })
-const kubeconfig = askerOf({ username: "carol" })
+const member = askerOf({ member: true })
+const kubeconfig = askerOf({ member: false })
+
+const rights: Schemas.Rights = {
+  rights: [{ right: "openTerminal", role: "developer", rule: "create pods/exec" }],
+  resources: [{ resource: "statefulsets", edit: "changeServices", delete: "deleteServices" }],
+}
 
 describe("closing an action by the person's rights", () => {
-  test("only a denial closes it, naming the role a member needs", () => {
+  test("only a denial closes it, saying whether the person is a member", () => {
     expect(gate("deploy", "allowed", member)).toStrictEqual({ open: true })
     expect(gate("deploy", "unknown", member)).toStrictEqual({ open: true })
     expect(gate("deploy", undefined, member)).toStrictEqual({ open: true })
-    expect(gate("deploy", "denied", member)).toMatchObject({
+    expect(gate("deploy", "denied", member)).toStrictEqual({
       open: false,
-      role: "developer",
+      right: "deploy",
       member: true,
     })
-    expect(gate("changeMembers", "denied", member)).toMatchObject({ role: "admin" })
+    expect(gate("openTerminal", "denied", kubeconfig)).toMatchObject({ member: false })
   })
 
-  test("a denial closes it for an admin account too", () => {
-    expect(gate("changeNodes", "denied", admin)).toMatchObject({ open: false, role: "admin" })
-  })
-
-  test("someone signed in with a kubeconfig is told the rule, not a role", () => {
-    expect(gate("openTerminal", "denied", kubeconfig)).toMatchObject({
-      open: false,
-      member: false,
-      rule: "create pods/exec",
-    })
-  })
-
-  test("members and nodes need an admin; everything else in a project a developer", () => {
-    expect(neededRole("changeMembers")).toBe("admin")
-    expect(neededRole("deploy")).toBe("developer")
-    expect(neededRole("changeNodes")).toBe("admin")
-    expect(ruleOf("readSecrets")).toBe("get secrets")
+  test("what holds a right comes from the server's rights", () => {
+    expect(needsOf(rights, "openTerminal")).toMatchObject({ role: "developer" })
+    expect(needsOf(rights, "deploy")).toBeUndefined()
+    expect(needsOf(undefined, "deploy")).toBeUndefined()
   })
 
   test("a read-only project closes its rights, and an unknown answer leaves them open", () => {
@@ -51,11 +36,9 @@ describe("closing an action by the person's rights", () => {
     expect(projectPermission(undefined)).toBe("unknown")
   })
 
-  test("an object's YAML is closed by the right for its kind, and any other kind is left open", () => {
-    expect(rightOfResource("deployments", "edit")).toBe("changeServices")
-    expect(rightOfResource("statefulsets", "delete")).toBe("deleteServices")
-    expect(rightOfResource("secrets", "delete")).toBe("changeSecrets")
-    expect(rightOfResource("httproutes", "edit")).toBe("changeDomains")
-    expect(rightOfResource("widgets", "edit")).toBeUndefined()
+  test("an object's YAML is closed by the right the server names for its kind", () => {
+    expect(rightOfResource(rights, "statefulsets", "delete")).toBe("deleteServices")
+    expect(rightOfResource(rights, "widgets", "edit")).toBeUndefined()
+    expect(rightOfResource(undefined, "statefulsets", "edit")).toBeUndefined()
   })
 })

@@ -252,7 +252,7 @@ mod tests {
             json!([{"project": "blog", "role": "viewer"},
                    {"project": "shop", "role": "developer"}])
         );
-        assert_eq!(token["createdBy"], "zeabur:ada");
+        assert_eq!(token["createdBy"], "ada");
         assert_eq!(token["expiresAt"], "2026-11-07T00:00:00Z");
         assert!(token.get("token").is_none(), "{token}");
         assert!(item(&listed, "default").is_none(), "{listed}");
