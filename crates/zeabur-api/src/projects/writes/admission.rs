@@ -83,7 +83,8 @@ pub(crate) async fn refine(
         | Kind::Invalid
         | Kind::TooManyRequests
         | Kind::Unavailable
-        | Kind::Internal => problem,
+        | Kind::Internal
+        | Kind::Unknown => problem,
     }
 }
 

@@ -39,6 +39,9 @@ pub enum ProviderState {
     NotInstalled,
     /// The person may not read its objects.
     Refused,
+    /// A state a newer server sent that this version does not know. Never sent.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }
 
 /// One backup provider of this build.
@@ -108,7 +111,7 @@ fn cluster_coverage(
         .iter()
         .find(|p| p.module == zeabur_modules::velero::MODULE.id)?;
     match velero.state {
-        ProviderState::Refused => return None,
+        ProviderState::Refused | ProviderState::Unknown => return None,
         ProviderState::NotInstalled => return Some(ClusterCoverage::NoVelero),
         ProviderState::Installed => {}
     }

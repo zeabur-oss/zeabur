@@ -132,6 +132,10 @@ pub enum Kind {
     Unavailable,
     /// Anything else; a bug or an unexpected answer.
     Internal,
+    /// A kind a newer server sent that this version does not know; read by its HTTP status. Never
+    /// sent.
+    #[serde(other, skip_serializing)]
+    Unknown,
 }
 
 impl Kind {
@@ -167,7 +171,7 @@ impl Kind {
             Self::Invalid | Self::SystemNamespace => 422,
             Self::TooManyRequests => 429,
             Self::Unavailable => 503,
-            Self::Internal => 500,
+            Self::Internal | Self::Unknown => 500,
         }
     }
 
@@ -199,6 +203,7 @@ impl Kind {
             Self::TooManyRequests => "/problems/too-many-requests",
             Self::Unavailable => "/problems/unavailable",
             Self::Internal => "/problems/internal",
+            Self::Unknown => "/problems/unknown",
         }
     }
 
@@ -222,6 +227,7 @@ impl Kind {
             Self::TooManyRequests => "The cluster is busy",
             Self::Unavailable => "The cluster cannot be reached",
             Self::Internal => "Something went wrong in Zeabur",
+            Self::Unknown => "Zeabur answered with a problem this version does not know",
         }
     }
 
@@ -256,6 +262,7 @@ impl Kind {
                 "Check that the cluster is running and that this machine can reach it."
             }
             Self::Internal => "Try again. If it keeps happening, report it with the details.",
+            Self::Unknown => "Read the details, or update to the server's version.",
         }
     }
 
@@ -599,7 +606,8 @@ impl Problem {
             | Kind::PlanExpired
             | Kind::SystemNamespace
             | Kind::LogUnavailable
-            | Kind::Internal => {
+            | Kind::Internal
+            | Kind::Unknown => {
                 format!("The cluster answered unexpectedly about {what}.")
             }
         };
@@ -772,7 +780,16 @@ mod tests {
             Kind::LogUnavailable => 13,
             Kind::QuotaExceeded => 14,
             Kind::PolicyDenied => 15,
+            // Read only, never sent, so not in `Kind::ALL`.
+            Kind::Unknown => usize::MAX,
         }
+    }
+
+    #[test]
+    fn a_kind_from_a_newer_server_reads_as_unknown_and_is_never_written() {
+        let read: Kind = serde_json::from_str("\"kind-from-a-newer-server\"").unwrap();
+        assert_eq!(read, Kind::Unknown);
+        assert!(serde_json::to_string(&Kind::Unknown).is_err());
     }
 
     /// A client that does not know a kind treats it by its status; Zeabur's own refinements
@@ -796,7 +813,8 @@ mod tests {
                 | Kind::Invalid
                 | Kind::TooManyRequests
                 | Kind::Unavailable
-                | Kind::Internal => kind,
+                | Kind::Internal
+                | Kind::Unknown => kind,
             };
             assert_eq!(Kind::from_code(kind.status()), expected, "{kind:?}");
         }
