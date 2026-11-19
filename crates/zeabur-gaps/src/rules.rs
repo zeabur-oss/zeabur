@@ -315,60 +315,32 @@ impl Rule for IngressToHttpRoute {
 
 // ── Routes that lead nowhere ────────────────────────────────────────────────────────────────────
 
-/// An Ingress or `HTTPRoute` whose traffic cannot arrive anywhere. A project-level finding: such
-/// a route reaches no workload, so it belongs to no service.
+/// An Ingress or `HTTPRoute` whose traffic cannot arrive anywhere. A project-level finding: such a
+/// route reaches no workload, so it belongs to no service.
 ///
 /// - **No Service.** An Ingress sends to the Services of its default backend and its rules' paths
 ///   [k8s-ingress]; an `HTTPRoute` to its `backendRefs`, of kind `Service` in the core group and
 ///   the route's namespace unless they say otherwise [gateway-backendref]. A backend no Service of
-///   the namespace has, a mistyped name most often, leads nowhere. A backend of weight 0 is left
-///   out: "no traffic should be forwarded for this entry" [gateway-httpbackendref], so a missing
-///   Service there loses no request. One finding per route names every such Service. A service page
-///   may say the same from the workload's side (`noService` when a workload has that name); the
-///   project's list says it from the route's, so it is reported either way. When the Services could
-///   not be listed ([`Input::services_readable`]), whether one exists is unknown and this case is
-///   not checked; the refused read is named in the answer's `unreadable` list.
+///   the namespace has is a finding, one per route naming every such Service. A backend of weight 0
+///   is left out: "no traffic should be forwarded for this entry" [gateway-httpbackendref]. Not
+///   checked when the Services could not be listed ([`Input::services_readable`]).
 /// - **No Gateway.** A `parentRef` names a Gateway (group `gateway.networking.k8s.io` and kind
 ///   `Gateway` when absent) in the route's namespace unless it names another
 ///   [gateway-parentreference]. One no namespace has is a finding, said only when the Gateways
 ///   could be listed ([`ClusterTraits::gateways`]); a parent of another kind, such as a mesh's
 ///   Service, is not checked.
 /// - **Not accepted.** A controller adds an entry to `status.parents` for each parent it manages,
-///   and an empty list means the route is attached to no Gateway; a parent that rejects the route
-///   sets `Accepted` to `False` [gateway-routeparentstatus]. With no entry, or every entry refused,
-///   nothing serves the route. A parent with no `Accepted` condition, or one that is `Unknown`, is
-///   not taken as a refusal. When a named Gateway is missing, that finding is the cause and this
-///   one is not added: a controller does not list a parent it cannot resolve. A route just created
-///   has no entry until its controller sees it, so it can show for a moment.
-///
-///   Only the route's Gateway parents are read. A parent may also be a Service, under the Mesh
-///   conformance profile: "There are two kinds of parent resources with 'Core' support: Gateway
-///   (Gateway conformance profile) Service (Mesh conformance profile, ClusterIP Services only)"
-///   [gateway-parentreference]. A mesh route carries no domain, and its parent's acceptance is
-///   the mesh's to report, so a route whose parents are all of another kind has no finding
-///   here, and a Service parent's entry neither raises nor silences one. A route with no
-///   `parentRefs` at all attaches to nothing and receives no traffic, a common omission: it is a
-///   finding of its own (`gap.danglingRoute.noParent`) about `spec.parentRefs`, unless it asks
-///   for default Gateways with `useDefaultGateways: All` (experimental): "if set, it will be
-///   attached to any default Gateway supporting the named scope" [gateway-commonroutespec].
-///   Such a route's Gateways are the ones that claimed it, so every Gateway entry of its
-///   `status.parents` is read: all of them refused is the not-accepted finding, and no entry is
-///   none, since whether a default Gateway exists at all is not known here. `None`, an unset
-///   field or an unknown value attaches to no default Gateway.
-///
-///   Only entries for a Gateway `spec.parentRefs` names now count
-///   ([`HttpRoute::gateway_parent_statuses`]): when a route moves to another Gateway, or from one
-///   listener (`sectionName`) to the whole Gateway, the old entry's `Accepted=True` can stay in
-///   the list until its controller cleans it up, and it says nothing about the new parent. Until
-///   the new parent's controller adds its entry, the route reads as not accepted, as a new route
-///   does.
-///
-///   A condition's `observedGeneration` older than the route's `metadata.generation` means "the
-///   condition is out of date with respect to the current state of the instance"
-///   [k8s-condition]. Such a condition is still read as it stands: it is the controller's last
-///   word about that parent, and a route that was accepted mostly stays accepted after an edit,
-///   so treating it as unknown would warn on every edit until the controller catches up. A stale
-///   refusal is read as a refusal for the same reason.
+///   and a parent that rejects the route sets `Accepted` to `False` [gateway-routeparentstatus].
+///   With no entry, or every entry refused, nothing serves the route; a missing or `Unknown`
+///   `Accepted` is not a refusal, and a missing Gateway is the cause that is reported instead. Only
+///   entries for a Gateway `spec.parentRefs` names now count
+///   ([`HttpRoute::gateway_parent_statuses`]). A condition whose `observedGeneration` is older than
+///   `metadata.generation` is "out of date with respect to the current state of the instance"
+///   [k8s-condition], and is read as it stands.
+/// - **No parent.** A route with no `parentRefs` attaches to nothing
+///   (`gap.danglingRoute.noParent`), unless it sets `useDefaultGateways: All`
+///   [gateway-commonroutespec]; its Gateways are then the ones that claimed it, and all of their
+///   entries refused is the not-accepted finding.
 ///
 /// [k8s-ingress]: https://kubernetes.io/docs/concepts/services-networking/ingress/
 /// [k8s-condition]: https://github.com/kubernetes/apimachinery/blob/v0.34.0/pkg/apis/meta/v1/types.go
