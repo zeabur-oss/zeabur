@@ -3,32 +3,55 @@
   <img alt="Zeabur: deploy on your own server, the Zeabur way. Deploy from Git, Docker Compose or an app template, and it is running." src="docs/images/cover-light.avif">
 </picture>
 
+**English** · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md)
+
 # Zeabur
 
-**Simple, secure deployments on your own Kubernetes.**
+**Deploy on your own server, the way you already do on zeabur.com.** Zeabur is open-source
+software. Projects, services, domains, environment variables, and app templates work the way you
+know from zeabur.com. You choose the hosting provider and the plan.
 
-Zeabur is an open-source platform you host yourself. It runs in your cluster (or on your
-machine), shows the cluster as projects and services, explains what is wrong in plain words, and lets you
-change things safely. It works with the objects you already have, never acts with more rights
-than you have, and keeps no state of its own: no database, no custom resources.
+## Coming from zeabur.com?
 
-**[oss.zeabur.com/zeabur](https://oss.zeabur.com/zeabur/)** shows what Zeabur does, and
-**[the documentation](https://oss.zeabur.com/docs/zeabur/)** covers installing, deploying,
-configuring and operating the cluster, and leaving Zeabur, in English,
+What works the same way:
+
+- **Projects and services.** A project holds a group of related services. Open it to see how each
+  service is doing.
+- **Ways to deploy.** Deploy from Git, Docker Compose, a Docker image, or an app template, or
+  upload a folder.
+- **Domains and variables.** Add a domain to a service, and change its environment variables on
+  the service's page.
+- **Logs and rollbacks.** Read a service's logs, and go back to the previous version when a new
+  one has a problem.
+
+What is different:
+
+- **The server is yours.** Your services run on your own server, and you pay the cloud provider or data
+  center you chose for it.
+- **You look after it.** You or your team upgrade Zeabur, back up data, and maintain the
+  server.
+- **For now, you need a Kubernetes cluster.** Kubernetes is open-source software that runs
+  containers on one or more servers, and Zeabur runs on top of it. Installing on a new server with
+  one command is still in development; see [#430](https://github.com/zeabur-oss/zeabur/issues/430).
+
+[The documentation](https://oss.zeabur.com/docs/zeabur/) covers installation, deployment, and
+configuration, with a screenshot for each step. It is also in
 [繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/) and [简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/).
+
+## What it does for you
 
 <table>
 <tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-home-dark.avif"><img src="docs/images/readme-home-light.avif" alt="Home: what needs you across the cluster, grouped by where each problem comes from"></picture><br><b>What needs you</b>, across every project, grouped by where each problem comes from.</td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-project-dark.avif"><img src="docs/images/readme-project-light.avif" alt="A project as a map of its services, databases and the connections between them"></picture><br><b>One page per project</b>: a map or a list, with what needs attention and what happened.</td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-home-dark.avif"><img src="docs/images/readme-home-light.avif" alt="Home: what needs your attention across the cluster, grouped by where each problem comes from"></picture><br><b>What needs your attention</b>, across every project, grouped by where each problem comes from.</td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-project-dark.avif"><img src="docs/images/readme-project-light.avif" alt="A project as a map of its services, databases and the connections between them"></picture><br><b>One page per project</b>: a map or a list, with what needs attention and what changed recently.</td>
 </tr>
 <tr>
 <td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-diagnosis-dark.avif"><img src="docs/images/readme-diagnosis-light.avif" alt="A service that keeps crashing: why, in plain words, and what to do"></picture><br><b>Diagnoses in plain words</b>, with what to do and the evidence.</td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-rollout-dark.avif"><img src="docs/images/readme-rollout-light.avif" alt="A service rolling out, with its usage and a domain that the browser can't reach"></picture><br><b>Rollouts, usage and domains</b>: progress, CPU and memory against the limits, and whether each domain answers.</td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-rollout-dark.avif"><img src="docs/images/readme-rollout-light.avif" alt="A service rolling out, with its usage and a domain that the browser can't reach"></picture><br><b>Updates, usage, and domains</b>: how far an update has gone, CPU and memory against the limits, and whether each domain opens.</td>
 </tr>
 <tr>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-database-dark.avif"><img src="docs/images/readme-database-light.avif" alt="A PostgreSQL database: its state, a warning about one instance with no backups, and how to connect"></picture><br><b>Databases</b> with their connection details and a warning when nothing would take over.</td>
-<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-cluster-dark.avif"><img src="docs/images/readme-cluster-light.avif" alt="The cluster: an end-of-life Kubernetes version and nodes running out of memory and disk"></picture><br><b>The cluster</b>: Kubernetes support dates, node pressure, backups, notifications and components.</td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-database-dark.avif"><img src="docs/images/readme-database-light.avif" alt="A PostgreSQL database: its state, a warning about one instance with no backups, and how to connect"></picture><br><b>Databases</b> with their connection details, and a warning when no standby would take over.</td>
+<td width="50%"><picture><source media="(prefers-color-scheme: dark)" srcset="docs/images/readme-cluster-dark.avif"><img src="docs/images/readme-cluster-light.avif" alt="The cluster: an end-of-life Kubernetes version and nodes running out of memory and disk"></picture><br><b>The cluster</b>: Kubernetes support dates, servers low on memory or disk, backups, notifications, and components.</td>
 </tr>
 </table>
 
@@ -36,20 +59,21 @@ configuring and operating the cluster, and leaving Zeabur, in English,
 
 ## Get started
 
-- **An existing Kubernetes cluster**: install the Helm chart, with sign-in through Zeabur Identity.
-  [Install in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/)
-- **Just you, with your kubeconfig**: `zeaburctl ui` opens Zeabur in your browser on your own
-  computer. [zeaburctl](https://oss.zeabur.com/docs/zeabur/reference/zeaburctl/)
-- **A bare Linux server**: not yet. [Zeatend](https://github.com/zeabur-oss/zeatend) will set up
-  Kubernetes there, and one command will install Zeabur
-  ([#430](https://github.com/zeabur-oss/zeabur/issues/430)).
+Today, you install Zeabur into an existing Kubernetes cluster with Helm, Kubernetes' package
+installer. Zeabur Identity handles sign-in, so it is installed first.
+[Install Zeabur in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/)
+lists what you need and each step.
+
+To look at a cluster from your own computer, `zeaburctl ui` opens Zeabur in your browser with your
+kubeconfig, the file `kubectl` uses to reach a cluster. See [zeaburctl](https://oss.zeabur.com/docs/zeabur/reference/zeaburctl/).
 
 [Releases](https://oss.zeabur.com/docs/zeabur/reference/releases/) lists what a release contains
 and how to verify it.
 
 ## Build from source
 
-In the [Nix](https://nixos.org) dev shell, which provides every tool:
+These commands download the source, enter the [Nix](https://nixos.org) dev shell, which has every
+tool, and build and start Zeabur:
 
 ```sh
 git clone https://github.com/zeabur-oss/zeabur && cd zeabur
@@ -66,8 +90,7 @@ with your current kubeconfig context.
 
 - [Contributing](CONTRIBUTING.md): environment, checks, dependency policy, tests.
 - [Developer docs](docs/internal/): crates, testing, wording, releasing.
-- [`docs/`](docs/) holds the sources of the documentation; edit a page there and it is published
-  to [oss.zeabur.com](https://oss.zeabur.com/docs/zeabur/).
+- [`docs/`](docs/) holds the sources of the documentation, which are published to [oss.zeabur.com](https://oss.zeabur.com/docs/zeabur/).
 
 ## License and credits
 
