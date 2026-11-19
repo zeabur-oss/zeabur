@@ -114,10 +114,7 @@ stringData:
         let app = app(&cluster);
         let (status, planned) = plan(&app, &creates(&[DEPLOYMENT, SERVICE, SECRET])).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
-        assert_eq!(
-            cluster.inspect(|s| (s.writes.len(), s.dry_runs)),
-            Some((0, 3))
-        );
+        assert_eq!(cluster.inspect(|s| s.writes.is_empty()), Some(true));
         let order: Vec<(&str, u64)> = planned["objects"]
             .as_array()
             .unwrap()

@@ -165,13 +165,16 @@ pub(crate) async fn write(
                 resource_version: answer.left().and_then(|o| o.metadata.resource_version),
                 generation: None,
                 uid: None,
+                object: None,
             });
         }
     };
+    let object = serde_json::to_value(&answer).ok();
     Ok(Written {
         resource_version: answer.metadata.resource_version,
         generation: answer.metadata.generation,
         uid: answer.metadata.uid,
+        object,
     })
 }
 
