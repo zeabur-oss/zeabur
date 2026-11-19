@@ -16,6 +16,8 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read as _, Write as _};
 
 use serde::{Deserialize, Serialize};
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_model::PodSecurityLevel;
 
 /// Where the API is when no mirror is set.
 pub const DEFAULT_URL: &str = "https://oss-catalog.zeabur.com/v1/";
@@ -221,8 +223,8 @@ impl Release {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Security {
-    /// The Pod Security level of its namespaces: `restricted`, `baseline` or `privileged`.
-    pub pod_security: String,
+    /// The Pod Security level of its namespaces.
+    pub pod_security: PodSecurityLevel,
     /// What it may do, in one sentence.
     #[serde(default)]
     pub summary: String,
@@ -453,8 +455,8 @@ pub struct Snapshot {
     pub index: Index,
     /// The component files, by id.
     pub components: BTreeMap<String, ComponentFile>,
-    /// When it was fetched, RFC 3339.
-    pub fetched_at: String,
+    /// When it was fetched.
+    pub fetched_at: Timestamp,
 }
 
 impl Snapshot {
@@ -483,7 +485,7 @@ impl Snapshot {
         index: Index,
         mut fetched: BTreeMap<String, ComponentFile>,
         previous: Option<&Self>,
-        fetched_at: String,
+        fetched_at: Timestamp,
     ) -> Result<Self, ApiError> {
         let mut components = BTreeMap::new();
         for entry in &index.components {
@@ -576,6 +578,10 @@ impl Snapshot {
 mod tests {
     use super::*;
 
+    fn second(n: i64) -> Timestamp {
+        Timestamp::from_second(n).unwrap()
+    }
+
     const INDEX: &[u8] = include_bytes!("../tests/api/catalog.json");
     const CERT_MANAGER: &[u8] = include_bytes!("../tests/api/cert-manager.json");
 
@@ -613,22 +619,17 @@ mod tests {
         let listed = only_cert_manager();
         let file = component(&listed, "cert-manager", CERT_MANAGER).unwrap();
         let fetched = BTreeMap::from([("cert-manager".to_owned(), file)]);
-        let first = Snapshot::assemble(listed.clone(), fetched, None, "t0".to_owned()).unwrap();
+        let first = Snapshot::assemble(listed.clone(), fetched, None, second(0)).unwrap();
         assert_eq!(first.stale(&listed), Vec::<String>::new());
 
-        let again = Snapshot::assemble(
-            listed.clone(),
-            BTreeMap::new(),
-            Some(&first),
-            "t1".to_owned(),
-        );
+        let again = Snapshot::assemble(listed.clone(), BTreeMap::new(), Some(&first), second(1));
         assert_eq!(again.unwrap().components, first.components);
 
         let mut changed = listed;
         changed.components[0].source_digest = "sha256:1".to_owned();
         assert_eq!(first.stale(&changed), ["cert-manager"]);
         assert_eq!(
-            Snapshot::assemble(changed, BTreeMap::new(), Some(&first), "t2".to_owned()),
+            Snapshot::assemble(changed, BTreeMap::new(), Some(&first), second(2)),
             Err(ApiError::Mismatch("cert-manager".to_owned()))
         );
     }
@@ -638,7 +639,7 @@ mod tests {
         let listed = only_cert_manager();
         let file = component(&listed, "cert-manager", CERT_MANAGER).unwrap();
         let fetched = BTreeMap::from([("cert-manager".to_owned(), file)]);
-        let snapshot = Snapshot::assemble(listed, fetched, None, "t0".to_owned()).unwrap();
+        let snapshot = Snapshot::assemble(listed, fetched, None, second(0)).unwrap();
         let bytes = snapshot.encode().unwrap();
         assert_eq!(Snapshot::decode(&bytes).unwrap(), snapshot);
         assert!(matches!(

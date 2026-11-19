@@ -18,13 +18,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use serde::Deserialize;
-use serde_json::{Map, Value, json};
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
+use zeabur_kube::DynamicObject;
 use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
-use zeabur_kube::k8s_openapi::api::core::v1::Pod;
+use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::k8s_openapi::{Metadata, NamespaceResourceScope, Resource};
+use zeabur_model::PodSecurityLevel;
 use zeabur_model::readiness::{self, Reason, Status};
 
 use crate::api::{ComponentFile, Health, Release, ReleaseType, Snapshot};
@@ -63,7 +66,7 @@ pub struct Target<'a> {
 }
 
 /// One release to apply.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Step {
     /// The component.
     pub component: String,
@@ -74,10 +77,10 @@ pub struct Step {
 }
 
 /// One object to apply.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Desired {
-    /// The object, `apiVersion`, `kind` and `metadata` included.
-    pub object: Value,
+    /// The object; `types` is always set.
+    pub object: DynamicObject,
     /// The namespace it goes in when its kind is namespaced and it names none.
     pub namespace: String,
 }
@@ -95,12 +98,12 @@ pub enum Warning {
         /// The component.
         component: String,
         /// `baseline` or `privileged`.
-        level: String,
+        level: PodSecurityLevel,
     },
 }
 
 /// An install.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct Install {
     /// The components it installs, in order: the ones needed, then the one asked for.
     pub components: Vec<String>,
@@ -161,11 +164,11 @@ pub fn install(snapshot: &Snapshot, id: &str, target: &Target<'_>) -> Result<Ins
                 component: component.clone(),
             });
         }
-        let level = &file.declaration.security.pod_security;
-        if level != "restricted" {
+        let level = file.declaration.security.pod_security;
+        if level != PodSecurityLevel::Restricted {
             warnings.push(Warning::Privileged {
                 component: component.clone(),
-                level: level.clone(),
+                level,
             });
         }
         steps.extend(steps_of(
@@ -237,9 +240,6 @@ fn check(file: &ComponentFile, target: &Target<'_>) -> Result<(), Refusal> {
             place: distribution.to_owned(),
         });
     }
-    if !["restricted", "baseline", "privileged"].contains(&d.security.pod_security.as_str()) {
-        return Err(unsupported("asks for an unknown Pod Security level"));
-    }
     if !d.inputs.is_empty() {
         return Err(unsupported("asks for values"));
     }
@@ -274,18 +274,19 @@ pub fn steps_of(
     for release in &file.declaration.releases {
         let mut objects = Vec::new();
         if namespaces.insert(release.namespace.clone()) {
+            let level = file.declaration.security.pod_security;
             objects.push(Desired {
-                object: namespace(&release.namespace, &file.declaration.security.pod_security),
+                object: namespace(&release.namespace, level).map_err(broken)?,
                 namespace: String::new(),
             });
         }
-        let made: Vec<Value> = match release.kind {
+        let made = match release.kind {
             ReleaseType::Helm => vec![helm_chart(release, profile).map_err(broken)?],
             ReleaseType::Inline => inline(release).map_err(broken)?,
             ReleaseType::Manifest | ReleaseType::Unknown => Vec::new(),
         };
         for mut object in made {
-            mark(&mut object, file, release, catalog_version);
+            mark(&mut object.metadata, file, release, catalog_version);
             objects.push(Desired {
                 object,
                 namespace: release.namespace.clone(),
@@ -300,89 +301,98 @@ pub fn steps_of(
     Ok(steps)
 }
 
+/// `object` as a [`DynamicObject`], with its `apiVersion` and `kind`.
+fn dynamic<K: Resource + Serialize>(object: &K) -> Result<DynamicObject, String> {
+    let mut value = serde_json::to_value(object).map_err(|e| e.to_string())?;
+    if let Some(fields) = value.as_object_mut() {
+        fields.insert("apiVersion".to_owned(), K::API_VERSION.into());
+        fields.insert("kind".to_owned(), K::KIND.into());
+    }
+    serde_json::from_value(value).map_err(|e| e.to_string())
+}
+
 /// A namespace with its Pod Security level [pss].
 ///
 /// [pss]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
-fn namespace(name: &str, level: &str) -> Value {
-    json!({
-        "apiVersion": "v1",
-        "kind": "Namespace",
-        "metadata": {
-            "name": name,
-            "labels": {"pod-security.kubernetes.io/enforce": level},
+fn namespace(name: &str, level: PodSecurityLevel) -> Result<DynamicObject, String> {
+    dynamic(&Namespace {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            labels: Some(BTreeMap::from([(
+                PodSecurityLevel::ENFORCE.to_owned(),
+                level.as_str().to_owned(),
+            )])),
+            ..ObjectMeta::default()
         },
+        ..Namespace::default()
     })
 }
 
 /// A chart release as a `HelmChart`, with the release's values and the profile's merged over
 /// them. `failurePolicy: abort` keeps a failed install or upgrade as it is, for a person to see,
 /// rather than helm-controller's default of uninstalling and installing again.
-fn helm_chart(release: &Release, profile: &str) -> Result<Value, String> {
+fn helm_chart(release: &Release, profile: &str) -> Result<DynamicObject, String> {
     let chart = release
         .chart
-        .as_deref()
+        .clone()
         .ok_or("a chart release names no chart")?;
     let version = release
         .version
-        .as_deref()
+        .clone()
         .ok_or("a chart release names no version")?;
     let mut values = parse_values(release.values.as_deref())?;
     if let Some(over) = release.profiles.get(profile) {
         merge(&mut values, parse_values(Some(over))?);
     }
-    let mut spec = Map::new();
-    spec.insert("chart".to_owned(), json!(chart));
-    if let Some(repo) = &release.repo {
-        spec.insert("repo".to_owned(), json!(repo));
-    }
-    spec.insert("version".to_owned(), json!(version));
-    spec.insert("targetNamespace".to_owned(), json!(release.namespace));
-    spec.insert("failurePolicy".to_owned(), json!("abort"));
-    if values.as_object().is_none_or(|v| !v.is_empty()) {
-        let text = serde_saphyr::to_string(&values).map_err(|e| e.to_string())?;
-        spec.insert("valuesContent".to_owned(), json!(text));
-    }
-    Ok(json!({
-        "apiVersion": "helm.cattle.io/v1",
-        "kind": "HelmChart",
-        "metadata": {"name": release.helm_name(), "namespace": CHART_NAMESPACE},
-        "spec": spec,
-    }))
+    let values_content = if values.as_object().is_none_or(|v| !v.is_empty()) {
+        Some(serde_saphyr::to_string(&values).map_err(|e| e.to_string())?)
+    } else {
+        None
+    };
+    dynamic(&HelmChart {
+        metadata: ObjectMeta {
+            name: Some(release.helm_name().to_owned()),
+            namespace: Some(CHART_NAMESPACE.to_owned()),
+            ..ObjectMeta::default()
+        },
+        spec: HelmChartSpec {
+            chart,
+            repo: release.repo.clone(),
+            version: Some(version),
+            target_namespace: Some(release.namespace.clone()),
+            failure_policy: Some(FailurePolicy::Abort),
+            values_content,
+        },
+        status: None,
+    })
 }
 
 /// The objects of an inline release.
-fn inline(release: &Release) -> Result<Vec<Value>, String> {
+fn inline(release: &Release) -> Result<Vec<DynamicObject>, String> {
     let text = release.manifests.as_deref().unwrap_or_default();
     let documents: Vec<Value> = serde_saphyr::from_multiple(text).map_err(|e| e.to_string())?;
-    let objects: Vec<Value> = documents.into_iter().filter(|d| !d.is_null()).collect();
-    for object in &objects {
-        let named = object
-            .pointer("/metadata/name")
-            .and_then(Value::as_str)
-            .is_some();
-        if !named || object.get("kind").and_then(Value::as_str).is_none() {
+    let mut objects = Vec::new();
+    for document in documents.into_iter().filter(|d| !d.is_null()) {
+        let object: DynamicObject = serde_json::from_value(document).map_err(|e| e.to_string())?;
+        if object.types.is_none() || object.metadata.name.is_none() {
             return Err("an inline object has no kind or name".to_owned());
         }
+        objects.push(object);
     }
     Ok(objects)
 }
 
 /// Labels and annotates an object as the component's.
-fn mark(object: &mut Value, file: &ComponentFile, release: &Release, catalog_version: &str) {
-    let Some(metadata) = object.get_mut("metadata").and_then(Value::as_object_mut) else {
-        return;
-    };
-    let labels = metadata.entry("labels").or_insert_with(|| json!({}));
-    if let Some(labels) = labels.as_object_mut() {
-        labels.insert(MANAGED_BY.to_owned(), json!(MANAGED_BY_ZEABUR));
-        labels.insert(COMPONENT.to_owned(), json!(file.id));
-        labels.insert(RELEASE.to_owned(), json!(release.name));
-    }
-    let annotations = metadata.entry("annotations").or_insert_with(|| json!({}));
-    if let Some(annotations) = annotations.as_object_mut() {
-        annotations.insert(SOURCE_DIGEST.to_owned(), json!(file.source_digest));
-        annotations.insert(CATALOG_VERSION.to_owned(), json!(catalog_version));
-    }
+fn mark(metadata: &mut ObjectMeta, file: &ComponentFile, release: &Release, catalog_version: &str) {
+    metadata.labels.get_or_insert_default().extend([
+        (MANAGED_BY.to_owned(), MANAGED_BY_ZEABUR.to_owned()),
+        (COMPONENT.to_owned(), file.id.clone()),
+        (RELEASE.to_owned(), release.name.clone()),
+    ]);
+    metadata.annotations.get_or_insert_default().extend([
+        (SOURCE_DIGEST.to_owned(), file.source_digest.clone()),
+        (CATALOG_VERSION.to_owned(), catalog_version.to_owned()),
+    ]);
 }
 
 /// The installed components that need `id`, which keep it from being removed.
@@ -412,25 +422,84 @@ pub enum Progress {
     Failed(String),
 }
 
-/// The fields of a `HelmChart` readiness reads [helm-controller-types].
+/// A K3s/RKE2 `HelmChart`, with the fields Zeabur writes and the status readiness reads
+/// [helm-controller-types].
 ///
 /// [helm-controller-types]: https://github.com/k3s-io/helm-controller/blob/v0.16.27/pkg/apis/helm.cattle.io/v1/types.go
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct HelmChart {
     /// Its metadata; `managedFields` tells when Zeabur last wrote it.
     #[serde(default)]
     pub metadata: ObjectMeta,
-    /// Its status.
+    /// What to install.
     #[serde(default)]
+    pub spec: HelmChartSpec,
+    /// Its status.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub status: Option<HelmChartStatus>,
 }
 
+impl Resource for HelmChart {
+    const API_VERSION: &'static str = "helm.cattle.io/v1";
+    const GROUP: &'static str = "helm.cattle.io";
+    const KIND: &'static str = "HelmChart";
+    const VERSION: &'static str = "v1";
+    const URL_PATH_SEGMENT: &'static str = "helmcharts";
+    type Scope = NamespaceResourceScope;
+}
+
+impl Metadata for HelmChart {
+    type Ty = ObjectMeta;
+
+    fn metadata(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
+    }
+}
+
+/// `HelmChart.spec`.
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HelmChartSpec {
+    /// The chart's name in `repo`, or an OCI reference.
+    #[serde(default)]
+    pub chart: String,
+    /// The chart repository.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo: Option<String>,
+    /// The chart version.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub version: Option<String>,
+    /// The namespace of the release.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub target_namespace: Option<String>,
+    /// What helm-controller does when an install or upgrade fails.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub failure_policy: Option<FailurePolicy>,
+    /// The values, as YAML.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub values_content: Option<String>,
+}
+
+/// `HelmChart.spec.failurePolicy`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub enum FailurePolicy {
+    /// Uninstall and install again, helm-controller's default.
+    Reinstall,
+    /// Keep the failed release as it is.
+    Abort,
+}
+
 /// `HelmChart.status`.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HelmChartStatus {
     /// The Job that installs or upgrades it.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub job_name: Option<String>,
     /// `JobCreated` and `Failed`.
     #[serde(default)]
@@ -438,7 +507,7 @@ pub struct HelmChartStatus {
 }
 
 /// A status condition.
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct Condition {
     /// Its type.
     #[serde(rename = "type")]
@@ -507,12 +576,14 @@ fn truncate(t: Timestamp) -> Timestamp {
 /// Whether an inline object is ready: it exists, and a `Ready` condition, when it has one, is
 /// `True`.
 #[must_use]
-pub fn object_progress(object: Option<&Value>) -> Progress {
+pub fn object_progress(object: Option<&DynamicObject>) -> Progress {
     let Some(object) = object else {
         return Progress::Pending;
     };
     let conditions: Vec<Condition> = object
-        .pointer("/status/conditions")
+        .data
+        .get("status")
+        .and_then(|s| s.get("conditions"))
         .cloned()
         .and_then(|c| serde_json::from_value(c).ok())
         .unwrap_or_default();
@@ -674,11 +745,24 @@ mod tests {
                 )
             })
             .collect();
-        Snapshot::assemble(index, fetched, None, "2026-11-19T00:00:00Z".to_owned()).unwrap()
+        Snapshot::assemble(index, fetched, None, Timestamp::UNIX_EPOCH).unwrap()
     }
 
     fn set(items: &[&str]) -> BTreeSet<String> {
         items.iter().map(|s| (*s).to_owned()).collect()
+    }
+
+    fn kind(object: &DynamicObject) -> &str {
+        object.types.as_ref().map_or("", |t| t.kind.as_str())
+    }
+
+    fn label<'a>(object: &'a DynamicObject, key: &str) -> Option<&'a str> {
+        object
+            .metadata
+            .labels
+            .as_ref()?
+            .get(key)
+            .map(String::as_str)
     }
 
     fn plan(id: &str, capabilities: &[&str], components: &[&str]) -> Result<Install, Refusal> {
@@ -702,28 +786,32 @@ mod tests {
         assert_eq!(releases, ["cert-manager", "issuers"]);
 
         let chart = &install.steps[0].objects;
-        assert_eq!(chart[0].object["kind"], "Namespace");
+        let namespace = &chart[0].object;
+        assert_eq!(kind(namespace), "Namespace");
         assert_eq!(
-            chart[0].object["metadata"]["labels"]["pod-security.kubernetes.io/enforce"],
-            "restricted"
+            label(namespace, PodSecurityLevel::ENFORCE),
+            Some("restricted")
         );
-        let helm = &chart[1].object;
-        assert_eq!(helm["kind"], "HelmChart");
-        assert_eq!(helm["metadata"]["namespace"], CHART_NAMESPACE);
+        let helm: HelmChart = chart[1].object.clone().try_parse().unwrap();
+        assert_eq!(kind(&chart[1].object), HelmChart::KIND);
+        assert_eq!(helm.metadata.namespace.as_deref(), Some(CHART_NAMESPACE));
         assert_eq!(
-            helm["spec"]["chart"],
+            helm.spec.chart,
             "oci://quay.io/jetstack/charts/cert-manager"
         );
-        assert_eq!(helm["spec"]["version"], "v1.21.3");
-        assert_eq!(helm["spec"]["targetNamespace"], "cert-manager");
-        assert_eq!(helm["spec"]["failurePolicy"], "abort");
-        assert_eq!(helm["metadata"]["labels"][COMPONENT], "cert-manager");
-        assert_eq!(helm["metadata"]["labels"][MANAGED_BY], MANAGED_BY_ZEABUR);
-        assert_eq!(helm["metadata"]["annotations"][CATALOG_VERSION], "0.5.3");
+        assert_eq!(helm.spec.version.as_deref(), Some("v1.21.3"));
+        assert_eq!(helm.spec.target_namespace.as_deref(), Some("cert-manager"));
+        assert_eq!(helm.spec.failure_policy, Some(FailurePolicy::Abort));
+        assert_eq!(label(&chart[1].object, COMPONENT), Some("cert-manager"));
+        assert_eq!(label(&chart[1].object, MANAGED_BY), Some(MANAGED_BY_ZEABUR));
+        assert_eq!(
+            helm.metadata.annotations.unwrap_or_default()[CATALOG_VERSION],
+            "0.5.3"
+        );
 
         // The single-node values merge over the release's: both are in the chart's values.
         let values: Value =
-            serde_saphyr::from_str(helm["spec"]["valuesContent"].as_str().unwrap()).unwrap();
+            serde_saphyr::from_str(helm.spec.values_content.as_deref().unwrap()).unwrap();
         assert_eq!(values["crds"]["keep"], true);
         assert_eq!(values["resources"]["limits"]["memory"], "128Mi");
         assert_eq!(values["webhook"]["resources"]["limits"]["memory"], "64Mi");
@@ -738,12 +826,12 @@ mod tests {
         let issuers: Vec<&str> = install.steps[1]
             .objects
             .iter()
-            .map(|d| d.object["metadata"]["name"].as_str().unwrap())
+            .map(|d| d.object.metadata.name.as_deref().unwrap())
             .collect();
         assert_eq!(issuers, ["letsencrypt-staging", "letsencrypt"]);
         assert_eq!(
-            install.steps[1].objects[0].object["metadata"]["labels"][RELEASE],
-            "issuers"
+            label(&install.steps[1].objects[0].object, RELEASE),
+            Some("issuers")
         );
     }
 
@@ -806,10 +894,10 @@ mod tests {
         let kinds: Vec<&str> = install.steps[0]
             .objects
             .iter()
-            .map(|d| d.object["kind"].as_str().unwrap())
+            .map(|d| kind(&d.object))
             .collect();
         assert_eq!(kinds[0], "Namespace");
-        assert!(kinds[1..].iter().all(|k| *k != "HelmChart"));
+        assert!(kinds[1..].iter().all(|k| *k != HelmChart::KIND));
     }
 
     #[test]
@@ -898,10 +986,15 @@ mod tests {
     #[test]
     fn an_inline_object_is_ready_when_it_exists_and_says_ready() {
         assert_eq!(object_progress(None), Progress::Pending);
-        let plain = json!({"kind": "ConfigMap"});
+        let object = |v: Value| -> DynamicObject { serde_json::from_value(v).unwrap() };
+        let plain = object(json!({"kind": "ConfigMap", "apiVersion": "v1", "metadata": {}}));
         assert_eq!(object_progress(Some(&plain)), Progress::Ready);
-        let issuer =
-            |status: &str| json!({"status": {"conditions": [{"type": "Ready", "status": status}]}});
+        let issuer = |status: &str| {
+            object(json!({
+                "metadata": {},
+                "status": {"conditions": [{"type": "Ready", "status": status}]},
+            }))
+        };
         assert_eq!(object_progress(Some(&issuer("False"))), Progress::Waiting);
         assert_eq!(object_progress(Some(&issuer("True"))), Progress::Ready);
     }

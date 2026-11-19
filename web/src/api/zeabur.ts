@@ -1193,7 +1193,7 @@ export type CatalogView = {
    */
   error?: string | null
   /**
-   * When it was read, RFC 3339.
+   * When it was read.
    * @nullable
    */
   fetchedAt?: string | null
@@ -3683,7 +3683,7 @@ export type ComponentWarning =
       component: string
       kind: "privileged"
       /** `baseline` or `privileged`. */
-      level: string
+      level: PodSecurityLevel
     }
 
 /**

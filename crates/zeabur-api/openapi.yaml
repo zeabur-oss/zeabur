@@ -5361,7 +5361,8 @@ components:
           type:
           - string
           - "null"
-          description: When it was read, RFC 3339.
+          format: date-time
+          description: When it was read.
         url:
           type: string
           description: Where Zeabur reads it.
@@ -7308,7 +7309,7 @@ components:
             enum:
             - privileged
           level:
-            type: string
+            $ref: "#/components/schemas/PodSecurityLevel"
             description: "`baseline` or `privileged`."
       description: What to know before installing.
     ComposeRequest:

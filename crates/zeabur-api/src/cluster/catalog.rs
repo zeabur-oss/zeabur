@@ -22,11 +22,13 @@ use std::time::{Duration, Instant};
 use axum::extract::State;
 use futures_util::future::BoxFuture;
 use serde::Serialize;
-use serde_json::json;
 use utoipa::ToSchema;
 use zeabur_catalog::api::{self, ApiError as CatalogError, ComponentFile, MAX_FILE, Snapshot};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::k8s_openapi::{ByteString, Resource as _};
 use zeabur_kube::{Cluster, ObjectTarget, ResourceRef, WriteBody, WriteRequest};
 
 use crate::error::ApiError;
@@ -166,7 +168,7 @@ impl Catalog {
     /// The snapshot, read again when the last read is older than the API's `max-age`, or a
     /// minute after a failed read (5 seconds while there is no snapshot). One read goes at a
     /// time, and the others wait for it.
-    pub async fn current(&self, now: Instant, fetched_at: &str) -> Current {
+    pub async fn current(&self, now: Instant, fetched_at: Timestamp) -> Current {
         let mut kept = self.kept.lock().await;
         if !kept.cache_read {
             kept.cache_read = true;
@@ -225,7 +227,7 @@ impl Catalog {
         &self,
         fetch: &dyn Fetch,
         kept: &Kept,
-        fetched_at: &str,
+        fetched_at: Timestamp,
     ) -> Result<Option<(Snapshot, Option<String>)>, Refusal> {
         let etag = kept.snapshot.as_ref().and_then(|_| kept.etag.clone());
         let url = format!("{}catalog.json", self.url);
@@ -252,7 +254,7 @@ impl Catalog {
             let file = api::component(&index, &id, &bytes)?;
             fetched.insert(id, file);
         }
-        let snapshot = Snapshot::assemble(index, fetched, previous, fetched_at.to_owned())?;
+        let snapshot = Snapshot::assemble(index, fetched, previous, fetched_at)?;
         Ok(Some((snapshot, etag)))
     }
 }
@@ -275,9 +277,7 @@ async fn read_cache(cluster: &dyn Cluster, namespace: &str) -> Result<Option<Sna
     else {
         return Ok(None);
     };
-    let map: ConfigMap = serde_json::to_value(object)
-        .and_then(serde_json::from_value)
-        .map_err(|e| e.to_string())?;
+    let map: ConfigMap = object.try_parse().map_err(|e| e.to_string())?;
     let Some(bytes) = map.binary_data.and_then(|mut d| d.remove(KEY)) else {
         return Ok(None);
     };
@@ -291,19 +291,22 @@ async fn write_cache(
     namespace: &str,
     snapshot: &Snapshot,
 ) -> Result<(), String> {
-    use base64::Engine as _;
     let bytes = snapshot.encode().map_err(|e| e.to_string())?;
-    let body = json!({
-        "apiVersion": "v1",
-        "kind": "ConfigMap",
-        "metadata": {"name": CACHE, "namespace": namespace},
-        "binaryData": {KEY: base64::engine::general_purpose::STANDARD.encode(bytes)},
-    });
+    let map = ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(CACHE.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            ..ObjectMeta::default()
+        },
+        binary_data: Some(BTreeMap::from([(KEY.to_owned(), ByteString(bytes))])),
+        ..ConfigMap::default()
+    };
+    let body = serde_json::to_value(&map).map_err(|e| e.to_string())?;
     let request = WriteRequest {
         target: ObjectTarget {
-            api_version: "v1".to_owned(),
-            kind: "ConfigMap".to_owned(),
-            plural: "configmaps".to_owned(),
+            api_version: ConfigMap::API_VERSION.to_owned(),
+            kind: ConfigMap::KIND.to_owned(),
+            plural: ConfigMap::URL_PATH_SEGMENT.to_owned(),
             namespace: namespace.to_owned(),
             name: CACHE.to_owned(),
         },
@@ -329,9 +332,10 @@ pub struct CatalogView {
     /// The release's commit.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub commit: Option<String>,
-    /// When it was read, RFC 3339.
+    /// When it was read.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub fetched_at: Option<String>,
+    #[schema(value_type = Option<String>, format = DateTime)]
+    pub fetched_at: Option<Timestamp>,
     /// Why the last read failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
@@ -355,7 +359,7 @@ pub(crate) async fn get(
         url: state.catalog.url().to_owned(),
         version: release.map(|r| r.version.clone()),
         commit: release.map(|r| r.commit.clone()),
-        fetched_at: current.snapshot.as_ref().map(|s| s.fetched_at.clone()),
+        fetched_at: current.snapshot.as_ref().map(|s| s.fetched_at),
         error: current.error,
         cache_error: current.cache_error,
     }))
@@ -364,10 +368,8 @@ pub(crate) async fn get(
 /// The catalog now, read again when it is stale.
 pub(crate) async fn current(state: &AppState) -> Current {
     let now = (state.clock)();
-    let fetched_at = zeabur_kube::k8s_openapi::jiff::Timestamp::from_second(now.as_second())
-        .unwrap_or(now)
-        .to_string();
-    state.catalog.current(Instant::now(), &fetched_at).await
+    let fetched_at = Timestamp::from_second(now.as_second()).unwrap_or(now);
+    state.catalog.current(Instant::now(), fetched_at).await
 }
 
 #[cfg(test)]
@@ -375,6 +377,10 @@ mod tests {
     use std::sync::Mutex;
 
     use super::*;
+
+    fn second(n: i64) -> Timestamp {
+        Timestamp::from_second(n).unwrap()
+    }
 
     const INDEX: &[u8] = include_bytes!("../../../zeabur-catalog/tests/api/catalog.json");
     const CERT_MANAGER: &[u8] =
@@ -440,15 +446,17 @@ mod tests {
         let fake = Fake::new();
         let catalog = catalog(&fake, None);
         let start = Instant::now();
-        let first = catalog.current(start, "t0").await;
+        let first = catalog.current(start, second(0)).await;
         assert_eq!(first.snapshot.unwrap().index.catalog.version, "0.5.3");
         assert_eq!(fake.reads.lock().unwrap().len(), 2);
 
-        catalog.current(start + Duration::from_secs(5), "t1").await;
+        catalog
+            .current(start + Duration::from_secs(5), second(1))
+            .await;
         assert_eq!(fake.reads.lock().unwrap().len(), 2);
 
-        let later = catalog.current(start + FRESH, "t2").await;
-        assert_eq!(later.snapshot.unwrap().fetched_at, "t0");
+        let later = catalog.current(start + FRESH, second(2)).await;
+        assert_eq!(later.snapshot.unwrap().fetched_at, second(0));
         assert_eq!(fake.reads.lock().unwrap().len(), 3);
     }
 
@@ -457,15 +465,15 @@ mod tests {
         let fake = Fake::new();
         let kept = catalog(&fake, None);
         let start = Instant::now();
-        kept.current(start, "t0").await;
+        kept.current(start, second(0)).await;
         *fake.down.lock().unwrap() = true;
-        let now = kept.current(start + FRESH, "t1").await;
+        let now = kept.current(start + FRESH, second(1)).await;
         assert!(now.snapshot.is_some());
         assert_eq!(now.error.as_deref(), Some("connection refused"));
 
         let fresh = Fake::new();
         *fresh.down.lock().unwrap() = true;
-        let never = catalog(&fresh, None).current(start, "t0").await;
+        let never = catalog(&fresh, None).current(start, second(0)).await;
         assert!(never.snapshot.is_none());
         assert!(never.error.is_some());
     }
@@ -476,12 +484,14 @@ mod tests {
         *fake.down.lock().unwrap() = true;
         let catalog = catalog(&fake, None);
         let start = Instant::now();
-        catalog.current(start, "t0").await;
-        catalog.current(start + Duration::from_secs(1), "t1").await;
+        catalog.current(start, second(0)).await;
+        catalog
+            .current(start + Duration::from_secs(1), second(1))
+            .await;
         assert_eq!(fake.reads.lock().unwrap().len(), 1);
 
         *fake.down.lock().unwrap() = false;
-        let now = catalog.current(start + RETRY_FIRST, "t2").await;
+        let now = catalog.current(start + RETRY_FIRST, second(2)).await;
         assert!(now.snapshot.is_some());
         assert!(now.error.is_none());
     }
@@ -491,7 +501,9 @@ mod tests {
         let fake = Fake::new();
         let text = String::from_utf8(fake.index.lock().unwrap().clone()).unwrap();
         *fake.index.lock().unwrap() = text.replacen("\"0.5.3\"", "\"0.6.0\"", 1).into_bytes();
-        let now = catalog(&fake, None).current(Instant::now(), "t0").await;
+        let now = catalog(&fake, None)
+            .current(Instant::now(), second(0))
+            .await;
         assert!(now.snapshot.is_none());
         assert!(now.error.unwrap().contains("0.6.0 needs a newer Zeabur"));
     }
@@ -503,15 +515,15 @@ mod tests {
         ));
         let fake = Fake::new();
         catalog(&fake, Some(Arc::clone(&cluster)))
-            .current(Instant::now(), "t0")
+            .current(Instant::now(), second(0))
             .await;
 
         let offline = Fake::new();
         *offline.down.lock().unwrap() = true;
         let now = catalog(&offline, Some(cluster))
-            .current(Instant::now(), "t1")
+            .current(Instant::now(), second(1))
             .await;
-        assert_eq!(now.snapshot.unwrap().fetched_at, "t0");
+        assert_eq!(now.snapshot.unwrap().fetched_at, second(0));
         assert!(now.error.is_some());
     }
 
@@ -521,7 +533,7 @@ mod tests {
         state.forbidden_writes.insert(format!("ConfigMap/{CACHE}"));
         let cluster: Arc<dyn Cluster> = Arc::new(zeabur_kube::memory::MemoryCluster::new(state));
         let now = catalog(&Fake::new(), Some(cluster))
-            .current(Instant::now(), "t0")
+            .current(Instant::now(), second(0))
             .await;
         assert!(now.snapshot.is_some());
         assert!(now.cache_error.unwrap().contains(CACHE));

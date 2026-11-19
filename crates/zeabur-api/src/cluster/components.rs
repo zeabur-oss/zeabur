@@ -37,12 +37,16 @@ use zeabur_catalog::engine::{
     Refusal, Target,
 };
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::k8s_openapi::Resource as _;
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
-use zeabur_kube::k8s_openapi::api::core::v1::{Node, PersistentVolume};
+use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, PersistentVolume};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{
-    Cluster, ClusterExt, ObjectTarget, Preconditions, ResourceRef, ServedResource, WriteBody,
+    Cluster, ClusterExt, DynamicObject, ObjectTarget, Preconditions, ResourceRef, ServedResource,
+    WriteBody,
 };
+use zeabur_model::PodSecurityLevel;
 
 use super::node_shells::{require_admin, send, yaml};
 use crate::error::ApiError;
@@ -153,7 +157,7 @@ pub enum ComponentWarning {
         /// The component.
         component: String,
         /// `baseline` or `privileged`.
-        level: String,
+        level: PodSecurityLevel,
     },
 }
 
@@ -258,7 +262,7 @@ pub(crate) async fn apply(
     // A dry run of an object in a namespace that does not exist yet fails, so namespaces go
     // first.
     let (namespaces, rest): (Vec<&Placed>, Vec<&Placed>) =
-        step.iter().partition(|o| o.target.kind == "Namespace");
+        step.iter().partition(|o| o.target.kind == Namespace::KIND);
     for (dry_run, group) in [
         (true, &namespaces),
         (false, &namespaces),
@@ -268,12 +272,17 @@ pub(crate) async fn apply(
         for object in group {
             match request.action {
                 ComponentAction::Install => {
+                    let Some(body) = &object.body else {
+                        continue;
+                    };
+                    let body = serde_json::to_value(body)
+                        .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e.to_string())))?;
                     let target = object.target.clone();
                     let refused = right("patch", &target);
                     send(
                         cluster.as_ref(),
                         target,
-                        WriteBody::Apply(object.body.clone()),
+                        WriteBody::Apply(body),
                         dry_run,
                         refused,
                     )
@@ -320,7 +329,8 @@ fn right(verb: &str, target: &ObjectTarget) -> Denied {
 /// One object of a step, as written or to delete.
 struct Placed {
     target: ObjectTarget,
-    body: Value,
+    /// For an install: the object to apply.
+    body: Option<DynamicObject>,
     /// For a removal: the uid of the object found, `None` when it is gone.
     uid: Option<String>,
 }
@@ -381,7 +391,7 @@ impl World {
             .map_err(|e| ApiError::from(e.into_problem("the cluster's resources")))?;
         if !served
             .iter()
-            .any(|r| r.group == "helm.cattle.io" && r.kind == "HelmChart")
+            .any(|r| r.group == HelmChart::GROUP && r.kind == HelmChart::KIND)
         {
             return Err(ApiError::from(Problem::new(
                 Kind::Invalid,
@@ -536,7 +546,7 @@ impl World {
         let mut foreign = None;
         for desired in &step.objects {
             let Some(target) = self.place(desired) else {
-                let kind = text(&desired.object, "/kind");
+                let kind = kind(&desired.object);
                 progress.push(if earlier_ready {
                     Progress::Failed(format!("the cluster does not serve {kind}"))
                 } else {
@@ -545,12 +555,15 @@ impl World {
                 writes.push(view(&desired.object, None, Some(&desired.namespace)));
                 continue;
             };
-            let mut body = with_namespace(&desired.object, &target);
+            let mut body = desired.object.clone();
+            if let Some(namespace) = target.namespace() {
+                body.metadata.namespace = Some(namespace.to_owned());
+            }
             let found = read(cluster, &target).await?;
             if let Some(found) = &found {
-                if target.kind == "Namespace" {
-                    keep_looser_level(&mut body, found);
-                } else if ours(found, &step.component) {
+                if target.kind == Namespace::KIND {
+                    keep_looser_level(&mut body.metadata, &found.metadata);
+                } else if ours(&found.metadata, &step.component) {
                     zeaburs = true;
                 } else {
                     foreign.get_or_insert_with(|| format!("{} {}", target.kind, target.name));
@@ -560,7 +573,7 @@ impl World {
             writes.push(view(&body, Some(&target), None));
             placed.push(Placed {
                 target,
-                body,
+                body: Some(body),
                 uid: None,
             });
         }
@@ -603,32 +616,28 @@ impl World {
             let mut placed = Vec::new();
             let mut progress = Vec::new();
             for desired in step.objects.iter().rev() {
-                if text(&desired.object, "/kind") == "Namespace" {
+                if kind(&desired.object) == Namespace::KIND {
                     continue;
                 }
                 let Some(target) = self.place(desired) else {
                     continue;
                 };
-                let found = read(cluster, &target).await?.filter(|o| ours(o, id));
+                let found = read(cluster, &target)
+                    .await?
+                    .filter(|o| ours(&o.metadata, id));
                 zeaburs |= found.is_some();
                 progress.push(match &found {
                     None => Progress::Ready,
-                    Some(o) if o.pointer("/metadata/deletionTimestamp").is_some() => {
-                        Progress::Waiting
-                    }
+                    Some(o) if o.metadata.deletion_timestamp.is_some() => Progress::Waiting,
                     Some(_) => Progress::Pending,
                 });
                 let mut write = view(&desired.object, Some(&target), None);
                 write.yaml = None;
                 writes.push(write);
                 placed.push(Placed {
-                    uid: found
-                        .as_ref()
-                        .and_then(|o| o.pointer("/metadata/uid"))
-                        .and_then(Value::as_str)
-                        .map(str::to_owned),
+                    uid: found.and_then(|o| o.metadata.uid),
                     target,
-                    body: Value::Null,
+                    body: None,
                 });
             }
             let (state, message) = combine(&progress);
@@ -755,30 +764,31 @@ impl World {
     /// Where an object goes: its resource from discovery and its namespace; `None` while the
     /// cluster does not serve its kind.
     fn place(&self, desired: &Desired) -> Option<ObjectTarget> {
-        let api_version = desired.object.get("apiVersion")?.as_str()?;
-        let kind = desired.object.get("kind")?.as_str()?;
-        let name = desired.object.pointer("/metadata/name")?.as_str()?;
-        let (group, _) = api_version.split_once('/').unwrap_or(("", api_version));
+        let types = desired.object.types.as_ref()?;
+        let metadata = &desired.object.metadata;
+        let name = metadata.name.clone()?;
+        let (group, _) = types
+            .api_version
+            .split_once('/')
+            .unwrap_or(("", &types.api_version));
         let served = self
             .served
             .iter()
-            .find(|r| r.group == group && r.kind == kind)?;
+            .find(|r| r.group == group && r.kind == types.kind)?;
         let namespace = if served.namespaced {
-            desired
-                .object
-                .pointer("/metadata/namespace")
-                .and_then(Value::as_str)
-                .unwrap_or(&desired.namespace)
-                .to_owned()
+            metadata
+                .namespace
+                .clone()
+                .unwrap_or_else(|| desired.namespace.clone())
         } else {
             String::new()
         };
         Some(ObjectTarget {
-            api_version: api_version.to_owned(),
-            kind: kind.to_owned(),
+            api_version: types.api_version.clone(),
+            kind: types.kind.clone(),
             plural: served.resource.clone(),
             namespace,
-            name: name.to_owned(),
+            name,
         })
     }
 
@@ -786,15 +796,15 @@ impl World {
         &self,
         cluster: &dyn Cluster,
         target: &ObjectTarget,
-        found: Option<&Value>,
+        found: Option<&DynamicObject>,
     ) -> Result<Progress, ApiError> {
         let Some(found) = found else {
             return Ok(Progress::Pending);
         };
-        if target.kind != "HelmChart" {
+        if target.kind != HelmChart::KIND {
             return Ok(engine::object_progress(Some(found)));
         }
-        let chart: HelmChart = serde_json::from_value(found.clone()).unwrap_or_default();
+        let chart: HelmChart = found.clone().try_parse().unwrap_or_default();
         let job_name = chart.status.as_ref().and_then(|s| s.job_name.clone());
         let job = match job_name {
             Some(name) => {
@@ -803,8 +813,7 @@ impl World {
                     .find_object(&resource, Some(CHART_NAMESPACE), &name)
                     .await
                     .map_err(|e| ApiError::from(e.into_problem(&format!("Job {name}"))))?
-                    .and_then(|o| serde_json::to_value(o).ok())
-                    .and_then(|v| serde_json::from_value::<Job>(v).ok())
+                    .and_then(|o| o.try_parse::<Job>().ok())
             }
             None => None,
         };
@@ -906,79 +915,62 @@ fn combine(progress: &[Progress]) -> (StepState, Option<String>) {
     (state, None)
 }
 
-async fn read(cluster: &dyn Cluster, target: &ObjectTarget) -> Result<Option<Value>, ApiError> {
-    let found = cluster
+async fn read(
+    cluster: &dyn Cluster,
+    target: &ObjectTarget,
+) -> Result<Option<DynamicObject>, ApiError> {
+    cluster
         .find_object(&target.resource(), target.namespace(), &target.name)
         .await
-        .map_err(|e| ApiError::from(e.into_problem(&format!("{} {}", target.kind, target.name))))?;
-    Ok(found.and_then(|o| serde_json::to_value(o).ok()))
+        .map_err(|e| ApiError::from(e.into_problem(&format!("{} {}", target.kind, target.name))))
 }
-
-const ENFORCE: &str = "pod-security.kubernetes.io/enforce";
 
 /// Keeps a namespace's Pod Security level when it is looser than the desired one: components
 /// share namespaces, and one that needs `privileged` must not lose it to one that needs less.
-fn keep_looser_level(desired: &mut Value, found: &Value) {
-    let rank = |level: Option<&str>| match level {
-        Some("privileged") => 2,
-        Some("baseline") => 1,
-        _ => 0,
+fn keep_looser_level(desired: &mut ObjectMeta, found: &ObjectMeta) {
+    let level = |m: &ObjectMeta| {
+        m.labels
+            .as_ref()?
+            .get(PodSecurityLevel::ENFORCE)
+            .and_then(|l| PodSecurityLevel::parse(l))
     };
-    let Some(current) = label(found, ENFORCE) else {
-        return;
-    };
-    if rank(Some(current)) > rank(label(desired, ENFORCE))
-        && let Some(labels) = desired
-            .pointer_mut("/metadata/labels")
-            .and_then(Value::as_object_mut)
+    if let Some(current) = level(found)
+        && level(desired).is_none_or(|wanted| current < wanted)
     {
-        labels.insert(ENFORCE.to_owned(), Value::from(current));
+        desired.labels.get_or_insert_default().insert(
+            PodSecurityLevel::ENFORCE.to_owned(),
+            current.as_str().to_owned(),
+        );
     }
 }
 
-/// Whether Zeabur wrote `object` for `component`.
-fn ours(object: &Value, component: &str) -> bool {
-    label(object, COMPONENT) == Some(component)
-        && label(object, MANAGED_BY) == Some(MANAGED_BY_ZEABUR)
+/// Whether Zeabur wrote the object for `component`.
+fn ours(metadata: &ObjectMeta, component: &str) -> bool {
+    metadata.labels.as_ref().is_some_and(|l| {
+        l.get(COMPONENT).is_some_and(|c| c == component)
+            && l.get(MANAGED_BY).is_some_and(|m| m == MANAGED_BY_ZEABUR)
+    })
 }
 
-fn label<'a>(object: &'a Value, key: &str) -> Option<&'a str> {
-    object
-        .pointer("/metadata/labels")
-        .and_then(|l| l.get(key))
-        .and_then(Value::as_str)
+fn kind(object: &DynamicObject) -> &str {
+    object.types.as_ref().map_or("", |t| t.kind.as_str())
 }
 
-/// The object with its namespace set, for a namespaced kind.
-fn with_namespace(object: &Value, target: &ObjectTarget) -> Value {
-    let mut object = object.clone();
-    if let Some(namespace) = target.namespace()
-        && let Some(metadata) = object.get_mut("metadata").and_then(Value::as_object_mut)
-    {
-        metadata.insert("namespace".to_owned(), Value::String(namespace.to_owned()));
-    }
-    object
-}
-
-fn view(object: &Value, target: Option<&ObjectTarget>, namespace: Option<&str>) -> ObjectWrite {
+fn view(
+    object: &DynamicObject,
+    target: Option<&ObjectTarget>,
+    namespace: Option<&str>,
+) -> ObjectWrite {
     ObjectWrite {
-        kind: text(object, "/kind").to_owned(),
-        name: text(object, "/metadata/name").to_owned(),
+        kind: kind(object).to_owned(),
+        name: object.metadata.name.clone().unwrap_or_default(),
         namespace: target
             .and_then(ObjectTarget::namespace)
             .or(namespace)
             .filter(|n| !n.is_empty())
             .map(str::to_owned),
-        yaml: yaml(object),
+        yaml: serde_json::to_value(object).ok().as_ref().and_then(yaml),
     }
-}
-
-/// The string at `pointer`, empty when there is none.
-fn text<'a>(object: &'a Value, pointer: &str) -> &'a str {
-    object
-        .pointer(pointer)
-        .and_then(Value::as_str)
-        .unwrap_or_default()
 }
 
 fn refusal(refusal: &Refusal) -> ApiError {
