@@ -1,6 +1,6 @@
 //! Templates of Zeabur Catalog against an in-memory cluster: the list says which components a
-//! template needs and whether the cluster serves them, and a `template` change is planned as the
-//! objects of the template in the project.
+//! template needs and whether the cluster serves them, a template's room is counted node by node,
+//! and a `template` change is planned as the objects of the template in the project.
 
 #[cfg(test)]
 mod tests {
@@ -9,7 +9,7 @@ mod tests {
     use axum::http::StatusCode;
     use serde_json::{Value, json};
     use zeabur_api::settings::{DomainSettings, Settings};
-    use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
+    use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node};
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
 
@@ -363,5 +363,49 @@ mod tests {
             let written = cluster.inspect(|s| !s.writes.is_empty()).unwrap();
             assert_eq!(written, want == StatusCode::OK, "{name}");
         }
+    }
+
+    fn node(name: &str, memory: &str) -> Node {
+        serde_json::from_value(json!({
+            "metadata": {"name": name},
+            "spec": {},
+            "status": {"conditions": [{"type": "Ready", "status": "True"}],
+                       "allocatable": {"cpu": "4", "memory": memory, "pods": "110"}}
+        }))
+        .unwrap()
+    }
+
+    async fn room(cluster: &MemoryCluster) -> Value {
+        let app = TestApi::new(cluster).router();
+        let (status, rooms) = send(&app, "GET", "/api/v1/cluster/template-rooms", None).await;
+        assert_eq!(status, StatusCode::OK, "{rooms}");
+        rooms["items"]["miniflux"].clone()
+    }
+
+    /// Miniflux's database requests 256 MiB. Two nodes with 200 MiB each have room for it only in
+    /// total, so it does not fit; one node with 8 GiB does.
+    #[tokio::test]
+    async fn a_template_fits_only_when_each_pod_fits_on_one_node() {
+        let cluster = cluster();
+        cluster.update(|s| s.nodes = vec![node("a", "200Mi"), node("b", "200Mi")]);
+        let short = room(&cluster).await;
+        assert_eq!(
+            (short["fit"].as_str(), short["resource"].as_str()),
+            (Some("short"), Some("memory"))
+        );
+        assert_eq!(short["free"], json!(400 << 20));
+
+        cluster.update(|s| s.nodes = vec![node("a", "8Gi")]);
+        assert_eq!(room(&cluster).await["fit"], "fits");
+    }
+
+    #[tokio::test]
+    async fn without_the_nodes_the_room_is_unknown() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.nodes = vec![node("a", "8Gi")];
+            s.forbidden_resources.insert("nodes".to_owned());
+        });
+        assert_eq!(room(&cluster).await["fit"], "unknown");
     }
 }

@@ -156,7 +156,7 @@ pub(crate) async fn get(
     Ok(Json(view(&state, template, served.as_deref())))
 }
 
-fn render_problem(error: &RenderError) -> ApiError {
+pub(super) fn render_problem(error: &RenderError) -> ApiError {
     let kind = if matches!(error, RenderError::UnknownTemplate(_)) {
         Kind::NotFound
     } else {

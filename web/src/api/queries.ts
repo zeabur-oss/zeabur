@@ -207,13 +207,14 @@ export const templatesQuery = queryOptions({
   queryFn: async ({ signal }) => await zeabur.listTemplates({ signal }),
 })
 
-/** A template of Zeabur Catalog this build carries. Its idle use changes only with the build. */
-export const templateQuery = (template: string) =>
-  queryOptions({
-    queryKey: ["cluster", "templates", template],
-    queryFn: async ({ signal }) => await zeabur.getTemplate(template, { signal }),
-    staleTime: Infinity,
-  })
+/** Whether the cluster has room for each template's pods, each on one node. */
+export const templateRoomsQuery = queryOptions({
+  queryKey: ["cluster", "template-rooms"],
+  queryFn: async ({ signal }) => await zeabur.listTemplateRooms({ signal }),
+  refetchInterval: CLUSTER_POLL,
+  refetchIntervalInBackground: false,
+  retryOnMount: false,
+})
 
 export const clusterUsageQuery = queryOptions({
   queryKey: ["cluster", "usage"],

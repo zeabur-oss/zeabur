@@ -22,38 +22,21 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::k8s_openapi::api::core::v1::Node;
-use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod, ResourceRef};
+use zeabur_kube::{Cluster, ClusterPod, ResourceRef};
 use zeabur_modules::velero::cluster::Inventory;
 
 use crate::cluster::backup_download;
-use crate::cluster::capacity::{Amount, NodeRoom, node_room, place, pod_amounts};
+use crate::cluster::capacity::{self, Amount, Fit, NodeRoom, place, pod_amounts};
 use crate::error::{ApiError, list_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
-
-/// The most pods read to count the room.
-const PODS_READ: usize = 5000;
-
-/// Whether the cluster has room for the copy.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-#[schema(as = RestoreFit)]
-pub enum Fit {
-    /// Each of the original's pods fits on a node, by what it requests.
-    Fits,
-    /// They do not.
-    Short,
-    /// Nodes or pods could not be read.
-    Unknown,
-}
 
 /// The room the copy needs and the room there is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = RestoreRoom)]
 pub struct Room {
-    /// The verdict.
+    /// Whether each of the original's pods fits on a node.
     pub fit: Fit,
     /// What the original's running pods request: millicores.
     pub need_cpu: u64,
@@ -122,18 +105,8 @@ pub(crate) fn routes() -> [ResourceRef; 2] {
 
 /// Reads, as the person, the room for a copy of `copy.source` into `copy`.
 pub(crate) async fn read_room(cluster: &dyn Cluster, copy: &mut Copy) {
-    let source = copy.source.as_str();
-    let (nodes, pods) =
-        futures_util::join!(cluster.list::<Node>(None), cluster.cluster_pods(PODS_READ));
-    let fit = match (nodes, pods) {
-        (Ok(nodes), Ok(pods)) if !pods.truncated => {
-            let left = node_room(&nodes, &pods.pods);
-            room(&pods.pods, source, Some(&left))
-        }
-        (_, Ok(pods)) => room(&pods.pods, source, None),
-        _ => room(&[], source, None),
-    };
-    copy.room = Some(fit);
+    let reading = capacity::read(cluster).await;
+    copy.room = Some(room(&reading.pods, &copy.source, reading.nodes.as_deref()));
 }
 
 /// The projects a backup holds that no longer exist.
@@ -230,6 +203,7 @@ mod tests {
         let node = |cpu, memory| NodeRoom {
             free: Amount { cpu, memory },
             pods: 10,
+            ..NodeRoom::default()
         };
         let roomy = [node(1000, 4 << 30)];
         let tight = [node(400, 4 << 30)];
@@ -251,6 +225,7 @@ mod tests {
                 memory: 1 << 30,
             },
             pods: 10,
+            ..NodeRoom::default()
         };
         let copy = room(&pods, "blog", Some(&[gib, gib, gib]));
         assert_eq!((copy.fit, copy.free_memory), (Fit::Short, 3 << 30));

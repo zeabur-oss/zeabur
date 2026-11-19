@@ -19,7 +19,7 @@ pub mod templates;
 pub mod versions;
 
 pub use installed::{ComponentUpgrade, InstallSource, Installation};
-pub use measured::{IdleUse, template_idle};
+pub use measured::{IdleUse, MeasuredPod, template_idle};
 pub use templates::{Catalog, Dropped, Index, RenderError, RenderOptions, Template, template_id};
 
 /// The commit of Zeabur Catalog this build carries.
