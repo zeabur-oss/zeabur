@@ -417,7 +417,7 @@ impl Rule for DanglingRoute {
             .snapshot
             .ingresses
             .iter()
-            .flat_map(|ingress| {
+            .filter_map(|ingress| {
                 let name = ingress.metadata.name.as_deref().unwrap_or_default();
                 let backends = ingress_backends(ingress)
                     .into_iter()

@@ -100,7 +100,7 @@ fn created(object: &Value, found: &mut Found, workloads: &mut usize, builds: &mu
                 rules
                     .into_iter()
                     .flatten()
-                    .flat_map(|rule| text_of(rule, "/host")),
+                    .filter_map(|rule| text_of(rule, "/host")),
             );
         }
         ("gateway.networking.k8s.io", "HTTPRoute") => {
