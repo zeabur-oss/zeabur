@@ -25,7 +25,9 @@ table and then the same values in each SVG.
 | Width 440 | Every figure, so the text stays readable on a 390 px screen. |
 | Stroke 1 | Borders. Stroke 1.5: the accent card and arrows. |
 | Corner 6 | Figure, groups and cards. Corner 4: tags. |
-| Font | `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif` |
+| Font, en | `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif` |
+| Font, zh-TW | `-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif` |
+| Font, zh-CN | `-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif` |
 | 14 px, weight 600 | Card titles (`.t`). |
 | 13 px | Card text (`.n`). |
 | 12.5 px | Group labels (`.h`). |

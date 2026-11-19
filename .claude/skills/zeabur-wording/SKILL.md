@@ -55,11 +55,10 @@ but not Kubernetes. A feature's pull request brings its page in this shape.
 6. **A diagram before long text.** A concept, or a page whose idea takes more than a short
    paragraph, opens with one diagram, then short text. Draw it as an SVG file for each locale,
    `docs/[<locale>/]images/diagrams/<id>.svg`, shown like a screenshot, so it renders on GitHub and
-   on the site. Match the site's blog figures: boxes on 1 px hairlines, 6 px corners, violet only
-   for the one thing that matters, no shadows, glow, gradients or window dots (`no-ai-flavour`).
-   Colours come from a `<style>` with `@media (prefers-color-scheme: dark)` inside the SVG, and the
-   font is the system stack (`-apple-system, "Segoe UI", "PingFang TC", "Noto Sans CJK TC",
-   sans-serif`; SC for zh-CN). Keep it to about seven boxes; the alt text states the idea.
+   on the site. Use only the colours, strokes, corners and fonts in
+   [`docs/internal/diagrams.md`](../../../docs/internal/diagrams.md): violet only for the one thing
+   that matters, no shadows, glow, gradients or window dots (`no-ai-flavour`). Keep it to about
+   seven boxes; the alt text states the idea.
 7. **Install pages follow who installs.** Most people paste a prompt into Claude or Codex and let
    it install. Hands-on users run the Zeatend TUI or CLI. Cluster admins who want to see every
    object install by hand (Helm, kubectl, Flux or Argo CD). Pages and the sidebar keep that order,
