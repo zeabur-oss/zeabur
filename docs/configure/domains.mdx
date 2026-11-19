@@ -5,7 +5,17 @@ description: Connect a domain to a service, and configure HTTPS certificates, re
 
 When you finish this page, visitors who open `https://app.example.com` see your service, with no certificate warning in the browser. The domain is listed under **Public domains** on the service's **Networking** tab, with its DNS and certificate status beside it.
 
-![A visitor's request goes from the browser through the domain and an HTTPS certificate to the service](../images/diagrams/domain-path.svg)
+<Figure label="A visitor's request goes from the browser through the domain and an HTTPS certificate to the service">
+<FigFlow>
+<FigCard title="Browser" />
+<FigArrow label="DNS record" />
+<FigCard title="app.example.com" note="Domain" />
+<FigArrow accent label="HTTPS" />
+<FigCard accent title="Certificate" />
+<FigArrow />
+<FigCard title="web" note="Service" />
+</FigFlow>
+</Figure>
 
 ![The web service's Networking tab, showing public domains and the private network](../images/shots/service-networking.avif)
 

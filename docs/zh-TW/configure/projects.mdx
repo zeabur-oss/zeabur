@@ -5,7 +5,13 @@ description: 建立專案，把叢集裡已有的應用程式加進 Zeabur，修
 
 做完這一頁，**專案**頁會多出一個專案，你可以在裡面部署服務。專案把一組相關的服務放在一起，用法和 zeabur.com 的專案一樣。專案的名稱、描述、圖示和網路隔離，都在專案的**設定**修改。
 
-![一個專案放一組服務，每個服務可以有自己的網域](../images/diagrams/project.svg)
+<Figure label="一個專案放一組服務，每個服務可以有自己的網域">
+<FigGroup label="專案 shop：放一組服務" row>
+<FigCard title="web" note="服務" tag="app.example.com" />
+<FigCard title="api" note="服務" tag="api.example.com" />
+<FigCard title="worker" note="服務，沒有公開網域" />
+</FigGroup>
+</Figure>
 
 ## 開始前
 

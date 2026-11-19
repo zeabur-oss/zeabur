@@ -5,7 +5,15 @@ description: 修改服務啟動時讀取的設定，或讓多個服務讀取同�
 
 做完這一頁，服務會用你設定的環境變數啟動，例如 `APP_URL` 或 `LOG_LEVEL`。多個服務要用同一組值時，可以放進共用變數，各服務再選要讀哪些鍵。
 
-![變更先放進草稿，檢查過後才套用到叢集](../images/diagrams/plan.svg)
+<Figure label="變更先放進草稿，檢查過後才套用到叢集">
+<FigFlow>
+<FigCard title="修改" note="變更先放進草稿" />
+<FigArrow />
+<FigCard accent title="檢查變更" note="先看清楚每一項" />
+<FigArrow />
+<FigCard title="套用" note="叢集才會改變" />
+</FigFlow>
+</Figure>
 
 ![服務 web 的環境變數分頁](../images/shots/service-variables.avif)
 

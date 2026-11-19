@@ -5,7 +5,17 @@ description: 将域名连接到服务，配置 HTTPS 证书、重定向与访客
 
 完成这一页后，访客打开 `https://app.example.com` 就会看到你的服务，浏览器不会出现证书警告。域名列在服务**网络**标签页的**公开域名**中，旁边显示 DNS 和证书的状态。
 
-![访客的请求从浏览器经过域名和 HTTPS 证书，送到服务](../images/diagrams/domain-path.svg)
+<Figure label="访客的请求从浏览器经过域名和 HTTPS 证书，送到服务">
+<FigFlow>
+<FigCard title="浏览器" />
+<FigArrow label="DNS 记录" />
+<FigCard title="app.example.com" note="域名" />
+<FigArrow accent label="HTTPS" />
+<FigCard accent title="证书" />
+<FigArrow />
+<FigCard title="web" note="服务" />
+</FigFlow>
+</Figure>
 
 ![web 服务的网络选项卡，列出公开域名与私有网络](../images/shots/service-networking.avif)
 

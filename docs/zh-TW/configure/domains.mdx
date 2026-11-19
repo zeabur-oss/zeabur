@@ -5,7 +5,17 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 
 做完這一頁，訪客打開 `https://app.example.com` 就會看到你的服務，瀏覽器不會出現憑證警告。網域列在服務**網路**分頁的**公開網域**，旁邊寫出 DNS 和憑證的狀態。
 
-![訪客的請求從瀏覽器經過網域和 HTTPS 憑證，送到服務](../images/diagrams/domain-path.svg)
+<Figure label="訪客的請求從瀏覽器經過網域和 HTTPS 憑證，送到服務">
+<FigFlow>
+<FigCard title="瀏覽器" />
+<FigArrow label="DNS 紀錄" />
+<FigCard title="app.example.com" note="網域" />
+<FigArrow accent label="HTTPS" />
+<FigCard accent title="憑證" />
+<FigArrow />
+<FigCard title="web" note="服務" />
+</FigFlow>
+</Figure>
 
 ![web 服務的網路分頁，列出公開網域與私有網路](../images/shots/service-networking.avif)
 
