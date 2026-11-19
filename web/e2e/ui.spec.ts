@@ -376,7 +376,7 @@ test("each project keeps its own map zoom", async ({ page }) => {
   const mine = (await canvasZoom(page).textContent()) ?? ""
 
   await page.getByRole("button", { name: "Switch project" }).first().click()
-  await page.getByRole("button", { name: new RegExp(`^${otherProject}\\b`) }).click()
+  await page.getByRole("link", { name: new RegExp(`^${otherProject}\\b`) }).click()
   await expect(page).toHaveURL(new RegExp(`/projects/${otherProject}`))
   // The URL changes before the page does; until then the wheel would zoom the first project.
   await expect(page.getByRole("heading", { level: 1, name: otherProject })).toBeVisible()
