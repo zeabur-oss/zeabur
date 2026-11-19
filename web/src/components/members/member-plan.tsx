@@ -164,7 +164,10 @@ function Writes({ writes }: { writes: MemberWrite[] }) {
       yaml={
         <div className="flex flex-col gap-4">
           {writes.map((write) => (
-            <Written key={`${write.action}:${write.kind}/${write.namespace ?? ""}/${write.name}`} write={write} />
+            <Written
+              key={`${write.action}:${write.kind}/${write.namespace ?? ""}/${write.name}`}
+              write={write}
+            />
           ))}
         </div>
       }
