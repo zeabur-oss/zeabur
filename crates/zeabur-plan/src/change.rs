@@ -341,17 +341,21 @@ pub enum Change {
     /// uploaded-folder source that asks for its upload token, and the objects of the service that
     /// runs the image it builds (see the `upload_service` module).
     CreateUploadService(UploadServiceChange),
-    /// Create the Secret that holds an SSH deploy key Zeabur generated, for Zeabur Builder to
-    /// fetch a private repository: a `kubernetes.io/ssh-auth` Secret with the private key and the
-    /// Git host's `known_hosts`, labelled `builder.zeabur.com/git-credentials: "true"`. The key is
-    /// sealed by the server that made it; the API opens it and plans the Secret as a `create`,
-    /// so the private key never travels in the clear.
+    /// Create the Secret that holds an SSH deploy key, for Zeabur Builder to fetch a private
+    /// repository: a `kubernetes.io/ssh-auth` Secret with the private key and the Git host's
+    /// `known_hosts`, labelled `builder.zeabur.com/git-credentials: "true"`. The API plans the
+    /// Secret as a `create` with its values hidden and makes the key pair at apply, so the
+    /// private key never leaves the server.
     #[serde(rename_all = "camelCase")]
     DeployKey {
         /// The Secret's name.
         name: String,
-        /// The sealed key, as `POST /projects/{p}/deploy-keys` returned it.
-        key: String,
+        /// The Git host as the repository's SSH URL names it, with `:port` when it is not 22.
+        host: String,
+        /// The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+        /// `github.com` and `gitlab.com`, whose keys Zeabur pins.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        known_hosts: Option<String>,
     },
     /// Create a Secret with the keys of an S3 destination from the cluster's list. The API reads
     /// the destination's Secret as the person and plans the Secret as a `create`, so the keys

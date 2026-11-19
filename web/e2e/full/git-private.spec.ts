@@ -10,7 +10,8 @@ import { deleteService } from "./git.ts"
 import { invite, member, signInAdmin, toast } from "./members.ts"
 
 // Deploy from Git with a deploy key, against a real private repository on GitHub whose
-// Dockerfile serves a page on port 8080. Until the key is on the repository the service fails
+// Dockerfile serves a page on port 8080. The apply makes the key and the drawer then shows its
+// public half. Until the key is on the repository the service fails
 // with GitHub's refusal; once it is, the service builds and runs; when the key is taken off
 // again the next poll fails and the service says so. Skipped unless E2E_PRIVATE_GIT_REPO is set.
 //
@@ -99,18 +100,13 @@ test("a Developer deploys a private repository with a deploy key", async ({ page
   const developer = await member(browser, developerLink, "e2e-git-private-developer", zeabur)
 
   let publicKey = ""
-  await test.step("the Developer makes a deploy key and applies the plan", async () => {
+  await test.step("the Developer applies the plan, then gets the deploy key it made", async () => {
     await developer.goto(`/projects/${encodeURIComponent(project)}`)
     await developer.getByRole("button", { name: "New", exact: true }).click()
     await developer.getByRole("menuitem", { name: "Deploy from Git", exact: true }).click()
     const drawer = developer.getByRole("dialog", { name: "Deploy from Git" })
     await drawer.getByRole("textbox", { name: "Repository" }).fill(repository)
     await drawer.getByRole("radio", { name: /^Deploy key/ }).click()
-    await drawer.getByRole("button", { name: "Create deploy key" }).click()
-    const key = drawer.getByRole("textbox", { name: "Public key" })
-    await expect(key).toHaveValue(/^ssh-ed25519 \S+ zeabur /)
-    publicKey = await key.inputValue()
-    await expect(drawer).toContainText("without write access")
     await drawer.getByRole("combobox", { name: "Build with" }).click()
     await developer.getByRole("option", { name: "Dockerfile", exact: true }).click()
     await drawer.getByRole("textbox", { name: "Name" }).fill(name)
@@ -120,8 +116,13 @@ test("a Developer deploys a private repository with a deploy key", async ({ page
     await expect(plan).toContainText(`${name}-git`)
     await expect(plan).not.toContainText("PRIVATE KEY")
     await plan.getByRole("button").last().click()
-    await expect(plan).toHaveCount(0)
     await expect(toast(developer, "Applied")).toBeVisible({ timeout: 30_000 })
+    const key = drawer.getByRole("textbox", { name: "Public key" })
+    await expect(key).toHaveValue(/^ssh-ed25519 \S+ zeabur /)
+    publicKey = await key.inputValue()
+    await expect(drawer).toContainText("without write access")
+    await drawer.getByRole("button", { name: "Open service page" }).click()
+    await expect(drawer).toHaveCount(0)
   })
 
   try {

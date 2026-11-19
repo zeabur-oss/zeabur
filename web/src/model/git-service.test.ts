@@ -187,27 +187,36 @@ describe("the objects", () => {
     expect(railpack.spec.env).toBeUndefined()
   })
 
-  test("a deploy key is a change of its own, and the Build uses SSH", () => {
+  test("a deploy key is a change of its own, made at apply, and the Build uses SSH", () => {
     const changes = createGitService(
-      form({ access: "deployKey", sealedKey: "k1.sealed" }),
+      form({ access: "deployKey", knownHosts: "ignored for a pinned host" }),
       "shop",
       "zot:5000",
       {},
     )
-    expect(changes.at(-1)).toEqual({ op: "deployKey", name: "site-git", key: "k1.sealed" })
+    expect(changes.at(-1)).toEqual({ op: "deployKey", name: "site-git", host: "github.com" })
     const build = changes.find(
       (c) => c.op === "create" && (c.object as Object).kind === "Build",
     ) as { object: Object }
     expect(build.object.spec.source.git.url).toBe("git@github.com:acme/site.git")
-    expect(JSON.stringify(changes)).not.toContain("PRIVATE KEY")
     const typed = "ssh://git@git.example.com:2222/acme/site.git"
+    const lines = "[git.example.com]:2222 ssh-ed25519 AAAA"
     const other = createGitService(
-      form({ url: typed, access: "deployKey", sealedKey: "k1.sealed" }),
+      form({ url: typed, access: "deployKey", knownHosts: lines }),
       "shop",
       "zot:5000",
       {},
-    ).find((c) => c.op === "create" && (c.object as Object).kind === "Build") as { object: Object }
-    expect(other.object.spec.source.git.url).toBe(typed)
+    )
+    expect(other.at(-1)).toEqual({
+      op: "deployKey",
+      name: "site-git",
+      host: "git.example.com:2222",
+      knownHosts: lines,
+    })
+    const otherBuild = other.find(
+      (c) => c.op === "create" && (c.object as Object).kind === "Build",
+    ) as { object: Object }
+    expect(otherBuild.object.spec.source.git.url).toBe(typed)
   })
 
   test("a repository picked from the GitHub App names its installation and no Secret", () => {

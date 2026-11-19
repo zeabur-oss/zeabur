@@ -31,7 +31,7 @@ use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{
     Cluster, ClusterError, ClusterExt as _, DynamicObject, ExecRequest, ExecSession, Identity,
-    ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest,
+    ObjectTarget, Preconditions, ResourceRef, WriteBody, WriteRequest, Written,
 };
 use zeabur_plan::node_shell::{self as shell, NAMESPACE, NodeShell, ShellState};
 
@@ -751,7 +751,7 @@ pub(crate) async fn send(
     body: WriteBody,
     dry_run: bool,
     refused: Denied,
-) -> Result<(), ApiError> {
+) -> Result<Written, ApiError> {
     let what = format!("{} {}", target.kind, target.name);
     let write = WriteRequest {
         target,
@@ -761,7 +761,6 @@ pub(crate) async fn send(
     cluster
         .write(&write)
         .await
-        .map(|_| ())
         .map_err(|error| read_problem(error, &what, refused))
 }
 

@@ -156,7 +156,7 @@ function useApplying(
   const [readySince, setReadySince] = useState<number>()
   const apply = useMutation({
     mutationFn: (version: string) => applyComponent(id, { action, catalogVersion: version }),
-    onSuccess: (next) => {
+    onSuccess: ({ plan: next }) => {
       setLatest(next)
       if (next.done || [...next.steps, ...next.checks].some((s) => s.state === "failed")) {
         setRunning(false)

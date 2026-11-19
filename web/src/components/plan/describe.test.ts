@@ -394,7 +394,7 @@ group("actionOf", () => {
     const form: Schemas.Change[] = [
       { op: "create", object: object("a") },
       { op: "create", object: object("b") },
-      { op: "deployKey", name: "c", key: "k" },
+      { op: "deployKey", name: "c", host: "github.com" },
     ]
     const yaml: Schemas.Change[] = ["a", "b", "c"].map((name) => ({
       op: "create",
@@ -705,7 +705,7 @@ group("deploying from Git", () => {
   } as unknown as Record<string, never>
   const changes: Schemas.Change[] = [
     { op: "create", object: deployment },
-    { op: "deployKey", name: "site-git", key: "k1.sealed" },
+    { op: "deployKey", name: "site-git", host: "github.com" },
   ]
 
   test("the deploy key reads as the Secret it creates, and the button still creates", () => {

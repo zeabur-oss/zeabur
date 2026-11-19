@@ -341,7 +341,7 @@ pub(crate) async fn plan(
     };
     let catalog = state.templates.current();
     templates::check_forms(&catalog, &request)?;
-    let opened = deploy_keys::open(&state, &identity.username, &project, &request)?;
+    let opened = deploy_keys::open(&project, &request, deploy_keys::KeyPair::Hidden)?;
     let opened = s3_destinations::open(cluster.as_ref(), &project, opened).await?;
     let templates::Opened {
         request: opened,
@@ -475,7 +475,7 @@ pub(crate) async fn apply(
         handoff: handoff.as_ref(),
         zeabur: state.terminals.as_deref(),
     };
-    let opened = deploy_keys::open(&state, &identity.username, &project, &claims.request)?;
+    let opened = deploy_keys::open(&project, &claims.request, deploy_keys::KeyPair::New)?;
     let opened = s3_destinations::open(cluster.as_ref(), &project, opened).await?;
     let opened = templates::open_as_planned(
         &state.templates.current(),

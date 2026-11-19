@@ -245,24 +245,44 @@ mod tests {
             "a plan writes nothing"
         );
 
-        // The first step: the namespace and the chart, dry run first.
-        let (status, plan) = call(&app, "apply", "install", "0.5.3").await;
-        assert_eq!(status, StatusCode::OK, "{plan}");
-        assert_eq!(states(&plan), ["cert-manager waiting", "issuers pending"]);
+        // The first step: the namespace and the chart, dry run first; the answer names what
+        // each write left.
+        let (status, applied) = call(&app, "apply", "install", "0.5.3").await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(
+            states(&applied["plan"]),
+            ["cert-manager waiting", "issuers pending"]
+        );
         let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
         let written: Vec<&str> = writes.iter().map(|w| w.target.kind.as_str()).collect();
         assert_eq!(written, ["Namespace", "HelmChart"]);
         assert!(writes.iter().all(|w| matches!(w.body, WriteBody::Apply(_))));
         assert_eq!(cluster.inspect(|s| s.dry_runs), Some(2));
+        let chart = dynamic(&cluster, "HelmChart", "cert-manager").unwrap();
+        let answered = &applied["written"][1];
+        assert_eq!(answered["kind"], "HelmChart");
+        assert_eq!(answered["namespace"], "kube-system");
+        assert_eq!(answered["uid"], chart["metadata"]["uid"]);
+        assert_eq!(
+            answered["resourceVersion"],
+            chart["metadata"]["resourceVersion"]
+        );
+        assert_eq!(applied["written"].as_array().unwrap().len(), writes.len());
 
         // Nothing new is written while helm-controller works.
         call(&app, "apply", "install", "0.5.3").await;
-        let (_, plan) = call(&app, "apply", "install", "0.5.3").await;
-        assert_eq!(states(&plan), ["cert-manager waiting", "issuers pending"]);
+        let (_, applied) = call(&app, "apply", "install", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            ["cert-manager waiting", "issuers pending"]
+        );
 
         chart_installed(&cluster);
-        let (_, plan) = call(&app, "apply", "install", "0.5.3").await;
-        assert_eq!(states(&plan), ["cert-manager ready", "issuers ready"]);
+        let (_, applied) = call(&app, "apply", "install", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            ["cert-manager ready", "issuers ready"]
+        );
         assert!(dynamic(&cluster, "ClusterIssuer", "letsencrypt").is_some());
 
         // An issuer is ready once cert-manager says so.
@@ -292,13 +312,47 @@ mod tests {
                 .to_string()
                 .contains("letsencrypt-account-key")
         );
-        let (_, plan) = call(&app, "apply", "remove", "0.5.3").await;
-        assert_eq!(states(&plan), ["issuers ready", "cert-manager pending"]);
-        let (_, plan) = call(&app, "apply", "remove", "0.5.3").await;
-        assert_eq!(plan["done"], true, "{plan}");
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            ["issuers ready", "cert-manager pending"]
+        );
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(applied["plan"]["done"], true, "{applied}");
         assert!(dynamic(&cluster, "HelmChart", "cert-manager").is_none());
         let namespaces = cluster.inspect(|s| s.namespaces.len()).unwrap();
         assert_eq!(namespaces, 1, "the namespace stays");
+    }
+
+    #[tokio::test]
+    async fn a_removal_deletes_only_the_objects_it_found_unchanged() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        call(&app, "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "remove", "0.5.3").await;
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(applied["plan"]["done"], true, "{applied}");
+        let deletions: Vec<_> = cluster
+            .inspect(|s| s.writes.clone())
+            .unwrap()
+            .into_iter()
+            .filter_map(|w| {
+                if let WriteBody::Delete(preconditions) = w.body {
+                    Some(preconditions)
+                } else {
+                    None
+                }
+            })
+            .collect();
+        assert!(dynamic(&cluster, "HelmChart", "cert-manager").is_none());
+        assert!(
+            deletions
+                .iter()
+                .all(|p| p.uid.is_some() && p.resource_version.is_some()),
+            "every deletion names the uid and resourceVersion it found: {deletions:?}"
+        );
     }
 
     #[tokio::test]

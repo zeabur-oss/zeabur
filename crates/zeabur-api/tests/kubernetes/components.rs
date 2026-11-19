@@ -74,8 +74,9 @@ async fn apply_all(app: &Router, action: &str) -> Value {
     assert_eq!(status, StatusCode::OK, "{plan}");
     let version = plan["catalogVersion"].as_str().unwrap().to_owned();
     loop {
-        let (status, plan) = call(app, "apply", action, &version).await;
-        assert_eq!(status, StatusCode::OK, "{plan}");
+        let (status, applied) = call(app, "apply", action, &version).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let plan = &applied["plan"];
         let failed = plan["steps"]
             .as_array()
             .unwrap()
@@ -83,7 +84,7 @@ async fn apply_all(app: &Router, action: &str) -> Value {
             .any(|s| s["state"] == "failed");
         assert!(!failed, "{plan}");
         if plan["done"] == true {
-            return plan;
+            return plan.clone();
         }
         assert!(started.elapsed() < WAIT, "not done in time: {plan}");
         tokio::time::sleep(Duration::from_secs(5)).await;

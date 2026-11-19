@@ -2072,8 +2072,14 @@ export type Change =
       op: "createUploadService"
     })
   | {
-      /** The sealed key, as `POST /projects/{p}/deploy-keys` returned it. */
-      key: string
+      /** The Git host as the repository's SSH URL names it, with `:port` when it is not 22. */
+      host: string
+      /**
+       * The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+       * `github.com` and `gitlab.com`, whose keys Zeabur pins.
+       * @nullable
+       */
+      knownHosts?: string | null
       /** The Secret's name. */
       name: string
       op: "deployKey"
@@ -3813,6 +3819,46 @@ export type ComponentPlan = {
 }
 
 /**
+ * What one write of `apply` left on the cluster.
+ */
+export type ObjectWritten = {
+  /**
+   * `metadata.generation` after the write, for the kinds that keep one.
+   * @nullable
+   */
+  generation?: number | null
+  /** The object's kind. */
+  kind: string
+  /** Its name. */
+  name: string
+  /**
+   * Its namespace, for a namespaced object.
+   * @nullable
+   */
+  namespace?: string | null
+  /**
+   * `metadata.resourceVersion` after the write, when the cluster answered with the object.
+   * @nullable
+   */
+  resourceVersion?: string | null
+  /**
+   * `metadata.uid` after the write; absent for a deletion.
+   * @nullable
+   */
+  uid?: string | null
+}
+
+/**
+ * What `apply` wrote, and the plan as it is after the writes.
+ */
+export type ComponentApplied = {
+  /** The plan after the writes, as `plan` answers it. */
+  plan: ComponentPlan
+  /** Each object written, in order; empty when no step was due. */
+  written: ObjectWritten[]
+}
+
+/**
  * What to plan.
  */
 export type ComponentRequest = {
@@ -5182,6 +5228,24 @@ export type DeletedProjects = {
 }
 
 /**
+ * A host key a deploy key's Secret trusts.
+ */
+export type TrustedHostKey = {
+  /** The key type, such as `ssh-ed25519`. */
+  algorithm: string
+  /** `SHA256:…`, as `ssh-keygen -l` prints it. */
+  fingerprint: string
+}
+
+/**
+ * The host keys a deploy key's Secret will trust.
+ */
+export type DeployKeyHost = {
+  /** Each host key, to compare with the fingerprints the host publishes. */
+  hostKeys: TrustedHostKey[]
+}
+
+/**
  * The public half of a deploy key Zeabur made.
  */
 export type DeployKeyPublic = {
@@ -5204,30 +5268,6 @@ export type DeployKeyRequest = {
    * @nullable
    */
   knownHosts?: string | null
-}
-
-/**
- * A host key a deploy key's Secret trusts.
- */
-export type TrustedHostKey = {
-  /** The key type, such as `ssh-ed25519`. */
-  algorithm: string
-  /** `SHA256:…`, as `ssh-keygen -l` prints it. */
-  fingerprint: string
-}
-
-/**
- * A new deploy key.
- */
-export type DeployKeyResponse = {
-  /** When the sealed key stops working, RFC 3339. */
-  expiresAt: string
-  /** The host keys the Secret will trust. */
-  hostKeys: TrustedHostKey[]
-  /** The private key, sealed: give it back in a plan's `deployKey` change. */
-  key: string
-  /** The public key, one `ssh-ed25519 …` line, to add on the Git host. */
-  publicKey: string
 }
 
 /**
@@ -10896,14 +10936,15 @@ export const getApplyComponentUrl = (id: string) => {
 }
 
 /**
- * @summary Writes the next step of the plan whose earlier steps are ready, dry run first, and answers as
-`plan` does. `409` when Zeabur has read another catalog release than the plan's.
+ * @summary Writes the next step of the plan whose earlier steps are ready, dry run first, and answers with
+each write's result and the plan after it. `409` when Zeabur has read another catalog release
+than the plan's.
  */
 export const applyComponent = async (
   id: string,
   componentRequest: ComponentRequest,
   options?: Parameters<typeof zeaburFetch>[1],
-): Promise<ComponentPlan> => {
+): Promise<ComponentApplied> => {
   const getHeaders = (
     h?: NonNullable<RequestInit["headers"]>,
   ): Record<string, string | readonly string[]> => {
@@ -10923,7 +10964,7 @@ export const applyComponent = async (
     }
     return headers
   }
-  return zeaburFetch<ComponentPlan>(getApplyComponentUrl(id), {
+  return zeaburFetch<ComponentApplied>(getApplyComponentUrl(id), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
@@ -12409,19 +12450,19 @@ export const exportDatabase = async (
   })
 }
 
-export const getCreateDeployKeyUrl = (project: string) => {
-  return `/api/v1/projects/${encodeURIComponent(String(project))}/deploy-keys`
+export const getInspectDeployKeyHostUrl = (project: string) => {
+  return `/api/v1/projects/${encodeURIComponent(String(project))}/deploy-keys/host-keys`
 }
 
 /**
- * @summary Makes an SSH deploy key for a repository on `host`: the public key to add there, and the
-private key sealed for the plan that creates its Secret.
+ * @summary The host keys a deploy key for `host` will trust: the pinned ones for GitHub and GitLab, else
+those of the `known_hosts` lines given. Makes no key.
  */
-export const createDeployKey = async (
+export const inspectDeployKeyHost = async (
   project: string,
   deployKeyRequest: DeployKeyRequest,
   options?: Parameters<typeof zeaburFetch>[1],
-): Promise<DeployKeyResponse> => {
+): Promise<DeployKeyHost> => {
   const getHeaders = (
     h?: NonNullable<RequestInit["headers"]>,
   ): Record<string, string | readonly string[]> => {
@@ -12441,7 +12482,7 @@ export const createDeployKey = async (
     }
     return headers
   }
-  return zeaburFetch<DeployKeyResponse>(getCreateDeployKeyUrl(project), {
+  return zeaburFetch<DeployKeyHost>(getInspectDeployKeyHostUrl(project), {
     ...options,
     method: "POST",
     headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },

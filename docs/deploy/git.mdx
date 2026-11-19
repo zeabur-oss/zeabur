@@ -73,14 +73,14 @@ When using **Git URL**, choose the option under **Repository access** that match
 | Option | Action |
 | --- | --- |
 | **Public repository** | Don't add credentials. |
-| **Deploy key** | Select **Create deploy key**, copy the **Public key**, and use the link beside it to add the key to the repository's deploy keys. Keep read-only access. |
+| **Deploy key** | Zeabur makes the key when you apply. After the apply, copy the **Public key** from the form and use the link beside it to add the key to the repository's deploy keys. Keep read-only access. The service builds once the key is on the repository. |
 | **Access token** | Enter a **Username** and **Token** that can read the repository over HTTPS. Zeabur prefills `x-access-token` for GitHub and `oauth2` for GitLab. |
 
 Deploy keys work with any Git host that supports SSH. Zeabur includes host keys for GitHub and GitLab. For other hosts, paste in the host key first:
 
 1. Run the command shown in the form on your computer, such as `ssh-keyscan -t ed25519,ecdsa -p 2222 git.example.com`. The command omits `-p` when the SSH port is 22.
-2. Paste the output into **Host keys (known_hosts)** and select **Create deploy key**. Zeabur Builder only accepts Ed25519 and ECDSA keys.
-3. The form lists each host key's fingerprint, such as `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`. Compare it with the fingerprint published by the Git host administrator, or ask the administrator to run `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the host. Once the fingerprints match, add the public key to the repository.
+2. Paste the output into **Host keys (known_hosts)** and select **Check host keys**. Zeabur Builder only accepts Ed25519 and ECDSA keys.
+3. The form lists each host key's fingerprint, such as `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`. Compare it with the fingerprint published by the Git host administrator, or ask the administrator to run `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the host. Continue only when the fingerprints match.
 
 If you enter an HTTPS repository URL, Zeabur connects using `git@host:path.git` instead. If SSH uses a port other than 22 or a user other than `git`, enter an SSH URL directly, such as `ssh://git@git.example.com:2222/acme/site.git`.
 
