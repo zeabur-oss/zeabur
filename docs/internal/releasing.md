@@ -21,7 +21,7 @@ until every package is built (see [Zeabur Desktop](#zeabur-desktop)).
 |---|---|---|
 | knope's `prepare-release` | once, in the release pull request | Sets the version in every file of `versioned_files` in `knope.toml`: both `Cargo.toml` files, each workspace crate in both lock files, the chart's `version` and `web/package.json`. The chart has no `appVersion`; its templates use the chart's `version`. `openapi.yaml` carries the API's own version, which a release does not change. |
 | `check` job | once | The tag is SemVer without build metadata, `CHANGELOG.md` has its section, and a tag is on `main`. |
-| `build` job | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog pin resolves (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `ZEABUR_IDENTITY_PINNED` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. |
+| `build` job | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog pin resolves (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with the latest Zeabur Identity release (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. |
 | `scripts/release-sign.sh` | macOS arm64, in the `build` job | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
 | `publish` job | once, tag only, after every build | Refuses when the release is already published. Its token cannot see a draft; the `release` job stops when the release is published. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms (`release-default-images.sh`) and writes `published/subjects.json`, which `attest` attests. |
 | `release` job | once, tag only | Copies the assets that `release-assets.sh` lists into `assets/`, adds the signed `SHA256SUMS`, attests them and creates the draft release with them, its title and the `CHANGELOG.md` notes (`zeabur-oss-release draft`). A draft that an earlier run left is replaced. |
@@ -139,14 +139,11 @@ not `sort -V`.
    `### Security` and releases as a patch. The update check in the interface and in `zeaburctl`
    looks for that heading to tell people their version has known security problems, as
    docs/reference/telemetry.mdx describes.
-   The catalog commit in `flake.lock` and the Zeabur Identity release tag in
-   `ZEABUR_IDENTITY_PINNED` are what the release embeds and installs: the catalog commit must
-   carry a published release tag and the Identity tag must exist, each release with its signed
-   `SHA256SUMS`. `check` refuses a pin without a release tag, so zeabur-oss-bot opens no release
-   pull request until the catalog or Identity is released and the pin moved to it. Renovate moves
-   the Identity tag only to newer release tags.
-   The release reads the Identity release's `digests.txt`, which Identity publishes from v0.1.2
-   on: release Identity before the next Zeabur release and move the pin to it.
+   The catalog commit in `flake.lock` is what the release embeds: it must carry a published
+   release tag with its signed `SHA256SUMS`. `check` refuses a pin without a release tag, so
+   zeabur-oss-bot opens no release pull request until the catalog is released and the pin moved
+   to it. Zeabur pins no Zeabur Identity or Zeabur Builder version: what it relies on from them is
+   in `fixtures/contracts`, and the smoke test installs the latest Identity release.
 2. Rehearse: **Actions → Release → Run workflow** on `release/next` with the version, `v<version>`. It
    runs the three builds with their smoke tests and publishes nothing; the pins are
    not checked.

@@ -38,19 +38,5 @@
       ],
       "groupName": "web (non-major)"
     }
-  ],
-  "customManagers": [
-    {
-      "customType": "regex",
-      "description": "Zeabur Identity release tag that e2e builds and a release installs.",
-      "managerFilePatterns": [
-        "/^ZEABUR_IDENTITY_PINNED$/"
-      ],
-      "matchStrings": [
-        "(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?)"
-      ],
-      "depNameTemplate": "zeabur-oss/identity",
-      "datasourceTemplate": "github-tags"
-    }
   ]
 }

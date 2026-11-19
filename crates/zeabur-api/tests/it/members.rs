@@ -58,35 +58,32 @@ mod tests {
     }
 
     fn signed_in(username: &str) -> MemoryCluster {
-        let served = [
-            "users:User",
-            "credentials:Credential",
-            "invitations:Invitation",
-            "grants:Grant",
-        ]
-        .into_iter()
-        .map(|r| {
-            let (plural, kind) = r.split_once(':').unwrap();
-            ServedResource::readable("identity.zeabur.com", "v1alpha1", plural, kind, true)
-        })
-        .chain([
-            ServedResource::readable(
-                "rbac.authorization.k8s.io",
-                "v1",
-                "rolebindings",
-                "RoleBinding",
-                true,
-            ),
-            ServedResource::readable(
-                "rbac.authorization.k8s.io",
-                "v1",
-                "clusterrolebindings",
-                "ClusterRoleBinding",
-                false,
-            ),
-        ])
-        .collect();
+        let served = zeabur_test_support::contracts::served("identity.zeabur.com")
+            .unwrap()
+            .into_iter()
+            .filter(|s| ["User", "Credential", "Invitation", "Grant"].contains(&s.kind.as_str()))
+            .map(|s| {
+                ServedResource::readable(&s.group, &s.version, &s.resource, &s.kind, s.namespaced)
+            })
+            .chain([
+                ServedResource::readable(
+                    "rbac.authorization.k8s.io",
+                    "v1",
+                    "rolebindings",
+                    "RoleBinding",
+                    true,
+                ),
+                ServedResource::readable(
+                    "rbac.authorization.k8s.io",
+                    "v1",
+                    "clusterrolebindings",
+                    "ClusterRoleBinding",
+                    false,
+                ),
+            ])
+            .collect();
         MemoryCluster::new(State {
+            schema: Some(zeabur_test_support::contracts::check_write),
             identity: Identity {
                 username: username.to_owned(),
                 groups: vec![],

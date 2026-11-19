@@ -526,7 +526,12 @@ impl FixtureOp for Plan {
             &params.request.0,
         );
         match planned {
-            Ok(planned) => to_value(planned).map_err(|e| e.to_string()),
+            Ok(planned) => {
+                for object in &planned.objects {
+                    zeabur_test_support::contracts::check_write(&object.raw_after)?;
+                }
+                to_value(planned).map_err(|e| e.to_string())
+            }
             Err(error) => Ok(json!({"error": error.code})),
         }
     }

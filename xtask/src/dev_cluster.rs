@@ -29,7 +29,7 @@ const ZOT_HOST: &str = "zot.zot.svc:5000";
 const ZOT_IP: &str = "10.43.0.50";
 const ZOT_CA: &str = "/etc/rancher/k3s/zot-ca.crt";
 
-const TOOLS: &[&str] = &["docker", "k3d", "kubectl", "helm", "openssl", "git", "curl"];
+const TOOLS: &[&str] = &["docker", "k3d", "kubectl", "helm", "openssl", "curl"];
 
 /// What `up` installs besides the cluster.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, clap::ValueEnum)]
@@ -60,14 +60,10 @@ pub(crate) struct Up {
     /// What to install besides the cluster.
     #[arg(long, value_enum, default_value_t)]
     pub(crate) profile: Profile,
-    /// Build Zeabur Identity from this working tree, as it is, instead of the release that
-    /// `ZEABUR_IDENTITY_PINNED` names.
+    /// Build Zeabur Identity from this working tree, as it is, instead of installing the latest
+    /// release.
     #[arg(long, value_name = "DIR", env = "ZEABUR_IDENTITY_SRC")]
     pub(crate) identity_src: Option<PathBuf>,
-    /// Build Zeabur Builder from this working tree, as it is (full profile), instead of
-    /// `ZEABUR_BUILDER_PINNED` fetched from `ZEABUR_BUILDER_GIT`.
-    #[arg(long, value_name = "DIR", env = "ZEABUR_BUILDER_SRC")]
-    pub(crate) builder_src: Option<PathBuf>,
     /// Run this Zeabur image (a local image is imported, any other is pulled) instead of one
     /// built from this checkout; Zeabur Proxy stays off.
     #[arg(long, value_name = "IMAGE", value_parser = clap::builder::NonEmptyStringValueParser::new())]
@@ -264,16 +260,10 @@ pub(crate) fn up(options: &Up) -> Result<(), String> {
 
     // cert-manager issues the certificate kube-apiserver checks on Zeabur Identity's internal
     // address, and the full profile's certificates.
-    catalog::install(
-        &dev,
-        "cert-manager",
-        "cert-manager",
-        &[],
-        catalog::stop_at_from_env().as_deref(),
-    )?;
+    catalog::install(&dev, "cert-manager", "cert-manager", &[])?;
     // Before Zeabur, so that e2e's removal check counts them as the cluster's own.
     if options.profile == Profile::Full {
-        full::install(&dev, options.builder_src.as_deref())?;
+        full::install(&dev)?;
     }
     identity::install(&dev, &built.identity)?;
     zeabur::install(
@@ -407,8 +397,6 @@ mod tests {
             "full",
             "--identity-src",
             "/src/identity",
-            "--builder-src",
-            "b",
             "--zeabur-image",
             "ghcr.io/zeabur-oss/zeabur:0.1.1",
             "--zeabur-chart",
@@ -420,7 +408,6 @@ mod tests {
             Up {
                 profile: Profile::Full,
                 identity_src: Some(PathBuf::from("/src/identity")),
-                builder_src: Some(PathBuf::from("b")),
                 zeabur_image: Some("ghcr.io/zeabur-oss/zeabur:0.1.1".to_owned()),
                 zeabur_chart: Some("oci://ghcr.io/zeabur-oss/charts/zeabur".to_owned()),
             }

@@ -97,7 +97,7 @@ jobs:
           scripts/release-build.sh "$VERSION" "$ARCH" dist
           if [[ "$OS" == linux ]]; then
             # The archive, the chart and the image as built, on the development cluster with
-            # Zeabur Identity at ZEABUR_IDENTITY_PINNED.
+            # the latest Zeabur Identity release.
             scripts/release-smoke.sh "dist/zeaburctl-$VERSION-linux-$ARCH.tar.gz" \
               deploy/chart/zeabur "zeabur:release-$ARCH"
           fi

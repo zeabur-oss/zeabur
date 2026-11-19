@@ -2,7 +2,7 @@
 
 Development tasks for this repository, in the [cargo xtask](https://github.com/matklad/cargo-xtask)
 convention: `cargo xtask <task>` (an alias in `.cargo/config.toml`) builds and runs this crate.
-Nothing ships it. Git, Docker, k3d, kubectl, Helm, openssl, curl, tar, cosign and Nix run as subprocesses;
+Nothing ships it. Docker, k3d, kubectl, Helm, openssl, curl, tar, cosign and Nix run as subprocesses;
 `cargo xtask --help` prints every task, and `cargo xtask <task> --help` its options.
 
 ```sh
@@ -10,7 +10,7 @@ Nothing ships it. Git, Docker, k3d, kubectl, Helm, openssl, curl, tar, cosign an
 # Zeabur Identity and Zeabur at https://zeabur.localhost. A second `up` brings a running cluster
 # in line with the checkout. State is in target/dev-cluster.
 cargo xtask dev-cluster up [--profile bare|default|full] [--identity-src <dir>]
-                           [--builder-src <dir>] [--zeabur-image <image>] [--zeabur-chart <chart>]
+                           [--zeabur-image <image>] [--zeabur-chart <chart>]
 cargo xtask dev-cluster down
 cargo xtask dev-cluster snapshot   # cluster-scoped objects and namespace metadata, for e2e
 
@@ -21,8 +21,4 @@ cargo xtask e2e-proxy
 
 # crates/zeabur-api/openapi.yaml from the handlers, then web/src/api/zeabur.ts from it.
 cargo xtask openapi
-
-# A checkout of a pinned commit or release tag (vX.Y.Z) from <url> in <dir>, kept between runs
-# for its build cache; untracked files other than target/ are removed.
-cargo xtask dev-cluster checkout <dir> <pin> <url>
 ```

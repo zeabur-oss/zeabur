@@ -4,7 +4,7 @@
 # Docker and Nix; it uses this machine's port 443 and enters `nix develop` by itself. The work is
 # `cargo xtask dev-cluster` (xtask/src/dev_cluster.rs); without arguments it prints its options.
 #
-#   nix run .#dev-cluster -- up [--profile bare|full] [--identity-src <dir>] [--builder-src <dir>]
+#   nix run .#dev-cluster -- up [--profile bare|full] [--identity-src <dir>]
 #                               [--zeabur-image <image>] [--zeabur-chart <chart>]
 #   nix run .#dev-cluster -- down
 #   scripts/dev-cluster.sh snapshot        # cluster-scoped objects and namespace metadata

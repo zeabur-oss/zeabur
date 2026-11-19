@@ -3147,6 +3147,7 @@ dependencies = [
  "zeabur-kube",
  "zeabur-local",
  "zeabur-telemetry",
+ "zeabur-test-support",
 ]
 
 [[package]]

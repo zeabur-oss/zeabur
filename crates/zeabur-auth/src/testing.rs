@@ -29,6 +29,12 @@ use zeabur_core::crypto::sha256;
 
 use crate::url::BaseUrl;
 
+/// Zeabur Identity's discovery document, with the issuer `https://identity.example`.
+const DISCOVERY: &str =
+    include_str!("../../../fixtures/contracts/identity/openid-configuration.json");
+/// The fields of Zeabur Identity's token answer.
+const TOKEN: &str = include_str!("../../../fixtures/contracts/identity/token.json");
+
 struct Code {
     user: String,
     challenge: String,
@@ -175,28 +181,34 @@ impl FakeIssuer {
     }
 }
 
+/// Zeabur Identity's own discovery document, served at this issuer.
 async fn metadata(State(shared): State<Shared>) -> Response {
-    let url = &shared.url;
-    axum::Json(json!({
-        "issuer": url,
-        "authorization_endpoint": format!("{url}/authorize"),
-        "token_endpoint": format!("{url}/token"),
-        "revocation_endpoint": format!("{url}/revoke"),
-        "code_challenge_methods_supported": ["S256"],
-        "authorization_response_iss_parameter_supported": true,
-    }))
-    .into_response()
+    let document = DISCOVERY.replace("https://identity.example", &shared.url);
+    ([(header::CONTENT_TYPE, "application/json")], document).into_response()
 }
 
 /// A token answer for `user`'s access token number `n`, with `refresh`.
+/// The fields are the ones Zeabur Identity sends; only their values are this issuer's.
 fn tokens(recorded: &Recorded, user: &str, n: usize, refresh: &str) -> Response {
-    let mut answer = serde_json::Map::new();
-    answer.insert("access_token".into(), json!(format!("{user}:{n}")));
-    answer.insert("token_type".into(), json!("Bearer"));
-    answer.insert("expires_in".into(), json!(recorded.expires_in));
-    answer.insert("refresh_token".into(), json!(refresh));
-    if let Some(seconds) = recorded.refresh_expires_in {
-        answer.insert("refresh_expires_in".into(), json!(seconds));
+    let mut answer: serde_json::Map<String, serde_json::Value> =
+        serde_json::from_str(TOKEN).unwrap();
+    let values = [
+        ("access_token", Some(json!(format!("{user}:{n}")))),
+        ("expires_in", Some(json!(recorded.expires_in))),
+        ("refresh_token", Some(json!(refresh))),
+        (
+            "refresh_expires_in",
+            recorded.refresh_expires_in.map(|s| json!(s)),
+        ),
+    ];
+    for (field, value) in values {
+        match (answer.get_mut(field), value) {
+            (Some(slot), Some(value)) => *slot = value,
+            (Some(_), None) => {
+                answer.remove(field);
+            }
+            (None, _) => {}
+        }
     }
     axum::Json(answer).into_response()
 }

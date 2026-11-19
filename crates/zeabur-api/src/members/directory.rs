@@ -671,6 +671,26 @@ mod tests {
 
     use super::*;
 
+    #[test]
+    fn every_kind_is_one_zeabur_identity_serves() {
+        let served = zeabur_test_support::contracts::served(GROUP).unwrap();
+        for kind in [
+            IdentityKind::User,
+            IdentityKind::Credential,
+            IdentityKind::Invitation,
+            IdentityKind::Grant,
+        ] {
+            assert!(
+                served.iter().any(|s| s.version == VERSION
+                    && s.resource == kind.plural()
+                    && s.kind == kind.kind()
+                    && s.namespaced),
+                "{}",
+                kind.kind()
+            );
+        }
+    }
+
     fn object<O: for<'de> Deserialize<'de>>(value: Value) -> O {
         serde_json::from_value(value).unwrap()
     }

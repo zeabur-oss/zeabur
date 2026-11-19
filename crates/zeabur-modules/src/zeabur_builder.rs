@@ -435,6 +435,20 @@ pub fn built_image(
 mod tests {
     use super::*;
 
+    #[test]
+    fn every_read_is_a_kind_zeabur_builder_serves() {
+        for read in MODULE.reads {
+            let served = zeabur_test_support::contracts::served(read.group).unwrap();
+            assert!(
+                served.iter().any(|s| s.version == read.version
+                    && s.resource == read.resource
+                    && s.kind == read.kind),
+                "{}",
+                read.kind
+            );
+        }
+    }
+
     fn object(value: serde_json::Value) -> DynamicObject {
         serde_json::from_value(value).unwrap()
     }

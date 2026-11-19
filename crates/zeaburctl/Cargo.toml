@@ -46,3 +46,4 @@ tower.workspace = true
 [dev-dependencies]
 tempfile.workspace = true
 zeabur-kube = { workspace = true, features = ["memory"] }
+zeabur-test-support.workspace = true

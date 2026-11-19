@@ -2,8 +2,7 @@
 # Integration tests (JSON Patch writes, dry run, identity, revocation), `zeaburctl doctor`, and
 # browser tests in local mode with the embedded interface, on the development cluster
 # (scripts/dev-cluster.sh, which also reads ZEABUR_IDENTITY_SRC, K3S_IMAGE and
-# ZEABUR_REGISTRY_MIRRORS; without ZEABUR_IDENTITY_SRC it installs the Zeabur Identity release that
-# ZEABUR_IDENTITY_PINNED names). The cluster is deleted at the end; ZEABUR_CI_KEEP=1 keeps it.
+# ZEABUR_REGISTRY_MIRRORS). The cluster is deleted at the end; ZEABUR_CI_KEEP=1 keeps it.
 set -euo pipefail
 cd "$(dirname "$0")/../.."
 source scripts/lib.sh

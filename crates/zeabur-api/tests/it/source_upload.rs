@@ -129,6 +129,7 @@ mod tests {
             "labels": {"zeabur.com/project": "true"}}}))
         .unwrap();
         let cluster = MemoryCluster::new(ClusterState {
+            schema: Some(zeabur_test_support::contracts::check_write),
             identity: Identity {
                 username: "alice".to_owned(),
                 groups: Vec::new(),

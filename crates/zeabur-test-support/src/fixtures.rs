@@ -140,6 +140,9 @@ fn load_case(area: &str, dir: &Path) -> Result<Fixture, LoadError> {
     } else {
         Vec::new()
     };
+    for object in &input {
+        crate::contracts::check_read(object).map_err(|e| parse_error(&input_path, &e))?;
+    }
     let expected_path = dir.join("expected.json");
     let expected = serde_json::from_str(&read(&expected_path)?)
         .map_err(|e| parse_error(&expected_path, &e))?;

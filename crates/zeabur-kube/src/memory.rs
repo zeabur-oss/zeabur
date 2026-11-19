@@ -34,6 +34,9 @@ use crate::port::{
     TerminalSize, Unreadable, WriteBody, WriteRequest, Written,
 };
 
+/// Checks an object a write would store; the error says what does not fit.
+pub type SchemaCheck = fn(&Value) -> Result<(), String>;
+
 /// What the in-memory cluster holds.
 #[derive(Debug, Default)]
 pub struct State {
@@ -82,6 +85,9 @@ pub struct State {
     pub served: Vec<ServedResource>,
     /// Objects of the resources in `served`, as JSON with `apiVersion` and `kind`.
     pub dynamic: Vec<DynamicObject>,
+    /// Checks each object a write would store, dry runs included, as kube-apiserver checks a
+    /// custom resource against its CRD's schema; a refusal is answered `422 Invalid`.
+    pub schema: Option<SchemaCheck>,
     /// Cluster-wide reads refused with `403 Forbidden`, by resource as [`ResourceRef::key`]
     /// names it: `nodes`, `pods`, `nodes.metrics.k8s.io`, `events.events.k8s.io`,
     /// `plans.upgrade.cattle.io`.
@@ -1309,6 +1315,13 @@ impl Cluster for MemoryCluster {
                     with_ephemeral_containers(current, operations)?
                 }
             };
+            if let Some(check) = state.schema
+                && let Err(message) = check(&object)
+            {
+                return Err(ClusterError::Status(KubernetesStatus::new(
+                    422, "Invalid", message,
+                )));
+            }
             if request.dry_run {
                 state.dry_runs += 1;
                 drop(state);

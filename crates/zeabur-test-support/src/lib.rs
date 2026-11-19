@@ -2,6 +2,7 @@
 
 #[cfg(feature = "allocations")]
 pub mod allocations;
+pub mod contracts;
 /// Loads the language-neutral test cases and compares results with them.
 pub mod fixtures;
 #[cfg(feature = "sandbox")]

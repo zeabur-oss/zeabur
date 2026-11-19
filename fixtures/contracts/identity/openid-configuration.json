@@ -1,0 +1,62 @@
+{
+  "issuer": "https://identity.example",
+  "authorization_endpoint": "https://identity.example/authorize",
+  "token_endpoint": "https://identity.example/token",
+  "userinfo_endpoint": "https://identity.example/userinfo",
+  "jwks_uri": "https://identity.example/jwks",
+  "pushed_authorization_request_endpoint": "https://identity.example/par",
+  "revocation_endpoint": "https://identity.example/revoke",
+  "scopes_supported": [
+    "openid",
+    "profile",
+    "groups",
+    "offline_access"
+  ],
+  "response_types_supported": [
+    "code"
+  ],
+  "response_modes_supported": [
+    "query"
+  ],
+  "grant_types_supported": [
+    "authorization_code",
+    "refresh_token"
+  ],
+  "subject_types_supported": [
+    "public"
+  ],
+  "id_token_signing_alg_values_supported": [
+    "ES256",
+    "RS256"
+  ],
+  "request_uri_parameter_supported": false,
+  "require_pushed_authorization_requests": false,
+  "code_challenge_methods_supported": [
+    "S256"
+  ],
+  "token_endpoint_auth_methods_supported": [
+    "none",
+    "client_secret_basic",
+    "client_secret_post"
+  ],
+  "revocation_endpoint_auth_methods_supported": [
+    "none",
+    "client_secret_basic",
+    "client_secret_post"
+  ],
+  "authorization_response_iss_parameter_supported": true,
+  "claims_supported": [
+    "iss",
+    "sub",
+    "aud",
+    "exp",
+    "iat",
+    "auth_time",
+    "nonce",
+    "amr",
+    "azp",
+    "preferred_username",
+    "name",
+    "groups"
+  ]
+}

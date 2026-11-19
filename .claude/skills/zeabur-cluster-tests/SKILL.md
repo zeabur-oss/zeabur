@@ -16,13 +16,13 @@ nix run .#dev-cluster -- down
 ```
 `scripts/dev-cluster.sh` (`cargo xtask dev-cluster`, `xtask/src/dev_cluster.rs`) is the one
 cluster setup: the `cluster` and `e2e` jobs,
-`e2e.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (the signed
-release `ZEABUR_IDENTITY_PINNED` names, or built from `--identity-src`) and Zeabur
+`e2e.sh` and `release-smoke.sh` all use it. It installs Zeabur Identity (its latest signed
+release, or built from `--identity-src`) and Zeabur
 from its chart with `helm upgrade --install` (values in `xtask/src/dev_cluster/zeabur.rs`;
 `proxy.enabled` when Zeabur Proxy's image is built), and imports busybox for the exec test. `--profile full` adds cert-manager,
 CloudNativePG with Barman Cloud, Percona MongoDB, Keel and zot (each with the Helm commands Zeabur
-Catalog gives), the test S3, and Zeabur Builder's chart from `ZEABUR_BUILDER_PINNED`, pushing
-anonymously to zot. The node pulls `zot.zot.svc:5000` through a mirror to
+Catalog gives), the test S3, and Zeabur Builder (its catalog component with zot), pushing to zot with
+the tokens Zeabur Builder signs. The node pulls `zot.zot.svc:5000` through a mirror to
 zot's fixed ClusterIP 10.43.0.50, checked against zot's CA.
 `--profile bare` is the cluster alone: run `binary(kubernetes)` and `e2e-ui.sh` there (the
 `cluster` job does), since Zeabur's ValidatingAdmissionPolicy `zeabur-project-namespace` stops
