@@ -10,15 +10,18 @@
 apiVersion: helm.cattle.io/v1
 kind: HelmChart
 metadata:
+  labels:
+    app.kubernetes.io/managed-by: zeabur
+    catalog.zeabur.com/component: metrics-server
+    catalog.zeabur.com/release: metrics-server
   name: metrics-server
   namespace: kube-system
 spec:
   chart: metrics-server
+  failurePolicy: abort
   repo: https://kubernetes-sigs.github.io/metrics-server
-  version: 3.14.0
   targetNamespace: kube-system
-  createNamespace: true
-  valuesContent: |-
+  valuesContent: |
     args:
     - --metric-resolution=15s
     image:
@@ -30,3 +33,4 @@ spec:
       requests:
         cpu: 20m
         memory: 32Mi
+  version: "3.14.0"

@@ -27,6 +27,7 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::k8s_openapi::{Metadata, NamespaceResourceScope, Resource};
 use zeabur_kube::{ClusterFacts, DynamicObject, ServedResource};
 use zeabur_model::PodSecurityLevel;
+use zeabur_model::kernel::names::is_system_namespace;
 use zeabur_model::readiness::{self, Explained, GenericStatus, Reason, Status};
 
 use crate::api::{ComponentFile, Health, Release, ReleaseType, Snapshot};
@@ -304,15 +305,20 @@ pub fn steps_of(
     let mut steps = Vec::new();
     for release in &file.declaration.releases {
         let mut objects = Vec::new();
-        if namespaces.insert(release.namespace.clone()) {
-            let level = file.declaration.security.pod_security;
+        let level = file.declaration.security.pod_security;
+        if namespaces.insert(release.namespace.clone())
+            && let Some(namespace) = namespace(&release.namespace, level)
+        {
             objects.push(Desired {
-                object: namespace(&release.namespace, level).map_err(broken)?,
+                object: dynamic(&namespace).map_err(broken)?,
                 namespace: String::new(),
             });
         }
         let made = match release.kind {
-            ReleaseType::Helm => vec![helm_chart(release, profile).map_err(broken)?],
+            ReleaseType::Helm => {
+                let values = profile_values(release, profile).map_err(broken)?;
+                vec![dynamic(&helm_chart(release, &values).map_err(broken)?).map_err(broken)?]
+            }
             ReleaseType::Inline => inline(release).map_err(broken)?,
             ReleaseType::Manifest | ReleaseType::Unknown => Vec::new(),
         };
@@ -333,7 +339,7 @@ pub fn steps_of(
 }
 
 /// `object` as a [`DynamicObject`], with its `apiVersion` and `kind`.
-fn dynamic<K: Resource + Serialize>(object: &K) -> Result<DynamicObject, String> {
+pub(crate) fn dynamic<K: Resource + Serialize>(object: &K) -> Result<DynamicObject, String> {
     let mut value = serde_json::to_value(object).map_err(|e| e.to_string())?;
     if let Some(fields) = value.as_object_mut() {
         fields.insert("apiVersion".to_owned(), K::API_VERSION.into());
@@ -342,60 +348,108 @@ fn dynamic<K: Resource + Serialize>(object: &K) -> Result<DynamicObject, String>
     serde_json::from_value(value).map_err(|e| e.to_string())
 }
 
-/// A namespace with its Pod Security level [pss].
+/// The namespace labels of the Pod Security modes.
+pub(crate) const POD_SECURITY_MODES: [&str; 3] = [
+    PodSecurityLevel::ENFORCE,
+    PodSecurityLevel::AUDIT,
+    PodSecurityLevel::WARN,
+];
+
+/// A namespace with its Pod Security level in every mode [pss]. `audit` and `warn` also check
+/// workload objects, so a cluster default stricter than the level would flag each one.
+///
+/// `None` for a namespace Kubernetes keeps for itself, such as `kube-system`: it exists, and its
+/// pods need more than a component's level.
 ///
 /// [pss]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
-fn namespace(name: &str, level: PodSecurityLevel) -> Result<DynamicObject, String> {
-    dynamic(&Namespace {
+pub(crate) fn namespace(name: &str, level: PodSecurityLevel) -> Option<Namespace> {
+    if is_system_namespace(name) {
+        return None;
+    }
+    Some(Namespace {
         metadata: ObjectMeta {
             name: Some(name.to_owned()),
-            labels: Some(BTreeMap::from([(
-                PodSecurityLevel::ENFORCE.to_owned(),
-                level.as_str().to_owned(),
-            )])),
+            labels: Some(
+                POD_SECURITY_MODES
+                    .into_iter()
+                    .map(|mode| (mode.to_owned(), level.as_str().to_owned()))
+                    .collect(),
+            ),
             ..ObjectMeta::default()
         },
         ..Namespace::default()
     })
 }
 
-/// A chart release as a `HelmChart`, with the release's values and the profile's merged over
-/// them. `failurePolicy: abort` keeps a failed install or upgrade as it is, for a person to see,
-/// rather than helm-controller's default of uninstalling and installing again.
-fn helm_chart(release: &Release, profile: &str) -> Result<DynamicObject, String> {
-    let chart = release
-        .chart
-        .clone()
-        .ok_or("a chart release names no chart")?;
-    let version = release
-        .version
-        .clone()
-        .ok_or("a chart release names no version")?;
+/// A release's values with the profile's merged over them.
+fn profile_values(release: &Release, profile: &str) -> Result<Value, String> {
     let mut values = parse_values(release.values.as_deref())?;
     if let Some(over) = release.profiles.get(profile) {
         merge(&mut values, parse_values(Some(over))?);
     }
+    Ok(values)
+}
+
+/// What a chart release installs.
+pub(crate) struct ChartRelease<'a> {
+    /// The Helm release name.
+    pub name: &'a str,
+    /// The chart's name in `repo`, or an OCI reference.
+    pub chart: &'a str,
+    /// The HTTP chart repository.
+    pub repo: Option<&'a str>,
+    /// The chart version.
+    pub version: &'a str,
+    /// The release's namespace.
+    pub namespace: &'a str,
+}
+
+/// A chart release as a `HelmChart` with `values`. `failurePolicy: abort` keeps a failed install
+/// or upgrade as it is, for a person to see, rather than helm-controller's default of
+/// uninstalling and installing again.
+pub(crate) fn chart_object(chart: &ChartRelease<'_>, values: &Value) -> Result<HelmChart, String> {
     let values_content = if values.as_object().is_none_or(|v| !v.is_empty()) {
-        Some(serde_saphyr::to_string(&values).map_err(|e| e.to_string())?)
+        Some(serde_saphyr::to_string(values).map_err(|e| e.to_string())?)
     } else {
         None
     };
-    dynamic(&HelmChart {
+    Ok(HelmChart {
         metadata: ObjectMeta {
-            name: Some(release.helm_name().to_owned()),
+            name: Some(chart.name.to_owned()),
             namespace: Some(CHART_NAMESPACE.to_owned()),
             ..ObjectMeta::default()
         },
         spec: HelmChartSpec {
-            chart,
-            repo: release.repo.clone(),
-            version: Some(version),
-            target_namespace: Some(release.namespace.clone()),
+            chart: chart.chart.to_owned(),
+            repo: chart.repo.map(str::to_owned),
+            version: Some(chart.version.to_owned()),
+            target_namespace: Some(chart.namespace.to_owned()),
             failure_policy: Some(FailurePolicy::Abort),
             values_content,
         },
         status: None,
     })
+}
+
+fn helm_chart(release: &Release, values: &Value) -> Result<HelmChart, String> {
+    let chart = release
+        .chart
+        .as_deref()
+        .ok_or("a chart release names no chart")?;
+    let version = release
+        .version
+        .as_deref()
+        .ok_or("a chart release names no version")?;
+    chart_object(
+        &ChartRelease {
+            name: release.helm_name(),
+            chart,
+            repo: release.repo.as_deref(),
+            version,
+            namespace: &release.namespace,
+        },
+        values,
+    )
 }
 
 /// The objects of an inline release.
@@ -413,13 +467,18 @@ fn inline(release: &Release) -> Result<Vec<DynamicObject>, String> {
     Ok(objects)
 }
 
-/// Labels and annotates an object as the component's.
-fn mark(metadata: &mut ObjectMeta, file: &ComponentFile, release: &Release, catalog_version: &str) {
+/// Labels an object as the release's.
+pub(crate) fn label_release(metadata: &mut ObjectMeta, component: &str, release: &str) {
     metadata.labels.get_or_insert_default().extend([
         (MANAGED_BY.to_owned(), MANAGED_BY_ZEABUR.to_owned()),
-        (COMPONENT.to_owned(), file.id.clone()),
-        (RELEASE.to_owned(), release.name.clone()),
+        (COMPONENT.to_owned(), component.to_owned()),
+        (RELEASE.to_owned(), release.to_owned()),
     ]);
+}
+
+/// Labels an object as the release's and annotates it with the catalog file it came from.
+fn mark(metadata: &mut ObjectMeta, file: &ComponentFile, release: &Release, catalog_version: &str) {
+    label_release(metadata, &file.id, &release.name);
     metadata.annotations.get_or_insert_default().extend([
         (SOURCE_DIGEST.to_owned(), file.source_digest.clone()),
         (CATALOG_VERSION.to_owned(), catalog_version.to_owned()),
@@ -1038,6 +1097,19 @@ mod tests {
             matches!(refusal, Refusal::NotHere { component, place } if component == "victoria-logs" && place == "Kubernetes v1.33.4+k3s1")
         );
         assert!(install(&snapshot(), "cert-manager", &target).is_ok());
+    }
+
+    #[test]
+    fn a_namespace_kubernetes_keeps_is_not_written() {
+        let traefik = &snapshot().components["traefik"];
+        let namespaces: Vec<String> = steps_of(traefik, "0.5.3", "single-node")
+            .unwrap()
+            .into_iter()
+            .flat_map(|s| s.objects)
+            .filter(|d| kind(&d.object) == "Namespace")
+            .filter_map(|d| d.object.metadata.name)
+            .collect();
+        assert_eq!(namespaces, ["traefik"]);
     }
 
     #[test]

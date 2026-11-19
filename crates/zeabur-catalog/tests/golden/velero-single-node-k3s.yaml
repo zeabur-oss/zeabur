@@ -1,5 +1,14 @@
 # Profile: single-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/
 # (K3s) or /var/lib/rancher/rke2/server/manifests/ (RKE2).
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    pod-security.kubernetes.io/audit: restricted
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/warn: restricted
+  name: velero
+---
 # Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
 # cloud: Velero reads the bucket's credentials from this AWS-style credentials file.
 apiVersion: v1
@@ -33,15 +42,18 @@ stringData:
 apiVersion: helm.cattle.io/v1
 kind: HelmChart
 metadata:
+  labels:
+    app.kubernetes.io/managed-by: zeabur
+    catalog.zeabur.com/component: velero
+    catalog.zeabur.com/release: velero
   name: velero
   namespace: kube-system
 spec:
   chart: velero
+  failurePolicy: abort
   repo: https://vmware-tanzu.github.io/helm-charts
-  version: 12.2.3
   targetNamespace: velero
-  createNamespace: true
-  valuesContent: |-
+  valuesContent: |
     configuration:
       backupStorageLocation:
       - bucket: <bucket>
@@ -92,3 +104,4 @@ spec:
         cpu: 20m
         memory: 64Mi
     snapshotsEnabled: false
+  version: "12.2.3"
