@@ -16,9 +16,12 @@
 //! [kubectl-from]: https://github.com/kubernetes/kubectl/blob/master/pkg/cmd/create/create_job.go
 //! [k8s-concurrency]: https://kubernetes.io/docs/concepts/workloads/controllers/cron-jobs/#concurrency-policy
 
-use k8s_openapi::api::batch::v1::{CronJob, Job};
-use k8s_openapi::api::core::v1::Container;
-use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
+
+use k8s_openapi::api::batch::v1::{CronJob, CronJobSpec, Job, JobSpec, JobTemplateSpec};
+use k8s_openapi::api::core::v1::{Container, PodSpec, PodTemplateSpec, Volume};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
+use serde_json::{Value, json};
 use zeabur_model::adapters::LABEL_TASK_OF;
 use zeabur_model::{WorkloadKind, WorkloadRef};
 
@@ -28,31 +31,7 @@ use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::json::{add, remove, replace};
 use crate::owned::SERVICE_LABEL;
-use crate::plan::{ErrorKind, PlanError, Planner, Working, error, to_json};
-
-/// The container fields a task keeps from the service's container.
-const KEPT_CONTAINER: [&str; 9] = [
-    "name",
-    "image",
-    "workingDir",
-    "imagePullPolicy",
-    "env",
-    "envFrom",
-    "volumeMounts",
-    "resources",
-    "securityContext",
-];
-
-/// The pod fields a task keeps from the service's pod; `volumes` is filtered apart.
-const KEPT_POD: [&str; 7] = [
-    "serviceAccountName",
-    "automountServiceAccountToken",
-    "securityContext",
-    "imagePullSecrets",
-    "nodeSelector",
-    "affinity",
-    "tolerations",
-];
+use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
 
 /// The longest CronJob name: its Jobs add 11 characters and must fit a 63-character label.
 const NAME_MAX: usize = 52;
@@ -115,50 +94,54 @@ impl<'a> Planner<'a> {
             ));
         }
         let container = Self::container(found, task.from, task.container)?;
-        let spec = found
-            .pod_spec()
-            .map(to_json)
-            .transpose()?
-            .unwrap_or_else(|| json!({}));
+        let spec = found.pod_spec().cloned().unwrap_or_default();
         let pod = task_pod(&spec, &container.spec, task.command, &task.from.name)?;
-        let mut labels = Map::new();
-        labels.insert(SERVICE_LABEL.to_owned(), json!(task.name));
-        labels.insert(LABEL_TASK_OF.to_owned(), json!(task.from.name));
+        let mut labels = BTreeMap::from([
+            (SERVICE_LABEL.to_owned(), task.name.to_owned()),
+            (LABEL_TASK_OF.to_owned(), task.from.name.clone()),
+        ]);
         if let Some(group) = found
             .meta()
             .labels
             .as_ref()
             .and_then(|l| l.get(self.conventions.group_label.as_ref()))
         {
-            labels.insert(self.conventions.group_label.to_string(), json!(group));
+            labels.insert(self.conventions.group_label.to_string(), group.clone());
         }
-        let mut cron_spec = json!({
-            "schedule": task.schedule.trim(),
-            "concurrencyPolicy": task.concurrency.as_kubernetes(),
-            "successfulJobsHistoryLimit": task.keep_succeeded,
-            "failedJobsHistoryLimit": task.keep_failed,
-            "jobTemplate": {"spec": {"template": {
-                "metadata": {"labels": {SERVICE_LABEL: task.name}},
-                "spec": pod,
-            }}},
-        });
-        if let (Some(zone), Some(map)) = (
-            task.time_zone.filter(|z| !z.is_empty()),
-            cron_spec.as_object_mut(),
-        ) {
-            map.insert("timeZone".to_owned(), json!(zone));
-        }
-        let body = json!({
-            "apiVersion": "batch/v1",
-            "kind": "CronJob",
-            "metadata": {
-                "name": task.name,
-                "namespace": self.input.snapshot.namespace,
-                "labels": labels,
+        let cron_job = CronJob {
+            metadata: ObjectMeta {
+                name: Some(task.name.to_owned()),
+                namespace: Some(self.input.snapshot.namespace.clone()),
+                labels: Some(labels),
+                ..ObjectMeta::default()
             },
-            "spec": cron_spec,
-        });
-        self.push_created(Target::of::<CronJob>(task.name), body);
+            spec: Some(CronJobSpec {
+                schedule: task.schedule.trim().to_owned(),
+                concurrency_policy: Some(task.concurrency.as_kubernetes().to_owned()),
+                successful_jobs_history_limit: Some(task.keep_succeeded),
+                failed_jobs_history_limit: Some(task.keep_failed),
+                time_zone: task.time_zone.filter(|z| !z.is_empty()).map(str::to_owned),
+                job_template: JobTemplateSpec {
+                    spec: Some(JobSpec {
+                        template: PodTemplateSpec {
+                            metadata: Some(ObjectMeta {
+                                labels: Some(BTreeMap::from([(
+                                    SERVICE_LABEL.to_owned(),
+                                    task.name.to_owned(),
+                                )])),
+                                ..ObjectMeta::default()
+                            }),
+                            spec: Some(pod),
+                        },
+                        ..JobSpec::default()
+                    }),
+                    ..JobTemplateSpec::default()
+                },
+                ..CronJobSpec::default()
+            }),
+            ..CronJob::default()
+        };
+        self.created(Target::of::<CronJob>(task.name), &cron_job)?;
         self.warnings.push(Warning::TaskImageCopied {
             from: task.from.clone(),
             image: container.spec.image.unwrap_or_default(),
@@ -227,45 +210,35 @@ impl<'a> Planner<'a> {
         let template = cron_job
             .spec
             .as_ref()
-            .map(|s| to_json(&s.job_template))
-            .transpose()?
-            .unwrap_or_else(|| json!({}));
-        let mut annotations = template
-            .pointer("/metadata/annotations")
-            .and_then(Value::as_object)
-            .cloned()
+            .map(|s| s.job_template.clone())
             .unwrap_or_default();
+        let template_meta = template.metadata.unwrap_or_default();
+        let mut annotations = template_meta.annotations.unwrap_or_default();
         annotations.insert(
             "cronjob.kubernetes.io/instantiate".to_owned(),
-            json!("manual"),
+            "manual".to_owned(),
         );
         let job = manual_job_name(name, self.input.now);
-        let mut metadata = json!({
-            "name": job,
-            "namespace": self.input.snapshot.namespace,
-            "annotations": annotations,
-            "ownerReferences": [{
-                "apiVersion": "batch/v1",
-                "kind": "CronJob",
-                "name": name,
-                "uid": uid,
-                "controller": true,
-                "blockOwnerDeletion": true,
-            }],
-        });
-        if let (Some(labels), Some(map)) = (
-            template.pointer("/metadata/labels"),
-            metadata.as_object_mut(),
-        ) {
-            map.insert("labels".to_owned(), labels.clone());
-        }
-        let body = json!({
-            "apiVersion": "batch/v1",
-            "kind": "Job",
-            "metadata": metadata,
-            "spec": template.get("spec").cloned().unwrap_or_else(|| json!({})),
-        });
-        self.push_created(Target::of::<Job>(&job), body);
+        let body = Job {
+            metadata: ObjectMeta {
+                name: Some(job.clone()),
+                namespace: Some(self.input.snapshot.namespace.clone()),
+                annotations: Some(annotations),
+                labels: template_meta.labels,
+                owner_references: Some(vec![OwnerReference {
+                    api_version: "batch/v1".to_owned(),
+                    kind: "CronJob".to_owned(),
+                    name: name.to_owned(),
+                    uid,
+                    controller: Some(true),
+                    block_owner_deletion: Some(true),
+                }]),
+                ..ObjectMeta::default()
+            },
+            spec: template.spec,
+            ..Job::default()
+        };
+        self.created(Target::of::<Job>(&job), &body)?;
         self.impact.insert(WorkloadRef {
             kind: WorkloadKind::CronJob,
             name: name.to_owned(),
@@ -353,75 +326,68 @@ impl<'a> Planner<'a> {
         };
         self.patch(index, vec![operation])
     }
-
-    fn push_created(&mut self, target: Target, body: Value) {
-        self.objects.push(Working {
-            target,
-            original: None,
-            current: body,
-            operations: Vec::new(),
-            owners: Vec::new(),
-            deleted: false,
-        });
-    }
 }
 
 /// The pod a task runs: the service's container with the command, and the volumes it mounts.
 fn task_pod(
-    spec: &Value,
+    spec: &PodSpec,
     container: &Container,
     command: &str,
     from: &str,
-) -> Result<Map<String, Value>, PlanError> {
-    let mut kept = Map::new();
-    let source = to_json(&container)?;
-    for field in KEPT_CONTAINER {
-        if let Some(value) = source.get(field) {
-            kept.insert(field.to_owned(), value.clone());
-        }
-    }
-    kept.insert("command".to_owned(), json!(["/bin/sh", "-c", command]));
+) -> Result<PodSpec, PlanError> {
+    let kept = Container {
+        name: container.name.clone(),
+        image: container.image.clone(),
+        working_dir: container.working_dir.clone(),
+        image_pull_policy: container.image_pull_policy.clone(),
+        env: container.env.clone(),
+        env_from: container.env_from.clone(),
+        volume_mounts: container.volume_mounts.clone(),
+        resources: container.resources.clone(),
+        security_context: container.security_context.clone(),
+        command: Some(vec![
+            "/bin/sh".to_owned(),
+            "-c".to_owned(),
+            command.to_owned(),
+        ]),
+        ..Container::default()
+    };
     let mounted: Vec<&str> = container
         .volume_mounts
         .iter()
         .flatten()
         .map(|m| m.name.as_str())
         .collect();
-    let volumes: Vec<Value> = spec
-        .get("volumes")
-        .and_then(Value::as_array)
-        .into_iter()
+    let volumes: Vec<Volume> = spec
+        .volumes
+        .iter()
         .flatten()
-        .filter(|v| {
-            v.get("name")
-                .and_then(Value::as_str)
-                .is_some_and(|n| mounted.contains(&n))
-        })
+        .filter(|v| mounted.contains(&v.name.as_str()))
         .cloned()
         .collect();
-    if let Some(missing) = mounted.iter().find(|m| {
-        !volumes
-            .iter()
-            .any(|v| v.get("name").and_then(Value::as_str) == Some(**m))
-    }) {
+    if let Some(missing) = mounted
+        .iter()
+        .find(|m| !volumes.iter().any(|v| v.name == **m))
+    {
         return Err(error(
             ErrorKind::Invalid,
             "volume_per_pod",
             format!("{from} gives each pod its own volume {missing}; a task cannot mount it."),
         ));
     }
-    let mut pod = Map::new();
-    for field in KEPT_POD {
-        if let Some(value) = spec.get(field) {
-            pod.insert(field.to_owned(), value.clone());
-        }
-    }
-    pod.insert("containers".to_owned(), json!([kept]));
-    pod.insert("restartPolicy".to_owned(), json!("Never"));
-    if !volumes.is_empty() {
-        pod.insert("volumes".to_owned(), json!(volumes));
-    }
-    Ok(pod)
+    Ok(PodSpec {
+        service_account_name: spec.service_account_name.clone(),
+        automount_service_account_token: spec.automount_service_account_token,
+        security_context: spec.security_context.clone(),
+        image_pull_secrets: spec.image_pull_secrets.clone(),
+        node_selector: spec.node_selector.clone(),
+        affinity: spec.affinity.clone(),
+        tolerations: spec.tolerations.clone(),
+        containers: vec![kept],
+        restart_policy: Some("Never".to_owned()),
+        volumes: (!volumes.is_empty()).then_some(volumes),
+        ..PodSpec::default()
+    })
 }
 
 /// The checks that need no cluster state.
