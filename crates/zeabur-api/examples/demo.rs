@@ -3083,11 +3083,17 @@ fn start(pod: &mut Pod, now: &str) {
 /// than the cluster has free.
 fn template_idle(id: &str) -> Option<zeabur_catalog::IdleUse> {
     let large = std::env::var("ZEABUR_DEMO_TEMPLATE_IDLE").is_ok_and(|v| v == "large");
-    (id == "error-pages").then(|| zeabur_catalog::IdleUse {
+    let pod = zeabur_catalog::MeasuredPod {
+        workload: "error-pages".to_owned(),
         memory_bytes: if large { 24 << 30 } else { 9 << 20 },
         cpu_millicores: if large { 6000 } else { 1 },
+    };
+    (id == "error-pages").then(|| zeabur_catalog::IdleUse {
+        memory_bytes: pod.memory_bytes,
+        cpu_millicores: pod.cpu_millicores,
         environment: "single-node-amd64-v1.36.4".to_owned(),
         measured_at: "2026-10-24".to_owned(),
+        pods: vec![pod],
     })
 }
 

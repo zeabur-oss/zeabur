@@ -784,11 +784,11 @@ export type VeleroBackupInventory = {
 }
 
 /**
- * Whether the cluster has room for the copy.
+ * Whether pods fit on the nodes.
  */
-export type RestoreFit = (typeof RestoreFit)[keyof typeof RestoreFit]
+export type Fit = (typeof Fit)[keyof typeof Fit]
 
-export const RestoreFit = {
+export const Fit = {
   fits: "fits",
   short: "short",
   unknown: "unknown",
@@ -798,8 +798,8 @@ export const RestoreFit = {
  * The room the copy needs and the room there is.
  */
 export type RestoreRoom = {
-  /** The verdict. */
-  fit: RestoreFit
+  /** Whether each of the original's pods fits on a node. */
+  fit: Fit
   /**
    * What the nodes have left in total: millicores.
    * @minimum 0
@@ -6809,6 +6809,24 @@ export type Hop = {
 }
 
 /**
+ * What one pod of a workload used once idle.
+ */
+export type MeasuredPod = {
+  /**
+   * Its CPU in millicores.
+   * @minimum 0
+   */
+  cpuMillicores: number
+  /**
+   * Its working set in bytes.
+   * @minimum 0
+   */
+  memoryBytes: number
+  /** The workload or database object (`miniflux-db`). */
+  workload: string
+}
+
+/**
  * What a template's pods used once idle, on a fresh cluster after its smoke checks.
  */
 export type IdleUse = {
@@ -6826,6 +6844,8 @@ export type IdleUse = {
    * @minimum 0
    */
   memoryBytes: number
+  /** Each workload's pod. */
+  pods: MeasuredPod[]
 }
 
 /**
@@ -10187,6 +10207,16 @@ export type RolloutProgress = {
 }
 
 /**
+ * CPU or memory.
+ */
+export type RoomResource = (typeof RoomResource)[keyof typeof RoomResource]
+
+export const RoomResource = {
+  memory: "memory",
+  cpu: "cpu",
+} as const
+
+/**
  * The way to one address of a service.
  */
 export type RouteTrace = {
@@ -10778,6 +10808,39 @@ export type TemplateView = {
 export type TemplateList = {
   /** Every template, by id. */
   items: TemplateView[]
+}
+
+/**
+ * Whether the cluster has room for a template's pods.
+ */
+export type TemplateRoom = {
+  /** Whether each pod fits on a node. */
+  fit: Fit
+  /**
+   * What the ready, schedulable nodes have free of it in all.
+   * @minimum 0
+   */
+  free: number
+  /**
+   * What the template's pods need of it in all: bytes or millicores.
+   * @minimum 0
+   */
+  need: number
+  /** The resource `need` and `free` are about: the one that is short, else memory. */
+  resource: RoomResource
+}
+
+/**
+ * By template id.
+ */
+export type TemplateRoomsItems = { [key: string]: TemplateRoom }
+
+/**
+ * The room for each template.
+ */
+export type TemplateRooms = {
+  /** By template id. */
+  items: TemplateRoomsItems
 }
 
 /**
@@ -12453,6 +12516,23 @@ export const planS3Destinations = async (
     method: "POST",
     headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
     body: JSON.stringify(s3DestinationsPlanRequest),
+  })
+}
+
+export const getListTemplateRoomsUrl = () => {
+  return `/api/v1/cluster/template-rooms`
+}
+
+/**
+ * @summary Whether the cluster has room for each template's pods, read as the person once for all of
+them: `unknown` when the nodes or the pods cannot be read whole.
+ */
+export const listTemplateRooms = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<TemplateRooms> => {
+  return zeaburFetch<TemplateRooms>(getListTemplateRoomsUrl(), {
+    ...options,
+    method: "GET",
   })
 }
 

@@ -2466,9 +2466,9 @@ export const zhTW: Messages = {
     "這個應用程式需要 HTTPS，但 Zeabur 還沒指定憑證簽發者。管理員可以在啟動 Zeabur 時用 --cluster-issuer 指定。",
   "add.templateRoom": (use, free) => `叢集放得下：需要 ${use} 記憶體，目前還有 ${free}。`,
   "add.templateLowMemory": (use, free) =>
-    `叢集記憶體不夠：需要 ${use}，目前只剩 ${free}。先騰出空間或加一台節點。`,
+    `叢集記憶體不夠：需要 ${use}，所有節點加起來還有 ${free}，但每個 Pod 都要放得進單一節點。先騰出空間或加一台節點。`,
   "add.templateLowCpu": (use, free) =>
-    `叢集 CPU 不夠：需要 ${use}，目前只剩 ${free}。先騰出空間或加一台節點。`,
+    `叢集 CPU 不夠：需要 ${use}，所有節點加起來還有 ${free}，但每個 Pod 都要放得進單一節點。先騰出空間或加一台節點。`,
   "add.templateGenerated": (secrets) => `密碼和金鑰會在你的瀏覽器產生，存進機密變數 ${secrets}。`,
   "add.templateInputEmpty": "這一欄必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
@@ -3700,11 +3700,11 @@ export const zhTW: Messages = {
   "domainPages.noServerHint":
     "這些頁面由 Error pages 範本提供，範本是一個小型 nginx。開啟任一個開關或編輯頁面時，會一併部署到這個專案。",
   "domainPages.room": (use, free) =>
-    `叢集還有空間：頁面伺服器閒置時大約用 ${use} 記憶體，目前還有 ${free} 可用。`,
+    `叢集還有空間：頁面伺服器大約需要 ${use} 記憶體，目前還有 ${free} 可用。`,
   "domainPages.tightMemory": (use, free) =>
-    `叢集的記憶體不太夠：頁面伺服器閒置時大約用 ${use}，目前只剩 ${free}。先騰出空間或加一個節點。`,
+    `叢集的記憶體不太夠：頁面伺服器大約需要 ${use}，所有節點加起來還有 ${free}，但它要放得進單一節點。先騰出空間或加一個節點。`,
   "domainPages.tightCpu": (use, free) =>
-    `叢集的 CPU 不太夠：頁面伺服器閒置時大約用 ${use}，目前只剩 ${free}。先騰出空間或加一個節點。`,
+    `叢集的 CPU 不太夠：頁面伺服器大約需要 ${use}，所有節點加起來還有 ${free}，但它要放得進單一節點。先騰出空間或加一個節點。`,
   "domainPages.page": "要編輯的頁面",
   "domainPages.page.maintenance": "維護",
   "domainPages.page.badGateway": "502 閘道錯誤",

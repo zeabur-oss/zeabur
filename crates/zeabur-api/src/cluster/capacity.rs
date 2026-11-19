@@ -31,9 +31,14 @@
 
 use std::collections::BTreeMap;
 
+use serde::Serialize;
+use utoipa::ToSchema;
 pub(crate) use zeabur_core::quantity::{bytes, millicores};
 use zeabur_kube::k8s_openapi::api::core::v1::Node;
-use zeabur_kube::{ClusterPod, ContainerResources};
+use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod, ContainerResources};
+
+/// The most pods read to count the room.
+const PODS_READ: usize = 5000;
 
 /// CPU and memory together.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
@@ -59,7 +64,7 @@ impl Amount {
         }
     }
 
-    fn max(self, other: Self) -> Self {
+    pub(crate) fn max(self, other: Self) -> Self {
         Self {
             cpu: self.cpu.max(other.cpu),
             memory: self.memory.max(other.memory),
@@ -132,10 +137,69 @@ pub(crate) fn pod_amounts(pod: &ClusterPod) -> (Amount, Amount) {
 /// What a ready, schedulable node has left for new pods.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) struct NodeRoom {
+    /// What the node has for pods.
+    pub(crate) allocatable: Amount,
     /// `allocatable` less what its pods request.
     pub(crate) free: Amount,
     /// Pod slots left.
     pub(crate) pods: u64,
+}
+
+impl NodeRoom {
+    /// The room left once a tenth of the node's allocatable stays free.
+    pub(crate) const fn less_a_tenth(self) -> Self {
+        Self {
+            free: Amount {
+                cpu: self.free.cpu.saturating_sub(self.allocatable.cpu / 10),
+                memory: self
+                    .free
+                    .memory
+                    .saturating_sub(self.allocatable.memory / 10),
+            },
+            ..self
+        }
+    }
+}
+
+/// Whether pods fit on the nodes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Fit {
+    /// Each pod fits on a node, by what it requests.
+    Fits,
+    /// They do not.
+    Short,
+    /// Nodes or pods could not be read.
+    Unknown,
+}
+
+/// The nodes' room and the pods, as the person reads them.
+pub(crate) struct Reading {
+    /// The room on each ready, schedulable node; `None` when the nodes or the pods could not be
+    /// read whole.
+    pub(crate) nodes: Option<Vec<NodeRoom>>,
+    /// The pods read; empty when they could not be read.
+    pub(crate) pods: Vec<ClusterPod>,
+}
+
+/// Reads, as the person, the nodes and the pods of every namespace.
+pub(crate) async fn read(cluster: &dyn Cluster) -> Reading {
+    let (nodes, pods) =
+        futures_util::join!(cluster.list::<Node>(None), cluster.cluster_pods(PODS_READ));
+    match (nodes, pods) {
+        (Ok(nodes), Ok(pods)) if !pods.truncated => Reading {
+            nodes: Some(node_room(&nodes, &pods.pods)),
+            pods: pods.pods,
+        },
+        (_, Ok(pods)) => Reading {
+            nodes: None,
+            pods: pods.pods,
+        },
+        (_, Err(_)) => Reading {
+            nodes: None,
+            pods: Vec::new(),
+        },
+    }
 }
 
 /// Whether a node takes new pods: it is not cordoned and its `Ready` condition is `True`.
@@ -177,16 +241,15 @@ pub(crate) fn node_room(nodes: &[Node], pods: &[ClusterPod]) -> Vec<NodeRoom> {
                 .get(node.metadata.name.as_deref().unwrap_or_default())
                 .copied()
                 .unwrap_or_default();
+            let allocatable = Amount {
+                cpu: quantity("cpu").and_then(millicores).unwrap_or(0),
+                memory: quantity("memory").and_then(bytes).unwrap_or(0),
+            };
             NodeRoom {
+                allocatable,
                 free: Amount {
-                    cpu: quantity("cpu")
-                        .and_then(millicores)
-                        .unwrap_or(0)
-                        .saturating_sub(taken.cpu),
-                    memory: quantity("memory")
-                        .and_then(bytes)
-                        .unwrap_or(0)
-                        .saturating_sub(taken.memory),
+                    cpu: allocatable.cpu.saturating_sub(taken.cpu),
+                    memory: allocatable.memory.saturating_sub(taken.memory),
                 },
                 pods: quantity("pods")
                     .and_then(|p| p.parse::<u64>().ok())
@@ -291,6 +354,7 @@ mod tests {
 
     fn node(memory: u64, pods: u64) -> NodeRoom {
         NodeRoom {
+            allocatable: Amount { cpu: 4000, memory },
             free: Amount { cpu: 4000, memory },
             pods,
         }
@@ -337,5 +401,22 @@ mod tests {
     #[test]
     fn a_node_without_a_pod_slot_takes_no_pod() {
         assert!(!place(&[pod(GIB)], &[node(8 * GIB, 0)]));
+    }
+
+    #[test]
+    fn a_tenth_of_a_node_stays_free() {
+        let full = NodeRoom {
+            allocatable: Amount {
+                cpu: 4000,
+                memory: 10 * GIB,
+            },
+            free: Amount {
+                cpu: 1000,
+                memory: 2 * GIB,
+            },
+            pods: 110,
+        };
+        assert!(place(&[pod(GIB)], &[full.less_a_tenth()]));
+        assert!(!place(&[pod(2 * GIB)], &[full.less_a_tenth()]));
     }
 }

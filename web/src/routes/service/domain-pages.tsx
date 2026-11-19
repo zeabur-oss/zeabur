@@ -1,7 +1,7 @@
 import { useQuery } from "@tanstack/react-query"
 import { useId, useState } from "react"
 
-import { configMapsQuery, nodesQuery, projectQuery, templateQuery } from "@/api/queries"
+import { configMapsQuery, projectQuery, templateRoomsQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
 import { FormField } from "@/components/form-field"
 import { ReviewWord } from "@/components/plan/draft"
@@ -23,7 +23,6 @@ import {
 } from "@/model/error-pages"
 import { projectTitle } from "@/model/project"
 import type { Service } from "@/model/service"
-import { templateRoom } from "@/model/template-room"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Label } from "@zeabur-oss/design-system/components/label"
 import { Select } from "@zeabur-oss/design-system/components/select"
@@ -185,19 +184,17 @@ function NoServer({ shown }: { shown: boolean }) {
   )
 }
 
-/** The template's measured idle use against what the cluster has free; nothing without both. */
+/** Whether the cluster has room for the template; nothing when the server cannot tell. */
 function useRoomSentence(id: string, enabled: boolean) {
   const t = useT()
   const q = useQuantityFormat()
-  const template = useQuery({ ...templateQuery(id), enabled })
-  const nodes = useQuery({ ...nodesQuery, enabled })
-  const room = templateRoom(template.data?.idle, nodes.data)
-  if (!room) return undefined
-  const tight = room.verdict === "tight"
+  const room = useQuery({ ...templateRoomsQuery, enabled }).data?.items[id]
+  if (!room || room.fit === "unknown") return undefined
+  const tight = room.fit === "short"
   if (room.resource === "cpu") {
-    return { tight, text: t("domainPages.tightCpu", q.cpu(room.use), q.cpu(room.free)) }
+    return { tight, text: t("domainPages.tightCpu", q.cpu(room.need), q.cpu(room.free)) }
   }
-  const use = q.memory(room.use)
+  const use = q.memory(room.need)
   const free = q.memory(room.free)
   return {
     tight,

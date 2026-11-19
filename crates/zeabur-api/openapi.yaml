@@ -1140,6 +1140,25 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/template-rooms:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        Whether the cluster has room for each template's pods, read as the person once for all of
+        them: `unknown` when the nodes or the pods cannot be read whole.
+      operationId: listTemplateRooms
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateRooms"
+        "500":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/templates:
     get:
       tags:
@@ -9944,6 +9963,13 @@ components:
             enum:
             - renamed
       description: A field of a service that is left out, or a difference to know of.
+    Fit:
+      type: string
+      description: Whether pods fit on the nodes.
+      enum:
+      - fits
+      - short
+      - unknown
     Fix:
       type: object
       description: The fix of a gap.
@@ -10807,6 +10833,7 @@ components:
       - cpuMillicores
       - environment
       - measuredAt
+      - pods
       properties:
         cpuMillicores:
           type: integer
@@ -10824,6 +10851,11 @@ components:
           format: int64
           description: The pods' working set in bytes.
           minimum: 0
+        pods:
+          type: array
+          items:
+            $ref: "#/components/schemas/MeasuredPod"
+          description: Each workload's pod.
     ImageInspection:
       type: object
       description: What the image's configuration says, or why it could not be read.
@@ -11703,6 +11735,27 @@ components:
       - autoscaler
       - controller
       - other
+    MeasuredPod:
+      type: object
+      description: What one pod of a workload used once idle.
+      required:
+      - workload
+      - memoryBytes
+      - cpuMillicores
+      properties:
+        cpuMillicores:
+          type: integer
+          format: int64
+          description: Its CPU in millicores.
+          minimum: 0
+        memoryBytes:
+          type: integer
+          format: int64
+          description: Its working set in bytes.
+          minimum: 0
+        workload:
+          type: string
+          description: The workload or database object (`miniflux-db`).
     MemberActions:
       type: object
       description: What the person asking may do to a member.
@@ -16536,13 +16589,6 @@ components:
           - string
           - "null"
           description: Why Velero's list could not be read.
-    RestoreFit:
-      type: string
-      description: Whether the cluster has room for the copy.
-      enum:
-      - fits
-      - short
-      - unknown
     RestoreRoom:
       type: object
       description: The room the copy needs and the room there is.
@@ -16554,8 +16600,8 @@ components:
       - freeMemory
       properties:
         fit:
-          $ref: "#/components/schemas/RestoreFit"
-          description: The verdict.
+          $ref: "#/components/schemas/Fit"
+          description: Whether each of the original's pods fits on a node.
         freeCpu:
           type: integer
           format: int64
@@ -16874,6 +16920,12 @@ components:
       - stuck
       - paused
       - waitsForDeletion
+    RoomResource:
+      type: string
+      description: CPU or memory.
+      enum:
+      - memory
+      - cpu
     Route:
       type: object
       description: |-
@@ -18690,6 +18742,44 @@ components:
         risk:
           type: string
           description: The risk, in English.
+    TemplateRoom:
+      type: object
+      description: Whether the cluster has room for a template's pods.
+      required:
+      - fit
+      - resource
+      - need
+      - free
+      properties:
+        fit:
+          $ref: "#/components/schemas/Fit"
+          description: Whether each pod fits on a node.
+        free:
+          type: integer
+          format: int64
+          description: What the ready, schedulable nodes have free of it in all.
+          minimum: 0
+        need:
+          type: integer
+          format: int64
+          description: "What the template's pods need of it in all: bytes or millicores."
+          minimum: 0
+        resource:
+          $ref: "#/components/schemas/RoomResource"
+          description: "The resource `need` and `free` are about: the one that is short, else memory."
+    TemplateRooms:
+      type: object
+      description: The room for each template.
+      required:
+      - items
+      properties:
+        items:
+          type: object
+          description: By template id.
+          additionalProperties:
+            $ref: "#/components/schemas/TemplateRoom"
+          propertyNames:
+            type: string
     TemplateService:
       type: object
       description: A service of a template.

@@ -2462,9 +2462,9 @@ export const zhCN: Messages = {
     "这个应用需要 HTTPS，但 Zeabur 还没指定证书签发者。管理员可以在启动 Zeabur 时用 --cluster-issuer 指定。",
   "add.templateRoom": (use, free) => `集群放得下：需要 ${use} 内存，目前还剩 ${free}。`,
   "add.templateLowMemory": (use, free) =>
-    `集群内存不够：需要 ${use}，目前只剩 ${free}。先腾出空间或加一台节点。`,
+    `集群内存不够：需要 ${use}，所有节点加起来还有 ${free}，但每个 Pod 都要放得进单个节点。先腾出空间或加一台节点。`,
   "add.templateLowCpu": (use, free) =>
-    `集群 CPU 不够：需要 ${use}，目前只剩 ${free}。先腾出空间或加一台节点。`,
+    `集群 CPU 不够：需要 ${use}，所有节点加起来还有 ${free}，但每个 Pod 都要放得进单个节点。先腾出空间或加一台节点。`,
   "add.templateGenerated": (secrets) => `密码和密钥会在你的浏览器生成，存进机密变量 ${secrets}。`,
   "add.templateInputEmpty": "这一栏必填。",
   "add.templateInputInvalid": (pattern) => `格式不符（${pattern}）。`,
@@ -3688,11 +3688,11 @@ export const zhCN: Messages = {
   "domainPages.noServerHint":
     "这些页面由 Error pages 模板提供，模板是一个小型 nginx。开启任一开关或编辑页面时，会一并部署到这个项目。",
   "domainPages.room": (use, free) =>
-    `集群还有空间：页面服务器空闲时大约占用 ${use} 内存，目前还有 ${free} 可用。`,
+    `集群还有空间：页面服务器大约需要 ${use} 内存，目前还有 ${free} 可用。`,
   "domainPages.tightMemory": (use, free) =>
-    `集群的内存不太够：页面服务器空闲时大约占用 ${use}，目前只剩 ${free}。先腾出空间或加一个节点。`,
+    `集群的内存不太够：页面服务器大约需要 ${use}，所有节点加起来还有 ${free}，但它要放得进单个节点。先腾出空间或加一个节点。`,
   "domainPages.tightCpu": (use, free) =>
-    `集群的 CPU 不太够：页面服务器空闲时大约占用 ${use}，目前只剩 ${free}。先腾出空间或加一个节点。`,
+    `集群的 CPU 不太够：页面服务器大约需要 ${use}，所有节点加起来还有 ${free}，但它要放得进单个节点。先腾出空间或加一个节点。`,
   "domainPages.page": "要编辑的页面",
   "domainPages.page.maintenance": "维护",
   "domainPages.page.badGateway": "502 网关错误",

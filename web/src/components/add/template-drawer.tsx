@@ -4,7 +4,7 @@ import ArrowLeftIcon from "~icons/ph/arrow-left"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretRightIcon from "~icons/ph/caret-right"
 
-import { clusterQuery, nodesQuery, templatesQuery } from "@/api/queries"
+import { clusterQuery, templateRoomsQuery, templatesQuery } from "@/api/queries"
 import { FormField, TrimmedInput } from "@/components/form-field"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
@@ -29,7 +29,6 @@ import {
   type TemplateInput,
 } from "@/model/app-templates"
 import { suggestedHost } from "@/model/image-service"
-import { templateRoom } from "@/model/template-room"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Card } from "@zeabur-oss/design-system/components/card"
@@ -92,10 +91,10 @@ export function TemplateDrawer({ project, onClose }: { project: string; onClose:
   )
 }
 
-/** What the template needs against what the nodes have free; nothing when either is unknown. */
+/** Whether the cluster has room for the template; nothing when the server cannot tell. */
 function useRoom(template: AppTemplate) {
-  const nodes = useQuery(nodesQuery).data
-  return templateRoom(template.idle ?? template.requests, nodes)
+  const room = useQuery(templateRoomsQuery).data?.items[template.id]
+  return room?.fit === "unknown" ? undefined : room
 }
 
 function TemplateList({ items, onPick }: { items: AppTemplate[]; onPick: (id: string) => void }) {
@@ -141,7 +140,7 @@ function TemplateRow({
   const room = useRoom(template)
   const absent = missing(template)
   const tight =
-    room?.verdict === "tight"
+    room?.fit === "short"
       ? t(room.resource === "cpu" ? "add.templateTightCpu" : "add.templateTightMemory")
       : undefined
   return (
@@ -417,9 +416,9 @@ function RoomNote({ template }: { template: AppTemplate }) {
   if (!room) return null
   const [use, free] =
     room.resource === "cpu"
-      ? [q.cpu(room.use), q.cpu(room.free)]
-      : [q.memory(room.use), q.memory(room.free)]
-  if (room.verdict === "room")
+      ? [q.cpu(room.need), q.cpu(room.free)]
+      : [q.memory(room.need), q.memory(room.free)]
+  if (room.fit === "fits")
     return <p className="type-meta text-muted-foreground">{t("add.templateRoom", use, free)}</p>
   return (
     <Alert variant="warn">
