@@ -15,9 +15,9 @@
 //!
 //! A removal deletes, in reverse order, the objects Zeabur wrote, except namespaces: deleting a
 //! `HelmChart` makes helm-controller uninstall its release, and what the catalog lists as
-//! `leftovers` stays. It is refused while another installed component needs this one, while
-//! objects of its custom resources exist outside its namespaces, or while volumes use its CSI
-//! drivers [installers].
+//! `leftovers` stays. It is refused while a component that another tool or Zeabur installed needs
+//! this one, while objects of its custom resources exist outside its namespaces, or while volumes
+//! use its CSI drivers [installers].
 //!
 //! Every route is refused unless the person may do everything everywhere: writing a `HelmChart`
 //! makes helm-controller run Helm as a cluster administrator.
@@ -626,7 +626,15 @@ impl World {
             .components
             .get(id)
             .ok_or_else(|| refusal(&Refusal::Unknown(id.to_owned())))?;
-        let needing = engine::needed_by(&self.snapshot, id, &self.installed);
+        // What another install left behind, such as CRDs, is not a component that needs this one;
+        // the check of its custom resources below covers the objects that still do.
+        let running = self
+            .sources
+            .iter()
+            .filter(|(_, source)| **source != InstallSource::Other)
+            .map(|(id, _)| id.clone())
+            .collect();
+        let needing = engine::needed_by(&self.snapshot, id, &running);
         if !needing.is_empty() {
             return Err(ApiError::from(Problem::new(
                 Kind::Conflict,

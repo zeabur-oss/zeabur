@@ -2,7 +2,8 @@
 //! `ClusterIssuers` once its CRDs are served, each step written as the person with server-side
 //! apply, readiness from helm-controller's Job and the health checks, and removal in reverse;
 //! and the refusals: someone who is not a cluster administrator, a plan of an older catalog
-//! release, a release someone else installed, a component another one needs, a cluster without
+//! release, a release someone else installed, a component another one needs (not its leftover
+//! CRDs), a cluster without
 //! helm-controller and a catalog Zeabur cannot reach.
 
 #[cfg(test)]
@@ -441,6 +442,40 @@ mod tests {
                 .as_str()
                 .unwrap()
                 .contains("Certificate shop/shop-tls")
+        );
+    }
+
+    #[tokio::test]
+    async fn a_component_needing_it_keeps_it_but_its_leftover_crds_do_not() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        call(&app, "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        cluster.update(|s| {
+            s.facts
+                .crds
+                .insert("clusters.postgresql.cnpg.io".to_owned());
+        });
+        let (status, plan) = call(&app, "plan", "remove", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+
+        cluster.update(|s| {
+            s.facts.workload_labels.push((
+                "cnpg-system/cloudnative-pg".to_owned(),
+                [(
+                    "helm.sh/chart".to_owned(),
+                    "cloudnative-pg-0.26.0".to_owned(),
+                )]
+                .into(),
+            ));
+        });
+        let (status, problem) = call(&app, "plan", "remove", "").await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert!(
+            problem["detail"]
+                .as_str()
+                .unwrap()
+                .contains("cloudnative-pg needs cert-manager")
         );
     }
 

@@ -145,8 +145,9 @@ export function ComponentsPage() {
 
   return (
     <ClusterFrame tab="components">
-      {search.component ? (
+      {search.component && capabilities.data ? (
         <OpenedPlan
+          key={search.component}
           id={search.component}
           list={list}
           onClose={() =>
@@ -244,7 +245,9 @@ const installationOf = (capability: Schemas.Capability, component: Schemas.Compo
 
 /** Zeabur removes what it installed and installs what nothing else manages; a component K3s, RKE2
  * or Helm manages gets no button. */
-const actionOf = (installation: Schemas.Installation | undefined) =>
+const actionOf = (
+  installation: Schemas.Installation | undefined,
+): Schemas.ComponentAction | undefined =>
   !installation || installation.source === "other"
     ? "install"
     : installation.source === "zeabur"
@@ -270,7 +273,9 @@ function useDown() {
   return (capability: string, component: string) => down.has(capability) || down.has(component)
 }
 
-/** The plan of the component in the address: removing it when Zeabur installed it, else installing. */
+/** The plan of the component in the address: removing it when Zeabur installed it, else installing.
+ * The action stays what it was when the plan opened, so a failed install is tried again, not
+ * removed, once the next poll finds Zeabur's chart. */
 function OpenedPlan({
   id,
   list,
@@ -281,8 +286,8 @@ function OpenedPlan({
   onClose: () => void
 }) {
   const opened = list.flatMap((c) => c.components).find((x) => x.id === id)
-  const action = actionOf(
-    opened && list.map((c) => installationOf(c, opened)).find((i) => i !== undefined),
+  const [action] = useState(() =>
+    actionOf(opened && list.map((c) => installationOf(c, opened)).find((i) => i !== undefined)),
   )
   if (!action) return null
   return (
@@ -348,11 +353,8 @@ function ComponentCard({
   const isDown = useDown()
   const installation = installationOf(capability, component)
   const installed = installation !== undefined
-  const action = actionOf(installation)
   const down = installed && isDown(capability.name, component.id)
   const state = down ? "down" : installed ? "installed" : (capability.suggestion ?? "optional")
-  const catalog = useQuery(catalogQuery).data
-  const offline = catalog !== undefined && !catalog.version
   return (
     <article className="flex w-full flex-col gap-3 rounded-xl border border-v2-border bg-card p-4 transition-colors hover:border-foreground/20">
       <div className="flex items-start gap-3">
@@ -382,30 +384,39 @@ function ComponentCard({
           <ArrowSquareOutIcon className="size-3" aria-hidden="true" />
           <span className="sr-only">{t("settings.opensInNewTab")}</span>
         </a>
-        {action && (
-          <Link
-            from="/cluster/components"
-            search={(previous) => ({
-              ...previous,
-              component: component.id,
-            })}
-            disabled={offline}
-            aria-disabled={offline}
-            className={cn(
-              buttonVariants({ variant: "outline", size: "xs" }),
-              "ml-auto aria-disabled:pointer-events-none aria-disabled:opacity-50",
-            )}
-          >
-            {action === "remove" ? (
-              <MinusCircleIcon aria-hidden="true" data-icon="inline-start" />
-            ) : (
-              <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
-            )}
-            {action === "remove" ? t("settings.removeCommand") : t("settings.installCommand")}
-          </Link>
-        )}
+        <CardAction id={component.id} action={actionOf(installation)} />
       </div>
     </article>
+  )
+}
+
+/** Install, or remove what Zeabur installed; nothing for a component another tool manages. */
+function CardAction({ id, action }: { id: string; action: Schemas.ComponentAction | undefined }) {
+  const t = useT()
+  const catalog = useQuery(catalogQuery).data
+  const offline = catalog !== undefined && !catalog.version
+  if (!action) return null
+  return (
+    <Link
+      from="/cluster/components"
+      search={(previous) => ({
+        ...previous,
+        component: id,
+      })}
+      disabled={offline}
+      aria-disabled={offline}
+      className={cn(
+        buttonVariants({ variant: "outline", size: "xs" }),
+        "ml-auto aria-disabled:pointer-events-none aria-disabled:opacity-50",
+      )}
+    >
+      {action === "remove" ? (
+        <MinusCircleIcon aria-hidden="true" data-icon="inline-start" />
+      ) : (
+        <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
+      )}
+      {action === "remove" ? t("settings.removeCommand") : t("settings.installCommand")}
+    </Link>
   )
 }
 
@@ -457,11 +468,6 @@ function UpgradeTag({ installation }: { installation: Schemas.Installation }) {
   const tested = installation.tested ?? ""
   switch (installation.upgrade) {
     case "behind-major":
-      return (
-        <StatusPill health="warn" size="sm">
-          {t("cluster.tested", tested)}
-        </StatusPill>
-      )
     case "behind-minor":
     case "behind-patch":
       return (
