@@ -498,10 +498,10 @@ export function buildOptionsChanges(build: Build, options: BuildOptions): Change
   return changes
 }
 
-/** What "Deploy from Git" lacks in this cluster: components to install (`enable` entries), and
- * whether Zeabur's chart names no registry. Unknown counts as there. */
+/** What "Deploy from Git" lacks in this cluster: components to install, and whether Zeabur's
+ * chart names no registry. Unknown counts as there. */
 export interface GitNeeds {
-  install: string[]
+  install: Schemas.ComponentRef[]
   registrySetting: boolean
 }
 
@@ -510,15 +510,19 @@ export function gitNeeds({
   capabilities,
   registry,
 }: {
-  builds: Schemas.ProjectBuilds["state"] | undefined
+  builds: Pick<Schemas.ProjectBuilds, "state" | "component"> | undefined
   capabilities: Schemas.Capability[] | undefined
   /** `""` when Zeabur has no registry setting; `undefined` while unknown. */
   registry: string | undefined
 }): GitNeeds | undefined {
-  const absent = (name: string) => capabilities?.find((c) => c.name === name)?.existing === false
-  const install: string[] = []
-  if (builds === "not-installed") install.push("builds")
-  if (absent("image-updates")) install.push("image-updates")
+  const install: Schemas.ComponentRef[] = []
+  if (builds?.state === "not-installed" && builds.component) install.push(builds.component)
+  const updates = keelInstall(capabilities)
+  if (updates) install.push(updates)
   const registrySetting = registry === ""
   return install.length > 0 || registrySetting ? { install, registrySetting } : undefined
 }
+
+/** The component that gives the cluster image updates (Keel), when it has none. */
+export const keelInstall = (capabilities: Schemas.Capability[] | undefined) =>
+  capabilities?.find((c) => c.name === "image-updates")?.install ?? undefined

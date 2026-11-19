@@ -20,6 +20,7 @@ use crate::{Module, Read, filled, read_as};
 /// The module.
 pub static MODULE: Module = Module {
     id: "zeabur-builder",
+    component: Some("zeabur-builder"),
     capability: "builds",
     reads: &[BUILDS, BUILD_RUNS],
     http: &[],

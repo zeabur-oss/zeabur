@@ -42,6 +42,9 @@ pub struct Module {
     pub id: &'static str,
     /// The capability it provides, as Zeabur Catalog names it (`metrics`).
     pub capability: &'static str,
+    /// The Zeabur Catalog component that installs it (`victoria-metrics`); `None` when the
+    /// catalogue has none.
+    pub component: Option<&'static str>,
     /// The Kubernetes resources it reads.
     pub reads: &'static [Read],
     /// The HTTP APIs it reads from a Service, through kube-apiserver's service proxy. Which

@@ -43,7 +43,7 @@ import {
   scheduleProblems,
   scheduleRequest,
   takenAt,
-  VELERO_COMPONENT,
+  providerOf,
   verdict,
   verdictHealth,
   type LocationForm,
@@ -127,12 +127,13 @@ function BackupsBody({ backups }: { backups: UseQueryResult<Data> }) {
     )
   if (backups.isPending) return <LoadingRows label={t("cluster.backups")} rows={4} />
   if (backups.isError) return <Problem error={backups.error} />
-  if (data?.state === "not-installed") return <NotInstalled />
+  if (data?.state === "not-installed") return <NotInstalled data={data} />
   return data ? <Installed data={data} /> : null
 }
 
-function NotInstalled() {
+function NotInstalled({ data }: { data: Schemas.ClusterBackups }) {
   const t = useT()
+  const velero = providerOf(data.providers, "velero")?.component
   return (
     <>
       <Empty variant="outline">
@@ -143,17 +144,19 @@ function NotInstalled() {
           <EmptyTitle>{t("clusterBackups.notInstalled")}</EmptyTitle>
           <EmptyDescription>{t("clusterBackups.notInstalledBody")}</EmptyDescription>
         </EmptyHeader>
-        <EmptyContent>
-          <Link
-            to="/cluster/components"
-            search={{ component: VELERO_COMPONENT }}
-            className={buttonVariants({ size: "sm" })}
-          >
-            {t("clusterBackups.install")}
-          </Link>
-        </EmptyContent>
+        {velero ? (
+          <EmptyContent>
+            <Link
+              to="/cluster/components"
+              search={{ component: velero.id }}
+              className={buttonVariants({ size: "sm" })}
+            >
+              {t("clusterBackups.install")}
+            </Link>
+          </EmptyContent>
+        ) : null}
       </Empty>
-      <BackupCoverage />
+      <BackupCoverage data={data} />
     </>
   )
 }

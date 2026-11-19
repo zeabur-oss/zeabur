@@ -148,20 +148,26 @@ mod tests {
         let app = app(&cluster());
         let (status, answer) = send(&app, "GET", "/api/v1/projects/shop/databases", None).await;
         assert_eq!(status, StatusCode::OK, "{answer}");
-        let engines: Vec<(&str, &str)> = answer["operators"]
+        let engines: Vec<(&str, &str, &str)> = answer["operators"]
             .as_array()
             .unwrap()
             .iter()
-            .map(|o| (o["engine"].as_str().unwrap(), o["state"].as_str().unwrap()))
+            .map(|o| {
+                (
+                    o["engine"].as_str().unwrap(),
+                    o["state"].as_str().unwrap(),
+                    o["component"]["id"].as_str().unwrap(),
+                )
+            })
             .collect();
         assert_eq!(
             engines,
             [
-                ("postgresql", "not-installed"),
-                ("mongodb", "not-installed"),
-                ("mysql", "installed"),
-                ("mariadb", "installed"),
-                ("dragonfly", "installed")
+                ("postgresql", "not-installed", "cloudnative-pg"),
+                ("mongodb", "not-installed", "percona-mongodb"),
+                ("mysql", "installed", "moco"),
+                ("mariadb", "installed", "mariadb-operator"),
+                ("dragonfly", "installed", "dragonfly-operator")
             ]
         );
         let mysql = named(&answer, "mysql");

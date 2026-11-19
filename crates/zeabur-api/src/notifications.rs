@@ -60,6 +60,8 @@ const HIDDEN: &str = "(hidden)";
 pub struct Notifications {
     /// Whether the operator's API is served and the channels could be read.
     pub state: ProviderState,
+    /// The catalogue component that installs the operator.
+    pub component: Option<zeabur_catalog::ComponentRef>,
     /// The namespace the channels are in.
     pub namespace: String,
     /// The events a channel here can receive.
@@ -288,12 +290,14 @@ async fn configs(
 
 async fn answer(
     cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
     namespace: &str,
     scope: Scope,
 ) -> Result<Notifications, ApiError> {
     let mut unreadable = Vec::new();
     let mut out = Notifications {
         state: ProviderState::Installed,
+        component: crate::cluster::modules::component(catalogue, &am::MODULE),
         namespace: namespace.to_owned(),
         events: scope.events().to_vec(),
         channels: Vec::new(),
@@ -346,10 +350,11 @@ async fn answer(
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = Notifications), (status = 401, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project_get(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<Notifications>, ApiError> {
-    answer(cluster.as_ref(), &project, Scope::Project)
+    answer(cluster.as_ref(), &state.catalogue, &project, Scope::Project)
         .await
         .map(Json)
 }
@@ -358,10 +363,18 @@ pub(crate) async fn project_get(
 #[utoipa::path(get, path = "/api/v1/cluster/notifications", tag = "cluster",
     operation_id = "getClusterNotifications",
     responses((status = 200, body = Notifications), (status = 401, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn cluster_get(Person(cluster): Person) -> Result<Json<Notifications>, ApiError> {
-    answer(cluster.as_ref(), am::CLUSTER_NAMESPACE, Scope::Cluster)
-        .await
-        .map(Json)
+pub(crate) async fn cluster_get(
+    State(state): State<AppState>,
+    Person(cluster): Person,
+) -> Result<Json<Notifications>, ApiError> {
+    answer(
+        cluster.as_ref(),
+        &state.catalogue,
+        am::CLUSTER_NAMESPACE,
+        Scope::Cluster,
+    )
+    .await
+    .map(Json)
 }
 
 /// One write of a plan.

@@ -10,7 +10,6 @@ type Backup = Schemas.VeleroBackup
 type Location = Schemas.VeleroLocation
 type Schedule = Schemas.VeleroSchedule
 
-export const VELERO_COMPONENT = "velero"
 export type Verdict =
   | { as: "notInstalled" }
   | { as: "refused" }
@@ -259,8 +258,6 @@ export function projectCoverage(data: Schemas.ProjectBackups): ProjectCoverage |
 export const backupDownloadUrl = (backup: string) =>
   `/api/v1/cluster/backups/${encodeURIComponent(backup)}/download`
 
-/** Whether the component `id` (`k8up`) is installed under any capability; unknown when the
- * person cannot read what is. */
-export function installedOf(items: Schemas.Capability[] | undefined, id: string) {
-  return items?.some((c) => c.installations.some((i) => i.component === id))
-}
+/** The backup provider of `module` (`k8up`, `velero`). */
+export const providerOf = (providers: Schemas.BackupProvider[] | undefined, module: string) =>
+  providers?.find((p) => p.module === module)

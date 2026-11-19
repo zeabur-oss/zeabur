@@ -57,6 +57,7 @@ use crate::{HttpApi, Module};
 /// The module.
 pub static MODULE: Module = Module {
     id: "prometheus-api",
+    component: Some("victoria-metrics"),
     capability: "metrics",
     reads: &[],
     http: &[PROMETHEUS_HTTP],

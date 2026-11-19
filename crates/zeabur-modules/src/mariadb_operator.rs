@@ -34,6 +34,7 @@ use crate::{Module, Read, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "mariadb-operator",
+    component: Some("mariadb-operator"),
     capability: "mariadb",
     reads: &[SERVERS, BACKUPS],
     http: &[],

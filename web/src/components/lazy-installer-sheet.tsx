@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState, type ComponentProps, type ReactNode } from "react"
 
 import { useT } from "@/i18n"
-import type { Needed } from "@/model/installer"
+import type { Schemas } from "@/api/client"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 
@@ -31,7 +31,7 @@ export function InstallAlert({
   icon?: ReactNode
   title?: string
   text: string
-  components: Needed[]
+  components: Schemas.ComponentRef[]
   reason?: string
 }) {
   const t = useT()

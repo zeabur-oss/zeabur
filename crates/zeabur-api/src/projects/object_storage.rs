@@ -31,6 +31,8 @@ pub struct ProjectObjectStorage {
     pub module: String,
     /// Whether its objects could be read.
     pub state: ProviderState,
+    /// The catalogue component that installs the operator.
+    pub component: Option<zeabur_catalog::ComponentRef>,
     /// The stores, by name.
     pub items: Vec<ObjectStorage>,
     /// What could not be read.
@@ -47,13 +49,19 @@ pub(crate) async fn get(
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectObjectStorage>, ApiError> {
-    read(cluster.as_ref(), &project, (state.clock)())
-        .await
-        .map(Json)
+    read(
+        cluster.as_ref(),
+        &state.catalogue,
+        &project,
+        (state.clock)(),
+    )
+    .await
+    .map(Json)
 }
 
 async fn read(
     cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
     project: &str,
     now: Timestamp,
 ) -> Result<ProjectObjectStorage, ApiError> {
@@ -116,6 +124,7 @@ async fn read(
     Ok(ProjectObjectStorage {
         module: seaweedfs::MODULE.id.to_owned(),
         state,
+        component: crate::cluster::modules::component(catalogue, &seaweedfs::MODULE),
         items,
         unreadable,
     })

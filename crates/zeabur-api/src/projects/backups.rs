@@ -11,6 +11,7 @@
 
 use std::collections::BTreeMap;
 
+use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
@@ -25,7 +26,7 @@ use zeabur_modules::{Module, Reading};
 use crate::cluster::s3_destinations;
 use crate::error::{ApiError, list_read, read_problem};
 use crate::extract::{Json, Path};
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::views::UnreadableView;
 
 /// Whether a provider's objects could be read.
@@ -48,6 +49,8 @@ pub struct BackupProvider {
     pub module: String,
     /// Whether it could be read.
     pub state: ProviderState,
+    /// The catalogue component that provides it, what to install when it is not installed.
+    pub component: Option<zeabur_catalog::ComponentRef>,
 }
 
 /// A project's backups across providers.
@@ -93,10 +96,15 @@ pub(crate) async fn read_all<const N: usize>(
     Ok(Ok(out))
 }
 
-fn provider(module: &Module, state: ProviderState) -> BackupProvider {
+pub(crate) fn provider(
+    catalogue: &[zeabur_catalog::Component],
+    module: &Module,
+    state: ProviderState,
+) -> BackupProvider {
     BackupProvider {
         module: module.id.to_owned(),
         state,
+        component: crate::cluster::modules::component(catalogue, module),
     }
 }
 
@@ -112,6 +120,7 @@ struct Gathered {
 /// Reads every provider this build has, as the person.
 async fn gather(
     cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
     project: &str,
     claims: &[ObjectMeta],
     names: &[String],
@@ -143,7 +152,7 @@ async fn gather(
             }
             Err(state) => state,
         };
-        g.providers.push(provider(&k8up::MODULE, state));
+        g.providers.push(provider(catalogue, &k8up::MODULE, state));
     }
     {
         use zeabur_modules::velero;
@@ -162,7 +171,8 @@ async fn gather(
             }
             Err(state) => state,
         };
-        g.providers.push(provider(&velero::MODULE, state));
+        g.providers
+            .push(provider(catalogue, &velero::MODULE, state));
     }
     {
         use zeabur_modules::cloudnative_pg;
@@ -186,7 +196,8 @@ async fn gather(
             }
             Err(state) => state,
         };
-        g.providers.push(provider(&cloudnative_pg::MODULE, state));
+        g.providers
+            .push(provider(catalogue, &cloudnative_pg::MODULE, state));
     }
 
     Ok(g)
@@ -240,15 +251,22 @@ async fn volumes(
     params(("project" = String, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectBackups), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectBackups>, ApiError> {
-    read(cluster.as_ref(), &project).await.map(Json)
+    read(cluster.as_ref(), &state.catalogue, &project)
+        .await
+        .map(Json)
 }
 
 /// The backups of `project`, read as the person (the answer of [`get`]; also what the backup
 /// gap rules look at).
-pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<ProjectBackups, ApiError> {
+pub(crate) async fn read(
+    cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
+    project: &str,
+) -> Result<ProjectBackups, ApiError> {
     let project = project.to_owned();
     let failed = |e: ClusterError| ApiError::from(e.into_problem(&format!("backups of {project}")));
     let claims = cluster
@@ -271,7 +289,7 @@ pub(crate) async fn read(cluster: &dyn Cluster, project: &str) -> Result<Project
         providers,
         databases,
         mut unreadable,
-    } = gather(cluster, &project, &claims, &names)
+    } = gather(cluster, catalogue, &project, &claims, &names)
         .await
         .map_err(failed)?;
     let volumes = volumes(cluster, &project, &claims, &mut unreadable)

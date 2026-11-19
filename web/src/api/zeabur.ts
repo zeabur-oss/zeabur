@@ -577,6 +577,19 @@ export type BackupCoverage = {
 }
 
 /**
+ * A catalogue component, as an install link names it.
+ */
+export type ComponentRef = {
+  /**
+   * The component's id (`k8up`), what `zeaburctl components export` and the component plan
+   * take.
+   */
+  id: string
+  /** Its human-readable name (`K8up`). */
+  name: string
+}
+
+/**
  * Whether a provider's objects could be read.
  */
 export type ProviderState = (typeof ProviderState)[keyof typeof ProviderState]
@@ -591,6 +604,7 @@ export const ProviderState = {
  * One backup provider of this build.
  */
 export type BackupProvider = {
+  component?: ComponentRef | null
   /** The module (`k8up`). */
   module: string
   /** Whether it could be read. */
@@ -1197,6 +1211,7 @@ export type Capability = {
   evidence: string[]
   /** `true` when any component of it was found. */
   existing: boolean
+  install?: ComponentRef | null
   /** The components found installed, with their versions and who manages them. */
   installations: Installation[]
   /** The capability (`ingress`, `certificates`, …). */
@@ -2781,6 +2796,8 @@ export type ClusterBackups = {
   locations: VeleroLocation[]
   /** Velero's namespace. */
   namespace: string
+  /** The backup tools of the cluster: K8up for volumes and Velero for whole projects. */
+  providers: BackupProvider[]
   /** The newest restores, newest first, a hundred at most. */
   restores: VeleroRestore[]
   /** When they run. */
@@ -5021,6 +5038,7 @@ export type DatabaseOperator = {
    * PostgreSQL; the operator itself for MongoDB.
    */
   backups: ProviderState
+  component?: ComponentRef | null
   /** The engine. */
   engine: DatabaseEngine
   /** The operator's module (`cloudnative-pg`). */
@@ -5302,8 +5320,9 @@ export const FaultOrigin = {
 export type Fault = {
   /**
    * The component or upstream service, for [`FaultOrigin::Component`] and
-   * [`FaultOrigin::Upstream`]: `ingress-controller`, `cert-manager`, `cluster-dns`,
-   * `metrics-server`, `node/<name>`, or a registry's host.
+   * [`FaultOrigin::Upstream`]. A component is named as Zeabur Catalog names it: the
+   * component (`cert-manager`, `metrics-server`), or the capability (`ingress`) when any of its
+   * components can serve it. Otherwise `cluster-dns`, `node/<name>`, or a registry's host.
    * @nullable
    */
   component?: string | null
@@ -7594,6 +7613,7 @@ export type Notifications = {
   canTest: Permission
   /** The channels, Zeabur's first, by name. */
   channels: AlertmanagerChannel[]
+  component?: ComponentRef | null
   /** The events a channel here can receive. */
   events: AlertmanagerEvent[]
   /** The namespace the channels are in. */
@@ -8732,6 +8752,7 @@ export type ZeaburBuilderBuild = {
 export type ProjectBuilds = {
   /** The `Build`s, by name. */
   builds: ZeaburBuilderBuild[]
+  component?: ComponentRef | null
   /** The workloads Keel updates; read only when there is a `Build`. */
   keel: KeelPolicy[]
   /** Their runs, newest first. */
@@ -9164,6 +9185,7 @@ export type SeaweedObjectStorage = {
  * A project's object storage.
  */
 export type ProjectObjectStorage = {
+  component?: ComponentRef | null
   /** The stores, by name. */
   items: SeaweedObjectStorage[]
   /** The operator's module (`seaweedfs-operator`). */

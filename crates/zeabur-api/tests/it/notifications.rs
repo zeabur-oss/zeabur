@@ -62,6 +62,7 @@ mod tests {
         let (status, found) = send(&app, "GET", BASE, None).await;
         assert_eq!(status, StatusCode::OK, "{found}");
         assert_eq!(found["state"], "not-installed");
+        assert_eq!(found["component"]["id"], "victoria-metrics");
         let (status, _) = send(&app, "POST", &format!("{BASE}/plan"), Some(&add())).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
     }

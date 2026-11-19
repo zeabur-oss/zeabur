@@ -260,21 +260,14 @@ const buttonOf = (installation: Schemas.Installation | undefined) =>
       ? "manage"
       : undefined
 
-/** What a component incident names, as the catalogue's capability or a component id. */
-const incidentComponents: Record<string, string> = {
-  "ingress-controller": "ingress",
-  "cert-manager": "certificates",
-  "metrics-server": "metrics-server",
-}
-
-/** The installed components an incident says are down, by capability or component id. */
+/** The installed components an incident says are down, by capability or component id: the
+ * catalogue's names, as the incident gives them. */
 function useDown() {
   const incidents = useQuery(clusterIncidentsQuery).data?.items ?? []
   const down = new Set(
     incidents
       .filter((i) => i.kind === "componentDown" && i.fault.component)
-      .map((i) => incidentComponents[i.fault.component ?? ""])
-      .filter((key): key is string => !!key),
+      .flatMap((i) => (i.fault.component ? [i.fault.component] : [])),
   )
   return (capability: string, component: string) => down.has(capability) || down.has(component)
 }

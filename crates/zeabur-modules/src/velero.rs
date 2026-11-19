@@ -35,6 +35,7 @@ use crate::{Module, Read, strings, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "velero",
+    component: Some("velero"),
     capability: "volume-backup",
     reads: &[SCHEDULES, BACKUPS, cluster::LOCATIONS],
     http: &[],

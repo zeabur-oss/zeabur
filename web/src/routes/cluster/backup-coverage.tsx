@@ -1,21 +1,16 @@
 // Cluster → Backups: which data is backed up by what, and whether that tool is there.
-import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import type { Schemas } from "@/api/client"
-import { capabilitiesQuery } from "@/api/queries"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
-import { installedOf, verdict, verdictHealth, VELERO_COMPONENT } from "@/model/cluster-backups"
+import { providerOf, verdict, verdictHealth } from "@/model/cluster-backups"
 import type { Health } from "@/model/service"
 import { Section } from "@/routes/cluster/section"
 
-const K8UP_COMPONENT = "k8up"
-
 export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
   const t = useT()
-  const items = useQuery({ ...capabilitiesQuery, retry: false }).data?.items
   const velero = data && data.state !== "not-installed" ? verdict(data) : undefined
   return (
     <Section id="backup-coverage" title={t("clusterBackups.coverage.title")}>
@@ -43,13 +38,7 @@ export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
             <Row
               data={t("clusterBackups.coverage.volumes")}
               method={t("clusterBackups.coverage.volumesMethod")}
-              status={
-                <Tool
-                  name="K8up"
-                  component={K8UP_COMPONENT}
-                  installed={installedOf(items, K8UP_COMPONENT)}
-                />
-              }
+              status={<Tool provider={providerOf(data?.providers, "k8up")} />}
             />
             <Row
               data={t("clusterBackups.coverage.project")}
@@ -60,7 +49,7 @@ export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
                     {t(`clusterBackups.verdict.${velero.as as "ok"}`)}
                   </Dot>
                 ) : (
-                  <Tool name="Velero" component={VELERO_COMPONENT} installed={false} />
+                  <Tool provider={providerOf(data?.providers, "velero")} />
                 )
               }
             />
@@ -96,26 +85,20 @@ function Dot({ health, children }: { health: Health; children: ReactNode }) {
   )
 }
 
-function Tool({
-  name,
-  component,
-  installed,
-}: {
-  name: string
-  component: string
-  installed: boolean | undefined
-}) {
+function Tool({ provider }: { provider?: Schemas.BackupProvider }) {
   const t = useT()
-  if (installed === undefined) return <Plain>—</Plain>
-  if (installed) return <Dot health="ok">{t("clusterBackups.coverage.installed", name)}</Dot>
+  const component = provider?.component
+  if (!component || provider.state === "refused") return <Plain>—</Plain>
+  if (provider.state === "installed")
+    return <Dot health="ok">{t("clusterBackups.coverage.installed", component.name)}</Dot>
   return (
     <Dot health="idle">
       <Link
         to="/cluster/components"
-        search={{ component }}
+        search={{ component: component.id }}
         className="underline underline-offset-2"
       >
-        {t("clusterBackups.coverage.install", name)}
+        {t("clusterBackups.coverage.install", component.name)}
       </Link>
     </Dot>
   )

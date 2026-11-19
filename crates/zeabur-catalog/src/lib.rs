@@ -244,6 +244,38 @@ pub struct Capability {
     pub components: Vec<Component>,
     /// The components found installed, with their versions and who manages them.
     pub installations: Vec<Installation>,
+    /// For a missing capability, the component to install: one recommended on this cluster's
+    /// profile, else the first that runs here; `None` when it exists or none runs here.
+    pub install: Option<ComponentRef>,
+}
+
+/// A catalogue component, as an install link names it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentRef {
+    /// The component's id (`k8up`), what `zeaburctl components export` and the component plan
+    /// take.
+    pub id: String,
+    /// Its human-readable name (`K8up`).
+    pub name: String,
+}
+
+impl From<&Component> for ComponentRef {
+    fn from(component: &Component) -> Self {
+        Self {
+            id: component.id.clone(),
+            name: component.display_name.clone(),
+        }
+    }
+}
+
+/// The component `id` of the catalogue.
+#[must_use]
+pub fn component_ref(catalogue: &[Component], id: &str) -> Option<ComponentRef> {
+    catalogue
+        .iter()
+        .find(|c| c.id == id)
+        .map(ComponentRef::from)
 }
 
 /// How strongly the catalogue suggests a missing capability.
@@ -294,27 +326,39 @@ fn default_on<'a>(component: &'a Component, profile: &str) -> &'a str {
 
 /// The components of a capability that can run here: on the cluster's distribution, when the
 /// version names one the catalogue knows, on its Kubernetes, and not unsupported on its profile.
-fn suggestion(components: &[Component], facts: &ClusterFacts) -> Suggestion {
+fn supported<'a>(components: &'a [Component], facts: &ClusterFacts) -> Vec<&'a Component> {
     let profile = profile(facts);
     let distribution = distribution(facts);
-    let supported: Vec<&Component> = components
+    components
         .iter()
         .filter(|c| {
             distribution.is_none_or(|d| c.distributions.iter().any(|x| x == d))
                 && kube_version::admits(&c.kube_version, &facts.version).unwrap_or(false)
                 && default_on(c, profile) != "unsupported"
         })
-        .collect();
-    if supported.is_empty() {
-        Suggestion::Unsupported
-    } else if supported
+        .collect()
+}
+
+/// How strongly the catalogue suggests a missing capability, and the component to install for
+/// it: a recommended one, else the first that runs here.
+fn suggestion(
+    components: &[Component],
+    facts: &ClusterFacts,
+) -> (Suggestion, Option<ComponentRef>) {
+    let profile = profile(facts);
+    let supported = supported(components, facts);
+    let recommended = supported
         .iter()
-        .any(|c| default_on(c, profile) == "recommended")
-    {
-        Suggestion::Recommended
-    } else {
-        Suggestion::Optional
-    }
+        .find(|c| default_on(c, profile) == "recommended");
+    let suggestion = match (recommended, supported.is_empty()) {
+        (Some(_), _) => Suggestion::Recommended,
+        (None, true) => Suggestion::Unsupported,
+        (None, false) => Suggestion::Optional,
+    };
+    let install = recommended
+        .or_else(|| supported.first())
+        .map(|c| ComponentRef::from(*c));
+    (suggestion, install)
 }
 
 /// Each capability of the catalogue: existing (with the evidence) or not.
@@ -336,6 +380,7 @@ pub fn detect(components: &[Component], facts: &ClusterFacts) -> Vec<Capability>
                 suggestion: None,
                 components: Vec::new(),
                 installations: Vec::new(),
+                install: None,
             });
         let running = running(&component.detection, facts);
         let mut evidence = crds(&component.detection, facts);
@@ -357,7 +402,9 @@ pub fn detect(components: &[Component], facts: &ClusterFacts) -> Vec<Capability>
     let mut capabilities: Vec<Capability> = capabilities.into_values().collect();
     for capability in &mut capabilities {
         if !capability.existing {
-            capability.suggestion = Some(suggestion(&capability.components, facts));
+            let (suggestion, install) = suggestion(&capability.components, facts);
+            capability.suggestion = Some(suggestion);
+            capability.install = install;
         }
     }
     capabilities
@@ -607,7 +654,7 @@ mod tests {
             nodes: Some(1),
             ..ClusterFacts::default()
         };
-        let one = |c: Component| suggestion(&[c], &facts);
+        let one = |c: Component| suggestion(&[c], &facts).0;
         assert_eq!(
             one(component("recommended", ">=1.34.0-0")),
             Suggestion::Recommended
@@ -624,6 +671,32 @@ mod tests {
             one(component("required", ">=1.34.0-0")),
             Suggestion::Unsupported
         );
+    }
+
+    #[test]
+    fn a_missing_capability_installs_a_recommended_component_that_runs_here() {
+        let facts = ClusterFacts {
+            version: "v1.36.5+k3s1".to_owned(),
+            nodes: Some(1),
+            ..ClusterFacts::default()
+        };
+        let named = |id: &str, defaults, kube_version| Component {
+            id: id.to_owned(),
+            ..component(defaults, kube_version)
+        };
+        let offered = |components: &[Component]| suggestion(components, &facts).1.map(|c| c.id);
+        let optional = named("optional", "optional", ">=1.34.0-0");
+        let recommended = named("recommended", "recommended", ">=1.34.0-0");
+        let too_new = named("too-new", "recommended", ">=1.37.0-0");
+        assert_eq!(
+            offered(&[optional.clone(), recommended]).as_deref(),
+            Some("recommended")
+        );
+        assert_eq!(
+            offered(&[too_new.clone(), optional]).as_deref(),
+            Some("optional")
+        );
+        assert_eq!(offered(&[too_new]), None);
     }
 
     #[test]

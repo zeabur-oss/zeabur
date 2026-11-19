@@ -26,6 +26,7 @@ use crate::{Module, Read};
 /// The module.
 pub static MODULE: Module = Module {
     id: "falco",
+    component: Some("falco"),
     capability: "runtime-security",
     reads: &[POLICY_REPORTS, CLUSTER_POLICY_REPORTS],
     http: &[],

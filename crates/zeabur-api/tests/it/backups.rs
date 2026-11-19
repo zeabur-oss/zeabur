@@ -116,6 +116,46 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn each_backup_tool_says_whether_it_is_installed_and_which_component_installs_it() {
+        let k8up = || ServedResource::readable("k8up.io", "v1", "schedules", "Schedule", true);
+        for (served, forbidden, k8up_state, velero_state) in [
+            (vec![], None, "not-installed", "not-installed"),
+            (
+                [served(), vec![k8up()]].concat(),
+                None,
+                "installed",
+                "installed",
+            ),
+            (
+                vec![k8up()],
+                Some("schedules.k8up.io"),
+                "refused",
+                "not-installed",
+            ),
+        ] {
+            let cluster = MemoryCluster::new(State {
+                served,
+                forbidden_resources: forbidden.into_iter().map(str::to_owned).collect(),
+                ..State::default()
+            });
+            let (status, found) =
+                send(&app(&cluster), "GET", "/api/v1/cluster/backups", None).await;
+            assert_eq!(status, StatusCode::OK, "{found}");
+            assert_eq!(found["state"], velero_state);
+            assert_eq!(
+                found["providers"],
+                json!([
+                    {"module": "k8up", "state": k8up_state,
+                     "component": {"id": "k8up", "name": "K8up"}},
+                    {"module": "velero", "state": velero_state,
+                     "component": {"id": "velero", "name": "Velero"}},
+                ]),
+                "{k8up_state}"
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn a_new_location_writes_its_keys_to_a_secret_and_no_answer_shows_them() {
         let cluster = velero(vec![]);
         let app = app(&cluster);

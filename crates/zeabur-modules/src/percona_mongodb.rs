@@ -41,6 +41,7 @@ use crate::{Module, Read, filled, read_as};
 /// The module.
 pub static MODULE: Module = Module {
     id: "percona-server-mongodb",
+    component: Some("percona-mongodb"),
     capability: "mongodb",
     reads: &[CLUSTERS, BACKUPS],
     http: &[],

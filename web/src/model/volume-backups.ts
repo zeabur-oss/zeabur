@@ -213,8 +213,9 @@ export function backUpVolumeNow(schedule: Schedule, claim: string, now: Date): C
 export const runsOf = (data: ProjectBackups, claim: string) =>
   data.runs.filter((r) => r.targets.some((t) => t.kind === "volume" && t.name === claim))
 
-export const k8upState = (data: ProjectBackups) =>
-  data.providers.find((p) => p.module === "k8up")?.state ?? "not-installed"
+export const k8upOf = (data: ProjectBackups) => data.providers.find((p) => p.module === "k8up")
+
+export const k8upState = (data: ProjectBackups) => k8upOf(data)?.state ?? "not-installed"
 
 type Template = Record<string, unknown> & {
   metadata?: Record<string, unknown>

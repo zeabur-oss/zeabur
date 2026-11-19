@@ -76,11 +76,11 @@ pub enum ComponentKind {
 }
 
 impl ComponentKind {
-    /// The name a [`Fault`] gives it.
+    /// The name a [`Fault`] gives it, as Zeabur Catalog names it.
     #[must_use]
     pub const fn name(self) -> &'static str {
         match self {
-            Self::IngressController => "ingress-controller",
+            Self::IngressController => "ingress",
             Self::CertManager => "cert-manager",
             Self::ClusterDns => "cluster-dns",
             Self::MetricsServer => "metrics-server",
@@ -770,7 +770,7 @@ mod tests {
             ids,
             [
                 "incidents/component/cert-manager",
-                "incidents/component/ingress-controller",
+                "incidents/component/ingress",
                 "incidents/component/metrics-server",
                 "incidents/node/node-b",
             ]

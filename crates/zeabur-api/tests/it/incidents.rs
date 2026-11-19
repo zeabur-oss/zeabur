@@ -121,17 +121,14 @@ mod tests {
             .collect();
         assert_eq!(
             ids,
-            [
-                "incidents/component/ingress-controller",
-                "incidents/node/node-b"
-            ]
+            ["incidents/component/ingress", "incidents/node/node-b"]
         );
 
         let controller = &list["items"][0];
         assert_eq!(controller["kind"], "componentDown");
         assert_eq!(
             controller["fault"],
-            json!({"origin": "component", "component": "ingress-controller", "fixer": "componentOwner"})
+            json!({"origin": "component", "component": "ingress", "fixer": "componentOwner"})
         );
         assert_eq!(controller["domains"], json!(["shop.example.test"]));
         assert_eq!(controller["projects"], json!(["shop"]));

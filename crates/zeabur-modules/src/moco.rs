@@ -44,6 +44,7 @@ use crate::{Module, Read, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "moco",
+    component: Some("moco"),
     capability: "mysql",
     reads: &[CLUSTERS, BACKUP_POLICIES],
     http: &[],

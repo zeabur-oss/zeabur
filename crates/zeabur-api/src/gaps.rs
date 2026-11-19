@@ -128,6 +128,7 @@ pub(crate) async fn project(
     let projection = zeabur_graph::project(&snapshot);
     let found = module_findings(
         cluster,
+        &state.catalogue,
         &project,
         &snapshot,
         &projection,
@@ -220,6 +221,7 @@ const MODULE_RULES: &[&str] = &[
 /// and its rule has nothing to say.
 async fn module_findings(
     cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
     project: &str,
     snapshot: &zeabur_graph::Snapshot,
     projection: &zeabur_model::Project,
@@ -247,7 +249,7 @@ async fn module_findings(
         ));
     }
     {
-        let backups = crate::projects::backups::read(cluster, project).await?;
+        let backups = crate::projects::backups::read(cluster, catalogue, project).await?;
         let installed = |module: &str| {
             backups.providers.iter().any(|p| {
                 p.module == module && p.state == crate::projects::backups::ProviderState::Installed
