@@ -716,15 +716,12 @@ mod tests {
     }
 
     /// A person who may `list` and `patch` a Secret but not `get` it can set and remove one key,
-    /// and the other keys stay: a key change is a merge patch of that key, which reads nothing.
-    /// Losing the other keys was a bug once. The plan shows no value. A YAML edit of that Secret
-    /// is refused with the denied `get`, as it is compared with the Secret as read. A ConfigMap's
-    /// keys can be edited with `list` and `patch` as well, and its other keys stay.
+    /// and the other keys stay: a key change is a merge patch of that key, which reads nothing. The
+    /// plan shows no value, and a YAML edit of that Secret is refused with the denied `get`. A
+    /// ConfigMap's keys edit the same way.
     ///
-    /// Kubernetes has no right to see a Secret's keys without its values: `list` and `watch`
-    /// return the values as `get` does [k8s-rbac-secrets]. Zeabur reads values only with `get`
-    /// and lists Secrets as a table without them, so a Role with `list` and `patch` but not `get`
-    /// is the person who cannot read them.
+    /// `list` and `watch` return a Secret's values as `get` does [k8s-rbac-secrets], so a Role with
+    /// `list` and `patch` but not `get` is the person who cannot read them.
     ///
     /// [k8s-rbac-secrets]: https://kubernetes.io/docs/concepts/security/rbac-good-practices/#listing-secrets
     #[tokio::test]
@@ -1048,12 +1045,10 @@ mod tests {
             .unwrap_or_default()
     }
 
-    /// Adopting a namespace and letting it go, as a person whose Role names the Namespace itself.
-    /// kube-apiserver authorises a request for `namespaces/{name}` in namespace `name`
-    /// ([requestinfo]), so a Role in the namespace limited by `resourceNames` is enough. Without
-    /// `patch` the person sees `canChange: denied` and the apply's dry run is refused with the
-    /// request named; with it, the plan adds and then removes the one label, and the label
-    /// kube-apiserver sets on every namespace (`kubernetes.io/metadata.name`) stays.
+    /// Adopting a namespace and letting it go, as a person whose Role names the Namespace itself:
+    /// kube-apiserver authorises `namespaces/{name}` in namespace `name` ([requestinfo]), so a Role
+    /// limited by `resourceNames` is enough. Without `patch` the person sees `canChange: denied`;
+    /// with it, the plan adds and then removes the one label.
     ///
     /// [requestinfo]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/request/requestinfo.go
     #[tokio::test]

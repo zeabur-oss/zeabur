@@ -397,11 +397,10 @@ pub fn on_delete(workload: Workload<'_>) -> bool {
 
 /// Whether every pod of the workload runs its current template and is ready.
 ///
-/// The [`readiness`] of a Deployment, StatefulSet or DaemonSet decides. kstatus does not follow
-/// an `OnDelete` StatefulSet, and its controller moves `status.currentRevision` only for
-/// `RollingUpdate` ([k8s-sts-utils], `completeRollingUpdate`). So an `OnDelete` StatefulSet is
-/// rolled out once `status.updatedReplicas` and `status.readyReplicas` reach `spec.replicas`. A
-/// Job or CronJob starts new pods for each run, so it has nothing to roll out.
+/// The [`readiness`] of a Deployment, StatefulSet or DaemonSet decides. An `OnDelete` StatefulSet
+/// is rolled out once `status.updatedReplicas` and `status.readyReplicas` reach `spec.replicas`, as
+/// its controller moves `status.currentRevision` only for `RollingUpdate` ([k8s-sts-utils]). A Job
+/// or CronJob has nothing to roll out.
 ///
 /// [k8s-sts-utils]: https://github.com/kubernetes/kubernetes/blob/v1.34.0/pkg/controller/statefulset/stateful_set_utils.go
 #[must_use]

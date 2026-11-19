@@ -18,15 +18,12 @@ pub fn sha256(data: &[u8]) -> [u8; 32] {
 #[must_use]
 pub fn hex(bytes: &[u8]) -> String {
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let mut out = String::with_capacity(bytes.len() * 2);
-    for byte in bytes {
-        for nibble in [byte >> 4, byte & 0x0F] {
-            if let Some(&digit) = DIGITS.get(usize::from(nibble)) {
-                out.push(char::from(digit));
-            }
-        }
-    }
-    out
+    bytes
+        .iter()
+        .flat_map(|byte| [byte >> 4, byte & 0x0F])
+        .filter_map(|nibble| DIGITS.get(usize::from(nibble)))
+        .map(|&digit| char::from(digit))
+        .collect()
 }
 
 #[cfg(test)]

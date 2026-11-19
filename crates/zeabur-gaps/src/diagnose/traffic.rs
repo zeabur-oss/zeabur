@@ -146,21 +146,24 @@ impl<'a> Traffic<'a> {
             return Vec::new();
         }
         let mut out = self.ingresses.get(name).cloned().unwrap_or_default();
-        for route in self.routes_to([name]) {
+        out.extend(self.routes_to([name]).into_iter().map(|route| {
             let route_name = route
                 .pointer("/metadata/name")
                 .and_then(Value::as_str)
                 .unwrap_or_default();
-            out.push((
+            (
                 route_name.to_owned(),
                 Origin::field("HTTPRoute", route_name, "spec.rules".to_owned()),
-            ));
-        }
-        for (kind, other, origin) in self.hosts.get(name).into_iter().flatten() {
-            if !(*kind == workload.kind() && *other == name) {
-                out.push(((*other).to_owned(), origin.clone()));
-            }
-        }
+            )
+        }));
+        out.extend(
+            self.hosts
+                .get(name)
+                .into_iter()
+                .flatten()
+                .filter(|(kind, other, _)| !(*kind == workload.kind() && *other == name))
+                .map(|(_, other, origin)| ((*other).to_owned(), origin.clone())),
+        );
         out
     }
 

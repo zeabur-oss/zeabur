@@ -199,12 +199,15 @@ impl Report {
 
     /// One section per check: its result and name, then a line per finding and the fix.
     fn text(&self) -> String {
-        let mut lines = Vec::new();
-        for check in &self.checks {
-            lines.push(format!("{:<9}{}", check.status.label(), check.name));
-            lines.extend(check.findings.iter().map(|f| format!("         {f}")));
-            lines.extend(check.fix.iter().map(|f| format!("         fix: {f}")));
-        }
+        let mut lines: Vec<String> = self
+            .checks
+            .iter()
+            .flat_map(|check| {
+                std::iter::once(format!("{:<9}{}", check.status.label(), check.name))
+                    .chain(check.findings.iter().map(|f| format!("         {f}")))
+                    .chain(check.fix.iter().map(|f| format!("         fix: {f}")))
+            })
+            .collect();
         lines.push(String::new());
         lines.join("\n")
     }
@@ -487,16 +490,19 @@ fn components(answer: &Result<Value, Value>) -> Check {
                 choices.join(" or ")
             ));
         }
-        for installation in list(capability, "installations") {
-            if text(installation, "upgrade").starts_with("behind-") {
-                check.findings.push(format!(
-                    "{} {} is behind the tested {}",
-                    text(installation, "displayName"),
-                    text(installation, "version"),
-                    text(installation, "tested")
-                ));
-            }
-        }
+        check.findings.extend(
+            list(capability, "installations")
+                .iter()
+                .filter(|installation| text(installation, "upgrade").starts_with("behind-"))
+                .map(|installation| {
+                    format!(
+                        "{} {} is behind the tested {}",
+                        text(installation, "displayName"),
+                        text(installation, "version"),
+                        text(installation, "tested")
+                    )
+                }),
+        );
     }
     if check.status == Status::Warning {
         check.add_fix("`zeaburctl ui` shows how to install each: Cluster, Components");
@@ -737,12 +743,11 @@ fn zeabur_identity_issuer_trust() -> Check {
 
 /// The reads a response names in `unreadable`, as findings.
 fn unreadable(check: &mut Check, answer: &Value) {
-    for refused in list(answer, "unreadable") {
-        check.findings.push(format!(
-            "partly checked: needs list {}",
-            text(refused, "resource")
-        ));
-    }
+    check.findings.extend(
+        list(answer, "unreadable")
+            .iter()
+            .map(|refused| format!("partly checked: needs list {}", text(refused, "resource"))),
+    );
 }
 
 /// A refused request as the rule that allows it: `get oauthclients.identity.zeabur.com/zeabur

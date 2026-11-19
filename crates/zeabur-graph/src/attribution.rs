@@ -177,15 +177,15 @@ fn pod_template_relations(
     for volume in spec.volumes.iter().flatten() {
         volume_relations(workload, &owner, volume, out);
     }
-    for secret in spec.image_pull_secrets.iter().flatten() {
-        out.push(relation(
+    out.extend(spec.image_pull_secrets.iter().flatten().map(|secret| {
+        relation(
             &owner,
             "Secret",
             &secret.name,
             RelationKind::ImagePullSecret,
             workload.origin(format!("{base}.imagePullSecrets[name={}]", secret.name)),
-        ));
-    }
+        )
+    }));
 }
 
 /// The `env` and `envFrom` references of one container.
@@ -336,17 +336,21 @@ fn claim_template_relations(
             .unwrap_or_default()
             .iter()
             .take_while(|claim| claim.starts_with(&prefix));
-        for &claim_name in named {
-            if created_by_claim_template(claim_name, template_name, set_name) {
-                out.push(relation(
-                    &owner,
-                    "PersistentVolumeClaim",
-                    claim_name,
-                    RelationKind::ClaimTemplate,
-                    workload.origin(format!("spec.volumeClaimTemplates[name={template_name}]")),
-                ));
-            }
-        }
+        out.extend(
+            named
+                .filter(|&&claim_name| {
+                    created_by_claim_template(claim_name, template_name, set_name)
+                })
+                .map(|&claim_name| {
+                    relation(
+                        &owner,
+                        "PersistentVolumeClaim",
+                        claim_name,
+                        RelationKind::ClaimTemplate,
+                        workload.origin(format!("spec.volumeClaimTemplates[name={template_name}]")),
+                    )
+                }),
+        );
     }
 }
 
@@ -425,15 +429,21 @@ fn route_relations(
         } else {
             path
         };
-        for &workload in selected.get(service).into_iter().flatten() {
-            out.push(relation(
-                workload,
-                "Ingress",
-                name,
-                RelationKind::Route,
-                Origin::field("Ingress", name, path.clone()),
-            ));
-        }
+        out.extend(
+            selected
+                .get(service)
+                .into_iter()
+                .flatten()
+                .map(|&workload| {
+                    relation(
+                        workload,
+                        "Ingress",
+                        name,
+                        RelationKind::Route,
+                        Origin::field("Ingress", name, path.clone()),
+                    )
+                }),
+        );
     }
 }
 

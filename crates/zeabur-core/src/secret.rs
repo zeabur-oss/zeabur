@@ -6,19 +6,13 @@
 /// string never grows, so it leaves no copy of a secret part behind.
 #[must_use]
 pub fn join(parts: &[&str]) -> String {
-    let mut joined = String::with_capacity(parts.iter().map(|part| part.len()).sum());
-    for part in parts {
-        joined.push_str(part);
-    }
-    joined
+    parts.concat()
 }
 
-/// Stops this process from writing a core dump: `RLIMIT_CORE` becomes 0 and, on Linux, the
-/// process becomes non-dumpable (`PR_SET_DUMPABLE` 0).
+/// Stops this process from writing a core dump.
 ///
-/// A non-dumpable process also refuses `ptrace` and `/proc/<pid>/mem` to other processes of its
-/// user. It can still read its own `/proc/self`, except files with mode `0400`, such as
-/// `environ`, which then belong to root [proc].
+/// `RLIMIT_CORE` becomes 0 and, on Linux, the process becomes non-dumpable (`PR_SET_DUMPABLE` 0),
+/// which also refuses `ptrace` and `/proc/<pid>/mem` to other processes of its user [proc].
 ///
 /// # Errors
 ///

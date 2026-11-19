@@ -161,12 +161,13 @@ impl Planner<'_> {
         let mut path = steps.to_vec();
         path.push(Step::field("ports"));
         self.claim(index, &path, &format!("ports of container {name}"))?;
-        let mut operations = Vec::new();
-        for position in &moved {
-            let field = format!("{at}/ports/{position}/containerPort");
-            operations.push(test(&field, json!(from)));
-            operations.push(replace(&field, json!(to)));
-        }
+        let mut operations: Vec<_> = moved
+            .iter()
+            .flat_map(|position| {
+                let field = format!("{at}/ports/{position}/containerPort");
+                [test(&field, json!(from)), replace(&field, json!(to))]
+            })
+            .collect();
         if moved.is_empty() {
             operations.push(match declared {
                 Some(_) => add(&format!("{at}/ports/-"), json!({"containerPort": to})),

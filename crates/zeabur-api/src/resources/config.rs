@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use axum::response::{IntoResponse, Response};
+use base64::Engine as _;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::ClusterExt as _;
 use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
@@ -91,25 +92,7 @@ fn secret_value(bytes: Vec<u8>) -> SecretValue {
 
 /// Standard base64 with padding (RFC 4648 §4).
 fn base64(bytes: &[u8]) -> String {
-    const ALPHABET: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
-    let mut out = String::with_capacity(bytes.len().div_ceil(3) * 4);
-    for chunk in bytes.chunks(3) {
-        let b = [
-            chunk.first().copied().unwrap_or(0),
-            chunk.get(1).copied().unwrap_or(0),
-            chunk.get(2).copied().unwrap_or(0),
-        ];
-        let n = (u32::from(b[0]) << 16) | (u32::from(b[1]) << 8) | u32::from(b[2]);
-        for (i, shift) in [18_u32, 12, 6, 0].into_iter().enumerate() {
-            if i <= chunk.len() {
-                let index = usize::try_from((n >> shift) & 0x3F).unwrap_or(0);
-                out.push(char::from(ALPHABET.get(index).copied().unwrap_or(b'=')));
-            } else {
-                out.push('=');
-            }
-        }
-    }
-    out
+    base64::engine::general_purpose::STANDARD.encode(bytes)
 }
 
 #[cfg(test)]

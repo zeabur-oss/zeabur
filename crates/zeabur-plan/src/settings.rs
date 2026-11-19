@@ -897,9 +897,11 @@ impl<'a> Planner<'a> {
                 .cloned()
                 .unwrap_or_default();
             map.retain(|name, _| !COMPUTE.contains(&name.as_str()));
-            for (name, value) in given {
-                map.insert(name.clone(), json!(value));
-            }
+            map.extend(
+                given
+                    .iter()
+                    .map(|(name, value)| (name.clone(), json!(value))),
+            );
             if let Some(object) = desired.as_object_mut() {
                 if map.is_empty() {
                     object.remove(section);

@@ -163,19 +163,21 @@ impl Planner<'_> {
         let mut metadata = Map::new();
         metadata.insert("name".to_owned(), json!(target.name));
         metadata.insert("namespace".to_owned(), json!(namespace));
-        for key in KEPT_METADATA {
-            if let Some(value) = object.pointer(&format!("/metadata/{key}")) {
-                metadata.insert(key.to_owned(), value.clone());
-            }
-        }
+        metadata.extend(KEPT_METADATA.iter().filter_map(|key| {
+            let value = object.pointer(&format!("/metadata/{key}"))?;
+            Some(((*key).to_owned(), value.clone()))
+        }));
         let mut body =
             json!({"apiVersion": target.api_version, "kind": target.kind, "metadata": metadata});
         if let (Some(fields), Some(out)) = (object.as_object(), body.as_object_mut()) {
-            for (key, value) in fields {
-                if !matches!(key.as_str(), "apiVersion" | "kind" | "metadata" | "status") {
-                    out.insert(key.clone(), value.clone());
-                }
-            }
+            out.extend(
+                fields
+                    .iter()
+                    .filter(|(key, _)| {
+                        !matches!(key.as_str(), "apiVersion" | "kind" | "metadata" | "status")
+                    })
+                    .map(|(key, value)| (key.clone(), value.clone())),
+            );
         }
         self.created.push((target.clone(), index));
         self.objects.push(Working {

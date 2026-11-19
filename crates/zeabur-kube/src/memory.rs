@@ -1209,25 +1209,13 @@ impl Cluster for MemoryCluster {
 
     // ── Writes ───────────────────────────────────────────────────────────────────────────────
 
-    /// Writes as kube-apiserver does, as far as Zeabur's writes reach (checked against k3s by
-    /// the write contract, `tests/contract/`):
-    ///
-    /// - A creation is refused with `409 AlreadyExists` when the name is taken, and stored with
-    ///   `metadata.generation` 1 for the kinds that keep one (`GENERATION_KINDS`).
-    /// - A JSON Patch is applied to the object held, all or nothing: a failed operation, `test` or
-    ///   other, is answered `422 Invalid`; an object that does not exist, `404 NotFound`.
-    /// - A field the kind's schema does not know is refused as `fieldValidation=Strict` refuses it:
-    ///   `400 BadRequest` for a creation, `422 Invalid` for a patch [k8s-validation].
-    /// - A deletion is refused with `409 Conflict` when its preconditions do not hold, `404
-    ///   NotFound` when the object does not exist; otherwise the object is taken away at once.
-    ///   Nothing is garbage collected: what the object owns stays.
-    /// - A dry run stops there. Otherwise the object is stored with the next `resourceVersion` (and
-    ///   a `uid` when it is new), and the next `generation` when its `spec` changed
-    ///   [k8s-generation], and the write is recorded in [`State::writes`].
-    ///
-    /// A Secret's values are held apart ([`State::secret_values`]), so a JSON Patch of a Secret
-    /// has its `test` operations on `metadata` checked and is otherwise only recorded, as is a
-    /// merge patch of one.
+    /// Writes as kube-apiserver does, as far as Zeabur's writes reach (checked against k3s by the
+    /// write contract, `tests/contract/`): `409 AlreadyExists` for a taken name, all-or-nothing
+    /// JSON Patch (`422 Invalid` for a failed operation, `404 NotFound` for a missing object),
+    /// strict field validation [k8s-validation], `409 Conflict` for a deletion whose preconditions
+    /// fail, and on each stored write the next `resourceVersion` and `generation` [k8s-generation],
+    /// recorded in [`State::writes`]. A Secret's values are held apart ([`State::secret_values`]),
+    /// so a patch of one is only recorded.
     ///
     /// [k8s-validation]: https://kubernetes.io/docs/reference/using-api/api-concepts/#field-validation
     /// [k8s-generation]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata

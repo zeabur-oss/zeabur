@@ -210,11 +210,9 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
 /// Listens on `address`, and where that is the default `[::]` and the node has no IPv6, on
 /// `0.0.0.0` instead; the address listened on.
 ///
-/// A cluster gives pods IPv4 addresses, IPv6 addresses or both [k8s-dual-stack], and a server on
-/// `0.0.0.0` cannot be reached over IPv6. A socket on `[::]` takes IPv6 connections and, on
-/// Linux, IPv4 ones too (as IPv4-mapped addresses) unless `net.ipv6.bindv6only` is set
-/// [linux-ipv6], so one listener serves all three kinds of cluster. A kernel with IPv6 turned
-/// off refuses that socket; then only IPv4 is there to serve.
+/// A cluster gives pods IPv4 addresses, IPv6 addresses or both [k8s-dual-stack]. A socket on `[::]`
+/// serves all three kinds, as on Linux it takes IPv4 connections too unless `net.ipv6.bindv6only`
+/// is set [linux-ipv6].
 ///
 /// [k8s-dual-stack]: https://kubernetes.io/docs/concepts/services-networking/dual-stack/
 /// [linux-ipv6]: https://man7.org/linux/man-pages/man7/ipv6.7.html

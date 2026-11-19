@@ -126,21 +126,26 @@ impl RouteKind {
                 .map(Some)
                 .collect(),
         };
-        for (at, host) in hosts.iter().enumerate() {
-            if host.as_deref() == Some(from) {
-                let path = match self {
-                    Self::Ingress => format!("{field}/{at}/host"),
-                    Self::HttpRoute => format!("{field}/{at}"),
-                };
-                operations.push(test(&path, json!(from)));
-                operations.push(replace(&path, json!(to)));
-            }
-        }
+        operations.extend(
+            hosts
+                .iter()
+                .enumerate()
+                .filter(|(_, host)| host.as_deref() == Some(from))
+                .flat_map(|(at, _)| {
+                    let path = match self {
+                        Self::Ingress => format!("{field}/{at}/host"),
+                        Self::HttpRoute => format!("{field}/{at}"),
+                    };
+                    [test(&path, json!(from)), replace(&path, json!(to))]
+                }),
+        );
         if self == Self::Ingress {
-            for (at, h, _) in tls_hosts(object, from) {
-                operations.push(replace(&format!("/spec/tls/{at}/hosts/{h}"), json!(to)));
-                tls_changed = true;
-            }
+            let tls = tls_hosts(object, from);
+            tls_changed = !tls.is_empty();
+            operations.extend(
+                tls.into_iter()
+                    .map(|(at, h, _)| replace(&format!("/spec/tls/{at}/hosts/{h}"), json!(to))),
+            );
         }
         (operations, tls_changed)
     }
@@ -155,22 +160,31 @@ impl RouteKind {
                     .unwrap_or_default()
                     .rules
                     .unwrap_or_default();
-                for (at, rule) in rules.iter().enumerate().rev() {
-                    if rule.host.as_deref() == Some(hostname) {
-                        operations.push(test(&format!("/spec/rules/{at}/host"), json!(hostname)));
-                        operations.push(remove(&format!("/spec/rules/{at}")));
-                    }
-                }
+                operations.extend(
+                    rules
+                        .iter()
+                        .enumerate()
+                        .rev()
+                        .filter(|(_, rule)| rule.host.as_deref() == Some(hostname))
+                        .flat_map(|(at, _)| {
+                            [
+                                test(&format!("/spec/rules/{at}/host"), json!(hostname)),
+                                remove(&format!("/spec/rules/{at}")),
+                            ]
+                        }),
+                );
                 if operations.is_empty() {
                     return operations;
                 }
-                for (at, h, alone) in tls_hosts(object, hostname).into_iter().rev() {
-                    operations.push(remove(&if alone {
-                        format!("/spec/tls/{at}")
-                    } else {
-                        format!("/spec/tls/{at}/hosts/{h}")
-                    }));
-                }
+                operations.extend(tls_hosts(object, hostname).into_iter().rev().map(
+                    |(at, h, alone)| {
+                        remove(&if alone {
+                            format!("/spec/tls/{at}")
+                        } else {
+                            format!("/spec/tls/{at}/hosts/{h}")
+                        })
+                    },
+                ));
             }
             Self::HttpRoute => {
                 let hostnames = read_http_route(object).spec.hostnames;

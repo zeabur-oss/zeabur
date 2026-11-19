@@ -150,12 +150,10 @@ fn take<T>(listed: Listed<T>, into: &mut Vec<T>, unreadable: &mut Vec<Unreadable
     }
 }
 
-/// How an exec ended, from the `Status` the kubelet sends on the stream's error channel:
-/// `Success`, or `Failure` with reason `NonZeroExitCode` and the code in a cause of reason
-/// `ExitCode` [kubelet-remotecommand]. Any other failure is the runtime's: a command missing
-/// from the image is told by runc's message (`stat /bin/sh: no such file or directory`) or Go's
-/// `exec.LookPath` (`executable file not found in $PATH`), since the runtime gives it no code.
-/// No status at all means the stream broke.
+/// How an exec ended, from the `Status` the kubelet sends on the stream's error channel: `Success`,
+/// or `Failure` with reason `NonZeroExitCode` and the code in a cause of reason `ExitCode`
+/// [kubelet-remotecommand]. Any other failure is the runtime's, which gives a missing command no
+/// code. No status at all means the stream broke.
 ///
 /// [kubelet-remotecommand]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/kubelet/pkg/cri/streaming/remotecommand/httpstream.go
 pub(crate) fn exit_status(status: Option<Status>) -> ExitStatus {
@@ -661,9 +659,13 @@ impl Cluster for UserClient {
                 .into_iter()
                 .map(|(k, v)| (k, v.0))
                 .collect();
-            for (k, v) in secret.string_data.unwrap_or_default() {
-                values.insert(k, v.into_bytes());
-            }
+            values.extend(
+                secret
+                    .string_data
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(k, v)| (k, v.into_bytes())),
+            );
             Ok(values)
         })
     }

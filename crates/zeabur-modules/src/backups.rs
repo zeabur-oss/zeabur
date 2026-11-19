@@ -224,15 +224,14 @@ pub const VOLUME_WITHOUT_BACKUP: &str = "volume-without-backup";
 /// The id of the rule for databases no schedule covers.
 pub const DATABASE_WITHOUT_BACKUP: &str = "database-without-backup";
 
-/// The rules `volume-without-backup` and `database-without-backup`: claims and databases no
-/// active schedule covers ([`unscheduled`]).
+/// The rules `volume-without-backup` and `database-without-backup`: claims and databases no active
+/// schedule covers ([`unscheduled`]).
 ///
-/// A database is a warning: it is the data a project cannot rebuild, and its operator backs it
-/// up natively (CloudNativePG's `ScheduledBackup` [cnpg-backup]). A claim is advice: many hold
-/// caches or data that can be rebuilt. Each fix names a form that asks for the bucket and ends in
-/// a plan: the database's backups (`backups.scheduledBackup`); for a claim, its volume's K8up
-/// backups when K8up is installed (`backups.k8upSchedule`) [k8up-schedule], else the cluster's
-/// Velero schedule when Velero is (`backups.veleroSchedule`) [velero-fs], else installing K8up.
+/// A database is a warning, as its data cannot be rebuilt and its operator backs it up natively
+/// [cnpg-backup]; a claim is advice, as many hold rebuildable data. Each fix ends in a plan: the
+/// database's backups (`backups.scheduledBackup`), or for a claim its K8up backups when K8up is
+/// installed (`backups.k8upSchedule`) [k8up-schedule], else Velero's (`backups.veleroSchedule`)
+/// [velero-fs], else installing K8up.
 ///
 /// [cnpg-backup]: https://cloudnative-pg.io/documentation/current/backup/
 /// [k8up-schedule]: https://docs.k8up.io/k8up/references/schedule-specification.html

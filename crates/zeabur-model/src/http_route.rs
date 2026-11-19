@@ -161,13 +161,11 @@ impl ParentReference {
         })
     }
 
-    /// Whether `other`, a status entry's `parentRef`, is this parent of the spec: the same
-    /// group, kind, namespace and name once the defaults are filled in, and exactly the same
-    /// `sectionName` and `port`, set or not. A status entry's `parentRef` "corresponds with a
-    /// `ParentRef` in the spec" [gateway-routeparentstatus], and an unset `sectionName` is not a
-    /// wildcard: "When unspecified (empty string), this will reference the entire resource"
-    /// [gateway-parentreference]. So an entry left from `sectionName: https` is not the entry
-    /// for the whole Gateway the spec now names.
+    /// Whether `other`, a status entry's `parentRef`, is this parent of the spec: the same group,
+    /// kind, namespace and name once the defaults are filled in, and exactly the same `sectionName`
+    /// and `port`, set or not. A status entry's `parentRef` "corresponds with a `ParentRef` in the
+    /// spec" [gateway-routeparentstatus], and an unset `sectionName` "will reference the entire
+    /// resource" [gateway-parentreference], not any section.
     ///
     /// [gateway-routeparentstatus]: https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#routeparentstatus
     /// [gateway-parentreference]: https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#parentreference

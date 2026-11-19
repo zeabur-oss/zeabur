@@ -236,12 +236,13 @@ fn entry(input: &TraceInput<'_>, ingress: &Ingress) -> Vec<String> {
         return own;
     }
     let class = class_of(ingress);
-    let mut out = BTreeSet::new();
-    for other in &input.snapshot.ingresses {
-        if class_of(other) == class {
-            out.extend(load_balancer(other));
-        }
-    }
+    let out: BTreeSet<String> = input
+        .snapshot
+        .ingresses
+        .iter()
+        .filter(|other| class_of(other) == class)
+        .flat_map(load_balancer)
+        .collect();
     out.into_iter().collect()
 }
 

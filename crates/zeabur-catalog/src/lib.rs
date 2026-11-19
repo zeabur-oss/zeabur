@@ -319,12 +319,10 @@ fn suggestion(components: &[Component], facts: &ClusterFacts) -> Suggestion {
 
 /// Each capability of the catalogue: existing (with the evidence) or not.
 ///
-/// Zeabur does not judge an existing installation against the catalogue's settings; it reports
-/// that one is there. A missing capability lists what could be installed, and whether the
-/// catalogue recommends it for a cluster of this shape (profile and distribution) or keeps it
-/// optional, so a small cluster is not told to install everything. A probe the
-/// person may not run finds nothing, so a capability can look missing to someone who cannot see
-/// it; [`ClusterFacts::unreadable`] tells the interface to say so.
+/// Zeabur reports that an installation is there, without judging it against the catalogue's
+/// settings. A missing capability lists what could be installed, and whether the catalogue
+/// recommends it for a cluster of this shape or keeps it optional. A probe the person may not run
+/// finds nothing, so [`ClusterFacts::unreadable`] tells the interface to say so.
 #[must_use]
 pub fn detect(components: &[Component], facts: &ClusterFacts) -> Vec<Capability> {
     let mut capabilities: BTreeMap<String, Capability> = BTreeMap::new();
@@ -377,28 +375,26 @@ fn crds(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
 
 /// Everything else in `facts` that matches `detection`: what goes away with the component.
 fn running(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
-    let mut found = Vec::new();
-    for service in detection
+    let mut found: Vec<String> = detection
         .api_services
         .iter()
         .filter(|s| facts.api_services.contains(*s))
-    {
-        found.push(format!("APIService {service}"));
-    }
-    for controller in detection
-        .gateway_controllers
-        .iter()
-        .filter(|c| facts.gateway_controllers.contains(*c))
-    {
-        found.push(format!("GatewayClass controller {controller}"));
-    }
-    for controller in detection
-        .ingress_controllers
-        .iter()
-        .filter(|c| facts.ingress_controllers.contains(*c))
-    {
-        found.push(format!("IngressClass controller {controller}"));
-    }
+        .map(|service| format!("APIService {service}"))
+        .collect();
+    found.extend(
+        detection
+            .gateway_controllers
+            .iter()
+            .filter(|c| facts.gateway_controllers.contains(*c))
+            .map(|controller| format!("GatewayClass controller {controller}")),
+    );
+    found.extend(
+        detection
+            .ingress_controllers
+            .iter()
+            .filter(|c| facts.ingress_controllers.contains(*c))
+            .map(|controller| format!("IngressClass controller {controller}")),
+    );
     for chart in &detection.helm_charts {
         // Release Secrets are never decoded, so the chart behind a release is unknown. A chart
         // is recognised by a release named after it (as `helm install <chart> <repo>/<chart>`
@@ -421,22 +417,26 @@ fn running(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
             found.push(format!("Helm chart {chart}"));
         }
     }
-    for addon in detection.addons_on("k3s") {
-        if facts
-            .k3s_helm_charts
-            .contains_key(&format!("kube-system/{addon}"))
-        {
-            found.push(format!("k3s add-on {addon}"));
-        }
-    }
-    for addon in detection.addons_on("rke2") {
-        if facts
-            .rke2_packaged_charts
-            .contains_key(&format!("kube-system/{addon}"))
-        {
-            found.push(format!("RKE2 add-on {addon}"));
-        }
-    }
+    found.extend(
+        detection
+            .addons_on("k3s")
+            .filter(|addon| {
+                facts
+                    .k3s_helm_charts
+                    .contains_key(&format!("kube-system/{addon}"))
+            })
+            .map(|addon| format!("k3s add-on {addon}")),
+    );
+    found.extend(
+        detection
+            .addons_on("rke2")
+            .filter(|addon| {
+                facts
+                    .rke2_packaged_charts
+                    .contains_key(&format!("kube-system/{addon}"))
+            })
+            .map(|addon| format!("RKE2 add-on {addon}")),
+    );
     for wanted in &detection.workloads {
         if facts.workload_labels.iter().any(|(kind, labels)| {
             *kind == wanted.kind

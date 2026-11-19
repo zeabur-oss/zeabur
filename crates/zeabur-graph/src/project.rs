@@ -42,13 +42,12 @@ pub fn provenance(meta: &ObjectMeta) -> Provenance {
 
 /// One namespace as a project.
 ///
-/// A service per workload with its containers; every Kubernetes Service and Ingress that reaches
-/// a workload, once, which the services name; and every ConfigMap, Secret, PVC, Service and
-/// Ingress with the workloads it belongs to.
+/// A service per workload with its containers, every Kubernetes Service
+/// and Ingress that reaches a workload (once, which the services name), and every ConfigMap,
+/// Secret, PVC, Service and Ingress with the workloads it belongs to.
 ///
-/// The references between workloads and resources ([`crate::relations`]) decide who owns what,
-/// but are not part of the project: the same edges are in the services' endpoint and route
-/// names, their containers' variables and mounts, and each resource's owners.
+/// The references between workloads and resources ([`crate::relations`]) decide who owns what, but
+/// are not part of the project.
 #[must_use]
 pub fn project(snapshot: &Snapshot) -> Project {
     project_with(snapshot, &Conventions::ZEABUR)

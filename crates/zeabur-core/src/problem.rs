@@ -85,33 +85,29 @@ pub enum Kind {
     /// [k8s-quota]: https://kubernetes.io/docs/concepts/policy/resource-quotas/
     QuotaExceeded,
     /// The person may make the change, but a policy in the cluster refused it: an admission
-    /// webhook, a `LimitRange`, Pod Security admission or another admission plugin
-    /// [k8s-admission]. Zeabur's own refinement of [`Kind::Forbidden`], with the same `403`;
-    /// `why` quotes the policy's own words. A webhook's denial arrives as `403`, or as `400` when
-    /// the webhook gave no status code of `400` or more [k8s-webhook-errors]; both are this
-    /// kind.
+    /// webhook, a `LimitRange`, Pod Security admission or another admission plugin [k8s-admission].
+    /// Zeabur's own refinement of [`Kind::Forbidden`], with the same `403`; `why` quotes the
+    /// policy's own words. A webhook's denial can also arrive as `400` [k8s-webhook-errors]; both
+    /// are this kind.
     ///
     /// [k8s-admission]: https://kubernetes.io/docs/reference/access-authn-authz/admission-controllers/
     /// [k8s-webhook-errors]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/admission/plugin/webhook/errors/statuserror.go
     PolicyDenied,
     /// The object does not exist.
     NotFound,
-    /// The container log asked for cannot be read: the container has not started, has not
-    /// restarted (for the previous run), or is gone from the node; which one travels in
+    /// The container log asked for cannot be read: the container has not started or restarted (for
+    /// the previous run), or is gone from the node; which one travels in
     /// [`Problem::unavailable_log`]. Zeabur's own refinement of [`Kind::NotFound`], with the same
-    /// `404`: the request is well-formed, but the log has no current representation (RFC 9110,
-    /// §15.5.5) [rfc9110], although kube-apiserver passes the kubelet's refusal on as
-    /// `400 BadRequest`.
+    /// `404` (RFC 9110, §15.5.5) [rfc9110], although kube-apiserver passes the kubelet's refusal on
+    /// as `400`.
     ///
     /// [rfc9110]: https://www.rfc-editor.org/rfc/rfc9110
     LogUnavailable,
     /// The object changed, or someone else owns the field.
     Conflict,
-    /// Helm, Argo CD or Flux manages the object or owns the field, and would undo the change
-    /// (named in [`Problem::managed_by`]). Zeabur's own refinement of [`Kind::Conflict`]: the
-    /// same `409`, since the request conflicts with who manages the object and the person can
-    /// resolve that and resubmit (RFC 9110, §15.5.10) [rfc9110]; its content is not at fault,
-    /// as `422` would say (§15.5.21). It has a type and title of its own because RFC 9457 keeps
+    /// Helm, Argo CD or Flux manages the object or owns the field, and would undo the change (named
+    /// in [`Problem::managed_by`]). Zeabur's own refinement of [`Kind::Conflict`], with the same
+    /// `409` (RFC 9110, §15.5.10) [rfc9110]. It has a type and title of its own, as RFC 9457 keeps
     /// a title the same for every occurrence of a type (§3.1.3) [rfc9457].
     ///
     /// [rfc9110]: https://www.rfc-editor.org/rfc/rfc9110
@@ -628,11 +624,11 @@ impl Problem {
         let params = &mut self.summary.params;
         params.insert("verb".to_owned(), denied.verb.clone());
         params.insert("resource".to_owned(), denied.resource.clone());
-        for (name, value) in [("name", &denied.name), ("namespace", &denied.namespace)] {
-            if let Some(value) = value {
-                params.insert(name.to_owned(), value.clone());
-            }
-        }
+        params.extend(
+            [("name", &denied.name), ("namespace", &denied.namespace)]
+                .into_iter()
+                .filter_map(|(name, value)| Some((name.to_owned(), value.clone()?))),
+        );
         self.denied = Some(denied);
     }
 

@@ -8,15 +8,12 @@ use zeabur_model::{Mount, MountCategory, NamespaceAttribution, ObjectRef, Origin
 use crate::snapshot::{ByName, Snapshot, name_of};
 use crate::workload::{Workload, find_container};
 
-/// The volume mounts of the container called `container`, in order; `None` when the workload
-/// has no such container.
+/// The volume mounts of the container called `container`, in order; `None` when the workload has no
+/// such container.
 ///
-/// Each mount is followed to its volume, and a claim on to its PVC, so size, access modes,
-/// storage class and status are shown in place. A StatefulSet's claim template has no volume in
-/// the pod template (the controller adds one per pod): it is described by the first ordinal's
-/// PVC once that exists, and by the template before then, and keeps the template's name as its
-/// claim name. A mount whose volume does not exist is kept, of kind `Unknown`, rather than
-/// dropped.
+/// Each mount is followed to its volume, and a claim on to its PVC. A StatefulSet's claim template
+/// has no volume in the pod template: it is described by the first ordinal's PVC once that exists,
+/// else by the template. A mount whose volume does not exist is kept, of kind `Unknown`.
 #[must_use]
 pub fn mounts(
     snapshot: &Snapshot,

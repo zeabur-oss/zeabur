@@ -284,26 +284,23 @@ pub(crate) enum Step {
 /// half-way leaves fewer rights, never more.
 pub(crate) fn steps(holder: &Holder, current: &[Binding], wanted: &[ProjectGrant]) -> Vec<Step> {
     let mine: Vec<&Binding> = current.iter().filter(|b| b.holder == *holder).collect();
-    let mut deletes = Vec::new();
-    let mut creates = Vec::new();
-    for binding in &mine {
-        let keep = wanted
-            .iter()
-            .any(|w| w.project == binding.project && Some(w.role) == binding.role);
-        if !keep {
-            deletes.push(Step::Delete((*binding).clone()));
-        }
-    }
-    for grant in wanted {
-        let held = mine
-            .iter()
-            .any(|b| b.project == grant.project && b.role == Some(grant.role));
-        if !held {
-            creates.push(Step::Create(grant.clone()));
-        }
-    }
-    deletes.extend(creates);
-    deletes
+    let deletes = mine
+        .iter()
+        .filter(|binding| {
+            !wanted
+                .iter()
+                .any(|w| w.project == binding.project && Some(w.role) == binding.role)
+        })
+        .map(|binding| Step::Delete((*binding).clone()));
+    let creates = wanted
+        .iter()
+        .filter(|grant| {
+            !mine
+                .iter()
+                .any(|b| b.project == grant.project && b.role == Some(grant.role))
+        })
+        .map(|grant| Step::Create(grant.clone()));
+    deletes.chain(creates).collect()
 }
 
 /// The wanted projects, checked: each a namespace name, each once.

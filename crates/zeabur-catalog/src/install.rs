@@ -834,22 +834,24 @@ impl<'a> Rendered<'a> {
             out.push_str(
                 "# Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).\n",
             );
-            for (input, key) in &inputs {
-                push(&mut out, format!("# {key}: {}\n", input.description.trim()));
-            }
+            out.extend(
+                inputs
+                    .iter()
+                    .map(|(input, key)| format!("# {key}: {}\n", input.description.trim())),
+            );
             push(
                 &mut out,
                 format!(
                     "apiVersion: v1\nkind: Secret\nmetadata:\n  name: {name}\n  namespace: {ns}\nstringData:\n"
                 ),
             );
-            for (input, key) in &inputs {
+            out.extend(inputs.iter().map(|(input, key)| {
                 let value = input.random().map_or_else(
                     || format!("<{}>", input.name),
                     |random| format!("<random: {random}>"),
                 );
-                push(&mut out, format!("  {key}: \"{value}\"\n"));
-            }
+                format!("  {key}: \"{value}\"\n")
+            }));
             out.push_str("---\n");
         }
         out

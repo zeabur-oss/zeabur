@@ -652,15 +652,16 @@ fn variables(
     }
     match spec.get("environment") {
         Some(Value::Object(map)) => {
-            for (name, value) in map {
-                pairs.push((name.clone(), scalar(value).unwrap_or_default()));
-            }
+            pairs.extend(
+                map.iter()
+                    .map(|(name, value)| (name.clone(), scalar(value).unwrap_or_default())),
+            );
         }
         Some(Value::Array(items)) => {
-            for item in items.iter().filter_map(scalar) {
+            pairs.extend(items.iter().filter_map(scalar).map(|item| {
                 let (name, value) = item.split_once('=').unwrap_or((&item, ""));
-                pairs.push((name.to_owned(), value.to_owned()));
-            }
+                (name.to_owned(), value.to_owned())
+            }));
         }
         _ => {}
     }
@@ -830,11 +831,12 @@ fn mark_shared_volumes(out: &mut [ComposeService], services: &Map<String, Value>
         *users.entry(volume.clone()).or_default() += 1;
     }
     for (service, volumes) in out.iter_mut().zip(named) {
-        for volume in volumes {
-            if users.get(&volume).is_some_and(|n| *n > 1) {
-                service.findings.push(Finding::SharedVolume { volume });
-            }
-        }
+        service.findings.extend(
+            volumes
+                .into_iter()
+                .filter(|volume| users.get(volume).is_some_and(|n| *n > 1))
+                .map(|volume| Finding::SharedVolume { volume }),
+        );
     }
 }
 
