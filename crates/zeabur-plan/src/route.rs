@@ -55,27 +55,27 @@ impl RouteKind {
     /// The hostnames of `object`, in order.
     pub(crate) fn hosts(self, object: &Value) -> Vec<String> {
         match self {
-            Self::Ingress => ingress(object)
+            Self::Ingress => read_ingress(object)
                 .spec
                 .into_iter()
                 .flat_map(|s| s.rules.into_iter().flatten())
                 .filter_map(|r| r.host)
                 .collect(),
-            Self::HttpRoute => http_route(object).spec.hostnames,
+            Self::HttpRoute => read_http_route(object).spec.hostnames,
         }
     }
 
     /// The names of the Services `object` sends to.
     pub(crate) fn services(self, object: &Value) -> BTreeSet<String> {
         match self {
-            Self::Ingress => ingress(object)
+            Self::Ingress => read_ingress(object)
                 .spec
                 .into_iter()
                 .flat_map(|s| s.rules.into_iter().flatten())
                 .flat_map(|r| r.http.into_iter().flat_map(|h| h.paths))
                 .filter_map(|p| p.backend.service.map(|s| s.name))
                 .collect(),
-            Self::HttpRoute => http_route(object)
+            Self::HttpRoute => read_http_route(object)
                 .spec
                 .rules
                 .into_iter()
@@ -92,14 +92,14 @@ impl RouteKind {
     pub(crate) fn is_last_host(self, object: &Value, hostname: &str) -> bool {
         match self {
             Self::Ingress => {
-                let spec = ingress(object).spec.unwrap_or_default();
+                let spec = read_ingress(object).spec.unwrap_or_default();
                 let rules = spec.rules.unwrap_or_default();
                 !rules.is_empty()
                     && rules.iter().all(|r| r.host.as_deref() == Some(hostname))
                     && spec.default_backend.is_none()
             }
             Self::HttpRoute => {
-                matches!(http_route(object).spec.hostnames.as_slice(), [only] if only == hostname)
+                matches!(read_http_route(object).spec.hostnames.as_slice(), [only] if only == hostname)
             }
         }
     }
@@ -113,13 +113,13 @@ impl RouteKind {
             Self::HttpRoute => "/spec/hostnames",
         };
         let hosts: Vec<Option<String>> = match self {
-            Self::Ingress => ingress(object)
+            Self::Ingress => read_ingress(object)
                 .spec
                 .into_iter()
                 .flat_map(|s| s.rules.into_iter().flatten())
                 .map(|r| r.host)
                 .collect(),
-            Self::HttpRoute => http_route(object)
+            Self::HttpRoute => read_http_route(object)
                 .spec
                 .hostnames
                 .into_iter()
@@ -150,7 +150,7 @@ impl RouteKind {
         let mut operations = Vec::new();
         match self {
             Self::Ingress => {
-                let rules = ingress(object)
+                let rules = read_ingress(object)
                     .spec
                     .unwrap_or_default()
                     .rules
@@ -173,7 +173,7 @@ impl RouteKind {
                 }
             }
             Self::HttpRoute => {
-                let hostnames = http_route(object).spec.hostnames;
+                let hostnames = read_http_route(object).spec.hostnames;
                 if let Some(at) = hostnames.iter().position(|v| v == hostname) {
                     operations.push(test(&format!("/spec/hostnames/{at}"), json!(hostname)));
                     operations.push(remove(&format!("/spec/hostnames/{at}")));
@@ -187,7 +187,7 @@ impl RouteKind {
 /// Each `tls` entry of Ingress `object` that lists `hostname`: the entry's index, the host's index
 /// in it, and whether it is the entry's only host.
 fn tls_hosts(object: &Value, hostname: &str) -> Vec<(usize, usize, bool)> {
-    let tls = ingress(object).spec.unwrap_or_default().tls;
+    let tls = read_ingress(object).spec.unwrap_or_default().tls;
     tls.iter()
         .flatten()
         .enumerate()
@@ -201,10 +201,10 @@ fn tls_hosts(object: &Value, hostname: &str) -> Vec<(usize, usize, bool)> {
         .collect()
 }
 
-fn ingress(object: &Value) -> Ingress {
+pub(crate) fn read_ingress(object: &Value) -> Ingress {
     serde_json::from_value(object.clone()).unwrap_or_default()
 }
 
-fn http_route(object: &Value) -> HttpRoute {
+pub(crate) fn read_http_route(object: &Value) -> HttpRoute {
     serde_json::from_value(object.clone()).unwrap_or_default()
 }

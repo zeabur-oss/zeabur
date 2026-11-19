@@ -28,8 +28,15 @@
 //! [traefik-priority]: https://doc.traefik.io/traefik/reference/routing-configuration/kubernetes/ingress/#annotations
 //! [gw-weight]: https://gateway-api.sigs.k8s.io/reference/spec/#httpbackendref
 
+use std::collections::BTreeMap;
+
 use k8s_openapi::api::core::v1::{ConfigMap, Service};
-use serde_json::{Map, Value, json};
+use k8s_openapi::api::networking::v1::{
+    HTTPIngressPath, HTTPIngressRuleValue, Ingress, IngressBackend, IngressRule,
+    IngressServiceBackend, IngressSpec, IngressTLS, ServiceBackendPort,
+};
+use serde_json::{Value, json};
+use zeabur_model::BackendRef;
 use zeabur_model::adapters::error_pages::{
     MAINTENANCE_PORT, PAGE_SERVER_LABEL, PAGES_PORT, PageServer, is_page_server, maintenance_of,
     page_server,
@@ -41,9 +48,11 @@ use crate::change::{Change, ErrorPageHtml, RouteKind, RouteRef, Target};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
+use crate::objects::{ErrorsService, MiddlewareSpec};
 use crate::plan::{
     ErrorKind, PlanError, Planner, array, error, http_route_target, ingress_target, to_json,
 };
+use crate::route::read_http_route;
 use crate::rules::route_name;
 
 /// The prefix of the Traefik annotations on an Ingress that set up its router.
@@ -96,12 +105,15 @@ fn given(pages: &ErrorPageHtml) -> Result<Vec<(&'static str, &str)>, PlanError> 
 }
 
 /// The `errors` middleware spec of an Ingress.
-pub(crate) fn errors_spec(server: &PageServer) -> Value {
-    json!({"errors": {
-        "status": ["502-504"],
-        "service": {"name": server.name, "port": server.pages},
-        "query": "/{status}.html",
-    }})
+pub(crate) fn errors_spec(server: &PageServer) -> MiddlewareSpec {
+    MiddlewareSpec::Errors {
+        status: vec!["502-504".to_owned()],
+        service: ErrorsService {
+            name: server.name.clone(),
+            port: server.pages,
+        },
+        query: "/{status}.html".to_owned(),
+    }
 }
 
 fn no_page_server() -> PlanError {
@@ -184,10 +196,6 @@ impl Planner<'_> {
         let requested = self
             .requested
             .iter()
-            .filter(|o| {
-                o.get("apiVersion").and_then(Value::as_str) == Some("v1")
-                    && o.get("kind").and_then(Value::as_str) == Some("Service")
-            })
             .filter_map(|o| serde_json::from_value::<Service>(o.clone()).ok());
         let labelled: Vec<Service> = self
             .input
@@ -262,7 +270,7 @@ impl Planner<'_> {
         }
         let server = self.page_server()?;
         if middleware.is_none() {
-            self.created_middleware(&name, owner_of(&meta).as_ref(), &errors_spec(&server));
+            self.created_middleware(&name, owner_of(&meta).as_ref(), errors_spec(&server))?;
         }
         if !listed {
             self.list(index, &name, false)?;
@@ -384,7 +392,7 @@ impl Planner<'_> {
                 format!("A route named {name} already exists."),
             ));
         }
-        let mut annotations: Map<String, Value> = meta
+        let mut annotations: BTreeMap<String, String> = meta
             .annotations
             .iter()
             .flatten()
@@ -393,49 +401,57 @@ impl Planner<'_> {
                     && key.as_str() != traefik::MIDDLEWARES_ANNOTATION
                     && key.as_str() != PRIORITY
             })
-            .map(|(key, value)| (key.clone(), json!(value)))
+            .map(|(key, value)| (key.clone(), value.clone()))
             .collect();
         annotations.insert(
             PRIORITY.to_owned(),
-            json!((self.host_priority(hostname) + 1).to_string()),
+            (self.host_priority(hostname) + 1).to_string(),
         );
-        let mut spec = json!({"rules": [{"host": hostname, "http": {"paths": [{
-            "path": "/",
-            "pathType": "Prefix",
-            "backend": {"service": {"name": server.name, "port": {"name": MAINTENANCE_PORT}}},
-        }]}}]});
-        if let Some(map) = spec.as_object_mut() {
-            if let Some(class) = object.pointer("/spec/ingressClassName") {
-                map.insert("ingressClassName".to_owned(), class.clone());
-            }
-            let tls = array(object, "/spec/tls").into_iter().find(|t| {
-                array(t, "/hosts")
-                    .iter()
-                    .any(|h| h.as_str() == Some(hostname))
+        let source: Ingress = serde_json::from_value(object.clone()).unwrap_or_default();
+        let source = source.spec.unwrap_or_default();
+        let tls = source
+            .tls
+            .into_iter()
+            .flatten()
+            .find(|t| t.hosts.iter().flatten().any(|h| h == hostname))
+            .map(|t| IngressTLS {
+                hosts: Some(vec![hostname.to_owned()]),
+                secret_name: t.secret_name,
             });
-            if let Some(tls) = tls {
-                let mut entry = json!({"hosts": [hostname]});
-                if let (Some(secret), Some(entry)) = (tls.get("secretName"), entry.as_object_mut())
-                {
-                    entry.insert("secretName".to_owned(), secret.clone());
-                }
-                map.insert("tls".to_owned(), json!([entry]));
-            }
-        }
+        let rule = IngressRule {
+            host: Some(hostname.to_owned()),
+            http: Some(HTTPIngressRuleValue {
+                paths: vec![HTTPIngressPath {
+                    path: Some("/".to_owned()),
+                    path_type: "Prefix".to_owned(),
+                    backend: IngressBackend {
+                        service: Some(IngressServiceBackend {
+                            name: server.name.clone(),
+                            port: Some(ServiceBackendPort {
+                                name: Some(MAINTENANCE_PORT.to_owned()),
+                                number: None,
+                            }),
+                        }),
+                        resource: None,
+                    },
+                }],
+            }),
+        };
         let mut metadata = self.owned_metadata(&name, Some(&owner));
-        if let Some(map) = metadata.as_object_mut() {
-            map.insert("annotations".to_owned(), Value::Object(annotations));
-        }
+        metadata.annotations = Some(annotations);
         self.created(
             ingress_target(&name),
-            json!({
-                "apiVersion": "networking.k8s.io/v1",
-                "kind": "Ingress",
-                "metadata": metadata,
-                "spec": spec,
-            }),
-        );
-        Ok(())
+            &Ingress {
+                metadata,
+                spec: Some(IngressSpec {
+                    ingress_class_name: source.ingress_class_name,
+                    rules: Some(vec![rule]),
+                    tls: tls.map(|t| vec![t]),
+                    ..IngressSpec::default()
+                }),
+                ..Ingress::default()
+            },
+        )
     }
 
     /// The highest Traefik priority of the project's Ingress routers that match `hostname`.
@@ -476,15 +492,12 @@ impl Planner<'_> {
         server: &PageServer,
     ) -> Result<(), PlanError> {
         let mut operations = Vec::new();
-        for (r, rule) in array(object, "/spec/rules").iter().enumerate() {
-            let refs = array(rule, "/backendRefs");
+        for (r, rule) in read_http_route(object).spec.rules.iter().enumerate() {
+            let refs = &rule.backend_refs;
             if refs.is_empty() {
                 continue;
             }
-            if refs
-                .iter()
-                .any(|b| b.get("weight").is_some_and(|w| *w != json!(1)))
-            {
+            if refs.iter().any(|b| b.weight.is_some_and(|w| w != 1)) {
                 return Err(error(
                     ErrorKind::Conflict,
                     "weighted_backends",
@@ -495,9 +508,9 @@ impl Planner<'_> {
             }
             for (b, backend) in refs.iter().enumerate() {
                 let path = format!("/spec/rules/{r}/backendRefs/{b}/weight");
-                match backend.get("weight") {
+                match backend.weight {
                     Some(weight) => {
-                        operations.extend([test(&path, weight.clone()), replace(&path, json!(0))]);
+                        operations.extend([test(&path, json!(weight)), replace(&path, json!(0))]);
                     }
                     None => operations.push(add(&path, json!(0))),
                 }
@@ -529,14 +542,19 @@ impl Planner<'_> {
     ) -> Result<(), PlanError> {
         let mut operations = Vec::new();
         let mut removals = Vec::new();
-        for (r, rule) in array(object, "/spec/rules").iter().enumerate() {
-            let refs = array(rule, "/backendRefs");
-            let page = page_refs(&refs, server);
+        let raw_rules = array(object, "/spec/rules");
+        for (r, rule) in read_http_route(object).spec.rules.iter().enumerate() {
+            let refs = &rule.backend_refs;
+            let raw_refs = raw_rules
+                .get(r)
+                .map(|rule| array(rule, "/backendRefs"))
+                .unwrap_or_default();
+            let page = page_refs(refs, server);
             for (b, backend) in refs.iter().enumerate() {
                 let path = format!("/spec/rules/{r}/backendRefs/{b}");
                 if page.contains(&b) {
-                    removals.push((path, backend.clone()));
-                } else if !page.is_empty() && backend.get("weight") == Some(&json!(0)) {
+                    removals.push((path, raw_refs.get(b).cloned().unwrap_or_default()));
+                } else if !page.is_empty() && backend.weight == Some(0) {
                     let path = format!("{path}/weight");
                     operations.extend([test(&path, json!(0)), replace(&path, json!(1))]);
                 }
@@ -582,15 +600,17 @@ fn rule_length(host: &str, path: Option<&str>, path_type: &str) -> u64 {
 
 /// Whether a rule of `HTTPRoute` `object` sends to the maintenance port of `server`.
 pub(crate) fn shows_maintenance(object: &Value, server: Option<&PageServer>) -> bool {
-    array(object, "/spec/rules")
+    read_http_route(object)
+        .spec
+        .rules
         .iter()
-        .any(|rule| !page_refs(&array(rule, "/backendRefs"), server).is_empty())
+        .any(|rule| !page_refs(&rule.backend_refs, server).is_empty())
 }
 
 /// The indexes of the `backendRefs` among `refs` that send to the maintenance port of `server`.
 /// Without a page server, it is the one of weight 1 next to others of weight 0.
-fn page_refs(refs: &[Value], server: Option<&PageServer>) -> Vec<usize> {
-    let weight = |b: &Value| b.get("weight").and_then(Value::as_i64).unwrap_or(1);
+fn page_refs(refs: &[BackendRef], server: Option<&PageServer>) -> Vec<usize> {
+    let weight = |b: &BackendRef| b.weight.unwrap_or(1);
     refs.iter()
         .enumerate()
         .filter(|(b, backend)| {
@@ -603,11 +623,7 @@ fn page_refs(refs: &[Value], server: Option<&PageServer>) -> Vec<usize> {
                             .enumerate()
                             .all(|(o, other)| o == *b || weight(other) == 0)
                 },
-                |server| {
-                    backend.get("name").and_then(Value::as_str) == Some(server.name.as_str())
-                        && backend.get("port").and_then(Value::as_i64)
-                            == Some(i64::from(server.maintenance))
-                },
+                |server| backend.name == server.name && backend.port == Some(server.maintenance),
             )
         })
         .map(|(b, _)| b)

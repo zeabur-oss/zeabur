@@ -23,9 +23,13 @@
 //! [le-challenges]: https://letsencrypt.org/docs/challenge-types/
 //! [k8s-tls]: https://kubernetes.io/docs/concepts/configuration/secret/#tls-secrets
 
-use base64::Engine as _;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use serde_json::{Map, Value, json};
+use std::collections::BTreeMap;
+
+use k8s_openapi::ByteString;
+use k8s_openapi::api::core::v1::Secret;
+use k8s_openapi::api::networking::v1::{Ingress, IngressRule, IngressSpec, IngressTLS};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
+use serde_json::{Value, json};
 use zeabur_model::adapters::traefik;
 
 use crate::access::{meta_of, owner_of};
@@ -35,7 +39,8 @@ use crate::edit::LAST_APPLIED;
 use crate::error_pages::errors_spec;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
-use crate::plan::{ErrorKind, PlanError, Planner, Working, array, error, ingress_target, to_json};
+use crate::plan::{ErrorKind, PlanError, Planner, Working, error, ingress_target, to_json};
+use crate::route::read_ingress;
 use crate::rules::route_name;
 
 pub(crate) const CLUSTER_ISSUER: &str = "cert-manager.io/cluster-issuer";
@@ -92,11 +97,11 @@ pub fn own_secret_name(ingress: &str, hostname: &str) -> String {
 }
 
 /// The Secret cert-manager fills for `hostname`: `<ingress>-tls` while no other entry names it.
-pub(crate) fn issued_secret_name(ingress: &str, hostname: &str, tls: &[Value]) -> String {
+pub(crate) fn issued_secret_name(ingress: &str, hostname: &str, tls: &[IngressTLS]) -> String {
     let first = format!("{ingress}-tls");
     let taken = tls.iter().any(|t| {
-        t.get("secretName").and_then(Value::as_str) == Some(first.as_str())
-            && !array(t, "/hosts").iter().all(|h| h == hostname)
+        t.secret_name.as_deref() == Some(first.as_str())
+            && !t.hosts.iter().flatten().all(|h| h == hostname)
     });
     if !taken {
         return first;
@@ -123,41 +128,47 @@ fn certificates() -> ResourceRef {
     }
 }
 
-/// The `tls` entry that lists `hostname`.
-fn listed(tls: &[Value], hostname: &str) -> Option<Value> {
-    tls.iter()
-        .find(|t| array(t, "/hosts").iter().any(|h| h == hostname))
-        .cloned()
+/// The `tls` entries of Ingress `object`.
+pub(crate) fn tls_of(object: &Value) -> Vec<IngressTLS> {
+    read_ingress(object)
+        .spec
+        .unwrap_or_default()
+        .tls
+        .unwrap_or_default()
 }
 
-fn secret_of(entry: &Value) -> Option<String> {
-    entry
-        .get("secretName")
-        .and_then(Value::as_str)
-        .map(str::to_owned)
+/// The `tls` entry that lists `hostname`.
+fn listed<'a>(tls: &'a [IngressTLS], hostname: &str) -> Option<&'a IngressTLS> {
+    tls.iter()
+        .find(|t| t.hosts.iter().flatten().any(|h| h == hostname))
 }
 
 /// `tls` with `hostname` in an entry of its own that names `secret`.
-fn with_own_entry(tls: &[Value], hostname: &str, secret: &str) -> Vec<Value> {
-    let mut entries: Vec<Value> = tls
+fn with_own_entry(tls: &[IngressTLS], hostname: &str, secret: &str) -> Vec<IngressTLS> {
+    let mut entries: Vec<IngressTLS> = tls
         .iter()
         .filter_map(|entry| {
-            let hosts = array(entry, "/hosts");
-            if !hosts.iter().any(|h| h == hostname) {
+            let Some(hosts) = entry
+                .hosts
+                .as_ref()
+                .filter(|h| h.contains(&hostname.to_owned()))
+            else {
                 return Some(entry.clone());
-            }
-            let rest: Vec<Value> = hosts.into_iter().filter(|h| h != hostname).collect();
+            };
+            let rest: Vec<String> = hosts.iter().filter(|h| *h != hostname).cloned().collect();
             if rest.is_empty() {
                 return None;
             }
-            let mut entry = entry.clone();
-            if let Some(map) = entry.as_object_mut() {
-                map.insert("hosts".to_owned(), Value::Array(rest));
-            }
-            Some(entry)
+            Some(IngressTLS {
+                hosts: Some(rest),
+                ..entry.clone()
+            })
         })
         .collect();
-    entries.push(json!({"hosts": [hostname], "secretName": secret}));
+    entries.push(IngressTLS {
+        hosts: Some(vec![hostname.to_owned()]),
+        secret_name: Some(secret.to_owned()),
+    });
     entries
 }
 
@@ -211,7 +222,7 @@ fn moved_ingress(
     name: &str,
     hostname: &str,
     pages: Option<&str>,
-) -> Value {
+) -> Ingress {
     let meta = meta_of(from);
     let ingress = meta.name.as_deref().unwrap_or_default();
     let made = [
@@ -238,51 +249,37 @@ fn moved_ingress(
             middlewares.join(","),
         );
     }
-    let rules: Vec<Value> = array(from, "/spec/rules")
+    let source = read_ingress(from).spec.unwrap_or_default();
+    let rules: Vec<IngressRule> = source
+        .rules
         .into_iter()
-        .filter(|r| r.get("host").and_then(Value::as_str) == Some(hostname))
+        .flatten()
+        .filter(|r| r.host.as_deref() == Some(hostname))
         .collect();
-    let mut body = json!({
-        "apiVersion": "networking.k8s.io/v1",
-        "kind": "Ingress",
-        "metadata": {"name": name, "namespace": namespace},
-        "spec": {"rules": rules},
-    });
-    let fields = [
-        ("/metadata", "labels", meta.labels.map(|l| json!(l))),
-        (
-            "/metadata",
-            "annotations",
-            (!annotations.is_empty()).then(|| json!(annotations)),
-        ),
-        (
-            "/spec",
-            "ingressClassName",
-            from.pointer("/spec/ingressClassName").cloned(),
-        ),
-    ];
-    for (at, key, value) in fields {
-        if let (Some(value), Some(map)) =
-            (value, body.pointer_mut(at).and_then(Value::as_object_mut))
-        {
-            map.insert(key.to_owned(), value);
-        }
+    Ingress {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            labels: meta.labels,
+            annotations: (!annotations.is_empty()).then_some(annotations),
+            ..ObjectMeta::default()
+        },
+        spec: Some(IngressSpec {
+            rules: Some(rules),
+            ingress_class_name: source.ingress_class_name,
+            ..IngressSpec::default()
+        }),
+        ..Ingress::default()
     }
-    body
 }
 
 /// The Secret the `tls` entry of `hostname` names.
 fn listed_secret(object: &Value, hostname: &str) -> Option<String> {
-    listed(&array(object, "/spec/tls"), hostname)
-        .as_ref()
-        .and_then(secret_of)
+    listed(&tls_of(object), hostname).and_then(|t| t.secret_name.clone())
 }
 
 fn rule_hosts(object: &Value) -> Vec<String> {
-    array(object, "/spec/rules")
-        .iter()
-        .filter_map(|r| r.get("host").and_then(Value::as_str).map(str::to_owned))
-        .collect()
+    RouteKind::Ingress.hosts(object)
 }
 
 #[expect(
@@ -399,15 +396,15 @@ impl Planner<'_> {
         let ingress = route.name.as_str();
         let in_maintenance = self.maintenance_ingress(ingress, hostname).is_some();
         refuse_move(&meta, ingress, hostname, in_maintenance)?;
-        let services = array(&current, "/spec/rules")
-            .iter()
-            .filter(|r| r.get("host").and_then(Value::as_str) == Some(hostname))
-            .flat_map(|r| array(r, "/http/paths"))
-            .filter_map(|p| {
-                p.pointer("/backend/service/name")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned)
-            })
+        let services = read_ingress(&current)
+            .spec
+            .unwrap_or_default()
+            .rules
+            .into_iter()
+            .flatten()
+            .filter(|r| r.host.as_deref() == Some(hostname))
+            .flat_map(|r| r.http.into_iter().flat_map(|h| h.paths))
+            .filter_map(|p| p.backend.service.map(|s| s.name))
             .collect();
         let name = self.own_route_name(&services, ingress, hostname)?;
         let pages = traefik::middlewares(&meta)
@@ -415,7 +412,7 @@ impl Planner<'_> {
             .then(|| traefik::error_pages_name(&name));
         if let Some(pages) = &pages {
             let spec = errors_spec(&self.page_server()?);
-            self.created_middleware(pages, None, &spec);
+            self.created_middleware(pages, None, spec)?;
         }
         let namespace = self.input.snapshot.namespace.clone();
         let body = moved_ingress(&current, &namespace, &name, hostname, pages.as_deref());
@@ -424,7 +421,7 @@ impl Planner<'_> {
         if let Some(issued) = issued {
             self.delete_issued(&issued, ingress);
         }
-        self.created(ingress_target(&name), body);
+        self.created(ingress_target(&name), &body)?;
         self.warnings.push(Warning::DomainMoved {
             hostname: hostname.to_owned(),
             from: ObjectName::of("Ingress", ingress),
@@ -443,15 +440,12 @@ impl Planner<'_> {
         issuer: &str,
     ) -> Result<(), PlanError> {
         let current = self.current(index);
-        let annotations = current
-            .pointer("/metadata/annotations")
-            .and_then(Value::as_object)
-            .cloned();
-        let tls = array(&current, "/spec/tls");
+        let annotations = meta_of(&current).annotations;
+        let tls = tls_of(&current);
         let own = own_secret_name(ingress, hostname);
         let mut operations = self.annotate(index, annotations.as_ref(), Some(issuer))?;
         let entry = listed(&tls, hostname);
-        let replaced = entry.as_ref().and_then(secret_of).as_deref() == Some(own.as_str());
+        let replaced = entry.and_then(|t| t.secret_name.as_deref()) == Some(own.as_str());
         if entry.is_none() || replaced {
             let entries =
                 with_own_entry(&tls, hostname, &issued_secret_name(ingress, hostname, &tls));
@@ -462,11 +456,11 @@ impl Planner<'_> {
         if replaced && self.input.snapshot.secret(&own).is_some() {
             self.delete(&secrets(), &own, None)?;
         }
-        let others: Vec<String> = array(&current, "/spec/tls")
+        let others: Vec<String> = tls
             .iter()
-            .flat_map(|t| array(t, "/hosts"))
-            .filter_map(|h| h.as_str().map(str::to_owned))
-            .filter(|h| h != hostname)
+            .flat_map(|t| t.hosts.iter().flatten())
+            .filter(|h| *h != hostname)
+            .cloned()
             .collect();
         if changed && !others.is_empty() {
             self.warnings.push(Warning::IssuerShared {
@@ -491,10 +485,7 @@ impl Planner<'_> {
     ) -> Result<(), PlanError> {
         let checked = self.checked(hostname)?;
         let current = self.current(index);
-        let annotations = current
-            .pointer("/metadata/annotations")
-            .and_then(Value::as_object)
-            .cloned();
+        let annotations = meta_of(&current).annotations;
         let named = annotations
             .as_ref()
             .is_some_and(|a| a.contains_key(CLUSTER_ISSUER) || a.contains_key(ISSUER));
@@ -513,9 +504,9 @@ impl Planner<'_> {
                 ),
             ));
         }
-        let tls = array(&current, "/spec/tls");
+        let tls = tls_of(&current);
         let secret = own_secret_name(ingress, hostname);
-        let previous = listed(&tls, hostname).as_ref().and_then(secret_of);
+        let previous = listed(&tls, hostname).and_then(|t| t.secret_name.clone());
         let mut operations = self.annotate(index, annotations.as_ref(), None)?;
         if previous.as_deref() != Some(secret.as_str()) {
             operations.extend(self.set_tls(
@@ -541,7 +532,7 @@ impl Planner<'_> {
     fn annotate(
         &mut self,
         index: usize,
-        annotations: Option<&Map<String, Value>>,
+        annotations: Option<&BTreeMap<String, String>>,
         issuer: Option<&str>,
     ) -> Result<Vec<Value>, PlanError> {
         let mut operations = Vec::new();
@@ -549,7 +540,7 @@ impl Planner<'_> {
         for key in [CLUSTER_ISSUER, ISSUER] {
             let wanted = (key == CLUSTER_ISSUER).then_some(issuer).flatten();
             let before = now(key);
-            if before.as_ref().and_then(Value::as_str) == wanted {
+            if before.as_deref() == wanted {
                 continue;
             }
             self.claim(
@@ -564,9 +555,11 @@ impl Planner<'_> {
             let path = pointer(&["metadata", "annotations", key]);
             match (before, wanted) {
                 (Some(before), Some(wanted)) => {
-                    operations.extend([test(&path, before), replace(&path, json!(wanted))]);
+                    operations.extend([test(&path, json!(before)), replace(&path, json!(wanted))]);
                 }
-                (Some(before), None) => operations.extend([test(&path, before), remove(&path)]),
+                (Some(before), None) => {
+                    operations.extend([test(&path, json!(before)), remove(&path)]);
+                }
                 (None, Some(wanted)) if annotations.is_some() => {
                     operations.push(add(&path, json!(wanted)));
                 }
@@ -583,15 +576,16 @@ impl Planner<'_> {
         &mut self,
         index: usize,
         current: &Value,
-        entries: &[Value],
+        entries: &[IngressTLS],
     ) -> Result<Vec<Value>, PlanError> {
         self.claim(index, &[Step::field("spec"), Step::field("tls")], "tls")?;
+        let entries = to_json(&entries)?;
         Ok(current.pointer("/spec/tls").map_or_else(
-            || vec![add("/spec/tls", json!(entries))],
+            || vec![add("/spec/tls", entries.clone())],
             |before| {
                 vec![
                     test("/spec/tls", before.clone()),
-                    replace("/spec/tls", json!(entries)),
+                    replace("/spec/tls", entries.clone()),
                 ]
             },
         ))
@@ -601,24 +595,30 @@ impl Planner<'_> {
     fn own_secret(
         &mut self,
         name: &str,
-        owner: Option<&Value>,
+        owner: Option<&OwnerReference>,
         checked: &CheckedCertificate,
     ) -> Result<(), PlanError> {
-        let encode = |text: &str| base64::engine::general_purpose::STANDARD.encode(text);
-        let data =
-            json!({"tls.crt": encode(&checked.certificate), "tls.key": encode(&checked.key)});
+        let data = BTreeMap::from([
+            (
+                "tls.crt".to_owned(),
+                ByteString(checked.certificate.clone().into_bytes()),
+            ),
+            (
+                "tls.key".to_owned(),
+                ByteString(checked.key.clone().into_bytes()),
+            ),
+        ]);
         let Some(existing) = self.input.snapshot.secret(name) else {
-            self.created(
-                Target::of::<k8s_openapi::api::core::v1::Secret>(name),
-                json!({
-                    "apiVersion": "v1",
-                    "kind": "Secret",
-                    "metadata": self.owned_metadata(name, owner),
-                    "type": "kubernetes.io/tls",
-                    "data": data,
-                }),
+            let metadata = self.owned_metadata(name, owner);
+            return self.created(
+                Target::of::<Secret>(name),
+                &Secret {
+                    metadata,
+                    type_: Some("kubernetes.io/tls".to_owned()),
+                    data: Some(data),
+                    ..Secret::default()
+                },
             );
-            return Ok(());
         };
         if existing.type_.as_deref() != Some("kubernetes.io/tls") {
             return Err(error(
@@ -628,11 +628,8 @@ impl Planner<'_> {
             ));
         }
         let object = to_json(existing)?;
-        let index = self.working(
-            Target::of::<k8s_openapi::api::core::v1::Secret>(name),
-            object,
-        );
-        self.patch(index, vec![add("/data", data)])
+        let index = self.working(Target::of::<Secret>(name), object);
+        self.patch(index, vec![add("/data", to_json(&data)?)])
     }
 
     /// Deletes the `Certificate` cert-manager made for Secret `secret` of Ingress `ingress`, if
@@ -644,12 +641,11 @@ impl Planner<'_> {
         let issued = self.input.objects.iter().find(|f| {
             f.resource == resource
                 && f.name == secret
-                && array(&f.object, "/metadata/ownerReferences")
+                && meta_of(&f.object)
+                    .owner_references
                     .iter()
-                    .any(|o| {
-                        o.get("kind").and_then(Value::as_str) == Some("Ingress")
-                            && o.get("name").and_then(Value::as_str) == Some(ingress)
-                    })
+                    .flatten()
+                    .any(|o| o.kind == "Ingress" && o.name == ingress)
         });
         let Some(issued) = issued else {
             return;

@@ -82,6 +82,15 @@ pub fn project_namespace(
     name: &str,
     display_name: Option<&str>,
     level: PodSecurityLevel,
+) -> Value {
+    serde_json::to_value(new_namespace(conventions, name, display_name, level)).unwrap_or_default()
+}
+
+fn new_namespace(
+    conventions: &Conventions,
+    name: &str,
+    display_name: Option<&str>,
+    level: PodSecurityLevel,
 ) -> Namespace {
     let level = level.as_str();
     let labels = BTreeMap::from([
@@ -180,7 +189,7 @@ impl Planner<'_> {
             "display_name",
             "display name",
         )?;
-        let namespace = to_json(&project_namespace(
+        let namespace = to_json(&new_namespace(
             conventions,
             &name,
             display_name,

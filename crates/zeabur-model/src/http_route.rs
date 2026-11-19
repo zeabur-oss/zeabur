@@ -67,6 +67,8 @@ pub struct BackendRef {
     pub name: String,
     /// The object's namespace; absent is the route's own.
     pub namespace: Option<String>,
+    /// The port of the Service it sends to.
+    pub port: Option<i32>,
     /// Its share of the rule's requests; absent is 1, and 0 forwards none
     /// (<https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#httpbackendref>).
     pub weight: Option<i32>,
@@ -321,6 +323,7 @@ mod tests {
                             kind: kind.map(str::to_owned),
                             name: (*name).to_owned(),
                             namespace: namespace.map(str::to_owned),
+                            port: None,
                             weight: None,
                         })
                         .collect(),
