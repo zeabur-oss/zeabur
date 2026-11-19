@@ -216,11 +216,19 @@ fn refused(detail: &str) -> ApiError {
 /// Whether [`open`] makes the key pair.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum KeyPair {
-    /// For a plan: the Secret holds no key, and its values are hidden anyway.
+    /// For a plan: the Secret holds [`PLANNED_KEY`] in place of a key, and its values are hidden
+    /// anyway.
     Hidden,
     /// For an apply: a new key pair.
     New,
 }
+
+/// What a planned Secret holds in place of the private key. Kubernetes refuses an
+/// `kubernetes.io/ssh-auth` Secret with an empty `ssh-privatekey` [k8s-ssh-auth], and the plan's
+/// dry run sends it.
+///
+/// [k8s-ssh-auth]: https://github.com/kubernetes/kubernetes/blob/v1.34.0/pkg/apis/core/validation/validation.go#L7407-L7411
+const PLANNED_KEY: &str = "<made at apply>";
 
 /// `request` with each `deployKey` change turned into the `create` of its Secret; the request as
 /// it is when it has none.
@@ -256,7 +264,7 @@ pub(crate) fn open(
             let host = host.trim().to_ascii_lowercase();
             let (lines, _) = trusted(&host, known_hosts.as_deref())?;
             let private = match pair {
-                KeyPair::Hidden => String::new(),
+                KeyPair::Hidden => PLANNED_KEY.to_owned(),
                 KeyPair::New => {
                     zeabur_core::ssh::deploy_key(&format!("zeabur {project}"))
                         .map_err(random)?
@@ -308,6 +316,22 @@ mod tests {
         );
         assert_eq!(split_port("git.example.com:x"), None);
         assert_eq!(split_port("2001:db8::1"), None);
+    }
+
+    #[test]
+    fn a_planned_secret_holds_a_key_kubernetes_accepts() {
+        let request = PlanRequest {
+            changes: vec![Change::DeployKey {
+                name: "web-git".to_owned(),
+                host: "github.com".to_owned(),
+                known_hosts: None,
+            }],
+        };
+        let planned = open("shop", &request, KeyPair::Hidden).unwrap();
+        let [Change::Create { object, .. }] = planned.changes.as_slice() else {
+            panic!("{:?}", planned.changes);
+        };
+        assert_eq!(object["stringData"]["ssh-privatekey"], PLANNED_KEY);
     }
 
     #[test]
