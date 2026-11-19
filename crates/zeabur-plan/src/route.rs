@@ -6,12 +6,14 @@
 
 use std::collections::BTreeSet;
 
+use k8s_openapi::api::networking::v1::Ingress;
 use serde_json::{Value, json};
+use zeabur_model::HttpRoute;
 
 use crate::change::{RouteKind, Target};
 use crate::checks::ResourceRef;
 use crate::json::{remove, replace, test};
-use crate::plan::{array, http_route_target, ingress_target};
+use crate::plan::{http_route_target, ingress_target};
 
 impl RouteKind {
     /// The kind as Kubernetes names it.
@@ -52,32 +54,34 @@ impl RouteKind {
 
     /// The hostnames of `object`, in order.
     pub(crate) fn hosts(self, object: &Value) -> Vec<String> {
-        let values = match self {
-            Self::Ingress => array(object, "/spec/rules")
-                .iter()
-                .filter_map(|r| r.get("host").cloned())
+        match self {
+            Self::Ingress => ingress(object)
+                .spec
+                .into_iter()
+                .flat_map(|s| s.rules.into_iter().flatten())
+                .filter_map(|r| r.host)
                 .collect(),
-            Self::HttpRoute => array(object, "/spec/hostnames"),
-        };
-        values
-            .iter()
-            .filter_map(|v| v.as_str().map(str::to_owned))
-            .collect()
+            Self::HttpRoute => http_route(object).spec.hostnames,
+        }
     }
 
     /// The names of the Services `object` sends to.
     pub(crate) fn services(self, object: &Value) -> BTreeSet<String> {
-        let name = |v: &Value, at: &str| v.pointer(at).and_then(Value::as_str).map(str::to_owned);
         match self {
-            Self::Ingress => array(object, "/spec/rules")
-                .iter()
-                .flat_map(|r| array(r, "/http/paths"))
-                .filter_map(|p| name(&p, "/backend/service/name"))
+            Self::Ingress => ingress(object)
+                .spec
+                .into_iter()
+                .flat_map(|s| s.rules.into_iter().flatten())
+                .flat_map(|r| r.http.into_iter().flat_map(|h| h.paths))
+                .filter_map(|p| p.backend.service.map(|s| s.name))
                 .collect(),
-            Self::HttpRoute => array(object, "/spec/rules")
-                .iter()
-                .flat_map(|r| array(r, "/backendRefs"))
-                .filter_map(|b| name(&b, "/name"))
+            Self::HttpRoute => http_route(object)
+                .spec
+                .rules
+                .into_iter()
+                .flat_map(|r| r.backend_refs)
+                .map(|b| b.name)
+                .filter(|name| !name.is_empty())
                 .collect(),
         }
     }
@@ -86,18 +90,16 @@ impl RouteKind {
     /// that has no default backend, or an `HTTPRoute` with only this hostname. Without it the
     /// Ingress would be invalid and the `HTTPRoute` would answer every host.
     pub(crate) fn is_last_host(self, object: &Value, hostname: &str) -> bool {
-        let host = Some(hostname);
         match self {
             Self::Ingress => {
-                let rules = array(object, "/spec/rules");
+                let spec = ingress(object).spec.unwrap_or_default();
+                let rules = spec.rules.unwrap_or_default();
                 !rules.is_empty()
-                    && rules
-                        .iter()
-                        .all(|r| r.get("host").and_then(Value::as_str) == host)
-                    && object.pointer("/spec/defaultBackend").is_none()
+                    && rules.iter().all(|r| r.host.as_deref() == Some(hostname))
+                    && spec.default_backend.is_none()
             }
             Self::HttpRoute => {
-                matches!(array(object, "/spec/hostnames").as_slice(), [only] if only.as_str() == host)
+                matches!(http_route(object).spec.hostnames.as_slice(), [only] if only == hostname)
             }
         }
     }
@@ -110,12 +112,26 @@ impl RouteKind {
             Self::Ingress => "/spec/rules",
             Self::HttpRoute => "/spec/hostnames",
         };
-        for (at, entry) in array(object, field).iter().enumerate() {
-            let (host, path) = match self {
-                Self::Ingress => (entry.get("host"), format!("{field}/{at}/host")),
-                Self::HttpRoute => (Some(entry), format!("{field}/{at}")),
-            };
-            if host.and_then(Value::as_str) == Some(from) {
+        let hosts: Vec<Option<String>> = match self {
+            Self::Ingress => ingress(object)
+                .spec
+                .into_iter()
+                .flat_map(|s| s.rules.into_iter().flatten())
+                .map(|r| r.host)
+                .collect(),
+            Self::HttpRoute => http_route(object)
+                .spec
+                .hostnames
+                .into_iter()
+                .map(Some)
+                .collect(),
+        };
+        for (at, host) in hosts.iter().enumerate() {
+            if host.as_deref() == Some(from) {
+                let path = match self {
+                    Self::Ingress => format!("{field}/{at}/host"),
+                    Self::HttpRoute => format!("{field}/{at}"),
+                };
                 operations.push(test(&path, json!(from)));
                 operations.push(replace(&path, json!(to)));
             }
@@ -134,8 +150,13 @@ impl RouteKind {
         let mut operations = Vec::new();
         match self {
             Self::Ingress => {
-                for (at, rule) in array(object, "/spec/rules").iter().enumerate().rev() {
-                    if rule.get("host").and_then(Value::as_str) == Some(hostname) {
+                let rules = ingress(object)
+                    .spec
+                    .unwrap_or_default()
+                    .rules
+                    .unwrap_or_default();
+                for (at, rule) in rules.iter().enumerate().rev() {
+                    if rule.host.as_deref() == Some(hostname) {
                         operations.push(test(&format!("/spec/rules/{at}/host"), json!(hostname)));
                         operations.push(remove(&format!("/spec/rules/{at}")));
                     }
@@ -152,8 +173,8 @@ impl RouteKind {
                 }
             }
             Self::HttpRoute => {
-                let hostnames = array(object, "/spec/hostnames");
-                if let Some(at) = hostnames.iter().position(|v| v.as_str() == Some(hostname)) {
+                let hostnames = http_route(object).spec.hostnames;
+                if let Some(at) = hostnames.iter().position(|v| v == hostname) {
                     operations.push(test(&format!("/spec/hostnames/{at}"), json!(hostname)));
                     operations.push(remove(&format!("/spec/hostnames/{at}")));
                 }
@@ -166,15 +187,24 @@ impl RouteKind {
 /// Each `tls` entry of Ingress `object` that lists `hostname`: the entry's index, the host's index
 /// in it, and whether it is the entry's only host.
 fn tls_hosts(object: &Value, hostname: &str) -> Vec<(usize, usize, bool)> {
-    array(object, "/spec/tls")
-        .iter()
+    let tls = ingress(object).spec.unwrap_or_default().tls;
+    tls.iter()
+        .flatten()
         .enumerate()
         .filter_map(|(at, tls)| {
-            let hosts = array(tls, "/hosts");
+            let hosts = tls.hosts.as_deref().unwrap_or_default();
             hosts
                 .iter()
-                .position(|v| v.as_str() == Some(hostname))
+                .position(|v| v == hostname)
                 .map(|h| (at, h, hosts.len() == 1))
         })
         .collect()
+}
+
+fn ingress(object: &Value) -> Ingress {
+    serde_json::from_value(object.clone()).unwrap_or_default()
+}
+
+fn http_route(object: &Value) -> HttpRoute {
+    serde_json::from_value(object.clone()).unwrap_or_default()
 }
