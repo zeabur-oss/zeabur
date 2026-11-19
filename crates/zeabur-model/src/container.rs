@@ -198,9 +198,12 @@ pub struct EnvVar {
 
 /// A variable's ConfigMap or Secret was written after the oldest running pod started.
 ///
-/// That pod may still hold the old value, as a container reads its variables once, when it starts
-/// [k8s-configmap-env]. `managedFields` keep one time per field manager [k8s-ssa-fields], so a
-/// manager that later wrote another key also counts: the pod *may* hold an old value.
+/// That pod may still hold the old value: a container reads its variables once, when it starts
+/// [k8s-configmap-env].
+///
+/// `managedFields` keep one time per field manager [k8s-ssa-fields], the time of its last write
+/// to any field it owns, so a manager owning this key that later wrote another key also counts:
+/// the pod *may* hold an old value, a restart settles it.
 ///
 /// [k8s-configmap-env]: https://kubernetes.io/docs/concepts/configuration/configmap/#configmaps-and-pods
 /// [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
