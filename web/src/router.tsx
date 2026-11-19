@@ -15,7 +15,9 @@ import {
   clusterBackupsQuery,
   notificationsQuery,
   clusterQuery,
+  clusterNameQuery,
   clusterWarningsQuery,
+  creatableQuery,
   databasesQuery,
   objectStorageQuery,
   eventsQuery,
@@ -24,11 +26,15 @@ import {
   projectGapsQuery,
   projectIncidentsQuery,
   projectQuery,
+  metricsStoreQuery,
+  objectsQuery,
   projectsQuery,
   queryClient,
   recentWarningsQuery,
   rolloutQuery,
+  signInSettingQuery,
   upgradesQuery,
+  whoamiQuery,
 } from "@/api/queries"
 import { isUnreachable } from "@/api/client"
 import { accountQuery, membersQuery } from "@/api/members"
@@ -172,12 +178,16 @@ const projectRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/project/page"), "ProjectPage"),
 })
 
-// Objects reads a dozen or so kinds when it opens and more on demand, so its loader does not wait
-// for them: the page shows its own loading state, and reads only while it is open.
+// Objects reads a dozen or so kinds when it opens and more on demand, so its loader starts the
+// first read without waiting for it: the page shows its own loading state, and reads only while
+// it is open.
 const objectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/objects",
   validateSearch: objectsSearch,
+  loader: ({ params }) => {
+    ensure(objectsQuery(params.project)).catch(() => undefined)
+  },
   remountDeps: ({ params }) => params.project,
   component: lazyRouteComponent(() => import("@/routes/project/objects"), "ObjectsPage"),
 })
@@ -185,6 +195,7 @@ const objectsRoute = createRoute({
 const createObjectsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/projects/$project/create",
+  loader: ({ params }) => load(ensure(creatableQuery(params.project))),
   remountDeps: ({ params }) => params.project,
   component: lazyRouteComponent(() => import("@/routes/project/create"), "CreatePage"),
 })
@@ -247,6 +258,15 @@ const objectStorageRoute = createRoute({
 const settingsRoute = createRoute({
   getParentRoute: () => rootRoute,
   path: "/settings",
+  loader: () =>
+    load(
+      ensure(whoamiQuery),
+      ensure(capabilitiesQuery),
+      ensure(clusterQuery),
+      ensure(clusterNameQuery),
+      ensure(signInSettingQuery),
+      ensure(metricsStoreQuery),
+    ),
   component: lazyRouteComponent(() => import("@/routes/settings"), "SettingsPage"),
 })
 

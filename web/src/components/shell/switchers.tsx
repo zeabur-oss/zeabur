@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
-import { useNavigate } from "@tanstack/react-router"
+import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 import CaretUpDownIcon from "~icons/ph/caret-up-down"
 import CheckIcon from "~icons/ph/check"
@@ -25,7 +25,6 @@ const optionClass =
 
 export function ProjectSwitcher({ current }: { current: string }) {
   const t = useT()
-  const navigate = useNavigate()
   const projects = useQuery(projectsQuery)
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState("")
@@ -55,12 +54,10 @@ export function ProjectSwitcher({ current }: { current: string }) {
         <ul className="flex max-h-72 flex-col overflow-y-auto py-1">
           {items.map((p) => (
             <li key={p.name}>
-              <button
-                type="button"
-                onClick={() => {
-                  setOpen(false)
-                  void navigate({ to: "/projects/$project", params: { project: p.name } })
-                }}
+              <Link
+                to="/projects/$project"
+                params={{ project: p.name }}
+                onClick={() => setOpen(false)}
                 className={cn(optionClass, "h-8")}
               >
                 <ProjectGlyph icon={p.icon} className="size-3.5" />
@@ -79,7 +76,7 @@ export function ProjectSwitcher({ current }: { current: string }) {
                 {p.name === current ? (
                   <CheckIcon className="ml-auto size-3.5" aria-hidden="true" />
                 ) : null}
-              </button>
+              </Link>
             </li>
           ))}
         </ul>
