@@ -254,6 +254,23 @@ test("backup-attach", async ({ page, shot }) => {
   await expect(page.locator('[data-slot="dialog-content"] button:text-is("YAML")')).toBeVisible()
   await shot({ clip: '[data-slot="dialog-content"]' })
 })
+// The certificate and the redirect or password panels of one domain (docs/zh-TW/configure/domains.mdx).
+test("domain-cert", async ({ page, shot }) => {
+  await page.goto("/projects/shop/services/Deployment/web?tab=networking", {
+    waitUntil: "networkidle",
+  })
+  await expect(page.locator('[data-testid="domain-cert"]').first()).toBeEnabled()
+  await page.locator('[data-testid="domain-cert"]').first().click()
+  await shot({ clip: '[data-slot="dialog-content"]' })
+})
+test("domain-access", async ({ page, shot }) => {
+  await page.goto("/projects/shop/services/Deployment/web?tab=networking", {
+    waitUntil: "networkidle",
+  })
+  await expect(page.locator('[data-testid="domain-access"]').first()).toBeEnabled()
+  await page.locator('[data-testid="domain-access"]').first().click()
+  await shot({ clip: '[data-slot="dialog-content"]' })
+})
 // Maintenance mode of one domain (docs/zh-TW/configure/maintenance.mdx).
 test("domain-pages-open", async ({ page, shot }) => {
   await page.goto("/projects/shop/services/Deployment/web?tab=networking", {
@@ -319,6 +336,38 @@ test("project-new-review", async ({ page, shot }) => {
   await page.locator('[data-slot="dialog-content"] button[type="submit"]').click()
   await expect(page.locator('[data-slot="dialog-content"] button:text-is("YAML")')).toBeVisible()
   await shot({ clip: '[data-slot="dialog-content"]:has(button:text-is("YAML"))' })
+})
+// A project's settings and shared variables (docs/zh-TW/configure/projects.mdx, variables.mdx).
+test("project-details", async ({ page, shot }) => {
+  await page.goto("/projects/shop/settings", { waitUntil: "networkidle" })
+  await expect(page.locator("#details")).toBeVisible()
+  await shot({ clip: "#details" })
+})
+test("project-network", async ({ page, shot }) => {
+  await page.goto("/projects/shop/settings", { waitUntil: "networkidle" })
+  await expect(page.locator("#network")).toBeVisible()
+  await shot({ clip: "#network" })
+})
+test("shared-variables-add", async ({ page, shot }) => {
+  await page.goto("/projects/shop/settings", { waitUntil: "networkidle" })
+  await expect(page.locator('[data-testid="shared-add"]')).toBeVisible()
+  await page.locator('[data-testid="shared-add"]').click()
+  await expect(page.locator('[data-slot="dialog-content"] input').first()).toBeVisible()
+  await page.locator('[data-slot="dialog-content"] input').first().fill("app-config")
+  await page
+    .locator('[data-slot="dialog-content"] textarea')
+    .first()
+    .fill("APP_URL=https://app.example.com\nLOG_LEVEL=info")
+  await shot({ clip: '[data-slot="dialog-content"]' })
+})
+test("shared-variables-use", async ({ page, shot }) => {
+  await page.goto("/projects/shop/services/Deployment/web?tab=variables", {
+    waitUntil: "networkidle",
+  })
+  await expect(page.locator('[data-testid="use-shared"]')).toBeVisible()
+  await page.locator('[data-testid="use-shared"]').click()
+  await expect(page.locator('[data-slot="dialog-content"]')).toBeVisible()
+  await shot({ clip: '[data-slot="dialog-content"]' })
 })
 test("image-form", async ({ page, shot }) => {
   await page.goto("/projects/edge", { waitUntil: "networkidle" })
@@ -444,6 +493,19 @@ test("variables-edit", async ({ page, shot }) => {
   await expect(page.locator('main [data-slot="tabs-content"] input').first()).toBeVisible()
   await shot({ clip: 'main [data-slot="tabs-content"]' })
 })
+test("variables-review", async ({ page, shot }) => {
+  await page.goto("/projects/shop/services/Deployment/web?tab=variables", {
+    waitUntil: "networkidle",
+  })
+  await expect(page.locator('main [data-slot="section-header"]')).toBeVisible()
+  await page
+    .locator('main [data-slot="section-header"] [role="group"] ~ button:last-of-type')
+    .click()
+  await page.locator('main [data-slot="tabs-content"] input').nth(1).fill("staging")
+  await page.locator('[data-slot="draft-bar"] button:last-child').click()
+  await expect(page.locator('[data-slot="dialog-content"] [role="group"]')).toBeVisible()
+  await shot({ clip: '[data-slot="dialog-content"]' })
+})
 test("volume-add", async ({ page, shot }) => {
   await page.goto("/projects/shop/services/Deployment/web?tab=settings", {
     waitUntil: "networkidle",
@@ -540,6 +602,16 @@ test("service-compute", async ({ page, shot }) => {
   })
   await expect(page.locator("main h1")).toBeVisible()
   await shot({ clip: "section#compute" })
+})
+test("compute-review", async ({ page, shot }) => {
+  await page.goto("/projects/shop/services/Deployment/web?tab=settings", {
+    waitUntil: "networkidle",
+  })
+  await expect(page.locator("section#compute input").first()).toBeVisible()
+  await page.locator("section#compute input").first().fill("3")
+  await page.locator('[data-slot="draft-bar"] button:last-child').click()
+  await expect(page.locator('[data-slot="dialog-content"] [role="group"]')).toBeVisible()
+  await shot({ clip: '[data-slot="dialog-content"]' })
 })
 test("service-health", async ({ page, shot }) => {
   await page.goto("/projects/shop/services/Deployment/web?tab=settings", {

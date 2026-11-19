@@ -3,12 +3,32 @@ title: Adjust replicas, resources, and health checks
 description: Set a service's replica count, CPU and memory, health checks, startup command, and whether containers can run as root.
 ---
 
-If a service is slow, runs out of memory, or needs to restart unhealthy replicas automatically, open the service's **Settings** and adjust **Compute** and **Health checks**. Then select **Review changes** at the bottom of the page and apply the changes. **Security** controls whether containers can run as root. Selecting an option opens the review screen directly.
+When you finish this page, the service runs with the replica count, CPU, and memory you chose. Broken replicas restart on their own, and replicas that aren't ready get no traffic. All of these settings are on the service's **Settings** tab. After a change, select **Review changes** at the bottom of the page and apply it.
+
+A replica is one running copy of the service. More replicas can handle more requests at once, and the others take over when one breaks.
+
+## Tabs on a service page
+
+Open a service to see these tabs at the top:
+
+| Tab | What it's for |
+| --- | --- |
+| **Overview** | The service's current state, whether replicas are ready, and problems that need you. |
+| **Logs** | The service's log output. |
+| **Deployments** | A record of each change. Compare two versions or go back to an earlier one. |
+| **Builds** | Only for services built from Git or an uploaded folder. Lists each build. |
+| **Usage** | CPU, memory, and network usage. |
+| **Networking** | Public domains and the private network. |
+| **Variables** | Settings the service reads when it starts. |
+| **Files** | Browse and edit files inside a replica. |
+| **Settings** | Replicas, resources, health checks, disks, and security, which this page covers. |
+
+For how to use the tabs, see [View logs, events, and usage, and open a terminal](./logs-terminal.mdx), [Restart, roll back, and pause services](./restart-rollback.mdx), [Add public domains and HTTPS](./domains.mdx), and [Configure environment variables](./variables.mdx).
 
 ## Before you start
 
 - You need permission to edit the service. If Helm, Argo CD, or Flux manages the service, these fields are read-only. Make changes in the original values or Git repository.
-- All settings except the replica count are part of the Pod template. Changing them replaces replicas. Services with only one replica may be unavailable for a few seconds during replacement.
+- Changing any setting other than the replica count makes Zeabur replace all replicas with the new settings. A service with only one replica may be unavailable for a few seconds during replacement.
 
 ## Compute resources
 
@@ -26,10 +46,12 @@ Open the service's **Settings** → **Compute** and change **Replicas** (0 to 10
 
 Enter **Reserved CPU**, **Maximum CPU**, **Reserved memory**, and **Maximum memory**. For example, reserve 0.25 CPU cores and 256 MiB of memory, with a memory maximum of 512 MiB.
 
-- Reserved: The node sets aside this amount for each replica. The scheduler also uses this amount to find a node. Leave it blank to reserve nothing.
-- Maximum: Containers restart when memory usage exceeds the maximum. CPU usage is throttled at the maximum. Leave it blank to set no maximum.
+- Reserved: The cluster sets aside this amount for each replica and uses it to pick a machine with room. Leave it blank to reserve nothing.
+- Maximum: A container restarts when its memory goes over the maximum. It slows down when its CPU reaches the maximum. Leave it blank to set no maximum.
 
-Below the fields, the form shows the CPU cores and memory of the **largest node** in the cluster. If the reserved amount exceeds that node's resources, no node can schedule the replica.
+Below the fields, the form shows the CPU cores and memory of the **largest node** in the cluster. A node is one machine in the cluster. If the reserved amount is more than that, the replica fits on no machine.
+
+![Compute resources in service settings, showing the replica count, reserved and maximum CPU and memory, and the largest node's resources below](../images/shots/service-compute.avif)
 
 The **Size** you choose when creating a service from an image or Git sets the initial values for these fields:
 
@@ -39,25 +61,25 @@ The **Size** you choose when creating a service from an image or Git sets the in
 | Medium | 0.25 cores | 256 MiB | 512 MiB |
 | Large | 0.5 cores | 512 MiB | 1 GiB |
 
-![Compute resources in service settings, showing the replica count, reserved and maximum CPU and memory, and the largest node's resources below](../images/shots/service-compute.avif)
-
 </Step>
 <Step>
 
 ### Review and apply
 
-Select **Review changes** at the bottom of the page. The review screen shows changes to the replica count, whether each service will be interrupted, and whether the nodes have enough capacity. Review the changes, then apply them.
+Select **Review changes** at the bottom of the page. The review screen shows how the replica count changes, whether the service will be interrupted, and whether the machines have room. Review the changes, then apply them.
+
+![Review screen before changing web to 3 replicas](../images/shots/compute-review.avif)
 
 </Step>
 </Steps>
 
-A Job runs once. You can't change its resources under **Compute**; use YAML instead.
+You can't change a job that runs once (a Job) under **Compute**. Use YAML instead.
 
-Below **Compute**, there's also **Restart when its config files or secrets change**. See [Get new values into running services](./variables.mdx#let-running-services-read-the-new-values). This toggle is set on the workload itself and doesn't replace replicas.
+Below **Compute**, there's also **Restart when its config files or secrets change**. See [Get new values into running services](./variables.mdx#let-running-services-read-the-new-values). Turning it on or off doesn't replace replicas.
 
 ## Health checks
 
-Open the service's **Settings** → **Health checks** and configure each of the three checks separately:
+Health checks tell the cluster whether a replica is working. Open the service's **Settings** → **Health checks** and configure each of the three checks separately:
 
 | Check | Purpose |
 | --- | --- |
@@ -75,7 +97,7 @@ For each check, set **Check** to **None**, **HTTP GET**, **TCP**, or **Command**
 
 ![Health checks in service settings, with HTTP GET selected for the traffic check, the path set to /healthz, and separate restart and startup checks](../images/shots/service-health.avif)
 
-After making changes, select **Review changes** at the bottom of the page and apply them. Only scheduled jobs and Jobs have no health checks.
+After making changes, select **Review changes** at the bottom of the page and apply them. Scheduled jobs and jobs that run once (Jobs) have no health checks.
 
 <Callout type="warn">
 A failed restart check restarts the container. If the app takes a long time to start, configure a startup check first or increase the restart check's failure threshold. Otherwise, the cluster may keep restarting the container before the app finishes starting.
@@ -104,7 +126,23 @@ Open the service's **Settings** → **Security** and choose what containers can 
 
 Selecting an option opens the review screen directly. Review and apply the change to replace the replicas. When you create a service from an image, Zeabur selects an option based on the image's configured user: Strict for a numeric non-root user, or Compatible otherwise.
 
-If a service has settings beyond what Compatible permits, such as host access, this section shows **Unrestricted**. Use YAML to change those settings. If the project's Pod Security level is `restricted`, only Strict services can start. See [Adjust the Pod Security level](./projects.mdx#change-the-pod-security-level).
+If a service has settings beyond what Compatible permits, such as host access, this section shows **Unrestricted**. Use YAML to change those settings. If an administrator sets the project's security level (Pod Security) to `restricted`, only Strict services can start. See [Adjust the Pod Security level](./projects.mdx#change-the-pod-security-level).
+
+## Verify the result
+
+- **Compute** and **Health checks** show the current values. **Security** shows whether Strict or Compatible is selected.
+- **Overview** shows whether replicas are ready.
+- **Usage** charts reserved and maximum resources alongside actual usage.
+
+## Troubleshooting
+
+| What you see | What to do next |
+| --- | --- |
+| Replicas keep waiting to be scheduled after a resource change | The reserved amount exceeds the available capacity on every node. Lower the reserved amount or add nodes. |
+| Replicas keep restarting, and events show `OOMKilled` | Memory usage exceeds the maximum. Increase **Maximum memory**. |
+| Replicas keep restarting, and events show `Liveness probe failed` | Check the restart check's path and port, or add a startup check to give the app more time to start. |
+| Replicas never become ready | The traffic check hasn't passed. Check **Logs** and confirm that the app responds on the check's port. |
+| Replicas won't start after switching to Strict, and events show `container has runAsNonRoot and image will run as root` | The image runs as root. Switch back to Compatible or use an image that runs as a non-root user. |
 
 ## Do the same with kubectl
 
@@ -181,9 +219,7 @@ spec:
 
 The example above uses **Strict** settings. For **Compatible**, remove `runAsNonRoot: true` from the Pod and `capabilities.drop: [ALL]` from the container. Keep `seccompProfile` and `allowPrivilegeEscalation: false`.
 
-## Verify the result
-
-**Compute** and **Health checks** show the current values in the cluster. **Security** shows whether Strict or Compatible is selected. **Overview** shows whether replicas are ready. **Usage** charts reserved and maximum resources alongside actual usage.
+### Verify the settings
 
 ```sh
 kubectl -n demo get deployment web
@@ -192,13 +228,3 @@ kubectl -n demo describe pod -l app.kubernetes.io/name=web
 ```
 
 The `READY` column in `get deployment` shows a value such as `2/2`. Matching numbers mean all replicas have passed their traffic checks. `describe pod` lists the `Readiness`, `Liveness`, and `Startup` settings. When a check fails, `Events` shows `Unhealthy`.
-
-## Troubleshooting
-
-| What you see | What to do next |
-| --- | --- |
-| Replicas keep waiting to be scheduled after a resource change | The reserved amount exceeds the available capacity on every node. Lower the reserved amount or add nodes. |
-| Replicas keep restarting, and events show `OOMKilled` | Memory usage exceeds the maximum. Increase **Maximum memory**. |
-| Replicas keep restarting, and events show `Liveness probe failed` | Check the restart check's path and port, or add a startup check to give the app more time to start. |
-| Replicas never become ready | The traffic check hasn't passed. Check **Logs** and confirm that the app responds on the check's port. |
-| Replicas won't start after switching to Strict, and events show `container has runAsNonRoot and image will run as root` | The image runs as root. Switch back to Compatible or use an image that runs as a non-root user. |

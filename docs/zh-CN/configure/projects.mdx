@@ -3,12 +3,14 @@ title: 创建和管理项目
 description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目名称和图标，并控制其他项目能否连接进来。
 ---
 
-项目就是带有 `zeabur.com/project: "true"` 标签的 Kubernetes Namespace。在**项目**页点击**新建项目**创建项目，或将集群中已有的 Namespace 加入 Zeabur。项目的名称、描述、图标和网络隔离都在项目**设置**中修改。
+完成这一页后，**项目**页会多出一个项目，你可以在里面部署服务。项目把一组相关的服务放在一起，用法和 zeabur.com 的项目一样。项目的名称、描述、图标和网络隔离，都在项目的**设置**中修改。
+
+![一个项目放一组服务，每个服务可以有自己的域名](../images/diagrams/project.svg)
 
 ## 开始前
 
-- 创建项目需要有创建 Namespace 的权限。将已有的 Namespace 加入 Zeabur 或从中移除，需要该 Namespace 的 `zeabur-manage` 权限，通常只有管理员具备，见[项目 Namespace 的保护](../reference/permissions.mdx#项目-namespace-的保护)。
-- 项目名称也是 Namespace 名称，创建后不能修改。只能使用小写字母、数字和连字符，开头和结尾必须是字母或数字，最多 63 个字符，且不能以 `kube-` 开头。
+- 你需要有创建项目的权限。找不到**新建项目**时，请管理员帮你创建项目，再把你加进去。
+- 想好项目名称。名称只能使用小写字母、数字和连字符，开头和结尾必须是字母或数字，最多 63 个字符，也不能以 `kube-` 开头。
 
 ## 创建项目
 
@@ -17,68 +19,97 @@ description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目�
 
 ### 填写名称
 
-打开**项目**页，点击**新建项目**。在**名称**中填写 `hello`，**显示名称**可以留空；填写后，界面会用显示名称代替 Namespace 名称。
+打开**项目**页，点击**新建项目**。在**名称**中填写 `hello`。**显示名称**可以留空，填写后会代替名称显示在界面上。
 
 ![新建项目窗口，名称填为 hello](../images/shots/project-new.avif)
 
-同名的 Namespace 已经存在时，表单会提示你改用已有的 Namespace，做法见[下一节](#将已有的-namespace-加入-zeabur)。
+项目在集群中是一个 Namespace，也就是 Kubernetes 用来分开放置一组服务的空间。项目名称就是 Namespace 的名称，所以创建后不能修改。同名的 Namespace 已经存在时，表单会提示你改用它，做法见[下一节](#将已有的-namespace-加入-zeabur)。
 
 </Step>
 <Step>
 
 ### 检查并创建
 
-提交后，检查页面会列出要创建的对象：
+点击**检查变更**，页面会列出 Zeabur 要做的事：
 
-- Namespace `hello`，带有项目标签和三个 Pod Security 标签，级别均为 `baseline`。服务可以以 root 身份运行，但不能访问宿主机。
-- `default` ServiceAccount 设为 `automountServiceAccountToken: false`，未指定 ServiceAccount 的副本不会获得 Kubernetes API 的令牌。
-- 如果集群中有带 `zeabur.com/platform: "true"` 标签的 Namespace，还会创建 NetworkPolicy `zeabur-project`，阻止其他项目的副本连接进来。
+- 创建 `hello` Namespace，加上项目标签。安全级别设为 `baseline`：服务可以以 root 身份运行，但不能访问宿主机。
+- 没有另外设置的服务，拿不到连接 Kubernetes API 用的令牌。
+- 集群中有带 `zeabur.com/platform: "true"` 标签的 Namespace 时，还会[隔离这个项目](#隔离其他项目)，其他项目的服务连接不进来。
 
 ![创建项目 hello 前的确认页面，说明将创建的 Namespace 和安全配置](../images/shots/project-new-review.avif)
 
-确认后应用，界面会进入新项目。
+确认后点击**创建**，界面会进入新项目。
 
 </Step>
 </Steps>
 
 ## 将已有的 Namespace 加入 Zeabur
 
-**项目**页的**其他 Namespace** 会列出尚未作为项目的 Namespace。在对应行打开菜单，选择**使用这个 Namespace**，检查后应用。
+集群中已经有应用时，可以把它所在的 Namespace 变成项目，不用重新部署。这需要该 Namespace 的 `zeabur-manage` 权限，通常只有管理员具备，见[项目 Namespace 的保护](../reference/permissions.mdx#项目-namespace-的保护)。
 
-Zeabur 只会为 Namespace 添加 `zeabur.com/project: "true"` 标签，不会修改其中的对象、Pod Security 标签和 NetworkPolicy。
+1. 在**项目**页的**其他 Namespace** 中找到那个 Namespace。
 
-不想再在 Zeabur 中看到这个 Namespace 时，打开项目**设置**的**危险区域**，点击**从 Zeabur 移除**。这只会移除项目标签，Namespace 及其中的所有内容都会保留。要连同内容一起删除，见[删除项目](./delete-project.mdx)。
+   ![项目页的其他 Namespace 列出集群中尚未作为项目的 Namespace](../images/shots/existing-namespaces.avif)
+
+2. 在对应行打开菜单，选择**使用这个 Namespace**，检查后应用。
+
+Zeabur 只会为 Namespace 添加项目标签 `zeabur.com/project: "true"`。其中的服务、数据和安全配置都不会改变。
+
+不想再在 Zeabur 中看到它时，打开项目**设置**的**危险区域**，点击**从 Zeabur 移除**。这只会移除项目标签，Namespace 及其中的所有内容都会保留。要连同内容一起删除，见[删除项目](./delete-project.mdx)。
 
 ## 修改名称、描述和图标
 
-打开项目**设置**的**基本信息**：
+1. 打开项目**设置**的**基本信息**，修改这三项：
+   - **项目名称**：代替 Namespace 名称显示在界面上，最多 64 个字符。
+   - **描述**：项目的用途，显示在名称下方，最多 500 个字符。
+   - **图标**：点击**更换图标**，从 16 个图标中选择一个。
 
-- **项目名称**：代替 Namespace 名称显示，最多 64 个字符。
-- **描述**：说明项目用途，显示在名称下方，最多 500 个字符。
-- **图标**：点击**更换图标**，从 16 个图标中选择一个。
+   ![项目设置的基本信息，有项目名称、描述和图标](../images/shots/project-details.avif)
 
-点击**保存详细信息**，检查后应用。这三项保存在 Namespace 的 annotation 中。项目的开发者可以修改这三项，其他 label 和 annotation 只有管理员能修改。
+2. 点击**保存详细信息**，检查后应用。
+
+项目的开发者可以修改这三项。Namespace 上的其他标签和注解只有管理员能修改。
 
 ## 设置构建的内存和 CPU
 
-在项目**设置**的**构建**，可以设置这个项目每次构建最多能用的内存和 CPU，例如 `2Gi` 和 `2`。留空就用 Zeabur Builder 的默认值。填的数量不能超过集群里最大的节点能给的量。点**保存构建上限**并应用，之后开始的构建就会用新的值。
+构建因为内存不够而失败时，失败信息会链接到这一节。
 
-构建因为内存不够而失败时，失败信息会链接到这一节。改构建上限要有那个 Namespace 的 `patch` 和 `zeabur-manage` 权限，所以开发者看得到，但不能保存。
+1. 打开项目**设置**的**构建**，填写这个项目每次构建最多能用的内存和 CPU，例如 `2Gi` 和 `2`。留空就用 Zeabur Builder 的默认值。填写的数量不能超过集群中最大的节点能提供的量。节点就是集群中的一台服务器。
+2. 点击**保存构建上限**，检查后应用。之后开始的构建就会使用新的值。
 
-这两个值就是 Namespace 的 `builder.zeabur.com/build-memory` 和 `builder.zeabur.com/build-cpu` 注解。
+修改构建上限需要该 Namespace 的 `patch` 和 `zeabur-manage` 权限。开发者看得到这两个字段，但不能保存。
 
 ## 隔离其他项目
 
-打开项目**设置**的**网络**，**其他项目**一行会说明当前状态：
+隔离后，其他项目的服务就连接不到这个项目的服务。
 
-- **集群中的任何副本都能连接到这个项目的服务。**：尚未隔离。点击**隔离**，检查后应用，Zeabur 会创建 NetworkPolicy `zeabur-project`。
-- **无法连接到这个项目的服务。项目内的服务和 Zeabur 组件不受影响。**：已经隔离。
+1. 打开项目**设置**的**网络**，查看**其他项目**这一行：
+   - **集群中的任何副本都能连接到这个项目的服务。**：尚未隔离。
+   - **无法连接到这个项目的服务。项目内的服务和 Zeabur 组件不受影响。**：已经隔离。
 
-隔离后，项目内的副本仍能相互连接，带有 `zeabur.com/platform: "true"` 标签的 Namespace（例如 Traefik 和数据库 operator 所在的 Namespace）以及 `kube-system` 也能连接进来。
+   ![项目设置的网络，其他项目一行说明当前是否隔离](../images/shots/project-network.avif)
 
-要允许另一个项目连接进来，点击**允许其他项目连入**，选择项目，点击**允许**，检查后应用。Zeabur 会创建 NetworkPolicy `zeabur-allow-from-<那个项目>`，对方的所有副本都能连接到这个项目的所有服务。要取消，在对应行点击**移除**。
+2. 尚未隔离时，点击**隔离**，检查后应用。
 
-界面没有取消隔离的按钮，需要用 kubectl 删除 `zeabur-project`，见下一节。规则是否真正生效，取决于集群的网络插件（CNI）是否支持 NetworkPolicy。
+隔离后，项目内的服务仍能相互连接。Traefik、数据库 operator 这类 Zeabur 组件也能连接进来，因为它们所在的 Namespace 带有 `zeabur.com/platform: "true"` 标签，`kube-system` 也一样。
+
+要让另一个项目连接进来，点击**允许其他项目连入**，选择项目，点击**允许**，检查后应用。那个项目的所有服务就能连接到这个项目的所有服务。要取消，在对应行点击**移除**。
+
+界面上没有取消隔离的按钮，需要用 kubectl 处理，见页面最后的[隔离和允许其他项目](#隔离和允许其他项目)。隔离是否真正生效，取决于集群的网络插件（CNI）是否支持 NetworkPolicy。
+
+## 确认结果
+
+**项目**页会列出这个项目，并显示你设置的名称、描述和图标。项目**设置**的**网络**会显示当前是否隔离，以及哪些项目能连接进来。
+
+## 遇到问题
+
+| 界面或结果 | 处理方法 |
+| --- | --- |
+| **已经有同名的 Namespace，可以改用已有的 Namespace。** | 换一个名称，或在**其他 Namespace** 中将那个 Namespace 加入 Zeabur。 |
+| 加入或移除项目时，集群返回 **Only an admin can change the namespace's labels** | 只有管理员能修改 Namespace 的标签，请管理员操作。 |
+| **这是 Kubernetes 为自身组件保留的 Namespace，不能作为项目。** | 以 `kube-` 开头的 Namespace 和节点终端使用的 `zeabur-node-shell` 都不能作为项目。 |
+| 创建项目时，检查页面没有隔离这一项 | 集群中没有带 `zeabur.com/platform: "true"` 标签的 Namespace。Zeabur 无法判断 Ingress controller 在哪里，所以不隔离，以免公开域名打不开。Ingress controller 是把域名的流量转给服务的组件。请管理员为它所在的 Namespace 添加标签，再到**网络**点击**隔离**。 |
+| 隔离后公开域名无法打开 | Ingress controller 所在的 Namespace 没有 `zeabur.com/platform: "true"` 标签。为那个 Namespace 添加标签，或在 `zeabur-project` 中添加一条允许连入的规则。 |
 
 ## 用 kubectl 完成相同操作
 
@@ -119,6 +150,16 @@ automountServiceAccountToken: false
 kubectl label namespace demo zeabur.com/project=true
 kubectl label namespace demo zeabur.com/project-
 kubectl annotate namespace demo --overwrite zeabur.com/display-name='Demo shop'
+```
+
+项目名称、描述和图标保存在 Namespace 的 annotation 上。
+
+### 构建上限
+
+构建上限是 Namespace 的 `builder.zeabur.com/build-memory` 和 `builder.zeabur.com/build-cpu` 注解：
+
+```sh
+kubectl annotate namespace demo --overwrite builder.zeabur.com/build-memory=2Gi builder.zeabur.com/build-cpu=2
 ```
 
 ### 调整 Pod Security 级别
@@ -186,9 +227,7 @@ spec:
 kubectl -n demo delete networkpolicy zeabur-project
 ```
 
-## 确认结果
-
-**项目**页会列出这个项目，并显示你设置的名称、描述和图标。项目**设置**的**网络**会显示当前是否隔离，以及哪些项目能连接进来。
+### 确认设置
 
 ```sh
 kubectl get namespace demo --show-labels
@@ -198,13 +237,3 @@ kubectl -n demo get serviceaccount default -o jsonpath='{.automountServiceAccoun
 ```
 
 第一行的标签中包含 `zeabur.com/project=true` 和 `pod-security.kubernetes.io/enforce=baseline`。第二行列出所有项目。隔离后，第三行会列出 `zeabur-project`。最后一行输出 `false`。
-
-## 遇到问题
-
-| 界面或结果 | 处理方法 |
-| --- | --- |
-| **已经有同名的 Namespace，可以改用已有的 Namespace。** | 换一个名称，或在**其他 Namespace** 中将那个 Namespace 加入 Zeabur。 |
-| 加入或移除项目时，集群返回 **Only an admin can change the namespace's labels** | 只有管理员能修改 Namespace 的标签，请管理员操作。 |
-| **这是 Kubernetes 为自身组件保留的 Namespace，不能作为项目。** | 以 `kube-` 开头的 Namespace 和节点终端使用的 `zeabur-node-shell` 都不能作为项目。 |
-| 创建项目时没有列出 `zeabur-project` | 集群中没有带 `zeabur.com/platform: "true"` 标签的 Namespace，Zeabur 无法判断 Ingress controller 在哪里，因此不会创建。请管理员为这些 Namespace 添加标签，再到**网络**点击**隔离**。 |
-| 隔离后公开域名无法打开 | Ingress controller 所在的 Namespace 没有 `zeabur.com/platform: "true"` 标签。为那个 Namespace 添加标签，或在 `zeabur-project` 中添加一条允许连入的规则。 |

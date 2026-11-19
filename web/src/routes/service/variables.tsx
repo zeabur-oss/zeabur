@@ -1203,7 +1203,7 @@ function UseSharedEntry({
   return (
     <div>
       <GateTip gate={gate}>
-        <Button variant="outline" size="sm" onClick={() => setOpen(true)}>
+        <Button variant="outline" size="sm" data-testid="use-shared" onClick={() => setOpen(true)}>
           <StackIcon aria-hidden="true" data-icon="inline-start" />
           {t("useShared.open")}
         </Button>

@@ -93,7 +93,12 @@ export function SharedVariablesSection({ project }: { project: string }) {
           description={groups.length === 0 ? t("shared.noneHint") : undefined}
         >
           <GateTip gate={gate}>
-            <Button variant="outline" size="sm" onClick={() => setAdding(true)}>
+            <Button
+              variant="outline"
+              size="sm"
+              data-testid="shared-add"
+              onClick={() => setAdding(true)}
+            >
               <PlusIcon aria-hidden="true" data-icon="inline-start" />
               {t("shared.add")}
             </Button>

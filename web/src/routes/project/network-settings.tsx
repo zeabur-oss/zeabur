@@ -26,7 +26,7 @@ export function NetworkSettings({ project }: { project: string }) {
   const gate = useGates(project)("changeNetworkPolicies")
   if (!reach) return null
   return (
-    <section>
+    <section id="network">
       <SectionLabel>{t("network.title")}</SectionLabel>
       <Card variant="list">
         <CardRow

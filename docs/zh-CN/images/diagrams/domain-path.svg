@@ -1,0 +1,28 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 336" width="440" height="336" role="img"><title>访客的请求从浏览器经过域名和 HTTPS 证书，送到服务</title><style>
+.bg{fill:#FAFAFB;stroke:#E8E7EB;stroke-width:1}
+.grp{fill:rgba(255,255,255,.55);stroke:#E8E7EB;stroke-width:1}
+.card{fill:#FFFFFF;stroke:#D0CED4;stroke-width:1}
+.card.accent{stroke:#6300FF;stroke-width:1.5}
+.tag{fill:#FFFFFF;stroke:#D0CED4;stroke-width:1}
+.hit{fill:rgba(99,0,255,.07)}
+.line{fill:none;stroke:#D0CED4;stroke-width:1.5}
+.head{fill:#D0CED4}
+text{font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif}
+.t{font-size:14px;font-weight:600;fill:#18171B}
+.n{font-size:13px;fill:#5C5962}
+.h{font-size:12.5px;fill:#5C5962}
+.tagt{font-size:12px;fill:#5C5962}
+.hitt{font-size:12px;fill:#6300FF}
+@media (prefers-color-scheme: dark){
+.bg{fill:#1D1C20;stroke:#34313A}
+.grp{fill:rgba(31,30,34,.55);stroke:#34313A}
+.card,.tag{fill:#1F1E22;stroke:#4C4851}
+.card.accent{stroke:#A469FF}
+.hit{fill:rgba(164,105,255,.14)}
+.line{stroke:#4C4851}
+.head{fill:#4C4851}
+.t{fill:#F0EFF2}
+.n,.h,.tagt{fill:#B0ADB6}
+.hitt{fill:#A469FF}
+}
+</style><rect class="bg" x="0.5" y="0.5" width="439" height="335" rx="6"/><rect class="card" x="100" y="16" width="240" height="44" rx="6"/><text class="t" x="220" y="43" text-anchor="middle">浏览器</text><path class="line" d="M220 60V86"/><path class="head" d="M220 92l-4 -7h8z"/><rect class="tag" x="232" y="65" width="68" height="22" rx="4"/><text class="tagt" x="266" y="80" text-anchor="middle">DNS 记录</text><rect class="card" x="100" y="92" width="240" height="56" rx="6"/><text class="t" x="220" y="116" text-anchor="middle">app.example.com</text><text class="n" x="220" y="134" text-anchor="middle">域名</text><path class="line" d="M220 148V182"/><path class="head" d="M220 188l-4 -7h8z"/><rect class="hit" x="232" y="157" width="51" height="22" rx="4"/><text class="hitt" x="257.5" y="172" text-anchor="middle">HTTPS</text><rect class="card accent" x="100" y="188" width="240" height="44" rx="6"/><text class="t" x="220" y="215" text-anchor="middle">证书</text><path class="line" d="M220 232V258"/><path class="head" d="M220 264l-4 -7h8z"/><rect class="card" x="100" y="264" width="240" height="56" rx="6"/><text class="t" x="220" y="288" text-anchor="middle">web</text><text class="n" x="220" y="306" text-anchor="middle">服务</text></svg>
