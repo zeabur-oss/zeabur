@@ -1,33 +1,30 @@
 // Installing or removing a catalog component: the plan's steps, then each step applied in turn
 // while the page waits for the one before it to be ready.
-import { useMutation, useQuery } from "@tanstack/react-query";
-import { useEffect, useState } from "react";
+import { useMutation, useQuery } from "@tanstack/react-query"
+import { useEffect, useState } from "react"
 
-import type { Schemas } from "@/api/client";
-import { applyComponent, planComponent } from "@/api/zeabur";
-import { capabilitiesQuery, refresh, reviewOnce } from "@/api/queries";
-import { Frame } from "@/components/members/frame";
-import { LoadingRows } from "@/components/page";
-import { Problem } from "@/components/problem";
-import { StatusPill } from "@/components/status";
-import { YamlBlock } from "@/components/yaml";
-import { useT } from "@/i18n";
-import { kindName } from "@/i18n/kind-name";
-import {
-  Alert,
-  AlertDescription,
-} from "@zeabur-oss/design-system/components/alert";
-import { Button } from "@zeabur-oss/design-system/components/button";
+import type { Schemas } from "@/api/client"
+import { applyComponent, planComponent } from "@/api/zeabur"
+import { capabilitiesQuery, refresh, reviewOnce } from "@/api/queries"
+import { Frame } from "@/components/members/frame"
+import { LoadingRows } from "@/components/page"
+import { Problem } from "@/components/problem"
+import { StatusPill } from "@/components/status"
+import { YamlBlock } from "@/components/yaml"
+import { useT } from "@/i18n"
+import { kindName } from "@/i18n/kind-name"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Button } from "@zeabur-oss/design-system/components/button"
 
 /** How long the page waits before it asks the server to go on. */
-const POLL_MS = 3_000;
+const POLL_MS = 3_000
 
 const health = {
   pending: "idle",
   waiting: "progress",
   ready: "ok",
   failed: "fail",
-} as const;
+} as const
 
 export function ComponentPlan({
   id,
@@ -35,40 +32,28 @@ export function ComponentPlan({
   action,
   onClose,
 }: {
-  id: string;
-  name: string;
-  action: Schemas.ComponentAction;
-  onClose: () => void;
+  id: string
+  name: string
+  action: Schemas.ComponentAction
+  onClose: () => void
 }) {
-  const t = useT();
+  const t = useT()
   const plan = useQuery({
     queryKey: ["component-plan", id, action],
     queryFn: ({ signal }) => planComponent(id, { action }, { signal }),
     ...reviewOnce,
-  });
-  const { shown, running, readySince, start, apply } = useApplying(
-    id,
-    action,
-    plan.data,
-  );
+  })
+  const { shown, running, readySince, start, apply } = useApplying(id, action, plan.data)
 
   const title =
-    action === "install"
-      ? t("installer.installTitle", name)
-      : t("installer.removeTitle", name);
+    action === "install" ? t("installer.installTitle", name) : t("installer.removeTitle", name)
   return (
     <Frame
       title={title}
       wide
       onClose={onClose}
       footer={
-        <Footer
-          action={action}
-          plan={shown}
-          running={running}
-          onClose={onClose}
-          onStart={start}
-        />
+        <Footer action={action} plan={shown} running={running} onClose={onClose} onStart={start} />
       }
     >
       {plan.isPending ? (
@@ -80,7 +65,7 @@ export function ComponentPlan({
       ) : null}
       {apply.isError ? <Problem error={apply.error} /> : null}
     </Frame>
-  );
+  )
 }
 
 /** Applies the plan's next step, then asks again every few seconds until the plan is done or a
@@ -90,42 +75,38 @@ function useApplying(
   action: Schemas.ComponentAction,
   planned: Schemas.ComponentPlan | undefined,
 ) {
-  const [running, setRunning] = useState(false);
-  const [latest, setLatest] = useState<Schemas.ComponentPlan>();
-  const [readySince, setReadySince] = useState<number>();
+  const [running, setRunning] = useState(false)
+  const [latest, setLatest] = useState<Schemas.ComponentPlan>()
+  const [readySince, setReadySince] = useState<number>()
   const apply = useMutation({
-    mutationFn: (version: string) =>
-      applyComponent(id, { action, catalogVersion: version }),
+    mutationFn: (version: string) => applyComponent(id, { action, catalogVersion: version }),
     onSuccess: (next) => {
-      setLatest(next);
-      if (
-        next.done ||
-        [...next.steps, ...next.checks].some((s) => s.state === "failed")
-      ) {
-        setRunning(false);
-        void refresh(capabilitiesQuery);
+      setLatest(next)
+      if (next.done || [...next.steps, ...next.checks].some((s) => s.state === "failed")) {
+        setRunning(false)
+        void refresh(capabilitiesQuery)
       }
     },
     onError: () => setRunning(false),
-  });
-  const shown = latest ?? planned;
-  const stepsReady = shown?.steps.every((s) => s.state === "ready") ?? false;
+  })
+  const shown = latest ?? planned
+  const stepsReady = shown?.steps.every((s) => s.state === "ready") ?? false
 
   useEffect(() => {
-    if (stepsReady && readySince === undefined) setReadySince(Date.now());
-  }, [stepsReady, readySince]);
+    if (stepsReady && readySince === undefined) setReadySince(Date.now())
+  }, [stepsReady, readySince])
 
   useEffect(() => {
-    if (!running || apply.isPending || !shown || shown.done) return;
-    const timer = setTimeout(() => apply.mutate(shown.catalogVersion), POLL_MS);
-    return () => clearTimeout(timer);
-  }, [running, apply, shown]);
+    if (!running || apply.isPending || !shown || shown.done) return
+    const timer = setTimeout(() => apply.mutate(shown.catalogVersion), POLL_MS)
+    return () => clearTimeout(timer)
+  }, [running, apply, shown])
 
   const start = (version: string) => {
-    setRunning(true);
-    apply.mutate(version);
-  };
-  return { shown, running, readySince, start, apply };
+    setRunning(true)
+    apply.mutate(version)
+  }
+  return { shown, running, readySince, start, apply }
 }
 
 function Footer({
@@ -135,24 +116,22 @@ function Footer({
   onClose,
   onStart,
 }: {
-  action: Schemas.ComponentAction;
-  plan?: Schemas.ComponentPlan;
-  running: boolean;
-  onClose: () => void;
-  onStart: (version: string) => void;
+  action: Schemas.ComponentAction
+  plan?: Schemas.ComponentPlan
+  running: boolean
+  onClose: () => void
+  onStart: (version: string) => void
 }) {
-  const t = useT();
+  const t = useT()
   if (plan?.done)
     return (
       <Button size="sm" onClick={onClose}>
         {t("common.close")}
       </Button>
-    );
-  const install = action === "install";
-  const idle = install
-    ? t("settings.installCommand")
-    : t("settings.removeCommand");
-  const busy = install ? t("components.installing") : t("components.removing");
+    )
+  const install = action === "install"
+  const idle = install ? t("settings.installCommand") : t("settings.removeCommand")
+  const busy = install ? t("components.installing") : t("components.removing")
   return (
     <>
       <Button variant="ghost" size="sm" onClick={onClose}>
@@ -168,34 +147,22 @@ function Footer({
         {running ? busy : idle}
       </Button>
     </>
-  );
+  )
 }
 
-function PlanBody({
-  plan,
-  readySince,
-}: {
-  plan: Schemas.ComponentPlan;
-  readySince?: number;
-}) {
-  const t = useT();
+function PlanBody({ plan, readySince }: { plan: Schemas.ComponentPlan; readySince?: number }) {
+  const t = useT()
   return (
     <div className="flex flex-col gap-5">
       {plan.done ? (
         <Alert variant="info" role="status">
           <AlertDescription>
-            {plan.action === "install"
-              ? t("components.installed")
-              : t("components.removed")}
+            {plan.action === "install" ? t("components.installed") : t("components.removed")}
           </AlertDescription>
         </Alert>
       ) : null}
       {plan.warnings.map((warning) => (
-        <Alert
-          key={`${warning.kind}/${warning.component}`}
-          variant="warn"
-          role="note"
-        >
+        <Alert key={`${warning.kind}/${warning.component}`} variant="warn" role="note">
           <AlertDescription>
             {warning.kind === "untested"
               ? t("components.untested", warning.component)
@@ -204,9 +171,7 @@ function PlanBody({
         </Alert>
       ))}
       <section className="flex flex-col gap-2">
-        <h3 className="type-meta font-medium text-muted-foreground">
-          {t("components.steps")}
-        </h3>
+        <h3 className="type-meta font-medium text-muted-foreground">{t("components.steps")}</h3>
         <ol className="flex flex-col">
           {plan.steps.map((step) => (
             <Step key={`${step.component}/${step.release}`} step={step} />
@@ -215,9 +180,7 @@ function PlanBody({
       </section>
       {plan.checks.length > 0 ? (
         <section className="flex flex-col gap-2">
-          <h3 className="type-meta font-medium text-muted-foreground">
-            {t("components.checks")}
-          </h3>
+          <h3 className="type-meta font-medium text-muted-foreground">{t("components.checks")}</h3>
           <ul className="flex flex-col gap-2">
             {plan.checks.map((check) => (
               <Check
@@ -234,9 +197,7 @@ function PlanBody({
           <h3 className="type-meta font-medium text-muted-foreground">
             {t("components.leftovers")}
           </h3>
-          <p className="text-pretty text-muted-foreground">
-            {t("components.leftoversWhy")}
-          </p>
+          <p className="text-pretty text-muted-foreground">{t("components.leftoversWhy")}</p>
           <ul className="flex flex-col gap-1 font-mono text-sm" translate="no">
             {plan.leftovers.map((item) => (
               <li key={item}>{item}</li>
@@ -245,11 +206,11 @@ function PlanBody({
         </section>
       ) : null}
     </div>
-  );
+  )
 }
 
 function Step({ step }: { step: Schemas.ComponentStep }) {
-  const t = useT();
+  const t = useT()
   return (
     <li className="flex flex-col gap-2 border-t border-rule py-3 first:border-t-0">
       <div className="flex items-center gap-3">
@@ -262,17 +223,12 @@ function Step({ step }: { step: Schemas.ComponentStep }) {
           {t(`components.state.${step.state}`)}
         </StatusPill>
       </div>
-      {step.message ? (
-        <p className="text-pretty text-destructive">{step.message}</p>
-      ) : null}
+      {step.message ? <p className="text-pretty text-destructive">{step.message}</p> : null}
       <ul className="flex flex-col gap-1">
         {step.writes.map((write) => {
-          const label = `${write.kind}/${write.name}`;
+          const label = `${write.kind}/${write.name}`
           return (
-            <li
-              key={`${write.namespace ?? ""}/${label}`}
-              className="flex flex-col gap-1"
-            >
+            <li key={`${write.namespace ?? ""}/${label}`} className="flex flex-col gap-1">
               {write.yaml ? (
                 <details>
                   <summary className="cursor-pointer text-sm">
@@ -286,15 +242,15 @@ function Step({ step }: { step: Schemas.ComponentStep }) {
                 </span>
               )}
             </li>
-          );
+          )
         })}
       </ul>
     </li>
-  );
+  )
 }
 
 function Written({ write }: { write: Schemas.ObjectWrite }) {
-  const t = useT();
+  const t = useT()
   return (
     <>
       <span>{kindName(t, write.kind)}</span>{" "}
@@ -307,28 +263,19 @@ function Written({ write }: { write: Schemas.ObjectWrite }) {
         </span>
       ) : null}
     </>
-  );
+  )
 }
 
-function Check({
-  check,
-  readySince,
-}: {
-  check: Schemas.ComponentCheck;
-  readySince?: number;
-}) {
-  const t = useT();
-  const [now, setNow] = useState(Date.now);
-  const waiting = check.state === "waiting";
+function Check({ check, readySince }: { check: Schemas.ComponentCheck; readySince?: number }) {
+  const t = useT()
+  const [now, setNow] = useState(Date.now)
+  const waiting = check.state === "waiting"
   useEffect(() => {
-    if (!waiting) return;
-    const timer = setInterval(() => setNow(Date.now()), 5_000);
-    return () => clearInterval(timer);
-  }, [waiting]);
-  const late =
-    waiting &&
-    readySince !== undefined &&
-    now - readySince > check.timeoutSeconds * 1000;
+    if (!waiting) return
+    const timer = setInterval(() => setNow(Date.now()), 5_000)
+    return () => clearInterval(timer)
+  }, [waiting])
+  const late = waiting && readySince !== undefined && now - readySince > check.timeoutSeconds * 1000
   return (
     <li className="flex flex-col gap-1">
       <div className="flex items-center gap-3">
@@ -339,11 +286,7 @@ function Check({
           {t(`components.state.${check.state}`)}
         </StatusPill>
       </div>
-      {late ? (
-        <p className="type-meta text-pretty text-muted-foreground">
-          {check.advice}
-        </p>
-      ) : null}
+      {late ? <p className="type-meta text-pretty text-muted-foreground">{check.advice}</p> : null}
     </li>
-  );
+  )
 }
