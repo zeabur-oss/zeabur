@@ -10,18 +10,6 @@ type Backup = Schemas.VeleroBackup
 type Location = Schemas.VeleroLocation
 type Schedule = Schemas.VeleroSchedule
 
-export type Verdict =
-  | { as: "notInstalled" }
-  | { as: "refused" }
-  | { as: "noLocation" }
-  | { as: "locationUnavailable" }
-  | { as: "noSchedule" }
-  | { as: "paused" }
-  | { as: "waiting" }
-  | { as: "failed"; backup: Backup }
-  | { as: "running"; backup: Backup }
-  | { as: "ok"; backup: Backup }
-
 /** The location Zeabur edits: the default one, else the one named `default`. */
 export function mainLocation(data: Data): Location | undefined {
   return data.locations.find((l) => l.default) ?? data.locations.find((l) => l.name === "default")
@@ -30,36 +18,6 @@ export function mainLocation(data: Data): Location | undefined {
 /** The schedule Zeabur set up; another one is shown, not edited. */
 export function mainSchedule(data: Data): Schedule | undefined {
   return data.schedules.find((s) => s.zeabur)
-}
-
-export function verdict(data: Data): Verdict {
-  if (data.state === "not-installed") return { as: "notInstalled" }
-  if (data.state === "refused") return { as: "refused" }
-  const location = mainLocation(data)
-  if (!location) return { as: "noLocation" }
-  if (location.phase === "unavailable") return { as: "locationUnavailable" }
-  const active = data.schedules.filter((s) => !s.paused)
-  if (data.schedules.length === 0) return { as: "noSchedule" }
-  const latest = data.backups.find((b) => b.outcome !== "unknown")
-  if (latest?.outcome === "running") return { as: "running", backup: latest }
-  if (active.length === 0) return { as: "paused" }
-  if (!latest) return { as: "waiting" }
-  if (latest.outcome === "failed" || latest.outcome === "partiallyFailed")
-    return { as: "failed", backup: latest }
-  return { as: "ok", backup: latest }
-}
-
-export const verdictHealth: Record<Verdict["as"], Health> = {
-  notInstalled: "idle",
-  refused: "idle",
-  noLocation: "warn",
-  locationUnavailable: "fail",
-  noSchedule: "warn",
-  paused: "idle",
-  waiting: "progress",
-  failed: "fail",
-  running: "progress",
-  ok: "ok",
 }
 
 export const outcomeHealth: Record<Schemas.BackupOutcome, Health> = {
@@ -231,26 +189,6 @@ export function covers(scope: { namespaces: string[]; excluded?: string[] }, nam
     scope.namespaces.includes("*") ||
     scope.namespaces.includes(namespace)
   )
-}
-
-export type ProjectCoverage =
-  | { as: "noVelero" }
-  | { as: "notCovered" }
-  | { as: "waiting" }
-  | { as: "last"; at: string | undefined; outcome: Schemas.BackupOutcome }
-
-/** What Project → Settings says about the cluster's backups, from the project's own read;
- * nothing when Velero could not be read. */
-export function projectCoverage(data: Schemas.ProjectBackups): ProjectCoverage | undefined {
-  const velero = data.providers.find((p) => p.module === "velero")
-  if (!velero || velero.state === "refused") return undefined
-  if (velero.state === "not-installed") return { as: "noVelero" }
-  const row = data.coverage.find((c) => c.target.kind === "namespace")
-  const run = row?.lastRun?.provider === "velero" ? row.lastRun : undefined
-  if (run) return { as: "last", at: run.finished ?? run.started ?? undefined, outcome: run.outcome }
-  return row?.scheduledBy.some((s) => s.startsWith("velero:"))
-    ? { as: "waiting" }
-    : { as: "notCovered" }
 }
 
 /** Where a backup's contents download from: Zeabur fetches them from the location and streams

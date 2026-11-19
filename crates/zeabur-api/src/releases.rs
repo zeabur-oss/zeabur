@@ -10,6 +10,7 @@ use axum::http::{self, HeaderMap, HeaderValue, Request};
 use semver::Version;
 use serde::Deserialize;
 use zeabur_http::Https;
+use zeabur_model::Health;
 
 use crate::views::{ZeaburNewer, ZeaburRelease};
 
@@ -162,13 +163,19 @@ pub fn newer(releases: &[ZeaburRelease], running: &str) -> Option<ZeaburNewer> {
         .collect();
     newer.sort_by(|a, b| b.0.cmp_precedence(&a.0));
     let (_, latest) = newer.first()?;
+    let security: Vec<ZeaburRelease> = newer
+        .iter()
+        .filter(|(_, r)| r.security && !r.prerelease)
+        .map(|(_, r)| (*r).clone())
+        .collect();
     Some(ZeaburNewer {
         latest: (*latest).clone(),
-        security: newer
-            .iter()
-            .filter(|(_, r)| r.security && !r.prerelease)
-            .map(|(_, r)| (*r).clone())
-            .collect(),
+        health: if security.is_empty() {
+            Health::Warn
+        } else {
+            Health::Fail
+        },
+        security,
     })
 }
 

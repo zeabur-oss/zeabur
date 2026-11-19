@@ -2,38 +2,10 @@ import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import { groupIncidents } from "@/model/incidents"
-import {
-  byNodeSeverity,
-  diskShare,
-  fillHealth,
-  groupIssues,
-  isProblem,
-  MEMORY,
-  nodeIssues,
-  worstNode,
-} from "@/model/node-health"
+import { diskShare, fillHealth } from "@/model/node-health"
 import { missingReason, volumeFill } from "@/model/volume-use"
 
 const GiB = 2 ** 30
-
-const node = (name: string, more: Partial<Schemas.NodeView> = {}): Schemas.NodeView => ({
-  id: `nodes/${name}`,
-  name,
-  allocatable: { cpuMillicores: 2000, memoryBytes: 2 * GiB, pods: 110 },
-  capacity: { cpuMillicores: 2000, memoryBytes: 2 * GiB, pods: 110 },
-  architecture: "amd64",
-  containerRuntime: "containerd://1.7",
-  cordoned: false,
-  kernelVersion: "6.1",
-  kubeletVersion: "v1.31.4+k3s1",
-  osImage: "Debian",
-  origin: { kind: "Node", name },
-  problems: [],
-  ready: "True",
-  roles: [],
-  taints: [],
-  ...more,
-})
 
 const disk = (capacity: number, available: number) => ({
   capacityBytes: capacity * GiB,
@@ -41,10 +13,7 @@ const disk = (capacity: number, available: number) => ({
   usedBytes: (capacity - available) * GiB,
 })
 
-const memoryUse = (share: number) => ({
-  cpuMillicores: 100,
-  memoryBytes: Math.round(share * 2 * GiB),
-})
+const MEMORY = { warn: 0.85, fail: 0.95 }
 
 describe("fill", () => {
   test("is ok below the warning, then warn, then fail", () => {
@@ -61,135 +30,14 @@ describe("fill", () => {
   })
 })
 
-describe("a node's issues", () => {
-  test("a healthy node has none", () => {
-    expect(nodeIssues(node("a"))).toEqual([])
-  })
-
-  test("memory nearly full leads with use, not with what pods reserve", () => {
-    const issues = nodeIssues(
-      node("vps-1", {
-        usage: memoryUse(0.91),
-        requests: { cpuMillicores: 100, memoryBytes: 0.2 * 2 * GiB },
-      }),
-    )
-    expect(issues.map((i) => [i.kind, i.health])).toEqual([["memoryFull", "warn"]])
-    expect(issues[0]?.share).toBeCloseTo(0.91, 2)
-  })
-
-  test("a node that is down has only that", () => {
-    const issues = nodeIssues(
-      node("a", { ready: "Unknown", usage: memoryUse(0.99), cordoned: true }),
-    )
-    expect(issues.map((i) => i.kind)).toEqual(["notReady"])
-  })
-
-  test("every pressure is listed, worst first, and a pressure replaces its own fill", () => {
-    const issues = nodeIssues(
-      node("a", {
-        problems: [
-          { type: "PIDPressure", status: "True" },
-          { type: "DiskPressure", status: "True" },
-          { type: "MemoryPressure", status: "True" },
-        ],
-        usage: memoryUse(0.97),
-        disk: disk(40, 2),
-        cordoned: true,
-        requests: { cpuMillicores: 1900, memoryBytes: 3 * GiB },
-      }),
-    )
-    expect(issues.map((i) => i.kind)).toEqual([
-      "memoryPressure",
-      "diskPressure",
-      "pidPressure",
-      "cordoned",
-      "reservedMemory",
-      "reservedCpu",
-    ])
-    expect(issues.filter(isProblem).map((i) => i.kind)).toEqual([
-      "memoryPressure",
-      "diskPressure",
-      "pidPressure",
-    ])
-  })
-
-  test("a disk past the kubelet's eviction line fails", () => {
-    expect(nodeIssues(node("a", { disk: disk(40, 3) }))[0]).toMatchObject({
-      kind: "diskFull",
-      health: "fail",
-    })
-    expect(nodeIssues(node("a", { disk: disk(40, 5) }))[0]).toMatchObject({
-      kind: "diskFull",
-      health: "warn",
-    })
-  })
-})
-
-describe("grouping by outcome", () => {
-  test("no nodes, no groups", () => {
-    expect(groupIssues([])).toEqual([])
-  })
-
-  test("the same outcome on many nodes is one group, fullest first", () => {
-    const nodes = Array.from({ length: 25 }, (_, i) =>
-      node(`n-${i}`, { usage: memoryUse(0.86 + i * 0.001) }),
-    )
-    const groups = groupIssues(nodes.flatMap(nodeIssues))
-    expect(groups.map((g) => g.issues.map((i) => i.node))).toEqual([
-      nodes.map((n) => n.name).reverse(),
-    ])
-  })
-
-  test("a failing group comes before a larger warning one", () => {
-    const groups = groupIssues(
-      [
-        node("a", { cordoned: true }),
-        node("b", { cordoned: true }),
-        node("c", { ready: "False" }),
-      ].flatMap(nodeIssues),
-    )
-    expect(groups.map((g) => [g.kind, g.issues.length])).toEqual([
-      ["notReady", 1],
-      ["cordoned", 2],
-    ])
-  })
-})
-
-describe("nodes, worst first", () => {
-  test("sorts down, then full, then fine by name", () => {
-    const nodes = [
-      node("c"),
-      node("b", { usage: memoryUse(0.9) }),
-      node("a"),
-      node("z", { ready: "False" }),
-    ]
-    expect(nodes.toSorted(byNodeSeverity).map((n) => n.name)).toEqual(["z", "b", "a", "c"])
-  })
-
-  test("the totals name the worst node only when there are several and it is a problem", () => {
-    expect(worstNode([])).toBeUndefined()
-    expect(worstNode([node("only", { ready: "False" })])).toBeUndefined()
-    expect(worstNode([node("a"), node("b", { cordoned: true })])).toBeUndefined()
-    expect(worstNode([node("a"), node("b", { disk: disk(40, 3) }), node("c")])?.node.name).toBe("b")
-  })
-
-  test("a cordoned node says whether replicas are leaving, all are gone, or they stay", () => {
-    const kind = (more: Partial<Schemas.NodeView>) =>
-      nodeIssues(node("a", { cordoned: true, ...more })).map((i) => [i.kind, i.health])
-    expect(kind({ movablePods: 3, leavingPods: 1 })).toEqual([["draining", "progress"]])
-    expect(kind({ movablePods: 0, leavingPods: 0 })).toEqual([["maintenance", "idle"]])
-    expect(kind({ movablePods: 0, leavingPods: 0, pinnedPods: 1 })).toEqual([
-      ["maintenance", "idle"],
-    ])
-    expect(kind({ movablePods: 3, leavingPods: 0 })).toEqual([["cordoned", "warn"]])
-    expect(kind({})).toEqual([["cordoned", "warn"]])
-    expect(kind({ movablePods: 0 }).map(([k]) => k)).not.toContain("cordoned")
-    expect(isProblem({ kind: "maintenance", node: "a", health: "idle" })).toBe(false)
-  })
-})
-
-const volume = (claim: string, capacity: number, available: number): Schemas.VolumeUsage => ({
+const volume = (
+  claim: string,
+  capacity: number,
+  available: number,
+  health: Schemas.Health = "ok",
+): Schemas.VolumeUsage => ({
   claim,
+  health,
   capacityBytes: capacity * GiB,
   availableBytes: available * GiB,
   usedBytes: (capacity - available) * GiB,
@@ -200,17 +48,17 @@ describe("a volume's fill", () => {
     expect(volumeFill([], "data", "db")).toBeUndefined()
   })
 
-  test("one claim: taken of capacity, amber from 85%", () => {
+  test("one claim: taken of capacity, with the server's health", () => {
     const fill = volumeFill([volume("uploads", 10, 2.4)], "uploads", "web")
     expect(fill).toMatchObject({ replicas: 1, health: "ok" })
     expect(fill?.takenBytes).toBeCloseTo(7.6 * GiB)
-    expect(volumeFill([volume("uploads", 10, 1.4)], "uploads", "web")?.health).toBe("warn")
+    expect(volumeFill([volume("uploads", 10, 1.4, "warn")], "uploads", "web")?.health).toBe("warn")
   })
 
   test("a StatefulSet's replicas: the fullest claim counts, others' claims do not", () => {
     const items = [
       volume("data-db-0", 10, 8),
-      volume("data-db-1", 10, 0.5),
+      volume("data-db-1", 10, 0.5, "fail"),
       volume("data-db-2", 10, 6),
       volume("data-dbx-0", 10, 0),
     ]

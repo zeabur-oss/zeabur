@@ -93,10 +93,6 @@ export function sumUsage(rows: Measured[]): Amount & { pods: number } {
   }
 }
 
-/** At or above this share of the memory limit a pod is close to being OOM-killed. Ours, not a
- * Kubernetes threshold. */
-export const NEAR_LIMIT = 0.9
-
 export type Note =
   | { kind: "oom" }
   | { kind: "memory-near-limit"; share: number }
@@ -104,21 +100,54 @@ export type Note =
   | { kind: "memory-over-request" }
   | { kind: "no-sample" }
 
-/** What to say about one pod, worst first. */
-export function notesFor(row: Measured, requests: Amount, limits: Amount): Note[] {
+/** What to say about one pod, worst first. `nearLimit` is the share of a limit the server calls
+ * close to it. */
+export function notesFor(
+  row: Measured,
+  requests: Amount,
+  limits: Amount,
+  nearLimit?: number,
+): Note[] {
   const notes: Note[] = []
   if (row.pod.reason === "OOMKilled") notes.push({ kind: "oom" })
   if (row.memory === undefined) {
     notes.push({ kind: "no-sample" })
     return notes
   }
-  if (limits.memory && row.memory / limits.memory >= NEAR_LIMIT)
+  if (limits.memory && nearLimit !== undefined && row.memory / limits.memory >= nearLimit)
     notes.push({ kind: "memory-near-limit", share: row.memory / limits.memory })
   else if (!limits.memory && requests.memory && row.memory > requests.memory)
     notes.push({ kind: "memory-over-request" })
-  if (limits.cpu && row.cpu !== undefined && row.cpu / limits.cpu >= NEAR_LIMIT)
+  if (
+    limits.cpu &&
+    row.cpu !== undefined &&
+    nearLimit !== undefined &&
+    row.cpu / limits.cpu >= nearLimit
+  )
     notes.push({ kind: "cpu-at-limit", share: row.cpu / limits.cpu })
   return notes
+}
+
+/** A usage bar: the share of the room it fills, where the request sits, and its tone. Without a
+ * limit the room is a quarter over the larger of use and request. */
+export function usageBar({
+  used,
+  request,
+  limit,
+  nearLimit,
+}: {
+  used?: number
+  request?: number
+  limit?: number
+  nearLimit?: number
+}): { share?: number; mark?: number; tone: "warn" | "over" | "ok" } {
+  const room = limit ?? Math.max(request ?? 0, used ?? 0) * 1.25
+  const share = used !== undefined && room > 0 ? used / room : undefined
+  const mark = request !== undefined && room > 0 ? request / room : undefined
+  if (limit && share !== undefined && nearLimit !== undefined && share >= nearLimit)
+    return { share, mark, tone: "warn" }
+  if (request && used !== undefined && used > request) return { share, mark, tone: "over" }
+  return { share, mark, tone: "ok" }
 }
 
 // ---------------------------------------------------------------------------------------------
@@ -181,7 +210,7 @@ export function serviceUsage(
   if (sum.pods === 0) return undefined
   const { requests, limits } = templateAmounts(service)
   const nearLimit = rows.some((row) =>
-    notesFor(row, requests, limits).some((n) => n.kind === "memory-near-limit"),
+    notesFor(row, requests, limits, usage.nearLimit).some((n) => n.kind === "memory-near-limit"),
   )
   return { ...sum, nearLimit }
 }

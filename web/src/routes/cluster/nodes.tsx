@@ -16,19 +16,7 @@ import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
-import {
-  byNodeSeverity,
-  DISK,
-  diskShare,
-  fillHealth,
-  MEMORY,
-  memoryUsed,
-  nodeIssues,
-  share,
-  TIGHT,
-  worstNode,
-  type IssueKind,
-} from "@/model/node-health"
+import { diskShare, fillHealth, memoryUsed, share } from "@/model/node-health"
 import type { Health } from "@/model/service"
 import { useIssueText } from "@/routes/cluster/attention"
 import { Forbidden, overviewRole } from "@/routes/cluster/forbidden"
@@ -38,6 +26,8 @@ import { Meter } from "@zeabur-oss/design-system/components/meter"
 
 type Resources = Schemas.Resources
 type NodeView = Schemas.NodeView
+type Thresholds = Schemas.NodeThresholds
+type IssueKind = Schemas.NodeIssueKind
 
 /** Above this many nodes the list gets a filter, a sort and a bound. */
 const LIST_AT = 7
@@ -54,26 +44,31 @@ function fill({
   requests,
   usage,
   limits,
+  tight,
 }: {
   allocatable: number
   requests?: number
   usage?: number
   limits?: { warn: number; fail: number }
+  tight: number
 }) {
   const used = share(usage, allocatable)
   const reserved = share(requests, allocatable)
+  const full = (reserved ?? 0) >= tight
   if (used !== undefined)
     return {
       lead: used,
       mark: reserved,
       reserved,
+      tight: full,
       health: limits ? fillHealth(used, limits) : ("ok" as Health),
     }
   return {
     lead: reserved,
     mark: undefined,
     reserved: undefined,
-    health: (reserved ?? 0) >= TIGHT ? ("warn" as Health) : ("ok" as Health),
+    tight: full,
+    health: full ? ("warn" as Health) : ("ok" as Health),
   }
 }
 
@@ -85,6 +80,7 @@ function Total({
   usage,
   format,
   thresholds,
+  tight,
   describe,
 }: {
   title: string
@@ -94,20 +90,19 @@ function Total({
   usage?: number
   format: (value: number) => string
   thresholds?: { warn: number; fail: number }
+  tight: number
   describe?: (requests: string, allocatable: string) => string
 }) {
   const t = useT()
   const { percent } = useQuantityFormat()
   const say = describe ?? ((r: string, a: string) => t("cluster.requestedOf", r, a))
-  const bar = fill({ allocatable, requests, usage, limits: thresholds })
-  const label = [
-    title,
-    usage !== undefined ? t("cluster.usedOf", format(usage), format(allocatable)) : "",
-    requests !== undefined ? say(format(requests), format(allocatable)) : "",
-    limits ? t("cluster.limits", format(limits)) : "",
-  ]
+  const bar = fill({ allocatable, requests, usage, limits: thresholds, tight })
+  const used = usage !== undefined ? t("cluster.usedOf", format(usage), format(allocatable)) : ""
+  const reserved = requests !== undefined ? say(format(requests), format(allocatable)) : ""
+  const label = [title, used, reserved, limits ? t("cluster.limits", format(limits)) : ""]
     .filter(Boolean)
     .join(", ")
+  const caption = used || reserved || t("cluster.allocatable", format(allocatable))
   return (
     <div className="flex min-w-0 flex-1 basis-44 flex-col gap-2">
       <div className="flex items-baseline justify-between gap-2">
@@ -118,15 +113,11 @@ function Total({
       </div>
       <Meter value={bar.lead} mark={bar.mark} tone={meterTone[bar.health]} label={label} />
       <span className="type-meta text-muted-foreground">
-        {usage !== undefined
-          ? t("cluster.usedOf", format(usage), format(allocatable))
-          : requests !== undefined
-            ? say(format(requests), format(allocatable))
-            : t("cluster.allocatable", format(allocatable))}
+        {caption}
         {bar.reserved !== undefined ? (
           <>
             {t("common.sep")}
-            <span className={cn(bar.reserved >= TIGHT && "text-warn-strong")}>
+            <span className={cn(bar.tight && "text-warn-strong")}>
               {t("cluster.reservedShare", percent(bar.reserved))}
             </span>
           </>
@@ -170,6 +161,7 @@ export function NodesSection() {
             <div className="flex flex-wrap gap-x-8 gap-y-5">
               <Total
                 title={t("cluster.cpu")}
+                tight={data.thresholds.tight}
                 allocatable={data.totals.allocatable.cpuMillicores}
                 requests={data.totals.requests?.cpuMillicores}
                 limits={data.totals.limits?.cpuMillicores}
@@ -183,7 +175,8 @@ export function NodesSection() {
                 limits={data.totals.limits?.memoryBytes}
                 usage={data.totals.usage?.memoryBytes}
                 format={memory}
-                thresholds={MEMORY}
+                thresholds={data.thresholds.memory}
+                tight={data.thresholds.tight}
               />
               {data.totals.disk ? (
                 <Total
@@ -191,21 +184,23 @@ export function NodesSection() {
                   allocatable={data.totals.disk.capacityBytes}
                   usage={data.totals.disk.capacityBytes - data.totals.disk.availableBytes}
                   format={memory}
-                  thresholds={DISK}
+                  thresholds={data.thresholds.disk}
+                  tight={data.thresholds.tight}
                 />
               ) : null}
               <Total
                 title={t("cluster.pods")}
+                tight={data.thresholds.tight}
                 allocatable={data.totals.allocatable.pods ?? 0}
                 requests={data.totals.requests?.pods ?? undefined}
                 format={plain}
                 describe={(placed, room) => t("cluster.podsOf", placed, room)}
               />
             </div>
-            <Worst nodes={data.items} />
+            <Worst data={data} />
           </div>
           <Notes data={data} />
-          <NodeList nodes={data.items} skew={skew} metrics={data.metrics} />
+          <NodeList data={data} skew={skew} />
         </div>
       ) : null}
     </Section>
@@ -213,21 +208,23 @@ export function NodesSection() {
 }
 
 /** The totals average the nodes; the one that is in trouble is named under them. */
-function Worst({ nodes }: { nodes: readonly NodeView[] }) {
+function Worst({ data }: { data: Schemas.NodeList }) {
   const issueText = useIssueText()
-  const worst = worstNode(nodes)
-  if (!worst) return null
+  const node = data.items.find((n) => n.name === data.worst)
+  const issue = node?.issues[0]
+  if (!node || !issue) return null
   const { text } = issueText({
-    kind: worst.issue.kind,
-    health: worst.issue.health,
-    issues: [worst.issue],
+    kind: issue.kind,
+    health: issue.health,
+    problem: true,
+    issues: [{ node: node.name, health: issue.health, share: issue.share }],
   })
   return (
     <a
-      href={`#node-${worst.node.name}`}
+      href={`#node-${node.name}`}
       className="flex items-center gap-2 border-t border-rule pt-3 type-meta hover:underline"
     >
-      <StatusDot health={worst.issue.health} />
+      <StatusDot health={issue.health} />
       {text}
     </a>
   )
@@ -235,24 +232,19 @@ function Worst({ nodes }: { nodes: readonly NodeView[] }) {
 
 type Sort = "worst" | "name" | "memory" | "disk"
 
-const sorters: Record<Sort, (a: NodeView, b: NodeView) => number> = {
-  worst: byNodeSeverity,
+const sorters = (
+  worstFirst: readonly string[],
+): Record<Sort, (a: NodeView, b: NodeView) => number> => ({
+  worst: (a, b) => worstFirst.indexOf(a.name) - worstFirst.indexOf(b.name),
   name: (a, b) => a.name.localeCompare(b.name),
   memory: (a, b) => (memoryUsed(b) ?? -1) - (memoryUsed(a) ?? -1) || a.name.localeCompare(b.name),
   disk: (a, b) =>
     (diskShare(b.disk) ?? -1) - (diskShare(a.disk) ?? -1) || a.name.localeCompare(b.name),
-}
+})
 
-function NodeList({
-  nodes,
-  skew,
-  metrics,
-}: {
-  nodes: readonly NodeView[]
-  skew: readonly Schemas.NodeSkew[]
-  metrics: Schemas.MetricsState
-}) {
+function NodeList({ data, skew }: { data: Schemas.NodeList; skew: readonly Schemas.NodeSkew[] }) {
   const t = useT()
+  const nodes = data.items
   const [query, setQuery] = useState("")
   const [sort, setSort] = useState<Sort>("worst")
   const [all, setAll] = useState(false)
@@ -265,7 +257,7 @@ function NodeList({
           node.roles.some((role) => role.toLowerCase().includes(needle)),
       )
     : nodes
-  const sorted = matching.toSorted(sorters[sort])
+  const sorted = matching.toSorted(sorters(data.worstFirst)[sort])
   const shown = large && !all ? sorted.slice(0, ROWS_SHOWN) : sorted
   return (
     <div className="flex flex-col gap-3">
@@ -303,7 +295,8 @@ function NodeList({
               key={node.id}
               node={node}
               skew={skew.find((s) => s.node === node.name)}
-              metrics={metrics}
+              metrics={data.metrics}
+              thresholds={data.thresholds}
             />
           ))}
         </ul>
@@ -358,7 +351,7 @@ const quiet = new Set<IssueKind>(["reservedMemory", "reservedCpu"])
 /** What is wrong with a node; the reservations show in the bars. */
 function NodePills({ node }: { node: NodeView }) {
   const t = useT()
-  const issues = nodeIssues(node).filter((issue) => !quiet.has(issue.kind))
+  const issues = node.issues.filter((issue) => !quiet.has(issue.kind))
   const taints = node.taints.map((taint) => `${taint.key}:${taint.effect}`).join("\n")
   const pills =
     issues.length === 0 ? (
@@ -389,10 +382,12 @@ function NodeRow({
   node,
   skew,
   metrics,
+  thresholds,
 }: {
   node: NodeView
   skew?: Schemas.NodeSkew
   metrics: Schemas.MetricsState
+  thresholds: Thresholds
 }) {
   const t = useT()
   const { cores, memory, percent } = useQuantityFormat()
@@ -413,6 +408,7 @@ function NodeRow({
       requests: numbers.requests,
       usage: numbers.usage,
       limits: numbers.thresholds,
+      tight: thresholds.tight,
     })
     return (
       <div className="flex min-w-0 flex-col gap-1 sm:w-36">
@@ -448,7 +444,7 @@ function NodeRow({
           <span
             className={cn(
               "type-meta text-muted-foreground",
-              bar.reserved >= TIGHT && "text-warn-strong",
+              bar.reserved >= thresholds.tight && "text-warn-strong",
             )}
           >
             {t("cluster.reservedShare", percent(bar.reserved))}
@@ -531,12 +527,12 @@ function NodeRow({
           requests: pick(node.requests, mem),
           usage: pick(node.usage, mem),
           maximum: pick(node.limits, mem),
-          thresholds: MEMORY,
+          thresholds: thresholds.memory,
         })}
         {node.disk ? (
           gauge(t("cluster.disk"), node.disk.capacityBytes, memory, {
             usage: node.disk.capacityBytes - node.disk.availableBytes,
-            thresholds: DISK,
+            thresholds: thresholds.disk,
           })
         ) : (
           <div aria-hidden className="hidden sm:block sm:w-36" />

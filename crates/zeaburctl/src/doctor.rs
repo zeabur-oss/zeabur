@@ -3,7 +3,7 @@
 //!
 //! # The API's answers, not a second opinion
 //!
-//! Every check reads the API in this process ([`InProcess`]) and words its answer: the severity
+//! Every check reads the API in this process ([`InProcess`]) and words its answer: the badge
 //! of the version comes from `GET /cluster/upgrades`, the missing components from
 //! `GET /cluster/capabilities` and `GET /cluster/gaps`, the Zeabur Identity objects from the
 //! project endpoints and the identity from `GET /whoami`. A read the cluster refuses is skipped
@@ -364,7 +364,7 @@ fn without_zeabur_dashboard(name: &'static str) -> Check {
     check
 }
 
-/// The version's severity and states, from `GET /cluster/upgrades`.
+/// The version's badge and states, from `GET /cluster/upgrades`.
 fn cluster_version(answer: &Result<Value, Value>) -> Check {
     const NAME: &str = "cluster-version";
     let upgrades = match answer {
@@ -382,14 +382,10 @@ fn cluster_version(answer: &Result<Value, Value>) -> Check {
     } else {
         format!("kube-apiserver {version} ({minor}, end of life {end_of_life})")
     });
-    check.status = match text(upgrades, "severity") {
-        "danger" => Status::Critical,
-        "warning" => Status::Warning,
-        "info" | "none" => Status::Ok,
-        other => {
-            check.findings.push(format!("unknown severity {other:?}"));
-            Status::Error
-        }
+    check.status = match upgrades.get("badge").map_or("ok", |b| text(b, "health")) {
+        "fail" => Status::Critical,
+        "warn" => Status::Warning,
+        _ => Status::Ok,
     };
     let skew = list(upgrades, "skew");
     let newer = Some(text(upgrades, "nextMinor"))
@@ -939,7 +935,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_versions_severity_is_the_apis() {
+    async fn the_versions_status_is_the_apis_badge() {
         let report = report(&cluster("v1.34.3+k3s1")).await;
         let version = check(&report, "cluster-version");
         assert_eq!(version.status, Status::Warning);

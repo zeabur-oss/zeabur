@@ -13,7 +13,6 @@ import { StatusDot } from "@/components/status"
 import { buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
-import { groupIssues, isProblem, nodeIssues, type IssueGroup } from "@/model/node-health"
 import { healthRank, type Health } from "@/model/service"
 import { useDate } from "@/routes/cluster/upgrade"
 import type { Newer } from "@/model/update-check"
@@ -54,11 +53,11 @@ export interface Attention {
 export function useIssueText() {
   const t = useT()
   const { percent } = useQuantityFormat()
-  return (group: IssueGroup): { text: string; detail: string } => {
+  return (group: Schemas.NodeIssueGroup): { text: string; detail: string } => {
     const first = group.issues[0]
     const n = group.issues.length
     const node = first?.node ?? ""
-    const share = first?.share !== undefined ? percent(first.share) : ""
+    const share = first?.share != null ? percent(first.share) : ""
     const severe = group.health === "fail"
     switch (group.kind) {
       case "memoryFull":
@@ -126,7 +125,7 @@ export function updateItem(t: Translate, zeabur: Schemas.ZeaburVersion, newer: N
   const security = newer.security.length > 0
   return {
     key: "zeabur-update",
-    health: security ? "fail" : "warn",
+    health: newer.health,
     text: security
       ? t("update.security", product, zeabur.version)
       : t("update.out", product, newer.latest.version),
@@ -183,6 +182,97 @@ export function componentsBehind(
   }
 }
 
+/** End of support, as the server found it: past, or coming while only patches still ship. */
+export function eolItem(
+  t: Translate,
+  date: (date: string) => string,
+  upgrades?: Schemas.Upgrades,
+): ClusterItem | undefined {
+  const minor = upgrades?.minor ?? ""
+  const eol = upgrades?.release?.endOfLife
+  const finding = upgrades?.attention.find(
+    (f) => f.state === "end-of-life" || (f.state === "maintenance" && eol),
+  )
+  if (!finding) return undefined
+  const past = finding.state === "end-of-life"
+  return {
+    key: "eol",
+    health: finding.health,
+    text: past
+      ? eol
+        ? t("cluster.attEolPast", minor, date(eol))
+        : t("cluster.attEolOld", minor)
+      : t("cluster.attEolSoon", minor, date(eol ?? "")),
+    detail: t("common.sentences", [
+      past ? t("cluster.attEol.why") : t("cluster.attEolSoon.why"),
+      t("cluster.attEol.fix"),
+    ]),
+    nodes: [],
+    problem: false,
+  }
+}
+
+/** Nodes whose kubelet is further behind the control plane than Kubernetes supports. */
+export function skewItem(t: Translate, upgrades?: Schemas.Upgrades): ClusterItem | undefined {
+  const skewed = (upgrades?.skew ?? []).filter((s) => s.unsupported)
+  if (skewed.length === 0) return undefined
+  return {
+    key: "skew",
+    health: "fail",
+    text:
+      skewed.length === 1
+        ? t("cluster.attSkew", skewed[0]?.node ?? "", skewed[0]?.kubeletVersion ?? "")
+        : t("cluster.attSkewMany", skewed.length),
+    detail: t("common.sentences", [t("cluster.attSkew.why"), t("cluster.attSkew.fix")]),
+    members:
+      skewed.length > 1
+        ? skewed.map((s) => ({ key: s.node, label: s.node, note: s.kubeletVersion }))
+        : undefined,
+    nodes: skewed.map((s) => s.node),
+    problem: false,
+  }
+}
+
+/** The server's node issue groups, one item each. */
+function nodeItems(
+  t: Translate,
+  percent: (share: number) => string,
+  issueText: ReturnType<typeof useIssueText>,
+  nodes?: Schemas.NodeList,
+): ClusterItem[] {
+  const items: ClusterItem[] = []
+  const nodesLink = (
+    <Link
+      to="/cluster"
+      hash="cluster-nodes"
+      className={buttonVariants({ variant: "outline", size: "sm" })}
+    >
+      {t("cluster.nodes")}
+    </Link>
+  )
+  for (const group of nodes?.attention ?? []) {
+    const { text, detail } = issueText(group)
+    items.push({
+      key: `node-${group.kind}`,
+      health: group.health,
+      text,
+      detail,
+      members:
+        group.issues.length > 1
+          ? group.issues.map((i) => ({
+              key: i.node,
+              label: i.node,
+              note: i.share != null ? percent(i.share) : undefined,
+            }))
+          : undefined,
+      link: nodesLink,
+      nodes: group.issues.map((i) => i.node),
+      problem: group.problem,
+    })
+  }
+  return items
+}
+
 export function useAttention(): Attention {
   const t = useT()
   const date = useDate()
@@ -196,73 +286,10 @@ export function useAttention(): Attention {
   const capabilities = capabilitiesRead.data
   const { zeabur, newer } = useNewer()
   const update = zeabur && newer ? updateItem(t, zeabur, newer) : undefined
-  const items: ClusterItem[] = []
-  const minor = upgrades?.minor ?? ""
-  const eol = upgrades?.release?.endOfLife
-  if (upgrades?.states.includes("end-of-life"))
-    items.push({
-      key: "eol",
-      health: "fail",
-      text: eol ? t("cluster.attEolPast", minor, date(eol)) : t("cluster.attEolOld", minor),
-      detail: t("common.sentences", [t("cluster.attEol.why"), t("cluster.attEol.fix")]),
-      nodes: [],
-      problem: false,
-    })
-  else if (upgrades?.states.includes("maintenance") && eol)
-    items.push({
-      key: "eol",
-      health: "warn",
-      text: t("cluster.attEolSoon", minor, date(eol)),
-      detail: t("common.sentences", [t("cluster.attEolSoon.why"), t("cluster.attEol.fix")]),
-      nodes: [],
-      problem: false,
-    })
-  const skewed = (upgrades?.skew ?? []).filter((s) => s.unsupported)
-  if (skewed.length > 0)
-    items.push({
-      key: "skew",
-      health: "fail",
-      text:
-        skewed.length === 1
-          ? t("cluster.attSkew", skewed[0]?.node ?? "", skewed[0]?.kubeletVersion ?? "")
-          : t("cluster.attSkewMany", skewed.length),
-      detail: t("common.sentences", [t("cluster.attSkew.why"), t("cluster.attSkew.fix")]),
-      members:
-        skewed.length > 1
-          ? skewed.map((s) => ({ key: s.node, label: s.node, note: s.kubeletVersion }))
-          : undefined,
-      nodes: skewed.map((s) => s.node),
-      problem: false,
-    })
-  const nodesLink = (
-    <Link
-      to="/cluster"
-      hash="cluster-nodes"
-      className={buttonVariants({ variant: "outline", size: "sm" })}
-    >
-      {t("cluster.nodes")}
-    </Link>
-  )
-  for (const group of groupIssues((nodes?.items ?? []).flatMap(nodeIssues))) {
-    const { text, detail } = issueText(group)
-    items.push({
-      key: `node-${group.kind}`,
-      health: group.health,
-      text,
-      detail,
-      members:
-        group.issues.length > 1
-          ? group.issues.map((i) => ({
-              key: i.node,
-              label: i.node,
-              note: i.share !== undefined ? percent(i.share) : undefined,
-            }))
-          : undefined,
-      link: nodesLink,
-      nodes: group.issues.map((i) => i.node),
-      problem: group.issues.some(isProblem),
-    })
-  }
+  const items = [
+    ...[eolItem(t, date, upgrades), skewItem(t, upgrades)].filter((i) => i !== undefined),
+    ...nodeItems(t, percent, issueText, nodes),
+  ]
   const behind = componentsBehind(capabilities, t)
   if (behind) items.push(behind)
   if (update) items.unshift(update)

@@ -20,7 +20,6 @@ import {
   largest,
   lead,
   maximum,
-  nearMaximum,
   reserved,
   shownName,
   together,
@@ -303,7 +302,7 @@ function NamespaceRow({ item, scale }: { item: NamespaceUsage; scale: Scale }) {
             {item.namespace}
           </span>
         )}
-        {nearMaximum(item) ? (
+        {item.nearMaximum ? (
           <span className="flex items-center gap-1.5 type-meta text-warn-strong">
             <StatusDot health="warn" />
             {t("clusterUsage.nearMaximum")}
@@ -396,7 +395,7 @@ function Gauge({
         size="sm"
         value={value / whole}
         mark={scale.measured && asked > 0 ? asked / whole : undefined}
-        tone={resource === "memory" && nearMaximum(item) ? "warn" : "ok"}
+        tone={resource === "memory" && item.nearMaximum ? "warn" : "ok"}
         label={label}
       />
       {details ? <span className="type-meta text-muted-foreground">{details}</span> : null}

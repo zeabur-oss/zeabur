@@ -63,6 +63,7 @@ pub(crate) mod health;
 pub mod issuers;
 pub mod maintenance;
 pub mod modules;
+pub mod node_health;
 pub mod node_shells;
 pub mod object_store;
 pub mod restore_copy;
@@ -85,7 +86,7 @@ use zeabur_kube::k8s_openapi::api::core::v1::Node;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{ClusterError, ClusterExt as _, DynamicObject};
-use zeabur_model::Origin;
+use zeabur_model::{Health, Origin};
 use zeabur_modules::Reading;
 
 use crate::error::{ApiError, list_read, list_read_of_key};
@@ -356,6 +357,7 @@ fn node_view(node: &Node) -> NodeView {
             .creation_timestamp
             .as_ref()
             .map(|t| t.0.to_string()),
+        issues: Vec::new(),
     }
 }
 
@@ -515,14 +517,10 @@ pub(crate) async fn nodes(
         totals.usage = plus(totals.usage, item.usage);
     }
     items.sort_by(|a, b| a.name.cmp(&b.name));
-    let pod_scan = match &pods {
-        None => PodScan::Unreadable,
-        Some(p) if p.truncated => PodScan::Partial,
-        Some(_) => PodScan::Complete,
-    };
+    let judged = node_health::judge(&mut items);
+    let pod_scan = PodScan::of(pods.as_ref());
     let pods_scanned = pods.as_ref().map_or(0, |p| p.pods.len());
     Ok(Json(NodeList {
-        items,
         totals,
         pod_scan,
         pods_scanned,
@@ -530,6 +528,11 @@ pub(crate) async fn nodes(
         metrics,
         disk: disk.state,
         unreadable,
+        thresholds: node_health::THRESHOLDS,
+        attention: judged.attention,
+        worst_first: judged.worst_first,
+        worst: judged.worst,
+        items,
     }))
 }
 
@@ -593,6 +596,10 @@ pub(crate) async fn upgrades(
         kubelets: &kubelets,
         plans: &statuses,
     });
+    let badge = versions::findings(&assessment.states).next();
+    let attention = versions::findings(&assessment.states)
+        .filter(|f| matches!(f.health, Health::Fail | Health::Warn))
+        .collect();
     Ok(Json(Upgrades {
         id: "cluster/upgrades".to_owned(),
         distribution: distribution(&version),
@@ -600,12 +607,8 @@ pub(crate) async fn upgrades(
         minor: assessment.minor,
         release: assessment.release,
         data_as_of: versions::DATA_AS_OF.to_owned(),
-        severity: assessment
-            .states
-            .iter()
-            .map(|s| s.severity())
-            .max()
-            .unwrap_or(versions::Severity::None),
+        badge,
+        attention,
         states: assessment.states,
         patch: assessment.patch,
         next_minor: assessment.next_minor,

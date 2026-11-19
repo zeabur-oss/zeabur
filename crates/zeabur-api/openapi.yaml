@@ -4937,6 +4937,26 @@ components:
       - volume
       - database
       - namespace
+    BackupVerdict:
+      type: object
+      description: "What the Backups tab says first: the state, how it shows, and the backup it is about."
+      required:
+      - state
+      - health
+      properties:
+        backup:
+          type:
+          - string
+          - "null"
+          description: |-
+            The backup it is about: the newest one with a known outcome, for `failed`, `running`
+            and `ok`.
+        health:
+          $ref: "#/components/schemas/Health"
+          description: How it shows.
+        state:
+          $ref: "#/components/schemas/VerdictState"
+          description: The state.
     BackupWrite:
       type: object
       description: One object a plan writes.
@@ -6870,6 +6890,7 @@ components:
       - canRestore
       - unreadable
       - providers
+      - verdict
       properties:
         backups:
           type: array
@@ -6922,6 +6943,57 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
+        verdict:
+          $ref: "#/components/schemas/BackupVerdict"
+          description: What the Backups tab says first.
+    ClusterCoverage:
+      oneOf:
+      - type: object
+        description: Velero is not installed.
+        required:
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - noVelero
+      - type: object
+        description: No active Velero schedule covers the project.
+        required:
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - notCovered
+      - type: object
+        description: A schedule covers it, and no backup of it has run yet.
+        required:
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - waiting
+      - type: object
+        description: The newest Velero backup of the project.
+        required:
+        - outcome
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - last
+          at:
+            type:
+            - string
+            - "null"
+            description: When it finished, else when it started (RFC 3339).
+          outcome:
+            $ref: "#/components/schemas/BackupOutcome"
+            description: How it went.
+      description: What the cluster's Velero backups do for one project.
     ClusterEventList:
       type: object
       description: Events of the whole cluster, the newest `limit` of them.
@@ -11810,6 +11882,7 @@ components:
       - requests
       - limits
       - unlimited
+      - nearMaximum
       properties:
         adopted:
           type:
@@ -11829,6 +11902,11 @@ components:
         namespace:
           type: string
           description: The namespace.
+        nearMaximum:
+          type: boolean
+          description: |-
+            Measured memory is at or above [`NEAR_LIMIT`] of what its pods may use at most, known
+            only when every pod sets a memory limit.
         origin:
           $ref: "#/components/schemas/Origin"
           description: Its Namespace.
@@ -12053,6 +12131,85 @@ components:
         type:
           type: string
           description: "`Ready`, `MemoryPressure`, `DiskPressure`, `PIDPressure` or `NetworkUnavailable`."
+    NodeIssue:
+      type: object
+      description: One thing wrong with a node.
+      required:
+      - kind
+      - health
+      properties:
+        health:
+          $ref: "#/components/schemas/Health"
+          description: How it shows.
+        kind:
+          $ref: "#/components/schemas/NodeIssueKind"
+          description: What.
+        share:
+          type:
+          - number
+          - "null"
+          format: double
+          description: "The share it is about: memory or disk in use, or reserved."
+    NodeIssueAt:
+      type: object
+      description: One issue on a node, in a group.
+      required:
+      - node
+      - health
+      properties:
+        health:
+          $ref: "#/components/schemas/Health"
+          description: How it shows there.
+        node:
+          type: string
+          description: The node.
+        share:
+          type:
+          - number
+          - "null"
+          format: double
+          description: The share it is about there.
+    NodeIssueGroup:
+      type: object
+      description: |-
+        One kind of issue over every node that has it, so twelve nodes over-reserved on memory read
+        as one line.
+      required:
+      - kind
+      - health
+      - problem
+      - issues
+      properties:
+        health:
+          $ref: "#/components/schemas/Health"
+          description: The worst health of its nodes.
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeIssueAt"
+          description: Each node with it, worst first.
+        kind:
+          $ref: "#/components/schemas/NodeIssueKind"
+          description: What.
+        problem:
+          type: boolean
+          description: It takes services down, or is about to.
+    NodeIssueKind:
+      type: string
+      description: What is wrong with a node, in the order it hurts.
+      enum:
+      - notReady
+      - memoryPressure
+      - diskPressure
+      - networkUnavailable
+      - memoryFull
+      - diskFull
+      - pidPressure
+      - cordoned
+      - draining
+      - maintenance
+      - reservedMemory
+      - reservedCpu
     NodeList:
       type: object
       description: The nodes, with the cluster's totals.
@@ -12065,7 +12222,15 @@ components:
       - metrics
       - disk
       - unreadable
+      - thresholds
+      - attention
+      - worstFirst
       properties:
+        attention:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeIssueGroup"
+          description: Each kind of issue over every node that has it, worst first.
         disk:
           $ref: "#/components/schemas/DiskState"
           description: Whether the nodes' disks could be read.
@@ -12084,6 +12249,9 @@ components:
           type: integer
           description: How many unfinished pods were read.
           minimum: 0
+        thresholds:
+          $ref: "#/components/schemas/NodeThresholds"
+          description: The thresholds the nodes are judged by.
         totals:
           $ref: "#/components/schemas/NodeTotals"
           description: Totals over every node.
@@ -12096,6 +12264,18 @@ components:
           type: integer
           description: Pods not yet placed on a node.
           minimum: 0
+        worst:
+          type:
+          - string
+          - "null"
+          description: |-
+            The node the totals would hide: the worst one, when there is more than one node and its
+            worst issue takes services down.
+        worstFirst:
+          type: array
+          items:
+            type: string
+          description: The nodes' names, worst first.
     NodeShellApplied:
       type: object
       description: What an apply did.
@@ -12298,6 +12478,26 @@ components:
         unsupported:
           type: boolean
           description: "`true` when outside the supported window."
+    NodeThresholds:
+      type: object
+      description: The thresholds a node is judged by.
+      required:
+      - tight
+      - memory
+      - disk
+      properties:
+        disk:
+          $ref: "#/components/schemas/Threshold"
+          description: |-
+            The kubelet's filesystem: the kubelet starts evicting pods below 10% free
+            (`nodefs.available<10%`).
+        memory:
+          $ref: "#/components/schemas/Threshold"
+          description: "Memory in use: the kernel kills processes as it runs out."
+        tight:
+          type: number
+          format: double
+          description: The share of allocatable reserved above which new pods may not fit.
     NodeTotals:
       type: object
       description: The cluster's totals over every node.
@@ -12346,6 +12546,7 @@ components:
       - containerRuntime
       - allocatable
       - capacity
+      - issues
       properties:
         allocatable:
           $ref: "#/components/schemas/Resources"
@@ -12377,6 +12578,11 @@ components:
         id:
           type: string
           description: "`cluster/nodes/<name>`."
+        issues:
+          type: array
+          items:
+            $ref: "#/components/schemas/NodeIssue"
+          description: What is wrong with it, worst first.
         kernelVersion:
           type: string
           description: The kernel version.
@@ -14609,6 +14815,13 @@ components:
       - keysFrom
       - unreadable
       properties:
+        cluster:
+          oneOf:
+          - $ref: "#/components/schemas/ClusterCoverage"
+            description: |-
+              What the cluster's Velero backups do for the project; absent when Velero could not be
+              read.
+          - type: "null"
         coverage:
           type: array
           items:
@@ -15247,11 +15460,18 @@ components:
       - id
       - state
       - pods
+      - nearLimit
       - unreadable
       properties:
         id:
           type: string
           description: "`projects/{project}/usage`."
+        nearLimit:
+          type: number
+          format: double
+          description: >-
+            The share of a pod's memory or CPU limit at or above which it is close to the
+            limit.
         pods:
           type: array
           items:
@@ -17227,14 +17447,6 @@ components:
           description: |-
             The address links open at; `None` when neither the server's configuration nor the
             Identity Deployment (where it can be read) names it.
-    Severity:
-      type: string
-      description: How much a state matters, from nothing to act on to act now.
-      enum:
-      - none
-      - info
-      - warning
-      - danger
     ShellExposure:
       type: object
       description: |-
@@ -17938,6 +18150,21 @@ components:
         version:
           type: string
           description: The application's version (`2.2.0`).
+    Threshold:
+      type: object
+      description: The shares at which a fill turns amber and red.
+      required:
+      - warn
+      - fail
+      properties:
+        fail:
+          type: number
+          format: double
+          description: Red from this share.
+        warn:
+          type: number
+          format: double
+          description: Amber from this share.
     Timeline:
       type: object
       description: A timeline.
@@ -18177,6 +18404,19 @@ components:
           - $ref: "#/components/schemas/SystemUpgradeControllerUpgrades"
             description: system-upgrade-controller's Plans.
           - type: "null"
+    UpgradeFinding:
+      type: object
+      description: A state of the cluster's version with how it shows.
+      required:
+      - state
+      - health
+      properties:
+        health:
+          $ref: "#/components/schemas/Health"
+          description: How it shows.
+        state:
+          $ref: "#/components/schemas/UpgradeState"
+          description: The state.
     UpgradeState:
       type: string
       description: |-
@@ -18199,12 +18439,22 @@ components:
       - kubernetesVersion
       - dataAsOf
       - states
-      - severity
+      - attention
       - skew
       - upgrading
       - unreadable
       - extensions
       properties:
+        attention:
+          type: array
+          items:
+            $ref: "#/components/schemas/UpgradeFinding"
+          description: The states someone has to act on, red and amber, most severe first.
+        badge:
+          oneOf:
+          - $ref: "#/components/schemas/UpgradeFinding"
+            description: "The one state the cluster's header and Home show: the most severe that shows."
+          - type: "null"
         dataAsOf:
           type: string
           description: When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`).
@@ -18248,9 +18498,6 @@ components:
           - $ref: "#/components/schemas/Release"
             description: That minor's support window, from Zeabur's bundled table.
           - type: "null"
-        severity:
-          $ref: "#/components/schemas/Severity"
-          description: The most severe state's severity.
         skew:
           type: array
           items:
@@ -18735,6 +18982,20 @@ components:
         zeabur:
           type: boolean
           description: It is the schedule Zeabur sets up ([`SCHEDULE`]).
+    VerdictState:
+      type: string
+      description: The cluster's backups in one state. An open set.
+      enum:
+      - notInstalled
+      - refused
+      - noLocation
+      - locationUnavailable
+      - noSchedule
+      - paused
+      - waiting
+      - failed
+      - running
+      - ok
     Via:
       type: string
       description: The form that made a plan.
@@ -18906,6 +19167,7 @@ components:
       - capacityBytes
       - usedBytes
       - availableBytes
+      - health
       properties:
         availableBytes:
           type: integer
@@ -18920,6 +19182,9 @@ components:
         claim:
           type: string
           description: The PersistentVolumeClaim.
+        health:
+          $ref: "#/components/schemas/Health"
+          description: "How full it shows: amber from 85% taken, red from 95%."
         usedBytes:
           type: integer
           format: int64
@@ -19438,7 +19703,11 @@ components:
       required:
       - latest
       - security
+      - health
       properties:
+        health:
+          $ref: "#/components/schemas/Health"
+          description: Red while a release fixes vulnerabilities the running version has, else amber.
         latest:
           $ref: "#/components/schemas/ZeaburRelease"
           description: >-

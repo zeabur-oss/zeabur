@@ -154,6 +154,8 @@ pub struct ZeaburNewer {
     /// The newer normal releases that fix vulnerabilities, newest first: the running version has
     /// them.
     pub security: Vec<ZeaburRelease>,
+    /// Red while a release fixes vulnerabilities the running version has, else amber.
+    pub health: Health,
 }
 
 /// A published release.
@@ -498,7 +500,7 @@ pub struct Taint {
 }
 
 /// A node: its roles, health, versions and capacity.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeView {
     /// `cluster/nodes/<name>`.
@@ -560,6 +562,8 @@ pub struct NodeView {
     /// When it joined the cluster (RFC 3339).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub created: Option<String>,
+    /// What is wrong with it, worst first.
+    pub issues: Vec<crate::cluster::node_health::NodeIssue>,
 }
 
 /// A filesystem's size and use.
@@ -627,6 +631,17 @@ pub enum PodScan {
     Unreadable,
 }
 
+impl PodScan {
+    /// How much of the pods `pods` holds; `None` when they could not be listed.
+    pub(crate) const fn of(pods: Option<&zeabur_kube::ClusterPods>) -> Self {
+        match pods {
+            None => Self::Unreadable,
+            Some(p) if p.truncated => Self::Partial,
+            Some(_) => Self::Complete,
+        }
+    }
+}
+
 /// Whether usage could be read. An open set.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
@@ -642,7 +657,7 @@ pub enum MetricsState {
 }
 
 /// The nodes, with the cluster's totals.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeList {
     /// Sorted by name.
@@ -661,6 +676,16 @@ pub struct NodeList {
     pub disk: DiskState,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
+    /// The thresholds the nodes are judged by.
+    pub thresholds: crate::cluster::node_health::NodeThresholds,
+    /// Each kind of issue over every node that has it, worst first.
+    pub attention: Vec<crate::cluster::node_health::NodeIssueGroup>,
+    /// The nodes' names, worst first.
+    pub worst_first: Vec<String>,
+    /// The node the totals would hide: the worst one, when there is more than one node and its
+    /// worst issue takes services down.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub worst: Option<String>,
 }
 
 /// The cluster's own version and what it calls for.
@@ -684,8 +709,11 @@ pub struct Upgrades {
     pub data_as_of: String,
     /// Every state that applies, most severe first. An open set.
     pub states: Vec<zeabur_catalog::versions::UpgradeState>,
-    /// The most severe state's severity.
-    pub severity: zeabur_catalog::versions::Severity,
+    /// The one state the cluster's header and Home show: the most severe that shows.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub badge: Option<zeabur_catalog::versions::UpgradeFinding>,
+    /// The states someone has to act on, red and amber, most severe first.
+    pub attention: Vec<zeabur_catalog::versions::UpgradeFinding>,
     /// A newer build of the same minor, from system-upgrade-controller's Plans; absent when no
     /// Plan resolved a newer version.
     #[serde(skip_serializing_if = "Option::is_none")]

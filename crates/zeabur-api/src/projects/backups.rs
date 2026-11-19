@@ -68,11 +68,70 @@ pub struct ProjectBackups {
     pub runs: Vec<Run>,
     /// The providers this build has.
     pub providers: Vec<BackupProvider>,
+    /// What the cluster's Velero backups do for the project; absent when Velero could not be
+    /// read.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cluster: Option<ClusterCoverage>,
     /// The S3 destination each Secret's keys were copied from, by the Secret's name; empty
     /// where the person may not list Secrets.
     pub keys_from: BTreeMap<String, String>,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
+}
+
+/// What the cluster's Velero backups do for one project.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(tag = "as", rename_all = "camelCase")]
+pub enum ClusterCoverage {
+    /// Velero is not installed.
+    NoVelero,
+    /// No active Velero schedule covers the project.
+    NotCovered,
+    /// A schedule covers it, and no backup of it has run yet.
+    Waiting,
+    /// The newest Velero backup of the project.
+    Last {
+        /// When it finished, else when it started (RFC 3339).
+        #[serde(skip_serializing_if = "Option::is_none")]
+        at: Option<String>,
+        /// How it went.
+        outcome: backups::Outcome,
+    },
+}
+
+/// What Velero does for the project, from its namespace's coverage row.
+fn cluster_coverage(
+    providers: &[BackupProvider],
+    coverage: &[Coverage],
+) -> Option<ClusterCoverage> {
+    let velero = providers
+        .iter()
+        .find(|p| p.module == zeabur_modules::velero::MODULE.id)?;
+    match velero.state {
+        ProviderState::Refused => return None,
+        ProviderState::NotInstalled => return Some(ClusterCoverage::NoVelero),
+        ProviderState::Installed => {}
+    }
+    let row = coverage
+        .iter()
+        .find(|c| c.target.kind == backups::TargetKind::Namespace);
+    if let Some(run) = row
+        .and_then(|r| r.last_run.as_ref())
+        .filter(|r| r.provider == zeabur_modules::velero::MODULE.id)
+    {
+        return Some(ClusterCoverage::Last {
+            at: run.time().map(str::to_owned),
+            outcome: run.outcome,
+        });
+    }
+    let prefix = format!("{}:", zeabur_modules::velero::MODULE.id);
+    Some(
+        if row.is_some_and(|r| r.scheduled_by.iter().any(|s| s.starts_with(&prefix))) {
+            ClusterCoverage::Waiting
+        } else {
+            ClusterCoverage::NotCovered
+        },
+    )
 }
 
 /// Reads `resources` of one module; the objects of each, or the state that stopped it.
@@ -319,6 +378,7 @@ pub(crate) async fn read(
         .filter_map(|meta| Some((meta.name.clone()?, s3_destinations::copied_from(meta)?)))
         .collect();
     Ok(ProjectBackups {
+        cluster: cluster_coverage(&providers, &coverage),
         coverage,
         unscheduled,
         schedules,

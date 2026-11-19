@@ -37,7 +37,7 @@ use zeabur_kube::{
     Cluster, ClusterError, ClusterExt as _, DynamicObject, ObjectTarget, ResourceRef, WriteBody,
     WriteRequest,
 };
-use zeabur_model::PodSecurityLevel;
+use zeabur_model::{Health, PodSecurityLevel};
 use zeabur_modules::backups::Outcome;
 use zeabur_modules::velero::{self, cluster as v};
 use zeabur_modules::{Reading, k8up};
@@ -90,6 +90,106 @@ pub struct ClusterBackups {
     pub unreadable: Vec<UnreadableView>,
     /// The backup tools of the cluster: K8up for volumes and Velero for whole projects.
     pub providers: Vec<BackupProvider>,
+    /// What the Backups tab says first.
+    pub verdict: Verdict,
+}
+
+/// The cluster's backups in one state. An open set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum VerdictState {
+    /// Velero is not installed.
+    NotInstalled,
+    /// The person may not read Velero's objects.
+    Refused,
+    /// There is no main location: none is the default and none is named `default`.
+    NoLocation,
+    /// Velero's last check could not reach the main location.
+    LocationUnavailable,
+    /// There is no schedule.
+    NoSchedule,
+    /// Every schedule is paused.
+    Paused,
+    /// A schedule runs, and no backup has finished yet.
+    Waiting,
+    /// The newest backup failed, or failed for some items.
+    Failed,
+    /// A backup is running.
+    Running,
+    /// The newest backup succeeded.
+    Ok,
+}
+
+/// What the Backups tab says first: the state, how it shows, and the backup it is about.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = BackupVerdict)]
+pub struct Verdict {
+    /// The state.
+    pub state: VerdictState,
+    /// How it shows.
+    pub health: Health,
+    /// The backup it is about: the newest one with a known outcome, for `failed`, `running`
+    /// and `ok`.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub backup: Option<String>,
+}
+
+impl Verdict {
+    const fn of(state: VerdictState) -> Self {
+        let health = match state {
+            VerdictState::NotInstalled | VerdictState::Refused | VerdictState::Paused => {
+                Health::Idle
+            }
+            VerdictState::NoLocation | VerdictState::NoSchedule => Health::Warn,
+            VerdictState::LocationUnavailable | VerdictState::Failed => Health::Fail,
+            VerdictState::Waiting | VerdictState::Running => Health::Progress,
+            VerdictState::Ok => Health::Ok,
+        };
+        Self {
+            state,
+            health,
+            backup: None,
+        }
+    }
+
+    /// The verdict over what Velero holds: the main location first, then the schedules, then
+    /// the newest backup. A running backup counts even while every schedule is paused.
+    fn read(
+        locations: &[v::Location],
+        schedules: &[v::ScheduleView],
+        backups: &[v::BackupView],
+    ) -> Self {
+        let Some(location) = main_location(locations) else {
+            return Self::of(VerdictState::NoLocation);
+        };
+        if location.phase == v::LocationPhase::Unavailable {
+            return Self::of(VerdictState::LocationUnavailable);
+        }
+        if schedules.is_empty() {
+            return Self::of(VerdictState::NoSchedule);
+        }
+        let latest = backups.iter().find(|b| b.outcome != Outcome::Unknown);
+        let about = |state| Self {
+            backup: latest.map(|b| b.name.clone()),
+            ..Self::of(state)
+        };
+        match latest.map(|b| b.outcome) {
+            Some(Outcome::Running) => about(VerdictState::Running),
+            _ if schedules.iter().all(|s| s.paused) => Self::of(VerdictState::Paused),
+            None => Self::of(VerdictState::Waiting),
+            Some(Outcome::Failed | Outcome::PartiallyFailed) => about(VerdictState::Failed),
+            Some(_) => about(VerdictState::Ok),
+        }
+    }
+}
+
+/// The location Zeabur edits: the default one, else the one named `default`.
+fn main_location(locations: &[v::Location]) -> Option<&v::Location> {
+    locations
+        .iter()
+        .find(|l| l.default)
+        .or_else(|| locations.iter().find(|l| l.name == v::LOCATION))
 }
 
 /// What to plan.
@@ -443,6 +543,11 @@ fn empty(
         keys_from: None,
         unreadable,
         providers,
+        verdict: Verdict::of(if state == ProviderState::Refused {
+            VerdictState::Refused
+        } else {
+            VerdictState::NotInstalled
+        }),
     }
 }
 
@@ -516,7 +621,9 @@ pub(crate) async fn get(
     schedules.sort_by(|a, b| (!a.zeabur, &a.name).cmp(&(!b.zeabur, &b.name)));
     let can_change = may_create(cluster, "schedules", &namespace).await;
     let can_restore = may_create(cluster, "restores", &namespace).await;
+    let verdict = Verdict::read(&locations, &schedules, &listed);
     Ok(Json(ClusterBackups {
+        verdict,
         state: ProviderState::Installed,
         namespace,
         locations,
@@ -570,10 +677,7 @@ async fn keys_from(
     namespace: &str,
     locations: &[v::Location],
 ) -> Option<String> {
-    let main = locations
-        .iter()
-        .find(|l| l.default)
-        .or_else(|| locations.iter().find(|l| l.name == v::LOCATION))?;
+    let main = main_location(locations)?;
     let secret = cluster
         .find_object(&secrets(), Some(namespace), main.credential.as_deref()?)
         .await

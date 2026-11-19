@@ -2,7 +2,7 @@
 // StatefulSet's mount names a claim template (`data`); each replica has its own claim
 // (`data-db-0`), and the fullest one counts.
 import type { Schemas } from "@/api/client"
-import { diskShare, fillHealth, VOLUME } from "@/model/node-health"
+import { diskShare } from "@/model/node-health"
 import { claimOf, type Health, type Service } from "@/model/service"
 
 type VolumeUsage = Schemas.VolumeUsage
@@ -63,7 +63,7 @@ export function volumeFill(
     capacityBytes: item.capacityBytes,
     takenBytes: Math.max(0, item.capacityBytes - item.availableBytes),
     share,
-    health: fillHealth(share, VOLUME),
+    health: item.health,
     replicas: new Set(mine.map((m) => m.claim)).size,
   }
 }

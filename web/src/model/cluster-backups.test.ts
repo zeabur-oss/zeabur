@@ -10,11 +10,9 @@ import {
   locationProblems,
   locationRequest,
   pickLocation,
-  projectCoverage,
   scheduleForm,
   scheduleProblems,
   scheduleRequest,
-  verdict,
 } from "@/model/cluster-backups"
 
 const location = (patch: Partial<Schemas.VeleroLocation> = {}): Schemas.VeleroLocation => ({
@@ -50,55 +48,6 @@ const backup = (
   outcome,
   errors: 0,
   warnings: 0,
-})
-
-const data = (patch: Partial<Schemas.ClusterBackups> = {}): Schemas.ClusterBackups => ({
-  state: "installed",
-  namespace: "velero",
-  locations: [location()],
-  schedules: [schedule()],
-  backups: [],
-  restores: [],
-  totalBackups: 0,
-  canChange: "allowed",
-  canRestore: "allowed",
-  unreadable: [],
-  providers: [],
-  ...patch,
-})
-
-describe("verdict", () => {
-  test("Velero not installed or not readable is a state", () => {
-    expect(verdict(data({ state: "not-installed" })).as).toBe("notInstalled")
-    expect(verdict(data({ state: "refused" })).as).toBe("refused")
-  })
-
-  test("the location comes before the schedule", () => {
-    expect(verdict(data({ locations: [] })).as).toBe("noLocation")
-    expect(verdict(data({ locations: [location({ phase: "unavailable" })] })).as).toBe(
-      "locationUnavailable",
-    )
-    expect(verdict(data({ schedules: [] })).as).toBe("noSchedule")
-  })
-
-  test("the newest backup decides, after a pause", () => {
-    expect(verdict(data()).as).toBe("waiting")
-    expect(verdict(data({ schedules: [schedule({ paused: true })] })).as).toBe("paused")
-    const failed = data({ backups: [backup("partiallyFailed"), backup("succeeded")] })
-    expect(verdict(failed)).toMatchObject({
-      as: "failed",
-      backup: { name: "zeabur-partiallyFailed" },
-    })
-    expect(verdict(data({ backups: [backup("succeeded")] })).as).toBe("ok")
-    expect(verdict(data({ backups: [backup("running"), backup("failed")] })).as).toBe("running")
-  })
-
-  test("a location named default counts when none is marked default", () => {
-    expect(verdict(data({ locations: [location({ default: false })] })).as).toBe("waiting")
-    expect(verdict(data({ locations: [location({ default: false, name: "other" })] })).as).toBe(
-      "noLocation",
-    )
-  })
 })
 
 describe("the location form", () => {
@@ -204,37 +153,4 @@ test("coverage and the last good backup", () => {
   expect(lastGood([backup("failed"), backup("partiallyFailed"), backup("succeeded")])?.name).toBe(
     "zeabur-partiallyFailed",
   )
-})
-
-test("the project's line comes from its own read of Velero", () => {
-  const project = (
-    state: Schemas.ProviderState,
-    row: Partial<Schemas.BackupCoverage> = {},
-  ): Schemas.ProjectBackups => ({
-    providers: [{ module: "velero", state }],
-    coverage: [{ target: { kind: "namespace", name: "shop" }, scheduledBy: [], ...row }],
-    runs: [],
-    keysFrom: {},
-    schedules: [],
-    unreadable: [],
-    unscheduled: [],
-  })
-  expect(projectCoverage(project("refused"))).toBeUndefined()
-  expect(projectCoverage(project("not-installed"))).toEqual({ as: "noVelero" })
-  expect(projectCoverage(project("installed"))).toEqual({ as: "notCovered" })
-  expect(projectCoverage(project("installed", { scheduledBy: ["velero:velero/zeabur"] }))).toEqual({
-    as: "waiting",
-  })
-  const run = {
-    name: "zeabur-1",
-    provider: "velero",
-    outcome: "succeeded" as const,
-    finished: "2026-10-23T03:05:00Z",
-    targets: [],
-  }
-  expect(projectCoverage(project("installed", { lastRun: run }))).toEqual({
-    as: "last",
-    at: "2026-10-23T03:05:00Z",
-    outcome: "succeeded",
-  })
 })

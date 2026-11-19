@@ -23,7 +23,6 @@ import { useI18n, useT } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import { BuildLimits } from "@/routes/project/build-limits"
 import { NetworkSettings } from "@/routes/project/network-settings"
-import { projectCoverage } from "@/model/cluster-backups"
 import { DISPLAY_NAME_MAX, mayChange, projectIcons, type ProjectIconName } from "@/model/project"
 import type { Service } from "@/model/service"
 import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
@@ -469,7 +468,7 @@ function ClusterBackups({ project }: { project: string }) {
   const t = useT()
   const { locale } = useI18n()
   const data = useBackups(project).data
-  const coverage = data ? projectCoverage(data) : undefined
+  const coverage = data?.cluster
   if (!coverage) return null
   const line = (() => {
     switch (coverage.as) {

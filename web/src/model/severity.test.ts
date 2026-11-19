@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { nodeIssues } from "@/model/node-health"
 import type { Overview } from "@/model/overview"
 import type { Status } from "@/model/service"
 import {
@@ -62,25 +61,6 @@ const toneOf = (
     now,
   }).tone
 
-const node = (more: Partial<Schemas.NodeView> = {}): Schemas.NodeView => ({
-  id: "nodes/vps-1",
-  name: "vps-1",
-  allocatable: { cpuMillicores: 2000, memoryBytes: 2 ** 31, pods: 110 },
-  capacity: { cpuMillicores: 2000, memoryBytes: 2 ** 31, pods: 110 },
-  architecture: "amd64",
-  containerRuntime: "containerd://1.7",
-  cordoned: false,
-  kernelVersion: "6.1",
-  kubeletVersion: "v1.31.4+k3s1",
-  osImage: "Debian",
-  origin: { kind: "Node", name: "vps-1" },
-  problems: [],
-  ready: "True",
-  roles: [],
-  taints: [],
-  ...more,
-})
-
 describe("red: not doing its job and won't recover without someone acting", () => {
   test("a failed run", () => {
     expect(toneOf({ health: "fail", word: "failing", reason: "Error", task: true })).toBe("fail")
@@ -119,10 +99,6 @@ describe("red: not doing its job and won't recover without someone acting", () =
     expect(severity.certificateFailed).toBe("fail")
   })
 
-  test("a node that is not ready", () => {
-    expect(nodeIssues(node({ ready: "False" }))[0]?.health).toBe("fail")
-  })
-
   test("an error log line", () => {
     expect(logTone.error).toBe("fail")
   })
@@ -151,13 +127,6 @@ describe("amber: still serving, but degraded or needs attention soon", () => {
 
   test("DNS that points elsewhere", () => {
     expect(reachHealth.elsewhere).toBe("warn")
-  })
-
-  test("more reserved than a node holds", () => {
-    const reserved = nodeIssues(
-      node({ requests: { cpuMillicores: 1900, memoryBytes: 0, pods: 3 } }),
-    ).find((i) => i.kind === "reservedCpu")
-    expect(reserved?.health).toBe("warn")
   })
 
   test("a warning log line", () => {

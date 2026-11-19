@@ -5,13 +5,13 @@ import type { ReactNode } from "react"
 import type { Schemas } from "@/api/client"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
-import { providerOf, verdict, verdictHealth } from "@/model/cluster-backups"
+import { providerOf } from "@/model/cluster-backups"
 import type { Health } from "@/model/service"
 import { Section } from "@/routes/cluster/section"
 
 export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
   const t = useT()
-  const velero = data && data.state !== "not-installed" ? verdict(data) : undefined
+  const velero = data && data.state !== "not-installed" ? data.verdict : undefined
   return (
     <Section id="backup-coverage" title={t("clusterBackups.coverage.title")}>
       <div className="overflow-hidden rounded-lg border border-main bg-card">
@@ -45,8 +45,8 @@ export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
               method={t("clusterBackups.coverage.projectMethod")}
               status={
                 velero ? (
-                  <Dot health={verdictHealth[velero.as]}>
-                    {t(`clusterBackups.verdict.${velero.as as "ok"}`)}
+                  <Dot health={velero.health}>
+                    {t(`clusterBackups.verdict.${velero.state as "ok"}`)}
                   </Dot>
                 ) : (
                   <Tool provider={providerOf(data?.providers, "velero")} />

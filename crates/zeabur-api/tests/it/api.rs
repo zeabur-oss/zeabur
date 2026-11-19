@@ -627,6 +627,62 @@ mod tests {
             [&json!("k8up"), &json!("velero"), &json!("cloudnative-pg")]
         );
         assert_eq!(backups["unreadable"][0]["resource"], "schedules.velero.io");
+        assert_eq!(backups.get("cluster"), None);
+    }
+
+    #[tokio::test]
+    async fn the_cluster_backups_say_whether_they_cover_the_project_and_how_the_last_went() {
+        let cluster = cluster();
+        let velero = |kind: &str, spec: Value, status: Value| -> zeabur_kube::DynamicObject {
+            serde_json::from_value(json!({
+                "apiVersion": "velero.io/v1", "kind": kind,
+                "metadata": {"name": "zeabur", "namespace": "velero",
+                             "labels": {"velero.io/schedule-name": "zeabur"}},
+                "spec": spec, "status": status
+            }))
+            .unwrap()
+        };
+        let coverage = get(&cluster, "/api/v1/projects/shop/backups").await;
+        assert_eq!(coverage["cluster"], json!({"as": "noVelero"}));
+
+        cluster.update(|s| {
+            for (resource, kind) in [("schedules", "Schedule"), ("backups", "Backup")] {
+                s.served.push(ServedResource::readable(
+                    "velero.io",
+                    "v1",
+                    resource,
+                    kind,
+                    true,
+                ));
+            }
+        });
+        let coverage = get(&cluster, "/api/v1/projects/shop/backups").await;
+        assert_eq!(coverage["cluster"], json!({"as": "notCovered"}));
+
+        cluster.update(|s| {
+            s.dynamic.push(velero(
+                "Schedule",
+                json!({"schedule": "0 3 * * *",
+                       "template": {"includedNamespaces": ["shop"]}}),
+                json!({}),
+            ));
+        });
+        let coverage = get(&cluster, "/api/v1/projects/shop/backups").await;
+        assert_eq!(coverage["cluster"], json!({"as": "waiting"}));
+
+        cluster.update(|s| {
+            s.dynamic.push(velero(
+                "Backup",
+                json!({"includedNamespaces": ["shop"]}),
+                json!({"phase": "Completed", "startTimestamp": "2026-10-23T03:00:00Z",
+                       "completionTimestamp": "2026-10-23T03:10:00Z"}),
+            ));
+        });
+        let coverage = get(&cluster, "/api/v1/projects/shop/backups").await;
+        assert_eq!(
+            coverage["cluster"],
+            json!({"as": "last", "at": "2026-10-23T03:10:00Z", "outcome": "succeeded"})
+        );
     }
 
     /// A claim of a StatefulSet a `MariaDB` controls and a claim a CloudNativePG `Cluster`

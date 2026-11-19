@@ -40,6 +40,7 @@ use std::fmt;
 
 use serde::Serialize;
 use utoipa::ToSchema;
+use zeabur_model::Health;
 
 /// When [`RELEASES`] was copied from the Kubernetes schedule.
 pub const DATA_AS_OF: &str = "2026-10-14";
@@ -180,32 +181,37 @@ pub enum UpgradeState {
 }
 
 impl UpgradeState {
-    /// How much it matters.
+    /// How it shows: red to act now, amber to plan for, progress for news; nothing for a state
+    /// that needs no word.
     #[must_use]
-    pub const fn severity(self) -> Severity {
+    pub const fn health(self) -> Option<Health> {
         match self {
-            Self::EndOfLife | Self::SkewUnsupported => Severity::Danger,
-            Self::Maintenance => Severity::Warning,
-            Self::PatchAvailable | Self::MinorAvailable | Self::SkewMixed | Self::Upgrading => {
-                Severity::Info
-            }
-            Self::NewerThanData => Severity::None,
+            Self::EndOfLife | Self::SkewUnsupported => Some(Health::Fail),
+            Self::Maintenance => Some(Health::Warn),
+            Self::PatchAvailable | Self::MinorAvailable | Self::Upgrading => Some(Health::Progress),
+            Self::SkewMixed | Self::NewerThanData => None,
         }
     }
 }
 
-/// How much a state matters, from nothing to act on to act now.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
-#[serde(rename_all = "kebab-case")]
-pub enum Severity {
-    /// Nothing to do.
-    None,
-    /// Worth knowing.
-    Info,
-    /// Plan to act.
-    Warning,
-    /// Act now.
-    Danger,
+/// A state of the cluster's version with how it shows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UpgradeFinding {
+    /// The state.
+    pub state: UpgradeState,
+    /// How it shows.
+    pub health: Health,
+}
+
+/// Each of `states` that shows, in their order.
+pub fn findings(states: &[UpgradeState]) -> impl Iterator<Item = UpgradeFinding> + '_ {
+    states.iter().filter_map(|&state| {
+        Some(UpgradeFinding {
+            state,
+            health: state.health()?,
+        })
+    })
 }
 
 /// A node whose kubelet minor differs from kube-apiserver's.
@@ -251,7 +257,8 @@ pub struct Assessment {
     pub minor: Option<String>,
     /// The table's row for that minor.
     pub release: Option<Release>,
-    /// Every state that applies, most severe first.
+    /// Every state that applies, most severe first: red, amber, progress, then those that show
+    /// nothing.
     pub states: Vec<UpgradeState>,
     /// A newer build of the same minor, from a Plan.
     pub patch: Option<String>,
@@ -315,7 +322,7 @@ pub fn assess(inputs: &Inputs<'_>) -> Assessment {
 
     newer(current, inputs.plans, &mut out);
     out.states
-        .sort_by(|a, b| b.severity().cmp(&a.severity()).then(a.cmp(b)));
+        .sort_by_key(|s| (s.health().is_none(), s.health(), *s));
     out
 }
 

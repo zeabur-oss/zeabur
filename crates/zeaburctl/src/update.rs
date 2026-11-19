@@ -143,14 +143,10 @@ mod tests {
             prerelease: false,
             security,
         };
-        let plain = ZeaburNewer {
-            latest: release(false),
-            security: Vec::new(),
+        let of = |security| {
+            releases::newer(&[release(security)], "0.1.1").expect("0.2.0 is newer than 0.1.1")
         };
-        let security = ZeaburNewer {
-            latest: release(true),
-            security: vec![release(true)],
-        };
+        let (plain, security) = (of(false), of(true));
         for notice in [notice(&plain, "0.1.1"), notice(&security, "0.1.1")] {
             assert!(!notice.contains('\n'));
             assert!(
