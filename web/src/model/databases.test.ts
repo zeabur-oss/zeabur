@@ -56,6 +56,8 @@ function merged(live: unknown, patch: unknown): Record<string, unknown> {
 
 const postgres: Database = {
   apiVersion: "postgresql.cnpg.io/v1",
+  apiGroup: "postgresql.cnpg.io",
+  apiGroupVersion: "v1",
   kind: "Cluster",
   resource: "clusters",
   engine: "postgresql",
@@ -89,6 +91,7 @@ const postgres: Database = {
 const mongo: Database = {
   ...postgres,
   apiVersion: "psmdb.percona.com/v1",
+  apiGroup: "psmdb.percona.com",
   kind: "PerconaServerMongoDB",
   resource: "perconaservermongodbs",
   engine: "mongodb",
@@ -1181,7 +1184,7 @@ describe("changing backups", () => {
       keysExist: false,
       regionSaved: false,
     })
-    const noRegion = "data:\n  ACCESS_KEY_ID: YQ==\n  ACCESS_SECRET_KEY: Yg==\n"
+    const noRegion = { ACCESS_KEY_ID: "YQ==", ACCESS_SECRET_KEY: "Yg==" }
     expect(backupKeys(pg, noRegion)).toEqual({ keysExist: true, regionSaved: false })
   })
 

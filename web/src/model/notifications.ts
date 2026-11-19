@@ -1,4 +1,5 @@
 import type { Schemas } from "@/api/client"
+import { AlertmanagerChannelKind } from "@/api/zeabur"
 
 type Settings = Schemas.AlertmanagerChannelSettings
 export type ChannelKind = Settings["kind"]
@@ -10,25 +11,20 @@ export const METRICS_COMPONENT = "victoria-metrics"
 /** `NAME_MAX` in zeabur-modules' alertmanager. */
 export const NAME_MAX = 30
 
-export const KINDS: ChannelKind[] = ["slack", "discord", "telegram", "email", "webhook", "ntfy"]
+export const KINDS = Object.values(AlertmanagerChannelKind).filter(
+  (kind): kind is ChannelKind => kind !== "other",
+)
 
-export type Field =
-  | "webhookUrl"
-  | "botToken"
-  | "chatId"
-  | "to"
-  | "from"
-  | "smarthost"
-  | "username"
-  | "password"
-  | "url"
-  | "bearerToken"
-  | "server"
-  | "topic"
-  | "accessToken"
+type Of<K extends ChannelKind> = Extract<Settings, { kind: K }>
+type FieldsOf<K extends ChannelKind> = Exclude<keyof Of<K>, "kind">
+export type Field = { [K in ChannelKind]: FieldsOf<K> }[ChannelKind]
 
-/** The fields of each kind, in order; the second value says whether it may stay empty. */
-export const FIELDS: Record<ChannelKind, [Field, boolean][]> = {
+/** The fields of each kind, in order, each with whether the schema lets it stay empty. */
+export const FIELDS: {
+  [K in ChannelKind]: {
+    [F in FieldsOf<K>]-?: [F, undefined extends Of<K>[F] ? true : false]
+  }[FieldsOf<K>][]
+} = {
   slack: [["webhookUrl", false]],
   discord: [["webhookUrl", false]],
   telegram: [
@@ -128,38 +124,6 @@ export function settingsOf(form: ChannelForm): Settings {
     case "ntfy":
       return { kind: "ntfy", server: v("server"), topic: v("topic"), accessToken: v("accessToken") }
   }
-}
-
-/** The first line of the section: whether alerts reach anyone, and what is wrong when not. */
-export type Verdict =
-  | { as: "none" }
-  | { as: "rejected"; count: number }
-  | { as: "waiting"; count: number }
-  | { as: "ok"; count: number }
-
-export function verdict(channels: Schemas.AlertmanagerChannel[]): Verdict {
-  if (channels.length === 0) return { as: "none" }
-  const count = (status: Schemas.AlertmanagerChannelStatus) =>
-    channels.filter((c) => c.status === status).length
-  if (count("rejected") > 0) return { as: "rejected", count: count("rejected") }
-  if (count("active") === 0) return { as: "waiting", count: channels.length }
-  return { as: "ok", count: count("active") }
-}
-
-/** What to do about a channel the operator refused, for the reasons Zeabur knows. */
-export type Fix = "secretMissing" | "scheme" | "url" | "required" | "port"
-
-// The operator's own words (v0.75); the scheme check also says "invalid URL", so it comes first.
-const FIXES: [RegExp, Fix][] = [
-  [/unable to fetch secret=|was not found at object="secret\//, "secretMissing"],
-  [/unsupported scheme/, "scheme"],
-  [/invalid URL|invalid 'url'|missing host for URL|webhook url|webhook_url/, "url"],
-  [/required field/, "required"],
-  [/smarthost=.*port cannot be empty/, "port"],
-]
-
-export function fixOf(reason: string): Fix | undefined {
-  return FIXES.find(([pattern]) => pattern.test(reason))?.[1]
 }
 
 export const statusHealth = { active: "ok", rejected: "fail", waiting: "idle" } as const

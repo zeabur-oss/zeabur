@@ -33,7 +33,7 @@ import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
 import { useScrollOnce } from "@/lib/in-view"
 import { addressOf } from "@/lib/objects"
-import { decodeSecretValue, secretData } from "@/lib/secret-data"
+import { decodeSecretValue } from "@/lib/secret-data"
 import { cn } from "@/lib/utils"
 
 type Kind = "ConfigMap" | "Secret"
@@ -51,14 +51,14 @@ export function editAfterTyping(current: string, value: string, hidden: boolean)
   return value === current || (hidden && value === "") ? undefined : { op: "set", value }
 }
 
-/** A Secret's keys from its YAML: text values decoded, the rest as bytes. */
-export function secretKeys(yaml: string): {
+/** A Secret's keys from its `data`: text values decoded, the rest as bytes. */
+export function secretKeys(data: Record<string, string> = {}): {
   text: Record<string, string>
   binary: Record<string, Uint8Array<ArrayBuffer>>
 } {
   const text: Record<string, string> = Object.create(null)
   const binary: Record<string, Uint8Array<ArrayBuffer>> = Object.create(null)
-  for (const [key, base64] of Object.entries(secretData(yaml))) {
+  for (const [key, base64] of Object.entries(data)) {
     const value = decodeSecretValue(base64)
     if (value?.text === undefined) binary[key] = value?.bytes ?? new Uint8Array()
     else text[key] = value.text
@@ -288,7 +288,9 @@ export function DataEditor({
   const scrollTo = useScrollOnce<HTMLLIElement>()
 
   const configMap = configMaps.data?.items.find((c) => c.origin.name === name)
-  const secret = secretKeys(kind === "Secret" ? (secretYaml.data?.yaml ?? "") : "")
+  const secret = secretKeys(
+    kind === "Secret" ? (secretYaml.data?.secretData ?? undefined) : undefined,
+  )
   const values: Record<string, string> =
     kind === "ConfigMap" ? (configMap?.data ?? {}) : secret.text
   const binary = kind === "ConfigMap" ? (configMap?.binaryKeys ?? []) : []

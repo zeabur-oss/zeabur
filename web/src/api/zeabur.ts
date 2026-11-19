@@ -228,6 +228,20 @@ export const AlertmanagerEvent = {
 } as const
 
 /**
+ * What to do about a channel the operator refused, for the reasons Zeabur knows.
+ */
+export type AlertmanagerChannelFix =
+  (typeof AlertmanagerChannelFix)[keyof typeof AlertmanagerChannelFix]
+
+export const AlertmanagerChannelFix = {
+  secretMissing: "secretMissing",
+  scheme: "scheme",
+  url: "url",
+  required: "required",
+  port: "port",
+} as const
+
+/**
  * Where a channel sends.
  */
 export type AlertmanagerChannelKind =
@@ -268,6 +282,7 @@ export type AlertmanagerChannel = {
    * `smarthost`, `username`); empty for one Zeabur did not make.
    */
   fields?: AlertmanagerChannelFields
+  fix?: AlertmanagerChannelFix | null
   /** Where it sends. */
   kind: AlertmanagerChannelKind
   /** Whether Zeabur made it, and so may change it. */
@@ -838,7 +853,8 @@ export type BackupsPlanRequest =
       cron: string
       /**
        * How many days each backup is kept.
-       * @minimum 0
+       * @minimum 1
+       * @maximum 365
        */
       keepDays: number
       /** The namespaces to back up; empty for every namespace. */
@@ -858,6 +874,7 @@ export type BackupsPlanRequest =
       backup: string
       /**
        * The new namespace, needed while `namespace` exists.
+       * @maxLength 63
        * @nullable
        */
       into?: string | null
@@ -954,6 +971,16 @@ export type Blocker = {
   need: number
   /** The resource: `requests.cpu`, `limits.memory`, `pods`, `cpu`, `memory`, … */
   resource: string
+}
+
+/**
+ * The Secret a `Build` reads its repository's credentials from.
+ */
+export type BuildCredentials = {
+  /** Its name. */
+  name: string
+  /** Whether it is the one Zeabur made for this `Build` (`<name>-git`), which goes with it. */
+  own: boolean
 }
 
 /**
@@ -1183,8 +1210,18 @@ export type Capability = {
 export type CapabilityList = {
   /** Zeabur Catalog's commit. */
   catalogueCommit: string
+  /**
+   * How many capabilities exist.
+   * @minimum 0
+   */
+  installed: number
   /** Each capability, sorted by name: existing (with evidence) or not (with what to install). */
   items: Capability[]
+  /**
+   * How many missing capabilities the catalogue recommends.
+   * @minimum 0
+   */
+  recommended: number
 }
 
 /**
@@ -2086,6 +2123,7 @@ export type Change =
   | {
       /**
        * What the project is.
+       * @maxLength 500
        * @nullable
        */
       description?: string | null
@@ -2191,6 +2229,46 @@ export type Change =
   | {
       op: "clusterTools"
     }
+
+/**
+ * Whether alerts reach anyone.
+ */
+export type ChannelsOutcome = (typeof ChannelsOutcome)[keyof typeof ChannelsOutcome]
+
+export const ChannelsOutcome = {
+  none: "none",
+  rejected: "rejected",
+  waiting: "waiting",
+  ok: "ok",
+} as const
+
+/**
+ * A service's health, from worst to best: what a status dot shows.
+ */
+export type Health = (typeof Health)[keyof typeof Health]
+
+export const Health = {
+  fail: "fail",
+  warn: "warn",
+  progress: "progress",
+  ok: "ok",
+  idle: "idle",
+} as const
+
+/**
+ * The first line of a set of channels: whether alerts reach anyone, and what is wrong when not.
+ */
+export type ChannelsVerdict = {
+  /**
+   * The channels the outcome counts.
+   * @minimum 0
+   */
+  count: number
+  /** Its status dot. */
+  health: Health
+  /** The outcome; a refused channel comes first. */
+  outcome: ChannelsOutcome
+}
 
 /**
  * A public source a rule rests on.
@@ -3364,6 +3442,8 @@ export type PlanWarning =
   | {
       code: "publicPort"
       dataStore?: DataStore | null
+      /** `fail` for a data store, `warn` for any other service. */
+      health: Health
       /** The port. */
       port: number
       /** The workload. */
@@ -4719,19 +4799,6 @@ export const DatabaseEngine = {
 } as const
 
 /**
- * A service's health, from worst to best: what a status dot shows.
- */
-export type Health = (typeof Health)[keyof typeof Health]
-
-export const Health = {
-  fail: "fail",
-  warn: "warn",
-  progress: "progress",
-  ok: "ok",
-  idle: "idle",
-} as const
-
-/**
  * One pod of a workload.
  */
 export type PodSummary = {
@@ -4812,6 +4879,10 @@ export const DatabaseState = {
  * One database cluster.
  */
 export type Database = {
+  /** The API group of `apiVersion`. */
+  apiGroup: string
+  /** The version of `apiVersion`, without its group. */
+  apiGroupVersion: string
   /** The object's `apiVersion`. */
   apiVersion: string
   app?: DatabaseAppUser | null
@@ -6145,7 +6216,11 @@ export type GitHubManifest = {
  * What the manifest flow needs.
  */
 export type GitHubManifestRequest = {
-  /** The App's name on GitHub, unique there, at most 34 characters. */
+  /**
+   * The App's name on GitHub, unique there, at most 34 characters.
+   * @minLength 1
+   * @maxLength 34
+   */
   name: string
   /** The organization to make the App in; empty for the person's own account. */
   organization?: string
@@ -6450,6 +6525,11 @@ export type IssuedTokenView = {
   ca?: string | null
   /** When it expires, RFC 3339, as kube-apiserver answered. */
   expiresAt: string
+  /**
+   * A kubeconfig that uses the token. `server` is empty: Zeabur knows kube-apiserver only by
+   * its in-cluster address, so the person fills in the one they reach it on.
+   */
+  kubeconfig: string
   /** The token's name. */
   name: string
   /** The namespace of its ServiceAccount. */
@@ -6916,6 +6996,8 @@ export type SetupLinks = {
 export type MembersView = {
   /** API tokens, by name: machine accounts with the access of a member. */
   apiTokens: ApiTokenView[]
+  /** The roles a member can be given in a project, in the order to offer them. */
+  assignableRoles: ProjectRole[]
   /** Whether the person may create invitations, as far as their rules tell. */
   canManage: Permission
   /**
@@ -6923,6 +7005,8 @@ export type MembersView = {
    * namespace.
    */
   canManageTokens: Permission
+  /** The role a new member gets in a project unless another is chosen. */
+  defaultRole: ProjectRole
   /** `members`. */
   id: string
   /** Whether Zeabur Identity is installed; when not, everything else is empty. */
@@ -7461,6 +7545,8 @@ export type Notifications = {
   state: ProviderState
   /** What could not be read. */
   unreadable: UnreadableView[]
+  /** Whether alerts reach anyone. */
+  verdict: ChannelsVerdict
 }
 
 /**
@@ -7532,6 +7618,13 @@ export type NotificationsPlanRequest =
     }
 
 /**
+ * A Secret's `data`, each key with its value in base64, as in `yaml`; absent for any other
+ * kind.
+ * @nullable
+ */
+export type ObjectDocumentSecretData = { [key: string]: string } | null
+
+/**
  * The object's `status` as the cluster reports it; absent when it has none, and never for a
  * Secret.
  * @nullable
@@ -7550,6 +7643,12 @@ export type ObjectDocument = {
   provenance: Provenance
   /** The plural resource name. */
   resource: string
+  /**
+   * A Secret's `data`, each key with its value in base64, as in `yaml`; absent for any other
+   * kind.
+   * @nullable
+   */
+  secretData?: ObjectDocumentSecretData
   /**
    * The object's `status` as the cluster reports it; absent when it has none, and never for a
    * Secret.
@@ -8473,11 +8572,7 @@ export type ZeaburBuilderBuild = {
    * @nullable
    */
   contextDir?: string | null
-  /**
-   * The Secret it reads the repository's credentials from.
-   * @nullable
-   */
-  credentials?: string | null
+  credentials?: BuildCredentials | null
   /**
    * The Dockerfile, relative to the context; none for `Dockerfile`.
    * @nullable
@@ -9478,6 +9573,8 @@ export type S3DestinationWrite = {
    * @nullable
    */
   beforeYaml?: string | null
+  /** Whether it is a copy of a destination's keys in another namespace. */
+  copy: boolean
   /** The object's kind. */
   kind: string
   /** Its name. */
@@ -9783,6 +9880,8 @@ export type TaskRun = {
    * @nullable
    */
   finished?: string | null
+  /** Its status dot: a failed run fails, a running one is fine, a finished one is idle. */
+  health: Health
   /** Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`). */
   manual: boolean
   /** The Job's name. */

@@ -30,9 +30,6 @@ type Run = Schemas.TaskRun
 export const zoned = (cron: string, zone?: string | null) =>
   zone ? `CRON_TZ=${zone} ${cron}` : cron
 
-const runHealth = (run: Run) =>
-  run.status === "failed" ? "fail" : run.status === "running" ? "ok" : "idle"
-
 export function TaskWhen({ schedule }: { schedule: Schemas.TaskSchedule }) {
   const t = useT()
   return (
@@ -214,7 +211,7 @@ function RunRow({
   const pod = run.pods.at(-1)
   return (
     <li className="flex min-w-0 items-center gap-2.5 px-4 py-2.5">
-      <StatusDot health={runHealth(run)} />
+      <StatusDot health={run.health} />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="flex min-w-0 items-center gap-2 type-body">
           <span className="font-medium">{t(`tasks.run.${run.status}`)}</span>

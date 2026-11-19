@@ -229,6 +229,22 @@ mod tests {
         let (planned, _) = applied(&app, BASE, &rotate()).await;
         assert!(!planned.to_string().contains("rotated-secret"), "{planned}");
         assert_eq!(planned["keptCopies"], json!([]), "{planned}");
+        let copies: Vec<(&str, &str, bool)> = planned["writes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| {
+                (
+                    w["kind"].as_str().unwrap(),
+                    w["namespace"].as_str().unwrap(),
+                    w["copy"].as_bool().unwrap(),
+                )
+            })
+            .filter(|(kind, ..)| *kind == "Secret")
+            .collect();
+        assert!(copies.contains(&("Secret", NAMESPACE, false)), "{planned}");
+        assert!(copies.contains(&("Secret", "shop", true)), "{planned}");
+        assert!(copies.contains(&("Secret", "velero", true)), "{planned}");
         let writes = cluster.inspect(|s| s.writes.clone()).unwrap();
         let written = |namespace: &str, name: &str| {
             writes

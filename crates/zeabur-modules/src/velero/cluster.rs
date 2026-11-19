@@ -607,13 +607,19 @@ fn cron_ok(cron: &str) -> bool {
         })
 }
 
+/// How many days a schedule may keep each backup.
+pub const KEEP_DAYS: std::ops::RangeInclusive<u32> = 1..=365;
+
+/// The longest namespace name.
+pub const NAMESPACE_MAX: usize = 63;
+
 /// Why a schedule request cannot be written, in a sentence; `None` when it can.
 #[must_use]
 pub fn schedule_problem(request: &ScheduleRequest) -> Option<String> {
     if !cron_ok(&request.cron) {
         return Some("Enter the schedule as five cron fields, such as 0 3 * * *.".into());
     }
-    if !(1..=365).contains(&request.keep_days) {
+    if !KEEP_DAYS.contains(&request.keep_days) {
         return Some("Keep backups from 1 to 365 days.".into());
     }
     if let Some(bad) = request.namespaces.iter().find(|n| !is_dns_label(n)) {

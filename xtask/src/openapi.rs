@@ -1,6 +1,7 @@
 //! The API's description and the web client made from it: `zeabur-api`'s test writes
 //! `crates/zeabur-api/openapi.yaml` when `ZEABUR_UPDATE_OPENAPI` is set, and `bun run gen:api`
-//! turns it into `web/src/api/zeabur.ts`. CI fails when either file is stale.
+//! turns it into `web/src/api/zeabur.ts` and the field rules `web/src/api/rules.ts`. CI fails
+//! when any of them is stale.
 
 use std::path::{Path, PathBuf};
 
@@ -32,7 +33,9 @@ pub(crate) fn generate() -> Result<(), String> {
         .args(["run", "gen:api"])
         .current_dir(root.join("web"))
         .run()?;
-    output::say("updated crates/zeabur-api/openapi.yaml and web/src/api/zeabur.ts");
+    output::say(
+        "updated crates/zeabur-api/openapi.yaml, web/src/api/zeabur.ts and web/src/api/rules.ts",
+    );
     Ok(())
 }
 

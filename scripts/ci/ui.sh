@@ -18,7 +18,7 @@ source scripts/lib.sh
   bun run test
   bun run gen:api
 )
-git diff --exit-code -- web/src/api/zeabur.ts
+git diff --exit-code -- web/src/api/zeabur.ts web/src/api/rules.ts
 (cd scripts/shots; bun run typecheck)
 (cd web; bun scripts/check-deprecated.ts .)
 ./scripts/ui-budget.sh

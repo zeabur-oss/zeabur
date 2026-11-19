@@ -741,7 +741,7 @@ function healthOf(warning: Schemas.PlanWarning): Said["health"] {
     case "taskImageCopied":
       return "idle"
     case "publicPort":
-      return warning.dataStore ? "fail" : "warn"
+      return warning.health
     case "publicPortBlocked":
       return "fail"
     default:

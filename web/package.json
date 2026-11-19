@@ -11,7 +11,7 @@
     "build": "tsc -b && vite build && bun scripts/postbuild.ts dist",
     "typecheck": "tsc -b",
     "test": "bun test src/",
-    "gen:api": "orval && oxfmt src/api/zeabur.ts",
+    "gen:api": "orval && bun scripts/gen-rules.ts ../crates/zeabur-api/openapi.yaml src/api/rules.ts && oxfmt src/api/zeabur.ts src/api/rules.ts",
     "lint": "oxlint --deny-warnings",
     "fallow": "bunx fallow@3.33.1",
     "fmt": "oxfmt",

@@ -36,13 +36,14 @@
 //! `zeabur_graph::manifest`), with the object's origin and the tool that manages it. The YAML
 //! leaves out `status`, which is not something a person writes; it comes beside it as JSON.
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use axum::extract::RawQuery;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use futures_util::StreamExt as _;
 use serde::Serialize;
+use serde_json::json;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -219,6 +220,10 @@ pub struct ObjectDocument {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[schema(value_type = Option<Object>)]
     pub status: Option<serde_json::Value>,
+    /// A Secret's `data`, each key with its value in base64, as in `yaml`; absent for any other
+    /// kind.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub secret_data: Option<BTreeMap<String, String>>,
     /// The object.
     pub origin: Origin,
     /// The tool that manages it, if any.
@@ -475,6 +480,7 @@ pub(crate) async fn get(
         top.insert("kind".to_owned(), reference.kind.clone().into());
     }
     let is_secret = reference.is_secret();
+    let mut secret_data = None;
     if is_secret {
         let values = cluster
             .reveal_secret(&project, &name)
@@ -489,13 +495,14 @@ pub(crate) async fn get(
         if let Some(top) = value.as_object_mut() {
             top.remove("stringData");
             top.remove("data");
-            if !values.is_empty() {
-                let data: serde_json::Map<String, serde_json::Value> = values
-                    .iter()
-                    .map(|(key, bytes)| (key.clone(), STANDARD.encode(bytes).into()))
-                    .collect();
-                top.insert("data".to_owned(), data.into());
+            let data: BTreeMap<String, String> = values
+                .iter()
+                .map(|(key, bytes)| (key.clone(), STANDARD.encode(bytes)))
+                .collect();
+            if !data.is_empty() {
+                top.insert("data".to_owned(), json!(data));
             }
+            secret_data = Some(data);
         }
     }
     let yaml = zeabur_graph::manifest::to_yaml(&value)
@@ -513,6 +520,7 @@ pub(crate) async fn get(
         resource: reference.resource.clone(),
         yaml,
         status,
+        secret_data,
         origin: Origin::complete(
             &reference.api_version(),
             &reference.kind,

@@ -409,6 +409,7 @@ pub enum Change {
         display_name: Option<String>,
         /// What the project is.
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "openapi", schema(max_length = 500))]
         description: Option<String>,
         /// Its icon.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -1441,6 +1442,8 @@ pub enum Warning {
         /// What kind of data store the workload is, when it is one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
         data_store: Option<zeabur_model::DataStore>,
+        /// `fail` for a data store, `warn` for any other service.
+        health: zeabur_model::Health,
     },
     /// A NetworkPolicy isolates the workload's pods and admits nothing from the internet, so the
     /// new public port does not answer until a policy admits it (added by the API, which reads the

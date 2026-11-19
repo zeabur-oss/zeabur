@@ -25,7 +25,6 @@ import { StatusDot, StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
 import {
   FIELDS,
-  fixOf,
   formOf,
   KINDS,
   METRICS_COMPONENT,
@@ -37,7 +36,6 @@ import {
   settingsOf,
   STORED_FIELDS,
   statusHealth,
-  verdict,
   type ChannelForm,
   type ChannelKind,
   type Event,
@@ -66,7 +64,6 @@ type Channel = Schemas.AlertmanagerChannel
 type Request = Schemas.NotificationsPlanRequest
 
 const GROUP = "operator.victoriametrics.com"
-const verdictHealth = { none: "idle", rejected: "fail", waiting: "idle", ok: "ok" } as const
 
 /** A project's channels, or the cluster's when `project` is absent. */
 export function Notifications({ project }: { project?: string }) {
@@ -127,7 +124,7 @@ function Channels({ data, project }: { data: Data; project?: string }) {
   const [open, setOpen] = useState<Open>()
   const close = () => setOpen(undefined)
   const plan = (request: Request, title: string) => setOpen({ as: "plan", request, title })
-  const v = verdict(data.channels)
+  const v = data.verdict
   return (
     <div className="flex flex-col gap-3">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
@@ -135,8 +132,10 @@ function Channels({ data, project }: { data: Data; project?: string }) {
           className="flex min-w-0 flex-1 items-center gap-2 type-body font-medium text-main"
           role="status"
         >
-          <StatusDot health={verdictHealth[v.as]} />
-          {v.as === "none" ? t("notify.verdict.none") : t(`notify.verdict.${v.as}`, v.count)}
+          <StatusDot health={v.health} />
+          {v.outcome === "none"
+            ? t("notify.verdict.none")
+            : t(`notify.verdict.${v.outcome}`, v.count)}
         </p>
         <GateTip gate={change}>
           <Button size="sm" variant="outline" onClick={() => setOpen({ as: "add" })}>
@@ -178,9 +177,8 @@ function Channels({ data, project }: { data: Data; project?: string }) {
 }
 
 /** What to do, when Zeabur knows the reason; the operator's words when not. */
-function Reason({ reason }: { reason: string }) {
+function Reason({ reason, fix }: { reason: string; fix?: Schemas.AlertmanagerChannelFix | null }) {
   const t = useT()
-  const fix = fixOf(reason)
   return fix ? (
     <span className="type-meta text-fail-strong">{t(`notify.fix.${fix}`)}</span>
   ) : (
@@ -284,7 +282,7 @@ function ChannelRow({
           <span className="type-meta text-muted-foreground">
             {channel.managed ? events : t("notify.unmanaged")}
           </span>
-          {channel.reason ? <Reason reason={channel.reason} /> : null}
+          {channel.reason ? <Reason reason={channel.reason} fix={channel.fix} /> : null}
         </span>
       }
     >

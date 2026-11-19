@@ -166,6 +166,8 @@ pub struct S3DestinationWrite {
     pub name: String,
     /// Its namespace; empty for a Namespace.
     pub namespace: String,
+    /// Whether it is a copy of a destination's keys in another namespace.
+    pub copy: bool,
     /// The object as it is, YAML; absent for a creation and for a Secret.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub before_yaml: Option<String>,
@@ -1196,6 +1198,7 @@ pub(crate) async fn plan(
                 kind: w.target.kind.clone(),
                 name: w.target.name.clone(),
                 namespace: w.target.namespace.clone(),
+                copy: w.target.kind == "Secret" && w.target.namespace != NAMESPACE,
                 before_yaml: w.before.as_ref().and_then(yaml),
                 after_yaml: w.shown.as_ref().and_then(yaml),
             })

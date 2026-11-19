@@ -203,6 +203,10 @@ pub struct Database {
     pub provider: String,
     /// The object's `apiVersion`.
     pub api_version: String,
+    /// The API group of `apiVersion`.
+    pub api_group: String,
+    /// The version of `apiVersion`, without its group.
+    pub api_group_version: String,
     /// The object's kind.
     pub kind: String,
     /// The object's plural resource name.

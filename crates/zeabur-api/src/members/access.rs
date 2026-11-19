@@ -56,6 +56,11 @@ pub enum ProjectRole {
 }
 
 impl ProjectRole {
+    /// The roles a member can be given, in the order to offer them.
+    pub const ALL: [Self; 2] = [Self::Developer, Self::Viewer];
+    /// The role a new member gets in a project unless another is chosen.
+    pub const DEFAULT: Self = Self::Developer;
+
     /// The chart's `ClusterRole`.
     #[must_use]
     pub const fn cluster_role(self) -> &'static str {
@@ -66,7 +71,7 @@ impl ProjectRole {
     }
 
     fn of_cluster_role(name: &str) -> Option<Self> {
-        [Self::Developer, Self::Viewer]
+        Self::ALL
             .into_iter()
             .find(|role| role.cluster_role() == name)
     }

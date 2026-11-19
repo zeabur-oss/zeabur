@@ -415,6 +415,8 @@ impl Directory {
             setup_links,
             can_manage,
             project_roles: false,
+            assignable_roles: super::access::ProjectRole::ALL.to_vec(),
+            default_role: super::access::ProjectRole::DEFAULT,
             api_tokens: Vec::new(),
             can_manage_tokens: Permission::Unknown,
             unreadable: self.unreadable.clone(),
@@ -660,6 +662,10 @@ pub struct MembersView {
     /// Whether members can be given Developer or Viewer in chosen projects (the chart's member
     /// roles are installed).
     pub project_roles: bool,
+    /// The roles a member can be given in a project, in the order to offer them.
+    pub assignable_roles: Vec<super::access::ProjectRole>,
+    /// The role a new member gets in a project unless another is chosen.
+    pub default_role: super::access::ProjectRole,
     /// Kinds the person may not read (invitations, grants, role bindings), whose parts are left
     /// out.
     pub unreadable: Vec<UnreadableView>,

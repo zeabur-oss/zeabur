@@ -37,6 +37,7 @@ use zeabur_kube::{
 };
 use zeabur_modules::alertmanager::{
     self as am, AlertmanagerChannel, AlertmanagerChannelSettings, AlertmanagerEvent,
+    ChannelsVerdict,
 };
 
 use crate::error::{ApiError, get_read, list_read, read_problem};
@@ -65,6 +66,8 @@ pub struct Notifications {
     pub events: Vec<AlertmanagerEvent>,
     /// The channels, Zeabur's first, by name.
     pub channels: Vec<AlertmanagerChannel>,
+    /// Whether alerts reach anyone.
+    pub verdict: ChannelsVerdict,
     /// Whether the catalog's rule set is installed; for the cluster only, absent when it could
     /// not be read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -294,6 +297,7 @@ async fn answer(
         namespace: namespace.to_owned(),
         events: scope.events().to_vec(),
         channels: Vec::new(),
+        verdict: ChannelsVerdict::of(&[]),
         rules_installed: None,
         can_change: Permission::Unknown,
         can_test: Permission::Unknown,
@@ -317,6 +321,7 @@ async fn answer(
     };
     let mut channels: Vec<AlertmanagerChannel> = objects.iter().map(am::channel).collect();
     channels.sort_by(|a, b| (!a.managed, &a.name).cmp(&(!b.managed, &b.name)));
+    out.verdict = ChannelsVerdict::of(&channels);
     out.channels = channels;
     if scope == Scope::Cluster {
         out.rules_installed = cluster

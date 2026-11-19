@@ -17,8 +17,8 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort, ServiceSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_model::Message;
 use zeabur_model::kernel::dns::is_dns_label;
+use zeabur_model::{Health, Message};
 
 use crate::change::{PublicPortChange, Target, Warning};
 use crate::owned::SERVICE_LABEL;
@@ -70,6 +70,34 @@ fn port_entry(port: &ServicePort) -> ServicePort {
         app_protocol: port.app_protocol.clone(),
         target_port: port.target_port.clone(),
         ..ServicePort::default()
+    }
+}
+
+/// The `LoadBalancer` copy of a Service port, labelled with the workload it opens.
+fn public_service(
+    name: &str,
+    namespace: &str,
+    workload: &str,
+    selector: &BTreeMap<String, String>,
+    port: ServicePort,
+) -> KubeService {
+    KubeService {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            labels: Some(BTreeMap::from([(
+                SERVICE_LABEL.to_owned(),
+                workload.to_owned(),
+            )])),
+            ..ObjectMeta::default()
+        },
+        spec: Some(ServiceSpec {
+            type_: Some("LoadBalancer".to_owned()),
+            selector: Some(selector.clone()),
+            ports: Some(vec![port]),
+            ..ServiceSpec::default()
+        }),
+        ..KubeService::default()
     }
 }
 
@@ -137,25 +165,13 @@ impl<'a> Planner<'a> {
             ));
         };
         self.refuse_taken(port)?;
-        let entry = port_entry(port);
-        let body = KubeService {
-            metadata: ObjectMeta {
-                name: Some(name.clone()),
-                namespace: Some(self.input.snapshot.namespace.clone()),
-                labels: Some(BTreeMap::from([(
-                    SERVICE_LABEL.to_owned(),
-                    reference.name.clone(),
-                )])),
-                ..ObjectMeta::default()
-            },
-            spec: Some(ServiceSpec {
-                type_: Some("LoadBalancer".to_owned()),
-                selector: Some(selector.clone()),
-                ports: Some(vec![entry]),
-                ..ServiceSpec::default()
-            }),
-            ..KubeService::default()
-        };
+        let body = public_service(
+            &name,
+            &self.input.snapshot.namespace,
+            &reference.name,
+            selector,
+            port_entry(port),
+        );
         self.objects.push(Working {
             target: service_target(&name),
             original: None,
@@ -175,6 +191,11 @@ impl<'a> Planner<'a> {
             workload: reference.clone(),
             port: change.port,
             data_store,
+            health: if data_store.is_some() {
+                Health::Fail
+            } else {
+                Health::Warn
+            },
         });
         Ok(())
     }

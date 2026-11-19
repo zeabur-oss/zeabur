@@ -169,6 +169,19 @@ mod tests {
         assert_eq!(mysql["pods"][0]["name"], "moco-mysql-0");
         assert_eq!(named(&answer, "maria")["pods"][0]["name"], "maria-0");
         assert_eq!(named(&answer, "cache")["primary"], "cache-1");
+        for database in answer["items"].as_array().unwrap() {
+            assert_eq!(
+                format!(
+                    "{}/{}",
+                    database["apiGroup"].as_str().unwrap(),
+                    database["apiGroupVersion"].as_str().unwrap()
+                ),
+                database["apiVersion"],
+                "{database}"
+            );
+        }
+        assert_eq!(mysql["apiGroup"], "moco.cybozu.com");
+        assert_eq!(mysql["apiGroupVersion"], "v1beta2");
         assert!(!answer.to_string().contains(PASSWORD));
     }
 

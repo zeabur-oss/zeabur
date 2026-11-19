@@ -159,9 +159,8 @@ export function buildDeletions(
   const kept = builds.filter((b) => !gone.includes(b))
   return gone.flatMap((build) => [
     { op: "delete" as const, resource: BUILD_RESOURCE, name: build.name },
-    ...(build.credentials === `${build.name}-git` &&
-    kept.every((b) => b.credentials !== build.credentials)
-      ? [{ op: "delete" as const, resource: SECRET_RESOURCE, name: build.credentials }]
+    ...(build.credentials?.own && kept.every((b) => b.credentials?.name !== build.credentials?.name)
+      ? [{ op: "delete" as const, resource: SECRET_RESOURCE, name: build.credentials.name }]
       : []),
   ])
 }

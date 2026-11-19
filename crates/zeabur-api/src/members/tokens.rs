@@ -7,6 +7,10 @@
 //!
 //! [k8s-root-ca]: https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#bound-service-account-token-volume
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
+use kube::config::{AuthInfo, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext};
+use secrecy::SecretString;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, Problem};
@@ -56,6 +60,9 @@ pub struct IssuedTokenView {
     pub ca: Option<String>,
     /// Whether the expiry was recorded on the ServiceAccount for the token list.
     pub recorded: bool,
+    /// A kubeconfig that uses the token. `server` is empty: Zeabur knows kube-apiserver only by
+    /// its in-cluster address, so the person fills in the one they reach it on.
+    pub kubeconfig: String,
 }
 
 impl std::fmt::Debug for IssuedTokenView {
@@ -65,6 +72,59 @@ impl std::fmt::Debug for IssuedTokenView {
             .field("expires_at", &self.expires_at)
             .finish_non_exhaustive()
     }
+}
+
+/// The namespace a new kubeconfig starts in: the token's project when it has exactly one.
+pub(crate) fn start_namespace(projects: &[ProjectGrant]) -> Option<String> {
+    match projects {
+        [only] => Some(only.project.clone()),
+        _ => None,
+    }
+}
+
+/// The kubeconfig of [`IssuedTokenView::kubeconfig`].
+pub(crate) fn kubeconfig(
+    name: &str,
+    token: &str,
+    ca: Option<&str>,
+    namespace: Option<&str>,
+) -> Result<String, ApiError> {
+    let config = Kubeconfig {
+        api_version: Some("v1".to_owned()),
+        kind: Some("Config".to_owned()),
+        clusters: vec![NamedCluster {
+            name: "zeabur".to_owned(),
+            cluster: Some(kube::config::Cluster {
+                server: Some(String::new()),
+                certificate_authority_data: ca.map(|pem| STANDARD.encode(pem)),
+                ..kube::config::Cluster::default()
+            }),
+            ..NamedCluster::default()
+        }],
+        auth_infos: vec![NamedAuthInfo {
+            name: name.to_owned(),
+            auth_info: Some(AuthInfo {
+                token: Some(SecretString::from(token)),
+                ..AuthInfo::default()
+            }),
+            ..NamedAuthInfo::default()
+        }],
+        contexts: vec![NamedContext {
+            name: name.to_owned(),
+            context: Some(Context {
+                cluster: "zeabur".to_owned(),
+                user: Some(name.to_owned()),
+                namespace: namespace.map(str::to_owned),
+                ..Context::default()
+            }),
+            ..NamedContext::default()
+        }],
+        current_context: Some(name.to_owned()),
+        ..Kubeconfig::default()
+    };
+    let internal = |e: String| ApiError::from(Problem::new(Kind::Internal, e));
+    let value = serde_json::to_value(&config).map_err(|e| internal(e.to_string()))?;
+    zeabur_graph::manifest::to_yaml(&value).map_err(internal)
 }
 
 pub(crate) fn service_accounts() -> ResourceRef {

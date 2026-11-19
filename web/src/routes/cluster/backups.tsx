@@ -29,6 +29,7 @@ import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
   hourOf,
+  KEEP_DAYS,
   insideCluster,
   lastGood,
   locationForm,
@@ -616,8 +617,8 @@ function ScheduleEditor({
           <Input
             size="sm"
             type="number"
-            min={1}
-            max={365}
+            min={KEEP_DAYS.minimum}
+            max={KEEP_DAYS.maximum}
             value={String(form.keepDays)}
             onChange={(event) => set({ keepDays: Number(event.target.value) })}
           />

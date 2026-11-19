@@ -227,7 +227,7 @@ function Refused({
 }) {
   const t = useT()
   const show = useMutation({
-    mutationFn: async () => await zeabur.revealDeployKey(project, build.credentials ?? ""),
+    mutationFn: async () => await zeabur.revealDeployKey(project, build.credentials?.name ?? ""),
   })
   const repo = parseRepository(build.gitUrl ?? "")
   const keyPage = repo ? deployKeyPage(repo) : undefined

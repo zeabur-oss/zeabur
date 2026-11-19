@@ -108,6 +108,10 @@ mod tests {
         assert_eq!(channel["target"], Value::Null);
         assert_eq!(channel["status"], "waiting");
         assert_eq!(channel["events"], json!(["crash-loop", "deploy-failed"]));
+        assert_eq!(
+            found["verdict"],
+            json!({"outcome": "waiting", "count": 1, "health": "idle"})
+        );
 
         let (planned, _) = applied(
             &app,
@@ -170,6 +174,7 @@ mod tests {
         );
         let (_, found) = send(&app, "GET", BASE, None).await;
         assert_eq!(found["channels"], json!([]));
+        assert_eq!(found["verdict"]["outcome"], "none");
     }
 
     #[tokio::test]

@@ -1010,6 +1010,13 @@ mod tests {
         assert!(yaml.contains("\ndata:\n"), "the YAML has data");
         assert_eq!(value("password"), SECRET_VALUE.as_bytes());
         assert_eq!(value("blob"), binary);
+        let data = |key: &str| {
+            base64::engine::general_purpose::STANDARD
+                .decode(secret["secretData"][key].as_str().unwrap())
+                .unwrap()
+        };
+        assert_eq!(data("password"), SECRET_VALUE.as_bytes());
+        assert_eq!(data("blob"), binary);
         assert!(
             !yaml.contains("stringData"),
             "the cluster never returns stringData"
@@ -1197,6 +1204,20 @@ mod tests {
         sorted.sort();
         assert_eq!(names(&capabilities), sorted);
         assert!(capabilities["catalogueCommit"].is_string());
+        let items = capabilities["items"].as_array().unwrap();
+        let counted = |keep: fn(&Value) -> bool| items.iter().filter(|c| keep(c)).count();
+        assert_eq!(
+            capabilities["installed"],
+            counted(|c| c["existing"] == true)
+        );
+        assert_eq!(
+            capabilities["recommended"],
+            counted(|c| c["suggestion"] == "recommended")
+        );
+        assert!(
+            capabilities["recommended"].as_u64().unwrap() > 0,
+            "{capabilities}"
+        );
 
         cluster.update(|s| {
             s.facts.unreadable.push(zeabur_kube::Unreadable {
@@ -1871,6 +1892,37 @@ mod tests {
             );
         });
         assert!(find(&get(&cluster, "/api/v1/projects/shop/gaps").await).is_none());
+    }
+
+    #[test]
+    fn the_described_limits_are_the_ones_the_server_checks() {
+        let description = serde_json::to_value(zeabur_api::openapi()).unwrap();
+        let schemas = &description["components"]["schemas"];
+        let variant = |schema: &str, op: &str| -> Value {
+            schemas[schema]["oneOf"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|v| v["properties"]["op"]["enum"][0] == op)
+                .unwrap()["properties"]
+                .clone()
+        };
+        let max = zeabur_model::DESCRIPTION_MAX;
+        assert_eq!(
+            variant("Change", "details")["description"]["maxLength"],
+            max
+        );
+        let name = &schemas["GitHubManifestRequest"]["properties"]["name"];
+        assert_eq!(name["maxLength"], zeabur_api::cluster::github_app::NAME_MAX);
+        assert_eq!(name["minLength"], 1);
+        let keep = &variant("BackupsPlanRequest", "schedule")["keepDays"];
+        let days = zeabur_modules::velero::cluster::KEEP_DAYS;
+        assert_eq!(keep["minimum"], *days.start());
+        assert_eq!(keep["maximum"], *days.end());
+        assert_eq!(
+            variant("BackupsPlanRequest", "restore")["into"]["maxLength"],
+            zeabur_modules::velero::cluster::NAMESPACE_MAX
+        );
     }
 
     #[test]

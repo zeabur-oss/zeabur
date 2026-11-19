@@ -72,7 +72,7 @@ pub struct ZeaburBuilderBuild {
     /// reports it.
     pub resolved_ref: Option<String>,
     /// The Secret it reads the repository's credentials from.
-    pub credentials: Option<String>,
+    pub credentials: Option<BuildCredentials>,
     /// The build context inside the repository or folder; none for its root.
     pub context_dir: Option<String>,
     /// The Dockerfile, relative to the context; none for `Dockerfile`.
@@ -368,6 +368,21 @@ struct RunStatus {
     image_digest: Option<String>,
 }
 
+/// The Secret a `Build` reads its repository's credentials from.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+pub struct BuildCredentials {
+    /// Its name.
+    pub name: String,
+    /// Whether it is the one Zeabur made for this `Build` (`<name>-git`), which goes with it.
+    pub own: bool,
+}
+
+/// The Secret Zeabur makes for a `Build`'s repository credentials.
+#[must_use]
+pub fn credentials_name(build: &str) -> String {
+    format!("{build}-git")
+}
+
 /// The `Build`s, sorted by name, read at `now` (see [`ZeaburBuilderProblem::lasting`]).
 #[must_use]
 pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBuilderBuild> {
@@ -380,19 +395,25 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
             let archive = spec.source.archive.as_ref();
             let latest_image = filled(status.latest_image.as_ref());
             let ready = build.condition("Ready");
+            let name = b.metadata.name.clone().unwrap_or_default();
+            let credentials = filled(
+                spec.source
+                    .credentials_ref
+                    .as_ref()
+                    .and_then(|c| c.name.as_ref()),
+            )
+            .map(|secret| BuildCredentials {
+                own: secret == credentials_name(&name),
+                name: secret,
+            });
             ZeaburBuilderBuild {
-                name: b.metadata.name.clone().unwrap_or_default(),
+                credentials,
+                name,
                 repository: filled(spec.output.image.as_ref())
                     .or_else(|| latest_image.as_deref().map(|i| repository(i).to_owned())),
                 git_url: filled(git.and_then(|g| g.url.as_ref())),
                 git_ref: filled(git.and_then(|g| g.ref_.as_ref())),
                 resolved_ref: filled(status.resolved_ref.as_ref()),
-                credentials: filled(
-                    spec.source
-                        .credentials_ref
-                        .as_ref()
-                        .and_then(|c| c.name.as_ref()),
-                ),
                 archive: archive.is_some(),
                 archive_digest: filled(archive.and_then(|a| a.digest.as_ref())),
                 awaiting_upload: awaiting_upload(&build),
@@ -608,6 +629,22 @@ mod tests {
                 .unwrap()
                 .contains("production")
         );
+    }
+
+    #[test]
+    fn only_the_secret_made_for_a_build_is_its_own() {
+        let build = |name: &str, secret: &str| {
+            object(serde_json::json!({
+                "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+                "metadata": {"name": name, "namespace": "demo"},
+                "spec": {"source": {"git": {"url": "ssh://git@example.com/acme/web"},
+                    "credentialsRef": {"name": secret}}}
+            }))
+        };
+        let found = builds(&[build("api", "shared-git"), build("web", "web-git")], None);
+        let own = |b: &ZeaburBuilderBuild| b.credentials.as_ref().map(|c| c.own);
+        assert_eq!(own(&found[0]), Some(false));
+        assert_eq!(own(&found[1]), Some(true));
     }
 
     #[test]

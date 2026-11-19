@@ -24,7 +24,6 @@
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
 import type { Translate } from "@/i18n"
-import { secretData } from "@/lib/secret-data"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
 import type { Event, Health } from "@/model/service"
 
@@ -813,12 +812,16 @@ const holdsRegion = (database: Database, keys: string[]) => {
   return key !== undefined && keys.includes(key)
 }
 
-/** Whether the keys Secret exists, by its values (`yaml`) or by the project's Secrets as listed,
+/** Whether the keys Secret exists, by its values (`data`) or by the project's Secrets as listed,
  * and whether it holds the region. A Secret the person may list but not read is taken to hold it,
  * as Zeabur writes it. */
-export function backupKeys(database: Database, yaml?: string, listed?: Schemas.ObjectList) {
-  if (yaml !== undefined)
-    return { keysExist: true, regionSaved: holdsRegion(database, Object.keys(secretData(yaml))) }
+export function backupKeys(
+  database: Database,
+  data?: Record<string, string>,
+  listed?: Schemas.ObjectList,
+) {
+  if (data !== undefined)
+    return { keysExist: true, regionSaved: holdsRegion(database, Object.keys(data)) }
   const secret = backupNames(database.name).secret
   const keysExist = (listed?.items ?? []).some(
     (kind) => kind.resource === "secrets" && kind.items.some((o) => o.name === secret),
@@ -889,14 +892,14 @@ function patched(live: unknown, after: Manifest, before: Manifest = {}): Manifes
 
 /** An edit that merges `spec` into the object's spec; the rest of the object stays. */
 function specEdit(
-  apiVersion: string,
+  address: Omit<ObjectAddress, "name">,
   kind: string,
-  resource: string,
   name: string,
   spec: Manifest,
 ): Change[] {
   if (Object.keys(spec).length === 0) return []
-  const [group = "", version = ""] = apiVersion.split("/")
+  const { group, version, resource } = address
+  const apiVersion = group ? `${group}/${version}` : version
   const yaml = JSON.stringify({ apiVersion, kind, metadata: { name }, spec })
   return [{ op: "edit", resource: { group, version, resource }, name, yaml, specOnly: true }]
 }
@@ -907,7 +910,8 @@ function write(database: Database, resource: string, after: Manifest, before?: M
   if (!before) return [create(labelled(database.name, after))]
   const name = String((after.metadata as Manifest).name)
   const spec = mergePatch(after.spec as Manifest, before.spec as Manifest)
-  return specEdit(String(after.apiVersion), String(after.kind), resource, name, spec)
+  const [group = "", version = ""] = String(after.apiVersion).split("/")
+  return specEdit({ group, version, resource }, String(after.kind), name, spec)
 }
 
 /** The database's object edited by `change`, if that changes it: the one way Zeabur edits a
@@ -916,9 +920,8 @@ function editObject(database: Database, change: (spec: Manifest) => void): Chang
   const before = ((database.object as { spec?: Manifest }).spec ?? {}) as Manifest
   const after = structuredClone(before)
   change(after)
-  const { resource } = databaseAddress(database)
   const spec = mergePatch(after, before)
-  return specEdit(database.apiVersion, database.kind, resource, database.name, spec)
+  return specEdit(databaseAddress(database), database.kind, database.name, spec)
 }
 
 function postgresStore(database: Database, target: BackupTarget, region: boolean): Manifest {
@@ -1412,8 +1415,12 @@ export const connectCommand = (project: string, database: Pick<Database, "name">
 
 /** Where the database's own object lives in the objects API: a custom resource of its operator. */
 export function databaseAddress(database: Database): ObjectAddress {
-  const [group = "", version = ""] = database.apiVersion.split("/")
-  return { group, version, resource: database.resource, name: database.name }
+  return {
+    group: database.apiGroup,
+    version: database.apiGroupVersion,
+    resource: database.resource,
+    name: database.name,
+  }
 }
 
 /** The tool an export runs in the primary; Dragonfly has none. */

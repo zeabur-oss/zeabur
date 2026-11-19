@@ -35,19 +35,20 @@ export default function OpenPortDrawer({
       .map((p) => ({
         value: `${e.name}/${p.port}`,
         label: `${e.name}:${p.port} ${p.protocol}`,
+        from: e.name,
+        port: p.port,
       })),
   )
   const [chosen, setChosen] = useState(choices[0]?.value ?? "")
-  const [from, portText] = chosen.split("/") as [string, string]
-  const port = Number(portText)
+  const choice = choices.find((c) => c.value === chosen)
   const database = !!service.dataStore
   const workload = { kind: service.kind, name: service.name }
   const review = () => {
-    if (!chosen) return
+    if (!choice) return
     step.plan({
-      title: t("ports.openTitle", port, service.name),
+      title: t("ports.openTitle", choice.port, service.name),
       service: workload,
-      changes: [{ op: "publicPort", workload, service: from, port }],
+      changes: [{ op: "publicPort", workload, service: choice.from, port: choice.port }],
     })
   }
   return (
@@ -64,7 +65,7 @@ export default function OpenPortDrawer({
           <Button
             size="sm"
             variant={database ? "destructive" : "default"}
-            disabled={!chosen}
+            disabled={!choice}
             onClick={review}
           >
             {t("edit.review")}

@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useId, useState, type ReactNode } from "react"
 import { toast } from "sonner"
 
+import { membersQuery } from "@/api/members"
 import { projectsQuery } from "@/api/queries"
 import { Frame } from "@/components/members/frame"
 import { MemberPlan, useProjectMention } from "@/components/members/member-plan"
@@ -138,6 +139,17 @@ export function AccessFields({
   )
 }
 
+/** The roles a member can be given, as the server lists them. */
+function useRoles() {
+  const t = useT()
+  const members = useQuery(membersQuery)
+  return (members.data?.assignableRoles ?? []).map((value) => ({
+    value,
+    label: t(`roles.${value}`),
+    hint: t(`roles.${value}Hint`),
+  }))
+}
+
 /** Every project with a box to pick it and, once picked, its role; a filter once there are many. */
 export function ProjectPicker({
   chosen,
@@ -151,6 +163,7 @@ export function ProjectPicker({
   const t = useT()
   const id = useId()
   const projects = useQuery(projectsQuery)
+  const roles = useRoles()
   const [query, setQuery] = useState("")
   const [first] = useState(() => new Set(chosen.keys()))
   const [others, setOthers] = useState(false)
@@ -169,16 +182,9 @@ export function ProjectPicker({
     else next.delete(name)
     onChosen(next)
   }
-  const roles = [
-    { value: "developer" as const, label: t("roles.developer") },
-    { value: "viewer" as const, label: t("roles.viewer") },
-  ]
   return (
     <div className="flex min-w-0 flex-col gap-2">
-      <ul className="flex flex-col gap-1 type-meta text-muted-foreground">
-        <li>{t("roles.developerHint")}</li>
-        <li>{t("roles.viewerHint")}</li>
-      </ul>
+      <RoleHints roles={roles} />
       {names.length === 0 ? (
         <p className="text-muted-foreground">{t("roles.noProjects")}</p>
       ) : (
@@ -225,9 +231,7 @@ export function ProjectPicker({
               })
             )}
           </ul>
-          <p className="type-meta text-muted-foreground">
-            {chosen.size === 0 ? t("roles.noneChosen") : t("roles.chosen", chosen.size)}
-          </p>
+          <ChosenCount size={chosen.size} />
         </>
       )}
       <ShowOthers
@@ -235,6 +239,25 @@ export function ProjectPicker({
         onShow={() => setOthers(true)}
       />
     </div>
+  )
+}
+
+function RoleHints({ roles }: { roles: { value: ProjectRole; hint: string }[] }) {
+  return (
+    <ul className="flex flex-col gap-1 type-meta text-muted-foreground">
+      {roles.map(({ value, hint }) => (
+        <li key={value}>{hint}</li>
+      ))}
+    </ul>
+  )
+}
+
+function ChosenCount({ size }: { size: number }) {
+  const t = useT()
+  return (
+    <p className="type-meta text-muted-foreground">
+      {size === 0 ? t("roles.noneChosen") : t("roles.chosen", size)}
+    </p>
   )
 }
 
