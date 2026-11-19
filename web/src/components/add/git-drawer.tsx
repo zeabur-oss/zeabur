@@ -69,6 +69,8 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const { form, set, shown, options, name, domains, registry } = built
   const [userSet, setUserSet] = useState(false)
   const [checked, setChecked] = useState<CheckedHost>()
+  // The live suggestion moves on (`site` → `site-2`) once the new service is listed.
+  const [planned, setPlanned] = useState(name)
 
   const url = repositoryUrl(github, form.url)
   const repo = parseRepository(url)
@@ -97,8 +99,9 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   })
   const blocked = Object.values(problems).some(Boolean)
 
-  const openService = () => void navigate(serviceLink(project, { kind: "Deployment", name }))
-  const key = useKeyStage(project, credentialsName(name), access === "deployKey", {
+  const openService = () =>
+    void navigate(serviceLink(project, { kind: "Deployment", name: planned }))
+  const key = useKeyStage(project, credentialsName(planned), access === "deployKey", {
     onClose,
     openService,
   })
@@ -106,6 +109,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
   const review = () => {
     built.try()
     if (blocked) return
+    setPlanned(name)
     planner.plan({
       title: t("add.planGit", name),
       changes: createGitService(resolved, project, registry, domains),
