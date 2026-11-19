@@ -1,7 +1,8 @@
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import * as z from "zod/mini"
 
 import { localProblem, type Problem } from "@/api/client"
+import { usePageVisible } from "@/lib/page-visible"
 
 const maxLines = 20_000
 
@@ -18,23 +19,31 @@ export interface LogStream {
 // The schema checks only `detail` and `fix`. The server defines the rest of `Problem`.
 const streamProblem = z.looseObject({ detail: z.string(), fix: z.string() })
 
-/** A dropped connection ends the stream: EventSource would reconnect and repeat the tail. Callers
- * key the component by `url`, so a new URL starts empty. */
+/** A dropped connection ends the stream: EventSource would reconnect and repeat the tail. A hidden
+ * tab closes the connection, and the tab showing again opens a new one, whose tail replaces the
+ * lines. Callers key the component by `url`, so a new URL starts empty. */
 export function useLogStream(url: string): LogStream {
   const [state, setState] = useState<LogStream>({ lines: [], open: false, ended: false })
+  const visible = usePageVisible()
+  const reopened = useRef(false)
 
   useEffect(() => {
+    if (!visible || state.ended) return undefined
     const source = new EventSource(url, { withCredentials: true })
     let pending: string[] = []
     let frame = 0
     let opened = false
+    let replace = reopened.current
+    reopened.current = false
     const flush = () => {
       frame = 0
       if (pending.length === 0) return
       const batch = pending
       pending = []
+      const replacing = replace
+      replace = false
       setState((previous) => {
-        const lines = previous.lines.concat(batch)
+        const lines = replacing ? batch : previous.lines.concat(batch)
         return {
           ...previous,
           lines: lines.length > maxLines ? lines.slice(lines.length - maxLines) : lines,
@@ -79,10 +88,11 @@ export function useLogStream(url: string): LogStream {
       }))
     })
     return () => {
+      reopened.current = opened
       if (frame) cancelAnimationFrame(frame)
       source.close()
     }
-  }, [url])
+  }, [url, visible, state.ended])
 
   return state
 }

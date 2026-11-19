@@ -1,14 +1,10 @@
-import { useEffect, useState } from "react"
+import { useNow } from "@/lib/page-visible"
 
 /** A plan's countdown shows from this many seconds left. */
 export const COUNTDOWN_FROM_SECONDS = 120
 
 export function useSecondsLeft(expiresAt?: string): number | undefined {
-  const [now, setNow] = useState(Date.now)
-  useEffect(() => {
-    const id = window.setInterval(() => setNow(Date.now()), 1000)
-    return () => window.clearInterval(id)
-  }, [])
+  const now = useNow(1000)
   return expiresAt ? Math.max(0, Math.round((Date.parse(expiresAt) - now) / 1000)) : undefined
 }
 
