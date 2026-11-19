@@ -237,7 +237,7 @@ pub fn repository(image: &str) -> &str {
     }
 }
 
-/// The fields of a `Build` that Zeabur reads [builder].
+/// The fields of a `Build` that Zeabur reads.
 #[derive(Default, Deserialize)]
 #[serde(default)]
 struct BuildView {
@@ -338,7 +338,7 @@ struct Condition {
     last_transition_time: Option<String>,
 }
 
-/// The fields of a `BuildRun` that Zeabur reads [builder].
+/// The fields of a `BuildRun` that Zeabur reads.
 #[derive(Default, Deserialize)]
 #[serde(default)]
 struct RunView {
