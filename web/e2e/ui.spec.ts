@@ -946,6 +946,10 @@ test("a component's install plan lists its steps before anything is written", as
   await expect(sheet.getByText("Steps")).toBeVisible({ timeout: 30_000 })
   await expect(sheet.getByText("Not started").first()).toBeVisible()
   await expect(sheet.getByRole("button", { name: "Install" })).toBeEnabled()
+  await expect(sheet.getByText("zeaburctl components export reloader --format flux")).toBeVisible()
+  await expect(
+    sheet.getByText("zeaburctl components export reloader --format argocd"),
+  ).toBeVisible()
 })
 
 // `<namespace>/<name>` of a Deployment whose container has no shell.

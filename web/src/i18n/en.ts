@@ -1193,6 +1193,9 @@ export const en = {
   "installer.removeTitle": (name: string) => `Remove ${name}`,
   "installer.export":
     "Print the manifests, then apply them with kubectl or commit them to your GitOps repository. Add --format helm for Helm commands.",
+  "components.gitops": "Flux or Argo CD",
+  "components.gitopsHow":
+    "Managing the cluster with Flux or Argo CD? Print the component's manifests instead, and commit them to the repository the cluster reads.",
   "components.manage": "Manage",
   "components.installing": "Installing…",
   "components.removing": "Removing…",
