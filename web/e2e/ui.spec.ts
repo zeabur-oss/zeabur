@@ -942,7 +942,7 @@ test("the project's suggestions list what it misses, and a fix is planned and ap
 
 test("a component's install plan lists its steps before anything is written", async ({ page }) => {
   await page.goto("/cluster/components?component=reloader")
-  const sheet = page.getByRole("dialog", { name: "Install Reloader" })
+  const sheet = page.getByRole("dialog", { name: /^Install .*Reloader$/ })
   await expect(sheet.getByText("Steps")).toBeVisible({ timeout: 30_000 })
   await expect(sheet.getByText("Not started").first()).toBeVisible()
   await expect(sheet.getByRole("button", { name: "Install" })).toBeEnabled()
