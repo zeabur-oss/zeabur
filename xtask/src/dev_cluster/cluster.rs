@@ -1,7 +1,11 @@
 //! The k3d cluster, its Traefik and its DNS.
 
+use std::collections::BTreeMap;
 use std::env;
 use std::time::Duration;
+
+use k8s_openapi::api::core::v1::ConfigMap;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 
 use super::{DevCluster, IDENTITY_HOST, ZEABUR_HOST, images, registries};
 use crate::process::wait_for;
@@ -89,13 +93,18 @@ pub(crate) fn resolve_hosts(dev: &DevCluster) -> Result<(), String> {
     let rewrite = |host: &str| {
         format!("rewrite name exact {host} traefik.kube-system.svc.cluster.local answer auto\n")
     };
-    let configmap = serde_json::json!({
-        "apiVersion": "v1",
-        "kind": "ConfigMap",
-        "metadata": {"name": "coredns-custom", "namespace": "kube-system"},
-        "data": {"zeabur-dev.override": rewrite(IDENTITY_HOST) + &rewrite(ZEABUR_HOST)},
-    });
-    dev.apply(configmap.to_string())?;
+    dev.apply_object(&ConfigMap {
+        metadata: ObjectMeta {
+            name: Some("coredns-custom".to_owned()),
+            namespace: Some("kube-system".to_owned()),
+            ..ObjectMeta::default()
+        },
+        data: Some(BTreeMap::from([(
+            "zeabur-dev.override".to_owned(),
+            rewrite(IDENTITY_HOST) + &rewrite(ZEABUR_HOST),
+        )])),
+        ..ConfigMap::default()
+    })?;
     dev.kubectl()
         .args([
             "-n",

@@ -1,8 +1,15 @@
 //! Zeabur from its chart, with the values of this cluster.
 
+use std::collections::BTreeMap;
 use std::path::Path;
 use std::time::Duration;
 
+use k8s_openapi::api::core::v1::Secret;
+use k8s_openapi::api::networking::v1::{
+    HTTPIngressPath, HTTPIngressRuleValue, Ingress, IngressBackend, IngressRule,
+    IngressServiceBackend, IngressSpec, IngressTLS, ServiceBackendPort,
+};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 
 use super::identity::identityctl;
@@ -41,7 +48,7 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
     dev.apply_created("zeabur", &["namespace", "zeabur"])?;
     dev.platform("zeabur")?;
     secrets(dev, install.profile)?;
-    dev.apply(identity_ingress().to_string())?;
+    dev.apply_object(&identity_ingress())?;
 
     let values = dev.write(
         "values.json",
@@ -107,10 +114,10 @@ fn secrets(dev: &DevCluster, profile: Profile) -> Result<(), String> {
             .rfind(|line| !line.trim().is_empty())
             .ok_or("zeabur-identityctl client create printed no secret")?
             .trim();
-        dev.apply(secret("zeabur-oidc", "client-secret", client_secret).to_string())?;
+        dev.apply_object(&secret("zeabur-oidc", "client-secret", client_secret))?;
     }
     if !has(&["-n", "zeabur", "get", "secret", "zeabur-plan-key"]) {
-        dev.apply(secret("zeabur-plan-key", "plan-key", &random_hex(32)?).to_string())?;
+        dev.apply_object(&secret("zeabur-plan-key", "plan-key", &random_hex(32)?))?;
     }
     let tls = dev.tls();
     dev.apply_created(
@@ -148,42 +155,63 @@ fn secrets(dev: &DevCluster, profile: Profile) -> Result<(), String> {
     Ok(())
 }
 
-fn secret(name: &str, key: &str, value: &str) -> Value {
-    json!({
-        "apiVersion": "v1",
-        "kind": "Secret",
-        "metadata": {"name": name, "namespace": "zeabur"},
-        "type": "Opaque",
-        "stringData": {key: value},
-    })
+fn secret(name: &str, key: &str, value: &str) -> Secret {
+    Secret {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some("zeabur".to_owned()),
+            ..ObjectMeta::default()
+        },
+        type_: Some("Opaque".to_owned()),
+        string_data: Some(BTreeMap::from([(key.to_owned(), value.to_owned())])),
+        ..Secret::default()
+    }
 }
 
 /// The `ClusterIssuer` of this cluster's CA, which the full profile installs.
 const ISSUER: &str = "zeabur-local-ca";
 
 /// Zeabur Identity's Ingress at `IDENTITY_HOST`.
-fn identity_ingress() -> Value {
-    json!({
-        "apiVersion": "networking.k8s.io/v1",
-        "kind": "Ingress",
-        "metadata": {
-            "name": "zeabur-identity",
-            "namespace": "zeabur-identity",
-            "annotations": {"cert-manager.io/cluster-issuer": ISSUER},
+fn identity_ingress() -> Ingress {
+    Ingress {
+        metadata: ObjectMeta {
+            name: Some("zeabur-identity".to_owned()),
+            namespace: Some("zeabur-identity".to_owned()),
+            annotations: Some(BTreeMap::from([(
+                "cert-manager.io/cluster-issuer".to_owned(),
+                ISSUER.to_owned(),
+            )])),
+            ..ObjectMeta::default()
         },
-        "spec": {
-            "ingressClassName": "traefik",
-            "tls": [{"hosts": [IDENTITY_HOST], "secretName": "zeabur-identity-tls"}],
-            "rules": [{
-                "host": IDENTITY_HOST,
-                "http": {"paths": [{
-                    "path": "/",
-                    "pathType": "Prefix",
-                    "backend": {"service": {"name": "zeabur-identity", "port": {"name": "http"}}},
-                }]},
-            }],
-        },
-    })
+        spec: Some(IngressSpec {
+            ingress_class_name: Some("traefik".to_owned()),
+            tls: Some(vec![IngressTLS {
+                hosts: Some(vec![IDENTITY_HOST.to_owned()]),
+                secret_name: Some("zeabur-identity-tls".to_owned()),
+            }]),
+            rules: Some(vec![IngressRule {
+                host: Some(IDENTITY_HOST.to_owned()),
+                http: Some(HTTPIngressRuleValue {
+                    paths: vec![HTTPIngressPath {
+                        path: Some("/".to_owned()),
+                        path_type: "Prefix".to_owned(),
+                        backend: IngressBackend {
+                            service: Some(IngressServiceBackend {
+                                name: "zeabur-identity".to_owned(),
+                                port: Some(ServiceBackendPort {
+                                    name: Some("http".to_owned()),
+                                    number: None,
+                                }),
+                            }),
+                            resource: None,
+                        },
+                    }],
+                }),
+            }]),
+            ..IngressSpec::default()
+        }),
+        ..Ingress::default()
+    }
 }
 
 /// The chart's values for this cluster (docs/install/existing-cluster.mdx), with the registry's

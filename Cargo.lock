@@ -2741,6 +2741,8 @@ name = "xtask"
 version = "0.2.0"
 dependencies = [
  "clap",
+ "k8s-openapi",
+ "serde",
  "serde-saphyr",
  "serde_json",
  "sha2",
