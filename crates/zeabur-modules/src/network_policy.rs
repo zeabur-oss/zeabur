@@ -47,9 +47,14 @@
 
 use std::collections::BTreeMap;
 
-use k8s_openapi::api::networking::v1::{NetworkPolicy, NetworkPolicyPeer, NetworkPolicyPort};
+use k8s_openapi::api::networking::v1::{
+    NetworkPolicy, NetworkPolicyEgressRule, NetworkPolicyIngressRule, NetworkPolicyPeer,
+    NetworkPolicyPort, NetworkPolicySpec,
+};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 use zeabur_model::adapters::selector::{is_empty, matches};
@@ -389,12 +394,10 @@ fn port_access(ports: Option<&Vec<NetworkPolicyPort>>, dns: bool) -> Access {
     }
     let covers_53 = ports.iter().any(|p| match &p.port {
         None => true,
-        Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::Int(n)) => {
+        Some(IntOrString::Int(n)) => {
             *n == 53 || p.end_port.is_some_and(|end| *n <= 53 && 53 <= end)
         }
-        Some(k8s_openapi::apimachinery::pkg::util::intstr::IntOrString::String(name)) => {
-            name.starts_with("dns")
-        }
+        Some(IntOrString::String(name)) => name.starts_with("dns"),
     });
     if covers_53 {
         Access::Allowed
@@ -847,11 +850,15 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
                 let object = policy(
                     namespace,
                     &policy_name(&format!("allow-to-{to_name}"), from),
-                    &json!({
-                        "podSelector": selector_value(&from.labels),
-                        "policyTypes": ["Egress"],
-                        "egress": [{"to": [{"podSelector": selector_value(&to.labels)}]}],
-                    }),
+                    NetworkPolicySpec {
+                        pod_selector: Some(selector(&from.labels)),
+                        policy_types: Some(vec!["Egress".to_owned()]),
+                        egress: Some(vec![NetworkPolicyEgressRule {
+                            to: Some(vec![pods_peer(selector(&to.labels))]),
+                            ports: None,
+                        }]),
+                        ..NetworkPolicySpec::default()
+                    },
                 );
                 Fix {
                     kind: FixKind::Plan,
@@ -859,7 +866,7 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
                     params: BTreeMap::from([
                         ("from".to_owned(), from.id.clone()),
                         ("to".to_owned(), to.id.clone()),
-                        ("object".to_owned(), object.to_string()),
+                        ("object".to_owned(), serde_json::to_string(&object).ok()?),
                     ]),
                 }
             } else {
@@ -872,7 +879,7 @@ pub fn gaps(namespace: &str, reachability: &Reachability, workloads: &[Workload]
                     params: BTreeMap::from([
                         ("from".to_owned(), from.id.clone()),
                         ("to".to_owned(), to.id.clone()),
-                        ("object".to_owned(), preset.object.to_string()),
+                        ("object".to_owned(), serde_json::to_string(&preset.object).ok()?),
                     ]),
                 }
             };
@@ -1039,7 +1046,7 @@ fn kind_and_name(id: &str) -> Option<(&'static str, &str)> {
 }
 
 /// A ready-made policy for a service, to plan as a new object.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = NetworkPolicyPreset)]
 pub struct Preset {
@@ -1050,11 +1057,40 @@ pub struct Preset {
     pub from: Option<String>,
     /// The NetworkPolicy to create.
     #[schema(value_type = Object)]
-    pub object: Value,
+    pub object: NetworkPolicy,
 }
 
-fn selector_value(labels: &BTreeMap<String, String>) -> Value {
-    json!({ "matchLabels": labels })
+fn selector(labels: &BTreeMap<String, String>) -> LabelSelector {
+    LabelSelector {
+        match_labels: Some(labels.clone()),
+        match_expressions: None,
+    }
+}
+
+fn label(key: &str, value: &str) -> LabelSelector {
+    selector(&BTreeMap::from([(key.to_owned(), value.to_owned())]))
+}
+
+fn pods_peer(pods: LabelSelector) -> NetworkPolicyPeer {
+    NetworkPolicyPeer {
+        pod_selector: Some(pods),
+        ..NetworkPolicyPeer::default()
+    }
+}
+
+const fn peer(namespaces: LabelSelector, pods: LabelSelector) -> NetworkPolicyPeer {
+    NetworkPolicyPeer {
+        namespace_selector: Some(namespaces),
+        pod_selector: Some(pods),
+        ip_block: None,
+    }
+}
+
+fn ingress_from(from: Vec<NetworkPolicyPeer>) -> Vec<NetworkPolicyIngressRule> {
+    vec![NetworkPolicyIngressRule {
+        from: Some(from),
+        ports: None,
+    }]
 }
 
 /// A name for a policy: `zeabur-<preset>-<workload name>`, cut to 63 characters.
@@ -1065,17 +1101,19 @@ fn policy_name(preset: &str, workload: &Workload) -> String {
     out.trim_end_matches('-').to_owned()
 }
 
-fn policy(namespace: &str, name: &str, spec: &Value) -> Value {
-    json!({
-        "apiVersion": "networking.k8s.io/v1",
-        "kind": "NetworkPolicy",
-        "metadata": {
-            "name": name,
-            "namespace": namespace,
-            "labels": {"app.kubernetes.io/managed-by": "zeabur"},
+fn policy(namespace: &str, name: &str, spec: NetworkPolicySpec) -> NetworkPolicy {
+    NetworkPolicy {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            labels: Some(BTreeMap::from([(
+                "app.kubernetes.io/managed-by".to_owned(),
+                "zeabur".to_owned(),
+            )])),
+            ..ObjectMeta::default()
         },
-        "spec": spec,
-    })
+        spec: Some(spec),
+    }
 }
 
 /// The presets for `target`:
@@ -1090,7 +1128,14 @@ fn policy(namespace: &str, name: &str, spec: &Value) -> Value {
 /// (a policy that selects pods admits only what its rules allow).
 #[must_use]
 pub fn presets(namespace: &str, target: &Workload, others: &[Workload]) -> Vec<Preset> {
-    let pods = selector_value(&target.labels);
+    let pods = selector(&target.labels);
+    let types = |types: &[&str]| Some(types.iter().map(|t| (*t).to_owned()).collect());
+    let dns = |protocol: &str| NetworkPolicyPort {
+        protocol: Some(protocol.to_owned()),
+        port: Some(IntOrString::Int(53)),
+        end_port: None,
+    };
+    let traefik = || label("app.kubernetes.io/name", "traefik");
     let mut out = vec![
         Preset {
             kind: "isolate".to_owned(),
@@ -1098,21 +1143,24 @@ pub fn presets(namespace: &str, target: &Workload, others: &[Workload]) -> Vec<P
             object: policy(
                 namespace,
                 &policy_name("isolate", target),
-                &json!({
-                    "podSelector": pods,
-                    "policyTypes": ["Ingress", "Egress"],
-                    "ingress": [{"from": [{"podSelector": {}}]}],
-                    "egress": [
-                        {"to": [{"podSelector": {}}]},
-                        {
-                            "to": [{
-                                "namespaceSelector": {"matchLabels": {NAMESPACE_NAME_LABEL: "kube-system"}},
-                                "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}},
-                            }],
-                            "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}],
+                NetworkPolicySpec {
+                    pod_selector: Some(pods.clone()),
+                    policy_types: types(&["Ingress", "Egress"]),
+                    ingress: Some(ingress_from(vec![pods_peer(LabelSelector::default())])),
+                    egress: Some(vec![
+                        NetworkPolicyEgressRule {
+                            to: Some(vec![pods_peer(LabelSelector::default())]),
+                            ports: None,
                         },
-                    ],
-                }),
+                        NetworkPolicyEgressRule {
+                            to: Some(vec![peer(
+                                label(NAMESPACE_NAME_LABEL, "kube-system"),
+                                label("k8s-app", "kube-dns"),
+                            )]),
+                            ports: Some(vec![dns("UDP"), dns("TCP")]),
+                        },
+                    ]),
+                },
             ),
         },
         Preset {
@@ -1121,20 +1169,15 @@ pub fn presets(namespace: &str, target: &Workload, others: &[Workload]) -> Vec<P
             object: policy(
                 namespace,
                 &policy_name("allow-ingress", target),
-                &json!({
-                    "podSelector": pods,
-                    "policyTypes": ["Ingress"],
-                    "ingress": [{"from": [
-                        {
-                            "namespaceSelector": {"matchLabels": {NAMESPACE_NAME_LABEL: "kube-system"}},
-                            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "traefik"}},
-                        },
-                        {
-                            "namespaceSelector": {"matchLabels": {PLATFORM_LABEL: "true"}},
-                            "podSelector": {"matchLabels": {"app.kubernetes.io/name": "traefik"}},
-                        },
-                    ]}],
-                }),
+                NetworkPolicySpec {
+                    pod_selector: Some(pods.clone()),
+                    policy_types: types(&["Ingress"]),
+                    ingress: Some(ingress_from(vec![
+                        peer(label(NAMESPACE_NAME_LABEL, "kube-system"), traefik()),
+                        peer(label(PLATFORM_LABEL, "true"), traefik()),
+                    ])),
+                    ..NetworkPolicySpec::default()
+                },
             ),
         },
     ];
@@ -1146,11 +1189,12 @@ pub fn presets(namespace: &str, target: &Workload, others: &[Workload]) -> Vec<P
             object: policy(
                 namespace,
                 &policy_name(&format!("allow-{from_name}"), target),
-                &json!({
-                    "podSelector": pods,
-                    "policyTypes": ["Ingress"],
-                    "ingress": [{"from": [{"podSelector": selector_value(&other.labels)}]}],
-                }),
+                NetworkPolicySpec {
+                    pod_selector: Some(pods.clone()),
+                    policy_types: types(&["Ingress"]),
+                    ingress: Some(ingress_from(vec![pods_peer(selector(&other.labels))])),
+                    ..NetworkPolicySpec::default()
+                },
             ),
         });
     }
@@ -1159,6 +1203,8 @@ pub fn presets(namespace: &str, target: &Workload, others: &[Workload]) -> Vec<P
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     fn workload(name: &str, app: &str) -> Workload {
@@ -1196,7 +1242,7 @@ mod tests {
                 &workloads[0].id,
             )
         };
-        let isolated = [object(isolate.object)];
+        let isolated = [object(serde_json::to_value(isolate.object).unwrap())];
         assert_eq!(blocked(&isolated).map(|p| p.len()), Some(1));
         assert_eq!(blocked(&[isolated[0].clone(), open]), None);
         assert_eq!(blocked(&[]), None);
@@ -1212,7 +1258,7 @@ mod tests {
         let r = reachability(Input {
             namespace: "shop",
             workloads: &workloads,
-            policies: &[object(preset.object)],
+            policies: &[object(serde_json::to_value(preset.object).unwrap())],
             connections: &[(workloads[0].id.clone(), workloads[1].id.clone())],
         });
         let api = &r.services[1];
@@ -1231,7 +1277,7 @@ mod tests {
                 .into_iter()
                 .find(|p| p.kind == kind)
                 .unwrap();
-            object(found.object)
+            object(serde_json::to_value(found.object).unwrap())
         };
         let from_traefik = |policies: &[DynamicObject]| {
             reachability(input(&workloads, policies, &[])).services[0].from_ingress_controller

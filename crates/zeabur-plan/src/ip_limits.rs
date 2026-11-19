@@ -21,7 +21,13 @@
 use std::collections::BTreeMap;
 use std::net::IpAddr;
 
-use serde_json::{Value, json};
+use k8s_openapi::api::networking::v1::{
+    IPBlock, NetworkPolicy, NetworkPolicyEgressRule, NetworkPolicyPeer, NetworkPolicyPort,
+    NetworkPolicySpec,
+};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use serde_json::json;
 use zeabur_model::WorkloadRef;
 use zeabur_model::adapters::traefik;
 
@@ -29,7 +35,8 @@ use crate::access::{meta_of, middleware_resource, owner_of};
 use crate::change::{Change, EgressLimitChange, RouteKind, RouteRef, Target};
 use crate::checks::ResourceRef;
 use crate::json::{add, replace, test};
-use crate::plan::{ErrorKind, PlanError, Planner, error, ingress_target};
+use crate::objects::MiddlewareSpec;
+use crate::plan::{ErrorKind, PlanError, Planner, error, ingress_target, to_json};
 
 const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
 
@@ -144,29 +151,67 @@ fn checked(given: &[String], ranges: bool) -> Result<Vec<String>, PlanError> {
 }
 
 /// The `spec` of the egress policy for pods with `labels`.
-fn egress_spec(labels: &BTreeMap<String, String>, cidrs: &[String]) -> Value {
+fn egress_spec(labels: &BTreeMap<String, String>, cidrs: &[String]) -> NetworkPolicySpec {
+    let selector = |labels: &[(&str, &str)]| LabelSelector {
+        match_labels: Some(
+            labels
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect(),
+        ),
+        ..LabelSelector::default()
+    };
+    let port = |protocol: &str| NetworkPolicyPort {
+        protocol: Some(protocol.to_owned()),
+        port: Some(IntOrString::Int(53)),
+        ..NetworkPolicyPort::default()
+    };
     let mut egress = vec![
-        json!({"to": [{"podSelector": {}}]}),
-        json!({
-            "to": [{
-                "namespaceSelector": {"matchLabels": {"kubernetes.io/metadata.name": "kube-system"}},
-                "podSelector": {"matchLabels": {"k8s-app": "kube-dns"}},
-            }],
-            "ports": [{"protocol": "UDP", "port": 53}, {"protocol": "TCP", "port": 53}],
-        }),
+        NetworkPolicyEgressRule {
+            to: Some(vec![NetworkPolicyPeer {
+                pod_selector: Some(LabelSelector::default()),
+                ..NetworkPolicyPeer::default()
+            }]),
+            ports: None,
+        },
+        NetworkPolicyEgressRule {
+            to: Some(vec![NetworkPolicyPeer {
+                namespace_selector: Some(selector(&[(
+                    "kubernetes.io/metadata.name",
+                    "kube-system",
+                )])),
+                pod_selector: Some(selector(&[("k8s-app", "kube-dns")])),
+                ..NetworkPolicyPeer::default()
+            }]),
+            ports: Some(vec![port("UDP"), port("TCP")]),
+        },
     ];
     if !cidrs.is_empty() {
-        let to: Vec<Value> = cidrs
-            .iter()
-            .map(|c| json!({"ipBlock": {"cidr": c}}))
-            .collect();
-        egress.push(json!({ "to": to }));
+        egress.push(NetworkPolicyEgressRule {
+            to: Some(
+                cidrs
+                    .iter()
+                    .map(|cidr| NetworkPolicyPeer {
+                        ip_block: Some(IPBlock {
+                            cidr: cidr.clone(),
+                            except: None,
+                        }),
+                        ..NetworkPolicyPeer::default()
+                    })
+                    .collect(),
+            ),
+            ports: None,
+        });
     }
-    json!({
-        "podSelector": {"matchLabels": labels},
-        "policyTypes": ["Egress"],
-        "egress": egress,
-    })
+    NetworkPolicySpec {
+        pod_selector: Some(LabelSelector {
+            match_labels: Some(labels.clone()),
+            ..LabelSelector::default()
+        }),
+        policy_types: Some(vec!["Egress".to_owned()]),
+        egress: Some(egress),
+        ..NetworkPolicySpec::default()
+    }
 }
 
 #[expect(
@@ -234,10 +279,10 @@ impl Planner<'_> {
             } else if found.pointer("/spec/ipAllowList").is_some() {
                 vec![add("/spec/ipAllowList/sourceRange", json!(ranges))]
             } else {
-                vec![add(
-                    "/spec",
-                    json!({"ipAllowList": {"sourceRange": ranges}}),
-                )]
+                let spec = MiddlewareSpec::IpAllowList {
+                    source_range: ranges,
+                };
+                vec![add("/spec", to_json(&spec)?)]
             };
             let at = self.working(crate::access::middleware_target(&name), found);
             self.patch(at, spec)?;
@@ -245,8 +290,10 @@ impl Planner<'_> {
             self.created_middleware(
                 &name,
                 owner_of(&meta).as_ref(),
-                &json!({"ipAllowList": {"sourceRange": ranges}}),
-            );
+                MiddlewareSpec::IpAllowList {
+                    source_range: ranges,
+                },
+            )?;
         }
         if !listed {
             let index = self.working(ingress_target(ingress), object);
@@ -305,20 +352,24 @@ impl Planner<'_> {
         if let Some(object) = existing {
             let before = object.get("spec").cloned().unwrap_or_default();
             let index = self.working(policy_target(&name), object);
-            return self.patch(index, vec![test("/spec", before), replace("/spec", spec)]);
+            return self.patch(
+                index,
+                vec![test("/spec", before), replace("/spec", to_json(&spec)?)],
+            );
         }
-        let body = json!({
-            "apiVersion": "networking.k8s.io/v1",
-            "kind": "NetworkPolicy",
-            "metadata": {
-                "name": name,
-                "namespace": self.input.snapshot.namespace,
-                "labels": {MANAGED_BY: "zeabur"},
+        let body = NetworkPolicy {
+            metadata: ObjectMeta {
+                name: Some(name.clone()),
+                namespace: Some(self.input.snapshot.namespace.clone()),
+                labels: Some(BTreeMap::from([(
+                    MANAGED_BY.to_owned(),
+                    "zeabur".to_owned(),
+                )])),
+                ..ObjectMeta::default()
             },
-            "spec": spec,
-        });
-        self.created(policy_target(&name), body);
-        Ok(())
+            spec: Some(spec),
+        };
+        self.created(policy_target(&name), &body)
     }
 }
 

@@ -124,6 +124,11 @@ impl DevCluster {
             .quiet()
     }
 
+    /// `kubectl apply` of `object`.
+    fn apply_object(&self, object: &impl serde::Serialize) -> Result<(), String> {
+        self.apply(serde_json::to_vec(object).map_err(|e| e.to_string())?)
+    }
+
     /// `kubectl create <args>` as YAML, applied, so that a second `up` updates the object.
     fn apply_created(&self, namespace: &str, args: &[&str]) -> Result<(), String> {
         let yaml = self

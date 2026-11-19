@@ -13,6 +13,7 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_gaps::{Certificates, TraceInput};
 use zeabur_kube::ResourceRef;
+use zeabur_kube::k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use zeabur_model::{Diagnosis, HopStatus, HopStep, RouteTrace, Service, WorkloadKind, id};
 use zeabur_plan::{Change, PlanRequest};
 
@@ -218,38 +219,29 @@ fn fix(read: &ProjectRead, service: &Service, trace: &RouteTrace) -> Option<Plan
     let [port] = ports.as_slice() else {
         return None;
     };
-    let object = read
+    let mut object = read
         .snapshot
         .services
         .iter()
-        .find(|s| s.metadata.name.as_deref() == Some(endpoint.as_str()))?;
-    let mut value = serde_json::to_value(object).ok()?;
+        .find(|s| s.metadata.name.as_deref() == Some(endpoint.as_str()))?
+        .clone();
     let mut changed = false;
-    for entry in value.pointer_mut("/spec/ports")?.as_array_mut()?.iter_mut() {
-        let target = entry
-            .get("targetPort")
-            .or_else(|| entry.get("port"))
-            .map(|t| t.as_str().map_or_else(|| t.to_string(), str::to_owned));
-        if target.as_deref() == Some(wrong) {
-            entry["targetPort"] = serde_json::json!(port);
+    for entry in object.spec.as_mut()?.ports.iter_mut().flatten() {
+        let target = match &entry.target_port {
+            Some(IntOrString::Int(n)) => n.to_string(),
+            Some(IntOrString::String(name)) => name.clone(),
+            None => entry.port.to_string(),
+        };
+        if target == wrong {
+            entry.target_port = Some(IntOrString::Int(*port));
             changed = true;
         }
     }
     if !changed {
         return None;
     }
-    if let Some(metadata) = value.get_mut("metadata").and_then(|m| m.as_object_mut()) {
-        metadata.remove("managedFields");
-    }
-    if let Some(object) = value.as_object_mut() {
-        object.remove("status");
-        object
-            .entry("apiVersion")
-            .or_insert_with(|| serde_json::json!("v1"));
-        object
-            .entry("kind")
-            .or_insert_with(|| serde_json::json!("Service"));
-    }
+    object.metadata.managed_fields = None;
+    object.status = None;
     Some(PlanRequest {
         changes: vec![Change::Edit {
             resource: zeabur_plan::ResourceRef {
@@ -258,7 +250,7 @@ fn fix(read: &ProjectRead, service: &Service, trace: &RouteTrace) -> Option<Plan
                 resource: "services".to_owned(),
             },
             name: endpoint.clone(),
-            yaml: serde_json::to_string_pretty(&value).ok()?,
+            yaml: serde_json::to_string_pretty(&object).ok()?,
             spec_only: false,
         }],
     })

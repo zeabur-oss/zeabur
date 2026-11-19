@@ -32,6 +32,9 @@ hex.workspace = true
 http-body-util.workspace = true
 # The registry client of `images`: the HTTPS stack kube-rs already ships.
 hyper-util.workspace = true
+json-patch.workspace = true
+# The kubeconfig of the tools pod.
+kube.workspace = true
 pastey.workspace = true
 rustls.workspace = true
 serde.workspace = true
@@ -67,7 +70,6 @@ tokio-tungstenite.workspace = true
 # YAML output of the OpenAPI document, for the committed copy only.
 serde-saphyr = { workspace = true, features = ["serialize"] }
 zeabur-core.workspace = true
-kube.workspace = true
 serde.workspace = true
 tower.workspace = true
 tracing.workspace = true

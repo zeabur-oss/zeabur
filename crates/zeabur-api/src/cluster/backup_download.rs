@@ -195,7 +195,9 @@ pub(crate) async fn fetch(
     cluster
         .write(&WriteRequest {
             target: request.clone(),
-            body: WriteBody::Create(v::download_request(namespace, &name, backup, what)),
+            body: WriteBody::Create(super::backups::value(&v::download_request(
+                namespace, &name, backup, what,
+            ))?),
             dry_run: false,
         })
         .await

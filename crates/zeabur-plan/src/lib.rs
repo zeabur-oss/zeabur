@@ -15,6 +15,7 @@ pub mod fields;
 mod ip_limits;
 pub mod json;
 pub mod node_shell;
+mod objects;
 mod owned;
 mod plan;
 mod pod_security;

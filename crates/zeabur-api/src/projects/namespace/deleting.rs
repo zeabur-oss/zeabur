@@ -12,9 +12,9 @@
 //! [k8s-ns-conditions]: https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/namespace-v1/#NamespaceStatus
 //! [k8s-ns-messages]: https://github.com/kubernetes/kubernetes/blob/v1.34.1/pkg/controller/namespace/deletion/status_condition_utils.go
 
-use serde::Serialize;
-use serde_json::Value;
+use serde::{Deserialize as _, Serialize};
 use utoipa::ToSchema;
+use zeabur_kube::k8s_openapi::api::core::v1::NamespaceStatus;
 use zeabur_kube::{Cluster, DynamicObject, ResourceRef};
 
 /// A project whose Namespace is being deleted.
@@ -120,22 +120,16 @@ pub(crate) async fn held_objects(
 
 /// The message of `namespace`'s condition `kind` when it is `True`; empty otherwise.
 fn condition(namespace: &DynamicObject, kind: &str) -> String {
-    let Some(conditions) = namespace
+    namespace
         .data
-        .pointer("/status/conditions")
-        .and_then(Value::as_array)
-    else {
-        return String::new();
-    };
-    conditions
-        .iter()
-        .find(|c| {
-            c.get("type").and_then(Value::as_str) == Some(kind)
-                && c.get("status").and_then(Value::as_str) == Some("True")
-        })
-        .and_then(|c| c.get("message").and_then(Value::as_str))
+        .get("status")
+        .and_then(|s| NamespaceStatus::deserialize(s).ok())
+        .and_then(|s| s.conditions)
         .unwrap_or_default()
-        .to_owned()
+        .into_iter()
+        .find(|c| c.type_ == kind && c.status == "True")
+        .and_then(|c| c.message)
+        .unwrap_or_default()
 }
 
 /// The items of a condition message: what follows the colon, split on `", "`.

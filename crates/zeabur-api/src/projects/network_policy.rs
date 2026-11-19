@@ -175,7 +175,7 @@ pub(crate) struct PresetQuery {
 }
 
 /// The ready-made policies for one service.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct PresetList {
     /// Isolate first, then allow the ingress controller, then one per other service.

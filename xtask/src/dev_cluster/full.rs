@@ -4,7 +4,8 @@ use std::fs;
 use std::path::Path;
 use std::time::Duration;
 
-use serde_json::json;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use serde::Serialize;
 
 use super::{DevCluster, ZOT_CA, ZOT_HOST, ZOT_IP, catalog, cluster, images};
 use crate::process::wait_for;
@@ -26,13 +27,19 @@ pub(crate) fn install(dev: &DevCluster, builder_src: Option<&Path>) -> Result<()
             &format!("--key={}", tls.join("ca.key").display()),
         ],
     )?;
-    let issuer = json!({
-        "apiVersion": "cert-manager.io/v1",
-        "kind": "ClusterIssuer",
-        "metadata": {"name": "zeabur-local-ca"},
-        "spec": {"ca": {"secretName": "zeabur-local-ca"}},
-    });
-    dev.apply(issuer.to_string())?;
+    dev.apply_object(&ClusterIssuer {
+        api_version: "cert-manager.io/v1",
+        kind: "ClusterIssuer",
+        metadata: ObjectMeta {
+            name: Some("zeabur-local-ca".to_owned()),
+            ..ObjectMeta::default()
+        },
+        spec: IssuerSpec {
+            ca: CaIssuer {
+                secret_name: "zeabur-local-ca",
+            },
+        },
+    })?;
     let stop_at = catalog::stop_at_from_env();
     for (component, namespace) in [
         ("cloudnative-pg", "cnpg-system"),
@@ -206,4 +213,25 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
         Duration::from_secs(180),
     )?;
     dev.platform("builder-system")
+}
+
+/// A cert-manager `ClusterIssuer` that signs with a CA.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct ClusterIssuer {
+    api_version: &'static str,
+    kind: &'static str,
+    metadata: ObjectMeta,
+    spec: IssuerSpec,
+}
+
+#[derive(Serialize)]
+struct IssuerSpec {
+    ca: CaIssuer,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct CaIssuer {
+    secret_name: &'static str,
 }

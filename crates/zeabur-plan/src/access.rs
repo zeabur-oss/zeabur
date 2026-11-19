@@ -20,9 +20,12 @@
 //! [gw-redirect]: https://gateway-api.sigs.k8s.io/reference/spec/#httprequestredirectfilter
 //! [gw-precedence]: https://gateway-api.sigs.k8s.io/reference/spec/#httprouterule
 
-use base64::Engine as _;
+use std::collections::BTreeMap;
+
+use k8s_openapi::ByteString;
 use k8s_openapi::api::core::v1::Secret;
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
+use serde::Serialize;
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use zeabur_model::adapters::traefik::{self, MIDDLEWARES_ANNOTATION};
@@ -32,6 +35,7 @@ use crate::checks::ResourceRef;
 use crate::edit::LAST_APPLIED;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
+use crate::objects::{HttpRouteObject, Middleware, MiddlewareSpec};
 use crate::plan::{
     ErrorKind, PlanError, Planner, Working, array, error, http_route_target, ingress_target,
     to_json,
@@ -197,30 +201,35 @@ impl Planner<'_> {
             return Ok(());
         };
         let line = htpasswd(user, &salt(self.input.now, ingress, &user.username))?;
-        let data =
-            json!({"users": base64::engine::general_purpose::STANDARD.encode(format!("{line}\n"))});
+        let data = BTreeMap::from([(
+            "users".to_owned(),
+            ByteString(format!("{line}\n").into_bytes()),
+        )]);
         let owner = owner_of(&meta);
         if let Some(secret) = secret {
             let index = self.working(Target::of::<Secret>(&name), secret);
-            self.patch(index, vec![add("/data", data)])?;
+            self.patch(index, vec![add("/data", to_json(&data)?)])?;
         } else {
+            let metadata = self.owned_metadata(&name, owner.as_ref());
             self.created(
                 Target::of::<Secret>(&name),
-                json!({
-                    "apiVersion": "v1",
-                    "kind": "Secret",
-                    "metadata": self.owned_metadata(&name, owner.as_ref()),
-                    "type": "Opaque",
-                    "data": data,
-                }),
-            );
+                &Secret {
+                    metadata,
+                    type_: Some("Opaque".to_owned()),
+                    data: Some(data),
+                    ..Secret::default()
+                },
+            )?;
         }
         if middleware.is_none() {
             self.created_middleware(
                 &name,
                 owner.as_ref(),
-                &json!({"basicAuth": {"secret": name, "removeHeader": true}}),
-            );
+                MiddlewareSpec::BasicAuth {
+                    secret: name.clone(),
+                    remove_header: true,
+                },
+            )?;
         }
         let index = self.working(ingress_target(ingress), object.clone());
         if !listed {
@@ -340,16 +349,16 @@ impl Planner<'_> {
             }
             return Ok(());
         };
-        let spec = json!({"redirectRegex": {
-            "regex": format!("^https?://{}(:[0-9]+)?/(.*)", hostname.replace('.', "\\.")),
-            "replacement": format!("https://{to}/${{2}}"),
-            "permanent": permanent,
-        }});
+        let spec = MiddlewareSpec::RedirectRegex {
+            regex: format!("^https?://{}(:[0-9]+)?/(.*)", hostname.replace('.', "\\.")),
+            replacement: format!("https://{to}/${{2}}"),
+            permanent,
+        };
         if let Some(found) = middleware {
             let index = self.working(middleware_target(&name), found);
-            self.patch(index, vec![add("/spec", spec)])?;
+            self.patch(index, vec![add("/spec", to_json(&spec)?)])?;
         } else {
-            self.created_middleware(&name, owner_of(&meta).as_ref(), &spec);
+            self.created_middleware(&name, owner_of(&meta).as_ref(), spec)?;
         }
         let index = self.working(ingress_target(ingress), object.clone());
         if !listed {
@@ -446,40 +455,29 @@ impl Planner<'_> {
         if array(&object, "/spec/hostnames").len() <= 1 {
             return Ok((name.to_owned(), object));
         }
-        let services = array(&object, "/spec/rules")
-            .iter()
-            .flat_map(|rule| array(rule, "/backendRefs"))
-            .filter_map(|r| r.get("name").and_then(Value::as_str).map(str::to_owned))
-            .collect();
+        let services = RouteKind::HttpRoute.services(&object);
         let own = self.own_route_name(&services, name, hostname)?;
         let meta = meta_of(&object);
         let mut annotations = meta.annotations.clone().unwrap_or_default();
         annotations.remove(LAST_APPLIED);
-        let mut metadata = json!({"name": own, "namespace": self.input.snapshot.namespace});
-        if let Some(map) = metadata.as_object_mut() {
-            if let Some(labels) = &meta.labels {
-                map.insert("labels".to_owned(), json!(labels));
-            }
-            if !annotations.is_empty() {
-                map.insert("annotations".to_owned(), json!(annotations));
-            }
-        }
+        let metadata = ObjectMeta {
+            name: Some(own.clone()),
+            namespace: Some(self.input.snapshot.namespace.clone()),
+            labels: meta.labels,
+            annotations: (!annotations.is_empty()).then_some(annotations),
+            ..ObjectMeta::default()
+        };
         let mut spec = object.get("spec").cloned().unwrap_or_default();
         if let Some(map) = spec.as_object_mut() {
             map.insert("hostnames".to_owned(), json!([hostname]));
         }
-        let body = json!({
-            "apiVersion": "gateway.networking.k8s.io/v1",
-            "kind": "HTTPRoute",
-            "metadata": metadata,
-            "spec": spec,
-        });
+        let body = to_json(&HttpRouteObject::new(metadata, spec))?;
         let route = RouteRef {
             kind: RouteKind::HttpRoute,
             name: name.to_owned(),
         };
         self.remove_domain(&route, hostname)?;
-        self.created(http_route_target(&own), body.clone());
+        self.created(http_route_target(&own), &body)?;
         self.warnings.push(Warning::DomainMoved {
             hostname: hostname.to_owned(),
             from: ObjectName::of("HTTPRoute", name),
@@ -497,33 +495,44 @@ impl Planner<'_> {
             .map(|f| f.object.clone())
     }
 
-    pub(crate) fn owned_metadata(&self, name: &str, owner: Option<&Value>) -> Value {
-        let mut metadata = json!({"name": name, "namespace": self.input.snapshot.namespace});
-        if let (Some(owner), Some(map)) = (owner, metadata.as_object_mut()) {
-            map.insert("ownerReferences".to_owned(), json!([owner]));
+    pub(crate) fn owned_metadata(&self, name: &str, owner: Option<&OwnerReference>) -> ObjectMeta {
+        ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(self.input.snapshot.namespace.clone()),
+            owner_references: owner.map(|owner| vec![owner.clone()]),
+            ..ObjectMeta::default()
         }
-        metadata
     }
 
-    pub(crate) fn created_middleware(&mut self, name: &str, owner: Option<&Value>, spec: &Value) {
-        let body = json!({
-            "apiVersion": format!("{TRAEFIK_GROUP}/{MIDDLEWARE_VERSION}"),
-            "kind": "Middleware",
-            "metadata": self.owned_metadata(name, owner),
-            "spec": spec,
-        });
-        self.created(middleware_target(name), body);
+    pub(crate) fn created_middleware(
+        &mut self,
+        name: &str,
+        owner: Option<&OwnerReference>,
+        spec: MiddlewareSpec,
+    ) -> Result<(), PlanError> {
+        let body = Middleware {
+            api_version: format!("{TRAEFIK_GROUP}/{MIDDLEWARE_VERSION}"),
+            kind: "Middleware",
+            metadata: self.owned_metadata(name, owner),
+            spec,
+        };
+        self.created(middleware_target(name), &body)
     }
 
-    pub(crate) fn created(&mut self, target: Target, body: Value) {
+    pub(crate) fn created<T: Serialize>(
+        &mut self,
+        target: Target,
+        body: &T,
+    ) -> Result<(), PlanError> {
         self.objects.push(Working {
             target,
             original: None,
-            current: body,
+            current: to_json(body)?,
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,
         });
+        Ok(())
     }
 
     /// Adds middleware `name` to the annotation of Ingress `index`: first, or last.
@@ -663,13 +672,14 @@ pub(crate) fn meta_of(object: &Value) -> ObjectMeta {
 }
 
 /// An owner reference to the Ingress, so the garbage collector deletes what it owns with it.
-pub(crate) fn owner_of(meta: &ObjectMeta) -> Option<Value> {
-    Some(json!({
-        "apiVersion": "networking.k8s.io/v1",
-        "kind": "Ingress",
-        "name": meta.name.as_deref()?,
-        "uid": meta.uid.as_deref()?,
-    }))
+pub(crate) fn owner_of(meta: &ObjectMeta) -> Option<OwnerReference> {
+    Some(OwnerReference {
+        api_version: "networking.k8s.io/v1".to_owned(),
+        kind: "Ingress".to_owned(),
+        name: meta.name.clone()?,
+        uid: meta.uid.clone()?,
+        ..OwnerReference::default()
+    })
 }
 
 #[cfg(test)]

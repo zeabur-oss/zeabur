@@ -7,13 +7,15 @@ use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
+use serde::Deserialize as _;
 use serde_json::Value;
 use zeabur_model::adapters::provenance::{detect_tool, managed_by};
 use zeabur_model::adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, traefik};
 use zeabur_model::{
-    Attribution, Container, ContainerResources, Endpoint, NamespaceAttribution, Origin, PageServer,
-    ProbeHandler, ProbeSummary, Probes, Project, Provenance, Quantities, Resource, ResourceKind,
-    Route, RouteMiddleware, RouteRule, RouteTls, Service, WorkloadRef, WorkloadSelector,
+    Attribution, BackendRef, Container, ContainerResources, Endpoint, HttpRoute, HttpRouteRule,
+    NamespaceAttribution, Origin, PageServer, ProbeHandler, ProbeSummary, Probes, Project,
+    Provenance, Quantities, Resource, ResourceKind, Route, RouteMiddleware, RouteRule, RouteTls,
+    Service, WorkloadRef, WorkloadSelector,
 };
 
 use crate::attribution::{attribution_of, ingress_backends, relations_of};
@@ -343,31 +345,18 @@ pub fn with_http_routes(project: &mut Project, http_routes: &[Value]) {
 fn http_route(object: &Value, page: Option<&str>) -> Option<Route> {
     let meta: ObjectMeta = serde_json::from_value(object.get("metadata")?.clone()).ok()?;
     let name = meta.name.clone()?;
-    let strings = |at: &str| -> Vec<String> {
-        object
-            .pointer(at)
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(|v| v.as_str().map(str::to_owned))
-            .collect()
-    };
-    let hostnames = strings("/spec/hostnames");
-    let rules: Vec<Value> = object
-        .pointer("/spec/rules")
-        .and_then(Value::as_array)
-        .cloned()
-        .unwrap_or_default();
-    let page_refs: Vec<&Value> = rules
+    let HttpRoute { spec, .. } = HttpRoute::deserialize(object).ok()?;
+    let hostnames = spec.hostnames;
+    let page_refs: Vec<&BackendRef> = spec
+        .rules
         .iter()
-        .filter_map(|rule| rule.get("backendRefs").and_then(Value::as_array))
-        .flat_map(|refs| page_refs(refs, page))
+        .flat_map(|rule| page_refs(&rule.backend_refs, page))
         .collect();
-    let route_rules = http_route_rules(&name, &hostnames, &rules, &|b| page_refs.contains(&b));
+    let route_rules = http_route_rules(&name, &hostnames, &spec.rules, &|b| page_refs.contains(&b));
     let mut backends: Vec<String> = route_rules.iter().map(|r| r.service.clone()).collect();
     backends.sort();
     backends.dedup();
-    let redirects = http_route_redirects(&name, &hostnames, &rules);
+    let redirects = http_route_redirects(&name, &hostnames, &spec.rules);
     Some(Route {
         maintenance: if page_refs.is_empty() {
             Vec::new()
@@ -393,21 +382,17 @@ fn http_route(object: &Value, page: Option<&str>) -> Option<Route> {
 
 /// The `backendRefs` among `refs` that send to page server `page`. When the page server is not
 /// known, it is the one of weight 1 next to others of weight 0, as maintenance leaves them.
-fn page_refs<'v>(refs: &'v [Value], page: Option<&str>) -> Vec<&'v Value> {
-    let weight = |b: &Value| b.get("weight").and_then(Value::as_i64).unwrap_or(1);
+fn page_refs<'v>(refs: &'v [BackendRef], page: Option<&str>) -> Vec<&'v BackendRef> {
+    let weight = |b: &BackendRef| b.weight.unwrap_or(1);
     page.map_or_else(
         || {
-            let shown: Vec<&Value> = refs.iter().filter(|b| weight(b) != 0).collect();
+            let shown: Vec<&BackendRef> = refs.iter().filter(|b| weight(b) != 0).collect();
             match shown.as_slice() {
                 [one] if refs.len() > 1 && weight(one) == 1 => vec![*one],
                 _ => Vec::new(),
             }
         },
-        |page| {
-            refs.iter()
-                .filter(|b| b.get("name").and_then(Value::as_str) == Some(page))
-                .collect()
-        },
+        |page| refs.iter().filter(|b| b.name == page).collect(),
     )
 }
 
@@ -416,8 +401,8 @@ fn page_refs<'v>(refs: &'v [Value], page: Option<&str>) -> Vec<&'v Value> {
 fn http_route_rules(
     name: &str,
     hostnames: &[String],
-    rules: &[Value],
-    skipped: &dyn Fn(&Value) -> bool,
+    rules: &[HttpRouteRule],
+    skipped: &dyn Fn(&BackendRef) -> bool,
 ) -> Vec<RouteRule> {
     let hosts: Vec<Option<String>> = if hostnames.is_empty() {
         vec![None]
@@ -426,19 +411,13 @@ fn http_route_rules(
     };
     let mut route_rules = Vec::new();
     for (r, rule) in rules.iter().enumerate() {
-        let refs = rule.get("backendRefs");
         let paths: Vec<(String, String)> = rule
-            .get("matches")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .filter_map(|m| m.get("path"))
+            .matches
+            .iter()
+            .filter_map(|m| m.path.as_ref())
             .map(|p| {
-                let kind = p
-                    .get("type")
-                    .and_then(Value::as_str)
-                    .unwrap_or("PathPrefix");
-                let value = p.get("value").and_then(Value::as_str).unwrap_or("/");
+                let kind = p.type_.as_deref().unwrap_or("PathPrefix");
+                let value = p.value.as_deref().unwrap_or("/");
                 (value.to_owned(), path_type(kind).to_owned())
             })
             .collect();
@@ -447,39 +426,23 @@ fn http_route_rules(
         } else {
             paths
         };
-        for (b, backend) in refs
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-            .enumerate()
-        {
+        for (b, backend) in rule.backend_refs.iter().enumerate() {
             let local = !skipped(backend)
-                && backend.get("namespace").is_none()
-                && backend
-                    .get("group")
-                    .and_then(Value::as_str)
-                    .unwrap_or_default()
-                    .is_empty()
-                && backend
-                    .get("kind")
-                    .and_then(Value::as_str)
-                    .unwrap_or("Service")
-                    == "Service";
-            let Some(service) = backend
-                .get("name")
-                .and_then(Value::as_str)
-                .filter(|_| local)
-            else {
+                && !backend.name.is_empty()
+                && backend.namespace.is_none()
+                && backend.group.as_deref().unwrap_or_default().is_empty()
+                && backend.kind.as_deref().unwrap_or("Service") == "Service";
+            if !local {
                 continue;
-            };
+            }
             for host in &hosts {
                 for (path, kind) in &paths {
                     route_rules.push(RouteRule {
                         host: host.clone(),
                         path: Some(path.clone()),
                         path_type: Some(kind.clone()),
-                        service: service.to_owned(),
-                        port: backend.get("port").map(Value::to_string),
+                        service: backend.name.clone(),
+                        port: backend.port.map(|p| p.to_string()),
                         origin: Origin::field(
                             "HTTPRoute",
                             name,
@@ -494,30 +457,23 @@ fn http_route_rules(
 }
 
 /// The redirect of each hostname of an `HTTPRoute` whose rules redirect.
-fn http_route_redirects(name: &str, hostnames: &[String], rules: &[Value]) -> Vec<RouteMiddleware> {
+fn http_route_redirects(
+    name: &str,
+    hostnames: &[String],
+    rules: &[HttpRouteRule],
+) -> Vec<RouteMiddleware> {
     let redirect = rules
         .iter()
-        .flat_map(|rule| {
-            rule.get("filters")
-                .and_then(Value::as_array)
-                .into_iter()
-                .flatten()
-        })
-        .find_map(|f| f.get("requestRedirect"));
+        .flat_map(|rule| &rule.filters)
+        .find_map(|f| f.request_redirect.as_ref());
     redirect.map_or_else(Vec::new, |redirect| {
         hostnames
             .iter()
             .map(|host| RouteMiddleware {
                 host: Some(host.clone()),
                 middleware: name.to_owned(),
-                to: redirect
-                    .get("hostname")
-                    .and_then(Value::as_str)
-                    .map(str::to_owned),
-                permanent: Some(matches!(
-                    redirect.get("statusCode").and_then(Value::as_i64),
-                    Some(301 | 308)
-                )),
+                to: redirect.hostname.clone(),
+                permanent: Some(matches!(redirect.status_code, Some(301 | 308))),
             })
             .collect()
     })

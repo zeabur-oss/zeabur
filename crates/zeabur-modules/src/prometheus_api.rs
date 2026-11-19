@@ -275,35 +275,19 @@ pub fn series(
     times: &[i64],
     scale: f64,
 ) -> Result<Vec<PrometheusSeries>, StoreError> {
-    let data = data(answer, "matrix", "a range of values")?;
+    let result: Vec<RangeSeries> = data(answer, "matrix", "a range of values")?;
     let index: BTreeMap<i64, usize> = times.iter().enumerate().map(|(i, &t)| (t, i)).collect();
     let mut pods: BTreeMap<String, Vec<Option<f64>>> = BTreeMap::new();
-    for result in data
-        .get("result")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-    {
-        let Some(pod) = result.pointer("/metric/pod").and_then(Value::as_str) else {
+    for result in result {
+        let Some(pod) = result.metric.get("pod") else {
             continue;
         };
         let values = pods
-            .entry(pod.to_owned())
+            .entry(pod.clone())
             .or_insert_with(|| vec![None; times.len()]);
-        for point in result
-            .get("values")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
-        {
-            let (Some(time), Some(value)) = (point.get(0).and_then(seconds), point.get(1)) else {
-                continue;
-            };
-            let value = value
-                .as_str()
-                .and_then(|v| v.parse::<f64>().ok())
-                .filter(|v| v.is_finite());
-            if let (Some(&slot), Some(value)) = (index.get(&time), value)
+        for (time, value) in result.values {
+            let value = value.parse::<f64>().ok().filter(|v| v.is_finite());
+            if let (Some(&slot), Some(value)) = (index.get(&seconds(time)), value)
                 && let Some(cell) = values.get_mut(slot)
             {
                 *cell = Some(value * scale);
@@ -316,23 +300,62 @@ pub fn series(
         .collect())
 }
 
-/// The `data` of a successful answer whose `resultType` is `kind`.
-fn data<'a>(answer: &'a Value, kind: &str, what: &str) -> Result<&'a Value, StoreError> {
-    if answer.get("status").and_then(Value::as_str) != Some("success") {
-        let message = answer
-            .get("error")
-            .and_then(Value::as_str)
-            .unwrap_or("the store answered without a status")
-            .to_owned();
-        return Err(StoreError { message });
-    }
-    let data = answer.get("data").unwrap_or(&Value::Null);
-    if data.get("resultType").and_then(Value::as_str) != Some(kind) {
+/// An answer of the query API [prom-api].
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Answer<T> {
+    status: String,
+    #[serde(default)]
+    error: Option<String>,
+    data: Option<AnswerData<T>>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct AnswerData<T> {
+    result_type: String,
+    result: Vec<T>,
+}
+
+/// A series of a range query: its labels and `[time, "value"]` points.
+#[derive(Deserialize)]
+struct RangeSeries {
+    #[serde(default)]
+    metric: BTreeMap<String, String>,
+    #[serde(default)]
+    values: Vec<(f64, String)>,
+}
+
+/// A series of an instant query: its labels and its `[time, "value"]`.
+#[derive(Deserialize)]
+struct InstantSample {
+    #[serde(default)]
+    metric: BTreeMap<String, String>,
+    value: (f64, String),
+}
+
+/// The results of a successful answer whose `resultType` is `kind`.
+fn data<T: serde::de::DeserializeOwned>(
+    answer: &Value,
+    kind: &str,
+    what: &str,
+) -> Result<Vec<T>, StoreError> {
+    let not = || StoreError {
+        message: format!("the store's answer is not {what} (resultType {kind})"),
+    };
+    let answer = Answer::<T>::deserialize(answer).map_err(|_unreadable| not())?;
+    if answer.status != "success" {
         return Err(StoreError {
-            message: format!("the store's answer is not {what} (resultType {kind})"),
+            message: answer
+                .error
+                .unwrap_or_else(|| "the store answered without a status".to_owned()),
         });
     }
-    Ok(data)
+    answer
+        .data
+        .filter(|d| d.result_type == kind)
+        .map(|d| d.result)
+        .ok_or_else(not)
 }
 
 /// One series' value at an instant, with its labels (`__name__` included).
@@ -359,37 +382,32 @@ impl PrometheusSample {
 ///
 /// When the store answered `status: error`, or with something else than a vector.
 pub fn samples(answer: &Value) -> Result<Vec<PrometheusSample>, StoreError> {
-    let data = data(answer, "vector", "a set of values")?;
-    Ok(data
-        .get("result")
-        .and_then(Value::as_array)
+    let result: Vec<InstantSample> = data(answer, "vector", "a set of values")?;
+    Ok(result
         .into_iter()
-        .flatten()
-        .filter_map(|result| {
-            let labels = result
-                .get("metric")?
-                .as_object()?
-                .iter()
-                .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.to_owned())))
-                .collect();
-            let value = result
-                .pointer("/value/1")?
-                .as_str()?
+        .filter_map(|sample| {
+            let value = sample
+                .value
+                .1
                 .parse::<f64>()
                 .ok()
                 .filter(|v| v.is_finite())?;
-            Some(PrometheusSample { labels, value })
+            Some(PrometheusSample {
+                labels: sample.metric,
+                value,
+            })
         })
         .collect())
 }
 
 /// A point's time: Unix seconds, which Prometheus sends as a number with a fraction.
-fn seconds(value: &Value) -> Option<i64> {
+const fn seconds(value: f64) -> i64 {
     #[expect(
         clippy::cast_possible_truncation,
         reason = "Unix seconds of a range's points fit an i64 and have no fraction to keep"
     )]
-    value.as_f64().map(|t| t.round() as i64)
+    let seconds = value.round() as i64;
+    seconds
 }
 
 /// The restarts in `restarts` (from [`Queries::restarts`]), sorted by time.

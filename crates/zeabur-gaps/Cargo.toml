@@ -18,12 +18,12 @@ workspace = true
 zeabur-graph.workspace = true
 zeabur-model.workspace = true
 k8s-openapi.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 
 [dev-dependencies]
 zeabur-test-support.workspace = true
 datatest-stable.workspace = true
-serde.workspace = true
 serde-saphyr.workspace = true
 
 # One test per fixture case (datatest-stable runs them).

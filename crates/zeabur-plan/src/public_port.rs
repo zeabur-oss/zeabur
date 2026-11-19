@@ -13,8 +13,10 @@
 //! [k8s-lb]: https://kubernetes.io/docs/concepts/services-networking/service/#loadbalancer
 //! [k3s-servicelb]: https://docs.k3s.io/networking/networking-services#service-load-balancer
 
-use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort};
-use serde_json::{Value, json};
+use std::collections::BTreeMap;
+
+use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort, ServiceSpec};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_model::Message;
 
 use crate::change::{PublicPortChange, Target, Warning};
@@ -59,19 +61,15 @@ fn is_load_balancer(object: &KubeService) -> bool {
 }
 
 /// A copy of `port` without its node port, which Kubernetes assigns again.
-fn port_entry(port: &ServicePort) -> Value {
-    let mut entry = json!({"port": port.port});
-    for (key, value) in [
-        ("name", port.name.clone().map(Value::from)),
-        ("protocol", port.protocol.clone().map(Value::from)),
-        ("appProtocol", port.app_protocol.clone().map(Value::from)),
-        ("targetPort", port.target_port.as_ref().map(|t| json!(t))),
-    ] {
-        if let (Some(value), Some(map)) = (value, entry.as_object_mut()) {
-            map.insert(key.to_owned(), value);
-        }
+fn port_entry(port: &ServicePort) -> ServicePort {
+    ServicePort {
+        port: port.port,
+        name: port.name.clone(),
+        protocol: port.protocol.clone(),
+        app_protocol: port.app_protocol.clone(),
+        target_port: port.target_port.clone(),
+        ..ServicePort::default()
     }
-    entry
 }
 
 #[expect(
@@ -139,20 +137,28 @@ impl<'a> Planner<'a> {
         };
         self.refuse_taken(port)?;
         let entry = port_entry(port);
-        let body = json!({
-            "apiVersion": "v1",
-            "kind": "Service",
-            "metadata": {
-                "name": name,
-                "namespace": self.input.snapshot.namespace,
-                "labels": {SERVICE_LABEL: reference.name},
+        let body = KubeService {
+            metadata: ObjectMeta {
+                name: Some(name.clone()),
+                namespace: Some(self.input.snapshot.namespace.clone()),
+                labels: Some(BTreeMap::from([(
+                    SERVICE_LABEL.to_owned(),
+                    reference.name.clone(),
+                )])),
+                ..ObjectMeta::default()
             },
-            "spec": {"type": "LoadBalancer", "selector": selector, "ports": [entry]},
-        });
+            spec: Some(ServiceSpec {
+                type_: Some("LoadBalancer".to_owned()),
+                selector: Some(selector.clone()),
+                ports: Some(vec![entry]),
+                ..ServiceSpec::default()
+            }),
+            ..KubeService::default()
+        };
         self.objects.push(Working {
             target: service_target(&name),
             original: None,
-            current: body,
+            current: to_json(&body)?,
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,

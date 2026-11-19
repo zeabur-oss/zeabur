@@ -2741,6 +2741,8 @@ name = "xtask"
 version = "0.3.0-beta.0"
 dependencies = [
  "clap",
+ "k8s-openapi",
+ "serde",
  "serde-saphyr",
  "serde_json",
  "sha2",
@@ -2801,6 +2803,7 @@ dependencies = [
  "hex",
  "http-body-util",
  "hyper-util",
+ "json-patch",
  "kube",
  "pastey",
  "rustls",

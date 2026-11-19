@@ -28,6 +28,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::k8s_openapi::api::core::v1::Secret;
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{
     Cluster, ClusterError, ClusterExt as _, DynamicObject, ObjectTarget, Preconditions,
@@ -394,7 +396,7 @@ fn version(object: Option<&Value>) -> String {
         .to_owned()
 }
 
-fn value(object: &DynamicObject) -> Result<Value, ApiError> {
+fn value(object: &impl Serialize) -> Result<Value, ApiError> {
     serde_json::to_value(object).map_err(|e| {
         ApiError::from(Problem::new(
             Kind::Internal,
@@ -490,14 +492,14 @@ impl Add<'_> {
             )));
         }
         versions.insert(format!("VMAlertmanagerConfig/{object_name}"), String::new());
-        let config = am::config(namespace, name, settings, self.events);
+        let config = value(&am::config(namespace, name, settings, self.events))?;
         Ok(vec![
             create(
                 "Secret",
                 namespace,
                 &object_name,
-                am::secret(namespace, name, settings, None),
-                am::secret(namespace, name, settings, Some(HIDDEN)),
+                value(&am::secret(namespace, name, settings, None))?,
+                value(&am::secret(namespace, name, settings, Some(HIDDEN)))?,
             ),
             create(
                 am::CONFIGS.kind,
@@ -550,16 +552,21 @@ impl Edit<'_> {
         let edited = am::edit(self.settings, &stored).map_err(invalid)?;
         let mut writes = Vec::new();
         if !edited.secret.is_empty() {
-            let hidden: serde_json::Map<String, Value> = edited
-                .secret
-                .keys()
-                .map(|key| (key.clone(), Value::String(HIDDEN.to_owned())))
-                .collect();
-            let shown = json!({
-                "apiVersion": "v1", "kind": "Secret",
-                "metadata": {"name": object_name, "namespace": namespace},
-                "stringData": hidden,
-            });
+            let shown = value(&Secret {
+                metadata: ObjectMeta {
+                    name: Some(object_name.clone()),
+                    namespace: Some(namespace.to_owned()),
+                    ..ObjectMeta::default()
+                },
+                string_data: Some(
+                    edited
+                        .secret
+                        .keys()
+                        .map(|key| (key.clone(), HIDDEN.to_owned()))
+                        .collect(),
+                ),
+                ..Secret::default()
+            })?;
             writes.push(match secret {
                 Some(secret) => {
                     let mut patch = vec![json!({"op": "test", "path": "/metadata/resourceVersion",
@@ -580,30 +587,29 @@ impl Edit<'_> {
                     "Secret",
                     namespace,
                     &object_name,
-                    am::secret(namespace, name, &edited.settings, None),
+                    value(&am::secret(namespace, name, &edited.settings, None))?,
                     shown,
                 ),
             });
         }
-        let made = am::config(namespace, name, &edited.settings, self.events);
+        let made = Some(value(
+            &am::config(namespace, name, &edited.settings, self.events).spec,
+        )?);
         let target_path = format!(
             "/metadata/annotations/{}",
             am::TARGET_ANNOTATION.replace('/', "~1")
         );
         let aim = edited.target.map(Value::String);
         let retarget = aim.is_some() && before.pointer(&target_path) != aim.as_ref();
-        if before.get("spec") != made.get("spec") || retarget {
+        if before.get("spec") != made.as_ref() || retarget {
             let mut after = before.clone();
             if let Some(object) = after.as_object_mut() {
-                object.insert(
-                    "spec".to_owned(),
-                    made.get("spec").cloned().unwrap_or_default(),
-                );
+                object.insert("spec".to_owned(), made.clone().unwrap_or_default());
             }
             let mut patch = vec![
                 json!({"op": "test", "path": "/metadata/resourceVersion",
                        "value": version(Some(&before))}),
-                json!({"op": "replace", "path": "/spec", "value": made.get("spec")}),
+                json!({"op": "replace", "path": "/spec", "value": made}),
             ];
             if let Some(aim) = aim.filter(|_| retarget) {
                 if let Some(slot) = after
@@ -746,7 +752,7 @@ async fn compute(
                 version(Some(&before)),
             );
             let job = job.unwrap_or_default();
-            let made = am::test_job(namespace, name, job);
+            let made = value(&am::test_job(namespace, name, job))?;
             vec![create("Job", namespace, job, made.clone(), made)]
         }
     };

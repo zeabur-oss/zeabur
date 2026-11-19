@@ -35,8 +35,11 @@
 //! [rfc6902-add]: https://www.rfc-editor.org/rfc/rfc6902#section-4.1
 //! [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
 
-use k8s_openapi::api::core::v1::ServiceAccount;
+use std::collections::BTreeMap;
+
+use k8s_openapi::api::core::v1::{Namespace, ServiceAccount};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
 use zeabur_model::kernel::names::{
@@ -51,8 +54,8 @@ use zeabur_model::{
 use crate::change::{Target, Warning};
 use crate::checks::is_dns_label;
 use crate::fields::Step;
-use crate::json::{add, pointer, remove, replace, test};
-use crate::plan::{ErrorKind, PlanError, Planner, Working, error};
+use crate::json::{add, pointer, remove, replace, test, value_of};
+use crate::plan::{ErrorKind, PlanError, Planner, Working, error, to_json};
 
 fn admin_namespace(name: &str, holds: &str) -> PlanError {
     error(
@@ -80,23 +83,36 @@ pub fn project_namespace(
     display_name: Option<&str>,
     level: PodSecurityLevel,
 ) -> Value {
+    value_of(&new_namespace(conventions, name, display_name, level))
+}
+
+fn new_namespace(
+    conventions: &Conventions,
+    name: &str,
+    display_name: Option<&str>,
+    level: PodSecurityLevel,
+) -> Namespace {
     let level = level.as_str();
-    let mut metadata = json!({
-        "name": name,
-        "labels": {
-            conventions.project_label.clone(): ADOPTED,
-            PodSecurityLevel::ENFORCE: level,
-            PodSecurityLevel::AUDIT: level,
-            PodSecurityLevel::WARN: level,
+    let labels = BTreeMap::from([
+        (conventions.project_label.to_string(), ADOPTED.to_owned()),
+        (PodSecurityLevel::ENFORCE.to_owned(), level.to_owned()),
+        (PodSecurityLevel::AUDIT.to_owned(), level.to_owned()),
+        (PodSecurityLevel::WARN.to_owned(), level.to_owned()),
+    ]);
+    Namespace {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            labels: Some(labels),
+            annotations: display_name.map(|display_name| {
+                BTreeMap::from([(
+                    conventions.display_name_annotation.to_string(),
+                    display_name.to_owned(),
+                )])
+            }),
+            ..ObjectMeta::default()
         },
-    });
-    if let (Some(display_name), Some(map)) = (display_name, metadata.as_object_mut()) {
-        map.insert(
-            "annotations".to_owned(),
-            json!({ conventions.display_name_annotation.clone(): display_name }),
-        );
+        ..Namespace::default()
     }
-    json!({"apiVersion": "v1", "kind": "Namespace", "metadata": metadata})
 }
 
 #[expect(
@@ -173,8 +189,12 @@ impl Planner<'_> {
             "display_name",
             "display name",
         )?;
-        let namespace =
-            project_namespace(conventions, &name, display_name, PodSecurityLevel::Baseline);
+        let namespace = to_json(&new_namespace(
+            conventions,
+            &name,
+            display_name,
+            PodSecurityLevel::Baseline,
+        ))?;
         self.objects.push(Working {
             target: Target::namespace(&name),
             original: None,
@@ -186,11 +206,15 @@ impl Planner<'_> {
         self.objects.push(Working {
             target: Target::of::<ServiceAccount>(DEFAULT_ACCOUNT),
             original: None,
-            current: json!({
-                "apiVersion": "v1", "kind": "ServiceAccount",
-                "metadata": {"name": DEFAULT_ACCOUNT, "namespace": name},
-                "automountServiceAccountToken": false,
-            }),
+            current: to_json(&ServiceAccount {
+                metadata: ObjectMeta {
+                    name: Some(DEFAULT_ACCOUNT.to_owned()),
+                    namespace: Some(name.clone()),
+                    ..ObjectMeta::default()
+                },
+                automount_service_account_token: Some(false),
+                ..ServiceAccount::default()
+            })?,
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,

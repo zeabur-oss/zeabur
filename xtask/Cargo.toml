@@ -11,6 +11,9 @@ readme = "README.md"
 
 [dependencies]
 clap.workspace = true
+# The objects the development cluster applies, and the namespaces it lists.
+k8s-openapi.workspace = true
+serde.workspace = true
 serde_json.workspace = true
 sha2.workspace = true
 tempfile.workspace = true

@@ -6146,6 +6146,8 @@ dependencies = [
  "hex",
  "http-body-util",
  "hyper-util",
+ "json-patch",
+ "kube",
  "pastey",
  "rustls",
  "secrecy",
@@ -6244,6 +6246,7 @@ name = "zeabur-gaps"
 version = "0.3.0-beta.0"
 dependencies = [
  "k8s-openapi",
+ "serde",
  "serde_json",
  "zeabur-graph",
  "zeabur-model",

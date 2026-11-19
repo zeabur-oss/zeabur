@@ -34,7 +34,10 @@
 
 use std::collections::BTreeMap;
 
-use k8s_openapi::api::core::v1::{Container, PersistentVolumeClaim};
+use k8s_openapi::api::core::v1::{
+    Container, PersistentVolumeClaim, PersistentVolumeClaimSpec, VolumeResourceRequirements,
+};
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Map, Value, json};
 use zeabur_graph::{ObjectKey, OwnerGraph, Workload, workloads};
@@ -474,19 +477,27 @@ impl<'a> Planner<'a> {
             ));
         }
         let access_mode = volume.access_mode.unwrap_or_default();
-        let mut spec = json!({
-            "accessModes": [access_mode],
-            "resources": {"requests": {"storage": volume.size}},
-        });
-        if let (Some(class), Some(map)) = (&volume.storage_class, spec.as_object_mut()) {
-            map.insert("storageClassName".to_owned(), json!(class));
-        }
-        let body = json!({
-            "apiVersion": "v1",
-            "kind": "PersistentVolumeClaim",
-            "metadata": {"name": claim_name, "namespace": self.input.snapshot.namespace},
-            "spec": spec,
-        });
+        let claim = PersistentVolumeClaim {
+            metadata: ObjectMeta {
+                name: Some(claim_name.clone()),
+                namespace: Some(self.input.snapshot.namespace.clone()),
+                ..ObjectMeta::default()
+            },
+            spec: Some(PersistentVolumeClaimSpec {
+                access_modes: Some(vec![access_mode.as_kubernetes().to_owned()]),
+                resources: Some(VolumeResourceRequirements {
+                    requests: Some(BTreeMap::from([(
+                        "storage".to_owned(),
+                        Quantity(volume.size.clone()),
+                    )])),
+                    limits: None,
+                }),
+                storage_class_name: volume.storage_class.clone(),
+                ..PersistentVolumeClaimSpec::default()
+            }),
+            ..PersistentVolumeClaim::default()
+        };
+        let body = to_json(&claim)?;
         // The claim first, so the pods find it.
         self.objects.insert(
             0,

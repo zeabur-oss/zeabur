@@ -1,5 +1,7 @@
 //! Changing Zeabur Identity's people: setup links and removals.
 
+use std::collections::BTreeMap;
+
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use serde::{Deserialize, Serialize};
@@ -8,12 +10,13 @@ use utoipa::ToSchema;
 use zeabur_core::crypto::{random, sha256};
 use zeabur_core::message::Message;
 use zeabur_core::problem::{Kind, Problem};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, WriteBody, WriteRequest};
 
 use super::directory::{AccountType, Directory, IdentityKind, Object, UserSpec, request};
 use super::{API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, USER_LABEL};
-use crate::error::{ApiError, read_problem};
+use crate::error::{ApiError, read_problem, to_json};
 
 /// How long a link made for a new member lasts, as `zeabur-identityctl invite`'s default.
 pub(crate) const INVITE_SECONDS: i64 = 7 * 24 * 3600;
@@ -161,33 +164,67 @@ pub(crate) async fn clear(
     Ok(())
 }
 
+/// A Zeabur Identity object Zeabur creates.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NewObject<S> {
+    api_version: &'static str,
+    kind: &'static str,
+    metadata: ObjectMeta,
+    spec: S,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NewUserSpec {
+    username: String,
+    groups: Vec<String>,
+    account_type: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    display_name: Option<String>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct NewInvitationSpec {
+    user: String,
+    token_hash: String,
+    expires_at: i64,
+}
+
+fn managed() -> BTreeMap<String, String> {
+    BTreeMap::from([(
+        "app.kubernetes.io/managed-by".to_owned(),
+        "zeabur".to_owned(),
+    )])
+}
+
 /// The `User` for a new member.
 pub(crate) fn new_user(
     namespace: &str,
     username: &str,
     display_name: Option<&str>,
     admin: bool,
-) -> Value {
-    let mut spec = json!({
-        "username": username,
-        "groups": [],
-        "accountType": account_type(admin),
-    });
-    if let Some(name) = display_name.map(str::trim).filter(|n| !n.is_empty())
-        && let Some(spec) = spec.as_object_mut()
-    {
-        spec.insert(
-            "displayName".to_owned(),
-            json!(name.chars().take(128).collect::<String>()),
-        );
+) -> NewObject<NewUserSpec> {
+    NewObject {
+        api_version: API_VERSION,
+        kind: "User",
+        metadata: ObjectMeta {
+            name: Some(username.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            labels: Some(managed()),
+            ..ObjectMeta::default()
+        },
+        spec: NewUserSpec {
+            username: username.to_owned(),
+            groups: Vec::new(),
+            account_type: account_type(admin),
+            display_name: display_name
+                .map(str::trim)
+                .filter(|n| !n.is_empty())
+                .map(|n| n.chars().take(128).collect()),
+        },
     }
-    json!({
-        "apiVersion": API_VERSION,
-        "kind": "User",
-        "metadata": {"name": username, "namespace": namespace,
-                     "labels": {"app.kubernetes.io/managed-by": "zeabur"}},
-        "spec": spec,
-    })
 }
 
 const fn account_type(admin: bool) -> &'static str {
@@ -243,38 +280,45 @@ pub(crate) fn link(issuer: &str, token: &str) -> String {
 pub(crate) fn invitation(
     namespace: &str,
     name: &str,
-    user: &Value,
+    user: &ObjectMeta,
     token: &str,
     expires_at: i64,
-) -> Value {
-    let username = user
-        .pointer("/metadata/name")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    let mut metadata = json!({
-        "name": name,
-        "namespace": namespace,
-        "labels": {
-            "app.kubernetes.io/managed-by": "zeabur",
-            USER_LABEL: username,
-            EXPIRY_BUCKET_LABEL: (expires_at / 3600).to_string(),
+) -> NewObject<NewInvitationSpec> {
+    let username = user.name.clone().unwrap_or_default();
+    let mut labels = managed();
+    labels.insert(USER_LABEL.to_owned(), username.clone());
+    labels.insert(
+        EXPIRY_BUCKET_LABEL.to_owned(),
+        (expires_at / 3600).to_string(),
+    );
+    NewObject {
+        api_version: API_VERSION,
+        kind: "Invitation",
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            labels: Some(labels),
+            annotations: Some(BTreeMap::from([(
+                EXPIRES_AT_ANNOTATION.to_owned(),
+                expires_at.to_string(),
+            )])),
+            owner_references: user.uid.clone().map(|uid| {
+                vec![OwnerReference {
+                    api_version: API_VERSION.to_owned(),
+                    kind: "User".to_owned(),
+                    name: username.clone(),
+                    uid,
+                    ..OwnerReference::default()
+                }]
+            }),
+            ..ObjectMeta::default()
         },
-        "annotations": {EXPIRES_AT_ANNOTATION: expires_at.to_string()},
-    });
-    if let Some(uid) = user.pointer("/metadata/uid").and_then(Value::as_str)
-        && let Some(metadata) = metadata.as_object_mut()
-    {
-        metadata.insert(
-            "ownerReferences".to_owned(),
-            json!([{"apiVersion": API_VERSION, "kind": "User", "name": username, "uid": uid}]),
-        );
+        spec: NewInvitationSpec {
+            user: username,
+            token_hash: token_hash(token),
+            expires_at,
+        },
     }
-    json!({
-        "apiVersion": API_VERSION,
-        "kind": "Invitation",
-        "metadata": metadata,
-        "spec": {"user": username, "tokenHash": token_hash(token), "expiresAt": expires_at},
-    })
 }
 
 /// Makes an invitation for the `User` `user` (as read, with its `uid`) lasting `seconds` from
@@ -296,7 +340,11 @@ pub(crate) async fn issue(
     let name = format!("inv-{}", hex(&suffix));
     let token = token(&name)?;
     let expires_at = now.as_second().saturating_add(seconds);
-    let object = invitation(namespace, &name, user, &token, expires_at);
+    let user = user
+        .get("metadata")
+        .and_then(|m| ObjectMeta::deserialize(m).ok())
+        .unwrap_or_default();
+    let object = to_json(&invitation(namespace, &name, &user, &token, expires_at))?;
     send(
         cluster,
         IdentityKind::Invitation,
@@ -355,12 +403,18 @@ mod tests {
 
     #[test]
     fn a_link_carries_its_token_in_the_fragment_and_only_the_hash_is_stored() {
-        let user = json!({"metadata": {"name": "ada", "uid": "u-1"}});
+        let user = ObjectMeta {
+            name: Some("ada".to_owned()),
+            uid: Some("u-1".to_owned()),
+            ..ObjectMeta::default()
+        };
         let token = token("inv-1").unwrap();
         let (name, secret) = token.split_once('.').unwrap();
         assert_eq!(name, "inv-1");
         assert_eq!(secret.len(), 43);
-        let object = invitation("zeabur-identity", "inv-1", &user, &token, 7200);
+        let object =
+            serde_json::to_value(invitation("zeabur-identity", "inv-1", &user, &token, 7200))
+                .unwrap();
         assert_eq!(object["spec"]["user"], "ada");
         assert_eq!(object["spec"]["expiresAt"], 7200);
         assert_eq!(object["metadata"]["labels"][USER_LABEL], "ada");
@@ -386,11 +440,11 @@ mod tests {
 
     #[test]
     fn a_new_admin_is_an_admin_account_and_a_member_a_regular_one() {
-        let admin = new_user("ns", "cy", Some(" Cy "), true);
+        let admin = serde_json::to_value(new_user("ns", "cy", Some(" Cy "), true)).unwrap();
         assert_eq!(admin["spec"]["groups"], json!([]));
         assert_eq!(admin["spec"]["accountType"], "Admin");
         assert_eq!(admin["spec"]["displayName"], "Cy");
-        let member = new_user("ns", "cy", None, false);
+        let member = serde_json::to_value(new_user("ns", "cy", None, false)).unwrap();
         assert_eq!(member["spec"]["groups"], json!([]));
         assert_eq!(member["spec"]["accountType"], "Regular");
     }

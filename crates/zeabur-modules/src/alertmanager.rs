@@ -29,8 +29,15 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use k8s_openapi::api::batch::v1::{Job, JobSpec};
+use k8s_openapi::api::core::v1::{
+    Capabilities, Container, PodSecurityContext, PodSpec, PodTemplateSpec, ResourceRequirements,
+    SeccompProfile, Secret, SecretKeySelector, SecurityContext,
+};
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 
@@ -482,6 +489,15 @@ fn secret_values(settings: &AlertmanagerChannelSettings) -> Vec<(&'static str, S
     }
 }
 
+fn meta(namespace: &str, name: &str, labels: BTreeMap<String, String>) -> ObjectMeta {
+    ObjectMeta {
+        name: Some(name.to_owned()),
+        namespace: Some(namespace.to_owned()),
+        labels: Some(labels),
+        ..ObjectMeta::default()
+    }
+}
+
 /// The Secret of channel `name`: its values, or `shown` in place of each to show it.
 #[must_use]
 pub fn secret(
@@ -489,48 +505,202 @@ pub fn secret(
     name: &str,
     settings: &AlertmanagerChannelSettings,
     shown: Option<&str>,
-) -> Value {
-    let data: serde_json::Map<String, Value> = secret_values(settings)
+) -> Secret {
+    let data = secret_values(settings)
         .into_iter()
-        .map(|(key, value)| {
-            (
-                key.to_owned(),
-                Value::String(shown.map_or(value, str::to_owned)),
-            )
-        })
+        .map(|(key, value)| (key.to_owned(), shown.map_or(value, str::to_owned)))
         .collect();
-    json!({
-        "apiVersion": "v1",
-        "kind": "Secret",
-        "metadata": {
-            "name": object_name(name),
-            "namespace": namespace,
-            "labels": {CHANNEL_LABEL: name},
-        },
-        "type": "Opaque",
-        "stringData": data,
-    })
+    Secret {
+        metadata: meta(
+            namespace,
+            &object_name(name),
+            BTreeMap::from([(CHANNEL_LABEL.to_owned(), name.to_owned())]),
+        ),
+        type_: Some("Opaque".to_owned()),
+        string_data: Some(data),
+        ..Secret::default()
+    }
 }
 
-fn key(name: &str, key: &str) -> Value {
-    json!({"name": object_name(name), "key": key})
+/// A `VMAlertmanagerConfig` as Zeabur writes it [vm-amcfg].
+#[derive(Debug, Clone, PartialEq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VmAlertmanagerConfig {
+    /// `operator.victoriametrics.com/v1beta1`.
+    pub api_version: String,
+    /// `VMAlertmanagerConfig`.
+    pub kind: String,
+    /// Its metadata.
+    pub metadata: ObjectMeta,
+    /// Its route and receivers.
+    pub spec: VmAlertmanagerConfigSpec,
 }
 
-fn bearer(name: &str, settings: &AlertmanagerChannelSettings) -> Option<Value> {
+/// The spec of a `VMAlertmanagerConfig`, in Alertmanager's field names.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct VmAlertmanagerConfigSpec {
+    /// The top route.
+    pub route: VmRoute,
+    /// The receivers.
+    pub receivers: Vec<VmReceiver>,
+}
+
+/// An Alertmanager route.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct VmRoute {
+    /// The receiver.
+    pub receiver: String,
+    /// The alerts it takes.
+    pub matchers: Vec<String>,
+    /// The labels it groups alerts by.
+    pub group_by: Vec<String>,
+    /// How long it waits before the first message of a group.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_wait: Option<String>,
+    /// How long it waits before a message of new alerts in a group.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub group_interval: Option<String>,
+    /// How long it waits before it sends a message again.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub repeat_interval: Option<String>,
+    /// The child routes.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub routes: Vec<Self>,
+}
+
+/// An Alertmanager receiver with the configs of one kind.
+#[derive(Debug, Clone, PartialEq, Default, Serialize)]
+pub struct VmReceiver {
+    /// Its name.
+    pub name: String,
+    /// Slack.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub slack_configs: Vec<SlackConfig>,
+    /// Discord.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub discord_configs: Vec<DiscordConfig>,
+    /// Telegram.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub telegram_configs: Vec<TelegramConfig>,
+    /// Email.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub email_configs: Vec<EmailConfig>,
+    /// Webhook, ntfy.
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    pub webhook_configs: Vec<WebhookConfig>,
+}
+
+/// A Slack config.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct SlackConfig {
+    /// The webhook URL.
+    pub api_url: SecretKeySelector,
+    /// The title.
+    pub title: String,
+    /// The text.
+    pub text: String,
+    /// Whether it says when alerts resolve.
+    pub send_resolved: bool,
+}
+
+/// A Discord config.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct DiscordConfig {
+    /// The webhook URL.
+    pub webhook_url_secret: SecretKeySelector,
+    /// The title.
+    pub title: String,
+    /// The message.
+    pub message: String,
+    /// Whether it says when alerts resolve.
+    pub send_resolved: bool,
+}
+
+/// A Telegram config.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct TelegramConfig {
+    /// The bot token.
+    pub bot_token: SecretKeySelector,
+    /// The chat.
+    pub chat_id: i64,
+    /// The message.
+    pub message: String,
+    /// Whether it says when alerts resolve.
+    pub send_resolved: bool,
+}
+
+/// An email config.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct EmailConfig {
+    /// The recipient.
+    pub to: String,
+    /// The sender.
+    pub from: String,
+    /// The SMTP server, `host:port`.
+    pub smarthost: String,
+    /// Whether it needs STARTTLS.
+    pub require_tls: bool,
+    /// The SMTP user.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_username: Option<String>,
+    /// The SMTP password.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub auth_password: Option<SecretKeySelector>,
+    /// Whether it says when alerts resolve.
+    pub send_resolved: bool,
+}
+
+/// A webhook config.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct WebhookConfig {
+    /// The URL.
+    pub url_secret: SecretKeySelector,
+    /// Its HTTP settings.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub http_config: Option<HttpConfig>,
+    /// Whether it says when alerts resolve.
+    pub send_resolved: bool,
+}
+
+/// The HTTP settings of a webhook.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct HttpConfig {
+    /// The `Authorization` header.
+    pub authorization: Authorization,
+}
+
+/// An `Authorization` header from a Secret key.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct Authorization {
+    /// The scheme, `Bearer`.
+    #[serde(rename = "type")]
+    pub type_: String,
+    /// The credentials.
+    pub credentials: SecretKeySelector,
+}
+
+fn key(name: &str, key: &str) -> SecretKeySelector {
+    SecretKeySelector {
+        name: object_name(name),
+        key: key.to_owned(),
+        optional: None,
+    }
+}
+
+fn bearer(name: &str, settings: &AlertmanagerChannelSettings) -> Option<HttpConfig> {
     secret_values(settings)
         .iter()
         .any(|(k, _)| *k == "token")
-        .then(|| json!({"authorization": {"type": "Bearer", "credentials": key(name, "token")}}))
+        .then(|| HttpConfig {
+            authorization: Authorization {
+                type_: "Bearer".to_owned(),
+                credentials: key(name, "token"),
+            },
+        })
 }
 
 const TITLE: &str = r#"{{ if eq .Status "resolved" }}Resolved: {{ end }}{{ (index .Alerts 0).Annotations.summary }}"#;
 const TEXT: &str = "{{ range .Alerts }}{{ .Annotations.description }}\n{{ end }}";
-
-fn set(object: &mut Value, key: &str, value: Value) {
-    if let Some(map) = object.as_object_mut() {
-        map.insert(key.to_owned(), value);
-    }
-}
 
 /// One receiver of channel `name`.
 fn receiver(
@@ -538,55 +708,56 @@ fn receiver(
     name: &str,
     settings: &AlertmanagerChannelSettings,
     send_resolved: bool,
-) -> Value {
-    let (field, mut config) = match settings {
-        AlertmanagerChannelSettings::Slack { .. } => (
-            "slack_configs",
-            json!({"api_url": key(name, "url"), "title": TITLE, "text": TEXT}),
-        ),
-        AlertmanagerChannelSettings::Discord { .. } => (
-            "discord_configs",
-            json!({"webhook_url_secret": key(name, "url"), "title": TITLE, "message": TEXT}),
-        ),
-        AlertmanagerChannelSettings::Telegram { chat_id, .. } => (
-            "telegram_configs",
-            json!({
-                "bot_token": key(name, "token"),
-                "chat_id": chat_id,
-                "message": format!("{TITLE}\n\n{TEXT}"),
-            }),
-        ),
+) -> VmReceiver {
+    let mut out = VmReceiver {
+        name: receiver.to_owned(),
+        ..VmReceiver::default()
+    };
+    match settings {
+        AlertmanagerChannelSettings::Slack { .. } => out.slack_configs.push(SlackConfig {
+            api_url: key(name, "url"),
+            title: TITLE.to_owned(),
+            text: TEXT.to_owned(),
+            send_resolved,
+        }),
+        AlertmanagerChannelSettings::Discord { .. } => out.discord_configs.push(DiscordConfig {
+            webhook_url_secret: key(name, "url"),
+            title: TITLE.to_owned(),
+            message: TEXT.to_owned(),
+            send_resolved,
+        }),
+        AlertmanagerChannelSettings::Telegram { chat_id, .. } => {
+            out.telegram_configs.push(TelegramConfig {
+                bot_token: key(name, "token"),
+                chat_id: *chat_id,
+                message: format!("{TITLE}\n\n{TEXT}"),
+                send_resolved,
+            });
+        }
         AlertmanagerChannelSettings::Email {
             to,
             from,
             smarthost,
             username,
             password,
-        } => {
-            let mut config = json!({
-                "to": to.trim(),
-                "from": from.trim(),
-                "smarthost": smarthost.trim(),
-                "require_tls": true,
-            });
-            if !username.trim().is_empty() {
-                set(&mut config, "auth_username", json!(username.trim()));
-            }
-            if !password.is_empty() {
-                set(&mut config, "auth_password", key(name, "password"));
-            }
-            ("email_configs", config)
-        }
+        } => out.email_configs.push(EmailConfig {
+            to: to.trim().to_owned(),
+            from: from.trim().to_owned(),
+            smarthost: smarthost.trim().to_owned(),
+            require_tls: true,
+            auth_username: (!username.trim().is_empty()).then(|| username.trim().to_owned()),
+            auth_password: (!password.is_empty()).then(|| key(name, "password")),
+            send_resolved,
+        }),
         AlertmanagerChannelSettings::Webhook { .. } | AlertmanagerChannelSettings::Ntfy { .. } => {
-            let mut config = json!({"url_secret": key(name, "url")});
-            if let Some(http) = bearer(name, settings) {
-                set(&mut config, "http_config", http);
-            }
-            ("webhook_configs", config)
+            out.webhook_configs.push(WebhookConfig {
+                url_secret: key(name, "url"),
+                http_config: bearer(name, settings),
+                send_resolved,
+            });
         }
-    };
-    set(&mut config, "send_resolved", json!(send_resolved));
-    json!({"name": receiver, field: [config]})
+    }
+    out
 }
 
 fn events_matcher(events: &[AlertmanagerEvent]) -> String {
@@ -597,11 +768,11 @@ fn events_matcher(events: &[AlertmanagerEvent]) -> String {
     format!("{EVENTS_MATCHER}\"{}\"", labels.join("|"))
 }
 
-fn matchers(name: &str, events: &[AlertmanagerEvent]) -> Value {
-    json!([
+fn matchers(name: &str, events: &[AlertmanagerEvent]) -> Vec<String> {
+    vec![
         events_matcher(events),
-        format!("zeabur_channel=~\"|{name}\"")
-    ])
+        format!("zeabur_channel=~\"|{name}\""),
+    ]
 }
 
 fn target(settings: &AlertmanagerChannelSettings) -> Option<String> {
@@ -628,6 +799,10 @@ fn host(url: &str) -> Option<String> {
     (!host.is_empty()).then(|| host.to_owned())
 }
 
+fn strings(values: &[&str]) -> Vec<String> {
+    values.iter().map(|v| (*v).to_owned()).collect()
+}
+
 /// The `VMAlertmanagerConfig` of channel `name`. Its secrets stay in the Secret
 /// ([`secret`]); the config only names their keys.
 #[must_use]
@@ -636,40 +811,49 @@ pub fn config(
     name: &str,
     settings: &AlertmanagerChannelSettings,
     events: &[AlertmanagerEvent],
-) -> Value {
-    let mut annotations = json!({KIND_ANNOTATION: settings.kind().label()});
+) -> VmAlertmanagerConfig {
+    let mut annotations = BTreeMap::from([(
+        KIND_ANNOTATION.to_owned(),
+        settings.kind().label().to_owned(),
+    )]);
     if let Some(target) = target(settings) {
-        set(&mut annotations, TARGET_ANNOTATION, json!(target));
+        annotations.insert(TARGET_ANNOTATION.to_owned(), target);
     }
-    json!({
-        "apiVersion": CONFIGS.resource().api_version(),
-        "kind": CONFIGS.kind,
-        "metadata": {
-            "name": object_name(name),
-            "namespace": namespace,
-            "labels": {CHANNEL_LABEL: name},
-            "annotations": annotations,
+    VmAlertmanagerConfig {
+        api_version: CONFIGS.resource().api_version(),
+        kind: CONFIGS.kind.to_owned(),
+        metadata: ObjectMeta {
+            annotations: Some(annotations),
+            ..meta(
+                namespace,
+                &object_name(name),
+                BTreeMap::from([(CHANNEL_LABEL.to_owned(), name.to_owned())]),
+            )
         },
-        "spec": {
-            "route": {
-                "receiver": "events",
-                "matchers": matchers(name, events),
-                "group_by": ["..."],
-                "group_wait": "30s",
-                "group_interval": "5m",
-                "repeat_interval": "12h",
-                "routes": [{
-                    "receiver": "states",
-                    "matchers": ["zeabur_kind=\"state\""],
-                    "group_by": ["alertname"],
+        spec: VmAlertmanagerConfigSpec {
+            route: VmRoute {
+                receiver: "events".to_owned(),
+                matchers: matchers(name, events),
+                group_by: strings(&["..."]),
+                group_wait: Some("30s".to_owned()),
+                group_interval: Some("5m".to_owned()),
+                repeat_interval: Some("12h".to_owned()),
+                routes: vec![VmRoute {
+                    receiver: "states".to_owned(),
+                    matchers: strings(&["zeabur_kind=\"state\""]),
+                    group_by: strings(&["alertname"]),
+                    group_wait: None,
+                    group_interval: None,
+                    repeat_interval: None,
+                    routes: Vec::new(),
                 }],
             },
-            "receivers": [
+            receivers: vec![
                 receiver("events", name, settings, false),
                 receiver("states", name, settings, true),
             ],
         },
-    })
+    }
 }
 
 /// `config` with its route taking `events` instead.
@@ -677,7 +861,7 @@ pub fn config(
 pub fn with_events(config: &Value, name: &str, events: &[AlertmanagerEvent]) -> Value {
     let mut out = config.clone();
     if let Some(route) = out.pointer_mut("/spec/route") {
-        route["matchers"] = matchers(name, events);
+        route["matchers"] = matchers(name, events).into();
     }
     out
 }
@@ -685,47 +869,64 @@ pub fn with_events(config: &Value, name: &str, events: &[AlertmanagerEvent]) -> 
 /// The Job that tests channel `name`: it only has to exist for a minute or two. Its pod does
 /// nothing and meets the restricted Pod Security Standard.
 #[must_use]
-pub fn test_job(namespace: &str, name: &str, job: &str) -> Value {
-    json!({
-        "apiVersion": "batch/v1",
-        "kind": "Job",
-        "metadata": {
-            "name": job,
-            "namespace": namespace,
-            "labels": {TEST_LABEL: name},
-        },
-        "spec": {
-            "activeDeadlineSeconds": 120,
-            "ttlSecondsAfterFinished": 300,
-            "backoffLimit": 0,
-            "template": {
-                "metadata": {"labels": {TEST_LABEL: name}},
-                "spec": {
-                    "restartPolicy": "Never",
-                    "automountServiceAccountToken": false,
-                    "enableServiceLinks": false,
-                    "securityContext": {
-                        "runAsNonRoot": true,
-                        "runAsUser": 65535,
-                        "seccompProfile": {"type": "RuntimeDefault"},
-                    },
-                    "containers": [{
-                        "name": "wait",
-                        "image": "registry.k8s.io/pause:3.10",
-                        "resources": {
-                            "requests": {"cpu": "1m", "memory": "4Mi"},
-                            "limits": {"cpu": "10m", "memory": "8Mi"},
-                        },
-                        "securityContext": {
-                            "allowPrivilegeEscalation": false,
-                            "readOnlyRootFilesystem": true,
-                            "capabilities": {"drop": ["ALL"]},
-                        },
+pub fn test_job(namespace: &str, name: &str, job: &str) -> Job {
+    let labels = BTreeMap::from([(TEST_LABEL.to_owned(), name.to_owned())]);
+    let quantities = |cpu: &str, memory: &str| {
+        BTreeMap::from([
+            ("cpu".to_owned(), Quantity(cpu.to_owned())),
+            ("memory".to_owned(), Quantity(memory.to_owned())),
+        ])
+    };
+    Job {
+        metadata: meta(namespace, job, labels.clone()),
+        spec: Some(JobSpec {
+            active_deadline_seconds: Some(120),
+            ttl_seconds_after_finished: Some(300),
+            backoff_limit: Some(0),
+            template: PodTemplateSpec {
+                metadata: Some(ObjectMeta {
+                    labels: Some(labels),
+                    ..ObjectMeta::default()
+                }),
+                spec: Some(PodSpec {
+                    restart_policy: Some("Never".to_owned()),
+                    automount_service_account_token: Some(false),
+                    enable_service_links: Some(false),
+                    security_context: Some(PodSecurityContext {
+                        run_as_non_root: Some(true),
+                        run_as_user: Some(65535),
+                        seccomp_profile: Some(SeccompProfile {
+                            type_: "RuntimeDefault".to_owned(),
+                            localhost_profile: None,
+                        }),
+                        ..PodSecurityContext::default()
+                    }),
+                    containers: vec![Container {
+                        name: "wait".to_owned(),
+                        image: Some("registry.k8s.io/pause:3.10".to_owned()),
+                        resources: Some(ResourceRequirements {
+                            requests: Some(quantities("1m", "4Mi")),
+                            limits: Some(quantities("10m", "8Mi")),
+                            ..ResourceRequirements::default()
+                        }),
+                        security_context: Some(SecurityContext {
+                            allow_privilege_escalation: Some(false),
+                            read_only_root_filesystem: Some(true),
+                            capabilities: Some(Capabilities {
+                                drop: Some(vec!["ALL".to_owned()]),
+                                add: None,
+                            }),
+                            ..SecurityContext::default()
+                        }),
+                        ..Container::default()
                     }],
-                },
+                    ..PodSpec::default()
+                }),
             },
-        },
-    })
+            ..JobSpec::default()
+        }),
+        ..Job::default()
+    }
 }
 
 /// The name of a test Job made at `unix_seconds`.
@@ -1000,6 +1201,8 @@ fn hide_url(reason: String) -> String {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -1019,6 +1222,10 @@ mod tests {
         serde_json::from_value(value).unwrap()
     }
 
+    fn json_of(object: impl Serialize) -> Value {
+        serde_json::to_value(object).unwrap()
+    }
+
     const EVENTS: [AlertmanagerEvent; 2] = [
         AlertmanagerEvent::DeployFailed,
         AlertmanagerEvent::CrashLoop,
@@ -1030,7 +1237,7 @@ mod tests {
             url: "https://hooks.example.com/zeabur?key=URL-SECRET".to_owned(),
             bearer_token: "TOKEN-SECRET".to_owned(),
         };
-        let config = config("shop", "ops", &settings, &EVENTS);
+        let config = json_of(config("shop", "ops", &settings, &EVENTS));
         let text = config.to_string();
         assert!(
             !text.contains("URL-SECRET") && !text.contains("TOKEN-SECRET"),
@@ -1040,9 +1247,9 @@ mod tests {
             config.pointer("/spec/receivers/0/webhook_configs/0/url_secret"),
             Some(&json!({"name": "zeabur-notify-ops", "key": "url"}))
         );
-        let written = secret("shop", "ops", &settings, None);
+        let written = json_of(secret("shop", "ops", &settings, None));
         assert_eq!(written["stringData"]["token"], "TOKEN-SECRET");
-        let shown = secret("shop", "ops", &settings, Some("(hidden)")).to_string();
+        let shown = json_of(secret("shop", "ops", &settings, Some("(hidden)"))).to_string();
         assert!(!shown.contains("SECRET"), "{shown}");
     }
 
@@ -1053,7 +1260,7 @@ mod tests {
             topic: "shop-alerts".to_owned(),
             access_token: String::new(),
         };
-        let mut made = config("shop", "phone", &settings, &EVENTS);
+        let mut made = json_of(config("shop", "phone", &settings, &EVENTS));
         made["status"] = json!({"updateStatus": "failed", "reason": "bad matcher"});
         let channel = channel(&object(made.clone()));
         assert_eq!(channel.name, "phone");
@@ -1089,7 +1296,7 @@ mod tests {
             BTreeMap::from([("token".to_owned(), "new-token".to_owned())])
         );
         assert_eq!(edited.target, None);
-        let made = config("shop", "ops", &edited.settings, &EVENTS)["spec"].to_string();
+        let made = json_of(config("shop", "ops", &edited.settings, &EVENTS))["spec"].to_string();
         assert!(made.contains("authorization"), "{made}");
         assert!(!made.contains("kept"), "{made}");
 
@@ -1104,7 +1311,7 @@ mod tests {
         .unwrap();
         assert!(kept.secret.is_empty());
         assert!(
-            !config("shop", "ops", &kept.settings, &EVENTS)
+            !json_of(config("shop", "ops", &kept.settings, &EVENTS))
                 .to_string()
                 .contains("authorization")
         );
@@ -1149,7 +1356,7 @@ mod tests {
         let settings = AlertmanagerChannelSettings::Slack {
             webhook_url: "https://hooks.slack.com/services/x".to_owned(),
         };
-        let config = config("shop", "team", &settings, &EVENTS);
+        let config = json_of(config("shop", "team", &settings, &EVENTS));
         assert_eq!(
             config.pointer("/spec/route/matchers"),
             Some(&json!([

@@ -59,10 +59,11 @@ use axum::extract::State;
 use axum::extract::ws::WebSocket;
 use axum::http::StatusCode;
 use axum::response::Response;
-use secrecy::ExposeSecret as _;
+use kube::config::{AuthInfo, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext};
 use secrecy::zeroize::Zeroizing;
+use secrecy::{ExposeSecret as _, SecretString};
 use serde::Serialize;
-use serde_json::{Value, json};
+use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
@@ -534,43 +535,38 @@ pub(crate) async fn delete_in(
 
 /// The kubeconfig for the tools pod. It is cleared on drop.
 fn kubeconfig(handoff: &Handoff, person: &str, start: &str) -> Zeroizing<Vec<u8>> {
-    // Serialize the token from a borrowed `&str`. A `Value` would hold a copy of it.
-    #[derive(Serialize)]
-    #[serde(rename_all = "kebab-case")]
-    struct Kubeconfig<'a> {
-        api_version: &'static str,
-        kind: &'static str,
-        clusters: Value,
-        users: [User<'a>; 1],
-        contexts: Value,
-        current_context: &'static str,
-    }
-    #[derive(Serialize)]
-    struct User<'a> {
-        name: &'a str,
-        user: Token<'a>,
-    }
-    #[derive(Serialize)]
-    struct Token<'a> {
-        token: &'a str,
-    }
-    let config = |token| Kubeconfig {
-        api_version: "v1",
-        kind: "Config",
-        clusters: json!([{"name": "zeabur", "cluster": {
-            "server": IN_CLUSTER_SERVER,
-            "certificate-authority": plans::TOOLS_CA,
-        }}]),
-        users: [User {
-            name: person,
-            user: Token { token },
+    let config = |token: &str| Kubeconfig {
+        api_version: Some("v1".to_owned()),
+        kind: Some("Config".to_owned()),
+        clusters: vec![NamedCluster {
+            name: "zeabur".to_owned(),
+            cluster: Some(kube::config::Cluster {
+                server: Some(IN_CLUSTER_SERVER.to_owned()),
+                certificate_authority: Some(plans::TOOLS_CA.to_owned()),
+                ..kube::config::Cluster::default()
+            }),
+            ..NamedCluster::default()
         }],
-        contexts: json!([{"name": "zeabur", "context": {
-            "cluster": "zeabur",
-            "user": person,
-            "namespace": start,
-        }}]),
-        current_context: "zeabur",
+        auth_infos: vec![NamedAuthInfo {
+            name: person.to_owned(),
+            auth_info: Some(AuthInfo {
+                token: Some(SecretString::from(token)),
+                ..AuthInfo::default()
+            }),
+            ..NamedAuthInfo::default()
+        }],
+        contexts: vec![NamedContext {
+            name: "zeabur".to_owned(),
+            context: Some(Context {
+                cluster: "zeabur".to_owned(),
+                user: Some(person.to_owned()),
+                namespace: Some(start.to_owned()),
+                ..Context::default()
+            }),
+            ..NamedContext::default()
+        }],
+        current_context: Some("zeabur".to_owned()),
+        ..Kubeconfig::default()
     };
     let token = handoff.token.secret().expose_secret();
     // JSON writes one byte as at most six (`\u00XX`). With this capacity the buffer never moves,
@@ -835,6 +831,8 @@ async fn run(
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]

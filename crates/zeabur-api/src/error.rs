@@ -49,6 +49,16 @@ pub(crate) fn read_problem(error: ClusterError, what: &str, read: Denied) -> Api
     ApiError::from(problem)
 }
 
+/// `object` as JSON, for the body of a write.
+pub(crate) fn to_json(object: &impl serde::Serialize) -> Result<serde_json::Value, ApiError> {
+    serde_json::to_value(object).map_err(|e| {
+        ApiError::from(Problem::new(
+            Kind::Internal,
+            format!("Zeabur could not write an object as JSON: {e}"),
+        ))
+    })
+}
+
 /// `denied`, which a `SelfSubjectAccessReview` answered no to before Zeabur sent it, about
 /// `what`.
 pub(crate) fn review_refusal(what: &str, denied: Denied) -> ApiError {

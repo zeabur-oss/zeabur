@@ -326,11 +326,15 @@ pub(crate) use store::{
 };
 
 pub(crate) mod store {
+    use std::collections::BTreeMap;
+
     use axum::extract::State;
     use serde::{Deserialize, Serialize};
     use serde_json::{Value, json};
     use utoipa::ToSchema;
     use zeabur_core::problem::{Denied, Kind, KubernetesStatus, MEDIA_TYPE as PROBLEM, Problem};
+    use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
+    use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
     use zeabur_kube::{
         Cluster, ClusterError, ClusterExt as _, ObjectTarget, ServicePort, Unreadable, WriteBody,
         WriteRequest,
@@ -766,11 +770,15 @@ pub(crate) mod store {
         let pointer = format!("/data/{key}");
         let Some(stored) = stored else {
             let value = value?;
-            return Some(WriteBody::Create(json!({
-                "apiVersion": "v1", "kind": "ConfigMap",
-                "metadata": {"name": name},
-                "data": {key: value}
-            })));
+            let config_map = ConfigMap {
+                metadata: ObjectMeta {
+                    name: Some(name.to_owned()),
+                    ..ObjectMeta::default()
+                },
+                data: Some(BTreeMap::from([(key.to_owned(), value.to_owned())])),
+                ..ConfigMap::default()
+            };
+            return serde_json::to_value(config_map).ok().map(WriteBody::Create);
         };
         let current = stored.pointer(&pointer).and_then(Value::as_str);
         let wanted = value.map(str::to_owned);

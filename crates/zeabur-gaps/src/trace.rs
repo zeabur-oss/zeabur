@@ -41,6 +41,9 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use k8s_openapi::api::core::v1::Service as KubeService;
 use k8s_openapi::api::networking::v1::{Ingress, IngressServiceBackend};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use serde::Deserialize;
+use serde::de::DeserializeOwned;
 use serde_json::Value;
 use zeabur_graph::Snapshot;
 use zeabur_model::{
@@ -608,35 +611,90 @@ const fn not_checked() -> CertificateCheck {
     }
 }
 
-fn condition<'a>(certificate: &'a Value, kind: &str) -> Option<&'a Value> {
-    certificate
-        .pointer("/status/conditions")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .find(|c| c.get("type").and_then(Value::as_str) == Some(kind))
+/// The fields of a cert-manager `Certificate` the trace reads.
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct CertificateView {
+    metadata: ObjectMeta,
+    spec: CertificateSpec,
+    status: CertificateStatus,
 }
 
-fn text(value: Option<&Value>, key: &str) -> String {
-    value
-        .and_then(|v| v.get(key))
-        .and_then(Value::as_str)
-        .unwrap_or_default()
-        .to_owned()
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct CertificateSpec {
+    secret_name: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct CertificateStatus {
+    conditions: Vec<Condition>,
+    not_after: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct Condition {
+    #[serde(rename = "type")]
+    type_: String,
+    status: String,
+    reason: String,
+    message: String,
+}
+
+/// The fields of a cert-manager ACME `Challenge` the trace reads.
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct ChallengeView {
+    spec: ChallengeSpec,
+    status: ChallengeStatus,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct ChallengeSpec {
+    dns_name: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct ChallengeStatus {
+    state: String,
+    reason: String,
+}
+
+fn read<T: Default + DeserializeOwned>(object: &Value) -> T {
+    T::deserialize(object).unwrap_or_default()
+}
+
+impl CertificateView {
+    fn condition(&self, kind: &str) -> Option<&Condition> {
+        self.status.conditions.iter().find(|c| c.type_ == kind)
+    }
+}
+
+fn status(condition: Option<&Condition>) -> &str {
+    condition.map_or("", |c| c.status.as_str())
+}
+
+fn reason_and_message(condition: Option<&Condition>) -> (String, String) {
+    condition.map_or_else(Default::default, |c| (c.reason.clone(), c.message.clone()))
 }
 
 /// The ACME challenge cert-manager runs for `host`, if one is under way.
-fn challenge<'a>(input: &TraceInput<'a>, host: &str) -> Option<&'a Value> {
-    input.challenges.iter().find(|c| {
-        c.pointer("/spec/dnsName")
-            .and_then(Value::as_str)
-            .is_some_and(|name| {
-                name == host
-                    || name
-                        .strip_prefix("*.")
-                        .is_some_and(|base| host.split_once('.').is_some_and(|(_, r)| r == base))
-            })
-    })
+fn challenge(input: &TraceInput<'_>, host: &str) -> Option<ChallengeView> {
+    input
+        .challenges
+        .iter()
+        .map(read::<ChallengeView>)
+        .find(|c| {
+            let name = c.spec.dns_name.as_str();
+            name == host
+                || name
+                    .strip_prefix("*.")
+                    .is_some_and(|base| host.split_once('.').is_some_and(|(_, r)| r == base))
+        })
 }
 
 /// The certificate hop of `host` and how its certificate stands, when `ingress` lists the host
@@ -689,14 +747,12 @@ fn certificate(
     if let Certificates::Listed(certificates) = input.certificates
         && let Some(certificate) = certificates
             .iter()
-            .find(|c| c.pointer("/spec/secretName").and_then(Value::as_str) == Some(secret))
+            .map(read::<CertificateView>)
+            .find(|c| c.spec.secret_name.as_deref() == Some(secret))
     {
-        let certificate_name = certificate
-            .pointer("/metadata/name")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let ready = condition(certificate, "Ready");
-        let issuing = condition(certificate, "Issuing");
+        let certificate_name = certificate.metadata.name.as_deref().unwrap_or_default();
+        let ready = certificate.condition("Ready");
+        let issuing = certificate.condition("Issuing");
         let origin = Origin::complete(
             "cert-manager.io/v1",
             "Certificate",
@@ -704,10 +760,7 @@ fn certificate(
             certificate_name,
         )
         .with_field("status.conditions[type=Ready]".to_owned());
-        let not_after = certificate
-            .pointer("/status/notAfter")
-            .and_then(Value::as_str)
-            .map(str::to_owned);
+        let not_after = certificate.status.not_after.clone();
         let check = |state, reason: String, message: String| CertificateCheck {
             state,
             name: Some(certificate_name.to_owned()),
@@ -716,11 +769,14 @@ fn certificate(
             not_after: not_after.clone(),
         };
         let challenge = challenge(input, host);
-        let challenge_state = text(challenge.and_then(|c| c.get("status")), "state");
-        let challenge_reason = text(challenge.and_then(|c| c.get("status")), "reason");
+        let challenged = challenge.is_some();
+        let ChallengeStatus {
+            state: challenge_state,
+            reason: challenge_reason,
+        } = challenge.unwrap_or_default().status;
         let challenge_failed = matches!(challenge_state.as_str(), "invalid" | "errored");
-        let issuing_now = text(issuing, "status") == "True";
-        let (hop, check) = if text(ready, "status") == "True" {
+        let issuing_now = status(issuing) == "True";
+        let (hop, check) = if status(ready) == "True" {
             (
                 base(HopStatus::Ok, "ok")
                     .with("until", not_after.clone().unwrap_or_default())
@@ -737,22 +793,22 @@ fn certificate(
                 check(CertificateState::Failed, challenge_state, challenge_reason),
             )
         } else if issuing_now {
-            let (reason, message) = if challenge.is_some() {
+            let (reason, message) = if challenged {
                 (challenge_state, challenge_reason)
             } else {
-                (text(issuing, "reason"), text(issuing, "message"))
+                reason_and_message(issuing)
             };
             (
                 base(HopStatus::Unknown, "issuing").with("certificate", certificate_name),
                 check(CertificateState::Issuing, reason, message),
             )
-        } else if text(ready, "status") == "False" {
-            let source = if text(issuing, "status") == "False" {
+        } else if status(ready) == "False" {
+            let source = if status(issuing) == "False" {
                 issuing
             } else {
                 ready
             };
-            let (reason, message) = (text(source, "reason"), text(source, "message"));
+            let (reason, message) = reason_and_message(source);
             (
                 base(HopStatus::Failed, "notReady")
                     .with("certificate", certificate_name)
@@ -767,10 +823,7 @@ fn certificate(
                 check(CertificateState::Issuing, String::new(), String::new()),
             )
         };
-        return Some((
-            hop.evidence(origin.with_value(text(ready, "status"))),
-            check,
-        ));
+        return Some((hop.evidence(origin.with_value(status(ready))), check));
     }
     if !input.secrets_readable {
         return Some((base(HopStatus::Unknown, "unreadable"), not_checked()));

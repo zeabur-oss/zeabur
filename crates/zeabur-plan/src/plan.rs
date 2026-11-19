@@ -33,7 +33,10 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use base64::Engine as _;
 use k8s_openapi::api::apps::v1::ReplicaSet;
-use k8s_openapi::api::networking::v1::Ingress;
+use k8s_openapi::api::networking::v1::{
+    HTTPIngressPath, HTTPIngressRuleValue, Ingress, IngressBackend, IngressRule,
+    IngressServiceBackend, IngressSpec, IngressTLS, ServiceBackendPort,
+};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
 use zeabur_graph::{Snapshot, Workload, workloads};
@@ -45,7 +48,7 @@ use zeabur_model::{HttpRoute, Message, Project, SourceKind, WorkloadKind, Worklo
 
 use crate::access::redirect_rule;
 use crate::certificates::{
-    CLUSTER_ISSUER, CheckedCertificate, ISSUER, IssuerRead, issued_secret_name,
+    CLUSTER_ISSUER, CheckedCertificate, ISSUER, IssuerRead, issued_secret_name, tls_of,
 };
 use crate::change::{
     AddDomainChange, CertificateSource, Change, DataEdit, DataKind, FieldOwners, GatewayParent,
@@ -58,6 +61,9 @@ use crate::edit::edit_operations;
 use crate::error_pages::shows_maintenance;
 use crate::fields::{Step, owners, reapplying_tool};
 use crate::json::{add, apply_patch, pointer, remove, replace, test};
+use crate::objects::{
+    HttpRouteObject, NewBackendRef, NewHttpRouteRule, NewHttpRouteSpec, ParentRef,
+};
 use crate::releases::Release;
 use crate::rules::{
     EnvEdit, diff, env_entry, managed_code, route_name, tool_name, validate_env, validate_hostname,
@@ -1394,45 +1400,60 @@ impl<'a> Planner<'a> {
         }
         let namespace = self.input.snapshot.namespace.clone();
         if let Some(parent) = parent {
-            let mut reference = json!({"name": parent.name, "namespace": parent.namespace});
-            if let (Some(section), Some(map)) = (&parent.section_name, reference.as_object_mut()) {
-                map.insert("sectionName".to_owned(), json!(section));
-            }
-            self.objects.push(Working {
-                target: http_route_target(&name),
-                original: None,
-                current: json!({
-                    "apiVersion": "gateway.networking.k8s.io/v1",
-                    "kind": "HTTPRoute",
-                    "metadata": {"name": name, "namespace": namespace},
-                    "spec": {
-                        "parentRefs": [reference],
-                        "hostnames": [hostname],
-                        "rules": [{"backendRefs": [{"name": service, "port": port}]}]
-                    }
-                }),
-                operations: Vec::new(),
-                owners: Vec::new(),
-                deleted: false,
-            });
-            return Ok(());
+            let route = HttpRouteObject::new(
+                ObjectMeta {
+                    name: Some(name.clone()),
+                    namespace: Some(namespace),
+                    ..ObjectMeta::default()
+                },
+                NewHttpRouteSpec {
+                    parent_refs: vec![ParentRef {
+                        name: parent.name.clone(),
+                        namespace: parent.namespace.clone(),
+                        section_name: parent.section_name.clone(),
+                    }],
+                    hostnames: vec![hostname.to_owned()],
+                    rules: vec![NewHttpRouteRule {
+                        backend_refs: vec![NewBackendRef {
+                            name: service.to_owned(),
+                            port,
+                        }],
+                    }],
+                },
+            );
+            return self.created(http_route_target(&name), &route);
         }
-        self.objects.push(Working {
-            target: ingress_target(&name),
-            original: None,
-            current: json!({
-                "apiVersion": "networking.k8s.io/v1",
-                "kind": "Ingress",
-                "metadata": {"name": name, "namespace": namespace},
-                "spec": {"rules": [{"host": hostname, "http": {"paths": [{
-                    "path": "/", "pathType": "Prefix",
-                    "backend": {"service": {"name": service, "port": {"number": port}}}
-                }]}}]}
+        let ingress = Ingress {
+            metadata: ObjectMeta {
+                name: Some(name.clone()),
+                namespace: Some(namespace),
+                ..ObjectMeta::default()
+            },
+            spec: Some(IngressSpec {
+                rules: Some(vec![IngressRule {
+                    host: Some(hostname.to_owned()),
+                    http: Some(HTTPIngressRuleValue {
+                        paths: vec![HTTPIngressPath {
+                            path: Some("/".to_owned()),
+                            path_type: "Prefix".to_owned(),
+                            backend: IngressBackend {
+                                service: Some(IngressServiceBackend {
+                                    name: service.to_owned(),
+                                    port: Some(ServiceBackendPort {
+                                        name: None,
+                                        number: Some(port),
+                                    }),
+                                }),
+                                resource: None,
+                            },
+                        }],
+                    }),
+                }]),
+                ..IngressSpec::default()
             }),
-            operations: Vec::new(),
-            owners: Vec::new(),
-            deleted: false,
-        });
+            ..Ingress::default()
+        };
+        self.created(ingress_target(&name), &ingress)?;
         let index = self.objects.len() - 1;
         self.secure(index, &name, hostname, certificate)
     }
@@ -1476,7 +1497,7 @@ impl<'a> Planner<'a> {
             .and_then(|a| a.get(CLUSTER_ISSUER).or_else(|| a.get(ISSUER)))
             .and_then(Value::as_str)
             .map(str::to_owned);
-        let tls = array(&current, "/spec/tls");
+        let tls = tls_of(&current);
         let mut operations = Vec::new();
         let unfit = named
             .as_deref()
@@ -1531,7 +1552,10 @@ impl<'a> Planner<'a> {
         };
         let secret = issued_secret_name(ingress, hostname, &tls);
         self.claim(index, &[Step::field("spec"), Step::field("tls")], "tls")?;
-        let entry = json!({"hosts": [hostname], "secretName": secret});
+        let entry = to_json(&IngressTLS {
+            hosts: Some(vec![hostname.to_owned()]),
+            secret_name: Some(secret),
+        })?;
         operations.push(if current.pointer("/spec/tls").is_some() {
             add("/spec/tls/-", entry)
         } else {
