@@ -1,0 +1,30 @@
+---
+title: 用 Zeatend 一個指令安裝
+description: 開發中。之後在一台全新的 Linux 伺服器上，用 Zeatend 的安裝畫面裝好 Kubernetes，再用一個指令裝上 Zeabur。
+---
+
+<Callout type="info" title="開發中">
+這個方式還不能用。進度見 [#430](https://github.com/zeabur-oss/zeabur/issues/430)。現在要安裝，請[手動把 Zeabur 裝進既有叢集](existing-cluster.mdx)。
+</Callout>
+
+想看清楚每個物件？現在可以[手動安裝](existing-cluster.mdx)。[交給 Agent 安裝](agent.mdx)也還在開發中。
+
+## 完成後你會有
+
+- 一台 Linux 伺服器，上面有一個 Kubernetes 叢集。
+- 叢集上的 Zeabur，以及負責登入的 Zeabur Identity。
+- 一個能用 HTTPS 打開的 Zeabur 網址。
+
+## 之後的流程
+
+[Zeatend](https://github.com/zeabur-oss/zeatend) 負責在伺服器上裝好 Kubernetes。它的安裝畫面有繁體中文、簡體中文和英文，按 F2 切換。
+
+1. 在伺服器上執行 Zeatend，打開安裝畫面。
+2. **伺服器**：畫面列出這台伺服器的資訊和檢查結果。你選擇要裝 K3s、RKE2 還是 KubeSolo，這三種都是 Kubernetes 發行版。檢查沒通過時，會停在這一頁。
+3. **連線方式**：填入這台伺服器 Kubernetes API 的位址，你的電腦之後用這個位址管理叢集。網域名稱和節點名稱可以不填。
+4. **確認**：畫面列出要安裝的版本和設定。
+5. **安裝**：畫面顯示每個步驟和紀錄。安裝在背景執行，SSH 斷線也不會中斷。
+6. 再用一個指令裝上 Zeabur。這個指令也會裝好登入用的 Zeabur Identity、處理網址的 Traefik、簽發 HTTPS 憑證的 cert-manager，以及讀取用量的 metrics-server。叢集裡已經有的，就不會重新安裝。
+7. 打開 Zeabur 的網址登入。之後還需要的元件，在**叢集** → **元件**頁面安裝。
+
+每個安裝畫面的樣子，見 Zeatend 的 [docs/screens](https://github.com/zeabur-oss/zeatend/tree/main/docs/screens)。

@@ -5,7 +5,19 @@ description: 用 Helm 把 Zeabur 装进你已有的 Kubernetes 集群，再用�
 
 照这一页做完，你会有一个通过 HTTPS 打开、用通行密钥登录的 Zeabur。集群里原有的应用，会出现在**项目**页。
 
-![Zeabur 装进自己的 zeabur Namespace，使用 Zeabur Identity 的登录客户端，新增由你分配的成员角色，你原有的应用留在原处](../images/diagrams/install.svg)
+这一页是手动安装。[交给 Agent 安装](agent.mdx)和 [Zeatend 一条命令安装](one-command.mdx)还在开发中。
+
+<Figure label="Zeabur 装进自己的 zeabur Namespace，使用 Zeabur Identity 的登录客户端，新增由你分配的成员角色，你原有的应用留在原处">
+<FigFlow>
+<FigCard title="Zeabur Identity" note="负责登录，需要先装好" />
+<FigArrow label="登录客户端" />
+<FigGroup label="你的 Kubernetes 集群">
+<FigCard accent title="zeabur Namespace" note="Zeabur、它的网址和 client secret" />
+<FigCard title="成员角色" note="在成员页由你分配" />
+<FigCard title="你原有的应用" note="留在原处，不会迁移" />
+</FigGroup>
+</FigFlow>
+</Figure>
 
 这一页用 Helm 手动安装 Zeabur，适合想看清楚 Zeabur 添加了哪些东西的集群管理员。Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur 就装在它上面。Helm 是 Kubernetes 的安装工具，下面的命令都用它安装和升级 Zeabur。如果你从 zeabur.com 过来，想先了解有哪些不同，见[从 zeabur.com 过来](../get-started/from-zeabur-com.mdx)。
 

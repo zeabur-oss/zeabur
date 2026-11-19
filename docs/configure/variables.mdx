@@ -5,7 +5,15 @@ description: Change the settings a service reads at startup, or let multiple ser
 
 When you finish this page, the service starts with the environment variables you set, such as `APP_URL` or `LOG_LEVEL`. When several services need the same values, put them in shared variables, and let each service choose which keys to read.
 
-![A change waits in a draft, you review it, and only then is it applied to the cluster](../images/diagrams/plan.svg)
+<Figure label="A change waits in a draft, you review it, and only then is it applied to the cluster">
+<FigFlow>
+<FigCard title="Edit" note="Changes wait in a draft" />
+<FigArrow />
+<FigCard accent title="Review changes" note="See every change first" />
+<FigArrow />
+<FigCard title="Apply" note="The cluster changes" />
+</FigFlow>
+</Figure>
 
 ![Variables tab for the web service](../images/shots/service-variables.avif)
 

@@ -5,7 +5,20 @@ description: 傳一個設定連結給成員，讓他用通行密鑰登入，只�
 
 照這一頁做完，你的同事會出現在**成員**頁，用自己的通行密鑰登入 Zeabur，只能用你分給他的專案。通行密鑰存在對方的手機或電腦裡，用指紋、臉部辨識或螢幕鎖解鎖，不用記密碼。
 
-![成員用通行密鑰經 Zeabur Identity 登入，Zeabur 只照你給的權限顯示：分給他的專案能用，其他專案只看得到名稱](../images/diagrams/members.svg)
+<Figure label="成員用通行密鑰經 Zeabur Identity 登入，Zeabur 只照你給的權限顯示：分給他的專案能用，其他專案只看得到名稱">
+<FigFlow>
+<FigCard title="成員" note="通行密鑰在他的手機或電腦裡" />
+<FigArrow label="登入" />
+<FigCard title="Zeabur Identity" note="確認是他本人" />
+<FigArrow label="帶著他的身分" />
+<FigCard title="Zeabur" note="照你給的權限顯示" />
+<FigArrow />
+<FigGroup label="你的叢集">
+<FigCard accent title="你分給他的專案" note="shop：開發者、blog：檢視者" />
+<FigCard title="其他專案" note="只看得到名稱" />
+</FigGroup>
+</FigFlow>
+</Figure>
 
 ## 開始之前
 

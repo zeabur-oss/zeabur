@@ -5,7 +5,13 @@ description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目�
 
 完成这一页后，**项目**页会多出一个项目，你可以在里面部署服务。项目把一组相关的服务放在一起，用法和 zeabur.com 的项目一样。项目的名称、描述、图标和网络隔离，都在项目的**设置**中修改。
 
-![一个项目放一组服务，每个服务可以有自己的域名](../images/diagrams/project.svg)
+<Figure label="一个项目放一组服务，每个服务可以有自己的域名">
+<FigGroup label="项目 shop：放一组服务" row>
+<FigCard title="web" note="服务" tag="app.example.com" />
+<FigCard title="api" note="服务" tag="api.example.com" />
+<FigCard title="worker" note="服务，没有公开域名" />
+</FigGroup>
+</Figure>
 
 ## 开始前
 

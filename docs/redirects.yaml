@@ -14,4 +14,4 @@ install/config-file: get-started/quickstart
 install/personal: get-started/quickstart
 reference/installer: get-started/quickstart
 reference/installer-configuration: get-started/quickstart
-get-started/ai-agent: get-started/quickstart
+get-started/ai-agent: install/agent

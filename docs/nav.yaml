@@ -5,8 +5,8 @@
   label: Get started
   pages: [quickstart, from-zeabur-com, first-project, how-it-works]
 - group: install
-  label: More ways to install
-  pages: [existing-cluster, desktop]
+  label: Ways to install
+  pages: [agent, one-command, existing-cluster, desktop]
 - group: upgrade
   label: Upgrade
   pages: [steps, notes]
