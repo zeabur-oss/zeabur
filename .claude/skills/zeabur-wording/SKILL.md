@@ -1,6 +1,6 @@
 ---
 name: zeabur-wording
-description: Zeabur's own terms and steps for any text people read in Zeabur — interface strings in web/src/i18n (en, zh-TW, zh-CN), API problem messages, sign-in pages, zeaburctl output, README and docs. Use whenever a change adds, renames or rewrites a user-visible string, or when reviewing copy.
+description: Zeabur's own terms and steps for any text people read in Zeabur — interface strings in web/src/i18n (en, zh-TW, zh-CN), API problem messages, sign-in pages, zeaburctl output, README and docs pages. Use whenever a change adds, renames or rewrites a user-visible string or a docs page, or when reviewing copy.
 ---
 
 # Wording
@@ -30,3 +30,39 @@ rulebook.
    locales at desktop and narrow widths (`zeabur-ui` for the demo server).
 
 Moving a hard-coded string into the catalogues is part of the change, not a follow-up.
+
+## Docs pages
+
+`docs/` (en), `docs/zh-TW/` and `docs/zh-CN/` are written for someone who has used zeabur.com
+but not Kubernetes. A feature's pull request brings its page in this shape.
+
+1. **zh-TW first.** Write the zh-TW page, then en and zh-CN as their own texts with the same facts,
+   steps and screenshots in the same places. All three change in the same pull request.
+2. **A task page has three parts, in this order:** what the reader has at the end (a sentence or
+   two, and the finished screen when it helps), the numbered steps, then what to do when something
+   goes wrong (what the reader sees, and what to do about it). Reference pages keep their shape.
+3. **A screenshot right after each step that changes the screen**, in all three locales. Take it
+   with a shot in `scripts/shots/docs.ts` and `scripts/docs-shots.sh` (`docs/internal/screenshots.md`),
+   never by hand, so the next run updates it. Its alt text says what the reader should see. A step
+   that only copies a value or happens outside Zeabur needs none. A screen another open issue will
+   change gets a sentence on what it is for, not a step-by-step shot, until that issue lands.
+4. **One idea per sentence, in everyday words.** Say what the reader does and sees: 「按**部署**」,
+   not 「觸發部署流程」. Name buttons and fields as the screen does, in bold.
+5. **No Kubernetes term before the reader needs it.** Use the plain word from
+   `docs/internal/wording.md` (副本, 磁碟, 機密變數). Bring in the Kubernetes term only where the
+   reader acts on it (`kubectl`, YAML, an install step), with one short sentence the first time
+   it appears; after that, use it bare. A "with kubectl" section goes at the end of the page.
+6. **A diagram before long text.** A concept, or a page whose idea takes more than a short
+   paragraph, opens with one diagram, then short text. Draw it as an SVG file for each locale,
+   `docs/[<locale>/]images/diagrams/<id>.svg`, shown like a screenshot, so it renders on GitHub and
+   on the site. Match the site's blog figures: boxes on 1 px hairlines, 6 px corners, violet only
+   for the one thing that matters, no shadows, glow, gradients or window dots (`no-ai-flavour`).
+   Colours come from a `<style>` with `@media (prefers-color-scheme: dark)` inside the SVG, and the
+   font is the system stack (`-apple-system, "Segoe UI", "PingFang TC", "Noto Sans CJK TC",
+   sans-serif`; SC for zh-CN). Keep it to about seven boxes; the alt text states the idea.
+7. **Install pages follow who installs.** Most people paste a prompt into Claude or Codex and let
+   it install. Hands-on users run the Zeatend TUI or CLI. Cluster admins who want to see every
+   object install by hand (Helm, kubectl, Flux or Argo CD). Pages and the sidebar keep that order,
+   and each install page links to the other two in one line. A path that has not shipped gets a
+   callout that it is in development, a description of what is coming and its issue, and no
+   commands or prompts to follow yet.
