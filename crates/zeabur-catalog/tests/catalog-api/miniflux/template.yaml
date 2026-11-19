@@ -1,0 +1,102 @@
+apiVersion: catalog.zeabur.com/v1
+kind: Template
+metadata:
+  name: Miniflux
+  # renovate: depName=miniflux/miniflux
+  version: "2.3.5"
+  summary: A feed reader, with PostgreSQL.
+  locales:
+    zh-TW:
+      summary: "RSS 閱讀器，搭配 PostgreSQL。"
+    zh-CN:
+      summary: "RSS 阅读器，搭配 PostgreSQL。"
+  license: Apache-2.0 AND PostgreSQL
+  # Also: https://cloudnative-pg.io/
+  homepage: https://miniflux.app/
+
+requires:
+  - {component: traefik}
+  - {component: cert-manager}
+  - {component: cloudnative-pg}
+
+services:
+  - name: miniflux
+    podSecurity: restricted
+    ports: [{name: http, port: 8080}]
+    resources: {requests: {cpu: 50m, memory: 64Mi}, limits: {cpu: "1", memory: 512Mi}}
+    domains: ['{{ .Domain }}']
+  - name: miniflux-db
+    podSecurity: restricted
+    ports: [{name: postgresql, port: 5432}]
+    resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 1Gi}}
+
+inputs:
+  - name: adminPassword
+    description: >-
+      Password of the admin user, created at the first start. Change it in
+      Miniflux after you sign in; the Secret is not applied again.
+    generate: {type: random, bytes: 32, encoding: base64url}
+    secret: {name: miniflux-secrets, key: admin-password}
+    validation: {pattern: '^[A-Za-z0-9_-]{43}$'}
+
+security:
+  summary: >-
+    The container runs as UID 65534 with a read-only filesystem, no Kubernetes
+    token and all extra system privileges removed. Outbound traffic is not
+    limited. After installation, only the admin user exists.
+  locales:
+    zh-TW:
+      summary: "以 UID 65534 執行，檔案系統唯讀，沒有 Kubernetes 權杖，也拿掉了所有額外的系統權限。對外連線沒有限制。安裝完只有 admin 一個使用者。"
+    zh-CN:
+      summary: "以 UID 65534 运行，文件系统只读，没有 Kubernetes 令牌，也去掉了所有额外的系统权限。对外连接没有限制。安装完只有 admin 一个用户。"
+  risks:
+    - risk: The server fetches feeds from addresses that users choose.
+      mitigation: >-
+        Miniflux refuses private network addresses by default. The template
+        does not limit outbound traffic. To limit it, add an egress
+        NetworkPolicy (a rule that limits outbound traffic).
+      locales:
+        zh-TW:
+          risk: "伺服器會去抓使用者指定位址的訂閱源。"
+          mitigation: "Miniflux 預設會拒絕私有網路位址。範本沒有限制對外連線，需要限制時，請加一條 egress NetworkPolicy（限制對外連線的規則）。"
+        zh-CN:
+          risk: "服务器会去抓取用户指定地址的订阅源。"
+          mitigation: "Miniflux 默认会拒绝私有网络地址。模板没有限制对外连接，需要限制时，请加一条 egress NetworkPolicy（限制对外连接的规则）。"
+    - risk: >-
+        The database pods (CloudNativePG) call the Kubernetes API with an
+        identity that the database operator creates.
+      mitigation: >-
+        The cloudnative-pg component creates separate permissions
+        for each database cluster. The Miniflux Pod has no token.
+      locales:
+        zh-TW:
+          risk: "資料庫 Pod（CloudNativePG）會用資料庫 operator 建立的身分去呼叫 Kubernetes API。"
+          mitigation: "cloudnative-pg 元件會為每個資料庫叢集各建一組權限。Miniflux 的 Pod 沒有權杖。"
+        zh-CN:
+          risk: "数据库 Pod（CloudNativePG）会用数据库 operator 创建的身份去调用 Kubernetes API。"
+          mitigation: "cloudnative-pg 组件会为每个数据库集群各建一组权限。Miniflux 的 Pod 没有令牌。"
+
+smoke:
+  - name: postgresql-ready
+    resource: cluster/miniflux-db
+    condition: condition=Ready
+    timeout: 900s
+  - name: miniflux-ready
+    resource: deployment/miniflux
+    condition: condition=Available
+    timeout: 600s
+    http: {service: miniflux, port: 8080, path: /healthcheck, status: 200, contains: OK}
+  - name: authentication-required
+    resource: deployment/miniflux
+    condition: condition=Available
+    timeout: 120s
+    http: {service: miniflux, port: 8080, path: /v1/me, status: 401}
+  - name: administrator-created
+    resource: cluster/miniflux-db
+    condition: condition=Ready
+    timeout: 120s
+    sql:
+      cluster: miniflux-db
+      database: miniflux
+      query: SELECT count(*) FROM users WHERE is_admin
+      expect: "1"

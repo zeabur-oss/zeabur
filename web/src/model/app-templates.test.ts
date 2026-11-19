@@ -81,6 +81,7 @@ const template = (patch: Partial<AppTemplate>): AppTemplate => ({
   license: "Apache-2.0",
   homepage: "https://miniflux.app/",
   version: "2.2.0",
+  revision: "r1",
   labels: { "app.kubernetes.io/instance": "miniflux" },
   requires: [],
   services: [],
@@ -253,6 +254,7 @@ describe("app templates", () => {
       {
         op: "template",
         template: "wordpress",
+        revision: "r1",
         inputs: { adminEmail: "me@example.com" },
         domain: "blog.example.com",
       },
@@ -261,7 +263,9 @@ describe("app templates", () => {
 
   test("a template that routes no domain is sent without one", () => {
     const changes = templateChanges(template({ needsDomain: false }), {}, {}, "x.example.com")
-    expect<unknown>(changes).toEqual([{ op: "template", template: "miniflux", inputs: {} }])
+    expect<unknown>(changes).toEqual([
+      { op: "template", template: "miniflux", revision: "r1", inputs: {} },
+    ])
   })
 
   test("the list leaves out the page server and filters by name or tagline", () => {

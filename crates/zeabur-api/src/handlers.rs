@@ -23,6 +23,8 @@ pub struct AppState {
     pub catalogue: Arc<Vec<zeabur_catalog::Component>>,
     /// Zeabur Catalog from its API (see [`crate::cluster::catalog`]).
     pub catalog: Arc<crate::cluster::catalog::Catalog>,
+    /// The templates offered, embedded or fetched (see [`crate::cluster::template_fetch`]).
+    pub templates: Arc<crate::cluster::template_fetch::Templates>,
     /// What a template uses when idle: [`zeabur_catalog::template_idle`], or made-up use in the
     /// demo.
     pub template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
