@@ -11,6 +11,7 @@ on:
         default: ""
   push:
     branches: [main]
+    paths: [CHANGELOG.md, .github/workflows/release-pr.yml]
 
 permissions:
   contents: read
@@ -21,7 +22,7 @@ concurrency:
 
 jobs:
   release-pr:
-    uses: zeabur-oss/.github/.github/workflows/release-pr.yml@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
+    uses: zeabur-oss/.github/.github/workflows/release-pr.yml@ef8d4e52a28d2f2f4fb48ef1dc09f36f33115a74 # main
     with:
       version: ${{ inputs.version }}
       prerelease: ${{ inputs.prerelease }}
