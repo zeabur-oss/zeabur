@@ -5,7 +5,20 @@ description: Send a member a setup link, so they sign in with a passkey and use 
 
 When you finish this page, your teammate is listed on **Members**, signs in to Zeabur with their own passkey, and can use only the projects you gave them. A passkey lives on their phone or computer. They unlock it with a fingerprint, their face, or the screen lock, so there is no password to remember.
 
-![A member signs in with a passkey through Zeabur Identity, and Zeabur shows them only what you allowed: their projects in full, other projects by name only](../images/diagrams/members.svg)
+<Figure label="A member signs in with a passkey through Zeabur Identity, and Zeabur shows them only what you allowed: their projects in full, other projects by name only">
+<FigFlow>
+<FigCard title="Member" note="Passkey on their phone or computer" />
+<FigArrow label="Signs in" />
+<FigCard title="Zeabur Identity" note="Checks that it's really them" />
+<FigArrow label="Who they are" />
+<FigCard title="Zeabur" note="Shows what you allowed" />
+<FigArrow />
+<FigGroup label="Your cluster">
+<FigCard accent title="Projects you gave them" note="shop: Developer, blog: Viewer" />
+<FigCard title="Other projects" note="Names only" />
+</FigGroup>
+</FigFlow>
+</Figure>
 
 ## Before you begin
 

@@ -5,7 +5,19 @@ description: Use Helm to install Zeabur into the Kubernetes cluster you already 
 
 When you finish this page, you have Zeabur at an HTTPS address, and you sign in to it with a passkey. The applications already in your cluster show up on the **Projects** page.
 
-![Zeabur goes into its own zeabur namespace with a sign-in client from Zeabur Identity, adds member roles for you to give out, and leaves your applications where they are](../images/diagrams/install.svg)
+This page is the manual install. [Let an agent install it](agent.mdx) and [Zeatend's one-command install](one-command.mdx) are still in development.
+
+<Figure label="Zeabur goes into its own zeabur namespace with a sign-in client from Zeabur Identity, adds member roles for you to give out, and leaves your applications where they are">
+<FigFlow>
+<FigCard title="Zeabur Identity" note="Handles sign-in. Install it first." />
+<FigArrow label="Sign-in client" />
+<FigGroup label="Your Kubernetes cluster">
+<FigCard accent title="zeabur namespace" note="Zeabur, its address and the client secret" />
+<FigCard title="Member roles" note="Given out on Members" />
+<FigCard title="Your applications" note="Stay where they are" />
+</FigGroup>
+</FigFlow>
+</Figure>
 
 This page installs Zeabur by hand with Helm, for cluster admins who want to see every object Zeabur adds. Kubernetes is open-source software that runs containers on one or more servers, and Zeabur runs on top of it. Helm is Kubernetes' package installer; the commands below use it to install and upgrade Zeabur. Coming from zeabur.com and want to know what is different first? See [Coming from zeabur.com](../get-started/from-zeabur-com.mdx).
 

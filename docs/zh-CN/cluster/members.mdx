@@ -5,7 +5,20 @@ description: 给成员发一个设置链接，让他用通行密钥登录，只�
 
 照这一页做完，你的同事会出现在**成员**页，用自己的通行密钥登录 Zeabur，只能使用你分给他的项目。通行密钥保存在对方的手机或电脑里，用指纹、面容或锁屏密码解锁，不用记密码。
 
-![成员用通行密钥通过 Zeabur Identity 登录，Zeabur 只按你给的权限显示：分给他的项目可以使用，其他项目只能看到名称](../images/diagrams/members.svg)
+<Figure label="成员用通行密钥通过 Zeabur Identity 登录，Zeabur 只按你给的权限显示：分给他的项目可以使用，其他项目只能看到名称">
+<FigFlow>
+<FigCard title="成员" note="通行密钥在他的手机或电脑里" />
+<FigArrow label="登录" />
+<FigCard title="Zeabur Identity" note="确认是他本人" />
+<FigArrow label="带着他的身份" />
+<FigCard title="Zeabur" note="按你给的权限显示" />
+<FigArrow />
+<FigGroup label="你的集群">
+<FigCard accent title="你分给他的项目" note="shop：开发者、blog：查看者" />
+<FigCard title="其他项目" note="只能看到名称" />
+</FigGroup>
+</FigFlow>
+</Figure>
 
 ## 开始之前
 

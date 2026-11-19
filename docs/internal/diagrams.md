@@ -1,37 +1,29 @@
 # Docs diagrams
 
-A docs diagram is one SVG for each locale at `docs/[<locale>/]images/diagrams/<id>.svg`. The page
-shows it like a screenshot. The SVG uses only the values in this file. A restyle changes this
-table and then the same values in each SVG.
+A docs diagram is HTML, written in the page with the site's diagram components. The text stays in
+the page's own locale, and the diagram reflows: side by side on a wide screen, stacked on a phone.
+The site keeps the colours, strokes and fonts in one stylesheet, so a restyle is one change in the
+website repository, not in the docs.
 
-## Palette
+| Component | Props | Use |
+| --- | --- | --- |
+| `Figure` | `label` | The whole diagram. `label` states the idea for screen readers. |
+| `FigFlow` | | Its children in order, with `FigArrow` between them. |
+| `FigGroup` | `label`, `row` | A box around cards, such as a cluster. `row` puts the cards side by side. |
+| `FigCard` | `title`, `note`, `tag`, `hot`, `accent` | One thing. `tag` is a short status; `hot` colours it. |
+| `FigArrow` | `label`, `accent` | The step from one child of `FigFlow` to the next. |
 
-| Use | Class | Light | Dark |
-| --- | --- | --- | --- |
-| Figure background | `.bg` fill | `#FAFAFB` | `#1D1C20` |
-| Figure border, group border | `.bg`, `.grp` stroke | `#E8E7EB` | `#34313A` |
-| Group box | `.grp` fill | `rgba(255,255,255,.55)` | `rgba(31,30,34,.55)` |
-| Card | `.card` fill | `#FFFFFF` | `#1F1E22` |
-| Card border, tag border, arrow | `.card`, `.tag` stroke, `.line`, `.head` | `#D0CED4` | `#4C4851` |
-| Title text | `.t` | `#18171B` | `#F0EFF2` |
-| Body text, labels, tags | `.n`, `.h`, `.tagt` | `#5C5962` | `#B0ADB6` |
-| The one thing that matters | `.accent` stroke, `.hitt` | `#6300FF` | `#A469FF` |
-| Accent tag background | `.hit` | `rgba(99,0,255,.07)` | `rgba(164,105,255,.14)` |
+```mdx
+<Figure label="Members sign in with Zeabur Identity, and Zeabur shows the projects you gave them.">
+<FigFlow>
+<FigCard title="Member" note="A passkey on their phone or computer" />
+<FigArrow label="Signs in" />
+<FigCard title="Zeabur Identity" note="Checks who they are" />
+<FigArrow />
+<FigCard accent title="Zeabur" note="Shows what you allowed" />
+</FigFlow>
+</Figure>
+```
 
-## Shape and type
-
-| Value | Use |
-| --- | --- |
-| Width 440 | Every figure, so the text stays readable on a 390 px screen. |
-| Stroke 1 | Borders. Stroke 1.5: the accent card and arrows. |
-| Corner 6 | Figure, groups and cards. Corner 4: tags. |
-| Font, en | `-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif` |
-| Font, zh-TW | `-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif` |
-| Font, zh-CN | `-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Noto Sans CJK SC", "Microsoft YaHei", sans-serif` |
-| 14 px, weight 600 | Card titles (`.t`). |
-| 13 px | Card text (`.n`). |
-| 12.5 px | Group labels (`.h`). |
-| 12 px | Tags (`.tagt`, `.hitt`). |
-
-The dark values go in `@media (prefers-color-scheme: dark)` inside the SVG's `<style>`. Keep a
-figure to about seven boxes. No shadows, glows, gradients or window dots.
+Use `accent` for the one thing that matters, and keep a diagram to about seven boxes. GitHub shows
+the component tags as text; the site renders them.
