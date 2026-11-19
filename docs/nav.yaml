@@ -3,7 +3,7 @@
 # translations' nav.yaml refers to it, and it is part of each page's URL.
 - group: get-started
   label: Get started
-  pages: [quickstart, first-project, how-it-works]
+  pages: [quickstart, from-zeabur-com, first-project, how-it-works]
 - group: install
   label: More ways to install
   pages: [existing-cluster, desktop]

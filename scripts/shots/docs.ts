@@ -99,6 +99,21 @@ test("notify-channels", async ({ page, shot }) => {
   await shot({ clip: 'main [data-slot="card"]' })
 })
 // Inviting a member (docs/zh-TW/cluster/members.mdx).
+test("members-list", async ({ page, shot }) => {
+  await page.goto("/members", { waitUntil: "networkidle" })
+  await expect(page.locator("main section[aria-label] ul > li").first()).toBeVisible()
+  await shot({ clip: "main" })
+})
+test("members-reset", async ({ page, shot }) => {
+  await page.goto("/members", { waitUntil: "networkidle" })
+  await page.locator("main section[aria-label] ul > li:nth-child(2) button[aria-label]").click()
+  // Change access, New setup link, Reset after a lost device, Remove member.
+  await page.locator('[role="menuitem"]').nth(2).click()
+  await expect(
+    page.locator('[data-slot="dialog-content"] [data-slot="checkbox"][data-checked]'),
+  ).toBeVisible()
+  await shot({ clip: '[data-slot="dialog-content"]' })
+})
 test("members-invite", async ({ page, shot }) => {
   await page.goto("/members", { waitUntil: "networkidle" })
   await page.locator('[data-slot="page-header"] button').click()

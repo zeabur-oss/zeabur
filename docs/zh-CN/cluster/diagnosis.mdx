@@ -81,9 +81,7 @@ kubectl -n shop get deploy -o custom-columns=NAME:.metadata.name,MEMORY:.spec.te
 
 ## 集群的“需要处理”
 
-**集群** → **概览**的**需要处理**列出影响整个集群的事项，例如 Kubernetes 版本已停止支持、kubelet 版本差距超出支持范围、节点内存或磁盘即将用满、节点未就绪，以及已安装的组件有新版本。没有问题时显示**没有需要处理的项目。**
-
-![集群概览的需要处理，列出 Kubernetes 版本即将停止支持，以及节点内存和磁盘即将用满](../images/shots/cluster-attention.avif)
+**集群** → **概览**的**需要处理**，让管理员在一个地方看到影响整个集群、不属于单个项目的事项。例如 Kubernetes 版本即将停止支持、服务器内存或磁盘即将用满、节点未就绪，或已安装的组件有新版本。没有问题时，这里显示**没有需要处理的项目。**
 
 用 kubectl 查询相同数据：
 

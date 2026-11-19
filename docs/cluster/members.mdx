@@ -1,80 +1,120 @@
 ---
 title: Invite members and assign project permissions
-description: Invite members with a one-time setup link, then assign Developer or Viewer permissions for each project.
+description: Send a member a setup link, so they sign in with a passkey and use only the projects you give them.
 ---
 
-Open **Members**, click **Invite**, select the projects the person can access, and send them the setup link. Once they open the link and add a passkey, they can sign in.
+When you finish this page, your teammate is listed on **Members**, signs in to Zeabur with their own passkey, and can use only the projects you gave them. A passkey lives on their phone or computer. They unlock it with a fingerprint, their face, or the screen lock, so there is no password to remember.
+
+![A member signs in with a passkey through Zeabur Identity, and Zeabur shows them only what you allowed: their projects in full, other projects by name only](../images/diagrams/members.svg)
 
 ## Before you begin
 
-- Setup links need Zeabur Identity installed in the cluster and running with `--invitations`.
-- You must be signed in to Zeabur with an admin account. Changes to members update users in Zeabur Identity and role bindings in Kubernetes.
-- Project roles require the chart's `memberRoles.enabled` setting, which is on by default. When it's off, the invitation form only lets you choose whether to grant **Admin** rights.
+- You're signed in to Zeabur with an admin account.
+- Zeabur Identity is installed in the cluster and handles sign-in to Zeabur. It must run with `--invitations` for setup links to work.
+- The chart's `memberRoles.enabled` setting is on, which is the default. When it's off, an invitation can only choose whether to give **Admin** rights.
 
 ## Invite a member
 
 <Steps>
 <Step>
 
-### Enter account details
+### Enter the account
 
-In **Members**, click **Invite**. Enter a **Username**. **Display name** is optional. Usernames can contain only lowercase letters, numbers, `-`, and `.`, up to 63 characters.
+Open **Members** and click **Invite**. Enter a **Username**. **Display name** is optional.
 
-If you enter an existing member's username, the link adds a passkey to their account without changing their permissions.
+A username can contain only lowercase letters, numbers, `-`, and `.`, up to 63 characters. If you enter an existing member, the link adds another passkey to their account and leaves their permissions as they are.
 
-To invite someone to one project, open the project's **Settings** and click **Invite someone to this project** under **Members**. That project is already selected, with the Developer role. The section also lists who can open the project.
+To add someone to one project, you can also start from that project: open its **Settings**, and under **Members** click **Invite** next to **Invite someone to this project**. That project is already selected, with the Developer role.
 
 </Step>
 <Step>
 
-### Choose which projects they can access
+### Choose their projects
 
-Under **Access**, select **Admin** or **Chosen projects**. Selecting **Admin** gives the person an admin account with full control over the cluster, including all projects, nodes, and members. Admin accounts can only sign in with passkeys, not GitHub or Google. See [Admin accounts and regular accounts](../reference/permissions.mdx#admin-accounts-and-regular-accounts).
-
-If you select **Chosen projects**, select the projects and choose a role for each. Each project defaults to **Viewer** when selected:
+Under **Access**, select **Chosen projects**, select the projects, and choose a role for each. A project you select starts as **Viewer**.
 
 | Role | What they can do |
 | --- | --- |
 | **Developer** | Deploy, change variables, restart services, read logs, open terminals, and read secret values. |
 | **Viewer** | View status and events. They can't read logs, make changes, open terminals, or read secret values. |
 
-A member can have different roles in different projects. Members with no projects selected can still sign in, but they can only see nodes and project names.
-
-The list shows projects only. To give a role in another namespace, click **Also show N namespaces that aren't projects** below it.
+A person can have different roles in different projects. Someone with no projects selected can still sign in, but sees only nodes and project names.
 
 ![Invite member dialog with Chosen projects selected, blog set to Viewer, and shop set to Developer](../images/shots/members-invite.avif)
+
+Selecting **Admin** gives the person full control over the cluster, including all projects, nodes, and members. Admins can sign in only with passkeys, not GitHub or Google. See [Admin accounts and regular accounts](../reference/permissions.mdx#admin-accounts-and-regular-accounts).
+
+The list shows projects only. If the cluster has other namespaces, click **Also show N namespaces that aren't projects** below it. A namespace is how Kubernetes groups things, and each project is one namespace.
 
 </Step>
 <Step>
 
-### Review and send the link
+### Review the change
 
-Click **Review changes**, check the new account and project permissions, and click **Invite erin** (`erin` is the username).
+Click **Review changes**. The dialog lists the account to add and the permissions in each project. If it looks right, click **Invite erin** (`erin` is the username).
 
 ![Invitation review dialog showing the new account and project permissions](../images/shots/members-invite-review.avif)
 
-Copy the generated link and send it through a channel only the recipient can access.
+</Step>
+<Step>
+
+### Send them the link
+
+Copy the setup link and send it through a channel only the recipient can read.
 
 ![Setup link and expiration time shown after creating an invitation](../images/shots/members-invite-link.avif)
 
-The invitation link expires in 7 days and can only be used once. The full link is shown only once. After the person sets up a passkey, return to **Members** and check that their **Passkeys** column shows a number. Then ask them to sign in and open an assigned project.
+The link expires in 7 days and works once. The full link is shown only this time.
+
+</Step>
+<Step>
+
+### Check that they can sign in
+
+The person opens the link and adds a passkey. Back on **Members**, their **Passkeys** column shows a number. Then ask them to sign in and open a project you gave them.
+
+![Members page listing each member's role, number of passkeys, and last sign-in](../images/shots/members-list.avif)
 
 </Step>
 </Steps>
 
 <Callout type="warn">
-Whoever opens the setup link first can add a passkey to the account and sign in. If you send the link to the wrong person or it leaks, click **Revoke** under **Pending setup links**, then generate a new link.
+Whoever opens a setup link first can add a passkey to the account and sign in. If you sent the link to the wrong person or it leaked, click **Revoke** under **Pending setup links**, then create a new link.
 </Callout>
 
-## Change permissions or handle a lost device
+## Change permissions
 
-Select **Change access** from the member's action menu, adjust their projects and roles, click **Review changes**, and then click **Save access**. Permissions take effect immediately. Terminals the person already has open stay active until they're closed.
+On the member's row, click **⋯** and select **Change access**. Adjust their projects and roles, click **Review changes**, then click **Save access**.
 
-Changing a member to **Admin** makes their account an admin account. They can then sign in only with passkeys, and sessions signed in through GitHub or Google end. Removing **Admin** changes the account back to a regular account.
+The change takes effect right away. A terminal the person already has open stays open until they close it.
 
-To add a backup device for a member, select **New setup link**. This link expires in 24 hours and can only be used once. Existing passkeys and sessions stay active.
+When you make a member **Admin**, they can sign in only with passkeys. Their sessions signed in through GitHub or Google end. Removing **Admin** turns the account back into a regular one.
 
-If a device is lost or stolen, select **Reset after a lost device**, select **Also remove their passkeys, linked accounts and sessions, for a lost or stolen device**, and click **Reset and create link**. No one can sign in to the account until the person opens the new link.
+## Add a device, or deal with a lost one
+
+To add a backup device for a member, click **⋯** on their row and select **New setup link**. This link expires in 24 hours and works once. Their passkeys and sessions stay.
+
+If a device is lost or stolen, click **⋯** and select **Reset after a lost device**. Select the option to also remove their passkeys, linked accounts, and sessions, then click **Reset and create link**. No one can sign in to the account until the person opens the new link.
+
+![Reset after a lost device dialog, with the option to remove passkeys, linked accounts, and sessions selected](../images/shots/members-reset.avif)
+
+## Remove a member
+
+First, revoke unused links under **Pending setup links**. Then click **⋯** on the member's row, select **Remove member**, and confirm.
+
+This deletes their passkeys, linked accounts, sessions, setup links, and the permissions Zeabur gave them. Projects and services stay.
+
+## If something goes wrong
+
+| What you see | What to do |
+| --- | --- |
+| **Zeabur Identity isn't installed** | Ask a cluster administrator to install Zeabur Identity, or start Zeabur with the namespace where Zeabur Identity runs. |
+| Zeabur doesn't know the Zeabur Identity URL | Start Zeabur with `--issuer-url`. |
+| Zeabur Identity isn't accepting setup links | Run Zeabur Identity with `--invitations`. |
+| **Zeabur was installed without the member roles** | Upgrade the chart with `memberRoles.enabled=true`, or make the member an admin. [Permissions](../reference/permissions.mdx) has the full table. |
+| You can't change your own permissions, reset your account, or remove yourself | Ask another admin. You can add a backup passkey yourself from the account page. |
+| The changes have expired | Click **Review changes** again. |
+| The person signs in but sees no projects | On **Members**, check that their row lists projects and roles. If not, add them with **Change access**. |
 
 ## Do the same with kubectl
 
@@ -148,23 +188,10 @@ kubectl -n zeabur-identity delete zbuser erin
 
 For other options, such as granting permissions through groups or disabling accounts, see [Managing users](https://oss.zeabur.com/docs/identity/managing-users) in the Zeabur Identity docs.
 
-## Verify the result
+To check with kubectl:
 
-- **Members** lists `erin`. The **Passkeys** column shows a number after they finish setup, and the permissions column shows `shop` and their role.
 - `kubectl get clusterrolebinding,rolebinding -A -l zeabur.com/member=erin` lists one ClusterRoleBinding and one RoleBinding for each project.
-- After signing in, the person can run `kubectl auth whoami` on their computer to check that the username is `zeabur:erin`. An administrator can check permissions with `kubectl auth can-i --as zeabur:erin -n shop create deployments`. It prints `yes` for a Developer and `no` for a Viewer.
+- After signing in, the person runs `kubectl auth whoami` on their computer. The username is `zeabur:erin`.
+- An admin can run `kubectl auth can-i --as zeabur:erin -n shop create deployments`. It prints `yes` for a Developer and `no` for a Viewer.
 
-## Common failures
-
-- **Zeabur Identity isn't installed**: Ask a cluster administrator to install Zeabur Identity, or start Zeabur in the namespace where Zeabur Identity is installed.
-- The interface says Zeabur doesn't know the Zeabur Identity URL: Start Zeabur with `--issuer-url`.
-- The interface says Zeabur Identity isn't accepting setup links: Run Zeabur Identity with `--invitations`.
-- **Zeabur was installed without the member roles**: Upgrade the chart with `memberRoles.enabled=true`, or make the member an admin. See [Permissions](../reference/permissions.mdx) for the full permissions table.
-- You can't change your own permissions, reset your own account, or remove yourself: Ask another administrator to do it. You can add a backup passkey from the account page.
-- The changes have expired: Click **Review changes** again.
-
-## Remove a member
-
-First, revoke unused links under **Pending setup links**. To stop a member from signing in, select **Remove member** from their action menu and confirm the removal.
-
-Removing a member deletes their passkeys, linked accounts, sessions, setup links, and role bindings created by Zeabur. Projects and services stay intact. Role bindings that Zeabur didn't create but that name `zeabur:<username>` also remain. An administrator must review those separately.
+Removing a member leaves role bindings that Zeabur didn't create but that name `zeabur:<username>`. An admin reviews those separately.

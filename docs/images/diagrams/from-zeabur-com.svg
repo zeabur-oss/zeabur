@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="226" viewBox="0 0 480 226" role="img" aria-label="Projects, services, domains, variables and templates work the same as on zeabur.com. The difference is where they run: on your own server, which you look after.">
+<title>Projects, services, domains, variables and templates work the same as on zeabur.com. The difference is where they run: on your own server, which you look after.</title>
+<style>
+.bg{fill:#FAFAFB;stroke:#E8E7EB}
+.card{fill:#FFFFFF;stroke:#D0CED4}
+.group{fill:#FFFFFF;fill-opacity:.55;stroke:#E8E7EB}
+.accent{fill:#FFFFFF;stroke:#6300FF}
+.chip{fill:none;stroke:#D0CED4}
+.wire{stroke:#D0CED4;fill:none}
+.head{fill:#D0CED4}
+text{fill:#18171B;font-family:-apple-system, 'Segoe UI', 'PingFang TC', 'Noto Sans CJK TC', sans-serif}
+.t{font-size:14px;font-weight:600}
+.n{font-size:14px;font-weight:500}
+.m{fill:#5C5962;font-size:12.5px}
+.k{fill:#5C5962;font-size:12px}
+.a{fill:#6300FF}
+@media (prefers-color-scheme: dark){
+.bg{fill:#1D1C20;stroke:#34313A}
+.card,.accent{fill:#1F1E22}
+.card{stroke:#4C4851}
+.group{fill:#1F1E22;stroke:#34313A}
+.accent{stroke:#A469FF}
+.chip,.wire{stroke:#4C4851}
+.head{fill:#4C4851}
+text{fill:#F0EFF2}
+.m,.k{fill:#B0ADB6}
+.a{fill:#A469FF}
+}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="479" height="225" rx="6"/>
+<rect class="card" x="20.5" y="20.5" width="439" height="75" rx="6"/>
+<text class="t" x="240.0" y="46" text-anchor="middle">Works the same</text>
+<rect class="chip" x="27.799999999999983" y="60.5" width="76.2" height="23" rx="4"/>
+<text class="m" x="65.89999999999998" y="76" text-anchor="middle">Projects</text>
+<rect class="chip" x="112.99999999999999" y="60.5" width="76.2" height="23" rx="4"/>
+<text class="m" x="151.1" y="76" text-anchor="middle">Services</text>
+<rect class="chip" x="198.2" y="60.5" width="68.80000000000001" height="23" rx="4"/>
+<text class="m" x="232.6" y="76" text-anchor="middle">Domains</text>
+<rect class="chip" x="276.0" y="60.5" width="83.60000000000001" height="23" rx="4"/>
+<text class="m" x="317.8" y="76" text-anchor="middle">Variables</text>
+<rect class="chip" x="368.6" y="60.5" width="83.60000000000001" height="23" rx="4"/>
+<text class="m" x="410.40000000000003" y="76" text-anchor="middle">Templates</text>
+<path class="wire" d="M126.5 96 V122"/>
+<path class="wire" d="M354.5 96 V122"/>
+<rect class="card" x="20.5" y="122.5" width="211.0" height="83" rx="6"/>
+<text class="t" x="126.0" y="148" text-anchor="middle">zeabur.com</text>
+<text class="m" x="126.0" y="168" text-anchor="middle">Runs on zeabur.com's servers</text>
+<text class="m" x="126.0" y="188" text-anchor="middle">zeabur.com looks after them</text>
+<rect class="accent" x="248.5" y="122.5" width="211.0" height="83" rx="6"/>
+<text class="t a" x="354.0" y="148" text-anchor="middle">Zeabur</text>
+<text class="m" x="354.0" y="168" text-anchor="middle">Runs on your own server</text>
+<text class="m" x="354.0" y="188" text-anchor="middle">You look after it</text>
+</svg>

@@ -2,6 +2,7 @@
   label: 开始使用
   pages:
     quickstart: 在一台服务器上安装 Zeabur
+    from-zeabur-com: 从 zeabur.com 过来
     first-project: 部署第一个服务
     how-it-works: Zeabur 如何管理服务
 - group: install

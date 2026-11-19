@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="226" viewBox="0 0 480 226" role="img" aria-label="專案、服務、網域、變數和範本，用起來和 zeabur.com 一樣。不一樣的是服務跑在哪裡：跑在你自己的主機上，由你維護。">
+<title>專案、服務、網域、變數和範本，用起來和 zeabur.com 一樣。不一樣的是服務跑在哪裡：跑在你自己的主機上，由你維護。</title>
+<style>
+.bg{fill:#FAFAFB;stroke:#E8E7EB}
+.card{fill:#FFFFFF;stroke:#D0CED4}
+.group{fill:#FFFFFF;fill-opacity:.55;stroke:#E8E7EB}
+.accent{fill:#FFFFFF;stroke:#6300FF}
+.chip{fill:none;stroke:#D0CED4}
+.wire{stroke:#D0CED4;fill:none}
+.head{fill:#D0CED4}
+text{fill:#18171B;font-family:-apple-system, 'Segoe UI', 'PingFang TC', 'Noto Sans CJK TC', sans-serif}
+.t{font-size:14px;font-weight:600}
+.n{font-size:14px;font-weight:500}
+.m{fill:#5C5962;font-size:12.5px}
+.k{fill:#5C5962;font-size:12px}
+.a{fill:#6300FF}
+@media (prefers-color-scheme: dark){
+.bg{fill:#1D1C20;stroke:#34313A}
+.card,.accent{fill:#1F1E22}
+.card{stroke:#4C4851}
+.group{fill:#1F1E22;stroke:#34313A}
+.accent{stroke:#A469FF}
+.chip,.wire{stroke:#4C4851}
+.head{fill:#4C4851}
+text{fill:#F0EFF2}
+.m,.k{fill:#B0ADB6}
+.a{fill:#A469FF}
+}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="479" height="225" rx="6"/>
+<rect class="card" x="20.5" y="20.5" width="439" height="75" rx="6"/>
+<text class="t" x="240.0" y="46" text-anchor="middle">用起來一樣</text>
+<rect class="chip" x="114.5" y="60.5" width="43" height="23" rx="4"/>
+<text class="m" x="136.0" y="76" text-anchor="middle">專案</text>
+<rect class="chip" x="166.5" y="60.5" width="43" height="23" rx="4"/>
+<text class="m" x="188.0" y="76" text-anchor="middle">服務</text>
+<rect class="chip" x="218.5" y="60.5" width="43" height="23" rx="4"/>
+<text class="m" x="240.0" y="76" text-anchor="middle">網域</text>
+<rect class="chip" x="270.5" y="60.5" width="43" height="23" rx="4"/>
+<text class="m" x="292.0" y="76" text-anchor="middle">變數</text>
+<rect class="chip" x="322.5" y="60.5" width="43" height="23" rx="4"/>
+<text class="m" x="344.0" y="76" text-anchor="middle">範本</text>
+<path class="wire" d="M126.5 96 V122"/>
+<path class="wire" d="M354.5 96 V122"/>
+<rect class="card" x="20.5" y="122.5" width="211.0" height="83" rx="6"/>
+<text class="t" x="126.0" y="148" text-anchor="middle">zeabur.com</text>
+<text class="m" x="126.0" y="168" text-anchor="middle">跑在 zeabur.com 的主機上</text>
+<text class="m" x="126.0" y="188" text-anchor="middle">由 zeabur.com 維護</text>
+<rect class="accent" x="248.5" y="122.5" width="211.0" height="83" rx="6"/>
+<text class="t a" x="354.0" y="148" text-anchor="middle">Zeabur</text>
+<text class="m" x="354.0" y="168" text-anchor="middle">跑在你自己的主機上</text>
+<text class="m" x="354.0" y="188" text-anchor="middle">由你維護</text>
+</svg>

@@ -83,9 +83,7 @@ kubectl -n shop get deploy -o custom-columns=NAME:.metadata.name,MEMORY:.spec.te
 
 ## Needs attention on the cluster
 
-**Needs attention** on **Cluster** → **Overview** lists things that affect the whole cluster, such as a Kubernetes version that is out of support, a kubelet version outside the supported skew, a node whose memory or disk is almost full, a node that isn't ready, and an installed component that has a new version. When nothing is wrong, it shows **Nothing needs attention.**
-
-![Needs attention on the cluster Overview, listing that the Kubernetes version is nearing end of support, and that node memory and disk are almost full](../images/shots/cluster-attention.avif)
+**Needs attention** on **Cluster** → **Overview** gives admins one place to see what affects the whole cluster rather than one project. For example, the Kubernetes version is nearing the end of support, a server is running out of memory or disk, a node isn't ready, or an installed component has a new version. When nothing is wrong, it shows **Nothing needs attention.**
 
 Query the same data with kubectl:
 
