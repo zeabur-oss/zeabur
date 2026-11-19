@@ -1042,14 +1042,16 @@ async fn held_elsewhere(
             if project == to {
                 continue;
             }
-            for host in v::route_hosts(&value(&route)?).map_err(|e| unreadable(&e))? {
-                if hosts.contains(&host) {
-                    held.push(Held {
+            let route_hosts = v::route_hosts(&value(&route)?).map_err(|e| unreadable(&e))?;
+            held.extend(
+                route_hosts
+                    .into_iter()
+                    .filter(|host| hosts.contains(host))
+                    .map(|host| Held {
                         host,
                         project: project.clone(),
-                    });
-                }
-            }
+                    }),
+            );
         }
     }
     held.sort();

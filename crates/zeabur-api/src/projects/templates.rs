@@ -276,11 +276,10 @@ fn write_pages(object: &mut Value, pages: &ErrorPageHtml) {
         && object.get("kind").and_then(Value::as_str) == Some("ConfigMap")
         && let Some(data) = object.get_mut("data").and_then(Value::as_object_mut)
     {
-        for (key, page) in html {
-            if let Some(page) = page {
-                data.insert(key.to_owned(), json!(page));
-            }
-        }
+        data.extend(
+            html.into_iter()
+                .filter_map(|(key, page)| page.as_ref().map(|page| (key.to_owned(), json!(page)))),
+        );
     }
 }
 

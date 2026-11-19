@@ -96,15 +96,21 @@ fn created(object: &Value, found: &mut Found, workloads: &mut usize, builds: &mu
         }
         ("networking.k8s.io", "Ingress") => {
             let rules = object.pointer("/spec/rules").and_then(Value::as_array);
-            for rule in rules.into_iter().flatten() {
-                found.hosts.extend(text_of(rule, "/host"));
-            }
+            found.hosts.extend(
+                rules
+                    .into_iter()
+                    .flatten()
+                    .flat_map(|rule| text_of(rule, "/host")),
+            );
         }
         ("gateway.networking.k8s.io", "HTTPRoute") => {
             let names = object.pointer("/spec/hostnames").and_then(Value::as_array);
-            for name in names.into_iter().flatten() {
-                found.hosts.extend(name.as_str().map(str::to_owned));
-            }
+            found.hosts.extend(
+                names
+                    .into_iter()
+                    .flatten()
+                    .filter_map(|name| name.as_str().map(str::to_owned)),
+            );
         }
         _ => {}
     }

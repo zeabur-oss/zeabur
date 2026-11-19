@@ -1117,12 +1117,12 @@ async fn compute(
                 Some(Vec::new())
             };
             copies_unknown = found.is_none();
-            for copy in found.iter().flatten() {
-                versions.insert(
+            versions.extend(found.iter().flatten().map(|copy| {
+                (
                     format!("Secret/{}/{}", copy.namespace, copy.name),
                     copy.version.clone(),
-                );
-            }
+                )
+            }));
             current.save(fields, found.as_deref(), &mut kept)?
         }
         S3DestinationsPlanRequest::Remove { name } => current.remove(name)?,

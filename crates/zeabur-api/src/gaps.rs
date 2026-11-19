@@ -145,9 +145,7 @@ pub(crate) async fn project(
     };
     let modules: Vec<ModuleRule> = ModuleRule::group(&found);
     let mut rules: Vec<&dyn Rule> = BUILTIN.to_vec();
-    for rule in &modules {
-        rules.push(rule);
-    }
+    rules.extend(modules.iter().map(|rule| -> &dyn Rule { rule }));
     let gaps = evaluate(
         &rules,
         &Input {
