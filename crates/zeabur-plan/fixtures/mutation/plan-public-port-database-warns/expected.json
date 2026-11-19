@@ -23,6 +23,6 @@
   ],
   "impact": [{"kind": "StatefulSet", "name": "db"}],
   "warnings": [
-    {"code": "publicPort", "workload": {"kind": "StatefulSet", "name": "db"}, "port": 5432, "dataStore": "postgres"}
+    {"code": "publicPort", "workload": {"kind": "StatefulSet", "name": "db"}, "port": 5432, "dataStore": "postgres", "health": "fail"}
   ]
 }

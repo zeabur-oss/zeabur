@@ -1181,7 +1181,7 @@ describe("changing backups", () => {
       keysExist: false,
       regionSaved: false,
     })
-    const noRegion = "data:\n  ACCESS_KEY_ID: YQ==\n  ACCESS_SECRET_KEY: Yg==\n"
+    const noRegion = { ACCESS_KEY_ID: "YQ==", ACCESS_SECRET_KEY: "Yg==" }
     expect(backupKeys(pg, noRegion)).toEqual({ keysExist: true, regionSaved: false })
   })
 

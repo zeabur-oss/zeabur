@@ -4454,6 +4454,11 @@ components:
             type: string
           propertyNames:
             type: string
+        fix:
+          oneOf:
+          - $ref: "#/components/schemas/AlertmanagerChannelFix"
+            description: What to do about it, when Zeabur knows the reason.
+          - type: "null"
         kind:
           $ref: "#/components/schemas/AlertmanagerChannelKind"
           description: Where it sends.
@@ -4476,6 +4481,15 @@ components:
           - string
           - "null"
           description: The address, chat or server it sends to, when it is not a secret.
+    AlertmanagerChannelFix:
+      type: string
+      description: What to do about a channel the operator refused, for the reasons Zeabur knows.
+      enum:
+      - secretMissing
+      - scheme
+      - url
+      - required
+      - port
     AlertmanagerChannelKind:
       type: string
       description: Where a channel sends.
@@ -6622,6 +6636,32 @@ components:
             enum:
             - clusterTools
       description: One change a person asks for.
+    ChannelsOutcome:
+      type: string
+      description: Whether alerts reach anyone.
+      enum:
+      - none
+      - rejected
+      - waiting
+      - ok
+    ChannelsVerdict:
+      type: object
+      description: "The first line of a set of channels: whether alerts reach anyone, and what is wrong when not."
+      required:
+      - outcome
+      - count
+      - health
+      properties:
+        count:
+          type: integer
+          description: The channels the outcome counts.
+          minimum: 0
+        health:
+          $ref: "#/components/schemas/Health"
+          description: Its status dot.
+        outcome:
+          $ref: "#/components/schemas/ChannelsOutcome"
+          description: The outcome; a refused channel comes first.
     Citation:
       type: object
       description: A public source a rule rests on.
@@ -12325,6 +12365,7 @@ components:
       - namespace
       - events
       - channels
+      - verdict
       - canChange
       - canTest
       - unreadable
@@ -12363,6 +12404,9 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: What could not be read.
+        verdict:
+          $ref: "#/components/schemas/ChannelsVerdict"
+          description: Whether alerts reach anyone.
     NotificationsApplied:
       type: object
       description: What an apply wrote.
@@ -12529,6 +12573,17 @@ components:
         resource:
           type: string
           description: The plural resource name.
+        secretData:
+          type:
+          - object
+          - "null"
+          description: |-
+            A Secret's `data`, each key with its value in base64, as in `yaml`; absent for any other
+            kind.
+          additionalProperties:
+            type: string
+          propertyNames:
+            type: string
         status:
           type:
           - object
@@ -13547,6 +13602,7 @@ components:
         required:
         - workload
         - port
+        - health
         - code
         properties:
           code:
@@ -13558,6 +13614,9 @@ components:
             - $ref: "#/components/schemas/DataStore"
               description: What kind of data store the workload is, when it is one.
             - type: "null"
+          health:
+            $ref: "#/components/schemas/Health"
+            description: "`fail` for a data store, `warn` for any other service."
           port:
             type: integer
             format: int32
@@ -17350,6 +17409,7 @@ components:
       required:
       - name
       - status
+      - health
       - manual
       - pods
       properties:
@@ -17358,6 +17418,9 @@ components:
           - string
           - "null"
           description: When it ended, in RFC 3339.
+        health:
+          $ref: "#/components/schemas/Health"
+          description: "Its status dot: a failed run fails, a running one is fine, a finished one is idle."
         manual:
           type: boolean
           description: "Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`)."

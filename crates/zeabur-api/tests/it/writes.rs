@@ -778,7 +778,7 @@ mod tests {
         assert_eq!(
             planned["warnings"],
             json!([
-                {"code": "publicPort", "workload": {"kind": "Deployment", "name": "web"}, "port": 8080},
+                {"code": "publicPort", "workload": {"kind": "Deployment", "name": "web"}, "port": 8080, "health": "warn"},
                 {"code": "publicPortBlocked", "workload": {"kind": "Deployment", "name": "web"},
                     "port": 8080, "policies": ["web-isolate"]}
             ]),

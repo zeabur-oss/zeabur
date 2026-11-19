@@ -872,7 +872,7 @@ function BackupForm({
     retry: false,
   }).data
   const secrets = useQuery(objectsQuery(project, { kinds: ["core/secrets"] })).data
-  const { keysExist, regionSaved } = backupKeys(database, saved?.yaml, secrets)
+  const { keysExist, regionSaved } = backupKeys(database, saved?.secretData ?? undefined, secrets)
   const problems = targetProblems(target, keysExist)
   const review = () => {
     setTried(true)

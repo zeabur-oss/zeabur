@@ -228,6 +228,20 @@ export const AlertmanagerEvent = {
 } as const
 
 /**
+ * What to do about a channel the operator refused, for the reasons Zeabur knows.
+ */
+export type AlertmanagerChannelFix =
+  (typeof AlertmanagerChannelFix)[keyof typeof AlertmanagerChannelFix]
+
+export const AlertmanagerChannelFix = {
+  secretMissing: "secretMissing",
+  scheme: "scheme",
+  url: "url",
+  required: "required",
+  port: "port",
+} as const
+
+/**
  * Where a channel sends.
  */
 export type AlertmanagerChannelKind =
@@ -268,6 +282,7 @@ export type AlertmanagerChannel = {
    * `smarthost`, `username`); empty for one Zeabur did not make.
    */
   fields?: AlertmanagerChannelFields
+  fix?: AlertmanagerChannelFix | null
   /** Where it sends. */
   kind: AlertmanagerChannelKind
   /** Whether Zeabur made it, and so may change it. */
@@ -2203,6 +2218,46 @@ export type Change =
     }
 
 /**
+ * Whether alerts reach anyone.
+ */
+export type ChannelsOutcome = (typeof ChannelsOutcome)[keyof typeof ChannelsOutcome]
+
+export const ChannelsOutcome = {
+  none: "none",
+  rejected: "rejected",
+  waiting: "waiting",
+  ok: "ok",
+} as const
+
+/**
+ * A service's health, from worst to best: what a status dot shows.
+ */
+export type Health = (typeof Health)[keyof typeof Health]
+
+export const Health = {
+  fail: "fail",
+  warn: "warn",
+  progress: "progress",
+  ok: "ok",
+  idle: "idle",
+} as const
+
+/**
+ * The first line of a set of channels: whether alerts reach anyone, and what is wrong when not.
+ */
+export type ChannelsVerdict = {
+  /**
+   * The channels the outcome counts.
+   * @minimum 0
+   */
+  count: number
+  /** Its status dot. */
+  health: Health
+  /** The outcome; a refused channel comes first. */
+  outcome: ChannelsOutcome
+}
+
+/**
  * A public source a rule rests on.
  */
 export type Citation = {
@@ -3374,6 +3429,8 @@ export type PlanWarning =
   | {
       code: "publicPort"
       dataStore?: DataStore | null
+      /** `fail` for a data store, `warn` for any other service. */
+      health: Health
       /** The port. */
       port: number
       /** The workload. */
@@ -4726,19 +4783,6 @@ export const DatabaseEngine = {
   mysql: "mysql",
   mariadb: "mariadb",
   dragonfly: "dragonfly",
-} as const
-
-/**
- * A service's health, from worst to best: what a status dot shows.
- */
-export type Health = (typeof Health)[keyof typeof Health]
-
-export const Health = {
-  fail: "fail",
-  warn: "warn",
-  progress: "progress",
-  ok: "ok",
-  idle: "idle",
 } as const
 
 /**
@@ -7471,6 +7515,8 @@ export type Notifications = {
   state: ProviderState
   /** What could not be read. */
   unreadable: UnreadableView[]
+  /** Whether alerts reach anyone. */
+  verdict: ChannelsVerdict
 }
 
 /**
@@ -7542,6 +7588,13 @@ export type NotificationsPlanRequest =
     }
 
 /**
+ * A Secret's `data`, each key with its value in base64, as in `yaml`; absent for any other
+ * kind.
+ * @nullable
+ */
+export type ObjectDocumentSecretData = { [key: string]: string } | null
+
+/**
  * The object's `status` as the cluster reports it; absent when it has none, and never for a
  * Secret.
  * @nullable
@@ -7560,6 +7613,12 @@ export type ObjectDocument = {
   provenance: Provenance
   /** The plural resource name. */
   resource: string
+  /**
+   * A Secret's `data`, each key with its value in base64, as in `yaml`; absent for any other
+   * kind.
+   * @nullable
+   */
+  secretData?: ObjectDocumentSecretData
   /**
    * The object's `status` as the cluster reports it; absent when it has none, and never for a
    * Secret.
@@ -9793,6 +9852,8 @@ export type TaskRun = {
    * @nullable
    */
   finished?: string | null
+  /** Its status dot: a failed run fails, a running one is fine, a finished one is idle. */
+  health: Health
   /** Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`). */
   manual: boolean
   /** The Job's name. */

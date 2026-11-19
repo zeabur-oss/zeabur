@@ -17,8 +17,8 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort, ServiceSpec};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_model::Message;
 use zeabur_model::kernel::dns::is_dns_label;
+use zeabur_model::{Health, Message};
 
 use crate::change::{PublicPortChange, Target, Warning};
 use crate::owned::SERVICE_LABEL;
@@ -175,6 +175,11 @@ impl<'a> Planner<'a> {
             workload: reference.clone(),
             port: change.port,
             data_store,
+            health: if data_store.is_some() {
+                Health::Fail
+            } else {
+                Health::Warn
+            },
         });
         Ok(())
     }

@@ -1,12 +1,10 @@
 import { describe, expect, test } from "bun:test"
 
 import {
-  fixOf,
   missing,
   missingInEdit,
   nameProblem,
   settingsOf,
-  verdict,
   type ChannelForm,
 } from "@/model/notifications"
 
@@ -42,36 +40,5 @@ describe("notification channels", () => {
     expect(
       missingInEdit(form({ kind: "ntfy", values: { server: "https://ntfy.example.com" } })),
     ).toEqual(["topic"])
-  })
-
-  test("a rejected channel comes first in the verdict", () => {
-    const channel = (status: "active" | "rejected" | "waiting") =>
-      ({ status }) as Parameters<typeof verdict>[0][number]
-    expect(verdict([])).toEqual({ as: "none" })
-    expect(verdict([channel("active"), channel("rejected")])).toEqual({
-      as: "rejected",
-      count: 1,
-    })
-    expect(verdict([channel("waiting")])).toEqual({ as: "waiting", count: 1 })
-  })
-
-  test("the operator's reasons map to what to do", () => {
-    expect(
-      fixOf(
-        'unable to fetch secret="zeabur-notify-ops", ns="shop": secrets "zeabur-notify-ops" not found',
-      ),
-    ).toBe("secretMissing")
-    expect(
-      fixOf('expected key="url" was not found at object="secret/shop/zeabur-notify-ops"'),
-    ).toBe("secretMissing")
-    expect(
-      fixOf(
-        'invalid URL (hidden) in key url from secret zeabur-notify-ops: unsupported scheme "ftp" for URL',
-      ),
-    ).toBe("scheme")
-    expect(fixOf("invalid URL (hidden) in key url from secret x: missing host for URL")).toBe("url")
-    expect(fixOf("required field 'chat_id' must be set")).toBe("required")
-    expect(fixOf('smarthost="mail.example.com": port cannot be empty')).toBe("port")
-    expect(fixOf("bad matcher")).toBeUndefined()
   })
 })

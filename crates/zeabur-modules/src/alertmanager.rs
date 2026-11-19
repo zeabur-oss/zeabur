@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
+use zeabur_model::Health;
 use zeabur_model::kernel::dns::is_rfc1035_label;
 
 use crate::{Module, Read, text};
@@ -317,6 +318,55 @@ pub enum AlertmanagerChannelStatus {
     Waiting,
 }
 
+/// What to do about a channel the operator refused, for the reasons Zeabur knows.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum AlertmanagerChannelFix {
+    /// The channel's Secret, or a key of it, is gone.
+    SecretMissing,
+    /// The URL's scheme is not one the operator takes.
+    Scheme,
+    /// The URL is not valid.
+    Url,
+    /// A required setting is empty.
+    Required,
+    /// The SMTP server has no port.
+    Port,
+}
+
+impl AlertmanagerChannelFix {
+    /// The fix for the operator's `reason` (v0.75's words); `None` for a reason Zeabur does not
+    /// know. The scheme check also says "invalid URL", so it comes before the URL.
+    fn of(reason: &str) -> Option<Self> {
+        let any = |words: &[&str]| words.iter().any(|w| reason.contains(w));
+        if any(&[
+            "unable to fetch secret=",
+            "was not found at object=\"secret/",
+        ]) {
+            Some(Self::SecretMissing)
+        } else if any(&["unsupported scheme"]) {
+            Some(Self::Scheme)
+        } else if any(&[
+            "invalid URL",
+            "invalid 'url'",
+            "missing host for URL",
+            "webhook url",
+            "webhook_url",
+        ]) {
+            Some(Self::Url)
+        } else if any(&["required field"]) {
+            Some(Self::Required)
+        } else if reason
+            .split_once("smarthost=")
+            .is_some_and(|(_, rest)| rest.contains("port cannot be empty"))
+        {
+            Some(Self::Port)
+        } else {
+            None
+        }
+    }
+}
+
 /// One channel, without its secrets.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -339,10 +389,69 @@ pub struct AlertmanagerChannel {
     /// Why the operator refused it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// What to do about it, when Zeabur knows the reason.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub fix: Option<AlertmanagerChannelFix>,
     /// Its settings that are not secret, by the request's field names (`chatId`, `to`, `from`,
     /// `smarthost`, `username`); empty for one Zeabur did not make.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub fields: BTreeMap<String, String>,
+}
+
+/// Whether alerts reach anyone.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum ChannelsOutcome {
+    /// There is no channel.
+    None,
+    /// The operator refused a channel; `count` says how many.
+    Rejected,
+    /// No channel is active yet; `count` is every channel.
+    Waiting,
+    /// Channels are active; `count` says how many.
+    Ok,
+}
+
+/// The first line of a set of channels: whether alerts reach anyone, and what is wrong when not.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ChannelsVerdict {
+    /// The outcome; a refused channel comes first.
+    pub outcome: ChannelsOutcome,
+    /// The channels the outcome counts.
+    pub count: usize,
+    /// Its status dot.
+    pub health: Health,
+}
+
+impl ChannelsVerdict {
+    /// The verdict of `channels`.
+    #[must_use]
+    pub fn of(channels: &[AlertmanagerChannel]) -> Self {
+        let count = |status| channels.iter().filter(|c| c.status == status).count();
+        let (outcome, count, health) = if channels.is_empty() {
+            (ChannelsOutcome::None, 0, Health::Idle)
+        } else if count(AlertmanagerChannelStatus::Rejected) > 0 {
+            (
+                ChannelsOutcome::Rejected,
+                count(AlertmanagerChannelStatus::Rejected),
+                Health::Fail,
+            )
+        } else if count(AlertmanagerChannelStatus::Active) == 0 {
+            (ChannelsOutcome::Waiting, channels.len(), Health::Idle)
+        } else {
+            (
+                ChannelsOutcome::Ok,
+                count(AlertmanagerChannelStatus::Active),
+                Health::Ok,
+            )
+        };
+        Self {
+            outcome,
+            count,
+            health,
+        }
+    }
 }
 
 /// What `name`, `events` and `settings` need before Zeabur writes them; `None` when nothing.
@@ -1010,6 +1119,7 @@ pub fn channel(object: &DynamicObject) -> AlertmanagerChannel {
         events,
         managed: label.is_some(),
         status,
+        fix: reason.as_deref().and_then(AlertmanagerChannelFix::of),
         reason,
         fields: if label.is_some() {
             shown_fields(&spec)
@@ -1343,6 +1453,80 @@ mod tests {
              unsupported scheme \"ftp\" for URL"
         );
         assert_eq!(hide_url("bad matcher".to_owned()), "bad matcher");
+    }
+
+    #[test]
+    fn the_operators_reasons_map_to_what_to_do() {
+        let fix = AlertmanagerChannelFix::of;
+        assert_eq!(
+            fix(
+                "unable to fetch secret=\"zeabur-notify-ops\", ns=\"shop\": secrets \"zeabur-notify-ops\" not found"
+            ),
+            Some(AlertmanagerChannelFix::SecretMissing)
+        );
+        assert_eq!(
+            fix("expected key=\"url\" was not found at object=\"secret/shop/zeabur-notify-ops\""),
+            Some(AlertmanagerChannelFix::SecretMissing)
+        );
+        assert_eq!(
+            fix(
+                "invalid URL (hidden) in key url from secret zeabur-notify-ops: unsupported scheme \"ftp\" for URL"
+            ),
+            Some(AlertmanagerChannelFix::Scheme)
+        );
+        assert_eq!(
+            fix("invalid URL (hidden) in key url from secret x: missing host for URL"),
+            Some(AlertmanagerChannelFix::Url)
+        );
+        assert_eq!(
+            fix("required field 'chat_id' must be set"),
+            Some(AlertmanagerChannelFix::Required)
+        );
+        assert_eq!(
+            fix("smarthost=\"mail.example.com\": port cannot be empty"),
+            Some(AlertmanagerChannelFix::Port)
+        );
+        assert_eq!(fix("bad matcher"), None);
+    }
+
+    #[test]
+    fn a_rejected_channel_comes_first_in_the_verdict() {
+        let channel = |status| AlertmanagerChannel {
+            name: "team".to_owned(),
+            config: "zeabur-notify-team".to_owned(),
+            kind: AlertmanagerChannelKind::Slack,
+            target: None,
+            events: Vec::new(),
+            managed: true,
+            status,
+            reason: None,
+            fix: None,
+            fields: BTreeMap::new(),
+        };
+        let verdict = |statuses: &[AlertmanagerChannelStatus]| {
+            let channels: Vec<_> = statuses.iter().copied().map(channel).collect();
+            let v = ChannelsVerdict::of(&channels);
+            (v.outcome, v.count, v.health)
+        };
+        assert_eq!(verdict(&[]), (ChannelsOutcome::None, 0, Health::Idle));
+        assert_eq!(
+            verdict(&[
+                AlertmanagerChannelStatus::Active,
+                AlertmanagerChannelStatus::Rejected
+            ]),
+            (ChannelsOutcome::Rejected, 1, Health::Fail)
+        );
+        assert_eq!(
+            verdict(&[AlertmanagerChannelStatus::Waiting]),
+            (ChannelsOutcome::Waiting, 1, Health::Idle)
+        );
+        assert_eq!(
+            verdict(&[
+                AlertmanagerChannelStatus::Active,
+                AlertmanagerChannelStatus::Waiting
+            ]),
+            (ChannelsOutcome::Ok, 1, Health::Ok)
+        );
     }
 
     #[test]

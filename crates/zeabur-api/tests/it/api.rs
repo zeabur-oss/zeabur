@@ -1010,6 +1010,13 @@ mod tests {
         assert!(yaml.contains("\ndata:\n"), "the YAML has data");
         assert_eq!(value("password"), SECRET_VALUE.as_bytes());
         assert_eq!(value("blob"), binary);
+        let data = |key: &str| {
+            base64::engine::general_purpose::STANDARD
+                .decode(secret["secretData"][key].as_str().unwrap())
+                .unwrap()
+        };
+        assert_eq!(data("password"), SECRET_VALUE.as_bytes());
+        assert_eq!(data("blob"), binary);
         assert!(
             !yaml.contains("stringData"),
             "the cluster never returns stringData"
@@ -1199,12 +1206,18 @@ mod tests {
         assert!(capabilities["catalogueCommit"].is_string());
         let items = capabilities["items"].as_array().unwrap();
         let counted = |keep: fn(&Value) -> bool| items.iter().filter(|c| keep(c)).count();
-        assert_eq!(capabilities["installed"], counted(|c| c["existing"] == true));
+        assert_eq!(
+            capabilities["installed"],
+            counted(|c| c["existing"] == true)
+        );
         assert_eq!(
             capabilities["recommended"],
             counted(|c| c["suggestion"] == "recommended")
         );
-        assert!(capabilities["recommended"].as_u64().unwrap() > 0, "{capabilities}");
+        assert!(
+            capabilities["recommended"].as_u64().unwrap() > 0,
+            "{capabilities}"
+        );
 
         cluster.update(|s| {
             s.facts.unreadable.push(zeabur_kube::Unreadable {

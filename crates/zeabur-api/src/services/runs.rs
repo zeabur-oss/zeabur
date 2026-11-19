@@ -9,8 +9,8 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_model::WorkloadKind;
 use zeabur_model::adapters::controller_of;
+use zeabur_model::{Health, WorkloadKind};
 
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
@@ -31,6 +31,16 @@ pub enum RunStatus {
     Failed,
 }
 
+impl RunStatus {
+    const fn health(self) -> Health {
+        match self {
+            Self::Failed => Health::Fail,
+            Self::Running => Health::Ok,
+            Self::Succeeded => Health::Idle,
+        }
+    }
+}
+
 /// One run of a CronJob.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -39,6 +49,8 @@ pub struct TaskRun {
     pub name: String,
     /// How it stands.
     pub status: RunStatus,
+    /// Its status dot: a failed run fails, a running one is fine, a finished one is idle.
+    pub health: Health,
     /// Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`).
     pub manual: bool,
     /// When it started, in RFC 3339.
@@ -136,6 +148,7 @@ fn run(job: &Job, pods: &[zeabur_kube::k8s_openapi::api::core::v1::Pod]) -> Task
     TaskRun {
         name,
         status: state,
+        health: state.health(),
         manual: job
             .metadata
             .annotations
@@ -186,6 +199,7 @@ mod tests {
             &[pod("nightly-1-a", "nightly-1"), pod("other", "nightly-2")],
         );
         assert_eq!(run.status, RunStatus::Failed);
+        assert_eq!(run.health, Health::Fail);
         assert!(run.manual);
         assert_eq!(run.pods, vec!["nightly-1-a"]);
     }
