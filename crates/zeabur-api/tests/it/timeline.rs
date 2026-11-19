@@ -128,7 +128,8 @@ mod tests {
         );
         assert_eq!(items[2]["writer"]["tool"], "zeabur");
         assert_eq!(items[2]["fields"], json!(["spec.template"]));
-        assert_eq!(items[3]["message"]["key"], "timeline.warning.crashLoop");
+        assert_eq!(items[3]["message"]["key"], "timeline.warning.other");
+        assert_eq!(items[3]["message"]["params"]["reason"], "BackOff");
         assert_eq!(items[3]["count"], 6);
         assert_eq!(items[3]["at"], "2026-10-01T12:30:00Z");
         assert!(items[4].get("revert").is_none());

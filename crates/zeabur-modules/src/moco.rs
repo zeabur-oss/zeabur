@@ -7,8 +7,10 @@
 //! the Service `moco-<cluster>-primary` on port 3306. Each member keeps its data in the claim
 //! `mysql-data-moco-<cluster>-<n>`. `status.conditions` has `Initialized`, `Available` and
 //! `Healthy`, and `status.syncedReplicas` counts the members in sync, the primary with them
-//! [moco-crd]. MOCO keeps its users' passwords in the Secret `moco-<cluster>`. `moco-writable`
-//! (`WRITABLE_PASSWORD`) may create databases and users [moco-usage].
+//! [moco-crd]. `status.reconcileInfo.generation` is the generation of the last reconciliation
+//! [moco-types], which the kstatus generic rule compares in place of `observedGeneration`
+//! [kstatus-generic]. MOCO keeps its users' passwords in the Secret `moco-<cluster>`.
+//! `moco-writable` (`WRITABLE_PASSWORD`) may create databases and users [moco-usage].
 //!
 //! # The app database
 //!
@@ -28,9 +30,12 @@
 //! [moco-usage]: https://github.com/cybozu-go/moco/blob/v0.37.0/docs/usage.md
 //! [moco-crd]: https://github.com/cybozu-go/moco/blob/v0.37.0/docs/crd_mysqlcluster_v1beta2.md
 //! [moco-backup]: https://github.com/cybozu-go/moco/blob/v0.37.0/docs/backup.md
+//! [moco-types]: https://github.com/cybozu-go/moco/blob/v0.37.0/api/v1beta2/mysqlcluster_types.go
+//! [kstatus-generic]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/generic.go
 
 use serde_json::Value;
 use zeabur_kube::DynamicObject;
+use zeabur_model::readiness::{self, Status};
 
 use crate::backups::{Outcome, Schedule, Target, TargetKind, newest};
 use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
@@ -77,18 +82,29 @@ fn condition<'a>(cluster: &'a DynamicObject, kind: &str) -> Option<&'a Value> {
         .find(|c| c["type"] == kind)
 }
 
+/// The state of a `MySQLCluster`: paused while `spec.offline` holds, else the kstatus generic
+/// rule with `status.reconcileInfo.generation` as the observed generation, then its conditions.
 fn state(cluster: &DynamicObject, members: i64, ready: i64) -> State {
-    let holds = |kind: &str| condition(cluster, kind).is_some_and(|c| c["status"] == "True");
     if cluster.data.pointer("/spec/offline") == Some(&Value::Bool(true)) {
-        State::Paused
-    } else if holds("Healthy") {
-        databases::by_members(members, ready)
-    } else if holds("Available") {
-        State::Degraded
-    } else if condition(cluster, "Initialized").is_none() || !holds("Initialized") {
-        State::Progressing
-    } else {
-        State::Failed
+        return State::Paused;
+    }
+    let mut status = databases::generic_status(cluster);
+    status.observed_generation = databases::int(cluster, "/status/reconcileInfo/generation");
+    let holds = |kind: &str| {
+        status
+            .conditions
+            .iter()
+            .any(|c| c.type_ == kind && c.status == "True")
+    };
+    match readiness::generic(&cluster.metadata, &status)
+        .readiness
+        .status
+    {
+        Status::InProgress => State::Progressing,
+        Status::Current if holds("Healthy") => databases::by_members(members, ready),
+        Status::Current if holds("Available") => State::Degraded,
+        Status::Current if !holds("Initialized") => State::Progressing,
+        Status::Current | Status::Failed => State::Failed,
     }
 }
 
@@ -453,6 +469,18 @@ mod tests {
                                     {"type": "Available", "status": "False"}])
             ),
             State::Failed
+        );
+        let mut changed = cluster(&serde_json::json!({
+            "conditions": [{"type": "Initialized", "status": "True"},
+                           {"type": "Available", "status": "True"},
+                           {"type": "Healthy", "status": "True"}],
+            "syncedReplicas": 3,
+            "reconcileInfo": {"generation": 1}
+        }));
+        changed.metadata.generation = Some(2);
+        assert_eq!(
+            database("shop", &changed, &[], &[]).state,
+            State::Progressing
         );
     }
 

@@ -14,8 +14,8 @@
 //!   manager is not recorded at all. Status writes are left out.
 //! - **Warnings**: the namespace's `Warning` events about the workload, its pods and its
 //!   `ReplicaSets`, folded by reason: a crash loop, an eviction, a pod that cannot be scheduled
-//!   (with the scheduler's reason), an image that cannot be pulled, a failing probe, a pod the
-//!   quota refused. Events last an hour by default [k8s-event-ttl].
+//!   (with the scheduler's reason), an image that cannot be pulled, a failing probe, a replica the
+//!   controller could not create. Events last an hour by default [k8s-event-ttl].
 //! - **Terminations**: the last termination of each container the pods report
 //!   (`lastState.terminated`, `state.terminated`), out-of-memory kills included; a normal exit of a
 //!   Job's container is left out.
@@ -30,6 +30,7 @@
 //! [k8s-ssa-fields]: https://kubernetes.io/docs/reference/using-api/server-side-apply/#field-management
 //! [k8s-hpa]: https://kubernetes.io/docs/tasks/run-application/horizontal-pod-autoscale/
 //! [k8s-event-ttl]: https://kubernetes.io/docs/reference/command-line-tools-reference/kube-apiserver/
+//! [kubelet-events]: https://github.com/kubernetes/kubernetes/blob/v1.34.0/pkg/kubelet/events/event.go
 
 use std::collections::BTreeMap;
 
@@ -138,7 +139,7 @@ pub struct TimelineEntry {
     /// The workload.
     pub workload: WorkloadRef,
     /// What happened, in one sentence: `timeline.release`, `timeline.write.<tool>`,
-    /// `timeline.warning.<crashLoop|evicted|imagePull|probe|quota|other>`,
+    /// `timeline.warning.<crashLoop|evicted|imagePull|probe|failedCreate|other>`,
     /// `timeline.warning.unschedulable.<claimMissing|claimUnbound|cpu|memory|placement|other>`,
     /// `timeline.termination.<oomKilled|exited>`. A warning names the service and, when it is
     /// about a pod, the replica; the component's own words are in `note`, not in the sentence.
@@ -351,28 +352,58 @@ fn names_pod_of(workload: &WorkloadRef, releases: &[Release], pod: &str) -> bool
 }
 
 /// The sentence for a warning: its reason folded, and for a pod that cannot be scheduled what the
-/// scheduler says is short, as the diagnosis reads it.
-fn warning_variant(event: &zeabur_gaps::Event) -> String {
-    let note = event.note.to_ascii_lowercase();
+/// scheduler says is short, as the diagnosis reads it. The kubelet gives `Failed` and `BackOff`
+/// to a pull and to a start alike [kubelet-events], so for those the waiting reason of the pod's
+/// containers tells which; the note is evidence only.
+fn warning_variant(event: &zeabur_gaps::Event, pods: &[&Pod]) -> String {
     match event.reason.as_str() {
-        "BackOff" if note.contains("image") => "imagePull",
-        "BackOff" | "CrashLoopBackOff" => "crashLoop",
+        "Failed" | "BackOff" => waiting(event, pods),
+        "CrashLoopBackOff" => "crashLoop",
         "Evicted" | "Preempted" => "evicted",
         "FailedScheduling" => {
             return format!("unschedulable.{}", zeabur_gaps::shortage(&event.note));
         }
-        "Failed" | "ErrImagePull" | "ImagePullBackOff" | "InspectFailed" => "imagePull",
+        "ErrImagePull" | "ImagePullBackOff" | "InspectFailed" | "ErrImageNeverPull" => "imagePull",
         "Unhealthy" => "probe",
-        "FailedCreate" => "quota",
+        "FailedCreate" => "failedCreate",
         _ => "other",
     }
     .to_owned()
+}
+
+/// What the containers of the pod `event` is about wait for: an image or a restart.
+fn waiting(event: &zeabur_gaps::Event, pods: &[&Pod]) -> &'static str {
+    let mut reasons = event
+        .regarding
+        .as_ref()
+        .filter(|r| r.kind == "Pod")
+        .and_then(|r| {
+            pods.iter()
+                .find(|p| p.metadata.name.as_deref() == Some(r.name.as_str()))
+        })
+        .and_then(|p| p.status.as_ref())
+        .into_iter()
+        .flat_map(|s| {
+            let init = s.init_container_statuses.iter().flatten();
+            init.chain(s.container_statuses.iter().flatten())
+        })
+        .filter_map(|c| c.state.as_ref()?.waiting.as_ref()?.reason.as_deref());
+    reasons
+        .find_map(|reason| match reason {
+            "ErrImagePull" | "ImagePullBackOff" | "InvalidImageName" | "ErrImageNeverPull" => {
+                Some("imagePull")
+            }
+            "CrashLoopBackOff" => Some("crashLoop"),
+            _ => None,
+        })
+        .unwrap_or("other")
 }
 
 fn warnings(
     workload: &WorkloadRef,
     releases: &[Release],
     events: &[zeabur_gaps::Event],
+    pods: &[&Pod],
 ) -> Vec<TimelineEntry> {
     let about = |event: &zeabur_gaps::Event| {
         event
@@ -406,12 +437,14 @@ fn warnings(
     folded
         .into_values()
         .map(|(at, count, latest, evidence)| {
-            let mut message =
-                Message::new(&format!("timeline.warning.{}", warning_variant(latest)))
-                    .with("service", workload.name.clone())
-                    .with("reason", latest.reason.clone())
-                    .with("note", latest.note.clone())
-                    .with("count", count.to_string());
+            let mut message = Message::new(&format!(
+                "timeline.warning.{}",
+                warning_variant(latest, pods)
+            ))
+            .with("service", workload.name.clone())
+            .with("reason", latest.reason.clone())
+            .with("note", latest.note.clone())
+            .with("count", count.to_string());
             if let Some(pod) = latest.regarding.as_ref().filter(|r| r.kind == "Pod") {
                 message = message.with("replica", pod.name.clone());
             }
@@ -526,7 +559,7 @@ pub(crate) fn of_workload(sources: &Sources<'_>, workload: Workload<'_>) -> Vec<
         .collect();
     let mut out = releases(&me, &held);
     out.extend(writes(workload));
-    out.extend(warnings(&me, &held, sources.events));
+    out.extend(warnings(&me, &held, sources.events, &pods));
     out.extend(terminations(&me, &pods));
     out
 }
@@ -725,6 +758,14 @@ mod tests {
         let held = [release("editor-5c8d9", 1, true)];
         let note =
             "0/1 nodes are available: persistentvolumeclaim \"editor-data\" not found. not found";
+        let crashing: Pod = serde_json::from_value(json!({
+            "metadata": {"name": "editor-5c8d9-q2w3e"},
+            "status": {"containerStatuses": [{
+                "name": "editor", "image": "editor:1", "imageID": "", "ready": false,
+                "restartCount": 4,
+                "state": {"waiting": {"reason": "CrashLoopBackOff"}}}]}
+        }))
+        .unwrap();
         let entries = warnings(
             &editor,
             &held,
@@ -736,6 +777,7 @@ mod tests {
                     541,
                 ),
             ],
+            &[&crashing],
         );
         let messages: Vec<_> = entries.iter().map(|e| &e.message).collect();
         assert_eq!(messages[0].key, "timeline.warning.crashLoop");
@@ -749,12 +791,30 @@ mod tests {
         assert_eq!(messages[1].params["claim"], "editor-data");
         assert_eq!(messages[1].params["note"], note);
         assert_eq!(
-            warning_variant(&warning(
-                "FailedScheduling",
-                "0/3 nodes are available: 3 Insufficient cpu.",
-                1
-            )),
+            warning_variant(
+                &warning(
+                    "FailedScheduling",
+                    "0/3 nodes are available: 3 Insufficient cpu.",
+                    1
+                ),
+                &[]
+            ),
             "unschedulable.cpu"
+        );
+        let pull = warning("BackOff", "Back-off pulling image \"editor:2\"", 3);
+        let pulling: Pod = serde_json::from_value(json!({
+            "metadata": {"name": "editor-5c8d9-q2w3e"},
+            "status": {"containerStatuses": [{
+                "name": "editor", "image": "editor:2", "imageID": "", "ready": false,
+                "restartCount": 0,
+                "state": {"waiting": {"reason": "ImagePullBackOff"}}}]}
+        }))
+        .unwrap();
+        assert_eq!(warning_variant(&pull, &[&pulling]), "imagePull");
+        assert_eq!(warning_variant(&pull, &[]), "other");
+        assert_eq!(
+            warning_variant(&warning("FailedCreate", "exceeded quota: compute", 1), &[]),
+            "failedCreate"
         );
     }
 }

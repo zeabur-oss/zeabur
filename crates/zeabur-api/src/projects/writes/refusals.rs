@@ -128,11 +128,10 @@ pub(super) fn moved_on(target: &zeabur_plan::Target) -> Problem {
 /// way kube-apiserver says it: `409 Conflict` (a `resourceVersion` mismatch), `409
 /// AlreadyExists` (a name taken since), or a `422` that names no invalid field, which is how a
 /// JSON Patch that does not apply (a failed `test`, a `remove` of a path that is gone) is
-/// answered [k8s-patch]; older servers put the JSON Patch library's "test failed" in the
-/// message. All are `409` here, with the fix to plan again. A `422` that names a field is the
-/// result being invalid, and stays as kube-apiserver gave it. `429` and other refusals pass through
-/// as kube-apiserver gave them (a `429` with its `Retry-After`); a `403` also names the request
-/// that was refused ([`denied`]).
+/// answered [k8s-patch]. All are `409` here, with the fix to plan again. A `422` that names a
+/// field is the result being invalid, and stays as kube-apiserver gave it. `429` and other
+/// refusals pass through as kube-apiserver gave them (a `429` with its `Retry-After`); a `403`
+/// also names the request that was refused ([`denied`]).
 ///
 /// [k8s-patch]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/patch.go
 pub(super) fn write_problem(
@@ -142,9 +141,7 @@ pub(super) fn write_problem(
 ) -> Problem {
     let changed = match &error {
         ClusterError::Status(status) => {
-            status.code == 409
-                || (status.code == 422
-                    && (!status.names_invalid_field || status.message.contains("test failed")))
+            status.code == 409 || (status.code == 422 && !status.names_invalid_field)
         }
         ClusterError::Transport(_) | ClusterError::Decode(_) | ClusterError::InvalidName(_) => {
             false
@@ -245,7 +242,6 @@ mod tests {
                 "Invalid",
                 "the server rejected our request due to an error in our request",
             ),
-            invalid_field("testing value /metadata/resourceVersion failed: test failed"),
             answer(409, "Conflict", "the object has been modified"),
             answer(409, "AlreadyExists", "ingresses \"web\" already exists"),
         ] {

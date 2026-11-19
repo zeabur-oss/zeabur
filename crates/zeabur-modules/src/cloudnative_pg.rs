@@ -18,6 +18,10 @@
 //! the read-write Service `<cluster>-rw` on port 5432 [cnpg-services]. Each instance's
 //! PersistentVolumeClaim is named after the instance (`status.instanceNames`).
 //!
+//! The kstatus generic rule over the `Cluster`'s conditions decides its state [kstatus-generic],
+//! `Ready` among them [cnpg-cluster-phases]; the phase and `phaseReason` are only shown. A
+//! hibernated `Cluster` has the condition `cnpg.io/hibernation` `True` [cnpg-hibernation].
+//!
 //! Backups go through the Barman Cloud plugin: the `Cluster` names the plugin
 //! (`barman-cloud.cloudnative-pg.io`) with `isWALArchiver: true` and the `ObjectStore` to use
 //! (`parameters.barmanObjectName`), and `ScheduledBackup`s and `Backup`s ask for
@@ -46,8 +50,11 @@
 //! [barman-cloud-api]: https://github.com/cloudnative-pg/plugin-barman-cloud/blob/v0.15.1/api/v1/objectstore_types.go
 //! [cnpg-config]: https://github.com/cloudnative-pg/cloudnative-pg/blob/v1.30.1/pkg/postgres/configuration.go
 //! [cnpg-recovery]: https://cloudnative-pg.io/documentation/current/recovery/
+//! [cnpg-hibernation]: https://github.com/cloudnative-pg/cloudnative-pg/blob/v1.30.1/docs/src/declarative_hibernation.md
+//! [kstatus-generic]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/generic.go
 
 use zeabur_kube::DynamicObject;
+use zeabur_model::readiness::{self, Reason, Status};
 
 use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, newest};
 use crate::databases::{
@@ -128,24 +135,28 @@ pub fn databases(clusters: &[DynamicObject]) -> Vec<Target> {
     out
 }
 
-/// The state of a `Cluster` from its phase [cnpg-cluster-phases] and ready instances.
-fn state(phase: Option<&str>, members: i64, ready: i64) -> State {
-    let Some(phase) = phase else {
-        return State::Unknown;
-    };
-    let lower = phase.to_ascii_lowercase();
-    if lower == "cluster in healthy state" {
-        databases::by_members(members, ready)
-    } else if lower.contains("hibernat") {
-        State::Paused
-    } else if lower.contains("unrecoverable")
-        || lower.contains("cannot")
-        || lower.starts_with("unable")
-        || lower.contains("failed")
+const HIBERNATION: &str = "cnpg.io/hibernation";
+
+/// The state of a `Cluster` by the kstatus generic rule and its ready instances. A hibernated
+/// `Cluster` is paused, and one with a phase but no `Ready` condition yet is progressing.
+fn state(cluster: &DynamicObject, members: i64, ready: i64) -> State {
+    let status = databases::generic_status(cluster);
+    if status
+        .conditions
+        .iter()
+        .any(|c| c.type_ == HIBERNATION && c.status == "True")
     {
-        State::Failed
-    } else {
-        State::Progressing
+        return State::Paused;
+    }
+    let readiness = readiness::generic(&cluster.metadata, &status).readiness;
+    match readiness.status {
+        Status::Failed => State::Failed,
+        Status::InProgress => State::Progressing,
+        Status::Current if readiness.reason == Reason::Ready => {
+            databases::by_members(members, ready)
+        }
+        Status::Current if cluster.data.pointer("/status/phase").is_some() => State::Progressing,
+        Status::Current => State::Unknown,
     }
 }
 
@@ -330,7 +341,7 @@ pub fn database(
     let scheduled: Vec<DynamicObject> = scheduled.iter().filter(mine).cloned().collect();
     let backups: Vec<DynamicObject> = backups.iter().filter(mine).cloned().collect();
     let found = findings_limited(namespace, &scheduled, &backups, 20);
-    let state = state(phase.as_deref(), members, ready);
+    let state = state(cluster, members, ready);
     let in_use = plugin_store(cluster).and_then(|wanted| named(&wanted));
     let store_created = in_use
         .and_then(|s| s.metadata.creation_timestamp.as_ref())
@@ -670,21 +681,33 @@ mod tests {
     }
 
     #[test]
-    fn phases_and_ready_instances_decide_the_state() {
-        assert_eq!(
-            state(Some("Cluster in healthy state"), 3, 2),
-            State::Degraded
-        );
-        assert_eq!(state(Some("Setting up primary"), 1, 0), State::Progressing);
-        assert_eq!(
-            state(
-                Some("Cluster is unrecoverable and needs manual intervention"),
-                1,
-                0
-            ),
-            State::Failed
-        );
-        assert_eq!(state(None, 1, 0), State::Unknown);
+    fn conditions_and_ready_instances_decide_the_state() {
+        let cluster = |status: serde_json::Value| {
+            object(serde_json::json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                "metadata": {"name": "pg", "namespace": "shop"},
+                "spec": {"instances": 3},
+                "status": status
+            }))
+        };
+        let ready = |status: &str| serde_json::json!({"type": "Ready", "status": status});
+        let healthy = cluster(serde_json::json!({
+            "phase": "Cluster in healthy state", "conditions": [ready("True")]
+        }));
+        assert_eq!(state(&healthy, 3, 2), State::Degraded);
+        let unrecoverable = cluster(serde_json::json!({
+            "phase": "Cluster is unrecoverable and needs manual intervention",
+            "conditions": [ready("False")]
+        }));
+        assert_eq!(state(&unrecoverable, 3, 0), State::Progressing);
+        let hibernated = cluster(serde_json::json!({
+            "phase": "Cluster in healthy state",
+            "conditions": [ready("False"), {"type": "cnpg.io/hibernation", "status": "True"}]
+        }));
+        assert_eq!(state(&hibernated, 3, 0), State::Paused);
+        let setting_up = cluster(serde_json::json!({"phase": "Setting up primary"}));
+        assert_eq!(state(&setting_up, 3, 0), State::Progressing);
+        assert_eq!(state(&cluster(serde_json::json!({})), 3, 0), State::Unknown);
     }
 
     #[test]

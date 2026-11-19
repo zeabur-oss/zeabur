@@ -519,6 +519,60 @@ mod tests {
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
     }
 
+    /// Zeabur plans a Job's env edit; kube-apiserver's dry run refuses the immutable pod template,
+    /// and the answer names the field.
+    #[tokio::test]
+    async fn a_jobs_pod_template_change_is_refused_by_the_dry_run_naming_the_field() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            let job = serde_json::from_value(json!({
+                "apiVersion": "batch/v1", "kind": "Job",
+                "metadata": {"name": "migrate", "namespace": "shop", "resourceVersion": "42"},
+                "spec": {"template": {"spec": {"restartPolicy": "Never", "containers": [
+                    {"name": "app", "image": "example/app:1"}]}}}
+            }))
+            .unwrap();
+            if let Some(objects) = s.objects.get_mut("shop") {
+                objects.jobs.push(job);
+            }
+            s.admission_refusals.insert(
+                "Job/migrate".to_owned(),
+                zeabur_core::problem::KubernetesStatus {
+                    names_invalid_field: true,
+                    details: Some(Box::new(zeabur_core::problem::StatusDetails {
+                        object: Some(("Job".to_owned(), "migrate".to_owned())),
+                        causes: vec![zeabur_core::problem::FieldCause {
+                            field: "spec.template".to_owned(),
+                            reason: "FieldValueInvalid".to_owned(),
+                            message: "field is immutable".to_owned(),
+                        }],
+                    })),
+                    ..zeabur_core::problem::KubernetesStatus::new(
+                        422,
+                        "Invalid",
+                        "Job.batch \"migrate\" is invalid: spec.template: Invalid value: \
+                         field is immutable",
+                    )
+                },
+            );
+        });
+        let app = app(&cluster);
+        let request = json!({"changes": [{"op": "env",
+            "workload": {"kind": "Job", "name": "migrate"},
+            "changes": [{"op": "set", "name": "MODE", "value": "maintenance"}]}]});
+        let planned = plan(&app, &request).await;
+        let (status, problem) = post(
+            app,
+            "/api/v1/projects/shop/apply",
+            &json!({"token": planned["token"]}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["kind"], "invalid");
+        assert_eq!(problem["fields"][0]["field"], "spec.template");
+        assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
+    }
+
     /// One key for every router, as on a server that reads it from a file, so a plan made
     /// through one applies through another.
     fn keyed(cluster: &MemoryCluster) -> Router {

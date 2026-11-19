@@ -2205,7 +2205,6 @@ export const zhTW: Messages = {
   "clusterBackups.failure.invalid": "Velero 不接受這次備份的設定。",
   "clusterBackups.failure.itemsFailed":
     "有些物件或磁碟區檔案沒有複製到，其餘的已存好。Velero 這次備份的紀錄會列出每一項。",
-  "clusterBackups.failure.interrupted": "備份途中 Velero 重新啟動了。下一次會照排程執行。",
   "clusterBackups.failure.other": "備份失敗。",
   "clusterBackups.restoreAction": "還原",
   "clusterBackups.problem.restoreNone": "請至少選一個 Namespace。",
@@ -3974,7 +3973,7 @@ export const zhTW: Messages = {
     `${p.service} 在等待可以執行的機器（${p.count} 次）。`,
   "sentence.timeline.warning.imagePull": (p) => `${p.service} 無法下載映像檔（${p.count} 次）。`,
   "sentence.timeline.warning.probe": (p) => `${p.service} 的健康檢查失敗（${p.count} 次）。`,
-  "sentence.timeline.warning.quota": (p) => `${p.service} 無法建立副本（${p.count} 次）。`,
+  "sentence.timeline.warning.failedCreate": (p) => `${p.service} 無法建立副本（${p.count} 次）。`,
   "sentence.timeline.warning.other": (p) => `${p.service} 發生 ${p.reason}（${p.count} 次）。`,
   "sentence.timeline.termination.oomKilled": (p) =>
     `${containerZhTW(p)} 用完了記憶體，被系統終止了。`,

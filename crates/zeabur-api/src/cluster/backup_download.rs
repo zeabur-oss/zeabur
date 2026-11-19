@@ -164,7 +164,7 @@ pub(crate) async fn fetch(
                 format!("Velero has no backup {backup:?}."),
             ))
         })?;
-    let view = v::backup(&object, &BTreeMap::new());
+    let view = v::backup(&object, &BTreeMap::new(), &[]);
     if !matches!(view.outcome, Outcome::Succeeded | Outcome::PartiallyFailed) {
         return Err(ApiError::from(Problem::new(
             Kind::Invalid,

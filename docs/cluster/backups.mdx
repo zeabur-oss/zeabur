@@ -248,7 +248,7 @@ If Velero wasn't installed from the Catalog, the cluster may not have `velero-re
 - **Back up now** is missing: You need a schedule created by Zeabur first, and the schedule needs a backup location.
 - The restore button (**New project from backup**, **Restore deleted project**, or **Restore a project**) is unavailable: You don't have permission to create a Restore in Velero's namespace. Velero writes objects using its own permissions during a restore, so only administrators can restore backups. See [Permissions](../reference/permissions.mdx). Ask an administrator to restore the backup with an admin account.
 - **Partly failed**: Some objects or volume files weren't copied. The rest were saved. Run `velero backup describe <backup> --details` to see which items failed, fix the issue, then run another backup.
-- The page says Velero restarted during the backup: The next backup runs on schedule. You can also click **Back up now** to run a replacement.
+- The backup failed: Read Velero's reason below it. If Velero restarted during the backup, the next one runs on schedule. You can also click **Back up now** to run a replacement.
 - **Volumes** shows **Objects only; files in volumes aren't copied**: The schedule was created outside Zeabur. Enable `defaultVolumesToFsBackup` in its original configuration.
 - The changes have expired: Click **Review changes** again.
 

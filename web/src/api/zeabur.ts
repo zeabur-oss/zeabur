@@ -2421,7 +2421,6 @@ export const VeleroFailure = {
   locationUnavailable: "locationUnavailable",
   invalid: "invalid",
   itemsFailed: "itemsFailed",
-  interrupted: "interrupted",
   other: "other",
 } as const
 
@@ -3639,6 +3638,11 @@ export type ComponentCheck = {
   advice: string
   /** The component. */
   component: string
+  /**
+   * Why it failed: the object, and its kstatus reason or the condition that says so.
+   * @nullable
+   */
+  message?: string | null
   /** The check. */
   name: string
   /** How far it has come; `pending` until every step is ready. */
@@ -9984,7 +9988,7 @@ export type TimelineEntry = {
   kind: EntryKind
   /**
    * What happened, in one sentence: `timeline.release`, `timeline.write.<tool>`,
-   * `timeline.warning.<crashLoop|evicted|imagePull|probe|quota|other>`,
+   * `timeline.warning.<crashLoop|evicted|imagePull|probe|failedCreate|other>`,
    * `timeline.warning.unschedulable.<claimMissing|claimUnbound|cpu|memory|placement|other>`,
    * `timeline.termination.<oomKilled|exited>`. A warning names the service and, when it is
    * about a pod, the replica; the component's own words are in `note`, not in the sentence.

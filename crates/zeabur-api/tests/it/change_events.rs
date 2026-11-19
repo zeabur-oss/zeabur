@@ -11,7 +11,9 @@ mod tests {
     use axum::http::StatusCode;
     use serde_json::json;
     use zeabur_api::measure::{Fact, Report};
-    use zeabur_kube::k8s_openapi::api::apps::v1::{Deployment, DeploymentStatus};
+    use zeabur_kube::k8s_openapi::api::apps::v1::{
+        Deployment, DeploymentCondition, DeploymentStatus,
+    };
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects};
@@ -87,7 +89,13 @@ mod tests {
                 observed_generation: web.metadata.generation,
                 replicas: Some(replicas),
                 updated_replicas: Some(replicas),
+                ready_replicas: Some(replicas),
                 available_replicas: Some(replicas),
+                conditions: Some(vec![DeploymentCondition {
+                    type_: "Available".into(),
+                    status: "True".into(),
+                    ..DeploymentCondition::default()
+                }]),
                 ..DeploymentStatus::default()
             });
         });

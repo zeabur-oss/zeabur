@@ -200,8 +200,6 @@ pub enum Failure {
     Invalid,
     /// It finished, but some objects or volumes were not copied.
     ItemsFailed,
-    /// The Velero server restarted while it ran.
-    Interrupted,
     /// Anything else; `reason` says what Velero said.
     Other,
 }
@@ -405,16 +403,13 @@ pub fn volume_bytes(pod_volume_backups: &[DynamicObject]) -> BTreeMap<String, u6
     out
 }
 
-/// What went wrong, from the phase and Velero's words.
-fn failure(phase: Option<&str>, reason: Option<&str>, errors: u64) -> Option<Failure> {
-    let said = reason.unwrap_or_default().to_lowercase();
-    let location = said.contains("backup storage location")
-        || said.contains("backupstoragelocation")
-        || said.contains("unavailable");
+/// What went wrong, from the phase and the phase of the location the backup goes to. Velero's
+/// own words are only shown, as `reason`.
+fn failure(phase: Option<&str>, location: Option<LocationPhase>, errors: u64) -> Option<Failure> {
+    let unreachable = location == Some(LocationPhase::Unavailable);
     match phase {
-        Some("FailedValidation" | "Failed") if location => Some(Failure::LocationUnavailable),
+        Some("FailedValidation" | "Failed") if unreachable => Some(Failure::LocationUnavailable),
         Some("FailedValidation") => Some(Failure::Invalid),
-        Some("Failed") if said.contains("server starting") => Some(Failure::Interrupted),
         Some("Failed") => Some(Failure::Other),
         Some(
             "PartiallyFailed"
@@ -426,9 +421,14 @@ fn failure(phase: Option<&str>, reason: Option<&str>, errors: u64) -> Option<Fai
     }
 }
 
-/// A backup as the interface shows it; `bytes` from [`volume_bytes`].
+/// A backup as the interface shows it; `bytes` from [`volume_bytes`]. Its location is the one
+/// `spec.storageLocation` names, else the default one, among `locations`.
 #[must_use]
-pub fn backup(object: &DynamicObject, bytes: &BTreeMap<String, u64>) -> BackupView {
+pub fn backup(
+    object: &DynamicObject,
+    bytes: &BTreeMap<String, u64>,
+    locations: &[Location],
+) -> BackupView {
     let phase = text(object, "/status/phase");
     let outcome = match phase.as_deref() {
         Some("Completed") => Outcome::Succeeded,
@@ -448,6 +448,11 @@ pub fn backup(object: &DynamicObject, bytes: &BTreeMap<String, u64>) -> BackupVi
     let reason = text(object, "/status/failureReason")
         .or_else(|| (!validation.is_empty()).then(|| validation.join("; ")));
     let errors = number(object, "/status/errors").unwrap_or(0);
+    let named = text(object, "/spec/storageLocation").filter(|n| !n.is_empty());
+    let location = locations
+        .iter()
+        .find(|l| named.as_ref().map_or(l.default, |n| *n == l.name))
+        .map(|l| l.phase);
     let name = name(object);
     BackupView {
         schedule: object
@@ -457,7 +462,7 @@ pub fn backup(object: &DynamicObject, bytes: &BTreeMap<String, u64>) -> BackupVi
             .and_then(|l| l.get(SCHEDULE_LABEL))
             .cloned(),
         namespaces: covered(object, "/spec"),
-        failure: failure(phase.as_deref(), reason.as_deref(), errors),
+        failure: failure(phase.as_deref(), location, errors),
         phase,
         outcome,
         started: text(object, "/status/startTimestamp"),
@@ -1517,12 +1522,22 @@ mod tests {
                 "status": {"progress": {"bytesDone": 24}}})),
         ];
         let bytes = volume_bytes(&pvbs);
+        let bsl = |phase: &str| {
+            location(&object(
+                json!({"apiVersion": API_VERSION, "kind": "BackupStorageLocation",
+                "metadata": {"name": "default", "namespace": "velero"},
+                "spec": {"default": true, "provider": "aws",
+                         "objectStorage": {"bucket": "backups"}},
+                "status": {"phase": phase}}),
+            ))
+        };
         let done = backup(
             &run(
                 "Completed",
                 json!({"progress": {"itemsBackedUp": 120, "totalItems": 120}}),
             ),
             &bytes,
+            &[],
         );
         assert_eq!(
             (done.outcome, done.failure, done.bytes, done.items),
@@ -1530,24 +1545,25 @@ mod tests {
         );
         assert_eq!(done.schedule.as_deref(), Some("zeabur"));
         assert_eq!(done.namespaces, Vec::<String>::new());
-        let unreachable = backup(
+        let said = "found a backup with status \"InProgress\" during the server starting";
+        let failed = run("Failed", json!({"failureReason": said}));
+        let unreachable = backup(&failed, &bytes, &[bsl("Unavailable")]);
+        assert_eq!(unreachable.failure, Some(Failure::LocationUnavailable));
+        let other = backup(&failed, &bytes, &[bsl("Available")]);
+        assert_eq!(
+            (other.failure, other.reason.as_deref()),
+            (Some(Failure::Other), Some(said))
+        );
+        let refused = backup(
             &run(
                 "FailedValidation",
-                json!({"validationErrors": [
-                    "an existing backup storage location wasn't specified at backup creation time and the default 'default' wasn't found"]}),
+                json!({"validationErrors": ["the default backup storage location wasn't found"]}),
             ),
             &bytes,
+            &[],
         );
-        assert_eq!(unreachable.failure, Some(Failure::LocationUnavailable));
-        let restarted = backup(
-            &run(
-                "Failed",
-                json!({"failureReason": "found a backup with status \"InProgress\" during the server starting, mark it as \"Failed\""}),
-            ),
-            &bytes,
-        );
-        assert_eq!(restarted.failure, Some(Failure::Interrupted));
-        let partly = backup(&run("PartiallyFailed", json!({"errors": 2})), &bytes);
+        assert_eq!(refused.failure, Some(Failure::Invalid));
+        let partly = backup(&run("PartiallyFailed", json!({"errors": 2})), &bytes, &[]);
         assert_eq!(
             (partly.outcome, partly.failure, partly.errors),
             (Outcome::PartiallyFailed, Some(Failure::ItemsFailed), 2)

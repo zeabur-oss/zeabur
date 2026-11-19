@@ -20,15 +20,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
-use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod};
+use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::k8s_openapi::{Metadata, NamespaceResourceScope, Resource};
-use zeabur_kube::{ClusterFacts, DynamicObject};
+use zeabur_kube::{ClusterFacts, DynamicObject, ServedResource};
 use zeabur_model::PodSecurityLevel;
-use zeabur_model::readiness::{self, Reason, Status};
+use zeabur_model::readiness::{self, Explained, GenericStatus, Reason, Status};
 
 use crate::api::{ComponentFile, Health, Release, ReleaseType, Snapshot};
 use crate::install::{merge, parse_values};
@@ -621,78 +620,126 @@ fn truncate(t: Timestamp) -> Timestamp {
     Timestamp::from_second(t.as_second()).unwrap_or(t)
 }
 
-/// Whether an inline object is ready: it exists, and a `Ready` condition, when it has one, is
-/// `True`.
+/// Whether an inline object of `group` and `kind` is ready, by kstatus.
+///
+/// The built-in kinds that `zeabur_model::readiness` knows follow the rule of their kind, a CRD
+/// follows `Established`, and the rest follow the generic rule. A failure names the object and
+/// its reason or condition.
 #[must_use]
-pub fn object_progress(object: Option<&DynamicObject>) -> Progress {
+pub fn object_progress(
+    group: &str,
+    kind: &str,
+    object: Option<&DynamicObject>,
+    now: Timestamp,
+) -> Progress {
     let Some(object) = object else {
         return Progress::Pending;
     };
-    let conditions: Vec<Condition> = object
-        .data
-        .get("status")
-        .and_then(|s| s.get("conditions"))
-        .cloned()
-        .and_then(|c| serde_json::from_value(c).ok())
-        .unwrap_or_default();
-    match conditions.iter().find(|c| c.kind == "Ready") {
-        Some(c) if c.status == "True" => Progress::Ready,
-        Some(_) => Progress::Waiting,
-        None => Progress::Ready,
-    }
+    kstatus(group, kind, object, now).unwrap_or(Progress::Waiting)
 }
 
-/// The API resource of a health check's kind, as `(group, version, plural)` [installers].
-///
-/// [installers]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/installers.mdx#install-and-check
-#[must_use]
-pub fn health_resource(
-    kind: &str,
-) -> Option<(&'static str, &'static str, &'static str, &'static str)> {
-    Some(match kind {
-        "APIService" => ("apiregistration.k8s.io", "v1", "apiservices", "APIService"),
-        "DaemonSet" => ("apps", "v1", "daemonsets", "DaemonSet"),
-        "Deployment" => ("apps", "v1", "deployments", "Deployment"),
-        "GatewayClass" => (
-            "gateway.networking.k8s.io",
-            "v1",
-            "gatewayclasses",
-            "GatewayClass",
-        ),
-        "Node.longhorn.io" => ("longhorn.io", "v1beta2", "nodes", "Node"),
-        "Pod" => ("", "v1", "pods", "Pod"),
-        "StatefulSet" => ("apps", "v1", "statefulsets", "StatefulSet"),
-        _ => return None,
+/// The kinds with a rule of their own in `zeabur_model::readiness`, as `(group, kind)`.
+const OWN_RULE: &[(&str, &str)] = &[
+    ("apps", "Deployment"),
+    ("apps", "StatefulSet"),
+    ("apps", "DaemonSet"),
+    ("", "Pod"),
+    ("batch", "Job"),
+    ("apiextensions.k8s.io", "CustomResourceDefinition"),
+];
+
+/// The kstatus answer for `object`; `None` when it does not parse as its kind.
+fn kstatus(group: &str, kind: &str, object: &DynamicObject, now: Timestamp) -> Option<Progress> {
+    let name = object.metadata.name.as_deref().unwrap_or_default();
+    let answer = |explained: Explained<'_>| progress(kind, name, explained);
+    Some(match (group, kind) {
+        ("apps", "Deployment") => answer(readiness::deployment(&parsed(object)?).into()),
+        ("apps", "StatefulSet") => answer(readiness::stateful_set(&parsed(object)?).into()),
+        ("apps", "DaemonSet") => answer(readiness::daemon_set(&parsed(object)?).into()),
+        ("", "Pod") => answer(readiness::pod(&parsed(object)?, now).into()),
+        ("batch", "Job") => answer(readiness::job(&parsed(object)?).into()),
+        ("apiextensions.k8s.io", "CustomResourceDefinition") => {
+            answer(readiness::custom_resource_definition(&parsed(object)?))
+        }
+        _ => answer(readiness::generic(&object.metadata, &status_of(object)?)),
     })
 }
 
-/// Whether a health check passes on `objects`, the objects its resource names: each is Current
-/// by kstatus for the workload kinds, or has the check's condition `True` for the others. No
-/// object yet is waiting.
+fn progress(kind: &str, name: &str, explained: Explained<'_>) -> Progress {
+    match explained.readiness.status {
+        Status::Current => Progress::Ready,
+        Status::InProgress => Progress::Waiting,
+        Status::Failed => Progress::Failed(explained.cause.map_or_else(
+            || format!("{kind} {name}: {}", explained.readiness.reason),
+            |cause| format!("{kind} {name}: {cause}"),
+        )),
+    }
+}
+
+fn parsed<K: serde::de::DeserializeOwned>(object: &DynamicObject) -> Option<K> {
+    serde_json::to_value(object)
+        .and_then(serde_json::from_value)
+        .ok()
+}
+
+/// The `status` fields the generic rule reads.
+fn status_of(object: &DynamicObject) -> Option<GenericStatus> {
+    #[derive(Deserialize)]
+    struct Body {
+        #[serde(default)]
+        status: GenericStatus,
+    }
+    serde_json::from_value::<Body>(object.data.clone())
+        .ok()
+        .map(|body| body.status)
+}
+
+/// The served resource of a health check's kind, `Kind` or `Kind.group` [installers].
+///
+/// A kind without a group is looked up in the groups of Kubernetes itself first: the core group,
+/// a group without a dot, or one under `k8s.io`.
+///
+/// [installers]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/installers.mdx#install-and-check
 #[must_use]
-pub fn check_progress(check: &Health, objects: &[Value], now: Timestamp) -> Progress {
+pub fn health_resource<'a>(kind: &str, served: &'a [ServedResource]) -> Option<&'a ServedResource> {
+    let (kind, group) = kind
+        .split_once('.')
+        .map_or((kind, None), |(kind, group)| (kind, Some(group)));
+    served
+        .iter()
+        .filter(|r| r.kind == kind && group.is_none_or(|group| r.group == group))
+        .min_by_key(|r| r.group.contains('.') && !r.group.ends_with(".k8s.io"))
+}
+
+/// Whether a health check passes on `objects` of `resource`, the objects it names.
+///
+/// Each object of a kind with a rule of its own is Current by kstatus. Each other object passes
+/// the generic rule's checks of deletion, generation, `Reconciling` and `Stalled`, and has the
+/// check's condition `True`. No object yet is waiting. A failure names the object and its reason
+/// or condition.
+#[must_use]
+pub fn check_progress(
+    check: &Health,
+    resource: &ServedResource,
+    objects: &[DynamicObject],
+    now: Timestamp,
+) -> Progress {
     if objects.is_empty() {
         return Progress::Waiting;
     }
+    let (group, kind) = (resource.group.as_str(), resource.kind.as_str());
+    let own_rule = OWN_RULE.contains(&(group, kind));
     let mut waiting = false;
     for object in objects {
-        let state = match check.resource.kind.as_str() {
-            "Deployment" => typed(object).map(|d: Deployment| readiness::deployment(&d)),
-            "StatefulSet" => typed(object).map(|s: StatefulSet| readiness::stateful_set(&s)),
-            "DaemonSet" => typed(object).map(|d: DaemonSet| readiness::daemon_set(&d)),
-            "Pod" => typed(object).map(|p: Pod| readiness::pod(&p, now)),
-            _ => {
-                if object_condition(object, &check.condition) {
-                    continue;
-                }
-                waiting = true;
-                continue;
-            }
+        let progress = if own_rule {
+            kstatus(group, kind, object, now).unwrap_or(Progress::Waiting)
+        } else {
+            condition_progress(kind, object, &check.condition)
         };
-        match state.map(|s| s.status) {
-            Some(Status::Current) => {}
-            Some(Status::Failed) => return Progress::Failed(check.advice.clone()),
-            _ => waiting = true,
+        match progress {
+            Progress::Ready => {}
+            Progress::Failed(why) => return Progress::Failed(why),
+            Progress::Pending | Progress::Waiting => waiting = true,
         }
     }
     if waiting {
@@ -702,19 +749,32 @@ pub fn check_progress(check: &Health, objects: &[Value], now: Timestamp) -> Prog
     }
 }
 
-fn typed<K: serde::de::DeserializeOwned>(object: &Value) -> Option<K> {
-    serde_json::from_value(object.clone()).ok()
-}
-
-fn object_condition(object: &Value, condition: &str) -> bool {
-    let conditions: Vec<Condition> = object
-        .pointer("/status/conditions")
-        .cloned()
-        .and_then(|c| serde_json::from_value(c).ok())
-        .unwrap_or_default();
-    conditions
+/// `condition` of `object` is `True`, once the generic rule finds the object observed, not
+/// reconciling and not stalled.
+fn condition_progress(kind: &str, object: &DynamicObject, condition: &str) -> Progress {
+    let Some(status) = status_of(object) else {
+        return Progress::Waiting;
+    };
+    let explained = readiness::generic(&object.metadata, &status);
+    let reason = explained.readiness.reason;
+    if explained.readiness.status == Status::Failed {
+        let name = object.metadata.name.as_deref().unwrap_or_default();
+        return progress(kind, name, explained);
+    }
+    let unsettled = [
+        Reason::Terminating,
+        Reason::LatestGenerationNotObserved,
+        Reason::Reconciling,
+    ];
+    let holds = status
+        .conditions
         .iter()
-        .any(|c| c.kind == condition && c.status == "True")
+        .any(|c| c.type_ == condition && c.status == "True");
+    if holds && !unsettled.contains(&reason) {
+        Progress::Ready
+    } else {
+        Progress::Waiting
+    }
 }
 
 /// A check's `timeout`, such as `60s` or `5m`, in seconds; 300 when it does not read.
@@ -1081,31 +1141,146 @@ mod tests {
         assert!(matches!(chart_progress(&c, Some(&j)), Progress::Failed(_)));
     }
 
+    fn object(v: Value) -> DynamicObject {
+        serde_json::from_value(v).unwrap()
+    }
+
     #[test]
-    fn an_inline_object_is_ready_when_it_exists_and_says_ready() {
-        assert_eq!(object_progress(None), Progress::Pending);
-        let object = |v: Value| -> DynamicObject { serde_json::from_value(v).unwrap() };
-        let plain = object(json!({"kind": "ConfigMap", "apiVersion": "v1", "metadata": {}}));
-        assert_eq!(object_progress(Some(&plain)), Progress::Ready);
+    fn an_inline_object_is_ready_by_the_kstatus_rule_of_its_kind() {
+        let now = Timestamp::from_second(2_000_000_000).unwrap();
+        let progress = |group, kind, v: Value| object_progress(group, kind, Some(&object(v)), now);
+        assert_eq!(
+            object_progress("", "ConfigMap", None, now),
+            Progress::Pending
+        );
+        let plain = json!({"kind": "ConfigMap", "apiVersion": "v1", "metadata": {}});
         let issuer = |status: &str| {
-            object(json!({
-                "metadata": {},
-                "status": {"conditions": [{"type": "Ready", "status": status}]},
-            }))
+            json!({"metadata": {"name": "letsencrypt", "generation": 1},
+                "status": {"conditions": [{"type": "Ready", "status": status}]}})
         };
-        assert_eq!(object_progress(Some(&issuer("False"))), Progress::Waiting);
-        assert_eq!(object_progress(Some(&issuer("True"))), Progress::Ready);
+        let unobserved = json!({"metadata": {"name": "letsencrypt", "generation": 2},
+            "status": {"observedGeneration": 1,
+                "conditions": [{"type": "Ready", "status": "True"}]}});
+        let crd = |conditions: Value| {
+            json!({"metadata": {"name": "issuers.cert-manager.io"},
+                "spec": {"group": "cert-manager.io", "scope": "Namespaced",
+                    "names": {"plural": "issuers", "kind": "Issuer"}, "versions": []},
+                "status": {"conditions": conditions}})
+        };
+        let fresh_deployment = json!({"metadata": {"name": "webhook", "generation": 1},
+            "spec": {"replicas": 1, "selector": {}, "template": {}}});
+        let cases = [
+            ("a ConfigMap", "", "ConfigMap", plain, Progress::Ready),
+            (
+                "not ready",
+                "cert-manager.io",
+                "Issuer",
+                issuer("False"),
+                Progress::Waiting,
+            ),
+            (
+                "ready",
+                "cert-manager.io",
+                "Issuer",
+                issuer("True"),
+                Progress::Ready,
+            ),
+            (
+                "an older generation",
+                "cert-manager.io",
+                "Issuer",
+                unobserved,
+                Progress::Waiting,
+            ),
+            (
+                "a CRD not established",
+                "apiextensions.k8s.io",
+                "CustomResourceDefinition",
+                crd(json!([])),
+                Progress::Waiting,
+            ),
+            (
+                "an established CRD",
+                "apiextensions.k8s.io",
+                "CustomResourceDefinition",
+                crd(json!([{"type": "Established", "status": "True"}])),
+                Progress::Ready,
+            ),
+            (
+                "a Deployment with no replica yet",
+                "apps",
+                "Deployment",
+                fresh_deployment,
+                Progress::Waiting,
+            ),
+        ];
+        for (name, group, kind, v, expected) in cases {
+            assert_eq!(progress(group, kind, v), expected, "{name}");
+        }
+    }
+
+    #[test]
+    fn a_failed_object_says_its_reason_and_condition() {
+        let now = Timestamp::from_second(2_000_000_000).unwrap();
+        let stalled = object(
+            json!({"metadata": {"name": "pg"}, "status": {"conditions": [
+            {"type": "Stalled", "status": "True", "reason": "BadSpec",
+             "message": "no such storage class"}]}}),
+        );
+        assert_eq!(
+            object_progress("postgresql.cnpg.io", "Cluster", Some(&stalled), now),
+            Progress::Failed("Cluster pg: Stalled: BadSpec: no such storage class".to_owned())
+        );
+        let past_deadline = object(json!({"metadata": {"name": "webhook"},
+            "spec": {"selector": {}, "template": {}, "progressDeadlineSeconds": 600},
+            "status": {"conditions": [{"type": "Progressing", "status": "False",
+                "reason": "ProgressDeadlineExceeded"}]}}));
+        assert_eq!(
+            object_progress("apps", "Deployment", Some(&past_deadline), now),
+            Progress::Failed("Deployment webhook: ProgressDeadlineExceeded".to_owned())
+        );
+    }
+
+    fn served(group: &str, kind: &str) -> ServedResource {
+        ServedResource {
+            group: group.to_owned(),
+            version: "v1".to_owned(),
+            resource: format!("{}s", kind.to_ascii_lowercase()),
+            kind: kind.to_owned(),
+            namespaced: true,
+            verbs: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_health_check_kind_is_found_in_discovery() {
+        let all = [
+            served("", "Node"),
+            served("apps", "Deployment"),
+            served("longhorn.io", "Node"),
+            served("gateway.networking.k8s.io", "GatewayClass"),
+        ];
+        let found = |kind| health_resource(kind, &all).map(|r| r.group.as_str());
+        assert_eq!(found("Deployment"), Some("apps"));
+        assert_eq!(found("Node"), Some(""));
+        assert_eq!(found("Node.longhorn.io"), Some("longhorn.io"));
+        assert_eq!(found("GatewayClass"), Some("gateway.networking.k8s.io"));
+        assert_eq!(found("APIService"), None);
     }
 
     #[test]
     fn a_health_check_reads_its_workloads_by_kstatus() {
         let file = &snapshot().components["cert-manager"];
         let check = &file.declaration.health[0];
+        let resource = served("apps", "Deployment");
         let now = Timestamp::from_second(2_000_000_000).unwrap();
-        assert_eq!(check_progress(check, &[], now), Progress::Waiting);
+        assert_eq!(
+            check_progress(check, &resource, &[], now),
+            Progress::Waiting
+        );
 
         let deployment = |available: i32| {
-            json!({
+            object(json!({
                 "apiVersion": "apps/v1",
                 "kind": "Deployment",
                 "metadata": {"name": "cert-manager", "generation": 1},
@@ -1118,14 +1293,46 @@ mod tests {
                     "availableReplicas": available,
                     "conditions": [{"type": "Available", "status": if available > 0 { "True" } else { "False" }}],
                 },
-            })
+            }))
         };
         assert_eq!(
-            check_progress(check, &[deployment(0)], now),
+            check_progress(check, &resource, &[deployment(0)], now),
             Progress::Waiting
         );
         assert_eq!(
-            check_progress(check, &[deployment(1)], now),
+            check_progress(check, &resource, &[deployment(1)], now),
+            Progress::Ready
+        );
+    }
+
+    #[test]
+    fn a_health_check_condition_counts_once_the_generation_is_observed() {
+        let check = Health {
+            name: "nodes-ready".to_owned(),
+            resource: api::HealthResource {
+                kind: "Node.longhorn.io".to_owned(),
+                namespace: Some("longhorn-system".to_owned()),
+                name: None,
+                selector: None,
+                all: true,
+            },
+            condition: "Ready".to_owned(),
+            timeout: "60s".to_owned(),
+            advice: String::new(),
+        };
+        let resource = served("longhorn.io", "Node");
+        let now = Timestamp::from_second(2_000_000_000).unwrap();
+        let node = |observed: i64| {
+            object(json!({"metadata": {"name": "n1", "generation": 2},
+                "status": {"observedGeneration": observed,
+                    "conditions": [{"type": "Ready", "status": "True"}]}}))
+        };
+        assert_eq!(
+            check_progress(&check, &resource, &[node(1)], now),
+            Progress::Waiting
+        );
+        assert_eq!(
+            check_progress(&check, &resource, &[node(2)], now),
             Progress::Ready
         );
     }

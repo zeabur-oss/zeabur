@@ -2392,8 +2392,6 @@ export const en = {
   "clusterBackups.failure.invalid": "Velero refused the backup's settings.",
   "clusterBackups.failure.itemsFailed":
     "Some objects or volume files weren't copied; the rest is saved. Velero's logs for this backup name each one.",
-  "clusterBackups.failure.interrupted":
-    "Velero restarted while this backup ran. The next one runs on schedule.",
   "clusterBackups.failure.other": "The backup failed.",
   "clusterBackups.restoreAction": "Restore",
   "clusterBackups.problem.restoreNone": "Choose at least one namespace.",
@@ -4351,7 +4349,7 @@ export const en = {
     `${p.service} couldn't download its image (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.probe": (p: P) =>
     `${p.service} failed a health check (${plural(Number(p.count), "time", "times")}).`,
-  "sentence.timeline.warning.quota": (p: P) =>
+  "sentence.timeline.warning.failedCreate": (p: P) =>
     `${p.service} couldn't create a replica (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.other": (p: P) =>
     `${p.reason} on ${p.service} (${plural(Number(p.count), "time", "times")}).`,
