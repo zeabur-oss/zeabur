@@ -236,7 +236,7 @@ mod tests {
     #[test]
     fn a_template_is_found_by_its_catalog_id_with_its_domain() {
         let found = read(&changes(json!([
-            {"op": "template", "template": "miniflux", "domain": "rss.example.com"},
+            {"op": "template", "template": "miniflux", "revision": "r", "domain": "rss.example.com"},
         ])));
         assert_eq!(
             found.features,

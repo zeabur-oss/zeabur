@@ -65,6 +65,7 @@ pub mod node_shells;
 pub mod object_store;
 pub mod restore_copy;
 pub mod s3_destinations;
+pub mod template_fetch;
 pub mod templates;
 pub mod tools;
 pub mod update;

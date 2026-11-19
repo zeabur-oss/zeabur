@@ -21,6 +21,8 @@ pub struct AppState {
     pub access: Arc<dyn ClusterAccess>,
     /// The embedded Zeabur Catalog.
     pub catalogue: Arc<Vec<zeabur_catalog::Component>>,
+    /// The templates offered, embedded or fetched (see [`crate::cluster::template_fetch`]).
+    pub templates: Arc<crate::cluster::template_fetch::Templates>,
     /// What a template uses when idle: [`zeabur_catalog::template_idle`], or made-up use in the
     /// demo.
     pub template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
