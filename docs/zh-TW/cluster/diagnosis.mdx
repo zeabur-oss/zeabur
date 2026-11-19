@@ -81,9 +81,7 @@ kubectl -n shop get deploy -o custom-columns=NAME:.metadata.name,MEMORY:.spec.te
 
 ## 叢集的「需要處理」
 
-**叢集** → **概覽**的**需要處理**列出影響整個叢集的事，例如 Kubernetes 版本已終止支援、kubelet 版本超出支援的差距、節點記憶體或磁碟快滿、節點未就緒，以及已安裝的元件有新版本。沒有問題時顯示**沒有需要處理的項目。**
-
-![叢集概覽的需要處理，列出 Kubernetes 版本即將終止支援，以及節點記憶體和磁碟快滿](../images/shots/cluster-attention.avif)
+**叢集** → **概覽**的**需要處理**，讓管理員在一個地方看到影響整個叢集、不屬於單一專案的事。例如 Kubernetes 版本快要停止支援、主機的記憶體或磁碟快滿、節點未就緒，或已安裝的元件有新版本。沒有問題時，這裡顯示**沒有需要處理的項目。**
 
 用 kubectl 查同樣的資料：
 

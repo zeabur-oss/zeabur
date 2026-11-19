@@ -1,0 +1,48 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="322" viewBox="0 0 480 322" role="img" aria-label="Zeabur 装进自己的 zeabur Namespace，使用 Zeabur Identity 的登录客户端，新增由你分配的成员角色，你原有的应用留在原处。">
+<title>Zeabur 装进自己的 zeabur Namespace，使用 Zeabur Identity 的登录客户端，新增由你分配的成员角色，你原有的应用留在原处。</title>
+<style>
+.bg{fill:#FAFAFB;stroke:#E8E7EB}
+.card{fill:#FFFFFF;stroke:#D0CED4}
+.group{fill:#FFFFFF;fill-opacity:.55;stroke:#E8E7EB}
+.accent{fill:#FFFFFF;stroke:#6300FF}
+.chip{fill:none;stroke:#D0CED4}
+.wire{stroke:#D0CED4;fill:none}
+.head{fill:#D0CED4}
+text{fill:#18171B;font-family:-apple-system, 'Segoe UI', 'PingFang SC', 'Noto Sans CJK SC', sans-serif}
+.t{font-size:14px;font-weight:600}
+.n{font-size:14px;font-weight:500}
+.m{fill:#5C5962;font-size:12.5px}
+.k{fill:#5C5962;font-size:12px}
+.a{fill:#6300FF}
+@media (prefers-color-scheme: dark){
+.bg{fill:#1D1C20;stroke:#34313A}
+.card,.accent{fill:#1F1E22}
+.card{stroke:#4C4851}
+.group{fill:#1F1E22;stroke:#34313A}
+.accent{stroke:#A469FF}
+.chip,.wire{stroke:#4C4851}
+.head{fill:#4C4851}
+text{fill:#F0EFF2}
+.m,.k{fill:#B0ADB6}
+.a{fill:#A469FF}
+}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="479" height="321" rx="6"/>
+<rect class="card" x="20.5" y="20.5" width="439" height="63" rx="6"/>
+<text class="t" x="240.0" y="46" text-anchor="middle">Zeabur Identity</text>
+<text class="m" x="240.0" y="66" text-anchor="middle">负责登录，需要先装好</text>
+<path class="wire" d="M240.5 84 V111"/>
+<path class="head" d="M236.0 110 L240.5 116 L245.0 110 Z"/>
+<text class="k" x="250.0" y="104.0" text-anchor="start">登录客户端</text>
+<rect class="group" x="20.5" y="116.5" width="439" height="185" rx="6"/>
+<text class="k" x="32" y="138" text-anchor="start">你的 Kubernetes 集群</text>
+<rect class="accent" x="32.5" y="150.5" width="415" height="63" rx="6"/>
+<text class="t a" x="240.0" y="176" text-anchor="middle">zeabur Namespace</text>
+<text class="m" x="240.0" y="196" text-anchor="middle">Zeabur、它的网址和 client secret</text>
+<rect class="card" x="32.5" y="226.5" width="201.0" height="63" rx="6"/>
+<text class="t" x="133.0" y="252" text-anchor="middle">成员角色</text>
+<text class="m" x="133.0" y="272" text-anchor="middle">在成员页由你分配</text>
+<rect class="card" x="246.5" y="226.5" width="201.0" height="63" rx="6"/>
+<text class="t" x="347.0" y="252" text-anchor="middle">你原有的应用</text>
+<text class="m" x="347.0" y="272" text-anchor="middle">留在原处，不会迁移</text>
+</svg>

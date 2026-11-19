@@ -34,9 +34,10 @@ What is different:
   containers on one or more servers, and Zeabur runs on top of it. Installing on a new server with
   one command is still in development; see [#430](https://github.com/zeabur-oss/zeabur/issues/430).
 
-[The documentation](https://oss.zeabur.com/docs/zeabur/) covers installation, deployment, and
-configuration, with a screenshot for each step. It is also in
-[繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/) and [简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/).
+[Coming from zeabur.com](https://oss.zeabur.com/docs/zeabur/get-started/from-zeabur-com/) shows where each of these is in the
+documentation, with a screenshot for each step, and where to start. It is also in
+[繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com/) and
+[简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/get-started/from-zeabur-com/).
 
 ## What it does for you
 

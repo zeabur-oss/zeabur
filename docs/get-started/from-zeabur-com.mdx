@@ -1,0 +1,37 @@
+---
+title: Coming from zeabur.com
+description: What works the same way as on zeabur.com, what is different, and where to start.
+---
+
+Used zeabur.com and now want your services on your own server? This page tells you what works the same way in Zeabur, what you look after yourself, and which page to start from.
+
+![Projects, services, domains, variables and templates work the same as on zeabur.com; the difference is that they run on your own server, which you look after](../images/diagrams/from-zeabur-com.svg)
+
+## What works the same way
+
+| What you do on zeabur.com | How to do it in Zeabur |
+| --- | --- |
+| Create a project to group related services | [Create and manage projects](../configure/projects.mdx) |
+| Deploy from a Git repository | [Build and deploy a service from Git](../deploy/git.mdx) |
+| Deploy a Docker image | [Deploy a container image](../deploy/image.mdx) |
+| Import Docker Compose | [Import Docker Compose services](../deploy/compose.mdx) |
+| Upload a folder and deploy it | [Upload a folder and deploy a service](../deploy/upload.mdx) |
+| Deploy a template in one click | [Deploy from an application template](../deploy/templates.mdx) |
+| Create a database | [Create, back up, and restore databases](../deploy/databases.mdx) |
+| Add a domain to a service | [Add public domains and HTTPS](../configure/domains.mdx) |
+| Set environment variables | [Configure environment variables](../configure/variables.mdx) |
+| Read logs, restart, go back to the previous version | [View logs, events, and usage](../configure/logs-terminal.mdx), [Restart, roll back, and pause services](../configure/restart-rollback.mdx) |
+
+For the Zeabur Catalog template that matches each popular zeabur.com template, see [Templates from zeabur.com](https://github.com/zeabur-oss/catalog/blob/main/docs/get-started/zeabur-com-templates.mdx).
+
+## What is different
+
+- **The server is yours.** Zeabur runs on your own server. You decide where your services run and how big the server is.
+- **You pay the server provider.** Zeabur is open-source software. It doesn't charge you and has no usage billing. You pay only for the server, to the cloud provider or data center you chose.
+- **You look after it.** You or your team [upgrade Zeabur](../upgrade/steps.mdx), [back up the cluster](../cluster/backups.mdx), and maintain the server.
+- **You invite the members.** Each person signs in with their own passkey and can use only the projects you give them. See [Invite members and assign project permissions](../cluster/members.mdx).
+- **Projects don't move over by themselves.** Deploy each service again in Zeabur from the same Git repository, image, or template. Set its variables again, and copy database and disk data yourself. Then point the domain at the new address.
+
+## Where to start
+
+Zeabur runs on Kubernetes, open-source software that runs containers on one or more servers. [Install Zeabur on a server](quickstart.mdx) shows the ways to install it and which one fits you. Then [deploy your first service](first-project.mdx).

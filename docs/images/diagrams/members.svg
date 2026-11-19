@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="480" height="458" viewBox="0 0 480 458" role="img" aria-label="A member signs in with a passkey through Zeabur Identity, and Zeabur shows them only what you allowed: their projects in full, other projects by name only.">
+<title>A member signs in with a passkey through Zeabur Identity, and Zeabur shows them only what you allowed: their projects in full, other projects by name only.</title>
+<style>
+.bg{fill:#FAFAFB;stroke:#E8E7EB}
+.card{fill:#FFFFFF;stroke:#D0CED4}
+.group{fill:#FFFFFF;fill-opacity:.55;stroke:#E8E7EB}
+.accent{fill:#FFFFFF;stroke:#6300FF}
+.chip{fill:none;stroke:#D0CED4}
+.wire{stroke:#D0CED4;fill:none}
+.head{fill:#D0CED4}
+text{fill:#18171B;font-family:-apple-system, 'Segoe UI', 'PingFang TC', 'Noto Sans CJK TC', sans-serif}
+.t{font-size:14px;font-weight:600}
+.n{font-size:14px;font-weight:500}
+.m{fill:#5C5962;font-size:12.5px}
+.k{fill:#5C5962;font-size:12px}
+.a{fill:#6300FF}
+@media (prefers-color-scheme: dark){
+.bg{fill:#1D1C20;stroke:#34313A}
+.card,.accent{fill:#1F1E22}
+.card{stroke:#4C4851}
+.group{fill:#1F1E22;stroke:#34313A}
+.accent{stroke:#A469FF}
+.chip,.wire{stroke:#4C4851}
+.head{fill:#4C4851}
+text{fill:#F0EFF2}
+.m,.k{fill:#B0ADB6}
+.a{fill:#A469FF}
+}
+</style>
+<rect class="bg" x="0.5" y="0.5" width="479" height="457" rx="6"/>
+<rect class="card" x="20.5" y="20.5" width="439" height="63" rx="6"/>
+<text class="t" x="240.0" y="46" text-anchor="middle">Member</text>
+<text class="m" x="240.0" y="66" text-anchor="middle">Passkey on their phone or computer</text>
+<path class="wire" d="M240.5 84 V111"/>
+<path class="head" d="M236.0 110 L240.5 116 L245.0 110 Z"/>
+<text class="k" x="250.0" y="104.0" text-anchor="start">Signs in</text>
+<rect class="card" x="20.5" y="116.5" width="439" height="63" rx="6"/>
+<text class="t" x="240.0" y="142" text-anchor="middle">Zeabur Identity</text>
+<text class="m" x="240.0" y="162" text-anchor="middle">Checks that it's really them</text>
+<path class="wire" d="M240.5 180 V207"/>
+<path class="head" d="M236.0 206 L240.5 212 L245.0 206 Z"/>
+<text class="k" x="250.0" y="200.0" text-anchor="start">Who they are</text>
+<rect class="card" x="20.5" y="212.5" width="439" height="63" rx="6"/>
+<text class="t" x="240.0" y="238" text-anchor="middle">Zeabur</text>
+<text class="m" x="240.0" y="258" text-anchor="middle">Shows what you allowed</text>
+<path class="wire" d="M240.5 276 V303"/>
+<path class="head" d="M236.0 302 L240.5 308 L245.0 302 Z"/>
+<rect class="group" x="20.5" y="308.5" width="439" height="129" rx="6"/>
+<text class="k" x="32" y="330" text-anchor="start">Your cluster</text>
+<rect class="accent" x="32.5" y="342.5" width="201.0" height="83" rx="6"/>
+<text class="t a" x="133.0" y="368" text-anchor="middle">Projects you gave them</text>
+<text class="m" x="133.0" y="388" text-anchor="middle">shop: Developer</text>
+<text class="m" x="133.0" y="408" text-anchor="middle">blog: Viewer</text>
+<rect class="card" x="246.5" y="342.5" width="201.0" height="83" rx="6"/>
+<text class="t" x="347.0" y="378" text-anchor="middle">Other projects</text>
+<text class="m" x="347.0" y="398" text-anchor="middle">Names only</text>
+</svg>
