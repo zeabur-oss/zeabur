@@ -3959,7 +3959,7 @@ export const zhCN: Messages = {
     `${p.service} 在等待可以运行的机器（${p.count} 次）。`,
   "sentence.timeline.warning.imagePull": (p) => `${p.service} 无法下载镜像（${p.count} 次）。`,
   "sentence.timeline.warning.probe": (p) => `${p.service} 的健康检查失败（${p.count} 次）。`,
-  "sentence.timeline.warning.quota": (p) => `${p.service} 无法创建副本（${p.count} 次）。`,
+  "sentence.timeline.warning.failedCreate": (p) => `${p.service} 无法创建副本（${p.count} 次）。`,
   "sentence.timeline.warning.other": (p) => `${p.service} 发生 ${p.reason}（${p.count} 次）。`,
   "sentence.timeline.termination.oomKilled": (p) =>
     `${containerZhCN(p)} 用完了内存，被系统终止了。`,

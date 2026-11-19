@@ -4349,7 +4349,7 @@ export const en = {
     `${p.service} couldn't download its image (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.probe": (p: P) =>
     `${p.service} failed a health check (${plural(Number(p.count), "time", "times")}).`,
-  "sentence.timeline.warning.quota": (p: P) =>
+  "sentence.timeline.warning.failedCreate": (p: P) =>
     `${p.service} couldn't create a replica (${plural(Number(p.count), "time", "times")}).`,
   "sentence.timeline.warning.other": (p: P) =>
     `${p.reason} on ${p.service} (${plural(Number(p.count), "time", "times")}).`,

@@ -3973,7 +3973,7 @@ export const zhTW: Messages = {
     `${p.service} 在等待可以執行的機器（${p.count} 次）。`,
   "sentence.timeline.warning.imagePull": (p) => `${p.service} 無法下載映像檔（${p.count} 次）。`,
   "sentence.timeline.warning.probe": (p) => `${p.service} 的健康檢查失敗（${p.count} 次）。`,
-  "sentence.timeline.warning.quota": (p) => `${p.service} 無法建立副本（${p.count} 次）。`,
+  "sentence.timeline.warning.failedCreate": (p) => `${p.service} 無法建立副本（${p.count} 次）。`,
   "sentence.timeline.warning.other": (p) => `${p.service} 發生 ${p.reason}（${p.count} 次）。`,
   "sentence.timeline.termination.oomKilled": (p) =>
     `${containerZhTW(p)} 用完了記憶體，被系統終止了。`,
