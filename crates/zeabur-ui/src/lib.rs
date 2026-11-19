@@ -19,20 +19,14 @@ pub use embedded::KIND;
 
 /// Content Security Policy for the interface's HTML.
 ///
-/// Scripts and fonts come from this origin only, nothing may frame the page, and
-/// scripts may not write HTML strings into the DOM (Trusted Types with no policy). The build emits
-/// no inline script, so `script-src 'self'` needs neither a hash nor `'unsafe-inline'`;
-/// `scripts/build-ui.sh` fails if `index.html` gains an inline script or style.
+/// Scripts and fonts come from this origin only, nothing may frame the page, and scripts may not
+/// write HTML strings into the DOM (Trusted Types with no policy). The build emits no inline
+/// script, which `scripts/build-ui.sh` checks.
 ///
-/// Styles also allow `'unsafe-inline'`: two libraries add `<style>` elements at run time. Sonner
-/// (toasts) inserts a fixed style sheet when its module loads and has no nonce option
-/// ([sonner#449]); CodeMirror (the YAML editor) inserts its theme's rules. Without the keyword,
-/// both are refused (`style-src` governs `<style>` elements, [mdn-style-src]). Inline styles can
-/// restyle the page but not run code; script execution stays restricted to this origin.
-///
-/// API calls go to this origin. `connect-src` also allows any `https:` origin for one request: a
-/// service's page checks from the person's browser whether its public domain answers
-/// (`fetch` with `no-cors`, so the response stays unreadable). Plain `http:` stays refused.
+/// Styles also allow `'unsafe-inline'`, as Sonner inserts a style sheet at run time with no nonce
+/// option ([sonner#449]) and CodeMirror inserts its theme's rules; `style-src` governs `<style>`
+/// elements [mdn-style-src]. `connect-src` also allows any `https:` origin, for a service page's
+/// `no-cors` check that its public domain answers.
 ///
 /// [sonner#449]: https://github.com/emilkowalski/sonner/issues/449
 /// [mdn-style-src]: https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Content-Security-Policy/style-src

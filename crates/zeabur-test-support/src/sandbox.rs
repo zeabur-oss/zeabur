@@ -283,15 +283,12 @@ where
     .expect("created");
 }
 
-/// Deletes a sandbox's namespace, and the cluster-scoped objects it names, when dropped: after
-/// the test passes and while a failed assertion unwinds alike, so a failed run leaves nothing
-/// behind for the next one.
+/// Deletes a sandbox's namespace, and the cluster-scoped objects it names, when dropped, also while
+/// a failed assertion unwinds, so a failed run leaves nothing behind.
 ///
-/// Rust has no async drop, and `drop` runs on the test's runtime thread, where blocking on a
-/// future panics and a spawned task may never run. So `drop` starts a thread with a runtime of
-/// its own and a client of its own (a client's connection belongs to the runtime that made it),
-/// and waits for the deletes to be sent. Failures are ignored: cleanup is best effort, and the
-/// names are random, so a leftover never collides with a later run.
+/// Rust has no async drop, so `drop` starts a thread with a runtime and a client of its own (a
+/// client's connection belongs to the runtime that made it) and waits for the deletes to be sent.
+/// Failures are ignored: cleanup is best effort.
 #[derive(Debug)]
 struct Cleanup {
     namespace: String,
