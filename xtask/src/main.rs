@@ -1,21 +1,23 @@
 #![doc = include_str!("../README.md")]
 
+mod checkout;
 mod dev_cluster;
 mod e2e_proxy;
 mod openapi;
 mod output;
 mod process;
 
+use std::path::PathBuf;
 use std::process::ExitCode;
 
 use clap::{Parser, Subcommand};
 
 const AFTER_HELP: &str = "\
-Without --identity-src, Zeabur Identity is its latest signed release. The full profile installs
-Zeabur Builder and the other components from the Zeabur Catalog bundle that flake.lock pins.
+Without --identity-src, Zeabur Identity is the signed release that xtask/pins/zeabur-identity names.
+xtask/pins/zeabur-builder and ZEABUR_BUILDER_GIT give the commit Zeabur Builder is built from.
 ZEABUR_REGISTRY_MIRRORS (`docker.io=http://mirror:5001,ghcr.io=...`) makes the node pull through
-those mirrors; K3S_IMAGE picks the k3s release. State is in target/dev-cluster (kubeconfig, CA,
-zeabur-identityctl).";
+those mirrors; K3S_IMAGE picks the k3s release; CATALOG_STOP_AT leaves out the catalog's releases
+from that one on. State is in target/dev-cluster (kubeconfig, CA, zeabur-identityctl).";
 
 /// Development tasks for this repository.
 #[derive(Debug, Parser)]
@@ -50,6 +52,12 @@ enum DevCluster {
     Down,
     /// Print cluster-scoped objects and namespace metadata.
     Snapshot,
+    /// Check out a pinned commit or release tag from `URL` in `DIR`.
+    Checkout {
+        dir: PathBuf,
+        pin: String,
+        url: String,
+    },
 }
 
 impl Task {
@@ -58,6 +66,9 @@ impl Task {
             Self::DevCluster(DevCluster::Up(options)) => dev_cluster::up(&options),
             Self::DevCluster(DevCluster::Down) => dev_cluster::down(),
             Self::DevCluster(DevCluster::Snapshot) => dev_cluster::snapshot(),
+            Self::DevCluster(DevCluster::Checkout { dir, pin, url }) => {
+                checkout::Pin::parse(&pin).and_then(|pin| checkout::checkout(&dir, &pin, &url))
+            }
             Self::E2eProxy => e2e_proxy::run(),
             Self::Openapi => openapi::generate(),
         }

@@ -6,15 +6,15 @@ Helpers shared by Zeabur's tests. Only ever a dev-dependency: nothing here reach
   is a directory holding `case.yaml`, an optional `input.yaml` with Kubernetes objects and
   `expected.json`. Each crate keeps its cases in its own `fixtures/<area>/`; `load!("<area>")`
   reads them. Objects stay `serde_json::Value`s: the crate under test decides how to type them.
-  The format is in the repository's `fixtures/README.md`. Each input object of Zeabur Identity or
-  Zeabur Builder must fit `contracts`.
-- `contracts`: Zeabur Identity's and Zeabur Builder's CRDs (`fixtures/contracts`), and a check of
-  an object against its CRD's schema.
+  The format is in the repository's `fixtures/README.md`.
 - `sandbox` (feature `sandbox`): a namespace on a disposable cluster with a
   person in it, deleted when the test ends, for the cluster tests (`crates/*/tests/kubernetes.rs`).
 - `tls` (feature `tls`): two CAs and a leaf for `localhost` and `127.0.0.1` that the first signed,
   made once per test run and valid for a day, and a loopback HTTPS server that presents the leaf,
   to test which certificates a client trusts.
+- `allocations` (feature `allocations`): bytes and allocations a body makes on the calling thread,
+  for the manual cost run (`crates/zeabur-kube/tests/overview_cost.rs`). Linking it replaces the
+  test binary's allocator.
 - `allocations` (feature `allocations`): bytes and allocations a body makes on the calling thread,
   for the manual cost run (`crates/zeabur-kube/tests/overview_cost.rs`). Linking it replaces the
   test binary's allocator.

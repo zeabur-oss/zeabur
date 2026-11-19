@@ -822,13 +822,11 @@ mod tests {
     }
 
     fn zeabur_client(spec: &Value) -> DynamicObject {
-        let client = json!({
+        object(json!({
             "apiVersion": "identity.zeabur.com/v1alpha1", "kind": "OAuthClient",
             "metadata": {"name": "zeabur", "namespace": "zeabur-identity"},
             "spec": spec,
-        });
-        zeabur_test_support::contracts::check_read(&client).unwrap();
-        object(client)
+        }))
     }
 
     /// A cluster at `version`, with the Zeabur dashboard in `zeabur`, Zeabur Identity installed

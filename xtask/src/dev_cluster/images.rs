@@ -4,7 +4,10 @@ use std::fs;
 use std::os::unix::fs::symlink;
 use std::path::Path;
 
+use sha2::{Digest as _, Sha256};
+
 use super::{DevCluster, cluster, identity_release};
+use crate::checkout::{self, Pin};
 use crate::output;
 
 pub(crate) const BUSYBOX: &str = "busybox:1.37";
@@ -34,7 +37,7 @@ pub(crate) struct Built {
 
 /// Zeabur Identity and its `zeabur-identityctl`, and, unless `zeabur_image` is given, Zeabur and
 /// Zeabur Proxy built from this checkout. Zeabur Identity is built from `identity_src`, else it is
-/// the latest published release, as people install it.
+/// the published release that `xtask/pins/zeabur-identity` names.
 pub(crate) fn build(
     dev: &DevCluster,
     identity_src: Option<&Path>,
@@ -50,8 +53,11 @@ pub(crate) fn build(
         import.push(identity.clone());
         identity
     } else {
-        let tag = identity_release::latest(dev)?;
-        let release = identity_release::fetch(dev, &tag)?;
+        let tag = match read_pin(dev, "xtask/pins/zeabur-identity")? {
+            Pin::Tag(tag) => tag,
+            Pin::Commit(commit) => return Err(no_release(&commit)),
+        };
+        let release = identity_release::fetch(dev, &tag)?.ok_or_else(|| no_release(&tag))?;
         output::say(&format!(
             "Zeabur Identity: release {tag}, {}",
             release.image
@@ -90,6 +96,13 @@ pub(crate) fn build(
     })
 }
 
+fn no_release(pin: &str) -> String {
+    format!(
+        "xtask/pins/zeabur-identity is {pin}, which has no Zeabur Identity release: \
+         pin a release tag, or set ZEABUR_IDENTITY_SRC to a checkout to build"
+    )
+}
+
 /// Builds Zeabur Identity's image and `zeabur-identityctl` from `src`; returns the image.
 fn build_identity(dev: &DevCluster, src: &Path) -> Result<String, String> {
     let src = fs::canonicalize(src)
@@ -116,6 +129,32 @@ fn link_identityctl(dev: &DevCluster, to: &Path) -> Result<(), String> {
     symlink(to, &link).map_err(|e| format!("linking {}: {e}", link.display()))
 }
 
+fn read_pin(dev: &DevCluster, pin_file: &str) -> Result<Pin, String> {
+    let path = dev.root.join(pin_file);
+    let pin = fs::read_to_string(&path).map_err(|e| format!("reading {}: {e}", path.display()))?;
+    Pin::parse(&pin)
+}
+
+/// `$url_env`, or `url` when it is unset or empty.
+fn pin_url(url_env: &str, url: &str) -> String {
+    std::env::var(url_env)
+        .ok()
+        .filter(|url| !url.is_empty())
+        .unwrap_or_else(|| url.to_owned())
+}
+
+/// A checkout of the pin in file `pin_file` of this repository, from `$url_env` or `url`, kept
+/// between runs for its build cache.
+pub(crate) fn pinned_checkout(
+    dev: &DevCluster,
+    dir: &Path,
+    pin_file: &str,
+    url_env: &str,
+    url: &str,
+) -> Result<(), String> {
+    checkout::checkout(dir, &read_pin(dev, pin_file)?, &pin_url(url_env, url))
+}
+
 /// Tags `image` by its content, so that a changed image gets a new tag and the cluster a new
 /// value.
 pub(crate) fn content_tag(dev: &DevCluster, image: &str) -> Result<String, String> {
@@ -127,16 +166,35 @@ pub(crate) fn content_tag(dev: &DevCluster, image: &str) -> Result<String, Strin
     Ok(tagged)
 }
 
-fn image_id(dev: &DevCluster, image: &str) -> Result<String, String> {
+pub(crate) fn image_id(dev: &DevCluster, image: &str) -> Result<String, String> {
     dev.cmd("docker")
         .args(["image", "inspect", "--format", "{{.Id}}", image])
         .read()
         .map(|id| id.trim().to_owned())
 }
 
-fn tag(dev: &DevCluster, image: &str, tagged: &str) -> Result<(), String> {
+pub(crate) fn tag(dev: &DevCluster, image: &str, tagged: &str) -> Result<(), String> {
     dev.cmd("docker").args(["tag", image, tagged]).quiet()?;
     dev.record_image(tagged)
+}
+
+/// One tag for images built together, from all their ids.
+pub(crate) fn joint_tag(ids: &[String]) -> String {
+    let mut hash = Sha256::new();
+    for id in ids {
+        hash.update(id.as_bytes());
+        hash.update(b"\n");
+    }
+    // Each byte becomes two hex digits, high nibble first, so the tag is the first 12 digits that
+    // `sha256sum` prints for the same input.
+    let digits: String = hash
+        .finalize()
+        .iter()
+        .flat_map(|byte| [byte >> 4, byte & 0xF])
+        .take(12)
+        .filter_map(|nibble| char::from_digit(u32::from(nibble), 16))
+        .collect();
+    format!("dev-{digits}")
 }
 
 /// Imports local images into the node and fails unless the node has them: k3d's import of a
@@ -195,7 +253,7 @@ fn node_has(listing: &str, image: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{node_has, split_tag};
+    use super::{joint_tag, node_has, split_tag};
 
     const LISTING: &str = "\
 IMAGE                                   TAG                 IMAGE ID            SIZE
@@ -253,6 +311,30 @@ localhost:5000/tool                     v1                  4a2b3c4d5e6f7       
         assert_eq!(
             split_tag(&format!("localhost:5000/tool:v1@{digest}")),
             ("localhost:5000/tool", Some("v1"))
+        );
+    }
+
+    #[test]
+    fn a_joint_tag_changes_with_any_image() {
+        let ids = |last: &str| {
+            vec![
+                "sha256:a".to_owned(),
+                "sha256:b".to_owned(),
+                last.to_owned(),
+            ]
+        };
+        let tag = joint_tag(&ids("sha256:c"));
+        assert!(tag.starts_with("dev-"));
+        assert_eq!(tag, joint_tag(&ids("sha256:c")));
+        assert_ne!(tag, joint_tag(&ids("sha256:d")));
+    }
+
+    #[test]
+    fn a_joint_tag_is_what_sha256sum_of_the_ids_gave() {
+        // printf 'sha256:a\nsha256:b\n' | sha256sum | cut -c1-12
+        assert_eq!(
+            joint_tag(&["sha256:a".to_owned(), "sha256:b".to_owned()]),
+            "dev-5d02884ff145"
         );
     }
 }

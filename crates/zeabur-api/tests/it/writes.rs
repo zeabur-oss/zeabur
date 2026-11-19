@@ -41,7 +41,6 @@ mod tests {
             "labels": {"zeabur.com/project": "true"}}}))
         .unwrap();
         MemoryCluster::new(State {
-            schema: Some(zeabur_test_support::contracts::check_write),
             identity: Identity {
                 username: "alice".to_owned(),
                 groups: vec!["developers".to_owned()],

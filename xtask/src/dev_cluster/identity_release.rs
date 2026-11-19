@@ -1,7 +1,7 @@
-//! The latest published Zeabur Identity release, as people install it: its image and
-//! `zeabur-identityctl`, checked as `scripts/release-pins.sh` checks the catalog's release. cosign
-//! checks the signature of the release's `SHA256SUMS`, which then gives the sums of `digests.txt`
-//! and of the identityctl archive; `digests.txt` gives the image by its digest.
+//! A published Zeabur Identity release: its image and `zeabur-identityctl`, checked as
+//! `scripts/release-pins.sh` checks the pins of a Zeabur release. cosign checks the signature of
+//! the release's `SHA256SUMS`, which then gives the sums of `digests.txt` and of the identityctl
+//! archive; `digests.txt` gives the image by its digest.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -25,10 +25,10 @@ pub(crate) struct Release {
 }
 
 /// The release `tag` of Zeabur Identity, downloaded to `target/dev-cluster/identity-release` and
-/// checked. The node pulls the image's platform from
+/// checked; `None` if `tag` has no published release. The node pulls the image's platform from
 /// its index, and identityctl is the archive of the node's architecture: k3d runs the node in the
 /// Docker that this machine uses.
-pub(crate) fn fetch(dev: &DevCluster, tag: &str) -> Result<Release, String> {
+pub(crate) fn fetch(dev: &DevCluster, tag: &str) -> Result<Option<Release>, String> {
     let docker_arch = dev
         .cmd("docker")
         .args(["info", "--format", "{{.Architecture}}"])
@@ -44,7 +44,7 @@ pub(crate) fn fetch(dev: &DevCluster, tag: &str) -> Result<Release, String> {
 
     let list = dir.join("SHA256SUMS");
     if !download(dev, tag, "SHA256SUMS", &list).map_err(context)? {
-        return Err(context("the release has no SHA256SUMS".to_owned()));
+        return Ok(None);
     }
     let bundle = dir.join("SHA256SUMS.sigstore.json");
     if !download(dev, tag, "SHA256SUMS.sigstore.json", &bundle).map_err(context)? {
@@ -81,48 +81,10 @@ pub(crate) fn fetch(dev: &DevCluster, tag: &str) -> Result<Release, String> {
         .arg("zeabur-identityctl")
         .quiet()
         .map_err(context)?;
-    Ok(Release {
+    Ok(Some(Release {
         image,
         identityctl: dir.join("zeabur-identityctl"),
-    })
-}
-
-/// The tag of the latest release: GitHub redirects `releases/latest` to `releases/tag/<tag>`
-/// [gh-latest]. Pre-releases are never the latest.
-///
-/// [gh-latest]: https://docs.github.com/en/repositories/releasing-projects-on-github/linking-to-releases
-pub(crate) fn latest(dev: &DevCluster) -> Result<String, String> {
-    let url = dev
-        .cmd("curl")
-        .args([
-            "--silent",
-            "--show-error",
-            "--fail",
-            "--location",
-            "--retry",
-            "3",
-        ])
-        .args([
-            "--head",
-            "--output",
-            "/dev/null",
-            "--write-out",
-            "%{url_effective}",
-        ])
-        .arg(format!("https://github.com/{REPOSITORY}/releases/latest"))
-        .read()?;
-    let url = url.trim();
-    release_tag(url).map(str::to_owned).ok_or_else(|| {
-        format!("{REPOSITORY}'s latest release is {url}, which names no release tag")
-    })
-}
-
-/// The tag of a `…/releases/tag/<tag>` URL of Zeabur Identity, when it is `vX.Y.Z`.
-fn release_tag(url: &str) -> Option<&str> {
-    let tag = url.strip_prefix(&format!("https://github.com/{REPOSITORY}/releases/tag/"))?;
-    let parts: Vec<&str> = tag.strip_prefix('v')?.split('.').collect();
-    let number = |part: &&str| !part.is_empty() && part.bytes().all(|b| b.is_ascii_digit());
-    (parts.len() == 3 && parts.iter().all(number)).then_some(tag)
+    }))
 }
 
 /// Downloads `file` of the release and checks it against `sums`.
@@ -210,7 +172,7 @@ fn archive_arch(docker: &str) -> Option<&'static str> {
 
 #[cfg(test)]
 mod tests {
-    use super::{archive_arch, index_image, listed, release_tag};
+    use super::{archive_arch, index_image, listed};
 
     const SUMS: &str = "\
 6ad5244e7aede0e1a48cffabdee2ebb8b4296d345e69a499417be9132276491c  digests.txt
@@ -261,23 +223,6 @@ index  ghcr.io/zeabur-oss/identity@sha256:4b691461c6f333ee3771b740298135fa4e3364
             );
         }
         assert!(index_image("linux/amd64  ghcr.io/zeabur-oss/identity@sha256:aa\n").is_err());
-    }
-
-    #[test]
-    fn the_latest_release_is_a_release_tag_of_zeabur_identity() {
-        assert_eq!(
-            release_tag("https://github.com/zeabur-oss/identity/releases/tag/v0.3.0"),
-            Some("v0.3.0")
-        );
-        for url in [
-            "https://github.com/zeabur-oss/identity/releases",
-            "https://github.com/zeabur-oss/identity/releases/tag/v0.3",
-            "https://github.com/zeabur-oss/identity/releases/tag/v0.3.0/../x",
-            "https://github.com/zeabur-oss/identity/releases/tag/--x",
-            "https://github.com/someone/identity/releases/tag/v0.3.0",
-        ] {
-            assert_eq!(release_tag(url), None, "{url}");
-        }
     }
 
     #[test]

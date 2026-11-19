@@ -10,8 +10,7 @@ result out. Any implementation, in any language, can run them.
 Each crate keeps the cases it is tested with, so a packaged crate carries them:
 `crates/zeabur-graph/fixtures/{graph,projection}`, `crates/zeabur-plan/fixtures/mutation`,
 `crates/zeabur-gaps/fixtures/gaps` and `crates/zeabur-modules/fixtures/modules`. This directory
-keeps the format, the operations, the chart corpus (`charts/`) and the contracts with Zeabur
-Identity and Zeabur Builder (`contracts/`).
+keeps the format, the operations and the chart corpus (`charts/`).
 
 ```
 crates/<crate>/fixtures/<area>/<case>/

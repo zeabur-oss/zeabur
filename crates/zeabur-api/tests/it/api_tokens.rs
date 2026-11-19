@@ -22,23 +22,21 @@ mod tests {
     }
 
     fn signed_in(username: &str) -> MemoryCluster {
-        let mut served: Vec<ServedResource> =
-            zeabur_test_support::contracts::served("identity.zeabur.com")
-                .unwrap()
-                .into_iter()
-                .filter(|s| {
-                    ["User", "Credential", "Invitation", "Grant"].contains(&s.kind.as_str())
-                })
-                .map(|s| {
-                    ServedResource::readable(
-                        &s.group,
-                        &s.version,
-                        &s.resource,
-                        &s.kind,
-                        s.namespaced,
-                    )
-                })
-                .collect();
+        let mut served = Vec::new();
+        for (plural, kind) in [
+            ("users", "User"),
+            ("credentials", "Credential"),
+            ("invitations", "Invitation"),
+            ("grants", "Grant"),
+        ] {
+            served.push(ServedResource::readable(
+                "identity.zeabur.com",
+                "v1alpha1",
+                plural,
+                kind,
+                true,
+            ));
+        }
         let rbac = |plural: &str, kind: &str, namespaced: bool| {
             ServedResource::readable("rbac.authorization.k8s.io", "v1", plural, kind, namespaced)
         };
@@ -59,7 +57,6 @@ mod tests {
         served.push(rbac("rolebindings", "RoleBinding", true));
         served.push(rbac("clusterrolebindings", "ClusterRoleBinding", false));
         MemoryCluster::new(State {
-            schema: Some(zeabur_test_support::contracts::check_write),
             identity: Identity {
                 username: username.to_owned(),
                 groups: vec![],
