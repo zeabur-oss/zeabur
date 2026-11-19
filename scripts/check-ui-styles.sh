@@ -1,10 +1,12 @@
 #!/usr/bin/env bash
 # Fails if the web interface uses a style it has given up (see web/DESIGN.md): all-caps
 # labels (`uppercase`), wide letter-spacing (`tracking-wider`, `tracking-widest`), gradients
-# (`bg-gradient-*`), glass (`backdrop-blur*`), Phosphor's `duotone` weight and focus rings
-# (`focus-visible:ring-*`, `focus-visible:outline-*`, `focus:outline-*`, `focus-within:ring-*`:
-# there are none, as in agent-playground and Linear; a field shows focus by its edge). A use that
-# is really needed goes in the allowlist below as `path:token`, with the reason above it.
+# (`bg-gradient-*`), glass (`backdrop-blur*`), Phosphor's `duotone` weight and glow rings
+# (`focus-visible:ring-*`, `focus:ring-*`, `focus-within:ring-*`) or a second focus outline
+# (`focus-visible:outline-*`, `focus:outline-*`). Keyboard focus is the design system's one
+# `:focus-visible` outline or an own cue (edge, background, underline); a control that sets
+# `outline-none` carries that cue. A use that is really needed goes in the allowlist below as
+# `path:token`, with the reason above it.
 #
 # It also fails on copy patterns that make a page read as generated (web/DESIGN.md, "Copy"):
 # - a Kubernetes kind after a heading (`kube=` on Panel or Section, "Public · Ingress"): headings
@@ -26,7 +28,7 @@ allow=(
 
 # A line worth a closer look, then each class token on it with any variant prefix (`md:`) and
 # important marker (`!`) taken off, compared whole.
-pattern='uppercase|tracking-wider|tracking-widest|bg-gradient-|backdrop-blur|duotone|focus-visible:(ring|outline)|focus:outline|focus-within:ring'
+pattern='uppercase|tracking-wider|tracking-widest|bg-gradient-|backdrop-blur|duotone|focus-visible:(ring|outline)|focus:(ring|outline)|focus-within:ring'
 banned='^(uppercase|tracking-wider|tracking-widest|bg-gradient-[[:alnum:]-]+|backdrop-blur(-[[:alnum:]]+)?|duotone)$'
 # A focus ring is told by its variant, so it is matched before the variant is taken off.
 focus_ring='(^|:)(focus-visible|focus|focus-within):-?(ring|outline)(-|$)'

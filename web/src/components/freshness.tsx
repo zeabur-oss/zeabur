@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react"
+import { useState } from "react"
 import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
 
 import { refreshProject } from "@/api/queries"
@@ -7,18 +7,10 @@ import { Button } from "@zeabur-oss/design-system/components/button"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useI18n, useT } from "@/i18n"
 import { formatTime, updatedWords } from "@/lib/format"
+import { useNow } from "@/lib/page-visible"
 import { cn } from "@/lib/utils"
 
 const spinAtLeast = 400
-
-function useNow(every: number) {
-  const [now, setNow] = useState(() => Date.now())
-  useEffect(() => {
-    const timer = window.setInterval(() => setNow(Date.now()), every)
-    return () => window.clearInterval(timer)
-  }, [every])
-  return now
-}
 
 /** "Updated 3m ago", kept current, with the exact time in its tooltip. */
 export function UpdatedAt({ at }: { at: number }) {

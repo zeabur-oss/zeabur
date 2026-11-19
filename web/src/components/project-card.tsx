@@ -145,7 +145,7 @@ function ProjectCard({ project, document, documentPending }: CardProps) {
     <Link
       to="/projects/$project"
       params={{ project: project.name }}
-      className="group/card flex min-h-42 w-full min-w-0 flex-col rounded-xl border border-main bg-card p-4 pt-3 transition-shadow outline-none hover:shadow-lg"
+      className="group/card flex min-h-42 w-full min-w-0 flex-col rounded-xl border border-main bg-card p-4 pt-3 transition-shadow hover:shadow-lg"
     >
       <span className="flex h-8 items-center gap-x-2.5">
         <ProjectTile project={project} />
@@ -179,7 +179,7 @@ function ProjectListRow({ project, document, documentPending }: CardProps) {
     <Link
       to="/projects/$project"
       params={{ project: project.name }}
-      className="flex h-10 w-full items-center gap-x-3 px-4 transition-colors outline-none hover:bg-v2-surface-hover"
+      className="flex h-10 w-full items-center gap-x-3 px-4 transition-colors focus-inset hover:bg-v2-surface-hover"
     >
       <span className="flex min-w-0 flex-1 items-center gap-x-2.5">
         <ProjectTile project={project} small />
@@ -229,7 +229,7 @@ function ListHeader({
         type="button"
         onClick={() => onSort(key)}
         aria-pressed={active}
-        className="inline-flex items-center gap-1 rounded outline-none hover:text-foreground"
+        className="inline-flex items-center gap-1 rounded hover:text-foreground"
       >
         {label}
         <SortIcon className={cn("size-3", !active && "opacity-40")} aria-hidden="true" />

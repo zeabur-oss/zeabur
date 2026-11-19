@@ -14,6 +14,7 @@ import { StatusPill } from "@/components/status"
 import { YamlBlock } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
+import { useNow } from "@/lib/page-visible"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 
@@ -379,13 +380,8 @@ function Written({ write }: { write: Schemas.ObjectWrite }) {
 
 function Check({ check, readySince }: { check: Schemas.ComponentCheck; readySince?: number }) {
   const t = useT()
-  const [now, setNow] = useState(Date.now)
   const waiting = check.state === "waiting"
-  useEffect(() => {
-    if (!waiting) return
-    const timer = setInterval(() => setNow(Date.now()), 5_000)
-    return () => clearInterval(timer)
-  }, [waiting])
+  const now = useNow(5_000, waiting)
   const late = waiting && readySince !== undefined && now - readySince > check.timeoutSeconds * 1000
   return (
     <li className="flex flex-col gap-1">

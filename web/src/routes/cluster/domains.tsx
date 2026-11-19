@@ -15,6 +15,7 @@ import { GateTip, useHintGate } from "@/components/gate"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
+import { nextRowId } from "@/lib/row-id"
 import { recordsFor, sslipSuffix } from "@/model/domains"
 import { Section } from "@/routes/cluster/section"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
@@ -23,6 +24,8 @@ import { Input } from "@zeabur-oss/design-system/components/input"
 
 type Setting = Schemas.DomainsSetting
 type Suffix = Schemas.SuffixCheck
+
+const newRow = (name = "") => ({ id: nextRowId(), name })
 
 const health = {
   pointsHere: "ok",
@@ -209,13 +212,13 @@ function Editor({
   const t = useT()
   const [rows, setRows] = useState(() => {
     const names = setting.suffixes.map((s) => s.name)
-    return names.length > 0 ? names : [""]
+    return (names.length > 0 ? names : [""]).map((name) => newRow(name))
   })
   const [tried, setTried] = useState(false)
-  const cleaned = rows.map((r) => r.trim().toLowerCase()).filter(Boolean)
+  const cleaned = rows.map((r) => r.name.trim().toLowerCase()).filter(Boolean)
   const bad = cleaned.filter((r) => !hostName.test(r))
   const set = (index: number, value: string) =>
-    setRows((list) => list.map((r, i) => (i === index ? value : r)))
+    setRows((list) => list.map((r, i) => (i === index ? { ...r, name: value } : r)))
   return (
     <form
       className="flex flex-col gap-4 rounded-xl border border-main bg-card p-5"
@@ -227,8 +230,8 @@ function Editor({
     >
       <p className="type-meta text-muted-foreground">{t("domains.editLead")}</p>
       <ul className="flex flex-col gap-2">
-        {rows.map((row, index) => (
-          <li key={index} className="flex items-center gap-2">
+        {rows.map(({ id, name: row }, index) => (
+          <li key={id} className="flex items-center gap-2">
             <Input
               size="sm"
               mono
@@ -269,7 +272,7 @@ function Editor({
           type="button"
           size="xs"
           variant="outline"
-          onClick={() => setRows((list) => [...list, ""])}
+          onClick={() => setRows((list) => [...list, newRow()])}
         >
           <PlusIcon aria-hidden="true" data-icon="inline-start" />
           {t("domains.add")}

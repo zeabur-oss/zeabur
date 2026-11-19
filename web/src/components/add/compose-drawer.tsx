@@ -2,6 +2,7 @@ import { useMutation, useQuery } from "@tanstack/react-query"
 import { useNavigate } from "@tanstack/react-router"
 import { useId, useState, type ReactNode } from "react"
 
+import { TrimmedInput } from "@/components/form-field"
 import { toProblem } from "@/api/client"
 import * as zeabur from "@/api/zeabur"
 import {
@@ -41,7 +42,6 @@ import {
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Card, CardRow, SectionLabel } from "@zeabur-oss/design-system/components/card"
-import { Input } from "@zeabur-oss/design-system/components/input"
 import { Label } from "@zeabur-oss/design-system/components/label"
 import { Switch } from "@zeabur-oss/design-system/components/switch"
 
@@ -512,13 +512,16 @@ function PublicDomain({
         {t("add.publicUrl")}
       </Toggle>
       {host === undefined ? null : (
-        <Input
+        <TrimmedInput
           size="sm"
           mono
+          inputMode="url"
           aria-label={t("add.publicUrl")}
           value={host}
           placeholder={placeholder}
-          onChange={(event) => onHost(event.target.value.trim())}
+          autoComplete="off"
+          spellCheck={false}
+          onValue={onHost}
         />
       )}
     </span>

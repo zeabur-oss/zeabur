@@ -120,7 +120,7 @@ function PhoneBar() {
       >
         <ListIcon aria-hidden="true" />
       </Button>
-      <Link to="/" className="flex h-7 items-center rounded-md outline-none" aria-label="Zeabur">
+      <Link to="/" className="flex h-7 items-center rounded-md" aria-label="Zeabur">
         <Logo className="h-5" aria-hidden="true" />
       </Link>
       <Button

@@ -44,7 +44,7 @@ description: Change Zeabur's web interface (web/: React, TanStack, shadcn/ui on 
   it (`model/overview.ts`). Projects are a compact table by default, cards on request
   (`components/project-card.tsx`); settings are `SectionLabel` over
   `Card variant="list"` of `CardRow`s. No underline tabs. Tokens, layout, shell and banned styles are in
-  `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including focus rings).
+  `web/DESIGN.md`; `scripts/check-ui-styles.sh` enforces the bans (including glow rings).
 - **Who it is for.** Most people self-hosting run one small server with a few services and do not
   know Kubernetes: they need to know whether things are fine, why not, and what to do. A minority
   runs dozens of services and wants raw detail. Serve both with one screen: conclusions by default,

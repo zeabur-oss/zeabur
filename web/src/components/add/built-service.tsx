@@ -9,7 +9,7 @@ import { clusterQuery, creatableQuery } from "@/api/queries"
 import { ImageSizeField } from "@/components/add/image-size"
 import { SecurityProfileField } from "@/components/security-profile"
 import { useTakenNames } from "@/components/add/taken"
-import { FormField } from "@/components/form-field"
+import { FormField, TrimmedInput } from "@/components/form-field"
 import { useT } from "@/i18n"
 import {
   buildMethods,
@@ -195,13 +195,13 @@ export function ServiceNameField({
       label={t("db.field.name")}
       errors={built.shown(problems.name, () => t(`add.problem.name.${problems.name ?? "empty"}`))}
     >
-      <Input
+      <TrimmedInput
         size="sm"
         mono
         value={built.name}
         autoComplete="off"
         spellCheck={false}
-        onChange={(event) => built.typeName(event.target.value.trim())}
+        onValue={built.typeName}
       />
     </FormField>
   )
@@ -325,14 +325,15 @@ export function PublicUrlFields({
           }
           errors={error}
         >
-          <Input
+          <TrimmedInput
             size="sm"
             mono
+            inputMode="url"
             value={host}
             placeholder={hostPlaceholder(project, domains.suffixes?.[0])}
             autoComplete="off"
             spellCheck={false}
-            onChange={(event) => onHost(event.target.value.trim())}
+            onValue={onHost}
           />
         </FormField>
       )}

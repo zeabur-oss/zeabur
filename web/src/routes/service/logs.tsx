@@ -639,7 +639,7 @@ function LogView({
       aria-pressed={severity === value}
       onClick={() => onSeverity(value)}
       className={cn(
-        "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-xs outline-none",
+        "inline-flex h-6 items-center gap-1.5 rounded-md border px-2 text-xs",
         severity === value
           ? "border-foreground/30 bg-muted font-medium"
           : "text-muted-foreground hover:text-foreground",

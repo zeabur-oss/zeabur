@@ -59,7 +59,7 @@ export function ProblemGroupRow({ project, group }: { project: string; group: Pr
                 type="button"
                 onClick={() => setExpanded(true)}
                 aria-label={t("attention.moreOf", hidden)}
-                className="ml-1.5 rounded outline-none hover:text-foreground hover:underline"
+                className="ml-1.5 rounded hover:text-foreground hover:underline"
               >
                 {t("attention.more", hidden)}
               </button>

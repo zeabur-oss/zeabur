@@ -109,6 +109,7 @@ export function RepositoryField({
           <Input
             size="sm"
             mono
+            type="url"
             value={url}
             placeholder="https://github.com/acme/web"
             autoComplete="off"

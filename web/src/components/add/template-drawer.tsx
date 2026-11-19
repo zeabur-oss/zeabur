@@ -5,7 +5,7 @@ import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import { clusterQuery, nodesQuery, templatesQuery } from "@/api/queries"
-import { FormField } from "@/components/form-field"
+import { FormField, TrimmedInput } from "@/components/form-field"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep, type PlanStepState } from "@/components/plan/planner"
@@ -311,14 +311,15 @@ function DomainField({
       }
       errors={problem ? [t(`add.problem.host.${problem}`)] : []}
     >
-      <Input
+      <TrimmedInput
         size="sm"
         mono
+        inputMode="url"
         value={host}
         placeholder={suffixed ? undefined : "app.example.com"}
         autoComplete="off"
         spellCheck={false}
-        onChange={(event) => onChange(event.target.value.trim())}
+        onValue={onChange}
       />
     </FormField>
   )
@@ -467,14 +468,14 @@ function InputField({
             : []
       }
     >
-      <Input
+      <TrimmedInput
         size="sm"
         mono
         value={value}
         placeholder={input.default ?? undefined}
         autoComplete="off"
         spellCheck={false}
-        onChange={(event) => onChange(event.target.value.trim())}
+        onValue={onChange}
       />
     </FormField>
   )

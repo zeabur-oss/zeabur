@@ -202,7 +202,7 @@ function AlertsCard({ project, service }: { project: string; service: Service })
           <Link
             to="/projects/$project"
             params={{ project }}
-            className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary outline-none hover:text-main"
+            className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary hover:text-main"
           >
             {t("common.all")}
             <CaretRightIcon className="size-3.5" aria-hidden="true" />
@@ -427,7 +427,7 @@ function More({ onClick, children }: { onClick: () => void; children: string }) 
     <button
       type="button"
       onClick={onClick}
-      className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary outline-none hover:text-main"
+      className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary hover:text-main"
     >
       {children}
       <CaretRightIcon className="size-3.5" aria-hidden="true" />
@@ -609,7 +609,7 @@ function Replicas({
                       <button
                         type="button"
                         onClick={() => onTab("logs", pod.name)}
-                        className="shrink-0 rounded px-1 text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
+                        className="shrink-0 rounded px-1 text-muted-foreground hit-area hover:bg-muted hover:text-foreground"
                         aria-label={t("pod.logsOf", pod.name)}
                       >
                         {t("tab.logs")}
@@ -617,7 +617,7 @@ function Replicas({
                     ) : null}
                     <Link
                       {...podObjectLink(project, pod.name)}
-                      className="shrink-0 rounded px-1 text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
+                      className="shrink-0 rounded px-1 text-muted-foreground hit-area hover:bg-muted hover:text-foreground"
                       aria-label={t("yaml.label", pod.name)}
                     >
                       {t("pod.yaml")}

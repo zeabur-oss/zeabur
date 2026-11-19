@@ -203,6 +203,8 @@ export function InviteDialog({
           mono
           value={username}
           autoComplete="off"
+          autoCapitalize="none"
+          spellCheck={false}
           aria-invalid={typed && target === "invalid"}
           aria-describedby={`${nameId}-hint`}
           onChange={(event) => setUsername(event.target.value)}

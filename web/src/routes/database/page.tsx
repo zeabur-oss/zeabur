@@ -38,7 +38,7 @@ import {
   Warnings,
 } from "@/components/store-detail"
 import { Diagnoses } from "@/components/diagnoses"
-import { FormField } from "@/components/form-field"
+import { FormField, NumberInput } from "@/components/form-field"
 import { GatedMenuItem, GateTip, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
@@ -69,7 +69,6 @@ import {
   turnOffSummary,
   writeBackups,
   backupKeys,
-  MAX_KEEP_DAYS,
   daysOf,
   engineName,
   engineOperator,
@@ -103,7 +102,6 @@ import { StoreMenu, StoreShell, useStorePage } from "@/routes/store/shell"
 import { Events, MemberLogs } from "@/routes/service/views"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
-import { Input } from "@zeabur-oss/design-system/components/input"
 import { PageColumn } from "@zeabur-oss/design-system/components/page-column"
 import {
   SummaryCard,
@@ -910,13 +908,10 @@ function BackupForm({
           <FrequencyField value={target.frequency} onChange={(frequency) => set({ frequency })} />
           {keepsEverything(database.engine) ? null : (
             <FormField label={t("db.backup.keep")} errors={error("keep")}>
-              <Input
+              <NumberInput
                 size="sm"
-                type="number"
-                min={1}
-                max={MAX_KEEP_DAYS}
-                value={String(target.keepDays)}
-                onChange={(event) => set({ keepDays: Number(event.target.value) })}
+                value={target.keepDays}
+                onValue={(keepDays) => set({ keepDays })}
               />
             </FormField>
           )}

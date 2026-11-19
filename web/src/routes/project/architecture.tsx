@@ -268,7 +268,7 @@ function Graph({
   const related = (edge: LaidEdge) => !active || edge.from === active || edge.to === active
   const hovered = graph.edges.find((e) => e.id === hoverEdge)
   const control =
-    "flex size-8 items-center justify-center text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
+    "flex size-8 items-center justify-center text-muted-foreground focus-inset hover:bg-muted hover:text-foreground"
 
   return (
     <div
@@ -354,7 +354,7 @@ function Graph({
                 d={edge.path}
                 fill="none"
                 stroke="transparent"
-                strokeWidth={14}
+                strokeWidth={24 / view.k}
                 className="pointer-events-auto cursor-help"
                 onPointerEnter={() => setHoverEdge(edge.id)}
                 onPointerLeave={() => setHoverEdge(undefined)}
@@ -527,7 +527,7 @@ function ServiceCard({
         onClick={onOpen}
         aria-pressed={selected}
         className={cn(
-          "relative z-1 flex h-28 w-full flex-col gap-2 rounded-lg border bg-card p-3 text-left shadow-xs outline-none transition-colors hover:border-foreground/25",
+          "relative z-1 flex h-28 w-full flex-col gap-2 rounded-lg border bg-card p-3 text-left shadow-xs transition-colors hover:border-foreground/25",
           selected && "border-brand ring-3 ring-brand/25",
           status.health === "fail" && !selected && "border-fail/40",
         )}
@@ -628,7 +628,7 @@ function DatabaseCard({
       <Link
         {...databaseLink(project, database)}
         className={cn(
-          "relative z-1 flex h-28 w-full flex-col gap-2 rounded-lg border bg-card p-3 text-left shadow-xs outline-none transition-colors hover:border-foreground/25",
+          "relative z-1 flex h-28 w-full flex-col gap-2 rounded-lg border bg-card p-3 text-left shadow-xs transition-colors hover:border-foreground/25",
           health === "fail" && "border-fail/40",
         )}
       >

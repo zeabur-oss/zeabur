@@ -86,7 +86,7 @@ export function OtherNamespaces({
               <Link
                 to="/projects/$project"
                 params={{ project: p.name }}
-                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-sm outline-none hover:bg-v2-surface-hover"
+                className="flex min-w-0 flex-1 items-center gap-3 px-4 py-3 text-sm focus-inset hover:bg-v2-surface-hover"
               >
                 <ProjectIcon icon={p.icon} />
                 <span className="truncate font-medium" translate="no">

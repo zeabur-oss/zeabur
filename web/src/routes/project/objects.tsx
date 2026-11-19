@@ -342,7 +342,7 @@ function ObjectList({
                       onClick={() =>
                         onOpen(row.object.id.replace(/^projects\/[^/]+\/objects\//, ""))
                       }
-                      className="flex h-8.5 w-full items-center gap-2 px-4 text-left text-sm outline-none hover:bg-hover"
+                      className="flex h-8.5 w-full items-center gap-2 px-4 text-left text-sm focus-inset hover:bg-hover"
                     >
                       <CaretRightIcon
                         className="size-3 shrink-0 text-muted-foreground"
@@ -387,7 +387,7 @@ function Toggle({
       aria-pressed={pressed}
       onClick={() => onChange(!pressed)}
       className={cn(
-        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs outline-none",
+        "inline-flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs",
         pressed ? "bg-muted font-medium" : "text-muted-foreground hover:text-foreground",
       )}
     >
@@ -444,7 +444,7 @@ function KindRow({ row, pinned }: { row: Extract<Row, { type: "kind" }>; pinned:
         title={pinned ? t("objects.unpin", plain) : t("objects.pin", plain)}
         onClick={() => togglePinnedKind(row.key)}
         className={cn(
-          "-mr-1 rounded p-1 outline-none hover:bg-muted",
+          "-mr-1 rounded p-1 hover:bg-muted",
           pinned ? "text-foreground" : "text-muted-foreground/60",
         )}
       >

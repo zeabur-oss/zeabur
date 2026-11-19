@@ -480,7 +480,7 @@ function NotePill({ note }: { note: Note }) {
       <span
         tabIndex={0}
         className={cn(
-          "rounded px-1.5 py-px font-medium whitespace-nowrap outline-none",
+          "rounded px-1.5 py-px font-medium whitespace-nowrap hit-area",
           tone === "warn" && "bg-warn-soft text-warn-strong",
           tone === "fail" && "bg-fail-soft text-fail-strong",
           tone === "plain" && "bg-muted text-muted-foreground",

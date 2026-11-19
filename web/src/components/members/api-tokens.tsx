@@ -7,7 +7,7 @@ import UserGearIcon from "~icons/ph/user-gear"
 import type { Schemas } from "@/api/client"
 import { Command } from "@/components/bits"
 import { DocsLink } from "@/components/docs-link"
-import { FormField } from "@/components/form-field"
+import { FormField, TrimmedInput } from "@/components/form-field"
 import { GatedMenuItem, GateTip } from "@/components/gate"
 import {
   ProjectPicker,
@@ -27,7 +27,6 @@ import { chosenOf, grantsOf } from "@/model/members"
 import type { Gate } from "@/model/rights"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { CopyInput } from "@zeabur-oss/design-system/components/copy-input"
-import { Input } from "@zeabur-oss/design-system/components/input"
 import { Menu, MenuContent, MenuTrigger } from "@zeabur-oss/design-system/components/menu"
 import { Select } from "@zeabur-oss/design-system/components/select"
 
@@ -320,13 +319,13 @@ function CreateDialog({
         hint={t("apiTokens.nameHint")}
         errors={tried && badName ? [t("apiTokens.nameProblem")] : []}
       >
-        <Input
+        <TrimmedInput
           size="sm"
           value={name}
           autoComplete="off"
           spellCheck={false}
           placeholder="github-actions"
-          onChange={(event) => setName(event.target.value.trim())}
+          onValue={setName}
         />
       </FormField>
       <TokenProjects chosen={chosen} onChosen={setChosen} />
