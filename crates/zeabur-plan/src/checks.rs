@@ -1,9 +1,12 @@
 //! Checks for storage, probes and YAML edits, each one fixture operation (`fixtures/mutation`).
 
+use k8s_openapi::api::core::v1::{ExecAction, GRPCAction, HTTPGetAction, Probe, TCPSocketAction};
+use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use zeabur_model::kernel::quantity;
 
+use crate::json::value_of;
 use crate::rules::Refusal;
 
 fn refusal(code: &str) -> Refusal {
@@ -35,6 +38,19 @@ pub enum AccessMode {
     ReadWriteMany,
     /// Read by pods on many nodes.
     ReadOnlyMany,
+}
+
+impl AccessMode {
+    /// The mode as Kubernetes names it.
+    #[must_use]
+    pub const fn as_kubernetes(self) -> &'static str {
+        match self {
+            Self::ReadWriteOnce => "ReadWriteOnce",
+            Self::ReadWriteOncePod => "ReadWriteOncePod",
+            Self::ReadWriteMany => "ReadWriteMany",
+            Self::ReadOnlyMany => "ReadOnlyMany",
+        }
+    }
 }
 
 /// A new volume for a workload: a PersistentVolumeClaim and where it is mounted.
@@ -235,48 +251,69 @@ pub fn probe_config(request: &ProbeRequest, ports: &[i32]) -> Result<Value, Refu
             if !path.starts_with('/') {
                 return Err(refusal("invalid_probe_path"));
             }
-            let mut get = json!({"path": path, "port": port});
-            match request.scheme.as_deref() {
-                None | Some("HTTP") => {}
-                Some("HTTPS") => {
-                    if let Some(map) = get.as_object_mut() {
-                        map.insert("scheme".to_owned(), json!("HTTPS"));
-                    }
-                }
+            let scheme = match request.scheme.as_deref() {
+                None | Some("HTTP") => None,
+                Some("HTTPS") => Some("HTTPS".to_owned()),
                 Some(_) => return Err(refusal("invalid_probe_scheme")),
+            };
+            Probe {
+                http_get: Some(HTTPGetAction {
+                    path: Some(path),
+                    port: IntOrString::Int(port),
+                    scheme,
+                    ..HTTPGetAction::default()
+                }),
+                ..Probe::default()
             }
-            json!({ "httpGet": get })
         }
-        ProbeHandler::TcpSocket => json!({"tcpSocket": {"port": checked_port()?}}),
-        ProbeHandler::Grpc => json!({"grpc": {"port": checked_port()?}}),
+        ProbeHandler::TcpSocket => Probe {
+            tcp_socket: Some(TCPSocketAction {
+                port: IntOrString::Int(checked_port()?),
+                host: None,
+            }),
+            ..Probe::default()
+        },
+        ProbeHandler::Grpc => Probe {
+            grpc: Some(GRPCAction {
+                port: checked_port()?,
+                service: None,
+            }),
+            ..Probe::default()
+        },
         ProbeHandler::Exec => {
             let command = request
                 .command
                 .clone()
                 .filter(|c| c.first().is_some_and(|first| !first.is_empty()))
                 .ok_or_else(|| refusal("missing_probe_command"))?;
-            json!({"exec": {"command": command}})
+            Probe {
+                exec: Some(ExecAction {
+                    command: Some(command),
+                }),
+                ..Probe::default()
+            }
         }
     };
     // The API's minimums [k8s-probe-fields].
     //
     // [k8s-probe-fields]: https://kubernetes.io/docs/tasks/configure-pod-container/configure-liveness-readiness-startup-probes/#configure-probes
     let timings = [
-        ("initialDelaySeconds", request.initial_delay_seconds, 0),
-        ("periodSeconds", request.period_seconds, 1),
-        ("timeoutSeconds", request.timeout_seconds, 1),
-        ("failureThreshold", request.failure_threshold, 1),
+        (request.initial_delay_seconds, 0),
+        (request.period_seconds, 1),
+        (request.timeout_seconds, 1),
+        (request.failure_threshold, 1),
     ];
-    for (field, value, min) in timings {
-        let Some(value) = value else { continue };
-        if value < min {
-            return Err(refusal("invalid_probe_timing"));
-        }
-        if let Some(map) = probe.as_object_mut() {
-            map.insert(field.to_owned(), json!(value));
-        }
+    if timings
+        .iter()
+        .any(|(value, min)| value.is_some_and(|v| v < *min))
+    {
+        return Err(refusal("invalid_probe_timing"));
     }
-    Ok(probe)
+    probe.initial_delay_seconds = request.initial_delay_seconds;
+    probe.period_seconds = request.period_seconds;
+    probe.timeout_seconds = request.timeout_seconds;
+    probe.failure_threshold = request.failure_threshold;
+    Ok(value_of(&probe))
 }
 
 // ── Compute ──────────────────────────────────────────────────────────────────────────────────
@@ -437,6 +474,8 @@ pub fn reconcile_identity(
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
