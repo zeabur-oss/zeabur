@@ -25,7 +25,9 @@ const streamProblem = z.looseObject({ detail: z.string(), fix: z.string() })
 export function useLogStream(url: string): LogStream {
   const [state, setState] = useState<LogStream>({ lines: [], open: false, ended: false })
   const visible = usePageVisible()
-  const reopened = useRef(false)
+  // The next batch replaces the lines: set when a connection that opened closes, cleared only once
+  // a batch has replaced them, so a connection closed before it opened keeps it.
+  const replaceNext = useRef(false)
 
   useEffect(() => {
     if (!visible || state.ended) return undefined
@@ -33,15 +35,13 @@ export function useLogStream(url: string): LogStream {
     let pending: string[] = []
     let frame = 0
     let opened = false
-    let replace = reopened.current
-    reopened.current = false
     const flush = () => {
       frame = 0
       if (pending.length === 0) return
       const batch = pending
       pending = []
-      const replacing = replace
-      replace = false
+      const replacing = replaceNext.current
+      replaceNext.current = false
       setState((previous) => {
         const lines = replacing ? batch : previous.lines.concat(batch)
         return {
@@ -88,7 +88,7 @@ export function useLogStream(url: string): LogStream {
       }))
     })
     return () => {
-      reopened.current = opened
+      if (opened) replaceNext.current = true
       if (frame) cancelAnimationFrame(frame)
       source.close()
     }
