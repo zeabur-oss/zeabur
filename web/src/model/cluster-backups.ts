@@ -179,7 +179,7 @@ export interface ScheduleForm {
 
 const DEFAULT_HOUR = 3
 const DEFAULT_KEEP_DAYS = 7
-export const KEEP_DAYS = rules["BackupsPlanRequest.schedule.keepDays"]
+const KEEP_DAYS = rules["BackupsPlanRequest.schedule.keepDays"]
 
 export function scheduleForm(schedule: Schedule | undefined): ScheduleForm {
   if (!schedule)
