@@ -5251,6 +5251,21 @@ components:
       enum:
       - quota
       - node
+    BuildCredentials:
+      type: object
+      description: The Secret a `Build` reads its repository's credentials from.
+      required:
+      - name
+      - own
+      properties:
+        name:
+          type: string
+          description: Its name.
+        own:
+          type: boolean
+          description: >-
+            Whether it is the one Zeabur made for this `Build` (`<name>-git`), which goes
+            with it.
     BuildOptionsChange:
       type: object
       description: A [`Change::BuildOptions`]. A field left out stays as it is.
@@ -8068,6 +8083,8 @@ components:
       - engine
       - provider
       - apiVersion
+      - apiGroup
+      - apiGroupVersion
       - kind
       - resource
       - name
@@ -8080,6 +8097,12 @@ components:
       - object
       - pods
       properties:
+        apiGroup:
+          type: string
+          description: The API group of `apiVersion`.
+        apiGroupVersion:
+          type: string
+          description: The version of `apiVersion`, without its group.
         apiVersion:
           type: string
           description: The object's `apiVersion`.
@@ -10662,6 +10685,7 @@ components:
       - token
       - expiresAt
       - recorded
+      - kubeconfig
       properties:
         ca:
           type:
@@ -10671,6 +10695,11 @@ components:
         expiresAt:
           type: string
           description: When it expires, RFC 3339, as kube-apiserver answered.
+        kubeconfig:
+          type: string
+          description: |-
+            A kubeconfig that uses the token. `server` is empty: Zeabur knows kube-apiserver only by
+            its in-cluster address, so the person fills in the one they reach it on.
         name:
           type: string
           description: The token's name.
@@ -16296,6 +16325,7 @@ components:
       - kind
       - name
       - namespace
+      - copy
       properties:
         action:
           $ref: "#/components/schemas/S3DestinationWriteAction"
@@ -16310,6 +16340,9 @@ components:
           - string
           - "null"
           description: The object as it is, YAML; absent for a creation and for a Secret.
+        copy:
+          type: boolean
+          description: Whether it is a copy of a destination's keys in another namespace.
         kind:
           type: string
           description: The object's kind.
@@ -19025,10 +19058,10 @@ components:
           - "null"
           description: The build context inside the repository or folder; none for its root.
         credentials:
-          type:
-          - string
-          - "null"
-          description: The Secret it reads the repository's credentials from.
+          oneOf:
+          - $ref: "#/components/schemas/BuildCredentials"
+            description: The Secret it reads the repository's credentials from.
+          - type: "null"
         dockerfile:
           type:
           - string

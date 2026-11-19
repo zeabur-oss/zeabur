@@ -268,7 +268,7 @@ function DestinationsPlan({ planned, onClose }: { planned: Planned; onClose: () 
           <ul className="flex flex-col gap-1">
             {data.writes.map((w) => (
               <li key={`${w.namespace}/${w.kind}/${w.name}`}>
-                {w.kind === "Secret" && w.namespace !== S3D_NAMESPACE
+                {w.copy
                   ? t("s3d.plan.copy", w.name, w.namespace)
                   : t(writeText[w.action], `${w.kind}/${w.name}`)}
               </li>
@@ -282,8 +282,6 @@ function DestinationsPlan({ planned, onClose }: { planned: Planned; onClose: () 
     </PlanFrame>
   )
 }
-
-const S3D_NAMESPACE = "zeabur-s3-destinations"
 
 /** The copies that keep the old keys, and why. */
 function KeptCopies({ plan }: { plan: Schemas.S3DestinationsPlan }) {

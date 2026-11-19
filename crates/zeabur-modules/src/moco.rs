@@ -270,9 +270,11 @@ pub fn database(
         ),
         engine: Engine::Mysql,
         provider: MODULE.id.to_owned(),
-        api_version: "moco.cybozu.com/v1beta2".to_owned(),
-        kind: "MySQLCluster".to_owned(),
-        resource: "mysqlclusters".to_owned(),
+        api_version: format!("{}/{}", CLUSTERS.group, CLUSTERS.version),
+        api_group: CLUSTERS.group.to_owned(),
+        api_group_version: CLUSTERS.version.to_owned(),
+        kind: CLUSTERS.kind.to_owned(),
+        resource: CLUSTERS.resource.to_owned(),
         state,
         phase: healthy
             .and_then(|c| c["reason"].as_str())

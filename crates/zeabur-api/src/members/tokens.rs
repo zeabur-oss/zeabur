@@ -7,6 +7,8 @@
 //!
 //! [k8s-root-ca]: https://kubernetes.io/docs/reference/access-authn-authz/service-accounts-admin/#bound-service-account-token-volume
 
+use base64::Engine as _;
+use base64::engine::general_purpose::STANDARD;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, Problem};
@@ -56,6 +58,9 @@ pub struct IssuedTokenView {
     pub ca: Option<String>,
     /// Whether the expiry was recorded on the ServiceAccount for the token list.
     pub recorded: bool,
+    /// A kubeconfig that uses the token. `server` is empty: Zeabur knows kube-apiserver only by
+    /// its in-cluster address, so the person fills in the one they reach it on.
+    pub kubeconfig: String,
 }
 
 impl std::fmt::Debug for IssuedTokenView {
@@ -65,6 +70,102 @@ impl std::fmt::Debug for IssuedTokenView {
             .field("expires_at", &self.expires_at)
             .finish_non_exhaustive()
     }
+}
+
+/// The namespace a new kubeconfig starts in: the token's project when it has exactly one.
+pub(crate) fn start_namespace(projects: &[ProjectGrant]) -> Option<String> {
+    match projects {
+        [only] => Some(only.project.clone()),
+        _ => None,
+    }
+}
+
+/// The kubeconfig of [`IssuedTokenView::kubeconfig`].
+pub(crate) fn kubeconfig(
+    name: &str,
+    token: &str,
+    ca: Option<&str>,
+    namespace: Option<&str>,
+) -> Result<String, ApiError> {
+    #[derive(Serialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct Config<'a> {
+        api_version: &'static str,
+        kind: &'static str,
+        clusters: [Named<'a, ClusterEntry>; 1],
+        users: [Named<'a, User<'a>>; 1],
+        contexts: [Named<'a, Context<'a>>; 1],
+        current_context: &'a str,
+    }
+    #[derive(Serialize)]
+    struct Named<'a, T> {
+        name: &'a str,
+        #[serde(flatten)]
+        entry: T,
+    }
+    #[derive(Serialize)]
+    struct ClusterEntry {
+        cluster: Server,
+    }
+    #[derive(Serialize)]
+    #[serde(rename_all = "kebab-case")]
+    struct Server {
+        server: &'static str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        certificate_authority_data: Option<String>,
+    }
+    #[derive(Serialize)]
+    struct User<'a> {
+        user: Token<'a>,
+    }
+    #[derive(Serialize)]
+    struct Token<'a> {
+        token: &'a str,
+    }
+    #[derive(Serialize)]
+    struct Context<'a> {
+        context: ContextEntry<'a>,
+    }
+    #[derive(Serialize)]
+    struct ContextEntry<'a> {
+        cluster: &'static str,
+        user: &'a str,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        namespace: Option<&'a str>,
+    }
+    let config = Config {
+        api_version: "v1",
+        kind: "Config",
+        clusters: [Named {
+            name: "zeabur",
+            entry: ClusterEntry {
+                cluster: Server {
+                    server: "",
+                    certificate_authority_data: ca.map(|pem| STANDARD.encode(pem)),
+                },
+            },
+        }],
+        users: [Named {
+            name,
+            entry: User {
+                user: Token { token },
+            },
+        }],
+        contexts: [Named {
+            name,
+            entry: Context {
+                context: ContextEntry {
+                    cluster: "zeabur",
+                    user: name,
+                    namespace,
+                },
+            },
+        }],
+        current_context: name,
+    };
+    let internal = |e: String| ApiError::from(Problem::new(Kind::Internal, e));
+    let value = serde_json::to_value(&config).map_err(|e| internal(e.to_string()))?;
+    zeabur_graph::manifest::to_yaml(&value).map_err(internal)
 }
 
 pub(crate) fn service_accounts() -> ResourceRef {

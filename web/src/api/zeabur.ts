@@ -972,6 +972,16 @@ export type Blocker = {
 }
 
 /**
+ * The Secret a `Build` reads its repository's credentials from.
+ */
+export type BuildCredentials = {
+  /** Its name. */
+  name: string
+  /** Whether it is the one Zeabur made for this `Build` (`<name>-git`), which goes with it. */
+  own: boolean
+}
+
+/**
  * A value read from a Secret or ConfigMap key, or a pod field.
  */
 export type EnvValueFrom = {
@@ -4866,6 +4876,10 @@ export const DatabaseState = {
  * One database cluster.
  */
 export type Database = {
+  /** The API group of `apiVersion`. */
+  apiGroup: string
+  /** The version of `apiVersion`, without its group. */
+  apiGroupVersion: string
   /** The object's `apiVersion`. */
   apiVersion: string
   app?: DatabaseAppUser | null
@@ -6504,6 +6518,11 @@ export type IssuedTokenView = {
   ca?: string | null
   /** When it expires, RFC 3339, as kube-apiserver answered. */
   expiresAt: string
+  /**
+   * A kubeconfig that uses the token. `server` is empty: Zeabur knows kube-apiserver only by
+   * its in-cluster address, so the person fills in the one they reach it on.
+   */
+  kubeconfig: string
   /** The token's name. */
   name: string
   /** The namespace of its ServiceAccount. */
@@ -8546,11 +8565,7 @@ export type ZeaburBuilderBuild = {
    * @nullable
    */
   contextDir?: string | null
-  /**
-   * The Secret it reads the repository's credentials from.
-   * @nullable
-   */
-  credentials?: string | null
+  credentials?: BuildCredentials | null
   /**
    * The Dockerfile, relative to the context; none for `Dockerfile`.
    * @nullable
@@ -9551,6 +9566,8 @@ export type S3DestinationWrite = {
    * @nullable
    */
   beforeYaml?: string | null
+  /** Whether it is a copy of a destination's keys in another namespace. */
+  copy: boolean
   /** The object's kind. */
   kind: string
   /** Its name. */

@@ -1,6 +1,7 @@
 // Sends a packed folder to the Build it is for. XMLHttpRequest, not fetch, for the upload's
 // progress.
 import { ApiError, localProblem, type Problem, type Schemas } from "@/api/client"
+import { getUploadBuildSourceUrl } from "@/api/zeabur"
 import { REQUEST_HEADERS } from "@/auth/session"
 
 /** The folder as raw bytes; the browser sets `Content-Length`. */
@@ -13,10 +14,7 @@ export function sendSource(
 ) {
   return new Promise<Schemas.UploadedSource>((resolve, reject) => {
     const http = new XMLHttpRequest()
-    http.open(
-      "POST",
-      `/api/v1/projects/${encodeURIComponent(project)}/builds/${encodeURIComponent(build)}/source?request=${encodeURIComponent(request)}`,
-    )
+    http.open("POST", getUploadBuildSourceUrl(project, build, { request }))
     http.setRequestHeader("content-type", "application/gzip")
     for (const [name, value] of Object.entries(REQUEST_HEADERS)) http.setRequestHeader(name, value)
     http.upload.onprogress = (event) => onProgress(event.loaded)

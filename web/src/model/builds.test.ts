@@ -126,7 +126,11 @@ describe("buildDeletions", () => {
   const web = named("web", [image])
 
   test("deletes the service's Build and the Secret the drawer made for it", () => {
-    const deletions = buildDeletions(web, [web], [build({ credentials: "web-git" })])
+    const deletions = buildDeletions(
+      web,
+      [web],
+      [build({ credentials: { name: "web-git", own: true } })],
+    )
     expect(deletions).toEqual([
       {
         op: "delete",
@@ -139,20 +143,24 @@ describe("buildDeletions", () => {
 
   test("keeps a Build another service runs, and credentials Zeabur did not make or another Build reads", () => {
     const copy = named("copy", [image])
-    expect(buildDeletions(web, [web, copy], [build({ credentials: "web-git" })])).toEqual([])
+    expect(
+      buildDeletions(web, [web, copy], [build({ credentials: { name: "web-git", own: true } })]),
+    ).toEqual([])
     const kinds = (deletions: ReturnType<typeof buildDeletions>) =>
       deletions.map((d) => (d.op === "delete" ? d.resource.resource : d.op))
-    expect(kinds(buildDeletions(web, [web], [build({ credentials: "github" })]))).toEqual([
-      "builds",
-    ])
+    expect(
+      kinds(buildDeletions(web, [web], [build({ credentials: { name: "github", own: false } })])),
+    ).toEqual(["builds"])
     const api = build({
       name: "api",
       repository: "zot.zot.svc:5000/shop/api",
-      credentials: "web-git",
+      credentials: { name: "web-git", own: false },
     })
-    expect(kinds(buildDeletions(web, [web], [build({ credentials: "web-git" }), api]))).toEqual([
-      "builds",
-    ])
+    expect(
+      kinds(
+        buildDeletions(web, [web], [build({ credentials: { name: "web-git", own: true } }), api]),
+      ),
+    ).toEqual(["builds"])
     expect(buildDeletions(named("redis", ["redis:7"]), [web], [build()])).toEqual([])
   })
 })
@@ -160,9 +168,15 @@ describe("buildDeletions", () => {
 describe("refusedCredentials", () => {
   const refused = { condition: "SourceReady", reason: "AuthFailed", lasting: true }
   test("a deploy key over SSH, a token over HTTPS, nothing without credentials", () => {
-    const ssh = build({ gitUrl: "git@github.com:acme/web.git", credentials: "web-git" })
+    const ssh = build({
+      gitUrl: "git@github.com:acme/web.git",
+      credentials: { name: "web-git", own: true },
+    })
     expect(refusedCredentials({ ...ssh, problem: refused }, undefined)).toBe("deployKey")
-    const https = build({ gitUrl: "https://github.com/acme/web.git", credentials: "web-git" })
+    const https = build({
+      gitUrl: "https://github.com/acme/web.git",
+      credentials: { name: "web-git", own: true },
+    })
     expect(refusedCredentials({ ...https, problem: refused }, undefined)).toBe("token")
     expect(refusedCredentials({ ...ssh, credentials: null, problem: refused }, undefined)).toBe(
       undefined,

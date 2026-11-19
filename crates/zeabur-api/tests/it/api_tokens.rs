@@ -4,6 +4,8 @@
 #[cfg(test)]
 mod tests {
     use axum::http::StatusCode;
+    use base64::Engine as _;
+    use base64::engine::general_purpose::STANDARD;
     use serde_json::{Value, json};
     use zeabur_api::Settings;
     use zeabur_api::settings::IdentitySettings;
@@ -225,6 +227,21 @@ mod tests {
         assert_eq!(issued["expiresAt"], "2026-11-07T00:00:00Z");
         assert!(issued["ca"].as_str().unwrap().contains("BEGIN CERTIFICATE"));
         assert_eq!(issued["recorded"], true);
+        let config: Value = serde_saphyr::from_str(issued["kubeconfig"].as_str().unwrap()).unwrap();
+        assert_eq!(config["clusters"][0]["cluster"]["server"], "");
+        let ca = config["clusters"][0]["cluster"]["certificate-authority-data"]
+            .as_str()
+            .unwrap();
+        assert_eq!(
+            STANDARD.decode(ca).unwrap(),
+            issued["ca"].as_str().unwrap().as_bytes()
+        );
+        assert_eq!(config["users"][0]["user"]["token"], issued["token"]);
+        assert_eq!(config["current-context"], "ci");
+        assert!(
+            config["contexts"][0]["context"].get("namespace").is_none(),
+            "{config}"
+        );
 
         let listed = tokens(&cluster).await;
         let token = item(&listed, "ci").unwrap();
@@ -350,6 +367,28 @@ mod tests {
             item(&tokens(&cluster).await, "ci").unwrap()["expiresAt"],
             "2026-11-06T02:30:00Z"
         );
+    }
+
+    #[tokio::test]
+    async fn the_kubeconfig_of_a_token_with_one_project_starts_in_it() {
+        let cluster = signed_in("zeabur:ada");
+        let projects = json!([{"project": "shop", "role": "viewer"}]);
+        let namespace = |applied: &Value| {
+            let config: Value =
+                serde_saphyr::from_str(applied["issued"]["kubeconfig"].as_str().unwrap()).unwrap();
+            assert_eq!(config["current-context"], "null", "{config}");
+            config["contexts"][0]["context"]["namespace"].clone()
+        };
+        let (status, applied, _) = change(&cluster, create("null", &projects, 3600)).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(namespace(&applied), "shop");
+        let (status, applied, _) = change(
+            &cluster,
+            json!({"op": "renewToken", "name": "null", "expirationSeconds": 3600}),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(namespace(&applied), "shop");
     }
 
     #[tokio::test]

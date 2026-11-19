@@ -193,9 +193,11 @@ pub fn database(
         ),
         engine: Engine::Mariadb,
         provider: MODULE.id.to_owned(),
-        api_version: "k8s.mariadb.com/v1alpha1".to_owned(),
-        kind: "MariaDB".to_owned(),
-        resource: "mariadbs".to_owned(),
+        api_version: format!("{}/{}", SERVERS.group, SERVERS.version),
+        api_group: SERVERS.group.to_owned(),
+        api_group_version: SERVERS.version.to_owned(),
+        kind: SERVERS.kind.to_owned(),
+        resource: SERVERS.resource.to_owned(),
         state,
         phase: condition
             .and_then(|c| c["reason"].as_str())

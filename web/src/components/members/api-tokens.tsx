@@ -22,14 +22,7 @@ import { YamlBlock } from "@/components/yaml"
 import { useI18n, useT } from "@/i18n"
 import { formatTime } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import {
-  DEFAULT_LIFETIME,
-  expired,
-  kubeconfig,
-  LIFETIMES,
-  startNamespace,
-  validName,
-} from "@/model/api-tokens"
+import { DEFAULT_LIFETIME, expired, LIFETIMES, validName } from "@/model/api-tokens"
 import { chosenOf, grantsOf } from "@/model/members"
 import type { Gate } from "@/model/rights"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -48,7 +41,7 @@ type Open =
   | { step: "access"; token: Token }
   | { step: "renew"; token: Token }
   | { step: "delete"; token: Token }
-  | { step: "shown"; issued: Issued; namespace?: string }
+  | { step: "shown"; issued: Issued }
 
 /** The API tokens: machine accounts for scripts and CI, with roles like a member's. */
 export function ApiTokenList({
@@ -200,10 +193,7 @@ function Opened({
   switch (open.step) {
     case "create":
       return (
-        <CreateDialog
-          onClose={onClose}
-          onIssued={(issued, namespace) => onOpen({ step: "shown", issued, namespace })}
-        />
+        <CreateDialog onClose={onClose} onIssued={(issued) => onOpen({ step: "shown", issued })} />
       )
     case "access":
       return <TokenAccess token={open.token} onClose={onClose} />
@@ -212,9 +202,7 @@ function Opened({
         <RenewDialog
           name={open.token.name}
           onClose={onClose}
-          onIssued={(issued) =>
-            onOpen({ step: "shown", issued, namespace: startNamespace(open.token.projects) })
-          }
+          onIssued={(issued) => onOpen({ step: "shown", issued })}
         />
       )
     case "delete":
@@ -234,7 +222,7 @@ function Opened({
         />
       )
     case "shown":
-      return <TokenShown issued={open.issued} namespace={open.namespace} onClose={onClose} />
+      return <TokenShown issued={open.issued} onClose={onClose} />
   }
 }
 
@@ -300,7 +288,7 @@ function CreateDialog({
   onIssued,
 }: {
   onClose: () => void
-  onIssued: (issued: Issued, namespace?: string) => void
+  onIssued: (issued: Issued) => void
 }) {
   const t = useT()
   const [name, setName] = useState("")
@@ -356,7 +344,7 @@ function CreatePlan({
   wanted: Wanted
   onBack: () => void
   onClose: () => void
-  onIssued: (issued: Issued, namespace?: string) => void
+  onIssued: (issued: Issued) => void
 }) {
   const t = useT()
   const sentence = useAccessSentence()
@@ -369,9 +357,7 @@ function CreatePlan({
       action={t("apiTokens.create")}
       onBack={onBack}
       onClose={onClose}
-      onApplied={(applied) =>
-        applied.issued ? onIssued(applied.issued, startNamespace(projects)) : onClose()
-      }
+      onApplied={(applied) => (applied.issued ? onIssued(applied.issued) : onClose())}
     />
   )
 }
@@ -464,15 +450,7 @@ function RenewDialog({
 }
 
 /** The token, once: copy it now, with the CA and a kubeconfig that only needs the address. */
-function TokenShown({
-  issued,
-  namespace,
-  onClose,
-}: {
-  issued: Issued
-  namespace?: string
-  onClose: () => void
-}) {
+function TokenShown({ issued, onClose }: { issued: Issued; onClose: () => void }) {
   const t = useT()
   const { locale } = useI18n()
   return (
@@ -497,7 +475,7 @@ function TokenShown({
       <DocsLink page={DOCS}>{t("apiTokens.docs")}</DocsLink>
       <h3 className="mt-2 text-sm font-medium">{t("apiTokens.shown.kubeconfig")}</h3>
       <p className="text-muted-foreground">{t("apiTokens.shown.kubeconfigHint")}</p>
-      <YamlBlock yaml={kubeconfig(issued, namespace)} label={t("apiTokens.shown.kubeconfig")} />
+      <YamlBlock yaml={issued.kubeconfig} label={t("apiTokens.shown.kubeconfig")} />
       {issued.ca ? (
         <>
           <h3 className="mt-2 text-sm font-medium">{t("apiTokens.shown.ca")}</h3>

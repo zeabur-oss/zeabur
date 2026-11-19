@@ -227,6 +227,8 @@ enum Op {
     IssueToken {
         name: String,
         seconds: i64,
+        /// The namespace the kubeconfig starts in: the token's project when it has exactly one.
+        start: Option<String>,
         /// The ServiceAccount as read or as it will be made, shown before the expiry is recorded.
         account: Box<ServiceAccount>,
     },
@@ -487,6 +489,7 @@ async fn create_token(
     computed.ops.push(Op::IssueToken {
         name: name.to_owned(),
         seconds,
+        start: tokens::start_namespace(projects),
         account: Box::new(account),
     });
     Ok(computed)
@@ -508,9 +511,15 @@ async fn renew_token(
     computed
         .versions
         .insert(key(&account_target(name)), version);
+    let holder = Holder::token(name);
+    let start = access::bindings_for(cluster, &holder)
+        .await
+        .ok()
+        .and_then(|bindings| tokens::start_namespace(&access::grants_of(&bindings, &holder)));
     computed.ops.push(Op::IssueToken {
         name: name.to_owned(),
         seconds,
+        start,
         account: Box::new(account),
     });
     Ok(computed)
@@ -765,6 +774,7 @@ fn writes_of(computed: &Computed, namespace: &str, username: &str, now: i64) -> 
                 name,
                 seconds,
                 account,
+                ..
             } => {
                 let target = account_target(name);
                 writes.push(MemberWrite {
@@ -997,8 +1007,14 @@ pub(crate) async fn apply(
     let mut link = None;
     let mut token = None;
     for op in &computed.ops {
-        if let Op::IssueToken { name, seconds, .. } = op {
-            token = Some(issue_token(cluster.as_ref(), name, *seconds).await?);
+        if let Op::IssueToken {
+            name,
+            seconds,
+            start,
+            ..
+        } = op
+        {
+            token = Some(issue_token(cluster.as_ref(), name, *seconds, start.as_deref()).await?);
             continue;
         }
         if !matches!(op, Op::Invite) {
@@ -1045,6 +1061,7 @@ async fn issue_token(
     cluster: &dyn Cluster,
     name: &str,
     seconds: i64,
+    start: Option<&str>,
 ) -> Result<IssuedTokenView, ApiError> {
     let namespace = api_token::NAMESPACE;
     let token = cluster
@@ -1069,8 +1086,10 @@ async fn issue_token(
         dry_run: false,
     };
     let recorded = cluster.write(&record).await.is_ok();
+    let ca = tokens::root_ca(cluster).await;
     Ok(IssuedTokenView {
-        ca: tokens::root_ca(cluster).await,
+        kubeconfig: tokens::kubeconfig(name, &token.token, ca.as_deref(), start)?,
+        ca,
         name: name.to_owned(),
         namespace: namespace.to_owned(),
         token: token.token,

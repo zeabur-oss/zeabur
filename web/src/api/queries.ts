@@ -600,11 +600,12 @@ export const clusterIncidentsQuery = queryOptions({
 
 /** Same origin, so EventSource sends the cookie. */
 export function followUrl(project: string, pod: string, options: LogOptions): string {
-  const query = new URLSearchParams({ tailLines: String(options.tailLines) })
-  if (options.container) query.set("container", options.container)
-  if (options.previous) query.set("previous", "true")
-  if (options.timestamps) query.set("timestamps", "true")
-  return `/api/v1/projects/${encodeURIComponent(project)}/pods/${encodeURIComponent(pod)}/logs/follow?${query}`
+  return zeabur.getFollowPodLogsUrl(project, pod, {
+    tailLines: options.tailLines,
+    container: options.container || undefined,
+    previous: options.previous || undefined,
+    timestamps: options.timestamps || undefined,
+  })
 }
 
 export const buildsQuery = (project: string) =>
