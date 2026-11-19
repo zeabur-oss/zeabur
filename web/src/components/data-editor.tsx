@@ -34,6 +34,7 @@ import { kindName } from "@/i18n/kind-name"
 import { useScrollOnce } from "@/lib/in-view"
 import { addressOf } from "@/lib/objects"
 import { decodeSecretValue } from "@/lib/secret-data"
+import { nextRowId } from "@/lib/row-id"
 import { cn } from "@/lib/utils"
 
 type Kind = "ConfigMap" | "Secret"
@@ -41,8 +42,16 @@ type Edit = { op: "set"; value: string } | { op: "remove" }
 
 interface Draft {
   edits: Record<string, Edit>
-  added: { key: string; value: string }[]
+  added: AddedRow[]
 }
+
+interface AddedRow {
+  id: number
+  key: string
+  value: string
+}
+
+const newRow = (): AddedRow => ({ id: nextRowId(), key: "", value: "" })
 
 const blank: Draft = { edits: {}, added: [] }
 
@@ -403,8 +412,7 @@ export function DataEditor({
               <form.Field name="added" mode="array">
                 {(rows) =>
                   rows.state.value.map((row, index) => (
-                    // oxlint-disable-next-line react/no-array-index-key -- new rows have no key yet
-                    <li key={index} className="flex flex-col gap-1.5 px-3 py-2.5">
+                    <li key={row.id} className="flex flex-col gap-1.5 px-3 py-2.5">
                       <span className="flex items-center gap-2">
                         <form.Field name={`added[${index}].key`}>
                           {(f) => (
@@ -453,7 +461,7 @@ export function DataEditor({
               variant="outline"
               size="sm"
               disabled={locked}
-              onClick={() => form.pushFieldValue("added", { key: "", value: "" })}
+              onClick={() => form.pushFieldValue("added", newRow())}
             >
               <PlusIcon aria-hidden="true" data-icon="inline-start" />
               {t("data.addKey")}

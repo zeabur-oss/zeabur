@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import { dataChangesOf, editAfterTyping, secretKeys } from "@/components/data-editor"
+import { nextRowId } from "@/lib/row-id"
 
 const secretData = { cert: "/wCA", password: "aHVudGVyMg==" }
 
@@ -37,5 +38,11 @@ describe("the key editor", () => {
     expect(dataChangesOf({ edits: { password: { op: "set", value: "new" } }, added: [] })).toEqual([
       { key: "password", op: "set", value: "new" },
     ])
+  })
+})
+
+describe("keys added in the dialog", () => {
+  test("each added row has its own id, so removing one keeps the others' input", () => {
+    expect(nextRowId()).not.toBe(nextRowId())
   })
 })
