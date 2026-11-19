@@ -6,6 +6,7 @@ import CaretDownIcon from "~icons/ph/caret-down"
 
 import type { Schemas } from "@/api/client"
 import { namespaceQuery, projectQuery } from "@/api/queries"
+import { rules } from "@/api/rules"
 import { AccessDialog, AdoptButton } from "@/components/adopt"
 import { useBackups } from "@/components/backups"
 import { CopyButton } from "@/components/bits"
@@ -43,9 +44,6 @@ const SharedVariables = lazy(() =>
 )
 
 const route = getRouteApi("/projects/$project/settings")
-
-/** zeabur-model `DESCRIPTION_MAX`. */
-export const DESCRIPTION_MAX = 500
 
 export function ProjectSettingsPage() {
   const { project } = route.useParams()
@@ -277,7 +275,10 @@ function DetailsForm({
             </CardRow>
           )}
         </form.Field>
-        <form.Field name="description" validators={{ onChange: atMost(DESCRIPTION_MAX) }}>
+        <form.Field
+          name="description"
+          validators={{ onChange: atMost(rules["Change.details.description"].maxLength) }}
+        >
           {(f) => (
             <CardRow
               label={t("projectSettings.description")}

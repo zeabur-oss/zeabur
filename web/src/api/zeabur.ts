@@ -853,7 +853,8 @@ export type BackupsPlanRequest =
       cron: string
       /**
        * How many days each backup is kept.
-       * @minimum 0
+       * @minimum 1
+       * @maximum 365
        */
       keepDays: number
       /** The namespaces to back up; empty for every namespace. */
@@ -873,6 +874,7 @@ export type BackupsPlanRequest =
       backup: string
       /**
        * The new namespace, needed while `namespace` exists.
+       * @maxLength 63
        * @nullable
        */
       into?: string | null
@@ -2121,6 +2123,7 @@ export type Change =
   | {
       /**
        * What the project is.
+       * @maxLength 500
        * @nullable
        */
       description?: string | null
@@ -6213,7 +6216,11 @@ export type GitHubManifest = {
  * What the manifest flow needs.
  */
 export type GitHubManifestRequest = {
-  /** The App's name on GitHub, unique there, at most 34 characters. */
+  /**
+   * The App's name on GitHub, unique there, at most 34 characters.
+   * @minLength 1
+   * @maxLength 34
+   */
   name: string
   /** The organization to make the App in; empty for the person's own account. */
   organization?: string

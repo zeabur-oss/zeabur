@@ -140,6 +140,7 @@ pub struct GitHubInstallation {
 #[serde(rename_all = "camelCase")]
 pub struct GitHubManifestRequest {
     /// The App's name on GitHub, unique there, at most 34 characters.
+    #[schema(min_length = 1, max_length = 34)]
     pub name: String,
     /// Where GitHub sends the browser back, `https://<zeabur>/settings/github-app`.
     pub redirect_url: String,
@@ -604,6 +605,9 @@ fn sealed<T: Serialize>(state: &AppState, prefix: &str, claims: &T) -> Result<St
     })
 }
 
+/// The longest name GitHub takes for an App.
+pub const NAME_MAX: usize = 34;
+
 /// What is wrong with a manifest request, in words for the person.
 fn manifest_problem(
     request: &GitHubManifestRequest,
@@ -615,7 +619,7 @@ fn manifest_problem(
         .redirect_url
         .split_once("://")
         .map(|(_, rest)| rest.split(['/', '?', '#']).next().unwrap_or_default());
-    if name.is_empty() || name.chars().count() > 34 {
+    if name.is_empty() || name.chars().count() > NAME_MAX {
         Some("A GitHub App's name has 1 to 34 characters.")
     } else if !url(&request.redirect_url) || public_host.is_some_and(|h| redirect_host != Some(h)) {
         Some("GitHub sends you back to Zeabur's own address only.")

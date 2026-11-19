@@ -1,4 +1,5 @@
 import type { Schemas } from "@/api/client"
+import { AlertmanagerChannelKind } from "@/api/zeabur"
 
 type Settings = Schemas.AlertmanagerChannelSettings
 export type ChannelKind = Settings["kind"]
@@ -10,25 +11,20 @@ export const METRICS_COMPONENT = "victoria-metrics"
 /** `NAME_MAX` in zeabur-modules' alertmanager. */
 export const NAME_MAX = 30
 
-export const KINDS: ChannelKind[] = ["slack", "discord", "telegram", "email", "webhook", "ntfy"]
+export const KINDS = Object.values(AlertmanagerChannelKind).filter(
+  (kind): kind is ChannelKind => kind !== "other",
+)
 
-export type Field =
-  | "webhookUrl"
-  | "botToken"
-  | "chatId"
-  | "to"
-  | "from"
-  | "smarthost"
-  | "username"
-  | "password"
-  | "url"
-  | "bearerToken"
-  | "server"
-  | "topic"
-  | "accessToken"
+type Of<K extends ChannelKind> = Extract<Settings, { kind: K }>
+type FieldsOf<K extends ChannelKind> = Exclude<keyof Of<K>, "kind">
+export type Field = { [K in ChannelKind]: FieldsOf<K> }[ChannelKind]
 
-/** The fields of each kind, in order; the second value says whether it may stay empty. */
-export const FIELDS: Record<ChannelKind, [Field, boolean][]> = {
+/** The fields of each kind, in order, each with whether the schema lets it stay empty. */
+export const FIELDS: {
+  [K in ChannelKind]: {
+    [F in FieldsOf<K>]-?: [F, undefined extends Of<K>[F] ? true : false]
+  }[FieldsOf<K>][]
+} = {
   slack: [["webhookUrl", false]],
   discord: [["webhookUrl", false]],
   telegram: [

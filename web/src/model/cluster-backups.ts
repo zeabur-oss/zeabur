@@ -1,6 +1,7 @@
 // The cluster's Velero backups as the Backups tab tells them: one verdict first, then where
 // backups go, when they run, and how each went.
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { type Destination, joinFolder } from "@/model/s3-destinations"
 import type { Health } from "@/model/service"
 
@@ -178,6 +179,7 @@ export interface ScheduleForm {
 
 const DEFAULT_HOUR = 3
 const DEFAULT_KEEP_DAYS = 7
+export const KEEP_DAYS = rules["BackupsPlanRequest.schedule.keepDays"]
 
 export function scheduleForm(schedule: Schedule | undefined): ScheduleForm {
   if (!schedule)
@@ -194,7 +196,8 @@ export type ScheduleProblem = "keep" | "projects"
 
 export function scheduleProblems(form: ScheduleForm): ScheduleProblem[] {
   const problems: ScheduleProblem[] = []
-  if (!Number.isInteger(form.keepDays) || form.keepDays < 1 || form.keepDays > 365)
+  const { minimum, maximum } = KEEP_DAYS
+  if (!Number.isInteger(form.keepDays) || form.keepDays < minimum || form.keepDays > maximum)
     problems.push("keep")
   if (form.scope === "projects" && form.namespaces.length === 0) problems.push("projects")
   return problems

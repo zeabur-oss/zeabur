@@ -5086,7 +5086,8 @@ components:
             type: integer
             format: int32
             description: How many days each backup is kept.
-            minimum: 0
+            maximum: 365
+            minimum: 1
           namespaces:
             type: array
             items:
@@ -5136,6 +5137,7 @@ components:
             - string
             - "null"
             description: The new namespace, needed while `namespace` exists.
+            maxLength: 63
           namespace:
             type: string
             description: The namespace to restore.
@@ -6463,6 +6465,7 @@ components:
             - string
             - "null"
             description: What the project is.
+            maxLength: 500
           displayName:
             type:
             - string
@@ -10135,6 +10138,8 @@ components:
         name:
           type: string
           description: The App's name on GitHub, unique there, at most 34 characters.
+          maxLength: 34
+          minLength: 1
         organization:
           type: string
           description: The organization to make the App in; empty for the person's own account.

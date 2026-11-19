@@ -14,6 +14,7 @@ import {
   projectsQuery,
   revealSecret,
 } from "@/api/queries"
+import { rules } from "@/api/rules"
 import { Ago } from "@/components/bits"
 import { useTargets } from "@/components/connect"
 import { FormField, NameField } from "@/components/form-field"
@@ -42,7 +43,7 @@ type Request = Schemas.BackupsPlanRequest
 type OnPlan = (request: Request, title: string, action?: string) => void
 type Copy = Schemas.RestoreCopy
 
-const NAMESPACE_MAX = 63
+const NAMESPACE_MAX = rules["BackupsPlanRequest.restore.into"].maxLength
 
 /** The projects a backup can restore, with the deleted ones it holds marked as such. */
 function useChoices(backup: Schemas.VeleroBackup) {

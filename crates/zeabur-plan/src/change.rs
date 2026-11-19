@@ -409,6 +409,7 @@ pub enum Change {
         display_name: Option<String>,
         /// What the project is.
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "openapi", schema(max_length = 500))]
         description: Option<String>,
         /// Its icon.
         #[serde(default, skip_serializing_if = "Option::is_none")]

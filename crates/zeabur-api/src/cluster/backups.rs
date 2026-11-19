@@ -124,6 +124,7 @@ pub enum BackupsPlanRequest {
         cron: String,
         /// How many days each backup is kept.
         #[serde(rename = "keepDays")]
+        #[schema(minimum = 1, maximum = 365)]
         keep_days: u32,
         /// The namespaces to back up; empty for every namespace.
         #[serde(default)]
@@ -146,6 +147,7 @@ pub enum BackupsPlanRequest {
         namespace: String,
         /// The new namespace, needed while `namespace` exists.
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[schema(max_length = 63)]
         into: Option<String>,
     },
     /// Move every route of `from` to `to`: delete each from `from` and create it in `to`. A route

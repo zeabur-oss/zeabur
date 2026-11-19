@@ -1,13 +1,13 @@
 // The cluster's GitHub App, as the web interface shows it: its name on GitHub, where GitHub sends
 // the browser back, and the repositories a project may pick from.
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { parseRepository } from "@/model/git-service"
 
 /** Cluster → GitHub, where GitHub sends the browser back after making the App. */
 export const CALLBACK_PATH = "/cluster/github-app"
 
-/** GitHub allows at most 34 characters. */
-const NAME_LIMIT = 34
+const NAME_LIMIT = rules["GitHubManifestRequest.name"].maxLength
 
 export const appName = (cluster: string): string =>
   `Zeabur ${cluster.trim()}`.slice(0, NAME_LIMIT).trim()

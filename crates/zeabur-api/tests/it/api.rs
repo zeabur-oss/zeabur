@@ -1895,6 +1895,37 @@ mod tests {
     }
 
     #[test]
+    fn the_described_limits_are_the_ones_the_server_checks() {
+        let description = serde_json::to_value(zeabur_api::openapi()).unwrap();
+        let schemas = &description["components"]["schemas"];
+        let variant = |schema: &str, op: &str| -> Value {
+            schemas[schema]["oneOf"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .find(|v| v["properties"]["op"]["enum"][0] == op)
+                .unwrap()["properties"]
+                .clone()
+        };
+        let max = zeabur_model::DESCRIPTION_MAX;
+        assert_eq!(
+            variant("Change", "details")["description"]["maxLength"],
+            max
+        );
+        let name = &schemas["GitHubManifestRequest"]["properties"]["name"];
+        assert_eq!(name["maxLength"], zeabur_api::cluster::github_app::NAME_MAX);
+        assert_eq!(name["minLength"], 1);
+        let keep = &variant("BackupsPlanRequest", "schedule")["keepDays"];
+        let days = zeabur_modules::velero::cluster::KEEP_DAYS;
+        assert_eq!(keep["minimum"], *days.start());
+        assert_eq!(keep["maximum"], *days.end());
+        assert_eq!(
+            variant("BackupsPlanRequest", "restore")["into"]["maxLength"],
+            zeabur_modules::velero::cluster::NAMESPACE_MAX
+        );
+    }
+
+    #[test]
     fn the_committed_description_is_current() {
         let committed =
             std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/openapi.yaml"))
