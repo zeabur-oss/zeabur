@@ -798,6 +798,8 @@ pub struct ClusterFacts {
     /// The `spec.version` of those `HelmChart` objects that name one, as `namespace/name` →
     /// version.
     pub k3s_helm_chart_versions: BTreeMap<String, String>,
+    /// The labels of those `HelmChart` objects, as `namespace/name` → labels.
+    pub k3s_helm_chart_labels: BTreeMap<String, BTreeMap<String, String>>,
     /// The `HelmChart` objects RKE2 deploys from its own charts, which carry the
     /// `rke2.cattle.io/inject-cluster-config: "true"` annotation, as `namespace/name` → the
     /// `helm.cattle.io/chart-url` annotation (empty when absent) [rke2-charts].

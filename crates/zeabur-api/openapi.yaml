@@ -10485,6 +10485,7 @@ components:
       enum:
       - k3s
       - rke2
+      - zeabur
       - helm-chart
       - helm
       - other

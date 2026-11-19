@@ -397,6 +397,7 @@ export const zhTW: Messages = {
   "cluster.newerThanTested": "比已測試版本新",
   "cluster.sourceK3s": "K3s",
   "cluster.sourceRke2": "RKE2",
+  "cluster.sourceZeabur": "Zeabur",
   "cluster.sourceHelmChart": "HelmChart",
   "cluster.sourceHelm": "Helm",
   "cluster.sourceOther": "—",

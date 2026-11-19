@@ -24,13 +24,14 @@
 //!
 //! [installers]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/installers.mdx
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
 
 use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
+use zeabur_catalog::InstallSource;
 use zeabur_catalog::api::{ComponentFile, Snapshot};
 use zeabur_catalog::engine::{
     self, CHART_NAMESPACE, COMPONENT, Desired, HelmChart, MANAGED_BY, MANAGED_BY_ZEABUR, Progress,
@@ -354,6 +355,10 @@ struct World {
     platform: String,
     capabilities: BTreeSet<String>,
     installed: BTreeSet<String>,
+    /// How each installed component was installed.
+    sources: BTreeMap<String, InstallSource>,
+    /// The components Zeabur wrote.
+    written: BTreeSet<String>,
     helm_releases: BTreeSet<String>,
     now: Timestamp,
 }
@@ -381,10 +386,16 @@ impl World {
             .filter(|c| c.existing)
             .map(|c| c.name.clone())
             .collect();
-        let installed = detected
+        let sources: BTreeMap<String, InstallSource> = detected
             .iter()
-            .flat_map(|c| c.installations.iter().map(|i| i.component.clone()))
+            .flat_map(|c| {
+                c.installations
+                    .iter()
+                    .map(|i| (i.component.clone(), i.source))
+            })
             .collect();
+        let installed = sources.keys().cloned().collect();
+        let written = engine::written(&facts).into_values().collect();
         let served = cluster
             .served_resources()
             .await
@@ -416,6 +427,8 @@ impl World {
             platform,
             capabilities,
             installed,
+            sources,
+            written,
             helm_releases: facts.helm_releases.clone(),
             now: (state.clock)(),
         })
@@ -440,10 +453,24 @@ impl World {
             platform: &self.platform,
             capabilities: &self.capabilities,
             components: &self.installed,
+            written: &self.written,
         }
     }
 
     async fn install(&self, cluster: &dyn Cluster, id: &str) -> Result<Planned, ApiError> {
+        if self
+            .sources
+            .get(id)
+            .is_some_and(|s| !matches!(s, InstallSource::Zeabur | InstallSource::Other))
+        {
+            return Err(ApiError::from(Problem::new(
+                Kind::Conflict,
+                format!(
+                    "{id} is installed, and Zeabur did not install it. Zeabur does not change a \
+                     component it did not install."
+                ),
+            )));
+        }
         let install =
             engine::install(&self.snapshot, id, &self.target()).map_err(|r| refusal(&r))?;
         let mut steps = Vec::new();

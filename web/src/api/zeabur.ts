@@ -1084,6 +1084,7 @@ export type InstallSource = (typeof InstallSource)[keyof typeof InstallSource]
 export const InstallSource = {
   k3s: "k3s",
   rke2: "rke2",
+  zeabur: "zeabur",
   "helm-chart": "helm-chart",
   helm: "helm",
   other: "other",

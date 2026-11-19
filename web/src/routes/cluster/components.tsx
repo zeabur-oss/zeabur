@@ -214,7 +214,9 @@ export function ComponentsPage() {
                 {group.items.flatMap((capability) =>
                   capability.components
                     .filter(
-                      (component) => filter !== "installed" || isInstalled(capability, component),
+                      (component) =>
+                        filter !== "installed" ||
+                        installationOf(capability, component) !== undefined,
                     )
                     .map((component) => (
                       <li key={component.id} className="flex">
@@ -231,14 +233,23 @@ export function ComponentsPage() {
   )
 }
 
-/** This component itself, not another of its capability: metrics-server covers "metrics" without
- * VictoriaMetrics being installed. */
 /** What the component gives the cluster, in the catalogue's words for `locale`. */
 const summaryOf = (component: Schemas.Component, locale: Locale) =>
   component.summary[locale] ?? component.summary.en
 
-const isInstalled = (capability: Schemas.Capability, component: Schemas.Component) =>
-  capability.installations.some((i) => i.component === component.id)
+/** This component itself, not another of its capability: metrics-server covers "metrics" without
+ * VictoriaMetrics being installed. */
+const installationOf = (capability: Schemas.Capability, component: Schemas.Component) =>
+  capability.installations.find((i) => i.component === component.id)
+
+/** Zeabur removes what it installed and installs what nothing else manages; a component K3s, RKE2
+ * or Helm manages gets no button. */
+const actionOf = (installation: Schemas.Installation | undefined) =>
+  !installation || installation.source === "other"
+    ? "install"
+    : installation.source === "zeabur"
+      ? "remove"
+      : undefined
 
 /** What a component incident names, as the catalogue's capability or a component id. */
 const incidentComponents: Record<string, string> = {
@@ -259,7 +270,7 @@ function useDown() {
   return (capability: string, component: string) => down.has(capability) || down.has(component)
 }
 
-/** The plan of the component in the address: removing it when it is installed, else installing. */
+/** The plan of the component in the address: removing it when Zeabur installed it, else installing. */
 function OpenedPlan({
   id,
   list,
@@ -270,15 +281,13 @@ function OpenedPlan({
   onClose: () => void
 }) {
   const opened = list.flatMap((c) => c.components).find((x) => x.id === id)
-  const installed = opened !== undefined && list.some((c) => isInstalled(c, opened))
+  const action = actionOf(
+    opened && list.map((c) => installationOf(c, opened)).find((i) => i !== undefined),
+  )
+  if (!action) return null
   return (
     <Suspense fallback={null}>
-      <ComponentPlan
-        id={id}
-        name={opened?.displayName ?? id}
-        action={installed ? "remove" : "install"}
-        onClose={onClose}
-      />
+      <ComponentPlan id={id} name={opened?.displayName ?? id} action={action} onClose={onClose} />
     </Suspense>
   )
 }
@@ -337,7 +346,9 @@ function ComponentCard({
   const capLabel = useCapabilityLabel()
   const CapIcon = icons[capability.name] ?? HardDrivesIcon
   const isDown = useDown()
-  const installed = isInstalled(capability, component)
+  const installation = installationOf(capability, component)
+  const installed = installation !== undefined
+  const action = actionOf(installation)
   const down = installed && isDown(capability.name, component.id)
   const state = down ? "down" : installed ? "installed" : (capability.suggestion ?? "optional")
   const catalog = useQuery(catalogQuery).data
@@ -371,26 +382,28 @@ function ComponentCard({
           <ArrowSquareOutIcon className="size-3" aria-hidden="true" />
           <span className="sr-only">{t("settings.opensInNewTab")}</span>
         </a>
-        <Link
-          from="/cluster/components"
-          search={(previous) => ({
-            ...previous,
-            component: component.id,
-          })}
-          disabled={offline}
-          aria-disabled={offline}
-          className={cn(
-            buttonVariants({ variant: "outline", size: "xs" }),
-            "ml-auto aria-disabled:pointer-events-none aria-disabled:opacity-50",
-          )}
-        >
-          {installed ? (
-            <MinusCircleIcon aria-hidden="true" data-icon="inline-start" />
-          ) : (
-            <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
-          )}
-          {installed ? t("settings.removeCommand") : t("settings.installCommand")}
-        </Link>
+        {action && (
+          <Link
+            from="/cluster/components"
+            search={(previous) => ({
+              ...previous,
+              component: component.id,
+            })}
+            disabled={offline}
+            aria-disabled={offline}
+            className={cn(
+              buttonVariants({ variant: "outline", size: "xs" }),
+              "ml-auto aria-disabled:pointer-events-none aria-disabled:opacity-50",
+            )}
+          >
+            {action === "remove" ? (
+              <MinusCircleIcon aria-hidden="true" data-icon="inline-start" />
+            ) : (
+              <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
+            )}
+            {action === "remove" ? t("settings.removeCommand") : t("settings.installCommand")}
+          </Link>
+        )}
       </div>
     </article>
   )
@@ -478,6 +491,7 @@ function UpgradeTag({ installation }: { installation: Schemas.Installation }) {
 const sourceKey = {
   k3s: "cluster.sourceK3s",
   rke2: "cluster.sourceRke2",
+  zeabur: "cluster.sourceZeabur",
   "helm-chart": "cluster.sourceHelmChart",
   helm: "cluster.sourceHelm",
   other: "cluster.sourceOther",

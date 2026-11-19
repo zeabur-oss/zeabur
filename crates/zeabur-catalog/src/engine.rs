@@ -20,13 +20,13 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use zeabur_kube::DynamicObject;
 use zeabur_kube::k8s_openapi::api::apps::v1::{DaemonSet, Deployment, StatefulSet};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
 use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Pod};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::k8s_openapi::{Metadata, NamespaceResourceScope, Resource};
+use zeabur_kube::{ClusterFacts, DynamicObject};
 use zeabur_model::PodSecurityLevel;
 use zeabur_model::readiness::{self, Reason, Status};
 
@@ -63,6 +63,9 @@ pub struct Target<'a> {
     pub capabilities: &'a BTreeSet<String>,
     /// The components the cluster has.
     pub components: &'a BTreeSet<String>,
+    /// The components Zeabur wrote, finished or not; [`install`] plans them again so that one
+    /// it began is finished.
+    pub written: &'a BTreeSet<String>,
 }
 
 /// One release to apply.
@@ -201,19 +204,40 @@ fn install_order(
         .ok_or_else(|| Refusal::Unknown(id.to_owned()))?;
     for reference in &file.declaration.requires {
         let needed = match (&reference.component, &reference.capability) {
-            (Some(component), _) if target.components.contains(component) => continue,
+            (Some(component), _)
+                if target.components.contains(component) && !target.written.contains(component) =>
+            {
+                continue;
+            }
             (Some(component), _) => component.clone(),
-            (None, Some(capability)) if target.capabilities.contains(capability) => continue,
-            (None, Some(capability)) => snapshot
-                .provider(capability, target.profile)
-                .map(|c| c.id.clone())
-                .ok_or_else(|| Refusal::NoProvider(capability.clone()))?,
+            (None, Some(capability)) => match written_provider(snapshot, target, capability) {
+                Some(id) => id,
+                None if target.capabilities.contains(capability) => continue,
+                None => snapshot
+                    .provider(capability, target.profile)
+                    .map(|c| c.id.clone())
+                    .ok_or_else(|| Refusal::NoProvider(capability.clone()))?,
+            },
             (None, None) => continue,
         };
         install_order(snapshot, &needed, target, order, visiting)?;
     }
     order.push(id.to_owned());
     Ok(())
+}
+
+/// The component Zeabur wrote that provides `capability`.
+fn written_provider(snapshot: &Snapshot, target: &Target<'_>, capability: &str) -> Option<String> {
+    target
+        .written
+        .iter()
+        .find(|id| {
+            snapshot
+                .components
+                .get(*id)
+                .is_some_and(|f| f.declaration.provides.capability == capability)
+        })
+        .cloned()
 }
 
 /// Refuses what the catalog does not offer here and what Zeabur cannot install yet.
@@ -393,6 +417,22 @@ fn mark(metadata: &mut ObjectMeta, file: &ComponentFile, release: &Release, cata
         (SOURCE_DIGEST.to_owned(), file.source_digest.clone()),
         (CATALOG_VERSION.to_owned(), catalog_version.to_owned()),
     ]);
+}
+
+/// The components with a `HelmChart` Zeabur wrote, as `namespace/name` → component. Each is
+/// installed or being installed by Zeabur, whatever detection finds.
+#[must_use]
+pub fn written(facts: &ClusterFacts) -> BTreeMap<String, String> {
+    facts
+        .k3s_helm_chart_labels
+        .iter()
+        .filter(|(_, labels)| {
+            labels
+                .get(MANAGED_BY)
+                .is_some_and(|m| m == MANAGED_BY_ZEABUR)
+        })
+        .filter_map(|(key, labels)| Some((key.clone(), labels.get(COMPONENT)?.clone())))
+        .collect()
 }
 
 /// The installed components that need `id`, which keep it from being removed.
@@ -766,14 +806,25 @@ mod tests {
     }
 
     fn plan(id: &str, capabilities: &[&str], components: &[&str]) -> Result<Install, Refusal> {
+        plan_written(id, capabilities, components, &[])
+    }
+
+    fn plan_written(
+        id: &str,
+        capabilities: &[&str],
+        components: &[&str],
+        written: &[&str],
+    ) -> Result<Install, Refusal> {
         let capabilities = set(capabilities);
         let components = set(components);
+        let written = set(written);
         let target = Target {
             profile: "single-node",
             distribution: Some("k3s"),
             platform: "linux/amd64",
             capabilities: &capabilities,
             components: &components,
+            written: &written,
         };
         install(&snapshot(), id, &target)
     }
@@ -856,6 +907,22 @@ mod tests {
     }
 
     #[test]
+    fn a_needed_component_zeabur_began_stays_in_the_plan_once_detected() {
+        // cert-manager's chart is written and its CRDs make it detected, but its issuers are not
+        // written yet.
+        let install = plan_written(
+            "cloudnative-pg",
+            &["ingress", "certificates"],
+            &["cert-manager"],
+            &["cert-manager"],
+        )
+        .unwrap();
+        assert_eq!(install.components, ["cert-manager", "cloudnative-pg"]);
+        let install = plan_written("keda-http-add-on", &[], &["keda"], &["keda"]).unwrap();
+        assert_eq!(install.components, ["keda", "keda-http-add-on"]);
+    }
+
+    #[test]
     fn components_zeabur_cannot_install_yet_are_refused() {
         let refusal = plan("crowdsec", &["ingress", "certificates"], &["traefik"]).unwrap_err();
         assert!(
@@ -877,6 +944,7 @@ mod tests {
             platform: "linux/amd64",
             capabilities: &capabilities,
             components: &components,
+            written: &BTreeSet::new(),
         };
         let refusal = install(&snapshot(), "cert-manager", &target).unwrap_err();
         assert!(matches!(refusal, Refusal::NotHere { place, .. } if place == "minikube"));

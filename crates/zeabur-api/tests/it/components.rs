@@ -344,6 +344,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_component_whose_crds_outlived_its_removal_installs_again() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.facts
+                .crds
+                .insert("certificates.cert-manager.io".to_owned());
+        });
+        let (status, plan) = call(&app(&cluster, false), "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+    }
+
+    #[tokio::test]
+    async fn a_component_helm_installed_is_not_installed_again() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.facts.workload_labels.push((
+                "tools/cert-manager".to_owned(),
+                [(
+                    "helm.sh/chart".to_owned(),
+                    "cert-manager-v1.20.0".to_owned(),
+                )]
+                .into(),
+            ));
+        });
+        let (status, problem) = call(&app(&cluster, false), "plan", "install", "").await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert!(
+            problem["detail"]
+                .as_str()
+                .unwrap()
+                .contains("did not install")
+        );
+    }
+
+    #[tokio::test]
     async fn a_chart_zeabur_did_not_write_is_not_taken_over() {
         let cluster = cluster();
         put(
