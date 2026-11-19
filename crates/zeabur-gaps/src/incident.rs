@@ -298,13 +298,17 @@ pub fn incidents(
     projects: &[Reach<'_>],
     wide: &Wide<'_>,
 ) -> Vec<Incident> {
-    let mut out = Vec::new();
-    for component in components.iter().filter(|c| c.down()) {
-        out.push(component_incident(component, classes, projects, wide));
-    }
-    for node in nodes.iter().filter(|n| !n.ready) {
-        out.push(node_incident(node, projects, wide));
-    }
+    let mut out: Vec<Incident> = components
+        .iter()
+        .filter(|c| c.down())
+        .map(|component| component_incident(component, classes, projects, wide))
+        .collect();
+    out.extend(
+        nodes
+            .iter()
+            .filter(|n| !n.ready)
+            .map(|node| node_incident(node, projects, wide)),
+    );
     out.sort_by(|a, b| a.id.cmp(&b.id));
     out.dedup_by(|a, b| {
         if a.id == b.id {

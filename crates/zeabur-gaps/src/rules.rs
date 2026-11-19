@@ -413,14 +413,18 @@ impl Rule for DanglingRoute {
                 .collect()
         });
         let services = services.as_ref();
-        let mut gaps = Vec::new();
-        for ingress in &input.snapshot.ingresses {
-            let name = ingress.metadata.name.as_deref().unwrap_or_default();
-            let backends = ingress_backends(ingress)
-                .into_iter()
-                .map(|(service, path)| (path, service));
-            gaps.extend(self.no_service("Ingress", name, backends, services));
-        }
+        let mut gaps: Vec<Gap> = input
+            .snapshot
+            .ingresses
+            .iter()
+            .flat_map(|ingress| {
+                let name = ingress.metadata.name.as_deref().unwrap_or_default();
+                let backends = ingress_backends(ingress)
+                    .into_iter()
+                    .map(|(service, path)| (path, service));
+                self.no_service("Ingress", name, backends, services)
+            })
+            .collect();
         for route in input.http_routes {
             let name = route.name();
             gaps.extend(self.no_service("HTTPRoute", name, route.local_service_refs(), services));
