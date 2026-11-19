@@ -73,7 +73,7 @@ export function QuickLook({
           <button
             type="button"
             onClick={() => onSelect(otherId)}
-            className="flex min-w-0 items-center gap-1.5 rounded font-medium outline-none hover:underline"
+            className="flex min-w-0 items-center gap-1.5 rounded font-medium hover:underline"
             translate="no"
           >
             <StatusDot health={statusOf(other).health} />

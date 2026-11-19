@@ -208,7 +208,7 @@ export function Reachability({
             </span>
             <button
               type="button"
-              className="flex w-full items-center justify-between gap-2 text-left outline-none sm:hidden"
+              className="flex w-full items-center justify-between gap-2 text-left sm:hidden"
               onClick={() => setDrawer("rules")}
             >
               {t("reach.rules", rules.length)}
@@ -377,7 +377,7 @@ function GroupButton({
       type="button"
       aria-expanded={expanded}
       onClick={onClick}
-      className="-mx-2 flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left outline-none hover:bg-v2-surface-hover aria-expanded:bg-v2-surface-hover"
+      className="-mx-2 flex min-w-0 items-center gap-2 rounded-md px-2 py-1 text-left hover:bg-v2-surface-hover aria-expanded:bg-v2-surface-hover"
     >
       <AccessPill access={group.access}>
         <span className="tabular-nums">{group.peers.length}</span>
@@ -434,7 +434,7 @@ function GroupTable({
                   type="button"
                   aria-pressed={descending}
                   onClick={() => setDescending((d) => !d)}
-                  className="inline-flex items-center gap-1 rounded outline-none hover:text-foreground"
+                  className="inline-flex items-center gap-1 rounded hover:text-foreground"
                 >
                   {t("reach.service")}
                   <CaretUpDownIcon className="size-3" aria-hidden="true" />

@@ -268,7 +268,7 @@ function MemberRow({
       <button
         type="button"
         onClick={() => onOpen({ kind: "details", member })}
-        className="flex min-w-0 items-center gap-3 text-left outline-none"
+        className="flex min-w-0 items-center gap-3 text-left"
       >
         <Avatar size="sm" shape="circle" name={name} />
         <span className="flex min-w-0 flex-col">

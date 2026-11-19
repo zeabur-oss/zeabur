@@ -71,7 +71,7 @@ export function Sidebar() {
         <Link
           to="/"
           activeOptions={{ exact: true, includeSearch: false }}
-          className="flex h-7 items-center rounded-md outline-none"
+          className="flex h-7 items-center rounded-md"
           aria-label="Zeabur"
         >
           <Logo className="h-5" aria-hidden="true" />

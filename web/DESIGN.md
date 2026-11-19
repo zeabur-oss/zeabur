@@ -34,11 +34,14 @@ look-alikes; `src/styles/app.css` imports it and adds only this interface's layo
 - **Empty states** that fill a page or a section are an `Empty` with its `Illustration` and one
   line; a "None." inside a card stays text.
 - **Choices** are `Select`, never a native `<select>`.
-- **Focus**: no focus rings. A field shows focus by its edge (`focus-within:border-ring`), a list
-  or menu by its highlighted row; Tab order, Esc and arrow keys work.
+- **Focus**: every control shows a visible `focus-visible` cue (border, background or underline); no
+  glow rings. A link or button takes the design system's outline (`--focus-ring`, from `:focus-visible`);
+  its unlayered rule beats a utility, so `outline-none` on a link or button hides nothing and stays
+  off. `focus-inset` draws that outline inside a row that fills a clipped card. A control that draws its own cue (a field's edge, `focus-within:border-ring`; a list or menu's
+  highlighted row) may set `outline-none`. Tab order, Esc and arrow keys work.
 - **Not used** (`scripts/check-ui-styles.sh` fails on them): `uppercase` and wide tracking,
   `bg-gradient-*`, backdrop blur, Phosphor `duotone`,
-  focus rings (`focus-visible:ring-*`, `focus-visible:outline-*`), middle-dot strings, bordered
+  glow rings (`focus-visible:ring-*`, `focus-visible:outline-*`), middle-dot strings, bordered
   pills for facts; also no hover lifts, no icon tiles, no `→` after link text (see Copy).
 
 Icons: Phosphor only (`import XIcon from "~icons/ph/x"`, `src/lib/icon.ts`), regular weight,
@@ -410,5 +413,5 @@ its utilities and components, not `transition-*` classes of your own. Here that 
   skeleton has the size of what replaces it, and a part that arrives later goes below the rest or
   holds its place.
 
-No focus rings (see the design system's tokens above); scrollable regions (the log) still take
-focus.
+Focus shows as the design system's outline or a border, background or underline, never a glow
+ring; scrollable regions (the log) still take focus.

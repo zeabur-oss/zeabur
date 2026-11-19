@@ -31,7 +31,7 @@ export function EventsTab({
               type="button"
               onClick={onClearPod}
               aria-label={t("events.clearPod")}
-              className="flex size-5 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-muted hover:text-foreground"
+              className="flex size-5 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
             >
               <XIcon className="size-3" aria-hidden="true" />
             </button>

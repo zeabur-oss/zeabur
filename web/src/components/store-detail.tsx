@@ -32,7 +32,7 @@ export function Warnings({ events, onEvents }: { events: Event[]; onEvents: () =
         <button
           type="button"
           onClick={onEvents}
-          className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary outline-none hover:text-main"
+          className="flex items-center gap-0.5 rounded text-xs font-medium text-secondary hover:text-main"
         >
           {t("common.all")}
           <CaretRightIcon className="size-3.5" aria-hidden="true" />

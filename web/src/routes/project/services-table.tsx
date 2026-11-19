@@ -126,7 +126,7 @@ export function ServicesTable({
           onClick={() =>
             set(active ? { desc: search.desc ? undefined : true } : { sort: key, desc: undefined })
           }
-          className="inline-flex items-center gap-1 rounded outline-none hover:text-foreground"
+          className="inline-flex items-center gap-1 rounded hover:text-foreground"
         >
           {label}
           <SortIcon className={cn("size-3", !active && "opacity-40")} aria-hidden="true" />
@@ -224,7 +224,7 @@ export function ServicesTable({
                     <td className="max-w-56 py-2 pr-3 pl-4">
                       <Link
                         {...serviceLink(project, service)}
-                        className="flex items-center gap-2.5 rounded-md outline-none"
+                        className="flex items-center gap-2.5 rounded-md"
                         title={service.name}
                       >
                         <ServiceIcon service={service} size="sm" />
@@ -354,7 +354,7 @@ function ServiceLines({
             <li key={serviceId(service)} className="border-t border-rule first:border-t-0">
               <Link
                 {...serviceLink(project, service)}
-                className="flex min-w-0 items-center gap-2.5 px-3 py-2.5 outline-none hover:bg-hover"
+                className="flex min-w-0 items-center gap-2.5 px-3 py-2.5 focus-inset hover:bg-hover"
               >
                 <StatusDot health={status.health} />
                 <span className="min-w-0 flex-1 truncate font-medium" translate="no">

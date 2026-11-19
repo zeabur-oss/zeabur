@@ -64,7 +64,7 @@ export function PodCells({
         {service.pods.slice(0, max).map((pod) => {
           const health = podHealth(pod)
           const className = cn(
-            "inline-flex items-center justify-center outline-none",
+            "inline-flex items-center justify-center",
             cellBox,
             cellColour[health],
           )

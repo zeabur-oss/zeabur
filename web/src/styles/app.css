@@ -43,6 +43,12 @@
   }
 }
 
+/* The design system's focus outline, drawn inside the box: for a control that fills a clipped row,
+   card or button group. Not a utility: the design system's `:focus-visible` rule is unlayered, so
+   only an unlayered rule overrides its offset. */
+.focus-inset:focus-visible {
+  outline-offset: -2px;
+}
 @utility flex-main {
   flex: 999 1 35rem;
 }
