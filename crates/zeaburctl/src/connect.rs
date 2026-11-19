@@ -438,19 +438,20 @@ fn one_member_note(database: &Database) -> Option<String> {
 
 /// `text` with every byte other than the RFC 3986 unreserved characters percent-encoded.
 fn encode(text: &str) -> String {
-    let mut out = String::new();
-    for byte in text.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
-            out.push(char::from(byte));
-        } else {
-            out.push('%');
-            for nibble in [byte >> 4, byte & 0xF] {
-                let digit = char::from_digit(u32::from(nibble), 16).unwrap_or('0');
-                out.push(digit.to_ascii_uppercase());
+    text.bytes()
+        .map(|byte| {
+            if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+                char::from(byte).to_string()
+            } else {
+                let digit = |nibble: u8| {
+                    char::from_digit(u32::from(nibble), 16)
+                        .unwrap_or('0')
+                        .to_ascii_uppercase()
+                };
+                format!("%{}{}", digit(byte >> 4), digit(byte & 0xF))
             }
-        }
-    }
-    out
+        })
+        .collect()
 }
 
 #[cfg(test)]
