@@ -41,6 +41,7 @@ use k8s_openapi::api::core::v1::{Namespace, ServiceAccount};
 use k8s_openapi::api::networking::v1::NetworkPolicy;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::{Value, json};
+use zeabur_model::kernel::dns::is_dns_label;
 use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
 use zeabur_model::kernel::names::{
     ANNOTATION_BUILD_CPU, ANNOTATION_BUILD_MEMORY, Conventions, admin_only_namespace,
@@ -52,7 +53,6 @@ use zeabur_model::{
 };
 
 use crate::change::{Target, Warning};
-use crate::checks::is_dns_label;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test, value_of};
 use crate::plan::{ErrorKind, PlanError, Planner, Working, error, to_json};

@@ -267,7 +267,7 @@ pub fn parse_service_port(text: &str) -> Result<ServicePort, String> {
     let (namespace, rest) = text.trim().split_once('/').ok_or_else(shape)?;
     let (name, port) = rest.split_once(':').ok_or_else(shape)?;
     for (what, value) in [("namespace", namespace), ("Service name", name)] {
-        if !zeabur_plan::checks::is_dns_label(value) {
+        if !zeabur_core::dns::is_dns_label(value) {
             return Err(format!(
                 "The {what} {value:?} is not a Kubernetes name (lower-case letters, digits and -)."
             ));

@@ -1,6 +1,7 @@
 pub mod data_store;
 pub mod denied;
 pub mod digest;
+pub mod dns;
 pub mod isolation;
 pub mod message;
 pub mod names;

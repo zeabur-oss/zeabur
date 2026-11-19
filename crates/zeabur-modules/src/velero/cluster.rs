@@ -58,6 +58,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
+use zeabur_model::kernel::dns::is_dns_label;
 
 use crate::backups::Outcome;
 use crate::{Read, strings, text};
@@ -606,15 +607,6 @@ fn cron_ok(cron: &str) -> bool {
         })
 }
 
-fn namespace_ok(name: &str) -> bool {
-    (1..=63).contains(&name.len())
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        && !name.starts_with('-')
-        && !name.ends_with('-')
-}
-
 /// Why a schedule request cannot be written, in a sentence; `None` when it can.
 #[must_use]
 pub fn schedule_problem(request: &ScheduleRequest) -> Option<String> {
@@ -624,7 +616,7 @@ pub fn schedule_problem(request: &ScheduleRequest) -> Option<String> {
     if !(1..=365).contains(&request.keep_days) {
         return Some("Keep backups from 1 to 365 days.".into());
     }
-    if let Some(bad) = request.namespaces.iter().find(|n| !namespace_ok(n)) {
+    if let Some(bad) = request.namespaces.iter().find(|n| !is_dns_label(n)) {
         return Some(format!("{bad:?} is not a namespace name."));
     }
     None
@@ -1000,7 +992,7 @@ pub fn new_namespace_problem(source: &str, into: &str) -> Option<String> {
             "Names starting with kube- are kept for Kubernetes; {into} cannot be a project."
         ));
     }
-    (!namespace_ok(into)).then(|| {
+    (!is_dns_label(into)).then(|| {
         format!(
             "{into:?} cannot name a namespace: use at most 63 lowercase letters, digits and \
              hyphens, starting and ending with a letter or digit."

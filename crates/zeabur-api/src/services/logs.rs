@@ -118,7 +118,7 @@ fn params(raw: Option<&str>) -> Result<Params, ApiError> {
                 })?;
             }
             "container" => {
-                if !zeabur_plan::checks::is_dns_label(&value) {
+                if !zeabur_core::dns::is_dns_label(&value) {
                     return Err(bad(format!("{value:?} is not a container's name.")));
                 }
                 params.container = Some(value.into_owned());
@@ -212,7 +212,7 @@ pub(crate) async fn history(
     RawQuery(raw): RawQuery,
 ) -> Result<Json<LogHistory>, ApiError> {
     let params = params(raw.as_deref())?;
-    if !zeabur_plan::checks::is_dns_label(&project) {
+    if !zeabur_core::dns::is_dns_label(&project) {
         return Err(bad(format!("{project:?} is not a project's name.")));
     }
     let pods = pod_pattern(&kind, &name).ok_or_else(|| {

@@ -9,6 +9,7 @@ use std::collections::BTreeSet;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use zeabur_model::adapters::provenance::Tool;
+use zeabur_model::kernel::dns::is_hostname;
 
 /// A refusal, as a stable `snake_case` code (the fixtures' `error`).
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -138,11 +139,9 @@ pub fn env_entry(change: &EnvEdit) -> Value {
 
 /// Checks a hostname (`mutation.validateHostname`).
 ///
-/// DNS labels of letters, digits and inner hyphens, at most 63 characters each and 253 in all,
-/// optionally behind one `*.` wildcard: the form Ingress and Gateway API hostnames take
-/// [rfc1123] [gateway-hostname].
+/// A lower-case hostname ([`is_hostname`]), optionally behind one `*.` wildcard: the form Ingress
+/// and Gateway API hostnames take [gateway-hostname].
 ///
-/// [rfc1123]: https://www.rfc-editor.org/rfc/rfc1123#section-2
 /// [gateway-hostname]: https://gateway-api.sigs.k8s.io/reference/spec/#hostname
 ///
 /// # Errors
@@ -153,17 +152,7 @@ pub fn validate_hostname(hostname: &str) -> Result<(), Refusal> {
         return Err(Refusal::of("hostname_required"));
     }
     let name = hostname.strip_prefix("*.").unwrap_or(hostname);
-    let valid = name.len() <= 253
-        && name.split('.').all(|label| {
-            !label.is_empty()
-                && label.len() <= 63
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-                && label
-                    .bytes()
-                    .all(|b| b.is_ascii_alphanumeric() || b == b'-')
-        });
-    if valid {
+    if is_hostname(name) {
         Ok(())
     } else {
         Err(Refusal::of("invalid_hostname"))

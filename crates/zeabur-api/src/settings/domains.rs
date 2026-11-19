@@ -48,7 +48,7 @@ pub fn parse_suffix(text: &str) -> Result<String, String> {
         .trim_start_matches("*.")
         .trim_end_matches('.')
         .to_ascii_lowercase();
-    if !zeabur_plan::checks::is_dns_subdomain(&suffix) || !suffix.contains('.') {
+    if !zeabur_core::dns::is_dns_subdomain(&suffix) || !suffix.contains('.') {
         return Err(format!(
             "{:?} is not a domain name such as apps.example.com.",
             text.trim()

@@ -204,7 +204,7 @@ impl Args {
                     .map_err(|e| format!("--metrics-service: {e}"))?;
         }
         if !self.namespace.is_empty() {
-            if !zeabur_plan::checks::is_dns_label(&self.namespace) {
+            if !zeabur_core::dns::is_dns_label(&self.namespace) {
                 return Err(format!(
                     "--namespace: {:?} is not a namespace's name",
                     self.namespace
@@ -296,7 +296,7 @@ fn domains(args: &Args) -> Result<zeabur_api::settings::DomainSettings, String> 
         .map_err(|e| format!("--domain-suffixes: {e}"))?;
     let issuer = args.cluster_issuer.trim();
     if !issuer.is_empty() {
-        if !zeabur_plan::checks::is_dns_subdomain(issuer) {
+        if !zeabur_core::dns::is_dns_subdomain(issuer) {
             return Err(format!(
                 "--cluster-issuer: {:?} is not a ClusterIssuer's name",
                 args.cluster_issuer
@@ -317,7 +317,7 @@ fn builds(args: &Args) -> Result<zeabur_api::settings::BuildSettings, String> {
         .split_once(':')
         .map_or((registry, None), |(host, port)| (host, Some(port)));
     let port_ok = port.is_none_or(|p| p.parse::<u16>().is_ok_and(|p| p > 0));
-    if !(zeabur_plan::checks::is_dns_subdomain(host) && port_ok) {
+    if !(zeabur_core::dns::is_dns_subdomain(host) && port_ok) {
         return Err(format!(
             "--build-registry: {:?} is not a registry such as zot.zot.svc:5000",
             args.build_registry
@@ -352,7 +352,7 @@ fn terminal(
             image.clone_into(setting);
         }
     }
-    if !zeabur_plan::checks::is_dns_label(&args.terminal_namespace) {
+    if !zeabur_core::dns::is_dns_label(&args.terminal_namespace) {
         return Err(format!(
             "--terminal-namespace: {:?} is not a namespace's name",
             args.terminal_namespace

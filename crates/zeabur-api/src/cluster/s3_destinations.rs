@@ -37,6 +37,7 @@ use base64::engine::general_purpose::STANDARD as BASE64;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
+use zeabur_core::dns::is_dns_label;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Namespace, Secret};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -703,15 +704,6 @@ async fn copied(cluster: &dyn Cluster, copy: CopyS3KeysChange) -> Result<Value, 
     Ok(object)
 }
 
-fn dns_label(name: &str) -> bool {
-    (1..=63).contains(&name.len())
-        && name
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-        && !name.starts_with('-')
-        && !name.ends_with('-')
-}
-
 fn bucket_name(bucket: &str) -> bool {
     (3..=63).contains(&bucket.len())
         && bucket
@@ -727,7 +719,7 @@ fn fields_problem(fields: &S3DestinationFields) -> Option<&'static str> {
     let host = endpoint
         .strip_prefix("https://")
         .or_else(|| endpoint.strip_prefix("http://"));
-    if !dns_label(&fields.name) {
+    if !is_dns_label(&fields.name) {
         Some(
             "A name has lower-case letters, digits and -, at most 63, and starts with a letter or digit.",
         )
@@ -1298,11 +1290,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn names_and_buckets_follow_kubernetes_and_s3() {
-        assert!(dns_label("r2-backups"));
-        for bad in ["", "-a", "a-", "A", "a_b", &"a".repeat(64)] {
-            assert!(!dns_label(bad), "{bad}");
-        }
+    fn buckets_follow_s3() {
         assert!(bucket_name("my.bucket-1"));
         for bad in ["ab", "My", ".ab", "ab-", "a b"] {
             assert!(!bucket_name(bad), "{bad}");

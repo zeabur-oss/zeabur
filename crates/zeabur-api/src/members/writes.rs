@@ -56,16 +56,7 @@ pub struct SetupLinkView {
 /// characters, as its `User` schema requires.
 #[must_use]
 pub(crate) fn is_username(name: &str) -> bool {
-    !name.is_empty()
-        && name.len() <= 63
-        && name.split('.').all(|label| {
-            !label.is_empty()
-                && label
-                    .bytes()
-                    .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'-')
-                && !label.starts_with('-')
-                && !label.ends_with('-')
-        })
+    name.len() <= 63 && zeabur_core::dns::is_dns_subdomain(name)
 }
 
 pub(crate) fn bad(detail: impl Into<String>) -> ApiError {

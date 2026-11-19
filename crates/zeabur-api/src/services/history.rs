@@ -291,7 +291,7 @@ pub(crate) async fn get(
     RawQuery(raw): RawQuery,
 ) -> Result<Json<ServiceHistory>, ApiError> {
     let range = range(raw.as_deref())?;
-    if !zeabur_plan::checks::is_dns_label(&project) {
+    if !zeabur_core::dns::is_dns_label(&project) {
         return Err(ApiError::from(Problem::new(
             Kind::BadRequest,
             format!("{project:?} is not a project's name."),

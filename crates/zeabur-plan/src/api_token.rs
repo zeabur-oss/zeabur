@@ -94,7 +94,7 @@ pub enum Refusal {
 ///
 /// [`Refusal::Name`] for a name that is not a DNS label.
 pub fn check_name(name: &str) -> Result<(), Refusal> {
-    if crate::checks::is_dns_label(name) {
+    if zeabur_model::kernel::dns::is_dns_label(name) {
         Ok(())
     } else {
         Err(Refusal::Name)

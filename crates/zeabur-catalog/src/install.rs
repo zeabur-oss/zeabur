@@ -49,8 +49,11 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
+use zeabur_kube::k8s_openapi::Resource;
+use zeabur_model::PodSecurityLevel;
 
 use crate::bundle;
+use crate::engine::{self, ChartRelease};
 
 /// The profiles the catalogue sizes components for.
 pub const PROFILES: [&str; 2] = ["single-node", "multi-node"];
@@ -375,7 +378,7 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
     if let Some(unknown) = file.unknown() {
         return Err(InstallError::Unknown(component.to_owned(), unknown));
     }
-    let rendered = Rendered::new(&file, profile).map_err(catalogue)?;
+    let rendered = Rendered::new(component, &file, profile).map_err(catalogue)?;
     Ok(InstallGuide {
         component: component.to_owned(),
         profile: profile.to_owned(),
@@ -426,16 +429,38 @@ struct Rendered<'a> {
     profile: &'a str,
     /// Per release: the merged values (inputs set at their paths), as YAML; empty when none.
     merged: Vec<String>,
+    /// The Namespace of each release, as Zeabur's installer writes it, as YAML documents.
+    namespaces: String,
+    /// Per release: its `HelmChart` as Zeabur's installer writes it, as YAML; `None` for
+    /// manifests.
+    charts: Vec<Option<String>>,
 }
 
 impl<'a> Rendered<'a> {
-    fn new(file: &'a File, profile: &'a str) -> Result<Self, String> {
+    fn new(id: &str, file: &'a File, profile: &'a str) -> Result<Self, String> {
+        let level = PodSecurityLevel::parse(&file.security.pod_security)
+            .ok_or_else(|| format!("Pod Security level {}", file.security.pod_security))?;
+        let mut namespaces = String::new();
+        let mut seen = Vec::new();
+        for release in &file.releases {
+            if !seen.contains(&release.namespace.as_str())
+                && let Some(namespace) = engine::namespace(&release.namespace, level)
+            {
+                seen.push(release.namespace.as_str());
+                namespaces.push_str(&yaml(&namespace)?);
+                namespaces.push_str(
+                    "---
+",
+                );
+            }
+        }
         let first_chart = file
             .releases
             .iter()
             .find(|r| r.is_chart())
             .map(|r| r.name.as_str());
         let mut merged = Vec::new();
+        let mut charts = Vec::new();
         for release in &file.releases {
             let mut values = parse_values(release.values.as_deref())?;
             if let Some(profile_values) = release.profiles.get(profile).and_then(Value::as_str) {
@@ -449,6 +474,7 @@ impl<'a> Rendered<'a> {
                     set_path(&mut values, path, placeholder(input));
                 }
             }
+            charts.push(Self::chart(id, release, &values)?);
             merged.push(if values.as_object().is_some_and(Map::is_empty) {
                 String::new()
             } else {
@@ -459,7 +485,34 @@ impl<'a> Rendered<'a> {
             file,
             profile,
             merged,
+            namespaces,
+            charts,
         })
+    }
+
+    /// A chart release's `HelmChart`, as YAML; `None` for manifests.
+    fn chart(id: &str, release: &Release, values: &Value) -> Result<Option<String>, String> {
+        let (chart, repo, version) = match release.source() {
+            Some(Source::Oci { url, version }) => (url, None, version),
+            Some(Source::Repo {
+                repo,
+                chart,
+                version,
+            }) => (chart, Some(repo), version),
+            Some(Source::Urls(_) | Source::Manifests(_)) | None => return Ok(None),
+        };
+        let mut object = engine::chart_object(
+            &ChartRelease {
+                name: release.release_name(),
+                chart,
+                repo,
+                version,
+                namespace: &release.namespace,
+            },
+            values,
+        )?;
+        engine::label_release(&mut object.metadata, id, &release.name);
+        yaml(&object).map(Some)
     }
 
     /// The Secrets inputs are stored in, each with its inputs: several inputs may share one
@@ -498,9 +551,9 @@ impl<'a> Rendered<'a> {
                 ),
             );
             if let Some((_, level)) = exempt.iter().find(|(name, _)| *name == ns) {
-                let labels: Vec<String> = PSA_MODES
+                let labels: Vec<String> = engine::POD_SECURITY_MODES
                     .iter()
-                    .map(|mode| format!("pod-security.kubernetes.io/{mode}={level}"))
+                    .map(|mode| format!("{mode}={level}"))
                     .collect();
                 push(
                     &mut out,
@@ -841,17 +894,20 @@ impl<'a> Rendered<'a> {
 
     /// Secrets, then each release: a manifest release as listed, a chart as its objects.
     fn append_releases(&self, out: &mut String, format: InstallFormat) {
-        for (ns, level) in self.exempt_namespaces() {
-            out.push_str(&namespace_object(ns, level));
-            out.push_str("---\n");
-        }
+        out.push_str(&self.namespaces);
         out.push_str(&self.secret_objects());
-        for (release, merged) in self.file.releases.iter().zip(&self.merged) {
+        for ((release, merged), chart) in self
+            .file
+            .releases
+            .iter()
+            .zip(&self.merged)
+            .zip(&self.charts)
+        {
             if let Some(text) = Self::manifest_release(release) {
                 out.push_str(&text);
                 continue;
             }
-            for object in Self::release_objects(format, release, merged) {
+            for object in Self::release_objects(format, release, merged, chart.as_deref()) {
                 out.push_str(&object);
                 out.push_str("---\n");
             }
@@ -859,12 +915,15 @@ impl<'a> Rendered<'a> {
     }
 
     /// A chart release's objects in one form; empty for manifests and for Helm.
-    fn release_objects(format: InstallFormat, release: &Release, merged: &str) -> Vec<String> {
+    fn release_objects(
+        format: InstallFormat,
+        release: &Release,
+        merged: &str,
+        chart: Option<&str>,
+    ) -> Vec<String> {
         match format {
             InstallFormat::Helm => Vec::new(),
-            InstallFormat::K3s => Self::helm_chart_object(release, merged)
-                .into_iter()
-                .collect(),
+            InstallFormat::K3s => chart.map(str::to_owned).into_iter().collect(),
             InstallFormat::Flux => Self::flux_objects(release, merged),
             InstallFormat::ArgoCd => Self::argo_cd_objects(release, merged),
         }
@@ -878,38 +937,6 @@ impl<'a> Rendered<'a> {
             InstallFormat::Flux => self.flux(),
             InstallFormat::ArgoCd => self.argo_cd(),
         }
-    }
-
-    /// One chart release as a k3s `HelmChart` in `kube-system`; `None` for manifests.
-    fn helm_chart_object(release: &Release, merged: &str) -> Option<String> {
-        let (chart, repo, version) = match release.source()? {
-            Source::Oci { url, version } => (url, None, version),
-            Source::Repo {
-                repo,
-                chart,
-                version,
-            } => (chart, Some(repo), version),
-            Source::Urls(_) | Source::Manifests(_) => return None,
-        };
-        let mut out = format!(
-            "apiVersion: helm.cattle.io/v1\nkind: HelmChart\nmetadata:\n  name: {}\n  namespace: kube-system\nspec:\n  chart: {chart}\n",
-            release.release_name()
-        );
-        if let Some(repo) = repo {
-            push(&mut out, format!("  repo: {repo}\n"));
-        }
-        push(
-            &mut out,
-            format!(
-                "  version: {version}\n  targetNamespace: {}\n  createNamespace: true\n",
-                release.namespace
-            ),
-        );
-        if !merged.is_empty() {
-            out.push_str("  valuesContent: |-\n");
-            out.push_str(&indent_block(merged, 4));
-        }
-        Some(out)
     }
 
     /// Flux sources and `HelmRelease`s.
@@ -1106,21 +1133,9 @@ fn set_path(root: &mut Value, path: &str, value: Value) {
 }
 
 /// Appends a formatted piece of text.
-/// The Pod Security modes a privileged component's namespace sets to `privileged`.
-const PSA_MODES: [&str; 3] = ["enforce", "audit", "warn"];
-
-/// A Namespace at the given Pod Security level, made before the releases in it; a cluster whose
-/// default is `restricted` (RKE2 with the CIS profile) refuses the pods otherwise.
-fn namespace_object(namespace: &str, level: &str) -> String {
-    let mut out =
-        format!("apiVersion: v1\nkind: Namespace\nmetadata:\n  name: {namespace}\n  labels:\n");
-    for mode in PSA_MODES {
-        push(
-            &mut out,
-            format!("    pod-security.kubernetes.io/{mode}: {level}\n"),
-        );
-    }
-    out
+/// `object` as a YAML document, with its `apiVersion` and `kind`.
+fn yaml<K: Resource + Serialize>(object: &K) -> Result<String, String> {
+    serde_saphyr::to_string(&engine::dynamic(object)?).map_err(|e| e.to_string())
 }
 
 fn push(out: &mut String, text: impl AsRef<str>) {
@@ -1244,6 +1259,53 @@ mod tests {
         }
     }
 
+    /// The `HelmChart` and Namespace objects of the k3s form are the ones Zeabur's installer
+    /// writes, without the annotations of the catalog release it installs from.
+    #[test]
+    fn the_k3s_form_holds_the_objects_the_installer_writes() {
+        let key = |o: &Value| format!("{}/{}", o["kind"], o["metadata"]["name"]);
+        for (id, text) in bundle::FILES {
+            let file: File = serde_saphyr::from_str(text).unwrap();
+            if !file.inputs.is_empty() {
+                continue;
+            }
+            let component = crate::api::ComponentFile {
+                id: (*id).to_owned(),
+                source_digest: String::new(),
+                declaration: serde_saphyr::from_str(text).unwrap(),
+                measurements: Vec::new(),
+            };
+            for profile in PROFILES {
+                let mut written: Vec<Value> = engine::steps_of(&component, "", profile)
+                    .unwrap()
+                    .into_iter()
+                    .flat_map(|step| step.objects)
+                    .map(|desired| {
+                        let mut object = desired.object;
+                        object.metadata.annotations = None;
+                        serde_json::to_value(object).unwrap()
+                    })
+                    .filter(|o| o["kind"] == "HelmChart" || o["kind"] == "Namespace")
+                    .collect();
+                let k3s = guide(id, profile)
+                    .unwrap()
+                    .formats
+                    .into_iter()
+                    .find(|f| f.format == InstallFormat::K3s)
+                    .unwrap()
+                    .text;
+                let mut exported: Vec<Value> = serde_saphyr::from_multiple::<Value>(&k3s)
+                    .unwrap()
+                    .into_iter()
+                    .filter(|o| o["kind"] == "HelmChart" || o["kind"] == "Namespace")
+                    .collect();
+                written.sort_by_key(key);
+                exported.sort_by_key(key);
+                assert_eq!(exported, written, "{id} {profile}");
+            }
+        }
+    }
+
     #[test]
     fn a_privileged_component_gets_a_privileged_namespace() {
         let (_, text) = bundle::FILES
@@ -1252,7 +1314,7 @@ mod tests {
             .unwrap();
         let mut file: File = serde_saphyr::from_str(text).unwrap();
         file.security.pod_security = "privileged".to_owned();
-        let rendered = Rendered::new(&file, "single-node").unwrap();
+        let rendered = Rendered::new("x", &file, "single-node").unwrap();
         let k3s = rendered.k3s();
         let namespace = k3s.find("kind: Namespace").unwrap();
         assert!(namespace < k3s.find("kind: HelmChart").unwrap());

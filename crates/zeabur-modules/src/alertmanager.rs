@@ -40,6 +40,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
+use zeabur_model::kernel::dns::is_rfc1035_label;
 
 use crate::{Module, Read, text};
 
@@ -368,14 +369,7 @@ pub fn problem(
 }
 
 fn name_problem(name: &str) -> Option<String> {
-    let valid = !name.is_empty()
-        && name.len() <= NAME_MAX
-        && name.starts_with(|c: char| c.is_ascii_lowercase())
-        && !name.ends_with('-')
-        && name
-            .chars()
-            .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '-');
-    (!valid).then(|| {
+    (!is_rfc1035_label(name, NAME_MAX)).then(|| {
         format!(
             "Name the channel with up to {NAME_MAX} lower-case letters, digits and hyphens, \
              starting with a letter."
