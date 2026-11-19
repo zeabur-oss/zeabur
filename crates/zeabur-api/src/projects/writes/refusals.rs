@@ -7,14 +7,12 @@ use zeabur_kube::{Cluster, ClusterError, WriteBody, WriteRequest};
 /// The problem for a refused write of `target`, reading the object again when kube-apiserver
 /// answers `422`.
 ///
-/// kube-apiserver answers a failed JSON Patch `test` with `422 Invalid` [k8s-patch-handler], the
-/// same code and reason as any invalid object, and its message is not an interface. So on a
-/// `422` to a patch, the object is read again and the patch's `test` operations are checked
-/// against it: if one no longer holds, the object moved on since the plan and the answer is
-/// `409`; if all hold, the `422` is a real validation error and passes through. Only when the
-/// object cannot be read is the message consulted ([`write_problem`]). A `403` or a webhook's
-/// `400` from admission becomes `quota-exceeded` or `policy-denied`
-/// ([`crate::projects::writes::admission`]).
+/// A failed JSON Patch `test` is answered `422 Invalid` like any invalid object
+/// [k8s-patch-handler], and its message is not an interface. So on a `422` to a patch, its `test`
+/// operations are checked against the object read again: one that no longer holds is a `409`,
+/// otherwise the `422` passes through. Only when the object cannot be read is the message consulted
+/// ([`write_problem`]). A `403` or a webhook's `400` from admission becomes `quota-exceeded` or
+/// `policy-denied` ([`crate::projects::writes::admission`]).
 ///
 /// [k8s-patch-handler]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/patch.go
 pub(super) async fn refused(
@@ -124,14 +122,11 @@ pub(super) fn moved_on(target: &zeabur_plan::Target) -> Problem {
 
 /// The problem for a refused write of `target`.
 ///
-/// A plan's preconditions failing means the object moved on since the plan was made, whichever
-/// way kube-apiserver says it: `409 Conflict` (a `resourceVersion` mismatch), `409
-/// AlreadyExists` (a name taken since), or a `422` that names no invalid field, which is how a
-/// JSON Patch that does not apply (a failed `test`, a `remove` of a path that is gone) is
-/// answered [k8s-patch]. All are `409` here, with the fix to plan again. A `422` that names a
-/// field is the result being invalid, and stays as kube-apiserver gave it. `429` and other
-/// refusals pass through as kube-apiserver gave them (a `429` with its `Retry-After`); a `403`
-/// also names the request that was refused ([`denied`]).
+/// A plan's preconditions failing means the object moved on since the plan: `409 Conflict`, `409
+/// AlreadyExists`, or a `422` that names no invalid field, which is how a JSON Patch that does not
+/// apply is answered [k8s-patch]. All are `409` here, with the fix to plan again. A `422` that
+/// names a field stays as kube-apiserver gave it, as do `429` (with its `Retry-After`) and other
+/// refusals. A `403` also names the request that was refused ([`denied`]).
 ///
 /// [k8s-patch]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/handlers/patch.go
 pub(super) fn write_problem(

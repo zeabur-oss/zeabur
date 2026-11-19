@@ -135,12 +135,10 @@ fn node_of<'a>(sample: &PrometheusSample, nodes: &'a [Node]) -> Option<&'a str> 
     })
 }
 
-/// Each node's kubelet filesystem in node-exporter's series ([`NODE_FILESYSTEMS`]).
-///
-/// The kubelet's `nodefs` is the filesystem that holds its root directory, `/var/lib/kubelet`
-/// unless `--root-dir` says otherwise ([eviction], "Eviction signals"; [kubelet]); of the
-/// filesystems node-exporter reports, that is the one mounted deepest on that path, `/` when
-/// nothing under it has a filesystem of its own.
+/// Each node's kubelet filesystem in node-exporter's series ([`NODE_FILESYSTEMS`]): the one mounted
+/// deepest on the kubelet's root directory, `/var/lib/kubelet` unless `--root-dir` says otherwise
+/// ([eviction], "Eviction signals"; [kubelet]), or `/` when nothing under it has a filesystem of
+/// its own.
 ///
 /// [eviction]: https://kubernetes.io/docs/concepts/scheduling-eviction/node-pressure-eviction/#eviction-signals
 /// [kubelet]: https://kubernetes.io/docs/reference/command-line-tools-reference/kubelet/
