@@ -13,7 +13,7 @@ publish = false
 # Lint policy (see CONTRIBUTING.md).
 # Everything is `warn` so work in progress still compiles; CI runs with `-D warnings`.
 
-# Crate levels, checked by scripts/check-levels.sh: a crate may depend (normal and build
+# Crate levels, checked by zeabur-oss-levels: a crate may depend (normal and build
 # dependencies) only on workspace crates of a lower level. Test crates are dev-dependencies only.
 # (Levels order crates; the product layers L0-L4 in docs/reference/architecture.mdx are a different thing.)
 [workspace.metadata.levels]
@@ -40,18 +40,18 @@ zeabur-test-support = 6
 xtask = 7
 
 # Integrations with installed components (see zeabur-modules' README), also checked by
-# scripts/check-levels.sh: only the composers may depend on a module crate, so the core crates
+# zeabur-oss-levels: only the composers may depend on a module crate, so the core crates
 # never know which modules a build has.
 [workspace.metadata.modules]
 crates = ["zeabur-modules"]
 composers = ["zeabur-api", "zeabur", "zeaburctl"]
 
 # Crates that run as their own component with a small trusted base, also checked by
-# scripts/check-levels.sh: each may depend only on the workspace crates listed for it.
+# zeabur-oss-levels: each may depend only on the workspace crates listed for it.
 [workspace.metadata.isolated]
 zeabur-proxy = []
 
-# Crates with no I/O and no key, also checked by scripts/check-levels.sh: a pure crate depends only on pure workspace crates.
+# Crates with no I/O and no key, also checked by zeabur-oss-levels: a pure crate depends only on pure workspace crates.
 [workspace.metadata.pure]
 crates = [
   "zeabur-model",

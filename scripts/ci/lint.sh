@@ -25,7 +25,7 @@ cargo_checks() {
   cargo deny --locked check
   # Writes target/unsafe-report.md, which the workflow uploads.
   node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy
-  ./scripts/check-levels.sh
+  node_modules/.bin/zeabur-oss-levels
   # The Helm chart: lint, what every rendering promises, and the values it refuses.
   ./scripts/check-chart.sh
 }
