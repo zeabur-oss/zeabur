@@ -59,6 +59,12 @@ fn read(changes: &[Change]) -> Found {
         } else if let Change::CreateUploadService(upload) = change {
             found.feature(Feature::ServiceCreated(Source::Upload));
             found.hosts.extend(upload.host.clone());
+        } else if let Change::CreateGitService(git) = change {
+            found.feature(Feature::ServiceCreated(Source::Git));
+            found.hosts.extend(git.host.clone());
+        } else if let Change::CreateImageService(image) = change {
+            found.feature(Feature::ServiceCreated(Source::Image));
+            found.hosts.extend(image.host.clone());
         } else if let Change::AddDomain(add) = change {
             found.hosts.push(add.hostname.clone());
         } else if let Some(Ok(object)) = created_object(change) {

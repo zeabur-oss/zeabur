@@ -13,12 +13,17 @@ use zeabur_plan::{
 use super::refusals::refused;
 use crate::error::{ApiError, get_read, read_problem};
 
-/// Whether `request` creates an object, from YAML or as a client built it.
+/// Whether `request` creates an object, from YAML, as a client built it, or as a new service.
 pub(super) fn creates(request: &PlanRequest) -> bool {
-    request
-        .changes
-        .iter()
-        .any(|c| matches!(c, Change::Create { .. }))
+    request.changes.iter().any(|c| {
+        matches!(
+            c,
+            Change::Create { .. }
+                | Change::CreateUploadService(_)
+                | Change::CreateGitService(_)
+                | Change::CreateImageService(_)
+        )
+    })
 }
 
 /// Whether `request` creates an object from a person's YAML.
@@ -45,11 +50,7 @@ pub(super) async fn served_kinds(
         .changes
         .iter()
         .any(|c| zeabur_plan::access::middleware_read(c).is_some() || is_ingress_maintenance(c));
-    let creates = request
-        .changes
-        .iter()
-        .any(|c| matches!(c, Change::Create { .. } | Change::CreateUploadService(_)));
-    if !creates && !middlewares {
+    if !creates(request) && !middlewares {
         return Ok(Vec::new());
     }
     let served = cluster

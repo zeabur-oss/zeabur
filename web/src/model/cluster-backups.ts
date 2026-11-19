@@ -2,6 +2,7 @@
 // backups go, when they run, and how each went.
 import type { Schemas } from "@/api/client"
 import { rules } from "@/api/rules"
+import { getDownloadClusterBackupUrl } from "@/api/zeabur"
 import { fits } from "@/model/rules"
 import { type Destination, joinFolder } from "@/model/s3-destinations"
 import type { Health } from "@/model/service"
@@ -198,8 +199,7 @@ export function covers(scope: { namespaces: string[]; excluded?: string[] }, nam
 
 /** Where a backup's contents download from: Zeabur fetches them from the location and streams
  * them, so no signed URL or key reaches the page. */
-export const backupDownloadUrl = (backup: string) =>
-  `/api/v1/cluster/backups/${encodeURIComponent(backup)}/download`
+export const backupDownloadUrl = getDownloadClusterBackupUrl
 
 /** The backup provider of `module` (`k8up`, `velero`). */
 export const providerOf = (providers: Schemas.BackupProvider[] | undefined, module: string) =>

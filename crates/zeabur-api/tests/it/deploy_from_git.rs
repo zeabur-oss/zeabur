@@ -1,8 +1,8 @@
-//! Deploying from Git, against an in-memory cluster: a deploy key is made at apply and its
-//! private half reaches only the Secret the apply creates, never a plan or an answer; a host
-//! whose key Zeabur does not pin needs its `known_hosts` lines; a service waiting for its first
-//! built image is building, or failed with the build, rather than failing to pull an image that
-//! does not exist yet; and a running service whose next build cannot happen says so.
+//! Deploying from Git, against an in-memory cluster: the deploy key of a Git service is made at
+//! apply and its private half reaches only the Secret the apply creates, never a plan or an answer;
+//! a host whose key Zeabur does not pin needs its `known_hosts` lines; a service waiting for its
+//! first built image is building, or failed with the build, rather than failing to pull an image
+//! that does not exist yet; and a running service whose next build cannot happen says so.
 
 #[cfg(test)]
 mod tests {
@@ -68,6 +68,27 @@ mod tests {
                         "output": {"image": "zot.zot.svc:5000/shop/site"}}})
     }
 
+    /// The API with a build registry, which a Git service needs.
+    fn git_app(cluster: &MemoryCluster) -> Router {
+        let settings = Settings {
+            builds: BuildSettings {
+                registry: Some("zot.zot.svc:5000".to_owned()),
+            },
+            ..Settings::default()
+        };
+        TestApi::new(cluster).with_settings(settings).router()
+    }
+
+    /// A Git service `site` read with a deploy key.
+    fn git_service(url: &str, known_hosts: Option<&str>) -> Value {
+        let mut access = json!({"type": "deployKey"});
+        if let Some(lines) = known_hosts {
+            access["knownHosts"] = json!(lines);
+        }
+        json!({"op": "createGitService", "name": "site", "url": url, "branch": "main",
+               "method": "dockerfile", "port": 8080, "access": access})
+    }
+
     async fn plan_and_apply(app: &Router, changes: Value) -> (Value, Value) {
         let request = json!({ "changes": changes });
         let (status, planned) =
@@ -102,15 +123,12 @@ mod tests {
 
     /// The plan lists the Secret with its values hidden and makes no key; the apply makes the key
     /// and creates an `ssh-auth` Secret Zeabur Builder reads, with GitHub's host key; the person
-    /// then reads its public half from the Secret.
+    /// then reads its public half through the `Build`.
     #[tokio::test]
     async fn a_deploy_key_is_made_at_apply_and_reaches_only_its_secret() {
         let cluster = cluster();
-        let app = app(&cluster);
-        let changes = json!([
-            {"op": "deployKey", "name": "site-git", "host": "github.com"},
-            {"op": "create", "object": build()},
-        ]);
+        let app = git_app(&cluster);
+        let changes = json!([git_service("git@github.com:acme/site.git", None)]);
         let (planned, applied) = plan_and_apply(&app, changes).await;
         assert!(!planned.to_string().contains("PRIVATE KEY"), "{planned}");
         let kinds: Vec<&str> = planned["objects"]
@@ -139,10 +157,16 @@ mod tests {
                 .starts_with("github.com ssh-ed25519 ")
         );
 
+        cluster.update(|s| {
+            s.secret_values.insert(
+                "shop/site-git".to_owned(),
+                BTreeMap::from([("ssh-privatekey".to_owned(), private.as_bytes().to_vec())]),
+            );
+        });
         let (status, public) = send(
             &app,
             "POST",
-            "/api/v1/projects/shop/deploy-keys/site-git/public",
+            "/api/v1/projects/shop/builds/site/deploy-key",
             None,
         )
         .await;
@@ -158,8 +182,8 @@ mod tests {
     #[tokio::test]
     async fn a_deploy_key_for_a_host_zeabur_does_not_pin_needs_its_lines() {
         let cluster = cluster();
-        let app = app(&cluster);
-        let request = json!({"changes": [{"op": "deployKey", "name": "site-git", "host": "git.example.com"}]});
+        let app = git_app(&cluster);
+        let request = json!({"changes": [git_service("git@git.example.com:acme/site.git", None)]});
         let (status, refusal) =
             send(&app, "POST", "/api/v1/projects/shop/plan", Some(&request)).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{refusal}");
@@ -173,7 +197,7 @@ mod tests {
     #[tokio::test]
     async fn a_deploy_key_for_another_host_trusts_the_lines_given() {
         let cluster = cluster();
-        let app = app(&cluster);
+        let app = git_app(&cluster);
         let ed25519 = "ssh-ed25519 \
             AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
         let given = format!(
@@ -195,8 +219,10 @@ mod tests {
             json!([{"algorithm": "ssh-ed25519",
                     "fingerprint": "SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU"}])
         );
-        let changes = json!([{"op": "deployKey", "name": "site-git",
-                              "host": "git.example.com:2222", "knownHosts": given}]);
+        let changes = json!([git_service(
+            "ssh://git@git.example.com:2222/acme/site.git",
+            Some(&given)
+        )]);
         plan_and_apply(&app, changes).await;
         assert_eq!(
             created_secret(&cluster)["stringData"]["known_hosts"],
@@ -457,8 +483,8 @@ mod tests {
         assert_eq!(slow["status"]["health"], "ok", "{slow}");
     }
 
-    /// When the host refuses a key, the person can see its public half again, read from the
-    /// Secret as them; a Secret without an SSH key says so.
+    /// When the host refuses a key, the person can see its public half again, read through the
+    /// `Build` from its Secret as them; a `Build` read with a token says so.
     #[tokio::test]
     async fn a_deploy_key_shows_its_public_half_again() {
         let cluster = cluster();
@@ -472,31 +498,35 @@ mod tests {
                 )]),
             );
             s.secret_values.insert(
-                "shop/site-token".to_owned(),
+                "shop/blog-git".to_owned(),
                 BTreeMap::from([("password".to_owned(), b"t".to_vec())]),
             );
+            for (name, credentials) in [("site", "site-git"), ("blog", "blog-git"), ("docs", "")] {
+                let mut build = json!({"apiVersion": "builder.zeabur.com/v1alpha1",
+                    "kind": "Build",
+                    "metadata": {"name": name, "namespace": "shop"},
+                    "spec": {"builderRef": "dockerfile",
+                             "source": {"git": {"url": "https://github.com/acme/site.git",
+                                                "ref": "main"}},
+                             "output": {"image": "zot.zot.svc:5000/shop/site"}}});
+                if !credentials.is_empty() {
+                    build["spec"]["source"]["credentialsRef"] = json!({"name": credentials});
+                }
+                s.dynamic.push(serde_json::from_value(build).unwrap());
+            }
         });
         let app = app(&cluster);
-        let (status, answer) = send(
-            &app,
-            "POST",
-            "/api/v1/projects/shop/deploy-keys/site-git/public",
-            None,
-        )
-        .await;
+        let reveal = |build: &str| format!("/api/v1/projects/shop/builds/{build}/deploy-key");
+        let (status, answer) = send(&app, "POST", &reveal("site"), None).await;
         assert_eq!(status, StatusCode::OK, "{answer}");
         assert!(
             key.public
                 .starts_with(answer["publicKey"].as_str().unwrap())
         );
         assert!(!answer.to_string().contains("PRIVATE"));
-        let (status, _) = send(
-            &app,
-            "POST",
-            "/api/v1/projects/shop/deploy-keys/site-token/public",
-            None,
-        )
-        .await;
-        assert_eq!(status, StatusCode::BAD_REQUEST);
+        for build in ["blog", "docs"] {
+            let (status, _) = send(&app, "POST", &reveal(build), None).await;
+            assert_eq!(status, StatusCode::BAD_REQUEST, "{build}");
+        }
     }
 }

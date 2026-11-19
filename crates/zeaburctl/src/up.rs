@@ -24,7 +24,7 @@ use zeabur_api::projects::writes::ApplyRequest;
 use zeabur_core::problem::Problem;
 use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
 use zeabur_kube::{Cluster, UserClient, UserToken, ZeaburInfo};
-use zeabur_plan::{Change, PlanRequest, UploadMethod, UploadServiceChange};
+use zeabur_plan::{BuildMethod, Change, PlanRequest, UploadServiceChange};
 
 use crate::forward::{self, ServiceAddress};
 use crate::in_process::InProcess;
@@ -47,10 +47,10 @@ enum Method {
 }
 
 impl Method {
-    const fn upload(self) -> UploadMethod {
+    const fn upload(self) -> BuildMethod {
         match self {
-            Self::Railpack => UploadMethod::Railpack,
-            Self::Dockerfile => UploadMethod::Dockerfile,
+            Self::Railpack => BuildMethod::Railpack,
+            Self::Dockerfile => BuildMethod::Dockerfile,
         }
     }
 }

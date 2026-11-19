@@ -2,6 +2,7 @@
 import * as z from "zod/mini"
 
 import type { Problem, Schemas } from "@/api/client"
+import { getOpenClusterToolsTerminalUrl, getOpenToolsTerminalUrl } from "@/api/zeabur"
 import { roleYaml } from "@/model/rbac"
 
 export type ServerFrame = Schemas.ServerFrame
@@ -84,9 +85,11 @@ export function toolsTerminalUrl(
   name: string,
 ): string {
   const scheme = location.protocol === "https:" ? "wss:" : "ws:"
-  const base =
-    project === undefined ? "/api/v1/cluster" : `/api/v1/projects/${encodeURIComponent(project)}`
-  return `${scheme}//${location.host}${base}/tools/${encodeURIComponent(name)}/terminal`
+  const path =
+    project === undefined
+      ? getOpenClusterToolsTerminalUrl(name)
+      : getOpenToolsTerminalUrl(project, name)
+  return `${scheme}//${location.host}${path}`
 }
 
 /** Both verbs on `pods/exec`: a WebSocket handshake is a GET (RFC 6455 §4.1), so RBAC checks `get`;

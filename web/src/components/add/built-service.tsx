@@ -90,9 +90,7 @@ export function resolveBuilt<F extends BuiltForm>(
     host,
     variables: context.env.variables,
     dockerfile: method === "dockerfile" ? form.dockerfile : "",
-    buildVariables: context.buildEnv.variables.flatMap((v) =>
-      "value" in v ? [{ name: v.name, value: v.value }] : [],
-    ),
+    buildVariables: context.buildEnv.variables,
     security,
   }
   return { name, method, port, portText, publish, publicUrl, host, security, resolved }

@@ -60,6 +60,35 @@ export const rules = {
     maxLength: 34,
     minLength: 1,
   },
+  "GitServiceChange.branch": {
+    pattern: "^(\\.?[A-Za-z0-9_-])+\\.?(/(\\.?[A-Za-z0-9_-])+\\.?)*$",
+  },
+  "GitServiceChange.directory": {
+    maxLength: 1024,
+    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
+  },
+  "GitServiceChange.dockerfile": {
+    maxLength: 1024,
+    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
+  },
+  "GitServiceChange.name": {
+    maxLength: 40,
+    pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$",
+  },
+  "ImageServiceChange.image": {
+    pattern: "^[a-z0-9][A-Za-z0-9._/:@-]*$",
+  },
+  "ImageServiceChange.name": {
+    maxLength: 40,
+    pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$",
+  },
+  "ImageServiceChange.port": {
+    minimum: 1,
+  },
+  "ImageServiceChange.replicas": {
+    minimum: 1,
+    maximum: 20,
+  },
   "MemberChange.createToken.name": {
     maxLength: 63,
     pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
@@ -83,9 +112,9 @@ export const rules = {
     maxLength: 63,
     pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
   },
-  ServiceReplicas: {
-    minimum: 1,
-    maximum: 20,
+  "ServiceVolume.name": {
+    maxLength: 63,
+    pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
   },
   "UploadServiceChange.directory": {
     maxLength: 1024,

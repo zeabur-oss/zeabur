@@ -69,9 +69,7 @@ function BuildOptionsForm({
     true,
   )
   const parsed = parseEnv(added)
-  const set = parsed.variables.flatMap((v) =>
-    "value" in v ? [{ name: v.name, value: v.value }] : [],
-  )
+  const set = parsed.variables
   const problems = {
     directory: pathProblem(options.directory),
     dockerfile: pathProblem(options.dockerfile),

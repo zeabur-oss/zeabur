@@ -56,9 +56,7 @@ export function createUploadService(form: UploadService, request: string): Chang
     ...(dockerfile ? { dockerfile } : {}),
     ...(port ? { port: Number(port) } : {}),
     ...(port && form.publicUrl ? { host: form.host.trim() } : {}),
-    variables: form.variables.flatMap((v) =>
-      "value" in v ? [{ name: v.name, value: v.value }] : [],
-    ),
+    variables: form.variables,
     buildVariables: form.buildVariables,
     size: form.size,
     security: form.security,

@@ -156,35 +156,45 @@ stringData:
         assert_eq!(secret["metadata"]["namespace"], "shop");
     }
 
-    /// The "Docker image" form sends objects, not YAML, so nothing asks discovery: a Deployment,
-    /// its Service, an Ingress asking cert-manager for HTTPS, and a volume claim are planned and
-    /// created claim first, Ingress last, with the annotation and `tls` block as sent.
+    /// The "Docker image" form sends the service, and the server makes its objects: a Deployment,
+    /// its Service, an Ingress asking the configured issuer for HTTPS, and a volume claim, planned
+    /// without discovery and created claim first, Ingress last. Its YAML hand-off lists the same
+    /// objects in plan order.
     #[tokio::test]
     async fn a_service_from_an_image_is_created_without_discovery() {
         let cluster = cluster();
-        let app = app(&cluster);
-        let labels = json!({"app.kubernetes.io/name": "site"});
-        let objects = [
-            json!({"apiVersion": "apps/v1", "kind": "Deployment",
-                   "metadata": {"name": "site", "labels": labels},
-                   "spec": {"replicas": 1, "strategy": {"type": "Recreate"},
-                            "selector": {"matchLabels": labels},
-                            "template": {"metadata": {"labels": labels},
-                                         "spec": {"containers": [{"name": "site", "image": "ghcr.io/acme/site:1.4",
-                                                                  "ports": [{"containerPort": 8080}]}]}}}}),
-            json!({"apiVersion": "v1", "kind": "Service", "metadata": {"name": "site", "labels": labels},
-                   "spec": {"selector": labels, "ports": [{"name": "http", "port": 8080, "targetPort": 8080}]}}),
-            json!({"apiVersion": "networking.k8s.io/v1", "kind": "Ingress",
-                   "metadata": {"name": "site", "labels": labels,
-                                "annotations": {"cert-manager.io/cluster-issuer": "letsencrypt"}},
-                   "spec": {"tls": [{"hosts": ["site-shop.apps.example.com"], "secretName": "site-tls"}],
-                            "rules": [{"host": "site-shop.apps.example.com", "http": {"paths": [{
-                                "path": "/", "pathType": "Prefix",
-                                "backend": {"service": {"name": "site", "port": {"number": 8080}}}}]}}]}}),
-            json!({"apiVersion": "v1", "kind": "PersistentVolumeClaim", "metadata": {"name": "site-data", "labels": labels},
-                   "spec": {"accessModes": ["ReadWriteOnce"], "resources": {"requests": {"storage": "1Gi"}}}}),
-        ];
-        let request = json!({"changes": objects.iter().map(|o| json!({"op": "create", "object": o})).collect::<Vec<_>>()});
+        let settings = Settings {
+            domains: DomainSettings {
+                cluster_issuer: Some("letsencrypt".to_owned()),
+                ..DomainSettings::default()
+            },
+            ..Settings::default()
+        };
+        let app = TestApi::new(&cluster).with_settings(settings).router();
+        let change = json!({"name": "site", "image": "ghcr.io/acme/site:1.4", "port": 8080,
+            "host": "site-shop.apps.example.com", "size": "small", "replicas": 1, "secretVariables": true,
+            "security": "baseline", "volumes": [{"name": "data", "mountPath": "/data", "size": "1Gi"}]});
+        let (status, yaml) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/image-service/yaml",
+            Some(&change),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{yaml}");
+        let kinds: Vec<Value> = yaml["yaml"]
+            .as_str()
+            .unwrap()
+            .split("---\n")
+            .map(|d| serde_saphyr::from_str::<Value>(d).unwrap()["kind"].clone())
+            .collect();
+        assert_eq!(
+            kinds,
+            ["PersistentVolumeClaim", "Deployment", "Service", "Ingress"]
+        );
+        let mut op = change.clone();
+        op["op"] = json!("createImageService");
+        let request = json!({"changes": [op]});
         let (status, planned) = plan(&app, &request).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
         let (status, applied) = apply(&app, &planned).await;
@@ -193,7 +203,7 @@ stringData:
         let kinds: Vec<&str> = writes.iter().map(|w| w.target.kind.as_str()).collect();
         assert_eq!(
             kinds,
-            ["PersistentVolumeClaim", "Service", "Deployment", "Ingress"]
+            ["PersistentVolumeClaim", "Deployment", "Service", "Ingress"]
         );
         let WriteBody::Create(ingress) = &writes[3].body else {
             panic!("a creation is a POST");

@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import type { Schemas } from "@/api/client"
 import {
   composeChanges,
   differences,
@@ -80,60 +81,59 @@ const context: ComposeContext = {
 }
 
 type Object = { kind: string; metadata: { name: string }; [key: string]: any }
+const objectsOf = (changes: Schemas.Change[]) =>
+  changes.flatMap((c) => (c.op === "create" ? [c.object as unknown as Object] : []))
+const servicesOf = (changes: Schemas.Change[]) =>
+  changes.flatMap((c) => (c.op === "createImageService" ? [c] : []))
 const objects = (choices: ComposeChoices) => {
   const changes = composeChanges(conversion, choices, context)
-  return {
-    ops: changes.map((c) => c.op),
-    objects: changes.flatMap((c) => (c.op === "create" ? [c.object as unknown as Object] : [])),
-  }
+  return { objects: objectsOf(changes), services: servicesOf(changes) }
 }
 const named = (list: Object[], kind: string, name: string) =>
   list.find((o) => o.kind === kind && o.metadata.name === name)
+const service = (list: Schemas.ImageServiceChange[], name: string) =>
+  list.find((s) => s.name === name)
 
 describe("composeChanges", () => {
   test("databases an operator makes get the connection variables of the database forms", () => {
-    const { ops, objects: made } = objects({
+    const { objects: made, services } = objects({
       managed: new Set(["db", "cache"]),
       published: new Map([["web", ""]]),
     })
-    expect(ops.every((op) => op === "create")).toBe(true)
     expect(named(made, "Cluster", "db")?.spec.imageName).toContain(":16-")
     expect(named(made, "Dragonfly", "cache")).toBeDefined()
-    expect(named(made, "PersistentVolumeClaim", "db-db-data")).toBeUndefined()
-    expect(named(made, "Ingress", "web")?.spec.rules[0].host).toBe("web-shop.apps.example.com")
+    expect(services.map((s) => s.name)).toEqual(["web"])
 
-    const pod = named(made, "Deployment", "web")?.spec.template.spec
-    const container = pod.containers[0]
-    expect(container.args).toEqual(["node", "server.js"])
-    expect(container.env).toEqual([
-      { name: "DATABASE_URL", valueFrom: { secretKeyRef: { name: "db-app", key: "uri" } } },
-      { name: "DB_PASSWORD", valueFrom: { secretKeyRef: { name: "db-app", key: "password" } } },
-      {
-        name: "REDIS_PASSWORD",
-        valueFrom: { secretKeyRef: { name: "cache-auth", key: "password" } },
-      },
+    const web = service(services, "web")!
+    expect(web.host).toBe("web-shop.apps.example.com")
+    expect(web.args).toEqual(["node", "server.js"])
+    expect(web.variables).toEqual([
+      { name: "LOG", value: "info" },
+      { name: "DATABASE_URL", valueFrom: { secretName: "db-app", key: "uri" } },
+      { name: "DB_HOST", value: "db-rw.shop.svc:5432" },
+      { name: "DB_PASSWORD", valueFrom: { secretName: "db-app", key: "password" } },
+      { name: "REDIS_PASSWORD", valueFrom: { secretName: "cache-auth", key: "password" } },
       { name: "REDIS_URL", value: "redis://:$(REDIS_PASSWORD)@cache.shop.svc:6379" },
     ])
-    expect(named(made, "Secret", "web-env")?.stringData).toEqual({
-      LOG: "info",
-      DB_HOST: "db-rw.shop.svc:5432",
-    })
-    expect(pod.initContainers.map((c: any) => c.command[2])).toEqual([
-      "until nc -z -w 2 cache.shop.svc 6379; do sleep 2; done",
-      "until nc -z -w 2 db-rw.shop.svc 5432; do sleep 2; done",
+    expect(web.waitFor?.hosts).toEqual([
+      { host: "cache.shop.svc", port: 6379 },
+      { host: "db-rw.shop.svc", port: 5432 },
     ])
   })
 
   test("a database kept as its image runs it with its usual port and volume", () => {
-    const { objects: made } = objects({ managed: new Set(), published: new Map() })
-    const db = named(made, "Deployment", "db")?.spec
+    const { services } = objects({ managed: new Set(), published: new Map() })
+    const db = service(services, "db")!
     expect(db.replicas).toBe(1)
-    expect(named(made, "Service", "db")?.spec.ports[0].port).toBe(5432)
-    expect(named(made, "PersistentVolumeClaim", "db-db-data")).toBeDefined()
-    expect(named(made, "Ingress", "web")).toBeUndefined()
-    const env = named(made, "Secret", "web-env")?.stringData
-    expect(env.DATABASE_URL).toBe("postgres://acme:s3cret@db:5432/acme")
-    expect(named(made, "Deployment", "web")?.spec.replicas).toBe(3)
+    expect(db.port).toBe(5432)
+    expect(db.volumes?.map((v) => v.name)).toEqual(["db-data"])
+    const web = service(services, "web")!
+    expect(web.host).toBeUndefined()
+    expect(web.variables).toContainEqual({
+      name: "DATABASE_URL",
+      value: "postgres://acme:s3cret@db:5432/acme",
+    })
+    expect(web.replicas).toBe(3)
   })
 })
 
@@ -229,24 +229,16 @@ describe("MinIO", () => {
       { managed: new Set(["minio"]), published: new Map() },
       context,
     )
-    const made = changes.flatMap((c) => (c.op === "create" ? [c.object as unknown as Object] : []))
+    const made = objectsOf(changes)
     expect(named(made, "Seaweed", "minio")).toBeDefined()
     expect(named(made, "Bucket", "minio-uploads")?.spec.name).toBe("uploads")
-    expect(named(made, "Deployment", "minio")).toBeUndefined()
-    const container = named(made, "Deployment", "app")?.spec.template.spec.containers[0]
-    expect(container.env).toEqual([
-      {
-        name: "S3_ACCESS_KEY_ID",
-        valueFrom: { secretKeyRef: { name: "minio-app", key: "accessKey" } },
-      },
-      {
-        name: "S3_SECRET_ACCESS_KEY",
-        valueFrom: { secretKeyRef: { name: "minio-app", key: "secretKey" } },
-      },
+    const services = servicesOf(changes)
+    expect(services.map((s) => s.name)).toEqual(["app"])
+    expect(service(services, "app")?.variables).toEqual([
+      { name: "S3_ENDPOINT", value: "http://minio-s3.shop.svc:8333" },
+      { name: "S3_ACCESS_KEY_ID", valueFrom: { secretName: "minio-app", key: "accessKey" } },
+      { name: "S3_SECRET_ACCESS_KEY", valueFrom: { secretName: "minio-app", key: "secretKey" } },
+      { name: "S3_BUCKET", value: "uploads" },
     ])
-    expect(named(made, "Secret", "app-env")?.stringData).toEqual({
-      S3_ENDPOINT: "http://minio-s3.shop.svc:8333",
-      S3_BUCKET: "uploads",
-    })
   })
 })

@@ -216,8 +216,7 @@ promised a stable `/api/v1`.",
         pods::exec::ClientFrame,
         pods::exec::ServerFrame,
         rules::DatabaseName,
-        rules::ProjectName,
-        rules::ServiceReplicas
+        rules::ProjectName
     ))
 )]
 struct ApiDoc;
@@ -338,6 +337,7 @@ macro_rules! handlers {
             cluster::github_app::project,
             images::inspect,
             projects::compose::convert_compose,
+            projects::image_service::yaml,
             projects::deploy_keys::public,
             projects::network_policy::presets,
             projects::usage::get,

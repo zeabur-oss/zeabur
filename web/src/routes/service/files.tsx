@@ -68,17 +68,14 @@ type Mount = Schemas.FileMount
 type Entry = Schemas.FileEntry
 type Kind = Schemas.FileMountKind
 
-const base = (p: Place) =>
-  `/api/v1/projects/${encodeURIComponent(p.project)}/pods/${encodeURIComponent(p.pod)}/files`
+/** The container and reader of a place, as the files endpoints take them. */
+const reader = (p: Place) => ({
+  ...(p.container ? { container: p.container } : {}),
+  ...(p.via ? { via: p.via } : {}),
+})
 
-const query = (p: Place, extra: Record<string, string | undefined>) => {
-  const params = new URLSearchParams()
-  for (const [name, value] of Object.entries({ container: p.container, via: p.via, ...extra }))
-    if (value) params.set(name, value)
-  return params.toString()
-}
-
-const contentUrl = (p: Place, path: string) => `${base(p)}/content?${query(p, { path })}`
+const contentUrl = (p: Place, path: string) =>
+  zeabur.getDownloadFileUrl(p.project, p.pod, { ...reader(p), path })
 
 const join = (folder: string, name: string) => (folder === "/" ? `/${name}` : `${folder}/${name}`)
 const parentOf = (path: string) => path.slice(0, path.lastIndexOf("/")) || "/"
@@ -1258,7 +1255,11 @@ function send(
     const request = new XMLHttpRequest()
     request.open(
       "PUT",
-      `${base(place)}/content?${query(place, { path, replace: replace ? "true" : undefined })}`,
+      zeabur.getUploadFileUrl(place.project, place.pod, {
+        ...reader(place),
+        path,
+        ...(replace ? { replace } : {}),
+      }),
     )
     for (const [name, value] of Object.entries(REQUEST_HEADERS))
       request.setRequestHeader(name, value)

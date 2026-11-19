@@ -13,11 +13,13 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use zeabur_model::{PodSecurityLevel, ProjectIcon, TaskConcurrency, WorkloadRef};
 
+use crate::built_service::GitServiceChange;
 use crate::checks::{ProbeRequest, ResourceRef, VolumeRequest};
+use crate::image_service::ImageServiceChange;
 use crate::rules::{EnvEdit, FieldChange};
 
-// `zeabur-api` resolves `DeployKey`, `PageServer`, `Template` and `CopyS3Keys` into other
-// changes before the planner sees them. The planner rejects them.
+// `zeabur-api` resolves `PageServer`, `Template` and `CopyS3Keys` into other changes, and makes
+// the deploy key of a `CreateGitService`, before the planner sees them. The planner rejects them.
 /// One change a person asks for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -339,24 +341,15 @@ pub enum Change {
     },
     /// Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
     /// uploaded-folder source that asks for its upload token, and the objects of the service that
-    /// runs the image it builds (see the `upload_service` module).
+    /// runs the image it builds (see the `built_service` module).
     CreateUploadService(UploadServiceChange),
-    /// Create the Secret that holds an SSH deploy key, for Zeabur Builder to fetch a private
-    /// repository: a `kubernetes.io/ssh-auth` Secret with the private key and the Git host's
-    /// `known_hosts`, labelled `builder.zeabur.com/git-credentials: "true"`. The API plans the
-    /// Secret as a `create` with its values hidden and makes the key pair at apply, so the
-    /// private key never leaves the server.
-    #[serde(rename_all = "camelCase")]
-    DeployKey {
-        /// The Secret's name.
-        name: String,
-        /// The Git host as the repository's SSH URL names it, with `:port` when it is not 22.
-        host: String,
-        /// The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
-        /// `github.com` and `gitlab.com`, whose keys Zeabur pins.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        known_hosts: Option<String>,
-    },
+    /// Create a service from a Git repository: a Zeabur Builder `Build` of the repository, its
+    /// credentials, and the objects of the service that runs the image it builds (see the
+    /// `built_service` module).
+    CreateGitService(GitServiceChange),
+    /// Create a service that runs a container image: its Deployment, and the Secrets, claims,
+    /// Service and Ingress the change asks for (see the `image_service` module).
+    CreateImageService(ImageServiceChange),
     /// Create a Secret with the keys of an S3 destination from the cluster's list. The API reads
     /// the destination's Secret as the person and plans the Secret as a `create`, so the keys
     /// never travel through the browser. The Secret is labelled with the destination and names
@@ -672,11 +665,11 @@ pub struct BuildOptionsChange {
     pub env: Vec<EnvEdit>,
 }
 
-/// How Zeabur Builder builds an uploaded folder.
+/// How Zeabur Builder builds a folder.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
-pub enum UploadMethod {
+pub enum BuildMethod {
     /// Railpack picks the language.
     Railpack,
     /// The folder's Dockerfile.
@@ -722,7 +715,7 @@ pub struct UploadServiceChange {
     /// [`Change::UploadToken`]).
     pub request: String,
     /// How the folder is built.
-    pub method: UploadMethod,
+    pub method: BuildMethod,
     /// The folder inside the upload to build. Left out: the whole upload.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
@@ -733,7 +726,7 @@ pub struct UploadServiceChange {
         )
     )]
     pub directory: Option<String>,
-    /// The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`].
+    /// The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "openapi",
