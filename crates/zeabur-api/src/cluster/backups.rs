@@ -467,7 +467,11 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
     }
     let namespace = v::velero_namespace(&locations, &schedules);
     let bytes = v::volume_bytes(&volumes);
-    let mut listed: Vec<v::BackupView> = backups.iter().map(|b| v::backup(b, &bytes)).collect();
+    let mut locations: Vec<v::Location> = locations.iter().map(v::location).collect();
+    let mut listed: Vec<v::BackupView> = backups
+        .iter()
+        .map(|b| v::backup(b, &bytes, &locations))
+        .collect();
     listed.sort_by(|a, b| b.time().cmp(&a.time()).then_with(|| a.name.cmp(&b.name)));
     let total_backups = listed.len();
     listed.truncate(SHOWN);
@@ -481,7 +485,6 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
         (b.started.is_none(), &b.started, &b.name).cmp(&(a.started.is_none(), &a.started, &a.name))
     });
     restores.truncate(SHOWN);
-    let mut locations: Vec<v::Location> = locations.iter().map(v::location).collect();
     locations.sort_by(|a, b| (!a.default, &a.name).cmp(&(!b.default, &b.name)));
     let keys_from = keys_from(cluster, &namespace, &locations).await;
     let mut schedules: Vec<v::ScheduleView> = schedules.iter().map(v::schedule).collect();
@@ -941,7 +944,7 @@ async fn finished_backup(
                 format!("Velero has no backup {backup:?}."),
             ))
         })?;
-    let view = v::backup(&found, &BTreeMap::new());
+    let view = v::backup(&found, &BTreeMap::new(), &[]);
     if !matches!(view.outcome, Outcome::Succeeded | Outcome::PartiallyFailed) {
         return Err(invalid(format!(
             "Backup {backup} has not finished, so it cannot be restored."

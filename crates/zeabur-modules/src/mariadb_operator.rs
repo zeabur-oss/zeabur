@@ -7,8 +7,9 @@
 //! `app.kubernetes.io/name: mariadb` and `app.kubernetes.io/instance: <name>`. Clients connect
 //! through the Service of its name on `spec.port` (3306), or `<name>-primary` with replication.
 //! Each member keeps its data in the claim `storage-<name>-<n>`. The `Ready` condition says how
-//! it is, and `status.currentPrimary` names the primary. `spec.database`, `spec.username` and
-//! `spec.passwordSecretKeyRef` make the user services connect as [mdb-api].
+//! it is, read by the kstatus generic rule [kstatus-generic], and `status.currentPrimary` names
+//! the primary. `spec.database`, `spec.username` and `spec.passwordSecretKeyRef` make the user
+//! services connect as [mdb-api].
 //!
 //! # Backups
 //!
@@ -20,9 +21,11 @@
 //!
 //! [mdb-api]: https://github.com/mariadb-operator/mariadb-operator/blob/v26.10.1/docs/api_reference.md
 //! [mdb-backup]: https://github.com/mariadb-operator/mariadb-operator/blob/v26.10.1/docs/logical_backup.md
+//! [kstatus-generic]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/generic.go
 
 use serde_json::Value;
 use zeabur_kube::DynamicObject;
+use zeabur_model::readiness::{self, Reason, Status};
 
 use crate::backups::{Schedule, Target, TargetKind, newest};
 use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
@@ -52,19 +55,19 @@ pub const BACKUPS: Read = Read {
     kind: "Backup",
 };
 
+/// The state of a `MariaDB`: paused while `spec.suspend` holds, else by the kstatus generic rule
+/// over its conditions [kstatus-generic].
 fn state(server: &DynamicObject) -> State {
-    let ready = server
-        .data
-        .pointer("/status/conditions")
-        .and_then(Value::as_array)
-        .and_then(|all| all.iter().find(|c| c["type"] == "Ready"));
     if server.data.pointer("/spec/suspend") == Some(&Value::Bool(true)) {
         return State::Paused;
     }
-    match ready {
-        None => State::Unknown,
-        Some(c) if c["status"] == "True" => State::Ready,
-        Some(_) => State::Progressing,
+    let status = databases::generic_status(server);
+    let readiness = readiness::generic(&server.metadata, &status).readiness;
+    match readiness.status {
+        Status::Failed => State::Failed,
+        Status::InProgress => State::Progressing,
+        Status::Current if readiness.reason == Reason::Ready => State::Ready,
+        Status::Current => State::Unknown,
     }
 }
 

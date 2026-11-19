@@ -2201,7 +2201,6 @@ export const zhCN: Messages = {
   "clusterBackups.failure.invalid": "Velero 不接受这次备份的设置。",
   "clusterBackups.failure.itemsFailed":
     "有些对象或卷文件没有复制到，其余的已保存。Velero 这次备份的日志会列出每一项。",
-  "clusterBackups.failure.interrupted": "备份过程中 Velero 重新启动了。下一次会按定时执行。",
   "clusterBackups.failure.other": "备份失败。",
   "clusterBackups.restoreAction": "还原",
   "clusterBackups.problem.restoreNone": "请至少选一个 Namespace。",

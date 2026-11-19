@@ -369,7 +369,11 @@ mod tests {
             .map(|b| b["name"].as_str().unwrap())
             .collect();
         assert_eq!(names, ["zeabur-20261023030000", "zeabur-20261022030000"]);
-        assert_eq!(found["backups"][0]["failure"], "locationUnavailable");
+        assert_eq!(found["backups"][0]["failure"], "other");
+        assert_eq!(
+            found["backups"][0]["reason"],
+            "backup storage location default is unavailable"
+        );
         assert_eq!(found["backups"][1]["bytes"], 2048);
         assert_eq!(found["totalBackups"], 2);
         assert_eq!(found["canChange"], "allowed");

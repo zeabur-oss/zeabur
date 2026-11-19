@@ -18270,7 +18270,6 @@ components:
       - locationUnavailable
       - invalid
       - itemsFailed
-      - interrupted
       - other
     VeleroLocation:
       type: object

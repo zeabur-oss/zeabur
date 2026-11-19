@@ -2392,8 +2392,6 @@ export const en = {
   "clusterBackups.failure.invalid": "Velero refused the backup's settings.",
   "clusterBackups.failure.itemsFailed":
     "Some objects or volume files weren't copied; the rest is saved. Velero's logs for this backup name each one.",
-  "clusterBackups.failure.interrupted":
-    "Velero restarted while this backup ran. The next one runs on schedule.",
   "clusterBackups.failure.other": "The backup failed.",
   "clusterBackups.restoreAction": "Restore",
   "clusterBackups.problem.restoreNone": "Choose at least one namespace.",

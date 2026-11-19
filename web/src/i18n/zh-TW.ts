@@ -2205,7 +2205,6 @@ export const zhTW: Messages = {
   "clusterBackups.failure.invalid": "Velero 不接受這次備份的設定。",
   "clusterBackups.failure.itemsFailed":
     "有些物件或磁碟區檔案沒有複製到，其餘的已存好。Velero 這次備份的紀錄會列出每一項。",
-  "clusterBackups.failure.interrupted": "備份途中 Velero 重新啟動了。下一次會照排程執行。",
   "clusterBackups.failure.other": "備份失敗。",
   "clusterBackups.restoreAction": "還原",
   "clusterBackups.problem.restoreNone": "請至少選一個 Namespace。",

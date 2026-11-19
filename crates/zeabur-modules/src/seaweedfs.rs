@@ -4,7 +4,8 @@
 //! A `Seaweed` runs a master, volume servers, a filer and an S3 gateway. The operator labels
 //! each pod with `app.kubernetes.io/name: seaweedfs` and `app.kubernetes.io/instance: <name>`.
 //! The gateway is the Service `<name>-s3`, on port 8333 unless `spec.s3.port` says otherwise. The
-//! status counts the replicas of each part and sets the `Ready` condition [sw-status].
+//! status counts the replicas of each part, and sets `observedGeneration` and the `Ready`
+//! condition [sw-status], which the kstatus generic rule reads [kstatus-generic].
 //!
 //! Access goes through the gateway's embedded IAM. An `S3Identity` is a user; an `S3Credentials`
 //! gives it an access key, which the operator writes to a Secret (`accessKey` and `secretKey`,
@@ -14,11 +15,13 @@
 //!
 //! [sw-api]: https://github.com/seaweedfs/seaweedfs-operator/tree/seaweedfs-operator-0.1.43/api/v1
 //! [sw-status]: https://github.com/seaweedfs/seaweedfs-operator/blob/seaweedfs-operator-0.1.43/internal/controller/seaweed_controller.go
+//! [kstatus-generic]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/generic.go
 
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
+use zeabur_model::readiness::{self, Reason, Status};
 
 use crate::databases::{self, Connection, State};
 use crate::{Module, Read, text};
@@ -264,18 +267,19 @@ fn counts(seaweed: &DynamicObject) -> (i64, i64) {
         })
 }
 
+/// The state of a `Seaweed` by the kstatus generic rule and its ready members: some ready while
+/// it is not is degraded.
 fn state(seaweed: &DynamicObject, members: i64, ready: i64) -> State {
-    let condition = seaweed
-        .data
-        .pointer("/status/conditions")
-        .and_then(Value::as_array)
-        .and_then(|all| all.iter().find(|c| c["type"] == "Ready"))
-        .and_then(|c| c["status"].as_str());
-    match condition {
-        Some("True") => databases::by_members(members, ready),
-        Some(_) if ready > 0 => State::Degraded,
-        Some(_) => State::Progressing,
-        None => State::Unknown,
+    let status = databases::generic_status(seaweed);
+    let readiness = readiness::generic(&seaweed.metadata, &status).readiness;
+    match readiness.status {
+        Status::Failed => State::Failed,
+        Status::InProgress if readiness.reason == Reason::NotReady && ready > 0 => State::Degraded,
+        Status::InProgress => State::Progressing,
+        Status::Current if readiness.reason == Reason::Ready => {
+            databases::by_members(members, ready)
+        }
+        Status::Current => State::Unknown,
     }
 }
 

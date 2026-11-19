@@ -248,7 +248,7 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 - 没有**立即备份**：要先有 Zeabur 创建的定时，而定时要先有存放位置。
 - 还原按钮（**从备份创建新项目**、**还原已删除的项目**或**还原项目**）无法使用：你不能在 Velero 的 Namespace 创建 Restore。还原时 Velero 用自己的权限写入对象，所以只有管理员能还原，见[权限](../reference/permissions.mdx)。请管理员用管理员账号还原。
 - **部分失败**：有些对象或卷文件没有复制到，其余的已经保存。用 `velero backup describe <backup> --details` 查看失败的条目，处理后再备份一次。
-- 界面提示备份途中 Velero 重启：下一次会按定时执行，也可以点击**立即备份**补一次。
+- 备份失败：查看备份下方 Velero 写的原因。如果是备份途中 Velero 重启，下一次会按定时执行，也可以点击**立即备份**补一次。
 - **卷**显示**只备份对象，不复制卷里的文件**：这是在 Zeabur 以外创建的定时，要到原来的配置开启 `defaultVolumesToFsBackup`。
 - 变更已过期：重新**检查变更**。
 

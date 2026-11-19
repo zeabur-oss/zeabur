@@ -2421,7 +2421,6 @@ export const VeleroFailure = {
   locationUnavailable: "locationUnavailable",
   invalid: "invalid",
   itemsFailed: "itemsFailed",
-  interrupted: "interrupted",
   other: "other",
 } as const
 

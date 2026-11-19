@@ -12,9 +12,10 @@
 //! may not read Secrets, and the host, port, database and user are not secret. The Secret that
 //! holds the password is named, so the interface can reveal it as the person when asked.
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
+use zeabur_model::readiness::GenericStatus;
 
 use crate::backups::{Outcome, Run, Schedule, Target, TargetKind};
 use crate::{Read, text};
@@ -415,6 +416,16 @@ pub(crate) fn tag(image: &str) -> Option<&str> {
         return None;
     }
     last.split_once(':').map(|(_, tag)| tag)
+}
+
+/// An operator object's `status` as the kstatus generic rule reads it: `observedGeneration` and
+/// the conditions. A status of another shape reads as empty.
+pub(crate) fn generic_status(object: &DynamicObject) -> GenericStatus {
+    object
+        .data
+        .get("status")
+        .and_then(|status| GenericStatus::deserialize(status).ok())
+        .unwrap_or_default()
 }
 
 /// The state of a database from what members are ready, once the operator says it is serving.
