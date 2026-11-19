@@ -98,8 +98,9 @@ function actionOf(d: Diagnosis): DiagnosisAction {
         ? { tab: "storage", label: "diagnosis.action.storage" }
         : { tab: "variables", label: "diagnosis.action.variables" }
     case "unexplained":
-      if (d.fix.key === "fix.multiAttach") return { tab: "yaml", label: "diagnosis.action.yaml" }
-      if (d.fix.key === "fix.outOfMemory")
+      if (d.fix.key === "diagnosis.unexplained.fix.multiAttach")
+        return { tab: "yaml", label: "diagnosis.action.yaml" }
+      if (d.fix.key === "diagnosis.unexplained.fix.outOfMemory")
         return { tab: "compute", label: "diagnosis.action.memory" }
       return cause.endsWith(".notReady")
         ? { tab: "logs", label: "diagnosis.action.logs", pod }

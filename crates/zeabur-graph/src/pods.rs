@@ -15,6 +15,7 @@ use k8s_openapi::jiff::Timestamp;
 use zeabur_model::adapters::selector;
 use zeabur_model::{
     ContainerStatusSummary, ContainerTermination, ContainerWaiting, Health, Origin, PodSummary,
+    StatusCause,
 };
 
 use crate::snapshot::{Snapshot, name_of};
@@ -87,6 +88,7 @@ pub fn summary(namespace: &str, pod: &Pod, now: Option<Timestamp>) -> PodSummary
             .flat_map(|spec| spec.containers.iter().map(|c| c.name.clone()))
             .collect(),
         reason: reason(statuses),
+        cause: None,
         created: pod
             .metadata
             .creation_timestamp
@@ -102,6 +104,13 @@ pub fn summary(namespace: &str, pod: &Pod, now: Option<Timestamp>) -> PodSummary
             .collect(),
         origin: Origin::object("Pod", name),
     };
+    let task = pod
+        .metadata
+        .owner_references
+        .iter()
+        .flatten()
+        .any(|owner| owner.kind == "Job");
+    summary.cause = StatusCause::of(summary.reason.as_deref(), task);
     summary.health = crate::health::pod_health(&summary, now);
     summary
 }

@@ -19,7 +19,6 @@ import {
 import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { checkUrl } from "@/model/browser-check"
-import { needsSetup } from "@/model/domains"
 import { severity } from "@/model/severity"
 
 type Route = Schemas.RouteTraceView
@@ -149,7 +148,7 @@ type Lead =
  * cluster could not tell, else the cluster's verdict. The rest waits in the checks. */
 function conclusion(route: Route, waiting: string | undefined): Lead {
   if (waiting) return { kind: "verdict" }
-  if (route.domain && needsSetup(route.domain)) return { kind: "setup", check: route.domain }
+  if (route.domain && route.domain.setup !== "valid") return { kind: "setup", check: route.domain }
   const tls = route.hops.some((h) => h.step === "certificate")
   const unverified = route.kind === "domain" && route.status === "unknown"
   if (unverified && checkUrl(route.address, tls) !== undefined) return { kind: "browser", tls }

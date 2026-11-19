@@ -3,9 +3,6 @@
 import type { Schemas } from "@/api/client"
 import type { Translate } from "@/i18n"
 
-/** The NetworkPolicy that limits where the pods of a workload connect. */
-export const egressPolicyName = (workload: string) => `${workload}-egress-limit`
-
 /** Entries of a list typed one per line, or separated by commas or spaces. */
 export function splitAddresses(text: string): string[] {
   return [...new Set(text.split(/[\s,]+/).filter(Boolean))]
@@ -48,11 +45,6 @@ function listUnder(yaml: string | undefined, key: string): string[] {
 /** The addresses a Traefik `ipAllowList` Middleware lets through. */
 export const sourceRangeOf = (yaml: string | undefined) => listUnder(yaml, "sourceRange")
 
-/** The `ipBlock` ranges a NetworkPolicy allows. */
-export function blocksOf(yaml: string | undefined): string[] {
-  return [...(yaml ?? "").matchAll(/^\s*cidr:\s*["']?([^\s"']+)/gm)].map((m) => m[1] ?? "")
-}
-
 export type Kind = "in" | "out"
 
 /** What the addresses of a limit are now, for the row that says it. */
@@ -73,15 +65,11 @@ export function incomingVerdict(
   return same ? { is: "only", addresses: first } : { is: "some" }
 }
 
-/** The pods: whether Zeabur's policy selects them, whether another policy limits their egress,
- * and the ranges of Zeabur's policy once read. */
-export function outgoingVerdict(
-  ours: boolean,
-  others: boolean,
-  blocks: string[] | undefined,
-): Verdict {
-  if (!ours) return { is: others ? "rules" : "noLimit" }
-  return blocks ? { is: "only", addresses: blocks } : { is: "limited" }
+/** The pods: the ranges of Zeabur's egress limit when it selects them, else whether another
+ * policy limits their egress. */
+export function outgoingVerdict(others: boolean, blocks: string[] | undefined): Verdict {
+  if (blocks) return { is: "only", addresses: blocks }
+  return { is: others ? "rules" : "noLimit" }
 }
 
 export interface Was {

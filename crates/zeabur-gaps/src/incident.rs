@@ -724,6 +724,7 @@ mod tests {
                 DiagnosisKind::CrashLoop,
                 &Message::new("diagnosis.crashLoop.cause.exitCode"),
             ),
+            refused_port: None,
         };
         project.services[0].diagnoses = vec![crash(vec!["web-1".to_owned()])];
         let nodes = [NodeState {

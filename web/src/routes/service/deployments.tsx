@@ -41,7 +41,7 @@ import {
   weekOf,
   type ChangeEntry,
 } from "@/model/changes"
-import { activityTone, warningTone, warningVariant } from "@/model/severity"
+import { activityTone, warningTone } from "@/model/severity"
 import { writerOf } from "@/routes/project/side"
 import { imageTag, isTask, statusOf, type Event, type Health, type Service } from "@/model/service"
 
@@ -212,7 +212,7 @@ function Entry({
   if (entry.kind === "warning")
     return (
       <TimelineItem
-        tone={warningTone(warningVariant(entry.event), health)}
+        tone={warningTone(entry.event.warning, health)}
         time={time}
         title={
           <span translate="no">

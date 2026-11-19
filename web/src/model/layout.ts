@@ -7,7 +7,6 @@ import type { Edge } from "@/model/connections"
 import type { DatabaseNode } from "@/model/database-parts"
 import {
   isHealthy,
-  roleOf,
   serviceId,
   statusOf,
   volumesOf,
@@ -97,7 +96,7 @@ export function layout(
     const id = serviceId(service)
     nodes.set(id, {
       id,
-      lane: laneOf[roleOf(service)],
+      lane: laneOf[service.role],
       x: 0,
       y: 0,
       w: CARD_W,

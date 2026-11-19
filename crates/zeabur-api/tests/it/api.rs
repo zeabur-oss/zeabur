@@ -237,7 +237,7 @@ mod tests {
         // The one service has a crash-looping pod.
         assert_eq!(
             items[0]["health"],
-            json!({"services": 1, "healthy": 0, "progressing": 0, "warning": 0, "failing": 1})
+            json!({"services": 1, "healthy": 0, "progressing": 0, "warning": 0, "failing": 1, "worst": "fail"})
         );
         assert_eq!(items[1]["name"], "default");
         assert!(items[1].get("health").is_none(), "not adopted: no counts");

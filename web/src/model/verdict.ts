@@ -1,31 +1,20 @@
-// One plain verdict for a service, from what the Overview already reads: its status, the causes
-// the diagnosis found, the rollout, each domain's trace and the browser's own check.
+// A service's verdict: the server's, with what only the Overview reads added. A rollout card or a
+// public domain that fails turns a running service into a deploying or unreachable one, and the
+// reach line comes from each domain's trace and the browser's own check.
 import type { Schemas } from "@/api/client"
 import type { BrowserCheck } from "@/model/browser-check"
-import { configuration } from "@/model/domains"
 import type { Overview } from "@/model/overview"
-import { reasonWord, type Health, type ReasonWord, type Status } from "@/model/service"
-import { schedulingHealth, severity, troubleTone } from "@/model/severity"
+import type { Health, Service } from "@/model/service"
+import { severity } from "@/model/severity"
 
-type Diagnosis = Schemas.Diagnosis
 type Route = Schemas.RouteTraceView
-type Pod = Pick<Schemas.PodSummary, "name" | "created">
 
 /** What is wrong, in a few words. */
-export type Trouble =
-  | { as: "reason"; word: ReasonWord }
-  | { as: "status"; word: Status["word"] }
-  | { as: "healthCheck" }
-  | { as: "quota" }
-  | { as: "unreachable"; domain: string }
+export type Trouble = Schemas.Trouble | { as: "unreachable"; domain: string }
 
 export type Headline =
-  | { as: "running" }
-  | { as: "deploying" }
-  | { as: "stopped" }
+  | Exclude<Schemas.Headline, { as: "problem" }>
   | { as: "problem"; trouble: Trouble }
-  /** A task's own word: completed, scheduled, paused. */
-  | { as: "status"; word: Status["word"] }
 
 /** Whether people reach the public domains, from the cluster's trace or the person's browser;
  * a domain not set up yet says so in the words Networking uses. */
@@ -44,30 +33,6 @@ export interface Verdict {
   reach?: Reach
 }
 
-const kindTrouble: Partial<Record<Diagnosis["kind"], Trouble>> = {
-  crashLoop: { as: "reason", word: "crashing" },
-  outOfMemory: { as: "reason", word: "outOfMemory" },
-  imagePull: { as: "reason", word: "imagePull" },
-  configMissing: { as: "reason", word: "configMissing" },
-  unschedulable: { as: "reason", word: "waitingForRoom" },
-  runFailed: { as: "reason", word: "runFailed" },
-  probeFailure: { as: "healthCheck" },
-  quotaBlocked: { as: "quota" },
-  podSecurity: { as: "reason", word: "security" },
-}
-
-function troubleOf(status: Status, causes: Diagnosis[]): Trouble {
-  // The kubelet reports a container that may not run as root as a config error.
-  if (causes.some((c) => c.kind === "podSecurity")) return { as: "reason", word: "security" }
-  const word = reasonWord(status.reason, status.task ?? false)
-  if (word) return { as: "reason", word }
-  for (const cause of causes) {
-    const trouble = kindTrouble[cause.kind]
-    if (trouble) return trouble
-  }
-  return { as: "status", word: status.word }
-}
-
 const isPublic = (route: Route) => route.kind === "domain" && !route.address.includes("*")
 
 type Seen = { domain: string; as: Reach["as"]; browser: boolean; record: boolean }
@@ -78,13 +43,13 @@ function seenOf(route: Route, checks: (address: string) => BrowserCheck | undefi
   const record = Boolean(check && check.dns !== "pointsHere" && check.target.length > 0)
   const said = (as: Reach["as"], browser = false): Seen => ({ domain, as, browser, record })
   if (route.status === "ok") return said("reachable")
-  const config = check ? configuration(check) : undefined
-  if (config === "invalid") return said("invalid")
-  if (config === "pending") return said("issuing")
+  const setup = check?.setup
+  if (setup === "invalid") return said("invalid")
+  if (setup === "pending") return said("issuing")
   if (route.status === "failed") return said("unreachable")
   const browser = checks(domain)?.state
   if (browser === "reachable") return said("reachable", true)
-  if (config === "elsewhere") return said("elsewhere")
+  if (setup === "elsewhere") return said("elsewhere")
   return browser === "unreachable" ? said("unreachable", true) : said("unknown")
 }
 
@@ -118,45 +83,22 @@ function reachOf(
   return reach
 }
 
-/** A rollout whose only trouble is pods waiting for a node, in its first minutes. */
-function problemTone(status: Status, causes: Diagnosis[], pods: Pod[], now: number): Health {
-  if (status.health !== "progress" || !causes.every((c) => c.kind === "unschedulable"))
-    return troubleTone(status.health)
-  const waiting = new Set(causes.flatMap((c) => c.pods))
-  const created = pods
-    .filter((pod) => waiting.has(pod.name))
-    .map((pod) => pod.created ?? undefined)
-    .toSorted()[0]
-  return schedulingHealth(created, now)
-}
-
 export function verdictOf({
-  status,
+  verdict,
   said,
   routes,
   checks,
-  pods = [],
-  now = Date.now(),
 }: {
-  status: Status
-  said: Pick<Overview, "causes" | "rollout" | "waiting">
+  verdict: Service["verdict"]
+  said: Pick<Overview, "rollout" | "waiting">
   routes: Route[]
   checks: (address: string) => BrowserCheck | undefined
-  pods?: Pod[]
-  now?: number
 }): Verdict {
+  const { tone, headline } = verdict ?? { tone: "idle", headline: { as: "stopped" } }
+  if (headline.as === "stopped" || headline.as === "status") return { tone, headline }
   const reach = reachOf(routes, said.waiting, checks)
-  if (status.desired === 0 && !status.task) return { tone: "idle", headline: { as: "stopped" } }
-  if (said.causes.length > 0 || status.health === "fail" || status.health === "warn")
-    return {
-      tone: problemTone(status, said.causes, pods, now),
-      headline: { as: "problem", trouble: troubleOf(status, said.causes) },
-      reach,
-    }
-  if (status.task || status.health === "idle")
-    return { tone: status.health, headline: { as: "status", word: status.word } }
-  if (status.health === "progress" || said.rollout.as === "card")
-    return { tone: "progress", headline: { as: "deploying" }, reach }
+  if (headline.as !== "running") return { tone, headline, reach }
+  if (said.rollout.as === "card") return { tone: "progress", headline: { as: "deploying" }, reach }
   const failed = routes.find((r) => isPublic(r) && r.status === "failed")
   if (failed)
     return {
@@ -164,7 +106,7 @@ export function verdictOf({
       headline: { as: "problem", trouble: { as: "unreachable", domain: failed.address } },
       reach: reach?.as === "unreachable" ? undefined : reach,
     }
-  return { tone: "ok", headline: { as: "running" }, reach }
+  return { tone, headline, reach }
 }
 
 /** The domains a reach line names before counting the rest. */

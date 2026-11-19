@@ -15,6 +15,7 @@ const service = (name: string, fields: Partial<Service> = {}) =>
     endpointNames: [],
     routeNames: [],
     status: { health: "ok", word: "running" },
+    role: "worker",
     ...fields,
   }) as unknown as Service
 
@@ -25,7 +26,10 @@ const columns = (services: Service[]) =>
 
 describe("the map's layout", () => {
   test("draws no domain cards: a service card names its host", () => {
-    const laid = layout([service("api", { endpointNames: ["api"], routeNames: ["api"] })], [])
+    const laid = layout(
+      [service("api", { endpointNames: ["api"], routeNames: ["api"], role: "web" })],
+      [],
+    )
     expect(laid.nodes.map((n) => n.id)).toStrictEqual(["Deployment/api"])
     expect(laid.frames.map((f) => f.lane)).toStrictEqual(["web"])
   })

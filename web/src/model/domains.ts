@@ -58,10 +58,6 @@ export const isSslip = (host: string) => /\.(sslip|nip)\.io$/.test(host)
 /** The sslip.io suffix for `address`: dashes, so URLs under it stay one label deep. */
 export const sslipSuffix = (address: string) => `${address.replaceAll(/[.:]/g, "-")}.sslip.io`
 
-/** Let's Encrypt refused for its rate limit, in cert-manager's words. */
-export const rateLimited = (message?: string | null) =>
-  Boolean(message && /rateLimited|too many (new )?(certificates|orders)/i.test(message))
-
 /** What a domain's DNS needs, Vercel-style: fine, or the records to add and why. */
 export type DnsSetup =
   | { as: "valid" }
@@ -76,21 +72,3 @@ export function dnsSetup(host: string, check: DomainCheck, suffixes?: readonly s
   if (check.dns === "elsewhere") return { as: "elsewhere", records, resolved: check.resolved ?? [] }
   return { as: "unknown", records }
 }
-
-/** Valid only when DNS points here and the certificate, if any, is issued or not cert-manager's;
- * invalid when a record is missing or issuing failed. Another address may be a CDN in front. */
-export function configuration(
-  check: DomainCheck,
-): "valid" | "invalid" | "pending" | "elsewhere" | "unknown" {
-  const certificate = check.certificate?.state
-  if (check.dns === "missing" || certificate === "failed") return "invalid"
-  if (certificate === "issuing") return "pending"
-  if (check.dns === "pointsHere") return "valid"
-  return check.dns === "elsewhere" ? "elsewhere" : "unknown"
-}
-
-/** Whether a domain has something to do: a record to set or a certificate not issued yet. */
-export const needsSetup = (check: DomainCheck) =>
-  check.dns !== "pointsHere" ||
-  check.certificate?.state === "failed" ||
-  check.certificate?.state === "issuing"

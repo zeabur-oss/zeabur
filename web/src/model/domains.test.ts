@@ -1,13 +1,11 @@
 import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import {
-  configuration,
   dnsSetup,
   domainsLead,
   filterRoutes,
   isSslip,
   plainFirst,
-  rateLimited,
   recordsFor,
   sslipSuffix,
   wildcardFor,
@@ -82,6 +80,7 @@ describe("filterRoutes", () => {
 const check = (more: Partial<Schemas.DomainCheck> = {}): Schemas.DomainCheck => ({
   target: ["203.0.113.10"],
   dns: "missing",
+  setup: "invalid",
   ...more,
 })
 
@@ -123,13 +122,6 @@ describe("sslip.io", () => {
     expect(isSslip("web-shop.203-0-113-7.sslip.io")).toBe(true)
     expect(isSslip("web.example.com")).toBe(false)
   })
-  test("a rate limit is told from other failures", () => {
-    expect(rateLimited("429 urn:ietf:params:acme:error:rateLimited: too many certificates")).toBe(
-      true,
-    )
-    expect(rateLimited("connection refused")).toBe(false)
-    expect(rateLimited(undefined)).toBe(false)
-  })
 })
 
 describe("dnsSetup", () => {
@@ -152,31 +144,5 @@ describe("dnsSetup", () => {
     expect(
       dnsSetup("shop.example.com", check({ dns: "elsewhere", resolved: ["198.51.100.7"] })),
     ).toMatchObject({ as: "elsewhere", resolved: ["198.51.100.7"] })
-  })
-})
-
-describe("configuration", () => {
-  test("valid when DNS points here and the certificate is issued", () => {
-    expect(configuration(check({ dns: "pointsHere", certificate: { state: "ready" } }))).toBe(
-      "valid",
-    )
-  })
-  test("valid when no cert-manager certificate is involved", () => {
-    expect(configuration(check({ dns: "pointsHere" }))).toBe("valid")
-  })
-  test("invalid when a record is missing or issuing failed", () => {
-    expect(configuration(check())).toBe("invalid")
-    expect(configuration(check({ dns: "pointsHere", certificate: { state: "failed" } }))).toBe(
-      "invalid",
-    )
-  })
-  test("pending while a certificate is issued", () => {
-    expect(configuration(check({ dns: "pointsHere", certificate: { state: "issuing" } }))).toBe(
-      "pending",
-    )
-  })
-  test("another address is its own state; a lookup without answer is unknown", () => {
-    expect(configuration(check({ dns: "elsewhere" }))).toBe("elsewhere")
-    expect(configuration(check({ dns: "unknown" }))).toBe("unknown")
   })
 })

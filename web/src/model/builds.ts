@@ -1,7 +1,7 @@
 import type { Schemas } from "@/api/client"
 import type { Service } from "@/model/service"
 
-export type Build = Schemas.ZeaburBuilderBuild
+export type Build = Schemas.ProjectBuild
 export type BuildRun = Schemas.ProjectBuildRun
 export type Builds = Schemas.ProjectBuilds
 
@@ -73,23 +73,6 @@ export function runsLatest(image: string, build: Build): boolean | undefined {
 export const runsOf = (runs: readonly BuildRun[], build: Build) =>
   runs.filter((run) => run.build === build.name)
 
-export type RunTone = "ok" | "fail" | "progress" | "neutral"
-
-export function runTone(run: BuildRun): RunTone {
-  switch (run.phase) {
-    case "Succeeded":
-      return "ok"
-    case "Failed":
-      return "fail"
-    case "Pending":
-    case "Planning":
-    case "Building":
-      return "progress"
-    default:
-      return "neutral"
-  }
-}
-
 const FINISHED = new Set(["Succeeded", "Failed", "Cancelled"])
 
 /** The branch the Build builds: what its default branch resolved to, or the ref it names. */
@@ -103,23 +86,6 @@ export function branchOf(build: Build): string | undefined {
 export function buildProblem(build: Build, latest: BuildRun | undefined) {
   if (latest && (!latest.phase || !FINISHED.has(latest.phase))) return undefined
   return build.problem ?? undefined
-}
-
-/**
- * Whether a build is under way or about to be: a run not finished yet, a Build with no image, run
- * or problem yet, or a request to build again, at most two minutes old, that no run has answered
- * yet.
- */
-export function building(data: Builds, now: number): boolean {
-  if (data.runs.some((run) => !run.phase || !FINISHED.has(run.phase))) return true
-  return data.builds.some((build) => {
-    if (!build.latestImage && !build.problem && !data.runs.some((r) => r.build === build.name))
-      return true
-    const asked = build.rebuildRequested ? Date.parse(build.rebuildRequested) : Number.NaN
-    if (!Number.isFinite(asked) || now - asked > 120_000) return false
-    const newest = data.runs.find((run) => run.build === build.name)
-    return !newest?.created || Date.parse(newest.created) < asked
-  })
 }
 
 /** Milliseconds from start to finish, or to `now` while it runs. */
@@ -165,28 +131,12 @@ export function buildDeletions(
   ])
 }
 
-/** Which credentials the Git host refused, when it refused them: a deploy key over SSH or a
- * token over HTTPS. */
-export function refusedCredentials(build: Build, latest: BuildRun | undefined) {
-  const problem = buildProblem(build, latest)
-  if (problem?.reason !== "AuthFailed" || !build.credentials) return undefined
-  return /^(ssh:\/\/|[\w.-]+@[^:/]+:)/.test(build.gitUrl ?? "") ? "deployKey" : "token"
-}
-
 /** The first words that say why a build failed: its own message, then the run's, then the
  * resource's. */
 export function failureText(build: Build | undefined, run: BuildRun | undefined) {
   const problem = build ? buildProblem(build, run) : undefined
   return [problem?.message, run?.message, run?.reason, build?.message, build?.reason].find(
     (text) => !!text,
-  )
-}
-
-/** Whether the build failed for lack of memory, which a higher build memory fixes. */
-export function ranOutOfMemory(build: Build | undefined, run: BuildRun | undefined): boolean {
-  const problem = build ? buildProblem(build, run) : undefined
-  return (
-    problem?.reason === "OutOfMemory" || (run?.phase === "Failed" && run.reason === "OutOfMemory")
   )
 }
 

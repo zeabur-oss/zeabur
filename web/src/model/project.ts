@@ -4,7 +4,7 @@ import { kubeAmount } from "@/lib/amount"
 import { roleYaml } from "@/model/rbac"
 import { textProblem } from "@/model/rules"
 import { bytesOf } from "@/model/volume-edit"
-import { countsHealth, healthRank } from "@/model/service"
+import { healthRank } from "@/model/service"
 
 export type ProjectIconName = Schemas.ProjectIcon
 
@@ -187,8 +187,7 @@ export function matchesProject(project: ProjectSummary, hosts: string[], needle:
     .includes(needle)
 }
 
-const healthOrder = (p: ProjectSummary) =>
-  p.health ? healthRank[countsHealth(p.health)] : healthRank.ok
+const healthOrder = (p: ProjectSummary) => (p.health ? healthRank[p.health.worst] : healthRank.ok)
 const named = (p: ProjectSummary) => p.displayName ?? p.name
 
 /** Failing first, or by name; `descending` turns the order around, ties stay by name. */

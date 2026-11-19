@@ -7,7 +7,7 @@ export type Route = Schemas.Route
 export type Network = Pick<Schemas.Project, "endpoints" | "routes">
 export type Event = Schemas.EventView
 export type Health = Schemas.Health
-export type Role = "web" | "internal" | "worker" | "job" | "data"
+export type Role = Schemas.ServiceRole
 
 const roles: Role[] = ["web", "internal", "worker", "job", "data"]
 
@@ -51,14 +51,6 @@ export function volumesOf(service: Service): Schemas.Mount[] {
 }
 
 export const claimOf = (mount: Schemas.Mount) => mount.object?.name ?? mount.claimName ?? mount.name
-
-export function roleOf(service: Service): Role {
-  if (service.routeNames.length > 0) return "web"
-  if (service.dataStore) return "data"
-  if (service.kind === "CronJob" || service.kind === "Job") return "job"
-  if (service.endpointNames.length > 0) return "internal"
-  return "worker"
-}
 
 const byName = new WeakMap<readonly { name: string }[], Map<string, { name: string }>>()
 
@@ -111,6 +103,8 @@ export interface Status {
   word: StatusWord
   /** The kubelet's reason (`CrashLoopBackOff`). */
   reason?: string
+  /** What the reason means, when the server knows it. */
+  cause?: ReasonWord
   /** Job or CronJob: a run that ends with an error failed, rather than crashed. */
   task?: boolean
   ready?: number
@@ -127,47 +121,7 @@ export interface PodFacts {
   lastExit?: { code: number; finished?: string }
 }
 
-export type ReasonWord =
-  | "crashing"
-  | "runFailed"
-  | "outOfMemory"
-  | "imagePull"
-  | "imageName"
-  | "configMissing"
-  | "cantStart"
-  | "waitingForRoom"
-  | "starting"
-  | "evicted"
-  | "releaseStuck"
-  | "gaveUp"
-  | "buildFailed"
-  | "security"
-
-const reasonWords: Record<string, ReasonWord> = {
-  CrashLoopBackOff: "crashing",
-  OOMKilled: "outOfMemory",
-  ErrImagePull: "imagePull",
-  ImagePullBackOff: "imagePull",
-  InvalidImageName: "imageName",
-  CreateContainerConfigError: "configMissing",
-  ContainerCannotRun: "cantStart",
-  RunContainerError: "cantStart",
-  StartError: "cantStart",
-  Unschedulable: "waitingForRoom",
-  ContainerCreating: "starting",
-  PodInitializing: "starting",
-  Evicted: "evicted",
-  ProgressDeadlineExceeded: "releaseStuck",
-  BackoffLimitExceeded: "gaveUp",
-  BuildFailed: "buildFailed",
-}
-
-/** `Error` is how a run ended: a task's run failed, a service that keeps restarting crashed. */
-export function reasonWord(reason: string | undefined, task: boolean): ReasonWord | undefined {
-  if (!reason) return undefined
-  if (reason === "Error") return task ? "runFailed" : "crashing"
-  return reasonWords[reason]
-}
+export type ReasonWord = Schemas.StatusCause
 
 export const isTask = (kind: string) => kind === "Job" || kind === "CronJob"
 
@@ -185,7 +139,7 @@ function podFacts(pod: Pod): PodFacts {
 
 /** Mirrors `crates/zeabur-graph/src/health.rs`; a CronJob between runs has no replica counts. */
 export function statusOf(service: Service): Status {
-  const { health, word, reason } = service.status
+  const { health, word, reason, cause } = service.status
   const counts =
     word === "scheduled"
       ? {}
@@ -195,6 +149,7 @@ export function statusOf(service: Service): Status {
     health,
     word,
     reason: reason ?? undefined,
+    cause: cause ?? undefined,
     task: isTask(service.kind),
     ...counts,
     ...(pod ? { pod: podFacts(pod) } : {}),
@@ -209,14 +164,6 @@ function hasReadinessCheck(service: Service): boolean {
   return main.length === 0 || main.some((c) => !!c.probes?.readiness)
 }
 
-/** Must agree with `worstHealth` over the same services. */
-export function countsHealth(counts: Schemas.ProjectHealth): Health {
-  if (counts.failing > 0) return "fail"
-  if (counts.warning > 0) return "warn"
-  if (counts.progressing > 0) return "progress"
-  return "ok"
-}
-
 export const isHealthy = (status: Status) => status.health === "ok" || status.health === "idle"
 export const needsAttention = (status: Status) =>
   status.health === "fail" || status.health === "warn"
@@ -227,15 +174,6 @@ export function byHealth(a: Service, b: Service): number {
   return (
     healthRank[statusOf(a).health] - healthRank[statusOf(b).health] || a.name.localeCompare(b.name)
   )
-}
-
-function worstHealth(statuses: Status[]): Health {
-  let worst: Health = "ok"
-  for (const status of statuses) {
-    if (status.health === "idle") continue
-    if (healthRank[status.health] < healthRank[worst]) worst = status.health
-  }
-  return worst
 }
 
 export interface Domain {
@@ -333,7 +271,7 @@ export function groupServices(services: Service[]): ServiceGroup[] {
       key: role,
       role,
       services: services
-        .filter((service) => roleOf(service) === role)
+        .filter((service) => service.role === role)
         .toSorted((a, b) => a.name.localeCompare(b.name)),
     }))
     .filter((group) => group.services.length > 0)
@@ -341,29 +279,9 @@ export function groupServices(services: Service[]): ServiceGroup[] {
 
 export type Project = Schemas.Project
 
-export interface ProjectSummary {
-  services: number
-  healthy: number
-  podsReady: number
-  pods: number
-  restarts: number
-  domains: Domain[]
-  health: Health
-}
-
-export function summarise(project: Project): ProjectSummary {
-  const statuses = project.services.map(statusOf)
-  const pods = project.services.flatMap((s) => s.pods)
-  return {
-    services: project.services.length,
-    healthy: statuses.filter(isHealthy).length,
-    podsReady: pods.filter((p) => p.ready).length,
-    pods: pods.length,
-    restarts: pods.reduce((sum, p) => sum + p.restarts, 0),
-    domains: project.services.flatMap((service) => domainsOf(project, service)),
-    health: worstHealth(statuses),
-  }
-}
+/** The domains of every service in the project. */
+export const projectDomains = (project: Project): Domain[] =>
+  project.services.flatMap((service) => domainsOf(project, service))
 
 export interface Claim {
   name: string

@@ -32,7 +32,7 @@ import { groupProblems, type ProblemGroup } from "@/model/attention"
 import { mapReadable } from "@/model/layout"
 import { suggestionsOf } from "@/model/overview"
 import { projectTitle } from "@/model/project"
-import { needsAttention, statusOf, summarise, type Project, type Service } from "@/model/service"
+import { needsAttention, statusOf, type Project, type Service } from "@/model/service"
 import { mapLayout, ProjectMap } from "@/routes/project/architecture"
 import { ProjectData, refusedPlaces, useProjectEvents } from "@/routes/project/data"
 import { NextStep } from "@/routes/project/next-step"
@@ -155,7 +155,7 @@ function Header({ project, data, view }: { project: string; data: Project; view?
                   {project}
                 </span>
               ) : null}
-              <HealthPill data={data} />
+              <HealthPill project={project} />
             </>
           }
           description={
@@ -208,26 +208,24 @@ function Header({ project, data, view }: { project: string; data: Project; view?
   )
 }
 
-function HealthPill({ data }: { data: Project }) {
+function HealthPill({ project }: { project: string }) {
   const t = useT()
-  const summary = summarise(data)
-  if (summary.services === 0) return null
-  const count = (health: string) =>
-    data.services.filter((s) => statusOf(s).health === health).length
-  if (summary.health === "fail")
+  const health = useQuery(projectQuery(project)).data?.health
+  if (!health || health.services === 0) return null
+  if (health.worst === "fail")
     return (
       <StatusPill health="fail">
-        {count("warn") > 0
+        {health.warning > 0
           ? [
-              t("overview.failingCount", count("fail")),
-              t("overview.degradedCount", count("warn")),
+              t("overview.failingCount", health.failing),
+              t("overview.degradedCount", health.warning),
             ].join(t("common.sep"))
-          : t("overview.failingCount", count("fail"))}
+          : t("overview.failingCount", health.failing)}
       </StatusPill>
     )
-  if (summary.health === "warn")
-    return <StatusPill health="warn">{t("overview.degradedCount", count("warn"))}</StatusPill>
-  if (summary.health === "progress")
+  if (health.worst === "warn")
+    return <StatusPill health="warn">{t("overview.degradedCount", health.warning)}</StatusPill>
+  if (health.worst === "progress")
     return <StatusPill health="progress">{t("status.rollingOut")}</StatusPill>
   return <StatusPill health="ok">{t("overview.healthy")}</StatusPill>
 }

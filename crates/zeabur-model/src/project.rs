@@ -184,6 +184,50 @@ pub struct Service {
     /// read, so the API fills it in when it serves the project document.
     #[serde(default)]
     pub diagnoses: Vec<crate::Diagnosis>,
+    /// What it does for the project; see [`Service::role_now`].
+    pub role: ServiceRole,
+    /// What its overview says first. The projection leaves this empty, as it does `diagnoses`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub verdict: Option<crate::ServiceVerdict>,
+}
+
+/// What a service does for its project, for how a client groups and draws it.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum ServiceRole {
+    /// An Ingress or `HTTPRoute` sends public traffic to it.
+    Web,
+    /// Only a Kubernetes Service selects it.
+    Internal,
+    /// Nothing sends traffic to it.
+    #[default]
+    Worker,
+    /// A Job or a CronJob.
+    Job,
+    /// A data store (see [`Service::data_store`]).
+    Data,
+}
+
+impl Service {
+    /// Its role from its routes, data store, kind and endpoints, in that order.
+    #[must_use]
+    pub const fn role_now(&self) -> ServiceRole {
+        if !self.route_names.is_empty() {
+            ServiceRole::Web
+        } else if self.data_store.is_some() {
+            ServiceRole::Data
+        } else if matches!(
+            self.workload.kind,
+            crate::WorkloadKind::CronJob | crate::WorkloadKind::Job
+        ) {
+            ServiceRole::Job
+        } else if !self.endpoint_names.is_empty() {
+            ServiceRole::Internal
+        } else {
+            ServiceRole::Worker
+        }
+    }
 }
 
 /// A workload's pod selector, as a Kubernetes Service can repeat it.

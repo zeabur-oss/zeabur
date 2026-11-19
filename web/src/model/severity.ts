@@ -26,9 +26,6 @@ export const severity = {
   scheduling: "progress",
 } as const satisfies Record<string, Health>
 
-/** How long a pod may wait for a node before waiting reads as a problem. */
-export const SCHEDULING_GRACE_MS = 5 * 60_000
-
 /** The worst of several; `ok` for none. */
 export function worstOf(healths: Iterable<Health>): Health {
   let worst: Health = "ok"
@@ -39,19 +36,6 @@ export function worstOf(healths: Iterable<Health>): Health {
 /** A problem's mark: its service's tone while that still serves, else red. */
 export const troubleTone = (health: Health): "fail" | "warn" =>
   health === "warn" ? "warn" : "fail"
-
-/** Replicas ready out of those wanted. */
-export function replicasHealth(ready: number, wanted: number): Health {
-  if (wanted <= 0) return "idle"
-  if (ready <= 0) return severity.noneReady
-  return ready < wanted ? severity.fewerReady : "ok"
-}
-
-/** A pod waiting for a node: on its way at first, a problem once it has waited too long. */
-export function schedulingHealth(created: string | undefined, now: number): Health {
-  const since = created ? Date.parse(created) : Number.NaN
-  return now - since < SCHEDULING_GRACE_MS ? severity.scheduling : severity.unschedulable
-}
 
 /** Whether people reach a domain, as Overview and Networking say it. */
 export const reachHealth = {
@@ -72,27 +56,6 @@ export const entryTone = {
   termination: severity.restarted,
 } as const
 
-/** What a Warning event says went wrong, folded as the timeline folds it
- * (`crates/zeabur-api/src/timeline.rs`). */
-export function warningVariant(event: { reason?: string | null; note?: string | null }): string {
-  const note = (event.note ?? "").toLowerCase()
-  switch (event.reason) {
-    case "BackOff":
-      return note.includes("image") ? "imagePull" : "crashLoop"
-    case "CrashLoopBackOff":
-      return "crashLoop"
-    case "Failed":
-    case "ErrImagePull":
-    case "ImagePullBackOff":
-    case "InspectFailed":
-      return "imagePull"
-    case "FailedScheduling":
-      return "unschedulable"
-    default:
-      return "other"
-  }
-}
-
 /** A timeline entry's warning variant (`crashLoop`, `unschedulable.claimMissing`), from its key. */
 export const timelineVariant = (key: string) => key.replace(/^timeline\.warning\./, "")
 
@@ -101,10 +64,10 @@ export const timelineVariant = (key: string) => key.replace(/^timeline\.warning\
  * crashing, cannot pull its image, or cannot be scheduled past the allowance, which the
  * service's own health already says (`health`, now).
  */
-export function warningTone(variant: string, health?: Health): "fail" | "warn" {
+export function warningTone(variant: string | null | undefined, health?: Health): "fail" | "warn" {
   if (variant === "crashLoop") return severity.crashing
   if (variant === "imagePull") return severity.imagePull
-  if (variant.startsWith("unschedulable") && health === "fail") return severity.unschedulable
+  if (variant?.startsWith("unschedulable") && health === "fail") return severity.unschedulable
   return severity.warningEvent
 }
 

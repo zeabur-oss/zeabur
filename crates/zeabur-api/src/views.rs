@@ -314,6 +314,8 @@ pub struct ProjectList {
 pub struct ProjectDocument {
     /// `projects/<name>`.
     pub id: String,
+    /// How many of its services are in each state, and the worst.
+    pub health: ProjectHealth,
     /// The projection.
     #[serde(flatten)]
     pub project: Project,
@@ -378,6 +380,38 @@ pub struct EventView {
     /// The component that reported it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reporter: Option<String>,
+    /// What a `Warning` says went wrong; absent for a `Normal` event.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub warning: Option<WarningKind>,
+}
+
+/// What a `Warning` event says went wrong, from its reason. An open set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum WarningKind {
+    /// A container keeps crashing.
+    CrashLoop,
+    /// An image cannot be pulled.
+    ImagePull,
+    /// A pod waits for a node.
+    Unschedulable,
+    /// Anything else.
+    Other,
+}
+
+impl WarningKind {
+    /// The kind of a warning with `reason` and `note`. The kubelet gives `BackOff` to a pull and
+    /// to a restart alike, so its note tells which.
+    #[must_use]
+    pub fn of(reason: &str, note: &str) -> Self {
+        match reason {
+            "BackOff" if note.to_ascii_lowercase().contains("image") => Self::ImagePull,
+            "BackOff" | "CrashLoopBackOff" => Self::CrashLoop,
+            "Failed" | "ErrImagePull" | "ImagePullBackOff" | "InspectFailed" => Self::ImagePull,
+            "FailedScheduling" => Self::Unschedulable,
+            _ => Self::Other,
+        }
+    }
 }
 
 /// Events of a project, the newest `limit` of them.
@@ -752,4 +786,23 @@ pub struct ClusterEventList {
     /// `true` when the cluster holds more events than Zeabur read (5,000): older ones may be
     /// missing.
     pub partial: bool,
+}
+
+#[cfg(test)]
+mod tests {
+    use super::WarningKind;
+
+    #[test]
+    fn a_warning_folds_by_its_reason_and_a_back_off_by_its_note() {
+        let pull = "Back-off pulling image \"x\"";
+        assert_eq!(WarningKind::of("BackOff", pull), WarningKind::ImagePull);
+        let restart = "Back-off restarting failed container";
+        assert_eq!(WarningKind::of("BackOff", restart), WarningKind::CrashLoop);
+        assert_eq!(WarningKind::of("ErrImagePull", ""), WarningKind::ImagePull);
+        assert_eq!(
+            WarningKind::of("FailedScheduling", ""),
+            WarningKind::Unschedulable
+        );
+        assert_eq!(WarningKind::of("FailedMount", ""), WarningKind::Other);
+    }
 }

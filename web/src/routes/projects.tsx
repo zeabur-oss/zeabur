@@ -14,7 +14,7 @@ import { ProjectIcon } from "@/components/project-icon"
 import { useT } from "@/i18n"
 import { projectsAsList } from "@/lib/stores"
 import { otherNamespaces } from "@/model/project"
-import { countsHealth, healthRank } from "@/model/service"
+import { healthRank } from "@/model/service"
 import {
   Empty,
   EmptyDescription,
@@ -120,7 +120,7 @@ export function ProjectsPage() {
   const switchId = useId()
   const items = projects.data?.items ?? []
   const rank = (p: (typeof items)[number]) =>
-    p.health ? healthRank[countsHealth(p.health)] : healthRank.ok
+    p.health ? healthRank[p.health.worst] : healthRank.ok
   const adopted = items
     .filter((p) => p.adopted)
     .toSorted((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))

@@ -292,6 +292,10 @@ pub(crate) async fn read(
         service.diagnoses = namespace.diagnose(service);
     }
     builds::built_images(cluster, project, &mut projection.services, now).await;
+    for service in &mut projection.services {
+        service.verdict = Some(crate::services::verdict::of(service, now));
+    }
+    let health = ProjectHealth::count(projection.services.iter().map(|s| s.status.health));
     let extensions = ProjectExtensions {
         network_policy: network_policy::extension(cluster, &snapshot, &projection, &mut unreadable)
             .await?,
@@ -299,6 +303,7 @@ pub(crate) async fn read(
     Ok(ProjectRead {
         document: ProjectDocument {
             id: id::project(project),
+            health,
             project: projection,
             unreadable,
             extensions,

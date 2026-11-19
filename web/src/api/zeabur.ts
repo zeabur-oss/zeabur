@@ -1336,6 +1336,8 @@ export type CertificateCheck = {
    * @nullable
    */
   notAfter?: string | null
+  /** It failed because Let's Encrypt refused for its rate limit, in cert-manager's words. */
+  rateLimited?: boolean
   /**
    * cert-manager's reason (`Failed`, `DoesNotExist`) or the ACME challenge's state.
    * @nullable
@@ -2879,6 +2881,18 @@ export type ClusterCoverage =
     }
 
 /**
+ * What a `Warning` event says went wrong, from its reason. An open set.
+ */
+export type WarningKind = (typeof WarningKind)[keyof typeof WarningKind]
+
+export const WarningKind = {
+  crashLoop: "crashLoop",
+  imagePull: "imagePull",
+  unschedulable: "unschedulable",
+  other: "other",
+} as const
+
+/**
  * One event about an object.
  */
 export type EventView = {
@@ -2905,6 +2919,7 @@ export type EventView = {
   reporter?: string | null
   /** `Normal` or `Warning`. */
   type: string
+  warning?: WarningKind | null
 }
 
 /**
@@ -4933,9 +4948,32 @@ export const DatabaseEngine = {
 } as const
 
 /**
+ * What a failing pod's reason means for a person. An open set.
+ */
+export type StatusCause = (typeof StatusCause)[keyof typeof StatusCause]
+
+export const StatusCause = {
+  crashing: "crashing",
+  runFailed: "runFailed",
+  outOfMemory: "outOfMemory",
+  imagePull: "imagePull",
+  imageName: "imageName",
+  configMissing: "configMissing",
+  cantStart: "cantStart",
+  waitingForRoom: "waitingForRoom",
+  starting: "starting",
+  evicted: "evicted",
+  releaseStuck: "releaseStuck",
+  gaveUp: "gaveUp",
+  buildFailed: "buildFailed",
+  security: "security",
+} as const
+
+/**
  * One pod of a workload.
  */
 export type PodSummary = {
+  cause?: StatusCause | null
   /**
    * Each container's state as the kubelet reports it, init containers first; empty before
    * the kubelet reports any.
@@ -5460,6 +5498,12 @@ export type Diagnosis = {
   lastSeen?: string | null
   /** The pods it was seen in, sorted. */
   pods: string[]
+  /**
+   * The port a failing readiness check was refused on: nothing listens there.
+   * @minimum 0
+   * @nullable
+   */
+  refusedPort?: number | null
   /** Why: the rule that applies, with this occurrence's numbers where Zeabur knows them. */
   why: Message
 }
@@ -5511,6 +5555,19 @@ export const DnsState = {
 } as const
 
 /**
+ * How far setting up a domain is.
+ */
+export type DomainSetup = (typeof DomainSetup)[keyof typeof DomainSetup]
+
+export const DomainSetup = {
+  valid: "valid",
+  invalid: "invalid",
+  pending: "pending",
+  elsewhere: "elsewhere",
+  unknown: "unknown",
+} as const
+
+/**
  * What setting up a domain needs and how far it is.
  */
 export type DomainCheck = {
@@ -5519,6 +5576,8 @@ export type DomainCheck = {
   dns: DnsState
   /** The addresses it resolved to. */
   resolved?: string[]
+  /** How far its setup is, from `dns` and `certificate`. */
+  setup: DomainSetup
   /**
    * The addresses the domain's DNS should point to: the route's `status.loadBalancer`, or
    * another route's of the same class while it has none. Empty when none is known.
@@ -6381,6 +6440,73 @@ export type GitHubManifestRequest = {
   /** Builder's webhook URL, `https://<host>/hooks/github-app`; empty when its receiver is off. */
   webhookUrl?: string
 }
+
+/**
+ * What a service is doing, in one word for a person. An open set: clients must show an unknown
+ * value by its [`Health`].
+ */
+export type StatusWord = (typeof StatusWord)[keyof typeof StatusWord]
+
+export const StatusWord = {
+  ready: "ready",
+  rollingOut: "rollingOut",
+  failing: "failing",
+  degraded: "degraded",
+  scheduled: "scheduled",
+  paused: "paused",
+  failed: "failed",
+  rolloutStuck: "rolloutStuck",
+  scaledToZero: "scaledToZero",
+  completed: "completed",
+  unknown: "unknown",
+  building: "building",
+  waitingUpload: "waitingUpload",
+} as const
+
+/**
+ * What is wrong, in a few words.
+ */
+export type Trouble =
+  | {
+      as: "reason"
+      /** The word. */
+      word: StatusCause
+    }
+  | {
+      as: "status"
+      /** The status word. */
+      word: StatusWord
+    }
+  | {
+      as: "healthCheck"
+    }
+  | {
+      as: "quota"
+    }
+
+/**
+ * What a verdict says.
+ */
+export type Headline =
+  | {
+      as: "running"
+    }
+  | {
+      as: "deploying"
+    }
+  | {
+      as: "stopped"
+    }
+  | {
+      as: "problem"
+      /** What is wrong. */
+      trouble: Trouble
+    }
+  | {
+      as: "status"
+      /** The status word. */
+      word: StatusWord
+    }
 
 /**
  * An object whose finalizers keep the Namespace.
@@ -7339,6 +7465,12 @@ export type NetworkPolicyPreset = {
 export type NetworkPolicyService = {
   /** A policy limits where it goes. */
   egressIsolated: boolean
+  /**
+   * The address ranges Zeabur's egress limit lets its pods reach; absent when no such limit
+   * selects them.
+   * @nullable
+   */
+  egressLimit?: string[] | null
   /** The ingress controller (Traefik). */
   fromIngressController: NetworkPolicyAccess
   /** Pods of other namespaces, whatever their labels. */
@@ -8585,6 +8717,19 @@ export type WorkloadSummary = Classification & {
 }
 
 /**
+ * What a service does for its project, for how a client groups and draws it.
+ */
+export type ServiceRole = (typeof ServiceRole)[keyof typeof ServiceRole]
+
+export const ServiceRole = {
+  web: "web",
+  internal: "internal",
+  worker: "worker",
+  job: "job",
+  data: "data",
+} as const
+
+/**
  * The user and groups a workload's pods run as: its first container's security context, else
  * the pod's. An absent user or group is the image's.
  */
@@ -8622,31 +8767,10 @@ export type WorkloadSelector = {
 }
 
 /**
- * What a service is doing, in one word for a person. An open set: clients must show an unknown
- * value by its [`Health`].
- */
-export type StatusWord = (typeof StatusWord)[keyof typeof StatusWord]
-
-export const StatusWord = {
-  ready: "ready",
-  rollingOut: "rollingOut",
-  failing: "failing",
-  degraded: "degraded",
-  scheduled: "scheduled",
-  paused: "paused",
-  failed: "failed",
-  rolloutStuck: "rolloutStuck",
-  scaledToZero: "scaledToZero",
-  completed: "completed",
-  unknown: "unknown",
-  building: "building",
-  waitingUpload: "waitingUpload",
-} as const
-
-/**
  * A service's health, the word for it, and why when a pod keeps failing.
  */
 export type ServiceStatus = {
+  cause?: StatusCause | null
   /** What its status dot shows. */
   health: Health
   /**
@@ -8658,6 +8782,16 @@ export type ServiceStatus = {
   reason?: string | null
   /** The word for it. */
   word: StatusWord
+}
+
+/**
+ * A service's verdict, from its status, its diagnoses and its pods.
+ */
+export type ServiceVerdict = {
+  /** What it says. */
+  headline: Headline
+  /** The colour of the verdict. */
+  tone: Health
 }
 
 /**
@@ -8684,6 +8818,8 @@ export type Service = WorkloadSummary & {
   podSecurity?: PodSecurityLevel | null
   /** Its pods, sorted by name. */
   pods: PodSummary[]
+  /** What it does for the project; see [`Service::role_now`]. */
+  role: ServiceRole
   /**
    * The names of the Ingresses and `HTTPRoute`s routing to those Services, sorted by name;
    * each is in the document's `routes`.
@@ -8693,6 +8829,7 @@ export type Service = WorkloadSummary & {
   selector?: WorkloadSelector | null
   /** Its health and the word for it, from the workload and its pods. */
   status: ServiceStatus
+  verdict?: ServiceVerdict | null
 }
 
 /**
@@ -8751,98 +8888,6 @@ export type ProjectBackups = {
   unreadable: UnreadableView[]
   /** Claims and databases no active schedule covers. */
   unscheduled: BackupTarget[]
-}
-
-/**
- * A project's build limits, as its namespace's annotations give them. Each is absent when its
- * annotation is missing, blank or not a quantity (Builder ignores such a value).
- */
-export type ProjectBuildLimits = {
-  /**
-   * The CPU limit of one build, such as `2` or `500m`.
-   * @nullable
-   */
-  buildCpu?: string | null
-  /**
-   * The memory limit of one build, such as `2Gi`.
-   * @nullable
-   */
-  buildMemory?: string | null
-}
-
-/**
- * A `BuildRun`.
- */
-export type ZeaburBuilderRun = {
-  /** The `Build`. */
-  build: string
-  /**
-   * When it was created.
-   * @nullable
-   */
-  created?: string | null
-  /**
-   * The pushed manifest's digest.
-   * @nullable
-   */
-  digest?: string | null
-  /**
-   * When it finished.
-   * @nullable
-   */
-  finished?: string | null
-  /**
-   * The ref the commit came from, such as `refs/heads/master`.
-   * @nullable
-   */
-  gitRef?: string | null
-  /**
-   * Details, at most 1 KiB of the Job's output.
-   * @nullable
-   */
-  message?: string | null
-  /** Its name, also its Job's and its pod's label. */
-  name: string
-  /**
-   * `Pending`, `Planning`, `Building`, `Succeeded`, `Failed` or `Cancelled`.
-   * @nullable
-   */
-  phase?: string | null
-  /**
-   * Why it waits or failed.
-   * @nullable
-   */
-  reason?: string | null
-  /**
-   * The commit.
-   * @nullable
-   */
-  revision?: string | null
-  /**
-   * When it started.
-   * @nullable
-   */
-  started?: string | null
-  /** The tags pushed. */
-  tags: string[]
-  /**
-   * `webhook`, `poll` or `manual`.
-   * @nullable
-   */
-  trigger?: string | null
-}
-
-/**
- * A run and the pod that ran it.
- */
-export type ProjectBuildRun = ZeaburBuilderRun & {
-  /** The pod's containers, in the order they run (`fetch`, `plan`, `build`). */
-  containers: string[]
-  /**
-   * Its pod, while it is there.
-   * @nullable
-   */
-  pod?: string | null
 }
 
 /**
@@ -9007,11 +9052,126 @@ export type ZeaburBuilderBuild = {
 }
 
 /**
+ * Which credentials a Git host refused.
+ */
+export type RefusedCredentials = (typeof RefusedCredentials)[keyof typeof RefusedCredentials]
+
+export const RefusedCredentials = {
+  deployKey: "deployKey",
+  token: "token",
+} as const
+
+/**
+ * A `Build`, and what its problem and its newest run say.
+ */
+export type ProjectBuild = ZeaburBuilderBuild & {
+  /** Its newest build ran out of memory: a higher build memory fixes it. */
+  outOfMemory: boolean
+  refused?: RefusedCredentials | null
+}
+
+/**
+ * A project's build limits, as its namespace's annotations give them. Each is absent when its
+ * annotation is missing, blank or not a quantity (Builder ignores such a value).
+ */
+export type ProjectBuildLimits = {
+  /**
+   * The CPU limit of one build, such as `2` or `500m`.
+   * @nullable
+   */
+  buildCpu?: string | null
+  /**
+   * The memory limit of one build, such as `2Gi`.
+   * @nullable
+   */
+  buildMemory?: string | null
+}
+
+/**
+ * A `BuildRun`.
+ */
+export type ZeaburBuilderRun = {
+  /** The `Build`. */
+  build: string
+  /**
+   * When it was created.
+   * @nullable
+   */
+  created?: string | null
+  /**
+   * The pushed manifest's digest.
+   * @nullable
+   */
+  digest?: string | null
+  /**
+   * When it finished.
+   * @nullable
+   */
+  finished?: string | null
+  /**
+   * The ref the commit came from, such as `refs/heads/master`.
+   * @nullable
+   */
+  gitRef?: string | null
+  /**
+   * Details, at most 1 KiB of the Job's output.
+   * @nullable
+   */
+  message?: string | null
+  /** Its name, also its Job's and its pod's label. */
+  name: string
+  /**
+   * `Pending`, `Planning`, `Building`, `Succeeded`, `Failed` or `Cancelled`.
+   * @nullable
+   */
+  phase?: string | null
+  /**
+   * Why it waits or failed.
+   * @nullable
+   */
+  reason?: string | null
+  /**
+   * The commit.
+   * @nullable
+   */
+  revision?: string | null
+  /**
+   * When it started.
+   * @nullable
+   */
+  started?: string | null
+  /** The tags pushed. */
+  tags: string[]
+  /**
+   * `webhook`, `poll` or `manual`.
+   * @nullable
+   */
+  trigger?: string | null
+}
+
+/**
+ * A run and the pod that ran it.
+ */
+export type ProjectBuildRun = ZeaburBuilderRun & {
+  /** The pod's containers, in the order they run (`fetch`, `plan`, `build`). */
+  containers: string[]
+  /** `ok` when it succeeded, `fail` when it failed, `progress` while it runs, else `idle`. */
+  health: Health
+  /**
+   * Its pod, while it is there.
+   * @nullable
+   */
+  pod?: string | null
+}
+
+/**
  * A project's builds.
  */
 export type ProjectBuilds = {
+  /** A build is under way or about to be, so a client polls sooner. */
+  building: boolean
   /** The `Build`s, by name. */
-  builds: ZeaburBuilderBuild[]
+  builds: ProjectBuild[]
   component?: ComponentRef | null
   /** The workloads Keel updates; read only when there is a `Build`. */
   keel: KeelPolicy[]
@@ -9103,6 +9263,40 @@ export type ProjectExtensions = {
 }
 
 /**
+ * How many of a project's services are in each state, for lists that show a project's health
+ * without its whole document.
+ */
+export type ProjectHealth = {
+  /**
+   * Services failing ([`Health::Fail`]).
+   * @minimum 0
+   */
+  failing: number
+  /**
+   * Services that are fine: [`Health::Ok`] or [`Health::Idle`].
+   * @minimum 0
+   */
+  healthy: number
+  /**
+   * Services rolling out ([`Health::Progress`]).
+   * @minimum 0
+   */
+  progressing: number
+  /**
+   * Services (workloads, without the Jobs a CronJob runs).
+   * @minimum 0
+   */
+  services: number
+  /**
+   * Services with too few ready replicas ([`Health::Warn`]).
+   * @minimum 0
+   */
+  warning: number
+  /** The worst health of any service; [`Health::Ok`] when every one is fine or there are none. */
+  worst: Health
+}
+
+/**
  * A project: its services, the resources they use and how they relate, read as the person.
  *
  * The one document a client needs for a project: the service, variables and objects views are
@@ -9111,6 +9305,8 @@ export type ProjectExtensions = {
 export type ProjectDocument = Project & {
   /** What the integrations add, by module; a module whose API is not served adds nothing. */
   extensions: ProjectExtensions
+  /** How many of its services are in each state, and the worst. */
+  health: ProjectHealth
   /** `projects/<name>`. */
   id: string
   /** Kinds the person could not list; the projection is missing what they hide. */
@@ -9159,38 +9355,6 @@ export type ProjectInstallation = {
 export type ProjectGitHubApp = {
   /** The installations, by account. */
   installations: ProjectInstallation[]
-}
-
-/**
- * How many of a project's services are in each state, for lists that show a project's health
- * without its whole document.
- */
-export type ProjectHealth = {
-  /**
-   * Services failing ([`Health::Fail`]).
-   * @minimum 0
-   */
-  failing: number
-  /**
-   * Services that are fine: [`Health::Ok`] or [`Health::Idle`].
-   * @minimum 0
-   */
-  healthy: number
-  /**
-   * Services rolling out ([`Health::Progress`]).
-   * @minimum 0
-   */
-  progressing: number
-  /**
-   * Services (workloads, without the Jobs a CronJob runs).
-   * @minimum 0
-   */
-  services: number
-  /**
-   * Services with too few ready replicas ([`Health::Warn`]).
-   * @minimum 0
-   */
-  warning: number
 }
 
 /**

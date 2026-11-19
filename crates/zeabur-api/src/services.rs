@@ -9,6 +9,7 @@ pub mod releases;
 pub mod rollout;
 pub mod runs;
 pub mod trace;
+pub(crate) mod verdict;
 
 use axum::extract::State;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};

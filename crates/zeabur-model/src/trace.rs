@@ -146,6 +146,52 @@ pub struct CertificateCheck {
     /// When it expires (`status.notAfter`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub not_after: Option<String>,
+    /// It failed because Let's Encrypt refused for its rate limit, in cert-manager's words.
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub rate_limited: bool,
+}
+
+impl CertificateCheck {
+    /// Whether cert-manager's `message` says that Let's Encrypt refused for its rate limit.
+    #[must_use]
+    pub fn says_rate_limited(message: &str) -> bool {
+        let message = message.to_ascii_lowercase();
+        message.contains("ratelimited")
+            || ["certificates", "new certificates", "orders", "new orders"]
+                .iter()
+                .any(|what| message.contains(&format!("too many {what}")))
+    }
+}
+
+/// How far setting up a domain is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum DomainSetup {
+    /// DNS points here, and the certificate, if any, is issued or not cert-manager's.
+    Valid,
+    /// A record is missing, or issuing the certificate failed.
+    Invalid,
+    /// cert-manager issues the certificate.
+    Pending,
+    /// DNS points at other addresses: a CDN in front, or a record to change.
+    Elsewhere,
+    /// DNS could not be checked.
+    Unknown,
+}
+
+impl DomainSetup {
+    /// The setup of a domain whose DNS is `dns` and whose certificate is `certificate`.
+    #[must_use]
+    pub const fn of(dns: DnsState, certificate: Option<CertificateState>) -> Self {
+        match (dns, certificate) {
+            (DnsState::Missing, _) | (_, Some(CertificateState::Failed)) => Self::Invalid,
+            (_, Some(CertificateState::Issuing)) => Self::Pending,
+            (DnsState::PointsHere, _) => Self::Valid,
+            (DnsState::Elsewhere, _) => Self::Elsewhere,
+            (DnsState::Unknown, _) => Self::Unknown,
+        }
+    }
 }
 
 /// What setting up a domain needs and how far it is.
@@ -164,6 +210,8 @@ pub struct DomainCheck {
     /// Its certificate, when the route lists the host for HTTPS.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub certificate: Option<CertificateCheck>,
+    /// How far its setup is, from `dns` and `certificate`.
+    pub setup: DomainSetup,
 }
 
 impl RouteTrace {
@@ -171,5 +219,51 @@ impl RouteTrace {
     #[must_use]
     pub fn first_failure(&self) -> Option<&Hop> {
         self.hops.iter().find(|h| h.status == HopStatus::Failed)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_domain_setup_names_a_missing_record_or_failed_certificate_first() {
+        assert_eq!(
+            DomainSetup::of(DnsState::Missing, Some(CertificateState::Issuing)),
+            DomainSetup::Invalid
+        );
+        assert_eq!(
+            DomainSetup::of(DnsState::PointsHere, Some(CertificateState::Failed)),
+            DomainSetup::Invalid
+        );
+        assert_eq!(
+            DomainSetup::of(DnsState::Elsewhere, Some(CertificateState::Issuing)),
+            DomainSetup::Pending
+        );
+        assert_eq!(
+            DomainSetup::of(DnsState::PointsHere, Some(CertificateState::NotChecked)),
+            DomainSetup::Valid
+        );
+        assert_eq!(
+            DomainSetup::of(DnsState::Elsewhere, None),
+            DomainSetup::Elsewhere
+        );
+        assert_eq!(
+            DomainSetup::of(DnsState::Unknown, None),
+            DomainSetup::Unknown
+        );
+    }
+
+    #[test]
+    fn a_rate_limit_is_read_from_cert_managers_words() {
+        assert!(CertificateCheck::says_rate_limited(
+            "429 urn:ietf:params:acme:error:rateLimited: too many certificates already issued"
+        ));
+        assert!(CertificateCheck::says_rate_limited(
+            "Too many new orders recently"
+        ));
+        assert!(!CertificateCheck::says_rate_limited(
+            "DNS problem: NXDOMAIN"
+        ));
     }
 }

@@ -22,6 +22,7 @@ pub mod readiness;
 mod reload;
 mod source;
 mod trace;
+mod verdict;
 mod workload;
 
 pub use attribution::{Attribution, NamespaceAttribution, Ownership, WorkloadRef};
@@ -36,7 +37,7 @@ pub use diagnosis::{
     IncidentKind, Message,
 };
 pub use gap::{Citation, Fix, FixKind, FixValues, Gap, Severity};
-pub use health::{Health, ProjectHealth, ServiceStatus, StatusWord};
+pub use health::{Health, ProjectHealth, ServiceStatus, StatusCause, StatusWord};
 pub use http_route::{
     BackendRef, GATEWAY_GROUP, HttpRoute, HttpRouteMetadata, HttpRouteRule, HttpRouteSpec,
     ParentReference, RouteCondition, RouteParentStatus, RouteStatus,
@@ -48,15 +49,16 @@ pub use network::{
 pub use pod_security::{PodSecurityLevel, RunAs};
 pub use project::{
     Connection, ConnectionEvidence, DataStore, PageServer, Project, Relation, RelationKind,
-    Resource, ResourceKind, Service, WorkloadSelector,
+    Resource, ResourceKind, Service, ServiceRole, WorkloadSelector,
 };
 pub use provenance::{Provenance, Tool};
 pub use reload::ConfigReload;
 pub use source::{ObjectRef, Origin, Source, SourceKind};
 pub use trace::{
-    AddressKind, CertificateCheck, CertificateState, DnsState, DomainCheck, Hop, HopStatus,
-    HopStep, RouteTrace,
+    AddressKind, CertificateCheck, CertificateState, DnsState, DomainCheck, DomainSetup, Hop,
+    HopStatus, HopStep, RouteTrace,
 };
+pub use verdict::{Headline, ServiceVerdict, Trouble};
 pub use workload::{
     Classification, ContainerStatusSummary, ContainerTermination, ContainerWaiting, ManagedBy,
     Phase, PodSummary, Replicas, TaskConcurrency, TaskSchedule, WorkloadKind, WorkloadSummary,

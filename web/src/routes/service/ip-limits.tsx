@@ -1,4 +1,4 @@
-import { useQueries, useQuery } from "@tanstack/react-query"
+import { useQueries } from "@tanstack/react-query"
 import { lazy, Suspense, useState, type ReactNode } from "react"
 import SignInIcon from "~icons/ph/sign-in"
 import SignOutIcon from "~icons/ph/sign-out"
@@ -8,8 +8,6 @@ import { objectQuery } from "@/api/queries"
 import { GateTip, useGate } from "@/components/gate"
 import { useT, type Translate } from "@/i18n"
 import {
-  blocksOf,
-  egressPolicyName,
   incomingVerdict,
   outgoingVerdict,
   sourceRangeOf,
@@ -79,16 +77,11 @@ function useIncoming(project: string, ingresses: Route[]) {
   return { limited, verdict, was }
 }
 
-/** The ranges of the pods' egress policy, once read. */
-function useOutgoing(project: string, service: Service, reach?: Schemas.NetworkPolicyService) {
-  const name = egressPolicyName(service.name)
-  const ours = reach?.selectedBy.includes(name) ?? false
-  const found = useQuery({
-    ...objectQuery(project, address("networking.k8s.io", "v1", "networkpolicies", name)),
-    enabled: ours,
-  })
-  const blocks = found.data ? blocksOf(found.data.yaml) : undefined
-  const verdict = outgoingVerdict(ours, reach?.egressIsolated ?? false, blocks)
+/** The ranges of the pods' egress limit. */
+function outgoingOf(reach?: Schemas.NetworkPolicyService) {
+  const blocks = reach?.egressLimit ?? undefined
+  const verdict = outgoingVerdict(reach?.egressIsolated ?? false, blocks)
+  const ours = blocks !== undefined
   return { ours, verdict, was: { on: ours, same: true, cidrs: blocks ?? [] } }
 }
 
@@ -113,7 +106,7 @@ export function IpLimits({
   const domains = useGate(project, "changeDomains")
   const policies = useGate(project, "changeNetworkPolicies")
   const incoming = useIncoming(project, ingresses)
-  const outgoing = useOutgoing(project, service, reachability)
+  const outgoing = outgoingOf(reachability)
   const managed = !!service.provenance.tool
   const none = ingresses.length === 0
   const edit = (kind: Kind, disabled: boolean) => (

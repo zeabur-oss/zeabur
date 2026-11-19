@@ -70,6 +70,9 @@ pub struct Diagnosis {
     /// read the incidents too.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub incident: Option<String>,
+    /// The port a failing readiness check was refused on: nothing listens there.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub refused_port: Option<u16>,
     /// What it shares with the diagnoses of other services that fail the same way.
     pub group: DiagnosisGroup,
 }

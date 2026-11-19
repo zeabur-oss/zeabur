@@ -4356,16 +4356,6 @@ export const en = {
     `The rollout of ${p.name} is stuck: a new replica's run failed.`,
   "sentence.rollout.stuck.podSecurity": (p: P) =>
     `The rollout of ${p.name} is stuck: security settings keep a new replica from starting.`,
-  "sentence.fix.multiAttach": (p: P) =>
-    `The old replica still holds its volume, and a volume attaches to one node at a time. In YAML, set ${p.service || "the service"}'s strategy.type to Recreate so the old replica stops first; each release then takes it offline for the seconds the new one needs to start.`,
-  "sentence.fix.outOfMemory": (p: P) =>
-    `Raise the memory maximum${p.limit ? ` above ${p.limit}` : ""}. Usage shows how close it gets. A maximum reserves nothing, so the node needs that much memory free.`,
-  "sentence.fix.evicted.disk":
-    "The node ran short of disk and stopped this replica. A new one starts on its own, without what the old one wrote outside a volume. Keep data on a volume and logs small, or ask a cluster administrator to free disk on that node.",
-  "sentence.fix.evicted.memory":
-    "The node ran short of memory and stopped this replica first. Reserve memory close to what it uses so it is stopped last. The reservation is held for it even when idle.",
-  "sentence.fix.evicted":
-    "The node ran short of resources and stopped this replica. A new one starts on its own. Its events say which resource ran short.",
   "sentence.rollout.stuck.deadlineExceeded": (p: P) =>
     `The rollout of ${p.name} is stuck: it made no progress before its deadline (progressDeadlineSeconds).`,
   "sentence.rollout.stuck.replicaFailure": (p: P) =>

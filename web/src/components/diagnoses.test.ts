@@ -2,9 +2,10 @@ import { describe, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import { logsReadable } from "@/api/logs-access"
+import { StatusCause } from "@/api/zeabur"
 import { diagnosisAction, type Diagnosis } from "@/components/diagnoses"
 import { en } from "@/i18n/en"
-import { reasonWord, statusOf, type Service } from "@/model/service"
+import { statusOf, type Service } from "@/model/service"
 
 const withLogs = (canReadLogs: Schemas.Permission) => ({ canReadLogs })
 
@@ -20,9 +21,15 @@ const diagnosis = (kind: Diagnosis["kind"], cause: string): Diagnosis => ({
 
 describe("a diagnosis's action", () => {
   test("follows a concrete fix to where it is done", () => {
-    const held = { ...diagnosis("unexplained", "x"), fix: { key: "fix.multiAttach" } }
+    const held = {
+      ...diagnosis("unexplained", "x"),
+      fix: { key: "diagnosis.unexplained.fix.multiAttach" },
+    }
     expect(diagnosisAction(held).tab).toBe("yaml")
-    const oom = { ...diagnosis("unexplained", "x"), fix: { key: "fix.outOfMemory" } }
+    const oom = {
+      ...diagnosis("unexplained", "x"),
+      fix: { key: "diagnosis.unexplained.fix.outOfMemory" },
+    }
     expect(diagnosisAction(oom).label).toBe("diagnosis.action.memory")
   })
 
@@ -97,20 +104,8 @@ describe("a diagnosis's action", () => {
 })
 
 describe("the status's plain word", () => {
-  test("says what a raw reason means; an unknown reason leaves the status word", () => {
-    expect(reasonWord("CrashLoopBackOff", false)).toBe("crashing")
-    expect(reasonWord("ImagePullBackOff", false)).toBe("imagePull")
-    expect(reasonWord("ErrImagePull", false)).toBe("imagePull")
-    expect(reasonWord("OOMKilled", true)).toBe("outOfMemory")
-    expect(reasonWord("SomethingNew", false)).toBe(undefined)
-    expect(reasonWord(undefined, false)).toBe(undefined)
-    for (const word of ["crashing", "imagePull", "outOfMemory", "runFailed"] as const)
-      expect(en[`reason.${word}`]).toBeTruthy()
-  })
-
-  test("reads Error as a crash for a service and as a failed run for a task", () => {
-    expect(reasonWord("Error", false)).toBe("crashing")
-    expect(reasonWord("Error", true)).toBe("runFailed")
+  test("has words for every cause the server names", () => {
+    for (const word of Object.values(StatusCause)) expect(en[`reason.${word}`], word).toBeTruthy()
   })
 
   test("rests on the failing pod: running again after a recent crash, its restarts and last exit", () => {

@@ -6,7 +6,7 @@ import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useI18n, useT, type Translate } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { reasonWord, type Health, type PodFacts, type Status } from "@/model/service"
+import { type Health, type PodFacts, type ReasonWord, type Status } from "@/model/service"
 
 const healthBg: Record<Health, string> = {
   ok: "bg-ok",
@@ -29,15 +29,14 @@ export function StatusDot({ health, className }: { health: Health; className?: s
   )
 }
 
-export function plainReason(t: Translate, reason: string | undefined, task: boolean) {
-  const word = reasonWord(reason, task)
-  return word ? t(`reason.${word}`) : undefined
+export function plainReason(t: Translate, cause: ReasonWord | null | undefined) {
+  return cause ? t(`reason.${cause}`) : undefined
 }
 
 export function useStatusWord() {
   const t = useT()
   return (status: Status) =>
-    plainReason(t, status.reason, status.task ?? false) ??
+    plainReason(t, status.cause) ??
     (status.unchecked ? t("status.readyUnchecked") : t(`status.${status.word}`))
 }
 

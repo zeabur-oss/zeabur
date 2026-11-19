@@ -138,6 +138,16 @@ export const serverEn = {
     `The newest event about it: ${p.event ?? ""}, “${p.note ?? ""}”.${!p.serving || p.serving === "none" ? `` : p.serving === "0" ? `` : p.serving === "1" ? ` The replica of the previous release still serves traffic.` : ` ${p.serving ?? ""} replicas of the previous release still serve traffic.`}`,
   "sentence.diagnosis.unexplained.why.noEvent": (p: P) =>
     `The cluster has recorded no event about it.${!p.serving || p.serving === "none" ? `` : p.serving === "0" ? `` : p.serving === "1" ? ` The replica of the previous release still serves traffic.` : ` ${p.serving ?? ""} replicas of the previous release still serve traffic.`}`,
+  "sentence.diagnosis.unexplained.fix.multiAttach": (p: P) =>
+    `The old replica still holds its volume, and a volume attaches to one node at a time. In YAML, set ${p.service || "the service"}'s strategy.type to Recreate so the old replica stops first; each release then takes it offline for the seconds the new one needs to start.`,
+  "sentence.diagnosis.unexplained.fix.outOfMemory": () =>
+    "Raise the memory maximum. Usage shows how close it gets. A maximum reserves nothing, so the node needs that much memory free.",
+  "sentence.diagnosis.unexplained.fix.evictedDisk": () =>
+    "The node ran short of disk and stopped this replica. A new one starts on its own, without what the old one wrote outside a volume. Keep data on a volume and logs small, or ask a cluster administrator to free disk on that node.",
+  "sentence.diagnosis.unexplained.fix.evictedMemory": () =>
+    "The node ran short of memory and stopped this replica first. Reserve memory close to what it uses so it is stopped last. The reservation is held for it even when idle.",
+  "sentence.diagnosis.unexplained.fix.evicted": () =>
+    "The node ran short of resources and stopped this replica. A new one starts on its own. Its events say which resource ran short.",
   "sentence.diagnosis.unexplained.fix.waiting": (p: P) =>
     `Open ${p.pod ?? ""}'s events: the kubelet says there what it waits for.`,
   "sentence.diagnosis.unexplained.fix.terminated": (p: P) =>
@@ -187,8 +197,8 @@ export const serverEn = {
     `${p.container ?? ""} ran out of memory and was stopped.`,
   "sentence.diagnosis.outOfMemory.cause.noLimit": (p: P) =>
     `${p.container ?? ""} was stopped because the machine ran short of memory.`,
-  "sentence.diagnosis.outOfMemory.fix.limit": () =>
-    "Raise the memory maximum, or find what uses the memory.",
+  "sentence.diagnosis.outOfMemory.fix.limit": (p: P) =>
+    `Raise the memory maximum${p.limit ? ` above ${p.limit}` : ""}. Usage shows how close it gets. A maximum reserves nothing, so the node needs that much memory free.`,
   "sentence.diagnosis.outOfMemory.fix.noLimit": () =>
     "Set how much memory it reserves, and its maximum, to fit what it uses.",
   "sentence.diagnosis.imagePull.cause.notFound": (p: P) =>

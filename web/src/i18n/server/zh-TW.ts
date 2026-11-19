@@ -135,6 +135,16 @@ export const serverZhTw = {
     `最新的事件：${p.event ?? ""}，「${p.note ?? ""}」。${!p.serving || p.serving === "none" ? `` : p.serving === "0" ? `` : `上一個版本的 ${p.serving ?? ""} 個副本仍在提供服務。`}`,
   "sentence.diagnosis.unexplained.why.noEvent": (p: P) =>
     `叢集沒有相關的事件。${!p.serving || p.serving === "none" ? `` : p.serving === "0" ? `` : `上一個版本的 ${p.serving ?? ""} 個副本仍在提供服務。`}`,
+  "sentence.diagnosis.unexplained.fix.multiAttach": (p: P) =>
+    `舊副本還占著磁碟區，而磁碟區一次只能掛在一個節點上。在 YAML 把 ${p.service || "服務"} 的 strategy.type 設為 Recreate，讓舊副本先停止。代價是每次部署時，新副本啟動的那幾秒服務會中斷。`,
+  "sentence.diagnosis.unexplained.fix.outOfMemory": () =>
+    "把記憶體上限調高，「用量」會顯示離上限還有多遠。上限不會預先保留記憶體，所以節點上要有足夠的可用記憶體。",
+  "sentence.diagnosis.unexplained.fix.evictedDisk": () =>
+    "節點的磁碟空間不足，停止了這個副本。新副本會自動啟動，但舊副本寫在磁碟區以外的資料不會保留。把資料放在磁碟區、減少日誌，或請叢集管理員清出那個節點的磁碟空間。",
+  "sentence.diagnosis.unexplained.fix.evictedMemory": () =>
+    "節點的記憶體不足，先停止了這個副本。把記憶體保留量設成接近實際用量，這個副本就會排到最後才停止，代價是閒置時這些記憶體也會一直保留著。",
+  "sentence.diagnosis.unexplained.fix.evicted": () =>
+    "節點資源不足，停止了這個副本。新副本會自動啟動，副本的事件會說明是哪種資源不足。",
   "sentence.diagnosis.unexplained.fix.waiting": (p: P) =>
     `開啟 ${p.pod ?? ""} 的事件，kubelet 會在那裡說明在等什麼。`,
   "sentence.diagnosis.unexplained.fix.terminated": (p: P) =>
@@ -179,7 +189,8 @@ export const serverZhTw = {
     `${p.container ?? ""} 用完了記憶體，被系統終止了。`,
   "sentence.diagnosis.outOfMemory.cause.noLimit": (p: P) =>
     `機器的記憶體不足，系統終止了 ${p.container ?? ""}。`,
-  "sentence.diagnosis.outOfMemory.fix.limit": () => "調高記憶體上限，或找出用掉記憶體的地方。",
+  "sentence.diagnosis.outOfMemory.fix.limit": (p: P) =>
+    `把記憶體上限調高${p.limit ? `到超過 ${p.limit}` : ""}，「用量」會顯示離上限還有多遠。上限不會預先保留記憶體，所以節點上要有足夠的可用記憶體。`,
   "sentence.diagnosis.outOfMemory.fix.noLimit": () => "依實際用量設定記憶體的保留量與上限。",
   "sentence.diagnosis.imagePull.cause.notFound": (p: P) =>
     `${p.container ?? ""} 無法下載映像檔 ${p.image ?? ""}：映像檔倉庫裡沒有這個映像檔。`,

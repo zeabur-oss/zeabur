@@ -28,11 +28,9 @@
       "origin": "unknown"
     },
     "fix": {
-      "key": "diagnosis.unexplained.fix.waiting",
+      "key": "diagnosis.unexplained.fix.multiAttach",
       "params": {
-        "pod": "demo-gateway-7d9c8b6f5-new1",
-        "service": "demo-gateway",
-        "stuck": "true"
+        "service": "demo-gateway"
       }
     },
     "kind": "unexplained",

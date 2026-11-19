@@ -17,7 +17,10 @@ const build = (exposedPorts?: string[]) =>
     exposedPorts,
   }) as Build
 
-const refused = (output = "dial tcp 10.42.2.31:8080: connect: connection refused") =>
+const refused = (
+  output = "dial tcp 10.42.2.31:8080: connect: connection refused",
+  refusedPort: number | null = 8080,
+) =>
   ({
     kind: "probeFailure",
     container: "checkout",
@@ -29,6 +32,7 @@ const refused = (output = "dial tcp 10.42.2.31:8080: connect: connection refused
     why: { key: "diagnosis.probeFailure.why.readiness" },
     fix: { key: "diagnosis.probeFailure.fix.readiness" },
     evidence: [],
+    refusedPort,
   }) as unknown as Schemas.Diagnosis
 
 const checkout = ({ started = 300, ready = false, diagnoses = [refused()] } = {}) =>
@@ -65,7 +69,7 @@ describe("a built service that doesn't listen on its port", () => {
   })
 
   test("is not said when the check fails for another reason", () => {
-    const timeout = refused("dial tcp 10.42.2.31:8080: i/o timeout")
+    const timeout = refused("dial tcp 10.42.2.31:8080: i/o timeout", null)
     expect(wrongPort(checkout({ diagnoses: [timeout] }), [build()], NOW)).toBeUndefined()
   })
 

@@ -347,6 +347,7 @@ impl Found {
                         .is_some_and(|passed| *passed > gathered.last))
             })
             .map(|((kind, container, _), gathered)| Diagnosis {
+                refused_port: refused_port(&gathered.cause),
                 kind,
                 container,
                 pods: gathered.pods.into_iter().collect(),
@@ -361,6 +362,17 @@ impl Found {
             })
             .collect()
     }
+}
+
+/// The port a failing readiness check was refused on, from the probe's output as the kubelet
+/// writes it: `dial tcp 10.42.0.7:8080: connect: connection refused`.
+fn refused_port(cause: &Message) -> Option<u16> {
+    if cause.key != "diagnosis.probeFailure.cause.readiness" {
+        return None;
+    }
+    let output = cause.params.get("output")?;
+    let (before, _) = output.split_once(": connect: connection refused")?;
+    before.rsplit_once(':')?.1.parse().ok()
 }
 
 fn parse(time: Option<&str>) -> Option<Timestamp> {
@@ -1343,6 +1355,7 @@ fn unexplained<'e, 's>(
     if stuck {
         why = why.with("serving", serving.to_string());
     }
+    let fix = concrete_fix(&why, state, name).unwrap_or(fix);
     Diagnosis {
         kind: DiagnosisKind::Unexplained,
         container: container.unwrap_or_default().to_owned(),
@@ -1355,7 +1368,39 @@ fn unexplained<'e, 's>(
         evidence,
         last_seen: last_seen.map(|t| t.to_string()),
         incident: None,
+        refused_port: None,
     }
+}
+
+/// A step to take, with its cost, where the fallback's fix only says where to look: a volume
+/// that the replica being replaced still holds, a container stopped for its memory, or a replica
+/// that its node evicted. `why` names the newest event and `reason` the container's state.
+fn concrete_fix(why: &Message, reason: Option<&str>, service: &str) -> Option<Message> {
+    let event = why.params.get("event").map(String::as_str);
+    let note = why.params.get("note").map_or("", String::as_str);
+    if event == Some("FailedAttachVolume") && note.contains("Multi-Attach") {
+        return Some(
+            Message::new("diagnosis.unexplained.fix.multiAttach").with("service", service),
+        );
+    }
+    if reason == Some("OOMKilled") {
+        return Some(Message::new("diagnosis.unexplained.fix.outOfMemory"));
+    }
+    if reason != Some("Evicted") && event != Some("Evicted") {
+        return None;
+    }
+    let note = note.to_ascii_lowercase();
+    let short = if ["ephemeral-storage", "nodefs", "imagefs", "disk"]
+        .iter()
+        .any(|word| note.contains(word))
+    {
+        "evictedDisk"
+    } else if note.contains("memory") {
+        "evictedMemory"
+    } else {
+        "evicted"
+    };
+    Some(Message::new(&format!("diagnosis.unexplained.fix.{short}")))
 }
 
 #[cfg(test)]
@@ -1526,5 +1571,71 @@ mod tests {
         let cut = truncate(&long);
         assert_eq!(cut.chars().count(), OUTPUT_LIMIT + 1);
         assert!(cut.ends_with('…'));
+    }
+
+    #[test]
+    fn a_refused_readiness_check_names_its_port() {
+        let cause = |key: &str, output: &str| Message::new(key).with("output", output);
+        let readiness = "diagnosis.probeFailure.cause.readiness";
+        assert_eq!(
+            refused_port(&cause(
+                readiness,
+                "Get \"http://10.42.0.7:8080/\": dial tcp 10.42.0.7:8080: connect: connection refused"
+            )),
+            Some(8080)
+        );
+        assert_eq!(
+            refused_port(&cause(readiness, "HTTP probe failed with statuscode: 503")),
+            None
+        );
+        assert_eq!(
+            refused_port(&cause(
+                "diagnosis.probeFailure.cause.liveness",
+                "dial tcp 10.42.0.7:8080: connect: connection refused"
+            )),
+            None
+        );
+    }
+
+    #[test]
+    fn the_fallback_says_the_concrete_fix_its_event_or_state_allows() {
+        let event = |reason: &str, note: &str| {
+            Message::new("diagnosis.unexplained.why.event")
+                .with("event", reason)
+                .with("note", note)
+        };
+        let key = |why: &Message, reason: Option<&str>| {
+            concrete_fix(why, reason, "web").map(|fix| fix.key)
+        };
+        let held = concrete_fix(
+            &event(
+                "FailedAttachVolume",
+                "Multi-Attach error for volume \"pvc-1\"",
+            ),
+            None,
+            "web",
+        )
+        .unwrap();
+        assert_eq!(held.key, "diagnosis.unexplained.fix.multiAttach");
+        assert_eq!(held.params.get("service").map(String::as_str), Some("web"));
+        let quiet = Message::new("diagnosis.unexplained.why.noEvent");
+        assert_eq!(
+            key(&quiet, Some("OOMKilled")).as_deref(),
+            Some("diagnosis.unexplained.fix.outOfMemory")
+        );
+        let evicted = |note: &str| key(&event("Evicted", note), None);
+        assert_eq!(
+            evicted("The node was low on resource: ephemeral-storage.").as_deref(),
+            Some("diagnosis.unexplained.fix.evictedDisk")
+        );
+        assert_eq!(
+            evicted("The node was low on resource: memory.").as_deref(),
+            Some("diagnosis.unexplained.fix.evictedMemory")
+        );
+        assert_eq!(
+            key(&quiet, Some("Evicted")).as_deref(),
+            Some("diagnosis.unexplained.fix.evicted")
+        );
+        assert_eq!(key(&event("BackOff", "Back-off"), Some("Error")), None);
     }
 }

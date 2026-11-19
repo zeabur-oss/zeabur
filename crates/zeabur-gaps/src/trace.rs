@@ -48,8 +48,8 @@ use serde_json::Value;
 use zeabur_graph::Snapshot;
 use zeabur_model::{
     AddressKind, CertificateCheck, CertificateState, Diagnosis, DiagnosisGroup, DiagnosisKind,
-    DnsState, DomainCheck, Health, Hop, HopStatus, HopStep, HttpRoute, Message, Origin, RouteTrace,
-    Service,
+    DnsState, DomainCheck, DomainSetup, Health, Hop, HopStatus, HopStep, HttpRoute, Message,
+    Origin, RouteTrace, Service,
 };
 
 use crate::diagnose::fault::fault;
@@ -288,6 +288,7 @@ fn domain_check(
         dns,
         resolved,
         certificate: certificate.cloned(),
+        setup: DomainSetup::of(dns, certificate.map(|c| c.state)),
     })
 }
 
@@ -610,6 +611,7 @@ const fn not_checked() -> CertificateCheck {
         reason: None,
         message: None,
         not_after: None,
+        rate_limited: false,
     }
 }
 
@@ -767,6 +769,8 @@ fn certificate(
             state,
             name: Some(certificate_name.to_owned()),
             reason: (!reason.is_empty()).then_some(reason),
+            rate_limited: state == CertificateState::Failed
+                && CertificateCheck::says_rate_limited(&message),
             message: (!message.is_empty()).then_some(message),
             not_after: not_after.clone(),
         };
@@ -1068,6 +1072,7 @@ pub fn diagnoses(traces: &[RouteTrace], service: &Service) -> Vec<Diagnosis> {
             last_seen: None,
             incident: (variant == "controllerDown")
                 .then(|| "incidents/component/ingress".to_owned()),
+            refused_port: None,
         });
     }
     out

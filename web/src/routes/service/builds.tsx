@@ -50,16 +50,13 @@ import { formatAgo } from "@/lib/format"
 import {
   branchOf,
   buildProblem,
-  building,
   builtContainers,
   durationOf,
   KEEL_WEBHOOK,
   keelPolicy,
   reasonKey,
-  refusedCredentials,
   runsLatest,
   runsOf,
-  runTone,
   shortSha,
   type Build,
   type BuildRun,
@@ -67,14 +64,13 @@ import {
   type Built,
 } from "@/model/builds"
 import { deployKeyPage, missingKeel, parseRepository } from "@/model/git-service"
-import { imageTag, isTask, type Service } from "@/model/service"
+import { imageTag, isTask, type Health, type Service } from "@/model/service"
 
 /** The service's builds, when a Zeabur Builder `Build` makes one of its images. */
 export function useServiceBuilds(project: string, service: Service) {
   const builds = useQuery({
     ...buildsQuery(project),
-    refetchInterval: (query) =>
-      query.state.data && building(query.state.data, Date.now()) ? 5_000 : 30_000,
+    refetchInterval: (query) => (query.state.data?.building ? 5_000 : 30_000),
   })
   const built = builds.data ? builtContainers(service, builds.data.builds) : []
   return { builds, built }
@@ -211,7 +207,8 @@ function phaseWord(t: ReturnType<typeof useT>, run?: BuildRun) {
   return key ? t(key) : t("builds.word.none")
 }
 
-const tones = { ok: "ok", fail: "fail", progress: "progress", neutral: "idle" } as const
+/** A run's dot: the timeline names idle `neutral`. */
+const dotTone = (health: Health) => (health === "idle" ? "neutral" : health)
 
 /** What to do when the Git host refuses the Build's credentials; for a deploy key, the key to add
  * again, read from its Secret only when asked. */
@@ -299,7 +296,7 @@ function Summary({
   const failedRun = !problem && latest?.phase === "Failed" ? latest : undefined
   const failure =
     problem?.message ?? (build.ready === "False" && !failedRun ? build.message : undefined)
-  const refused = refusedCredentials(build, latest)
+  const refused = build.refused
   const waiting = build.awaitingUpload && !build.latestImage
   return (
     <SummaryCard aria-label={t("builds.status", build.name)}>
@@ -395,7 +392,7 @@ function SummaryActions({
 
 function summaryTone(problem: ReturnType<typeof buildProblem>, latest?: BuildRun) {
   if (problem) return problem.lasting ? "fail" : "progress"
-  return latest ? tones[runTone(latest)] : "idle"
+  return latest ? latest.health : "idle"
 }
 
 function Failure({
@@ -676,7 +673,7 @@ function History({ project, runs }: { project: string; runs: BuildRun[] }) {
           return (
             <TimelineItem
               key={run.name}
-              tone={runTone(run)}
+              tone={dotTone(run.health)}
               time={<Ago iso={run.started ?? run.created} />}
               title={
                 <span className="flex flex-wrap items-baseline gap-x-2">

@@ -53,14 +53,7 @@ import { podObjectLink, serviceLink } from "@/lib/place"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
 import { alertsFor, folded } from "@/model/alerts"
-import {
-  failureText,
-  ranOutOfMemory,
-  refusedCredentials,
-  runsOf,
-  type Build,
-  type BuildRun,
-} from "@/model/builds"
+import { failureText, runsOf, type Build, type BuildRun } from "@/model/builds"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
@@ -70,7 +63,6 @@ import {
   isHealthy,
   isTask,
   podHealth,
-  podReason,
   serviceId,
   statusOf,
   type Event,
@@ -118,10 +110,9 @@ export function OverviewTab({
   const browser = useBrowserChecks()
   const routes = trace.data?.routes ?? []
   const verdict = verdictOf({
-    status: statusOf(service),
+    verdict: service.verdict,
     said,
     routes,
-    pods: service.pods,
     checks: (address) => {
       const route = routes.find((r) => r.kind === "domain" && r.address === address)
       return browser(address, route?.hops.some((h) => h.step === "certificate") ?? false)
@@ -417,8 +408,8 @@ function buildWhy(
 ): string | null | undefined {
   const { service, build, run, failed, waiting } = at
   if (!failed) return waiting ? t("builds.waitingUpload", service.name) : t("overview.building")
-  if (ranOutOfMemory(build, run)) return t("builds.reason.OutOfMemory")
-  const refused = build ? refusedCredentials(build, run) : undefined
+  if (build?.outOfMemory) return t("builds.reason.OutOfMemory")
+  const refused = build?.refused
   return (refused ? t(`builds.refused.${refused}`) : undefined) ?? failureText(build, run)
 }
 
@@ -578,7 +569,6 @@ function Replicas({
   const t = useT()
   const logs = useLogsReadable(project)
   const { ready, desired } = replicaCounts(service)
-  const task = isTask(service.kind)
   const scalable = service.kind === "Deployment" || service.kind === "StatefulSet"
   return (
     <Popover>
@@ -596,8 +586,7 @@ function Replicas({
             {service.pods.map((pod) => {
               const health = podHealth(pod)
               const reason =
-                plainReason(t, podReason(pod), task) ??
-                (pod.ready ? t("pod.ready") : t("pod.notReady"))
+                plainReason(t, pod.cause) ?? (pod.ready ? t("pod.ready") : t("pod.notReady"))
               return (
                 <li key={pod.name} className="flex flex-col gap-0.5 rounded px-2 py-1.5">
                   <span className="flex min-w-0 items-center gap-2 text-xs">

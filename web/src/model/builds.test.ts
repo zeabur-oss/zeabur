@@ -2,19 +2,15 @@ import { describe, expect, test } from "bun:test"
 
 import {
   buildDeletions,
-  building,
   builtContainers,
   durationOf,
   failureText,
-  ranOutOfMemory,
   reasonKey,
-  refusedCredentials,
   repositoryOf,
   runsLatest,
   shortSha,
   type Build,
   type BuildRun,
-  type Builds,
 } from "@/model/builds"
 import type { Service } from "@/model/service"
 
@@ -29,6 +25,7 @@ const build = (over: Partial<Build> = {}): Build => ({
   awaitingUpload: false,
   keelWebhooks: [],
   env: [],
+  outOfMemory: false,
   ...over,
 })
 
@@ -93,33 +90,6 @@ test("a run's duration runs to now until it finishes", () => {
   expect(durationOf({ ...run, started: null }, 0)).toBeUndefined()
 })
 
-test("a request to build again counts as building until a run answers it", () => {
-  const now = Date.parse("2026-10-23T08:01:00Z")
-  const run = (over: Partial<BuildRun>) =>
-    ({ build: "web", phase: "Succeeded", created: "2026-10-23T07:00:00Z", ...over }) as BuildRun
-  const data = (runs: BuildRun[], asked?: string) =>
-    ({ builds: [build({ rebuildRequested: asked })], runs, keel: [] }) as unknown as Builds
-  expect(building(data([run({})]), now)).toBe(false)
-  expect(building(data([run({ phase: null })]), now)).toBe(true)
-  expect(building(data([run({ phase: "Building" })]), now)).toBe(true)
-  expect(building(data([run({})], "2026-10-23T08:00:30Z"), now)).toBe(true)
-  const answered = run({ created: "2026-10-23T08:00:40Z" })
-  expect(building(data([answered], "2026-10-23T08:00:30Z"), now)).toBe(false)
-  expect(building(data([run({})], "2026-10-23T07:30:00Z"), now)).toBe(false)
-})
-
-test("a new Build counts as building until it has a run or a problem", () => {
-  const fresh = (over: Partial<Build>) =>
-    ({
-      builds: [build({ latestImage: null, problem: null, ...over })],
-      runs: [],
-      keel: [],
-    }) as unknown as Builds
-  expect(building(fresh({}), 0)).toBe(true)
-  const problem = { condition: "SourceReady", lasting: true } as Build["problem"]
-  expect(building(fresh({ problem }), 0)).toBe(false)
-})
-
 describe("buildDeletions", () => {
   const image = "zot.zot.svc:5000/shop/web:pending"
   const named = (name: string, images: string[]) => ({ ...service(images), name }) as Service
@@ -165,28 +135,6 @@ describe("buildDeletions", () => {
   })
 })
 
-describe("refusedCredentials", () => {
-  const refused = { condition: "SourceReady", reason: "AuthFailed", lasting: true }
-  test("a deploy key over SSH, a token over HTTPS, nothing without credentials", () => {
-    const ssh = build({
-      gitUrl: "git@github.com:acme/web.git",
-      credentials: { name: "web-git", own: true },
-    })
-    expect(refusedCredentials({ ...ssh, problem: refused }, undefined)).toBe("deployKey")
-    const https = build({
-      gitUrl: "https://github.com/acme/web.git",
-      credentials: { name: "web-git", own: true },
-    })
-    expect(refusedCredentials({ ...https, problem: refused }, undefined)).toBe("token")
-    expect(refusedCredentials({ ...ssh, credentials: null, problem: refused }, undefined)).toBe(
-      undefined,
-    )
-    expect(
-      refusedCredentials({ ...ssh, problem: { ...refused, reason: "RefNotFound" } }, undefined),
-    ).toBe(undefined)
-  })
-})
-
 describe("shortSha", () => {
   test("a commit and an uploaded folder's digest both read as seven hexadecimal digits", () => {
     expect(shortSha("3f9a1c2b7d4e5f60718293a4b5c6d7e8f9012345")).toBe("3f9a1c2")
@@ -212,16 +160,5 @@ describe("reasonKey", () => {
   test("a reason Zeabur does not know shares one sentence", () => {
     expect(reasonKey("SomethingNew")).toBe("builds.reason.other")
     expect(reasonKey(undefined)).toBe("builds.reason.other")
-  })
-})
-
-describe("a build that ran out of memory", () => {
-  const failed = (reason: string): BuildRun =>
-    ({ name: "r", build: "web", phase: "Failed", reason }) as BuildRun
-
-  test("is told from other failures by the run's reason", () => {
-    expect(ranOutOfMemory(build(), failed("OutOfMemory"))).toBe(true)
-    expect(ranOutOfMemory(build(), failed("BuildFailed"))).toBe(false)
-    expect(ranOutOfMemory(build(), undefined)).toBe(false)
   })
 })
