@@ -39,7 +39,7 @@
 //!
 //! **Symptoms.** A service's diagnosis is linked to an incident ([`link`]) only where the cause
 //! explains it: a diagnosis about pods on a node that is not ready, a pod the scheduler cannot
-//! place while a node carries the `not-ready` or `unreachable` taint, or a route that is not
+//! place because the node carries the `not-ready` or `unreachable` taint, or a route that is not
 //! accepted while its controller is down. Its fault becomes the incident's, so the service's
 //! problem reads as the cluster's.
 //!
@@ -138,6 +138,15 @@ pub struct NodeState {
     /// It carries the `node.kubernetes.io/not-ready` or `node.kubernetes.io/unreachable` taint.
     pub tainted: bool,
 }
+
+/// The taints the node lifecycle controller puts on a node that is not ready or unreachable
+/// [k8s-taint-based-evictions].
+///
+/// [k8s-taint-based-evictions]: https://kubernetes.io/docs/concepts/scheduling-eviction/taint-and-toleration/#taint-based-evictions
+const NODE_DOWN_TAINTS: [&str; 2] = [
+    "node.kubernetes.io/not-ready",
+    "node.kubernetes.io/unreachable",
+];
 
 fn label<'a>(meta: &'a ObjectMeta, key: &str) -> Option<&'a str> {
     meta.labels.as_ref()?.get(key).map(String::as_str)
@@ -249,10 +258,9 @@ pub fn node_states(nodes: &[Node]) -> Vec<NodeState> {
                     .as_ref()
                     .and_then(|s| s.taints.as_ref())
                     .is_some_and(|taints| {
-                        taints.iter().any(|t| {
-                            t.key == "node.kubernetes.io/not-ready"
-                                || t.key == "node.kubernetes.io/unreachable"
-                        })
+                        taints
+                            .iter()
+                            .any(|t| NODE_DOWN_TAINTS.contains(&t.key.as_str()))
                     }),
             }
         })
@@ -486,15 +494,21 @@ fn explains_component(kind: ComponentKind, diagnosis: &zeabur_model::Diagnosis) 
 }
 
 /// Whether `node`, not ready, explains `diagnosis` of a service with pods `on_node` there. A pod
-/// the scheduler cannot place is explained while the node carries the `not-ready` or
-/// `unreachable` taint.
+/// the scheduler cannot place is explained only while the node carries the `not-ready` or
+/// `unreachable` taint and the scheduler's message names that taint, so a missing claim or a
+/// placement rule is not read as the outage.
 fn explains_node(
     diagnosis: &zeabur_model::Diagnosis,
     node: &NodeState,
     on_node: &BTreeSet<&str>,
 ) -> bool {
     if diagnosis.kind == DiagnosisKind::Unschedulable {
-        return node.tainted;
+        let message = diagnosis
+            .why
+            .params
+            .get("message")
+            .map_or("", String::as_str);
+        return node.tainted && NODE_DOWN_TAINTS.iter().any(|t| message.contains(t));
     }
     let pods_there = diagnosis
         .pods
@@ -717,12 +731,22 @@ mod tests {
             pods: Vec::new(),
             ..crash(Vec::new())
         };
-        assert!(!explains_node(&unschedulable, &nodes[0], &BTreeSet::new()));
+        let waiting = |message: &str| zeabur_model::Diagnosis {
+            why: Message::new("diagnosis.unschedulable.why").with("message", message),
+            ..unschedulable.clone()
+        };
+        let taint = waiting(
+            "0/2 nodes are available: 1 node(s) had untolerated taint \
+             {node.kubernetes.io/unreachable: }, 1 Insufficient cpu.",
+        );
+        let claim = waiting("persistentvolumeclaim \"data\" not found");
+        assert!(!explains_node(&taint, &nodes[0], &BTreeSet::new()));
         let tainted = NodeState {
             tainted: true,
             ..nodes[0].clone()
         };
-        assert!(explains_node(&unschedulable, &tainted, &BTreeSet::new()));
+        assert!(explains_node(&taint, &tainted, &BTreeSet::new()));
+        assert!(!explains_node(&claim, &tainted, &BTreeSet::new()));
         let found = incidents(
             &[
                 down(ComponentKind::IngressController),
