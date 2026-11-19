@@ -38,6 +38,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Namespace, Secret};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{
     Cluster, ClusterExt as _, DynamicObject, ObjectTarget, Preconditions, ResourceRef, WriteBody,
@@ -47,7 +49,7 @@ use zeabur_model::Origin;
 use zeabur_modules::velero::cluster as v;
 use zeabur_plan::{Change, CopyS3KeysChange, DataEdit, DataKind, PlanRequest};
 
-use crate::error::{ApiError, get_read, list_read, read_problem};
+use crate::error::{ApiError, get_read, list_read, read_problem, to_json};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
@@ -272,9 +274,7 @@ fn text(object: &DynamicObject, key: &str) -> String {
         .to_owned()
 }
 
-fn labelled(
-    meta: &zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
-) -> bool {
+fn labelled(meta: &ObjectMeta) -> bool {
     meta.labels.as_ref().is_some_and(|l| l.contains_key(LABEL))
 }
 
@@ -361,9 +361,7 @@ pub(crate) async fn keys(cluster: &dyn Cluster, name: &str) -> Result<(String, S
 }
 
 /// The destination a Secret's keys were copied from, by its label.
-pub(crate) fn copied_from(
-    meta: &zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta,
-) -> Option<String> {
+pub(crate) fn copied_from(meta: &ObjectMeta) -> Option<String> {
     meta.labels.as_ref()?.get(LABEL).cloned()
 }
 
@@ -744,7 +742,16 @@ fn fields_problem(fields: &S3DestinationFields) -> Option<&'static str> {
     }
 }
 
-fn config_map(fields: &S3DestinationFields) -> Value {
+fn meta(name: &str) -> ObjectMeta {
+    ObjectMeta {
+        name: Some(name.to_owned()),
+        namespace: Some(NAMESPACE.to_owned()),
+        labels: Some(BTreeMap::from([(LABEL.to_owned(), name.to_owned())])),
+        ..ObjectMeta::default()
+    }
+}
+
+fn config_map(fields: &S3DestinationFields) -> ConfigMap {
     let mut data = BTreeMap::from([
         ("endpoint", fields.endpoint.trim().trim_end_matches('/')),
         ("bucket", fields.bucket.trim()),
@@ -757,23 +764,27 @@ fn config_map(fields: &S3DestinationFields) -> Value {
     if !prefix.is_empty() {
         data.insert("prefix", prefix);
     }
-    json!({
-        "apiVersion": "v1",
-        "kind": "ConfigMap",
-        "metadata": {"name": fields.name, "namespace": NAMESPACE,
-                     "labels": {LABEL: fields.name}},
-        "data": data,
-    })
+    ConfigMap {
+        metadata: meta(&fields.name),
+        data: Some(
+            data.into_iter()
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .collect(),
+        ),
+        ..ConfigMap::default()
+    }
 }
 
-fn secret(name: &str, access: &str, secret: &str) -> Value {
-    json!({
-        "apiVersion": "v1",
-        "kind": "Secret",
-        "metadata": {"name": name, "namespace": NAMESPACE, "labels": {LABEL: name}},
-        "type": "Opaque",
-        "stringData": {ACCESS_KEY_ID: access, SECRET_ACCESS_KEY: secret},
-    })
+fn secret(name: &str, access: &str, secret: &str) -> Secret {
+    Secret {
+        metadata: meta(name),
+        type_: Some("Opaque".to_owned()),
+        string_data: Some(BTreeMap::from([
+            (ACCESS_KEY_ID.to_owned(), access.to_owned()),
+            (SECRET_ACCESS_KEY.to_owned(), secret.to_owned()),
+        ])),
+        ..Secret::default()
+    }
 }
 
 struct Planned {
@@ -928,11 +939,14 @@ fn rotate(copy: &Copy, access: &str, key: &str) -> Result<Planned, CopyKept> {
     let (data, shown) = match names.as_slice() {
         [file] => (
             json!({*file: v::credentials_file(access, key)}),
-            json!({*file: HIDDEN}),
+            BTreeMap::from([((*file).to_owned(), HIDDEN.to_owned())]),
         ),
         [id, secret] => (
             json!({*id: access, *secret: key}),
-            json!({*id: HIDDEN, *secret: HIDDEN}),
+            BTreeMap::from([
+                ((*id).to_owned(), HIDDEN.to_owned()),
+                ((*secret).to_owned(), HIDDEN.to_owned()),
+            ]),
         ),
         _ => return Err(CopyKept::UnknownKeys),
     };
@@ -944,9 +958,16 @@ fn rotate(copy: &Copy, access: &str, key: &str) -> Result<Planned, CopyKept> {
         ])),
         action: S3DestinationWriteAction::Patch,
         before: None,
-        shown: Some(json!({"apiVersion": "v1", "kind": "Secret",
-            "metadata": {"name": copy.name, "namespace": copy.namespace},
-            "stringData": shown})),
+        shown: serde_json::to_value(Secret {
+            metadata: ObjectMeta {
+                name: Some(copy.name.clone()),
+                namespace: Some(copy.namespace.clone()),
+                ..ObjectMeta::default()
+            },
+            string_data: Some(shown),
+            ..Secret::default()
+        })
+        .ok(),
     })
 }
 
@@ -1010,11 +1031,16 @@ impl Current {
         };
         let mut writes = Vec::new();
         if self.namespace.is_none() {
-            let namespace = json!({"apiVersion": "v1", "kind": "Namespace",
-                                   "metadata": {"name": NAMESPACE}});
+            let namespace = to_json(&Namespace {
+                metadata: ObjectMeta {
+                    name: Some(NAMESPACE.to_owned()),
+                    ..ObjectMeta::default()
+                },
+                ..Namespace::default()
+            })?;
             writes.push(create("Namespace", NAMESPACE, namespace.clone(), namespace));
         }
-        let after = config_map(fields);
+        let after = to_json(&config_map(fields))?;
         match &self.config_map {
             None => writes.push(create("ConfigMap", &fields.name, after.clone(), after)),
             Some(before) if before.get("data") == after.get("data") => {}
@@ -1024,12 +1050,12 @@ impl Current {
             }
         }
         if let Some((access, key)) = keys {
-            let shown = secret(&fields.name, HIDDEN, HIDDEN);
+            let shown = to_json(&secret(&fields.name, HIDDEN, HIDDEN))?;
             writes.push(match &self.secret {
                 None => create(
                     "Secret",
                     &fields.name,
-                    secret(&fields.name, access, key),
+                    to_json(&secret(&fields.name, access, key))?,
                     shown,
                 ),
                 Some(before) => patch(

@@ -15,7 +15,7 @@ use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use bytes::Bytes;
 use http_body_util::Full;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::Value;
 use zeabur_http::Https;
 
 /// The most a GitHub answer may be.
@@ -85,9 +85,20 @@ pub(crate) struct GitHub<'a> {
 /// The JWT of the App `issuer` (its client ID, or its ID), valid from a minute before `now` for
 /// nine minutes, as GitHub allows at most ten.
 pub(crate) fn jwt(issuer: &str, pem: &str, now: i64) -> Result<String, String> {
+    #[derive(Serialize)]
+    struct Claims<'a> {
+        iat: i64,
+        exp: i64,
+        iss: &'a str,
+    }
     let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"RS256","typ":"JWT"}"#);
-    let claims = json!({"iat": now - 60, "exp": now + 9 * 60, "iss": issuer});
-    let input = format!("{header}.{}", URL_SAFE_NO_PAD.encode(claims.to_string()));
+    let claims = serde_json::to_string(&Claims {
+        iat: now - 60,
+        exp: now + 9 * 60,
+        iss: issuer,
+    })
+    .map_err(|e| e.to_string())?;
+    let input = format!("{header}.{}", URL_SAFE_NO_PAD.encode(claims));
     let signature = zeabur_core::crypto::sign_rs256(pem, input.as_bytes())
         .map_err(|e| format!("the App's private key: {e}"))?;
     Ok(format!("{input}.{}", URL_SAFE_NO_PAD.encode(signature)))
@@ -198,12 +209,24 @@ impl GitHub<'_> {
         struct Page {
             repositories: Vec<Repository>,
         }
+        #[derive(Serialize)]
+        struct TokenRequest {
+            permissions: Permissions,
+        }
+        #[derive(Serialize)]
+        struct Permissions {
+            metadata: &'static str,
+        }
+        let body = serde_json::to_value(TokenRequest {
+            permissions: Permissions { metadata: "read" },
+        })
+        .map_err(|e| e.to_string())?;
         let Token { token } = self
             .expect(
                 http::Method::POST,
                 &format!("/app/installations/{id}/access_tokens"),
                 Some(jwt),
-                Some(&json!({"permissions": {"metadata": "read"}})),
+                Some(&body),
                 201,
             )
             .await?;

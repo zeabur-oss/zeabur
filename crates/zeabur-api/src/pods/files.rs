@@ -44,6 +44,7 @@ use zeabur_core::message::Message;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::Cluster;
 use zeabur_kube::files::{self, EntryKind, Failure, FileError, FilePath, Target};
+use zeabur_kube::k8s_openapi::api::core::v1::{PodSpec, Volume};
 use zeabur_plan::terminal::{self, ContainerState};
 
 use crate::error::{ApiError, read_problem};
@@ -320,111 +321,74 @@ fn refuse(kind: Kind, detail: &str, key: &str, params: &[(&str, &str)]) -> ApiEr
     ApiError::from(problem)
 }
 
-fn object_name(volume: &Value, kind: &str, field: &str) -> Option<String> {
-    volume.get(kind)?.get(field)?.as_str().map(str::to_owned)
-}
-
 /// What a volume of the pod's `spec.volumes` is, and the object behind it.
-fn classify(volume: Option<&Value>) -> (FileMountKind, Option<String>, bool) {
+fn classify(volume: Option<&Volume>) -> (FileMountKind, Option<String>, bool) {
     let Some(volume) = volume else {
         return (FileMountKind::Other, None, false);
     };
-    if volume.get("persistentVolumeClaim").is_some() {
-        let read_only = volume
-            .pointer("/persistentVolumeClaim/readOnly")
-            .and_then(Value::as_bool)
-            == Some(true);
-        (
+    let named = |name: &String| Some(name.clone()).filter(|n| !n.is_empty());
+    if let Some(claim) = &volume.persistent_volume_claim {
+        return (
             FileMountKind::Claim,
-            object_name(volume, "persistentVolumeClaim", "claimName"),
-            read_only,
-        )
-    } else if volume.get("secret").is_some() {
-        (
-            FileMountKind::Secret,
-            object_name(volume, "secret", "secretName"),
-            true,
-        )
-    } else if let Some(projected) = volume.get("projected") {
-        let sources = projected
-            .get("sources")
-            .and_then(Value::as_array)
-            .map_or(&[][..], Vec::as_slice);
-        let secret = sources.iter().find_map(|s| s.pointer("/secret/name"));
+            named(&claim.claim_name),
+            claim.read_only == Some(true),
+        );
+    }
+    if let Some(secret) = &volume.secret {
+        return (FileMountKind::Secret, secret.secret_name.clone(), true);
+    }
+    if let Some(config) = &volume.config_map {
+        return (FileMountKind::ConfigMap, named(&config.name), true);
+    }
+    if let Some(projected) = &volume.projected {
+        let sources = projected.sources.as_deref().unwrap_or_default();
+        let secret = sources
+            .iter()
+            .find_map(|s| s.secret.as_ref().and_then(|s| named(&s.name)));
         let credentials = secret.is_some()
-            || sources.iter().any(|s| {
-                s.get("serviceAccountToken").is_some() || s.get("clusterTrustBundle").is_some()
-            });
-        if credentials {
-            (
-                FileMountKind::Secret,
-                secret.and_then(Value::as_str).map(str::to_owned),
-                true,
-            )
-        } else {
-            let config = sources
+            || sources
                 .iter()
-                .find_map(|s| s.pointer("/configMap/name"))
-                .and_then(Value::as_str)
-                .map(str::to_owned);
-            (FileMountKind::ConfigMap, config, true)
+                .any(|s| s.service_account_token.is_some() || s.cluster_trust_bundle.is_some());
+        if credentials {
+            return (FileMountKind::Secret, secret, true);
         }
-    } else if volume.get("configMap").is_some() {
-        (
-            FileMountKind::ConfigMap,
-            object_name(volume, "configMap", "name"),
-            true,
-        )
-    } else if volume
-        .pointer("/csi/driver")
-        .and_then(Value::as_str)
-        .is_some_and(|d| d == "secrets-store.csi.k8s.io")
+        let config = sources
+            .iter()
+            .find_map(|s| s.config_map.as_ref().and_then(|c| named(&c.name)));
+        return (FileMountKind::ConfigMap, config, true);
+    }
+    if volume
+        .csi
+        .as_ref()
+        .is_some_and(|c| c.driver == "secrets-store.csi.k8s.io")
     {
         (FileMountKind::Secret, None, true)
-    } else if volume.get("emptyDir").is_some() || volume.get("ephemeral").is_some() {
+    } else if volume.empty_dir.is_some() || volume.ephemeral.is_some() {
         (FileMountKind::EmptyDir, None, false)
     } else {
-        (
-            FileMountKind::Other,
-            None,
-            volume.get("downwardAPI").is_some(),
-        )
+        (FileMountKind::Other, None, volume.downward_api.is_some())
     }
 }
 
 /// The mounts of `container` in `pod`, by path, then the image at `/`.
 fn mounts_of(pod: &Value, container: &str) -> Vec<FileMount> {
-    let volumes: Vec<&Value> = pod
-        .pointer("/spec/volumes")
-        .and_then(Value::as_array)
-        .map_or_else(Vec::new, |v| v.iter().collect());
-    let spec = pod
-        .pointer("/spec/containers")
-        .and_then(Value::as_array)
-        .and_then(|c| {
-            c.iter()
-                .find(|c| c.get("name").and_then(Value::as_str) == Some(container))
-        });
+    let spec = PodSpec::deserialize(pod.get("spec").unwrap_or(&Value::Null)).unwrap_or_default();
+    let volumes = spec.volumes.unwrap_or_default();
+    let spec = spec.containers.into_iter().find(|c| c.name == container);
     let mut mounts: Vec<FileMount> = spec
-        .and_then(|c| c.get("volumeMounts"))
-        .and_then(Value::as_array)
-        .map_or(&[][..], Vec::as_slice)
         .iter()
+        .flat_map(|c| c.volume_mounts.iter().flatten())
         .filter_map(|m| {
-            let path = FilePath::parse(m.get("mountPath")?.as_str()?)?;
-            let name = m.get("name")?.as_str()?;
-            let volume = volumes
-                .iter()
-                .find(|v| v.get("name").and_then(Value::as_str) == Some(name))
-                .copied();
+            let path = FilePath::parse(&m.mount_path)?;
+            let volume = volumes.iter().find(|v| v.name == m.name);
             let (kind, object, read_only) = classify(volume);
             Some(FileMount {
                 path: path.as_str().to_owned(),
                 kind,
-                volume: Some(name.to_owned()),
+                volume: Some(m.name.clone()),
                 object,
-                read_only: read_only || m.get("readOnly").and_then(Value::as_bool) == Some(true),
-                part: m.get("subPath").is_some() || m.get("subPathExpr").is_some(),
+                read_only: read_only || m.read_only == Some(true),
+                part: m.sub_path.is_some() || m.sub_path_expr.is_some(),
                 lost: (kind == FileMountKind::EmptyDir).then_some(FileLost::Replaced),
             })
         })
@@ -437,8 +401,8 @@ fn mounts_of(pod: &Value, container: &str) -> Vec<FileMount> {
         volume: None,
         object: None,
         read_only: spec
-            .and_then(|c| c.pointer("/securityContext/readOnlyRootFilesystem"))
-            .and_then(Value::as_bool)
+            .and_then(|c| c.security_context)
+            .and_then(|s| s.read_only_root_filesystem)
             == Some(true),
         part: false,
         lost: Some(FileLost::Restart),

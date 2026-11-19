@@ -25,6 +25,7 @@ use std::collections::BTreeMap;
 use axum::extract::State;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
+use kube::api::TypeMeta;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
@@ -866,13 +867,12 @@ async fn routes_of(cluster: &dyn Cluster, namespace: &str) -> Result<Vec<Value>,
                     list_read(&resource.group, &resource.resource, Some(namespace)),
                 )
             })?;
-        for route in listed.into_iter().flatten() {
-            let mut route = value(&route)?;
-            if let Some(map) = route.as_object_mut() {
-                map.insert("apiVersion".to_owned(), json!(resource.api_version()));
-                map.insert("kind".to_owned(), json!(resource.kind));
-            }
-            out.push(route);
+        for mut route in listed.into_iter().flatten() {
+            route.types = Some(TypeMeta {
+                api_version: resource.api_version(),
+                kind: resource.kind.clone(),
+            });
+            out.push(value(&route)?);
         }
     }
     Ok(out)

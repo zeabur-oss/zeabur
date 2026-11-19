@@ -35,7 +35,7 @@ use super::writes::{
     INVITE_SECONDS, SetupLinkView, admin_patch, bad, is_username, issue, new_user, refuse,
     user_object,
 };
-use crate::error::{ApiError, read_problem};
+use crate::error::{ApiError, read_problem, to_json};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, PlanKey, TokenError};
@@ -336,13 +336,9 @@ impl Computed {
         };
         let target = super::writes::target(IdentityKind::User, namespace, typed.name());
         let mut after = user.clone();
-        for op in operations.as_array().into_iter().flatten() {
-            if op["op"] == "add"
-                && let Some(field) = op["path"].as_str().and_then(|p| p.strip_prefix("/spec/"))
-                && let Some(spec) = after.get_mut("spec").and_then(Value::as_object_mut)
-            {
-                spec.insert(field.to_owned(), op["value"].clone());
-            }
+        if let Ok(patch) = json_patch::Patch::deserialize(&operations) {
+            // A failed patch leaves `after` as it was.
+            json_patch::patch(&mut after, &patch).unwrap_or_default();
         }
         self.versions.insert(
             key(&target),
@@ -611,7 +607,7 @@ async fn invite(
         computed.new_member = true;
         computed.create(
             user_target,
-            new_user(namespace, username, display_name, admin),
+            to_json(&new_user(namespace, username, display_name, admin))?,
         );
         if identity.project_roles {
             let holder = Holder::member(username);

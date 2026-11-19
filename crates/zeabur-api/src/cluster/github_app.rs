@@ -45,10 +45,13 @@ use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
 use zeabur_core::message::Message;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::k8s_openapi::ByteString;
+use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Secret};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt as _, ObjectTarget, ResourceRef, WriteBody, WriteRequest};
 
-use crate::error::{ApiError, get_read, read_problem};
+use crate::error::{ApiError, get_read, read_problem, to_json};
 use crate::extract::{Json, Path};
 use crate::github::{self, Conversion, GitHub};
 use crate::handlers::{AppState, Person};
@@ -642,25 +645,52 @@ fn manifest_problem(
 /// and receive pushes when Builder's receiver has a URL.
 ///
 /// [gh-manifest-params]: https://docs.github.com/en/apps/sharing-github-apps/registering-a-github-app-from-a-manifest#github-app-manifest-parameters
-fn manifest_of(request: &GitHubManifestRequest) -> Value {
-    let mut manifest = json!({
-        "name": request.name.trim(),
-        "url": "https://github.com/zeabur-oss/builder",
-        "description": "Builds container images of pushed commits with Zeabur Builder.",
-        "redirect_url": request.redirect_url,
-        "public": false,
-        "default_permissions": {"contents": "read", "metadata": "read", "statuses": "write"},
-    });
-    if !request.webhook_url.is_empty()
-        && let Some(fields) = manifest.as_object_mut()
-    {
-        fields.insert(
-            "hook_attributes".to_owned(),
-            json!({"url": request.webhook_url, "active": true}),
-        );
-        fields.insert("default_events".to_owned(), json!(["push"]));
+fn manifest_of(request: &GitHubManifestRequest) -> Manifest<'_> {
+    let hooked = !request.webhook_url.is_empty();
+    Manifest {
+        name: request.name.trim(),
+        url: "https://github.com/zeabur-oss/builder",
+        description: "Builds container images of pushed commits with Zeabur Builder.",
+        redirect_url: &request.redirect_url,
+        public: false,
+        default_permissions: AppPermissions {
+            contents: "read",
+            metadata: "read",
+            statuses: "write",
+        },
+        hook_attributes: hooked.then_some(HookAttributes {
+            url: &request.webhook_url,
+            active: true,
+        }),
+        default_events: hooked.then_some(["push"]),
     }
-    manifest
+}
+
+#[derive(Serialize)]
+struct Manifest<'a> {
+    name: &'a str,
+    url: &'static str,
+    description: &'static str,
+    redirect_url: &'a str,
+    public: bool,
+    default_permissions: AppPermissions,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    hook_attributes: Option<HookAttributes<'a>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    default_events: Option<[&'static str; 1]>,
+}
+
+#[derive(Serialize)]
+struct AppPermissions {
+    contents: &'static str,
+    metadata: &'static str,
+    statuses: &'static str,
+}
+
+#[derive(Serialize)]
+struct HookAttributes<'a> {
+    url: &'a str,
+    active: bool,
 }
 
 /// Starts GitHub's manifest flow: a `state` sealed for the person, valid for an hour, and the
@@ -789,7 +819,7 @@ pub(crate) async fn form(
         "<style>{FORM_STYLE}</style><form method=\"post\" action=\"{}\"><p>{lead}</p>\
 <input type=\"hidden\" name=\"manifest\" value=\"{}\"><button type=\"submit\">{button}</button></form>",
         escape(&action),
-        escape(&manifest_of(&claims.request).to_string()),
+        escape(&serde_json::to_string(&manifest_of(&claims.request)).unwrap_or_default()),
     );
     let mut response = page::html(StatusCode::OK, lang, "", None, &body);
     let style = STANDARD.encode(Sha256::digest(FORM_STYLE.as_bytes()));
@@ -1019,11 +1049,10 @@ fn put(
     }
 }
 
-fn data_of(object: Option<&Value>) -> serde_json::Map<String, Value> {
+fn data_of(object: Option<&Value>) -> BTreeMap<String, String> {
     object
-        .and_then(|o| o.get("data"))
-        .and_then(Value::as_object)
-        .cloned()
+        .and_then(|o| ConfigMap::deserialize(o).ok())
+        .and_then(|c| c.data)
         .unwrap_or_default()
 }
 
@@ -1061,25 +1090,38 @@ async fn save(
     if api_url.trim_end_matches('/') != crate::settings::GITHUB_API {
         values.insert("api-url", api_url.to_owned());
     }
-    let metadata = |annotations: Value| json!({"name": SECRET, "namespace": NAMESPACE, "annotations": annotations});
-    let annotations = json!({PAGE_ANNOTATION: app.html_url});
-    let after = if before.is_none() {
-        json!({
-            "apiVersion": "v1", "kind": "Secret", "metadata": metadata(annotations.clone()),
-            "type": "Opaque", "stringData": values,
-        })
-    } else {
-        let data: serde_json::Map<String, Value> = values
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), json!(STANDARD.encode(v))))
-            .collect();
-        json!({"metadata": metadata(annotations.clone()), "data": data})
+    let secret = |string_data: BTreeMap<String, String>, data| Secret {
+        metadata: ObjectMeta {
+            name: Some(SECRET.to_owned()),
+            namespace: Some(NAMESPACE.to_owned()),
+            annotations: Some(BTreeMap::from([(
+                PAGE_ANNOTATION.to_owned(),
+                app.html_url.clone(),
+            )])),
+            ..ObjectMeta::default()
+        },
+        type_: Some("Opaque".to_owned()),
+        string_data: (!string_data.is_empty()).then_some(string_data),
+        data,
+        ..Secret::default()
     };
-    let shown = json!({
-        "apiVersion": "v1", "kind": "Secret", "metadata": metadata(annotations),
-        "type": "Opaque",
-        "data": values.keys().map(|k| ((*k).to_owned(), json!(HIDDEN))).collect::<serde_json::Map<_, _>>(),
-    });
+    let named = |value: fn(&String) -> String| {
+        values
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), value(v)))
+            .collect::<BTreeMap<_, _>>()
+    };
+    let after = if before.is_none() {
+        secret(named(String::clone), None)
+    } else {
+        let data = values
+            .iter()
+            .map(|(k, v)| ((*k).to_owned(), ByteString(v.clone().into_bytes())))
+            .collect();
+        secret(BTreeMap::new(), Some(data))
+    };
+    let after = to_json(&after)?;
+    let shown = to_json(&secret(named(|_| HIDDEN.to_owned()), None))?;
     let mut kept = before
         .as_ref()
         .and_then(|b| b.pointer("/metadata/annotations"))
@@ -1110,7 +1152,7 @@ async fn grant(
     let key = installation.id.to_string();
     let grants = find(cluster, &config_maps(), NAMESPACE, GRANTS).await?;
     let mut data = data_of(grants.as_ref());
-    let (old, every) = grant_of(data.get(&key).and_then(Value::as_str).unwrap_or_default());
+    let (old, every) = grant_of(data.get(&key).map_or("", String::as_str));
     let mut warnings = Vec::new();
     if every {
         warnings.push(GitHubAppWarning::WasEveryNamespace);
@@ -1127,12 +1169,11 @@ async fn grant(
     if namespaces.is_empty() {
         data.remove(&key);
     } else {
-        data.insert(key.clone(), json!(namespaces.join(", ")));
+        data.insert(key.clone(), namespaces.join(", "));
     }
     let mut versions = BTreeMap::from([("ConfigMap".to_owned(), version(grants.as_ref()))]);
     let mut writes = Vec::new();
-    let after = json!({"apiVersion": "v1", "kind": "ConfigMap",
-        "metadata": {"name": GRANTS, "namespace": NAMESPACE}, "data": data});
+    let after = to_json(&config_map(GRANTS, NAMESPACE, None, &data))?;
     if data_of(grants.as_ref()) != data || grants.is_none() && !namespaces.is_empty() {
         writes.push(put(
             "ConfigMap",
@@ -1152,13 +1193,17 @@ async fn grant(
         versions.insert(format!("ConfigMap/{namespace}"), version(before.as_ref()));
         let mut data = data_of(before.as_ref());
         if chosen.contains(namespace) {
-            data.insert(key.clone(), json!(snapshot));
+            data.insert(key.clone(), snapshot.clone());
         } else if data.remove(&key).is_none() {
             continue;
         }
-        let after = json!({"apiVersion": "v1", "kind": "ConfigMap",
-            "metadata": {"name": PROJECT_CONFIG_MAP, "namespace": namespace, "labels": {LABEL: "true"}},
-            "data": data});
+        let labels = BTreeMap::from([(LABEL.to_owned(), "true".to_owned())]);
+        let after = to_json(&config_map(
+            PROJECT_CONFIG_MAP,
+            namespace,
+            Some(labels),
+            &data,
+        ))?;
         writes.push(put(
             "ConfigMap",
             before.as_ref(),
@@ -1172,6 +1217,24 @@ async fn grant(
         writes,
         warnings,
     })
+}
+
+fn config_map(
+    name: &str,
+    namespace: &str,
+    labels: Option<BTreeMap<String, String>>,
+    data: &BTreeMap<String, String>,
+) -> ConfigMap {
+    ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            labels,
+            ..ObjectMeta::default()
+        },
+        data: Some(data.clone()),
+        ..ConfigMap::default()
+    }
 }
 
 fn yaml(object: &Value) -> Option<String> {
@@ -1272,7 +1335,6 @@ pub(crate) async fn project(
     .await?;
     let mut installations: Vec<ProjectInstallation> = data_of(object.as_ref())
         .values()
-        .filter_map(Value::as_str)
         .filter_map(|v| serde_json::from_str(v).ok())
         .collect();
     installations.sort_by(|a, b| a.account.cmp(&b.account).then(a.id.cmp(&b.id)));
@@ -1294,11 +1356,13 @@ mod tests {
 
     #[test]
     fn the_manifest_asks_for_pushes_only_with_a_webhook() {
-        let without = manifest_of(&request(""));
+        let json_of =
+            |r: &GitHubManifestRequest| serde_json::to_value(manifest_of(r)).unwrap_or_default();
+        let without = json_of(&request(""));
         assert_eq!(without["default_permissions"]["contents"], "read");
         assert!(without.get("hook_attributes").is_none());
         assert!(without.get("default_events").is_none());
-        let with = manifest_of(&request("https://hooks.example.com/hooks/github-app"));
+        let with = json_of(&request("https://hooks.example.com/hooks/github-app"));
         assert_eq!(with["default_events"], json!(["push"]));
         assert_eq!(
             with["hook_attributes"]["url"],
