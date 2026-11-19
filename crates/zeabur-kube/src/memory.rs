@@ -1117,8 +1117,6 @@ impl Cluster for MemoryCluster {
                     rules: vec![AccessRule {
                         verbs: vec!["get".to_owned(), "list".to_owned(), "watch".to_owned()],
                         groups: vec!["*".to_owned()],
-                        resources: vec!["*".to_owned()],
-                        names: Vec::new(),
                     }],
                     incomplete: false,
                 }

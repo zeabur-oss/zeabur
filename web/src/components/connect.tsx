@@ -2,7 +2,7 @@ import { useQuery } from "@tanstack/react-query"
 import { useId, useState } from "react"
 import PlugsConnectedIcon from "~icons/ph/plugs-connected"
 
-import { databasesQuery, namespaceQuery, projectQuery } from "@/api/queries"
+import { databasesQuery, projectQuery } from "@/api/queries"
 import { FormField, TrimmedInput } from "@/components/form-field"
 import { GateTip, useGate } from "@/components/gate"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
@@ -56,9 +56,7 @@ const nameProblemText = (t: Translate, problem: NameProblem) =>
 
 /** Services the person may change, for connecting a database. */
 export function useTargets(project: string): Service[] {
-  const services = useQuery(projectQuery(project)).data?.services ?? []
-  const rights = useQuery(namespaceQuery(project)).data?.workloadPatch ?? []
-  return candidates(services, rights)
+  return candidates(useQuery(projectQuery(project)).data?.services ?? [])
 }
 
 const pickedOf = (targets: Service[], choice: Choice) =>

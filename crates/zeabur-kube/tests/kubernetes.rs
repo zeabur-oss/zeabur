@@ -126,8 +126,7 @@ mod tests {
             .await;
         assert_eq!(refused.unwrap_err().code(), Some(403));
 
-        // The listing path skips discovery and may be served from the watch cache; the rules
-        // review hints at the same answer without a refusal.
+        // The listing path skips discovery and may be served from the watch cache.
         let cached: Vec<String> = user
             .list_served_metadata(&resource, sandbox.namespace())
             .await
@@ -137,12 +136,6 @@ mod tests {
             .filter_map(|m| m.name)
             .collect();
         assert!(cached.contains(&"app".to_owned()), "{cached:?}");
-        let rules = user
-            .access_rules(sandbox.namespace())
-            .await
-            .expect("rules review");
-        assert_eq!(rules.list(&resource), zeabur_kube::Access::Allowed);
-        assert_ne!(rules.list(&secrets), zeabur_kube::Access::Allowed);
     }
 
     /// The ConfigMap `name` of the sandbox, as a write addresses it.
@@ -366,6 +359,64 @@ mod tests {
         assert!(refused(
             user.list::<ResourceQuota>(Some(sandbox.namespace())).await
         ));
+    }
+
+    /// A project is read-only from its rules review, which also lists the self reviews every
+    /// person may create. `cluster-admin` bound by a RoleBinding writes in that namespace only,
+    /// so a cluster-wide access review refuses a cluster action.
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
+    async fn read_only_and_cluster_actions_come_from_kube_apiserver_reviews() {
+        let sandbox = Sandbox::new(
+            "zeabur-rights",
+            json!([{"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list"]}]),
+        )
+        .await;
+        let (user, namespace) = (sandbox.user(), sandbox.namespace());
+        let read_only = || async {
+            user.access_rules(namespace)
+                .await
+                .expect("rules review")
+                .read_only()
+        };
+        assert_eq!(read_only().await, Some(true));
+
+        Api::<RoleBinding>::namespaced(sandbox.admin().clone(), namespace)
+            .create(
+                &PostParams::default(),
+                &serde_json::from_value(json!({
+                    "metadata": {"name": "cluster-admin"},
+                    "roleRef": {"apiGroup": "rbac.authorization.k8s.io", "kind": "ClusterRole",
+                                "name": "cluster-admin"},
+                    "subjects": [{"kind": "ServiceAccount", "name": PERSON, "namespace": namespace}]
+                }))
+                .unwrap(),
+            )
+            .await
+            .expect("role binding");
+        // RBAC bindings take effect within moments.
+        let deadline = Instant::now() + Duration::from_secs(10);
+        while read_only().await != Some(false) {
+            assert!(
+                Instant::now() < deadline,
+                "still read-only 10 s after the binding"
+            );
+            tokio::time::sleep(Duration::from_millis(200)).await;
+        }
+
+        let cluster_wide = |verb: &str, group: &str, resource: &str| zeabur_core::problem::Denied {
+            verb: verb.to_owned(),
+            group: group.to_owned(),
+            resource: resource.to_owned(),
+            name: None,
+            namespace: None,
+        };
+        for request in [
+            cluster_wide("patch", "", "nodes"),
+            cluster_wide("create", "velero.io", "schedules"),
+        ] {
+            assert!(!user.review_access(&request).await.unwrap(), "{request:?}");
+        }
     }
 
     #[tokio::test]

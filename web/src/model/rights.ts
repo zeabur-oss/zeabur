@@ -1,27 +1,12 @@
 import type { Schemas } from "@/api/client"
 
-export type ProjectRights = Schemas.ProjectRights
 export type ClusterRights = Schemas.ClusterRights
-/** Rights a page reads itself rather than from the project's or the cluster's review. */
-type PageRight =
-  | "changeNotifications"
-  | "testNotifications"
-  | "changeClusterNotifications"
-  | "testClusterNotifications"
-  | "changeDomainSuffixes"
-  | "changeS3Destinations"
-  | "changeGitHubApp"
-  | "restoreBackups"
-  | "createServices"
-  | "changeBuildLimits"
-  | "changeApiTokens"
-export type Right = keyof ProjectRights | keyof ClusterRights | PageRight
 type Permission = Schemas.Permission
 
 /** The least product role that holds a right. */
 export type NeededRole = "developer" | "admin"
 
-const rules: Record<Right, { role: NeededRole; rule: string }> = {
+const rules = {
   deploy: { role: "developer", rule: "create deployments.apps" },
   changeServices: { role: "developer", rule: "patch deployments.apps" },
   deleteServices: { role: "developer", rule: "delete deployments.apps" },
@@ -62,7 +47,24 @@ const rules: Record<Right, { role: NeededRole; rule: string }> = {
   changeS3Destinations: { role: "admin", rule: "create secrets -n zeabur-s3-destinations" },
   changeGitHubApp: { role: "admin", rule: "create secrets -n builder-system" },
   changeBuildLimits: { role: "admin", rule: "patch and zeabur-manage namespaces" },
-}
+} satisfies Record<string, { role: NeededRole; rule: string }>
+
+export type Right = keyof typeof rules
+/** Rights a page reads itself rather than from the project's or the cluster's review. */
+type PageRight =
+  | "changeNotifications"
+  | "testNotifications"
+  | "changeClusterNotifications"
+  | "testClusterNotifications"
+  | "changeDomainSuffixes"
+  | "changeS3Destinations"
+  | "changeGitHubApp"
+  | "restoreBackups"
+  | "createServices"
+  | "changeBuildLimits"
+  | "changeApiTokens"
+/** A right in a project, closed when the project is read-only for the person. */
+export type ProjectRight = Exclude<Right, keyof ClusterRights | PageRight>
 
 export const neededRole = (right: Right): NeededRole => rules[right].role
 export const ruleOf = (right: Right): string => rules[right].rule
@@ -92,34 +94,10 @@ export function gate(right: Right, permission: Permission | undefined, asker: As
   return { open: false, right, ...rules[right], member: asker.member }
 }
 
-/** Every right `unknown`: for tests and for a project whose review failed. */
-export function unknownRights(): ProjectRights {
-  return Object.fromEntries(
-    (Object.keys(rules) as Right[])
-      .filter((r) => !(r in notProject))
-      .map((r) => [r, "unknown" as const]),
-  ) as ProjectRights
-}
-
-const clusterOnly: Record<keyof ClusterRights, true> = {
-  changeNodes: true,
-  changeBackups: true,
-}
-
-const notProject: Record<Exclude<Right, keyof ProjectRights>, true> = {
-  ...clusterOnly,
-  changeDomainSuffixes: true,
-  changeNotifications: true,
-  testNotifications: true,
-  changeClusterNotifications: true,
-  testClusterNotifications: true,
-  changeS3Destinations: true,
-  changeGitHubApp: true,
-  restoreBackups: true,
-  createServices: true,
-  changeBuildLimits: true,
-  changeApiTokens: true,
-}
+/** A project right's answer: denied when the project is read-only, unknown when that is not
+ * known. */
+export const projectPermission = (readOnly: boolean | null | undefined): Permission =>
+  readOnly === true ? "denied" : readOnly === false ? "allowed" : "unknown"
 
 const workloads = ["deployments", "statefulsets", "daemonsets"]
 
@@ -128,9 +106,9 @@ const workloads = ["deployments", "statefulsets", "daemonsets"]
 export function rightOfResource(
   resource: string,
   change: "edit" | "delete",
-): keyof ProjectRights | undefined {
+): ProjectRight | undefined {
   if (workloads.includes(resource)) return change === "delete" ? "deleteServices" : "changeServices"
-  const rights: Record<string, keyof ProjectRights> = {
+  const rights: Record<string, ProjectRight> = {
     secrets: "changeSecrets",
     configmaps: "changeConfig",
     ingresses: "changeDomains",

@@ -485,21 +485,23 @@ pub(crate) mod store {
     }
 
     /// Whether the person may change the ConfigMap `name` in `namespace`, or create it when it
-    /// does not exist, as far as their RBAC rules there tell.
+    /// does not exist, from one `SelfSubjectAccessReview`.
     pub(crate) async fn can_change_config_map(
         cluster: &dyn Cluster,
         namespace: &str,
         name: &str,
         exists: bool,
     ) -> Permission {
-        let resource = zeabur_kube::ResourceRef::new("", "v1", "configmaps", "ConfigMap");
         let verb = if exists { "patch" } else { "create" };
-        cluster
-            .access_rules(namespace)
-            .await
-            .map_or(Permission::Unknown, |rules| {
-                rules.allows(verb, &resource, name).into()
-            })
+        // Creating has no name to authorise yet.
+        let request = Denied {
+            verb: verb.to_owned(),
+            group: String::new(),
+            resource: "configmaps".to_owned(),
+            name: exists.then(|| name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+        };
+        cluster.review_access(&request).await.into()
     }
 
     /// Keeps `value` under `key` in the settings ConfigMap of `namespace` (removes the key for

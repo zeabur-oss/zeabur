@@ -11,16 +11,16 @@
 //!
 //! A cluster administrator (every verb on every resource, cluster-wide, from one
 //! `SelfSubjectAccessReview`) is Admin in every project, and no project is reviewed. Anyone else
-//! gets one `SelfSubjectRulesReview` [k8s-ssrr] per adopted project, summarised as the product's
-//! role whose key rights the rules hold; each role also needs those of the roles below it:
+//! gets, per adopted project, the product's role kube-apiserver's reviews [k8s-ssrr] point to:
 //!
-//! | Role | Key rights |
+//! | Role | Answer |
 //! |---|---|
-//! | Viewer | `get` and `list` on `pods` |
-//! | Developer | `get` on `pods/log`, `patch` on `deployments.apps`, `create` on `pods/exec`, `get` on `secrets` |
-//! | Admin | `create` on `rolebindings.rbac.authorization.k8s.io` |
+//! | Admin | an access review allows `create` on `rolebindings.rbac.authorization.k8s.io` |
+//! | Developer | the rules review has a write verb (the project is not read-only) |
+//! | Viewer | read-only, and an access review allows `list` on `pods` |
 //!
-//! Rights short of Viewer are no role. A project whose review fails says so, without a role.
+//! Less than that is no role. A project whose reviews fail, or whose rules review is incomplete,
+//! says so, without a role.
 //!
 //! # Signing in
 //!
@@ -41,7 +41,7 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, admin_only_namespace, is_system_namespace};
 use zeabur_core::problem::{Denied, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{Access, AccessRules, Cluster, ResourceRef};
+use zeabur_kube::{AccessRules, Cluster};
 use zeabur_model::ProjectDetails;
 
 use crate::error::ApiError;
@@ -116,45 +116,34 @@ pub struct AccountView {
     pub manage_sign_in_url: Option<String>,
 }
 
-fn core(resource: &str) -> ResourceRef {
-    ResourceRef::new("", "v1", resource, "")
-}
-
-/// The role whose key rights `rules` hold.
-#[must_use]
-pub fn role(rules: &AccessRules) -> AccountRole {
-    let all = |checks: &[(&str, ResourceRef)]| {
-        checks
-            .iter()
-            .all(|(verb, resource)| rules.allows(verb, resource, "") == Access::Allowed)
+/// The person's role in `project`, whose read-only answer is `read_only` (see the module docs).
+pub(crate) async fn role(
+    cluster: &dyn Cluster,
+    project: &str,
+    read_only: Option<bool>,
+) -> Option<AccountRole> {
+    let review = |verb: &str, group: &str, resource: &str| Denied {
+        verb: verb.to_owned(),
+        group: group.to_owned(),
+        resource: resource.to_owned(),
+        name: None,
+        namespace: Some(project.to_owned()),
     };
-    let viewer = all(&[("get", core("pods")), ("list", core("pods"))]);
-    let developer = viewer
-        && all(&[
-            ("get", core("pods/log")),
-            (
-                "patch",
-                ResourceRef::new("apps", "v1", "deployments", "Deployment"),
-            ),
-            ("create", core("pods/exec")),
-            ("get", core("secrets")),
-        ]);
-    let admin = developer
-        && all(&[(
-            "create",
-            ResourceRef::new(
-                "rbac.authorization.k8s.io",
-                "v1",
-                "rolebindings",
-                "RoleBinding",
-            ),
-        )]);
-    match (admin, developer, viewer) {
-        (true, ..) => AccountRole::Admin,
-        (_, true, _) => AccountRole::Developer,
-        (_, _, true) => AccountRole::Viewer,
-        _ => AccountRole::None,
+    let admin = review("create", "rbac.authorization.k8s.io", "rolebindings");
+    let pods = review("list", "", "pods");
+    let (admin, viewer) =
+        futures_util::join!(cluster.review_access(&admin), cluster.review_access(&pods));
+    if admin.ok()? {
+        return Some(AccountRole::Admin);
     }
+    if !read_only? {
+        return Some(AccountRole::Developer);
+    }
+    Some(if viewer.ok()? {
+        AccountRole::Viewer
+    } else {
+        AccountRole::None
+    })
 }
 
 /// Whether the person may do every verb on every resource, cluster-wide.
@@ -238,7 +227,9 @@ async fn roles(
                 let role = if admin {
                     Some(AccountRole::Admin)
                 } else {
-                    cluster.access_rules(&name).await.ok().map(|r| role(&r))
+                    let rules = cluster.access_rules(&name).await.ok();
+                    let read_only = rules.as_ref().and_then(AccessRules::read_only);
+                    role(cluster.as_ref(), &name, read_only).await
                 };
                 ProjectAccess {
                     name,
@@ -250,84 +241,4 @@ async fn roles(
         .buffered(CONCURRENCY)
         .collect()
         .await
-}
-
-#[cfg(test)]
-mod tests {
-    use zeabur_kube::AccessRule;
-
-    use super::*;
-
-    fn rule(verbs: &[&str], groups: &[&str], resources: &[&str]) -> AccessRule {
-        let owned = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect();
-        AccessRule {
-            verbs: owned(verbs),
-            groups: owned(groups),
-            resources: owned(resources),
-            names: Vec::new(),
-        }
-    }
-
-    fn rules(rules: Vec<AccessRule>) -> AccessRules {
-        AccessRules {
-            rules,
-            incomplete: false,
-        }
-    }
-
-    fn viewer() -> Vec<AccessRule> {
-        vec![rule(
-            &["get", "list", "watch"],
-            &[""],
-            &["pods", "services"],
-        )]
-    }
-
-    fn developer() -> Vec<AccessRule> {
-        let mut rules = viewer();
-        rules.push(rule(&["get"], &[""], &["pods/log"]));
-        rules.push(rule(
-            &["get", "patch", "update"],
-            &["apps"],
-            &["deployments"],
-        ));
-        rules.push(rule(&["create"], &[""], &["pods/exec"]));
-        rules.push(rule(&["get", "list"], &[""], &["secrets"]));
-        rules
-    }
-
-    #[test]
-    fn the_key_rights_decide_the_role_and_each_role_needs_the_ones_below() {
-        assert_eq!(role(&AccessRules::everything()), AccountRole::Admin);
-        assert_eq!(role(&rules(viewer())), AccountRole::Viewer);
-        assert_eq!(role(&rules(developer())), AccountRole::Developer);
-        let mut admin = developer();
-        admin.push(rule(
-            &["create"],
-            &["rbac.authorization.k8s.io"],
-            &["rolebindings"],
-        ));
-        assert_eq!(role(&rules(admin)), AccountRole::Admin);
-        // Binding others without reading pods is not a role the product gives.
-        let odd = vec![rule(
-            &["create"],
-            &["rbac.authorization.k8s.io"],
-            &["rolebindings"],
-        )];
-        assert_eq!(role(&rules(odd)), AccountRole::None);
-        // Logs are a subresource: `pods` alone does not reach them, so no Developer without them.
-        let no_logs: Vec<_> = developer()
-            .into_iter()
-            .filter(|r| r.resources != ["pods/log"])
-            .collect();
-        assert_eq!(role(&rules(no_logs)), AccountRole::Viewer);
-        assert_eq!(role(&AccessRules::default()), AccountRole::None);
-    }
-
-    #[test]
-    fn a_rule_limited_to_names_gives_no_role() {
-        let mut named = rule(&["*"], &["*"], &["*"]);
-        named.names = vec!["api".to_owned()];
-        assert_eq!(role(&rules(vec![named])), AccountRole::None);
-    }
 }

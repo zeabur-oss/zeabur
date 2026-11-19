@@ -249,7 +249,8 @@ async fn objects_written_as_yaml_are_created_as_the_person() {
     widgets(&admin).await;
     let app = app(sandbox.user());
 
-    // What the person may create, from discovery and their rules.
+    // What the person may create, from discovery; a project that is not read-only leaves each
+    // kind to the plan's dry run.
     let (status, list) = send(
         &app,
         "GET",
@@ -266,9 +267,9 @@ async fn objects_written_as_yaml_are_created_as_the_person() {
             .find(|k| k["kind"] == kind)
             .map(|k| (k["access"].clone(), k["custom"].clone()))
     };
-    assert_eq!(access("Deployment"), Some((json!("allowed"), json!(false))));
-    assert_eq!(access("CronJob"), Some((json!("denied"), json!(false))));
-    assert_eq!(access("Widget"), Some((json!("allowed"), json!(true))));
+    assert_eq!(access("Deployment"), Some((json!("unknown"), json!(false))));
+    assert_eq!(access("CronJob"), Some((json!("unknown"), json!(false))));
+    assert_eq!(access("Widget"), Some((json!("unknown"), json!(true))));
     assert!(
         list["clusterScoped"]
             .as_array()

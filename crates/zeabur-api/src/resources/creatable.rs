@@ -2,14 +2,15 @@
 //!
 //! `GET /projects/{p}/creatable` asks discovery which resources the cluster serves and keeps the
 //! namespaced kinds that can be created, read and listed, leaving out what controllers generate
-//! and events. Each carries an `access` hint for `create` from one `SelfSubjectRulesReview`; the
-//! plan's dry run is what decides. The cluster-scoped kinds are named too, so a client can say
-//! why one is refused before planning.
+//! and events. Each carries an `access` hint: denied when the project is read-only for the person
+//! ([`zeabur_kube::AccessRules::read_only`]), unknown otherwise; the plan's dry run is what
+//! decides. The cluster-scoped kinds are named too, so a client can say why one is refused before
+//! planning.
 
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{AccessRules, ServedResource};
+use zeabur_kube::ServedResource;
 
 use super::objects::{GENERATED, ObjectAccess};
 use crate::error::ApiError;
@@ -30,7 +31,7 @@ pub struct CreatableKind {
     pub kind: String,
     /// Not one of Kubernetes' own groups: a custom resource, or an extension API.
     pub custom: bool,
-    /// Whether the person may create it, as the review hints.
+    /// Whether the person may create it: denied in a read-only project, else unknown.
     pub access: ObjectAccess,
 }
 
@@ -83,10 +84,10 @@ pub(crate) async fn list(
         .served_resources()
         .await
         .map_err(|e| ApiError::from(e.into_problem("the cluster's APIs")))?;
-    let rules = cluster.access_rules(&project).await.unwrap_or(AccessRules {
-        rules: Vec::new(),
-        incomplete: true,
-    });
+    let access = match cluster.access_rules(&project).await.map(|r| r.read_only()) {
+        Ok(Some(true)) => ObjectAccess::Denied,
+        _ => ObjectAccess::Unknown,
+    };
     let mut items: Vec<CreatableKind> = served
         .iter()
         .filter(|s| creatable(s))
@@ -96,7 +97,7 @@ pub(crate) async fn list(
             resource: s.resource.clone(),
             kind: s.kind.clone(),
             custom: custom(&s.group),
-            access: rules.allows("create", &s.as_ref(), "").into(),
+            access,
         })
         .collect();
     items.sort_by(|a, b| (&a.group, &a.kind).cmp(&(&b.group, &b.kind)));

@@ -239,7 +239,7 @@ describe("connecting a database to a service", () => {
     expect(connected(web(env), postgres)).toBe(false)
   })
 
-  test("only services the person may patch, not the database's own or another tool's", () => {
+  test("only services, not the database's own or another tool's", () => {
     const service = (name: string, extra: Partial<Service> = {}) =>
       ({ kind: "Deployment", name, provenance: { warnBeforeEdit: false }, ...extra }) as Service
     const all = [
@@ -250,12 +250,7 @@ describe("connecting a database to a service", () => {
         provenance: { warnBeforeEdit: true, tool: "Helm" } as Service["provenance"],
       }),
     ]
-    const names = (rights: Parameters<typeof candidates>[1]) =>
-      candidates(all, rights).map((s) => s.name)
-    expect(names([{ kind: "Deployment", all: "allowed", names: [] }])).toEqual(["web", "api"])
-    expect(names([{ kind: "Deployment", all: "denied", names: ["api"] }])).toEqual(["api"])
-    expect(names([{ kind: "Deployment", all: "unknown", names: [] }])).toEqual(["web", "api"])
-    expect(names([])).toEqual([])
+    expect(candidates(all).map((s) => s.name)).toEqual(["web", "api"])
   })
 
   test("a database created in the same plan is connected by the names its operator gives", () => {

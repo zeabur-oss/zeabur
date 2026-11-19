@@ -26,16 +26,13 @@ mod tests {
         .unwrap()
     }
 
-    fn rules(verbs: &[&str], resources: &[&str]) -> AccessRules {
-        let owned = |v: &[&str]| v.iter().map(|s| (*s).to_owned()).collect();
+    fn rules(verbs: &[&str]) -> AccessRules {
         AccessRules {
             rules: vec![AccessRule {
-                verbs: owned(verbs),
+                verbs: verbs.iter().map(|s| (*s).to_owned()).collect(),
                 groups: vec![String::new()],
-                resources: owned(resources),
-                names: Vec::new(),
             }],
-            incomplete: true,
+            incomplete: false,
         }
     }
 
@@ -57,6 +54,7 @@ mod tests {
             ],
             access_rules,
             cluster_wide_denied: !admin,
+            refused_rights: ["create rolebindings".to_owned()].into(),
             ..State::default()
         })
     }
@@ -71,11 +69,8 @@ mod tests {
     async fn you_are_who_the_cluster_says_with_a_role_per_adopted_project() {
         let cluster = cluster(
             BTreeMap::from([
-                (
-                    "web".to_owned(),
-                    Some(rules(&["get", "list"], &["pods", "pods/log"])),
-                ),
-                ("api".to_owned(), Some(rules(&["get"], &["configmaps"]))),
+                ("web".to_owned(), Some(rules(&["get", "list"]))),
+                ("api".to_owned(), Some(rules(&["get", "patch"]))),
                 ("billing".to_owned(), None),
             ]),
             false,
@@ -90,12 +85,30 @@ mod tests {
         assert_eq!(
             body["projects"],
             json!([
-                {"name": "api", "role": "none"},
+                {"name": "api", "role": "developer"},
                 {"name": "billing"},
                 {"name": "web", "role": "viewer"},
             ])
         );
         assert!(body.get("manageSignInUrl").is_none());
+    }
+
+    /// Without pods to list, a read-only project gives no role; the right to create RoleBindings
+    /// there gives Admin.
+    #[tokio::test]
+    async fn the_role_follows_the_access_reviews_of_the_project() {
+        let cluster = cluster(
+            BTreeMap::from([("web".to_owned(), Some(rules(&["get"])))]),
+            false,
+        );
+        cluster.update(|s| {
+            s.refused_rights.insert("list pods".to_owned());
+        });
+        let body = account(&cluster).await;
+        assert_eq!(body["projects"][2], json!({"name": "web", "role": "none"}));
+        cluster.update(|s| s.refused_rights.clear());
+        let body = account(&cluster).await;
+        assert_eq!(body["projects"][2], json!({"name": "web", "role": "admin"}));
     }
 
     #[tokio::test]

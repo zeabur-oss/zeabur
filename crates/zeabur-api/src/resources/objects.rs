@@ -8,9 +8,8 @@
 //! # Listing: kinds first
 //!
 //! `GET /projects/{p}/objects` asks discovery which namespaced resources the cluster serves and
-//! answers every listable kind, each with an `access` hint from one `SelfSubjectRulesReview`
-//! (see `zeabur_kube::objects`). Only some kinds are read, metadata only (the form `kubectl get`
-//! uses for a table), a few at a time:
+//! answers every listable kind, with `access` as its list answered. Only some kinds are read,
+//! metadata only (the form `kubectl get` uses for a table), a few at a time:
 //!
 //! - without parameters, the kinds a project usually holds (`CURATED`: workloads, Services,
 //!   Ingresses and HTTPRoutes, ConfigMaps, Secrets, claims, network policies, service accounts,
@@ -22,12 +21,12 @@
 //! `?label=<key>=<value>` keeps only the objects with that label, as `kubectl get -l` does: the
 //! objects a database made carry `zeabur.com/database: <name>`, so deleting it can find them.
 //!
-//! Other kinds come back with `listed: false` and no items, for a client to read on demand. A
-//! kind the hint says the person may not list is not read; one refused when read is named in
-//! `unreadable`. Resources that are not objects a person keeps (`metrics.k8s.io`'s measurements)
-//! and the core group's `events` (the same events as `events.k8s.io`) are left out. Kinds that
-//! controllers create on their own (replica sets, endpoint slices, controller revisions, leases,
-//! events, endpoints) are marked `generated` and read only when named.
+//! Other kinds come back with `listed: false`, `access: unknown` and no items, for a client to
+//! read on demand. A kind refused when read is named in `unreadable`. Resources that are not
+//! objects a person keeps (`metrics.k8s.io`'s measurements) and the core group's `events` (the same
+//! events as `events.k8s.io`) are left out. Kinds that controllers create on their own (replica
+//! sets, endpoint slices, controller revisions, leases, events, endpoints) are marked `generated`
+//! and read only when named.
 //!
 //! # One object
 //!
@@ -47,7 +46,7 @@ use serde_json::json;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use zeabur_kube::{Access, AccessRules, ClusterError, ResourceRef, ServedResource};
+use zeabur_kube::{Cluster, ClusterError, ResourceRef, ServedResource};
 use zeabur_model::{Origin, Provenance};
 
 use crate::error::{ApiError, get_read, read_problem};
@@ -89,27 +88,16 @@ pub(crate) const CURATED: [(&str, &str); 15] = [
     ("policy", "poddisruptionbudgets"),
 ];
 
-/// Whether the person may list a kind, as one `SelfSubjectRulesReview` hints, or as a list
-/// answered.
+/// Whether the person may list a kind, as a list answered.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ObjectAccess {
-    /// A rule allows it.
+    /// The list was answered.
     Allowed,
-    /// No rule allows it, or a list was refused.
+    /// The list was refused.
     Denied,
-    /// The review cannot tell (another authorizer decides too); reading it tells.
+    /// Not listed: only reading it tells.
     Unknown,
-}
-
-impl From<Access> for ObjectAccess {
-    fn from(access: Access) -> Self {
-        match access {
-            Access::Allowed => Self::Allowed,
-            Access::Denied => Self::Denied,
-            Access::Unknown => Self::Unknown,
-        }
-    }
 }
 
 /// The parameters of the objects list (for the description; parsed by hand like
@@ -319,8 +307,8 @@ fn parse_query(query: Option<&str>) -> Result<ListQuery, ApiError> {
 
 /// Every listable namespaced kind of a project, kinds first: the usual kinds (or only those named
 /// in `kinds`) and, with `all`, every kind that controllers do not generate are read (names, ages
-/// and owners only); the rest come back unread. Each kind carries an access hint; kinds refused
-/// when read are named in `unreadable`. With `label`, only the objects with that label.
+/// and owners only); the rest come back unread. Kinds refused when read are named in
+/// `unreadable`. With `label`, only the objects with that label.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/objects", tag = "resources", operation_id = "listObjects",
     params(("project" = String, Path), ObjectListParams),
     responses((status = 200, body = ObjectList), (status = 400, body = Problem, content_type = PROBLEM),
@@ -336,12 +324,6 @@ pub(crate) async fn list(
         .served_resources()
         .await
         .map_err(|e| ApiError::from(e.into_problem("the cluster's APIs")))?;
-    // The review is open to every signed-in person; if it fails anyway, every kind is unknown and
-    // reading it tells.
-    let rules = cluster.access_rules(&project).await.unwrap_or(AccessRules {
-        rules: Vec::new(),
-        incomplete: true,
-    });
     let mut kinds: Vec<(ObjectKind, ResourceRef)> = served
         .iter()
         .filter(|s| listed(s))
@@ -355,7 +337,7 @@ pub(crate) async fn list(
                 kind: s.kind.clone(),
                 generated: GENERATED.contains(&pair),
                 curated: CURATED.contains(&pair),
-                access: rules.list(&reference).into(),
+                access: ObjectAccess::Unknown,
                 listed: false,
                 items: Vec::new(),
             };
@@ -384,6 +366,7 @@ pub(crate) async fn list(
         .buffered(CONCURRENCY)
         .collect()
         .await;
+    let tried = reads.len();
     let mut refused = Vec::new();
     for (i, resource, read) in reads {
         let Some((kind, _)) = kinds.get_mut(i) else {
@@ -399,6 +382,7 @@ pub(crate) async fn list(
                 objects.sort_by(|a, b| a.name.cmp(&b.name));
                 kind.items = objects;
                 kind.listed = true;
+                kind.access = ObjectAccess::Allowed;
             }
             Ok(None) => kind.listed = true,
             Err(error) => {
@@ -407,8 +391,13 @@ pub(crate) async fn list(
             }
         }
     }
-    // Nothing at all may be listed: the project itself is out of reach, not a few kinds.
-    if !kinds.is_empty() && kinds.iter().all(|(k, _)| k.access == ObjectAccess::Denied) {
+    // Every usual kind refused, and the rules review grants no list: the project itself is out of
+    // reach, not a few kinds. Kinds asked for by name are answered one by one in `unreadable`.
+    if requested.is_empty()
+        && tried > 0
+        && refused.len() == tried
+        && lists_nothing(cluster, &project).await
+    {
         return Err(ApiError::from(Problem {
             kubernetes: refused.into_iter().next().map(|r| r.kubernetes),
             ..Problem::new(
@@ -424,6 +413,17 @@ pub(crate) async fn list(
         scanned: all,
         unreadable: refused,
     }))
+}
+
+/// Whether the rules review says the person may list nothing in `project`. A failed or incomplete
+/// review says nothing, so the kinds' own refusals are answered instead.
+async fn lists_nothing(cluster: &dyn Cluster, project: &str) -> bool {
+    cluster
+        .access_rules(project)
+        .await
+        .ok()
+        .and_then(|rules| rules.lists_any())
+        == Some(false)
 }
 
 fn not_found(project: &str, what: &str) -> ApiError {
