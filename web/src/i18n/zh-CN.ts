@@ -1108,6 +1108,9 @@ export const zhCN: Messages = {
   "installer.removeTitle": (name) => `移除 ${name}`,
   "installer.export":
     "打印 manifests 后用 kubectl 应用，或提交到 GitOps 仓库。加上 --format helm 会改为打印 Helm 命令。",
+  "components.gitops": "用 Flux 或 Argo CD",
+  "components.gitopsHow":
+    "集群用 Flux 或 Argo CD 管理的话，改用下面的命令输出组件的 manifest，再提交到集群读取的仓库。",
   "components.manage": "管理",
   "components.installing": "安装中…",
   "components.removing": "移除中…",

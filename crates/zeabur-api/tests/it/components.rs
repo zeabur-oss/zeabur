@@ -541,6 +541,12 @@ mod tests {
                 .unwrap()
                 .contains("helm-controller")
         );
+        assert!(
+            problem["detail"]
+                .as_str()
+                .unwrap()
+                .contains("zeaburctl components export")
+        );
     }
 
     #[tokio::test]
