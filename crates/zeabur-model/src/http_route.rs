@@ -51,8 +51,49 @@ pub struct HttpRouteSpec {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct HttpRouteRule {
+    /// The requests the rule takes; none is every request.
+    pub matches: Vec<HttpRouteMatch>,
+    /// What the rule does to requests, in order.
+    pub filters: Vec<HttpRouteFilter>,
     /// Where the rule sends requests.
     pub backend_refs: Vec<BackendRef>,
+}
+
+/// A request match of a rule (Gateway API `HTTPRouteMatch`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct HttpRouteMatch {
+    /// The path the request has.
+    pub path: Option<HttpPathMatch>,
+}
+
+/// A path match (Gateway API `HTTPPathMatch`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default)]
+pub struct HttpPathMatch {
+    /// `Exact`, `PathPrefix` or `RegularExpression`; absent is `PathPrefix`.
+    #[serde(rename = "type")]
+    pub type_: Option<String>,
+    /// The path; absent is `/`.
+    pub value: Option<String>,
+}
+
+/// A filter of a rule (Gateway API `HTTPRouteFilter`), as far as Zeabur reads one.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct HttpRouteFilter {
+    /// The redirect the filter answers with.
+    pub request_redirect: Option<RequestRedirect>,
+}
+
+/// A redirect filter (Gateway API `HTTPRequestRedirectFilter`).
+#[derive(Debug, Clone, Default, PartialEq, Eq, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+pub struct RequestRedirect {
+    /// The hostname it redirects to; absent keeps the request's.
+    pub hostname: Option<String>,
+    /// The status code; absent is 302.
+    pub status_code: Option<i32>,
 }
 
 /// A rule's backend (Gateway API `HTTPBackendRef`).
@@ -67,7 +108,7 @@ pub struct BackendRef {
     pub name: String,
     /// The object's namespace; absent is the route's own.
     pub namespace: Option<String>,
-    /// The port of the Service it sends to.
+    /// The port of the Service.
     pub port: Option<i32>,
     /// Its share of the rule's requests; absent is 1, and 0 forwards none
     /// (<https://gateway-api.sigs.k8s.io/reference/api-spec/1.4/spec/#httpbackendref>).
@@ -323,10 +364,10 @@ mod tests {
                             kind: kind.map(str::to_owned),
                             name: (*name).to_owned(),
                             namespace: namespace.map(str::to_owned),
-                            port: None,
-                            weight: None,
+                            ..BackendRef::default()
                         })
                         .collect(),
+                    ..HttpRouteRule::default()
                 }],
             },
             status: RouteStatus::default(),
@@ -453,6 +494,7 @@ mod tests {
                     ..BackendRef::default()
                 },
             ],
+            ..HttpRouteRule::default()
         });
         assert_eq!(
             route.local_service_refs().collect::<Vec<_>>(),
