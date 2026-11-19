@@ -1193,6 +1193,7 @@ export const en = {
   "installer.removeTitle": (name: string) => `Remove ${name}`,
   "installer.export":
     "Print the manifests, then apply them with kubectl or commit them to your GitOps repository. Add --format helm for Helm commands.",
+  "components.manage": "Manage",
   "components.installing": "Installing…",
   "components.removing": "Removing…",
   "components.installed": "Installed, and every health check passes.",

@@ -429,7 +429,7 @@ pub struct Options {
     /// `settings.trusted_ca`.
     pub images: Option<Arc<images::Inspector>>,
     /// The templates offered; `None` offers the ones this build carries and fetches newer ones
-    /// from `settings.template_fetch`.
+    /// from `settings.catalog_url` when `settings.template_fetch` is set.
     pub templates: Option<zeabur_catalog::Catalog>,
     /// What a template uses when idle.
     pub template_idle: fn(&str) -> Option<zeabur_catalog::IdleUse>,
@@ -526,10 +526,10 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         catalog,
         cache,
     ));
-    let templates = match (templates, &settings.template_fetch, &tls) {
+    let templates = match (templates, settings.template_fetch, &tls) {
         (Some(catalog), ..) => cluster::template_fetch::Templates::fixed(catalog),
-        (None, Some(url), Ok(tls)) => cluster::template_fetch::Templates::fetching(
-            url.clone(),
+        (None, true, Ok(tls)) => cluster::template_fetch::Templates::fetching(
+            settings.catalog_url.clone(),
             zeabur_http::Https::new(reach, tls),
         ),
         (None, ..) => {

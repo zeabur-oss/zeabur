@@ -142,10 +142,6 @@ pub(crate) struct Args {
     /// `false`. `DO_NOT_TRACK` does not turn it off.
     #[arg(long, env = "ZEABUR_TEMPLATE_FETCH", default_value_t = true, action = clap::ArgAction::Set)]
     pub(crate) template_fetch: bool,
-    /// Where to fetch templates from: a copy of `https://oss-catalog.zeabur.com/v1/`, such as a
-    /// mirror. Empty: that address.
-    #[arg(long, env = "ZEABUR_TEMPLATE_FETCH_URL", default_value = "")]
-    pub(crate) template_fetch_url: String,
     /// Zeabur's own Deployment in `--namespace`, read as the person to tell how Zeabur was
     /// installed. Empty: not known.
     #[arg(long, env = "ZEABUR_DEPLOYMENT", default_value = "")]
@@ -229,7 +225,7 @@ impl Args {
         settings.identity.project_roles = self.member_roles;
         settings.update_check = self.update_check && !zeabur_telemetry::do_not_track();
         settings.catalog_url = catalog_url(&self.catalog_url)?;
-        settings.template_fetch = template_fetch(self)?;
+        settings.template_fetch = self.template_fetch;
         if !self.deployment.is_empty() {
             settings.deployment = Some(self.deployment.clone());
         }
@@ -309,27 +305,6 @@ fn domains(args: &Args) -> Result<zeabur_api::settings::DomainSettings, String> 
         domains.cluster_issuer = Some(issuer.to_owned());
     }
     Ok(domains)
-}
-
-/// Where templates are fetched from, ending in `/`; `None` when fetching is off.
-fn template_fetch(args: &Args) -> Result<Option<String>, String> {
-    if !args.template_fetch {
-        return Ok(None);
-    }
-    let url = args.template_fetch_url.trim();
-    if url.is_empty() {
-        return Ok(Some(zeabur_api::settings::TEMPLATE_FETCH_URL.to_owned()));
-    }
-    if !url.starts_with("https://") {
-        return Err(format!(
-            "--template-fetch-url: {url:?} is not an https:// URL"
-        ));
-    }
-    if url.ends_with('/') {
-        Ok(Some(url.to_owned()))
-    } else {
-        Ok(Some(format!("{url}/")))
-    }
 }
 
 /// Where services deployed from Git keep their images, from `args`.
@@ -619,22 +594,18 @@ mod tests {
     }
 
     #[test]
-    fn templates_are_fetched_over_https_only_and_can_be_turned_off() {
-        let files = Files::new("template-fetch");
+    fn the_catalog_is_read_over_https_only_and_template_updates_can_be_turned_off() {
+        let files = Files::new("catalog-url");
         let config = args(&files, &["--template-fetch", "false"]).unwrap();
-        assert_eq!(config.settings.template_fetch, None);
-        let config = args(
-            &files,
-            &["--template-fetch-url", "https://catalog.mirror.svc/v1"],
-        )
-        .unwrap();
+        assert!(!config.settings.template_fetch);
+        let config = args(&files, &["--catalog-url", "https://catalog.mirror.svc/v1"]).unwrap();
         assert_eq!(
-            config.settings.template_fetch.as_deref(),
-            Some("https://catalog.mirror.svc/v1/")
+            config.settings.catalog_url,
+            "https://catalog.mirror.svc/v1/"
         );
         for url in ["catalog.example.com", "http://catalog.mirror.svc/v1/"] {
-            let error = args(&files, &["--template-fetch-url", url]).unwrap_err();
-            assert!(error.starts_with("--template-fetch-url:"), "{error}");
+            let error = args(&files, &["--catalog-url", url]).unwrap_err();
+            assert!(error.starts_with("--catalog-url:"), "{error}");
         }
     }
 
@@ -651,7 +622,7 @@ mod tests {
                     ..zeabur_api::settings::IdentitySettings::default()
                 },
                 update_check: !zeabur_telemetry::do_not_track(),
-                template_fetch: Some(zeabur_api::settings::TEMPLATE_FETCH_URL.to_owned()),
+                template_fetch: true,
                 ..zeabur_api::Settings::default()
             }
         );

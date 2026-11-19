@@ -197,14 +197,7 @@
     "templateFetch": {
       "type": "object",
       "additionalProperties": false,
-      "properties": {
-        "enabled": { "type": "boolean" },
-        "url": {
-          "description": "Where to fetch templates from, or empty for https://oss-catalog.zeabur.com/v1/.",
-          "type": "string",
-          "pattern": "^$|^https://"
-        }
-      }
+      "properties": { "enabled": { "type": "boolean" } }
     },
     "memberRoles": {
       "type": "object",

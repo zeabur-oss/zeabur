@@ -145,12 +145,10 @@ expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
   'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_CATALOG_URL") | .value' https://oss-catalog.zeabur.com/v1/
 expect "updateCheck=false" "$(render -f "$chart/ci/minimal-values.yaml" --set updateCheck.enabled=false)" "$update_env" false
 
-# Template updates are on unless turned off, and go to the default address unless one is given.
+# Template updates are on unless turned off.
 fetch_env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_TEMPLATE_FETCH*") | .name + "=" + .value'
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$fetch_env" ZEABUR_TEMPLATE_FETCH=true
 expect "templateFetch=false" "$(render -f "$chart/ci/minimal-values.yaml" --set templateFetch.enabled=false)" "$fetch_env" ZEABUR_TEMPLATE_FETCH=false
-expect "templateFetch.url" "$(render -f "$chart/ci/minimal-values.yaml" --set templateFetch.url=https://mirror.example.com/v1/)" \
-  "[$fetch_env] | join(\",\")" ZEABUR_TEMPLATE_FETCH=true,ZEABUR_TEMPLATE_FETCH_URL=https://mirror.example.com/v1/
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
   'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_DEPLOYMENT") | .value' zeabur
 

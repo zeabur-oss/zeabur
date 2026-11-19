@@ -94,14 +94,11 @@ pub struct Settings {
     /// Where Zeabur reads Zeabur Catalog's API (`ZEABUR_CATALOG_URL`), an `https://` URL ending
     /// in `/`.
     pub catalog_url: String,
-    /// Where Zeabur fetches newer templates from, a URL ending in `/` (see
-    /// [`crate::cluster::template_fetch`]): the chart's `templateFetch`. `None`: only the
-    /// templates this build carries.
-    pub template_fetch: Option<String>,
+    /// Whether Zeabur fetches newer templates from `catalog_url` (see
+    /// [`crate::cluster::template_fetch`]): the chart's `templateFetch.enabled`. `false`: only
+    /// the templates this build carries.
+    pub template_fetch: bool,
 }
-
-/// Where Zeabur Catalog's releases are published for Zeabur to fetch templates from.
-pub const TEMPLATE_FETCH_URL: &str = "https://oss-catalog.zeabur.com/v1/";
 
 /// The GitHub the cluster's GitHub App is made on: github.com by default.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -193,7 +190,7 @@ impl Default for Settings {
             deployment: None,
             update_check: false,
             catalog_url: zeabur_catalog::api::DEFAULT_URL.to_owned(),
-            template_fetch: None,
+            template_fetch: false,
         }
     }
 }

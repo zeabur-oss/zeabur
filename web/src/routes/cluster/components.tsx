@@ -17,11 +17,11 @@ import HardDrivesIcon from "~icons/ph/hard-drives"
 import HeartbeatIcon from "~icons/ph/heartbeat"
 import LightningIcon from "~icons/ph/lightning"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
-import MinusCircleIcon from "~icons/ph/minus-circle"
 import PackageIcon from "~icons/ph/package"
 import PulseIcon from "~icons/ph/pulse"
 import ShieldCheckIcon from "~icons/ph/shield-check"
 import SignpostIcon from "~icons/ph/signpost"
+import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
 
 import { isStatus, type Schemas } from "@/api/client"
@@ -243,15 +243,13 @@ const summaryOf = (component: Schemas.Component, locale: Locale) =>
 const installationOf = (capability: Schemas.Capability, component: Schemas.Component) =>
   capability.installations.find((i) => i.component === component.id)
 
-/** Zeabur removes what it installed and installs what nothing else manages; a component K3s, RKE2
- * or Helm manages gets no button. */
-const actionOf = (
-  installation: Schemas.Installation | undefined,
-): Schemas.ComponentAction | undefined =>
-  !installation || installation.source === "other"
+/** Install when nothing is installed, manage what Zeabur may have installed; nothing for a
+ * component K3s, RKE2 or Helm manages. The dialog's plan decides between installing and removing. */
+const buttonOf = (installation: Schemas.Installation | undefined) =>
+  !installation
     ? "install"
-    : installation.source === "zeabur"
-      ? "remove"
+    : installation.source === "zeabur" || installation.source === "other"
+      ? "manage"
       : undefined
 
 /** What a component incident names, as the catalogue's capability or a component id. */
@@ -273,9 +271,7 @@ function useDown() {
   return (capability: string, component: string) => down.has(capability) || down.has(component)
 }
 
-/** The plan of the component in the address: removing it when Zeabur installed it, else installing.
- * The action stays what it was when the plan opened, so a failed install is tried again, not
- * removed, once the next poll finds Zeabur's chart. */
+/** The plan of the component in the address. */
 function OpenedPlan({
   id,
   list,
@@ -286,13 +282,9 @@ function OpenedPlan({
   onClose: () => void
 }) {
   const opened = list.flatMap((c) => c.components).find((x) => x.id === id)
-  const [action] = useState(() =>
-    actionOf(opened && list.map((c) => installationOf(c, opened)).find((i) => i !== undefined)),
-  )
-  if (!action) return null
   return (
     <Suspense fallback={null}>
-      <ComponentPlan id={id} name={opened?.displayName ?? id} action={action} onClose={onClose} />
+      <ComponentPlan id={id} name={opened?.displayName ?? id} onClose={onClose} />
     </Suspense>
   )
 }
@@ -384,18 +376,18 @@ function ComponentCard({
           <ArrowSquareOutIcon className="size-3" aria-hidden="true" />
           <span className="sr-only">{t("settings.opensInNewTab")}</span>
         </a>
-        <CardAction id={component.id} action={actionOf(installation)} />
+        <CardAction id={component.id} button={buttonOf(installation)} />
       </div>
     </article>
   )
 }
 
-/** Install, or remove what Zeabur installed; nothing for a component another tool manages. */
-function CardAction({ id, action }: { id: string; action: Schemas.ComponentAction | undefined }) {
+/** Opens the component's plan. */
+function CardAction({ id, button }: { id: string; button: "install" | "manage" | undefined }) {
   const t = useT()
   const catalog = useQuery(catalogQuery).data
   const offline = catalog !== undefined && !catalog.version
-  if (!action) return null
+  if (!button) return null
   return (
     <Link
       from="/cluster/components"
@@ -410,12 +402,12 @@ function CardAction({ id, action }: { id: string; action: Schemas.ComponentActio
         "ml-auto aria-disabled:pointer-events-none aria-disabled:opacity-50",
       )}
     >
-      {action === "remove" ? (
-        <MinusCircleIcon aria-hidden="true" data-icon="inline-start" />
+      {button === "manage" ? (
+        <SlidersHorizontalIcon aria-hidden="true" data-icon="inline-start" />
       ) : (
         <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
       )}
-      {action === "remove" ? t("settings.removeCommand") : t("settings.installCommand")}
+      {button === "manage" ? t("components.manage") : t("settings.installCommand")}
     </Link>
   )
 }

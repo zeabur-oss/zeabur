@@ -35,7 +35,7 @@ Click **Install** on a component card. The dialog lists each step and the object
 
 ### Install
 
-Click **Install**. Zeabur writes one step at a time with your account, and starts the next step once the one before it is ready. Keep the dialog open until every step and health check shows **Ready**; if you close it, click **Install** again to go on from where it stopped. When a health check takes longer than expected, the dialog says what to check.
+Click **Install**. Zeabur writes one step at a time with your account, and starts the next step once the one before it is ready. Keep the dialog open until every step and health check shows **Ready**; if you close it, click **Manage** on its card to go on from where it stopped. When a health check takes longer than expected, the dialog says what to check.
 
 </Step>
 </Steps>
@@ -90,7 +90,7 @@ Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middlew
 
 ## Remove components
 
-To remove a component Zeabur installed, click **Remove** on its card, check the steps, then click **Remove**. Zeabur deletes its objects in the reverse order; deleting a chart makes helm-controller uninstall it. The dialog lists what stays, such as CRDs and keys. Zeabur refuses while another installed component needs it, or while objects of its custom resources are still in use outside its own namespace, and names them.
+To remove a component Zeabur installed, click **Manage** on its card. Once every step is done, the dialog offers removal: check the steps, then click **Remove**. Zeabur deletes its objects in the reverse order; deleting a chart makes helm-controller uninstall it. The dialog lists what stays, such as CRDs and keys. Zeabur refuses while another installed component needs it, or while objects of its custom resources are still in use outside its own namespace, and names them.
 
 Remove a component Zeabur didn't install through the same files or tools you used to install it, such as `kubectl delete -f`, `helm uninstall`, Flux, or Argo CD.
 
@@ -120,6 +120,8 @@ For a cluster without internet access, serve a copy of the catalog over HTTPS:
    ```
 
 The URL must start with `https://`. The catalog only says which charts and images to install; helm-controller and the nodes still pull those from their registries, so mirror them too.
+
+[Template updates](../reference/telemetry.mdx#template-updates) read the same address.
 
 ## Common failures
 

@@ -1111,6 +1111,7 @@ export const zhTW: Messages = {
   "installer.removeTitle": (name) => `移除 ${name}`,
   "installer.export":
     "印出 manifests 後用 kubectl 套用，或提交到 GitOps 儲存庫。加上 --format helm 會改印 Helm 指令。",
+  "components.manage": "管理",
   "components.installing": "安裝中…",
   "components.removing": "移除中…",
   "components.installed": "已安裝，健康檢查都通過了。",

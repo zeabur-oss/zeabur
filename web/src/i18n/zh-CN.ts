@@ -1108,6 +1108,7 @@ export const zhCN: Messages = {
   "installer.removeTitle": (name) => `移除 ${name}`,
   "installer.export":
     "打印 manifests 后用 kubectl 应用，或提交到 GitOps 仓库。加上 --format helm 会改为打印 Helm 命令。",
+  "components.manage": "管理",
   "components.installing": "安装中…",
   "components.removing": "移除中…",
   "components.installed": "已安装，健康检查都通过了。",

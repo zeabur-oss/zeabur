@@ -248,17 +248,16 @@ telemetry:
 updateCheck:
   enabled: true
 
-# Where Zeabur reads the components it installs: the Zeabur Catalog API, over HTTPS.
+# Where Zeabur reads Zeabur Catalog: the components it installs and newer templates. An https://
+# address, such as a mirror of a release's api-v1.tar.gz.
 catalog:
   url: https://oss-catalog.zeabur.com/v1/
 
 # Template updates (docs/reference/telemetry.mdx): every 6 hours at most, Zeabur fetches Zeabur
-# Catalog's newest templates and offers them in place of the ones it was built with. It trusts the
-# address it fetches from. DO_NOT_TRACK does not turn it off. url: a copy of
-# https://oss-catalog.zeabur.com/v1/, such as a mirror; empty for that address.
+# Catalog's newest templates from catalog.url and offers them in place of the ones it was built
+# with. It trusts the address it fetches from. DO_NOT_TRACK does not turn it off.
 templateFetch:
   enabled: true
-  url: ""
 
 podAnnotations: {}
 podLabels: {}

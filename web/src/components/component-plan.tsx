@@ -26,7 +26,50 @@ const health = {
   failed: "fail",
 } as const
 
+const planQuery = (id: string, action: Schemas.ComponentAction) => ({
+  queryKey: ["component-plan", id, action],
+  queryFn: ({ signal }: { signal: AbortSignal }) => planComponent(id, { action }, { signal }),
+  ...reviewOnce,
+})
+
+/** Installs the component until its install plan is done, then removes it. The server's plan
+ * decides, since only it sees every object Zeabur wrote; the action stays while the dialog is
+ * open, so a failed install is tried again rather than removed. */
 export function ComponentPlan({
+  id,
+  name,
+  onClose,
+}: {
+  id: string
+  name: string
+  onClose: () => void
+}) {
+  const t = useT()
+  const install = useQuery(planQuery(id, "install"))
+  const [action, setAction] = useState<Schemas.ComponentAction>()
+  if (action === undefined && install.data) setAction(install.data.done ? "remove" : "install")
+  if (action) return <PlanDialog id={id} name={name} action={action} onClose={onClose} />
+  return (
+    <Frame
+      title={t("installer.installTitle", name)}
+      wide
+      onClose={onClose}
+      footer={
+        <Button variant="ghost" size="sm" onClick={onClose}>
+          {t("plan.cancel")}
+        </Button>
+      }
+    >
+      {install.isError ? (
+        <Problem error={install.error} />
+      ) : (
+        <LoadingRows label={t("plan.planning")} rows={3} />
+      )}
+    </Frame>
+  )
+}
+
+function PlanDialog({
   id,
   name,
   action,
@@ -38,11 +81,7 @@ export function ComponentPlan({
   onClose: () => void
 }) {
   const t = useT()
-  const plan = useQuery({
-    queryKey: ["component-plan", id, action],
-    queryFn: ({ signal }) => planComponent(id, { action }, { signal }),
-    ...reviewOnce,
-  })
+  const plan = useQuery(planQuery(id, action))
   const { shown, running, readySince, start, apply } = useApplying(id, action, plan.data)
 
   const title =
