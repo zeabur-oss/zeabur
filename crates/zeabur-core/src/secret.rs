@@ -9,9 +9,10 @@ pub fn join(parts: &[&str]) -> String {
     parts.concat()
 }
 
-/// Stops this process from writing a core dump: `RLIMIT_CORE` becomes 0 and, on Linux, the process
-/// becomes non-dumpable (`PR_SET_DUMPABLE` 0), which also refuses `ptrace` and `/proc/<pid>/mem` to
-/// other processes of its user [proc].
+/// Stops this process from writing a core dump.
+///
+/// `RLIMIT_CORE` becomes 0 and, on Linux, the process becomes non-dumpable (`PR_SET_DUMPABLE` 0),
+/// which also refuses `ptrace` and `/proc/<pid>/mem` to other processes of its user [proc].
 ///
 /// # Errors
 ///

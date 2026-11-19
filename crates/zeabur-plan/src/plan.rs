@@ -1942,10 +1942,11 @@ pub(crate) fn pod_spec_steps(kind: WorkloadKind) -> Vec<Step> {
         .collect()
 }
 
-/// What pins each object a plan writes, by `kind/name`, for the token: a patch's first `test` (the
-/// generation, else the `resourceVersion`), and for a deletion its `resourceVersion`, the
-/// precondition kube-apiserver checks. A patch that tests `metadata.finalizers` also pins them.
-/// Each object is keyed by its `apiVersion`, kind and name.
+/// What pins each object a plan writes, by `kind/name`, for the token.
+///
+/// A patch's first `test` pins it (the generation, else the `resourceVersion`), and for a deletion
+/// its `resourceVersion`, the precondition kube-apiserver checks. A patch that tests
+/// `metadata.finalizers` also pins them. Each object is keyed by its `apiVersion`, kind and name.
 #[must_use]
 pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
     plan.objects

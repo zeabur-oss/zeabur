@@ -40,7 +40,9 @@ pub fn provenance(meta: &ObjectMeta) -> Provenance {
     }
 }
 
-/// One namespace as a project: a service per workload with its containers, every Kubernetes Service
+/// One namespace as a project.
+///
+/// A service per workload with its containers, every Kubernetes Service
 /// and Ingress that reaches a workload (once, which the services name), and every ConfigMap,
 /// Secret, PVC, Service and Ingress with the workloads it belongs to.
 ///
