@@ -38,7 +38,13 @@ export interface AddChoices {
    * known. */
   objectStorage?: { installed: boolean; operator?: Component }
   /** "Deploy from Git": open, or closed by the person's role or by what the cluster lacks. */
-  git: { open: boolean; gate: Gate; install: Component[]; registrySetting: boolean }
+  git: {
+    open: boolean
+    gate: Gate
+    install: Component[]
+    keelUnavailable: boolean
+    registrySetting: boolean
+  }
   yaml: boolean
   /** Nothing to offer: the person may only look. */
   none: boolean
@@ -94,8 +100,9 @@ function useGitChoice(project: string | undefined): AddChoices["git"] {
 }
 
 function gitChoice(gate: Gate, needs: ReturnType<typeof gitNeeds>): AddChoices["git"] {
-  if (!needs) return { open: gate.open, gate, install: [], registrySetting: false }
-  return { open: false, gate, install: needs.install, registrySetting: needs.registrySetting }
+  if (!needs)
+    return { open: gate.open, gate, install: [], keelUnavailable: false, registrySetting: false }
+  return { open: false, gate, ...needs }
 }
 
 /** What "New" offers in the project: a kind the person's role cannot add is closed, one unknown
@@ -148,6 +155,7 @@ export const entryTestid = (what: AddWhat) =>
 function gitEntry(git: AddChoices["git"], what: "git" | "upload", t: Translate): AddEntry {
   const entry: AddEntry = { what, group: "service", label: t(`add.${what}`), gate: git.gate }
   if (git.open || !git.gate.open) return entry
+  if (git.keelUnavailable) return { ...entry, why: t("add.gitMissing.keel") }
   const note = git.registrySetting ? t("add.gitMissing.registrySetting") : undefined
   if (git.install.length === 0) return { ...entry, why: note ?? "" }
   const names = t(

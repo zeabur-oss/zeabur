@@ -747,6 +747,8 @@ export const en = {
   "builds.autoUpdateHint": "Each new build goes live as soon as it finishes.",
   "builds.autoUpdatePolicy": (policy: string) =>
     `Keel updates this service with its ${policy} policy, set outside Zeabur.`,
+  "builds.keelUnavailable":
+    "Auto-deploy needs the Keel component, which this cluster doesn't have and can't install on its Kubernetes version.",
   "builds.keelMissing": "Auto-deploy needs the Keel component, which this cluster doesn't have.",
   "builds.history": "History",
   "builds.trigger.webhook": "Pushed",
@@ -2883,6 +2885,8 @@ export const en = {
   "add.card.git": "Build a Git repository and run it.",
   "add.palette.git": (project: string) => `Deploy from Git in ${project}`,
   "add.gitNeedsWhy": "Deploy from Git and Upload a folder need these components.",
+  "add.gitMissing.keel":
+    "Needs the Keel component, which this cluster doesn't have and can't install on its Kubernetes version.",
   "add.gitMissing.registrySetting":
     "Zeabur has no registry for builds: set builds.registry in its chart.",
   "add.upload": "Upload a folder",

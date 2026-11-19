@@ -498,10 +498,12 @@ export function buildOptionsChanges(build: Build, options: BuildOptions): Change
   return changes
 }
 
-/** What "Deploy from Git" lacks in this cluster: components to install, and whether Zeabur's
- * chart names no registry. Unknown counts as there. */
+/** What "Deploy from Git" lacks in this cluster: components to install, whether Keel is missing
+ * with nothing that installs it here, and whether Zeabur's chart names no registry. Unknown counts
+ * as there. */
 export interface GitNeeds {
   install: Schemas.ComponentRef[]
+  keelUnavailable: boolean
   registrySetting: boolean
 }
 
@@ -517,12 +519,18 @@ export function gitNeeds({
 }): GitNeeds | undefined {
   const install: Schemas.ComponentRef[] = []
   if (builds?.state === "not-installed" && builds.component) install.push(builds.component)
-  const updates = keelInstall(capabilities)
-  if (updates) install.push(updates)
+  const keel = missingKeel(capabilities)
+  if (keel?.install) install.push(keel.install)
+  const keelUnavailable = keel !== undefined && !keel.install
   const registrySetting = registry === ""
-  return install.length > 0 || registrySetting ? { install, registrySetting } : undefined
+  return install.length > 0 || keelUnavailable || registrySetting
+    ? { install, keelUnavailable, registrySetting }
+    : undefined
 }
 
-/** The component that gives the cluster image updates (Keel), when it has none. */
-export const keelInstall = (capabilities: Schemas.Capability[] | undefined) =>
-  capabilities?.find((c) => c.name === "image-updates")?.install ?? undefined
+/** Image updates (Keel) when the cluster has none, with the component that installs it here if
+ * any; `undefined` when it is there or unknown. */
+export const missingKeel = (capabilities: Schemas.Capability[] | undefined) => {
+  const keel = capabilities?.find((c) => c.name === "image-updates")
+  return keel?.existing === false ? { install: keel.install ?? undefined } : undefined
+}

@@ -369,6 +369,7 @@ describe("what the cluster lacks", () => {
   const builder = { id: "zeabur-builder", name: "Zeabur Builder" }
   const keel = { id: "keel", name: "Keel" }
   const noKeel = { name: "image-updates", existing: false, install: keel }
+  const keelUnsupported = { name: "image-updates", existing: false, install: null }
   const zot = "zot.zot.svc:5000"
   test.each([
     [
@@ -376,22 +377,35 @@ describe("what the cluster lacks", () => {
       "not-installed",
       [noKeel],
       zot,
-      { install: [builder, keel], registrySetting: false },
+      { install: [builder, keel], keelUnavailable: false, registrySetting: false },
     ],
-    ["the Builder alone", "not-installed", [], zot, { install: [builder], registrySetting: false }],
+    [
+      "the Builder alone",
+      "not-installed",
+      [],
+      zot,
+      { install: [builder], keelUnavailable: false, registrySetting: false },
+    ],
     [
       "the registry setting, which no component gives",
       "installed",
       [],
       "",
-      { install: [], registrySetting: true },
+      { install: [], keelUnavailable: false, registrySetting: true },
     ],
     [
       "Keel, with another registry",
       "installed",
       [noKeel],
       "ghcr.io/acme",
-      { install: [keel], registrySetting: false },
+      { install: [keel], keelUnavailable: false, registrySetting: false },
+    ],
+    [
+      "Keel that this Kubernetes version cannot install, so nothing opens it",
+      "installed",
+      [keelUnsupported],
+      zot,
+      { install: [], keelUnavailable: true, registrySetting: false },
     ],
     ["nothing with a configured registry", "installed", [], "harbor.example.com", undefined],
     ["nothing while unknown", undefined, undefined, undefined, undefined],
