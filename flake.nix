@@ -56,9 +56,26 @@
         );
     in
     {
-      overlays.default = final: _: {
+      overlays.default = final: prev: {
         # The nightly, components and targets of rust-toolchain.toml, the same file rustup reads.
         rustToolchain = final.rust-bin.fromRustupToolchainFile ./rust-toolchain.toml;
+        # Nixpkgs has 2.12.4, whose RPM bundle refuses a pre-release version such as 0.3.0-beta.0
+        # (tauri-apps/tauri#16336, fixed in 2.12.5). Drop this once nixpkgs-unstable has 2.12.5.
+        cargo-tauri = prev.cargo-tauri.overrideAttrs (
+          finalAttrs: _: {
+            version = "2.12.6";
+            src = final.fetchFromGitHub {
+              owner = "tauri-apps";
+              repo = "tauri";
+              tag = "tauri-cli-v${finalAttrs.version}";
+              hash = "sha256-GPmPwKloggoRL38BS1GVgkzsSG95zgmGPcJFnstR63s=";
+            };
+            cargoDeps = final.rustPlatform.fetchCargoVendor {
+              inherit (finalAttrs) pname version src;
+              hash = "sha256-gJyKD3SZUwv/sk3VFr9wkjzcaSkm0xV3mwzIBhrS8hY=";
+            };
+          }
+        );
       };
 
       devShells = forEachSupportedSystem (
