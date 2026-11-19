@@ -704,8 +704,9 @@ impl World {
         })
     }
 
-    /// Refuses a removal while objects of the component's custom resources exist outside its
-    /// namespaces, or volumes use its CSI drivers [installers].
+    /// Refuses a removal while objects of the component's custom resources are in use, or volumes
+    /// use its CSI drivers [installers]. An object is in use when Zeabur wrote it for another
+    /// component, or when nobody labelled it and it is outside the component's namespaces.
     ///
     /// [installers]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/installers.mdx
     async fn still_used(
@@ -742,13 +743,16 @@ impl World {
                 .map_err(|e| ApiError::from(e.into_problem(&format!("{crd} objects"))))?;
             for object in objects {
                 let namespace = object.metadata.namespace.clone().unwrap_or_default();
-                let ours = object
+                let written_for = object
                     .metadata
                     .labels
                     .as_ref()
-                    .and_then(|l| l.get(COMPONENT))
-                    .is_some_and(|c| *c == file.id);
-                if !ours && !own.contains(namespace.as_str()) {
+                    .and_then(|l| l.get(COMPONENT));
+                let user = written_for.map_or_else(
+                    || !own.contains(namespace.as_str()),
+                    |component| *component != file.id,
+                );
+                if user {
                     let name = object.metadata.name.unwrap_or_default();
                     users.push(if namespace.is_empty() {
                         format!("{} {name}", served.kind)

@@ -468,6 +468,34 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn an_object_zeabur_wrote_for_another_component_keeps_it_in_any_namespace() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        call(&app, "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        put(
+            &cluster,
+            json!({
+                "apiVersion": "cert-manager.io/v1",
+                "kind": "Certificate",
+                "metadata": {
+                    "name": "webhook-tls",
+                    "namespace": "cert-manager",
+                    "labels": {"catalog.zeabur.com/component": "cloudnative-pg"},
+                },
+            }),
+        );
+        let (status, problem) = call(&app, "plan", "remove", "").await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert!(
+            problem["detail"]
+                .as_str()
+                .unwrap()
+                .contains("Certificate cert-manager/webhook-tls")
+        );
+    }
+
+    #[tokio::test]
     async fn a_component_needing_it_keeps_it_but_its_leftover_crds_do_not() {
         let cluster = cluster();
         let app = app(&cluster, false);
