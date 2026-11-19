@@ -29,7 +29,6 @@ import { useT } from "@/i18n"
 import { serviceLink } from "@/lib/place"
 import {
   createGitService,
-  credentialsName,
   deployKeyHost,
   deployKeyPage,
   gitProblems,
@@ -66,7 +65,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
     const repo = parseRepository(repositoryUrl(github, f.url))
     return builtName(repo?.path.split("/").at(-1) ?? "", taken)
   })
-  const { form, set, shown, options, name, domains, registry } = built
+  const { form, set, shown, options, name } = built
   const [userSet, setUserSet] = useState(false)
   const [checked, setChecked] = useState<CheckedHost>()
   // The live suggestion moves on (`site` → `site-2`) once the new service is listed.
@@ -101,7 +100,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
 
   const openService = () =>
     void navigate(serviceLink(project, { kind: "Deployment", name: planned }))
-  const key = useKeyStage(project, credentialsName(planned), access === "deployKey", {
+  const key = useKeyStage(project, planned, access === "deployKey", {
     onClose,
     openService,
   })
@@ -112,7 +111,7 @@ export function GitDrawer({ project, onClose }: { project: string; onClose: () =
     setPlanned(name)
     planner.plan({
       title: t("add.planGit", name),
-      changes: createGitService(resolved, project, registry, domains),
+      changes: createGitService(resolved),
     })
   }
 
@@ -331,16 +330,16 @@ function TokenFields({
 }
 
 /** With a deploy key, the drawer stays after the apply starts and shows the public key the apply
- * made; without one, it closes and the service page opens once applied. */
+ * made for `build`; without one, it closes and the service page opens once applied. */
 function useKeyStage(
   project: string,
-  secret: string,
+  build: string,
   withKey: boolean,
   { onClose, openService }: { onClose: () => void; openService: () => void },
 ) {
   const [stage, setStage] = useState<"applying" | "applied">()
   const reveal = useMutation({
-    mutationFn: async () => await zeabur.revealDeployKey(project, secret),
+    mutationFn: async () => await zeabur.revealDeployKey(project, build),
   })
   return {
     stage,

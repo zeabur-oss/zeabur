@@ -391,7 +391,7 @@ group("actionOf", () => {
     const form: Schemas.Change[] = [
       { op: "create", object: object("a") },
       { op: "create", object: object("b") },
-      { op: "deployKey", name: "c", host: "github.com" },
+      { op: "create", object: object("c") },
     ]
     const yaml: Schemas.Change[] = ["a", "b", "c"].map((name) => ({
       op: "create",
@@ -628,22 +628,37 @@ group("restartRuleApplies", () => {
   })
 })
 
-group("deploying from Git", () => {
-  const deployment = {
-    apiVersion: "apps/v1",
-    kind: "Deployment",
-    metadata: { name: "site" },
-  } as unknown as Record<string, never>
-  const changes: Schemas.Change[] = [
-    { op: "create", object: deployment },
-    { op: "deployKey", name: "site-git", host: "github.com" },
+group("deploying from Git or an image", () => {
+  const git: Schemas.Change[] = [
+    {
+      op: "createGitService",
+      name: "site",
+      url: "git@github.com:acme/site.git",
+      method: "railpack",
+      access: { type: "deployKey" },
+    },
+  ]
+  const image: Schemas.Change[] = [
+    {
+      op: "createImageService",
+      name: "web",
+      image: "nginx:1.27",
+      secretVariables: true,
+      size: "small",
+      replicas: 1,
+      security: "baseline",
+    },
   ]
 
-  test("the deploy key reads as the Secret it creates, and the button still creates", () => {
-    const d = describe(t, { changes }, plan(), pods({}))
-    expect(d.lines).toContain("confirm.deployKey(site-git)")
-    expect(d.lines.join(" ")).not.toContain("k1.sealed")
-    expect(actionOf(t, { changes })).toBe("create.buttonMany(2)")
+  test("one sentence names the service, and the button creates", () => {
+    expect(describe(t, { changes: git }, plan(), pods({})).lines).toContain(
+      "confirm.createGitService(site)",
+    )
+    expect(describe(t, { changes: image }, plan(), pods({})).lines).toContain(
+      "confirm.createImageService(web)",
+    )
+    expect(actionOf(t, { changes: git })).toBe("action.create")
+    expect(actionOf(t, { changes: image })).toBe("action.create")
   })
 })
 

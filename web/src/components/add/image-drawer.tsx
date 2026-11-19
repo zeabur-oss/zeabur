@@ -5,6 +5,7 @@ import CaretRightIcon from "~icons/ph/caret-right"
 
 import { clusterQuery, creatableQuery } from "@/api/queries"
 import { rules } from "@/api/rules"
+import * as zeabur from "@/api/zeabur"
 import { useTakenNames } from "@/components/add/taken"
 import { AmountInput } from "@/components/amount-input"
 import { FormField, quantity } from "@/components/form-field"
@@ -18,13 +19,12 @@ import { growthWords, useStorage } from "@/components/storage-class"
 import { useT } from "@/i18n"
 import { handOff } from "@/lib/adding"
 import { serviceLink } from "@/lib/place"
-import { toYaml } from "@/lib/yaml-out"
 import { portNote, shownPort } from "@/model/image-ports"
 import {
   createImageService,
   hasTag,
   hostProblem,
-  imageObjects,
+  imageChange,
   imageOptions,
   imageProblem,
   nameFromImage,
@@ -48,7 +48,7 @@ import { Select } from "@zeabur-oss/design-system/components/select"
 import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 const MOUNT_PATH = /^\/\S*$/
-const MAX_REPLICAS = rules.ServiceReplicas.maximum
+const MAX_REPLICAS = rules["ImageServiceChange.replicas"].maximum
 
 interface Extras {
   env: string
@@ -148,11 +148,12 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
     if (blocked) return
     planner.plan({
       title: t("add.planImage", name),
-      changes: createImageService(service(), domains),
+      changes: createImageService(service()),
     })
   }
-  const editYaml = () => {
-    handOff(project, toYaml(imageObjects(service(), domains)))
+  const editYaml = async () => {
+    const { yaml } = await zeabur.previewImageService(project, imageChange(service()))
+    handOff(project, yaml)
     onClose()
     void navigate({ to: "/projects/$project/create", params: { project } })
   }
@@ -171,7 +172,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
             variant="ghost"
             size="sm"
             className="-ml-3"
-            onClick={editYaml}
+            onClick={() => void editYaml().catch(() => setTried(true))}
             disabled={form.image.trim() === ""}
           >
             {t("add.editYaml")}

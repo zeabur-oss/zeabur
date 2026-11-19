@@ -8,7 +8,6 @@ use utoipa::openapi::schema::{ObjectBuilder, Schema, SchemaType, Type};
 use utoipa::{PartialSchema, ToSchema};
 use zeabur_model::kernel::dns::{DNS_LABEL_PATTERN, LABEL_MAX, RFC1035_LABEL_PATTERN};
 use zeabur_model::kernel::names::DATABASE_NAME_MAX;
-use zeabur_plan::compose::MAX_REPLICAS;
 
 /// A project's name, which is its namespace's: a DNS label. Names starting with `kube-` are
 /// Kubernetes' own, and a plan that creates one is refused.
@@ -53,26 +52,5 @@ impl PartialSchema for DatabaseName {
 impl ToSchema for DatabaseName {
     fn name() -> Cow<'static, str> {
         Cow::Borrowed("DatabaseName")
-    }
-}
-
-/// How many replicas a new service may run, as a Compose file and the image form give them.
-#[derive(Debug)]
-pub struct ServiceReplicas;
-
-impl PartialSchema for ServiceReplicas {
-    fn schema() -> RefOr<Schema> {
-        ObjectBuilder::new()
-            .schema_type(SchemaType::Type(Type::Integer))
-            .description(Some("How many replicas a new service may run."))
-            .minimum(Some(1))
-            .maximum(Some(MAX_REPLICAS))
-            .into()
-    }
-}
-
-impl ToSchema for ServiceReplicas {
-    fn name() -> Cow<'static, str> {
-        Cow::Borrowed("ServiceReplicas")
     }
 }

@@ -41,6 +41,8 @@ pub const BUILDER_VERSION: &str = "v1alpha1";
 pub const REBUILD: &str = "builder.zeabur.com/rebuild";
 /// The annotation whose new value asks for a token to upload an archive.
 pub const UPLOAD_TOKEN_REQUEST: &str = "builder.zeabur.com/upload-token-request";
+/// The label Zeabur Builder reads credentials by.
+pub const GIT_CREDENTIALS_LABEL: &str = "builder.zeabur.com/git-credentials";
 /// The workload annotation that has Keel update it, and to which tags.
 pub const KEEL_POLICY: &str = "keel.sh/policy";
 /// The policy Zeabur sets: any new tag of the image, since the builder's tags are not

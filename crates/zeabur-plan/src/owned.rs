@@ -23,15 +23,13 @@ use zeabur_model::adapters::provenance::{Tool, detect_tool};
 use zeabur_model::adapters::{controller_of, label};
 use zeabur_model::{HttpRoute, RelationKind, WorkloadKind, WorkloadRef};
 
+use crate::builds::GIT_CREDENTIALS_LABEL;
 use crate::change::{KeptReason, ObjectName, Warning};
 use crate::checks::ResourceRef;
 use crate::rules::route_name;
 
 /// The label "Deploy an image" and "Deploy from Git" put on every object they create.
 pub const SERVICE_LABEL: &str = "app.kubernetes.io/name";
-
-/// The label of the Secrets a Zeabur Builder `Build` fetches with.
-const GIT_CREDENTIALS_LABEL: &str = "builder.zeabur.com/git-credentials";
 
 /// The ConfigMap kube-apiserver publishes into every namespace.
 const ROOT_CA_CONFIG_MAP: &str = "kube-root-ca.crt";

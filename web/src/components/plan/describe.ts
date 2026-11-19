@@ -258,8 +258,6 @@ function sentenceOf(
       return databases.has(`${change.resource.resource}.${change.resource.group}`)
         ? t("confirm.deleteDatabase", change.name)
         : t("confirm.delete", change.name)
-    case "deployKey":
-      return t("confirm.deployKey", change.name)
     case "debugContainer":
       return t("confirm.debugContainer", change.pod)
     default:
@@ -278,7 +276,17 @@ type ServiceChange =
   | PagesChange
   | LimitChange
 
-type UploadChange = Extract<Change, { op: "uploadToken" | "createUploadService" | "archiveDigest" }>
+type UploadChange = Extract<
+  Change,
+  {
+    op:
+      | "uploadToken"
+      | "createUploadService"
+      | "createGitService"
+      | "createImageService"
+      | "archiveDigest"
+  }
+>
 
 type LimitChange = Extract<Change, { op: "ipAllow" | "egressLimit" }>
 
@@ -359,6 +367,10 @@ function uploadSentence(t: Translate, change: UploadChange | LimitChange | Pages
   switch (change.op) {
     case "createUploadService":
       return t("confirm.createUploadService", change.name)
+    case "createGitService":
+      return t("confirm.createGitService", change.name)
+    case "createImageService":
+      return t("confirm.createImageService", change.name)
     case "uploadToken":
       return t("confirm.uploadToken", change.build)
     case "archiveDigest":
@@ -818,10 +830,12 @@ const storageOps = new Set<Change["op"]>([
   "swapClaim",
 ])
 
-// A deploy key and copied S3 keys open into the create of a Secret: a form that sends one still
-// creates.
+// Copied S3 keys and a new service open into creates: a form that sends one still creates.
 const opOf = (change: Change): Change["op"] =>
-  change.op === "deployKey" || change.op === "copyS3Keys" || change.op === "createUploadService"
+  change.op === "copyS3Keys" ||
+  change.op === "createUploadService" ||
+  change.op === "createGitService" ||
+  change.op === "createImageService"
     ? "create"
     : change.op
 
@@ -850,7 +864,6 @@ const plainAction: Partial<Record<Change["op"], PlainKey>> = {
   delete: "action.delete",
   adopt: "action.adopt",
   createProject: "action.create",
-  deployKey: "action.create",
   unadopt: "action.unadopt",
   deleteProject: "action.deleteProject",
   forceDeleteProject: "action.forceDeleteProject",
@@ -971,6 +984,8 @@ function serviceAction(t: Translate, change: ServiceChange): string {
 function uploadAction(t: Translate, change: UploadChange | LimitChange | PagesChange): string {
   switch (change.op) {
     case "createUploadService":
+    case "createGitService":
+    case "createImageService":
       return t("action.create")
     case "uploadToken":
     case "archiveDigest":

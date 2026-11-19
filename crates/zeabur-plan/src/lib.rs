@@ -3,6 +3,7 @@
 pub mod access;
 pub mod api_token;
 pub mod builds;
+mod built_service;
 mod certificates;
 mod change;
 pub mod checks;
@@ -12,6 +13,7 @@ mod delete;
 pub mod edit;
 mod error_pages;
 pub mod fields;
+mod image_service;
 mod ip_limits;
 pub mod json;
 pub mod node_shell;
@@ -32,20 +34,27 @@ mod shared;
 mod tasks;
 pub mod terminal;
 pub mod token;
-mod upload_service;
 
+pub use built_service::{
+    BRANCH_PATTERN, DeployKeySecret, GitAccess, GitServiceChange, Repository, deploy_key_host,
+    parse_repository,
+};
 pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{
-    AddDomainChange, BasicAuthUser, BuildOptionsChange, CertificateChange, CertificateSource,
-    Change, ConnectionRef, CopyS3KeysChange, DataEdit, DataKind, EgressLimitChange,
-    EnvImportChange, ErrorPageHtml, FieldOwners, GatewayParent, HttpOnlyReason, IpAllowChange,
-    KeptReason, LabelVolumeChange, NameValue, ObjectName, Plan, PlanRequest, PlannedObject,
-    ProbeKind, PublicPortChange, RouteKind, RouteRef, ServiceSize, Target, TemplateChange,
-    UploadMethod, UploadServiceChange, Warning, Write,
+    AddDomainChange, BasicAuthUser, BuildMethod, BuildOptionsChange, CertificateChange,
+    CertificateSource, Change, ConnectionRef, CopyS3KeysChange, DataEdit, DataKind,
+    EgressLimitChange, EnvImportChange, ErrorPageHtml, FieldOwners, GatewayParent, HttpOnlyReason,
+    IpAllowChange, KeptReason, LabelVolumeChange, NameValue, ObjectName, Plan, PlanRequest,
+    PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, ServiceSize, Target,
+    TemplateChange, UploadServiceChange, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};
 pub use delete::{MONGODB_CLAIMS_FINALIZER, data_claims};
+pub use image_service::{
+    HostPort, IMAGE_PATTERN, ImageServiceChange, RegistryLogin, ServiceVariable, ServiceVolume,
+    WaitFor, image_service_objects,
+};
 pub use ip_limits::egress_limit_name;
 pub use owned::{Owned, SERVICE_LABEL, owned, workload_of};
 pub use plan::{

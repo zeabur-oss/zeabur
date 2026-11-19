@@ -1,13 +1,11 @@
-// A service from a container image: the objects the "Docker image" form creates, each one `create`
-// change of one plan (docs/design: basic create). No `app.kubernetes.io/managed-by`: a plan
-// refuses to change an object another tool manages.
+// A service from a container image: the "Docker image" form, sent as one `createImageService`
+// change. The server makes its objects.
 import type { Schemas } from "@/api/client"
 import { rules } from "@/api/rules"
-import { templateSecurity, type Profile } from "@/model/pod-security"
+import { type Profile } from "@/model/pod-security"
 import { textProblem } from "@/model/rules"
 
 type Change = Schemas.Change
-type Manifest = Record<string, unknown>
 
 export type ImageSize = "small" | "medium" | "large"
 export const imageSizes: ImageSize[] = ["small", "medium", "large"]
@@ -22,17 +20,9 @@ export const imageResources: Record<
 }
 
 /** A variable of the new service: a value, or a key of a Secret (a database's connection). */
-export type ServiceVariable =
-  | { name: string; value: string; expands?: boolean }
-  | { name: string; from: { secret: string; key: string } }
+export type ServiceVariable = Schemas.ServiceVariable
 
-/** A claim `<service>-<name>` mounted at `mountPath`. */
-export interface ServiceVolume {
-  name: string
-  mountPath: string
-  size: string
-  readOnly?: boolean
-}
+export type ServiceVolume = Schemas.ServiceVolume
 
 export interface ImageService {
   image: string
@@ -76,8 +66,8 @@ export const newImageService = (): ImageService => ({
   security: "baseline",
 })
 
-const NAME = rules["UploadServiceChange.name"]
-const IMAGE = /^[a-z0-9][A-Za-z0-9._/:@-]*$/
+const NAME = rules["ImageServiceChange.name"]
+const IMAGE = new RegExp(rules["ImageServiceChange.image"].pattern)
 const HOST = /^(?=.{1,253}$)([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.)+[a-z]([-a-z0-9]{0,61}[a-z0-9])?$/
 const VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*$/
 
@@ -150,8 +140,8 @@ export const hostPlaceholder = (project: string, suffix?: string | null) =>
   suffix ? `<name>-${project}.${suffix}` : "web.example.com"
 
 /** `KEY=value` lines as pasted from a `.env` file; the lines that are not, from 1. */
-export function parseEnv(text: string): { variables: ServiceVariable[]; bad: number[] } {
-  const variables: ServiceVariable[] = []
+export function parseEnv(text: string): { variables: Schemas.NameValue[]; bad: number[] } {
+  const variables: Schemas.NameValue[] = []
   const bad: number[] = []
   text.split("\n").forEach((raw, i) => {
     const line = raw.trim()
@@ -173,214 +163,30 @@ export function parseEnv(text: string): { variables: ServiceVariable[]; bad: num
   return { variables, bad }
 }
 
-const base64 = (text: string) => btoa(String.fromCharCode(...new TextEncoder().encode(text)))
-
-const portOf = (form: ImageService) => (form.port.trim() === "" ? undefined : Number(form.port))
-
-type Labels = Record<string, string>
-
-const secretable = (v: ServiceVariable): v is Extract<ServiceVariable, { value: string }> =>
-  "value" in v && !v.expands
-
-/** Plain values go in `<name>-env` when the form asks; a value that reads another variable with
- * $(…) stays in `env`, as Kubernetes expands it only there. */
-function envOf(form: ImageService) {
-  const plain = form.variables.filter(secretable)
-  const envSecret = form.secretVariables && plain.length > 0 ? `${form.name}-env` : undefined
-  const env = form.variables
-    .filter((v) => !envSecret || !secretable(v))
-    .map((v) =>
-      "value" in v
-        ? { name: v.name, value: v.value }
-        : { name: v.name, valueFrom: { secretKeyRef: { name: v.from.secret, key: v.from.key } } },
-    )
-  return { plain, envSecret, env }
-}
-
-function registrySecret(form: ImageService, labels: Labels): Manifest | undefined {
-  const registry = form.registry
-  if (!registry) return undefined
-  const auth = base64(`${registry.username}:${registry.password}`)
-  return {
-    apiVersion: "v1",
-    kind: "Secret",
-    metadata: { name: `${form.name}-registry`, labels },
-    type: "kubernetes.io/dockerconfigjson",
-    stringData: {
-      ".dockerconfigjson": JSON.stringify({
-        auths: {
-          [registry.server.trim()]: {
-            username: registry.username,
-            password: registry.password,
-            auth,
-          },
-        },
-      }),
-    },
-  }
-}
-
-const claimOf = (form: ImageService, volume: ServiceVolume, labels: Labels): Manifest => ({
-  apiVersion: "v1",
-  kind: "PersistentVolumeClaim",
-  metadata: { name: `${form.name}-${volume.name}`, labels },
-  spec: {
-    accessModes: ["ReadWriteOnce"],
-    resources: { requests: { storage: volume.size.trim() } },
-  },
-})
-
-const optional = (on: unknown, value: Manifest): Manifest => (on ? value : {})
-
-function containerOf(form: ImageService, ports: number[], env: ReturnType<typeof envOf>) {
-  const volumes = form.volumes ?? []
-  const port = ports[0]
+/** The change the form sends. */
+export function imageChange(form: ImageService): Schemas.ImageServiceChange {
+  const port = form.port.trim() === "" ? undefined : Number(form.port)
   return {
     name: form.name,
     image: form.image.trim(),
-    ...optional(form.command?.length, { command: form.command }),
-    ...optional(form.args?.length, { args: form.args }),
-    ...optional(port, { ports: ports.map((p) => ({ containerPort: p })) }),
-    ...optional(env.envSecret, { envFrom: [{ secretRef: { name: env.envSecret } }] }),
-    ...optional(env.env.length > 0, { env: env.env }),
-    resources: imageResources[form.size],
-    ...optional(port, { readinessProbe: { tcpSocket: { port } } }),
-    ...optional(volumes.length > 0, {
-      volumeMounts: volumes.map((v) => ({
-        name: v.name,
-        mountPath: v.mountPath,
-        ...optional(v.readOnly, { readOnly: true }),
-      })),
-    }),
-    ...templateSecurity(form.security).container,
+    ...(port ? { port, morePorts: form.morePorts ?? [] } : {}),
+    ...(port && form.publicUrl ? { host: form.host.trim() } : {}),
+    variables: form.variables,
+    secretVariables: form.secretVariables,
+    volumes: form.volumes ?? [],
+    size: form.size,
+    replicas: form.replicas,
+    ...(form.registry ? { registry: form.registry } : {}),
+    security: form.security,
+    command: form.command ?? [],
+    args: form.args ?? [],
+    ...(form.waitFor ? { waitFor: form.waitFor } : {}),
   }
 }
 
-/** Init containers that wait until each host accepts connections on its port. */
-const waitContainers = (wait: NonNullable<ImageService["waitFor"]>) =>
-  wait.hosts.map(({ host, port }, i) => ({
-    name: `wait-${i + 1}`,
-    image: wait.image,
-    command: ["sh", "-c", `until nc -z -w 2 ${host} ${port}; do sleep 2; done`],
-    resources: { requests: { cpu: "10m", memory: "16Mi" }, limits: { memory: "32Mi" } },
-    // As nobody, so a pod that must not run as root starts it too.
-    securityContext: {
-      allowPrivilegeEscalation: false,
-      capabilities: { drop: ["ALL"] },
-      runAsNonRoot: true,
-      runAsUser: 65534,
-    },
-  }))
-
-function deploymentOf(form: ImageService, container: Manifest, labels: Labels): Manifest {
-  const volumes = form.volumes ?? []
-  const stateful = volumes.length > 0
-  return {
-    apiVersion: "apps/v1",
-    kind: "Deployment",
-    metadata: { name: form.name, labels },
-    spec: {
-      replicas: stateful ? 1 : form.replicas,
-      // A ReadWriteOnce claim is mounted by one node at a time: the old pod stops first.
-      ...optional(stateful, { strategy: { type: "Recreate" } }),
-      selector: { matchLabels: labels },
-      template: {
-        metadata: { labels },
-        spec: {
-          ...optional(form.registry, { imagePullSecrets: [{ name: `${form.name}-registry` }] }),
-          ...templateSecurity(form.security).pod,
-          ...optional(form.waitFor?.hosts.length, {
-            initContainers: form.waitFor && waitContainers(form.waitFor),
-          }),
-          containers: [container],
-          ...optional(stateful, {
-            volumes: volumes.map((v) => ({
-              name: v.name,
-              persistentVolumeClaim: { claimName: `${form.name}-${v.name}` },
-            })),
-          }),
-        },
-      },
-    },
-  }
-}
-
-const serviceOf = (name: string, ports: number[], labels: Labels): Manifest => ({
-  apiVersion: "v1",
-  kind: "Service",
-  metadata: { name, labels },
-  spec: {
-    selector: labels,
-    ports: ports.map((p, i) => ({ name: i === 0 ? "http" : `port-${p}`, port: p, targetPort: p })),
-  },
-})
-
-function ingressOf(form: ImageService, port: number, domains: DomainSettings, labels: Labels) {
-  const host = form.host.trim()
-  const issuer = domains.clusterIssuer ?? undefined
-  return {
-    apiVersion: "networking.k8s.io/v1",
-    kind: "Ingress",
-    metadata: {
-      name: form.name,
-      labels,
-      ...optional(issuer, { annotations: { "cert-manager.io/cluster-issuer": issuer } }),
-    },
-    spec: {
-      ...optional(issuer, { tls: [{ hosts: [host], secretName: `${form.name}-tls` }] }),
-      rules: [
-        {
-          host,
-          http: {
-            paths: [
-              {
-                path: "/",
-                pathType: "Prefix",
-                backend: { service: { name: form.name, port: { number: port } } },
-              },
-            ],
-          },
-        },
-      ],
-    },
-  }
-}
-
-/** The objects the form creates, in the order a plan creates them. */
-export function imageObjects(form: ImageService, domains: DomainSettings): Manifest[] {
-  const labels = { "app.kubernetes.io/name": form.name }
-  const port = portOf(form)
-  const ports = port ? [port, ...(form.morePorts ?? [])] : []
-  const env = envOf(form)
-  const envSecret: Manifest[] = env.envSecret
-    ? [
-        {
-          apiVersion: "v1",
-          kind: "Secret",
-          metadata: { name: env.envSecret, labels },
-          type: "Opaque",
-          stringData: Object.fromEntries(env.plain.map((v) => [v.name, v.value])),
-        },
-      ]
-    : []
-  const service = port ? [serviceOf(form.name, ports, labels)] : []
-  const ingress = port && form.publicUrl ? [ingressOf(form, port, domains, labels)] : []
-  const registry = registrySecret(form, labels)
-  return [
-    ...envSecret,
-    ...(registry ? [registry] : []),
-    ...(form.volumes ?? []).map((v) => claimOf(form, v, labels)),
-    deploymentOf(form, containerOf(form, ports, env), labels),
-    ...service,
-    ...ingress,
-  ]
-}
-
-export const createImageService = (form: ImageService, domains: DomainSettings): Change[] =>
-  imageObjects(form, domains).map((object): Change => ({
-    op: "create",
-    object: { ...object },
-  }))
+export const createImageService = (form: ImageService): Change[] => [
+  { op: "createImageService", ...imageChange(form) },
+]
 
 /** What a person may create, by kind, as the creatable list hints; absent kinds are unknown. */
 export type Rights = (group: string, resource: string) => Schemas.ObjectAccess

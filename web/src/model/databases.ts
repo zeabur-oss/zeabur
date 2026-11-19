@@ -24,6 +24,7 @@
 import type { Schemas } from "@/api/client"
 import type { ObjectAddress } from "@/api/queries"
 import { rules } from "@/api/rules"
+import { getExportDatabaseUrl } from "@/api/zeabur"
 import type { Translate } from "@/i18n"
 import { fits, textProblem } from "@/model/rules"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
@@ -1431,7 +1432,7 @@ export const exportTool: Partial<Record<Engine, string>> = {
 
 /** Where the dump downloads from: the server runs the tool through the person's `pods/exec`. */
 export const exportUrl = (project: string, database: Pick<Database, "engine" | "name">) =>
-  `/api/v1/projects/${encodeURIComponent(project)}/databases/${database.engine}/${encodeURIComponent(database.name)}/export`
+  getExportDatabaseUrl(project, database.engine, database.name)
 
 /** The container the server runs in, in each member. */
 export const serverContainer: Record<Engine, string> = {
