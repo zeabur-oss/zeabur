@@ -8,7 +8,7 @@ import WarningIcon from "~icons/ph/warning"
 import type { Schemas } from "@/api/client"
 import { namespaceQuery } from "@/api/queries"
 import { BackupDetails, CoverageRow, RunRow, useBackups } from "@/components/backups"
-import { FormField } from "@/components/form-field"
+import { FormField, NumberInput } from "@/components/form-field"
 import { GateTip, useGate } from "@/components/gate"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanner, usePlanStep } from "@/components/plan/planner"
@@ -33,7 +33,6 @@ import {
 } from "@/model/volume-backups"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
-import { Input } from "@zeabur-oss/design-system/components/input"
 
 type ProjectBackups = Schemas.ProjectBackups
 type Service = Schemas.Service
@@ -316,16 +315,9 @@ function ScheduleDrawer({
       notes: [t("backups.volume.password", `${claim}-backup`), userNote(t, user)],
     })
   }
-  const count = (key: "keepLast" | "keepDays" | "keepWeekly", label: string, max: number) => (
+  const count = (key: "keepLast" | "keepDays" | "keepWeekly", label: string) => (
     <FormField label={label} errors={key === "keepDays" ? errors("keep") : []}>
-      <Input
-        size="sm"
-        type="number"
-        min={key === "keepDays" ? 1 : 0}
-        max={max}
-        value={String(target[key])}
-        onChange={(event) => set({ [key]: Number(event.target.value) })}
-      />
+      <NumberInput size="sm" value={target[key]} onValue={(value) => set({ [key]: value })} />
     </FormField>
   )
   return (
@@ -381,9 +373,9 @@ function ScheduleDrawer({
           folderHint={t("backups.volume.folderHint", `${project}/${claim}`)}
         >
           <FrequencyField value={target.frequency} onChange={(frequency) => set({ frequency })} />
-          {count("keepLast", t("backups.volume.keepLast"), 100)}
-          {count("keepDays", t("backups.volume.keepDaily"), 365)}
-          {count("keepWeekly", t("backups.volume.keepWeekly"), 520)}
+          {count("keepLast", t("backups.volume.keepLast"))}
+          {count("keepDays", t("backups.volume.keepDaily"))}
+          {count("keepWeekly", t("backups.volume.keepWeekly"))}
         </S3Fields>
       </ReviewForm>
     </PlanDrawer>

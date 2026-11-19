@@ -70,6 +70,7 @@ export function FormDrawer({
 export function ReviewForm({ onReview, children }: { onReview: () => void; children: ReactNode }) {
   return (
     <form
+      noValidate
       className="flex flex-col gap-4"
       onSubmit={(event) => {
         event.preventDefault()

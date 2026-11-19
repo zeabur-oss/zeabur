@@ -6,7 +6,7 @@ import PlusIcon from "~icons/ph/plus"
 
 import type { Schemas } from "@/api/client"
 import { projectQuery } from "@/api/queries"
-import { FormField } from "@/components/form-field"
+import { FormField, TrimmedInput } from "@/components/form-field"
 import { GateNote, GateTip, useGates } from "@/components/gate"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
@@ -16,7 +16,6 @@ import { parseDotenv } from "@/model/env-edit"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Card, CardRow, SectionLabel } from "@zeabur-oss/design-system/components/card"
-import { Input } from "@zeabur-oss/design-system/components/input"
 import { RadioGroup, RadioOption } from "@zeabur-oss/design-system/components/radio"
 import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
@@ -217,13 +216,13 @@ function AddDrawer({
     >
       <ReviewForm onReview={review}>
         <FormField label={t("shared.name")} errors={shown(problems.name)}>
-          <Input
+          <TrimmedInput
             size="sm"
             mono
             value={name}
             autoComplete="off"
             spellCheck={false}
-            onChange={(event) => setName(event.target.value.trim())}
+            onValue={setName}
           />
         </FormField>
         <fieldset className="flex flex-col gap-2">

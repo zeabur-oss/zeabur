@@ -397,6 +397,7 @@ function ChannelDialog({
     >
       <form
         id={formId}
+        noValidate
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault()
@@ -503,7 +504,7 @@ function ChannelField({
     >
       <Input
         size="sm"
-        type={SECRET_FIELDS.includes(field) ? "password" : "text"}
+        type={fieldType(field)}
         inputMode={field === "chatId" ? "numeric" : undefined}
         autoComplete="off"
         spellCheck={false}
@@ -513,6 +514,13 @@ function ChannelField({
       />
     </FormField>
   )
+}
+
+function fieldType(field: Field) {
+  if (SECRET_FIELDS.includes(field)) return "password"
+  if (field === "to" || field === "from") return "email"
+  if (field === "server") return "url"
+  return "text"
 }
 
 function hintOf(kind: ChannelKind, field: Field, t: ReturnType<typeof useT>) {

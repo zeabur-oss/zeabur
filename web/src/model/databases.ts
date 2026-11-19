@@ -574,7 +574,7 @@ export const newBackupTarget = (): BackupTarget => ({
 export type TargetProblem = "endpoint" | "bucket" | "keys" | "keep"
 
 /** The most days of backups the form keeps. */
-export const MAX_KEEP_DAYS = 365
+const MAX_KEEP_DAYS = 365
 
 /** What is wrong with the form; with `keysExist`, keys left empty keep the Secret's. */
 export function targetProblems(target: BackupTarget, keysExist = false): TargetProblem[] {

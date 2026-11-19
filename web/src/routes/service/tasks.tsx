@@ -5,7 +5,7 @@ import PlusIcon from "~icons/ph/plus"
 
 import { projectQuery } from "@/api/queries"
 import type { Schemas } from "@/api/client"
-import { FormField } from "@/components/form-field"
+import { FormField, TrimmedInput } from "@/components/form-field"
 import { GateNote, GateTip, useGate } from "@/components/gate"
 import { useHold } from "@/components/plan/draft"
 import { PlanDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
@@ -193,13 +193,7 @@ function ScheduleTaskDrawer({
           />
         </FormField>
         <FormField label={t("tasks.name")} errors={shown(problems.name)}>
-          <Input
-            size="sm"
-            mono
-            value={name}
-            autoComplete="off"
-            onChange={(event) => setName(event.target.value.trim())}
-          />
+          <TrimmedInput size="sm" mono value={name} autoComplete="off" onValue={setName} />
         </FormField>
         <ContainerField containers={containers} value={container} onChange={setContainer} />
         <RunFields
@@ -384,12 +378,12 @@ function RunFields({
   const shown = (message?: string) => (message ? [message] : [])
   const keep = (key: "keepSucceeded" | "keepFailed") => (
     <FormField label={t(`tasks.${key}`)} errors={shown(problems[key])}>
-      <Input
+      <TrimmedInput
         size="sm"
         inputMode="numeric"
         value={values[key]}
         disabled={disabled}
-        onChange={(event) => onChange(key, event.target.value.trim())}
+        onValue={(value) => onChange(key, value)}
       />
     </FormField>
   )

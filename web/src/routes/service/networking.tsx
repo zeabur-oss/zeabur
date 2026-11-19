@@ -36,7 +36,7 @@ import { CopyButton } from "@/components/bits"
 import { usePlanner, type PlanAsk } from "@/components/plan/planner"
 import { refusedAmong, RefusedKinds } from "@/components/refused"
 import { FilterField } from "@/components/filter-field"
-import { FormField } from "@/components/form-field"
+import { FormField, TrimmedInput } from "@/components/form-field"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
 import {
@@ -830,13 +830,13 @@ function PrivateAddressFields({
       >
         <div className="flex flex-wrap items-end gap-2">
           <FormField label={t("net.privatePort")} className="w-28">
-            <Input
+            <TrimmedInput
               size="sm"
               mono
               inputMode="numeric"
               placeholder="8080"
               value={port}
-              onChange={(event) => setPort(event.target.value.trim())}
+              onValue={setPort}
             />
           </FormField>
           <Managed tool={managed} gate={gate}>

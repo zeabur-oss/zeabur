@@ -3,7 +3,7 @@ import { useId, useState } from "react"
 import PlugsConnectedIcon from "~icons/ph/plugs-connected"
 
 import { databasesQuery, namespaceQuery, projectQuery } from "@/api/queries"
-import { FormField } from "@/components/form-field"
+import { FormField, TrimmedInput } from "@/components/form-field"
 import { GateTip, useGate } from "@/components/gate"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep, type PlanAsk } from "@/components/plan/planner"
@@ -23,7 +23,6 @@ import {
 import type { Service } from "@/model/service"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
-import { Input } from "@zeabur-oss/design-system/components/input"
 import { Label } from "@zeabur-oss/design-system/components/label"
 import { Select } from "@zeabur-oss/design-system/components/select"
 
@@ -213,13 +212,13 @@ export function ConnectFields({
               (tried || choice.name !== undefined) && problem ? [nameProblemText(t, problem)] : []
             }
           >
-            <Input
+            <TrimmedInput
               size="sm"
               mono
               value={name}
               autoComplete="off"
               spellCheck={false}
-              onChange={(event) => onChange({ ...choice, name: event.target.value.trim() })}
+              onValue={(name) => onChange({ ...choice, name })}
             />
           </FormField>
           <EngineOption database={database} choice={choice} onChange={onChange} />

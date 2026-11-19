@@ -15,7 +15,7 @@ import {
   refresh as refreshQuery,
 } from "@/api/queries"
 import { Ago } from "@/components/bits"
-import { FormField } from "@/components/form-field"
+import { FormField, NumberInput } from "@/components/form-field"
 import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { GateTip, useHintGate } from "@/components/gate"
 import { LoadingRows } from "@/components/page"
@@ -29,7 +29,6 @@ import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
   hourOf,
-  KEEP_DAYS,
   insideCluster,
   lastGood,
   locationForm,
@@ -614,14 +613,7 @@ function ScheduleEditor({
           />
         </FormField>
         <FormField label={t("clusterBackups.keep")} errors={error("keep")}>
-          <Input
-            size="sm"
-            type="number"
-            min={KEEP_DAYS.minimum}
-            max={KEEP_DAYS.maximum}
-            value={String(form.keepDays)}
-            onChange={(event) => set({ keepDays: Number(event.target.value) })}
-          />
+          <NumberInput size="sm" value={form.keepDays} onValue={(keepDays) => set({ keepDays })} />
         </FormField>
       </div>
       <fieldset className="flex flex-col gap-2">

@@ -43,7 +43,8 @@ export function NewProjectButton({
 function NewProjectDialog({ taken, onClose }: { taken: string[]; onClose: () => void }) {
   const t = useT()
   const navigate = useNavigate()
-  const [name, setName] = useState("")
+  const [typed, setTyped] = useState("")
+  const name = typed.trim().toLowerCase()
   const [displayName, setDisplayName] = useState("")
   const [tried, setTried] = useState(false)
   const problem = newProjectProblem(name, taken)
@@ -94,11 +95,12 @@ function NewProjectDialog({ taken, onClose }: { taken: string[]; onClose: () => 
               <Input
                 size="sm"
                 mono
-                value={name}
+                value={typed}
                 autoFocus
+                autoCapitalize="none"
                 autoComplete="off"
                 spellCheck={false}
-                onChange={(event) => setName(event.target.value.trim().toLowerCase())}
+                onChange={(event) => setTyped(event.target.value)}
               />
             </FormField>
             <FormField
