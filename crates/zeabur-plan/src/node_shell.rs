@@ -53,10 +53,22 @@
 //! [k8s-rbac]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/
 //! [k8s-event]: https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/event-v1/
 
+use std::collections::BTreeMap;
+
+use k8s_openapi::api::core::v1::{
+    Container, Namespace, ObjectReference, Pod, PodSpec, ResourceRequirements, SecurityContext,
+    Toleration,
+};
+use k8s_openapi::api::events::v1::Event;
+use k8s_openapi::api::rbac::v1::{PolicyRule, Subject as RbacSubject};
+use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta};
+use serde::Deserialize;
 use serde_json::{Value, json};
 use zeabur_model::kernel::digest::{hex, sha256};
 use zeabur_model::kernel::names::FIELD_MANAGER;
 
+use crate::json::value_of;
 pub use crate::terminal::person_key;
 
 /// The namespace node shells go in; never a project.
@@ -185,60 +197,85 @@ fn watch_command(pod: &str, proc: &str, interval: u32) -> Vec<String> {
 /// The node shell pod `request` describes, as it is created.
 #[must_use]
 pub fn pod_body(request: &NodeShell<'_>) -> Value {
-    json!({
-        "apiVersion": "v1",
-        "kind": "Pod",
-        "metadata": {
-            "name": pod_name(request),
-            "namespace": NAMESPACE,
-            "labels": {
-                "app.kubernetes.io/name": PREFIX.trim_end_matches('-'),
-                "app.kubernetes.io/managed-by": FIELD_MANAGER,
-                LABEL: "true",
-                NODE_LABEL: label_value(request.node),
-                PERSON_LABEL: person_key(request.person),
-            },
-            "annotations": {
-                PERSON_ANNOTATION: request.person,
-            },
+    let pod = pod_name(request);
+    value_of(&Pod {
+        metadata: ObjectMeta {
+            name: Some(pod.clone()),
+            namespace: Some(NAMESPACE.to_owned()),
+            labels: Some(BTreeMap::from([
+                (
+                    "app.kubernetes.io/name".to_owned(),
+                    PREFIX.trim_end_matches('-').to_owned(),
+                ),
+                (
+                    "app.kubernetes.io/managed-by".to_owned(),
+                    FIELD_MANAGER.to_owned(),
+                ),
+                (LABEL.to_owned(), "true".to_owned()),
+                (NODE_LABEL.to_owned(), label_value(request.node)),
+                (PERSON_LABEL.to_owned(), person_key(request.person)),
+            ])),
+            annotations: Some(BTreeMap::from([(
+                PERSON_ANNOTATION.to_owned(),
+                request.person.to_owned(),
+            )])),
+            ..ObjectMeta::default()
         },
-        "spec": {
-            "nodeName": request.node,
-            "hostPID": true,
-            "hostNetwork": true,
-            "hostIPC": true,
-            "dnsPolicy": "ClusterFirstWithHostNet",
-            "tolerations": [{"operator": "Exists"}],
-            "restartPolicy": "Never",
-            "activeDeadlineSeconds": DEADLINE_SECONDS,
-            "terminationGracePeriodSeconds": 5,
-            "automountServiceAccountToken": false,
-            "enableServiceLinks": false,
-            "containers": [{
-                "name": CONTAINER,
-                "image": request.image,
-                "imagePullPolicy": "IfNotPresent",
-                "command": watch_command(&pod_name(request), "/proc", WATCH_INTERVAL_SECONDS),
-                "securityContext": {"privileged": true},
-                "resources": {"requests": {"cpu": "10m", "memory": "16Mi"}},
+        spec: Some(PodSpec {
+            node_name: Some(request.node.to_owned()),
+            host_pid: Some(true),
+            host_network: Some(true),
+            host_ipc: Some(true),
+            dns_policy: Some("ClusterFirstWithHostNet".to_owned()),
+            tolerations: Some(vec![Toleration {
+                operator: Some("Exists".to_owned()),
+                ..Toleration::default()
+            }]),
+            restart_policy: Some("Never".to_owned()),
+            active_deadline_seconds: Some(DEADLINE_SECONDS),
+            termination_grace_period_seconds: Some(5),
+            automount_service_account_token: Some(false),
+            enable_service_links: Some(false),
+            containers: vec![Container {
+                name: CONTAINER.to_owned(),
+                image: Some(request.image.to_owned()),
+                image_pull_policy: Some("IfNotPresent".to_owned()),
+                command: Some(watch_command(&pod, "/proc", WATCH_INTERVAL_SECONDS)),
+                security_context: Some(SecurityContext {
+                    privileged: Some(true),
+                    ..SecurityContext::default()
+                }),
+                resources: Some(ResourceRequirements {
+                    requests: Some(BTreeMap::from([
+                        ("cpu".to_owned(), Quantity("10m".to_owned())),
+                        ("memory".to_owned(), Quantity("16Mi".to_owned())),
+                    ])),
+                    ..ResourceRequirements::default()
+                }),
+                ..Container::default()
             }],
-        },
+            ..PodSpec::default()
+        }),
+        ..Pod::default()
     })
 }
 
 /// The namespace node shells go in, as it is created.
 #[must_use]
 pub fn namespace_body() -> Value {
-    json!({
-        "apiVersion": "v1",
-        "kind": "Namespace",
-        "metadata": {
-            "name": NAMESPACE,
-            "labels": {
-                "app.kubernetes.io/managed-by": FIELD_MANAGER,
-                ENFORCE: PRIVILEGED,
-            },
+    value_of(&Namespace {
+        metadata: ObjectMeta {
+            name: Some(NAMESPACE.to_owned()),
+            labels: Some(BTreeMap::from([
+                (
+                    "app.kubernetes.io/managed-by".to_owned(),
+                    FIELD_MANAGER.to_owned(),
+                ),
+                (ENFORCE.to_owned(), PRIVILEGED.to_owned()),
+            ])),
+            ..ObjectMeta::default()
         },
+        ..Namespace::default()
     })
 }
 
@@ -277,50 +314,44 @@ pub fn namespace_patch(namespace: &Value) -> Option<(Vec<Value>, Value)> {
     Some((operations, after))
 }
 
-/// The Event that records `request`'s shell on its node, opened `at` (RFC 3339).
+/// The Event that records `request`'s shell on its node, opened `at` (RFC 3339). An `at` that is
+/// not a time leaves `eventTime` out, which kube-apiserver refuses.
 #[must_use]
 pub fn event_body(request: &NodeShell<'_>, at: &str) -> Value {
     let pod = pod_name(request);
-    let mut regarding = json!({"apiVersion": "v1", "kind": "Node", "name": request.node});
-    if let (Some(uid), Some(object)) = (request.node_uid, regarding.as_object_mut()) {
-        object.insert("uid".to_owned(), json!(uid));
-    }
-    json!({
-        "apiVersion": "events.k8s.io/v1",
-        "kind": "Event",
-        "metadata": {
-            "name": pod,
-            "namespace": EVENT_NAMESPACE,
-            "labels": {LABEL: "true"},
+    value_of(&Event {
+        metadata: ObjectMeta {
+            name: Some(pod.clone()),
+            namespace: Some(EVENT_NAMESPACE.to_owned()),
+            labels: Some(BTreeMap::from([(LABEL.to_owned(), "true".to_owned())])),
+            ..ObjectMeta::default()
         },
-        "eventTime": micro_time(at),
-        "reportingController": "zeabur.com/node-shell",
-        "reportingInstance": FIELD_MANAGER,
-        "action": "OpenShell",
-        "reason": EVENT_REASON,
-        "type": "Normal",
-        "regarding": regarding,
-        "related": {"apiVersion": "v1", "kind": "Pod", "namespace": NAMESPACE, "name": pod},
-        "note": format!(
+        event_time: at.parse().ok().map(MicroTime),
+        reporting_controller: Some("zeabur.com/node-shell".to_owned()),
+        reporting_instance: Some(FIELD_MANAGER.to_owned()),
+        action: Some("OpenShell".to_owned()),
+        reason: Some(EVENT_REASON.to_owned()),
+        type_: Some("Normal".to_owned()),
+        regarding: Some(ObjectReference {
+            api_version: Some("v1".to_owned()),
+            kind: Some("Node".to_owned()),
+            name: Some(request.node.to_owned()),
+            uid: request.node_uid.map(str::to_owned),
+            ..ObjectReference::default()
+        }),
+        related: Some(ObjectReference {
+            api_version: Some("v1".to_owned()),
+            kind: Some("Pod".to_owned()),
+            namespace: Some(NAMESPACE.to_owned()),
+            name: Some(pod.clone()),
+            ..ObjectReference::default()
+        }),
+        note: Some(format!(
             "{} opened a root shell on this node in pod {NAMESPACE}/{pod}.",
             request.person
-        ),
+        )),
+        ..Event::default()
     })
-}
-
-/// An RFC 3339 time in UTC with exactly six fractional digits, as `eventTime` (a `MicroTime`)
-/// takes it.
-fn micro_time(at: &str) -> String {
-    let Some(base) = at.strip_suffix('Z') else {
-        return at.to_owned();
-    };
-    let (seconds, fraction) = base.split_once('.').unwrap_or((base, ""));
-    let digits: String = fraction
-        .chars()
-        .chain(std::iter::repeat('0'))
-        .take(6)
-        .collect();
-    format!("{seconds}.{digits}Z")
 }
 
 /// The `kubectl` command that opens the same shell.
@@ -529,34 +560,47 @@ pub struct Exposure {
     pub subjects: Vec<Subject>,
 }
 
-fn strings<'a>(rule: &'a Value, field: &str) -> Vec<&'a str> {
-    rule.get(field)
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str)
-        .collect()
+/// The part of a `RoleBinding` or `ClusterRoleBinding` that is read.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct BindingView {
+    kind: String,
+    metadata: ObjectMeta,
+    role_ref: RoleRefView,
+    subjects: Vec<RbacSubject>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct RoleRefView {
+    kind: String,
+    name: String,
+}
+
+/// The part of a `Role` or `ClusterRole` that is read.
+#[derive(Debug, Default, Deserialize)]
+#[serde(default)]
+struct RoleView {
+    kind: String,
+    metadata: ObjectMeta,
+    rules: Vec<PolicyRule>,
 }
 
 /// What `rules` grant of creating pods and running commands in them, in the core group.
 /// `get` counts: before Kubernetes 1.31 it is enough for a WebSocket exec or attach.
-fn rights_of(rules: &[Value]) -> Vec<String> {
+fn rights_of(rules: &[PolicyRule]) -> Vec<String> {
     let mut rights = Vec::new();
     for rule in rules {
-        let groups = strings(rule, "apiGroups");
-        if !groups.iter().any(|g| matches!(*g, "" | "*")) {
+        let groups = rule.api_groups.as_deref().unwrap_or_default();
+        if !groups.iter().any(|g| matches!(g.as_str(), "" | "*")) {
             continue;
         }
-        let verbs = strings(rule, "verbs");
-        let resources = strings(rule, "resources");
-        let verb = |v: &str| verbs.iter().any(|x| *x == v || *x == "*");
-        let pods = resources.iter().any(|r| matches!(*r, "pods" | "*"));
-        let exec = resources
-            .iter()
-            .any(|r| matches!(*r, "pods/exec" | "pods/*" | "*/exec" | "*"));
-        let attach = resources
-            .iter()
-            .any(|r| matches!(*r, "pods/attach" | "pods/*" | "*/attach" | "*"));
+        let verb = |v: &str| rule.verbs.iter().any(|x| x == v || x == "*");
+        let resources = rule.resources.as_deref().unwrap_or_default();
+        let any = |names: &[&str]| resources.iter().any(|r| names.contains(&r.as_str()));
+        let pods = any(&["pods", "*"]);
+        let exec = any(&["pods/exec", "pods/*", "*/exec", "*"]);
+        let attach = any(&["pods/attach", "pods/*", "*/attach", "*"]);
         for (granted, right) in [
             (pods && verb("create"), "create pods"),
             (exec && verb("create"), "create pods/exec"),
@@ -576,56 +620,45 @@ fn rights_of(rules: &[Value]) -> Vec<String> {
 /// Whether `subject` is Kubernetes' own: a component's user (`system:kube-controller-manager`), a
 /// service account in `kube-system`, or the groups of nodes and of `cluster-admin`'s own
 /// (`system:masters`). Broad groups (`system:authenticated`, `system:serviceaccounts`) are not.
-fn is_kubernetes_own(subject: &Value) -> bool {
-    let name = subject
-        .get("name")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    match subject.get("kind").and_then(Value::as_str) {
-        Some("User") => {
+fn is_kubernetes_own(subject: &RbacSubject) -> bool {
+    let name = subject.name.as_str();
+    match subject.kind.as_str() {
+        "User" => {
             name.starts_with("system:")
                 && name != "system:anonymous"
                 && !name.starts_with("system:serviceaccount:")
         }
-        Some("Group") => matches!(name, "system:masters" | "system:nodes"),
-        Some("ServiceAccount") => {
-            subject.get("namespace").and_then(Value::as_str) == Some("kube-system")
-        }
+        "Group" => matches!(name, "system:masters" | "system:nodes"),
+        "ServiceAccount" => subject.namespace.as_deref() == Some("kube-system"),
         _ => false,
     }
 }
 
 /// Whether `subject` is the user named `username`.
-fn is_user(subject: &Value, username: Option<&str>) -> bool {
+fn is_user(subject: &RbacSubject, username: Option<&str>) -> bool {
     let Some(username) = username else {
         return false;
     };
-    let name = subject
-        .get("name")
-        .and_then(Value::as_str)
-        .unwrap_or_default();
-    match subject.get("kind").and_then(Value::as_str) {
-        Some("User") => name == username,
-        Some("ServiceAccount") => subject
-            .get("namespace")
-            .and_then(Value::as_str)
-            .is_some_and(|namespace| {
-                username == format!("system:serviceaccount:{namespace}:{name}")
-            }),
+    let name = subject.name.as_str();
+    match subject.kind.as_str() {
+        "User" => name == username,
+        "ServiceAccount" => subject.namespace.as_deref().is_some_and(|namespace| {
+            username == format!("system:serviceaccount:{namespace}:{name}")
+        }),
         _ => false,
     }
 }
 
 fn find<'a>(
-    objects: &'a [Value],
+    roles: &'a [RoleView],
     kind: &str,
     namespace: Option<&str>,
     name: &str,
-) -> Option<&'a Value> {
-    objects.iter().find(|o| {
-        o.get("kind").and_then(Value::as_str) == Some(kind)
-            && o.pointer("/metadata/name").and_then(Value::as_str) == Some(name)
-            && o.pointer("/metadata/namespace").and_then(Value::as_str) == namespace
+) -> Option<&'a RoleView> {
+    roles.iter().find(|o| {
+        o.kind == kind
+            && o.metadata.name.as_deref() == Some(name)
+            && o.metadata.namespace.as_deref() == namespace
     })
 }
 
@@ -657,39 +690,30 @@ pub fn exposures_except(
     roles: &[Value],
     trusted: Option<&str>,
 ) -> Vec<Exposure> {
+    let roles: Vec<RoleView> = roles
+        .iter()
+        .filter_map(|r| serde_json::from_value(r.clone()).ok())
+        .collect();
     let mut found = Vec::new();
     for binding in bindings {
-        let kind = binding
-            .get("kind")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let namespace = binding
-            .pointer("/metadata/namespace")
-            .and_then(Value::as_str);
+        let Ok(binding) = serde_json::from_value::<BindingView>(binding.clone()) else {
+            continue;
+        };
+        let kind = binding.kind.as_str();
+        let namespace = binding.metadata.namespace.as_deref();
         if kind == "RoleBinding" && namespace != Some(pods_in) {
             continue;
         }
-        let role_kind = binding
-            .pointer("/roleRef/kind")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
-        let role_name = binding
-            .pointer("/roleRef/name")
-            .and_then(Value::as_str)
-            .unwrap_or_default();
+        let role_kind = binding.role_ref.kind.as_str();
+        let role_name = binding.role_ref.name.as_str();
         if role_kind == "ClusterRole" && role_name == "cluster-admin" {
             continue;
         }
         let role_namespace = (role_kind == "Role").then_some(namespace).flatten();
-        let Some(role) = find(roles, role_kind, role_namespace, role_name) else {
+        let Some(role) = find(&roles, role_kind, role_namespace, role_name) else {
             continue;
         };
-        let granted = role
-            .get("rules")
-            .and_then(Value::as_array)
-            .cloned()
-            .unwrap_or_default();
-        let mut rights = rights_of(&granted);
+        let mut rights = rights_of(&role.rules);
         if kind == "ClusterRoleBinding" {
             rights.retain(|r| r != "create pods");
         }
@@ -697,15 +721,13 @@ pub fn exposures_except(
             continue;
         }
         let subjects: Vec<Subject> = binding
-            .get("subjects")
-            .and_then(Value::as_array)
-            .into_iter()
-            .flatten()
+            .subjects
+            .iter()
             .filter(|s| !is_kubernetes_own(s) && !is_user(s, trusted))
             .map(|s| Subject {
-                kind: text(s, "/kind").unwrap_or_default(),
-                name: text(s, "/name").unwrap_or_default(),
-                namespace: text(s, "/namespace"),
+                kind: s.kind.clone(),
+                name: s.name.clone(),
+                namespace: s.namespace.clone(),
             })
             .collect();
         if subjects.is_empty() {
@@ -713,7 +735,7 @@ pub fn exposures_except(
         }
         found.push(Exposure {
             kind: kind.to_owned(),
-            name: text(binding, "/metadata/name").unwrap_or_default(),
+            name: binding.metadata.name.clone().unwrap_or_default(),
             role: format!("{role_kind}/{role_name}"),
             rights,
             subjects,
@@ -759,7 +781,6 @@ mod tests {
             json!(["sh", "-c", WATCH, "node-shell", name, "120", "/proc", "2"])
         );
         assert_eq!(body["metadata"]["namespace"], NAMESPACE);
-        let _pod: k8s_openapi::api::core::v1::Pod = serde_json::from_value(body).unwrap();
     }
 
     #[test]
@@ -827,14 +848,6 @@ mod tests {
         assert_eq!(event["regarding"]["name"], "vps-1");
         assert_eq!(event["regarding"]["uid"], "node-uid-1");
         assert_eq!(event["eventTime"], "2026-10-23T05:00:07.000000Z");
-        assert_eq!(
-            micro_time("2026-10-23T05:00:07.123456789Z"),
-            "2026-10-23T05:00:07.123456Z"
-        );
-        assert_eq!(
-            micro_time("2026-10-23T05:00:07.5Z"),
-            "2026-10-23T05:00:07.500000Z"
-        );
         assert_eq!(event["reason"], EVENT_REASON);
         assert!(
             event["note"]
@@ -843,7 +856,6 @@ mod tests {
                 .starts_with("zeabur:alice@example.com opened a root shell")
         );
         assert_eq!(event["related"]["name"], pod_name(&request("vps-1")));
-        let _event: k8s_openapi::api::events::v1::Event = serde_json::from_value(event).unwrap();
     }
 
     #[test]

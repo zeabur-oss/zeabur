@@ -19,6 +19,13 @@
 
 use serde_json::{Value, json};
 
+/// The JSON of a typed object. k8s-openapi types and the plan's own structs serialize without
+/// error, so the fallback is not taken.
+#[must_use]
+pub(crate) fn value_of<T: serde::Serialize>(object: &T) -> Value {
+    serde_json::to_value(object).unwrap_or_default()
+}
+
 /// One pointer token, escaped (`~` → `~0`, `/` → `~1`) [rfc6901].
 ///
 /// [rfc6901]: https://www.rfc-editor.org/rfc/rfc6901

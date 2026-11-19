@@ -54,7 +54,7 @@ use zeabur_model::{
 use crate::change::{Target, Warning};
 use crate::checks::is_dns_label;
 use crate::fields::Step;
-use crate::json::{add, pointer, remove, replace, test};
+use crate::json::{add, pointer, remove, replace, test, value_of};
 use crate::plan::{ErrorKind, PlanError, Planner, Working, error, to_json};
 
 fn admin_namespace(name: &str, holds: &str) -> PlanError {
@@ -83,7 +83,7 @@ pub fn project_namespace(
     display_name: Option<&str>,
     level: PodSecurityLevel,
 ) -> Value {
-    serde_json::to_value(new_namespace(conventions, name, display_name, level)).unwrap_or_default()
+    value_of(&new_namespace(conventions, name, display_name, level))
 }
 
 fn new_namespace(
