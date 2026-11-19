@@ -35,14 +35,17 @@ const planQuery = (id: string, action: Schemas.ComponentAction) => ({
 /** Installs the component until its install plan is done, then removes it. The server's plan
  * decides, since only it sees every object Zeabur wrote; the action stays while the dialog is
  * open, so a failed install is tried again rather than removed. Once Zeabur wrote a step, the
- * install dialog also offers removal, for an install that cannot finish. */
+ * install dialog also offers removal, for an install that cannot finish. An installed component
+ * is offered removal when its install plan is refused, such as when a dependency was removed. */
 export function ComponentPlan({
   id,
   name,
+  installed,
   onClose,
 }: {
   id: string
   name: string
+  installed: boolean
   onClose: () => void
 }) {
   const t = useT()
@@ -66,9 +69,16 @@ export function ComponentPlan({
       wide
       onClose={onClose}
       footer={
-        <Button variant="ghost" size="sm" onClick={onClose}>
-          {t("plan.cancel")}
-        </Button>
+        <>
+          <Button variant="ghost" size="sm" onClick={onClose}>
+            {t("plan.cancel")}
+          </Button>
+          {installed && install.isError ? (
+            <Button variant="outline" size="sm" onClick={() => setAction("remove")}>
+              {t("settings.removeCommand")}
+            </Button>
+          ) : null}
+        </>
       }
     >
       {install.isError ? (

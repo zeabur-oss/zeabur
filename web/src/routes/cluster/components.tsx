@@ -282,9 +282,15 @@ function OpenedPlan({
   onClose: () => void
 }) {
   const opened = list.flatMap((c) => c.components).find((x) => x.id === id)
+  const installation = list.flatMap((c) => c.installations).find((i) => i.component === id)
   return (
     <Suspense fallback={null}>
-      <ComponentPlan id={id} name={opened?.displayName ?? id} onClose={onClose} />
+      <ComponentPlan
+        id={id}
+        name={opened?.displayName ?? id}
+        installed={buttonOf(installation) === "manage"}
+        onClose={onClose}
+      />
     </Suspense>
   )
 }
