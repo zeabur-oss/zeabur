@@ -222,7 +222,7 @@ export function WrittenList({
     <ul className="flex flex-col gap-1.5 text-sm">
       {items.map((item) => (
         <li
-          key={`${item.place ?? ""}/${item.kind}/${item.name}`}
+          key={`${item.state}:${item.place ?? ""}/${item.kind}/${item.name}`}
           className="flex min-w-0 flex-wrap items-baseline gap-x-2"
         >
           <span>{kindName(t, item.kind)}</span>
