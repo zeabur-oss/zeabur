@@ -37,7 +37,7 @@ pub(crate) struct Built {
 
 /// Zeabur Identity and its `zeabur-identityctl`, and, unless `zeabur_image` is given, Zeabur and
 /// Zeabur Proxy built from this checkout. Zeabur Identity is built from `identity_src`, else it is
-/// the published release that `ZEABUR_IDENTITY_PINNED` names.
+/// the published release that `xtask/pins/zeabur-identity` names.
 pub(crate) fn build(
     dev: &DevCluster,
     identity_src: Option<&Path>,
@@ -53,7 +53,7 @@ pub(crate) fn build(
         import.push(identity.clone());
         identity
     } else {
-        let tag = match read_pin(dev, "ZEABUR_IDENTITY_PINNED")? {
+        let tag = match read_pin(dev, "xtask/pins/zeabur-identity")? {
             Pin::Tag(tag) => tag,
             Pin::Commit(commit) => return Err(no_release(&commit)),
         };
@@ -98,7 +98,7 @@ pub(crate) fn build(
 
 fn no_release(pin: &str) -> String {
     format!(
-        "ZEABUR_IDENTITY_PINNED is {pin}, which has no Zeabur Identity release: \
+        "xtask/pins/zeabur-identity is {pin}, which has no Zeabur Identity release: \
          pin a release tag, or set ZEABUR_IDENTITY_SRC to a checkout to build"
     )
 }

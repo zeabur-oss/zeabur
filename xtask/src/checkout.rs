@@ -21,7 +21,7 @@ const REPOSITORY_ENV: &[&str] = &[
     "GIT_DISCOVERY_ACROSS_FILESYSTEM",
 ];
 
-/// What a pin file such as `ZEABUR_IDENTITY_PINNED` names.
+/// What a pin file such as `xtask/pins/zeabur-identity` names.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum Pin {
     /// A full commit id in hex (SHA-1 or SHA-256).

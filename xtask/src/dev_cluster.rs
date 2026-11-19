@@ -61,11 +61,11 @@ pub(crate) struct Up {
     #[arg(long, value_enum, default_value_t)]
     pub(crate) profile: Profile,
     /// Build Zeabur Identity from this working tree, as it is, instead of the release that
-    /// `ZEABUR_IDENTITY_PINNED` names.
+    /// `xtask/pins/zeabur-identity` names.
     #[arg(long, value_name = "DIR", env = "ZEABUR_IDENTITY_SRC")]
     pub(crate) identity_src: Option<PathBuf>,
     /// Build Zeabur Builder from this working tree, as it is (full profile), instead of
-    /// `ZEABUR_BUILDER_PINNED` fetched from `ZEABUR_BUILDER_GIT`.
+    /// `xtask/pins/zeabur-builder` fetched from `ZEABUR_BUILDER_GIT`.
     #[arg(long, value_name = "DIR", env = "ZEABUR_BUILDER_SRC")]
     pub(crate) builder_src: Option<PathBuf>,
     /// Run this Zeabur image (a local image is imported, any other is pulled) instead of one

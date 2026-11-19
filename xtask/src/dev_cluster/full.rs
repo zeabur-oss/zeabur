@@ -120,7 +120,7 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
         images::pinned_checkout(
             dev,
             &dir,
-            "ZEABUR_BUILDER_PINNED",
+            "xtask/pins/zeabur-builder",
             "ZEABUR_BUILDER_GIT",
             "https://github.com/zeabur-oss/builder.git",
         )?;

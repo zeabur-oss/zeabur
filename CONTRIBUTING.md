@@ -245,16 +245,16 @@ nix run .#dev-cluster -- down     # deletes the cluster, its volume and its imag
 ```
 
 `up` builds Zeabur and Zeabur Proxy from the checkout (cargo profile `ci`, which compiles faster
-than `release`) and installs the Zeabur Identity release that `ZEABUR_IDENTITY_PINNED` names, then
+than `release`) and installs the Zeabur Identity release that `xtask/pins/zeabur-identity` names, then
 prints the setup link that enrols the first admin's passkey. Your browser accepts the site once it trusts the printed CA
 (`target/dev-cluster/tls/ca.crt`). On a VM, forward port 443 from your machine
 (`sudo ssh -L 443:127.0.0.1:443 <vm>`); `*.localhost` resolves to your own machine. Run `up` again
 after a change: it rebuilds and redeploys what changed. Options:
 
 - `--profile full`: also CloudNativePG with the Barman Cloud plugin, the Percona Operator for
-  MongoDB, Keel, cert-manager, zot, a test S3 and Zeabur Builder (from `ZEABUR_BUILDER_PINNED`).
+  MongoDB, Keel, cert-manager, zot, a test S3 and Zeabur Builder (from `xtask/pins/zeabur-builder`).
 - `--identity-src ../identity`: Zeabur Identity from that working tree, as it is. To move to a newer
-  Zeabur Identity, write its release tag to `ZEABUR_IDENTITY_PINNED`.
+  Zeabur Identity, write its release tag to `xtask/pins/zeabur-identity`.
 - `ZEABUR_REGISTRY_MIRRORS=docker.io=http://mirror:5001,ghcr.io=http://mirror:5002`: the node pulls
   through these registry mirrors (each `registry=endpoint`), for a machine behind a slow or
   rate-limited link. `K3S_IMAGE` picks the K3s release.
