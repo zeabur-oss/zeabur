@@ -753,15 +753,14 @@ pub fn opened_without(input: Input<'_>, name: &str) -> Opened {
     }
 }
 
-/// The policies that keep every connection from the internet off service `id`.
+/// The policies that keep every connection from the internet off service `id`; `None` when no
+/// policy isolates it for ingress, one may admit such a connection, or `id` is not a service of
+/// `input`.
 ///
-/// `None` when no policy isolates it for ingress, when one may admit such a connection, or when
-/// `id` is not a service of `input`.
-///
-/// A connection to a `LoadBalancer` port reaches the pod from an address outside the cluster's
-/// pods, or, through k3s `ServiceLB`, from a pod in `kube-system` [k3s-servicelb]. Thus a rule
-/// admits it when it has no `from`, an `ipBlock` peer, or a peer that may be a pod of
-/// `kube-system`. A rule that names ports may admit it, so it counts as admitting.
+/// A connection to a `LoadBalancer` port comes from outside the cluster's pods or, through k3s
+/// `ServiceLB`, from a pod in `kube-system` [k3s-servicelb]. So a rule admits it when it has no
+/// `from`, an `ipBlock` peer, or a peer that may be a `kube-system` pod; a rule that names ports
+/// counts as admitting.
 ///
 /// [k3s-servicelb]: https://docs.k3s.io/networking/networking-services#how-the-service-lb-works
 #[must_use]
@@ -817,14 +816,12 @@ pub fn blocked_connections(reachability: &Reachability) -> Vec<&Connection> {
 /// The id of the rule [`gaps`] checks.
 pub const BLOCKED_CONNECTION: &str = "blocked-connection";
 
-/// The rule `blocked-connection`: a connection the project's own configuration implies (a
-/// variable pointing at another service) that its NetworkPolicy objects block [k8s-netpol].
+/// The rule `blocked-connection`: a connection the project's own configuration implies (a variable
+/// pointing at another service) that its NetworkPolicy objects block [k8s-netpol].
 ///
-/// A warning: the caller will fail at run time. When only the callee's ingress stops it, the fix
-/// is a plan creating the `allow-from-service` preset (see [`presets`]); when the caller's egress
-/// stops it, the fix is a plan creating a policy that lets the caller reach the callee. A
-/// connection blocked at both ends gets the egress policy; the ingress side is the same preset,
-/// offered on the callee's Networking tab.
+/// A warning, as the caller will fail at run time. The fix is a plan creating the
+/// `allow-from-service` preset (see [`presets`]) when the callee's ingress stops it, otherwise a
+/// policy that lets the caller reach the callee.
 ///
 /// [k8s-netpol]: https://kubernetes.io/docs/concepts/services-networking/network-policies/
 #[must_use]
@@ -919,16 +916,11 @@ pub const NO_NETWORK_POLICY: &str = "no-network-policy";
 /// The rule `no-network-policy`: services of the project that no NetworkPolicy isolates for
 /// ingress, each accepting connections from every pod of the cluster [k8s-isolation].
 ///
-/// One finding per project, naming those services, so a project without any policy is one line.
-///
-/// The fix is one plan: the `isolate` preset for each of them, and
-/// `allow-from-ingress-controller` for those an Ingress or HTTPRoute sends traffic to. `isolate`
-/// admits every pod of the project, so the project's own connections need no `allow-from-service`;
-/// the plan is checked with [`reachability`] itself, and what it would cut off that is open today
-/// is named in the message as `cuts`: `otherNamespaces`, `outside`, `published`, `connections`.
-///
-/// Always advice: whether the policies take effect depends on the cluster's network plugin, which
-/// the message says. No workloads, no finding.
+/// One finding per project, naming those services. The fix is one plan: the `isolate` preset for
+/// each, and `allow-from-ingress-controller` for those an Ingress or HTTPRoute sends traffic to.
+/// The plan is checked with [`reachability`], and what it would cut off is named in the message as
+/// `cuts`. Always advice, as whether policies take effect depends on the cluster's network plugin.
+/// No workloads, no finding.
 ///
 /// [k8s-isolation]: https://kubernetes.io/docs/concepts/services-networking/network-policies/#the-two-sorts-of-pod-isolation
 #[must_use]

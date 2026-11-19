@@ -4,14 +4,10 @@ use serde::{Deserialize, Serialize};
 
 /// Where a value is *declared* or read from: the Kubernetes object and the field inside it.
 ///
-/// Every value the API returns carries one, so a client can always show which object to open,
-/// and a change plan knows which field it writes. It is the one provenance type of the API: the
-/// projection's values, events, logs, ConfigMaps, Secrets and projects all use it.
-///
-/// Inside a project document `apiVersion` and `namespace` are left out: every object is in the
-/// project's namespace, and the kind names one API group. Responses that stand alone (an event,
-/// a log, a ConfigMap) carry both, so the reference is complete without its context; that is
-/// Kubernetes' `ObjectReference` shape [k8s-api-conventions].
+/// Every value the API returns carries one, so a client can show which object to open and a change
+/// plan knows which field it writes. Inside a project document `apiVersion` and `namespace` are
+/// left out, as every object is in the project's namespace; a response that stands alone carries
+/// both, as Kubernetes' `ObjectReference` does [k8s-api-conventions].
 ///
 /// `field_path` names JSON fields with dots. A list whose entries Kubernetes merges by a key is
 /// addressed by that key, `containers[name=app]`; an atomic list by index, `envFrom[0]`.

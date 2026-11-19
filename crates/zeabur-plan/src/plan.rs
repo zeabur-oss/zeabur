@@ -1810,13 +1810,10 @@ fn show_key(object: &mut Value, key: &str) {
 
 /// The `test` that pins a patch to the object its plan read.
 ///
-/// An object with `metadata.generation` is pinned by it: the server raises the generation on
-/// every change to its spec, and only then [k8s-conventions-metadata], so a controller writing
-/// the object's status (which bumps `resourceVersion` every few seconds during a rollout
-/// [k8s-status-subresource]) does not make the plan stale, while any edit someone else makes to
-/// the spec does. Every value the patch replaces or removes is tested as well, which covers
-/// edits to metadata. An object without a generation (a ConfigMap, a Secret) is pinned by its
-/// `resourceVersion` [k8s-resource-version].
+/// An object with `metadata.generation` is pinned by it, as the server raises it only when the spec
+/// changes [k8s-conventions-metadata], so a controller writing status [k8s-status-subresource] does
+/// not make the plan stale. Every value the patch replaces or removes is tested as well. An object
+/// without a generation is pinned by its `resourceVersion` [k8s-resource-version].
 ///
 /// [k8s-conventions-metadata]: https://github.com/kubernetes/community/blob/master/contributors/devel/sig-architecture/api-conventions.md#metadata
 /// [k8s-status-subresource]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definitions/#status-subresource
@@ -1945,14 +1942,10 @@ pub(crate) fn pod_spec_steps(kind: WorkloadKind) -> Vec<Step> {
         .collect()
 }
 
-/// What pins each object a plan writes, by `kind/name`, for the token.
-///
-/// The pin of a patch is the generation when the object has one, else its `resourceVersion`
-/// (the patch's first `test`), so a status write between plan and apply does not make the plan
-/// stale. The pin of a deletion is its `resourceVersion`, the precondition kube-apiserver checks
-/// (it has none on the generation). A patch that tests `metadata.finalizers` also pins them: a
-/// controller can remove a finalizer without a new generation. Each object is keyed by its
-/// `apiVersion`, kind and name, as two API groups can serve the same kind.
+/// What pins each object a plan writes, by `kind/name`, for the token: a patch's first `test` (the
+/// generation, else the `resourceVersion`), and for a deletion its `resourceVersion`, the
+/// precondition kube-apiserver checks. A patch that tests `metadata.finalizers` also pins them.
+/// Each object is keyed by its `apiVersion`, kind and name.
 #[must_use]
 pub fn versions(plan: &Plan) -> BTreeMap<String, String> {
     plan.objects

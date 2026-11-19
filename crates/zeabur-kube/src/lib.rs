@@ -58,12 +58,10 @@ use secrecy::{ExposeSecret as _, SecretString};
 
 /// Where kube-apiserver is and how to verify it. Holds no credential.
 ///
-/// Its clones share one pool of connections, which every [`UserClient::with_token`] client of
-/// the endpoint sends through, so the connections open at once follow the requests in flight,
-/// not the number of signed-in people. A connection carries no identity: each request carries
-/// its person's bearer token, and kube-apiserver authenticates every request on its own
-/// [k8s-authn]. The pool's TLS has no client certificate, and its verifier re-reads the CA
-/// bundle, so a rotated bundle is still picked up.
+/// Its clones share one pool of connections, so the connections open at once follow the requests in
+/// flight, not the number of signed-in people. Each request carries its person's bearer token,
+/// which kube-apiserver authenticates on its own [k8s-authn]. The CA bundle is re-read, so a
+/// rotated bundle is picked up.
 ///
 /// [k8s-authn]: https://kubernetes.io/docs/reference/access-authn-authz/authentication/
 #[derive(Clone)]

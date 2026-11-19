@@ -317,15 +317,13 @@ pub trait Cluster: Send + Sync {
 
     // ── Reads through the service proxy ──────────────────────────────────────────────────────
 
-    /// `GET path_and_query` of `service` through kube-apiserver's service proxy
-    /// (`/api/v1/namespaces/{namespace}/services/{name}:{port}/proxy/…`) [k8s-proxy], as the
-    /// person: the right it needs is `get` on `services/proxy` for that Service. The answer must
-    /// be JSON.
+    /// `GET path_and_query` of `service` through kube-apiserver's service proxy [k8s-proxy], as the
+    /// person: it needs `get` on `services/proxy` for that Service. The answer must be JSON.
+    /// `path_and_query` is Zeabur's own (it starts with `/` and is already encoded), never a
+    /// person's.
     ///
-    /// kube-apiserver does not pass the person's identity on: it removes `Authorization` and the
-    /// impersonation headers before proxying [k8s-authn-filter], so the Service sees a request
-    /// without a user and cannot tell people apart. `path_and_query` is Zeabur's own (it starts
-    /// with `/` and is already encoded), never a person's.
+    /// The Service cannot tell people apart, as kube-apiserver removes `Authorization` and the
+    /// impersonation headers before proxying [k8s-authn-filter].
     ///
     /// [k8s-proxy]: https://kubernetes.io/docs/tasks/access-application-cluster/access-cluster-services/#manually-constructing-apiserver-proxy-urls
     /// [k8s-authn-filter]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/filters/authentication.go

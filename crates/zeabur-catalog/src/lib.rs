@@ -319,12 +319,10 @@ fn suggestion(components: &[Component], facts: &ClusterFacts) -> Suggestion {
 
 /// Each capability of the catalogue: existing (with the evidence) or not.
 ///
-/// Zeabur does not judge an existing installation against the catalogue's settings; it reports
-/// that one is there. A missing capability lists what could be installed, and whether the
-/// catalogue recommends it for a cluster of this shape (profile and distribution) or keeps it
-/// optional, so a small cluster is not told to install everything. A probe the
-/// person may not run finds nothing, so a capability can look missing to someone who cannot see
-/// it; [`ClusterFacts::unreadable`] tells the interface to say so.
+/// Zeabur reports that an installation is there, without judging it against the catalogue's
+/// settings. A missing capability lists what could be installed, and whether the catalogue
+/// recommends it for a cluster of this shape or keeps it optional. A probe the person may not run
+/// finds nothing, so [`ClusterFacts::unreadable`] tells the interface to say so.
 #[must_use]
 pub fn detect(components: &[Component], facts: &ClusterFacts) -> Vec<Capability> {
     let mut capabilities: BTreeMap<String, Capability> = BTreeMap::new();

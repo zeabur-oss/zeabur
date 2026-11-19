@@ -662,20 +662,15 @@ fn find<'a>(
     })
 }
 
-/// The bindings that let anyone but cluster administrators and Kubernetes' own components into
-/// the pods of `pods_in`.
-///
-/// That is [`NAMESPACE`]'s node shells, or a cluster tools pod, which holds an administrator's
+/// The bindings that let anyone but cluster administrators and Kubernetes' own components into the
+/// pods of `pods_in`: [`NAMESPACE`]'s node shells, or a cluster tools pod, hold an administrator's
 /// credential.
 ///
 /// `bindings` are the `RoleBindings` of `pods_in` and every `ClusterRoleBinding`, `roles` the
 /// namespace's `Roles` and every `ClusterRole`. A binding counts when its role lets its subjects
-/// exec or attach into pods, or, bound in `pods_in`, create pods there. Bindings to
-/// `cluster-admin` are left out: their subjects are cluster administrators.
-///
-/// Cluster-wide `create pods` is not counted: whoever holds it can already run a privileged pod
-/// in `kube-system` or any other privileged namespace, so a node shell adds nothing. That is the
-/// residual risk: such a subject (a provisioner, a CI runner) is as good as node root anyway.
+/// exec or attach into pods, or, bound in `pods_in`, create pods there. Bindings to `cluster-admin`
+/// are left out, and so is cluster-wide `create pods`: whoever holds it can already run a
+/// privileged pod anywhere.
 #[must_use]
 pub fn exposures(pods_in: &str, bindings: &[Value], roles: &[Value]) -> Vec<Exposure> {
     exposures_except(pods_in, bindings, roles, None)

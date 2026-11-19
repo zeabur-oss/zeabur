@@ -500,20 +500,14 @@ pub const BUILD_FAILED: &str = "BuildFailed";
 
 /// Gives a service that runs a `Build`'s image the build's status when it matters.
 ///
-/// A container runs a `Build`'s image when the repositories match, the `Build`'s own
-/// (`spec.output.image`), as a service deployed from Git has. The build has failed when the
-/// newest run failed, or nothing runs and the `Build` is not ready or has a lasting
-/// [`ZeaburBuilderProblem`], such as a branch that does not exist or a deploy key the host
-/// refuses.
+/// A container runs a `Build`'s image when the repositories match the `Build`'s own
+/// (`spec.output.image`). The build has failed when the newest run failed, or nothing runs and the
+/// `Build` is not ready or has a lasting [`ZeaburBuilderProblem`]. A `Build` that waits for its
+/// folder to be uploaded has not failed.
 ///
-/// A `Build` that waits for its folder to be uploaded has not failed. Its service is waiting for
-/// the upload, not building.
-///
-/// Before the first image the service is building, not failing to pull an image that does not
-/// exist, or it has failed with [`BUILD_FAILED`]; its diagnoses go, since the missing image and
-/// the replicas it leaves unready both come from the build. After it, a failed build fails a
-/// service that is otherwise well with [`BUILD_FAILED`] too: what it serves stays, but no new
-/// commit reaches it until someone acts.
+/// Before the first image the service is building, or has failed with [`BUILD_FAILED`], and its
+/// diagnoses go, as the build causes them. After it, a failed build fails an otherwise well service
+/// with [`BUILD_FAILED`] too.
 pub fn built_image(
     service: &mut zeabur_model::Service,
     builds: &[ZeaburBuilderBuild],

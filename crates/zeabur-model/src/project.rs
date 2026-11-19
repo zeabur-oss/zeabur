@@ -98,12 +98,8 @@ pub enum ConnectionEvidence {
 /// A service's endpoints and routes, looked up by name.
 ///
 /// A project lists each Kubernetes Service and Ingress once, and a service names its own
-/// ([`Service::endpoint_names`], [`Service::route_names`]). Copied under every workload they
-/// reach, they would grow with the square of the workloads when every Service selects every
-/// workload. Nothing is lost by sharing them: an [`Endpoint`] and a [`Route`] are read from their
-/// object alone. A named `targetPort` stays a name, resolved against a workload's container
-/// ports only by the reader that needs it, and a route lists every rule of its Ingress, also
-/// those for other workloads' Services.
+/// ([`Service::endpoint_names`], [`Service::route_names`]), so they do not grow with the square of
+/// the workloads.
 impl Project {
     /// The endpoint named `name`.
     #[must_use]

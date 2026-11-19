@@ -47,12 +47,10 @@ pub fn random_token<const N: usize>() -> Result<String, RandomError> {
     Ok(hex(&random::<N>()?))
 }
 
-/// Encrypts and authenticates `plaintext` with AES-256-GCM [sp800-38d] under `key`.
-///
-/// `aad` is bound as associated data [rfc5116]. The result is `nonce ‖ ciphertext ‖ tag`: a
-/// fresh random 96-bit nonce (the length SP 800-38D §8.2.2 allows for random nonces), the
-/// ciphertext, and the 16-byte tag. Only a holder of `key` can read it or make one that [`open`]
-/// accepts.
+/// Encrypts and authenticates `plaintext` with AES-256-GCM [sp800-38d] under `key`, binding `aad`
+/// as associated data [rfc5116]. The result is `nonce ‖ ciphertext ‖ tag`: a fresh random 96-bit
+/// nonce (the length SP 800-38D §8.2.2 allows for random nonces), the ciphertext, and the 16-byte
+/// tag.
 ///
 /// [rfc5116]: https://www.rfc-editor.org/rfc/rfc5116
 /// [sp800-38d]: https://doi.org/10.6028/NIST.SP.800-38D

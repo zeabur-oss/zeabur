@@ -9,12 +9,9 @@ pub fn join(parts: &[&str]) -> String {
     parts.concat()
 }
 
-/// Stops this process from writing a core dump: `RLIMIT_CORE` becomes 0 and, on Linux, the
-/// process becomes non-dumpable (`PR_SET_DUMPABLE` 0).
-///
-/// A non-dumpable process also refuses `ptrace` and `/proc/<pid>/mem` to other processes of its
-/// user. It can still read its own `/proc/self`, except files with mode `0400`, such as
-/// `environ`, which then belong to root [proc].
+/// Stops this process from writing a core dump: `RLIMIT_CORE` becomes 0 and, on Linux, the process
+/// becomes non-dumpable (`PR_SET_DUMPABLE` 0), which also refuses `ptrace` and `/proc/<pid>/mem` to
+/// other processes of its user [proc].
 ///
 /// # Errors
 ///

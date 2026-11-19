@@ -104,10 +104,9 @@ impl Location {
 
     /// The entry at `index` of this keyed list, identified by its `key` field.
     ///
-    /// `managedFields` names an entry by every key field of its list: a container port by its
-    /// number and its protocol (`+listMapKey=containerPort`, `+listMapKey=protocol`), and the
-    /// protocol defaults to `TCP` [k8s-core-types]. An entry named by the number alone would
-    /// match no owner, and a field Helm, Argo CD or Flux owns there would be taken over.
+    /// `managedFields` names an entry by every key field of its list, a container port by its
+    /// number and its protocol, which defaults to `TCP` [k8s-core-types]; the number alone would
+    /// match no owner.
     ///
     /// [k8s-core-types]: https://github.com/kubernetes/api/blob/master/core/v1/types.go
     fn entry(&self, index: usize, key: &str, id: &Value, item: &Value) -> Self {
