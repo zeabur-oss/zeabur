@@ -25,12 +25,12 @@ import { COUNTDOWN_FROM_SECONDS, clock, useSecondsLeft } from "@/components/plan
 import { carryOut } from "@/components/plan/outcome"
 import type { PlanAsk, PlanHooks } from "@/components/plan/planner"
 import { DescribeYaml } from "@/components/describe-yaml"
-import { PlanPreview, useShortfall } from "@/components/plan/preview"
+import { PlanPreview } from "@/components/plan/preview"
 import { ProjectDeletion } from "@/components/plan/project-deletion"
 import { changedSince, type Reviewed } from "@/components/plan/replan"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Collapsible,
@@ -113,7 +113,6 @@ function usePlan(
     : undefined
   const grouped = !!description?.facts
   const light = weight.risk === "low" && !grouped
-  const short = useShortfall(plan.data?.preview)
   const named = typedName(ask.changes, project)
   const [typed, setTyped] = useState("")
   const typedInput = useRef<HTMLInputElement>(null)
@@ -152,7 +151,6 @@ function usePlan(
     <Conclusion
       replanned={reviewed ? <Replanned reviewed={reviewed} plan={plan.data} /> : undefined}
       description={description}
-      short={short}
       high={weight.risk === "high"}
       grouped={grouped}
       bare={bare}
@@ -301,19 +299,17 @@ export function PlanStep({ footer, ...props }: PlanProps & { footer: HTMLElement
   )
 }
 
-/** What stays in view above the scrolling body: new pods that do not fit, what the plan puts at
- * risk and, for many changes, the summary and its cost. */
+/** What stays in view above the scrolling body: what the plan puts at risk and, for many changes,
+ * the summary and its cost. */
 function Conclusion({
   replanned,
   description,
-  short,
   high,
   grouped,
   bare,
 }: {
   replanned?: ReactNode
   description: Description
-  short?: ReturnType<typeof useShortfall>
   high: boolean
   grouped: boolean
   /** Inside a drawer's body, without the dialog's band. */
@@ -321,23 +317,10 @@ function Conclusion({
 }) {
   const t = useT()
   const risk = description.risk ?? (high && grouped ? description.consequence : undefined)
-  if (!replanned && !short && !risk && !grouped) return null
+  if (!replanned && !risk && !grouped) return null
   return (
     <div className={cn("flex flex-col gap-3", !bare && "border-b px-5 py-3")}>
       {replanned}
-      {short ? (
-        <Alert variant="warn" role="note">
-          <WarningFillIcon aria-hidden="true" />
-          <AlertTitle>{t("plan.short.title")}</AlertTitle>
-          <AlertDescription>
-            <p>{short.cost}</p>
-            {short.reasons.map((line) => (
-              <p key={line}>{line}</p>
-            ))}
-            <p>{short.fix}</p>
-          </AlertDescription>
-        </Alert>
-      ) : null}
       {risk ? (
         <Alert variant="warn" role="note">
           <WarningFillIcon aria-hidden="true" />

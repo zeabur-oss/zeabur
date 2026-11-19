@@ -1457,21 +1457,6 @@ export const zhTW: Messages = {
   "plan.col.service": "服務",
   "plan.col.replicas": "副本",
   "plan.col.effect": "影響",
-  "plan.short.title": "空間不足",
-  "plan.short.nodes": (names, n) =>
-    n === 0
-      ? "新的副本會停在 Pending，等節點有空間才啟動。舊的副本會繼續執行，服務不中斷，但變更要到那時才完成。"
-      : `新的副本會停在 Pending，等節點有空間才啟動。在那之前，${names}${latinEnd(names)}不會執行。`,
-  "plan.short.quota": (names, n) =>
-    n === 0
-      ? "配額不夠，新的副本要等配額空出來才能建立。舊的副本會繼續執行，服務不中斷，但變更要到那時才完成。"
-      : `配額不夠，新的副本要等配額空出來才能建立。在那之前，${names}${latinEnd(names)}不會執行。`,
-  "plan.short.fix": (quota, nodes) =>
-    quota && nodes
-      ? "要完成變更，調高配額並騰出節點空間，或調低每個副本的保留量。"
-      : quota
-        ? "要完成變更，調高配額或調低每個副本的保留量。"
-        : "要完成變更，騰出節點空間或調低每個副本的保留量。",
   "plan.fact.removed": (n) => `移除 ${n} 項`,
   "plan.fact.changed": (n) => `變更 ${n} 項`,
   "plan.fact.added": (n) => `新增 ${n} 項`,
@@ -1479,7 +1464,6 @@ export const zhTW: Messages = {
   "plan.fact.staysUp": "服務不中斷",
   "plan.fact.downBriefly": "會短暫中斷",
   "plan.fact.stops": "停止服務",
-  "plan.fact.fits": "資源足夠",
   "plan.outcome.stops.label": "停止服務",
   "plan.outcome.stops.count": (n) => `${n} 個停止服務`,
   "plan.outcome.down.label": "重新啟動時中斷",
@@ -4016,20 +4000,6 @@ export const zhTW: Messages = {
   "preview.domain": (host) => `網域 ${host} 會開始對外提供服務。`,
   "preview.pendingRestart": (name) => `${name} 重新啟動前會繼續使用舊的值。`,
   "preview.downtime": "會有短暫的時間沒有副本提供服務。",
-  "preview.fits": (pods, cpu, memory) =>
-    `資源足夠：尖峰時會多出 ${pods} 個副本、${cpu}和 ${memory}。`,
-  "preview.fitsPods": (pods) => `資源足夠：尖峰時會多出 ${pods} 個副本。`,
-  "preview.blockedQuota": (name, resource, need, left) =>
-    resource === "pods"
-      ? `配額 ${name} 只容許再多 ${left} 個副本，這次需要 ${need} 個。`
-      : `配額 ${name} 只剩 ${left}，這次需要 ${need}。`,
-  "preview.blockedNodes": (_name, resource, need, left) =>
-    resource === "pods"
-      ? `沒有節點放得下 ${need} 個新的副本，最空的節點只能再放 ${left} 個。`
-      : `沒有節點有 ${need} 的空間，最空的節點只有 ${left}。`,
-  "preview.fitUnknown": (pods, cpu, memory) =>
-    `尖峰時會多出 ${pods} 個副本、${cpu}和 ${memory}。Zeabur 無法確認放不放得下。`,
-  "preview.fitUnknownPods": (pods) => `尖峰時會多出 ${pods} 個副本。Zeabur 無法確認放不放得下。`,
   "preview.dataLoss": "會遺失的資料",
   "preview.loss.claimDeleted": (claim, paths) =>
     `會刪除磁碟區 ${claim}${paths ? `，以及 ${paths} 裡的資料` : ""}。`,

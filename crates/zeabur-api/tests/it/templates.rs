@@ -127,11 +127,10 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::OK, "{planned}");
         assert!(!planned.to_string().contains(&"a".repeat(43)), "{planned}");
-        // The database and the domain start too, and the database's instance counts.
+        // The database and the domain start too.
         let preview = &planned["preview"];
         assert_eq!(preview["databases"][0]["name"], "miniflux-db", "{preview}");
         assert_eq!(preview["domains"], json!(["rss.example.com"]), "{preview}");
-        assert_eq!(preview["fit"]["pods"], 2, "{preview}");
         let (status, applied) = send(
             &app,
             "POST",

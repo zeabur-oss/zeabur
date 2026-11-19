@@ -1569,21 +1569,6 @@ export const en = {
   "plan.col.service": "Service",
   "plan.col.replicas": "Replicas",
   "plan.col.effect": "Effect",
-  "plan.short.title": "Not enough room",
-  "plan.short.nodes": (names: string, n: number) =>
-    n === 0
-      ? "The new replicas wait as Pending until a node has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
-      : `The new replicas wait as Pending until a node has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
-  "plan.short.quota": (names: string, n: number) =>
-    n === 0
-      ? "The quota refuses the new replicas until it has room. The old ones keep running, so the service stays up, but the change isn't finished until then."
-      : `The quota refuses the new replicas until it has room. ${names} ${n === 1 ? "doesn't" : "don't"} run until then.`,
-  "plan.short.fix": (quota: boolean, nodes: boolean): string =>
-    quota && nodes
-      ? "To finish it, raise the quota and free up room on a node, or reserve less per replica."
-      : quota
-        ? "To finish it, raise the quota or reserve less per replica."
-        : "To finish it, free up room on a node or reserve less per replica.",
   "plan.fact.removed": (n: number) => `${n} removed`,
   "plan.fact.changed": (n: number) => `${n} changed`,
   "plan.fact.added": (n: number) => `${n} added`,
@@ -1592,7 +1577,6 @@ export const en = {
   "plan.fact.staysUp": "stays up",
   "plan.fact.downBriefly": "down briefly",
   "plan.fact.stops": "stops serving",
-  "plan.fact.fits": "fits",
   "plan.outcome.stops.label": "Stop serving",
   "plan.outcome.stops.count": (n: number) => `${n} stop serving`,
   "plan.outcome.down.label": "Down while restarting",
@@ -4404,22 +4388,6 @@ export const en = {
   "preview.domain": (host: string) => `The domain ${host} starts serving.`,
   "preview.pendingRestart": (name: string) => `${name} keeps the old value until it restarts.`,
   "preview.downtime": "Nothing serves for a moment.",
-  "preview.fits": (replicas: number, cpu: string, memory: string) =>
-    `Fits: it adds ${plural(replicas, "replica", "replicas")}, ${cpu} and ${memory} at its peak.`,
-  "preview.fitsPods": (replicas: number) =>
-    `Fits: it adds ${plural(replicas, "replica", "replicas")} at its peak.`,
-  "preview.blockedQuota": (name: string, resource: string, need: string, left: string) =>
-    resource === "pods"
-      ? `Quota ${name} allows ${left} more replicas; this needs ${need}.`
-      : `Quota ${name} allows ${left} more; this needs ${need}.`,
-  "preview.blockedNodes": (_name: string, resource: string, need: string, left: string) =>
-    resource === "pods"
-      ? `No node has room for ${need} more replicas; the roomiest has room for ${left}.`
-      : `No node has ${need} free; the roomiest has ${left}.`,
-  "preview.fitUnknown": (replicas: number, cpu: string, memory: string) =>
-    `It adds ${plural(replicas, "replica", "replicas")}, ${cpu} and ${memory} at its peak. Zeabur could not check whether they fit.`,
-  "preview.fitUnknownPods": (replicas: number) =>
-    `It adds ${plural(replicas, "replica", "replicas")} at its peak. Zeabur could not check whether they fit.`,
   "preview.dataLoss": "Data this loses",
   "preview.loss.claimDeleted": (claim: string, paths: string) =>
     `Deletes the volume ${claim}${paths ? ` and what is in ${paths}` : ""}.`,
