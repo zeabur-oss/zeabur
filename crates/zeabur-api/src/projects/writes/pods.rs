@@ -131,7 +131,7 @@ async fn admitted(
             project,
             &target,
             &Write::Create {
-                body: pod(workload, &name),
+                body: pod(workload, &name, plan),
             },
         )
     };
@@ -149,8 +149,10 @@ async fn admitted(
 }
 
 /// A Pod of `workload`'s template named `name`. A StatefulSet's claim templates become empty
-/// volumes, so the containers' mounts resolve.
-fn pod(workload: &Added<'_>, name: &str) -> Value {
+/// volumes, so the containers' mounts resolve. A ServiceAccount that `plan` creates does not
+/// exist yet, and the ServiceAccount admission plugin refuses a Pod that names a missing one, so
+/// the Pod runs as `default` instead: quotas, limit ranges and Pod Security do not read it.
+fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
     let mut metadata = workload
         .template
         .get("metadata")
@@ -173,6 +175,16 @@ fn pod(workload: &Added<'_>, name: &str) -> Value {
         .filter_map(|c| c.pointer("/metadata/name"))
         .map(|name| json!({"name": name, "emptyDir": {}}))
         .collect();
+    if let Some(spec) = spec.as_object_mut() {
+        let account = spec
+            .get("serviceAccountName")
+            .or_else(|| spec.get("serviceAccount"))
+            .and_then(Value::as_str);
+        if account.is_some_and(|account| creates_account(plan, account)) {
+            spec.remove("serviceAccountName");
+            spec.remove("serviceAccount");
+        }
+    }
     if !claims.is_empty() {
         let volumes = spec
             .as_object_mut()
@@ -182,6 +194,15 @@ fn pod(workload: &Added<'_>, name: &str) -> Value {
         }
     }
     json!({"apiVersion": "v1", "kind": "Pod", "metadata": metadata, "spec": spec})
+}
+
+fn creates_account(plan: &Plan, account: &str) -> bool {
+    plan.objects.iter().any(|o| {
+        o.target.api_version == "v1"
+            && o.target.kind == "ServiceAccount"
+            && o.target.name == account
+            && matches!(o.write, Write::Create { .. })
+    })
 }
 
 fn at(workload: &Added<'_>) -> Option<ProblemAt> {
@@ -264,4 +285,48 @@ fn exceeded<'q>(quota: &'q ResourceQuota, need: &Need) -> Option<(&'q str, Strin
         let over = amount > 0 && read(&used)?.saturating_add(amount) > read(&hard.0)?;
         over.then(|| (resource.as_str(), hard.0.clone(), used))
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn planned(kind: &str, name: &str, body: &Value) -> Value {
+        json!({
+            "target": {"apiVersion": if kind == "ServiceAccount" { "v1" } else { "apps/v1" },
+                       "kind": kind, "plural": format!("{}s", kind.to_lowercase()), "name": name},
+            "changes": [], "owners": [], "write": {"type": "create", "body": body}
+        })
+    }
+
+    fn account_of(plan: &Plan) -> Option<String> {
+        let template = json!({"spec": {"serviceAccountName": "worker", "containers": []}});
+        let workload = Added {
+            object: &plan.objects[0],
+            template: &template,
+            pods: 1,
+            change: Some(0),
+        };
+        pod(&workload, "web-dry-run", plan)
+            .pointer("/spec/serviceAccountName")
+            .and_then(Value::as_str)
+            .map(str::to_owned)
+    }
+
+    #[test]
+    fn a_service_account_the_plan_creates_is_left_out_of_the_dry_run() {
+        let with: Plan = serde_json::from_value(json!({
+            "objects": [planned("Deployment", "web", &json!({})),
+                        planned("ServiceAccount", "worker", &json!({}))],
+            "impact": [], "warnings": []
+        }))
+        .unwrap();
+        assert_eq!(account_of(&with), None);
+        let without: Plan = serde_json::from_value(json!({
+            "objects": [planned("Deployment", "web", &json!({}))],
+            "impact": [], "warnings": []
+        }))
+        .unwrap();
+        assert_eq!(account_of(&without).as_deref(), Some("worker"));
+    }
 }
