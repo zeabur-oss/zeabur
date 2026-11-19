@@ -89,10 +89,12 @@ pub fn deploy_key(comment: &str) -> Result<DeployKey, RandomError> {
 
     let encoded = STANDARD.encode(&body);
     let mut private = String::from("-----BEGIN OPENSSH PRIVATE KEY-----\n");
-    for line in encoded.as_bytes().chunks(PEM_WIDTH) {
-        private.push_str(&String::from_utf8_lossy(line));
-        private.push('\n');
-    }
+    private.extend(
+        encoded
+            .as_bytes()
+            .chunks(PEM_WIDTH)
+            .map(|line| format!("{}\n", String::from_utf8_lossy(line))),
+    );
     private.push_str("-----END OPENSSH PRIVATE KEY-----\n");
     let line = format!(
         "ssh-ed25519 {} {comment}",

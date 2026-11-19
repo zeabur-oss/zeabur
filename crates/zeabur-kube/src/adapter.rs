@@ -661,9 +661,13 @@ impl Cluster for UserClient {
                 .into_iter()
                 .map(|(k, v)| (k, v.0))
                 .collect();
-            for (k, v) in secret.string_data.unwrap_or_default() {
-                values.insert(k, v.into_bytes());
-            }
+            values.extend(
+                secret
+                    .string_data
+                    .unwrap_or_default()
+                    .into_iter()
+                    .map(|(k, v)| (k, v.into_bytes())),
+            );
             Ok(values)
         })
     }

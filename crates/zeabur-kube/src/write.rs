@@ -86,16 +86,19 @@ pub(crate) fn checked(target: &ObjectTarget, with_name: bool) -> Result<(), Clus
 
 /// Percent-encodes everything but the unreserved characters of RFC 3986 section 2.3.
 fn encode(segment: &str) -> String {
-    let mut out = String::with_capacity(segment.len());
-    for byte in segment.bytes() {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
-            out.push(char::from(byte));
-        } else {
-            out.push('%');
-            out.push_str(&zeabur_core::crypto::hex(&[byte]).to_ascii_uppercase());
-        }
-    }
-    out
+    segment
+        .bytes()
+        .map(|byte| {
+            if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~') {
+                char::from(byte).to_string()
+            } else {
+                format!(
+                    "%{}",
+                    zeabur_core::crypto::hex(&[byte]).to_ascii_uppercase()
+                )
+            }
+        })
+        .collect()
 }
 
 /// The query string of a creation. A deletion writes no fields, so it names no field manager and

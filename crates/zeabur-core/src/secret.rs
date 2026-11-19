@@ -6,11 +6,7 @@
 /// string never grows, so it leaves no copy of a secret part behind.
 #[must_use]
 pub fn join(parts: &[&str]) -> String {
-    let mut joined = String::with_capacity(parts.iter().map(|part| part.len()).sum());
-    for part in parts {
-        joined.push_str(part);
-    }
-    joined
+    parts.concat()
 }
 
 /// Stops this process from writing a core dump: `RLIMIT_CORE` becomes 0 and, on Linux, the

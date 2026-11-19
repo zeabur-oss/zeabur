@@ -733,23 +733,24 @@ pub fn opened_without(input: Input<'_>, name: &str) -> Opened {
         policies: &rest,
         ..input
     });
-    let mut opened = Opened::default();
-    for (was, now) in before.services.iter().zip(&after.services) {
-        if was.ingress_isolated && !now.ingress_isolated {
-            opened.ingress.push(was.service.clone());
-        }
-        if was.egress_isolated && !now.egress_isolated {
-            opened.egress.push(was.service.clone());
-        }
+    let services = || before.services.iter().zip(&after.services);
+    Opened {
+        ingress: services()
+            .filter(|(was, now)| was.ingress_isolated && !now.ingress_isolated)
+            .map(|(was, _)| was.service.clone())
+            .collect(),
+        egress: services()
+            .filter(|(was, now)| was.egress_isolated && !now.egress_isolated)
+            .map(|(was, _)| was.service.clone())
+            .collect(),
+        connections: before
+            .connections
+            .iter()
+            .zip(&after.connections)
+            .filter(|(was, now)| now.access < was.access)
+            .map(|(was, _)| (was.from.clone(), was.to.clone()))
+            .collect(),
     }
-    opened.connections = before
-        .connections
-        .iter()
-        .zip(&after.connections)
-        .filter(|(was, now)| now.access < was.access)
-        .map(|(was, _)| (was.from.clone(), was.to.clone()))
-        .collect();
-    opened
 }
 
 /// The policies that keep every connection from the internet off service `id`.

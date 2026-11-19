@@ -322,13 +322,13 @@ pub fn steps_of(
             ReleaseType::Inline => inline(release).map_err(broken)?,
             ReleaseType::Manifest | ReleaseType::Unknown => Vec::new(),
         };
-        for mut object in made {
+        objects.extend(made.into_iter().map(|mut object| {
             mark(&mut object.metadata, file, release, catalog_version);
-            objects.push(Desired {
+            Desired {
                 object,
                 namespace: release.namespace.clone(),
-            });
-        }
+            }
+        }));
         steps.push(Step {
             component: file.id.clone(),
             release: release.name.clone(),

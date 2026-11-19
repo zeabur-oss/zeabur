@@ -628,11 +628,11 @@ impl Problem {
         let params = &mut self.summary.params;
         params.insert("verb".to_owned(), denied.verb.clone());
         params.insert("resource".to_owned(), denied.resource.clone());
-        for (name, value) in [("name", &denied.name), ("namespace", &denied.namespace)] {
-            if let Some(value) = value {
-                params.insert(name.to_owned(), value.clone());
-            }
-        }
+        params.extend(
+            [("name", &denied.name), ("namespace", &denied.namespace)]
+                .into_iter()
+                .filter_map(|(name, value)| Some((name.to_owned(), value.clone()?))),
+        );
         self.denied = Some(denied);
     }
 
