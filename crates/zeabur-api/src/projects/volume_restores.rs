@@ -6,7 +6,7 @@
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
-use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Cluster, DynamicObject};
 use zeabur_modules::k8up::{self, RestoreView, SnapshotView};
 
@@ -78,7 +78,12 @@ pub(crate) async fn get(
             if let Some(schedule) = k8up::schedule_of(&schedules, &claim) {
                 out.schedule.clone_from(&schedule.metadata.name);
                 out.snapshots = k8up::snapshots(&snapshots, schedule, &claim);
-                out.template = Some(k8up::restore_template(schedule, &claim));
+                out.template = Some(k8up::restore_template(schedule, &claim).map_err(|e| {
+                    ApiError::from(Problem::new(
+                        Kind::Internal,
+                        format!("Zeabur could not read the K8up schedule: {e}"),
+                    ))
+                })?);
             }
         }
         Err(state) => out.state = state,

@@ -1386,7 +1386,7 @@ fn alerting() -> Vec<DynamicObject> {
         return Vec::new();
     }
     let channel = |namespace: &str, name: &str, settings: &S, events: &[E], status: Value| {
-        let mut object: DynamicObject = from(am::config(namespace, name, settings, events));
+        let mut object = from_typed(am::config(namespace, name, settings, events));
         object.metadata.resource_version = Some("4".to_owned());
         if let Some(data) = object.data.as_object_mut() {
             data.insert("status".to_owned(), status);

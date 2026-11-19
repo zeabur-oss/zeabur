@@ -52,6 +52,8 @@
 
 use std::collections::BTreeMap;
 
+use k8s_openapi::api::core::v1::{ConfigMap, Secret, SecretKeySelector, TypedLocalObjectReference};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use utoipa::ToSchema;
@@ -623,16 +625,154 @@ pub fn schedule_problem(request: &ScheduleRequest) -> Option<String> {
     None
 }
 
-/// The object at `path` in `value`, made where missing; `None` where something else is in the way.
-fn map_at<'a>(value: &'a mut Value, path: &[&str]) -> Option<&'a mut Map<String, Value>> {
-    let mut here = value;
-    for key in path {
-        here = here
-            .as_object_mut()?
-            .entry((*key).to_owned())
-            .or_insert_with(|| json!({}));
+/// A `velero.io/v1` object with the spec `S`. Top-level fields Zeabur does not set (`status`)
+/// stay as read.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct VeleroObject<S> {
+    /// `velero.io/v1`.
+    #[serde(default)]
+    pub api_version: String,
+    /// The kind.
+    #[serde(default)]
+    pub kind: String,
+    /// Its metadata.
+    #[serde(default)]
+    pub metadata: ObjectMeta,
+    /// Its spec.
+    pub spec: S,
+    /// The other top-level fields.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
+}
+
+impl<S> VeleroObject<S> {
+    fn new(kind: &str, namespace: &str, name: &str, spec: S) -> Self {
+        Self {
+            api_version: API_VERSION.to_owned(),
+            kind: kind.to_owned(),
+            metadata: ObjectMeta {
+                name: Some(name.to_owned()),
+                namespace: Some(namespace.to_owned()),
+                ..ObjectMeta::default()
+            },
+            spec,
+            rest: Map::new(),
+        }
     }
-    here.as_object_mut()
+}
+
+/// The fields of a `BackupStorageLocation` spec Zeabur sets [velero-bsl]; the others stay.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LocationSpec {
+    /// The object store plugin.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub provider: Option<String>,
+    /// Backups that name no location go here.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<bool>,
+    /// The bucket and the folder in it.
+    #[serde(default)]
+    pub object_storage: ObjectStorage,
+    /// The plugin's settings.
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
+    pub config: BTreeMap<String, String>,
+    /// The Secret key with the plugin's keys.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub credential: Option<SecretKeySelector>,
+    /// The other fields.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
+}
+
+/// A location's `objectStorage`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ObjectStorage {
+    /// The bucket.
+    #[serde(default)]
+    pub bucket: String,
+    /// The folder in the bucket.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub prefix: Option<String>,
+    /// The other fields.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
+}
+
+/// The fields of a `Schedule` spec Zeabur sets [velero-schedule]; the others stay.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ScheduleSpec {
+    /// The cron.
+    #[serde(default)]
+    pub schedule: String,
+    /// Whether it makes no backups.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub paused: Option<bool>,
+    /// The spec of each backup.
+    #[serde(default)]
+    pub template: BackupSpec,
+    /// The other fields.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
+}
+
+/// The fields of a `Backup` spec Zeabur sets [velero-backup]; the others stay.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct BackupSpec {
+    /// The namespaces, `*` for all.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub included_namespaces: Option<Vec<String>>,
+    /// How long Velero keeps the backup.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub ttl: Option<String>,
+    /// File-system backup of every volume.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default_volumes_to_fs_backup: Option<bool>,
+    /// The other fields.
+    #[serde(flatten)]
+    pub rest: Map<String, Value>,
+}
+
+/// The fields of a `Restore` spec Zeabur sets [velero-restore].
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RestoreSpec {
+    /// The backup.
+    pub backup_name: String,
+    /// The namespaces of the backup it restores.
+    pub included_namespaces: Vec<String>,
+    /// Each namespace of the backup and the one it goes into.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub namespace_mapping: Option<BTreeMap<String, String>>,
+    /// The kinds it leaves out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub excluded_resources: Option<Vec<String>>,
+    /// The only kinds it restores.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub included_resources: Option<Vec<String>>,
+    /// The resource modifier ConfigMap.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub resource_modifier: Option<TypedLocalObjectReference>,
+}
+
+/// A `DownloadRequest` spec [velero-download].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DownloadRequestSpec {
+    /// What it asks for.
+    pub target: DownloadTarget,
+}
+
+/// What a `DownloadRequest` asks for, of which backup.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
+pub struct DownloadTarget {
+    /// What.
+    pub kind: Download,
+    /// The backup.
+    pub name: String,
 }
 
 /// The location as it will be: `current` with the request's fields, or a new default location.
@@ -641,56 +781,62 @@ fn map_at<'a>(value: &'a mut Value, path: &[&str]) -> Option<&'a mut Map<String,
 /// A new location has the store encrypt every object with the key in [`BACKUP_KEY`] (SSE-C).
 /// A current location keeps its encryption: a key added later makes older objects unreadable
 /// on stores that refuse SSE-C headers for objects written without them.
-#[must_use]
+///
+/// # Errors
+///
+/// When `current` is not a `BackupStorageLocation`.
 pub fn location_object(
     namespace: &str,
     current: Option<&Value>,
     request: &LocationRequest,
     credential: bool,
-) -> Value {
-    let mut object = current.cloned().unwrap_or_else(|| {
-        json!({
-            "apiVersion": API_VERSION,
-            "kind": "BackupStorageLocation",
-            "metadata": {"name": LOCATION, "namespace": namespace},
-            "spec": {
-                "provider": "aws",
-                "default": true,
-                "config": {"customerKeyEncryptionSecret": format!("{BACKUP_KEY}/{BACKUP_KEY_KEY}")},
+) -> Result<VeleroObject<LocationSpec>, serde_json::Error> {
+    let mut object = match current {
+        Some(current) => VeleroObject::deserialize(current)?,
+        None => VeleroObject::new(
+            "BackupStorageLocation",
+            namespace,
+            LOCATION,
+            LocationSpec {
+                provider: Some("aws".to_owned()),
+                default: Some(true),
+                config: BTreeMap::from([(
+                    "customerKeyEncryptionSecret".to_owned(),
+                    format!("{BACKUP_KEY}/{BACKUP_KEY_KEY}"),
+                )]),
+                ..LocationSpec::default()
             },
-        })
-    });
+        ),
+    };
     let region = match request.region.trim() {
         "" => DEFAULT_REGION,
         region => region,
     };
     let prefix = request.prefix.trim().trim_matches('/');
-    if let Some(storage) = map_at(&mut object, &["spec", "objectStorage"]) {
-        storage.insert("bucket".to_owned(), json!(request.bucket.trim()));
-        if prefix.is_empty() {
-            storage.remove("prefix");
-        } else {
-            storage.insert("prefix".to_owned(), json!(prefix));
-        }
-    }
+    let spec = &mut object.spec;
+    request
+        .bucket
+        .trim()
+        .clone_into(&mut spec.object_storage.bucket);
+    spec.object_storage.prefix = (!prefix.is_empty()).then(|| prefix.to_owned());
+    spec.config.insert("region".to_owned(), region.to_owned());
     let endpoint = request.endpoint.trim().trim_end_matches('/');
-    if let Some(config) = map_at(&mut object, &["spec", "config"]) {
-        config.insert("region".to_owned(), json!(region));
-        if endpoint.is_empty() {
-            config.remove("s3Url");
-            config.remove("s3ForcePathStyle");
-        } else {
-            config.insert("s3Url".to_owned(), json!(endpoint));
-            config.insert("s3ForcePathStyle".to_owned(), json!("true"));
-        }
+    if endpoint.is_empty() {
+        spec.config.remove("s3Url");
+        spec.config.remove("s3ForcePathStyle");
+    } else {
+        spec.config.insert("s3Url".to_owned(), endpoint.to_owned());
+        spec.config
+            .insert("s3ForcePathStyle".to_owned(), "true".to_owned());
     }
-    if let (true, Some(spec)) = (credential, map_at(&mut object, &["spec"])) {
-        spec.insert(
-            "credential".to_owned(),
-            json!({"name": CREDENTIALS, "key": CREDENTIALS_KEY}),
-        );
+    if credential {
+        spec.credential = Some(SecretKeySelector {
+            name: CREDENTIALS.to_owned(),
+            key: CREDENTIALS_KEY.to_owned(),
+            optional: None,
+        });
     }
-    object
+    Ok(object)
 }
 
 /// The keys as the AWS plugin reads them, an AWS shared credentials file.
@@ -703,28 +849,29 @@ pub fn credentials_file(access_key_id: &str, secret_access_key: &str) -> String 
     )
 }
 
+fn opaque_secret(namespace: &str, name: &str, key: &str, value: &str) -> Secret {
+    Secret {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            ..ObjectMeta::default()
+        },
+        type_: Some("Opaque".to_owned()),
+        string_data: Some(BTreeMap::from([(key.to_owned(), value.to_owned())])),
+        ..Secret::default()
+    }
+}
+
 /// The Secret with the SSE-C key `key` of a new location.
 #[must_use]
-pub fn backup_key_secret(namespace: &str, key: &str) -> Value {
-    json!({
-        "apiVersion": "v1",
-        "kind": "Secret",
-        "metadata": {"name": BACKUP_KEY, "namespace": namespace},
-        "type": "Opaque",
-        "stringData": {BACKUP_KEY_KEY: key},
-    })
+pub fn backup_key_secret(namespace: &str, key: &str) -> Secret {
+    opaque_secret(namespace, BACKUP_KEY, BACKUP_KEY_KEY, key)
 }
 
 /// The Secret with the keys under `string_data`, as Zeabur writes it with `stringData`.
 #[must_use]
-pub fn credentials_secret(namespace: &str, string_data: &str) -> Value {
-    json!({
-        "apiVersion": "v1",
-        "kind": "Secret",
-        "metadata": {"name": CREDENTIALS, "namespace": namespace},
-        "type": "Opaque",
-        "stringData": {CREDENTIALS_KEY: string_data},
-    })
+pub fn credentials_secret(namespace: &str, string_data: &str) -> Secret {
+    opaque_secret(namespace, CREDENTIALS, CREDENTIALS_KEY, string_data)
 }
 
 /// The name of Velero's node agent, the DaemonSet that copies volume files.
@@ -735,52 +882,51 @@ pub const NODE_AGENT: &str = "node-agent";
 ///
 /// `node_agent` is whether the node agent runs; `None` when that is not known, which keeps the
 /// file-system backup setting of `current` and turns it off in a new schedule.
-#[must_use]
+///
+/// # Errors
+///
+/// When `current` is not a `Schedule`.
 pub fn schedule_object(
     namespace: &str,
     current: Option<&Value>,
     request: &ScheduleRequest,
     node_agent: Option<bool>,
-) -> Value {
-    let mut object = current.cloned().unwrap_or_else(|| {
-        json!({
-            "apiVersion": API_VERSION,
-            "kind": "Schedule",
-            "metadata": {"name": SCHEDULE, "namespace": namespace},
-            "spec": {"template": {}},
-        })
-    });
-    let cron = request
+) -> Result<VeleroObject<ScheduleSpec>, serde_json::Error> {
+    let mut object = match current {
+        Some(current) => VeleroObject::deserialize(current)?,
+        None => VeleroObject::new("Schedule", namespace, SCHEDULE, ScheduleSpec::default()),
+    };
+    object.spec.schedule = request
         .cron
         .split_whitespace()
         .collect::<Vec<_>>()
         .join(" ");
-    if let Some(spec) = map_at(&mut object, &["spec"]) {
-        spec.insert("schedule".to_owned(), json!(cron));
-    }
-    let namespaces: Vec<&str> = if request.namespaces.is_empty() {
-        vec!["*"]
+    let namespaces = if request.namespaces.is_empty() {
+        vec!["*".to_owned()]
     } else {
-        request.namespaces.iter().map(String::as_str).collect()
+        request.namespaces.clone()
     };
-    if let Some(template) = map_at(&mut object, &["spec", "template"]) {
-        template.insert("includedNamespaces".to_owned(), json!(namespaces));
-        template.insert("ttl".to_owned(), json!(ttl(request.keep_days)));
-        if let Some(files) = node_agent.or_else(|| current.is_none().then_some(false)) {
-            template.insert("defaultVolumesToFsBackup".to_owned(), json!(files));
-        }
+    let template = &mut object.spec.template;
+    template.included_namespaces = Some(namespaces);
+    template.ttl = Some(ttl(request.keep_days));
+    if let Some(files) = node_agent.or_else(|| current.is_none().then_some(false)) {
+        template.default_volumes_to_fs_backup = Some(files);
     }
-    object
+    Ok(object)
 }
 
 /// The schedule paused or resumed.
-#[must_use]
-pub fn paused(current: &Value, paused: bool) -> Value {
-    let mut object = current.clone();
-    if let Some(spec) = map_at(&mut object, &["spec"]) {
-        spec.insert("paused".to_owned(), json!(paused));
-    }
-    object
+///
+/// # Errors
+///
+/// When `current` is not a `Schedule`.
+pub fn paused(
+    current: &Value,
+    paused: bool,
+) -> Result<VeleroObject<ScheduleSpec>, serde_json::Error> {
+    let mut object: VeleroObject<ScheduleSpec> = VeleroObject::deserialize(current)?;
+    object.spec.paused = Some(paused);
+    Ok(object)
 }
 
 /// The name of a backup made now from `schedule`, as `velero backup create --from-schedule`
@@ -792,27 +938,36 @@ pub fn backup_name(schedule: &str, compact_time: &str) -> String {
 
 /// A backup now with `schedule`'s template, labelled as the schedule's. Without the node agent
 /// (`node_agent` is `Some(false)`) it does not ask for file-system backup.
-#[must_use]
-pub fn backup_now(schedule: &Value, name: &str, node_agent: Option<bool>) -> Value {
-    let at = |pointer: &str| schedule.pointer(pointer).cloned().unwrap_or(Value::Null);
-    let mut labels = schedule
-        .pointer("/metadata/labels")
-        .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
-    labels.insert(SCHEDULE_LABEL.to_owned(), at("/metadata/name"));
-    let mut spec = at("/spec/template");
-    if node_agent == Some(false)
-        && let Some(spec) = spec.as_object_mut()
-        && spec.get("defaultVolumesToFsBackup") == Some(&json!(true))
-    {
-        spec.insert("defaultVolumesToFsBackup".to_owned(), json!(false));
+///
+/// # Errors
+///
+/// When `schedule` is not a `Schedule`.
+pub fn backup_now(
+    schedule: &Value,
+    name: &str,
+    node_agent: Option<bool>,
+) -> Result<VeleroObject<BackupSpec>, serde_json::Error> {
+    let schedule: VeleroObject<ScheduleSpec> = VeleroObject::deserialize(schedule)?;
+    let mut labels = schedule.metadata.labels.unwrap_or_default();
+    labels.insert(
+        SCHEDULE_LABEL.to_owned(),
+        schedule.metadata.name.unwrap_or_default(),
+    );
+    let mut spec = schedule.spec.template;
+    if node_agent == Some(false) && spec.default_volumes_to_fs_backup == Some(true) {
+        spec.default_volumes_to_fs_backup = Some(false);
     }
-    json!({
-        "apiVersion": API_VERSION,
-        "kind": "Backup",
-        "metadata": {"name": name, "namespace": at("/metadata/namespace"), "labels": labels},
-        "spec": spec,
+    Ok(VeleroObject {
+        api_version: API_VERSION.to_owned(),
+        kind: "Backup".to_owned(),
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: schedule.metadata.namespace,
+            labels: Some(labels),
+            ..ObjectMeta::default()
+        },
+        spec,
+        rest: Map::new(),
     })
 }
 
@@ -867,23 +1022,18 @@ pub const HELD_BACK: [&str; 6] = [
     "challenges.acme.cert-manager.io",
 ];
 
-fn restore_spec(backup: &str, source: &str, into: &str) -> Map<String, Value> {
-    let mut spec = Map::new();
-    spec.insert("backupName".to_owned(), json!(backup));
-    spec.insert("includedNamespaces".to_owned(), json!([source]));
-    if into != source {
-        spec.insert("namespaceMapping".to_owned(), json!({ source: into }));
+fn restore_spec(backup: &str, source: &str, into: &str) -> RestoreSpec {
+    RestoreSpec {
+        backup_name: backup.to_owned(),
+        included_namespaces: vec![source.to_owned()],
+        namespace_mapping: (into != source)
+            .then(|| BTreeMap::from([(source.to_owned(), into.to_owned())])),
+        ..RestoreSpec::default()
     }
-    spec
 }
 
-fn restore_named(namespace: &str, name: &str, spec: Map<String, Value>) -> Value {
-    json!({
-        "apiVersion": API_VERSION,
-        "kind": "Restore",
-        "metadata": {"name": name, "namespace": namespace},
-        "spec": Value::Object(spec),
-    })
+fn kinds(kinds: &[&str]) -> Vec<String> {
+    kinds.iter().map(|k| (*k).to_owned()).collect()
 }
 
 /// A restore of `source` from `backup` without the [`HELD_BACK`] kinds, in Velero's namespace
@@ -898,16 +1048,17 @@ pub fn restore_object(
     backup: &str,
     source: &str,
     into: Option<&str>,
-) -> Value {
+) -> VeleroObject<RestoreSpec> {
     let mut spec = restore_spec(backup, source, into.unwrap_or(source));
-    spec.insert("excludedResources".to_owned(), json!(HELD_BACK));
+    spec.excluded_resources = Some(kinds(&HELD_BACK));
     if into.is_some() {
-        spec.insert(
-            "resourceModifier".to_owned(),
-            json!({"kind": "ConfigMap", "name": name}),
-        );
+        spec.resource_modifier = Some(TypedLocalObjectReference {
+            api_group: None,
+            kind: "ConfigMap".to_owned(),
+            name: name.to_owned(),
+        });
     }
-    restore_named(namespace, name, spec)
+    VeleroObject::new("Restore", namespace, name, spec)
 }
 
 /// The resource modifier `name` in Velero's namespace `namespace`: Velero sets `spec.suspend` on
@@ -916,19 +1067,22 @@ pub fn restore_object(
 /// The rules match the namespace in the backup, not the mapped one. Velero reads a JSON Patch
 /// `value` of `"true"` as the boolean.
 #[must_use]
-pub fn paused_cron_jobs(namespace: &str, name: &str, source: &str) -> Value {
+pub fn paused_cron_jobs(namespace: &str, name: &str, source: &str) -> ConfigMap {
     let rules = format!(
         "version: v1\n\
          resourceModifierRules:\n\
          - conditions:\n    groupResource: cronjobs.batch\n    namespaces:\n    - {source}\n  \
          patches:\n  - operation: add\n    path: /spec/suspend\n    value: \"true\"\n"
     );
-    json!({
-        "apiVersion": "v1",
-        "kind": "ConfigMap",
-        "metadata": {"name": name, "namespace": namespace},
-        "data": {"cronjobs.yaml": rules},
-    })
+    ConfigMap {
+        metadata: ObjectMeta {
+            name: Some(name.to_owned()),
+            namespace: Some(namespace.to_owned()),
+            ..ObjectMeta::default()
+        },
+        data: Some(BTreeMap::from([("cronjobs.yaml".to_owned(), rules)])),
+        ..ConfigMap::default()
+    }
 }
 
 /// The JSON Patch that makes the `Restore` `restore` own an object, so the garbage collector
@@ -953,10 +1107,10 @@ pub fn domains_restore(
     backup: &str,
     source: &str,
     into: &str,
-) -> Value {
+) -> VeleroObject<RestoreSpec> {
     let mut spec = restore_spec(backup, source, into);
-    spec.insert("includedResources".to_owned(), json!(ROUTES));
-    restore_named(namespace, name, spec)
+    spec.included_resources = Some(kinds(&ROUTES));
+    VeleroObject::new("Restore", namespace, name, spec)
 }
 
 /// What a backup holds of one namespace, from Velero's list of the backup's objects.
@@ -1019,63 +1173,87 @@ pub fn inventory(list: &BTreeMap<String, Vec<String>>, namespace: &str) -> Inven
     out
 }
 
+/// An Ingress or an HTTPRoute with its spec as read.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Route {
+    /// `networking.k8s.io/v1` or `gateway.networking.k8s.io/v1`.
+    #[serde(default)]
+    pub api_version: String,
+    /// `Ingress` or `HTTPRoute`.
+    #[serde(default)]
+    pub kind: String,
+    /// Its metadata.
+    #[serde(default)]
+    pub metadata: ObjectMeta,
+    /// Its spec, the same for the copy.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub spec: Option<Value>,
+}
+
 /// The copy of the route `route` that `into` gets when its hostnames move there: the same spec,
 /// labels and annotations, without what the server or `kubectl` set.
-#[must_use]
-pub fn moved_route(route: &Value, into: &str) -> Value {
-    let keep = |pointer: &str| route.pointer(pointer).cloned();
-    let mut metadata = Map::new();
-    metadata.insert(
-        "name".to_owned(),
-        keep("/metadata/name").unwrap_or(Value::Null),
-    );
-    metadata.insert("namespace".to_owned(), json!(into));
-    if let Some(labels) = keep("/metadata/labels") {
-        metadata.insert("labels".to_owned(), labels);
-    }
-    if let Some(Value::Object(mut annotations)) = keep("/metadata/annotations") {
+///
+/// # Errors
+///
+/// When `route` has no object metadata.
+pub fn moved_route(route: &Value, into: &str) -> Result<Route, serde_json::Error> {
+    let route = Route::deserialize(route)?;
+    let annotations = route.metadata.annotations.and_then(|mut annotations| {
         annotations.remove("kubectl.kubernetes.io/last-applied-configuration");
-        if !annotations.is_empty() {
-            metadata.insert("annotations".to_owned(), Value::Object(annotations));
-        }
-    }
-    let mut out = Map::new();
-    for field in ["apiVersion", "kind"] {
-        out.insert(
-            field.to_owned(),
-            route.get(field).cloned().unwrap_or(Value::Null),
-        );
-    }
-    out.insert("metadata".to_owned(), Value::Object(metadata));
-    if let Some(spec) = route.get("spec") {
-        out.insert("spec".to_owned(), spec.clone());
-    }
-    Value::Object(out)
+        (!annotations.is_empty()).then_some(annotations)
+    });
+    Ok(Route {
+        metadata: ObjectMeta {
+            name: route.metadata.name,
+            namespace: Some(into.to_owned()),
+            labels: route.metadata.labels,
+            annotations,
+            ..ObjectMeta::default()
+        },
+        ..route
+    })
+}
+
+#[derive(Deserialize)]
+struct HostsView {
+    #[serde(default)]
+    spec: HostsSpec,
+}
+
+#[derive(Default, Deserialize)]
+struct HostsSpec {
+    #[serde(default)]
+    rules: Vec<HostRule>,
+    #[serde(default)]
+    hostnames: Vec<String>,
+}
+
+#[derive(Deserialize)]
+struct HostRule {
+    host: Option<String>,
 }
 
 /// The hostnames of an Ingress (`spec.rules[].host`) or an HTTPRoute (`spec.hostnames`).
-#[must_use]
-pub fn route_hosts(route: &Value) -> Vec<String> {
-    let rules = route
-        .pointer("/spec/rules")
-        .and_then(Value::as_array)
+///
+/// # Errors
+///
+/// When `route` is neither.
+pub fn route_hosts(route: &Value) -> Result<Vec<String>, serde_json::Error> {
+    let HostsView { spec } = HostsView::deserialize(route)?;
+    let mut out: Vec<String> = spec
+        .rules
         .into_iter()
-        .flatten()
-        .filter_map(|r| r["host"].as_str());
-    let names = route
-        .pointer("/spec/hostnames")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(Value::as_str);
-    let mut out: Vec<String> = rules.chain(names).map(str::to_owned).collect();
+        .filter_map(|r| r.host)
+        .chain(spec.hostnames)
+        .collect();
     out.sort();
     out.dedup();
-    out
+    Ok(out)
 }
 
 /// What a `DownloadRequest` asks for [velero-download].
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 pub enum Download {
     /// The archive of the backup's objects, `.tar.gz`.
     BackupContents,
@@ -1085,17 +1263,23 @@ pub enum Download {
 
 /// A `DownloadRequest` for `what` of `backup` [velero-download].
 #[must_use]
-pub fn download_request(namespace: &str, name: &str, backup: &str, what: Download) -> Value {
-    let kind = match what {
-        Download::BackupContents => "BackupContents",
-        Download::BackupResourceList => "BackupResourceList",
-    };
-    json!({
-        "apiVersion": API_VERSION,
-        "kind": "DownloadRequest",
-        "metadata": {"name": name, "namespace": namespace},
-        "spec": {"target": {"kind": kind, "name": backup}},
-    })
+pub fn download_request(
+    namespace: &str,
+    name: &str,
+    backup: &str,
+    what: Download,
+) -> VeleroObject<DownloadRequestSpec> {
+    VeleroObject::new(
+        "DownloadRequest",
+        namespace,
+        name,
+        DownloadRequestSpec {
+            target: DownloadTarget {
+                kind: what,
+                name: backup.to_owned(),
+            },
+        },
+    )
 }
 
 /// The signed URL a `DownloadRequest` holds once Velero processed it, and when it expires.
@@ -1113,6 +1297,10 @@ mod tests {
 
     fn object(value: Value) -> DynamicObject {
         serde_json::from_value(value).unwrap()
+    }
+
+    fn json_of(object: impl Serialize) -> Value {
+        serde_json::to_value(object).unwrap()
     }
 
     #[test]
@@ -1143,7 +1331,7 @@ mod tests {
             region: String::new(),
             endpoint: "https://minio.example.com/".into(),
         };
-        let written = location_object("velero", None, &request, true);
+        let written = json_of(location_object("velero", None, &request, true).unwrap());
         assert_eq!(
             written["spec"],
             json!({"provider": "aws", "default": true,
@@ -1171,7 +1359,7 @@ mod tests {
             region: "eu-west-1".into(),
             endpoint: String::new(),
         };
-        let written = location_object("velero", Some(&current), &request, false);
+        let written = json_of(location_object("velero", Some(&current), &request, false).unwrap());
         assert_eq!(written["spec"]["accessMode"], "ReadWrite");
         assert_eq!(written["spec"]["objectStorage"], json!({"bucket": "new"}));
         assert_eq!(
@@ -1183,15 +1371,18 @@ mod tests {
 
     #[test]
     fn a_schedule_backs_up_every_namespace_or_the_chosen_ones_with_their_volumes() {
-        let all = schedule_object(
-            "velero",
-            None,
-            &ScheduleRequest {
-                cron: "0  3 * * *".into(),
-                keep_days: 7,
-                namespaces: vec![],
-            },
-            Some(true),
+        let all = json_of(
+            schedule_object(
+                "velero",
+                None,
+                &ScheduleRequest {
+                    cron: "0  3 * * *".into(),
+                    keep_days: 7,
+                    namespaces: vec![],
+                },
+                Some(true),
+            )
+            .unwrap(),
         );
         assert_eq!(all["spec"]["schedule"], "0 3 * * *");
         assert_eq!(
@@ -1209,15 +1400,18 @@ mod tests {
             "spec": {"schedule": "0 3 * * *", "paused": true,
                      "template": {"includedNamespaces": ["*"], "storageLocation": "default",
                                   "hooks": {}}}});
-        let some = schedule_object(
-            "velero",
-            Some(&current),
-            &ScheduleRequest {
-                cron: "0 1 * * *".into(),
-                keep_days: 30,
-                namespaces: vec!["shop".into(), "blog".into()],
-            },
-            None,
+        let some = json_of(
+            schedule_object(
+                "velero",
+                Some(&current),
+                &ScheduleRequest {
+                    cron: "0 1 * * *".into(),
+                    keep_days: 30,
+                    namespaces: vec!["shop".into(), "blog".into()],
+                },
+                None,
+            )
+            .unwrap(),
         );
         assert_eq!(some["spec"]["paused"], true);
         assert_eq!(some["spec"]["template"]["storageLocation"], "default");
@@ -1237,28 +1431,31 @@ mod tests {
         };
         let files = |object: &Value| object["spec"]["template"]["defaultVolumesToFsBackup"].clone();
         assert_eq!(
-            files(&schedule_object("velero", None, &request, Some(false))),
-            json!(false)
-        );
-        assert_eq!(
-            files(&schedule_object("velero", None, &request, None)),
-            json!(false)
-        );
-        let current = schedule_object("velero", None, &request, Some(true));
-        assert_eq!(
-            files(&schedule_object(
-                "velero",
-                Some(&current),
-                &request,
-                Some(false)
+            files(&json_of(
+                schedule_object("velero", None, &request, Some(false)).unwrap()
             )),
             json!(false)
         );
         assert_eq!(
-            files(&schedule_object("velero", Some(&current), &request, None)),
+            files(&json_of(
+                schedule_object("velero", None, &request, None).unwrap()
+            )),
+            json!(false)
+        );
+        let current = json_of(schedule_object("velero", None, &request, Some(true)).unwrap());
+        assert_eq!(
+            files(&json_of(
+                schedule_object("velero", Some(&current), &request, Some(false)).unwrap()
+            )),
+            json!(false)
+        );
+        assert_eq!(
+            files(&json_of(
+                schedule_object("velero", Some(&current), &request, None).unwrap()
+            )),
             json!(true)
         );
-        let now = backup_now(&current, "zeabur-20261026000000", Some(false));
+        let now = json_of(backup_now(&current, "zeabur-20261026000000", Some(false)).unwrap());
         assert_eq!(now["spec"]["defaultVolumesToFsBackup"], json!(false));
     }
 
@@ -1292,7 +1489,7 @@ mod tests {
                      "template": {"includedNamespaces": ["*"], "ttl": "168h0m0s",
                                   "defaultVolumesToFsBackup": true}}});
         let name = backup_name("zeabur", "20261023101500");
-        let made = backup_now(&current, &name, None);
+        let made = json_of(backup_now(&current, &name, None).unwrap());
         assert_eq!(made["metadata"]["name"], "zeabur-20261023101500");
         assert_eq!(
             made["metadata"]["labels"],
@@ -1359,7 +1556,13 @@ mod tests {
 
     #[test]
     fn a_restore_copies_into_a_new_namespace_without_routes_or_keeps_the_name_of_a_missing_one() {
-        let copy = restore_object("velero", "zeabur-1-2", "zeabur-1", "shop", Some("shop-2"));
+        let copy = json_of(restore_object(
+            "velero",
+            "zeabur-1-2",
+            "zeabur-1",
+            "shop",
+            Some("shop-2"),
+        ));
         let mut read = object(copy.clone());
         read.data["status"] = json!({"phase": "PartiallyFailed", "warnings": 3, "errors": 1});
         let view = restore(&read);
@@ -1374,7 +1577,13 @@ mod tests {
             json!({"kind": "ConfigMap", "name": "zeabur-1-2"})
         );
 
-        let same = restore_object("velero", "zeabur-1-2", "zeabur-1", "shop", None);
+        let same = json_of(restore_object(
+            "velero",
+            "zeabur-1-2",
+            "zeabur-1",
+            "shop",
+            None,
+        ));
         assert_eq!(
             same["spec"],
             json!({"backupName": "zeabur-1", "includedNamespaces": ["shop"],
@@ -1394,7 +1603,7 @@ mod tests {
 
     #[test]
     fn a_copy_pauses_the_cron_jobs_of_the_original_namespace_by_the_documented_rule_format() {
-        let modifier = paused_cron_jobs("velero", "zeabur-1-2", "shop");
+        let modifier = json_of(paused_cron_jobs("velero", "zeabur-1-2", "shop"));
         assert_eq!(modifier["metadata"]["name"], "zeabur-1-2");
         let rules: Value =
             serde_saphyr::from_str(modifier["data"]["cronjobs.yaml"].as_str().unwrap()).unwrap();
@@ -1417,7 +1626,13 @@ mod tests {
 
     #[test]
     fn domains_come_back_as_a_restore_of_only_the_routes() {
-        let back = domains_restore("velero", "zeabur-1-3", "zeabur-1", "shop", "shop-2");
+        let back = json_of(domains_restore(
+            "velero",
+            "zeabur-1-3",
+            "zeabur-1",
+            "shop",
+            "shop-2",
+        ));
         assert_eq!(
             back["spec"],
             json!({"backupName": "zeabur-1", "includedNamespaces": ["shop"],
@@ -1425,7 +1640,13 @@ mod tests {
         );
         let view = restore(&object(back));
         assert_eq!(view.resources, ROUTES);
-        let home = domains_restore("velero", "zeabur-1-3", "zeabur-1", "shop", "shop");
+        let home = json_of(domains_restore(
+            "velero",
+            "zeabur-1-3",
+            "zeabur-1",
+            "shop",
+            "shop",
+        ));
         assert_eq!(home["spec"].get("namespaceMapping"), None);
     }
 
@@ -1464,7 +1685,7 @@ mod tests {
             "spec": {"rules": [{"host": "shop.example.com"}, {"host": "www.example.com"}]},
             "status": {"loadBalancer": {}}
         });
-        let moved = moved_route(&ingress, "shop-2");
+        let moved = json_of(moved_route(&ingress, "shop-2").unwrap());
         assert_eq!(
             moved,
             json!({
@@ -1475,11 +1696,14 @@ mod tests {
             })
         );
         assert_eq!(
-            route_hosts(&ingress),
+            route_hosts(&ingress).unwrap(),
             ["shop.example.com", "www.example.com"]
         );
         let route = json!({"spec": {"hostnames": ["b.example.com", "a.example.com"]}});
-        assert_eq!(route_hosts(&route), ["a.example.com", "b.example.com"]);
+        assert_eq!(
+            route_hosts(&route).unwrap(),
+            ["a.example.com", "b.example.com"]
+        );
     }
 
     #[test]

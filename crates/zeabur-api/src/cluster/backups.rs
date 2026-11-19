@@ -608,13 +608,15 @@ fn version(object: Option<&Value>) -> String {
         .to_owned()
 }
 
-fn value(object: &DynamicObject) -> Result<Value, ApiError> {
-    serde_json::to_value(object).map_err(|e| {
-        ApiError::from(Problem::new(
-            Kind::Internal,
-            format!("Zeabur could not read a Velero object: {e}"),
-        ))
-    })
+pub(crate) fn value(object: &impl Serialize) -> Result<Value, ApiError> {
+    serde_json::to_value(object).map_err(|e| unreadable(&e))
+}
+
+fn unreadable(e: &serde_json::Error) -> ApiError {
+    ApiError::from(Problem::new(
+        Kind::Internal,
+        format!("Zeabur could not read a Velero object: {e}"),
+    ))
 }
 
 fn invalid(detail: String) -> ApiError {
@@ -728,15 +730,13 @@ async fn location_writes(
             }
             secret
         };
-        let shown = annotated(v::credentials_secret(namespace, HIDDEN));
-        let (body, action) = existing.as_ref().map_or_else(
-            || {
-                (
-                    WriteBody::Create(annotated(v::credentials_secret(namespace, &file))),
-                    BackupWriteAction::Create,
-                )
-            },
-            |existing| {
+        let shown = annotated(value(&v::credentials_secret(namespace, HIDDEN))?);
+        let (body, action) = match existing.as_ref() {
+            None => (
+                WriteBody::Create(annotated(value(&v::credentials_secret(namespace, &file))?)),
+                BackupWriteAction::Create,
+            ),
+            Some(existing) => {
                 let mut operations = vec![
                     json!({"op": "test", "path": "/metadata/resourceVersion",
                            "value": version(Some(existing))}),
@@ -752,8 +752,8 @@ async fn location_writes(
                     WriteBody::JsonPatch(Value::Array(operations)),
                     BackupWriteAction::Patch,
                 )
-            },
-        );
+            }
+        };
         writes.push(Planned {
             target: target("Secret", namespace, v::CREDENTIALS),
             body,
@@ -775,7 +775,10 @@ async fn location_writes(
     if current.is_none() {
         writes.extend(backup_key_write(cluster, namespace, versions).await?);
     }
-    let after = v::location_object(namespace, current.as_ref(), request, keys.is_some());
+    let after = value(
+        &v::location_object(namespace, current.as_ref(), request, keys.is_some())
+            .map_err(|e| unreadable(&e))?,
+    )?;
     writes.extend(change(
         "BackupStorageLocation",
         namespace,
@@ -823,10 +826,10 @@ async fn backup_key_write(
         })?;
     Ok(Some(Planned {
         target: target("Secret", namespace, v::BACKUP_KEY),
-        body: WriteBody::Create(v::backup_key_secret(namespace, &key)),
+        body: WriteBody::Create(value(&v::backup_key_secret(namespace, &key))?),
         action: BackupWriteAction::Create,
         before: None,
-        shown: v::backup_key_secret(namespace, HIDDEN),
+        shown: value(&v::backup_key_secret(namespace, HIDDEN))?,
     }))
 }
 
@@ -994,7 +997,7 @@ async fn restore_writes(
                 None,
                 copy_namespace(into, original),
             ));
-            let modifier = v::paused_cron_jobs(namespace, name, source);
+            let modifier = value(&v::paused_cron_jobs(namespace, name, source))?;
             writes.extend(change("ConfigMap", namespace, name, None, modifier));
             computed.modifier = Some(target("ConfigMap", namespace, name));
             Some(into)
@@ -1008,7 +1011,7 @@ async fn restore_writes(
         unread: None,
         room: None,
     });
-    let object = v::restore_object(namespace, name, backup, source, into);
+    let object = value(&v::restore_object(namespace, name, backup, source, into))?;
     writes.extend(change("Restore", namespace, name, None, object));
     Ok(writes)
 }
@@ -1034,7 +1037,7 @@ async fn held_elsewhere(
             if project == to {
                 continue;
             }
-            for host in v::route_hosts(&value(&route)?) {
+            for host in v::route_hosts(&value(&route)?).map_err(|e| unreadable(&e))? {
                 if hosts.contains(&host) {
                     held.push(Held {
                         host,
@@ -1074,11 +1077,10 @@ async fn attach_writes(
         ))
     })?;
     versions.insert(format!("Namespace/{to}"), version(Some(&project)));
-    let mut hosts: Vec<String> = backup_download::routes(state, cluster, backup, source)
-        .await?
-        .iter()
-        .flat_map(v::route_hosts)
-        .collect();
+    let mut hosts = Vec::new();
+    for route in backup_download::routes(state, cluster, backup, source).await? {
+        hosts.extend(v::route_hosts(&route).map_err(|e| unreadable(&e))?);
+    }
     hosts.sort();
     hosts.dedup();
     if hosts.is_empty() {
@@ -1092,7 +1094,7 @@ async fn attach_writes(
         return Ok(Vec::new());
     }
     let name = made.unwrap_or_default();
-    let object = v::domains_restore(namespace, name, backup, source, to);
+    let object = value(&v::domains_restore(namespace, name, backup, source, to))?;
     Ok(change("Restore", namespace, name, None, object)
         .into_iter()
         .collect())
@@ -1159,7 +1161,7 @@ async fn move_writes(
             )));
         }
         versions.insert(format!("{kind}/{from}/{name}"), version(Some(&before)));
-        hosts.extend(v::route_hosts(&before));
+        hosts.extend(v::route_hosts(&before).map_err(|e| unreadable(&e))?);
         writes.push(Planned {
             target: target(&kind, from, &name),
             body: WriteBody::Delete(zeabur_kube::Preconditions {
@@ -1171,7 +1173,7 @@ async fn move_writes(
             before: Some(before.clone()),
             shown: Value::Null,
         });
-        let moved = v::moved_route(&before, to);
+        let moved = value(&v::moved_route(&before, to).map_err(|e| unreadable(&e))?)?;
         writes.extend(change(&kind, to, &name, None, moved));
     }
     hosts.sort();
@@ -1269,12 +1271,15 @@ async fn compute(
                 format!("Schedule/{}", v::SCHEDULE),
                 version(schedule.as_ref()),
             );
-            let after = v::schedule_object(
-                namespace,
-                schedule.as_ref(),
-                &request,
-                node_agent(cluster, namespace).await,
-            );
+            let after = value(
+                &v::schedule_object(
+                    namespace,
+                    schedule.as_ref(),
+                    &request,
+                    node_agent(cluster, namespace).await,
+                )
+                .map_err(|e| unreadable(&e))?,
+            )?;
             change("Schedule", namespace, v::SCHEDULE, schedule, after)
                 .into_iter()
                 .collect()
@@ -1282,7 +1287,7 @@ async fn compute(
         BackupsPlanRequest::Pause { paused } => {
             let current = schedule.ok_or_else(no_schedule)?;
             versions.insert(format!("Schedule/{}", v::SCHEDULE), version(Some(&current)));
-            let after = v::paused(&current, *paused);
+            let after = value(&v::paused(&current, *paused).map_err(|e| unreadable(&e))?)?;
             change("Schedule", namespace, v::SCHEDULE, Some(current), after)
                 .into_iter()
                 .collect()
@@ -1291,7 +1296,10 @@ async fn compute(
             let current = schedule.ok_or_else(no_schedule)?;
             versions.insert(format!("Schedule/{}", v::SCHEDULE), version(Some(&current)));
             let name = made.unwrap_or_default();
-            let made = v::backup_now(&current, name, node_agent(cluster, namespace).await);
+            let made = value(
+                &v::backup_now(&current, name, node_agent(cluster, namespace).await)
+                    .map_err(|e| unreadable(&e))?,
+            )?;
             change("Backup", namespace, name, None, made)
                 .into_iter()
                 .collect()

@@ -40,8 +40,10 @@
 
 use std::collections::BTreeMap;
 
-use k8s_openapi::apimachinery::pkg::apis::meta::v1::LabelSelector;
-use serde_json::{Value, json};
+use k8s_openapi::api::core::v1::{LocalObjectReference, PodSecurityContext};
+use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
+use serde::{Deserialize, Serialize};
+use serde_json::{Map, Value};
 use zeabur_kube::DynamicObject;
 use zeabur_model::adapters::selector::matches;
 
@@ -157,23 +159,81 @@ fn retention(schedule: &DynamicObject) -> BTreeMap<String, i64> {
         .collect()
 }
 
+/// A `k8up.io/v1` object as Zeabur offers it to create.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct K8upObject<S> {
+    api_version: &'static str,
+    kind: &'static str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    metadata: Option<ObjectMeta>,
+    spec: S,
+}
+
+/// The fields of a `Schedule` spec that its runs and restores copy [k8up-api].
+#[derive(Default, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct ScheduleSpec {
+    backend: Option<Value>,
+    pod_security_context: Option<PodSecurityContext>,
+    pod_config_ref: Option<LocalObjectReference>,
+    #[serde(default)]
+    backup: BackupSpec,
+}
+
+/// A `Schedule`'s backup spec, as a `Backup` spec without the timing.
+#[derive(Default, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct BackupSpec {
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    backend: Option<Value>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pod_security_context: Option<PodSecurityContext>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pod_config_ref: Option<LocalObjectReference>,
+    #[expect(dead_code, reason = "read to leave the timing out of a Backup")]
+    #[serde(default, skip_serializing)]
+    schedule: Option<String>,
+    #[expect(dead_code, reason = "read to leave the timing out of a Backup")]
+    #[serde(default, skip_serializing)]
+    concurrent_runs_allowed: Option<bool>,
+    #[serde(flatten)]
+    rest: Map<String, Value>,
+}
+
+/// A `Restore` spec with what Zeabur copies from the `Schedule`.
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct RestoreSpec {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    backend: Option<Value>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pod_security_context: Option<PodSecurityContext>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pod_config_ref: Option<LocalObjectReference>,
+}
+
+fn schedule_spec(schedule: &DynamicObject) -> Result<ScheduleSpec, serde_json::Error> {
+    schedule
+        .data
+        .get("spec")
+        .map_or_else(|| Ok(ScheduleSpec::default()), ScheduleSpec::deserialize)
+}
+
 /// A `Backup` that runs a `Schedule`'s backup once: its backup spec without the timing, with the
 /// schedule-wide backend, Pod security context and Pod config when the backup has none.
-fn run_now(schedule: &DynamicObject) -> Value {
-    let mut spec = match schedule.data.pointer("/spec/backup") {
-        Some(Value::Object(backup)) => backup.clone(),
-        _ => serde_json::Map::new(),
-    };
-    spec.remove("schedule");
-    spec.remove("concurrentRunsAllowed");
-    for field in ["backend", "podSecurityContext", "podConfigRef"] {
-        if let Some(value) = schedule.data.pointer(&format!("/spec/{field}"))
-            && !spec.contains_key(field)
-        {
-            spec.insert(field.to_owned(), value.clone());
-        }
-    }
-    json!({"apiVersion": "k8up.io/v1", "kind": "Backup", "spec": spec})
+fn run_now(schedule: &DynamicObject) -> Result<Value, serde_json::Error> {
+    let schedule = schedule_spec(schedule)?;
+    let mut spec = schedule.backup;
+    spec.backend = spec.backend.or(schedule.backend);
+    spec.pod_security_context = spec.pod_security_context.or(schedule.pod_security_context);
+    spec.pod_config_ref = spec.pod_config_ref.or(schedule.pod_config_ref);
+    serde_json::to_value(K8upObject {
+        api_version: "k8up.io/v1",
+        kind: "Backup",
+        metadata: None,
+        spec,
+    })
 }
 
 /// What K8up's objects of one namespace say about its claims. Runs are the newest ten.
@@ -201,7 +261,7 @@ pub fn findings(
             note: None,
             destination: destination(schedule),
             retention: retention(schedule),
-            run_now: Some(run_now(schedule)),
+            run_now: run_now(schedule).ok(),
         });
     }
     out.schedules.sort_by(|a, b| a.name.cmp(&b.name));
@@ -386,25 +446,30 @@ pub fn restores(objects: &[DynamicObject], claim: &str) -> Vec<RestoreView> {
 
 /// A `Restore` with `schedule`'s backend and Pod security, labelled for `claim`, for the
 /// snapshot and the method to be added.
-#[must_use]
-pub fn restore_template(schedule: &DynamicObject, claim: &str) -> Value {
-    let mut spec = serde_json::Map::new();
-    if let Some(backend) = backend(schedule) {
-        spec.insert("backend".to_owned(), backend.clone());
-    }
-    for field in ["podSecurityContext", "podConfigRef"] {
-        if let Some(value) = schedule
-            .data
-            .pointer(&format!("/spec/backup/{field}"))
-            .or_else(|| schedule.data.pointer(&format!("/spec/{field}")))
-        {
-            spec.insert(field.to_owned(), value.clone());
-        }
-    }
-    json!({
-        "apiVersion": "k8up.io/v1", "kind": "Restore",
-        "metadata": {"labels": {VOLUME_LABEL: claim}},
-        "spec": spec,
+///
+/// # Errors
+///
+/// When `schedule`'s spec is not a K8up `Schedule` spec.
+pub fn restore_template(schedule: &DynamicObject, claim: &str) -> Result<Value, serde_json::Error> {
+    let schedule = schedule_spec(schedule)?;
+    serde_json::to_value(K8upObject {
+        api_version: "k8up.io/v1",
+        kind: "Restore",
+        metadata: Some(ObjectMeta {
+            labels: Some(BTreeMap::from([(
+                VOLUME_LABEL.to_owned(),
+                claim.to_owned(),
+            )])),
+            ..ObjectMeta::default()
+        }),
+        spec: RestoreSpec {
+            backend: schedule.backup.backend.or(schedule.backend),
+            pod_security_context: schedule
+                .backup
+                .pod_security_context
+                .or(schedule.pod_security_context),
+            pod_config_ref: schedule.backup.pod_config_ref.or(schedule.pod_config_ref),
+        },
     })
 }
 
