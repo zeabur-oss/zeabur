@@ -1,11 +1,28 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 288" width="480" height="288" role="img"><title>變更先放進草稿，檢查過後才套用到叢集</title><style>
-svg{--bg:#FAFAFB;--card:#FFFFFF;--line:#E8E7EB;--line2:#D0CED4;--text:#18171B;--muted:#5C5962;--acc:#6300FF;--accs:rgba(99,0,255,.07)}
-@media (prefers-color-scheme: dark){svg{--bg:#1D1C20;--card:#1F1E22;--line:#34313A;--line2:#4C4851;--text:#F0EFF2;--muted:#B0ADB6;--acc:#A469FF;--accs:rgba(164,105,255,.14)}}
-text{font-family:-apple-system,"Segoe UI","PingFang TC","Noto Sans CJK TC",sans-serif;fill:var(--text)}
-.bg{fill:var(--bg)}.card{fill:var(--card);stroke:var(--line2);stroke-width:1}
-.soft{fill:var(--bg);stroke:var(--line);stroke-width:1}
-.acc{fill:var(--accs);stroke:var(--acc);stroke-width:1}
-.t{font-size:17px;font-weight:600}.m{font-size:14px;fill:var(--muted)}.a{fill:var(--acc)}
-.ln{stroke:var(--line2);stroke-width:1;fill:none}.lna{stroke:var(--acc);stroke-width:1.5;fill:none}
-.hd{fill:var(--line2)}.hda{fill:var(--acc)}
-</style><rect class="bg" width="480" height="288" rx="6"/><rect class="card" x="90" y="16" width="300" height="64" rx="6"/><text class="t" x="240.0" y="44.0" text-anchor="middle">修改</text><text class="m" x="240.0" y="64.0" text-anchor="middle">變更先放進草稿</text><path class="ln" d="M240 80V105"/><path class="hd" d="M240 112l-4 -8h8z"/><rect class="acc" x="90" y="112" width="300" height="64" rx="6"/><text class="t" x="240.0" y="140.0" text-anchor="middle">檢查變更</text><text class="m" x="240.0" y="160.0" text-anchor="middle">先看清楚每一項</text><path class="lna" d="M240 176V201"/><path class="hda" d="M240 208l-4 -8h8z"/><rect class="card" x="90" y="208" width="300" height="64" rx="6"/><text class="t" x="240.0" y="236.0" text-anchor="middle">套用</text><text class="m" x="240.0" y="256.0" text-anchor="middle">叢集才會改變</text></svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 440 256" width="440" height="256" role="img"><title>變更先放進草稿，檢查過後才套用到叢集</title><style>
+.bg{fill:#FAFAFB;stroke:#E8E7EB;stroke-width:1}
+.grp{fill:rgba(255,255,255,.55);stroke:#E8E7EB;stroke-width:1}
+.card{fill:#FFFFFF;stroke:#D0CED4;stroke-width:1}
+.card.accent{stroke:#6300FF;stroke-width:1.5}
+.tag{fill:#FFFFFF;stroke:#D0CED4;stroke-width:1}
+.hit{fill:rgba(99,0,255,.07)}
+.line{fill:none;stroke:#D0CED4;stroke-width:1.5}
+.head{fill:#D0CED4}
+text{font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang TC", "Noto Sans CJK TC", "Microsoft JhengHei", sans-serif}
+.t{font-size:14px;font-weight:600;fill:#18171B}
+.n{font-size:13px;fill:#5C5962}
+.h{font-size:12.5px;fill:#5C5962}
+.tagt{font-size:12px;fill:#5C5962}
+.hitt{font-size:12px;fill:#6300FF}
+@media (prefers-color-scheme: dark){
+.bg{fill:#1D1C20;stroke:#34313A}
+.grp{fill:rgba(31,30,34,.55);stroke:#34313A}
+.card,.tag{fill:#1F1E22;stroke:#4C4851}
+.card.accent{stroke:#A469FF}
+.hit{fill:rgba(164,105,255,.14)}
+.line{stroke:#4C4851}
+.head{fill:#4C4851}
+.t{fill:#F0EFF2}
+.n,.h,.tagt{fill:#B0ADB6}
+.hitt{fill:#A469FF}
+}
+</style><rect class="bg" x="0.5" y="0.5" width="439" height="255" rx="6"/><rect class="card" x="80" y="16" width="280" height="56" rx="6"/><text class="t" x="220" y="40" text-anchor="middle">修改</text><text class="n" x="220" y="58" text-anchor="middle">變更先放進草稿</text><path class="line" d="M220 72V94"/><path class="head" d="M220 100l-4 -7h8z"/><rect class="card accent" x="80" y="100" width="280" height="56" rx="6"/><text class="t" x="220" y="124" text-anchor="middle">檢查變更</text><text class="n" x="220" y="142" text-anchor="middle">先看清楚每一項</text><path class="line" d="M220 156V178"/><path class="head" d="M220 184l-4 -7h8z"/><rect class="card" x="80" y="184" width="280" height="56" rx="6"/><text class="t" x="220" y="208" text-anchor="middle">套用</text><text class="n" x="220" y="226" text-anchor="middle">叢集才會改變</text></svg>
