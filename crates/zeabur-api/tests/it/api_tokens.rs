@@ -228,6 +228,8 @@ mod tests {
         assert!(issued["ca"].as_str().unwrap().contains("BEGIN CERTIFICATE"));
         assert_eq!(issued["recorded"], true);
         let config: Value = serde_saphyr::from_str(issued["kubeconfig"].as_str().unwrap()).unwrap();
+        assert_eq!(config["apiVersion"], "v1");
+        assert_eq!(config["kind"], "Config");
         assert_eq!(config["clusters"][0]["cluster"]["server"], "");
         let ca = config["clusters"][0]["cluster"]["certificate-authority-data"]
             .as_str()

@@ -9,6 +9,8 @@
 
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
+use kube::config::{AuthInfo, Context, Kubeconfig, NamedAuthInfo, NamedCluster, NamedContext};
+use secrecy::SecretString;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, Problem};
@@ -87,81 +89,38 @@ pub(crate) fn kubeconfig(
     ca: Option<&str>,
     namespace: Option<&str>,
 ) -> Result<String, ApiError> {
-    #[derive(Serialize)]
-    #[serde(rename_all = "kebab-case")]
-    struct Config<'a> {
-        api_version: &'static str,
-        kind: &'static str,
-        clusters: [Named<'a, ClusterEntry>; 1],
-        users: [Named<'a, User<'a>>; 1],
-        contexts: [Named<'a, Context<'a>>; 1],
-        current_context: &'a str,
-    }
-    #[derive(Serialize)]
-    struct Named<'a, T> {
-        name: &'a str,
-        #[serde(flatten)]
-        entry: T,
-    }
-    #[derive(Serialize)]
-    struct ClusterEntry {
-        cluster: Server,
-    }
-    #[derive(Serialize)]
-    #[serde(rename_all = "kebab-case")]
-    struct Server {
-        server: &'static str,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        certificate_authority_data: Option<String>,
-    }
-    #[derive(Serialize)]
-    struct User<'a> {
-        user: Token<'a>,
-    }
-    #[derive(Serialize)]
-    struct Token<'a> {
-        token: &'a str,
-    }
-    #[derive(Serialize)]
-    struct Context<'a> {
-        context: ContextEntry<'a>,
-    }
-    #[derive(Serialize)]
-    struct ContextEntry<'a> {
-        cluster: &'static str,
-        user: &'a str,
-        #[serde(skip_serializing_if = "Option::is_none")]
-        namespace: Option<&'a str>,
-    }
-    let config = Config {
-        api_version: "v1",
-        kind: "Config",
-        clusters: [Named {
-            name: "zeabur",
-            entry: ClusterEntry {
-                cluster: Server {
-                    server: "",
-                    certificate_authority_data: ca.map(|pem| STANDARD.encode(pem)),
-                },
-            },
+    let config = Kubeconfig {
+        api_version: Some("v1".to_owned()),
+        kind: Some("Config".to_owned()),
+        clusters: vec![NamedCluster {
+            name: "zeabur".to_owned(),
+            cluster: Some(kube::config::Cluster {
+                server: Some(String::new()),
+                certificate_authority_data: ca.map(|pem| STANDARD.encode(pem)),
+                ..kube::config::Cluster::default()
+            }),
+            ..NamedCluster::default()
         }],
-        users: [Named {
-            name,
-            entry: User {
-                user: Token { token },
-            },
+        auth_infos: vec![NamedAuthInfo {
+            name: name.to_owned(),
+            auth_info: Some(AuthInfo {
+                token: Some(SecretString::from(token)),
+                ..AuthInfo::default()
+            }),
+            ..NamedAuthInfo::default()
         }],
-        contexts: [Named {
-            name,
-            entry: Context {
-                context: ContextEntry {
-                    cluster: "zeabur",
-                    user: name,
-                    namespace,
-                },
-            },
+        contexts: vec![NamedContext {
+            name: name.to_owned(),
+            context: Some(Context {
+                cluster: "zeabur".to_owned(),
+                user: Some(name.to_owned()),
+                namespace: namespace.map(str::to_owned),
+                ..Context::default()
+            }),
+            ..NamedContext::default()
         }],
-        current_context: name,
+        current_context: Some(name.to_owned()),
+        ..Kubeconfig::default()
     };
     let internal = |e: String| ApiError::from(Problem::new(Kind::Internal, e));
     let value = serde_json::to_value(&config).map_err(|e| internal(e.to_string()))?;
