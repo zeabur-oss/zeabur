@@ -2,7 +2,8 @@
 //!
 //! The numbers come from Zeabur Catalog's `measurements/templates/<id>.json`, which its nightly
 //! end-to-end run writes. Only passed runs count. A run lists one pod of each workload; every
-//! template runs one pod per workload, so the rows add up to the template.
+//! template runs one pod per workload (`replicas: 1`, `instances: 1`), so the rows are the
+//! template's pods.
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
@@ -22,6 +23,20 @@ pub struct IdleUse {
     pub environment: String,
     /// The day it was measured (`2026-10-25`).
     pub measured_at: String,
+    /// Each workload's pod.
+    pub pods: Vec<MeasuredPod>,
+}
+
+/// What one pod of a workload used once idle.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MeasuredPod {
+    /// The workload or database object (`miniflux-db`).
+    pub workload: String,
+    /// Its working set in bytes.
+    pub memory_bytes: u64,
+    /// Its CPU in millicores.
+    pub cpu_millicores: u64,
 }
 
 #[derive(Deserialize)]
@@ -54,6 +69,7 @@ struct Platform {
 /// One pod of a workload, as Kubernetes quantities (`22Mi`, `3m`).
 #[derive(Deserialize)]
 struct Pod {
+    workload: String,
     memory: String,
     cpu: String,
 }
@@ -98,17 +114,23 @@ fn idle_from(text: &str) -> Option<IdleUse> {
         .filter(preferred)
         .max_by(|a, b| a.measured_at.cmp(&b.measured_at))
         .or_else(|| passed.max_by(|a, b| a.measured_at.cmp(&b.measured_at)))?;
-    let mut memory_bytes = 0;
-    let mut cpu_millicores = 0;
-    for pod in &measured.pods {
-        memory_bytes += quantity::bytes(&pod.memory)?;
-        cpu_millicores += quantity::millicores(&pod.cpu)?;
-    }
+    let pods = measured
+        .pods
+        .iter()
+        .map(|pod| {
+            Some(MeasuredPod {
+                workload: pod.workload.clone(),
+                memory_bytes: quantity::bytes(&pod.memory)?,
+                cpu_millicores: quantity::millicores(&pod.cpu)?,
+            })
+        })
+        .collect::<Option<Vec<_>>>()?;
     Some(IdleUse {
-        memory_bytes,
-        cpu_millicores,
+        memory_bytes: pods.iter().map(|p| p.memory_bytes).sum(),
+        cpu_millicores: pods.iter().map(|p| p.cpu_millicores).sum(),
         environment: measured.name(),
         measured_at: measured.measured_at.clone(),
+        pods,
     })
 }
 
@@ -144,6 +166,18 @@ mod tests {
                 cpu_millicores: 4,
                 environment: "kind-single-node-amd64-v1.36.4".to_owned(),
                 measured_at: "2026-10-25".to_owned(),
+                pods: vec![
+                    MeasuredPod {
+                        workload: "app".to_owned(),
+                        memory_bytes: 300 * 1024 * 1024,
+                        cpu_millicores: 3,
+                    },
+                    MeasuredPod {
+                        workload: "app-db".to_owned(),
+                        memory_bytes: 10 * 1024 * 1024,
+                        cpu_millicores: 1,
+                    },
+                ],
             })
         );
     }
@@ -178,6 +212,22 @@ mod tests {
             if text.contains(r#""result":"passed""#) || text.contains(r#""result": "passed""#) {
                 let idle = idle_from(text);
                 assert!(idle.is_some_and(|i| i.memory_bytes > 0), "{id}");
+            }
+        }
+    }
+
+    /// The rows are the template's pods only while each workload runs one pod.
+    #[test]
+    fn every_embedded_template_runs_one_pod_per_workload() {
+        for (id, _, manifests) in bundle::TEMPLATES {
+            for line in manifests.lines() {
+                let line = line.trim();
+                if let Some(count) = line
+                    .strip_prefix("replicas:")
+                    .or_else(|| line.strip_prefix("instances:"))
+                {
+                    assert_eq!(count.trim(), "1", "{id}: {line}");
+                }
             }
         }
     }
