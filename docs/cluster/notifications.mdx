@@ -138,7 +138,7 @@ Secret keys and receiver settings for other types:
 | Webhook | `url`; `token` is optional | `webhook_configs`, with `url_secret` pointing to `url`; if a token is set, add `http_config.authorization` with `type: Bearer` and `credentials` pointing to `token` |
 | ntfy | `url`; `token` is optional | Same as Webhook. Set `url` to `https://ntfy.sh/<topic>?template=alertmanager`. For a self-hosted server, replace the domain |
 
-Sending a test creates a Job with the label `zeabur.com/notification-test: <name>`. When the metrics component's alerting rules detect it, they send a test alert addressed to this channel:
+Sending a test creates a Job with the label `zeabur.com/notification-test: <name>`. When Zeabur's alerting rules detect it, they send a test alert addressed to this channel:
 
 ```yaml
 apiVersion: batch/v1
@@ -192,7 +192,7 @@ kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
 
 - **Waiting**: Alertmanager hasn't loaded the channel yet. Check again later.
 - **Rejected**: The row shows the reason, such as an incomplete URL, a missing stored URL or token, or an SMTP server without a port. Click **Edit**, fix the settings, and save.
-- No test message arrives: Check the destination service's URL and token. If the page says Zeabur's alerting rules aren't installed, reinstall the metrics component.
+- No test message arrives: Check the destination service's URL and token. If the page says Zeabur's alerting rules aren't installed or are from another Zeabur version, click **Install rules** or **Update rules**.
 - You can add a channel but can't test it: Sending a test requires permission to create Jobs. Ask an administrator to check this permission.
 - **Made outside Zeabur. Change it where it was made.**: Make the change in the original Helm or GitOps configuration.
 

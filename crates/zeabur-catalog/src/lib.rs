@@ -17,6 +17,7 @@ mod kube_version;
 pub mod measured;
 pub mod templates;
 pub mod versions;
+pub mod zeabur;
 
 pub use installed::{ComponentUpgrade, InstallSource, Installation};
 pub use measured::{IdleUse, MeasuredPod, template_idle};

@@ -1,0 +1,20 @@
+# Zeabur Proxy reads the log store for the Logs tab. The component's own policy admits only the
+# collector and vmagent; Kubernetes admits the union of every policy that selects a pod. The
+# namespace selector holds Zeabur's namespace, because anyone can label a pod in their own
+# namespace.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: zeabur-proxy-logs
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: vlsingle, app.kubernetes.io/instance: victoria-logs}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 9428, protocol: TCP}]
+      from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: zeabur}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: zeabur-proxy}

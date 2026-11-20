@@ -1,6 +1,7 @@
 //! `zeaburctl components export`: Zeabur Catalog components' manifests or Helm commands, to
 //! install them on a cluster. The text comes from the catalogue in this binary
-//! ([`zeabur_catalog::install`]); no cluster is read.
+//! ([`zeabur_catalog::install`]), followed by the objects Zeabur adds to the component
+//! ([`zeabur_catalog::zeabur`]); no cluster is read.
 
 use std::process::ExitCode;
 
@@ -21,7 +22,9 @@ enum ComponentsCommand {
     /// Print what installs one or more components, with the catalogue's pinned versions and
     /// values. Apply it with kubectl, or commit it to the repository a GitOps tool watches.
     ///
-    /// Values the component asks for show as `<name>` placeholders; replace them first.
+    /// Values the component asks for show as `<name>` placeholders; replace them first. Zeabur's
+    /// own objects for the component (its alert rules, Zeabur Proxy's access to the logs) come
+    /// last; apply them once the component is installed.
     Export(ExportArgs),
 }
 
@@ -38,6 +41,9 @@ struct ExportArgs {
     /// The sizing: `single-node` or `multi-node`.
     #[arg(long, default_value = PROFILES[0], value_parser = PROFILES)]
     profile: String,
+    /// The namespace Zeabur runs in, which Zeabur's objects admit.
+    #[arg(long, default_value = "zeabur")]
+    zeabur_namespace: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -88,6 +94,7 @@ fn text(args: &ExportArgs) -> Result<String, InstallError> {
             .into_iter()
             .find(|f| f.format == format)
             .map_or_default(|f| f.text);
+        let text = text + &zeaburs(component, args)?;
         if !out.is_empty() && !out.ends_with(separator) {
             if !out.ends_with('\n') {
                 out.push('\n');
@@ -97,6 +104,23 @@ fn text(args: &ExportArgs) -> Result<String, InstallError> {
         out.push_str(&text);
     }
     Ok(out)
+}
+
+/// The objects Zeabur adds to `component`, in the export's format.
+fn zeaburs(component: &str, args: &ExportArgs) -> Result<String, InstallError> {
+    let yaml = zeabur_catalog::zeabur::yaml(component, &args.zeabur_namespace)
+        .map_err(|e| InstallError::Catalogue(component.to_owned(), e))?;
+    if yaml.is_empty() {
+        return Ok(String::new());
+    }
+    let comment = format!("# Zeabur's objects for {component}: apply them once it is installed.\n");
+    Ok(if args.format == Format::Helm {
+        format!(
+            "\n{comment}kubectl apply --server-side --field-manager zeabur -f - <<'EOF'\n{yaml}EOF\n"
+        )
+    } else {
+        format!("---\n{comment}{yaml}")
+    })
 }
 
 #[cfg(test)]
@@ -135,6 +159,27 @@ mod tests {
             text(&export(&["cert-manager", "nope"])).is_err(),
             "an unknown one fails the whole export"
         );
+    }
+
+    #[test]
+    fn export_adds_zeaburs_objects_in_each_format() {
+        let rules = text(&export(&["victoria-metrics"])).unwrap();
+        assert!(rules.contains("kind: VMRule"), "{rules}");
+        let policy = text(&export(&[
+            "victoria-logs",
+            "--format",
+            "helm",
+            "--zeabur-namespace",
+            "platform",
+        ]))
+        .unwrap();
+        assert!(policy.contains("kubectl apply --server-side"), "{policy}");
+        assert!(
+            policy.contains("kubernetes.io/metadata.name: platform"),
+            "{policy}"
+        );
+        let none = text(&export(&["cert-manager"])).unwrap();
+        assert!(!none.contains("Zeabur's objects"), "{none}");
     }
 
     #[test]

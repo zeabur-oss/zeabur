@@ -71,9 +71,10 @@ pub const RULES: Read = Read {
     kind: "VMRule",
 };
 
-/// Where the catalog installs Alertmanager, the rules and the cluster's channels.
+/// Where the catalog installs Alertmanager, and where the rules and the cluster's channels are.
 pub const CLUSTER_NAMESPACE: &str = "observability";
-/// The rule set that makes the alerts.
+/// The rule set that makes the alerts, which Zeabur writes with VictoriaMetrics
+/// (`zeabur_catalog::zeabur`).
 pub const RULES_NAME: &str = "zeabur-notifications";
 /// The label of a channel Zeabur made; its value is the channel's name.
 pub const CHANNEL_LABEL: &str = "zeabur.com/notification-channel";

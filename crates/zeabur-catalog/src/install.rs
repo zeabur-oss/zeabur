@@ -1255,6 +1255,7 @@ mod tests {
                     &manifests,
                     &[],
                     &engine::Contributions::default(),
+                    "zeabur",
                 )
                 .unwrap()
                 .into_iter()

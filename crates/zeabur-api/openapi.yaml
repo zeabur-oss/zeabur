@@ -13422,13 +13422,13 @@ components:
         namespace:
           type: string
           description: The namespace the channels are in.
-        rulesInstalled:
-          type:
-          - boolean
-          - "null"
-          description: |-
-            Whether the catalog's rule set is installed; for the cluster only, absent when it could
-            not be read.
+        rules:
+          oneOf:
+          - $ref: "#/components/schemas/RulesState"
+            description: |-
+              Whether Zeabur's alert rules are installed as this Zeabur writes them; for the cluster
+              only, absent when they could not be read.
+          - type: "null"
         state:
           $ref: "#/components/schemas/ProviderState"
           description: Whether the operator's API is served and the channels could be read.
@@ -13577,6 +13577,15 @@ components:
             type: string
             enum:
             - test
+      - type: object
+        description: Write Zeabur's alert rules as this Zeabur has them; for the cluster only.
+        required:
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - rules
       description: What to plan.
     ObjectAccess:
       type: string
@@ -17382,6 +17391,13 @@ components:
       description: >-
         One address's way, and the plan that fixes where it stops when Zeabur can write
         one.
+    RulesState:
+      type: string
+      description: Zeabur's alert rules on the cluster, which it writes with VictoriaMetrics.
+      enum:
+      - current
+      - outdated
+      - missing
     RunAs:
       type: object
       description: |-

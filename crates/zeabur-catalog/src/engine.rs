@@ -176,6 +176,8 @@ pub struct Target<'a> {
     pub written: &'a BTreeSet<String>,
     /// The components the distribution packages, with their `HelmChart` in `kube-system`.
     pub packaged: &'a BTreeMap<String, String>,
+    /// The namespace Zeabur runs in, which [`crate::zeabur::objects`] admit.
+    pub zeabur_namespace: &'a str,
 }
 
 /// One release to apply.
@@ -439,6 +441,7 @@ pub fn install(
             manifests,
             &own,
             &Contributions::of(snapshot, &earlier)?,
+            target.zeabur_namespace,
         )?);
         earlier.insert(component.clone());
         for c in &file.declaration.contributes {
@@ -848,6 +851,9 @@ pub fn verify(download: &Download, bytes: Vec<u8>) -> Result<String, String> {
 /// A removal passes no inputs, and deletes the steps' objects in reverse; the Secrets of inputs
 /// stay.
 ///
+/// The last step holds the objects Zeabur adds to the component ([`crate::zeabur`]) for a Zeabur
+/// in `zeabur_namespace`.
+///
 /// Each Secret goes in the step of the first release in its namespace, or the first step, after
 /// the namespace and before the release, so a chart finds it.
 ///
@@ -861,6 +867,7 @@ pub fn steps_of(
     manifests: &Manifests,
     inputs: &[Resolved],
     contributions: &Contributions,
+    zeabur_namespace: &str,
 ) -> Result<Vec<Step>, Refusal> {
     let broken = broken(&file.id);
     let releases = &file.declaration.releases;
@@ -923,6 +930,21 @@ pub fn steps_of(
             release: release.name.clone(),
             objects,
             skip_if_present: release.skip_if_present.clone(),
+        });
+    }
+    let zeaburs = crate::zeabur::objects(&file.id, zeabur_namespace).map_err(broken)?;
+    if !zeaburs.is_empty() {
+        steps.push(Step {
+            component: file.id.clone(),
+            release: crate::zeabur::RELEASE.to_owned(),
+            objects: zeaburs
+                .into_iter()
+                .map(|object| Desired {
+                    namespace: object.metadata.namespace.clone().unwrap_or_default(),
+                    object,
+                })
+                .collect(),
+            skip_if_present: Vec::new(),
         });
     }
     Ok(steps)
@@ -1820,6 +1842,7 @@ mod tests {
             components: &empty,
             written: &empty,
             packaged: &BTreeMap::new(),
+            zeabur_namespace: "zeabur",
         };
         install(
             &snapshot(),
@@ -2063,6 +2086,7 @@ mod tests {
             &Manifests::new(),
             &[],
             &Contributions::default(),
+            "zeabur",
         )
         .unwrap();
         assert!(
@@ -2162,6 +2186,7 @@ mod tests {
             components: &components,
             written: &written,
             packaged: &BTreeMap::new(),
+            zeabur_namespace: "zeabur",
         };
         install(&snapshot(), id, &target, &manifests(), none())
     }
@@ -2277,6 +2302,7 @@ mod tests {
             components: &components,
             written: &BTreeSet::new(),
             packaged: &BTreeMap::new(),
+            zeabur_namespace: "zeabur",
         };
         let refusal =
             install(&snapshot(), "cert-manager", &target, &manifests(), none()).unwrap_err();
@@ -2296,6 +2322,7 @@ mod tests {
             components: &components,
             written: &BTreeSet::new(),
             packaged: &BTreeMap::new(),
+            zeabur_namespace: "zeabur",
         };
         let refusal =
             install(&snapshot(), "victoria-logs", &target, &manifests(), none()).unwrap_err();
@@ -2315,6 +2342,7 @@ mod tests {
             &manifests(),
             &[],
             &Contributions::default(),
+            "zeabur",
         )
         .unwrap()
         .into_iter()
@@ -2376,6 +2404,7 @@ mod tests {
             &Manifests::new(),
             &[],
             &Contributions::default(),
+            "zeabur",
         )
         .unwrap_err();
         assert!(refusal.to_string().contains(&format!("{SUC}/crd.yaml")));
@@ -2787,6 +2816,7 @@ mod tests {
                 components: &self.components,
                 written: &self.written,
                 packaged: &self.packaged,
+                zeabur_namespace: "zeabur",
             }
         }
     }
@@ -2838,6 +2868,7 @@ mod tests {
                 &manifests(),
                 &[],
                 &Contributions::default(),
+                "zeabur",
             )
             .unwrap()[0],
         );

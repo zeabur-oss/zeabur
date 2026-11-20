@@ -493,6 +493,8 @@ struct World {
     /// The components the distribution packages, with their `HelmChart` in `kube-system`.
     packaged: BTreeMap<String, String>,
     helm_releases: BTreeSet<String>,
+    /// The namespace Zeabur runs in.
+    zeabur_namespace: String,
     now: Timestamp,
 }
 
@@ -577,6 +579,11 @@ impl World {
             written,
             packaged,
             helm_releases: facts.helm_releases.clone(),
+            zeabur_namespace: state
+                .settings
+                .namespace
+                .clone()
+                .unwrap_or_else(|| "zeabur".to_owned()),
             now: (state.clock)(),
         })
     }
@@ -659,6 +666,7 @@ impl World {
             components: &self.running,
             written: &self.written,
             packaged: &self.packaged,
+            zeabur_namespace: &self.zeabur_namespace,
         }
     }
 
@@ -903,8 +911,16 @@ impl World {
         let version = &self.snapshot.index.catalog.version;
         let manifests = self.manifests([file]).await?;
         let none = engine::Contributions::default();
-        let own = engine::steps_of(file, version, self.profile, &manifests, &[], &none)
-            .map_err(|r| refusal(&r))?;
+        let own = engine::steps_of(
+            file,
+            version,
+            self.profile,
+            &manifests,
+            &[],
+            &none,
+            &self.zeabur_namespace,
+        )
+        .map_err(|r| refusal(&r))?;
         let mut zeaburs = false;
         let mut leftovers = file.declaration.leftovers.clone();
         leftovers.extend(engine::input_secrets(file));

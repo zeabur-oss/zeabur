@@ -7,6 +7,10 @@ description: 每一版不相容的變更，以及升級前要先做的事。一�
 
 一次跨好幾版升級時，從你目前的版本開始，依序看過到目標版本為止的每一節。新的版本寫在最上面。
 
+## v0.3.0 → v0.3.1
+
+Zeabur 改成在安裝 VictoriaMetrics 和 VictoriaLogs 時，自己寫入警示規則，以及讓 Zeabur Proxy 讀取記錄的網路規則。Catalog 的元件不再帶這些東西，自訂資源的指標也改名為 `kube_customresource_*`。如果你用 Helm、Flux 或 Argo CD 安裝 VictoriaMetrics，先從 Zeabur Catalog 升級，再用 `zeaburctl components export victoria-metrics victoria-logs` 印出 Zeabur 的物件，套用每個元件最後面的那幾個。舊的 `zeabur-notifications` VMRule 還在、通知頁面又更新不了時，先用 `kubectl -n observability delete vmrule zeabur-notifications` 刪掉，再到通知頁面按**安裝規則**。
+
 ## v0.2 → v0.3
 
 zeabur-installer 已經移除。一個 `helm install` 就能把 Zeabur 裝進既有的叢集；全新的伺服器先用 [Zeatend](../install/one-command.mdx) 裝好 Kubernetes。

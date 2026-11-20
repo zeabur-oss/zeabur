@@ -212,7 +212,7 @@ mod tests {
         let (status, found) = send(&app, "GET", "/api/v1/cluster/notifications", None).await;
         assert_eq!(status, StatusCode::OK, "{found}");
         assert_eq!(found["namespace"], "observability");
-        assert_eq!(found["rulesInstalled"], false);
+        assert_eq!(found["rules"], "missing");
         assert!(
             found["events"]
                 .as_array()
@@ -227,6 +227,46 @@ mod tests {
                 &json!({"op": "add", "name": "ops", "events": ["node-not-ready"],
                          "settings": {"kind": "slack", "webhookUrl": HOOK}}),
             ),
+        )
+        .await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn the_cluster_writes_zeaburs_rules_again_when_they_are_missing_or_outdated() {
+        const CLUSTER: &str = "/api/v1/cluster/notifications";
+        let cluster = alerting();
+        let app = app(&cluster);
+        let rules = |app: &Router| {
+            let app = app.clone();
+            async move { send(&app, "GET", CLUSTER, None).await.1["rules"].clone() }
+        };
+        assert_eq!(rules(&app).await, "missing");
+        let (planned, _) = applied(&app, CLUSTER, &json!({"op": "rules"})).await;
+        assert_eq!(planned["writes"][0]["kind"], "VMRule");
+        assert_eq!(planned["writes"][0]["action"], "create");
+        assert_eq!(rules(&app).await, "current");
+
+        cluster.update(|s| {
+            for object in &mut s.dynamic {
+                if object.metadata.name.as_deref() == Some("zeabur-notifications") {
+                    object.metadata.annotations.get_or_insert_default().insert(
+                        "catalog.zeabur.com/source-digest".to_owned(),
+                        "older".to_owned(),
+                    );
+                }
+            }
+        });
+        assert_eq!(rules(&app).await, "outdated");
+        let (planned, _) = applied(&app, CLUSTER, &json!({"op": "rules"})).await;
+        assert_eq!(planned["writes"][0]["action"], "patch");
+        assert_eq!(rules(&app).await, "current");
+
+        let (status, _) = send(
+            &app,
+            "POST",
+            &format!("{BASE}/plan"),
+            Some(&json!({"op": "rules"})),
         )
         .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
