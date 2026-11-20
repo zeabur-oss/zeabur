@@ -9,3 +9,9 @@ home: https://github.com/zeabur-oss/zeabur
 icon: https://oss.zeabur.com/favicon.svg
 sources:
   - https://github.com/zeabur-oss/zeabur
+dependencies:
+  # Zeabur Identity: sign-in, installed into the namespace zeabur-identity.
+  - name: identity
+    version: 0.3.1
+    repository: oci://ghcr.io/zeabur-oss/charts
+    condition: identity.enabled

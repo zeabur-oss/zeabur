@@ -59,6 +59,13 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
         )
         .to_string(),
     )?;
+    if !install.chart.join("charts").is_dir() {
+        dev.cmd("helm")
+            .args(["dependency", "build"])
+            .arg(install.chart)
+            .quiet()
+            .map_err(|e| format!("fetching Zeabur Identity's chart: {e}"))?;
+    }
     dev.cmd("helm")
         .args(["upgrade", "--install", "zeabur"])
         .arg(install.chart)
@@ -214,8 +221,9 @@ fn identity_ingress() -> Ingress {
     }
 }
 
-/// The chart's values for this cluster (docs/install/existing-cluster.mdx), with the registry's
-/// CA in the full profile, and Zeabur Proxy when its image is built here.
+/// The chart's values for this cluster, with the registry's CA in the full profile, and Zeabur
+/// Proxy when its image is built here. Zeabur Identity is at xtask/pins/zeabur-identity, and the
+/// cluster's components are installed already.
 fn values(image: &str, full: bool, proxy_image: Option<&str>) -> Value {
     let (repository, tag) = split_tag(image);
     // The templates prefer a digest: an empty one clears the one a released chart pins.
@@ -223,6 +231,9 @@ fn values(image: &str, full: bool, proxy_image: Option<&str>) -> Value {
     let mut values = json!({
         "image": {"repository": repository, "tag": tag.unwrap_or("latest"), "digest": digest,
                   "pullPolicy": "IfNotPresent"},
+        "global": {"domain": "localhost"},
+        "identity": {"enabled": false},
+        "components": {"install": []},
         "clusterName": cluster::NAME,
         "publicUrl": format!("https://{ZEABUR_HOST}"),
         "issuer": {
@@ -235,7 +246,7 @@ fn values(image: &str, full: bool, proxy_image: Option<&str>) -> Value {
         "ingress": {
             "enabled": true,
             "className": "traefik",
-            "annotations": {"cert-manager.io/cluster-issuer": ISSUER},
+            "clusterIssuer": ISSUER,
             "tls": {"secretName": "zeabur-tls"},
         },
     });

@@ -12,8 +12,8 @@ metadata:
   labels:
     {{- include "zeabur.labels" . | nindent 4 }}
 data:
-  url: {{ required "publicUrl is required" .Values.publicUrl | trimSuffix "/" | quote }}
-  issuer: {{ required "issuer.url is required" .Values.issuer.url | quote }}
+  url: {{ include "zeabur.publicUrl" . | quote }}
+  issuer: {{ include "zeabur.issuerUrl" . | quote }}
   {{- with .Values.builds.registry }}
   registry: {{ . | quote }}
   {{- if $.Values.builds.caBundle.configMap }}

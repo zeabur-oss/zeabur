@@ -1,11 +1,28 @@
-Zeabur is starting in {{ .Release.Namespace }}:
+{{- $publicUrl := include "zeabur.publicUrl" . -}}
+{{- $issuer := include "zeabur.issuerUrl" . -}}
+Zeabur is starting at {{ $publicUrl }}. Wait for it with:
 
   kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "zeabur.fullname" . }}
+{{- if and .Values.identity.enabled .Release.IsInstall .Values.identity.admin.setupLink }}
 
-Then open {{ .Values.publicUrl }} and sign in through {{ .Values.issuer.url }}.
+Create the first administrator ({{ .Values.identity.admin.user }}) in a browser. The link works
+once and expires in {{ .Values.identity.admin.validFor }}:
+
+  {{ $issuer }}/setup#token={{ include "identity.setupToken" (dict "Values" .Values.identity) }}
+
+The certificates can take a minute after install. If the link has expired, issue another with:
+
+  zeabur-identityctl setup-link --issuer {{ $issuer }} --username {{ .Values.identity.admin.user }}
+{{- else }}
+
+Sign in through {{ $issuer }}.
+{{- end }}
+
+kube-apiserver must trust {{ $issuer }} (audience kubernetes, username prefix zeabur:),
+for example with Zeatend's apiServer.jwt.
 {{- if not (or .Values.ingress.enabled .Values.httpRoute.enabled) }}
 
-Neither ingress.enabled nor httpRoute.enabled is set: route {{ .Values.publicUrl }} to the
+Neither ingress.enabled nor httpRoute.enabled is set: route {{ $publicUrl }} to the
 Service {{ include "zeabur.fullname" . }} (port {{ .Values.service.port }}) yourself.
 {{- end }}
 {{- if .Values.memberRoles.enabled }}

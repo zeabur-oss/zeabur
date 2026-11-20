@@ -327,15 +327,14 @@ jobs:
           scripts/release-default-images.sh >"$RUNNER_TEMP/default-images.txt"
 
           cp -r deploy/chart/zeabur chart
+          helm dependency build chart
           zeabur=$(image zeabur "" image image.tar | tail -n 1)
           proxy=$(image proxy proxy proxy.image proxy-image.tar | tail -n 1)
           cat "$RUNNER_TEMP/default-images.txt" >>published/digests.txt
           # The chart runs each image pinned to its index, and no other.
           [[ "$(scripts/chart-images.sh chart)" == "$(printf '%s\n' "$zeabur" "$proxy" | sort)" ]] ||
             { echo "::error::the chart does not run the images just pushed"; exit 1; }
-          helm lint --strict chart --set publicUrl=https://zeabur.example.com \
-            --set issuer.url=https://identity.example.com \
-            --set issuer.clientSecret.existingSecret=zeabur-oidc
+          helm lint --strict chart --set global.domain=example.com
           helm package chart --destination published
           release push-chart --out published "oci://ghcr.io/$owner/charts" "published/zeabur-$plain.tgz"
           cat published/subjects.json published/digests.txt

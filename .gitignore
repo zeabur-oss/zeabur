@@ -5,3 +5,4 @@ result-*
 .DS_Store
 .claude/settings.local.json
 node_modules
+/deploy/chart/zeabur/charts/

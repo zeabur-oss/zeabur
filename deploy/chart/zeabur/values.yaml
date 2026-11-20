@@ -13,9 +13,21 @@ image:
 
 imagePullSecrets: []
 
-# The address people open, with no path: https://zeabur.example.com. Required. Sign-in comes
-# back to <publicUrl>/auth/callback, the redirect URI registered at Zeabur Identity; Ingress and HTTPRoute
-# take their host name from it.
+global:
+  # The domain the addresses are under: Zeabur is zeabur.<domain> and Zeabur Identity
+  # identity.<domain>; point both (or *.<domain>) at the cluster's ingress. Empty: <ip>.sslip.io,
+  # where <ip> is the first node's ExternalIP, else its InternalIP, which needs no DNS.
+  domain: ""
+
+# Zeabur Identity, installed with Zeabur into the namespace zeabur-identity (its chart's values go
+# under `identity`, such as identity.admin.user). The chart registers Zeabur as a client there.
+# Off: bring your own issuer with issuer.url and issuer.clientSecret.existingSecret.
+identity:
+  enabled: true
+
+# The address people open, with no path: https://zeabur.example.com. Sign-in comes back to
+# <publicUrl>/auth/callback; Ingress and HTTPRoute take their host name from it.
+# Empty: https://zeabur.<global.domain>.
 publicUrl: ""
 
 # What the interface calls this cluster, so people with several can tell them apart, such as
@@ -24,14 +36,15 @@ clusterName: ""
 
 issuer:
   # Zeabur Identity's public URL (its issuer), exactly as Zeabur Identity's discovery document states it.
-  # Required.
+  # Empty: the Zeabur Identity this chart installs.
   url: ""
-  # The client registered with `zeabur-identityctl client create`.
+  # The client's ID at the issuer.
   clientId: zeabur
   clientSecret:
-    # The Secret holding the client secret `zeabur-identityctl client create` printed. Required; create
-    # it before installing (docs/install/existing-cluster.mdx). The chart never takes the secret as a value, so it
-    # stays out of Helm's release records.
+    # The Secret holding the client secret, for an issuer this chart does not install. The chart
+    # never takes the secret as a value, so it stays out of Helm's release records. Empty, with
+    # identity.enabled: the chart registers the client in Zeabur Identity and makes the Secret
+    # <release>-client with a random secret, kept on upgrades.
     existingSecret: ""
     key: client-secret
   # A ConfigMap with extra CA certificates (PEM) to trust for the issuer only; set extraTrustedCA
@@ -46,12 +59,13 @@ issuer:
 # New public URLs. suffixes: the domains a new service's URL is suggested under, as
 # <service>-<project>.<suffix>, such as apps.example.com, the first by default; point a wildcard
 # DNS record (*.apps.example.com) at the cluster's ingress. An administrator can change them on
-# the cluster page. Empty: people type the whole host.
+# the cluster page. Empty: the <ip>.sslip.io domain when global.domain is empty, else people type
+# the whole host.
 # clusterIssuer: the cert-manager ClusterIssuer that signs a new URL's certificate; Zeabur adds its
 # annotation and a tls block to the Ingress, shown in the plan. Empty: new URLs are HTTP only.
 domains:
   suffixes: []
-  clusterIssuer: ""
+  clusterIssuer: letsencrypt
 
 # Services deployed from Git. registry: where Zeabur Builder pushes and nodes pull, the same as the
 # Builder's default registry; a new service runs <registry>/<project>/<service>. The default is the
@@ -213,13 +227,17 @@ service:
   port: 80
 
 ingress:
-  enabled: false
+  enabled: true
+  # Empty: the cluster's default IngressClass (Traefik on K3s).
   className: ""
+  # The cert-manager ClusterIssuer that signs the certificate in tls.secretName. Empty: no
+  # annotation; bring the TLS Secret yourself.
+  clusterIssuer: letsencrypt
   annotations: {}
   tls:
-    # A TLS Secret for the public URL's host name (for example from cert-manager). Empty: the
-    # Ingress has no `tls` section, and TLS ends in front of it.
-    secretName: ""
+    # The TLS Secret for the public URL's host name. Empty: the Ingress has no `tls` section, and
+    # TLS ends in front of it.
+    secretName: zeabur-tls
 
 # A Gateway API route (gateway.networking.k8s.io/v1) instead of, or next to, the Ingress.
 httpRoute:
@@ -252,6 +270,13 @@ updateCheck:
 # address, such as a mirror of a release's api-v1.tar.gz.
 catalog:
   url: https://oss-catalog.zeabur.com/v1/
+
+# Components installed once, right after `helm install`, as Cluster → Components installs them:
+# a hook Job runs `zeabur components install <id>` for each, as cluster-admin until it finishes.
+# cert-manager signs the certificates for Zeabur and Zeabur Identity (ingress.clusterIssuer).
+# Empty: install them from Cluster → Components later. Upgrades never install them.
+components:
+  install: [cert-manager]
 
 # Template updates (docs/reference/telemetry.mdx): every 6 hours at most, Zeabur fetches Zeabur
 # Catalog's newest templates from catalog.url and offers them in place of the ones it was built

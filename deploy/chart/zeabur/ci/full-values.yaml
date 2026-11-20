@@ -2,6 +2,9 @@
 image:
   repository: registry.example.test/zeabur
   tag: v0.0.0-test
+# An issuer of its own instead of the Zeabur Identity the chart installs.
+identity:
+  enabled: false
 publicUrl: https://zeabur.example.test
 clusterName: shop-prod
 issuer:
@@ -37,9 +40,12 @@ terminal:
       memory: 256Mi
 planKey:
   existingSecret: zeabur-plan-key
+components:
+  install: [cert-manager, local-path]
 ingress:
   enabled: true
   className: traefik
+  clusterIssuer: ""
   tls:
     secretName: zeabur-tls
 proxy:
