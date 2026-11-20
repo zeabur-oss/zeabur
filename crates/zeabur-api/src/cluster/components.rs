@@ -37,8 +37,8 @@ use utoipa::ToSchema;
 use zeabur_catalog::InstallSource;
 use zeabur_catalog::api::{ComponentFile, Snapshot};
 use zeabur_catalog::engine::{
-    self, CHART_NAMESPACE, COMPONENT, Desired, HelmChart, MANAGED_BY, MANAGED_BY_ZEABUR, Manifests,
-    Progress, Refusal, Target,
+    self, CHART_NAMESPACE, COMPONENT, Desired, FIELD_MANAGER, HelmChart, MANAGED_BY,
+    MANAGED_BY_ZEABUR, Manifests, Progress, Refusal, Target,
 };
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::Resource as _;
@@ -1133,11 +1133,24 @@ async fn skipped(cluster: &dyn Cluster, step: &engine::Step) -> Result<bool, Api
     Ok(true)
 }
 
+/// Whether Zeabur wrote the object for `component`: its labels say so, or it has no component
+/// label and Zeabur applied it. A controller can replace the labels of what it manages, as the
+/// System Upgrade Controller does with its CRD when it starts.
 fn ours(metadata: &ObjectMeta, component: &str) -> bool {
-    metadata.labels.as_ref().is_some_and(|l| {
-        l.get(COMPONENT).is_some_and(|c| c == component)
-            && l.get(MANAGED_BY).is_some_and(|m| m == MANAGED_BY_ZEABUR)
-    })
+    let labels = metadata.labels.as_ref();
+    let applied = || {
+        metadata.managed_fields.iter().flatten().any(|m| {
+            m.manager.as_deref() == Some(FIELD_MANAGER) && m.operation.as_deref() == Some("Apply")
+        })
+    };
+    labels
+        .and_then(|l| l.get(COMPONENT))
+        .map_or_else(applied, |c| {
+            c == component
+                && labels
+                    .and_then(|l| l.get(MANAGED_BY))
+                    .is_some_and(|m| m == MANAGED_BY_ZEABUR)
+        })
 }
 
 fn kind(object: &DynamicObject) -> &str {

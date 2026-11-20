@@ -820,6 +820,30 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_crd_whose_labels_its_controller_replaced_stays_zeaburs() {
+        let cluster = cluster_with_crds();
+        let app = app(&cluster, false);
+        let suc = "system-upgrade-controller";
+        call_for(&app, suc, "apply", "install", "0.5.3").await;
+        // The controller updates its embedded CRD on start: Zeabur's labels go, its fields stay.
+        let mut crd = dynamic(
+            &cluster,
+            "CustomResourceDefinition",
+            "plans.upgrade.cattle.io",
+        )
+        .unwrap();
+        crd["metadata"]["labels"] = json!({});
+        crd["metadata"]["managedFields"] = json!([
+            {"manager": "zeabur", "operation": "Apply", "apiVersion": "apiextensions.k8s.io/v1"},
+        ]);
+        put(&cluster, crd);
+        established(&cluster, "plans.upgrade.cattle.io");
+        let (status, plan) = call_for(&app, suc, "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(states(&plan), ["crds ready", "controller pending"]);
+    }
+
+    #[tokio::test]
     async fn a_release_whose_crds_another_tool_installed_is_left_out() {
         let cluster = cluster_with_crds();
         put(
