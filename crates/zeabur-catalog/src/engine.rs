@@ -396,8 +396,18 @@ pub fn install(
 ) -> Result<Install, Refusal> {
     let order = components(snapshot, id, target)?;
     let version = &snapshot.index.catalog.version;
-    let contributors = target.written.iter().chain(&order).cloned().collect();
-    let contributions = Contributions::of(snapshot, &contributors)?;
+    let installed: BTreeSet<String> = target.written.iter().chain(&order).cloned().collect();
+    let contributions = Contributions::of(snapshot, &installed)?;
+    // A component installed in this plan is written again like one Zeabur wrote before.
+    let after = Target {
+        written: &installed,
+        ..*target
+    };
+    let mut earlier: BTreeSet<String> = target
+        .written
+        .difference(&order.iter().cloned().collect())
+        .cloned()
+        .collect();
     let mut steps = Vec::new();
     let mut warnings = Vec::new();
     let mut resolved = Vec::new();
@@ -421,14 +431,16 @@ pub fn install(
             });
         }
         let own = resolve(file, inputs)?;
+        // Only the components before it add values: a contributor's objects are not there yet.
         steps.extend(steps_of(
             file,
             version,
             target.profile,
             manifests,
             &own,
-            &contributions,
+            &Contributions::of(snapshot, &earlier)?,
         )?);
+        earlier.insert(component.clone());
         for c in &file.declaration.contributes {
             let (to, release) = (&c.target.component, &c.target.release);
             let again = |id: &String| {
@@ -439,12 +451,13 @@ pub fn install(
                         .any(|o| o.target == c.target)
                 })
             };
-            // The target's own step has the values; a later contributor writes it once.
-            if order.contains(to) || order.iter().skip(i + 1).any(again) {
+            // A target installed later has the values in its own step, and a later contributor
+            // writes it again once for all.
+            if order.iter().skip(i + 1).any(|o| o == to || again(o)) {
                 continue;
             }
             let values = contributions.to(to, release);
-            match rewrite(snapshot, target, to, release, inputs, &contributions)? {
+            match rewrite(snapshot, &after, to, release, inputs, &contributions)? {
                 Some(step) => steps.push(step),
                 None if target.components.contains(to) => warnings.push(Warning::Unchanged {
                     component: to.clone(),
@@ -2879,6 +2892,35 @@ mod tests {
     }
 
     #[test]
+    fn a_target_installed_with_its_contributor_gets_the_values_after_the_contributor() {
+        let install = plan("crowdsec", &["certificates"], &[]).unwrap();
+        let steps: Vec<(&str, &str)> = install
+            .steps
+            .iter()
+            .map(|s| (s.component.as_str(), s.release.as_str()))
+            .collect();
+        let traefik = |s: &Step| s.component == "traefik";
+        let first = install.steps.iter().position(traefik).unwrap();
+        let last = install.steps.iter().rposition(traefik).unwrap();
+        let middleware = install
+            .steps
+            .iter()
+            .position(|s| s.release == "bouncer-middleware")
+            .unwrap();
+        // Traefik does not use the bouncer before CrowdSec's middleware is there.
+        assert!(first < middleware && middleware < last, "{steps:?}");
+        assert!(
+            values_of(&install.steps[first])["experimental"]["plugins"]
+                .get("crowdsec-bouncer")
+                .is_none()
+        );
+        assert!(
+            values_of(&install.steps[last])["experimental"]["plugins"]["crowdsec-bouncer"]
+                .is_object()
+        );
+    }
+
+    #[test]
     fn installing_a_contributor_writes_the_chart_zeabur_installed_again() {
         let mut snapshot = snapshot();
         contributing(&mut snapshot, "keda-http-add-on", "a: http");
@@ -2896,12 +2938,18 @@ mod tests {
             .iter()
             .map(|s| (s.component.as_str(), s.release.as_str()))
             .collect();
-        // keda is written, so the plan has it again first, with the value already in it.
+        // keda-http-add-on needs keda, so keda comes first without the value, and is written
+        // again with it once the add-on's objects are there.
         assert_eq!(
             steps,
-            [("keda", "keda"), ("keda-http-add-on", "http-add-on")]
+            [
+                ("keda", "keda"),
+                ("keda-http-add-on", "http-add-on"),
+                ("keda", "keda")
+            ]
         );
-        assert_eq!(values_of(&install.steps[0])["a"], "http");
+        assert!(values_of(&install.steps[0]).get("a").is_none());
+        assert_eq!(values_of(&install.steps[2])["a"], "http");
 
         // cloudnative-pg does not need keda: its own steps, then keda's chart again.
         contributing(&mut snapshot, "cloudnative-pg", "b: cnpg");
