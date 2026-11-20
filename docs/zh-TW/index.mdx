@@ -13,7 +13,7 @@ description: 從既有的 Kubernetes 叢集開始管理服務。
 
 ## 使用既有 Kubernetes 叢集
 
-準備叢集管理權限、Helm，以及 kube-apiserver 已信任的 Zeabur Identity。Zeabur 的網址要能用 HTTPS 開啟，瀏覽器才會提供通行密鑰。
+準備叢集管理權限和 Helm。Chart 會一起安裝 Zeabur Identity，kube-apiserver 要信任它，做法見[把 Zeabur 裝進既有叢集](install/existing-cluster.mdx)。Zeabur 的網址要能用 HTTPS 開啟，瀏覽器才會提供通行密鑰。
 
 完成後，用通行密鑰登入 Zeabur，在**專案**找到既有的 Namespace，或新增專案部署服務。
 

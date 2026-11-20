@@ -13,7 +13,7 @@ Installing Zeabur on a bare server comes back with Zeatend. Until then, install 
 
 ## Use an existing Kubernetes cluster
 
-You need cluster admin access, Helm, and a Zeabur Identity that kube-apiserver already trusts. The Zeabur address must open over HTTPS so the browser offers passkeys.
+You need cluster admin access and Helm. The chart installs Zeabur Identity too, and kube-apiserver must trust it, as [Install Zeabur in an existing cluster](install/existing-cluster.mdx) shows. The Zeabur address must open over HTTPS so the browser offers passkeys.
 
 When the install finishes, sign in to Zeabur with a passkey, then find an existing Namespace under **Projects** or add a project to deploy services.
 

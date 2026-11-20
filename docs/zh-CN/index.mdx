@@ -13,7 +13,7 @@ description: 从已有的 Kubernetes 集群开始管理服务。
 
 ## 使用已有的 Kubernetes 集群
 
-准备集群管理权限、Helm，以及 kube-apiserver 已信任的 Zeabur Identity。Zeabur 网址必须能通过 HTTPS 打开，浏览器才会提供通行密钥。
+准备集群管理权限和 Helm。Chart 会一并安装 Zeabur Identity，kube-apiserver 需要信任它，做法见[将 Zeabur 安装到已有集群](install/existing-cluster.mdx)。Zeabur 网址必须能通过 HTTPS 打开，浏览器才会提供通行密钥。
 
 完成后，用通行密钥登录 Zeabur，在**项目**中找到已有的 Namespace，或新建项目部署服务。
 
