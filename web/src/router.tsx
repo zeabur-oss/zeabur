@@ -44,6 +44,7 @@ import { RouteError, RoutePending } from "@/components/route-states"
 import { canonicalKind, isTask } from "@/model/service"
 import {
   componentsSearch,
+  gitHubAppContinueSearch,
   gitHubAppSearch,
   objectsSearch,
   projectSearch,
@@ -66,6 +67,8 @@ import {
 //   /cluster/github-app                        the cluster's GitHub App, and where GitHub sends the
 //                                              browser back after making it (?project=… offers
 //                                              the way back to that project's Git form)
+//   /cluster/github-app/continue               sends the App's manifest to GitHub (?state=…); the
+//                                              server lets this page's forms go to GitHub
 //   /projects                                  every project and namespace
 //   /projects/$project                         the project: its problems, then its services as a
 //                                              map or a list (?view=map|list, ?service=… quick look)
@@ -317,6 +320,17 @@ const gitHubAppRoute = createRoute({
   component: lazyRouteComponent(() => import("@/routes/cluster/github-app"), "GitHubAppPage"),
 })
 
+const gitHubAppContinueRoute = createRoute({
+  getParentRoute: () => rootRoute,
+  path: "/cluster/github-app/continue",
+  validateSearch: gitHubAppContinueSearch,
+  loader: () => load(ensure(clusterQuery), ensure(upgradesQuery)),
+  component: lazyRouteComponent(
+    () => import("@/routes/cluster/github-app"),
+    "GitHubAppContinuePage",
+  ),
+})
+
 // What each problem type means: its `type` URI is this page (RFC 9457, section 3.1.1).
 const problemRoute = createRoute({
   getParentRoute: () => rootRoute,
@@ -343,6 +357,7 @@ export const router = createRouter({
     clusterNotificationsRoute,
     componentsRoute,
     gitHubAppRoute,
+    gitHubAppContinueRoute,
     problemRoute,
   ]),
   defaultPreload: "intent",

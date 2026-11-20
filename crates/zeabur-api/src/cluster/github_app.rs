@@ -5,7 +5,7 @@
 //! |---|---|
 //! | `GET /api/v1/cluster/github-app` | the App, its installations and their projects, and whether the person may change them |
 //! | `POST /api/v1/cluster/github-app/manifest` | a sealed `state` for GitHub's manifest flow, bound to the person for an hour |
-//! | `GET /api/v1/cluster/github-app/form` | the page that sends the manifest to GitHub |
+//! | `GET /api/v1/cluster/github-app/form` | where the page [`CONTINUE_PATH`] sends the manifest, and the manifest |
 //! | `POST /api/v1/cluster/github-app/conversion` | turns the code GitHub sent back into the App, and plans storing it; writes nothing |
 //! | `POST /api/v1/cluster/github-app/plan` | what granting an installation to projects writes, and a token; writes nothing |
 //! | `POST /api/v1/cluster/github-app/apply` | carries out a plan by its token |
@@ -19,8 +19,8 @@
 //! rights. Zeabur grants itself nothing.
 //!
 //! GitHub's manifest flow [gh-manifest] makes the App. The browser posts the manifest to GitHub
-//! from a page of this server whose `form-action` allows GitHub only; the web interface's own
-//! policy stays `'self'`. GitHub sends the browser back with a code and the `state`; the
+//! from the web interface's page [`CONTINUE_PATH`], which the server sends with GitHub's origin
+//! in `form-action`; every other page keeps `'self'`. GitHub sends the browser back with a code and the `state`; the
 //! conversion opens the `state`, checks it is the person's and fresh, and exchanges the code
 //! once. The private key and the webhook secret travel only in the sealed plan token, and the
 //! plan shows the Secret with its values hidden.
@@ -35,13 +35,8 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use axum::extract::{RawQuery, State};
-use axum::http::{HeaderMap, HeaderValue, StatusCode, header};
-use axum::response::Response;
-use base64::Engine as _;
-use base64::engine::general_purpose::STANDARD;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
-use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
 use zeabur_core::dns::is_dns_label;
 use zeabur_core::message::Message;
@@ -56,7 +51,6 @@ use crate::error::{ApiError, get_read, read_problem, to_json};
 use crate::extract::{Json, Path};
 use crate::github::{self, Conversion, GitHub};
 use crate::handlers::{AppState, Person};
-use crate::page::{self, Lang};
 use crate::plan_token::{self as token, TokenError};
 use crate::projects::namespace::Permission;
 use crate::projects::writes::token_problem;
@@ -74,6 +68,8 @@ pub const PROJECT_CONFIG_MAP: &str = "zeabur-github-app";
 pub const LABEL: &str = "zeabur.com/github-app";
 /// The annotation Builder's own setup puts on the Secret: the App's page.
 pub const PAGE_ANNOTATION: &str = "builder.zeabur.com/github-app";
+/// The web interface's page that sends the manifest to GitHub.
+pub const CONTINUE_PATH: &str = "/cluster/github-app/continue";
 const PLAN_PREFIX: &str = "gha1.";
 const STATE_PREFIX: &str = "ghs1.";
 /// How long the manifest flow may take, as long as GitHub keeps the code.
@@ -158,6 +154,19 @@ pub struct GitHubManifestRequest {
 pub struct GitHubManifest {
     /// Open this page, which sends the manifest to GitHub.
     pub form_url: String,
+}
+
+/// The form that sends the manifest to GitHub.
+#[derive(Debug, Clone, Serialize, ToSchema)]
+pub struct GitHubManifestForm {
+    /// The App's name on GitHub.
+    pub name: String,
+    /// The organization the App is made in; empty for the person's own account.
+    pub organization: String,
+    /// Where the form posts: GitHub's new App page, with the `state`.
+    pub action: String,
+    /// The `manifest` field, JSON.
+    pub manifest: String,
 }
 
 /// What GitHub sent back.
@@ -575,7 +584,7 @@ async fn listed(
 fn flow_problem() -> ApiError {
     problem(
         Kind::BadRequest,
-        "The link from GitHub expired, or it is not from this server. Start again from the \
+        "This link expired, or it is not from this server. Start again from the \
          cluster page.",
     )
 }
@@ -732,60 +741,29 @@ pub(crate) async fn manifest(
         .append_pair("state", &sealed)
         .finish();
     Ok(Json(GitHubManifest {
-        form_url: format!("/api/v1/cluster/github-app/form?{query}"),
+        form_url: format!("{CONTINUE_PATH}?{query}"),
     }))
 }
 
-fn escape(text: &str) -> String {
-    text.replace('&', "&amp;")
-        .replace('"', "&quot;")
-        .replace('<', "&lt;")
-        .replace('>', "&gt;")
-}
-
-/// The form page's only style, allowed by its hash.
-const FORM_STYLE: &str = "body{margin:0;min-height:100vh;display:grid;place-items:center;\
-font:15px/1.6 system-ui,sans-serif;color:#18181b;background:#fafafa}\
-form{max-width:26rem;margin:16px;padding:24px;border:1px solid #e4e4e7;border-radius:12px;\
-background:#fff}p{margin:0 0 16px}button{font:inherit;font-weight:500;padding:6px 14px;\
-border:0;border-radius:8px;color:#fff;background:#18181b;cursor:pointer}\
-@media(prefers-color-scheme:dark){body{color:#fafafa;background:#09090b}\
-form{border-color:#27272a;background:#18181b}button{color:#18181b;background:#fafafa}}";
-
-/// The page that sends the manifest to GitHub: a form with one button, no script, whose policy
-/// lets forms go to GitHub only.
+/// Where the page [`CONTINUE_PATH`] sends the manifest, and the manifest. Anyone with the
+/// `state` may read them; the conversion checks the person.
 #[utoipa::path(get, path = "/api/v1/cluster/github-app/form", tag = "cluster",
     operation_id = "getGitHubAppForm",
     params(("state" = String, Query, description = "The state `manifest` answered")),
-    responses((status = 200, content_type = "text/html", description = "The page"),
-              (status = 400, content_type = "text/html", description = "The state is not valid")))]
+    responses((status = 200, body = GitHubManifestForm),
+              (status = 400, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn form(
     State(state): State<AppState>,
-    headers: HeaderMap,
     RawQuery(query): RawQuery,
-) -> Response {
-    let lang = Lang::of(&headers);
+) -> Result<Json<GitHubManifestForm>, ApiError> {
     let sealed = form_urlencoded::parse(query.unwrap_or_default().as_bytes())
         .find(|(k, _)| k == "state")
         .map_or_default(|(_, v)| v.into_owned());
-    let opened = sealing(&state)
+    let claims = sealing(&state)
         .ok()
         .and_then(|key| token::open_as::<FlowState>(&key, STATE_PREFIX, &sealed).ok())
-        .filter(|c| (state.clock)().as_second() < c.expires_at);
-    let Some(claims) = opened else {
-        let text = match lang {
-            Lang::En => "This link has expired. Go back to Zeabur and start again.",
-            Lang::ZhTw => "這個連結已經失效，請回到 Zeabur 重新開始。",
-            Lang::ZhCn => "这个链接已经失效，请回到 Zeabur 重新开始。",
-        };
-        return page::html(
-            StatusCode::BAD_REQUEST,
-            lang,
-            "",
-            None,
-            &format!("<p>{text}</p>"),
-        );
-    };
+        .filter(|c| (state.clock)().as_second() < c.expires_at)
+        .ok_or_else(flow_problem)?;
     let web = state.settings.github.web_url.trim_end_matches('/');
     let organization = claims.request.organization.as_str();
     let path = if organization.is_empty() {
@@ -796,39 +774,12 @@ pub(crate) async fn form(
     let query: String = form_urlencoded::Serializer::new(String::new())
         .append_pair("state", &sealed)
         .finish();
-    let action = format!("{web}{path}?{query}");
-    let (lead, button) = match lang {
-        Lang::En => (
-            "GitHub asks you to confirm the new App. Zeabur brings you back when it is made.",
-            "Continue on GitHub",
-        ),
-        Lang::ZhTw => (
-            "接下來會到 GitHub 確認建立 App，建好後會自動回到 Zeabur。",
-            "前往 GitHub",
-        ),
-        Lang::ZhCn => (
-            "接下来会到 GitHub 确认创建 App，创建后会自动回到 Zeabur。",
-            "前往 GitHub",
-        ),
-    };
-    let body = format!(
-        "<style>{FORM_STYLE}</style><form method=\"post\" action=\"{}\"><p>{lead}</p>\
-<input type=\"hidden\" name=\"manifest\" value=\"{}\"><button type=\"submit\">{button}</button></form>",
-        escape(&action),
-        escape(&serde_json::to_string(&manifest_of(&claims.request)).unwrap_or_default()),
-    );
-    let mut response = page::html(StatusCode::OK, lang, "", None, &body);
-    let style = STANDARD.encode(Sha256::digest(FORM_STYLE.as_bytes()));
-    let policy = format!(
-        "default-src 'none'; style-src 'sha256-{style}'; base-uri 'none'; form-action {web}; \
-frame-ancestors 'none'"
-    );
-    if let Ok(value) = HeaderValue::from_str(&policy) {
-        response
-            .headers_mut()
-            .insert(header::CONTENT_SECURITY_POLICY, value);
-    }
-    response
+    Ok(Json(GitHubManifestForm {
+        name: claims.request.name.clone(),
+        organization: organization.to_owned(),
+        action: format!("{web}{path}?{query}"),
+        manifest: serde_json::to_string(&manifest_of(&claims.request)).unwrap_or_default(),
+    }))
 }
 
 /// Turns the code GitHub sent back into the App, and plans storing it in Builder's Secret;

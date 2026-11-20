@@ -32,6 +32,14 @@ export async function startManifest(body: Schemas.GitHubManifestRequest): Promis
   return (await zeabur.startGitHubAppManifest(body)).formUrl
 }
 
+/** Where the page that sends the manifest posts it, and the manifest. */
+export const manifestFormQuery = (state: string) =>
+  queryOptions({
+    queryKey: ["github-app-form", state],
+    queryFn: async ({ signal }) => await zeabur.getGitHubAppForm({ state }, { signal }),
+    ...reviewOnce,
+  })
+
 const planning = (key: QueryKey, plan: (signal: AbortSignal) => Promise<GitHubAppPlan>) =>
   queryOptions({
     queryKey: key,

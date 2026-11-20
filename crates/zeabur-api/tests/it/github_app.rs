@@ -19,7 +19,6 @@ mod tests {
     use base64::Engine as _;
     use base64::engine::general_purpose::{STANDARD, URL_SAFE_NO_PAD};
     use serde_json::{Value, json};
-    use tower::ServiceExt as _;
     use zeabur_api::Settings;
     use zeabur_api::settings::GitHubSettings;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
@@ -216,6 +215,7 @@ mod tests {
             send(app, "POST", &format!("{BASE}/manifest"), Some(&request)).await;
         assert_eq!(status, StatusCode::OK, "{started}");
         let form = started["formUrl"].as_str().unwrap().to_owned();
+        assert!(form.starts_with("/cluster/github-app/continue?state="), "{form}");
         form.split_once("state=").unwrap().1.to_owned()
     }
 
@@ -270,45 +270,21 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn the_form_sends_the_manifest_to_github_only() {
+    async fn the_form_sends_the_manifest_to_github() {
         let (_cluster, app, _fake) = setup().await;
         let state = start(&app).await;
-        let request = axum::http::Request::get(format!("{BASE}/form?state={state}"))
-            .body(axum::body::Body::empty())
-            .unwrap();
-        let response = app.clone().oneshot(request).await.unwrap();
-        assert_eq!(response.status(), StatusCode::OK);
-        let policy = response.headers()["content-security-policy"]
-            .to_str()
-            .unwrap()
-            .to_owned();
+        let (status, form) = send(&app, "GET", &format!("{BASE}/form?state={state}"), None).await;
+        assert_eq!(status, StatusCode::OK, "{form}");
+        let action = form["action"].as_str().unwrap();
         assert!(
-            policy.contains("form-action https://github.com;"),
-            "{policy}"
+            action.starts_with("https://github.com/settings/apps/new?state="),
+            "{action}"
         );
-        assert!(!policy.contains("script-src"), "{policy}");
-        assert!(policy.contains("style-src 'sha256-"), "{policy}");
-        assert!(!policy.contains("unsafe"), "{policy}");
-        let page = http_body_util::BodyExt::collect(response.into_body())
-            .await
-            .unwrap()
-            .to_bytes();
-        let page = String::from_utf8_lossy(&page);
-        assert!(
-            page.contains("action=\"https://github.com/settings/apps/new?state="),
-            "{page}"
-        );
-        assert!(page.contains("name=\"manifest\""), "{page}");
-        assert!(
-            page.contains("&quot;statuses&quot;:&quot;write&quot;"),
-            "{page}"
-        );
+        let manifest: Value = serde_json::from_str(form["manifest"].as_str().unwrap()).unwrap();
+        assert_eq!(manifest["default_permissions"]["statuses"], "write", "{manifest}");
 
-        let request = axum::http::Request::get(format!("{BASE}/form?state=ghs1.forged"))
-            .body(axum::body::Body::empty())
-            .unwrap();
-        let response = app.clone().oneshot(request).await.unwrap();
-        assert_eq!(response.status(), StatusCode::BAD_REQUEST);
+        let (status, _) = send(&app, "GET", &format!("{BASE}/form?state=ghs1.forged"), None).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
     }
 
     #[tokio::test]

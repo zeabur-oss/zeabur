@@ -6637,6 +6637,20 @@ export type GitHubManifest = {
 }
 
 /**
+ * The form that sends the manifest to GitHub.
+ */
+export type GitHubManifestForm = {
+  /** Where the form posts: GitHub's new App page, with the `state`. */
+  action: string
+  /** The `manifest` field, JSON. */
+  manifest: string
+  /** The App's name on GitHub. */
+  name: string
+  /** The organization the App is made in; empty for the person's own account. */
+  organization: string
+}
+
+/**
  * What the manifest flow needs.
  */
 export type GitHubManifestRequest = {
@@ -11968,14 +11982,14 @@ export const getGetGitHubAppFormUrl = (params: GetGitHubAppFormParams) => {
 }
 
 /**
- * @summary The page that sends the manifest to GitHub: a form with one button, no script, whose policy
-lets forms go to GitHub only.
+ * @summary Where the page [`CONTINUE_PATH`] sends the manifest, and the manifest. Anyone with the
+`state` may read them; the conversion checks the person.
  */
 export const getGitHubAppForm = async (
   params: GetGitHubAppFormParams,
   options?: Parameters<typeof zeaburFetch>[1],
-): Promise<unknown> => {
-  return zeaburFetch<unknown>(getGetGitHubAppFormUrl(params), {
+): Promise<GitHubManifestForm> => {
+  return zeaburFetch<GitHubManifestForm>(getGetGitHubAppFormUrl(params), {
     ...options,
     method: "GET",
   })

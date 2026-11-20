@@ -5,6 +5,7 @@ use std::sync::OnceLock;
 
 use axum::Router;
 use axum::body::{Body, Bytes};
+use axum::routing::any;
 use axum::http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header};
 use axum::response::Response;
 
@@ -130,6 +131,40 @@ pub fn router_for(assets: &'static [Asset], csp: &'static str) -> Router {
     })
 }
 
+/// [`router_for`] with [`CSP`], except the page at `path`, whose forms may also go to `origin`, a
+/// bare `https://host[:port]` (the one page that posts to another site). Without `origin`, that
+/// page gets [`CSP`] too.
+pub fn router_with_form_page(
+    assets: &'static [Asset],
+    path: &'static str,
+    origin: Option<&str>,
+) -> Router {
+    let router = router_for(assets, CSP);
+    let Some(csp) = origin.and_then(csp_with_form_action) else {
+        return router;
+    };
+    router.route(
+        path,
+        any(move |request: Request<Body>| async move {
+            respond_with(
+                assets,
+                csp,
+                request.method(),
+                request.uri().path(),
+                request.headers(),
+            )
+        }),
+    )
+}
+
+fn csp_with_form_action(origin: &str) -> Option<HeaderValue> {
+    HeaderValue::from_str(&CSP.replace(
+        "form-action 'self';",
+        &format!("form-action 'self' {origin};"),
+    ))
+    .ok()
+}
+
 /// Whether `path` is a page of the interface: a client-side route answered with `index.html`,
 /// not a file, an API path or a missing build output.
 #[cfg(feature = "interface")]
@@ -161,6 +196,16 @@ pub fn is_page_in(assets: &[Asset], path: &str) -> bool {
 pub fn respond(
     assets: &[Asset],
     csp: &'static str,
+    method: &Method,
+    path: &str,
+    headers: &HeaderMap,
+) -> Response {
+    respond_with(assets, HeaderValue::from_static(csp), method, path, headers)
+}
+
+fn respond_with(
+    assets: &[Asset],
+    csp: HeaderValue,
     method: &Method,
     path: &str,
     headers: &HeaderMap,
@@ -313,7 +358,7 @@ fn if_none_match(headers: &HeaderMap, etag: &str) -> bool {
 }
 
 /// `csp` is the policy of an HTML page, `None` for other files.
-fn harden(headers: &mut HeaderMap, csp: Option<&'static str>) {
+fn harden(headers: &mut HeaderMap, csp: Option<HeaderValue>) {
     insert(headers, header::X_CONTENT_TYPE_OPTIONS, "nosniff");
     insert(
         headers,
@@ -321,7 +366,7 @@ fn harden(headers: &mut HeaderMap, csp: Option<&'static str>) {
         "same-origin",
     );
     if let Some(csp) = csp {
-        insert(headers, header::CONTENT_SECURITY_POLICY, csp);
+        headers.insert(header::CONTENT_SECURITY_POLICY, csp);
         insert(headers, header::X_FRAME_OPTIONS, "DENY");
         insert(headers, header::REFERRER_POLICY, "no-referrer");
         insert(
@@ -710,6 +755,34 @@ mod tests {
             header(&response, "cross-origin-resource-policy"),
             Some("same-origin")
         );
+    }
+
+    #[tokio::test]
+    async fn only_the_page_with_its_own_policy_may_send_forms_elsewhere() {
+        let app = router_with_form_page(
+            &TEST_ASSETS,
+            "/cluster/github-app/continue",
+            Some("https://github.com"),
+        );
+        let policy = async |path: &str| {
+            let response = app
+                .clone()
+                .oneshot(Request::get(path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            header(&response, "content-security-policy")
+                .unwrap_or_default()
+                .to_owned()
+        };
+        let page = policy("/cluster/github-app/continue?state=s").await;
+        assert!(
+            page.contains("; form-action 'self' https://github.com;"),
+            "{page}"
+        );
+        assert_eq!(page.replace(" https://github.com;", ";"), CSP);
+        assert_eq!(policy("/cluster/github-app").await, CSP);
+        assert_eq!(policy("/cluster/github-app/continue/x").await, CSP);
     }
 
     #[test]

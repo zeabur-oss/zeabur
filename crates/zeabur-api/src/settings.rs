@@ -109,6 +109,21 @@ pub struct GitHubSettings {
     pub api_url: String,
 }
 
+impl GitHubSettings {
+    /// The origin of [`web_url`](Self::web_url), `https://github.com`: what the page that sends
+    /// the manifest may post to. `None` when `web_url` is not an `https` or `http` URL of a host.
+    #[must_use]
+    pub fn web_origin(&self) -> Option<String> {
+        let (scheme, rest) = self.web_url.split_once("://")?;
+        let authority = rest.split('/').next().unwrap_or_default();
+        let host_chars = |c: char| c.is_ascii_alphanumeric() || matches!(c, '.' | '-' | ':');
+        (matches!(scheme, "https" | "http")
+            && !authority.is_empty()
+            && authority.chars().all(host_chars))
+        .then(|| format!("{scheme}://{authority}"))
+    }
+}
+
 /// github.com's REST API.
 pub const GITHUB_API: &str = "https://api.github.com";
 
@@ -881,6 +896,26 @@ pub(crate) mod store {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn the_form_may_post_to_github_s_origin_only() {
+        let origin = |web_url: &str| {
+            GitHubSettings {
+                web_url: web_url.to_owned(),
+                api_url: GITHUB_API.to_owned(),
+            }
+            .web_origin()
+        };
+        assert_eq!(origin("https://github.com").as_deref(), Some("https://github.com"));
+        assert_eq!(
+            origin("https://ghe.example.com:8443/").as_deref(),
+            Some("https://ghe.example.com:8443")
+        );
+        assert_eq!(origin("https://github.com; script-src *"), None);
+        assert_eq!(origin("https://*.github.com"), None);
+        assert_eq!(origin("javascript://x"), None);
+        assert_eq!(origin("github.com"), None);
+    }
 
     #[test]
     fn a_service_port_is_namespace_name_and_port() {

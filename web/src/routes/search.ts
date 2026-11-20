@@ -159,6 +159,8 @@ export const gitHubAppSearch = z.object({
   project: text,
 })
 
+export const gitHubAppContinueSearch = z.object({ state: text })
+
 const projectSortKeys = ["health", "name"] as const
 export type ProjectSortKey = (typeof projectSortKeys)[number]
 
