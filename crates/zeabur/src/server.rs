@@ -348,10 +348,6 @@ fn credentials(parts: &Parts) -> Option<&Credentials<Connection>> {
     }
 }
 
-fn timestamp(seconds: i64) -> Timestamp {
-    Timestamp::from_second(seconds).unwrap_or(Timestamp::UNIX_EPOCH)
-}
-
 impl ClusterAccess for SessionAccess {
     fn for_request(&self, parts: &Parts) -> Result<Arc<dyn Cluster>, Box<Problem>> {
         Ok(Arc::clone(&connection(parts)?.cluster))
@@ -361,7 +357,7 @@ impl ClusterAccess for SessionAccess {
         let base = &credentials(parts)?.base;
         Some(Handoff {
             token: base.value.token.clone(),
-            expires_at: timestamp(base.expires_at),
+            expires_at: Timestamp::from_second(base.expires_at).ok()?,
         })
     }
 

@@ -26,6 +26,7 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_graph::manifest::{HIDDEN, to_yaml};
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, LogOptions};
 use zeabur_model::{Message, Origin, Service, WorkloadKind, id};
 
@@ -62,8 +63,8 @@ impl Doc {
 pub struct EvidenceBundle {
     /// `projects/<project>/services/<kind>/<name>/evidence`.
     pub id: String,
-    /// When it was read, RFC 3339.
-    pub generated_at: String,
+    /// When it was read.
+    pub generated_at: Timestamp,
     /// The text to copy.
     pub markdown: String,
     /// Reads the person was refused; the text names them too.
@@ -333,7 +334,7 @@ pub(crate) async fn bundle(
     read: &ProjectRead,
     service: &Service,
     trace: &ServiceTrace,
-    generated_at: &str,
+    generated_at: Timestamp,
 ) -> String {
     let project = &read.document.project.namespace;
     let mut out = Doc(format!(
@@ -393,11 +394,8 @@ pub(crate) async fn evidence(
         .find(|s| s.workload.kind == workload_kind && s.workload.name == name)
         .ok_or_else(|| not_found(&project, workload_kind.as_str(), &name))?;
     let trace = of_service(&state, cluster, &read, service).await?;
-    let generated_at =
-        zeabur_kube::k8s_openapi::jiff::Timestamp::from_second((state.clock)().as_second())
-            .unwrap_or(zeabur_kube::k8s_openapi::jiff::Timestamp::UNIX_EPOCH)
-            .to_string();
-    let markdown = bundle(cluster, &read, service, &trace, &generated_at).await;
+    let generated_at = crate::plan_token::whole_second((state.clock)())?;
+    let markdown = bundle(cluster, &read, service, &trace, generated_at).await;
     Ok(Json(EvidenceBundle {
         id: format!("{}/evidence", id::service(&project, workload_kind, &name)),
         generated_at,

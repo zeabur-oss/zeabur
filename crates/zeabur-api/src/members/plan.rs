@@ -38,7 +38,7 @@ use super::writes::{
 use crate::error::{ApiError, read_problem, to_json};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
-use crate::plan_token::{self as token, LIFETIME_SECONDS, PlanKey, TokenError};
+use crate::plan_token::{self as token, PlanKey, TokenError};
 use crate::projects::writes::token_problem;
 use crate::settings::IdentitySettings;
 
@@ -167,8 +167,8 @@ pub struct MemberWrite {
 pub struct MemberPlan {
     /// Send this to `apply` to carry out exactly this plan.
     pub token: String,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// The writes, in order.
     pub writes: Vec<MemberWrite>,
     /// For an invitation: how long its link will work once made, in seconds.
@@ -865,15 +865,16 @@ pub(crate) async fn plan(
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     let computed = compute(&state, cluster.as_ref(), &identity.username, &change).await?;
     let namespace = state.settings.identity.namespace.as_str();
-    let now = (state.clock)().as_second();
+    let clock = (state.clock)();
+    let now = clock.as_second();
     let writes = writes_of(&computed, namespace, username_of(&change), now);
-    let expires_at = now.saturating_add(LIFETIME_SECONDS);
+    let expires_at = token::expiry(clock)?;
     let claims = Claims {
         person: identity.username,
         groups: identity.groups,
         change,
         versions: computed.versions,
-        expires_at,
+        expires_at: expires_at.as_second(),
     };
     let token = token::sign_as(&sealing, PREFIX, &claims).map_err(|_random| {
         ApiError::from(Problem::new(
@@ -883,9 +884,7 @@ pub(crate) async fn plan(
     })?;
     Ok(Json(MemberPlan {
         token,
-        expires_at: Timestamp::from_second(expires_at)
-            .unwrap_or(Timestamp::UNIX_EPOCH)
-            .to_string(),
+        expires_at,
         writes,
         link_seconds: computed.link_seconds,
         new_member: computed.new_member,
@@ -1087,7 +1086,7 @@ async fn issue_token(
         })?;
     let record = WriteRequest {
         target: account_target(name),
-        body: WriteBody::JsonPatch(json!(api_token::expiry_patch(name, &token.expires_at))),
+        body: WriteBody::JsonPatch(json!(api_token::expiry_patch(name, token.expires_at))),
         dry_run: false,
     };
     let recorded = cluster.write(&record).await.is_ok();

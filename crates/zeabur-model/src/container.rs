@@ -1,5 +1,6 @@
 //! A container's environment and storage.
 
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::attribution::Attribution;
@@ -212,12 +213,12 @@ pub struct EnvVar {
 #[serde(rename_all = "camelCase")]
 pub struct PendingRestart {
     /// When the object was last written by a field manager that owns the key (for an `envFrom`
-    /// import, any key), RFC 3339.
-    pub written_at: String,
+    /// import, any key).
+    pub written_at: Timestamp,
     /// That manager.
     pub manager: String,
-    /// When the oldest running pod started (`status.startTime`), RFC 3339.
-    pub pod_started_at: String,
+    /// When the oldest running pod started (`status.startTime`).
+    pub pod_started_at: Timestamp,
     /// That pod.
     pub pod: String,
 }

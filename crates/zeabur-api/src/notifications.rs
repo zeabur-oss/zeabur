@@ -43,7 +43,7 @@ use zeabur_modules::alertmanager::{
 use crate::error::{ApiError, get_read, list_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
-use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
+use crate::plan_token::{self as token, TokenError};
 use crate::projects::backups::ProviderState;
 use crate::projects::namespace::Permission;
 use crate::projects::writes::token_problem;
@@ -175,8 +175,8 @@ pub struct NotificationWrite {
 pub struct NotificationsPlan {
     /// Send this to `apply` to carry out exactly this plan.
     pub token: String,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// The writes, in order; empty when nothing changes.
     pub writes: Vec<NotificationWrite>,
 }
@@ -803,11 +803,12 @@ async fn plan_in(
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
-    let now = (state.clock)().as_second();
+    let clock = (state.clock)();
+    let now = clock.as_second();
     let job = matches!(request, NotificationsPlanRequest::Test { .. })
         .then(|| am::test_job_name(request.name(), now));
     let computed = compute(cluster, namespace, scope, &request, job.as_deref()).await?;
-    let expires_at = now.saturating_add(LIFETIME_SECONDS);
+    let expires_at = token::expiry(clock)?;
     let claims = Claims {
         person: identity.username,
         groups: identity.groups,
@@ -815,7 +816,7 @@ async fn plan_in(
         request,
         versions: computed.versions,
         job,
-        expires_at,
+        expires_at: expires_at.as_second(),
     };
     let token = token::sign_as(&sealing, PREFIX, &claims).map_err(|_random| {
         ApiError::from(Problem::new(
@@ -825,9 +826,7 @@ async fn plan_in(
     })?;
     Ok(NotificationsPlan {
         token,
-        expires_at: Timestamp::from_second(expires_at)
-            .unwrap_or(Timestamp::UNIX_EPOCH)
-            .to_string(),
+        expires_at,
         writes: computed
             .writes
             .iter()

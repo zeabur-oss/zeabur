@@ -21,6 +21,7 @@ use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::ClusterError;
 use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_model::{Origin, ProjectDetails};
 use zeabur_modules::Reading;
 
@@ -115,9 +116,9 @@ pub struct ClusterUsage {
     pub pods_scanned: usize,
     /// Whether usage could be read.
     pub metrics: MetricsState,
-    /// When the newest sample was taken (RFC 3339).
+    /// When the newest sample was taken.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<String>,
+    pub timestamp: Option<Timestamp>,
     /// The window CPU is averaged over, as metrics-server writes it (`15s`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<String>,
@@ -149,14 +150,14 @@ fn add_usage(
     metrics: Result<Reading<UnreadableView>, ClusterError>,
     sums: &mut BTreeMap<String, Sum>,
     unreadable: &mut Vec<UnreadableView>,
-) -> (MetricsState, Option<String>, Option<String>) {
+) -> (MetricsState, Option<Timestamp>, Option<String>) {
     let mut timestamp = None;
     let mut window = None;
     let state = match metrics {
         Ok(Reading::Objects(objects)) => {
             let samples = zeabur_modules::metrics_server::pod_usage(&objects);
             if let Some(newest) = samples.iter().max_by(|a, b| a.timestamp.cmp(&b.timestamp)) {
-                timestamp.clone_from(&newest.timestamp);
+                timestamp = newest.timestamp;
                 window.clone_from(&newest.window);
             }
             for sample in samples {

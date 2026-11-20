@@ -156,8 +156,9 @@ tower-http = { version = "0.7", default-features = false, features = [
 ] }
 tracing = "0.1"
 # OpenAPI from the code. Reviewed 2026-10-28 (zeabur-api README): no `yaml` feature (it pulls a
-# c2rust libyaml); the spec is written with serde-saphyr. Never enable `config`.
-utoipa = { version = "=6.0.0", default-features = false, features = ["macros"] }
+# c2rust libyaml); the spec is written with serde-saphyr. Never enable `config`. `jiff_0_2` states
+# jiff's `Timestamp` as `date-time` and `Date` as `date`; it adds no crate.
+utoipa = { version = "=6.0.0", default-features = false, features = ["macros", "jiff_0_2"] }
 utoipa-axum = "=0.3.0"
 # Names the struct `#[utoipa::path]` generates for a handler (zeabur-api `described!`); already in
 # the tree through utoipa-axum.

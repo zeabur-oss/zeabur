@@ -669,8 +669,8 @@ pub struct WriteRequest {
 pub struct IssuedToken {
     /// `status.token`.
     pub token: String,
-    /// `status.expirationTimestamp`, RFC 3339.
-    pub expires_at: String,
+    /// `status.expirationTimestamp`.
+    pub expires_at: k8s_openapi::jiff::Timestamp,
 }
 
 impl std::fmt::Debug for IssuedToken {

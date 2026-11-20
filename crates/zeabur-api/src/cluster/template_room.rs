@@ -160,7 +160,7 @@ mod tests {
             memory_bytes: pods.iter().map(|p| p.2).sum(),
             cpu_millicores: pods.iter().map(|p| p.1).sum(),
             environment: "kind-single-node-amd64".to_owned(),
-            measured_at: "2026-11-01".to_owned(),
+            measured_at: zeabur_kube::k8s_openapi::jiff::civil::date(2026, 11, 1),
             pods: pods
                 .iter()
                 .map(|&(workload, cpu_millicores, memory_bytes)| MeasuredPod {

@@ -42,6 +42,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use k8s_openapi::api::core::v1::Service as KubeService;
 use k8s_openapi::api::networking::v1::{Ingress, IngressServiceBackend};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::jiff::Timestamp;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -764,7 +765,11 @@ fn certificate(
             certificate_name,
         )
         .with_field("status.conditions[type=Ready]".to_owned());
-        let not_after = certificate.status.not_after.clone();
+        let not_after: Option<Timestamp> = certificate
+            .status
+            .not_after
+            .as_deref()
+            .and_then(|t| t.parse().ok());
         let check = |state, reason: String, message: String| CertificateCheck {
             state,
             name: Some(certificate_name.to_owned()),
@@ -772,7 +777,7 @@ fn certificate(
             rate_limited: state == CertificateState::Failed
                 && CertificateCheck::says_rate_limited(&message),
             message: (!message.is_empty()).then_some(message),
-            not_after: not_after.clone(),
+            not_after,
         };
         let challenge = challenge(input, host);
         let challenged = challenge.is_some();
@@ -785,7 +790,7 @@ fn certificate(
         let (hop, check) = if status(ready) == "True" {
             (
                 base(HopStatus::Ok, "ok")
-                    .with("until", not_after.clone().unwrap_or_default())
+                    .with("until", not_after.map_or_default(|t| t.to_string()))
                     .saw("True"),
                 check(CertificateState::Ready, String::new(), String::new()),
             )

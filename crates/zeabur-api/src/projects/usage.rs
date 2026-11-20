@@ -15,6 +15,7 @@ use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_model::{Health, Origin};
 use zeabur_modules::Reading;
 
@@ -60,9 +61,9 @@ pub struct ProjectUsage {
     pub id: String,
     /// Whether usage could be read.
     pub state: MetricsState,
-    /// When the newest sample was taken (RFC 3339).
+    /// When the newest sample was taken.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<String>,
+    pub timestamp: Option<Timestamp>,
     /// The window CPU is averaged over, as metrics-server writes it (`15s`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<String>,
@@ -106,7 +107,7 @@ pub(crate) async fn get(
         Ok(Reading::Objects(objects)) => {
             let pods = zeabur_modules::metrics_server::pod_usage(&objects);
             if let Some(newest) = pods.iter().max_by(|a, b| a.timestamp.cmp(&b.timestamp)) {
-                usage.timestamp.clone_from(&newest.timestamp);
+                usage.timestamp = newest.timestamp;
                 usage.window.clone_from(&newest.window);
             }
             usage.pods = pods.into_iter().map(|pod| view(&project, pod)).collect();

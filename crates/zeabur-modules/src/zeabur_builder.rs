@@ -15,7 +15,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 
-use crate::{Module, Read, filled, read_as};
+use crate::{Module, Read, filled, filled_time, read_as};
 
 /// The module.
 pub static MODULE: Module = Module {
@@ -66,7 +66,7 @@ pub struct ZeaburBuilderBuild {
     /// (`status.uploadToken.request`).
     pub upload_request: Option<String>,
     /// When that upload token expires.
-    pub upload_expires: Option<String>,
+    pub upload_expires: Option<Timestamp>,
     /// The branch or tag it follows; `HEAD` (or none) follows the repository's default branch.
     pub git_ref: Option<String>,
     /// The ref the newest commit came from, such as `refs/heads/master`, when the controller
@@ -148,7 +148,7 @@ pub struct ZeaburBuilderProblem {
     /// The controller's message.
     pub message: Option<String>,
     /// When the condition turned `False`.
-    pub since: Option<String>,
+    pub since: Option<Timestamp>,
     /// Whether it needs someone to act. Only `ResolveFailed` (a timeout or a server error) may
     /// clear by itself, so it counts once it has lasted [`TRANSIENT`].
     pub lasting: bool,
@@ -177,12 +177,9 @@ fn problem(build: &BuildView, now: Option<Timestamp>) -> Option<ZeaburBuilderPro
                 c.status == "False" && c.reason.as_deref() != Some(WAITING_FOR_UPLOAD)
             })?;
             let reason = filled(found.reason.as_ref());
-            let since = filled(found.last_transition_time.as_ref());
+            let since = filled_time(found.last_transition_time.as_ref());
             let lasting = reason.as_deref() != Some("ResolveFailed")
-                || match (
-                    now,
-                    since.as_deref().and_then(|s| s.parse::<Timestamp>().ok()),
-                ) {
+                || match (now, since) {
                     (Some(now), Some(since)) => now.duration_since(since) >= TRANSIENT,
                     _ => true,
                 };
@@ -217,11 +214,11 @@ pub struct ZeaburBuilderRun {
     /// Details, at most 1 KiB of the Job's output.
     pub message: Option<String>,
     /// When it was created.
-    pub created: Option<String>,
+    pub created: Option<Timestamp>,
     /// When it started.
-    pub started: Option<String>,
+    pub started: Option<Timestamp>,
     /// When it finished.
-    pub finished: Option<String>,
+    pub finished: Option<Timestamp>,
     /// The tags pushed.
     pub tags: Vec<String>,
     /// The pushed manifest's digest.
@@ -424,7 +421,7 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                         .as_ref()
                         .and_then(|t| t.request.as_ref()),
                 ),
-                upload_expires: filled(
+                upload_expires: filled_time(
                     status
                         .upload_token
                         .as_ref()
@@ -480,19 +477,15 @@ pub fn runs(objects: &[DynamicObject]) -> Vec<ZeaburBuilderRun> {
                 phase: filled(status.phase.as_ref()),
                 reason: filled(status.reason.as_ref()),
                 message: filled(status.message.as_ref()),
-                created: r
-                    .metadata
-                    .creation_timestamp
-                    .as_ref()
-                    .map(|t| t.0.to_string()),
-                started: filled(status.start_time.as_ref()),
-                finished: filled(status.completion_time.as_ref()),
+                created: r.metadata.creation_timestamp.as_ref().map(|t| t.0),
+                started: filled_time(status.start_time.as_ref()),
+                finished: filled_time(status.completion_time.as_ref()),
                 tags: status.tags,
                 digest: filled(status.image_digest.as_ref()),
             })
         })
         .collect();
-    out.sort_by(|a, b| (b.created.as_deref(), &b.name).cmp(&(a.created.as_deref(), &a.name)));
+    out.sort_by(|a, b| (b.created, &b.name).cmp(&(a.created, &a.name)));
     out
 }
 

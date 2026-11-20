@@ -3,7 +3,7 @@
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
-use zeabur_core::problem::Denied;
+use zeabur_core::problem::{Denied, Kind, Problem};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, DynamicObject, ResourceRef};
@@ -138,11 +138,8 @@ impl<S, T> Object<S, T> {
         self.metadata.name.as_deref().unwrap_or_default()
     }
 
-    pub(crate) fn created(&self) -> Option<String> {
-        self.metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|t| t.0.to_string())
+    pub(crate) fn created(&self) -> Option<Timestamp> {
+        self.metadata.creation_timestamp.as_ref().map(|t| t.0)
     }
 }
 
@@ -287,8 +284,7 @@ impl Directory {
             let last_used_at = credential
                 .status
                 .last_used_at
-                .and_then(|secs| Timestamp::from_second(secs).ok())
-                .map(|t| t.to_string());
+                .and_then(|secs| Timestamp::from_second(secs).ok());
             if credential.spec.kind == "Passkey" {
                 let passkey = credential.spec.passkey.clone().unwrap_or_default();
                 let label = credential
@@ -323,12 +319,9 @@ impl Directory {
         let last_sign_in_at = grants
             .iter()
             .filter_map(|g| Timestamp::from_second(g.spec.auth_time).ok())
-            .map(|t| t.to_string())
-            .chain(passkeys.iter().filter_map(|p| p.last_used_at.clone()))
-            .chain(linked.iter().filter_map(|l| l.last_used_at.clone()))
-            .filter_map(|t| t.parse::<Timestamp>().ok())
-            .max()
-            .map(|t| t.to_string());
+            .chain(passkeys.iter().filter_map(|p| p.last_used_at))
+            .chain(linked.iter().filter_map(|l| l.last_used_at))
+            .max();
         let spec = &user.spec;
         let admin = spec.account_type == AccountType::Admin;
         MemberView {
@@ -365,14 +358,22 @@ impl Directory {
         &self,
         invitation: &Object<InvitationSpec>,
         namespace: &str,
-    ) -> InvitationView {
+    ) -> Result<InvitationView, ApiError> {
         let username = &invitation.spec.user;
-        InvitationView {
+        let expires_at = Timestamp::from_second(invitation.spec.expires_at).map_err(|_range| {
+            ApiError::from(Problem::new(
+                Kind::Internal,
+                format!(
+                    "Zeabur Identity gave invitation {} an expiry out of range.",
+                    invitation.name()
+                ),
+            ))
+        })?;
+        Ok(InvitationView {
             id: format!("members/invitations/{}", invitation.name()),
             name: invitation.name().to_owned(),
             username: username.clone(),
-            expires_at: Timestamp::from_second(invitation.spec.expires_at)
-                .map_or_default(|t| t.to_string()),
+            expires_at,
             created_at: invitation.created(),
             new_member: self.user(username).is_none()
                 || !self.credentials.iter().any(|c| &c.spec.user == username),
@@ -382,7 +383,7 @@ impl Directory {
                 Some(namespace),
                 invitation.name(),
             ),
-        }
+        })
     }
 
     /// Every member (sorted by name) and every invitation still valid at `now` (soonest to
@@ -395,7 +396,7 @@ impl Directory {
         setup_links: SetupLinks,
         can_manage: Permission,
         project_roles: bool,
-    ) -> MembersView {
+    ) -> Result<MembersView, ApiError> {
         let mut items: Vec<MemberView> = self
             .users
             .iter()
@@ -408,14 +409,14 @@ impl Directory {
             })
             .collect();
         items.sort_by(|a, b| a.username.cmp(&b.username));
-        let mut invitations: Vec<InvitationView> = self
+        let mut invitations = self
             .invitations
             .iter()
             .filter(|i| i.spec.expires_at > now.as_second())
             .map(|i| self.invitation(i, namespace))
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
         invitations.sort_by(|a, b| a.expires_at.cmp(&b.expires_at).then(a.name.cmp(&b.name)));
-        MembersView {
+        Ok(MembersView {
             id: "members".to_owned(),
             installed: true,
             items,
@@ -428,7 +429,7 @@ impl Directory {
             api_tokens: Vec::new(),
             can_manage_tokens: Permission::Unknown,
             unreadable: self.unreadable.clone(),
-        }
+        })
     }
 }
 
@@ -544,12 +545,12 @@ pub struct PasskeyView {
     /// The name its owner gave it, at enrolment or since.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub label: Option<String>,
-    /// When it was added, RFC 3339.
+    /// When it was added.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<String>,
+    pub created_at: Option<Timestamp>,
     /// When it last signed in, where Zeabur Identity records it.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_used_at: Option<String>,
+    pub last_used_at: Option<Timestamp>,
     /// Whether it may be synced to the owner's other devices (the authenticator's BE flag).
     pub synced: bool,
     /// The authenticator model (AAGUID), when it reported one.
@@ -569,10 +570,10 @@ pub struct LinkedAccountView {
     pub provider: String,
     /// When it was linked.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<String>,
+    pub created_at: Option<Timestamp>,
     /// When it last signed in, where recorded.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_used_at: Option<String>,
+    pub last_used_at: Option<Timestamp>,
     /// The `Credential`.
     pub origin: Origin,
 }
@@ -614,7 +615,7 @@ pub struct MemberView {
     pub linked: Vec<LinkedAccountView>,
     /// The latest sign-in Zeabur Identity knows of: from live sessions and recorded last use.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_sign_in_at: Option<String>,
+    pub last_sign_in_at: Option<Timestamp>,
     /// Signed-in sessions (grants) that can still renew.
     pub sessions: usize,
     /// Pending setup links.
@@ -650,11 +651,11 @@ pub struct InvitationView {
     pub name: String,
     /// Who it enrols a passkey for.
     pub username: String,
-    /// When it stops working, RFC 3339.
-    pub expires_at: String,
+    /// When it stops working.
+    pub expires_at: Timestamp,
     /// When it was made.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<String>,
+    pub created_at: Option<Timestamp>,
     /// Whether it is for someone who cannot sign in yet (no credential).
     pub new_member: bool,
     /// The `Invitation`.
@@ -753,17 +754,19 @@ mod tests {
 
     #[test]
     fn a_member_has_their_passkeys_oldest_first_with_the_name_chosen_last() {
-        let view = directory().view(
-            "zeabur-identity",
-            Some("zeabur:ada"),
-            Timestamp::from_second(1_000_000_000).unwrap(),
-            SetupLinks {
-                issuer: None,
-                accepted: None,
-            },
-            Permission::Allowed,
-            true,
-        );
+        let view = directory()
+            .view(
+                "zeabur-identity",
+                Some("zeabur:ada"),
+                Timestamp::from_second(1_000_000_000).unwrap(),
+                SetupLinks {
+                    issuer: None,
+                    accepted: None,
+                },
+                Permission::Allowed,
+                true,
+            )
+            .unwrap();
         let ada = &view.items[0];
         assert_eq!(ada.username, "ada");
         assert!(ada.you);
@@ -772,7 +775,10 @@ mod tests {
         assert_eq!(labels, [Some("Phone"), Some("MacBook")]);
         assert_eq!(ada.sessions, 1);
         // The recorded use is later than the grant's sign-in.
-        assert_eq!(ada.last_sign_in_at.as_deref(), Some("2026-10-20T08:00:00Z"));
+        assert_eq!(
+            ada.last_sign_in_at,
+            Some("2026-10-20T08:00:00Z".parse().unwrap())
+        );
         let bob = &view.items[1];
         assert!(!bob.you);
         assert_eq!(bob.role, MemberRole::Member);
@@ -787,7 +793,32 @@ mod tests {
 
     #[test]
     fn expired_invitations_are_left_out_and_one_for_a_new_name_is_a_new_member() {
-        let view = directory().view(
+        let view = directory()
+            .view(
+                "zeabur-identity",
+                None,
+                Timestamp::from_second(1_000_000_000).unwrap(),
+                SetupLinks {
+                    issuer: None,
+                    accepted: None,
+                },
+                Permission::Allowed,
+                true,
+            )
+            .unwrap();
+        assert_eq!(view.invitations.len(), 1);
+        assert_eq!(view.invitations[0].username, "cy");
+        assert!(view.invitations[0].new_member);
+    }
+
+    #[test]
+    fn an_invitation_expiry_out_of_range_is_refused_not_dated() {
+        let mut directory = directory();
+        directory
+            .invitations
+            .push(object(json!({"metadata": {"name": "inv-far"},
+            "spec": {"user": "dee", "tokenHash": "sha256:00", "expiresAt": i64::MAX}})));
+        let refused = directory.view(
             "zeabur-identity",
             None,
             Timestamp::from_second(1_000_000_000).unwrap(),
@@ -798,9 +829,7 @@ mod tests {
             Permission::Allowed,
             true,
         );
-        assert_eq!(view.invitations.len(), 1);
-        assert_eq!(view.invitations[0].username, "cy");
-        assert!(view.invitations[0].new_member);
+        assert!(refused.is_err());
     }
 
     #[test]

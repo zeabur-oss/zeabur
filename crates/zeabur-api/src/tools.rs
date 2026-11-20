@@ -271,12 +271,12 @@ pub struct ToolsPodStatus {
     pub phase: String,
     /// Whether a terminal can open in it now.
     pub ready: bool,
-    /// When it started, RFC 3339.
+    /// When it started.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub started_at: Option<String>,
-    /// When it stops whatever happens (`activeDeadlineSeconds` after it started), RFC 3339.
+    pub started_at: Option<Timestamp>,
+    /// When it stops whatever happens (`activeDeadlineSeconds` after it started).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stops_at: Option<String>,
+    pub stops_at: Option<Timestamp>,
     /// How many terminals are open in it on this server.
     pub terminals: usize,
     /// Why it does not start, when it cannot.
@@ -347,8 +347,8 @@ fn pod_status(pod: &Value, sessions: &Sessions) -> ToolsPodStatus {
         )
         .map(str::to_owned),
         phase: text(pod, "/status/phase").unwrap_or("Pending").to_owned(),
-        started_at: text(pod, "/status/startTime").map(str::to_owned),
-        stops_at: stops_at(pod).map(|t| t.to_string()),
+        started_at: text(pod, "/status/startTime").and_then(|t| t.parse().ok()),
+        stops_at: stops_at(pod),
         name,
         namespace,
         image,
@@ -465,7 +465,7 @@ pub(crate) async fn status_in(
         }
         pods.push(pod_status(&pod, &state.tools));
     }
-    pods.sort_by(|a, b| a.started_at.cmp(&b.started_at));
+    pods.sort_by_key(|p| p.started_at);
     Ok(ToolsStatus {
         namespace,
         available,

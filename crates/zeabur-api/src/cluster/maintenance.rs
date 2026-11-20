@@ -27,7 +27,7 @@ use zeabur_kube::{
 use crate::error::{ApiError, get_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
-use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
+use crate::plan_token::{self as token, TokenError};
 use crate::projects::writes::token_problem;
 
 /// Sealed plans of this module start with this, so no other plan's token opens as one.
@@ -57,8 +57,8 @@ pub struct MaintenanceRequest {
 pub struct MaintenancePlan {
     /// Send this to `apply` to carry out exactly this plan.
     pub token: String,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// The node.
     pub node: String,
     /// The action.
@@ -201,14 +201,14 @@ pub(crate) async fn plan(
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     let node = read_node(cluster.as_ref(), &name).await?;
-    let expires_at = (state.clock)().as_second().saturating_add(LIFETIME_SECONDS);
+    let expires_at = token::expiry((state.clock)())?;
     let claims = Claims {
         person: identity.username,
         groups: identity.groups,
         node: name.clone(),
         node_uid: node.metadata.uid.clone().unwrap_or_default(),
         action: request.action,
-        expires_at,
+        expires_at: expires_at.as_second(),
     };
     let token = token::sign_as(&sealing, PREFIX, &claims).map_err(|_random| {
         ApiError::from(Problem::new(
@@ -218,9 +218,7 @@ pub(crate) async fn plan(
     })?;
     Ok(Json(MaintenancePlan {
         token,
-        expires_at: Timestamp::from_second(expires_at)
-            .unwrap_or(Timestamp::UNIX_EPOCH)
-            .to_string(),
+        expires_at,
         cordoned: is_cordoned(&node),
         node: name,
         action: request.action,

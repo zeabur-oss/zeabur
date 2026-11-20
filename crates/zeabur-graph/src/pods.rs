@@ -89,11 +89,7 @@ pub fn summary(namespace: &str, pod: &Pod, now: Option<Timestamp>) -> PodSummary
             .collect(),
         reason: reason(statuses),
         cause: None,
-        created: pod
-            .metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|time| time.0.to_string()),
+        created: pod.metadata.creation_timestamp.as_ref().map(|time| time.0),
         node: pod.spec.as_ref().and_then(|spec| spec.node_name.clone()),
         container_statuses: status
             .and_then(|s| s.init_container_statuses.as_deref())
@@ -131,7 +127,7 @@ fn container_status(status: &ContainerStatus, init: bool) -> ContainerStatusSumm
         started_at: state
             .and_then(|s| s.running.as_ref())
             .and_then(|running| running.started_at.as_ref())
-            .map(|time| time.0.to_string()),
+            .map(|time| time.0),
         terminated: state.and_then(|s| s.terminated.as_ref()).map(termination),
         last_termination: status
             .last_state
@@ -145,14 +141,8 @@ fn termination(terminated: &ContainerStateTerminated) -> ContainerTermination {
     ContainerTermination {
         reason: terminated.reason.clone(),
         exit_code: terminated.exit_code,
-        started: terminated
-            .started_at
-            .as_ref()
-            .map(|time| time.0.to_string()),
-        finished: terminated
-            .finished_at
-            .as_ref()
-            .map(|time| time.0.to_string()),
+        started: terminated.started_at.as_ref().map(|time| time.0),
+        finished: terminated.finished_at.as_ref().map(|time| time.0),
         message: terminated.message.clone(),
     }
 }

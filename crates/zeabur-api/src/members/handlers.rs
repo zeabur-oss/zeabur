@@ -123,7 +123,7 @@ pub(crate) async fn list(
         links,
         can,
         identity.project_roles,
-    );
+    )?;
     view.api_tokens = found.api_tokens;
     view.can_manage_tokens = can_tokens;
     Ok(Json(view))
@@ -304,10 +304,10 @@ impl MembersView {
 }
 
 impl SetupLinkView {
-    pub(crate) fn new(
+    pub(crate) const fn new(
         url: String,
         username: String,
-        expires_at: i64,
+        expires_at: zeabur_kube::k8s_openapi::jiff::Timestamp,
         name: String,
         created_member: bool,
         reset: bool,
@@ -315,8 +315,7 @@ impl SetupLinkView {
         Self {
             url,
             username,
-            expires_at: zeabur_kube::k8s_openapi::jiff::Timestamp::from_second(expires_at)
-                .map_or_default(|t| t.to_string()),
+            expires_at,
             name,
             created_member,
             reset,
