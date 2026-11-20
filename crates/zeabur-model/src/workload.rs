@@ -1,5 +1,6 @@
 //! Workloads as clients list them.
 
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::provenance::Provenance;
@@ -32,9 +33,9 @@ pub struct PodSummary {
     /// What that reason means, when Zeabur knows it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub cause: Option<crate::StatusCause>,
-    /// When it was created, in RFC 3339.
+    /// When it was created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
+    pub created: Option<Timestamp>,
     /// The node it runs on, once scheduled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
@@ -65,9 +66,9 @@ pub struct ContainerStatusSummary {
     /// Why it is waiting, when it is.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub waiting: Option<ContainerWaiting>,
-    /// When the current run started, in RFC 3339, when it is running.
+    /// When the current run started, when it is running.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub started_at: Option<String>,
+    pub started_at: Option<Timestamp>,
     /// How it ended, when it is terminated now.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminated: Option<ContainerTermination>,
@@ -99,12 +100,12 @@ pub struct ContainerTermination {
     pub reason: Option<String>,
     /// The process's exit code.
     pub exit_code: i32,
-    /// When it started, in RFC 3339.
+    /// When it started.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub started: Option<String>,
-    /// When it ended, in RFC 3339.
+    pub started: Option<Timestamp>,
+    /// When it ended.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub finished: Option<String>,
+    pub finished: Option<Timestamp>,
     /// The container's termination message, or the runtime's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -272,9 +273,9 @@ pub struct WorkloadSummary {
     /// The first container's image, as a quick identifier.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub image: Option<String>,
-    /// When the workload was created, in RFC 3339.
+    /// When the workload was created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
+    pub created: Option<Timestamp>,
     /// The tool that manages the workload, if any.
     pub provenance: Provenance,
     /// A CronJob's schedule; absent for other kinds.
@@ -299,9 +300,9 @@ pub struct TaskSchedule {
     /// The controller starts no new runs (`spec.suspend`).
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub suspended: bool,
-    /// When a run was last started, in RFC 3339.
+    /// When a run was last started.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_scheduled: Option<String>,
+    pub last_scheduled: Option<Timestamp>,
     /// The service it was made from: its `zeabur.com/task-of` label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_of: Option<String>,

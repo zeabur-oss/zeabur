@@ -378,7 +378,7 @@ fn cluster_version(answer: &Result<Upgrades, Box<Problem>>) -> Check {
     let end_of_life = upgrades
         .release
         .as_ref()
-        .map_or("", |release| &release.end_of_life);
+        .map_or_else(String::new, |release| release.end_of_life.to_string());
     let version = &upgrades.kubernetes_version;
     check.findings.push(if end_of_life.is_empty() {
         format!("kube-apiserver {version}")

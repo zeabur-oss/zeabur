@@ -334,7 +334,6 @@ pub struct CatalogView {
     pub commit: Option<String>,
     /// When it was read.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<String>, format = DateTime)]
     pub fetched_at: Option<Timestamp>,
     /// Why the last read failed.
     #[serde(skip_serializing_if = "Option::is_none")]

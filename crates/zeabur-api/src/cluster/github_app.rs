@@ -57,7 +57,7 @@ use crate::extract::{Json, Path};
 use crate::github::{self, Conversion, GitHub};
 use crate::handlers::{AppState, Person};
 use crate::page::{self, Lang};
-use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
+use crate::plan_token::{self as token, TokenError};
 use crate::projects::namespace::Permission;
 use crate::projects::writes::token_problem;
 use crate::views::UnreadableView;
@@ -228,8 +228,8 @@ pub enum GitHubAppWarning {
 pub struct GitHubAppPlan {
     /// Send this to `apply` to carry out exactly this plan.
     pub token: String,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// The writes, in order; empty when nothing changes.
     pub writes: Vec<GitHubAppWrite>,
     /// What to know first.
@@ -268,8 +268,8 @@ pub struct ProjectInstallation {
     pub account: String,
     /// The repositories it could read.
     pub repositories: Vec<ProjectRepository>,
-    /// When the list was read from GitHub, RFC 3339.
-    pub refreshed_at: String,
+    /// When the list was read from GitHub.
+    pub refreshed_at: Timestamp,
 }
 
 /// A repository a project may build with an installation.
@@ -927,7 +927,7 @@ pub(crate) async fn plan(
                 private: r.private,
             })
             .collect(),
-        refreshed_at: now.to_string(),
+        refreshed_at: now,
     };
     let intent = Intent::Grant {
         installation,
@@ -947,19 +947,17 @@ async fn planned(
         writes,
         warnings,
     } = compute(cluster, &intent).await?;
-    let expires_at = (state.clock)().as_second().saturating_add(LIFETIME_SECONDS);
+    let expires_at = token::expiry((state.clock)())?;
     let claims = Claims {
         person: identity.username,
         groups: identity.groups,
         intent,
         versions,
-        expires_at,
+        expires_at: expires_at.as_second(),
     };
     Ok(Json(GitHubAppPlan {
         token: sealed(state, PLAN_PREFIX, &claims)?,
-        expires_at: Timestamp::from_second(expires_at)
-            .unwrap_or(Timestamp::UNIX_EPOCH)
-            .to_string(),
+        expires_at,
         writes: writes
             .iter()
             .map(|w| GitHubAppWrite {

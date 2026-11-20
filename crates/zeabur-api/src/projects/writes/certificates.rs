@@ -168,7 +168,12 @@ pub(super) fn checked(
     request: &PlanRequest,
     now: &str,
 ) -> Result<BTreeMap<String, CheckedCertificate>, ApiError> {
-    let now: Timestamp = now.parse().unwrap_or(Timestamp::UNIX_EPOCH);
+    let now: Timestamp = now.parse().map_err(|_time| {
+        ApiError::from(Problem::new(
+            Kind::Internal,
+            "The plan's time is not an RFC 3339 time, so Zeabur could not check its certificates.",
+        ))
+    })?;
     let mut out = BTreeMap::new();
     for (at, hostname, certificate) in choices(request) {
         let Some(CertificateSource::Own { certificate, key }) = certificate else {
@@ -262,7 +267,7 @@ pub(crate) fn check(
             )
         })?;
     Ok(CheckedCertificate {
-        not_after: not_after.to_string(),
+        not_after,
         certificate: pem_text(certificate),
         key: pem_text(key),
     })
@@ -349,10 +354,10 @@ fn time(tag: u8, value: &[u8]) -> Option<Timestamp> {
 pub(crate) struct CertificateDates {
     /// The Secret.
     pub(crate) secret: String,
-    /// From when the certificate is valid, RFC 3339.
-    pub(crate) not_before: String,
-    /// When it expires, RFC 3339.
-    pub(crate) not_after: String,
+    /// From when the certificate is valid.
+    pub(crate) not_before: Timestamp,
+    /// When it expires.
+    pub(crate) not_after: Timestamp,
 }
 
 /// The dates of the certificate a domain's tls entry names, read as the person.
@@ -383,8 +388,8 @@ pub(crate) async fn get(
     };
     Ok(Json(CertificateDates {
         secret,
-        not_before: not_before.to_string(),
-        not_after: not_after.to_string(),
+        not_before,
+        not_after,
     }))
 }
 
@@ -407,7 +412,7 @@ mod tests {
     #[test]
     fn accepts_a_matching_pair_and_reads_its_expiry() {
         let checked = check(CERT, KEY, "shop.example.test", at("2026-06-01T00:00:00Z")).unwrap();
-        assert_eq!(checked.not_after, "2126-01-01T00:00:00Z");
+        assert_eq!(checked.not_after.to_string(), "2126-01-01T00:00:00Z");
         assert!(checked.key.starts_with("-----BEGIN PRIVATE KEY-----"));
     }
 

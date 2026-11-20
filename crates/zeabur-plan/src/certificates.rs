@@ -29,6 +29,7 @@ use k8s_openapi::ByteString;
 use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::api::networking::v1::{Ingress, IngressRule, IngressSpec, IngressTLS};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
+use k8s_openapi::jiff::Timestamp;
 use serde_json::{Value, json};
 use zeabur_model::adapters::traefik;
 
@@ -65,8 +66,8 @@ pub enum IssuerRead {
 /// expired.
 #[derive(Clone, PartialEq, Eq)]
 pub struct CheckedCertificate {
-    /// When it expires, RFC 3339.
-    pub not_after: String,
+    /// When it expires.
+    pub not_after: Timestamp,
     /// The certificate and its intermediates, PEM.
     pub certificate: String,
     /// The private key, PEM.

@@ -240,11 +240,7 @@ pub fn database(
         },
         app,
         backups: backups_of(namespace, &name, state, backups, jobs),
-        created: server
-            .metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|t| t.0.to_string()),
+        created: server.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(server),
         pods: Vec::new(),
         restored: databases::restored(server),

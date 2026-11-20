@@ -16,9 +16,10 @@
 //! [ms-faq]: https://github.com/kubernetes-sigs/metrics-server/blob/master/FAQ.md
 //! [ms-pod-storage]: https://github.com/kubernetes-sigs/metrics-server/blob/master/pkg/storage/pod.go
 
+use k8s_openapi::jiff::Timestamp;
 use zeabur_kube::DynamicObject;
 
-use crate::{Module, Read, text};
+use crate::{Module, Read, text, time};
 
 /// The module.
 pub static MODULE: Module = Module {
@@ -87,8 +88,8 @@ pub struct PodUsage {
     pub namespace: String,
     /// The pod.
     pub pod: String,
-    /// When the sample was taken (RFC 3339).
-    pub timestamp: Option<String>,
+    /// When the sample was taken.
+    pub timestamp: Option<Timestamp>,
     /// The window CPU was averaged over (`15s`, `1m0.5s`).
     pub window: Option<String>,
     /// Its containers.
@@ -103,7 +104,7 @@ pub fn pod_usage(objects: &[DynamicObject]) -> Vec<PodUsage> {
         .map(|object| PodUsage {
             namespace: object.metadata.namespace.clone().unwrap_or_default(),
             pod: object.metadata.name.clone().unwrap_or_default(),
-            timestamp: text(object, "/timestamp"),
+            timestamp: time(object, "/timestamp"),
             window: text(object, "/window"),
             containers: object
                 .data

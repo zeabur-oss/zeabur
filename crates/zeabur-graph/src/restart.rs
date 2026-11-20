@@ -73,9 +73,9 @@ fn written_after(
         )
         .max_by_key(|(time, _)| *time)?;
     (written > started.0).then(|| PendingRestart {
-        written_at: written.to_string(),
+        written_at: written,
         manager,
-        pod_started_at: started.0.to_string(),
+        pod_started_at: started.0,
         pod: started.1.clone(),
     })
 }
@@ -150,7 +150,7 @@ mod tests {
         let pending = container.env[0].pending_restart.as_ref().unwrap();
         assert_eq!(pending.manager, "kubectl-edit");
         assert_eq!(pending.pod, "web-1");
-        assert_eq!(pending.pod_started_at, "2026-10-01T10:00:00Z");
+        assert_eq!(pending.pod_started_at.to_string(), "2026-10-01T10:00:00Z");
         assert!(container.imported_env[0].pending_restart.is_some());
     }
 

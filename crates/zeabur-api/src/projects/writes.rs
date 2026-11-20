@@ -76,8 +76,8 @@ use crate::settings::Settings;
 pub struct PlanResponse {
     /// Send this to `apply` to carry out exactly this plan.
     pub token: String,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// The plan.
     #[serde(flatten)]
     pub plan: Plan,
@@ -363,7 +363,7 @@ pub(crate) async fn plan(
         .whoami()
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
-    let now = Timestamp::from_second((state.clock)().as_second()).unwrap_or(Timestamp::UNIX_EPOCH);
+    let now = token::whole_second((state.clock)())?;
     let made_at = now.to_string();
     let planner = terminal::Planner {
         settings: &state.settings.terminal,
@@ -406,7 +406,7 @@ pub(crate) async fn plan(
     } else {
         Vec::new()
     };
-    let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
+    let expires_at = token::expiry(now)?;
     let claims = Claims {
         person: identity.username,
         groups: identity.groups,
@@ -415,7 +415,7 @@ pub(crate) async fn plan(
         versions: zeabur_plan::versions(&plan),
         templates: rendered,
         made_at,
-        expires_at,
+        expires_at: expires_at.as_second(),
     };
     let token = token::sign(&key, &claims).map_err(|_random| {
         ApiError::from(Problem::new(
@@ -425,9 +425,7 @@ pub(crate) async fn plan(
     })?;
     Ok(Json(PlanResponse {
         token,
-        expires_at: Timestamp::from_second(expires_at)
-            .unwrap_or(Timestamp::UNIX_EPOCH)
-            .to_string(),
+        expires_at,
         plan: plan.without_secret_values(),
         preview,
         risk,

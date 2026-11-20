@@ -63,6 +63,7 @@ use k8s_openapi::api::events::v1::Event;
 use k8s_openapi::api::rbac::v1::{PolicyRule, Subject as RbacSubject};
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{MicroTime, ObjectMeta};
+use k8s_openapi::jiff::{SignedDuration, Timestamp};
 use serde::Deserialize;
 use serde_json::{Value, json};
 use zeabur_model::kernel::digest::{hex, sha256};
@@ -440,10 +441,10 @@ pub struct ShellPod {
     pub node: String,
     /// Who opened it.
     pub person: Option<String>,
-    /// When it was created, RFC 3339.
-    pub created_at: Option<String>,
-    /// When its deadline stops it, RFC 3339: from its start, or its creation until then.
-    pub stops_at: Option<String>,
+    /// When it was created.
+    pub created_at: Option<Timestamp>,
+    /// When its deadline stops it: from its start, or its creation until then.
+    pub stops_at: Option<Timestamp>,
     /// How it is doing.
     pub state: ShellState,
 }
@@ -491,12 +492,12 @@ fn state_of(pod: &Value) -> ShellState {
     }
 }
 
-/// `at` plus `seconds`, RFC 3339 in UTC; `None` when `at` is not a time.
-fn after(at: &str, seconds: i64) -> Option<String> {
-    let at: k8s_openapi::jiff::Timestamp = at.parse().ok()?;
-    at.checked_add(k8s_openapi::jiff::SignedDuration::from_secs(seconds))
-        .ok()
-        .map(|t| t.to_string())
+/// A time field of `object`, by JSON pointer; `None` when missing or not an RFC 3339 time.
+fn time(object: &Value, path: &str) -> Option<Timestamp> {
+    object
+        .pointer(path)
+        .and_then(Value::as_str)
+        .and_then(|t| t.parse().ok())
 }
 
 /// The node shell pods among `pods`, oldest first.
@@ -506,14 +507,14 @@ pub fn shells(pods: &[Value]) -> Vec<ShellPod> {
         .iter()
         .filter(|p| is_node_shell(p))
         .filter_map(|pod| {
-            let created_at = text(pod, "/metadata/creationTimestamp");
+            let created_at = time(pod, "/metadata/creationTimestamp");
             let deadline = pod
                 .pointer("/spec/activeDeadlineSeconds")
                 .and_then(Value::as_i64)
                 .unwrap_or(DEADLINE_SECONDS);
-            let stops_at = text(pod, "/status/startTime")
-                .or_else(|| created_at.clone())
-                .and_then(|at| after(&at, deadline));
+            let stops_at = time(pod, "/status/startTime")
+                .or(created_at)
+                .and_then(|at| at.checked_add(SignedDuration::from_secs(deadline)).ok());
             Some(ShellPod {
                 name: text(pod, "/metadata/name")?,
                 node: text(pod, "/spec/nodeName")?,
@@ -528,7 +529,7 @@ pub fn shells(pods: &[Value]) -> Vec<ShellPod> {
             })
         })
         .collect();
-    found.sort_by(|a, b| (&a.created_at, &a.name).cmp(&(&b.created_at, &b.name)));
+    found.sort_by(|a, b| (a.created_at, &a.name).cmp(&(b.created_at, &b.name)));
     found
 }
 
@@ -1324,9 +1325,15 @@ mod tests {
                 message: Some("no".to_owned())
             }
         );
-        assert_eq!(found[0].stops_at.as_deref(), Some("2026-10-23T05:30:00Z"));
+        assert_eq!(
+            found[0].stops_at,
+            Some("2026-10-23T05:30:00Z".parse().unwrap())
+        );
         assert_eq!(found[1].state, ShellState::Running);
-        assert_eq!(found[1].stops_at.as_deref(), Some("2026-10-23T05:30:03Z"));
+        assert_eq!(
+            found[1].stops_at,
+            Some("2026-10-23T05:30:03Z".parse().unwrap())
+        );
         assert_eq!(
             found[2].state,
             ShellState::Ended {

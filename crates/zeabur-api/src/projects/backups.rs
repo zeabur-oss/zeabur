@@ -19,6 +19,7 @@ use zeabur_graph::{ObjectKey, OwnerGraph, Snapshot};
 use zeabur_kube::k8s_openapi::api::apps::v1::StatefulSet;
 use zeabur_kube::k8s_openapi::api::core::v1::PersistentVolumeClaim;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, DynamicObject, ResourceRef};
 use zeabur_modules::backups::{self, Coverage, Findings, Run, Schedule, Target};
 use zeabur_modules::{Module, Reading};
@@ -94,9 +95,9 @@ pub enum ClusterCoverage {
     Waiting,
     /// The newest Velero backup of the project.
     Last {
-        /// When it finished, else when it started (RFC 3339).
+        /// When it finished, else when it started.
         #[serde(skip_serializing_if = "Option::is_none")]
-        at: Option<String>,
+        at: Option<Timestamp>,
         /// How it went.
         outcome: backups::Outcome,
     },
@@ -123,7 +124,7 @@ fn cluster_coverage(
         .filter(|r| r.provider == zeabur_modules::velero::MODULE.id)
     {
         return Some(ClusterCoverage::Last {
-            at: run.time().map(str::to_owned),
+            at: run.time(),
             outcome: run.outcome,
         });
     }

@@ -17,6 +17,7 @@
 //! [sw-status]: https://github.com/seaweedfs/seaweedfs-operator/blob/seaweedfs-operator-0.1.43/internal/controller/seaweed_controller.go
 //! [kstatus-generic]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/generic.go
 
+use k8s_openapi::jiff::Timestamp;
 use serde::Serialize;
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -180,9 +181,9 @@ pub struct ObjectStorage {
     pub access_key: Option<AccessKey>,
     /// Its buckets, by name.
     pub buckets: Vec<Bucket>,
-    /// When it was created, RFC 3339.
+    /// When it was created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
+    pub created: Option<Timestamp>,
     /// The object as written, without `status` and `managedFields`.
     #[schema(value_type = Object)]
     pub object: Value,
@@ -380,11 +381,7 @@ pub fn object_storage(
             phase: text(k, "/status/phase"),
         }),
         buckets,
-        created: seaweed
-            .metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|t| t.0.to_string()),
+        created: seaweed.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(seaweed),
         pods: Vec::new(),
         name,

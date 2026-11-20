@@ -11,7 +11,7 @@ use zeabur_core::crypto::{random, sha256};
 use zeabur_core::message::Message;
 use zeabur_core::problem::{Kind, Problem};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, OwnerReference};
-use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, WriteBody, WriteRequest};
 
 use super::directory::{AccountType, Directory, IdentityKind, Object, UserSpec, request};
@@ -42,8 +42,8 @@ pub struct SetupLinkView {
     pub url: String,
     /// Whose account it adds a passkey to.
     pub username: String,
-    /// When it stops working, RFC 3339.
-    pub expires_at: String,
+    /// When it stops working.
+    pub expires_at: Timestamp,
     /// The `Invitation` object's name, to revoke it.
     pub name: String,
     /// Whether the member was created now.
@@ -321,7 +321,7 @@ pub(crate) async fn issue(
     user: &Value,
     now: Timestamp,
     seconds: i64,
-) -> Result<(String, String, i64), ApiError> {
+) -> Result<(String, String, Timestamp), ApiError> {
     let suffix = random::<8>().map_err(|_random| {
         ApiError::from(Problem::new(
             Kind::Internal,
@@ -330,12 +330,25 @@ pub(crate) async fn issue(
     })?;
     let name = format!("inv-{}", hex(&suffix));
     let token = token(&name)?;
-    let expires_at = now.as_second().saturating_add(seconds);
+    let expires_at = now
+        .checked_add(SignedDuration::from_secs(seconds))
+        .map_err(|_overflow| {
+            ApiError::from(Problem::new(
+                Kind::Internal,
+                "The link would expire past the last time Zeabur can represent.",
+            ))
+        })?;
     let user = user
         .get("metadata")
         .and_then(|m| ObjectMeta::deserialize(m).ok())
         .unwrap_or_default();
-    let object = to_json(&invitation(namespace, &name, &user, &token, expires_at))?;
+    let object = to_json(&invitation(
+        namespace,
+        &name,
+        &user,
+        &token,
+        expires_at.as_second(),
+    ))?;
     send(
         cluster,
         IdentityKind::Invitation,

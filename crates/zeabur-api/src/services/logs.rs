@@ -44,8 +44,8 @@ pub enum LogHistoryState {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LogHistoryLine {
-    /// When it was written, RFC 3339.
-    pub time: String,
+    /// When it was written.
+    pub time: Timestamp,
     /// The pod that wrote it, which may be gone.
     pub pod: String,
     /// Its container.
@@ -171,25 +171,20 @@ fn lines(body: &[u8]) -> Vec<LogHistoryLine> {
             .unwrap_or_default()
             .to_owned()
     };
-    let mut lines: Vec<(Timestamp, LogHistoryLine)> = body
+    let mut lines: Vec<LogHistoryLine> = body
         .split(|&b| b == b'\n')
         .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
         .filter_map(|entry| {
-            let time = field(&entry, "_time");
-            let at = time.parse::<Timestamp>().ok()?;
-            Some((
-                at,
-                LogHistoryLine {
-                    time,
-                    pod: field(&entry, "kubernetes.pod_name"),
-                    container: field(&entry, "kubernetes.container_name"),
-                    message: field(&entry, "_msg"),
-                },
-            ))
+            Some(LogHistoryLine {
+                time: field(&entry, "_time").parse().ok()?,
+                pod: field(&entry, "kubernetes.pod_name"),
+                container: field(&entry, "kubernetes.container_name"),
+                message: field(&entry, "_msg"),
+            })
         })
         .collect();
-    lines.sort_by_key(|(at, _)| *at);
-    lines.into_iter().map(|(_, line)| line).collect()
+    lines.sort_by_key(|line| line.time);
+    lines
 }
 
 /// What a service's pods logged over the last hour, 6 hours, day or week, also pods replaced

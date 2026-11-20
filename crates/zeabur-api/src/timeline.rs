@@ -132,8 +132,8 @@ pub struct ReleaseRef {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct TimelineEntry {
-    /// When, RFC 3339: the release's creation, the write, the last event, the termination.
-    pub at: String,
+    /// When: the release's creation, the write, the last event, the termination.
+    pub at: Timestamp,
     /// What it records.
     pub kind: EntryKind,
     /// The workload.
@@ -251,7 +251,7 @@ fn writes(workload: Workload<'_>) -> Vec<TimelineEntry> {
                 .as_ref()
                 .map_or_else(Vec::new, |f| owned_fields(&f.0));
             Some(TimelineEntry {
-                at: at.to_string(),
+                at,
                 kind: EntryKind::Write,
                 workload: me.clone(),
                 message: Message::new(&format!("timeline.write.{}", tool_key(tool)))
@@ -298,7 +298,7 @@ fn releases(workload: &WorkloadRef, releases: &[Release]) -> Vec<TimelineEntry> 
                 message = message.with("changeCause", cause.clone());
             }
             Some(TimelineEntry {
-                at: release.created.clone()?,
+                at: release.created?,
                 kind: EntryKind::Release,
                 workload: workload.clone(),
                 message,
@@ -452,7 +452,7 @@ fn warnings(
                 message = message.with("claim", claim);
             }
             TimelineEntry {
-                at: at.to_string(),
+                at,
                 kind: EntryKind::Warning,
                 workload: workload.clone(),
                 message,
@@ -505,7 +505,7 @@ fn terminations(workload: &WorkloadRef, pods: &[&Pod]) -> Vec<TimelineEntry> {
                     "exited"
                 };
                 out.push(TimelineEntry {
-                    at: at.0.to_string(),
+                    at: at.0,
                     kind: EntryKind::Termination,
                     workload: workload.clone(),
                     message: Message::new(&format!("timeline.termination.{variant}"))
@@ -567,9 +567,7 @@ pub(crate) fn of_workload(sources: &Sources<'_>, workload: Workload<'_>) -> Vec<
 /// Newest first, then by kind, at most [`LIMIT`]; whether some were left out.
 pub(crate) fn newest(mut items: Vec<TimelineEntry>) -> (Vec<TimelineEntry>, bool) {
     items.sort_by(|a, b| {
-        let time = |e: &TimelineEntry| e.at.parse::<Timestamp>().ok();
-        time(b)
-            .cmp(&time(a))
+        b.at.cmp(&a.at)
             .then(a.kind.cmp(&b.kind))
             .then(a.workload.cmp(&b.workload))
     });

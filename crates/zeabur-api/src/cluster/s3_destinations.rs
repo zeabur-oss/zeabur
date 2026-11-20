@@ -54,7 +54,7 @@ use zeabur_plan::{Change, CopyS3KeysChange, DataEdit, DataKind, PlanRequest};
 use crate::error::{ApiError, get_read, list_read, read_problem, to_json};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
-use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
+use crate::plan_token::{self as token, TokenError};
 use crate::projects::namespace::Permission;
 use crate::projects::writes::token_problem;
 use crate::views::UnreadableView;
@@ -185,8 +185,8 @@ pub struct S3DestinationWrite {
 pub struct S3DestinationsPlan {
     /// Send this to `apply` to carry out exactly this plan.
     pub token: String,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// The writes, in order; empty when nothing changes.
     pub writes: Vec<S3DestinationWrite>,
     /// Copies of the keys that the plan leaves with the old keys.
@@ -1167,13 +1167,13 @@ pub(crate) async fn plan(
         kept,
         copies_unknown,
     } = compute(cluster.as_ref(), &request).await?;
-    let expires_at = (state.clock)().as_second().saturating_add(LIFETIME_SECONDS);
+    let expires_at = token::expiry((state.clock)())?;
     let claims = Claims {
         person: identity.username,
         groups: identity.groups,
         request,
         versions,
-        expires_at,
+        expires_at: expires_at.as_second(),
     };
     let token = token::sign_as(&sealing, PREFIX, &claims).map_err(|_random| {
         ApiError::from(Problem::new(
@@ -1183,9 +1183,7 @@ pub(crate) async fn plan(
     })?;
     Ok(Json(S3DestinationsPlan {
         token,
-        expires_at: Timestamp::from_second(expires_at)
-            .unwrap_or(Timestamp::UNIX_EPOCH)
-            .to_string(),
+        expires_at,
         writes: writes
             .iter()
             .map(|w| S3DestinationWrite {

@@ -17,6 +17,7 @@
 use k8s_openapi::api::apps::v1::{ControllerRevision, ReplicaSet};
 use k8s_openapi::api::core::v1::Pod;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use zeabur_model::{WorkloadKind, WorkloadRef};
@@ -53,9 +54,9 @@ pub struct Release {
     pub name: String,
     /// The images of its containers, in order.
     pub images: Vec<String>,
-    /// When it was made, RFC 3339.
+    /// When it was made.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
+    pub created: Option<Timestamp>,
     /// Why it was made, from `kubernetes.io/change-cause`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change_cause: Option<String>,
@@ -90,8 +91,8 @@ fn annotation(meta: &ObjectMeta, name: &str) -> Option<String> {
     meta.annotations.as_ref()?.get(name).cloned()
 }
 
-fn created(meta: &ObjectMeta) -> Option<String> {
-    meta.creation_timestamp.as_ref().map(|t| t.0.to_string())
+fn created(meta: &ObjectMeta) -> Option<Timestamp> {
+    meta.creation_timestamp.as_ref().map(|t| t.0)
 }
 
 /// The releases of `workload`, newest first.

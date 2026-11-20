@@ -1,5 +1,6 @@
 //! The way traffic travels to a service, hop by hop, and where it stops.
 
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 use crate::diagnosis::Message;
@@ -145,7 +146,7 @@ pub struct CertificateCheck {
     pub message: Option<String>,
     /// When it expires (`status.notAfter`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub not_after: Option<String>,
+    pub not_after: Option<Timestamp>,
     /// It failed because Let's Encrypt refused for its rate limit, in cert-manager's words.
     #[serde(default, skip_serializing_if = "crate::is_false")]
     pub rate_limited: bool,

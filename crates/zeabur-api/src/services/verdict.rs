@@ -120,7 +120,7 @@ fn problem_tone(service: &Service, causes: &[&Diagnosis], now: Timestamp) -> Hea
         .pods
         .iter()
         .filter(|pod| waiting.contains(pod.name.as_str()))
-        .filter_map(|pod| pod.created.as_deref()?.parse::<Timestamp>().ok())
+        .filter_map(|pod| pod.created)
         .min();
     match oldest {
         Some(created) if now.duration_since(created) < SCHEDULING_GRACE => Health::Progress,
@@ -211,7 +211,7 @@ mod tests {
             containers: Vec::new(),
             reason: Some("Unschedulable".to_owned()),
             cause: None,
-            created: Some(created.to_owned()),
+            created: Some(created.parse().unwrap()),
             node: None,
             container_statuses: Vec::new(),
             origin: Origin::object("Pod", name),

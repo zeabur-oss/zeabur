@@ -42,13 +42,14 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::{LocalObjectReference, PodSecurityContext};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use zeabur_kube::DynamicObject;
 use zeabur_model::adapters::selector::matches;
 
 use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, condition, newest};
-use crate::{Module, Read, text};
+use crate::{Module, Read, text, time};
 
 /// The module.
 pub static MODULE: Module = Module {
@@ -280,12 +281,8 @@ pub fn findings(
             provider: MODULE.id.to_owned(),
             targets: covered(backup, "/spec", volumes),
             outcome,
-            started: backup
-                .metadata
-                .creation_timestamp
-                .as_ref()
-                .map(|t| t.0.to_string()),
-            finished: completed.as_ref().and_then(|c| c.0.clone()),
+            started: backup.metadata.creation_timestamp.as_ref().map(|t| t.0),
+            finished: completed.as_ref().and_then(|c| c.0),
             message: completed
                 .filter(|_| outcome == Outcome::Failed)
                 .and_then(|c| c.2),
@@ -303,8 +300,8 @@ pub fn findings(
 pub struct SnapshotView {
     /// restic's ID.
     pub id: String,
-    /// When it was taken, RFC 3339.
-    pub date: String,
+    /// When it was taken.
+    pub date: Timestamp,
 }
 
 /// A `Restore` of a claim's backups.
@@ -323,12 +320,12 @@ pub struct RestoreView {
     pub delete: bool,
     /// How it went, as K8up reports it.
     pub outcome: Outcome,
-    /// When it was created, RFC 3339.
+    /// When it was created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub started: Option<String>,
-    /// When it finished, RFC 3339.
+    pub started: Option<Timestamp>,
+    /// When it finished.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished: Option<String>,
+    pub finished: Option<Timestamp>,
     /// Why it failed.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -389,11 +386,11 @@ pub fn snapshots(
         .filter_map(|o| {
             Some(SnapshotView {
                 id: text(o, "/spec/id")?,
-                date: text(o, "/spec/date")?,
+                date: time(o, "/spec/date")?,
             })
         })
         .collect();
-    out.sort_by(|a, b| b.date.cmp(&a.date));
+    out.sort_by_key(|s| std::cmp::Reverse(s.date));
     out
 }
 
@@ -423,12 +420,8 @@ pub fn restores(objects: &[DynamicObject], claim: &str) -> Vec<RestoreView> {
                 into: text(o, "/spec/restoreMethod/folder/claimName"),
                 delete: o.data.pointer("/spec/delete").and_then(Value::as_bool) == Some(true),
                 outcome,
-                started: o
-                    .metadata
-                    .creation_timestamp
-                    .as_ref()
-                    .map(|t| t.0.to_string()),
-                finished: completed.as_ref().and_then(|c| c.0.clone()),
+                started: o.metadata.creation_timestamp.as_ref().map(|t| t.0),
+                finished: completed.as_ref().and_then(|c| c.0),
                 message: completed
                     .filter(|_| outcome == Outcome::Failed)
                     .and_then(|c| c.2),
@@ -441,7 +434,7 @@ pub fn restores(objects: &[DynamicObject], claim: &str) -> Vec<RestoreView> {
             }
         })
         .collect();
-    out.sort_by(|a, b| b.started.cmp(&a.started));
+    out.sort_by_key(|r| std::cmp::Reverse(r.started));
     out
 }
 
@@ -543,7 +536,7 @@ mod tests {
         assert_eq!(found.runs[0].outcome, Outcome::Failed);
         assert_eq!(found.runs[0].message.as_deref(), Some("repository locked"));
         assert_eq!(
-            found.runs[0].finished.as_deref(),
+            found.runs[0].finished.map(|t| t.to_string()).as_deref(),
             Some("2026-10-14T02:01:00Z")
         );
     }

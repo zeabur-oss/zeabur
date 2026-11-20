@@ -1,5 +1,6 @@
 #![doc = include_str!("../README.md")]
 
+use k8s_openapi::jiff::Timestamp;
 use serde::Serialize;
 use zeabur_kube::{DynamicObject, ResourceRef};
 
@@ -153,6 +154,20 @@ pub(crate) fn text(object: &DynamicObject, pointer: &str) -> Option<String> {
         .and_then(serde_json::Value::as_str)
         .filter(|s| !s.is_empty())
         .map(str::to_owned)
+}
+
+/// `value` read as an RFC 3339 time; `None` when missing or not a time.
+pub(crate) fn filled_time(value: Option<&String>) -> Option<Timestamp> {
+    value.and_then(|s| s.parse().ok())
+}
+
+/// A time field of an object, by JSON pointer; `None` when missing or not an RFC 3339 time.
+pub(crate) fn time(object: &DynamicObject, pointer: &str) -> Option<Timestamp> {
+    object
+        .data
+        .pointer(pointer)
+        .and_then(serde_json::Value::as_str)
+        .and_then(|s| s.parse().ok())
 }
 
 /// A map of strings at `pointer`; empty when missing.

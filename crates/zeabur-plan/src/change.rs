@@ -9,6 +9,7 @@
 
 use std::collections::BTreeMap;
 
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use zeabur_model::{PodSecurityLevel, ProjectIcon, TaskConcurrency, WorkloadRef};
@@ -1243,8 +1244,8 @@ pub enum Warning {
     OwnCertificate {
         /// The hostname.
         hostname: String,
-        /// When the certificate expires, RFC 3339.
-        not_after: String,
+        /// When the certificate expires.
+        not_after: Timestamp,
     },
     /// The issuer is set on the whole Ingress, so these other hostnames also get their
     /// certificates from it.
@@ -1427,10 +1428,10 @@ pub enum Warning {
         image: String,
         /// Who `kubectl` and `helm` act as: the person's user name.
         person: String,
-        /// When the credential written into the pod expires, RFC 3339; `kubectl` is refused
-        /// from then until a terminal opens again with a fresh one.
+        /// When the credential written into the pod expires; `kubectl` is refused from then until
+        /// a terminal opens again with a fresh one.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        credential_expires_at: Option<String>,
+        credential_expires_at: Option<Timestamp>,
         /// The pod stops this long after it starts, whatever happens (`activeDeadlineSeconds`).
         deadline_seconds: i64,
         /// It is deleted this long after its last terminal closes.

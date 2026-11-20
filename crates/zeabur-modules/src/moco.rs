@@ -316,11 +316,7 @@ pub fn database(
         },
         app: Some(app),
         backups: backups_of(namespace, cluster, &name, state, policies, jobs),
-        created: cluster
-            .metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|t| t.0.to_string()),
+        created: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),

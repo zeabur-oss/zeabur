@@ -54,6 +54,7 @@ use k8s_openapi::api::apps::v1::{DaemonSet, Deployment};
 use k8s_openapi::api::core::v1::Node;
 use k8s_openapi::api::networking::v1::Ingress;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::jiff::Timestamp;
 use zeabur_graph::Snapshot;
 use zeabur_model::{
     AffectedService, DiagnosisKind, Fault, FaultOrigin, Fixer, Incident, IncidentKind, Message,
@@ -110,8 +111,8 @@ pub struct Component {
     pub ready: i32,
     /// The `spec.controller` values of the `IngressClasses` it serves (an ingress controller).
     pub ingress_controllers: Vec<String>,
-    /// When it stopped being available, RFC 3339, when the workload says.
-    pub since: Option<String>,
+    /// When it stopped being available, when the workload says.
+    pub since: Option<Timestamp>,
 }
 
 impl Component {
@@ -133,8 +134,8 @@ pub struct NodeState {
     pub status: String,
     /// The condition's reason, such as `KubeletNotReady` or `NodeStatusUnknown`.
     pub reason: Option<String>,
-    /// When the condition last changed, RFC 3339.
-    pub since: Option<String>,
+    /// When the condition last changed.
+    pub since: Option<Timestamp>,
     /// It carries the `node.kubernetes.io/not-ready` or `node.kubernetes.io/unreachable` taint.
     pub tainted: bool,
 }
@@ -194,7 +195,7 @@ pub fn components(deployments: &[Deployment], daemon_sets: &[DaemonSet]) -> Vec<
             .flat_map(|s| s.conditions.iter().flatten())
             .find(|c| c.type_ == "Available" && c.status != "True")
             .and_then(|c| c.last_transition_time.as_ref())
-            .map(|t| t.0.to_string());
+            .map(|t| t.0);
         out.push(Component {
             kind,
             workload: complete("apps/v1", "Deployment", &deployment.metadata),
@@ -252,7 +253,7 @@ pub fn node_states(nodes: &[Node]) -> Vec<NodeState> {
                 reason: ready.and_then(|c| c.reason.clone()),
                 since: ready
                     .and_then(|c| c.last_transition_time.as_ref())
-                    .map(|t| t.0.to_string()),
+                    .map(|t| t.0),
                 tainted: node
                     .spec
                     .as_ref()
@@ -486,7 +487,7 @@ fn component_incident(
                 .with_field("status.readyReplicas".to_owned())
                 .with_value(component.ready.to_string()),
         ],
-        since: component.since.clone(),
+        since: component.since,
     }
 }
 
@@ -595,7 +596,7 @@ fn node_incident(node: &NodeState, projects: &[Reach<'_>], wide: &Wide<'_>) -> I
                 .with_field("status.conditions[type=Ready]".to_owned())
                 .with_value(node.status.clone()),
         ],
-        since: node.since.clone(),
+        since: node.since,
     }
 }
 
