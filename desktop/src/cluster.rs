@@ -74,6 +74,12 @@ impl Clusters {
         Some(started)
     }
 
+    /// The address of the service the window `label` runs.
+    pub(crate) fn service(&self, label: &str) -> Option<tauri::Url> {
+        let running = self.running.lock().unwrap_or_else(PoisonError::into_inner);
+        running.get(label)?.url().parse().ok()
+    }
+
     /// Forgets the window `label` and stops its service.
     pub(crate) fn closed(&self, label: &str) {
         self.targets
