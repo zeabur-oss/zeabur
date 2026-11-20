@@ -757,3 +757,28 @@ name = "jsonptr"
 kind = "unsafe"
 reason = "JSON Pointer of json-patch, which kube's `jsonpatch` feature uses for JSON Patch; casts a validated `str` to its `Pointer` and `Token` newtypes (pointer.rs, token.rs); no native code, runs in the server and in the planner"
 approved = "2026-11-15"
+
+# --- Zeabur Builder's custom resources (zeabur-builder-api): kube's `CustomResource` derive and schemars, which writes the resources' schemas. Zeabur reads and writes the objects and never generates a schema.
+[[crate]]
+name = "dyn-clone"
+kind = "unsafe"
+reason = "Clones schemars' boxed schema transforms (`Box<dyn GenTransform>`): casts the cloned box back to the trait object (lib.rs); no native code; runs only when a schema is generated"
+approved = "pending"
+
+[[crate]]
+name = "ref-cast"
+kind = "unsafe"
+reason = "schemars' `Schema` view of a JSON object, a `#[repr(transparent)]` newtype: the unsafe marker traits its derive implements (custom.rs); no native code"
+approved = "pending"
+
+[[crate]]
+name = "ref-cast-impl"
+kind = "unsafe"
+reason = "Build time only"
+approved = "pending"
+
+[[crate]]
+name = "darling_core"
+kind = "unsafe"
+reason = "Build time only: kube-derive's attribute parser; the one hit is the word `unsafe` in an error message (error/mod.rs)"
+approved = "pending"

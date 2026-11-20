@@ -10,16 +10,19 @@
 
 use std::collections::BTreeMap;
 
-use k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, Secret, SecretKeySelector};
+use k8s_openapi::api::core::v1::Secret;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use zeabur_builder_api::build::{
+    ArchiveSource, Build, BuildSpec, Concurrency, EnvVar, EnvVarSource, GitHubAppSource, GitSource,
+    NotifyTarget, NotifyType, OutputSpec, SourceSpec, TriggerSpec,
+};
+use zeabur_builder_api::common::{SecretKeyRef, SecretRef};
+use zeabur_builder_api::{annotations, labels};
 use zeabur_model::PodSecurityLevel;
 
-use crate::builds::{
-    BUILDER_GROUP, BUILDER_VERSION, GIT_CREDENTIALS_LABEL, KEEL_FORCE, KEEL_POLICY,
-    UPLOAD_TOKEN_REQUEST, build_path,
-};
+use crate::builds::{KEEL_FORCE, KEEL_POLICY, build_path};
 use crate::change::{BuildMethod, NameValue, ServiceSize, UploadServiceChange};
 use crate::image_service::{
     ImageServiceChange, check_host, check_name, check_variable_names, image_objects, labels_of,
@@ -353,80 +356,6 @@ fn check_git(change: &GitServiceChange) -> Result<Repository, PlanError> {
     Ok(repository)
 }
 
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Build {
-    api_version: String,
-    kind: &'static str,
-    metadata: ObjectMeta,
-    spec: BuildSpec,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct BuildSpec {
-    builder_ref: &'static str,
-    source: BuildSource,
-    output: BuildOutput,
-    notify: [BuildNotify; 1],
-    #[serde(skip_serializing_if = "Vec::is_empty")]
-    env: Vec<EnvVar>,
-}
-
-#[derive(Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct BuildSource {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    archive: Option<Paths>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    git: Option<GitSource>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    credentials_ref: Option<NameRef>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    github_app: Option<GitHubApp>,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct Paths {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    context_dir: Option<String>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    dockerfile: Option<String>,
-}
-
-#[derive(Serialize)]
-struct GitSource {
-    url: String,
-    #[serde(rename = "ref")]
-    reference: String,
-    #[serde(flatten)]
-    paths: Paths,
-}
-
-#[derive(Serialize)]
-struct NameRef {
-    name: String,
-}
-
-#[derive(Serialize)]
-#[serde(rename_all = "camelCase")]
-struct GitHubApp {
-    installation_id: u64,
-}
-
-#[derive(Serialize)]
-struct BuildOutput {
-    image: String,
-}
-
-#[derive(Serialize)]
-struct BuildNotify {
-    #[serde(rename = "type")]
-    kind: &'static str,
-    url: &'static str,
-}
-
 /// What a built service takes from its change, whatever the source.
 struct Built<'a> {
     name: &'a str,
@@ -472,13 +401,11 @@ impl<'a> Built<'a> {
         }
     }
 
-    fn paths(&self) -> Paths {
-        Paths {
-            context_dir: self.directory.clone(),
-            dockerfile: (self.method == BuildMethod::Dockerfile)
-                .then(|| self.dockerfile.clone())
-                .flatten(),
-        }
+    /// The Dockerfile, which only [`BuildMethod::Dockerfile`] reads.
+    fn dockerfile(&self) -> Option<String> {
+        (self.method == BuildMethod::Dockerfile)
+            .then(|| self.dockerfile.clone())
+            .flatten()
     }
 
     /// The objects in project `project`, in the order they are created: `before`, the build
@@ -489,7 +416,7 @@ impl<'a> Built<'a> {
         registry: &str,
         cluster_issuer: Option<&str>,
         before: Vec<Value>,
-        source: BuildSource,
+        source: SourceSpec,
         annotations: Option<BTreeMap<String, String>>,
     ) -> Result<Vec<Value>, PlanError> {
         let name = self.name;
@@ -542,38 +469,45 @@ impl<'a> Built<'a> {
                 name: v.name.clone(),
                 value: None,
                 value_from: Some(EnvVarSource {
-                    secret_key_ref: Some(SecretKeySelector {
+                    secret_key_ref: SecretKeyRef {
                         name: build_secret.clone(),
                         key: v.name.clone(),
-                        optional: None,
-                    }),
-                    ..EnvVarSource::default()
+                    },
                 }),
             })
             .collect();
-        out.push(to_json(&Build {
-            api_version: format!("{BUILDER_GROUP}/{BUILDER_VERSION}"),
-            kind: "Build",
-            metadata: ObjectMeta {
-                name: Some(name.to_owned()),
-                labels: Some(labels),
-                annotations,
-                ..ObjectMeta::default()
-            },
-            spec: BuildSpec {
-                builder_ref: match self.method {
-                    BuildMethod::Railpack => "railpack",
-                    BuildMethod::Dockerfile => "dockerfile",
-                },
+        let builder_ref = match self.method {
+            BuildMethod::Railpack => "railpack",
+            BuildMethod::Dockerfile => "dockerfile",
+        };
+        let mut build = Build::new(
+            name,
+            BuildSpec {
                 source,
-                output: BuildOutput { image: repository },
-                notify: [BuildNotify {
-                    kind: "keel",
-                    url: KEEL_WEBHOOK,
-                }],
+                builder_ref: builder_ref.to_owned(),
+                output: Some(OutputSpec {
+                    image: Some(repository),
+                    ..OutputSpec::default()
+                }),
                 env,
+                triggers: TriggerSpec::default(),
+                concurrency: Concurrency::default(),
+                history_limit: None,
+                notify: vec![NotifyTarget {
+                    kind: NotifyType::Keel,
+                    url: KEEL_WEBHOOK.to_owned(),
+                    secret_ref: None,
+                }],
+                suspend: false,
             },
-        })?);
+        );
+        build.metadata = ObjectMeta {
+            name: Some(name.to_owned()),
+            labels: Some(labels),
+            annotations,
+            ..ObjectMeta::default()
+        };
+        out.push(to_json(&build)?);
         Ok(out)
     }
 }
@@ -582,11 +516,11 @@ impl<'a> Built<'a> {
 fn credentials(
     change: &GitServiceChange,
     repository: &Repository,
-) -> Result<(Option<Secret>, BuildSource), PlanError> {
+) -> Result<(Option<Secret>, SourceSpec), PlanError> {
     let name = change.name.as_str();
     let secret_name = format!("{name}-git");
     let mut labels = labels_of(name);
-    labels.insert(GIT_CREDENTIALS_LABEL.to_owned(), "true".to_owned());
+    labels.insert(labels::GIT_CREDENTIALS.to_owned(), "true".to_owned());
     let secret = |kind: &str, values: [(&str, &str); 2]| Secret {
         metadata: ObjectMeta {
             name: Some(secret_name.clone()),
@@ -608,8 +542,14 @@ fn credentials(
         GitAccess::GithubApp { installation_id } => (
             None,
             https,
-            Some(GitHubApp {
-                installation_id: *installation_id,
+            Some(GitHubAppSource {
+                installation_id: i64::try_from(*installation_id).map_err(|e| {
+                    refused(
+                        "invalid_installation",
+                        &format!("The GitHub App installation is not one GitHub gives: {e}."),
+                        "access",
+                    )
+                })?,
             }),
         ),
         GitAccess::Token { username, token } => (
@@ -651,21 +591,22 @@ fn credentials(
         }
     };
     let built = Built::of_git(change);
-    let source = BuildSource {
+    let source = SourceSpec {
         git: Some(GitSource {
             url,
-            reference: change
+            git_ref: change
                 .branch
                 .as_deref()
                 .map(str::trim)
                 .filter(|b| !b.is_empty())
                 .unwrap_or(DEFAULT_BRANCH_REF)
                 .to_owned(),
-            paths: built.paths(),
+            context_dir: built.directory.clone(),
+            dockerfile: built.dockerfile(),
         }),
-        credentials_ref: secret.as_ref().map(|_| NameRef { name: secret_name }),
+        archive: None,
+        credentials_ref: secret.as_ref().map(|_| SecretRef { name: secret_name }),
         github_app,
-        ..BuildSource::default()
     };
     Ok((secret, source))
 }
@@ -694,12 +635,20 @@ impl Planner<'_> {
         check_built(&built)?;
         check_upload(change)?;
         let registry = self.registry()?;
-        let source = BuildSource {
-            archive: Some(built.paths()),
-            ..BuildSource::default()
+        let source = SourceSpec {
+            git: None,
+            archive: Some(ArchiveSource {
+                digest: None,
+                context_dir: built.directory.clone(),
+                dockerfile: built.dockerfile(),
+            }),
+            credentials_ref: None,
+            github_app: None,
         };
-        let annotations =
-            BTreeMap::from([(UPLOAD_TOKEN_REQUEST.to_owned(), change.request.clone())]);
+        let annotations = BTreeMap::from([(
+            annotations::UPLOAD_TOKEN_REQUEST.to_owned(),
+            change.request.clone(),
+        )]);
         let project = self.input.snapshot.namespace.clone();
         let objects = built.objects(
             &project,

@@ -23,34 +23,30 @@
 //! [keel]: https://keel.sh/docs/#policies
 
 use serde_json::{Value, json};
+use zeabur_builder_api::annotations::{REBUILD, UPLOAD_TOKEN_REQUEST};
+use zeabur_builder_api::build::{
+    Build, EnvVar, EnvVarSource, MAX_ENV, MAX_PATH, MAX_UPLOAD_REQUEST, NotifyTarget, NotifyType,
+};
+use zeabur_builder_api::common::SecretKeyRef;
 use zeabur_model::{WorkloadKind, WorkloadRef};
 
 use crate::change::{BuildOptionsChange, Target};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
-use crate::plan::{ErrorKind, PlanError, Planner, error, workload_json, workload_target};
+use crate::plan::{ErrorKind, PlanError, Planner, error, to_json, workload_json, workload_target};
 use crate::project::{set_key, shown, steps};
-use crate::rules::{EnvEdit, env_entry, validate_env};
+use crate::rules::{EnvEdit, validate_env};
 
 /// The API group of Zeabur Builder's resources.
-pub const BUILDER_GROUP: &str = "builder.zeabur.com";
+pub const BUILDER_GROUP: &str = zeabur_builder_api::GROUP;
 /// Their version.
 pub const BUILDER_VERSION: &str = "v1alpha1";
-/// The annotation whose new value builds a `Build` again.
-pub const REBUILD: &str = "builder.zeabur.com/rebuild";
-/// The annotation whose new value asks for a token to upload an archive.
-pub const UPLOAD_TOKEN_REQUEST: &str = "builder.zeabur.com/upload-token-request";
-/// The label Zeabur Builder reads credentials by.
-pub const GIT_CREDENTIALS_LABEL: &str = "builder.zeabur.com/git-credentials";
 /// The workload annotation that has Keel update it, and to which tags.
 pub const KEEL_POLICY: &str = "keel.sh/policy";
 /// The policy Zeabur sets: any new tag of the image, since the builder's tags are not
 /// versions.
 pub const KEEL_FORCE: &str = "force";
-
-/// Longest upload token request the controller answers.
-const MAX_UPLOAD_REQUEST: usize = 63;
 
 /// Whether `digest` is a SHA-256 digest in the form the `Build` takes.
 fn archive_digest_valid(digest: &str) -> bool {
@@ -59,12 +55,12 @@ fn archive_digest_valid(digest: &str) -> bool {
     })
 }
 
-/// Most build variables a `Build` takes.
-const MAX_BUILD_ENV: usize = 128;
 /// Longest path the `Build` takes for its directory and Dockerfile.
-pub const MAX_BUILD_PATH: usize = 1024;
+pub const MAX_BUILD_PATH: usize = MAX_PATH;
 
-/// A build path as the `Build`'s schema writes it, empty allowed, for the API's description.
+/// A build path as the `Build`'s schema writes it
+/// ([`zeabur_builder_api::build::RELATIVE_PATH_PATTERN`]), empty allowed, for the API's
+/// description.
 pub const BUILD_PATH_PATTERN: &str =
     "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$";
 
@@ -183,14 +179,16 @@ impl Planner<'_> {
         self.patch(index, operations)
     }
 
+    /// The working copy of the `Build` at `index`, as Zeabur Builder's type.
+    fn typed_build(&self, index: usize) -> Result<Build, PlanError> {
+        serde_json::from_value(self.current(index))
+            .map_err(|e| error(ErrorKind::Invalid, "unreadable_build", e.to_string()))
+    }
+
     /// The `Build` named `name` must take its source from an uploaded archive.
     fn archive_build(&mut self, name: &str) -> Result<usize, PlanError> {
         let index = self.build(name)?;
-        if self
-            .current(index)
-            .pointer("/spec/source/archive")
-            .is_none()
-        {
+        if self.typed_build(index)?.spec.source.archive.is_none() {
             return Err(error(
                 ErrorKind::BadRequest,
                 "not_an_upload",
@@ -347,27 +345,27 @@ impl Planner<'_> {
             ));
         }
         let index = self.build(name)?;
-        let current = self.current(index);
-        let targets = current
-            .pointer("/spec/notify")
-            .and_then(Value::as_array)
-            .cloned();
-        let entry = json!({"type": "keel", "url": url});
-        let known = targets.as_ref().is_some_and(|list| {
-            list.iter()
-                .any(|t| t["type"] == "keel" && t["url"].as_str() == Some(url))
-        });
-        if known {
+        let targets = self.typed_build(index)?.spec.notify;
+        if targets
+            .iter()
+            .any(|t| t.kind == NotifyType::Keel && t.url == url)
+        {
             return Ok(());
         }
+        let entry = to_json(&NotifyTarget {
+            kind: NotifyType::Keel,
+            url: url.to_owned(),
+            secret_ref: None,
+        })?;
         self.claim(
             index,
             &[Step::field("spec"), Step::field("notify")],
             "spec.notify",
         )?;
-        let operation = match targets {
-            Some(_) => add("/spec/notify/-", entry),
-            None => add("/spec/notify", json!([entry])),
+        let operation = if targets.is_empty() {
+            add("/spec/notify", Value::Array(vec![entry]))
+        } else {
+            add("/spec/notify/-", entry)
         };
         self.patch(index, vec![operation])
     }
@@ -423,19 +421,14 @@ impl Planner<'_> {
         for edit in &change.env {
             self.build_env(index, &change.build, edit)?;
         }
-        let after = self.current(index);
-        let count = after
-            .pointer("/spec/env")
-            .and_then(Value::as_array)
-            .map_or(0, Vec::len);
-        if count > MAX_BUILD_ENV {
+        if self.typed_build(index)?.spec.env.len() > MAX_ENV {
             return Err(error(
                 ErrorKind::BadRequest,
                 "too_many_variables",
-                format!("A Build takes at most {MAX_BUILD_ENV} build variables."),
+                format!("A Build takes at most {MAX_ENV} build variables."),
             ));
         }
-        if after == before {
+        if self.current(index) == before {
             return Err(error(
                 ErrorKind::BadRequest,
                 "unchanged",
@@ -453,11 +446,7 @@ impl Planner<'_> {
         field: &str,
         value: &str,
     ) -> Result<(), PlanError> {
-        let source = if self
-            .current(index)
-            .pointer("/spec/source/archive")
-            .is_some()
-        {
+        let source = if self.typed_build(index)?.spec.source.archive.is_some() {
             "archive"
         } else {
             "git"
@@ -485,31 +474,25 @@ impl Planner<'_> {
     }
 
     fn build_env(&mut self, index: usize, build: &str, edit: &EnvEdit) -> Result<(), PlanError> {
-        let env = self
-            .current(index)
-            .pointer("/spec/env")
-            .and_then(Value::as_array)
-            .cloned();
-        let existing = env.as_ref().and_then(|env| {
-            env.iter()
-                .position(|e| e.get("name").and_then(Value::as_str) == Some(edit.name.as_str()))
-        });
+        let env = self.typed_build(index)?.spec.env;
+        let existing = env.iter().position(|e| e.name == edit.name);
         let path = [
             Step::field("spec"),
             Step::field("env"),
             Step::named(&edit.name),
         ];
         let shown = format!("build variable {}", edit.name);
+        let entry = to_json(&build_variable(edit))?;
         let operations = match (edit.op.as_str(), existing) {
             ("set", Some(at)) => {
-                let entry = format!("/spec/env/{at}");
+                let at = format!("/spec/env/{at}");
                 vec![
-                    test(&format!("{entry}/name"), json!(edit.name)),
-                    replace(&entry, env_entry(edit)),
+                    test(&format!("{at}/name"), json!(edit.name)),
+                    replace(&at, entry),
                 ]
             }
-            ("set", None) if env.is_some() => vec![add("/spec/env/-", env_entry(edit))],
-            ("set", None) => vec![add("/spec/env", json!([env_entry(edit)]))],
+            ("set", None) if !env.is_empty() => vec![add("/spec/env/-", entry)],
+            ("set", None) => vec![add("/spec/env", Value::Array(vec![entry]))],
             (_, Some(at)) => {
                 let entry = format!("/spec/env/{at}");
                 vec![
@@ -532,9 +515,37 @@ impl Planner<'_> {
     }
 }
 
+/// A build variable as `edit` sets it: a literal value, or a key of a Secret.
+fn build_variable(edit: &EnvEdit) -> EnvVar {
+    let from = edit.value_from.as_ref().map(|from| EnvVarSource {
+        secret_key_ref: SecretKeyRef {
+            name: from.secret_name.clone().unwrap_or_default(),
+            key: from.key.clone().unwrap_or_default(),
+        },
+    });
+    EnvVar {
+        name: edit.name.clone(),
+        value: from
+            .is_none()
+            .then(|| edit.value.clone().unwrap_or_default()),
+        value_from: from,
+    }
+}
+
 #[cfg(test)]
 mod tests {
+    use zeabur_builder_api::build::RELATIVE_PATH_PATTERN;
+
     use super::*;
+
+    #[test]
+    fn the_path_pattern_is_the_builds_with_the_empty_path() {
+        let path = RELATIVE_PATH_PATTERN
+            .strip_prefix('^')
+            .and_then(|p| p.strip_suffix('$'))
+            .unwrap();
+        assert_eq!(BUILD_PATH_PATTERN, format!("^({path})?$"));
+    }
 
     #[test]
     fn the_path_pattern_says_what_the_check_does() {

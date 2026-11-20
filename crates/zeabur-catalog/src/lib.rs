@@ -531,6 +531,28 @@ mod tests {
         }
     }
 
+    /// Zeabur reads and writes Zeabur Builder's objects with `zeabur-builder-api` at one tag, and
+    /// the development cluster builds the release this catalogue installs.
+    #[test]
+    fn the_builder_api_is_the_release_the_catalogue_installs() {
+        let lock = include_str!("../../../Cargo.lock");
+        let api = lock
+            .lines()
+            .find_map(|line| {
+                line.strip_prefix("source = \"git+https://github.com/zeabur-oss/builder?tag=")
+            })
+            .and_then(|rest| rest.split_once('#'))
+            .map(|(tag, _)| tag)
+            .unwrap();
+        let installed = catalogue()
+            .unwrap()
+            .into_iter()
+            .find(|c| c.id == "zeabur-builder")
+            .and_then(|c| c.tested_version)
+            .unwrap();
+        assert_eq!(api, format!("v{installed}"));
+    }
+
     fn k3s_defaults() -> ClusterFacts {
         let mut facts = ClusterFacts {
             version: "v1.36.5+k3s1".to_owned(),

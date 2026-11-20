@@ -12,6 +12,18 @@ pub(crate) fn stop_at_from_env() -> Option<String> {
         .filter(|release| !release.is_empty())
 }
 
+/// The chart version the catalog pins for `component` (its id).
+pub(crate) fn tested_version(dev: &DevCluster, component: &str) -> Result<String, String> {
+    let version = dev
+        .cmd("cargo")
+        .current_dir(&dev.root)
+        .args(["run", "-q", "--locked", "-p", "zeabur-catalog", "--example"])
+        .args(["tested_version", "--", component])
+        .read()
+        .map_err(|e| format!("reading {component}'s version from the catalog: {e}"))?;
+    Ok(version.trim().to_owned())
+}
+
 /// Runs the catalog's commands for `component` (its id) with `inputs`
 /// (`<input>=<value>`), leaving out the releases from `stop_at` on, then waits for the rollout of
 /// each Deployment in `namespace`.

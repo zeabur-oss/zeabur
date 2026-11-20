@@ -65,7 +65,7 @@ pub(crate) struct Up {
     #[arg(long, value_name = "DIR", env = "ZEABUR_IDENTITY_SRC")]
     pub(crate) identity_src: Option<PathBuf>,
     /// Build Zeabur Builder from this working tree, as it is (full profile), instead of
-    /// `xtask/pins/zeabur-builder` fetched from `ZEABUR_BUILDER_GIT`.
+    /// the release Zeabur Catalog installs, fetched from `ZEABUR_BUILDER_GIT`.
     #[arg(long, value_name = "DIR", env = "ZEABUR_BUILDER_SRC")]
     pub(crate) builder_src: Option<PathBuf>,
     /// Run this Zeabur image (a local image is imported, any other is pulled) instead of one

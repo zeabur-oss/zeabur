@@ -18,12 +18,12 @@ use std::collections::BTreeSet;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde_json::Value;
+use zeabur_builder_api::labels::GIT_CREDENTIALS;
 use zeabur_graph::{Snapshot, ingress_backends, is_machinery_secret, relations, workloads};
 use zeabur_model::adapters::provenance::{Tool, detect_tool};
 use zeabur_model::adapters::{controller_of, label};
 use zeabur_model::{HttpRoute, RelationKind, WorkloadKind, WorkloadRef};
 
-use crate::builds::GIT_CREDENTIALS_LABEL;
 use crate::change::{KeptReason, ObjectName, Warning};
 use crate::checks::ResourceRef;
 use crate::rules::route_name;
@@ -251,7 +251,7 @@ pub fn owned(snapshot: &Snapshot, http_routes: &[Value], workload: &WorkloadRef)
     }
     for secret in &snapshot.secrets {
         let object = secret.metadata.name.as_deref().unwrap_or_default();
-        let builds = label(secret.metadata.labels.as_ref(), GIT_CREDENTIALS_LABEL).is_some();
+        let builds = label(secret.metadata.labels.as_ref(), GIT_CREDENTIALS).is_some();
         if is_machinery_secret(secret) || builds {
             continue;
         }
