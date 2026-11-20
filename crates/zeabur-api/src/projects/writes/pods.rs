@@ -123,7 +123,8 @@ async fn admitted(
     plan: &Plan,
     workload: &Added<'_>,
 ) -> Result<Option<ClusterPod>, ApiError> {
-    let name = format!("{}-dry-run", workload.object.target.name);
+    // Generated, so a Pod already named like it can't answer 409 in place of admission.
+    let name = format!("{}-dry-run-", workload.object.target.name);
     let target = Target::of::<Pod>(&name);
     let write = WriteRequest {
         dry_run: true,
@@ -148,11 +149,11 @@ async fn admitted(
     }
 }
 
-/// A Pod of `workload`'s template named `name`. A StatefulSet's claim templates become claim
-/// volumes named as the StatefulSet controller names them, so both `volumeMounts` and
-/// `volumeDevices` resolve (a block device takes only a claim); each replaces a template volume of
-/// its name, as the controller's `updateStorage` does. A dry run doesn't read the claim. A
-/// ServiceAccount that `plan` creates does not exist yet, and the ServiceAccount admission plugin
+/// A Pod of `workload`'s template whose name kube-apiserver generates from `name`. A
+/// StatefulSet's claim templates become the claims of its first replica, so both `volumeMounts`
+/// and `volumeDevices` resolve (a block device takes only a claim); each replaces a template
+/// volume of its name, as the controller's `updateStorage` does. A dry run doesn't read the claim.
+/// A ServiceAccount that `plan` creates does not exist yet, and the ServiceAccount admission plugin
 /// refuses a Pod that names a missing one, so the Pod runs as `default` instead: quotas, limit
 /// ranges and Pod Security do not read it.
 fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
@@ -162,7 +163,8 @@ fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
         .and_then(Value::as_object)
         .cloned()
         .unwrap_or_default();
-    metadata.insert("name".to_owned(), json!(name));
+    metadata.remove("name");
+    metadata.insert("generateName".to_owned(), json!(name));
     let mut spec = workload
         .template
         .get("spec")
@@ -178,7 +180,7 @@ fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
         .filter_map(|c| c.pointer("/metadata/name"))
         .filter_map(Value::as_str)
         .map(|claim| {
-            json!({"name": claim, "persistentVolumeClaim": {"claimName": format!("{claim}-{name}")}})
+            json!({"name": claim, "persistentVolumeClaim": {"claimName": format!("{claim}-{}-0", workload.object.target.name)}})
         })
         .collect();
     if let Some(spec) = spec.as_object_mut() {
@@ -314,7 +316,7 @@ mod tests {
             pods: 1,
             change: Some(0),
         };
-        pod(&workload, "web-dry-run", plan)
+        pod(&workload, "web-dry-run-", plan)
             .pointer("/spec/serviceAccountName")
             .and_then(Value::as_str)
             .map(str::to_owned)
@@ -356,12 +358,12 @@ mod tests {
             pods: 1,
             change: Some(0),
         };
-        let pod = pod(&workload, "db-dry-run", &plan);
+        let pod = pod(&workload, "db-dry-run-", &plan);
         assert_eq!(
             pod.pointer("/spec/volumes").unwrap(),
             &json!([
                 {"name": "tmp", "emptyDir": {}},
-                {"name": "data", "persistentVolumeClaim": {"claimName": "data-db-dry-run"}}
+                {"name": "data", "persistentVolumeClaim": {"claimName": "data-db-0"}}
             ])
         );
     }
