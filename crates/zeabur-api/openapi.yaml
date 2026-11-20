@@ -7670,6 +7670,25 @@ components:
           level:
             $ref: "#/components/schemas/PodSecurityLevel"
             description: "`baseline` or `privileged`."
+      - type: object
+        description: |-
+          Another tool installed or configured a component the install adds values to, so Zeabur
+          leaves it as it is.
+        required:
+        - component
+        - values
+        - kind
+        properties:
+          component:
+            type: string
+            description: The component.
+          kind:
+            type: string
+            enum:
+            - unchanged
+          values:
+            type: string
+            description: The values to add to it, YAML.
       description: What to know before installing.
     ComposeRequest:
       type: object
@@ -19392,7 +19411,7 @@ components:
       type: string
       description: What a component uses that Zeabur cannot install yet.
       enum:
-      - contributes
+      - contributesWithoutChart
       - newerRelease
     UpgradeExtensions:
       type: object

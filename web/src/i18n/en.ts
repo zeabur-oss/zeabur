@@ -1206,6 +1206,8 @@ export const en = {
     `Zeabur Catalog has not tested ${name} on a cluster like this one.`,
   "components.privileged": (name: string, level: string) =>
     `${name} runs pods that need the ${level} Pod Security level.`,
+  "components.unchanged": (name: string) =>
+    `Zeabur didn't install or configure ${name}, so it leaves ${name} as it is. To use the two together, add these lines to the Helm values of ${name} yourself.`,
   "components.steps": "Steps",
   "components.checks": "Health checks",
   "components.leftovers": "Stays on the cluster",
@@ -1242,8 +1244,8 @@ export const en = {
   "components.value.empty": "Not set",
   "components.value.on": "On",
   "components.value.off": "Off",
-  "components.unsupported.contributes":
-    "Zeabur can't install this yet because it changes other components' settings.",
+  "components.unsupported.contributesWithoutChart":
+    "Zeabur can't install this because it changes other components' settings but has no Helm chart of its own.",
   "components.unsupported.newerRelease":
     "This version of Zeabur can't install it. Update Zeabur first.",
   "components.howToInstall": "How to install",

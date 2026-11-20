@@ -1122,6 +1122,8 @@ export const zhTW: Messages = {
   "components.removed": "已移除。",
   "components.untested": (name) => `Zeabur Catalog 還沒在這類叢集上測試過 ${name}。`,
   "components.privileged": (name, level) => `${name} 的 Pod 需要 ${level} 等級的 Pod Security。`,
+  "components.unchanged": (name) =>
+    `${name} 不是 Zeabur 安裝或設定的，所以 Zeabur 不會改動它。要讓兩者一起運作，請自己把下面這幾行加進 ${name} 的 Helm values。`,
   "components.steps": "步驟",
   "components.checks": "健康檢查",
   "components.leftovers": "會留在叢集上",
@@ -1155,7 +1157,8 @@ export const zhTW: Messages = {
   "components.value.empty": "未設定",
   "components.value.on": "開啟",
   "components.value.off": "關閉",
-  "components.unsupported.contributes": "Zeabur 還不能安裝這個元件，因為它會修改其他元件的設定。",
+  "components.unsupported.contributesWithoutChart":
+    "這個元件會修改其他元件的設定，本身卻沒有 Helm chart，所以 Zeabur 無法安裝。",
   "components.unsupported.newerRelease": "這個版本的 Zeabur 無法安裝這個元件，請先更新 Zeabur。",
   "components.howToInstall": "安裝方式",
   "settings.homepage": "首頁",

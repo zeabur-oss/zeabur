@@ -1119,6 +1119,8 @@ export const zhCN: Messages = {
   "components.removed": "已移除。",
   "components.untested": (name) => `Zeabur Catalog 还没在这类集群上测试过 ${name}。`,
   "components.privileged": (name, level) => `${name} 的 Pod 需要 ${level} 级别的 Pod Security。`,
+  "components.unchanged": (name) =>
+    `${name} 不是 Zeabur 安装或配置的，所以 Zeabur 不会改动它。要让两者一起工作，请自己把下面这几行加到 ${name} 的 Helm values。`,
   "components.steps": "步骤",
   "components.checks": "健康检查",
   "components.leftovers": "会留在集群上",
@@ -1152,7 +1154,8 @@ export const zhCN: Messages = {
   "components.value.empty": "未设置",
   "components.value.on": "开启",
   "components.value.off": "关闭",
-  "components.unsupported.contributes": "Zeabur 还不能安装这个组件，因为它会修改其他组件的设置。",
+  "components.unsupported.contributesWithoutChart":
+    "这个组件会修改其他组件的设置，本身却没有 Helm chart，所以 Zeabur 无法安装。",
   "components.unsupported.newerRelease": "这个版本的 Zeabur 无法安装这个组件，请先更新 Zeabur。",
   "components.howToInstall": "安装方式",
   "settings.homepage": "主页",

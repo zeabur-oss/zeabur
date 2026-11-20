@@ -6,7 +6,9 @@
 //! CRDs), a cluster without
 //! helm-controller and a catalog Zeabur cannot reach. Manifest releases: the System Upgrade
 //! Controller from its files, Falco without the policy report CRDs another tool installed, and a
-//! file that does not match its digest.
+//! file that does not match its digest. A component that adds values to K3s's packaged Traefik
+//! writes its `HelmChartConfig`, unless the person wrote one, and writes it again when its values
+//! differ.
 
 #[cfg(test)]
 mod tests {
@@ -96,12 +98,25 @@ mod tests {
     }
 
     /// Zeabur Catalog v0.5.3 with the components of `FIXTURES`, or no answer at all; `tampered`
-    /// answers each manifest file with other bytes than the catalog's digest.
+    /// answers each manifest file with other bytes than the catalog's digest. With
+    /// `contributes` adds values to another component.
     #[derive(Default)]
     struct Api {
         down: bool,
         tampered: bool,
+        contributes: Option<Contributes>,
     }
+
+    /// A contribution the catalog files do not have.
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Contributes {
+        /// cert-manager adds [`BOUNCER`] to Traefik.
+        Bouncer,
+        /// cloudnative-pg adds a value to cert-manager, which it needs.
+        ToNeeded,
+    }
+
+    const BOUNCER: &str = "ports:\n  web:\n    middlewares:\n    - bouncer\n";
 
     impl Fetch for Api {
         #[expect(
@@ -152,6 +167,18 @@ mod tests {
                             })
                             .collect();
                         release["urlDigests"] = json!(digests);
+                    }
+                    if self.contributes == Some(Contributes::Bouncer) && id == "cert-manager" {
+                        file["declaration"]["contributes"] = json!([{
+                            "target": {"component": "traefik", "release": "traefik"},
+                            "values": BOUNCER,
+                        }]);
+                    }
+                    if self.contributes == Some(Contributes::ToNeeded) && id == "cloudnative-pg" {
+                        file["declaration"]["contributes"] = json!([{
+                            "target": {"component": "cert-manager", "release": "cert-manager"},
+                            "values": "# Added by cloudnative-pg.\nadded: cnpg\n",
+                        }]);
                     }
                     serde_json::to_vec(&file).unwrap()
                 };
@@ -1013,5 +1040,254 @@ mod tests {
             "{problem}"
         );
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
+    }
+
+    /// The cluster with Traefik that K3s packages, which takes a `HelmChartConfig`, and an app
+    /// whose cert-manager adds values to it.
+    fn packaged() -> (MemoryCluster, Router) {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.facts.k3s_helm_charts.insert(
+                "kube-system/traefik".to_owned(),
+                "https://%{KUBERNETES_API}%/static/charts/traefik-41.6.101+up41.6.1.tgz".to_owned(),
+            );
+            s.served.push(served(
+                "helm.cattle.io",
+                "helmchartconfigs",
+                "HelmChartConfig",
+                true,
+            ));
+        });
+        let app = TestApi::new(&cluster)
+            .signed_in(TOKEN)
+            .with_catalog(Arc::new(Api {
+                contributes: Some(Contributes::Bouncer),
+                ..Api::default()
+            }))
+            .router();
+        (cluster, app)
+    }
+
+    /// helm-controller installs the packaged Traefik with its config, after Zeabur's writes.
+    fn traefik_installed(cluster: &MemoryCluster) {
+        put(
+            cluster,
+            json!({
+                "apiVersion": "helm.cattle.io/v1",
+                "kind": "HelmChart",
+                "metadata": {"name": "traefik", "namespace": "kube-system"},
+                "spec": {"chart": "traefik"},
+                "status": {"jobName": "helm-install-traefik"},
+            }),
+        );
+        cluster.update(|s| {
+            let job = json!({
+                "apiVersion": "batch/v1",
+                "kind": "Job",
+                "metadata": {"name": "helm-install-traefik", "namespace": "kube-system",
+                             "creationTimestamp": "2030-01-01T00:00:00Z"},
+                "status": {"conditions": [
+                    {"type": "SuccessCriteriaMet", "status": "True"},
+                    {"type": "Complete", "status": "True"},
+                ]},
+            });
+            let kube_system = s.objects.get_mut("kube-system").unwrap();
+            kube_system.jobs.push(serde_json::from_value(job).unwrap());
+        });
+    }
+
+    #[tokio::test]
+    async fn a_chart_written_before_and_after_its_contributor_is_done_with_the_values() {
+        let cluster = cluster();
+        let app = TestApi::new(&cluster)
+            .signed_in(TOKEN)
+            .with_catalog(Arc::new(Api {
+                contributes: Some(Contributes::ToNeeded),
+                ..Api::default()
+            }))
+            .router();
+        let (status, plan) = call_for(&app, "cloudnative-pg", "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(
+            states(&plan),
+            [
+                "cert-manager pending",
+                "issuers pending",
+                "cloudnative-pg pending",
+                "plugin-barman-cloud pending",
+                "cert-manager pending"
+            ]
+        );
+        call_for(&app, "cloudnative-pg", "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        // The last step writes the chart again with cloudnative-pg's value, and
+        // helm-controller installs it.
+        let mut chart = dynamic(&cluster, "HelmChart", "cert-manager").unwrap();
+        let values = chart["spec"]["valuesContent"].as_str().unwrap().to_owned();
+        chart["spec"]["valuesContent"] = json!(format!("added: cnpg\n{values}"));
+        put(&cluster, chart);
+        let (_, plan) = call_for(&app, "cloudnative-pg", "plan", "install", "").await;
+        let now = states(&plan);
+        // The first write is done too: applying it again would take the value out.
+        assert_eq!(
+            now.first().map(String::as_str),
+            Some("cert-manager ready"),
+            "{now:?}"
+        );
+        assert_eq!(
+            now.last().map(String::as_str),
+            Some("cert-manager ready"),
+            "{now:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn values_for_packaged_traefik_go_in_its_config_and_leave_with_the_component() {
+        let (cluster, app) = packaged();
+        let (status, plan) = call(&app, "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(
+            states(&plan),
+            ["cert-manager pending", "issuers pending", "traefik pending"]
+        );
+        assert_eq!(plan["steps"][2]["writes"][0]["kind"], "HelmChartConfig");
+
+        call(&app, "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        call(&app, "apply", "install", "0.5.3").await;
+        let (_, applied) = call(&app, "apply", "install", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            ["cert-manager ready", "issuers ready", "traefik waiting"]
+        );
+        let config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
+        assert_eq!(config["metadata"]["namespace"], "kube-system");
+        assert_eq!(config["spec"]["valuesContent"], BOUNCER);
+        assert_eq!(
+            config["metadata"]["labels"]["app.kubernetes.io/managed-by"],
+            "zeabur"
+        );
+
+        // Removal takes the values out of Traefik first, then removes cert-manager.
+        let (status, plan) = call(&app, "plan", "remove", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(
+            states(&plan),
+            [
+                "traefik pending",
+                "issuers pending",
+                "cert-manager pending",
+                "traefik pending"
+            ]
+        );
+        // The config stays, empty, and cert-manager waits until Traefik is installed without
+        // the values: its middleware is still in Traefik until then.
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
+        assert_eq!(config["spec"]["valuesContent"], "");
+        assert_eq!(
+            states(&applied["plan"]),
+            [
+                "traefik waiting",
+                "issuers pending",
+                "cert-manager pending",
+                "traefik pending"
+            ]
+        );
+        // helm-controller installs Traefik without the values: cert-manager goes, then the
+        // empty config.
+        traefik_installed(&cluster);
+        let (_, plan) = call(&app, "plan", "remove", "").await;
+        assert_eq!(
+            states(&plan),
+            [
+                "traefik ready",
+                "issuers pending",
+                "cert-manager pending",
+                "traefik pending"
+            ]
+        );
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            [
+                "traefik ready",
+                "issuers ready",
+                "cert-manager pending",
+                "traefik pending"
+            ]
+        );
+        assert!(dynamic(&cluster, "HelmChartConfig", "traefik").is_some());
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            [
+                "traefik ready",
+                "issuers ready",
+                "cert-manager ready",
+                "traefik pending"
+            ]
+        );
+        let (status, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(applied["plan"]["done"], true, "{applied}");
+        assert!(dynamic(&cluster, "HelmChartConfig", "traefik").is_none());
+    }
+
+    #[tokio::test]
+    async fn an_installed_config_with_other_values_is_written_again() {
+        let (cluster, app) = packaged();
+        call(&app, "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.5.3").await;
+        // helm-controller installs Traefik with the config.
+        traefik_installed(&cluster);
+        let (_, plan) = call(&app, "plan", "install", "").await;
+        assert_eq!(
+            states(&plan),
+            ["cert-manager ready", "issuers ready", "traefik ready"]
+        );
+
+        // An earlier catalog release added other values.
+        let mut config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
+        config["spec"]["valuesContent"] = json!("ports: {}\n");
+        put(&cluster, config);
+        let (_, plan) = call(&app, "plan", "install", "").await;
+        assert_eq!(
+            states(&plan),
+            ["cert-manager ready", "issuers ready", "traefik pending"]
+        );
+        call(&app, "apply", "install", "0.5.3").await;
+        let config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
+        assert_eq!(config["spec"]["valuesContent"], BOUNCER);
+    }
+
+    #[tokio::test]
+    async fn a_helm_chart_config_the_person_wrote_is_left_as_it_is() {
+        let (cluster, app) = packaged();
+        let theirs = json!({
+            "apiVersion": "helm.cattle.io/v1",
+            "kind": "HelmChartConfig",
+            "metadata": {"name": "traefik", "namespace": "kube-system"},
+            "spec": {"valuesContent": "logs:\n  access:\n    enabled: true\n"},
+        });
+        put(&cluster, theirs.clone());
+        let (status, plan) = call(&app, "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(states(&plan), ["cert-manager pending", "issuers pending"]);
+        assert!(plan["warnings"].as_array().unwrap().contains(&json!({
+            "kind": "unchanged",
+            "component": "traefik",
+            "values": BOUNCER,
+        })));
+
+        call(&app, "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        call(&app, "apply", "install", "0.5.3").await;
+        let config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
+        assert_eq!(config["spec"], theirs["spec"]);
+        let (_, plan) = call(&app, "plan", "remove", "").await;
+        assert_eq!(states(&plan), ["issuers pending", "cert-manager pending"]);
     }
 }

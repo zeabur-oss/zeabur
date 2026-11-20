@@ -1113,7 +1113,7 @@ export type BuildSettings = {
 export type Unsupported = (typeof Unsupported)[keyof typeof Unsupported]
 
 export const Unsupported = {
-  contributes: "contributes",
+  contributesWithoutChart: "contributesWithoutChart",
   newerRelease: "newerRelease",
 } as const
 
@@ -4172,6 +4172,13 @@ export type ComponentWarning =
       kind: "privileged"
       /** `baseline` or `privileged`. */
       level: PodSecurityLevel
+    }
+  | {
+      /** The component. */
+      component: string
+      kind: "unchanged"
+      /** The values to add to it, YAML. */
+      values: string
     }
 
 /**
