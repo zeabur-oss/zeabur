@@ -31,7 +31,7 @@ Zeabur doesn't add nodes; on a cluster set up with Zeatend, Zeatend does. Open t
 sudo zeatend node add
 ```
 
-It prints a configuration with a join token and the commands to run on the new VM. On RKE2, add `--role server` to add a server instead of a worker. On the new VM, [download Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend), then run the printed commands as root. `zeatend plan` checks the ports and the distance to the server, and `zeatend apply` joins the VM and waits until the node is `Ready`.
+It prints the commands to run on the new VM: they write `/etc/zeatend/config.yaml` with the join token in it, then run `zeatend plan` and `zeatend apply`. On RKE2, add `--role server` to add a server instead of a worker. On the new VM, [download Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend), then run the printed commands as root. `zeatend plan` checks the ports and the network latency to the server, and `zeatend apply` joins the VM and waits until the node is `Ready`.
 
 A worker's token joins workers for one hour; change that with `--ttl`. Once the node is `Ready`, revoke the token with the last command `node add` printed. An RKE2 server gets the cluster's server token, which doesn't expire. Keep it out of chats and tickets.
 

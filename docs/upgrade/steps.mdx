@@ -31,7 +31,7 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 With `--reset-then-reuse-values`, Helm starts from the new chart's defaults, including the image, then applies the values you set. With `--reuse-values`, the image stays on the old version.
 
-On a server you set up with [Zeatend](../install/one-command.mdx), run the commands on the server, as in the install: `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml` first, then `sudo -E helm upgrade …` and `sudo k3s kubectl -n zeabur rollout status deployment/zeabur`.
+On a server you set up with [Zeatend](../install/one-command.mdx), run the commands on the server, as in the install. First `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`, or `/etc/rancher/rke2/rke2.yaml` on RKE2. Then run `sudo -E helm upgrade …`, and wait with `sudo k3s kubectl …` on K3s or `sudo -E /var/lib/rancher/rke2/bin/kubectl …` on RKE2.
 
 ## Upgrade with Argo CD
 
@@ -55,7 +55,7 @@ On a server you set up with Zeatend, Zeatend upgrades K3s, RKE2 or KubeSolo, apa
 
 `apply` installs the new release and restarts K3s, RKE2 or KubeSolo. The Kubernetes API stops answering for a short time, and running services keep serving. With more than one node, upgrade the servers first, one at a time, then the workers.
 
-Kubernetes moves up one minor version at a time. When the new release is further ahead, `plan` stops before it changes anything and names the release to apply first. Set that release as `version` in `/etc/zeatend/config.yaml`, run `apply`, then remove `version` and run `apply` again.
+Kubernetes moves up one minor version at a time. When the new release is further ahead, `plan` stops before it changes anything and names the release to apply first. Set that release as `version` in `/etc/zeatend/config.yaml` and run `apply`. Repeat with each release `plan` names, then remove `version` and run `apply` once more.
 
 ### A server that zeabur-installer set up
 

@@ -31,7 +31,7 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 `--reset-then-reuse-values` 会先采用新版 chart 的默认值，包括镜像，再应用你之前设置的值。用 `--reuse-values` 的话，镜像会停在旧版。
 
-在用 [Zeatend](../install/one-command.mdx) 装好的服务器上，和安装时一样在服务器上运行：先 `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`，再运行 `sudo -E helm upgrade …` 和 `sudo k3s kubectl -n zeabur rollout status deployment/zeabur`。
+在用 [Zeatend](../install/one-command.mdx) 装好的服务器上，和安装时一样在服务器上运行。先 `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`，RKE2 则是 `/etc/rancher/rke2/rke2.yaml`。再运行 `sudo -E helm upgrade …`，然后等待副本就绪：K3s 用 `sudo k3s kubectl …`，RKE2 用 `sudo -E /var/lib/rancher/rke2/bin/kubectl …`。
 
 ## 用 Argo CD 升级
 
@@ -55,7 +55,7 @@ Zeabur 运行在你自己的电脑上，没有服务器要升级。到[发行文
 
 `apply` 会装上新版本，再重启 K3s、RKE2 或 KubeSolo。Kubernetes API 会有一小段时间没有响应，运行中的服务照常工作。有多个节点时，先逐台升级服务器，再升级工作节点。
 
-Kubernetes 一次只能升一个小版本。新版本跨度更大时，`plan` 会在做任何改动之前停下，并写明要先应用哪个版本。把那个版本写进 `/etc/zeatend/config.yaml` 的 `version`，运行 `apply`，再删掉 `version`，运行一次 `apply`。
+Kubernetes 一次只能升一个小版本。新版本跨度更大时，`plan` 会在做任何改动之前停下，并写明要先应用哪个版本。把那个版本写进 `/etc/zeatend/config.yaml` 的 `version`，运行 `apply`。`plan` 每写出一个版本就照做一次，最后删掉 `version`，再运行一次 `apply`。
 
 ### 用 zeabur-installer 安装的服务器
 

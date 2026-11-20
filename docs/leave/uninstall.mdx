@@ -14,7 +14,7 @@ You need a kubeconfig with permission to manage the objects installed by Zeabur.
 1. Connect to the target cluster with kubectl and check the context and current permissions. On a K3s or RKE2 server, you can use `/etc/rancher/k3s/k3s.yaml` (K3s) or `/etc/rancher/rke2/rke2.yaml` (RKE2), which root manages. Don't share these admin credentials with regular members.
 2. Record how Zeabur was installed, its release name, and its namespace. The Helm examples below use release `zeabur` and namespace `zeabur`. Replace them with the actual names for your installation.
 3. Close any open container terminals, kubectl terminals, and node terminals, and apply or discard any reviewed changes. Removing Zeabur disconnects these sessions and invalidates changes you haven't applied.
-4. If members still need to act under their Zeabur Identity accounts, keep Identity and arrange [replacement RBAC and admission policies](#member-permissions-and-admission-policies) first. Removal deletes the member roles provided by the chart and the member bindings created by Zeabur.
+4. Removal also removes the Zeabur Identity server, so nobody can sign in with Zeabur Identity afterward. If members, other clients, user kubeconfigs or automation still sign in with it, move them to another sign-in system and arrange [replacement RBAC and admission policies](#member-permissions-and-admission-policies) first. Removal deletes the member roles provided by the chart and the member bindings created by Zeabur.
 5. Back up important data with your existing backup tools. Check that the secrets, destinations, and controllers needed to restore it are still available. This process doesn't delete application volumes.
 
 On your computer, check the connection and record the current service state:
@@ -160,13 +160,13 @@ This deletes only the registration list and its secrets. It doesn't delete remot
 
 ## Remove Zeabur Identity as well
 
-`helm uninstall` already removes the Zeabur Identity server that the chart installed. Its accounts and passkeys stay in the `zeabur-identity` namespace. If other clients, user kubeconfigs, or automation still sign in with Zeabur Identity, move them to another sign-in system first and confirm that you can manage the cluster without it. Then delete the accounts and passkeys:
+`helm uninstall` already removes the Zeabur Identity server that the chart installed. Its accounts and passkeys stay in the `zeabur-identity` namespace. Once you are sure nobody needs them, and you can manage the cluster without Zeabur Identity, delete them:
 
 ```sh
 kubectl delete namespace zeabur-identity
 ```
 
-This can't be undone. kube-apiserver keeps the Zeabur Identity issuer in its authentication configuration until you remove it. On a server set up with Zeatend, it is `apiServer.authenticationConfig` in `/etc/zeatend/config.yaml`.
+This can't be undone. kube-apiserver keeps the Zeabur Identity issuer in its authentication configuration until you remove it. On a server set up with Zeatend, delete `apiServer.authenticationConfig` from `/etc/zeatend/config.yaml` and run `sudo zeatend apply`.
 
 If you kept your own Zeabur Identity with `identity.enabled=false`, remove it through the source you installed it from.
 

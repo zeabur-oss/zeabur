@@ -31,7 +31,7 @@ Zeabur 不負責加入節點；用 Zeatend 裝好的叢集，由 Zeatend 加入�
 sudo zeatend node add
 ```
 
-指令會印出一份含加入權杖的設定，以及要在新 VM 執行的指令。RKE2 要加伺服器而不是工作節點時，加上 `--role server`。在新 VM 上先[下載 Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend)，再以 root 執行印出來的指令。`zeatend plan` 會檢查連接埠和到伺服器的距離，`zeatend apply` 會讓 VM 加入叢集，並等節點變成 `Ready`。
+指令會印出要在新 VM 執行的指令：先寫入 `/etc/zeatend/config.yaml`，加入權杖就在這份設定裡，再執行 `zeatend plan` 和 `zeatend apply`。RKE2 要加伺服器而不是工作節點時，加上 `--role server`。在新 VM 上先[下載 Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend)，再以 root 執行印出來的指令。`zeatend plan` 會檢查連接埠和到伺服器的網路延遲，`zeatend apply` 會讓 VM 加入叢集，並等節點變成 `Ready`。
 
 工作節點的權杖一小時內有效，可以用 `--ttl` 調整。節點 `Ready` 後，用 `node add` 印出的最後一行指令撤銷權杖。RKE2 伺服器拿到的是叢集的伺服器權杖，不會過期，不要貼到聊天室或工單裡。
 

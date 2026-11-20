@@ -31,7 +31,7 @@ Zeabur 不负责添加节点；用 Zeatend 装好的集群，由 Zeatend 添加�
 sudo zeatend node add
 ```
 
-命令会打印一份含加入令牌的配置，以及要在新 VM 上运行的命令。RKE2 要添加服务器而不是工作节点时，加上 `--role server`。在新 VM 上先[下载 Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend)，再以 root 身份运行打印出的命令。`zeatend plan` 会检查端口和到服务器的距离，`zeatend apply` 会让 VM 加入集群，并等待节点变为 `Ready`。
+命令会打印要在新 VM 上运行的命令：先写入 `/etc/zeatend/config.yaml`，加入令牌就在这份配置里，再运行 `zeatend plan` 和 `zeatend apply`。RKE2 要添加服务器而不是工作节点时，加上 `--role server`。在新 VM 上先[下载 Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend)，再以 root 身份运行打印出的命令。`zeatend plan` 会检查端口和到服务器的网络延迟，`zeatend apply` 会让 VM 加入集群，并等待节点变为 `Ready`。
 
 工作节点的令牌一小时内有效，可以用 `--ttl` 调整。节点 `Ready` 后，用 `node add` 打印的最后一行命令撤销令牌。RKE2 服务器拿到的是集群的服务器令牌，不会过期，不要贴到聊天或工单里。
 
