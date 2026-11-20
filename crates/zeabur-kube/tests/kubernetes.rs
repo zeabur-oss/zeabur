@@ -21,6 +21,7 @@ mod tests {
     use k8s_openapi::api::authentication::v1::SelfSubjectReview;
     use k8s_openapi::api::core::v1::{ConfigMap, Node, Pod, ResourceQuota};
     use k8s_openapi::api::rbac::v1::{ClusterRole, ClusterRoleBinding, Role, RoleBinding};
+    use k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
     use kube::api::{Api, ListParams, PostParams};
     use serde_json::json;
     use zeabur_kube::{
@@ -71,6 +72,61 @@ mod tests {
         let elsewhere = Api::<ConfigMap>::namespaced(sandbox.user().kube().clone(), "default");
         let error = elsewhere.list(&ListParams::default()).await.unwrap_err();
         assert_eq!(status_code(&error), Some(403), "{error}");
+    }
+
+    /// One API group with two kinds: `Gadget` at `v1`, the group's preferred version, and
+    /// `Gizmo` at `v1beta1` only, as an operator serves kinds it has not moved to `v1` yet.
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
+    async fn a_kind_outside_the_preferred_version_is_served() {
+        let sandbox = Sandbox::new("zeabur-versions", rules()).await;
+        let group = format!("{}.example.com", sandbox.namespace());
+        let crds = Api::<CustomResourceDefinition>::all(sandbox.admin().clone());
+        for (plural, kind, version) in [("gadgets", "Gadget", "v1"), ("gizmos", "Gizmo", "v1beta1")]
+        {
+            let name = format!("{plural}.{group}");
+            sandbox.delete_crd(&name);
+            let crd = json!({
+                "metadata": {"name": name},
+                "spec": {
+                    "group": group,
+                    "scope": "Namespaced",
+                    "names": {"plural": plural, "singular": plural.trim_end_matches('s'), "kind": kind},
+                    "versions": [{
+                        "name": version, "served": true, "storage": true,
+                        "schema": {"openAPIV3Schema": {
+                            "type": "object", "x-kubernetes-preserve-unknown-fields": true}},
+                    }],
+                },
+            });
+            crds.create(
+                &PostParams::default(),
+                &serde_json::from_value(crd).unwrap(),
+            )
+            .await
+            .expect("custom resource definition");
+        }
+
+        let deadline = Instant::now() + Duration::from_secs(60);
+        let ours = loop {
+            let served = sandbox.user().served_resources().await.expect("discovery");
+            let ours: Vec<(String, String)> = served
+                .into_iter()
+                .filter(|r| r.group == group)
+                .map(|r| (r.kind, r.version))
+                .collect();
+            if ours.len() == 2 || Instant::now() >= deadline {
+                break ours;
+            }
+            tokio::time::sleep(Duration::from_millis(500)).await;
+        };
+        assert_eq!(
+            ours,
+            [
+                ("Gadget".to_owned(), "v1".to_owned()),
+                ("Gizmo".to_owned(), "v1beta1".to_owned()),
+            ]
+        );
     }
 
     #[tokio::test]
