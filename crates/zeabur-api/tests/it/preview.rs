@@ -133,7 +133,7 @@ mod tests {
     async fn without_the_right_to_create_pods_a_scale_is_not_held_to_the_quota() {
         let cluster = cluster("700m");
         cluster.update(|s| {
-            s.forbidden_writes.insert("Pod/web-dry-run".to_owned());
+            s.forbidden_writes.insert("Pod/web-dry-run-".to_owned());
             s.refused_rights.insert("create pods".to_owned());
         });
         let preview = preview(&cluster, scale(3)).await;
@@ -146,7 +146,7 @@ mod tests {
         let cluster = cluster("0");
         cluster.update(|s| {
             s.admission_refusals.insert(
-                "Pod/web-dry-run".to_owned(),
+                "Pod/web-dry-run-".to_owned(),
                 zeabur_core::problem::KubernetesStatus::new(
                     403,
                     "Forbidden",
