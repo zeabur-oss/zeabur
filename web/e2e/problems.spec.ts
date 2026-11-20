@@ -141,7 +141,7 @@ test("a pod that runs again after a recent crash keeps the service failing, in p
             name: service,
             ready: true,
             restarts: 5,
-            lastTermination: { exitCode: 1, reason: "Error", finished },
+            lastTermination: { exitCode: 1, reason: "Error", finishedAt: finished },
           },
         ],
       })
