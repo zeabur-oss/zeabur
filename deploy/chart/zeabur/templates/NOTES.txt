@@ -18,8 +18,8 @@ The certificates can take a minute after install. If the link has expired, issue
 Sign in through {{ $issuer }}.
 {{- end }}
 
-kube-apiserver must trust {{ $issuer }} (audience kubernetes, username prefix zeabur:),
-for example with Zeatend's apiServer.jwt.
+kube-apiserver must accept the sign-in tokens of {{ $issuer }}.
+`zeabur-identityctl kube-config --issuer {{ $issuer }}` prints its configuration.
 {{- if not (or .Values.ingress.enabled .Values.httpRoute.enabled) }}
 
 Neither ingress.enabled nor httpRoute.enabled is set: route {{ $publicUrl }} to the
