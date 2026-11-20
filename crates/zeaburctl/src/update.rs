@@ -183,9 +183,10 @@ mod tests {
     fn github(
         status: &'static str,
         headers: &'static str,
-        body: &'static str,
+        body: &str,
         delay: Duration,
     ) -> (String, Receiver<String>) {
+        let body = body.to_owned();
         let listener = TcpListener::bind("127.0.0.1:0").unwrap();
         let address = listener.local_addr().unwrap();
         let (seen, requests) = mpsc::channel();
@@ -193,6 +194,7 @@ mod tests {
             for stream in listener.incoming() {
                 let Ok(mut stream) = stream else { break };
                 let seen = seen.clone();
+                let body = body.clone();
                 std::thread::spawn(move || {
                     let mut buffer = [0; 4096];
                     let read = stream.read(&mut buffer).unwrap_or(0);
@@ -209,12 +211,14 @@ mod tests {
         (format!("http://{address}/releases"), requests)
     }
 
-    const RELEASES_JSON: &str = r####"[{"tag_name":"v99.0.0","html_url":"https://example.test/99","body":"### Security\n- x"}]"####;
+    fn releases_json() -> String {
+        serde_json::json!([{"tag_name":"v99.0.0","html_url":"https://example.test/99","body":"### Security\n- x"}]).to_string()
+    }
     const WAIT: Duration = Duration::from_secs(10);
 
     #[test]
     fn a_slow_answer_holds_the_command_up_no_longer_than_the_grace() {
-        let (url, _) = github("200 OK", "", RELEASES_JSON, Duration::from_secs(30));
+        let (url, _) = github("200 OK", "", &releases_json(), Duration::from_secs(30));
         let started = Instant::now();
         assert_eq!(
             Check::start_at(&url, None).notice(Duration::from_millis(200)),
@@ -225,7 +229,7 @@ mod tests {
 
     #[test]
     fn every_command_asks_and_names_a_newer_release() {
-        let (url, requests) = github("200 OK", "", RELEASES_JSON, Duration::ZERO);
+        let (url, requests) = github("200 OK", "", &releases_json(), Duration::ZERO);
         for _ in 0..2 {
             let notice = Check::start_at(&url, None).notice(WAIT).unwrap();
             assert!(notice.contains("99.0.0"), "{notice}");

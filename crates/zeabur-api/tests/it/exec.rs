@@ -157,7 +157,9 @@ mod tests {
         output_until(&mut socket, "echo hello\r\n$ ").await;
 
         socket
-            .send(Message::text(r#"{"type":"resize","cols":120,"rows":40}"#))
+            .send(Message::text(
+                json!({"type":"resize","cols":120,"rows":40}).to_string(),
+            ))
             .await
             .unwrap();
         let resized = TerminalSize {

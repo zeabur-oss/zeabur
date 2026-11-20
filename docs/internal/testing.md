@@ -89,6 +89,15 @@ Removing or weakening one of these tests needs another test of the same promise 
 - **No real clock where the answer depends on the date**: tests fix it (`zeabur_api::Options::clock`).
 - **A flaky test is broken.** It is fixed or removed, not retried until green [nondeterminism].
 
+## JSON in tests
+
+- **`json!`, not raw strings.** Tests build JSON with `serde_json::json!`. They compare whole
+  objects (`assert_eq!(serde_json::to_value(&typed)?, json!({ … }))`) or deserialize one
+  (`serde_json::from_value::<Typed>(json!({ … }))`), and never index into a `Value`.
+- **A raw string only where the exact bytes are the subject**: malformed or byte-exact parser
+  input, a signature over a body, a golden file, NDJSON. A one-line comment says why.
+- **Production code** reads and writes a known shape through a typed struct, not `json!`.
+
 ## Cost runs
 
 What a read costs is measured by hand, never asserted. The `zeabur-overview-cost` skill says how

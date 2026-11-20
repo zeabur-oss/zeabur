@@ -137,31 +137,39 @@ fn idle_from(text: &str) -> Option<IdleUse> {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::{Value, json};
     use zeabur_kube::k8s_openapi::jiff::civil::date;
 
     use super::*;
 
-    fn run(distribution: &str, arch: &str, memory: &str, result: &str, at: &str) -> String {
-        format!(
-            r#"{{"distribution": "{distribution}", "profile": "single-node",
-                "platform": {{"os": "linux", "architecture": "{arch}"}},
-                "kubernetesVersion": "v1.36.4",
-                "pods": [{{"workload": "app", "kind": "Deployment", "memory": "{memory}", "cpu": "3m"}},
-                         {{"workload": "app-db", "kind": "Cluster", "memory": "10Mi", "cpu": "1m"}}],
-                "result": "{result}", "measuredAt": "{at}"}}"#
-        )
+    fn run(distribution: &str, arch: &str, memory: &str, result: &str, at: &str) -> Value {
+        json!({
+            "distribution": distribution,
+            "profile": "single-node",
+            "platform": {"os": "linux", "architecture": arch},
+            "kubernetesVersion": "v1.36.4",
+            "pods": [
+                {"workload": "app", "kind": "Deployment", "memory": memory, "cpu": "3m"},
+                {"workload": "app-db", "kind": "Cluster", "memory": "10Mi", "cpu": "1m"},
+            ],
+            "result": result,
+            "measuredAt": at,
+        })
+    }
+
+    fn bundle_of(environments: &[Value]) -> String {
+        json!({"template": "ghost", "environments": environments}).to_string()
     }
 
     #[test]
     fn takes_the_newest_passed_single_node_kind_amd64_run() {
-        let text = format!(
-            r#"{{"template": "ghost", "environments": [{}, {}, {}, {}, {}]}}"#,
+        let text = bundle_of(&[
             run("k3s", "amd64", "900Mi", "passed", "2026-10-26"),
             run("kind", "amd64", "300Mi", "passed", "2026-10-11"),
             run("kind", "amd64", "300Mi", "passed", "2026-10-25"),
             run("kind", "amd64", "0", "failed", "2026-10-27"),
             run("kind", "arm64", "280Mi", "passed", "2026-10-28"),
-        );
+        ]);
         assert_eq!(
             idle_from(&text),
             Some(IdleUse {
@@ -187,26 +195,24 @@ mod tests {
 
     #[test]
     fn the_newest_day_wins_and_reads_back_as_a_date() {
-        let text = format!(
-            r#"{{"environments": [{}, {}]}}"#,
+        let text = bundle_of(&[
             run("kind", "amd64", "300Mi", "passed", "2026-11-10"),
             run("kind", "amd64", "900Mi", "passed", "2026-11-09"),
-        );
+        ]);
         let idle = idle_from(&text).unwrap();
         assert_eq!(idle.measured_at, date(2026, 11, 10));
         assert_eq!(
-            serde_json::to_value(&idle).unwrap()["measuredAt"],
-            "2026-11-10"
+            serde_json::to_value(idle.measured_at).unwrap(),
+            json!("2026-11-10")
         );
     }
 
     #[test]
     fn falls_back_to_another_passed_run() {
-        let text = format!(
-            r#"{{"environments": [{}, {}]}}"#,
+        let text = bundle_of(&[
             run("k3s", "arm64", "12Mi", "passed", "2026-10-11"),
             run("kind", "amd64", "0", "skipped", "2026-10-12"),
-        );
+        ]);
         let idle = idle_from(&text).unwrap();
         assert_eq!(idle.environment, "k3s-single-node-arm64-v1.36.4");
         assert_eq!(idle.memory_bytes, 22 * 1024 * 1024);
@@ -214,12 +220,12 @@ mod tests {
 
     #[test]
     fn a_run_without_a_result_did_not_pass_and_the_others_still_count() {
-        let text = format!(
-            r#"{{"environments": [{}, {}]}}"#,
+        let mut unfinished = run("kind", "amd64", "900Mi", "passed", "2026-10-12");
+        unfinished.as_object_mut().unwrap().remove("result");
+        let text = bundle_of(&[
             run("kind", "amd64", "300Mi", "passed", "2026-10-11"),
-            run("kind", "amd64", "900Mi", "passed", "2026-10-12")
-                .replace(r#""result": "passed", "#, ""),
-        );
+            unfinished,
+        ]);
         let idle = idle_from(&text).unwrap();
         assert_eq!(idle.measured_at, date(2026, 10, 11));
     }
@@ -252,12 +258,9 @@ mod tests {
 
     #[test]
     fn nothing_without_a_readable_measurement() {
-        assert_eq!(idle_from(r#"{"environments": []}"#), None);
+        assert_eq!(idle_from(&bundle_of(&[])), None);
         assert_eq!(idle_from("{"), None);
         let unreadable = run("kind", "amd64", "lots", "passed", "2026-10-11");
-        assert_eq!(
-            idle_from(&format!(r#"{{"environments": [{unreadable}]}}"#)),
-            None
-        );
+        assert_eq!(idle_from(&bundle_of(&[unreadable])), None);
     }
 }

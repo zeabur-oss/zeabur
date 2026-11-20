@@ -91,6 +91,7 @@ pub(crate) fn jwt(issuer: &str, pem: &str, now: i64) -> Result<String, String> {
         exp: i64,
         iss: &'a str,
     }
+    // The signed header, byte for byte.
     let header = URL_SAFE_NO_PAD.encode(br#"{"alg":"RS256","typ":"JWT"}"#);
     let claims = serde_json::to_string(&Claims {
         iat: now - 60,

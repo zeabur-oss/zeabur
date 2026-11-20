@@ -69,13 +69,10 @@ mod tests {
 
     #[tokio::test]
     async fn the_persons_token_asks_for_the_services_pods_in_the_project() {
-        let lines = concat!(
-            r#"{"_time":"2026-10-22T14:44:11Z","_msg":"later","kubernetes.pod_name":"web-6d9-abcde","kubernetes.container_name":"app"}"#,
-            "\n",
-            r#"{"_time":"2026-10-22T14:44:10.5Z","_msg":"earlier","kubernetes.pod_name":"web-5c8-fghij","kubernetes.container_name":"app"}"#,
-            "\n",
-        );
-        let (app, fake) = app(Ok(answer(200, lines)));
+        let later = json!({"_time":"2026-10-22T14:44:11Z","_msg":"later","kubernetes.pod_name":"web-6d9-abcde","kubernetes.container_name":"app"});
+        let earlier = json!({"_time":"2026-10-22T14:44:10.5Z","_msg":"earlier","kubernetes.pod_name":"web-5c8-fghij","kubernetes.container_name":"app"});
+        let lines = format!("{later}\n{earlier}\n");
+        let (app, fake) = app(Ok(answer(200, &lines)));
         let (status, body) = send(
             &app,
             "GET",
@@ -84,15 +81,19 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::OK, "{body}");
-        assert_eq!(body["state"], "available");
-        assert_eq!(body["range"], "6h");
-        assert_eq!(body["truncated"], true);
         assert_eq!(
-            body["lines"],
-            json!([
-                {"writtenAt": "2026-10-22T14:44:10.5Z", "pod": "web-5c8-fghij", "container": "app", "message": "earlier"},
-                {"writtenAt": "2026-10-22T14:44:11Z", "pod": "web-6d9-abcde", "container": "app", "message": "later"},
-            ])
+            body,
+            json!({
+                "id": "projects/shop/services/deployment/web/logs/history",
+                "state": "available",
+                "limit": 2,
+                "range": "6h",
+                "truncated": true,
+                "lines": [
+                    {"writtenAt": "2026-10-22T14:44:10.5Z", "pod": "web-5c8-fghij", "container": "app", "message": "earlier"},
+                    {"writtenAt": "2026-10-22T14:44:11Z", "pod": "web-6d9-abcde", "container": "app", "message": "later"},
+                ],
+            })
         );
         let asked = fake.asked.lock().unwrap().clone();
         let [(token, path)] = asked.as_slice() else {
@@ -125,7 +126,8 @@ mod tests {
             (
                 Ok(answer(
                     403,
-                    r#"{"code":"forbidden","detail":"You may not read logs in shop."}"#,
+                    &json!({"code":"forbidden","detail":"You may not read logs in shop."})
+                        .to_string(),
                 )),
                 "unreadable",
                 Some("You may not read logs in shop."),
@@ -133,7 +135,8 @@ mod tests {
             (
                 Ok(answer(
                     503,
-                    r#"{"code":"unavailable","detail":"kube-apiserver did not answer."}"#,
+                    &json!({"code":"unavailable","detail":"kube-apiserver did not answer."})
+                        .to_string(),
                 )),
                 "unavailable",
                 Some("kube-apiserver did not answer."),
@@ -147,9 +150,18 @@ mod tests {
             let (app, _) = app(answer);
             let (status, body) = send(&app, "GET", PATH, None).await;
             assert_eq!(status, StatusCode::OK, "{body}");
-            assert_eq!(body["state"], state, "{body}");
-            assert_eq!(body["message"].as_str(), message, "{body}");
-            assert_eq!(body["lines"], json!([]));
+            assert_eq!(
+                body,
+                json!({
+                    "id": "projects/shop/services/deployment/web/logs/history",
+                    "state": state,
+                    "range": "1h",
+                    "lines": [],
+                    "limit": 1000,
+                    "truncated": false,
+                    "message": message,
+                })
+            );
         }
     }
 
@@ -168,7 +180,17 @@ mod tests {
         ] {
             let (status, body) = send(&app, "GET", PATH, None).await;
             assert_eq!(status, StatusCode::OK, "{body}");
-            assert_eq!(body["state"], "not-installed");
+            assert_eq!(
+                body,
+                json!({
+                    "id": "projects/shop/services/deployment/web/logs/history",
+                    "state": "not-installed",
+                    "range": "1h",
+                    "lines": [],
+                    "limit": 1000,
+                    "truncated": false,
+                })
+            );
         }
     }
 

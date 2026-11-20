@@ -350,7 +350,7 @@ mod tests {
                                 .and_then(|p| p.split('?').next())
                                 .unwrap_or_default();
                             let body = routes.get(path).map_or_else(
-                                || b"{\"kind\":\"Status\",\"code\":404,\"reason\":\"NotFound\",\"status\":\"Failure\"}".to_vec(),
+                                || serde_json::to_vec(&json!({"kind":"Status","code":404,"reason":"NotFound","status":"Failure"})).unwrap(),
                                 |body| body.as_ref().clone(),
                             );
                             let status = if routes.contains_key(path) { "200 OK" } else { "404 Not Found" };

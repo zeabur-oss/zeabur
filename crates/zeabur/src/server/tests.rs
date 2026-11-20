@@ -250,7 +250,7 @@ fn encode(bytes: &[u8]) -> String {
 fn jwt(claims: &Value) -> String {
     format!(
         "{}.{}.signature",
-        encode(br#"{"alg":"RS256","typ":"JWT"}"#),
+        encode(json!({"alg":"RS256","typ":"JWT"}).to_string().as_bytes()),
         encode(claims.to_string().as_bytes())
     )
 }

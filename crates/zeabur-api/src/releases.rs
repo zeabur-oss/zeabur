@@ -238,11 +238,13 @@ mod tests {
     #[test]
     fn drafts_are_left_out_and_security_notes_are_marked() {
         let list = parse(
-            br#####"[
+            serde_json::json!([
                 {"tag_name":"v0.1.2","html_url":"https://example.test/0.1.2","body":"## 0.1.2\n\n### Security\n- x"},
                 {"tag_name":"v0.1.3","html_url":"https://example.test/0.1.3","draft":true},
                 {"tag_name":"v0.1.2-beta.0","html_url":"https://example.test/b0","prerelease":true,"body":"#### Security"}
-            ]"#####,
+            ])
+            .to_string()
+            .as_bytes(),
         )
         .unwrap();
         let versions: Vec<_> = list.iter().map(|r| r.version.as_str()).collect();

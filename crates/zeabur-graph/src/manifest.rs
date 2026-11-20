@@ -200,7 +200,7 @@ mod tests {
                 "uid": "1234", "resourceVersion": "99", "generation": 3,
                 "creationTimestamp": "2026-10-15T00:00:00Z",
                 "managedFields": [{"manager": "kubectl"}],
-                "annotations": {LAST_APPLIED: "{\"spec\":{}}"},
+                "annotations": {LAST_APPLIED: json!({"spec": {}}).to_string()},
                 "labels": {"app": "web"},
                 "namespace": "shop", "name": "web"
             },
@@ -235,7 +235,7 @@ mod tests {
         let secret = json!({
             "apiVersion": "v1", "kind": "Secret",
             "metadata": {"name": "db", "namespace": "shop", "annotations": {
-                LAST_APPLIED: "{\"data\":{\"password\":\"aHVudGVyMg==\"}}"
+                LAST_APPLIED: json!({"data": {"password": "aHVudGVyMg=="}}).to_string()
             }},
             "type": "Opaque",
             "data": {"password": "aHVudGVyMg==", "user": "YWRtaW4="},

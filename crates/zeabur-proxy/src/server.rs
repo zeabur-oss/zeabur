@@ -335,27 +335,26 @@ mod tests {
     }
 
     /// A backend that records each request's target and headers and answers `body`.
-    async fn backend(
-        status: u16,
-        body: &'static str,
-    ) -> (Uri, Arc<Mutex<Vec<(String, HeaderMap)>>>) {
+    async fn backend(status: u16, body: &str) -> (Uri, Arc<Mutex<Vec<(String, HeaderMap)>>>) {
         let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
         let address = listener.local_addr().unwrap();
         let seen = Arc::new(Mutex::new(Vec::new()));
         let recorded = Arc::clone(&seen);
+        let body = Bytes::from(body.to_owned());
         tokio::spawn(async move {
             loop {
                 let (stream, _) = listener.accept().await.unwrap();
                 let recorded = Arc::clone(&recorded);
+                let body = body.clone();
                 tokio::spawn(async move {
                     let service = hyper::service::service_fn(move |request: Request<_>| {
                         recorded
                             .lock()
                             .unwrap()
                             .push((request.uri().to_string(), request.headers().clone()));
+                        let body = body.clone();
                         async move {
-                            let mut response =
-                                Response::new(Full::new(Bytes::from_static(body.as_bytes())));
+                            let mut response = Response::new(Full::new(body));
                             *response.status_mut() = StatusCode::from_u16(status).unwrap();
                             response.headers_mut().insert(
                                 header::CONTENT_TYPE,
@@ -424,7 +423,7 @@ mod tests {
 
     #[tokio::test]
     async fn an_allowed_query_reaches_the_backend_rebuilt_without_the_persons_headers() {
-        let (url, seen) = backend(200, "{\"_msg\":\"hi\"}\n").await;
+        let (url, seen) = backend(200, &format!("{}\n", serde_json::json!({"_msg": "hi"}))).await;
         let proxy = proxy(url, allowing(&["a"]), 1 << 20);
         let response = Arc::clone(&proxy)
             .handle(get(
@@ -437,7 +436,10 @@ mod tests {
         assert_eq!(headers[header::CONTENT_TYPE], "application/stream+json");
         assert_eq!(headers[header::CACHE_CONTROL], "no-store");
         assert!(headers.get("set-cookie").is_none());
-        assert_eq!(body(response).await.unwrap(), "{\"_msg\":\"hi\"}\n");
+        assert_eq!(
+            body(response).await.unwrap(),
+            format!("{}\n", serde_json::json!({"_msg": "hi"}))
+        );
         let seen = seen.lock().unwrap().clone();
         let (target, sent) = &seen[0];
         assert!(
@@ -520,7 +522,7 @@ mod tests {
 
     #[tokio::test]
     async fn a_metrics_query_reaches_the_backend_held_to_the_granted_namespace() {
-        let (url, seen) = backend(200, "{\"status\":\"success\"}").await;
+        let (url, seen) = backend(200, &serde_json::json!({"status": "success"}).to_string()).await;
         let proxy = proxy(url, allowing(&["a"]), 1 << 20);
         let response = Arc::clone(&proxy)
             .handle(get(
@@ -627,7 +629,7 @@ mod tests {
     // cannot run yet, so the proxy refuses none of them.
     #[tokio::test]
     async fn one_persons_queries_at_once_all_reach_the_backend() {
-        let (url, seen) = backend(200, "{\"status\":\"success\"}").await;
+        let (url, seen) = backend(200, &serde_json::json!({"status": "success"}).to_string()).await;
         let proxy = proxy(url, allowing(&["a"]), 1 << 20);
         let mut answers = Vec::new();
         for _ in 0..3 {

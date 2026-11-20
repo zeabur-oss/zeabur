@@ -266,6 +266,8 @@ pub(crate) async fn history(
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::*;
 
     #[test]
@@ -311,13 +313,9 @@ mod tests {
 
     #[test]
     fn lines_come_oldest_first_whatever_their_precision() {
-        let body = concat!(
-            r#"{"_time":"2026-10-22T14:44:10.9Z","_msg":"second","kubernetes.pod_name":"web-1","kubernetes.container_name":"app"}"#,
-            "\n",
-            "not json\n",
-            r#"{"_time":"2026-10-22T14:44:10.123456789Z","_msg":"first","kubernetes.pod_name":"web-0","kubernetes.container_name":"app"}"#,
-            "\n",
-        );
+        let second = json!({"_time":"2026-10-22T14:44:10.9Z","_msg":"second","kubernetes.pod_name":"web-1","kubernetes.container_name":"app"});
+        let first = json!({"_time":"2026-10-22T14:44:10.123456789Z","_msg":"first","kubernetes.pod_name":"web-0","kubernetes.container_name":"app"});
+        let body = format!("{second}\nnot json\n{first}\n");
         let lines = lines(body.as_bytes());
         assert_eq!(
             lines.iter().map(|l| l.message.as_str()).collect::<Vec<_>>(),
@@ -325,7 +323,11 @@ mod tests {
         );
         assert_eq!(lines[0].pod, "web-0");
         assert_eq!(
-            detail(br#"{"code":"forbidden","detail":"no"}"#),
+            detail(
+                json!({"code":"forbidden","detail":"no"})
+                    .to_string()
+                    .as_bytes()
+            ),
             "no".to_owned()
         );
         assert_eq!(detail(b" plain \n"), "plain".to_owned());
