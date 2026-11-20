@@ -5,9 +5,9 @@ use std::sync::OnceLock;
 
 use axum::Router;
 use axum::body::{Body, Bytes};
-use axum::routing::any;
 use axum::http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header};
 use axum::response::Response;
+use axum::routing::any;
 
 #[cfg(feature = "interface")]
 mod embedded {

@@ -20,10 +20,10 @@
 //!
 //! GitHub's manifest flow [gh-manifest] makes the App. The browser posts the manifest to GitHub
 //! from the web interface's page [`CONTINUE_PATH`], which the server sends with GitHub's origin
-//! in `form-action`; every other page keeps `'self'`. GitHub sends the browser back with a code and the `state`; the
-//! conversion opens the `state`, checks it is the person's and fresh, and exchanges the code
-//! once. The private key and the webhook secret travel only in the sealed plan token, and the
-//! plan shows the Secret with its values hidden.
+//! in `form-action`; every other page keeps `'self'`. GitHub sends the browser back with a code and
+//! the `state`; the conversion opens the `state`, checks it is the person's and fresh, and
+//! exchanges the code once. The private key and the webhook secret travel only in the sealed plan
+//! token, and the plan shows the Secret with its values hidden.
 //!
 //! Project members cannot read `builder-system`, so a grant also writes what the project may
 //! build into the project: the ConfigMap [`PROJECT_CONFIG_MAP`], one key per installation, with

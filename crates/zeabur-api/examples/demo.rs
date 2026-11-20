@@ -3452,12 +3452,13 @@ async fn main() -> std::io::Result<()> {
         terminals,
         ..zeabur_api::Options::default()
     };
-    let app = zeabur_api::router_with(Arc::new(access), options)
-        .fallback_service(zeabur_ui::router_with_form_page(
+    let app = zeabur_api::router_with(Arc::new(access), options).fallback_service(
+        zeabur_ui::router_with_form_page(
             zeabur_ui::assets(),
             zeabur_api::cluster::github_app::CONTINUE_PATH,
             origin.as_deref(),
-        ));
+        ),
+    );
     // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090, or port 0 for any free one.
     let addr = std::env::var("ZEABUR_DEMO_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await?;

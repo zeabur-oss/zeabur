@@ -906,7 +906,10 @@ mod tests {
             }
             .web_origin()
         };
-        assert_eq!(origin("https://github.com").as_deref(), Some("https://github.com"));
+        assert_eq!(
+            origin("https://github.com").as_deref(),
+            Some("https://github.com")
+        );
         assert_eq!(
             origin("https://ghe.example.com:8443/").as_deref(),
             Some("https://ghe.example.com:8443")

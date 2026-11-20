@@ -215,7 +215,10 @@ mod tests {
             send(app, "POST", &format!("{BASE}/manifest"), Some(&request)).await;
         assert_eq!(status, StatusCode::OK, "{started}");
         let form = started["formUrl"].as_str().unwrap().to_owned();
-        assert!(form.starts_with("/cluster/github-app/continue?state="), "{form}");
+        assert!(
+            form.starts_with("/cluster/github-app/continue?state="),
+            "{form}"
+        );
         form.split_once("state=").unwrap().1.to_owned()
     }
 
@@ -281,7 +284,10 @@ mod tests {
             "{action}"
         );
         let manifest: Value = serde_json::from_str(form["manifest"].as_str().unwrap()).unwrap();
-        assert_eq!(manifest["default_permissions"]["statuses"], "write", "{manifest}");
+        assert_eq!(
+            manifest["default_permissions"]["statuses"], "write",
+            "{manifest}"
+        );
 
         let (status, _) = send(&app, "GET", &format!("{BASE}/form?state=ghs1.forged"), None).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
