@@ -47,6 +47,7 @@ use zeabur_kube::{
     WriteRequest,
 };
 use zeabur_model::Origin;
+use zeabur_model::kernel::s3::is_bucket_name;
 use zeabur_modules::velero::cluster as v;
 use zeabur_plan::{Change, CopyS3KeysChange, DataEdit, DataKind, PlanRequest};
 
@@ -110,10 +111,12 @@ pub struct S3Destination {
 #[serde(rename_all = "camelCase")]
 pub struct S3DestinationFields {
     /// Its name: lower-case letters, digits and `-`, at most 63.
+    #[schema(max_length = 63, pattern = "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")]
     pub name: String,
     /// The S3-compatible endpoint, `https://…`.
     pub endpoint: String,
     /// The bucket.
+    #[schema(pattern = "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")]
     pub bucket: String,
     /// The region.
     #[serde(default)]
@@ -706,15 +709,6 @@ async fn copied(cluster: &dyn Cluster, copy: CopyS3KeysChange) -> Result<Value, 
     Ok(object)
 }
 
-fn bucket_name(bucket: &str) -> bool {
-    (3..=63).contains(&bucket.len())
-        && bucket
-            .bytes()
-            .all(|b| b.is_ascii_lowercase() || b.is_ascii_digit() || b == b'.' || b == b'-')
-        && bucket.starts_with(|c: char| c.is_ascii_alphanumeric())
-        && bucket.ends_with(|c: char| c.is_ascii_alphanumeric())
-}
-
 /// What is wrong with `fields`, in words for the person.
 fn fields_problem(fields: &S3DestinationFields) -> Option<&'static str> {
     let endpoint = fields.endpoint.trim();
@@ -727,7 +721,7 @@ fn fields_problem(fields: &S3DestinationFields) -> Option<&'static str> {
         )
     } else if host.is_none_or(|h| h.is_empty() || h.contains(char::is_whitespace)) {
         Some("The endpoint starts with https:// or http://.")
-    } else if !bucket_name(fields.bucket.trim()) {
+    } else if !is_bucket_name(fields.bucket.trim()) {
         Some("A bucket name has 3 to 63 lower-case letters, digits, dots and -.")
     } else if fields.prefix.contains("..") || fields.prefix.contains(char::is_whitespace) {
         Some("A folder has no spaces and no ..")
@@ -1293,10 +1287,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn buckets_follow_s3() {
-        assert!(bucket_name("my.bucket-1"));
+    fn a_destination_names_an_s3_bucket() {
+        let fields = |bucket: &str| S3DestinationFields {
+            name: "offsite".to_owned(),
+            endpoint: "https://s3.example.com".to_owned(),
+            bucket: bucket.to_owned(),
+            region: String::new(),
+            prefix: String::new(),
+            access_key_id: String::new(),
+            secret_access_key: String::new(),
+        };
+        assert_eq!(fields_problem(&fields("my.bucket-1")), None);
         for bad in ["ab", "My", ".ab", "ab-", "a b"] {
-            assert!(!bucket_name(bad), "{bad}");
+            assert!(fields_problem(&fields(bad)).is_some(), "{bad}");
         }
     }
 }

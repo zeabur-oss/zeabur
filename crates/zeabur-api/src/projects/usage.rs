@@ -80,7 +80,7 @@ pub struct ProjectUsage {
 /// not read it (`unreadable` names the refusal), or it did not answer.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/usage", tag = "projects",
     operation_id = "getProjectUsage",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectUsage),
               (status = 401, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
@@ -187,7 +187,7 @@ pub struct VolumeUsageList {
 /// description of `GET /api/v1/settings/metrics-store`.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/volumes", tag = "projects",
     operation_id = "getVolumeUsage",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = VolumeUsageList),
               (status = 400, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn volumes(

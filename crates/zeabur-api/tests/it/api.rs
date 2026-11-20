@@ -2033,6 +2033,148 @@ mod tests {
         );
     }
 
+    fn described_schemas() -> Value {
+        serde_json::to_value(zeabur_api::openapi()).unwrap()["components"]["schemas"].clone()
+    }
+
+    /// The fields of the `op` variant of `schema`.
+    fn variant_of(schemas: &Value, schema: &str, op: &str) -> Value {
+        schemas[schema]["oneOf"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["properties"]["op"]["enum"][0] == op)
+            .unwrap()["properties"]
+            .clone()
+    }
+
+    /// Each name pattern a form reads is the one the server checks: the same constant.
+    #[test]
+    fn the_described_names_are_the_server_checks() {
+        use zeabur_model::kernel::dns::{
+            DNS_LABEL_PATTERN, DNS_SUBDOMAIN_PATTERN, LABEL_MAX, RFC1035_LABEL_PATTERN,
+            SUBDOMAIN_MAX,
+        };
+        use zeabur_model::kernel::s3::BUCKET_PATTERN;
+        use zeabur_plan::builds::{BUILD_PATH_PATTERN, MAX_BUILD_PATH};
+
+        let schemas = described_schemas();
+        let variant = |schema: &str, op: &str| variant_of(&schemas, schema, op);
+        let field = |schema: &str, name: &str| schemas[schema]["properties"][name].clone();
+        let rule = |found: &Value, max: usize, pattern: &str| {
+            assert_eq!(found["maxLength"], max, "{found}");
+            assert_eq!(found["pattern"], pattern, "{found}");
+        };
+        let backups = zeabur_modules::velero::cluster::NAMESPACE_MAX;
+        rule(
+            &variant("BackupsPlanRequest", "restore")["into"],
+            backups,
+            DNS_LABEL_PATTERN,
+        );
+        rule(&schemas["ProjectName"], LABEL_MAX, DNS_LABEL_PATTERN);
+        rule(
+            &schemas["DatabaseName"],
+            zeabur_model::kernel::names::DATABASE_NAME_MAX,
+            RFC1035_LABEL_PATTERN,
+        );
+        rule(
+            &variant("Change", "scheduleTask")["name"],
+            zeabur_plan::TASK_NAME_MAX,
+            DNS_LABEL_PATTERN,
+        );
+        rule(
+            &field("VolumeRequest", "name"),
+            LABEL_MAX,
+            DNS_LABEL_PATTERN,
+        );
+        rule(
+            &field("VolumeRequest", "claimName"),
+            SUBDOMAIN_MAX,
+            DNS_SUBDOMAIN_PATTERN,
+        );
+        rule(
+            &variant("MemberChange", "invite")["username"],
+            LABEL_MAX,
+            DNS_SUBDOMAIN_PATTERN,
+        );
+        rule(
+            &variant("MemberChange", "createToken")["name"],
+            LABEL_MAX,
+            DNS_LABEL_PATTERN,
+        );
+        rule(
+            &variant("NotificationsPlanRequest", "add")["name"],
+            zeabur_modules::alertmanager::NAME_MAX,
+            RFC1035_LABEL_PATTERN,
+        );
+        rule(
+            &field("UploadServiceChange", "name"),
+            zeabur_plan::compose::SERVICE_NAME_MAX,
+            RFC1035_LABEL_PATTERN,
+        );
+        for (schema, name) in [
+            ("UploadServiceChange", "directory"),
+            ("UploadServiceChange", "dockerfile"),
+            ("BuildOptionsChange", "contextDir"),
+            ("BuildOptionsChange", "dockerfile"),
+        ] {
+            rule(&field(schema, name), MAX_BUILD_PATH, BUILD_PATH_PATTERN);
+        }
+        rule(
+            &field("S3DestinationFields", "name"),
+            LABEL_MAX,
+            DNS_LABEL_PATTERN,
+        );
+        assert_eq!(
+            field("S3DestinationFields", "bucket")["pattern"],
+            BUCKET_PATTERN
+        );
+        assert_eq!(
+            variant("BackupsPlanRequest", "location")["bucket"]["pattern"],
+            BUCKET_PATTERN
+        );
+    }
+
+    /// Each number limit and default a form reads is the one the server uses.
+    #[test]
+    fn the_described_limits_and_defaults_are_the_server_ones() {
+        let schemas = described_schemas();
+        let variant = |schema: &str, op: &str| variant_of(&schemas, schema, op);
+        let field = |schema: &str, name: &str| schemas[schema]["properties"][name].clone();
+        for op in ["createProject", "details"] {
+            assert_eq!(
+                variant("Change", op)["displayName"]["maxLength"],
+                zeabur_model::DISPLAY_NAME_MAX
+            );
+        }
+        assert_eq!(
+            field("ClusterNameChange", "name")["maxLength"],
+            zeabur_api::settings::CLUSTER_NAME_MAX
+        );
+        for (op, field) in [
+            ("scheduleTask", "keepSucceeded"),
+            ("scheduleTask", "keepFailed"),
+            ("editTask", "keepSucceeded"),
+            ("editTask", "keepFailed"),
+        ] {
+            let kept = &variant("Change", op)[field];
+            assert_eq!(kept["minimum"], 0);
+            assert_eq!(kept["maximum"], zeabur_plan::KEPT_RUNS_MAX);
+        }
+        let replicas = &schemas["ServiceReplicas"];
+        assert_eq!(replicas["minimum"], 1);
+        assert_eq!(replicas["maximum"], zeabur_plan::compose::MAX_REPLICAS);
+        let schedule = variant("BackupsPlanRequest", "schedule");
+        assert_eq!(
+            schedule["cron"]["default"],
+            zeabur_modules::velero::cluster::DEFAULT_CRON
+        );
+        assert_eq!(
+            schedule["keepDays"]["default"],
+            zeabur_modules::velero::cluster::DEFAULT_KEEP_DAYS
+        );
+    }
+
     #[test]
     fn the_committed_description_is_current() {
         let clashes = zeabur_api::schema_clashes();

@@ -776,7 +776,7 @@ async fn reader(
 /// person may add one with the `debugContainer` change.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/files", tag = "pods",
     operation_id = "getFiles",
-    params(("project" = String, Path), ("pod" = String, Path), FileParams),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path), FileParams),
     responses((status = 200, body = Files),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM),
@@ -814,7 +814,7 @@ const KUBELET_ENTRY: &str = "..";
 /// keys are what the volume holds.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/files/entries", tag = "pods",
     operation_id = "listFiles",
-    params(("project" = String, Path), ("pod" = String, Path), FileParams),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path), FileParams),
     responses((status = 200, body = FileList),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM),
@@ -921,7 +921,7 @@ pub(crate) fn disposition(name: &str) -> HeaderValue {
 /// A file in a Secret's volume, also through a link, is refused; a folder is not downloaded.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/files/content", tag = "pods",
     operation_id = "downloadFile",
-    params(("project" = String, Path), ("pod" = String, Path), FileParams),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path), FileParams),
     responses((status = 200, description = "The file's bytes", content_type = "application/octet-stream"),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM),
@@ -962,7 +962,7 @@ fn is_text(bytes: &[u8]) -> Option<String> {
 /// A file as text, up to [`MAX_PREVIEW`] bytes; `text` is absent when it is not UTF-8 text.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/pods/{pod}/files/preview", tag = "pods",
     operation_id = "previewFile",
-    params(("project" = String, Path), ("pod" = String, Path), FileParams),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path), FileParams),
     responses((status = 200, body = FilePreview),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM),
@@ -999,7 +999,7 @@ pub(crate) async fn preview(
 /// only with `replace=true`; otherwise it is a `409` (`files.exists`).
 #[utoipa::path(put, path = "/api/v1/projects/{project}/pods/{pod}/files/content", tag = "pods",
     operation_id = "uploadFile",
-    params(("project" = String, Path), ("pod" = String, Path), FileParams),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path), FileParams),
     request_body(content = Vec<u8>, content_type = "application/octet-stream"),
     responses((status = 204, description = "Written"),
               (status = 400, body = Problem, content_type = PROBLEM),
@@ -1073,7 +1073,7 @@ pub(crate) async fn upload(
 /// Makes a folder.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/pods/{pod}/files/folders", tag = "pods",
     operation_id = "makeFolder",
-    params(("project" = String, Path), ("pod" = String, Path)),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path)),
     request_body = FileNewFolder,
     responses((status = 204, description = "Made"),
               (status = 403, body = Problem, content_type = PROBLEM),
@@ -1099,7 +1099,7 @@ pub(crate) async fn make_folder(
 /// Renames a file or folder within its folder; refused when the new name is taken.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/pods/{pod}/files/moves", tag = "pods",
     operation_id = "renameFile",
-    params(("project" = String, Path), ("pod" = String, Path)),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path)),
     request_body = FileRename,
     responses((status = 204, description = "Renamed"),
               (status = 400, body = Problem, content_type = PROBLEM),
@@ -1134,7 +1134,7 @@ pub(crate) async fn rename(
 /// Deletes a file, or a folder with everything in it.
 #[utoipa::path(delete, path = "/api/v1/projects/{project}/pods/{pod}/files/entries", tag = "pods",
     operation_id = "deleteFile",
-    params(("project" = String, Path), ("pod" = String, Path), FileParams),
+    params(("project" = crate::rules::ProjectName, Path), ("pod" = String, Path), FileParams),
     responses((status = 204, description = "Deleted"),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM),

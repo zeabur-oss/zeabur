@@ -44,7 +44,7 @@ pub struct UploadedSource {
 /// change the controller has answered; the upload goes to the registry the token names.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/builds/{build}/source", tag = "projects",
     operation_id = "uploadBuildSource",
-    params(("project" = String, Path), ("build" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path), ("build" = String, Path),
            ("request" = String, Query, description = "The upload token request the Build has answered")),
     request_body(content = Vec<u8>, content_type = "application/gzip"),
     responses((status = 200, body = UploadedSource),

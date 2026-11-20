@@ -80,35 +80,13 @@ test("creation order follows what workloads need", () => {
   expect(inCreateOrder(docs).map((d) => d.kind)).toEqual(["Secret", "Service", "Deployment"])
 })
 
-describe("check", () => {
-  test("finds what the server would refuse, at its line", () => {
-    const text = [
-      service,
-      "apiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: r\n",
-      "apiVersion: traefik.io/v1alpha1\nkind: Middleware\nmetadata:\n  name: m\n",
-      "apiVersion: v1\nkind: Secret\nmetadata:\n  name: s\n",
-      "apiVersion: v1\nkind: ConfigMap\nmetadata: {}\n",
-      deployment,
-    ].join("---\n")
-    const docs = documentsOf(text)
-    const found = check(docs, "shop", {
-      creatable,
-      existing: new Set(["apps/deployments/api"]),
-    })
-    expect(found.map((f) => [f.code, f.document, f.line])).toEqual([
-      ["otherNamespace", 0, 5],
-      ["clusterScoped", 1, 10],
-      ["notServed", 2, 15],
-      ["rights", 3, 20],
-      ["missingField", 4, 26],
-      ["exists", 5, 31],
-    ])
-  })
-
-  test("the same object twice is found at the second", () => {
-    const docs = documentsOf(`${deployment}---\n${deployment}`)
-    expect(check(docs, "shop", { creatable }).map((f) => [f.code, f.document])).toEqual([
-      ["duplicate", 1],
-    ])
-  })
+test("check points at the kinds the person may not create, and leaves the rest to the server", () => {
+  const text = [
+    service,
+    "apiVersion: rbac.authorization.k8s.io/v1\nkind: ClusterRole\nmetadata:\n  name: r\n",
+    "apiVersion: v1\nkind: Secret\nmetadata:\n  name: s\n",
+    deployment,
+  ].join("---\n")
+  const found = check(documentsOf(text), creatable)
+  expect(found.map((f) => [f.kind, f.document, f.line])).toEqual([["Secret", 2, 15]])
 })

@@ -74,7 +74,7 @@ fn ready(certificate: &serde_json::Value) -> bool {
 /// readiness, the certificate, the route, the Service, its target port and the pods' readiness.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/trace", tag = "services",
     operation_id = "traceService",
-    params(("project" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),
     responses((status = 200, body = ServiceTrace), (status = 404, body = Problem, content_type = PROBLEM)))]

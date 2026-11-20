@@ -15,7 +15,7 @@ use crate::projects::writes::plan_problem;
 
 #[utoipa::path(post, path = "/api/v1/projects/{project}/compose", tag = "projects",
     operation_id = "convertCompose",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     request_body = ComposeRequest,
     responses((status = 200, body = Conversion),
               (status = 400, body = zeabur_core::problem::Problem, content_type = PROBLEM)))]

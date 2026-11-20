@@ -358,7 +358,7 @@ pub(crate) struct CertificateDates {
 /// The dates of the certificate a domain's tls entry names, read as the person.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/certificates/{secret}", tag = "projects",
     operation_id = "getCertificateDates",
-    params(("project" = String, Path), ("secret" = String, Path, description = "A kubernetes.io/tls Secret")),
+    params(("project" = crate::rules::ProjectName, Path), ("secret" = String, Path, description = "A kubernetes.io/tls Secret")),
     responses((status = 200, body = CertificateDates),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM),

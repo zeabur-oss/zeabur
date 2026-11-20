@@ -35,7 +35,10 @@ use crate::owned::SERVICE_LABEL;
 use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
 
 /// The longest CronJob name: its Jobs add 11 characters and must fit a 63-character label.
-const NAME_MAX: usize = 52;
+pub const TASK_NAME_MAX: usize = 52;
+
+/// The most finished runs of a task kept, of each outcome.
+pub const KEPT_RUNS_MAX: i32 = 100;
 
 /// What a new scheduled task runs and when.
 pub(crate) struct TaskRequest<'r> {
@@ -392,11 +395,11 @@ fn task_pod(
 
 /// The checks that need no cluster state.
 fn check_request(task: &TaskRequest<'_>) -> Result<(), PlanError> {
-    if task.name.len() > NAME_MAX || !is_dns_label(task.name) {
+    if task.name.len() > TASK_NAME_MAX || !is_dns_label(task.name) {
         return Err(field_error(
             "invalid_name",
             format!(
-                "{:?} is not a valid task name: use up to {NAME_MAX} lowercase letters, digits and hyphens.",
+                "{:?} is not a valid task name: use up to {TASK_NAME_MAX} lowercase letters, digits and hyphens.",
                 task.name
             ),
             "name",
@@ -416,7 +419,9 @@ fn check_request(task: &TaskRequest<'_>) -> Result<(), PlanError> {
             "command",
         ));
     }
-    if !(0..=100).contains(&task.keep_succeeded) || !(0..=100).contains(&task.keep_failed) {
+    if !(0..=KEPT_RUNS_MAX).contains(&task.keep_succeeded)
+        || !(0..=KEPT_RUNS_MAX).contains(&task.keep_failed)
+    {
         return Err(error(
             ErrorKind::BadRequest,
             "invalid_history",
@@ -442,7 +447,11 @@ fn check_edit(edit: &TaskEdit<'_>) -> Result<(), PlanError> {
         ));
     }
     let keeps = [edit.keep_succeeded, edit.keep_failed];
-    if keeps.into_iter().flatten().any(|n| !(0..=100).contains(&n)) {
+    if keeps
+        .into_iter()
+        .flatten()
+        .any(|n| !(0..=KEPT_RUNS_MAX).contains(&n))
+    {
         return Err(error(
             ErrorKind::BadRequest,
             "invalid_history",
@@ -533,5 +542,51 @@ mod tests {
         );
         let long = "a".repeat(52);
         assert!(manual_job_name(&long, "2026-10-23T10:15:30Z").len() <= 63);
+    }
+
+    #[test]
+    fn a_task_is_named_by_a_label_and_keeps_at_most_a_hundred_runs() {
+        let from = WorkloadRef {
+            kind: WorkloadKind::Deployment,
+            name: "web".to_owned(),
+        };
+        let task = |name: &str, kept: i32| {
+            let refused = check_request(&TaskRequest {
+                from: &from,
+                container: None,
+                name,
+                schedule: "0 3 * * *",
+                time_zone: None,
+                command: "true",
+                concurrency: TaskConcurrency::Forbid,
+                keep_succeeded: kept,
+                keep_failed: 1,
+            });
+            refused.err().map(|e| e.code)
+        };
+        assert_eq!(task(&"a".repeat(TASK_NAME_MAX), KEPT_RUNS_MAX), None);
+        let long = "a".repeat(TASK_NAME_MAX + 1);
+        assert_eq!(task(&long, 3).as_deref(), Some("invalid_name"));
+        assert_eq!(task("Backup", 3).as_deref(), Some("invalid_name"));
+        assert_eq!(
+            task("backup", KEPT_RUNS_MAX + 1).as_deref(),
+            Some("invalid_history")
+        );
+        let edit = |kept: i32| {
+            check_edit(&TaskEdit {
+                cron_job: "backup",
+                schedule: None,
+                time_zone: None,
+                command: None,
+                concurrency: None,
+                keep_succeeded: None,
+                keep_failed: Some(kept),
+                paused: None,
+            })
+            .err()
+            .map(|e| e.code)
+        };
+        assert_eq!(edit(KEPT_RUNS_MAX), None);
+        assert_eq!(edit(-1).as_deref(), Some("invalid_history"));
     }
 }

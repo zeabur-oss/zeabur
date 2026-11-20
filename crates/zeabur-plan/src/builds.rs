@@ -60,7 +60,11 @@ fn archive_digest_valid(digest: &str) -> bool {
 /// Most build variables a `Build` takes.
 const MAX_BUILD_ENV: usize = 128;
 /// Longest path the `Build` takes for its directory and Dockerfile.
-const MAX_BUILD_PATH: usize = 1024;
+pub const MAX_BUILD_PATH: usize = 1024;
+
+/// A build path as the `Build`'s schema writes it, empty allowed, for the API's description.
+pub const BUILD_PATH_PATTERN: &str =
+    "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$";
 
 /// Whether `path` is a relative path that the `Build` accepts: no segment starts with `.`, so
 /// the path cannot climb out with `..`.
@@ -523,5 +527,30 @@ impl Planner<'_> {
             self.claim(index, &path, &shown)?;
         }
         self.patch(index, operations)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_path_pattern_says_what_the_check_does() {
+        let pattern = regex::Regex::new(BUILD_PATH_PATTERN).unwrap();
+        let paths = [
+            "apps/web",
+            "Dockerfile",
+            "a@b+c-d_e.f",
+            "../etc",
+            "apps/.git",
+            ".env",
+            "apps//web",
+            "apps/web/",
+            "a b",
+        ];
+        for path in paths {
+            assert_eq!(pattern.is_match(path), build_path(path), "{path:?}");
+        }
+        assert!(pattern.is_match(""));
     }
 }

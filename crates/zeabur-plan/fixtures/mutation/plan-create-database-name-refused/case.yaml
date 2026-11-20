@@ -1,0 +1,7 @@
+description: "An object made for a database whose name is longer than 30 characters is refused: the operators derive longer names from it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {"op": "create", "object": {"apiVersion": "v1", "kind": "Secret", "metadata": {"name": "orders-archive-of-every-region-app", "labels": {"zeabur.com/database": "orders-archive-of-every-region"}}, "stringData": {"password": "x"}}}
+      - {"op": "create", "object": {"apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "orders-archive-of-every-region-x", "labels": {"zeabur.com/database": "orders-archive-of-every-regions"}}}}

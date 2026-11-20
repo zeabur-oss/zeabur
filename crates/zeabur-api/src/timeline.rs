@@ -597,7 +597,7 @@ pub(crate) async fn history(
 /// last write, warnings folded by reason and containers that stopped, for every workload.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/timeline", tag = "projects",
     operation_id = "getProjectTimeline",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = Timeline), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(
     State(state): State<AppState>,
@@ -630,7 +630,7 @@ pub(crate) async fn project(
 /// the plan that returns to the one before it.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/timeline", tag = "services",
     operation_id = "getServiceTimeline",
-    params(("project" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),
     responses((status = 200, body = Timeline), (status = 404, body = Problem, content_type = PROBLEM)))]

@@ -1315,7 +1315,7 @@ pub(crate) async fn apply(
 /// granted; read as the person from the project's ConfigMap [`PROJECT_CONFIG_MAP`].
 #[utoipa::path(get, path = "/api/v1/projects/{project}/github-app", tag = "projects",
     operation_id = "getProjectGitHubApp",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectGitHubApp),
               (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(

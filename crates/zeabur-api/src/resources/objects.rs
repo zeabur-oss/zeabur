@@ -310,7 +310,7 @@ fn parse_query(query: Option<&str>) -> Result<ListQuery, ApiError> {
 /// and owners only); the rest come back unread. Kinds refused when read are named in
 /// `unreadable`. With `label`, only the objects with that label.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/objects", tag = "resources", operation_id = "listObjects",
-    params(("project" = String, Path), ObjectListParams),
+    params(("project" = crate::rules::ProjectName, Path), ObjectListParams),
     responses((status = 200, body = ObjectList), (status = 400, body = Problem, content_type = PROBLEM),
               (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn list(
@@ -437,7 +437,7 @@ fn not_found(project: &str, what: &str) -> ApiError {
 /// cluster serves (`core` names the empty group). A Secret comes with its values, read with the
 /// person's own credential.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/objects/{group}/{version}/{resource}/{name}", tag = "resources", operation_id = "getObject",
-    params(("project" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path),
            ("group" = String, Path, description = "The API group; `core` for the core group"),
            ("version" = String, Path),
            ("resource" = String, Path, description = "The plural resource name, such as `deployments`"),

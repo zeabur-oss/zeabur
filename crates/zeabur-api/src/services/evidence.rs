@@ -371,7 +371,7 @@ pub(crate) async fn bundle(
 /// previous log, and its objects with variable values hidden. Never a Secret.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/services/{kind}/{name}/evidence", tag = "services",
     operation_id = "getServiceEvidence",
-    params(("project" = String, Path),
+    params(("project" = crate::rules::ProjectName, Path),
            ("kind" = String, Path, description = "deployment, statefulset, daemonset, job or cronjob; any case"),
            ("name" = String, Path)),
     responses((status = 200, body = EvidenceBundle), (status = 404, body = Problem, content_type = PROBLEM)))]

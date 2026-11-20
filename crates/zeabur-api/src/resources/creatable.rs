@@ -74,7 +74,7 @@ fn custom(group: &str) -> bool {
 /// The kinds the person may create in a project, each with an access hint, and the kinds that
 /// belong to the whole cluster.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/creatable", tag = "resources", operation_id = "listCreatable",
-    params(("project" = String, Path)),
+    params(("project" = crate::rules::ProjectName, Path)),
     responses((status = 200, body = CreatableList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn list(
     Person(cluster): Person,

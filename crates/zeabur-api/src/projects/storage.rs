@@ -130,7 +130,7 @@ pub struct ProjectStorage {
 /// in `unreadable` instead of failing the answer.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/storage", tag = "projects",
     operation_id = "getProjectStorage",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectStorage),
               (status = 400, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(

@@ -25,8 +25,6 @@ const DataEditor = lazy(() =>
 
 const SHARED_LABEL = "zeabur.com/shared-variables"
 const SHOWN = 20
-const NAME = /^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$/
-const KEY = /^[-._a-zA-Z0-9]+$/
 
 type Kind = "ConfigMap" | "Secret"
 
@@ -170,21 +168,14 @@ function AddDrawer({
   const [text, setText] = useState("")
   const [tried, setTried] = useState(false)
   const parsed = parseDotenv(text)
-  const badKey = parsed.entries.find((e) => !KEY.test(e.name))
   const problems = {
-    name: !NAME.test(name)
-      ? t("shared.badName")
-      : taken.has(`${kind}/${name}`)
-        ? t("shared.taken", kind, name)
-        : undefined,
+    name: taken.has(`${kind}/${name}`) ? t("shared.taken", kind, name) : undefined,
     values:
       parsed.entries.length === 0
         ? t("shared.needValues")
         : parsed.unread[0] !== undefined
           ? t("shared.unread", parsed.unread[0])
-          : badKey
-            ? t("shared.badKey", badKey.name)
-            : undefined,
+          : undefined,
   }
   const values = Object.fromEntries(parsed.entries.map((e) => [e.name, e.value]))
   const review = () => {

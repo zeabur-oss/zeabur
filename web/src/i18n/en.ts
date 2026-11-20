@@ -516,7 +516,6 @@ export const en = {
   "projects.problem.invalid":
     "Lowercase letters, digits and hyphens, starting and ending with a letter or digit.",
   "projects.problem.long": "At most 63 characters.",
-  "projects.problem.system": "Names starting with kube- belong to Kubernetes.",
   "projects.problem.taken": "A namespace of this name exists. Use the existing namespace instead.",
   "projects.planNew": (name: string) => `Create project ${name}`,
   "projects.rowMenu": (name: string) => `More for ${name}`,
@@ -1498,23 +1497,9 @@ export const en = {
   "create.docLineField": (document: number, line: number, field: string) =>
     `Document ${document}, line ${line}, ${field}`,
   "create.showInYaml": "Show in YAML",
-  "create.problems": (n: number) => plural(n, "problem", "problems"),
   "create.notes": (n: number) => plural(n, "note", "notes"),
-  "create.fixFirst": "Fix the problems above to review.",
-  "create.found.invalidYaml": "This line doesn't read as YAML: check its indentation and quotes.",
-  "create.found.missingField": (field: string) => `Every object needs ${field}.`,
-  "create.found.clusterScoped": (kind: string) =>
-    `${kind} belongs to the whole cluster. Zeabur creates objects only inside a project.`,
-  "create.found.notServed": (kind: string, apiVersion: string) =>
-    `This cluster doesn't serve ${kind} (${apiVersion}).`,
   "create.found.rights": (kind: string, project: string) =>
     `Your rights don't seem to allow creating ${kind} in ${project}. The review asks the cluster.`,
-  "create.found.otherNamespace": (namespace: string, project: string) =>
-    `Namespace ${namespace} isn't this project. Remove the line, or write ${project}.`,
-  "create.found.duplicate": (kind: string, name: string) => `${kind} ${name} is written twice.`,
-  "create.found.exists": (kind: string, name: string) =>
-    `A ${kind} named ${name} already exists. Create never changes it.`,
-  "create.edit": (name: string) => `Edit ${name}`,
   "create.planOne": (kind: string, name: string) => `Create ${kind} ${name}`,
   "create.planMany": (n: number, project: string) => `Create ${n} objects in ${project}`,
   "create.createsMany": (n: number, list: string) =>
@@ -3088,10 +3073,10 @@ export const en = {
     `Grow the volume of ${name} from ${from} to ${to}. The operator grows it in place, and its files stay.`,
   "s3.field.bucket": "Bucket",
   "s3.bucketHint": "Optional. Add more later.",
-  "s3.bucketRule": "3 to 63 lowercase letters, digits and hyphens.",
+  "s3.bucketRule": "3 to 63 lowercase letters, digits, dots and hyphens.",
   "s3.bucket.empty": "Give it a name.",
   "s3.bucket.invalid":
-    "3 to 63 lowercase letters, digits and hyphens, starting and ending with a letter or digit.",
+    "3 to 63 lowercase letters, digits, dots and hyphens, starting and ending with a letter or digit.",
   "s3.bucket.taken": "This store already has a bucket of this name.",
   "s3.oneCopy":
     "One copy: each part runs once and the files are on one volume. Nothing takes over if its node fails.",
@@ -4180,11 +4165,9 @@ export const en = {
   "shared.kind": "Store values as",
   "shared.values": "Variables",
   "shared.valuesHint": "One NAME=value on each line, as in a .env file.",
-  "shared.badName": "Use lowercase letters, digits, hyphens and dots.",
   "shared.taken": (kind: string, name: string) => `A ${kind} named ${name} already exists.`,
   "shared.needValues": "Add at least one NAME=value line.",
   "shared.unread": (line: number) => `Line ${line} is not NAME=value.`,
-  "shared.badKey": (key: string) => `${key} is not a valid name: use letters, digits, -, _ and .`,
   "useShared.open": "Use shared variables",
   "useShared.title": (service: string) => `Use shared variables in ${service}`,
   "useShared.lead":

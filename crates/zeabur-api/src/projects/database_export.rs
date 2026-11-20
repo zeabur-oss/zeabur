@@ -249,7 +249,7 @@ async fn drain(mut error: std::pin::Pin<Box<dyn tokio::io::AsyncRead + Send>>) -
 /// The database's dump, streamed as it is made.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/databases/{engine}/{name}/export", tag = "projects",
     operation_id = "exportDatabase",
-    params(("project" = String, Path, description = "The project's namespace"),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace"),
            ("engine" = String, Path, description = "`postgresql`, `mongodb`, `mysql` or `mariadb`"),
            ("name" = String, Path, description = "The database")),
     responses((status = 200, description = "The dump's bytes", content_type = "application/octet-stream"),

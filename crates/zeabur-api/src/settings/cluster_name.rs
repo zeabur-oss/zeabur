@@ -141,6 +141,7 @@ pub struct ClusterNameSetting {
 #[serde(rename_all = "camelCase", deny_unknown_fields)]
 pub struct ClusterNameChange {
     /// The name, at most 63 characters; `null` goes back to the name Zeabur finds itself.
+    #[schema(max_length = 63)]
     pub name: Option<String>,
 }
 

@@ -199,6 +199,7 @@ pub enum BackupsPlanRequest {
     /// Set where backups go.
     Location {
         /// The bucket.
+        #[schema(pattern = "^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$")]
         bucket: String,
         /// A folder in the bucket.
         #[serde(default)]
@@ -223,10 +224,12 @@ pub enum BackupsPlanRequest {
     /// Set Zeabur's schedule.
     Schedule {
         /// Five cron fields, in the Velero server's clock.
+        #[serde(default = "default_cron")]
+        #[schema(default = "0 3 * * *")]
         cron: String,
         /// How many days each backup is kept.
-        #[serde(rename = "keepDays")]
-        #[schema(minimum = 1, maximum = 365)]
+        #[serde(rename = "keepDays", default = "default_keep_days")]
+        #[schema(minimum = 1, maximum = 365, default = 7)]
         keep_days: u32,
         /// The namespaces to back up; empty for every namespace.
         #[serde(default)]
@@ -249,7 +252,7 @@ pub enum BackupsPlanRequest {
         namespace: String,
         /// The new namespace, needed while `namespace` exists.
         #[serde(default, skip_serializing_if = "Option::is_none")]
-        #[schema(max_length = 63)]
+        #[schema(max_length = 63, pattern = "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")]
         into: Option<String>,
     },
     /// Move every route of `from` to `to`: delete each from `from` and create it in `to`. A route
@@ -270,6 +273,14 @@ pub enum BackupsPlanRequest {
         /// The project the routes go to.
         to: String,
     },
+}
+
+fn default_cron() -> String {
+    v::DEFAULT_CRON.to_owned()
+}
+
+const fn default_keep_days() -> u32 {
+    v::DEFAULT_KEEP_DAYS
 }
 
 impl std::fmt::Debug for BackupsPlanRequest {
@@ -1782,6 +1793,19 @@ pub(crate) async fn apply(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn a_schedule_left_out_is_daily_at_three_kept_a_week() {
+        let request: BackupsPlanRequest = serde_json::from_str(r#"{"op":"schedule"}"#).unwrap();
+        assert_eq!(
+            request,
+            BackupsPlanRequest::Schedule {
+                cron: "0 3 * * *".to_owned(),
+                keep_days: 7,
+                namespaces: Vec::new(),
+            }
+        );
+    }
 
     #[test]
     fn debug_leaves_the_secret_access_key_out() {

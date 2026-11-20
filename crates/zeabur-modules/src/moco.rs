@@ -35,6 +35,7 @@
 
 use serde_json::Value;
 use zeabur_kube::DynamicObject;
+use zeabur_model::kernel::names::LABEL_DATABASE as DATABASE_LABEL;
 use zeabur_model::readiness::{self, Status};
 
 use crate::backups::{Outcome, Schedule, Target, TargetKind, newest};
@@ -57,9 +58,6 @@ pub const CLUSTERS: Read = Read {
     resource: "mysqlclusters",
     kind: "MySQLCluster",
 };
-
-/// The label of what Zeabur makes for a database, its name as the value.
-const DATABASE_LABEL: &str = "zeabur.com/database";
 
 /// `moco.cybozu.com/v1beta2` `BackupPolicy`, in the project's namespace.
 pub const BACKUP_POLICIES: Read = Read {

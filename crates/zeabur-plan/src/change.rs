@@ -402,6 +402,7 @@ pub enum Change {
     CreateProject {
         /// The name to show instead of the namespace's.
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "openapi", schema(max_length = 64))]
         display_name: Option<String>,
     },
     /// Set the project's details, the Namespace's `zeabur.com/display-name`,
@@ -410,6 +411,7 @@ pub enum Change {
     Details {
         /// The name to show instead of the namespace's.
         #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(feature = "openapi", schema(max_length = 64))]
         display_name: Option<String>,
         /// What the project is.
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -441,6 +443,10 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         container: Option<String>,
         /// The CronJob's name.
+        #[cfg_attr(
+            feature = "openapi",
+            schema(max_length = 52, pattern = "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$")
+        )]
         name: String,
         /// When it runs, a cron expression such as `0 3 * * *`.
         schedule: String,
@@ -453,9 +459,11 @@ pub enum Change {
         #[serde(default)]
         concurrency: TaskConcurrency,
         /// How many succeeded runs to keep.
+        #[cfg_attr(feature = "openapi", schema(minimum = 0, maximum = 100))]
         #[serde(default = "three")]
         keep_succeeded: i32,
         /// How many failed runs to keep.
+        #[cfg_attr(feature = "openapi", schema(minimum = 0, maximum = 100))]
         #[serde(default = "one")]
         keep_failed: i32,
     },
@@ -486,9 +494,11 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         concurrency: Option<TaskConcurrency>,
         /// How many succeeded runs to keep.
+        #[cfg_attr(feature = "openapi", schema(minimum = 0, maximum = 100))]
         #[serde(default, skip_serializing_if = "Option::is_none")]
         keep_succeeded: Option<i32>,
         /// How many failed runs to keep.
+        #[cfg_attr(feature = "openapi", schema(minimum = 0, maximum = 100))]
         #[serde(default, skip_serializing_if = "Option::is_none")]
         keep_failed: Option<i32>,
         /// Stop starting runs on schedule (`spec.suspend`), or start again.
@@ -638,9 +648,23 @@ pub struct BuildOptionsChange {
     /// The build context inside the repository, `spec.source.git.contextDir`. Empty: the
     /// repository's root.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(
+            max_length = 1024,
+            pattern = "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$"
+        )
+    )]
     pub context_dir: Option<String>,
     /// The Dockerfile, relative to the context, `spec.source.git.dockerfile`. Empty: `Dockerfile`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(
+            max_length = 1024,
+            pattern = "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$"
+        )
+    )]
     pub dockerfile: Option<String>,
     /// The build variables to set or remove, `spec.env`. A value from a Secret names only
     /// `secretName` and `key`.
@@ -689,6 +713,10 @@ pub struct NameValue {
 #[serde(rename_all = "camelCase")]
 pub struct UploadServiceChange {
     /// The service's name, which its `Build`, workload and Service share.
+    #[cfg_attr(
+        feature = "openapi",
+        schema(max_length = 40, pattern = "^[a-z]([-a-z0-9]*[a-z0-9])?$")
+    )]
     pub name: String,
     /// A value the `Build` has not been asked with before, for its upload token (see
     /// [`Change::UploadToken`]).
@@ -697,9 +725,23 @@ pub struct UploadServiceChange {
     pub method: UploadMethod,
     /// The folder inside the upload to build. Left out: the whole upload.
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(
+            max_length = 1024,
+            pattern = "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$"
+        )
+    )]
     pub directory: Option<String>,
     /// The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`].
     #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[cfg_attr(
+        feature = "openapi",
+        schema(
+            max_length = 1024,
+            pattern = "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$"
+        )
+    )]
     pub dockerfile: Option<String>,
     /// The port the app listens on. Left out: a worker, which takes no connections.
     #[serde(default, skip_serializing_if = "Option::is_none")]

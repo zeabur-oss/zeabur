@@ -1,6 +1,6 @@
 // Objects written as YAML, created through a plan: the editor with templates, what the server
-// would refuse found before planning and pointed at its line, the order of creation beside it, and
-// after a refusal part way, what was created with a plan to delete exactly that.
+// refuses pointed at its line, the order of creation beside it, and after a refusal part way, what
+// was created with a plan to delete exactly that.
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link, useNavigate } from "@tanstack/react-router"
 import { lazy, Suspense, useEffect, useMemo, useRef, useState } from "react"
@@ -12,22 +12,20 @@ import WarningFillIcon from "~icons/ph/warning-fill"
 import XIcon from "~icons/ph/x"
 
 import type { Problem as ProblemBody, Schemas } from "@/api/client"
-import { creatableQuery, objectsQuery } from "@/api/queries"
+import { creatableQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
 import { usePlanner } from "@/components/plan/planner"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
 import type { LineMark, YamlEditorHandle } from "@/components/yaml-editor"
-import { useT, type Translate } from "@/i18n"
+import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import {
-  blocking,
   check,
   creates,
   documentsOf,
   inCreateOrder,
   lineOf,
-  servedKind,
   type Found,
   type YamlDocument,
 } from "@/model/create"
@@ -63,29 +61,6 @@ const deployment: Schemas.CreatableKind = {
   access: "unknown",
 }
 
-const keyOf = (group: string, resource: string) => `${group || "core"}/${resource}`
-
-function foundText(t: Translate, found: Found, project: string): string {
-  switch (found.code) {
-    case "invalidYaml":
-      return t("create.found.invalidYaml")
-    case "missingField":
-      return t("create.found.missingField", found.field)
-    case "clusterScoped":
-      return t("create.found.clusterScoped", found.kind)
-    case "notServed":
-      return t("create.found.notServed", found.kind, found.apiVersion)
-    case "rights":
-      return t("create.found.rights", found.kind, project)
-    case "otherNamespace":
-      return t("create.found.otherNamespace", found.namespace, project)
-    case "duplicate":
-      return t("create.found.duplicate", found.kind, found.name)
-    case "exists":
-      return t("create.found.exists", found.kind, found.name)
-  }
-}
-
 export function CreatePage() {
   const { project } = route.useParams()
   const t = useT()
@@ -96,23 +71,7 @@ export function CreatePage() {
   useEffect(() => dropHandoff(project), [project])
   const [text, setText] = useState(initial)
   const docs = useMemo(() => documentsOf(text), [text])
-  const kinds = useMemo(() => {
-    const keys = new Set<string>()
-    for (const d of docs) {
-      const served = servedKind(creatable.data, d)
-      if (served) keys.add(keyOf(served.group, served.resource))
-    }
-    return [...keys].toSorted()
-  }, [docs, creatable.data])
-  const objects = useQuery({ ...objectsQuery(project, { kinds }), enabled: kinds.length > 0 })
-  const existing = useMemo(() => {
-    const names = new Set<string>()
-    for (const kind of objects.data?.items ?? [])
-      for (const item of kind.items) names.add(`${keyOf(kind.group, kind.resource)}/${item.name}`)
-    return names
-  }, [objects.data])
-  const found = check(docs, project, { creatable: creatable.data, existing })
-  const stopped = found.some(blocking)
+  const found = check(docs, creatable.data)
 
   const editor = useRef<YamlEditorHandle | undefined>(undefined)
   const jump = (line: number) => editor.current?.jump(line)
@@ -142,8 +101,8 @@ export function CreatePage() {
 
   const marks: LineMark[] = found.map((f) => ({
     line: f.line,
-    tone: blocking(f) ? "fail" : "warn",
-    message: foundText(t, f, project),
+    tone: "warn",
+    message: t("create.found.rights", f.kind, project),
   }))
   if (refusedLine !== undefined && planner.refusal)
     marks.push({ line: refusedLine, tone: "fail", message: planner.refusal.title })
@@ -207,11 +166,7 @@ export function CreatePage() {
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <span className="type-meta text-muted-foreground">
-            {stopped
-              ? t("create.fixFirst")
-              : found.length > 0
-                ? t("create.notes", found.length)
-                : null}
+            {found.length > 0 ? t("create.notes", found.length) : null}
           </span>
           <span className="ml-auto flex flex-wrap items-center justify-end gap-2">
             <Link
@@ -221,7 +176,7 @@ export function CreatePage() {
             >
               {t("plan.cancel")}
             </Link>
-            <Button size="sm" disabled={stopped || docs.length === 0} onClick={review}>
+            <Button size="sm" disabled={docs.length === 0} onClick={review}>
               {t("create.review")}
               <CaretRightIcon aria-hidden="true" data-icon="inline-end" />
             </Button>
@@ -303,30 +258,18 @@ function FoundList({
   return (
     <ul
       className="flex shrink-0 flex-col rounded-xl border bg-card"
-      aria-label={t("create.problems", found.length)}
+      aria-label={t("create.notes", found.length)}
     >
       {found.map((f) => (
         <li
-          key={`${f.line}/${f.code}`}
+          key={f.line}
           className="flex flex-wrap items-start gap-x-3 gap-y-1 border-b px-4 py-2.5 text-sm last:border-b-0"
         >
-          <StatusDot health={blocking(f) ? "fail" : "warn"} className="mt-1.5" />
-          <span className="min-w-0 flex-1">{foundText(t, f, project)}</span>
-          <span className="flex items-center gap-2">
-            <Button variant="ghost" size="xs" onClick={() => jump(f.line)}>
-              {t("create.docLine", f.document + 1, f.line)}
-            </Button>
-            {f.code === "exists" ? (
-              <Link
-                to="/projects/$project/objects"
-                params={{ project }}
-                search={{ object: f.id }}
-                className={cn(buttonVariants({ variant: "outline", size: "xs" }))}
-              >
-                {t("create.edit", f.name)}
-              </Link>
-            ) : null}
-          </span>
+          <StatusDot health="warn" className="mt-1.5" />
+          <span className="min-w-0 flex-1">{t("create.found.rights", f.kind, project)}</span>
+          <Button variant="ghost" size="xs" onClick={() => jump(f.line)}>
+            {t("create.docLine", f.document + 1, f.line)}
+          </Button>
         </li>
       ))}
     </ul>
@@ -343,10 +286,8 @@ function Order({
   jump: (line: number) => void
 }) {
   const t = useT()
-  const toneOf = (d: YamlDocument) => {
-    const own = found.filter((f) => f.document === d.index)
-    return own.some(blocking) ? "fail" : own.length > 0 ? "warn" : undefined
-  }
+  const toneOf = (d: YamlDocument) =>
+    found.some((f) => f.document === d.index) ? "warn" : undefined
   return (
     <aside className="hidden w-64 shrink-0 flex-col self-start rounded-xl border bg-card lg:flex">
       <header className="flex h-10 items-center gap-1.5 border-b px-4">

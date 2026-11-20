@@ -44,11 +44,11 @@ describe("object storage", () => {
     )
   })
 
-  test("bucket names are 3 to 63 lowercase letters, digits and hyphens", () => {
+  test("bucket names follow the server's bucket rule", () => {
     expect(bucketProblem("uploads", [])).toBeUndefined()
     expect(bucketProblem("", [])).toBe("empty")
     expect(bucketProblem("Up", [])).toBe("invalid")
-    expect(bucketProblem("a.b", [])).toBe("invalid")
+    expect(bucketProblem("ab", [])).toBe("invalid")
     expect(bucketProblem("uploads", ["uploads"])).toBe("taken")
   })
 })

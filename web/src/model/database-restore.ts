@@ -2,6 +2,7 @@
 // copies the original's spec and starts from the backup; the original is not changed. The
 // `zeabur.com/restored-*` annotations tie the two together for the pages.
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { databaseOfEnv, type Target } from "@/model/connect"
 import {
   APP_DATABASE,
@@ -69,10 +70,12 @@ export function restorePoints(database: Database): RestorePoint[] {
     }))
 }
 
-const NAME_MAX = 30
-
 /** `<name>-restored-<MMDD>`, the original's name cut to fit `max`. */
-export function restoredName(name: string, now: Date, max = NAME_MAX): string {
+export function restoredName(
+  name: string,
+  now: Date,
+  max: number = rules.DatabaseName.maxLength,
+): string {
   const suffix = `-restored-${String(now.getMonth() + 1).padStart(2, "0")}${String(now.getDate()).padStart(2, "0")}`
   return `${name.slice(0, max - suffix.length).replace(/-+$/, "")}${suffix}`
 }

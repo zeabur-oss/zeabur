@@ -2,7 +2,9 @@
 // change of one plan (docs/design: basic create). No `app.kubernetes.io/managed-by`: a plan
 // refuses to change an object another tool manages.
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { templateSecurity, type Profile } from "@/model/pod-security"
+import { textProblem } from "@/model/rules"
 
 type Change = Schemas.Change
 type Manifest = Record<string, unknown>
@@ -74,8 +76,7 @@ export const newImageService = (): ImageService => ({
   security: "baseline",
 })
 
-const NAME_MAX = 40
-const DNS_LABEL = /^[a-z]([-a-z0-9]*[a-z0-9])?$/
+const NAME = rules["UploadServiceChange.name"]
 const IMAGE = /^[a-z0-9][A-Za-z0-9._/:@-]*$/
 const HOST = /^(?=.{1,253}$)([a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?\.)+[a-z]([-a-z0-9]{0,61}[a-z0-9])?$/
 const VARIABLE = /^[A-Za-z_][A-Za-z0-9_]*$/
@@ -99,7 +100,7 @@ export function nameFromImage(image: string, taken: readonly string[]): string {
     repository(image.trim().toLowerCase())
       .replace(/[^a-z0-9-]+/g, "-")
       .replace(/^[^a-z]+/, "")
-      .slice(0, NAME_MAX - 3)
+      .slice(0, NAME.maxLength - 3)
       .replace(/-+$/, "") || "app"
   if (!taken.includes(base)) return base
   for (let n = 2; ; n += 1) if (!taken.includes(`${base}-${n}`)) return `${base}-${n}`
@@ -118,8 +119,8 @@ export function serviceNameProblem(
   taken: readonly string[],
 ): FieldProblem | undefined {
   if (name === "") return "empty"
-  if (name.length > NAME_MAX) return "long"
-  if (!DNS_LABEL.test(name)) return "invalid"
+  const problem = textProblem(name, NAME)
+  if (problem) return problem
   return taken.includes(name) ? "taken" : undefined
 }
 

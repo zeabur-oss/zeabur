@@ -1,7 +1,9 @@
 // The Storage section's editor: a service's volumes as rows to grow, move, protect, add and
 // remove, and the changes that carry them into one plan.
 import type { Schemas } from "@/api/client"
-import { defaultClaimName, subdomain, volumeRequest } from "@/routes/service/volume"
+import { rules } from "@/api/rules"
+import { fits } from "@/model/rules"
+import { defaultClaimName, volumeRequest } from "@/routes/service/volume"
 
 type Change = Schemas.Change
 
@@ -52,7 +54,8 @@ const live = (row: VolumeRow) => !row.removed && !blank(row)
 export const editedCount = (rows: readonly VolumeRow[]) =>
   rows.filter((row) => !blank(row) && rowState(row) !== "same").length
 
-const volumeName = /^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?$/
+const VOLUME_NAME = rules["VolumeRequest.name"]
+const CLAIM_NAME = rules["VolumeRequest.claimName"]
 
 /** The volume name an added row gets from its mount path: `/var/lib/data` is `data`. */
 export function nameFromPath(mountPath: string): string {
@@ -61,7 +64,7 @@ export function nameFromPath(mountPath: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9-]+/g, "-")
     .replace(/^-+|-+$/g, "")
-    .slice(0, 63)
+    .slice(0, VOLUME_NAME.maxLength)
     .replace(/-+$/, "")
   return name || "data"
 }
@@ -114,9 +117,9 @@ export function problemsOf(
     else if ((paths.get(path) ?? 0) > 1 || taken.has(path)) problems.set(row.id, "pathTaken")
     else if (bytes === undefined || bytes <= 0) problems.set(row.id, "badSize")
     else if (row.was && bytes < (bytesOf(row.was.size) ?? 0)) problems.set(row.id, "shrinks")
-    else if (!row.was && !volumeName.test(nameOf(row))) problems.set(row.id, "badName")
+    else if (!row.was && !fits(nameOf(row), VOLUME_NAME)) problems.set(row.id, "badName")
     else if (!row.was && (names.get(nameOf(row)) ?? 0) > 1) problems.set(row.id, "nameTaken")
-    else if (!row.was && row.claimName !== null && !subdomain.test(row.claimName.trim()))
+    else if (!row.was && row.claimName !== null && !fits(row.claimName.trim(), CLAIM_NAME))
       problems.set(row.id, "badClaimName")
   }
   return problems

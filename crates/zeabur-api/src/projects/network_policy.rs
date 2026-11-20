@@ -188,7 +188,7 @@ pub struct PresetList {
 /// NetworkPolicy depends on its network plugin.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/network-policy/presets", tag = "projects",
     operation_id = "listNetworkPolicyPresets",
-    params(("project" = String, Path), PresetQuery),
+    params(("project" = crate::rules::ProjectName, Path), PresetQuery),
     responses((status = 200, body = PresetList), (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn presets(
     State(state): State<AppState>,

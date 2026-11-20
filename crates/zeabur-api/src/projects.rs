@@ -312,7 +312,7 @@ pub(crate) async fn read(
 /// A project's services, the resources they use, and how they relate: the project document.
 #[utoipa::path(get, path = "/api/v1/projects/{project}", tag = "projects",
     operation_id = "getProject",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectDocument), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
     State(state): State<AppState>,

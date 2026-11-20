@@ -71,7 +71,7 @@ pub struct ProjectBuilds {
 /// person. `state` is `not-installed` when the cluster does not serve `builder.zeabur.com`.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/builds", tag = "projects",
     operation_id = "getProjectBuilds",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectBuilds), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn get(
     State(state): State<AppState>,

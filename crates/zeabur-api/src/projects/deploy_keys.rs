@@ -159,7 +159,7 @@ fn trusted(host: &str, given: Option<&str>) -> Result<(String, Vec<TrustedHostKe
 /// those of the `known_hosts` lines given. Makes no key.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/deploy-keys/host-keys", tag = "projects",
     operation_id = "inspectDeployKeyHost",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     request_body = DeployKeyRequest,
     responses((status = 200, body = DeployKeyHost),
               (status = 400, body = Problem, content_type = PROBLEM)))]
@@ -177,7 +177,7 @@ pub(crate) async fn host_keys(
 /// Git host again. Only on the person's request: the Secret holds the private key too.
 #[utoipa::path(post, path = "/api/v1/projects/{project}/deploy-keys/{name}/public", tag = "projects",
     operation_id = "revealDeployKey",
-    params(("project" = String, Path, description = "The project's namespace"),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace"),
            ("name" = String, Path, description = "The Secret holding the key")),
     responses((status = 200, body = DeployKeyPublic),
               (status = 400, body = Problem, content_type = PROBLEM),

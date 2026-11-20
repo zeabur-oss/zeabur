@@ -143,29 +143,16 @@ export function inCreateOrder(documents: readonly YamlDocument[]): YamlDocument[
   return documents.toSorted((a, b) => rank(a) - rank(b) || a.index - b.index)
 }
 
-/** A problem found before planning, at a line of the whole text. */
-export type Found =
-  | { code: "invalidYaml"; line: number; document: number }
-  | { code: "missingField"; line: number; document: number; field: string }
-  | { code: "clusterScoped"; line: number; document: number; kind: string }
-  | { code: "notServed"; line: number; document: number; kind: string; apiVersion: string }
-  | { code: "rights"; line: number; document: number; kind: string }
-  | { code: "otherNamespace"; line: number; document: number; namespace: string }
-  | { code: "duplicate"; line: number; document: number; kind: string; name: string }
-  | { code: "exists"; line: number; document: number; kind: string; name: string; id: string }
-
-/** Problems that keep a plan from being made; the others are only hints. */
-export const blocking = (found: Found) => found.code !== "rights"
-
-export interface Known {
-  /** What `GET /creatable` answered; `undefined` while it loads. */
-  creatable?: Schemas.CreatableList
-  /** `<group>/<resource>/<name>` of objects that exist, `core` for the core group. */
-  existing?: ReadonlySet<string>
+/** A kind the person may not create, at its line: a hint, for the plan says what the server
+ * refuses. */
+export interface Found {
+  line: number
+  document: number
+  kind: string
 }
 
 /** The kind a document names, as discovery serves it. */
-export function servedKind(
+function servedKind(
   creatable: Schemas.CreatableList | undefined,
   document: YamlDocument,
 ): Schemas.CreatableKind | undefined {
@@ -173,58 +160,14 @@ export function servedKind(
   return creatable?.items.find((k) => k.group === group && k.kind === document.kind)
 }
 
-/** What the server would refuse, found before asking it, each at its line. */
-export function check(documents: readonly YamlDocument[], project: string, known: Known): Found[] {
-  const found: Found[] = []
-  const seen = new Set<string>()
-  for (const d of documents) {
-    const document = d.index
-    if (d.error !== undefined) {
-      found.push({ code: "invalidYaml", line: d.error, document })
-      continue
-    }
-    const missing = (["apiVersion", "kind", "metadata.name"] as const).find(
-      (f) => !(f === "apiVersion" ? d.apiVersion : f === "kind" ? d.kind : d.name),
-    )
-    if (missing) {
-      found.push({ code: "missingField", line: lineOf(d, missing), document, field: missing })
-      continue
-    }
-    const kind = d.kind ?? ""
-    const group = groupOf(d.apiVersion)
-    const kindLine = lineOf(d, "kind")
-    const served = servedKind(known.creatable, d)
-    if (known.creatable?.clusterScoped.some((k) => k.group === group && k.kind === kind))
-      found.push({ code: "clusterScoped", line: kindLine, document, kind })
-    else if (known.creatable && !served)
-      found.push({
-        code: "notServed",
-        line: kindLine,
-        document,
-        kind,
-        apiVersion: d.apiVersion ?? "",
-      })
-    else if (served?.access === "denied")
-      found.push({ code: "rights", line: kindLine, document, kind })
-    if (d.namespace && d.namespace !== project)
-      found.push({
-        code: "otherNamespace",
-        line: lineOf(d, "metadata.namespace"),
-        document,
-        namespace: d.namespace,
-      })
-    const name = d.name ?? ""
-    const key = `${group}/${kind}/${name}`
-    if (seen.has(key))
-      found.push({ code: "duplicate", line: lineOf(d, "metadata.name"), document, kind, name })
-    seen.add(key)
-    if (served) {
-      const id = [served.group || "core", served.version, served.resource, name].join("/")
-      if (known.existing?.has([served.group || "core", served.resource, name].join("/")))
-        found.push({ code: "exists", line: lineOf(d, "metadata.name"), document, kind, name, id })
-    }
-  }
-  return found
+/** The documents whose kind `GET /creatable` says the person may not create. */
+export function check(
+  documents: readonly YamlDocument[],
+  creatable: Schemas.CreatableList | undefined,
+): Found[] {
+  return documents
+    .filter((d) => d.error === undefined && servedKind(creatable, d)?.access === "denied")
+    .map((d) => ({ line: lineOf(d, "kind"), document: d.index, kind: d.kind ?? "" }))
 }
 
 /** The changes that create the documents, one per document, in written order. */

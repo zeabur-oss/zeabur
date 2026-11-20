@@ -394,7 +394,7 @@ fn finished(pod: &Value, now: Timestamp) -> bool {
 /// The person's tools pods in the project's tools namespace, deleting those that are done with.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/tools", tag = "pods",
     operation_id = "listToolsPods",
-    params(("project" = String, Path)),
+    params(("project" = crate::rules::ProjectName, Path)),
     responses((status = 200, body = ToolsStatus),
               (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn status(
@@ -502,7 +502,7 @@ async fn own_pod(
 /// `resourceVersion` preconditions); its terminals end with it.
 #[utoipa::path(delete, path = "/api/v1/projects/{project}/tools/{name}", tag = "pods",
     operation_id = "deleteToolsPod",
-    params(("project" = String, Path), ("name" = String, Path)),
+    params(("project" = crate::rules::ProjectName, Path), ("name" = String, Path)),
     responses((status = 204, description = "Deleted"),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM),
@@ -756,7 +756,7 @@ fn after_close(
 /// (by default) after its last terminal closes.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/tools/{name}/terminal", tag = "pods",
     operation_id = "openToolsTerminal",
-    params(("project" = String, Path), ("name" = String, Path)),
+    params(("project" = crate::rules::ProjectName, Path), ("name" = String, Path)),
     responses((status = 101, description = "Switched to the terminal's WebSocket"),
               (status = 401, body = Problem, content_type = PROBLEM),
               (status = 403, body = Problem, content_type = PROBLEM)))]

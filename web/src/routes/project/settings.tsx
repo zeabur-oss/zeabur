@@ -23,7 +23,7 @@ import { useI18n, useT } from "@/i18n"
 import { formatAgo } from "@/lib/format"
 import { BuildLimits } from "@/routes/project/build-limits"
 import { NetworkSettings } from "@/routes/project/network-settings"
-import { DISPLAY_NAME_MAX, mayChange, projectIcons, type ProjectIconName } from "@/model/project"
+import { mayChange, projectIcons, type ProjectIconName } from "@/model/project"
 import type { Service } from "@/model/service"
 import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { Card, CardFooter, CardRow, SectionLabel } from "@zeabur-oss/design-system/components/card"
@@ -250,7 +250,10 @@ function DetailsForm({
             </CardRow>
           )}
         </form.Field>
-        <form.Field name="displayName" validators={{ onChange: atMost(DISPLAY_NAME_MAX) }}>
+        <form.Field
+          name="displayName"
+          validators={{ onChange: atMost(rules["Change.details.displayName"].maxLength) }}
+        >
           {(f) => (
             <CardRow
               label={t("projectSettings.name")}

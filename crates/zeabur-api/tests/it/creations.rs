@@ -276,6 +276,36 @@ stringData:
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
     }
 
+    /// An object a client built, not YAML, is dry-run at the plan too: a name kube-apiserver
+    /// refuses is refused before the plan is shown.
+    #[tokio::test]
+    async fn a_built_object_kube_apiserver_refuses_is_refused_at_the_plan() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.admission_refusals.insert(
+                "ConfigMap/shared.".to_owned(),
+                KubernetesStatus {
+                    names_invalid_field: true,
+                    ..refuse(
+                        422,
+                        "Invalid",
+                        "ConfigMap \"shared.\" is invalid: metadata.name: Invalid value: \
+                         \"shared.\": a lowercase RFC 1123 subdomain must consist of lower case \
+                         alphanumeric characters, '-' or '.'",
+                    )
+                },
+            );
+        });
+        let app = app(&cluster);
+        let request = json!({"changes": [{"op": "create", "object": {
+            "apiVersion": "v1", "kind": "ConfigMap", "metadata": {"name": "shared."}
+        }}]});
+        let (status, problem) = plan(&app, &request).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert_eq!(problem["at"]["change"], 0, "{problem}");
+        assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
+    }
+
     /// A quota's refusal at the dry run is `quota-exceeded`, at its document.
     #[tokio::test]
     async fn a_create_over_a_quota_is_refused_at_the_plan() {

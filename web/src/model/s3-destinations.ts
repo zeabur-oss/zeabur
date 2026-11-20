@@ -1,6 +1,8 @@
 // The cluster's S3 destinations: a picker for backup forms. A plan copies a destination's keys
 // into a Secret of the project, so no backup reads the list.
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
+import { fits } from "@/model/rules"
 
 type Change = Schemas.Change
 export type Destination = Schemas.S3Destination
@@ -107,10 +109,10 @@ export function destinationProblems(
   editing: boolean,
 ): DestinationProblem[] {
   const problems: DestinationProblem[] = []
-  if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(form.name)) problems.push("name")
+  if (!fits(form.name, rules["S3DestinationFields.name"])) problems.push("name")
   else if (!editing && taken.includes(form.name)) problems.push("taken")
   if (!/^https?:\/\/[^\s/]+\S*$/.test(form.endpoint.trim())) problems.push("endpoint")
-  if (!/^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$/.test(form.bucket.trim())) problems.push("bucket")
+  if (!fits(form.bucket.trim(), rules["S3DestinationFields.bucket"])) problems.push("bucket")
   if (form.prefix.includes("..") || /\s/.test(form.prefix)) problems.push("prefix")
   const typed = [form.accessKeyId.trim(), form.secretAccessKey.trim()].filter(Boolean).length
   if (typed === 1 || (!editing && typed === 0)) problems.push("keys")

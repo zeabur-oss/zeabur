@@ -85,7 +85,7 @@ pub(crate) async fn attachable<C: Cluster + ?Sized>(
 /// The Gateways a new `HTTPRoute` of the project can attach to.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/gateways", tag = "projects",
     operation_id = "listProjectGateways",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = ProjectGateways),
               (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn list(

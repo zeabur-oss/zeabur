@@ -4,6 +4,7 @@ import { useState } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
 import { clusterQuery, creatableQuery } from "@/api/queries"
+import { rules } from "@/api/rules"
 import { useTakenNames } from "@/components/add/taken"
 import { AmountInput } from "@/components/amount-input"
 import { FormField, quantity } from "@/components/form-field"
@@ -47,7 +48,7 @@ import { Select } from "@zeabur-oss/design-system/components/select"
 import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 const MOUNT_PATH = /^\/\S*$/
-const MAX_REPLICAS = 20
+const MAX_REPLICAS = rules.ServiceReplicas.maximum
 
 interface Extras {
   env: string

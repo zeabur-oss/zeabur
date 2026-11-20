@@ -1,5 +1,7 @@
 import type { Problem, Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { isRefusal } from "@/model/problem"
+import { fits } from "@/model/rules"
 
 export type Member = Schemas.MemberView
 export type Passkey = Schemas.PasskeyView
@@ -63,13 +65,8 @@ export function linkState(links: SetupLinks): "ready" | "no-issuer" | "not-redee
 }
 
 /** A Zeabur Identity user name, as its `User` schema takes it. */
-export function isUsername(name: string): boolean {
-  return (
-    name.length > 0 &&
-    name.length <= 63 &&
-    name.split(".").every((label) => /^[a-z0-9]([a-z0-9-]*[a-z0-9])?$/.test(label))
-  )
-}
+export const isUsername = (name: string): boolean =>
+  fits(name, rules["MemberChange.invite.username"])
 
 /** What typing a user name into the invitation leads to. */
 export function inviteTarget(

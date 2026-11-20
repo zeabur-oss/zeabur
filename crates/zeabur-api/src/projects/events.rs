@@ -39,7 +39,7 @@ pub(crate) struct EventParams {
 /// then by name. `totalSize` counts every event that matched, also those past the limit.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/events", tag = "projects",
     operation_id = "listProjectEvents",
-    params(("project" = String, Path, description = "The project's namespace"), EventParams, LimitParams),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace"), EventParams, LimitParams),
     responses((status = 200, body = EventList), (status = 400, body = Problem, content_type = PROBLEM),
               (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn events(

@@ -891,7 +891,10 @@ export type BackupsPlanRequest =
   | {
       /** The access key ID; empty with the secret to keep the keys the location has. */
       accessKeyId?: string
-      /** The bucket. */
+      /**
+       * The bucket.
+       * @pattern ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
+       */
       bucket: string
       /**
        * An S3 destination of the cluster's list to copy the keys from, instead of the keys
@@ -911,13 +914,13 @@ export type BackupsPlanRequest =
     }
   | {
       /** Five cron fields, in the Velero server's clock. */
-      cron: string
+      cron?: string
       /**
        * How many days each backup is kept.
        * @minimum 1
        * @maximum 365
        */
-      keepDays: number
+      keepDays?: number
       /** The namespaces to back up; empty for every namespace. */
       namespaces?: string[]
       op: "schedule"
@@ -937,6 +940,7 @@ export type BackupsPlanRequest =
        * The new namespace, needed while `namespace` exists.
        * @maxLength 63
        * @nullable
+       * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
        */
       into?: string | null
       /** The namespace to restore. */
@@ -1095,12 +1099,16 @@ export type BuildOptionsChange = {
   /**
    * The build context inside the repository, `spec.source.git.contextDir`. Empty: the
    * repository's root.
+   * @maxLength 1024
    * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
    */
   contextDir?: string | null
   /**
    * The Dockerfile, relative to the context, `spec.source.git.dockerfile`. Empty: `Dockerfile`.
+   * @maxLength 1024
    * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
    */
   dockerfile?: string | null
   /**
@@ -1586,12 +1594,18 @@ export type VolumeRequest = {
   accessMode?: AccessMode | null
   /**
    * The claim's name; absent for `<workload>-<name>`. A claim that exists is never reused.
+   * @maxLength 253
    * @nullable
+   * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
    */
   claimName?: string | null
   /** Where the container sees it; absolute. */
   mountPath: string
-  /** The volume's name in the pod. */
+  /**
+   * The volume's name in the pod.
+   * @maxLength 63
+   * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+   */
   name?: string
   /** The size, a Kubernetes quantity such as `5Gi`. */
   size: string
@@ -1737,12 +1751,16 @@ export type UploadServiceChange = {
   buildVariables?: NameValue[]
   /**
    * The folder inside the upload to build. Left out: the whole upload.
+   * @maxLength 1024
    * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
    */
   directory?: string | null
   /**
    * The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`].
+   * @maxLength 1024
    * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
    */
   dockerfile?: string | null
   /**
@@ -1752,7 +1770,11 @@ export type UploadServiceChange = {
   host?: string | null
   /** How the folder is built. */
   method: UploadMethod
-  /** The service's name, which its `Build`, workload and Service share. */
+  /**
+   * The service's name, which its `Build`, workload and Service share.
+   * @maxLength 40
+   * @pattern ^[a-z]([-a-z0-9]*[a-z0-9])?$
+   */
   name: string
   /**
    * The port the app listens on. Left out: a worker, which takes no connections.
@@ -2183,6 +2205,7 @@ export type Change =
   | {
       /**
        * The name to show instead of the namespace's.
+       * @maxLength 64
        * @nullable
        */
       displayName?: string | null
@@ -2197,6 +2220,7 @@ export type Change =
       description?: string | null
       /**
        * The name to show instead of the namespace's.
+       * @maxLength 64
        * @nullable
        */
       displayName?: string | null
@@ -2228,11 +2252,23 @@ export type Change =
       container?: string | null
       /** The service: a Deployment, StatefulSet or DaemonSet. */
       from: WorkloadRef
-      /** How many failed runs to keep. */
+      /**
+       * How many failed runs to keep.
+       * @minimum 0
+       * @maximum 100
+       */
       keepFailed?: number
-      /** How many succeeded runs to keep. */
+      /**
+       * How many succeeded runs to keep.
+       * @minimum 0
+       * @maximum 100
+       */
       keepSucceeded?: number
-      /** The CronJob's name. */
+      /**
+       * The CronJob's name.
+       * @maxLength 52
+       * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+       */
       name: string
       op: "scheduleTask"
       /** When it runs, a cron expression such as `0 3 * * *`. */
@@ -2259,11 +2295,15 @@ export type Change =
       cronJob: string
       /**
        * How many failed runs to keep.
+       * @minimum 0
+       * @maximum 100
        * @nullable
        */
       keepFailed?: number | null
       /**
        * How many succeeded runs to keep.
+       * @minimum 0
+       * @maximum 100
        * @nullable
        */
       keepSucceeded?: number | null
@@ -3047,6 +3087,7 @@ export type ClusterKind = {
 export type ClusterNameChange = {
   /**
    * The name, at most 63 characters; `null` goes back to the name Zeabur finds itself.
+   * @maxLength 63
    * @nullable
    */
   name?: string | null
@@ -5095,6 +5136,13 @@ export type Database = {
 }
 
 /**
+ * A database's name, as the label zeabur.com/database of its objects carries it.
+ * @maxLength 30
+ * @pattern ^[a-z]([-a-z0-9]*[a-z0-9])?$
+ */
+export type DatabaseName = string
+
+/**
  * Whether an engine's operator, and its backup component, could be read.
  */
 export type DatabaseOperator = {
@@ -6912,7 +6960,11 @@ export type MemberChange =
       op: "invite"
       /** A new member's roles in projects, when they are not an admin. */
       projects?: ProjectGrant[]
-      /** Login name: lower-case letters, digits, `-` and `.`, at most 63 characters. */
+      /**
+       * Login name: lower-case letters, digits, `-` and `.`, at most 63 characters.
+       * @maxLength 63
+       * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?(\.[a-z0-9]([-a-z0-9]*[a-z0-9])?)*$
+       */
       username: string
     }
   | {
@@ -6932,7 +6984,11 @@ export type MemberChange =
   | {
       /** How long the token should last; kube-apiserver may cut it. */
       expirationSeconds: number
-      /** Its name: lower-case letters, digits and `-`, at most 63 characters. */
+      /**
+       * Its name: lower-case letters, digits and `-`, at most 63 characters.
+       * @maxLength 63
+       * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+       */
       name: string
       op: "createToken"
       /** Its roles in projects. */
@@ -7836,7 +7892,11 @@ export type NotificationsPlanRequest =
   | {
       /** The events it receives. */
       events: AlertmanagerEvent[]
-      /** Its name. */
+      /**
+       * Its name.
+       * @maxLength 30
+       * @pattern ^[a-z]([-a-z0-9]*[a-z0-9])?$
+       */
       name: string
       op: "add"
       /** Where it sends, secrets included. */
@@ -9179,6 +9239,13 @@ export type ProjectList = {
 }
 
 /**
+ * A project's namespace: a DNS label.
+ * @maxLength 63
+ * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+ */
+export type ProjectName = string
+
+/**
  * A project's Namespace.
  */
 export type ProjectNamespace = ProjectDetails &
@@ -9798,11 +9865,18 @@ export type S3Destination = {
 export type S3DestinationFields = {
   /** The access key ID; empty with the secret to keep the keys the destination has. */
   accessKeyId?: string
-  /** The bucket. */
+  /**
+   * The bucket.
+   * @pattern ^[a-z0-9][a-z0-9.-]{1,61}[a-z0-9]$
+   */
   bucket: string
   /** The S3-compatible endpoint, `https://…`. */
   endpoint: string
-  /** Its name: lower-case letters, digits and `-`, at most 63. */
+  /**
+   * Its name: lower-case letters, digits and `-`, at most 63.
+   * @maxLength 63
+   * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+   */
   name: string
   /** A folder in the bucket. */
   prefix?: string
@@ -10004,6 +10078,13 @@ export type ServiceHistory = {
   /** The settings ConfigMap or the store, when the person may not read it. */
   unreadable: UnreadableView[]
 }
+
+/**
+ * How many replicas a new service may run.
+ * @minimum 1
+ * @maximum 20
+ */
+export type ServiceReplicas = number
 
 /**
  * Every way to a service, and the diagnoses where they stop.
@@ -12387,7 +12468,7 @@ export const listProjects = async (
   })
 }
 
-export const getGetProjectUrl = (project: string) => {
+export const getGetProjectUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}`
 }
 
@@ -12395,7 +12476,7 @@ export const getGetProjectUrl = (project: string) => {
  * @summary A project's services, the resources they use, and how they relate: the project document.
  */
 export const getProject = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectDocument> => {
   return zeaburFetch<ProjectDocument>(getGetProjectUrl(project), {
@@ -12404,7 +12485,7 @@ export const getProject = async (
   })
 }
 
-export const getGetProjectAlertsUrl = (project: string) => {
+export const getGetProjectAlertsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/alerts`
 }
 
@@ -12412,7 +12493,7 @@ export const getGetProjectAlertsUrl = (project: string) => {
  * @summary Falco's recent alerts about a project's pods, newest first, read as the person.
  */
 export const getProjectAlerts = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<RuntimeAlerts> => {
   return zeaburFetch<RuntimeAlerts>(getGetProjectAlertsUrl(project), {
@@ -12421,7 +12502,7 @@ export const getProjectAlerts = async (
   })
 }
 
-export const getApplyProjectUrl = (project: string) => {
+export const getApplyProjectUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/apply`
 }
 
@@ -12429,7 +12510,7 @@ export const getApplyProjectUrl = (project: string) => {
  * @summary Carries out a plan by its token: checks it, dry-runs every write, then writes.
  */
 export const applyProject = async (
-  project: string,
+  project: ProjectName,
   applyRequest: ApplyRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ApplyResponse> => {
@@ -12460,7 +12541,7 @@ export const applyProject = async (
   })
 }
 
-export const getGetProjectBackupsUrl = (project: string) => {
+export const getGetProjectBackupsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/backups`
 }
 
@@ -12471,7 +12552,7 @@ CloudNativePG), read as the person. Outcomes are as each provider reports them; 
 not test restores.
  */
 export const getProjectBackups = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectBackups> => {
   return zeaburFetch<ProjectBackups>(getGetProjectBackupsUrl(project), {
@@ -12480,7 +12561,7 @@ export const getProjectBackups = async (
   })
 }
 
-export const getGetProjectBuildsUrl = (project: string) => {
+export const getGetProjectBuildsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/builds`
 }
 
@@ -12489,7 +12570,7 @@ export const getGetProjectBuildsUrl = (project: string) => {
 person. `state` is `not-installed` when the cluster does not serve `builder.zeabur.com`.
  */
 export const getProjectBuilds = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectBuilds> => {
   return zeaburFetch<ProjectBuilds>(getGetProjectBuildsUrl(project), {
@@ -12499,7 +12580,7 @@ export const getProjectBuilds = async (
 }
 
 export const getUploadBuildSourceUrl = (
-  project: string,
+  project: ProjectName,
   build: string,
   params: UploadBuildSourceParams,
 ) => {
@@ -12524,7 +12605,7 @@ export const getUploadBuildSourceUrl = (
  * @summary Pushes the request's body, a gzip tar of the folder, as the `Build`'s next source.
  */
 export const uploadBuildSource = async (
-  project: string,
+  project: ProjectName,
   build: string,
   uploadBuildSourceBody: number[],
   params: UploadBuildSourceParams,
@@ -12557,7 +12638,7 @@ export const uploadBuildSource = async (
   })
 }
 
-export const getGetCertificateDatesUrl = (project: string, secret: string) => {
+export const getGetCertificateDatesUrl = (project: ProjectName, secret: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/certificates/${encodeURIComponent(String(secret))}`
 }
 
@@ -12565,7 +12646,7 @@ export const getGetCertificateDatesUrl = (project: string, secret: string) => {
  * @summary The dates of the certificate a domain's tls entry names, read as the person.
  */
 export const getCertificateDates = async (
-  project: string,
+  project: ProjectName,
   secret: string,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<CertificateDates> => {
@@ -12575,12 +12656,12 @@ export const getCertificateDates = async (
   })
 }
 
-export const getConvertComposeUrl = (project: string) => {
+export const getConvertComposeUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/compose`
 }
 
 export const convertCompose = async (
-  project: string,
+  project: ProjectName,
   composeRequest: ComposeRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<Conversion> => {
@@ -12611,7 +12692,7 @@ export const convertCompose = async (
   })
 }
 
-export const getListConfigMapsUrl = (project: string) => {
+export const getListConfigMapsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/configmaps`
 }
 
@@ -12619,7 +12700,7 @@ export const getListConfigMapsUrl = (project: string) => {
  * @summary The ConfigMaps of a project, in full, sorted by name. Lists ConfigMaps only.
  */
 export const listConfigMaps = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ConfigMapList> => {
   return zeaburFetch<ConfigMapList>(getListConfigMapsUrl(project), {
@@ -12628,7 +12709,7 @@ export const listConfigMaps = async (
   })
 }
 
-export const getListCreatableUrl = (project: string) => {
+export const getListCreatableUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/creatable`
 }
 
@@ -12637,7 +12718,7 @@ export const getListCreatableUrl = (project: string) => {
 belong to the whole cluster.
  */
 export const listCreatable = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<CreatableList> => {
   return zeaburFetch<CreatableList>(getListCreatableUrl(project), {
@@ -12646,7 +12727,7 @@ export const listCreatable = async (
   })
 }
 
-export const getGetProjectDatabasesUrl = (project: string) => {
+export const getGetProjectDatabasesUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/databases`
 }
 
@@ -12656,7 +12737,7 @@ knows (CloudNativePG, the Percona Operator for MongoDB, MOCO, mariadb-operator, 
 Operator).
  */
 export const getProjectDatabases = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectDatabases> => {
   return zeaburFetch<ProjectDatabases>(getGetProjectDatabasesUrl(project), {
@@ -12665,7 +12746,7 @@ export const getProjectDatabases = async (
   })
 }
 
-export const getExportDatabaseUrl = (project: string, engine: string, name: string) => {
+export const getExportDatabaseUrl = (project: ProjectName, engine: string, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/databases/${encodeURIComponent(String(engine))}/${encodeURIComponent(String(name))}/export`
 }
 
@@ -12673,7 +12754,7 @@ export const getExportDatabaseUrl = (project: string, engine: string, name: stri
  * @summary The database's dump, streamed as it is made.
  */
 export const exportDatabase = async (
-  project: string,
+  project: ProjectName,
   engine: string,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -12684,7 +12765,7 @@ export const exportDatabase = async (
   })
 }
 
-export const getInspectDeployKeyHostUrl = (project: string) => {
+export const getInspectDeployKeyHostUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/deploy-keys/host-keys`
 }
 
@@ -12693,7 +12774,7 @@ export const getInspectDeployKeyHostUrl = (project: string) => {
 those of the `known_hosts` lines given. Makes no key.
  */
 export const inspectDeployKeyHost = async (
-  project: string,
+  project: ProjectName,
   deployKeyRequest: DeployKeyRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<DeployKeyHost> => {
@@ -12724,7 +12805,7 @@ export const inspectDeployKeyHost = async (
   })
 }
 
-export const getRevealDeployKeyUrl = (project: string, name: string) => {
+export const getRevealDeployKeyUrl = (project: ProjectName, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/deploy-keys/${encodeURIComponent(String(name))}/public`
 }
 
@@ -12733,7 +12814,7 @@ export const getRevealDeployKeyUrl = (project: string, name: string) => {
 Git host again. Only on the person's request: the Secret holds the private key too.
  */
 export const revealDeployKey = async (
-  project: string,
+  project: ProjectName,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<DeployKeyPublic> => {
@@ -12743,7 +12824,7 @@ export const revealDeployKey = async (
   })
 }
 
-export const getListProjectEventsUrl = (project: string, params?: ListProjectEventsParams) => {
+export const getListProjectEventsUrl = (project: ProjectName, params?: ListProjectEventsParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -12765,7 +12846,7 @@ export const getListProjectEventsUrl = (project: string, params?: ListProjectEve
  * @summary Events in a project, the newest `limit` of them (100 by default; see [`crate::query`]).
  */
 export const listProjectEvents = async (
-  project: string,
+  project: ProjectName,
   params?: ListProjectEventsParams,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<EventList> => {
@@ -12775,7 +12856,7 @@ export const listProjectEvents = async (
   })
 }
 
-export const getListProjectGapsUrl = (project: string) => {
+export const getListProjectGapsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/gaps`
 }
 
@@ -12783,7 +12864,7 @@ export const getListProjectGapsUrl = (project: string) => {
  * @summary What a project is missing, by the built-in rules, each with its citations and fix.
  */
 export const listProjectGaps = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<GapList> => {
   return zeaburFetch<GapList>(getListProjectGapsUrl(project), {
@@ -12792,7 +12873,7 @@ export const listProjectGaps = async (
   })
 }
 
-export const getListProjectGatewaysUrl = (project: string) => {
+export const getListProjectGatewaysUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/gateways`
 }
 
@@ -12800,7 +12881,7 @@ export const getListProjectGatewaysUrl = (project: string) => {
  * @summary The Gateways a new `HTTPRoute` of the project can attach to.
  */
 export const listProjectGateways = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectGateways> => {
   return zeaburFetch<ProjectGateways>(getListProjectGatewaysUrl(project), {
@@ -12809,7 +12890,7 @@ export const listProjectGateways = async (
   })
 }
 
-export const getGetProjectGitHubAppUrl = (project: string) => {
+export const getGetProjectGitHubAppUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/github-app`
 }
 
@@ -12818,7 +12899,7 @@ export const getGetProjectGitHubAppUrl = (project: string) => {
 granted; read as the person from the project's ConfigMap [`PROJECT_CONFIG_MAP`].
  */
 export const getProjectGitHubApp = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectGitHubApp> => {
   return zeaburFetch<ProjectGitHubApp>(getGetProjectGitHubAppUrl(project), {
@@ -12827,7 +12908,7 @@ export const getProjectGitHubApp = async (
   })
 }
 
-export const getInspectImageUrl = (project: string) => {
+export const getInspectImageUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/images/inspect`
 }
 
@@ -12836,7 +12917,7 @@ export const getInspectImageUrl = (project: string) => {
 as. A registry that cannot be read answers `200` with `unreadable`.
  */
 export const inspectImage = async (
-  project: string,
+  project: ProjectName,
   inspectRequest: InspectRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ImageInspection> => {
@@ -12867,7 +12948,7 @@ export const inspectImage = async (
   })
 }
 
-export const getListProjectIncidentsUrl = (project: string) => {
+export const getListProjectIncidentsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/incidents`
 }
 
@@ -12876,7 +12957,7 @@ export const getListProjectIncidentsUrl = (project: string) => {
 not ready, with the services, domains and projects it reaches.
  */
 export const listProjectIncidents = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<IncidentList> => {
   return zeaburFetch<IncidentList>(getListProjectIncidentsUrl(project), {
@@ -12885,7 +12966,7 @@ export const listProjectIncidents = async (
   })
 }
 
-export const getGetProjectNamespaceUrl = (project: string) => {
+export const getGetProjectNamespaceUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/namespace`
 }
 
@@ -12893,7 +12974,7 @@ export const getGetProjectNamespaceUrl = (project: string) => {
  * @summary A project's Namespace: adopted or not, its details, and whether you may change them.
  */
 export const getProjectNamespace = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectNamespace> => {
   return zeaburFetch<ProjectNamespace>(getGetProjectNamespaceUrl(project), {
@@ -12903,7 +12984,7 @@ export const getProjectNamespace = async (
 }
 
 export const getListNetworkPolicyPresetsUrl = (
-  project: string,
+  project: ProjectName,
   params: ListNetworkPolicyPresetsParams,
 ) => {
   const normalizedParams = new URLSearchParams()
@@ -12928,7 +13009,7 @@ reach it, or let one other service reach it. Nothing is written; whether the clu
 NetworkPolicy depends on its network plugin.
  */
 export const listNetworkPolicyPresets = async (
-  project: string,
+  project: ProjectName,
   params: ListNetworkPolicyPresetsParams,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<PresetList> => {
@@ -12938,7 +13019,7 @@ export const listNetworkPolicyPresets = async (
   })
 }
 
-export const getGetProjectNotificationsUrl = (project: string) => {
+export const getGetProjectNotificationsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/notifications`
 }
 
@@ -12948,7 +13029,7 @@ as the person; the operator's API not served is `state: not-installed`. Secrets 
 read.
  */
 export const getProjectNotifications = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<Notifications> => {
   return zeaburFetch<Notifications>(getGetProjectNotificationsUrl(project), {
@@ -12957,7 +13038,7 @@ export const getProjectNotifications = async (
   })
 }
 
-export const getApplyProjectNotificationsUrl = (project: string) => {
+export const getApplyProjectNotificationsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/notifications/apply`
 }
 
@@ -12966,7 +13047,7 @@ export const getApplyProjectNotificationsUrl = (project: string) => {
 then writes.
  */
 export const applyProjectNotifications = async (
-  project: string,
+  project: ProjectName,
   notificationsApply: NotificationsApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<NotificationsApplied> => {
@@ -12997,7 +13078,7 @@ export const applyProjectNotifications = async (
   })
 }
 
-export const getPlanProjectNotificationsUrl = (project: string) => {
+export const getPlanProjectNotificationsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/notifications/plan`
 }
 
@@ -13006,7 +13087,7 @@ export const getPlanProjectNotificationsUrl = (project: string) => {
 a token to apply it; writes nothing. Secrets never appear in the answer.
  */
 export const planProjectNotifications = async (
-  project: string,
+  project: ProjectName,
   notificationsPlanRequest: NotificationsPlanRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<NotificationsPlan> => {
@@ -13037,7 +13118,7 @@ export const planProjectNotifications = async (
   })
 }
 
-export const getGetProjectObjectStorageUrl = (project: string) => {
+export const getGetProjectObjectStorageUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage`
 }
 
@@ -13045,7 +13126,7 @@ export const getGetProjectObjectStorageUrl = (project: string) => {
  * @summary The object storage of a project, read as the person.
  */
 export const getProjectObjectStorage = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectObjectStorage> => {
   return zeaburFetch<ProjectObjectStorage>(getGetProjectObjectStorageUrl(project), {
@@ -13054,7 +13135,7 @@ export const getProjectObjectStorage = async (
   })
 }
 
-export const getListObjectsUrl = (project: string, params?: ListObjectsParams) => {
+export const getListObjectsUrl = (project: ProjectName, params?: ListObjectsParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13077,7 +13158,7 @@ and owners only); the rest come back unread. Kinds refused when read are named i
 `unreadable`. With `label`, only the objects with that label.
  */
 export const listObjects = async (
-  project: string,
+  project: ProjectName,
   params?: ListObjectsParams,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ObjectList> => {
@@ -13088,7 +13169,7 @@ export const listObjects = async (
 }
 
 export const getGetObjectUrl = (
-  project: string,
+  project: ProjectName,
   group: string,
   version: string,
   resource: string,
@@ -13103,7 +13184,7 @@ cluster serves (`core` names the empty group). A Secret comes with its values, r
 person's own credential.
  */
 export const getObject = async (
-  project: string,
+  project: ProjectName,
   group: string,
   version: string,
   resource: string,
@@ -13116,7 +13197,7 @@ export const getObject = async (
   })
 }
 
-export const getPlanProjectUrl = (project: string) => {
+export const getPlanProjectUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/plan`
 }
 
@@ -13124,7 +13205,7 @@ export const getPlanProjectUrl = (project: string) => {
  * @summary Computes the writes a change needs and returns them with a token; writes nothing.
  */
 export const planProject = async (
-  project: string,
+  project: ProjectName,
   planRequest: PlanRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<PlanResponse> => {
@@ -13156,7 +13237,7 @@ export const planProject = async (
 }
 
 export const getGetDebugContainerUrl = (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: GetDebugContainerParams,
 ) => {
@@ -13182,7 +13263,7 @@ export const getGetDebugContainerUrl = (
  * @summary Whether the pod has a debug container of Zeabur's for a container, and its state.
  */
 export const getDebugContainer = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: GetDebugContainerParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13194,7 +13275,7 @@ export const getDebugContainer = async (
 }
 
 export const getOpenPodTerminalUrl = (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: OpenPodTerminalParams,
 ) => {
@@ -13234,7 +13315,7 @@ export const getOpenPodTerminalUrl = (
  * @summary A terminal in a container, over a WebSocket.
  */
 export const openPodTerminal = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: OpenPodTerminalParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13245,7 +13326,7 @@ export const openPodTerminal = async (
   })
 }
 
-export const getGetFilesUrl = (project: string, pod: string, params?: GetFilesParams) => {
+export const getGetFilesUrl = (project: ProjectName, pod: string, params?: GetFilesParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13268,7 +13349,7 @@ export const getGetFilesUrl = (project: string, pod: string, params?: GetFilesPa
  * @summary A container's mounts and how its files are reached.
  */
 export const getFiles = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: GetFilesParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13279,7 +13360,11 @@ export const getFiles = async (
   })
 }
 
-export const getDownloadFileUrl = (project: string, pod: string, params?: DownloadFileParams) => {
+export const getDownloadFileUrl = (
+  project: ProjectName,
+  pod: string,
+  params?: DownloadFileParams,
+) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13300,7 +13385,7 @@ export const getDownloadFileUrl = (project: string, pod: string, params?: Downlo
  * @summary A file's contents, streamed as the container reads it, up to [`MAX_TRANSFER`] bytes.
  */
 export const downloadFile = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: DownloadFileParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13311,7 +13396,7 @@ export const downloadFile = async (
   })
 }
 
-export const getUploadFileUrl = (project: string, pod: string, params?: UploadFileParams) => {
+export const getUploadFileUrl = (project: ProjectName, pod: string, params?: UploadFileParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13333,7 +13418,7 @@ export const getUploadFileUrl = (project: string, pod: string, params?: UploadFi
  * @summary Writes the request's body as the file `path`, up to [`MAX_TRANSFER`] bytes.
  */
 export const uploadFile = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   uploadFileBody: Blob,
   params?: UploadFileParams,
@@ -13366,7 +13451,7 @@ export const uploadFile = async (
   })
 }
 
-export const getListFilesUrl = (project: string, pod: string, params?: ListFilesParams) => {
+export const getListFilesUrl = (project: ProjectName, pod: string, params?: ListFilesParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13389,7 +13474,7 @@ export const getListFilesUrl = (project: string, pod: string, params?: ListFiles
  * @summary A folder's entries: the first [`MAX_ENTRIES`] by name, folders first.
  */
 export const listFiles = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: ListFilesParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13400,7 +13485,7 @@ export const listFiles = async (
   })
 }
 
-export const getDeleteFileUrl = (project: string, pod: string, params?: DeleteFileParams) => {
+export const getDeleteFileUrl = (project: ProjectName, pod: string, params?: DeleteFileParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13420,7 +13505,7 @@ export const getDeleteFileUrl = (project: string, pod: string, params?: DeleteFi
  * @summary Deletes a file, or a folder with everything in it.
  */
 export const deleteFile = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: DeleteFileParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13431,7 +13516,7 @@ export const deleteFile = async (
   })
 }
 
-export const getMakeFolderUrl = (project: string, pod: string) => {
+export const getMakeFolderUrl = (project: ProjectName, pod: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/pods/${encodeURIComponent(String(pod))}/files/folders`
 }
 
@@ -13439,7 +13524,7 @@ export const getMakeFolderUrl = (project: string, pod: string) => {
  * @summary Makes a folder.
  */
 export const makeFolder = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   fileNewFolder: FileNewFolder,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13471,7 +13556,7 @@ export const makeFolder = async (
   })
 }
 
-export const getRenameFileUrl = (project: string, pod: string) => {
+export const getRenameFileUrl = (project: ProjectName, pod: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/pods/${encodeURIComponent(String(pod))}/files/moves`
 }
 
@@ -13479,7 +13564,7 @@ export const getRenameFileUrl = (project: string, pod: string) => {
  * @summary Renames a file or folder within its folder; refused when the new name is taken.
  */
 export const renameFile = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   fileRename: FileRename,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13511,7 +13596,11 @@ export const renameFile = async (
   })
 }
 
-export const getPreviewFileUrl = (project: string, pod: string, params?: PreviewFileParams) => {
+export const getPreviewFileUrl = (
+  project: ProjectName,
+  pod: string,
+  params?: PreviewFileParams,
+) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13531,7 +13620,7 @@ export const getPreviewFileUrl = (project: string, pod: string, params?: Preview
  * @summary A file as text, up to [`MAX_PREVIEW`] bytes; `text` is absent when it is not UTF-8 text.
  */
 export const previewFile = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: PreviewFileParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13542,7 +13631,7 @@ export const previewFile = async (
   })
 }
 
-export const getGetPodLogsUrl = (project: string, pod: string, params?: GetPodLogsParams) => {
+export const getGetPodLogsUrl = (project: ProjectName, pod: string, params?: GetPodLogsParams) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13563,7 +13652,7 @@ export const getGetPodLogsUrl = (project: string, pod: string, params?: GetPodLo
 started, has not restarted, or is gone) is a `log-unavailable` problem, never a log line.
  */
 export const getPodLogs = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: GetPodLogsParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13574,7 +13663,11 @@ export const getPodLogs = async (
   })
 }
 
-export const getFollowPodLogsUrl = (project: string, pod: string, params?: FollowPodLogsParams) => {
+export const getFollowPodLogsUrl = (
+  project: ProjectName,
+  pod: string,
+  params?: FollowPodLogsParams,
+) => {
   const normalizedParams = new URLSearchParams()
 
   Object.entries(params || {}).forEach(([key, value]) => {
@@ -13595,7 +13688,7 @@ export const getFollowPodLogsUrl = (project: string, pod: string, params?: Follo
 `error` event with a problem (JSON) when the stream fails, after which it ends.
  */
 export const followPodLogs = async (
-  project: string,
+  project: ProjectName,
   pod: string,
   params?: FollowPodLogsParams,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13606,7 +13699,7 @@ export const followPodLogs = async (
   })
 }
 
-export const getRevealSecretUrl = (project: string, name: string) => {
+export const getRevealSecretUrl = (project: ProjectName, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/secrets/${encodeURIComponent(String(name))}/reveal`
 }
 
@@ -13615,7 +13708,7 @@ export const getRevealSecretUrl = (project: string, name: string) => {
 the response is never cached, and nothing in Zeabur logs or keeps it.
  */
 export const revealSecret = async (
-  project: string,
+  project: ProjectName,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<RevealedSecret> => {
@@ -13625,7 +13718,7 @@ export const revealSecret = async (
   })
 }
 
-export const getGetServiceUrl = (project: string, kind: string, name: string) => {
+export const getGetServiceUrl = (project: ProjectName, kind: string, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/services/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(name))}`
 }
 
@@ -13634,7 +13727,7 @@ export const getGetServiceUrl = (project: string, kind: string, name: string) =>
 The web interface reads the project document instead.
  */
 export const getService = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13645,7 +13738,7 @@ export const getService = async (
   })
 }
 
-export const getGetServiceEvidenceUrl = (project: string, kind: string, name: string) => {
+export const getGetServiceEvidenceUrl = (project: ProjectName, kind: string, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/services/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(name))}/evidence`
 }
 
@@ -13655,7 +13748,7 @@ problems, the way to it hop by hop, recent events, the end of each restarted con
 previous log, and its objects with variable values hidden. Never a Secret.
  */
 export const getServiceEvidence = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13667,7 +13760,7 @@ export const getServiceEvidence = async (
 }
 
 export const getGetServiceHistoryUrl = (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   params?: GetServiceHistoryParams,
@@ -13698,7 +13791,7 @@ which project members have; otherwise it is `get` on the store's `services/proxy
 reading every project's metrics: see the description of `GET /api/v1/settings/metrics-store`.
  */
 export const getServiceHistory = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   params?: GetServiceHistoryParams,
@@ -13711,7 +13804,7 @@ export const getServiceHistory = async (
 }
 
 export const getGetServiceLogHistoryUrl = (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   params?: GetServiceLogHistoryParams,
@@ -13739,7 +13832,7 @@ project's log history (`get` on `logs.proxy.zeabur.com` in its namespace), or it
 answer.
  */
 export const getServiceLogHistory = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   params?: GetServiceLogHistoryParams,
@@ -13751,7 +13844,7 @@ export const getServiceLogHistory = async (
   })
 }
 
-export const getListServiceReleasesUrl = (project: string, kind: string, name: string) => {
+export const getListServiceReleasesUrl = (project: ProjectName, kind: string, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/services/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(name))}/releases`
 }
 
@@ -13760,7 +13853,7 @@ export const getListServiceReleasesUrl = (project: string, kind: string, name: s
 `current`. A rollback is a plan (`rollback` change).
  */
 export const listServiceReleases = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13771,7 +13864,7 @@ export const listServiceReleases = async (
   })
 }
 
-export const getGetServiceRolloutUrl = (project: string, kind: string, name: string) => {
+export const getGetServiceRolloutUrl = (project: ProjectName, kind: string, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/services/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(name))}/rollout`
 }
 
@@ -13781,7 +13874,7 @@ not, and whether it is done, progressing, or stuck (with the reason and the plan
 back). Poll it while `status` is `progressing`.
  */
 export const getServiceRollout = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13792,7 +13885,7 @@ export const getServiceRollout = async (
   })
 }
 
-export const getListTaskRunsUrl = (project: string, kind: string, name: string) => {
+export const getListTaskRunsUrl = (project: ProjectName, kind: string, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/services/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(name))}/runs`
 }
 
@@ -13800,7 +13893,7 @@ export const getListTaskRunsUrl = (project: string, kind: string, name: string) 
  * @summary A CronJob's runs, newest first.
  */
 export const listTaskRuns = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13811,7 +13904,7 @@ export const listTaskRuns = async (
   })
 }
 
-export const getGetServiceTimelineUrl = (project: string, kind: string, name: string) => {
+export const getGetServiceTimelineUrl = (project: ProjectName, kind: string, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/services/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(name))}/timeline`
 }
 
@@ -13820,7 +13913,7 @@ export const getGetServiceTimelineUrl = (project: string, kind: string, name: st
 the plan that returns to the one before it.
  */
 export const getServiceTimeline = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13831,7 +13924,7 @@ export const getServiceTimeline = async (
   })
 }
 
-export const getTraceServiceUrl = (project: string, kind: string, name: string) => {
+export const getTraceServiceUrl = (project: ProjectName, kind: string, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/services/${encodeURIComponent(String(kind))}/${encodeURIComponent(String(name))}/trace`
 }
 
@@ -13840,7 +13933,7 @@ export const getTraceServiceUrl = (project: string, kind: string, name: string) 
 readiness, the certificate, the route, the Service, its target port and the pods' readiness.
  */
 export const traceService = async (
-  project: string,
+  project: ProjectName,
   kind: string,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
@@ -13851,7 +13944,7 @@ export const traceService = async (
   })
 }
 
-export const getGetProjectStorageUrl = (project: string) => {
+export const getGetProjectStorageUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/storage`
 }
 
@@ -13862,7 +13955,7 @@ on: the class, and the node its PersistentVolume is pinned to. Read as you: list
 in `unreadable` instead of failing the answer.
  */
 export const getProjectStorage = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectStorage> => {
   return zeaburFetch<ProjectStorage>(getGetProjectStorageUrl(project), {
@@ -13871,7 +13964,7 @@ export const getProjectStorage = async (
   })
 }
 
-export const getGetProjectTimelineUrl = (project: string) => {
+export const getGetProjectTimelineUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/timeline`
 }
 
@@ -13880,7 +13973,7 @@ export const getGetProjectTimelineUrl = (project: string) => {
 last write, warnings folded by reason and containers that stopped, for every workload.
  */
 export const getProjectTimeline = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<Timeline> => {
   return zeaburFetch<Timeline>(getGetProjectTimelineUrl(project), {
@@ -13889,7 +13982,7 @@ export const getProjectTimeline = async (
   })
 }
 
-export const getListToolsPodsUrl = (project: string) => {
+export const getListToolsPodsUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/tools`
 }
 
@@ -13897,7 +13990,7 @@ export const getListToolsPodsUrl = (project: string) => {
  * @summary The person's tools pods in the project's tools namespace, deleting those that are done with.
  */
 export const listToolsPods = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ToolsStatus> => {
   return zeaburFetch<ToolsStatus>(getListToolsPodsUrl(project), {
@@ -13906,7 +13999,7 @@ export const listToolsPods = async (
   })
 }
 
-export const getDeleteToolsPodUrl = (project: string, name: string) => {
+export const getDeleteToolsPodUrl = (project: ProjectName, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/tools/${encodeURIComponent(String(name))}`
 }
 
@@ -13915,7 +14008,7 @@ export const getDeleteToolsPodUrl = (project: string, name: string) => {
 `resourceVersion` preconditions); its terminals end with it.
  */
 export const deleteToolsPod = async (
-  project: string,
+  project: ProjectName,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<void> => {
@@ -13925,7 +14018,7 @@ export const deleteToolsPod = async (
   })
 }
 
-export const getOpenToolsTerminalUrl = (project: string, name: string) => {
+export const getOpenToolsTerminalUrl = (project: ProjectName, name: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/tools/${encodeURIComponent(String(name))}/terminal`
 }
 
@@ -13939,7 +14032,7 @@ export const getOpenToolsTerminalUrl = (project: string, name: string) => {
  * @summary A terminal in a tools pod of the person's, over a WebSocket.
  */
 export const openToolsTerminal = async (
-  project: string,
+  project: ProjectName,
   name: string,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<unknown> => {
@@ -13949,7 +14042,7 @@ export const openToolsTerminal = async (
   })
 }
 
-export const getGetProjectUsageUrl = (project: string) => {
+export const getGetProjectUsageUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/usage`
 }
 
@@ -13960,7 +14053,7 @@ purposes"). Always `200`: `state` says when metrics-server is not installed, the
 not read it (`unreadable` names the refusal), or it did not answer.
  */
 export const getProjectUsage = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ProjectUsage> => {
   return zeaburFetch<ProjectUsage>(getGetProjectUsageUrl(project), {
@@ -13969,7 +14062,7 @@ export const getProjectUsage = async (
   })
 }
 
-export const getGetVolumeUsageUrl = (project: string) => {
+export const getGetVolumeUsageUrl = (project: ProjectName) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/volumes`
 }
 
@@ -13982,7 +14075,7 @@ values for the project. Reading the store is reading every project's metrics: se
 description of `GET /api/v1/settings/metrics-store`.
  */
 export const getVolumeUsage = async (
-  project: string,
+  project: ProjectName,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<VolumeUsageList> => {
   return zeaburFetch<VolumeUsageList>(getGetVolumeUsageUrl(project), {
@@ -13991,7 +14084,7 @@ export const getVolumeUsage = async (
   })
 }
 
-export const getGetVolumeRestoresUrl = (project: string, claim: string) => {
+export const getGetVolumeRestoresUrl = (project: ProjectName, claim: string) => {
   return `/api/v1/projects/${encodeURIComponent(String(project))}/volumes/${encodeURIComponent(String(claim))}/restores`
 }
 
@@ -14000,7 +14093,7 @@ export const getGetVolumeRestoresUrl = (project: string, claim: string) => {
 parts of a `Restore`, read as the person.
  */
 export const getVolumeRestores = async (
-  project: string,
+  project: ProjectName,
   claim: string,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<VolumeRestores> => {

@@ -108,7 +108,7 @@ pub(crate) async fn ingress_class_facts(
 /// What a project is missing, by the built-in rules, each with its citations and fix.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/gaps", tag = "projects",
     operation_id = "listProjectGaps",
-    params(("project" = String, Path, description = "The project's namespace")),
+    params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
     responses((status = 200, body = GapList), (status = 403, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn project(
     State(state): State<AppState>,

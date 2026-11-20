@@ -33,6 +33,7 @@ use crate::builds::{
     BUILDER_GROUP, BUILDER_VERSION, KEEL_FORCE, KEEL_POLICY, UPLOAD_TOKEN_REQUEST, build_path,
 };
 use crate::change::{NameValue, ServiceSize, UploadMethod, UploadServiceChange};
+use crate::compose::SERVICE_NAME_MAX;
 use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
 use crate::rules::is_c_identifier;
 
@@ -40,8 +41,6 @@ use crate::rules::is_c_identifier;
 const PENDING_TAG: &str = "pending";
 /// The webhook Keel is told of a new image at.
 const KEEL_WEBHOOK: &str = "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native";
-/// The longest service name.
-const NAME_MAX: usize = 40;
 /// The longest upload token request.
 const REQUEST_MAX: usize = 63;
 
@@ -52,7 +51,7 @@ fn refused(code: &str, detail: &str, field: &str) -> PlanError {
 }
 
 fn check(change: &UploadServiceChange) -> Result<(), PlanError> {
-    if !is_rfc1035_label(&change.name, NAME_MAX) {
+    if !is_rfc1035_label(&change.name, SERVICE_NAME_MAX) {
         return Err(refused(
             "invalid_name",
             "A service name is lower case letters, digits and hyphens, starts with a letter and has at most 40 characters.",
