@@ -80,7 +80,7 @@ From these two files, note:
 
 Write `values.yaml` from `old-values.yaml`. Don't use `--reuse-values` or `--reset-then-reuse-values`: they keep the installer's `image`, which pins v0.2.
 
-With an external Zeabur Identity, set `identity.enabled: false`, keep `issuer` as it is, including `issuer.clientSecret`, and leave out `image` and the other `identity` keys. Skip the rest of this table. Otherwise, change these keys:
+Change the keys as the table shows. With an external Zeabur Identity, there are three differences: set `identity.enabled: false`, keep `issuer.url` and `issuer.clientSecret` as they are, and leave out every other `identity` key that the table and the list below it add.
 
 | In `old-values.yaml` | In `values.yaml` |
 | --- | --- |

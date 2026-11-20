@@ -80,7 +80,7 @@ cp /etc/zeabur-installer/config.yaml installer-config.yaml
 
 根据 `old-values.yaml` 编写 `values.yaml`。不要用 `--reuse-values` 或 `--reset-then-reuse-values`：它们会保留安装程序设置的 `image`，让版本停在 v0.2。
 
-使用外部 Zeabur Identity 时，设置 `identity.enabled: false`，原样保留 `issuer`（包括 `issuer.clientSecret`），去掉 `image`，不要添加其他 `identity` 键，下表其他项也不用照着改。其他情况按下表修改：
+按下表修改各个键。使用外部 Zeabur Identity 时有三点不同：设置 `identity.enabled: false`，原样保留 `issuer.url` 和 `issuer.clientSecret`，下表和表后列表要添加的其他 `identity` 键都不要添加。
 
 | `old-values.yaml` 中的内容 | `values.yaml` 中的写法 |
 | --- | --- |
