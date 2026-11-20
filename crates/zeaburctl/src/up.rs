@@ -17,17 +17,13 @@ use std::process::ExitCode;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
 use secrecy::ExposeSecret as _;
-use serde::Serialize;
-use serde::de::DeserializeOwned;
+use serde::de::{DeserializeOwned, IgnoredAny};
+use serde::{Deserialize, Serialize};
 use zeabur_api::projects::backups::ProviderState;
-use zeabur_api::projects::builds::ProjectBuilds;
-use zeabur_api::projects::source_upload::UploadedSource;
-use zeabur_api::projects::writes::{ApplyRequest, ApplyResponse, PlanResponse};
-use zeabur_api::views::ProjectList;
+use zeabur_api::projects::writes::ApplyRequest;
 use zeabur_core::problem::Problem;
 use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
 use zeabur_kube::{Cluster, UserClient, UserToken, ZeaburInfo};
-use zeabur_modules::zeabur_builder::ZeaburBuilderBuild;
 use zeabur_plan::{Change, PlanRequest, UploadMethod, UploadServiceChange};
 
 use crate::forward::{self, ServiceAddress};
@@ -359,18 +355,57 @@ fn said(problem: Box<Problem>) -> String {
     }
 }
 
-fn named<'a>(builds: &'a ProjectBuilds, name: &str) -> Option<&'a ZeaburBuilderBuild> {
+/// The parts of the API's answers that `up` reads. A server of another release may add fields
+/// and enum values, so `up` reads only these; serde skips the rest.
+#[derive(Deserialize)]
+struct Planned {
+    token: String,
+}
+
+#[derive(Deserialize)]
+struct Projects {
+    items: Vec<ProjectItem>,
+}
+
+#[derive(Deserialize)]
+struct ProjectItem {
+    name: String,
+    adopted: bool,
+    #[serde(default)]
+    deleting: bool,
+}
+
+#[derive(Deserialize)]
+struct Builds {
+    state: ProviderState,
+    builds: Vec<Build>,
+}
+
+#[derive(Deserialize)]
+#[serde(rename_all = "camelCase")]
+struct Build {
+    name: String,
+    archive: bool,
+    upload_request: Option<String>,
+}
+
+#[derive(Deserialize)]
+struct Uploaded {
+    digest: String,
+}
+
+fn named<'a>(builds: &'a Builds, name: &str) -> Option<&'a Build> {
     builds.builds.iter().find(|b| b.name == name)
 }
 
 async fn plan_and_apply(api: &Zeabur, project: &str, changes: Vec<Change>) -> Result<(), String> {
-    let planned: PlanResponse = api
+    let planned: Planned = api
         .post(
             &format!("/api/v1/projects/{project}/plan"),
             &PlanRequest { changes },
         )
         .await?;
-    api.post::<_, ApplyResponse>(
+    api.post::<_, IgnoredAny>(
         &format!("/api/v1/projects/{project}/apply"),
         &ApplyRequest {
             token: planned.token,
@@ -383,7 +418,7 @@ async fn plan_and_apply(api: &Zeabur, project: &str, changes: Vec<Change>) -> Re
 
 /// The projects the person may put a service in.
 async fn projects(api: &Zeabur) -> Result<Vec<String>, String> {
-    let list: ProjectList = api.get("/api/v1/projects").await?;
+    let list: Projects = api.get("/api/v1/projects").await?;
     Ok(list
         .items
         .into_iter()
@@ -489,7 +524,7 @@ async fn deploy(
 ) -> Result<String, String> {
     let project = choose_project(api, target.project.as_deref(), &mut ask).await?;
     let project = project.as_str();
-    let builds: ProjectBuilds = api
+    let builds: Builds = api
         .get(&format!("/api/v1/projects/{project}/builds"))
         .await?;
     if builds.state == ProviderState::NotInstalled {
@@ -533,7 +568,7 @@ async fn deploy(
     }
     wait_for_token(api, project, service, request, timing).await?;
     output::info("Uploading.");
-    let uploaded: UploadedSource = api
+    let uploaded: Uploaded = api
         .post_bytes(
             &format!("/api/v1/projects/{project}/builds/{service}/source?request={request}"),
             "application/gzip",
@@ -561,7 +596,7 @@ async fn wait_for_token(
 ) -> Result<(), String> {
     let deadline = tokio::time::Instant::now() + timing.wait;
     loop {
-        let builds: ProjectBuilds = api
+        let builds: Builds = api
             .get(&format!("/api/v1/projects/{project}/builds"))
             .await?;
         let answered = named(&builds, service)
@@ -588,6 +623,7 @@ mod tests {
     use secrecy::SecretString;
     use serde_json::{Value, json};
     use zeabur_api::access::SingleCluster;
+    use zeabur_core::problem::Kind;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
@@ -1030,5 +1066,25 @@ mod tests {
             let name = folder_name(&path);
             assert_eq!(name, expected, "{folder}");
         }
+    }
+
+    #[test]
+    fn answers_from_a_newer_server_with_new_values_still_read() {
+        let builds: Builds = serde_json::from_value(json!({
+            "state": "paused-by-a-newer-server",
+            "builds": [{"name": "web", "archive": true, "phase": "new-phase"}],
+            "runs": [{"state": "a-state-this-version-does-not-know"}]
+        }))
+        .unwrap();
+        assert_eq!(builds.state, ProviderState::Unknown);
+        assert_eq!(builds.builds[0].name, "web");
+
+        let mut problem = serde_json::to_value(Problem::new(Kind::Conflict, "Why.")).unwrap();
+        problem["kind"] = json!("a-kind-this-version-does-not-know");
+        let body = serde_json::to_vec(&problem).unwrap();
+        let refused =
+            crate::answer::read::<IgnoredAny>(StatusCode::CONFLICT, &body, "test").unwrap_err();
+        assert_eq!(refused.kind, Kind::Unknown);
+        assert_eq!(refused.detail, "Why.");
     }
 }
