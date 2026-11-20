@@ -955,6 +955,8 @@ fn only_namespace(body: &str, namespace: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+
     use super::{Answer, check_clean, hits_total, only_namespace, spoofer};
 
     fn answer(status: u16, body: &str) -> Answer {
@@ -966,9 +968,10 @@ mod tests {
 
     #[test]
     fn curls_output_splits_into_body_and_status() {
-        let parsed = Answer::parse("{\"a\":1}\nline two\n403");
+        let first = json!({"a":1}).to_string();
+        let parsed = Answer::parse(&format!("{first}\nline two\n403"));
         assert_eq!(parsed.status, 403);
-        assert_eq!(parsed.body, "{\"a\":1}\nline two");
+        assert_eq!(parsed.body, format!("{first}\nline two"));
         assert_eq!(Answer::parse("\n000").status, 0);
         assert_eq!(Answer::parse("").status, 0);
     }
@@ -1005,22 +1008,29 @@ mod tests {
 
     #[test]
     fn hits_are_summed_over_every_document() {
-        let body = r#"{"hits":[{"fields":{},"timestamps":[],"values":[],"total":2},{"total":3}]}
-{"hits":[{"total":1}]}
-{"hits":[]}"#;
-        assert_eq!(hits_total(body).unwrap(), 6);
-        assert_eq!(hits_total(r#"{"hits":[{"fields":{}}]}"#).unwrap(), 0);
+        let body = [
+            json!({"hits":[{"fields":{},"timestamps":[],"values":[],"total":2},{"total":3}]}),
+            json!({"hits":[{"total":1}]}),
+            json!({"hits":[]}),
+        ]
+        .map(|document| document.to_string())
+        .join("\n");
+        assert_eq!(hits_total(&body).unwrap(), 6);
+        assert_eq!(
+            hits_total(&json!({"hits":[{"fields":{}}]}).to_string()).unwrap(),
+            0
+        );
         assert!(hits_total("not json").is_err());
     }
 
     #[test]
     fn namespace_values_must_name_only_a() {
         assert!(only_namespace(
-            r#"{"status":"success","data":["proxy-canary"]}"#,
+            &json!({"status":"success","data":["proxy-canary"]}).to_string(),
             "proxy-canary"
         ));
         assert!(!only_namespace(
-            r#"{"status":"success","data":["proxy-canary","proxy-canary-b"]}"#,
+            &json!({"status":"success","data":["proxy-canary","proxy-canary-b"]}).to_string(),
             "proxy-canary"
         ));
         assert!(!only_namespace("", "proxy-canary"));

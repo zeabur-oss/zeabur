@@ -389,6 +389,7 @@ fn harden(headers: &mut HeaderMap, csp: Option<HeaderValue>) {
 
 fn not_found() -> Response {
     let mut response = status(StatusCode::NOT_FOUND, |_| {});
+    // A fixed problem body; this crate has no serde.
     *response.body_mut() = Body::from(r#"{"type":"about:blank","title":"Not Found","status":404}"#);
     response.headers_mut().insert(
         header::CONTENT_TYPE,

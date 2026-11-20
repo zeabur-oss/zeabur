@@ -125,66 +125,67 @@ pub(crate) fn one(body: &[u8]) -> Result<DynamicObject, ClusterError> {
 
 #[cfg(test)]
 mod tests {
-    #[test]
-    fn a_list_with_null_items_is_an_empty_list() {
-        assert_eq!(list(br#"{"items": null}"#).unwrap().len(), 0);
-        assert_eq!(list(b"{}").unwrap().len(), 0);
-        let pods = crate::ResourceRef::new("", "v1", "pods", "Pod");
-        let plain = crate::port::RawList::new(&pods, br#"{"items": null}"#.to_vec());
-        assert_eq!(plain.objects().unwrap().len(), 0);
-    }
+    use serde_json::{Value, json};
 
     use super::*;
     use crate::objects::{HIDDEN, LAST_APPLIED};
 
-    const SECRET: &str = r#"{
-        "apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true,
-        "metadata": {"name": "db", "namespace": "shop", "annotations": {
-            "kubectl.kubernetes.io/last-applied-configuration":
-                "{\"data\":{\"password\":\"aHVudGVyMg==\"}}",
-            "team": "data"}},
-        "data": {"password": "aHVudGVyMg==", "user": "YWRtaW4="},
-        "stringData": {"token": "s3cr3t"}
-    }"#;
+    fn bytes(value: &Value) -> Vec<u8> {
+        serde_json::to_vec(value).unwrap()
+    }
+
+    #[test]
+    fn a_list_with_null_items_is_an_empty_list() {
+        let null_items = bytes(&json!({"items": null}));
+        assert_eq!(list(&null_items).unwrap(), []);
+        assert_eq!(list(&bytes(&json!({}))).unwrap(), []);
+        let pods = crate::ResourceRef::new("", "v1", "pods", "Pod");
+        let plain = crate::port::RawList::new(&pods, null_items);
+        assert_eq!(plain.objects().unwrap(), []);
+    }
+
+    fn secret() -> Value {
+        json!({
+            "apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true,
+            "metadata": {"name": "db", "namespace": "shop", "annotations": {
+                LAST_APPLIED: json!({"data": {"password": "aHVudGVyMg=="}}).to_string(),
+                "team": "data"}},
+            "data": {"password": "aHVudGVyMg==", "user": "YWRtaW4="},
+            "stringData": {"token": "s3cr3t"}
+        })
+    }
+
+    fn slim_secret() -> Value {
+        json!({
+            "apiVersion": "v1", "kind": "Secret", "type": "Opaque", "immutable": true,
+            "metadata": {"name": "db", "namespace": "shop", "annotations": {
+                LAST_APPLIED: HIDDEN,
+                "team": "data"}},
+            "data": {"password": "", "user": ""},
+            "stringData": {"token": ""}
+        })
+    }
 
     #[test]
     fn a_secret_keeps_its_keys_and_type_and_loses_its_values() {
-        let object = one(SECRET.as_bytes()).unwrap();
-        let text = serde_json::to_string(&object).unwrap();
-        for value in ["aHVudGVyMg==", "YWRtaW4=", "s3cr3t"] {
-            assert!(!text.contains(value), "{text}");
-        }
-        assert_eq!(object.data["type"], "Opaque");
-        assert_eq!(object.data["immutable"], true);
-        assert_eq!(object.data["data"]["password"], "");
-        assert_eq!(object.data["data"]["user"], "");
-        assert_eq!(object.data["stringData"]["token"], "");
-        assert_eq!(object.types.as_ref().unwrap().kind, "Secret");
-        let annotations = object.metadata.annotations.unwrap();
-        assert_eq!(annotations[LAST_APPLIED], HIDDEN);
-        assert_eq!(annotations["team"], "data");
+        let object = one(&bytes(&secret())).unwrap();
+        assert_eq!(serde_json::to_value(&object).unwrap(), slim_secret());
     }
 
     #[test]
     fn a_list_of_secrets_loses_every_value() {
-        let body = format!(
-            r#"{{"items": [{SECRET}, {{"metadata": {{"name": "empty"}}, "data": null}}]}}"#
+        let body = json!({"items": [secret(), {"metadata": {"name": "empty"}, "data": null}]});
+        let objects = list(&bytes(&body)).unwrap();
+        assert_eq!(
+            serde_json::to_value(&objects).unwrap(),
+            json!([slim_secret(), {"metadata": {"name": "empty"}}])
         );
-        let objects = list(body.as_bytes()).unwrap();
-        assert_eq!(objects.len(), 2);
-        let text = serde_json::to_string(&objects).unwrap();
-        assert!(
-            !text.contains("aHVudGVyMg==") && !text.contains("s3cr3t"),
-            "{text}"
-        );
-        assert_eq!(objects[0].data["data"].as_object().unwrap().len(), 2);
-        assert!(objects[1].data.get("data").is_none());
     }
 
     #[test]
     fn a_secret_that_is_not_an_object_is_a_decode_error() {
         assert!(matches!(
-            one(br#"{"metadata": {"name": "db"}, "data": ["x"]}"#),
+            one(&bytes(&json!({"metadata": {"name": "db"}, "data": ["x"]}))),
             Err(ClusterError::Decode(_))
         ));
     }

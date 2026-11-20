@@ -1231,18 +1231,25 @@ mod tests {
 
     #[test]
     fn a_secret_table_with_null_rows_or_cells_is_empty_or_unreadable_per_row() {
-        let null_rows = br#"{"columnDefinitions":[{"name":"Type"}],"rows":null}"#;
-        assert_eq!(parse_secret_table(null_rows).unwrap().len(), 0);
-        let null_cells = br#"{"columnDefinitions":[{"name":"Type"}],"rows":[{"cells":null,
-            "object":{"metadata":{"name":"db"}}}]}"#;
-        let secrets = parse_secret_table(null_cells).unwrap();
+        let null_rows = serde_json::json!({"columnDefinitions":[{"name":"Type"}],"rows":null});
+        assert_eq!(
+            parse_secret_table(&serde_json::to_vec(&null_rows).unwrap())
+                .unwrap()
+                .len(),
+            0
+        );
+        let null_cells = serde_json::json!({"columnDefinitions":[{"name":"Type"}],"rows":[{"cells":null,
+            "object":{"metadata":{"name":"db"}}}]});
+        let secrets = parse_secret_table(&serde_json::to_vec(&null_cells).unwrap()).unwrap();
         assert_eq!(secrets[0].secret.metadata.name.as_deref(), Some("db"));
         assert_eq!(secrets[0].key_count, 0);
     }
 
     #[test]
     fn a_secret_table_hides_the_values_kubectl_apply_copied_into_an_annotation() {
-        let applied = r#"{"apiVersion":"v1","data":{"password":"aHVudGVyMg=="},"kind":"Secret"}"#;
+        let applied =
+            serde_json::json!({"apiVersion":"v1","data":{"password":"aHVudGVyMg=="},"kind":"Secret"})
+                .to_string();
         let table = serde_json::json!({
             "kind": "Table",
             "apiVersion": "meta.k8s.io/v1",

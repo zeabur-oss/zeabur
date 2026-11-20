@@ -112,6 +112,7 @@ mod tests {
             {"metadata": {"name": "zeabur-e2e", "labels": {"zeabur.com/platform": "true", "a": "b"}}},
             {"metadata": {"name": "default", "annotations": {"note": "x"}}},
         ]});
+        // The compact JSON on each tab-separated line is the subject.
         assert_eq!(
             format(BTreeMap::new(), &namespaces(&list)),
             "zeabur-e2e\t{\"a\":\"b\",\"zeabur.com/platform\":\"true\"}\t{}\n\

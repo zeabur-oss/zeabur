@@ -372,6 +372,7 @@ mod tests {
     use std::path::PathBuf;
 
     use clap::Parser;
+    use serde_json::json;
 
     use super::{Profile, Up, not_ready};
 
@@ -387,15 +388,16 @@ mod tests {
 
     #[test]
     fn only_pods_that_are_neither_ready_nor_finished_are_listed() {
-        let json = r#"{"items": [
+        let json = json!({"items": [
             {"metadata": {"name": "up"}, "status": {"phase": "Running",
               "conditions": [{"type": "Ready", "status": "True"}]}},
             {"metadata": {"name": "stuck"}, "status": {"phase": "Running",
               "conditions": [{"type": "Ready", "status": "False"}]}},
             {"metadata": {"name": "new"}, "status": {"phase": "Pending"}},
             {"metadata": {"name": "job"}, "status": {"phase": "Succeeded",
-              "conditions": [{"type": "Ready", "status": "False"}]}}]}"#;
-        assert_eq!(not_ready(json), ["stuck", "new"]);
+              "conditions": [{"type": "Ready", "status": "False"}]}}]})
+        .to_string();
+        assert_eq!(not_ready(&json), ["stuck", "new"]);
     }
 
     #[test]

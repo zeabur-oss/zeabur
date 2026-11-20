@@ -761,7 +761,7 @@ contexts:
         while request(&mut socket).await.is_some() {
             seen += 1;
             let reply = if seen == 1 {
-                let status = r#"{"kind":"Status","apiVersion":"v1","status":"Failure","code":429,"reason":"TooManyRequests"}"#;
+                let status = serde_json::json!({"kind":"Status","apiVersion":"v1","status":"Failure","code":429,"reason":"TooManyRequests"}).to_string();
                 format!(
                     "HTTP/1.1 429 Too Many Requests\r\nretry-after: 0\r\ncontent-length: {}\r\n\r\n{status}",
                     status.len()

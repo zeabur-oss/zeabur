@@ -459,7 +459,9 @@ mod tests {
         assert!(from_pull_secret(&values, "quay.io").is_none());
         let old = BTreeMap::from([(
             ".dockercfg".to_owned(),
-            br#"{"quay.io": {"auth": "dTpw"}}"#.to_vec(),
+            serde_json::json!({"quay.io": {"auth": "dTpw"}})
+                .to_string()
+                .into_bytes(),
         )]);
         assert_eq!(from_pull_secret(&old, "quay.io").unwrap().username, "u");
     }

@@ -1799,7 +1799,8 @@ mod tests {
 
     #[test]
     fn a_schedule_left_out_is_daily_at_three_kept_a_week() {
-        let request: BackupsPlanRequest = serde_json::from_str(r#"{"op":"schedule"}"#).unwrap();
+        let request: BackupsPlanRequest =
+            serde_json::from_value(serde_json::json!({"op":"schedule"})).unwrap();
         assert_eq!(
             request,
             BackupsPlanRequest::Schedule {

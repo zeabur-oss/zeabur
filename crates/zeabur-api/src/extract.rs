@@ -136,6 +136,7 @@ mod tests {
     use axum::body::Body;
     use axum::http::header::CONTENT_TYPE;
     use serde::Deserialize;
+    use serde_json::json;
 
     use super::*;
 
@@ -168,7 +169,7 @@ mod tests {
     async fn a_wrong_value_names_the_field_and_not_the_type() {
         let problem = refusal(
             Some("application/json"),
-            r#"{"changes":[{"op":"creatSe"}]}"#,
+            &json!({"changes":[{"op":"creatSe"}]}).to_string(),
         )
         .await;
         assert_eq!(problem.kind, Kind::BadRequest);
@@ -180,6 +181,7 @@ mod tests {
 
     #[tokio::test]
     async fn broken_json_names_the_position() {
+        // Trailing garbage after a valid document is the case.
         let problem = refusal(Some("application/json"), r#"{"changes":[]} x"#).await;
         assert_eq!(
             problem.detail,

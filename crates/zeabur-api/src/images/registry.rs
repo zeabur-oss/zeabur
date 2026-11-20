@@ -993,7 +993,7 @@ mod tests {
             if get.url.starts_with("https://10.0.0.5:5001/token?") {
                 return Answer {
                     status: 200,
-                    body: br#"{"token":"t"}"#.to_vec(),
+                    body: serde_json::json!({"token":"t"}).to_string().into_bytes(),
                     ..Answer::default()
                 };
             }
@@ -1039,7 +1039,7 @@ mod tests {
                     if get.url.starts_with(fake::REALM) {
                         return Answer {
                             status: 200,
-                            body: br#"{"token":"t"}"#.to_vec(),
+                            body: serde_json::json!({"token":"t"}).to_string().into_bytes(),
                             ..Answer::default()
                         };
                     }
@@ -1155,7 +1155,9 @@ mod tests {
         let mut registry = nginx();
         for (url, answer) in &mut registry.routes {
             if url.starts_with("https://cdn.test") {
-                answer.body = br#"{"config":{"ExposedPorts":{"22/tcp":{}}}}"#.to_vec();
+                answer.body = serde_json::json!({"config":{"ExposedPorts":{"22/tcp":{}}}})
+                    .to_string()
+                    .into_bytes();
             }
         }
         assert!(matches!(

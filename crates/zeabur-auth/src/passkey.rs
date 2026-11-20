@@ -121,12 +121,13 @@ mod tests {
 
     use axum::Router;
     use axum::routing::get;
+    use serde_json::json;
 
     use super::*;
     use crate::http::ExtraRoots;
 
     async fn issuer(
-        answer: &'static str,
+        answer: String,
         status: StatusCode,
         delay: Duration,
     ) -> (BaseUrl, Arc<AtomicUsize>) {
@@ -136,6 +137,7 @@ mod tests {
             "/.well-known/passkey-endpoints",
             get(move || {
                 counted.fetch_add(1, Ordering::SeqCst);
+                let answer = answer.clone();
                 async move {
                     tokio::time::sleep(delay).await;
                     (status, answer)
@@ -159,7 +161,7 @@ mod tests {
     #[tokio::test]
     async fn the_manage_url_is_read_at_the_issuers_origin_once() {
         let (url, reads) = issuer(
-            r#"{"enroll": "https://id.example.com/enroll", "manage": "https://id.example.com/account?tab=passkeys"}"#,
+            json!({"enroll": "https://id.example.com/enroll", "manage": "https://id.example.com/account?tab=passkeys"}).to_string(),
             StatusCode::OK,
             Duration::ZERO,
         )
@@ -176,24 +178,24 @@ mod tests {
 
     #[tokio::test]
     async fn no_document_an_insecure_url_or_a_slow_issuer_name_no_page() {
-        let (url, _) = issuer("", StatusCode::NOT_FOUND, Duration::ZERO).await;
+        let (url, _) = issuer(String::new(), StatusCode::NOT_FOUND, Duration::ZERO).await;
         assert_eq!(endpoints(&url).manage().await, None);
         let (url, _) = issuer(
-            r#"{"manage": "http://id.example.com/account"}"#,
+            json!({"manage": "http://id.example.com/account"}).to_string(),
             StatusCode::OK,
             Duration::ZERO,
         )
         .await;
         assert_eq!(endpoints(&url).manage().await, None);
         let (url, _) = issuer(
-            r#"{"enroll": "https://id.example.com/enroll"}"#,
+            json!({"enroll": "https://id.example.com/enroll"}).to_string(),
             StatusCode::OK,
             Duration::ZERO,
         )
         .await;
         assert_eq!(endpoints(&url).manage().await, None);
         let (url, _) = issuer(
-            r#"{"manage": "https://id.example.com/account"}"#,
+            json!({"manage": "https://id.example.com/account"}).to_string(),
             StatusCode::OK,
             Duration::from_secs(5),
         )
