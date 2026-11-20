@@ -53,9 +53,9 @@ use zeabur_kube::k8s_openapi::Resource;
 use zeabur_model::PodSecurityLevel;
 
 use crate::api::{Generate, Input, InputValue};
-use crate::bundle;
 use crate::engine::{self, ChartRelease};
 use crate::templates::Encoding;
+use crate::{bundle, zeabur};
 
 /// The profiles the catalogue sizes components for.
 pub const PROFILES: [&str; 2] = ["single-node", "multi-node"];
@@ -325,10 +325,17 @@ impl File {
 
 /// How to install the component `id` for `profile`.
 ///
+/// Each text ends with the objects Zeabur adds to the component ([`zeabur::objects`]) for a
+/// Zeabur that runs in `zeabur_namespace`. Apply them once the component is installed.
+///
 /// # Errors
 ///
 /// An unknown component or profile, or a catalogue file that does not parse.
-pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallError> {
+pub fn guide(
+    component: &str,
+    profile: &str,
+    zeabur_namespace: &str,
+) -> Result<InstallGuide, InstallError> {
     if !PROFILES.contains(&profile) {
         return Err(InstallError::UnknownProfile(profile.to_owned()));
     }
@@ -343,6 +350,7 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
         return Err(InstallError::Unknown(component.to_owned(), unknown));
     }
     let rendered = Rendered::new(component, &file, profile).map_err(catalogue)?;
+    let zeaburs = zeabur::yaml(component, zeabur_namespace).map_err(catalogue)?;
     Ok(InstallGuide {
         component: component.to_owned(),
         profile: profile.to_owned(),
@@ -378,10 +386,25 @@ pub fn guide(component: &str, profile: &str) -> Result<InstallGuide, InstallErro
         .into_iter()
         .map(|format| InstallText {
             format,
-            text: rendered.text(format),
+            text: rendered.text(format) + &zeaburs_text(component, format, &zeaburs),
         })
         .collect(),
     })
+}
+
+/// `yaml`, the objects Zeabur adds to `component`, in `format`; empty when there are none.
+fn zeaburs_text(component: &str, format: InstallFormat, yaml: &str) -> String {
+    if yaml.is_empty() {
+        return String::new();
+    }
+    let comment = format!("# Zeabur's objects for {component}: apply them once it is installed.\n");
+    if format == InstallFormat::Helm {
+        format!(
+            "\n{comment}kubectl apply --server-side --field-manager zeabur -f - <<'EOF'\n{yaml}EOF\n"
+        )
+    } else {
+        format!("---\n{comment}{yaml}")
+    }
 }
 
 /// A Secret inputs are stored in: `(namespace, name)`, and each input with its key.
@@ -1201,7 +1224,7 @@ mod tests {
     fn every_component_renders_in_every_form_and_profile_as_valid_yaml() {
         for (component, _) in bundle::FILES {
             for profile in PROFILES {
-                let guide = guide(component, profile)
+                let guide = guide(component, profile, "zeabur")
                     .unwrap_or_else(|e| panic!("{component} {profile}: {e}"));
                 for text in &guide.formats {
                     assert!(
@@ -1267,7 +1290,7 @@ mod tests {
                 })
                 .filter(|o| o["kind"] == "HelmChart" || o["kind"] == "Namespace")
                 .collect();
-                let k3s = guide(id, profile)
+                let k3s = guide(id, profile, "zeabur")
                     .unwrap()
                     .formats
                     .into_iter()
@@ -1299,7 +1322,7 @@ mod tests {
         let namespace = k3s.find("kind: Namespace").unwrap();
         assert!(namespace < k3s.find("kind: HelmChart").unwrap());
         for (id, _) in bundle::FILES {
-            let guide = guide(id, "multi-node").unwrap();
+            let guide = guide(id, "multi-node", "zeabur").unwrap();
             if guide.security.pod_security != "privileged" {
                 continue;
             }
@@ -1316,7 +1339,7 @@ mod tests {
 
     #[test]
     fn a_baseline_component_gets_a_baseline_namespace_in_every_form() {
-        let guide = guide("k8up", "single-node").unwrap();
+        let guide = guide("k8up", "single-node", "zeabur").unwrap();
         assert_eq!(guide.security.pod_security, "baseline");
         for text in &guide.formats {
             let label = if text.format == InstallFormat::Helm {
@@ -1368,7 +1391,7 @@ mod tests {
     #[test]
     fn components_k3s_also_packages_say_to_disable_its_copy_first() {
         for (component, _) in bundle::FILES {
-            let guide = guide(component, "single-node").unwrap();
+            let guide = guide(component, "single-node", "zeabur").unwrap();
             let expected: &[&str] = match *component {
                 "traefik" => &["traefik"],
                 "metrics-server" => &["metrics-server"],
@@ -1390,13 +1413,14 @@ mod tests {
     /// Representative cases: an OCI chart with a profile (cert-manager), an HTTP repository with
     /// asked inputs (velero), generated inputs stored in Secrets (crowdsec), a manifest
     /// release before a chart (traefik), and the k3s packaged notes (traefik, metrics-server).
-    const GOLDEN: [(&str, &str); 6] = [
+    const GOLDEN: [(&str, &str); 7] = [
         ("cert-manager", "single-node"),
         ("cert-manager", "multi-node"),
         ("velero", "single-node"),
         ("crowdsec", "single-node"),
         ("traefik", "multi-node"),
         ("metrics-server", "single-node"),
+        ("victoria-logs", "single-node"),
     ];
 
     #[test]
@@ -1405,7 +1429,7 @@ mod tests {
         let update = std::env::var_os("ZEABUR_UPDATE_GOLDEN").is_some();
         let mut stale = Vec::new();
         for (component, profile) in GOLDEN {
-            for text in guide(component, profile).unwrap().formats {
+            for text in guide(component, profile, "zeabur").unwrap().formats {
                 let format = match text.format {
                     InstallFormat::Helm => "helm.sh",
                     InstallFormat::K3s => "k3s.yaml",

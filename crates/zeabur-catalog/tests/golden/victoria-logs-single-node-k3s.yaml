@@ -1,0 +1,127 @@
+# Profile: single-node. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/
+# (K3s) or /var/lib/rancher/rke2/server/manifests/ (RKE2).
+apiVersion: v1
+kind: Namespace
+metadata:
+  labels:
+    pod-security.kubernetes.io/audit: privileged
+    pod-security.kubernetes.io/enforce: privileged
+    pod-security.kubernetes.io/warn: privileged
+  name: observability
+---
+# logs (namespace observability)
+# The log store.
+apiVersion: operator.victoriametrics.com/v1
+kind: VLSingle
+metadata:
+  name: victoria-logs
+  namespace: observability
+spec:
+  # Two weeks, or less when the volume reaches 8GiB of its 10Gi.
+  retentionPeriod: 14d
+  retentionMaxDiskSpaceUsageBytes: 8GiB
+  storage:
+    resources:
+      requests: {storage: 10Gi}
+  extraArgs:
+    # Caches stop at 128MiB instead of 60% of the limit.
+    memory.allowedBytes: 128MiB
+    search.maxConcurrentRequests: "2"
+    defaultParallelReaders: "2"
+  resources:
+    requests: {cpu: 50m, memory: 64Mi}
+    limits: {memory: 384Mi}
+---
+# One collector per node, reading container logs.
+apiVersion: operator.victoriametrics.com/v1
+kind: VLAgent
+metadata:
+  name: collector
+  namespace: observability
+spec:
+  k8sCollector:
+    enabled: true
+    # Their lines are noise that shares the 8GiB budget with the project logs, and
+    # observability would feed the collector's own errors back.
+    excludeFilter: kubernetes.pod_namespace:in(kube-system, kube-public, kube-node-lease, observability)
+  # Namespace, pod and container suffice; labels add cardinality. The
+  # operator (v0.75.0) passes no flag for k8sCollector.includePodLabels:
+  # false, and vlagent's default is true.
+  extraArgs:
+    kubernetesCollector.includePodLabels: "false"
+    # kube-apiserver's audit log, under the /var/lib the collector already mounts
+    # read-only. K3s and RKE2 write it in their own directory, and only
+    # control-plane nodes have the file. Rotated backups are followed, not read again.
+    fileCollector.glob: /var/lib/rancher/*/server/logs/audit.log
+    fileCollector.extraFields: '{"app":"kube-apiserver-audit","node":"%{NODE_NAME}"}'
+    fileCollector.streamFields: app,node
+    fileCollector.timeField: stageTimestamp
+    fileCollector.msgField: requestURI
+    envflag.enable: "true"
+  extraEnvs:
+    - name: NODE_NAME
+      valueFrom: {fieldRef: {fieldPath: spec.nodeName}}
+  remoteWriteSettings:
+    queues: 1
+    # What the node keeps while the log store is down.
+    maxDiskUsagePerURL: 512MiB
+  remoteWrite:
+    - url: http://vlsingle-victoria-logs.observability.svc:9428/internal/insert
+  resources:
+    requests: {cpu: 20m, memory: 16Mi}
+    limits: {memory: 128Mi}
+---
+# Only the collector, the metrics stack's vmagent (the operator's scrape of
+# /metrics) and Zeabur Proxy in the zeabur namespace reach the log store.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: victoria-logs
+  namespace: observability
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: vlsingle, app.kubernetes.io/instance: victoria-logs}
+  policyTypes: [Ingress]
+  ingress:
+    - ports: [{port: 9428, protocol: TCP}]
+      from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: vlagent, app.kubernetes.io/instance: collector}
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: vmagent}
+        # Both selectors: anyone can label a pod in their own namespace.
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: zeabur}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: zeabur-proxy}
+---
+# Zeabur's objects for victoria-logs: apply them once it is installed.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  annotations:
+    catalog.zeabur.com/source-digest: 07f0b78310480131d305708a767dd3a1347badc755e833533526d0fa98b04cca
+  labels:
+    app.kubernetes.io/managed-by: zeabur
+    catalog.zeabur.com/component: victoria-logs
+    catalog.zeabur.com/release: zeabur
+  name: zeabur-proxy-logs
+  namespace: observability
+spec:
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          kubernetes.io/metadata.name: zeabur
+      podSelector:
+        matchLabels:
+          app.kubernetes.io/name: zeabur-proxy
+    ports:
+    - port: 9428
+      protocol: TCP
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/instance: victoria-logs
+      app.kubernetes.io/name: vlsingle
+  policyTypes:
+  - Ingress

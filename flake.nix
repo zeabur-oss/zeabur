@@ -109,7 +109,7 @@
               yq-go
               openssl
 
-              # Zeabur's alert rules (crates/zeabur-catalog/tests/notification_rules.rs): vmalert-tool
+              # Zeabur's alert rules (crates/zeabur-catalog/src/zeabur.rs): vmalert-tool
               victoriametrics
             ];
 

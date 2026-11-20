@@ -1,7 +1,7 @@
 //! `zeaburctl components export`: Zeabur Catalog components' manifests or Helm commands, to
 //! install them on a cluster. The text comes from the catalogue in this binary
-//! ([`zeabur_catalog::install`]), followed by the objects Zeabur adds to the component
-//! ([`zeabur_catalog::zeabur`]); no cluster is read.
+//! ([`zeabur_catalog::install`]), which ends with the objects Zeabur adds to the component;
+//! no cluster is read.
 
 use std::process::ExitCode;
 
@@ -89,12 +89,11 @@ fn text(args: &ExportArgs) -> Result<String, InstallError> {
     };
     let mut out = String::new();
     for component in &args.components {
-        let text = guide(component, &args.profile)?
+        let text = guide(component, &args.profile, &args.zeabur_namespace)?
             .formats
             .into_iter()
             .find(|f| f.format == format)
             .map_or_default(|f| f.text);
-        let text = text + &zeaburs(component, args)?;
         if !out.is_empty() && !out.ends_with(separator) {
             if !out.ends_with('\n') {
                 out.push('\n');
@@ -104,23 +103,6 @@ fn text(args: &ExportArgs) -> Result<String, InstallError> {
         out.push_str(&text);
     }
     Ok(out)
-}
-
-/// The objects Zeabur adds to `component`, in the export's format.
-fn zeaburs(component: &str, args: &ExportArgs) -> Result<String, InstallError> {
-    let yaml = zeabur_catalog::zeabur::yaml(component, &args.zeabur_namespace)
-        .map_err(|e| InstallError::Catalogue(component.to_owned(), e))?;
-    if yaml.is_empty() {
-        return Ok(String::new());
-    }
-    let comment = format!("# Zeabur's objects for {component}: apply them once it is installed.\n");
-    Ok(if args.format == Format::Helm {
-        format!(
-            "\n{comment}kubectl apply --server-side --field-manager zeabur -f - <<'EOF'\n{yaml}EOF\n"
-        )
-    } else {
-        format!("---\n{comment}{yaml}")
-    })
 }
 
 #[cfg(test)]
