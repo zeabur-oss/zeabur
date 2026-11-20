@@ -22,7 +22,7 @@ export function useUpgradeBadge(
   const badge = upgrades?.badge
   if (!upgrades || !badge) return null
   const eol = upgrades.release?.endOfLife
-  const text = {
+  const words = {
     "end-of-life": () => t("cluster.endOfLife"),
     maintenance: () => t("cluster.endOfLifeOn", eol ? date(eol) : ""),
     "skew-unsupported": () => t("cluster.skewBadge"),
@@ -31,6 +31,8 @@ export function useUpgradeBadge(
     "minor-available": () => t("cluster.available", upgrades.nextMinor ?? ""),
     "skew-mixed": () => null,
     "newer-than-data": () => null,
-  }[badge.state]()
+  }
+  // A state newer than this build shows no pill.
+  const text = Object.hasOwn(words, badge.state) ? words[badge.state]() : null
   return text === null ? null : { health: badge.health, text }
 }
