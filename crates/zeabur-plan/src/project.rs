@@ -202,6 +202,7 @@ impl Planner<'_> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,
+            foreground: false,
         });
         self.objects.push(Working {
             target: Target::of::<ServiceAccount>(DEFAULT_ACCOUNT),
@@ -218,6 +219,7 @@ impl Planner<'_> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,
+            foreground: false,
         });
         if self.input.platform_namespaces {
             self.objects.push(Working {
@@ -227,6 +229,7 @@ impl Planner<'_> {
                 operations: Vec::new(),
                 owners: Vec::new(),
                 deleted: false,
+                foreground: false,
             });
         }
         Ok(())

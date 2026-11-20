@@ -12,9 +12,10 @@
 //! - **A deletion** is kube's `Api::delete` with `DeleteOptions` in its body [k8s-delete-options]:
 //!   `propagationPolicy: Background`, as `kubectl delete` does by default, so kube-apiserver
 //!   removes the object at once and the garbage collector removes what it owns (a Deployment's
-//!   ReplicaSets and their Pods) afterwards [k8s-gc]; and `preconditions` on its `uid` and
-//!   `resourceVersion`, so an object changed or replaced since it was read is refused with `409
-//!   Conflict` instead of deleted.
+//!   ReplicaSets and their Pods) afterwards [k8s-gc], or `Foreground` when asked, so the object
+//!   stays until what it owns is gone; and `preconditions` on its `uid` and `resourceVersion`, so
+//!   an object changed or replaced since it was read is refused with `409 Conflict` instead of
+//!   deleted.
 //! - Creations and patches name `fieldManager=zeabur`, so `managedFields` records Zeabur as the one
 //!   who changed those fields [k8s-field-manager], and ask for `fieldValidation=Strict`: a field
 //!   the object's schema does not know fails the request instead of being dropped silently
@@ -228,7 +229,11 @@ pub(crate) fn delete_params(preconditions: &Preconditions, dry_run: bool) -> Del
             resource_version: preconditions.resource_version.clone(),
         }),
         grace_period_seconds: preconditions.grace_period_seconds,
-        ..DeleteParams::background()
+        ..if preconditions.foreground {
+            DeleteParams::foreground()
+        } else {
+            DeleteParams::background()
+        }
     }
 }
 
@@ -347,6 +352,7 @@ mod tests {
             uid: Some("u-1".to_owned()),
             resource_version: Some("42".to_owned()),
             grace_period_seconds: None,
+            foreground: false,
         };
         let body = |dry_run| serde_json::to_value(delete_params(&preconditions, dry_run)).unwrap();
         let options = body(false);
@@ -357,5 +363,22 @@ mod tests {
         );
         assert_eq!(options.get("dryRun"), None);
         assert_eq!(body(true)["dryRun"], serde_json::json!(["All"]));
+    }
+
+    #[test]
+    fn a_foreground_deletion_asks_for_foreground_propagation() {
+        let preconditions = Preconditions {
+            uid: Some("u-1".to_owned()),
+            resource_version: Some("42".to_owned()),
+            grace_period_seconds: None,
+            foreground: true,
+        };
+        assert_eq!(
+            serde_json::to_value(delete_params(&preconditions, false)).unwrap(),
+            serde_json::json!({
+                "propagationPolicy": "Foreground",
+                "preconditions": { "uid": "u-1", "resourceVersion": "42" },
+            })
+        );
     }
 }

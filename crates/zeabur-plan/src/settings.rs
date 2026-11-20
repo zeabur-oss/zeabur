@@ -502,6 +502,7 @@ impl<'a> Planner<'a> {
                 operations: Vec::new(),
                 owners: Vec::new(),
                 deleted: false,
+                foreground: false,
             },
         );
         let (index, container_pointer, _) = self.container_slot(found, &target)?;

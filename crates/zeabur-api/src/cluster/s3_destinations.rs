@@ -846,6 +846,7 @@ fn delete(kind: &str, before: &Value) -> Planned {
             uid: field("/metadata/uid"),
             resource_version: field("/metadata/resourceVersion"),
             grace_period_seconds: None,
+            foreground: false,
         }),
         action: S3DestinationWriteAction::Delete,
         before: (kind != "Secret").then(|| before.clone()),

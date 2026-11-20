@@ -649,6 +649,9 @@ pub struct Preconditions {
     /// `gracePeriodSeconds`: how long a pod's containers may take to stop; its own
     /// `terminationGracePeriodSeconds` when `None`, at once when `0`.
     pub grace_period_seconds: Option<u32>,
+    /// `propagationPolicy: Foreground` instead of `Background`: the object stays until the
+    /// garbage collector has deleted what it owns.
+    pub foreground: bool,
 }
 
 /// One write to one object.

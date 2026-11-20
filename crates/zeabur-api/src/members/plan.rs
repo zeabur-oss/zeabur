@@ -937,6 +937,7 @@ async fn send(cluster: &dyn Cluster, op: &Op, dry_run: bool) -> Result<(), ApiEr
                 uid: uid.clone(),
                 resource_version: None,
                 grace_period_seconds: None,
+                foreground: false,
             }),
             "delete",
         ),

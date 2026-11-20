@@ -179,6 +179,7 @@ impl<'a> Planner<'a> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,
+            foreground: false,
         });
         self.impact.insert(reference.clone());
         let data_store = self
@@ -252,6 +253,7 @@ impl<'a> Planner<'a> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: true,
+            foreground: false,
         });
         Ok(())
     }

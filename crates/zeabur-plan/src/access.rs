@@ -531,6 +531,7 @@ impl Planner<'_> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,
+            foreground: false,
         });
         Ok(())
     }

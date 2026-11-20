@@ -1125,8 +1125,8 @@ pub enum Write {
         #[cfg_attr(feature = "openapi", schema(value_type = Object))]
         body: Value,
     },
-    /// A `DELETE` with background propagation, refused (`409`) unless the object still has this
-    /// `uid` and `resourceVersion`.
+    /// A `DELETE`, refused (`409`) unless the object still has this `uid` and
+    /// `resourceVersion`.
     #[serde(rename_all = "camelCase")]
     Delete {
         /// The object's `metadata.uid`.
@@ -1134,6 +1134,12 @@ pub enum Write {
         uid: Option<String>,
         /// The object's `metadata.resourceVersion`.
         resource_version: String,
+        /// Foreground propagation: the object stays until the garbage collector has deleted
+        /// what it owns [k8s-gc-foreground]. Background (the object goes at once) when false.
+        ///
+        /// [k8s-gc-foreground]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-deletion
+        #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+        foreground: bool,
     },
     /// An RFC 6902 JSON Patch of a Pod's `ephemeralcontainers` subresource that adds one
     /// container. Its first operation tests `metadata.uid`, so a pod replaced since the plan

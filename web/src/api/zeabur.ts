@@ -8442,6 +8442,13 @@ export type PlannedWrite =
       type: "mergePatch"
     }
   | {
+      /**
+       * Foreground propagation: the object stays until the garbage collector has deleted
+       * what it owns [k8s-gc-foreground]. Background (the object goes at once) when false.
+       *
+       * [k8s-gc-foreground]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-deletion
+       */
+      foreground?: boolean
       /** The object's `metadata.resourceVersion`. */
       resourceVersion: string
       type: "delete"

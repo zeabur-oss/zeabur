@@ -749,10 +749,12 @@ pub(crate) fn write_request(
             Write::Delete {
                 uid,
                 resource_version,
+                foreground,
             } => WriteBody::Delete(Preconditions {
                 uid: uid.clone(),
                 resource_version: Some(resource_version.clone()),
                 grace_period_seconds: None,
+                foreground: *foreground,
             }),
         },
         dry_run: false,

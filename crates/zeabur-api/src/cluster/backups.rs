@@ -1339,6 +1339,7 @@ async fn move_writes(
                 uid: metadata.uid.clone(),
                 resource_version: metadata.resource_version.clone(),
                 grace_period_seconds: None,
+                foreground: false,
             }),
             action: BackupWriteAction::Delete,
             before: Some(before.clone()),

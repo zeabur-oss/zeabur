@@ -7,8 +7,8 @@
 //! A read the person may not make leaves its part out; a refused read of database objects is told
 //! as a right the person lacks.
 //!
-//! The apply dry-runs every write, then deletes the database objects, waits up to
-//! [`DATABASE_WAIT`] for them to go, deletes the Namespace, and
+//! The apply dry-runs every write, then deletes the database objects in the foreground, waits up
+//! to [`DATABASE_WAIT`] for them and their pods to go, deletes the Namespace, and
 //! last deletes the person's tools pods for the project with Zeabur's service account. The wait
 //! ends early when they are gone; past the deadline the Namespace is deleted all the
 //! same, and the namespace controller deletes what is left.
@@ -470,6 +470,7 @@ async fn delete_tools_pods(planner: &Planner<'_>, cluster: &dyn Cluster, project
                     .and_then(Value::as_str)
                     .unwrap_or_default()
                     .to_owned(),
+                foreground: false,
             },
         );
         if let Err(error) = zeabur.write(&write).await {

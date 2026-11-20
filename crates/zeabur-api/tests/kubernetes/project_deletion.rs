@@ -4,7 +4,9 @@
 //! in that namespace.
 //!
 //! Where CloudNativePG is not installed (the bare profile), a stand-in for its `Cluster` CRD is
-//! made and deleted with the sandbox.
+//! made and deleted with the sandbox. A running pod the `Cluster` owns has CloudNativePG's grace
+//! period (1800s) and, like PostgreSQL, takes some seconds to stop, so a Namespace deleted while it
+//! is still there waits for the namespace controller's 5-minute resync.
 //!
 //! A project held by a finalizer no controller removes is force deleted by a person whose rights
 //! come from a ClusterRole, since the namespace controller deletes the Roles inside the project.
@@ -16,7 +18,7 @@ use kube::api::{Api, DeleteParams, DynamicObject, Patch, PatchParams, PostParams
 use kube::core::GroupVersionKind;
 use kube::discovery::ApiResource;
 use serde_json::json;
-use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Namespace};
+use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Namespace, Pod};
 use zeabur_kube::k8s_openapi::api::rbac::v1::{ClusterRole, ClusterRoleBinding};
 use zeabur_test_support::sandbox::{PERSON, Sandbox, create};
 
@@ -25,6 +27,8 @@ use crate::common::{app, plan_and_apply};
 const CRD: &str = "clusters.postgresql.cnpg.io";
 /// Long enough for the namespace controller to empty a namespace.
 const WAIT: Duration = Duration::from_secs(180);
+/// Well below the namespace controller's 5-minute resync.
+const PROMPT: Duration = Duration::from_secs(90);
 
 fn api(group: &str, version: &str, kind: &str) -> ApiResource {
     ApiResource::from_gvk(&GroupVersionKind::gvk(group, version, kind))
@@ -111,10 +115,39 @@ async fn a_project_with_a_database_goes_away() {
         "spec": {"instances": 1, "storage": {"size": "1Gi"}}
     }))
     .unwrap();
-    clusters
+    let database = clusters
         .create(&PostParams::default(), &database)
         .await
         .unwrap();
+    let pods = Api::<Pod>::namespaced(admin.clone(), &ns);
+    create(
+        &pods,
+        json!({"metadata": {"name": "db-1", "ownerReferences": [{
+                   "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster", "name": "db",
+                   "uid": database.metadata.uid, "controller": true,
+                   "blockOwnerDeletion": true}]},
+               "spec": {"terminationGracePeriodSeconds": 1800,
+                        "containers": [{"name": "db", "image": "busybox:1.37",
+                            "command": ["sh", "-c",
+                                "trap 'sleep 20; exit 0' TERM; while true; do sleep 1; done"]}]}}),
+    )
+    .await;
+    let deadline = tokio::time::Instant::now() + WAIT;
+    while pods
+        .get("db-1")
+        .await
+        .unwrap()
+        .status
+        .and_then(|s| s.phase)
+        .as_deref()
+        != Some("Running")
+    {
+        assert!(
+            tokio::time::Instant::now() < deadline,
+            "the database pod is not running"
+        );
+        tokio::time::sleep(Duration::from_secs(1)).await;
+    }
 
     let app = app(sandbox.user());
     // RBAC follows the Role's change within moments; plan until the plan sees the right.
@@ -134,12 +167,16 @@ async fn a_project_with_a_database_goes_away() {
         .filter_map(|a| a["target"]["kind"].as_str())
         .collect();
     assert_eq!(kinds, ["Cluster", "Namespace"], "{applied}");
-    gone(&namespaces, &ns).await;
+    assert!(
+        pods.get_opt("db-1").await.unwrap().is_none(),
+        "the Namespace was deleted before the database pod was gone"
+    );
+    gone(&namespaces, &ns, PROMPT).await;
 }
 
-/// Waits until `namespace` is gone, for at most [`WAIT`].
-async fn gone(namespaces: &Api<Namespace>, namespace: &str) {
-    let deadline = tokio::time::Instant::now() + WAIT;
+/// Waits until `namespace` is gone, for at most `wait`.
+async fn gone(namespaces: &Api<Namespace>, namespace: &str, wait: Duration) {
+    let deadline = tokio::time::Instant::now() + wait;
     loop {
         match namespaces.get_opt(namespace).await.unwrap() {
             None => return,
@@ -219,5 +256,5 @@ async fn a_project_held_by_a_finalizer_without_a_controller_is_force_deleted() {
         .filter_map(|a| Some((a["target"]["kind"].as_str()?, a["target"]["name"].as_str()?)))
         .collect();
     assert_eq!(written, [("ConfigMap", "held")], "{applied}");
-    gone(&namespaces, &ns).await;
+    gone(&namespaces, &ns, WAIT).await;
 }

@@ -270,6 +270,8 @@ pub(crate) struct Working {
     pub(crate) owners: Vec<FieldOwners>,
     /// The write deletes the object.
     pub(crate) deleted: bool,
+    /// The deletion propagates in the foreground ([`Write::Delete`]).
+    pub(crate) foreground: bool,
 }
 
 pub(crate) struct Planner<'a> {
@@ -620,6 +622,7 @@ impl<'a> Planner<'a> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: false,
+            foreground: false,
         });
         self.objects.len() - 1
     }
