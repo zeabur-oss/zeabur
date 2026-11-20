@@ -367,6 +367,7 @@ fn delete_request(namespace: &str, pod: &Value) -> WriteRequest {
             resource_version: text(pod, "/metadata/resourceVersion")
                 .unwrap_or_default()
                 .to_owned(),
+            foreground: false,
         },
     )
 }

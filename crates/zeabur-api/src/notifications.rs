@@ -441,6 +441,7 @@ fn delete(kind: &str, namespace: &str, object: &Value, before: Option<Value>) ->
             uid: field("/metadata/uid"),
             resource_version: field("/metadata/resourceVersion"),
             grace_period_seconds: None,
+            foreground: false,
         }),
         action: NotificationWriteAction::Delete,
         before,

@@ -772,6 +772,7 @@ const fn delete_now(uid: Option<String>) -> WriteBody {
         uid,
         resource_version: None,
         grace_period_seconds: Some(0),
+        foreground: false,
     })
 }
 

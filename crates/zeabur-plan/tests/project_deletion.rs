@@ -102,7 +102,7 @@ mod tests {
     }
 
     #[test]
-    fn the_databases_go_before_the_namespace_each_pinned_to_the_object_read() {
+    fn the_databases_go_in_the_foreground_before_the_namespace_each_pinned_to_the_object_read() {
         let plan = planned(&shop(), &snapshot(), &deletion()).unwrap();
         let writes: Vec<(&str, &str, &Write)> = plan
             .objects
@@ -118,6 +118,7 @@ mod tests {
                     &Write::Delete {
                         uid: Some("db-uid".to_owned()),
                         resource_version: "40".to_owned(),
+                        foreground: true,
                     }
                 ),
                 (
@@ -126,6 +127,7 @@ mod tests {
                     &Write::Delete {
                         uid: Some("ns-uid".to_owned()),
                         resource_version: "7".to_owned(),
+                        foreground: false,
                     }
                 ),
             ]

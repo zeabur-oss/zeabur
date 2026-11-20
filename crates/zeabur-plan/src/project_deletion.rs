@@ -2,15 +2,22 @@
 //! `kubectl delete namespace <name>` does.
 //!
 //! - **The writes.** First a `DELETE` of each database object (CloudNativePG `Cluster`, Percona
-//!   `PerconaServerMongoDB`, …), then a `DELETE` of the Namespace, each with preconditions on the
-//!   object's `uid` and `resourceVersion` (the `delete` module). The namespace controller then
-//!   deletes every object in the namespace and removes the Namespace last [k8s-ns-delete].
+//!   `PerconaServerMongoDB`, …) with foreground propagation, then a `DELETE` of the Namespace, each
+//!   with preconditions on the object's `uid` and `resourceVersion` (the `delete` module). The
+//!   namespace controller then deletes every object in the namespace and removes the Namespace last
+//!   [k8s-ns-delete].
 //! - **Why databases go first.** An operator puts finalizers on its database objects and removes
 //!   them when it has cleaned up. If the namespace controller deletes the operator's other objects
 //!   in the same pass, or the operator does not run, the finalizers stay and the Namespace stays
 //!   `Terminating` [k8s-finalizers]. The API deletes the database objects, waits for them to go,
 //!   then deletes the Namespace. When a finalizer stays, the Namespace stays `Terminating`, and the
 //!   interface lists the objects that hold it.
+//! - **Why in the foreground.** With foreground propagation a database object stays until the
+//!   garbage collector has deleted the pods it owns [k8s-gc-foreground], so the wait for the object
+//!   is a wait for its pods too. A database pod can have a long grace period (1800s for
+//!   CloudNativePG), and the namespace controller checks a Namespace again only after half the
+//!   longest grace period of its pods, or at its 5-minute resync [k8s-ns-controller]. Without the
+//!   pods, the Namespace goes within seconds.
 //! - **What goes and what stays** is told in one [`Warning::DeletesProject`]: the services, the
 //!   databases, the volumes and what their reclaim policy does with the data [k8s-reclaim], and the
 //!   person's tools pods for the project. Backups in object storage and everything outside the
@@ -41,6 +48,8 @@
 //! [k8s-ns-delete]: https://kubernetes.io/docs/tasks/administer-cluster/namespaces/#deleting-a-namespace
 //! [k8s-finalizers]: https://kubernetes.io/docs/concepts/overview/working-with-objects/finalizers/
 //! [k8s-reclaim]: https://kubernetes.io/docs/concepts/storage/persistent-volumes/#reclaiming
+//! [k8s-gc-foreground]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/#foreground-deletion
+//! [k8s-ns-controller]: https://github.com/kubernetes/kubernetes/blob/master/pkg/controller/namespace/namespace_controller.go
 
 use std::collections::BTreeMap;
 
@@ -197,9 +206,9 @@ impl<'a> Planner<'a> {
                 plural: database.resource.resource.clone(),
                 name: text(&database.object, "/metadata/name"),
             };
-            self.push_deletion(target, database.object.clone());
+            self.push_deletion(target, database.object.clone(), true);
         }
-        self.push_deletion(Target::namespace(&name), object.clone());
+        self.push_deletion(Target::namespace(&name), object.clone(), false);
 
         let services: Vec<WorkloadRef> = workloads(snapshot)
             .into_iter()
@@ -326,7 +335,7 @@ impl<'a> Planner<'a> {
         Ok((object, meta))
     }
 
-    fn push_deletion(&mut self, target: Target, object: Value) {
+    fn push_deletion(&mut self, target: Target, object: Value, foreground: bool) {
         self.objects.push(Working {
             target,
             current: object.clone(),
@@ -334,6 +343,7 @@ impl<'a> Planner<'a> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: true,
+            foreground,
         });
     }
 }

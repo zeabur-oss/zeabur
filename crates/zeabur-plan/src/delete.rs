@@ -285,6 +285,7 @@ impl Planner<'_> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: true,
+            foreground: false,
         });
         let this = ObjectName {
             kind: kind.clone(),
@@ -490,6 +491,7 @@ impl Planner<'_> {
             operations: Vec::new(),
             owners: Vec::new(),
             deleted: true,
+            foreground: false,
         });
         self.claim_data_warning(&ObjectName {
             kind: "PersistentVolumeClaim".to_owned(),
@@ -806,6 +808,7 @@ pub(crate) fn deletion(working: Working) -> Result<PlannedObject, PlanError> {
         write: Write::Delete {
             uid,
             resource_version,
+            foreground: working.foreground,
         },
         change: None,
         raw_after: Value::Null,
