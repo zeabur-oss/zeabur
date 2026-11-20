@@ -474,7 +474,7 @@ function BackToProject({ project }: { project: string }) {
 const continueRoute = getRouteApi("/cluster/github-app/continue")
 
 /** Cluster → GitHub, between the form and GitHub: sends the manifest to GitHub. Only this page
- * may post forms to GitHub, so links to it and from it load a new page. */
+ * may post forms to GitHub, so the way here loads a new page. */
 export function GitHubAppContinuePage() {
   const t = useT()
   const { state = "" } = continueRoute.useSearch()
