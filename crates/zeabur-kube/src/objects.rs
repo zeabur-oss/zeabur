@@ -57,7 +57,7 @@ pub const LAST_APPLIED: &str = "kubectl.kubernetes.io/last-applied-configuration
 /// What replaces a hidden value.
 pub const HIDDEN: &str = "(hidden)";
 
-/// A resource kube-apiserver serves, as discovery describes it, at the version [`served_resources`]
+/// A resource kube-apiserver serves, as discovery describes it, at the version kubectl
 /// picks for it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ServedResource {
