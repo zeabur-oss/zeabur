@@ -158,14 +158,19 @@ test("an admin invites a Developer and a Viewer, who each get what their role al
 
     const namespace = (await (
       await viewer.request.get(`/api/v1/projects/${encodeURIComponent(second)}/namespace`)
-    ).json()) as { role?: string; can: Record<string, string> }
+    ).json()) as {
+      role?: string
+      readOnly?: boolean | null
+      canChange: string
+      canReadLogs: string
+      canReadSecrets: string
+    }
     expect(namespace.role).toBe("viewer")
-    expect(namespace.can).toMatchObject({
-      deploy: "denied",
-      changeServices: "denied",
-      openTerminal: "denied",
-      readSecrets: "denied",
-      changeMembers: "denied",
+    expect(namespace.readOnly).toBe(true)
+    expect(namespace).toMatchObject({
+      canChange: "denied",
+      canReadLogs: "denied",
+      canReadSecrets: "denied",
     })
 
     // Closed rather than missing, each with the role that opens it.
