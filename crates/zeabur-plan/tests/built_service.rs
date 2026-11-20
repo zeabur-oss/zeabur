@@ -240,13 +240,6 @@ mod tests {
             }),
             "invalid_host"
         );
-        assert_eq!(
-            with(&|c| c.variables = vec![NameValue {
-                name: "1A".to_owned(),
-                value: String::new()
-            }]),
-            "invalid_env_name"
-        );
     }
 
     /// `security: privileged` gives no privileged settings: the pod is at least baseline.

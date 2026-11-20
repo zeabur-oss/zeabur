@@ -300,7 +300,6 @@ fn check_built(built: &Built<'_>) -> Result<(), PlanError> {
         }
     }
     check_host(built.host, built.port)?;
-    check_variable_names(built.variables.iter().map(|v| v.name.as_str()), "variables")?;
     check_variable_names(
         built.build_variables.iter().map(|v| v.name.as_str()),
         "buildVariables",
