@@ -80,7 +80,7 @@ From these two files, note:
 
 Write `values.yaml` from `old-values.yaml`. Don't use `--reuse-values` or `--reset-then-reuse-values`: they keep the installer's `image`, which pins v0.2.
 
-With an external Zeabur Identity, set `identity.enabled: false`, keep `issuer` as it is, including `issuer.clientSecret`, and leave out the other `identity` keys and the rest of this table. Otherwise, change these keys:
+With an external Zeabur Identity, set `identity.enabled: false`, keep `issuer` as it is, including `issuer.clientSecret`, and leave out `image` and the other `identity` keys. Skip the rest of this table. Otherwise, change these keys:
 
 | In `old-values.yaml` | In `values.yaml` |
 | --- | --- |
@@ -212,7 +212,7 @@ Everyone signs in again once, because the Zeabur pod was replaced.
 
 #### 9. Clean up
 
-Zeabur no longer reads the Secret `zeabur/zeabur-oidc`, the installer's sign-in client secret. Once the owner agrees, delete it:
+Zeabur no longer reads the Secret `zeabur/zeabur-oidc`, the installer's sign-in client secret, unless it uses an external Zeabur Identity. In that case `values.yaml` still names it, so keep it. Otherwise, once the owner agrees, delete it:
 
 ```sh
 kubectl -n zeabur delete secret zeabur-oidc

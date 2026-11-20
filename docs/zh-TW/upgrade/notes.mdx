@@ -80,7 +80,7 @@ cp /etc/zeabur-installer/config.yaml installer-config.yaml
 
 以 `old-values.yaml` 為基礎撰寫 `values.yaml`。不要用 `--reuse-values` 或 `--reset-then-reuse-values`，這兩個選項會保留安裝程式的 `image`，讓版本固定在 v0.2。
 
-使用外部 Zeabur Identity 時，設定 `identity.enabled: false`，原樣保留 `issuer`（包括 `issuer.clientSecret`），不要加上其他 `identity` 鍵，也不用照下表修改。其他情況照下表修改：
+使用外部 Zeabur Identity 時，設定 `identity.enabled: false`，原樣保留 `issuer`（包括 `issuer.clientSecret`），拿掉 `image`，不要加上其他 `identity` 鍵，下表其他項目也不用照著改。其他情況照下表修改：
 
 | `old-values.yaml` 裡的設定 | `values.yaml` 裡的設定 |
 | --- | --- |
@@ -212,7 +212,7 @@ Zeabur 的副本換新後，所有人都要重新登入一次。
 
 #### 9. 清理
 
-Zeabur 不再讀取 Secret `zeabur/zeabur-oidc`，這是安裝程式建立的登入用戶端金鑰。擁有者同意後再刪除：
+Secret `zeabur/zeabur-oidc` 是安裝程式建立的登入用戶端金鑰。使用外部 Zeabur Identity 時，`values.yaml` 還指向它，要留著。其他情況下 Zeabur 不再讀取它，擁有者同意後再刪除：
 
 ```sh
 kubectl -n zeabur delete secret zeabur-oidc
