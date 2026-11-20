@@ -20,9 +20,91 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
 
+{{/* The sslip.io name of an IP address. sslip.io reads an IPv6 address with each ":" written as "-"
+     (https://github.com/cunnie/sslip.io/blob/9f98ba8d30deb426ddddb889c09ed8740e1585fc/xip/xip.go#L763-L766),
+     because a DNS label cannot hold ":". */}}
+{{- define "zeabur.sslipDomain" -}}
+{{- printf "%s.sslip.io" (. | replace ":" "-" | lower) -}}
+{{- end -}}
+
+{{/* The domain the addresses are under: global.domain, else <ip>.sslip.io from the first node's
+     ExternalIP, else its InternalIP. Read once per render. */}}
+{{- define "zeabur.domain" -}}
+{{- if not (hasKey .Values.global "_domain") -}}
+{{- $domain := .Values.global.domain -}}
+{{- if not $domain -}}
+{{- $ip := "" -}}
+{{- range $node := (lookup "v1" "Node" "" "").items | default list -}}
+{{- if not $ip -}}
+{{- range $node.status.addresses -}}{{- if and (eq .type "ExternalIP") (not $ip) -}}{{- $ip = .address -}}{{- end -}}{{- end -}}
+{{- range $node.status.addresses -}}{{- if and (eq .type "InternalIP") (not $ip) -}}{{- $ip = .address -}}{{- end -}}{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- $domain = include "zeabur.sslipDomain" (required "global.domain is required when the chart cannot read the cluster's nodes (helm template)" $ip) -}}
+{{- end -}}
+{{- if not (regexMatch "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$" $domain) -}}
+{{- fail (printf "global.domain must be a lowercase domain name, not %q" $domain) -}}
+{{- end -}}
+{{- $_ := set .Values.global "_domain" $domain -}}
+{{- end -}}
+{{- .Values.global._domain -}}
+{{- end -}}
+
+{{/* publicUrl, else https://zeabur.<domain>. */}}
+{{- define "zeabur.publicUrl" -}}
+{{- if .Values.publicUrl -}}
+{{- .Values.publicUrl -}}
+{{- else -}}
+https://zeabur.{{ include "zeabur.domain" . }}
+{{- end -}}
+{{- end -}}
+
+{{/* issuer.url, else the Zeabur Identity this chart installs. */}}
+{{- define "zeabur.issuerUrl" -}}
+{{- if .Values.issuer.url -}}
+{{- .Values.issuer.url -}}
+{{- else if .Values.identity.issuer -}}
+{{- .Values.identity.issuer -}}
+{{- else if .Values.identity.enabled -}}
+https://identity.{{ include "zeabur.domain" . }}
+{{- else -}}
+{{- fail "issuer.url is required when identity.enabled is false" -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The chart makes the client secret: it installs Identity and no Secret is given. */}}
+{{- define "zeabur.ownClientSecret" -}}
+{{- if and .Values.identity.enabled (not .Values.issuer.clientSecret.existingSecret) -}}true{{- end -}}
+{{- end -}}
+
+{{- define "zeabur.clientSecret" -}}
+{{- if include "zeabur.ownClientSecret" . -}}
+{{- printf "%s-client" (include "zeabur.fullname" .) -}}
+{{- else -}}
+{{- required "issuer.clientSecret.existingSecret is required when identity.enabled is false" .Values.issuer.clientSecret.existingSecret -}}
+{{- end -}}
+{{- end -}}
+
+{{/* The domains new URLs are suggested under: domains.suffixes, else an sslip.io domain. */}}
+{{- define "zeabur.domainSuffixes" -}}
+{{- if .Values.domains.suffixes -}}
+{{- join "," .Values.domains.suffixes -}}
+{{- else if or (not .Values.global.domain) (hasSuffix ".sslip.io" .Values.global.domain) -}}
+{{- include "zeabur.domain" . -}}
+{{- end -}}
+{{- end -}}
+
 {{/* The public URL's host name, for the Ingress and the HTTPRoute. */}}
 {{- define "zeabur.host" -}}
-{{- (urlParse (required "publicUrl is required" .Values.publicUrl)).hostname -}}
+{{- (urlParse (include "zeabur.publicUrl" .)).hostname -}}
+{{- end -}}
+
+{{- define "zeabur.image" -}}
+{{- if .Values.image.digest -}}
+{{ .Values.image.repository }}@{{ .Values.image.digest }}
+{{- else -}}
+{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.Version }}
+{{- end -}}
 {{- end -}}
 
 {{- define "zeabur.planKeySecret" -}}

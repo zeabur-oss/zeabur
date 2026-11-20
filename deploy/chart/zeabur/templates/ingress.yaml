@@ -6,7 +6,11 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     {{- include "zeabur.labels" . | nindent 4 }}
-  {{- with .Values.ingress.annotations }}
+  {{- $annotations := .Values.ingress.annotations | default dict }}
+  {{- with .Values.ingress.clusterIssuer }}
+  {{- $annotations = merge (dict "cert-manager.io/cluster-issuer" .) $annotations }}
+  {{- end }}
+  {{- with $annotations }}
   annotations:
     {{- toYaml . | nindent 4 }}
   {{- end }}

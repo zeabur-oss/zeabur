@@ -6,9 +6,11 @@ set -euo pipefail
 
 chart=${1:?usage: chart-images.sh <chart>}
 
-# Turn on every optional workload, so that no image is left out.
+# Turn on every optional workload, so that no image is left out. Zeabur Identity's chart pins
+# its own image.
 values=(
-  --set publicUrl=https://zeabur.example.com
+  --set global.domain=example.com
+  --set identity.enabled=false
   --set issuer.url=https://identity.example.com
   --set issuer.clientSecret.existingSecret=zeabur-oidc
   --set proxy.enabled=true

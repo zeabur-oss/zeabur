@@ -1,6 +1,4 @@
-# The fewest values an installation needs (scripts/check-chart.sh).
-publicUrl: https://zeabur.example.test
-issuer:
-  url: https://identity.example.test
-  clientSecret:
-    existingSecret: zeabur-oidc
+# The fewest values an installation needs (scripts/check-chart.sh): the domain, which a real
+# install reads from the cluster's nodes when it is empty.
+global:
+  domain: example.test

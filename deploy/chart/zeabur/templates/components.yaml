@@ -1,0 +1,100 @@
+{{- with .Values.components.install }}
+{{- $name := printf "%s-components" (include "zeabur.fullname" $) | trunc 63 | trimSuffix "-" }}
+{{- /* cluster-admin, because installing a component is an admin's step (Cluster → Components
+       checks for every right). The hook objects are deleted once the Job succeeds. */}}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" $ | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "zeabur.labels" $ | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-weight: "-1"
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: cluster-admin
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ $.Release.Namespace }}
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" $ | nindent 4 }}
+  annotations:
+    helm.sh/hook: post-install
+    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+spec:
+  backoffLimit: 2
+  template:
+    metadata:
+      labels:
+        {{- include "zeabur.selectorLabels" $ | nindent 8 }}
+    spec:
+      serviceAccountName: {{ $name }}
+      restartPolicy: Never
+      {{- with $.Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsUser: 65532
+        runAsGroup: 65532
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      {{- with $.Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with $.Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- /* One at a time, in order: each but the last as an init container. */}}
+      {{- $last := sub (len .) 1 }}
+      {{- range $i, $id := . }}
+      {{- if eq $i 0 }}
+      {{ if eq $i $last }}containers{{ else }}initContainers{{ end }}:
+      {{- else if eq $i $last }}
+      containers:
+      {{- end }}
+        - name: {{ printf "install-%d" $i }}
+          image: {{ include "zeabur.image" $ | quote }}
+          imagePullPolicy: {{ $.Values.image.pullPolicy }}
+          args: [components, install, {{ $id | quote }}, --timeout, 4m]
+          env:
+            - name: ZEABUR_CATALOG_URL
+              value: {{ $.Values.catalog.url | quote }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi
+      {{- end }}
+{{- end }}

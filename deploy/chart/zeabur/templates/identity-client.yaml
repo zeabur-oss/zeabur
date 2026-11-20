@@ -1,0 +1,45 @@
+{{- if .Values.identity.enabled }}
+{{- /* Zeabur's client at the Zeabur Identity this chart installs. A secret the chart makes is
+       random on install and kept on upgrades; Identity stores only its hash. */}}
+{{- $hash := "" }}
+{{- if include "zeabur.ownClientSecret" . }}
+{{- $name := include "zeabur.clientSecret" . }}
+{{- $key := .Values.issuer.clientSecret.key }}
+{{- $existing := lookup "v1" "Secret" .Release.Namespace $name }}
+{{- $secret := "" }}
+{{- if and $existing (index ($existing.data | default dict) $key) }}
+{{- $secret = index $existing.data $key | b64dec }}
+{{- else }}
+{{- $secret = randAlphaNum 43 }}
+{{- end }}
+{{- $hash = printf "sha256:%s" ($secret | sha256sum) }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+type: Opaque
+data:
+  {{ $key }}: {{ $secret | b64enc }}
+---
+{{- else }}
+{{- $hash = required "issuer.clientSecret.hash is required with identity.enabled and issuer.clientSecret.existingSecret" .Values.issuer.clientSecret.hash }}
+{{- end }}
+{{- $publicUrl := include "zeabur.publicUrl" . }}
+apiVersion: identity.zeabur.com/v1alpha1
+kind: OAuthClient
+metadata:
+  name: {{ .Values.issuer.clientId }}
+  namespace: zeabur-identity
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  type: Confidential
+  displayName: Zeabur
+  redirectUris: [{{ printf "%s/auth/callback" $publicUrl | quote }}]
+  homeUrl: {{ printf "%s/" $publicUrl | quote }}
+  audiences: [kubernetes]
+  secretHash: {{ $hash }}
+{{- end }}

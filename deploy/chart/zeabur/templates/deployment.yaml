@@ -46,25 +46,21 @@ spec:
           type: RuntimeDefault
       containers:
         - name: zeabur
-          {{- if .Values.image.digest }}
-          image: "{{ .Values.image.repository }}@{{ .Values.image.digest }}"
-          {{- else }}
-          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.Version }}"
-          {{- end }}
+          image: {{ include "zeabur.image" . | quote }}
           imagePullPolicy: {{ .Values.image.pullPolicy }}
           env:
             # IPv4 and IPv6, so the pod answers in single-stack and dual-stack clusters alike.
             - name: ZEABUR_LISTEN
               value: "[::]:8080"
             - name: ZEABUR_PUBLIC_URL
-              value: {{ required "publicUrl is required" .Values.publicUrl | quote }}
+              value: {{ include "zeabur.publicUrl" . | quote }}
             {{- with .Values.clusterName }}
             - name: ZEABUR_CLUSTER_NAME
               value: {{ . | quote }}
             {{- end }}
-            {{- with .Values.domains.suffixes }}
+            {{- with include "zeabur.domainSuffixes" . }}
             - name: ZEABUR_DOMAIN_SUFFIXES
-              value: {{ join "," . | quote }}
+              value: {{ . | quote }}
             {{- end }}
             {{- with .Values.domains.clusterIssuer }}
             - name: ZEABUR_CLUSTER_ISSUER
@@ -97,7 +93,7 @@ spec:
             {{- end }}
             {{- end }}
             - name: ZEABUR_ISSUER_URL
-              value: {{ required "issuer.url is required" $issuer.url | quote }}
+              value: {{ include "zeabur.issuerUrl" . | quote }}
             - name: ZEABUR_CLIENT_ID
               value: {{ $issuer.clientId | quote }}
             - name: ZEABUR_CLIENT_SECRET_FILE
@@ -246,7 +242,7 @@ spec:
                         fieldPath: metadata.namespace
         - name: client-secret
           secret:
-            secretName: {{ required "issuer.clientSecret.existingSecret is required" $issuer.clientSecret.existingSecret }}
+            secretName: {{ include "zeabur.clientSecret" . }}
             defaultMode: 0440
             items:
               - key: {{ $issuer.clientSecret.key }}

@@ -16,8 +16,18 @@ fail() {
   failures=$((failures + 1))
 }
 
-render() { # $@ = extra helm arguments
+# Zeabur Identity's chart, which deploy/chart/zeabur/Chart.yaml names.
+[[ -d "$chart/charts" ]] || helm dependency build "$chart" >/dev/null
+
+# Everything the chart renders, Zeabur Identity's objects and the install hooks included.
+render_all() { # $@ = extra helm arguments
   helm template zeabur "$chart" --namespace zeabur "$@"
+}
+
+# Zeabur's own objects, without Zeabur Identity's or the install hooks.
+render() { # $@ = extra helm arguments
+  render_all "$@" | yq 'select((.metadata.labels."helm.sh/chart" // "zeabur-") | test("^zeabur-"))
+    | select(.metadata.annotations."helm.sh/hook" == null)'
 }
 
 # Prints the value of a yq expression over every rendered document, one per line.
@@ -155,7 +165,7 @@ expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
 # The plan key: generated when no Secret is named, else the named one is mounted.
 out=$(render -f "$chart/ci/minimal-values.yaml")
 # 32 bytes, which is 44 characters of Base64 with one `=` of padding.
-expect minimal "$out" 'select(.kind == "Secret") | .data["plan-key"] | test("^[A-Za-z0-9+/]{43}=$")' true
+expect minimal "$out" 'select(.kind == "Secret" and .metadata.name == "zeabur-plan-key") | .data["plan-key"] | test("^[A-Za-z0-9+/]{43}=$")' true
 out=$(render -f "$chart/ci/full-values.yaml")
 expect full "$out" '[select(.kind == "Secret")] | length' 0
 expect full "$out" 'select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.volumes[] | select(.name == "plan-key") | .secret.secretName' \
@@ -206,8 +216,26 @@ expect full "$(render -f "$chart/ci/full-values.yaml")" "$cluster_env" shop-prod
 
 # New public URLs: the suffixes and a ClusterIssuer reach Zeabur only when given.
 domain_env='[select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_DOMAIN_SUFFIXES" or .name == "ZEABUR_CLUSTER_ISSUER") | .value] | join(",")'
-expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$domain_env" ""
+expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$domain_env" letsencrypt
 expect full "$(render -f "$chart/ci/full-values.yaml")" "$domain_env" "apps.example.test,example.test,letsencrypt"
+expect sslip "$(render -f "$chart/ci/minimal-values.yaml" --set global.domain=192.0.2.10.sslip.io)" \
+  "$domain_env" "192.0.2.10.sslip.io,letsencrypt"
+
+# A node's address becomes its sslip.io name; an IPv6 address has "-" for ":". `helm template` reads no
+# nodes, so a copy of the chart renders the helper for each address.
+sslip_chart="$(mktemp -d)/zeabur"
+cp -R "$chart" "$sslip_chart"
+printf '%s\n' 'names: {{ range list "192.0.2.10" "2001:DB8::10" }}{{ include "zeabur.sslipDomain" . }} {{ end }}' \
+  >"$sslip_chart/templates/sslip-names.yaml"
+got=$(helm template zeabur "$sslip_chart" -f "$chart/ci/minimal-values.yaml" --show-only templates/sslip-names.yaml | yq .names)
+[[ "$got" == "192.0.2.10.sslip.io 2001-db8--10.sslip.io" ]] || fail "sslip.io names: got '$got'"
+rm -rf "$(dirname "$sslip_chart")"
+
+# A client secret from a Secret of one's own: Identity gets the given hash, and the chart makes no Secret.
+own_client='[(select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.volumes[] | select(.name == "client-secret") | .secret.secretName), (select(.kind == "OAuthClient") | .spec.secretHash), (select(.kind == "Secret" and (.metadata.name | test("-client$"))) | .metadata.name)] | join(",")'
+client_hash="sha256:$(printf '%064d' 0)"
+expect "own client secret" "$(render -f "$chart/ci/minimal-values.yaml" --set issuer.clientSecret.existingSecret=zeabur-client \
+  --set issuer.clientSecret.hash="$client_hash")" "$own_client" "zeabur-client,$client_hash"
 
 # Extra CAs reach Zeabur only when given, from a ConfigMap or a Secret.
 extra_ca='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec | [(.containers[0].env[] | select(.name == "ZEABUR_EXTRA_CA_FILE") | .value), (.volumes[] | select(.name == "extra-ca") | .secret.secretName // .configMap.name)] | join(",")'
@@ -283,7 +311,14 @@ refuse() { # $1 = why, $@ = helm arguments
 refuse "a plain http public URL" --set publicUrl=http://zeabur.example.test
 refuse "a public URL with a path" --set publicUrl=https://zeabur.example.test/ui
 refuse "an issuer with a trailing slash" --set issuer.url=https://identity.example.test/
-refuse "no client secret" --set issuer.clientSecret.existingSecret=
+refuse "no domain where the nodes cannot be read" --set global.domain=
+refuse "a domain that is not a domain" --set global.domain=Example_Test
+refuse "no issuer without Zeabur Identity" --set identity.enabled=false
+refuse "no client secret without Zeabur Identity" --set identity.enabled=false \
+  --set issuer.url=https://identity.example.test
+refuse "a client Secret without its hash" --set issuer.clientSecret.existingSecret=zeabur-client
+refuse "a client secret hash that is not sha256" --set issuer.clientSecret.existingSecret=zeabur-client \
+  --set issuer.clientSecret.hash="$(printf '%064d' 0)"
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm
 refuse "a plain http catalog" --set catalog.url=http://catalog.example.test/v1/
@@ -314,6 +349,35 @@ id=0a1b2c3d-0000-4000-8000-000000000000
 expect telemetry "$(render -f "$chart/ci/minimal-values.yaml")" "[$env | select(.name == \"ZEABUR_TELEMETRY_ENABLED\" or .name == \"ZEABUR_INSTALLATION_ID\")] | length" 0
 expect telemetry "$(render -f "$chart/ci/minimal-values.yaml" --set telemetry.enabled=true --set telemetry.installationId=$id)" \
   "[$env | select(.name == \"ZEABUR_TELEMETRY_ENABLED\" or .name == \"ZEABUR_INSTALLATION_ID\") | .value] | join(\",\")" "true,$id"
+
+# With Zeabur Identity, the chart registers Zeabur as its client: the redirect URI at the public
+# URL, the hash of the client secret Zeabur reads, and the addresses under global.domain.
+out=$(render_all -f "$chart/ci/minimal-values.yaml")
+client='select(.kind == "OAuthClient")'
+expect identity "$out" "$client | [.metadata.namespace, .metadata.name, .spec.type, .spec.redirectUris[0], .spec.homeUrl, (.spec.audiences | join(\",\"))] | join(\" \")" \
+  "zeabur-identity zeabur Confidential https://zeabur.example.test/auth/callback https://zeabur.example.test/ kubernetes"
+secret=$(query "$out" 'select(.kind == "Secret" and .metadata.name == "zeabur-client") | .data["client-secret"]' | base64 -d)
+[[ "$(query "$out" "$client | .spec.secretHash")" == "sha256:$(printf %s "$secret" | sha256sum | cut -d' ' -f1)" ]] ||
+  fail "identity: the OAuthClient's secretHash is not the hash of the client secret Zeabur reads"
+expect identity "$out" '[select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_PUBLIC_URL" or .name == "ZEABUR_ISSUER_URL") | .value] | join(",")' \
+  "https://zeabur.example.test,https://identity.example.test"
+expect identity "$out" '[select(.kind == "Ingress") | .metadata.annotations["cert-manager.io/cluster-issuer"] + " " + .spec.tls[0].hosts[0]] | sort | join(",")' \
+  "letsencrypt identity.example.test,letsencrypt zeabur.example.test"
+expect full "$(render_all -f "$chart/ci/full-values.yaml")" '[select(.kind == "OAuthClient" or .metadata.namespace == "zeabur-identity")] | length' 0
+
+# The components are installed once, after `helm install`, in order, by a Job whose cluster-admin
+# binding is gone when it succeeds.
+hook='select(.metadata.annotations."helm.sh/hook")'
+expect components "$out" "[$hook | .kind + \"/\" + .metadata.name + \" \" + .metadata.annotations.\"helm.sh/hook\"] | sort | join(\",\")" \
+  "ClusterRoleBinding/zeabur-components post-install,Job/zeabur-components post-install,Job/zeabur-identity-setup post-install,Role/zeabur-identity-setup post-install,RoleBinding/zeabur-identity-setup post-install,ServiceAccount/zeabur-components post-install,ServiceAccount/zeabur-identity-setup post-install"
+expect components "$out" "[$hook | select(.metadata.name == \"zeabur-components\") | .metadata.annotations.\"helm.sh/hook-delete-policy\"] | unique | join(\",\")" \
+  before-hook-creation,hook-succeeded
+expect components "$out" 'select(.kind == "ClusterRoleBinding" and .metadata.name == "zeabur-components") | .roleRef.name' cluster-admin
+expect components "$(render_all -f "$chart/ci/full-values.yaml")" \
+  'select(.kind == "Job" and .metadata.name == "zeabur-components") | .spec.template.spec | [(.initContainers[], .containers[]) | .args | join(" ")] | join(",")' \
+  "components install cert-manager --timeout 4m,components install local-path --timeout 4m"
+expect components "$(render_all -f "$chart/ci/minimal-values.yaml" --set 'components.install=null')" \
+  '[select(.metadata.name == "zeabur-components")] | length' 0
 
 if ((failures > 0)); then
   echo "$failures chart check(s) failed" >&2
