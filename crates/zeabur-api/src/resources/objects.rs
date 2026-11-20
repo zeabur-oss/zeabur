@@ -46,6 +46,7 @@ use serde_json::json;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ResourceRef, ServedResource};
 use zeabur_model::{Origin, Provenance};
 
@@ -146,9 +147,9 @@ pub struct ObjectSummary {
     pub id: String,
     /// Its name.
     pub name: String,
-    /// When it was created, RFC 3339.
+    /// When it was created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
+    pub created_at: Option<Timestamp>,
     /// The kind of its controlling owner, when it has one (`ReplicaSet` for a pod).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner_kind: Option<String>,
@@ -245,7 +246,7 @@ fn summary(project: &str, resource: &ResourceRef, metadata: ObjectMeta) -> Objec
     ObjectSummary {
         id: object_id(project, resource, &name),
         owner_kind,
-        created: metadata.creation_timestamp.map(|t| t.0.to_string()),
+        created_at: metadata.creation_timestamp.map(|t| t.0),
         name,
     }
 }

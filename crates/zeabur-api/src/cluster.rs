@@ -85,7 +85,7 @@ use zeabur_catalog::versions::{self, Inputs, PlanStatus};
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Node;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::api::resource::Quantity;
-use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::k8s_openapi::jiff::tz::TimeZone;
 use zeabur_kube::{ClusterError, ClusterExt as _, DynamicObject};
 use zeabur_model::{Health, Origin};
 use zeabur_modules::Reading;
@@ -353,11 +353,7 @@ fn node_view(node: &Node) -> NodeView {
         pinned_pods: None,
         usage: None,
         disk: None,
-        created: node
-            .metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|t| t.0.to_string()),
+        created_at: node.metadata.creation_timestamp.as_ref().map(|t| t.0),
         issues: Vec::new(),
     }
 }
@@ -537,11 +533,6 @@ pub(crate) async fn nodes(
     }))
 }
 
-/// The day of `now` in UTC, `YYYY-MM-DD`.
-fn day(now: Timestamp) -> String {
-    now.to_string().get(..10).unwrap_or_default().to_owned()
-}
-
 /// The cluster's version and what it calls for: end of life from the bundled table, version
 /// skew between kube-apiserver and the kubelets, and newer patches and minors from
 /// system-upgrade-controller's Plans.
@@ -590,10 +581,10 @@ pub(crate) async fn upgrades(
             ))
         })
         .collect();
-    let today = day((state.clock)());
+    let today = (state.clock)().to_zoned(TimeZone::UTC).date();
     let assessment = versions::assess(&Inputs {
         current: &version,
-        today: &today,
+        today,
         kubelets: &kubelets,
         plans: &statuses,
     });
@@ -607,7 +598,7 @@ pub(crate) async fn upgrades(
         kubernetes_version: version,
         minor: assessment.minor,
         release: assessment.release,
-        data_as_of: versions::DATA_AS_OF.to_owned(),
+        data_copied_at: versions::DATA_AS_OF,
         badge,
         attention,
         states: assessment.states,

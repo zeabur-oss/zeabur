@@ -54,6 +54,7 @@ use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::{ConfigMap, Secret, SecretKeySelector, TypedLocalObjectReference};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 use utoipa::ToSchema;
@@ -62,7 +63,7 @@ use zeabur_model::kernel::dns::is_dns_label;
 use zeabur_model::kernel::s3::is_bucket_name;
 
 use crate::backups::Outcome;
-use crate::{Read, strings, text};
+use crate::{Read, strings, text, time};
 
 /// `velero.io/v1` `BackupStorageLocation`, cluster-wide.
 pub const LOCATIONS: Read = Read {
@@ -149,9 +150,9 @@ pub struct Location {
     pub credential: Option<String>,
     /// Whether Velero can reach it.
     pub phase: LocationPhase,
-    /// When Velero last checked, RFC 3339.
+    /// When Velero last checked.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_validated: Option<String>,
+    pub last_validated_at: Option<Timestamp>,
     /// Velero's message about the last check.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -182,9 +183,9 @@ pub struct ScheduleView {
     pub excluded: Vec<String>,
     /// It copies the files on every volume (file-system backup).
     pub fs_backup: bool,
-    /// When it last made a backup, RFC 3339.
+    /// When it last made a backup.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_backup: Option<String>,
+    pub last_backup: Option<Timestamp>,
     /// Why Velero refused it (`status.validationErrors`).
     pub validation_errors: Vec<String>,
     /// It is the schedule Zeabur sets up ([`SCHEDULE`]).
@@ -223,15 +224,15 @@ pub struct BackupView {
     pub phase: Option<String>,
     /// How it went.
     pub outcome: Outcome,
-    /// When it started, RFC 3339.
+    /// When it started.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub started: Option<String>,
-    /// When it finished, RFC 3339.
+    pub started_at: Option<Timestamp>,
+    /// When it finished.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished: Option<String>,
-    /// When Velero deletes it, RFC 3339.
+    pub finished_at: Option<Timestamp>,
+    /// When Velero deletes it.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires: Option<String>,
+    pub expires_at: Option<Timestamp>,
     /// Objects copied.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub items: Option<u64>,
@@ -256,8 +257,8 @@ pub struct BackupView {
 impl BackupView {
     /// The time it is sorted by: started, else finished.
     #[must_use]
-    pub fn time(&self) -> Option<&str> {
-        self.started.as_deref().or(self.finished.as_deref())
+    pub fn time(&self) -> Option<Timestamp> {
+        self.started_at.or(self.finished_at)
     }
 }
 
@@ -280,12 +281,12 @@ pub struct RestoreView {
     pub phase: Option<String>,
     /// How it went.
     pub outcome: Outcome,
-    /// When it started, RFC 3339.
+    /// When it started.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub started: Option<String>,
-    /// When it finished, RFC 3339.
+    pub started_at: Option<Timestamp>,
+    /// When it finished.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished: Option<String>,
+    pub finished_at: Option<Timestamp>,
     /// Errors Velero counted.
     pub errors: u64,
     /// Warnings Velero counted, such as objects that were already there.
@@ -333,7 +334,7 @@ pub fn location(object: &DynamicObject) -> Location {
         endpoint: text(object, "/spec/config/s3Url"),
         credential: text(object, "/spec/credential/name"),
         phase,
-        last_validated: text(object, "/status/lastValidationTime"),
+        last_validated_at: time(object, "/status/lastValidationTime"),
         message: text(object, "/status/message"),
     }
 }
@@ -379,7 +380,7 @@ pub fn schedule(object: &DynamicObject) -> ScheduleView {
         namespaces: covered(object, "/spec/template"),
         excluded: strings(object, "/spec/template/excludedNamespaces"),
         fs_backup: flag(object, "/spec/template/defaultVolumesToFsBackup"),
-        last_backup: text(object, "/status/lastBackup"),
+        last_backup: time(object, "/status/lastBackup"),
         validation_errors: strings(object, "/status/validationErrors"),
         zeabur: object.metadata.name.as_deref() == Some(SCHEDULE),
     }
@@ -467,9 +468,9 @@ pub fn backup(
         failure: failure(phase.as_deref(), location, errors),
         phase,
         outcome,
-        started: text(object, "/status/startTimestamp"),
-        finished: text(object, "/status/completionTimestamp"),
-        expires: text(object, "/status/expiration"),
+        started_at: time(object, "/status/startTimestamp"),
+        finished_at: time(object, "/status/completionTimestamp"),
+        expires_at: time(object, "/status/expiration"),
         items: number(object, "/status/progress/itemsBackedUp"),
         total_items: number(object, "/status/progress/totalItems"),
         errors,
@@ -511,8 +512,8 @@ pub fn restore(object: &DynamicObject) -> RestoreView {
             .map(str::to_owned),
         namespaces: covered(object, "/spec"),
         outcome,
-        started: text(object, "/status/startTimestamp"),
-        finished: text(object, "/status/completionTimestamp"),
+        started_at: time(object, "/status/startTimestamp"),
+        finished_at: time(object, "/status/completionTimestamp"),
         errors: number(object, "/status/errors").unwrap_or(0),
         warnings: number(object, "/status/warnings").unwrap_or(0),
         reason: text(object, "/status/failureReason")
@@ -1285,11 +1286,11 @@ pub fn download_request(
 
 /// The signed URL a `DownloadRequest` holds once Velero processed it, and when it expires.
 #[must_use]
-pub fn download_url(object: &DynamicObject) -> Option<(String, Option<String>)> {
+pub fn download_url(object: &DynamicObject) -> Option<(String, Option<Timestamp>)> {
     (text(object, "/status/phase").as_deref() == Some("Processed"))
         .then(|| text(object, "/status/downloadURL"))
         .flatten()
-        .map(|url| (url, text(object, "/status/expiration")))
+        .map(|url| (url, time(object, "/status/expiration")))
 }
 
 #[cfg(test)]

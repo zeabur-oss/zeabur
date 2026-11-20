@@ -19,6 +19,6 @@
         "value": "Cannot load HTTPBackendRef demo/web: service port 8081 not found"
       }
     ],
-    "lastSeen": "2026-10-17T10:02:18Z"
+    "lastSeenAt": "2026-10-17T10:02:18Z"
   }
 ]

@@ -53,6 +53,7 @@
 //! [cnpg-hibernation]: https://github.com/cloudnative-pg/cloudnative-pg/blob/v1.30.1/docs/src/declarative_hibernation.md
 //! [kstatus-generic]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/status/generic.go
 
+use k8s_openapi::jiff::Timestamp;
 use zeabur_kube::DynamicObject;
 use zeabur_model::readiness::{self, Reason, Status};
 
@@ -60,7 +61,7 @@ use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, newes
 use crate::databases::{
     self, AppUser, Backups, Connection, Database, Engine, RecoveryWindow, State, Store,
 };
-use crate::{Module, Read, strings, text};
+use crate::{Module, Read, strings, text, time};
 
 /// The module.
 pub static MODULE: Module = Module {
@@ -216,15 +217,19 @@ fn recovery_window(
         .get(&server)?
         .get("firstRecoverabilityPoint")?
         .as_str()?
-        .to_owned();
+        .parse()
+        .ok()?;
     let lag_seconds = text(cluster, "/spec/postgresql/parameters/archive_timeout")
         .map_or(Some(300), |t| seconds(&t))
         .filter(|s| *s > 0)?;
-    Some(RecoveryWindow { first, lag_seconds })
+    Some(RecoveryWindow {
+        earliest_at: first,
+        lag_seconds,
+    })
 }
 
 /// When the condition `kind` last turned true, if it is true.
-fn true_since(cluster: &DynamicObject, kind: &str) -> Option<String> {
+fn true_since(cluster: &DynamicObject, kind: &str) -> Option<Timestamp> {
     cluster
         .data
         .pointer("/status/conditions")?
@@ -232,19 +237,19 @@ fn true_since(cluster: &DynamicObject, kind: &str) -> Option<String> {
         .iter()
         .find(|c| c["type"] == kind && c["status"] == "True")
         .and_then(|c| c["lastTransitionTime"].as_str())
-        .map(str::to_owned)
+        .and_then(|t| t.parse().ok())
 }
 
 /// A backup can start: the instances run with the plugin's sidecar. `ContinuousArchiving` is
 /// true even without an archiver, so the cluster must also have become ready again after the
 /// store was made (the operator restarts the instances to add the sidecar), or have finished a
-/// backup since. Times are the API's second-precision RFC 3339, which sort as text.
-fn backups_ready(cluster: &DynamicObject, store_created: Option<&str>, runs: &[Run]) -> bool {
+/// backup since.
+fn backups_ready(cluster: &DynamicObject, store_created: Option<Timestamp>, runs: &[Run]) -> bool {
     let Some(created) = store_created else {
         return true_since(cluster, "ContinuousArchiving").is_some();
     };
     true_since(cluster, "ContinuousArchiving").is_some()
-        && (true_since(cluster, "Ready").is_some_and(|t| t.as_str() > created)
+        && (true_since(cluster, "Ready").is_some_and(|t| t > created)
             || runs
                 .iter()
                 .any(|r| r.outcome == Outcome::Succeeded && r.time().is_some_and(|t| t > created)))
@@ -347,7 +352,7 @@ pub fn database(
     let in_use = plugin_store(cluster).and_then(|wanted| named(&wanted));
     let store_created = in_use
         .and_then(|s| s.metadata.creation_timestamp.as_ref())
-        .map(|t| t.0.to_string());
+        .map(|t| t.0);
     let recovery_window = recovery_window(cluster, in_use);
     Database {
         origin: zeabur_model::Origin::complete(
@@ -389,17 +394,13 @@ pub fn database(
         backups: Backups {
             ready: state == State::Ready
                 && store.as_ref().is_some_and(|s| s.in_use)
-                && backups_ready(cluster, store_created.as_deref(), &found.runs),
+                && backups_ready(cluster, store_created, &found.runs),
             store,
             schedules: found.schedules,
             runs: found.runs,
             recovery_window,
         },
-        created: cluster
-            .metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|t| t.0.to_string()),
+        created_at: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),
@@ -463,8 +464,8 @@ fn findings_limited(
             provider: MODULE.id.to_owned(),
             targets: vec![target],
             outcome,
-            started: text(backup, "/status/startedAt"),
-            finished: text(backup, "/status/stoppedAt"),
+            started_at: time(backup, "/status/startedAt"),
+            finished_at: time(backup, "/status/stoppedAt"),
             message: text(backup, "/status/error"),
             restore_from: (outcome == Outcome::Succeeded)
                 .then(|| text(backup, "/status/backupId"))
@@ -649,21 +650,21 @@ mod tests {
             database("shop", pg, std::slice::from_ref(&store), &[], &[])
                 .backups
                 .recovery_window
-                .map(|w| (w.first, w.lag_seconds))
+                .map(|w| (w.earliest_at, w.lag_seconds))
         };
-        let first = "2026-10-20T03:05:00Z".to_owned();
+        let first: Timestamp = "2026-10-20T03:05:00Z".parse().unwrap();
         let cases = [
             (
                 "default archive_timeout",
                 serde_json::json!({}),
                 "True",
-                Some((first.clone(), 300)),
+                Some((first, 300)),
             ),
             (
                 "its own archive_timeout",
                 serde_json::json!({"archive_timeout": "1h"}),
                 "True",
-                Some((first.clone(), 3600)),
+                Some((first, 3600)),
             ),
             (
                 "archive_timeout in seconds",

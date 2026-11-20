@@ -38,7 +38,7 @@ export interface RestorePoint {
 export function recoveryRange(database: Database, now: Date): { from: Date; to: Date } | undefined {
   const window = database.backups.recoveryWindow
   if (database.engine !== "postgresql" || !window) return undefined
-  const from = new Date(window.first)
+  const from = new Date(window.earliestAt)
   const to = new Date(now.getTime() - window.lagSeconds * 1000)
   if (Number.isNaN(from.getTime()) || to <= from) return undefined
   return { from, to }
@@ -65,7 +65,7 @@ export function restorePoints(database: Database): RestorePoint[] {
     .filter((r) => r.outcome === "succeeded" && r.restoreFrom)
     .map((r) => ({
       backup: r.name,
-      time: r.finished ?? r.started ?? undefined,
+      time: r.finishedAt ?? r.startedAt ?? undefined,
       from: r.restoreFrom ?? undefined,
     }))
 }

@@ -368,7 +368,7 @@ function EventEntries({
                 ? warningTone(event.warning, service && statusOf(service).health)
                 : "neutral"
             }
-            time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
+            time={event.lastSeenAt ? <Ago iso={event.lastSeenAt} /> : undefined}
             title={
               <span>
                 <span className="font-medium" translate="no">

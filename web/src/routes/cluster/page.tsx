@@ -210,7 +210,7 @@ function WarningRow({ event }: { event: Schemas.EventView }) {
         </span>
         {event.note ? `${t("common.sep")}${event.note}` : null}
       </span>
-      <Ago iso={event.lastSeen} className="type-meta text-muted-foreground" />
+      <Ago iso={event.lastSeenAt} className="type-meta text-muted-foreground" />
     </li>
   )
 }

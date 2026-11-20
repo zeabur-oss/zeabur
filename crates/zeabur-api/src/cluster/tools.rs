@@ -39,7 +39,7 @@ use crate::access::Handoff;
 use crate::error::ApiError;
 use crate::extract::{Json, Path, WebSocketUpgrade};
 use crate::handlers::{AppState, Credential, Person};
-use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
+use crate::plan_token::{self as token, TokenError};
 use crate::pods::exec::Terminal;
 use crate::projects::writes::terminal::{Planner, list_pods, local_mode, tools_plan};
 use crate::projects::writes::token_problem;
@@ -57,8 +57,8 @@ pub struct ClusterToolsPlan {
     /// bindings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// The namespace of the pod.
     pub namespace: String,
     /// The pod it starts, or the one it uses.
@@ -233,9 +233,7 @@ pub(crate) async fn plan(
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     let now = (state.clock)();
-    let made_at = Timestamp::from_second(now.as_second())
-        .unwrap_or(Timestamp::UNIX_EPOCH)
-        .to_string();
+    let made_at = token::whole_second(now)?.to_string();
     let computed = compute(
         &state,
         cluster.as_ref(),
@@ -245,13 +243,13 @@ pub(crate) async fn plan(
         &made_at,
     )
     .await?;
-    let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
+    let expires_at = token::expiry(now)?;
     let claims = Claims {
         person: identity.username,
         groups: identity.groups,
         made_at,
         pod: computed.pod.clone(),
-        expires_at,
+        expires_at: expires_at.as_second(),
     };
     let writes = computed
         .writes()
@@ -271,9 +269,7 @@ pub(crate) async fn plan(
     };
     Ok(Json(ClusterToolsPlan {
         token,
-        expires_at: Timestamp::from_second(expires_at)
-            .unwrap_or(Timestamp::UNIX_EPOCH)
-            .to_string(),
+        expires_at,
         namespace: computed.namespace,
         pod: computed.pod,
         writes,

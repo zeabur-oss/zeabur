@@ -421,7 +421,7 @@ mod tests {
             revision: 2,
             name: "db-new".to_owned(),
             images: Vec::new(),
-            created: None,
+            created_at: None,
             change_cause: None,
             current: true,
             pods: ReleasePods {

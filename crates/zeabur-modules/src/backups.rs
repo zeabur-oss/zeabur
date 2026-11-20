@@ -12,6 +12,7 @@
 
 use std::collections::BTreeMap;
 
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
@@ -71,12 +72,12 @@ pub struct Run {
     pub targets: Vec<Target>,
     /// How it went.
     pub outcome: Outcome,
-    /// When it started, RFC 3339.
+    /// When it started.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub started: Option<String>,
-    /// When it finished, RFC 3339.
+    pub started_at: Option<Timestamp>,
+    /// When it finished.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished: Option<String>,
+    pub finished_at: Option<Timestamp>,
     /// The provider's message, for a failure.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -89,8 +90,8 @@ pub struct Run {
 impl Run {
     /// The time it is sorted by: finished, else started.
     #[must_use]
-    pub fn time(&self) -> Option<&str> {
-        self.finished.as_deref().or(self.started.as_deref())
+    pub fn time(&self) -> Option<Timestamp> {
+        self.finished_at.or(self.started_at)
     }
 }
 
@@ -326,7 +327,7 @@ pub fn newest(runs: &mut Vec<Run>, limit: usize) {
 pub(crate) fn condition(
     object: &zeabur_kube::DynamicObject,
     kind: &str,
-) -> Option<(Option<String>, Option<String>, Option<String>)> {
+) -> Option<(Option<Timestamp>, Option<String>, Option<String>)> {
     object
         .data
         .pointer("/status/conditions")?
@@ -335,7 +336,13 @@ pub(crate) fn condition(
         .find(|c| c["type"] == kind && c["status"] == "True")
         .map(|c| {
             let text = |key: &str| c[key].as_str().map(str::to_owned);
-            (text("lastTransitionTime"), text("reason"), text("message"))
+            (
+                c["lastTransitionTime"]
+                    .as_str()
+                    .and_then(|t| t.parse().ok()),
+                text("reason"),
+                text("message"),
+            )
         })
 }
 

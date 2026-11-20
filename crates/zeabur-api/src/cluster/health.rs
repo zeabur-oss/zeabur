@@ -88,7 +88,7 @@ fn leader(component: &str, lease: &Lease, now: Timestamp) -> LeaderLease {
         holder: spec
             .and_then(|s| s.holder_identity.clone())
             .filter(|h| !h.is_empty()),
-        renewed: renewed.map(|t| t.to_string()),
+        renewed_at: renewed,
         duration_seconds: duration,
         current,
     }
@@ -214,7 +214,10 @@ mod tests {
         let fresh = leader("kube-scheduler", &lease("2026-10-22T10:00:20Z", 15), now);
         assert!(fresh.current);
         assert_eq!(fresh.holder.as_deref(), Some("server-0_1f2e"));
-        assert_eq!(fresh.renewed.as_deref(), Some("2026-10-22T10:00:20Z"));
+        assert_eq!(
+            fresh.renewed_at,
+            Some("2026-10-22T10:00:20Z".parse().unwrap())
+        );
         let stale = leader("kube-scheduler", &lease("2026-10-22T09:58:00Z", 15), now);
         assert!(!stale.current);
     }

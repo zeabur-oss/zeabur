@@ -15,6 +15,7 @@ use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Denied, Kind, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, ServiceAccount};
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, DynamicObject, ResourceRef};
 use zeabur_plan::api_token::{self, NAMESPACE, Refusal};
 
@@ -35,12 +36,12 @@ pub struct ApiTokenView {
     /// Whoever made it: a Zeabur Identity user name, or the Kubernetes user name of anyone else.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created_by: Option<String>,
-    /// When it was made, RFC 3339.
+    /// When it was made.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<String>,
-    /// When its latest token expires, RFC 3339, as kube-apiserver answered.
+    pub created_at: Option<Timestamp>,
+    /// When its latest token expires, as kube-apiserver answered.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub expires_at: Option<String>,
+    pub expires_at: Option<Timestamp>,
 }
 
 /// A token kube-apiserver issued, shown once.
@@ -53,8 +54,8 @@ pub struct IssuedTokenView {
     pub namespace: String,
     /// The bearer token.
     pub token: String,
-    /// When it expires, RFC 3339, as kube-apiserver answered.
-    pub expires_at: String,
+    /// When it expires, as kube-apiserver answered.
+    pub expires_at: Timestamp,
     /// kube-apiserver's CA bundle, PEM; absent when it could not be read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub ca: Option<String>,

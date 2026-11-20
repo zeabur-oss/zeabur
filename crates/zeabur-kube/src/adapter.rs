@@ -894,7 +894,7 @@ impl Cluster for UserClient {
             })?;
             Ok(IssuedToken {
                 token: status.token,
-                expires_at: status.expiration_timestamp.0.to_string(),
+                expires_at: status.expiration_timestamp.0,
             })
         })
     }

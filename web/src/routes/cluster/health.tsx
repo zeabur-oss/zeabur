@@ -89,7 +89,7 @@ function Readiness({ health }: { health: ClusterHealth }) {
                 {lease.component}
               </span>
               <span className="type-meta text-muted-foreground">
-                {t("cluster.leaseStale")} <Ago iso={lease.renewed} />
+                {t("cluster.leaseStale")} <Ago iso={lease.renewedAt} />
               </span>
             </li>
           ))}
@@ -121,7 +121,7 @@ function Coverage({ health }: { health: ClusterHealth }) {
                   </dt>
                   <dd>
                     {lease.current ? t("cluster.leaseRenewed") : t("cluster.leaseStale")}{" "}
-                    <Ago iso={lease.renewed} />
+                    <Ago iso={lease.renewedAt} />
                   </dd>
                 </div>
               ))}

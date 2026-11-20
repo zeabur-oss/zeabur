@@ -90,9 +90,9 @@ export function buildProblem(build: Build, latest: BuildRun | undefined) {
 
 /** Milliseconds from start to finish, or to `now` while it runs. */
 export function durationOf(run: BuildRun, now: number): number | undefined {
-  if (!run.started) return undefined
-  const end = run.finished ? Date.parse(run.finished) : now
-  const ms = end - Date.parse(run.started)
+  if (!run.startedAt) return undefined
+  const end = run.finishedAt ? Date.parse(run.finishedAt) : now
+  const ms = end - Date.parse(run.startedAt)
   return Number.isFinite(ms) && ms >= 0 ? ms : undefined
 }
 

@@ -3092,7 +3092,7 @@ fn template_idle(id: &str) -> Option<zeabur_catalog::IdleUse> {
         memory_bytes: pod.memory_bytes,
         cpu_millicores: pod.cpu_millicores,
         environment: "single-node-amd64-v1.36.4".to_owned(),
-        measured_at: "2026-10-24".to_owned(),
+        measured_at: zeabur_kube::k8s_openapi::jiff::civil::date(2026, 10, 24),
         pods: vec![pod],
     })
 }

@@ -27,7 +27,7 @@
         "fieldPath": "status.conditions[type=PodScheduled]"
       }
     ],
-    "lastSeen": "2026-10-15T11:50:00Z",
+    "lastSeenAt": "2026-10-15T11:50:00Z",
     "fault": {"origin": "cluster", "fixer": "clusterAdmin"}
   }
 ]

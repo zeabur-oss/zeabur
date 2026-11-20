@@ -157,7 +157,7 @@ pub(crate) fn event_view(project: &str, event: &Event) -> EventView {
         reason,
         note,
         count,
-        last_seen: last_seen(event).map(|t| t.to_string()),
+        last_seen_at: last_seen(event),
         reporter: event.reporting_controller.clone().or_else(|| {
             event
                 .deprecated_source

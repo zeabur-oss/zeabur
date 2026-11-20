@@ -573,11 +573,11 @@ pub fn summarise_with(
             .pod_spec()
             .and_then(|spec| spec.containers.first())
             .and_then(|container| container.image.clone()),
-        created: workload
+        created_at: workload
             .meta()
             .creation_timestamp
             .as_ref()
-            .map(|time| time.0.to_string()),
+            .map(|time| time.0),
         provenance: provenance(workload.meta()),
         schedule: schedule(workload),
         origin: Origin::object(workload.kind().as_str(), workload.name()),
@@ -593,11 +593,11 @@ fn schedule(workload: Workload<'_>) -> Option<TaskSchedule> {
         cron: spec.schedule.clone(),
         time_zone: spec.time_zone.clone(),
         suspended: spec.suspend.unwrap_or(false),
-        last_scheduled: cron_job
+        last_scheduled_at: cron_job
             .status
             .as_ref()
             .and_then(|s| s.last_schedule_time.as_ref())
-            .map(|time| time.0.to_string()),
+            .map(|time| time.0),
         task_of: cron_job
             .metadata
             .labels

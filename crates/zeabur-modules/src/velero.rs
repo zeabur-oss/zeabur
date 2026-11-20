@@ -30,7 +30,7 @@ use zeabur_kube::DynamicObject;
 pub mod cluster;
 
 use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, newest};
-use crate::{Module, Read, strings, text};
+use crate::{Module, Read, strings, text, time};
 
 /// The module.
 pub static MODULE: Module = Module {
@@ -155,8 +155,8 @@ pub fn findings(
             provider: MODULE.id.to_owned(),
             targets: targets(backup, "/spec", namespace, volumes),
             outcome,
-            started: text(backup, "/status/startTimestamp"),
-            finished: text(backup, "/status/completionTimestamp"),
+            started_at: time(backup, "/status/startTimestamp"),
+            finished_at: time(backup, "/status/completionTimestamp"),
             message: errors.map(|n| format!("{n} errors")),
             restore_from: None,
         });

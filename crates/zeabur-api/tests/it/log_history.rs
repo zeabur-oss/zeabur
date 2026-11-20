@@ -90,8 +90,8 @@ mod tests {
         assert_eq!(
             body["lines"],
             json!([
-                {"time": "2026-10-22T14:44:10.5Z", "pod": "web-5c8-fghij", "container": "app", "message": "earlier"},
-                {"time": "2026-10-22T14:44:11Z", "pod": "web-6d9-abcde", "container": "app", "message": "later"},
+                {"writtenAt": "2026-10-22T14:44:10.5Z", "pod": "web-5c8-fghij", "container": "app", "message": "earlier"},
+                {"writtenAt": "2026-10-22T14:44:11Z", "pod": "web-6d9-abcde", "container": "app", "message": "later"},
             ])
         );
         let asked = fake.asked.lock().unwrap().clone();

@@ -1385,10 +1385,7 @@ impl Cluster for MemoryCluster {
                 .push((format!("{namespace}/{name}"), seconds));
             let token = format!("memory-token-{}", state.issued_tokens.len());
             drop(state);
-            Ok(IssuedToken {
-                token,
-                expires_at: expires_at.to_string(),
-            })
+            Ok(IssuedToken { token, expires_at })
         })
     }
 

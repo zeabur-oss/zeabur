@@ -84,7 +84,7 @@ function progressText(t: Translate, locale: string, state: Schemas.ProjectDeleti
   )
   return [
     t("deleting.body"),
-    t("deleting.since", formatAgo(state.since, locale)),
+    t("deleting.since", formatAgo(state.startedAt, locale)),
     left.length > 0 ? t("deleting.left", t("common.list", left)) : "",
   ]
     .filter(Boolean)

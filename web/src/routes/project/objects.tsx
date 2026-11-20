@@ -356,7 +356,7 @@ function ObjectList({
                           {t("objects.owner", kindName(t, row.object.ownerKind))}
                         </span>
                       ) : null}
-                      <Ago iso={row.object.created} className="type-meta text-muted-foreground" />
+                      <Ago iso={row.object.createdAt} className="type-meta text-muted-foreground" />
                     </button>
                   )}
                 </div>

@@ -42,10 +42,10 @@ describe("repeats", () => {
         pod: "web-1",
         container: "web",
         command,
-        time,
+        happenedAt: time,
       }) as Alert
     const rows = folded([shell("3"), shell("2", "bash"), shell("1")])
-    expect(rows.map((r) => [r.alert.time, r.count])).toEqual([
+    expect(rows.map((r) => [r.alert.happenedAt, r.count])).toEqual([
       ["3", 2],
       ["2", 1],
     ])

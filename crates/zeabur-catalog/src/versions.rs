@@ -41,10 +41,11 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use zeabur_kube::k8s_openapi::jiff::civil::{Date, date};
 use zeabur_model::Health;
 
 /// When [`RELEASES`] was copied from the Kubernetes schedule.
-pub const DATA_AS_OF: &str = "2026-10-14";
+pub const DATA_AS_OF: Date = date(2026, 10, 14);
 
 /// One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -53,11 +54,11 @@ pub struct Release {
     /// `1.34`.
     pub minor: Cow<'static, str>,
     /// Its first release.
-    pub released: Cow<'static, str>,
+    pub released_at: Date,
     /// From this day only critical fixes are made ("maintenance mode").
-    pub maintenance_from: Cow<'static, str>,
+    pub maintenance_starts_at: Date,
     /// The last day it gets patches.
-    pub end_of_life: Cow<'static, str>,
+    pub end_of_life_at: Date,
 }
 
 /// Kubernetes minors still supported or recently ended, newest first.
@@ -69,33 +70,33 @@ pub struct Release {
 pub const RELEASES: &[Release] = &[
     Release {
         minor: Cow::Borrowed("1.37"),
-        released: Cow::Borrowed("2026-08-26"),
-        maintenance_from: Cow::Borrowed("2027-08-28"),
-        end_of_life: Cow::Borrowed("2027-10-28"),
+        released_at: date(2026, 8, 26),
+        maintenance_starts_at: date(2027, 8, 28),
+        end_of_life_at: date(2027, 10, 28),
     },
     Release {
         minor: Cow::Borrowed("1.36"),
-        released: Cow::Borrowed("2026-04-22"),
-        maintenance_from: Cow::Borrowed("2027-04-28"),
-        end_of_life: Cow::Borrowed("2027-06-28"),
+        released_at: date(2026, 4, 22),
+        maintenance_starts_at: date(2027, 4, 28),
+        end_of_life_at: date(2027, 6, 28),
     },
     Release {
         minor: Cow::Borrowed("1.35"),
-        released: Cow::Borrowed("2025-12-17"),
-        maintenance_from: Cow::Borrowed("2026-12-28"),
-        end_of_life: Cow::Borrowed("2027-02-28"),
+        released_at: date(2025, 12, 17),
+        maintenance_starts_at: date(2026, 12, 28),
+        end_of_life_at: date(2027, 2, 28),
     },
     Release {
         minor: Cow::Borrowed("1.34"),
-        released: Cow::Borrowed("2025-08-27"),
-        maintenance_from: Cow::Borrowed("2026-08-27"),
-        end_of_life: Cow::Borrowed("2026-10-27"),
+        released_at: date(2025, 8, 27),
+        maintenance_starts_at: date(2026, 8, 27),
+        end_of_life_at: date(2026, 10, 27),
     },
     Release {
         minor: Cow::Borrowed("1.33"),
-        released: Cow::Borrowed("2025-04-23"),
-        maintenance_from: Cow::Borrowed("2026-04-28"),
-        end_of_life: Cow::Borrowed("2026-06-28"),
+        released_at: date(2025, 4, 23),
+        maintenance_starts_at: date(2026, 4, 28),
+        end_of_life_at: date(2026, 6, 28),
     },
 ];
 
@@ -242,8 +243,8 @@ pub struct PlanStatus {
 pub struct Inputs<'a> {
     /// kube-apiserver's `gitVersion`.
     pub current: &'a str,
-    /// Today, `YYYY-MM-DD` (UTC).
-    pub today: &'a str,
+    /// Today (UTC).
+    pub today: Date,
     /// Each node and its kubelet's version; empty when nodes cannot be read.
     pub kubelets: &'a [(String, String)],
     /// The upgrades a node-updates provider manages; empty when there is none or they cannot be
@@ -292,8 +293,8 @@ pub fn assess(inputs: &Inputs<'_>) -> Assessment {
     let minor = current.minor_label();
     out.release = release(&minor);
     match &out.release {
-        Some(row) if inputs.today > &*row.end_of_life => out.states.push(UpgradeState::EndOfLife),
-        Some(row) if inputs.today >= &*row.maintenance_from => {
+        Some(row) if inputs.today > row.end_of_life_at => out.states.push(UpgradeState::EndOfLife),
+        Some(row) if inputs.today >= row.maintenance_starts_at => {
             out.states.push(UpgradeState::Maintenance);
         }
         Some(_) => {}
@@ -382,7 +383,7 @@ mod tests {
     fn inputs(current: &str) -> Inputs<'_> {
         Inputs {
             current,
-            today: "2026-10-14",
+            today: date(2026, 10, 14),
             kubelets: &[],
             plans: &[],
         }
@@ -408,9 +409,12 @@ mod tests {
             assert_eq!(minor_order(&newer.minor, &older.minor), Ordering::Greater);
         }
         for row in RELEASES {
-            assert!(row.released < row.maintenance_from && row.maintenance_from < row.end_of_life);
+            assert!(
+                row.released_at < row.maintenance_starts_at
+                    && row.maintenance_starts_at < row.end_of_life_at
+            );
         }
-        assert_eq!(release("1.34").unwrap().end_of_life, "2026-10-27");
+        assert_eq!(release("1.34").unwrap().end_of_life_at, date(2026, 10, 27));
     }
 
     #[test]
@@ -420,7 +424,7 @@ mod tests {
         assert_eq!(a.states, [UpgradeState::Maintenance]);
         assert!(a.patch.is_none() && a.next_minor.is_none());
         let after = assess(&Inputs {
-            today: "2026-10-28",
+            today: date(2026, 10, 28),
             ..i
         });
         assert_eq!(after.states, [UpgradeState::EndOfLife]);

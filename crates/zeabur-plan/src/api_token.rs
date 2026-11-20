@@ -14,6 +14,7 @@ use std::collections::BTreeMap;
 use k8s_openapi::api::authentication::v1::{TokenRequest, TokenRequestSpec};
 use k8s_openapi::api::core::v1::ServiceAccount;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::jiff::Timestamp;
 use serde_json::{Value, json};
 pub use zeabur_model::kernel::names::API_TOKENS_NAMESPACE as NAMESPACE;
 
@@ -69,12 +70,12 @@ pub fn token_request(seconds: i64) -> TokenRequest {
 /// The JSON Patch that records `expires_at` on the ServiceAccount of the token `name`; its `test`
 /// refuses a ServiceAccount that is no longer that token.
 #[must_use]
-pub fn expiry_patch(name: &str, expires_at: &str) -> Vec<Value> {
+pub fn expiry_patch(name: &str, expires_at: Timestamp) -> Vec<Value> {
     vec![
         test(&pointer(&["metadata", "labels", LABEL]), json!(name)),
         add(
             &pointer(&["metadata", "annotations", EXPIRES_AT_ANNOTATION]),
-            json!(expires_at),
+            json!(expires_at.to_string()),
         ),
     ]
 }
@@ -122,9 +123,9 @@ pub struct Token {
     /// Who made it.
     pub created_by: Option<String>,
     /// `metadata.creationTimestamp`.
-    pub created_at: Option<String>,
-    /// When the latest token expires.
-    pub expires_at: Option<String>,
+    pub created_at: Option<Timestamp>,
+    /// When the latest token expires; `None` when the annotation is missing or not a time.
+    pub expires_at: Option<Timestamp>,
 }
 
 /// The token a ServiceAccount is, when its [`LABEL`] names it.
@@ -139,11 +140,8 @@ pub fn read(account: &ServiceAccount) -> Option<Token> {
     Some(Token {
         name: name.to_owned(),
         created_by: annotation(CREATED_BY_ANNOTATION),
-        created_at: metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|time| time.0.to_string()),
-        expires_at: annotation(EXPIRES_AT_ANNOTATION),
+        created_at: metadata.creation_timestamp.as_ref().map(|time| time.0),
+        expires_at: annotation(EXPIRES_AT_ANNOTATION).and_then(|t| t.parse().ok()),
     })
 }
 
@@ -190,8 +188,8 @@ mod tests {
             "2026-12-01T00:00:00Z".to_owned(),
         );
         assert_eq!(
-            read(&patched).unwrap().expires_at.as_deref(),
-            Some("2026-12-01T00:00:00Z")
+            read(&patched).unwrap().expires_at,
+            Some("2026-12-01T00:00:00Z".parse().unwrap())
         );
         let mut other = account.clone();
         other
@@ -203,7 +201,7 @@ mod tests {
         let mut unlabelled = account;
         unlabelled.metadata.labels = Some(BTreeMap::new());
         assert_eq!(read(&unlabelled), None);
-        let patch = expiry_patch("ci", "2026-12-01T00:00:00Z");
+        let patch = expiry_patch("ci", "2026-12-01T00:00:00Z".parse().unwrap());
         assert_eq!(patch[0]["op"], "test");
         assert_eq!(patch[0]["value"], "ci");
         assert_eq!(

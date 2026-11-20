@@ -380,7 +380,7 @@ export type ProjectGrant = {
  */
 export type ApiTokenView = {
   /**
-   * When it was made, RFC 3339.
+   * When it was made.
    * @nullable
    */
   createdAt?: string | null
@@ -390,7 +390,7 @@ export type ApiTokenView = {
    */
   createdBy?: string | null
   /**
-   * When its latest token expires, RFC 3339, as kube-apiserver answered.
+   * When its latest token expires, as kube-apiserver answered.
    * @nullable
    */
   expiresAt?: string | null
@@ -535,10 +535,10 @@ export type BackupTarget = {
  */
 export type BackupRun = {
   /**
-   * When it finished, RFC 3339.
+   * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The provider's message, for a failure.
    * @nullable
@@ -557,10 +557,10 @@ export type BackupRun = {
    */
   restoreFrom?: string | null
   /**
-   * When it started, RFC 3339.
+   * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /** What it covered. */
   targets: BackupTarget[]
 }
@@ -861,7 +861,7 @@ export type BackupsPlan = {
    */
   backup?: string | null
   copy?: RestoreCopy | null
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /**
    * The hostnames of an `attachDomains` plan that another project serves. While there are
@@ -1361,9 +1361,9 @@ export type CertificateCheck = {
  * The dates of the certificate in a `kubernetes.io/tls` Secret. Never its key.
  */
 export type CertificateDates = {
-  /** When it expires, RFC 3339. */
+  /** When it expires. */
   notAfter: string
-  /** From when the certificate is valid, RFC 3339. */
+  /** From when the certificate is valid. */
   notBefore: string
   /** The Secret. */
   secret: string
@@ -2794,16 +2794,16 @@ export type VeleroBackup = {
    */
   errors: number
   /**
-   * When Velero deletes it, RFC 3339.
+   * When Velero deletes it.
    * @nullable
    */
-  expires?: string | null
+  expiresAt?: string | null
   failure?: VeleroFailure | null
   /**
-   * When it finished, RFC 3339.
+   * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * Objects copied.
    * @minimum 0
@@ -2832,10 +2832,10 @@ export type VeleroBackup = {
    */
   schedule?: string | null
   /**
-   * When it started, RFC 3339.
+   * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /**
    * Objects it set out to copy.
    * @minimum 0
@@ -2879,10 +2879,10 @@ export type VeleroLocation = {
    */
   endpoint?: string | null
   /**
-   * When Velero last checked, RFC 3339.
+   * When Velero last checked.
    * @nullable
    */
-  lastValidated?: string | null
+  lastValidatedAt?: string | null
   /**
    * Velero's message about the last check.
    * @nullable
@@ -2920,10 +2920,10 @@ export type VeleroRestore = {
    */
   errors: number
   /**
-   * When it finished, RFC 3339.
+   * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The new namespace it restores into, when it maps one.
    * @nullable
@@ -2948,10 +2948,10 @@ export type VeleroRestore = {
   /** The only kinds it restores (`includedResources`), as `resource.group`; empty for all. */
   resources?: string[]
   /**
-   * When it started, RFC 3339.
+   * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /**
    * Warnings Velero counted, such as objects that were already there.
    * @minimum 0
@@ -2976,7 +2976,7 @@ export type VeleroSchedule = {
    */
   keepDays?: number | null
   /**
-   * When it last made a backup, RFC 3339.
+   * When it last made a backup.
    * @nullable
    */
   lastBackup?: string | null
@@ -3085,7 +3085,7 @@ export type ClusterCoverage =
   | {
       as: "last"
       /**
-       * When it finished, else when it started (RFC 3339).
+       * When it finished, else when it started.
        * @nullable
        */
       at?: string | null
@@ -3114,10 +3114,10 @@ export type EventView = {
   /** `projects/<project>/events/<name>`. */
   id: string
   /**
-   * When it last happened (RFC 3339).
+   * When it last happened.
    * @nullable
    */
-  lastSeen?: string | null
+  lastSeenAt?: string | null
   /** What happened, as the component reported it. */
   note: string
   /** The Event object itself. */
@@ -3139,7 +3139,7 @@ export type EventView = {
  * Events of the whole cluster, the newest `limit` of them.
  */
 export type ClusterEventList = {
-  /** Newest first (by `lastSeen`, events without one last), then by namespace and name. */
+  /** Newest first (by `lastSeenAt`, events without one last), then by namespace and name. */
   items: EventView[]
   /**
    * `true` when the cluster holds more events than Zeabur read (5,000): older ones may be
@@ -3190,7 +3190,7 @@ export type LeaderLease = {
    * When the leader last renewed the lease.
    * @nullable
    */
-  renewed?: string | null
+  renewedAt?: string | null
 }
 
 /**
@@ -3571,7 +3571,7 @@ export type PlanWarning =
       code: "ownCertificate"
       /** The hostname. */
       hostname: string
-      /** When the certificate expires, RFC 3339. */
+      /** When the certificate expires. */
       notAfter: string
     }
   | {
@@ -3711,8 +3711,8 @@ export type PlanWarning =
   | {
       code: "toolsPod"
       /**
-       * When the credential written into the pod expires, RFC 3339; `kubectl` is refused
-       * from then until a terminal opens again with a fresh one.
+       * When the credential written into the pod expires; `kubectl` is refused from then until
+       * a terminal opens again with a fresh one.
        * @nullable
        */
       credentialExpiresAt?: string | null
@@ -3843,7 +3843,7 @@ export type ShellWrite = {
  * A plan that starts the person's cluster tools pod, or uses the one that still runs.
  */
 export type ClusterToolsPlan = {
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /**
    * Bindings that let others into the pod, and so to the credential in it; the plan cannot be
@@ -3996,10 +3996,10 @@ export type ClusterUsage = {
    */
   podsScanned: number
   /**
-   * When the newest sample was taken (RFC 3339).
+   * When the newest sample was taken.
    * @nullable
    */
-  timestamp?: string | null
+  sampledAt?: string | null
   /** Every namespace together. */
   totals: UsageTotals
   /** What could not be read. */
@@ -4511,11 +4511,11 @@ export type PendingRestart = {
   manager: string
   /** That pod. */
   pod: string
-  /** When the oldest running pod started (`status.startTime`), RFC 3339. */
+  /** When the oldest running pod started (`status.startTime`). */
   podStartedAt: string
   /**
    * When the object was last written by a field manager that owns the key (for an `envFrom`
-   * import, any key), RFC 3339.
+   * import, any key).
    */
   writtenAt: string
 }
@@ -4840,10 +4840,10 @@ export type ContainerTermination = {
   /** The process's exit code. */
   exitCode: number
   /**
-   * When it ended, in RFC 3339.
+   * When it ended.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The container's termination message, or the runtime's.
    * @nullable
@@ -4855,10 +4855,10 @@ export type ContainerTermination = {
    */
   reason?: string | null
   /**
-   * When it started, in RFC 3339.
+   * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
 }
 
 /**
@@ -4893,7 +4893,7 @@ export type ContainerStatusSummary = {
   /** How many times the kubelet restarted it. */
   restarts: number
   /**
-   * When the current run started, in RFC 3339, when it is running.
+   * When the current run started, when it is running.
    * @nullable
    */
   startedAt?: string | null
@@ -5048,8 +5048,8 @@ export type DatabaseAppUser = {
  * The times a new database can recover to.
  */
 export type DatabaseRecoveryWindow = {
-  /** The earliest time, RFC 3339: when the oldest backup in the store finished. */
-  first: string
+  /** The earliest time: when the oldest backup in the store finished. */
+  earliestAt: string
   /**
    * The newest time is this many seconds before now: the archive may not hold the most
    * recent writes yet.
@@ -5195,10 +5195,10 @@ export type PodSummary = {
   /** Its containers' names, for picking whose log to read. */
   containers: string[]
   /**
-   * When it was created, in RFC 3339.
+   * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** `fail` when it keeps failing, `ok` when ready, `idle` when it succeeded, `warn` otherwise. */
   health: Health
   /** Its resource name, `projects/<project>/pods/<name>`; see [`crate::id`]. */
@@ -5240,10 +5240,10 @@ export type DatabaseRestored = {
   /** The database the backup is of. */
   from: string
   /**
-   * When the backup was taken, RFC 3339.
+   * When the backup was taken.
    * @nullable
    */
-  time?: string | null
+  takenAt?: string | null
 }
 
 /**
@@ -5278,10 +5278,10 @@ export type Database = {
   /** Where and as whom to connect. */
   connection: DatabaseConnection
   /**
-   * When it was created, RFC 3339.
+   * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** The engine. */
   engine: DatabaseEngine
   /**
@@ -5705,10 +5705,10 @@ export type Diagnosis = {
   /** What kind of failure. */
   kind: DiagnosisKind
   /**
-   * When it last happened, in RFC 3339, when known.
+   * When it last happened, when known.
    * @nullable
    */
-  lastSeen?: string | null
+  lastSeenAt?: string | null
   /** The pods it was seen in, sorted. */
   pods: string[]
   /**
@@ -5996,7 +5996,7 @@ export const EntryKind = {
  * Events of a project, the newest `limit` of them.
  */
 export type EventList = {
-  /** Newest first (by `lastSeen`, events without one last), then by name. */
+  /** Newest first (by `lastSeenAt`, events without one last), then by name. */
   items: EventView[]
   /**
    * How many events matched, also those past `limit`.
@@ -6009,7 +6009,7 @@ export type EventList = {
  * A service's evidence, as Markdown.
  */
 export type EvidenceBundle = {
-  /** When it was read, RFC 3339. */
+  /** When it was read. */
   generatedAt: string
   /** `projects/<project>/services/<kind>/<name>/evidence`. */
   id: string
@@ -6069,6 +6069,11 @@ export type FalcoAlert = {
    * @nullable
    */
   container?: string | null
+  /**
+   * When it happened.
+   * @nullable
+   */
+  happenedAt?: string | null
   /** The report result it was read from. */
   origin: Origin
   /** Falco's own sentence, with every field it names. */
@@ -6084,11 +6089,6 @@ export type FalcoAlert = {
   severity: FalcoSeverity
   /** Falco's event source (`syscall`, `k8s_audit`). */
   source: string
-  /**
-   * When it happened, RFC 3339.
-   * @nullable
-   */
-  time?: string | null
   /**
    * The user it ran as.
    * @nullable
@@ -6598,7 +6598,7 @@ export type GitHubAppWrite = {
  * A plan, and the token that applies it.
  */
 export type GitHubAppPlan = {
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /** Send this to `apply` to carry out exactly this plan. */
   token: string
@@ -6837,7 +6837,7 @@ export type IdleUse = {
   cpuMillicores: number
   /** Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`. */
   environment: string
-  /** The day it was measured (`2026-10-25`). */
+  /** The day it was measured. */
   measuredAt: string
   /**
    * The pods' working set in bytes.
@@ -6934,10 +6934,10 @@ export type Incident = {
   /** The services it reaches, sorted by id, as far as the reader could see them. */
   services: AffectedService[]
   /**
-   * Since when, in RFC 3339, when known.
+   * Since when, when known.
    * @nullable
    */
-  since?: string | null
+  startedAt?: string | null
   /** What stops working because of it. */
   why: Message
 }
@@ -6999,7 +6999,7 @@ export type InvitationView = {
    * @nullable
    */
   createdAt?: string | null
-  /** When it stops working, RFC 3339. */
+  /** When it stops working. */
   expiresAt: string
   /** `members/invitations/<name>`. */
   id: string
@@ -7022,7 +7022,7 @@ export type IssuedTokenView = {
    * @nullable
    */
   ca?: string | null
-  /** When it expires, RFC 3339, as kube-apiserver answered. */
+  /** When it expires, as kube-apiserver answered. */
   expiresAt: string
   /**
    * A kubeconfig that uses the token. `server` is empty: Zeabur knows kube-apiserver only by
@@ -7095,8 +7095,8 @@ export type LogHistoryLine = {
   message: string
   /** The pod that wrote it, which may be gone. */
   pod: string
-  /** When it was written, RFC 3339. */
-  time: string
+  /** When it was written. */
+  writtenAt: string
 }
 
 /**
@@ -7193,7 +7193,7 @@ export type MaintenancePlan = {
   action: NodeAction
   /** Whether the node is cordoned now. */
   cordoned: boolean
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /** The node. */
   node: string
@@ -7244,7 +7244,7 @@ export type MemberActions = {
 export type SetupLinkView = {
   /** Whether the member was created now. */
   createdMember: boolean
-  /** When it stops working, RFC 3339. */
+  /** When it stops working. */
   expiresAt: string
   /** The `Invitation` object's name, to revoke it. */
   name: string
@@ -7385,7 +7385,7 @@ export type MemberWrite = {
  * A member plan and the token that applies it.
  */
 export type MemberPlan = {
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /**
    * For an invitation: how long its link will work once made, in seconds.
@@ -7420,7 +7420,7 @@ export type PasskeyView = {
    */
   authenticator?: string | null
   /**
-   * When it was added, RFC 3339.
+   * When it was added.
    * @nullable
    */
   createdAt?: string | null
@@ -7842,10 +7842,10 @@ export type NodeView = {
   /** Cordoned: new pods are not scheduled here (`spec.unschedulable`). */
   cordoned: boolean
   /**
-   * When it joined the cluster (RFC 3339).
+   * When it joined the cluster.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   disk?: DiskUsage | null
   /** `cluster/nodes/<name>`. */
   id: string
@@ -8000,7 +8000,7 @@ export type NodeShellApply = {
 export type NodeShellPlan = {
   /** How long it runs at most, in seconds. */
   deadlineSeconds: number
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /** Bindings that let others into node shells; the plan cannot be applied while there is one. */
   exposed: ShellExposure[]
@@ -8070,7 +8070,7 @@ export const ShellPhase = {
  */
 export type NodeShellView = {
   /**
-   * When it was created, RFC 3339.
+   * When it was created.
    * @nullable
    */
   createdAt?: string | null
@@ -8099,7 +8099,7 @@ export type NodeShellView = {
    */
   reason?: string | null
   /**
-   * When its deadline stops it, RFC 3339.
+   * When its deadline stops it.
    * @nullable
    */
   stopsAt?: string | null
@@ -8210,7 +8210,7 @@ export type NotificationsApply = {
  * A plan, and the token that applies it.
  */
 export type NotificationsPlan = {
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /** Send this to `apply` to carry out exactly this plan. */
   token: string
@@ -8312,10 +8312,10 @@ export type ObjectDocument = {
  */
 export type ObjectSummary = {
   /**
-   * When it was created, RFC 3339.
+   * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** `projects/<p>/objects/<group>/<version>/<resource>/<name>`, `core` for the empty group. */
   id: string
   /** Its name. */
@@ -8650,7 +8650,7 @@ export type Risk = {
  * A plan and the token that applies it.
  */
 export type PlanResponse = Plan & {
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /** What the workloads it creates miss: resource requests and limits, health checks. */
   gaps?: Gap[]
@@ -8889,10 +8889,10 @@ export type TaskSchedule = {
   /** How many succeeded runs Kubernetes keeps (`spec.successfulJobsHistoryLimit`). */
   keepSucceeded: number
   /**
-   * When a run was last started, in RFC 3339.
+   * When a run was last started.
    * @nullable
    */
-  lastScheduled?: string | null
+  lastScheduledAt?: string | null
   /** The controller starts no new runs (`spec.suspend`). */
   suspended?: boolean
   /**
@@ -8912,10 +8912,10 @@ export type TaskSchedule = {
  */
 export type WorkloadSummary = Classification & {
   /**
-   * When the workload was created, in RFC 3339.
+   * When the workload was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /**
    * The first container's image, as a quick identifier.
    * @nullable
@@ -9155,7 +9155,7 @@ export type ZeaburBuilderProblem = {
    * When the condition turned `False`.
    * @nullable
    */
-  since?: string | null
+  startedAt?: string | null
 }
 
 /**
@@ -9263,7 +9263,7 @@ export type ZeaburBuilderBuild = {
    * When that upload token expires.
    * @nullable
    */
-  uploadExpires?: string | null
+  uploadExpiresAt?: string | null
   /**
    * The upload token request the controller last answered
    * (`status.uploadToken.request`).
@@ -9318,7 +9318,7 @@ export type ZeaburBuilderRun = {
    * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /**
    * The pushed manifest's digest.
    * @nullable
@@ -9328,7 +9328,7 @@ export type ZeaburBuilderRun = {
    * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The ref the commit came from, such as `refs/heads/master`.
    * @nullable
@@ -9360,7 +9360,7 @@ export type ZeaburBuilderRun = {
    * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /** The tags pushed. */
   tags: string[]
   /**
@@ -9454,8 +9454,8 @@ export type ProjectDeleting = {
   held: HeldObject[]
   /** What is left, by resource, as the namespace controller counts it. */
   remaining: RemainingContent[]
-  /** When the deletion started, RFC 3339. */
-  since: string
+  /** When the deletion started. */
+  startedAt: string
 }
 
 /**
@@ -9564,7 +9564,7 @@ export type ProjectInstallation = {
   account: string
   /** Its ID. */
   id: number
-  /** When the list was read from GitHub, RFC 3339. */
+  /** When the list was read from GitHub. */
   refreshedAt: string
   /** The repositories it could read. */
   repositories: ProjectRepository[]
@@ -9786,10 +9786,10 @@ export type SeaweedObjectStorage = {
   buckets: SeaweedBucket[]
   connection?: DatabaseConnection | null
   /**
-   * When it was created, RFC 3339.
+   * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** Its IAM objects: identities, credentials, policies and policy bindings, by kind and name. */
   iam: Origin[]
   /**
@@ -9911,13 +9911,13 @@ export type ProjectUsage = {
   nearLimit: number
   /** Every pod with a sample, by name. A running pod missing here has none yet. */
   pods: PodUsage[]
-  /** Whether usage could be read. */
-  state: MetricsState
   /**
-   * When the newest sample was taken (RFC 3339).
+   * When the newest sample was taken.
    * @nullable
    */
-  timestamp?: string | null
+  sampledAt?: string | null
+  /** Whether usage could be read. */
+  state: MetricsState
   /** What could not be read. */
   unreadable: UnreadableView[]
   /**
@@ -9954,13 +9954,13 @@ export type PrometheusSeries = {
  */
 export type Release = {
   /** The last day it gets patches. */
-  endOfLife: string
+  endOfLifeAt: string
   /** From this day only critical fixes are made ("maintenance mode"). */
-  maintenanceFrom: string
+  maintenanceStartsAt: string
   /** `1.34`. */
   minor: string
   /** Its first release. */
-  released: string
+  releasedAt: string
 }
 
 /**
@@ -10387,7 +10387,7 @@ export type S3DestinationsApply = {
 export type S3DestinationsPlan = {
   /** The person may not list Secrets in every namespace, so the plan did not look for copies. */
   copiesUnknown?: boolean
-  /** When the token stops working, RFC 3339. */
+  /** When the token stops working. */
   expiresAt: string
   /** Copies of the keys that the plan leaves with the old keys. */
   keptCopies: KeptCopy[]
@@ -10638,10 +10638,10 @@ export type SystemUpgradeControllerUpgrades = {
  */
 export type TaskRun = {
   /**
-   * When it ended, in RFC 3339.
+   * When it ended.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /** Its status dot: a failed run fails, a running one is fine, a finished one is idle. */
   health: Health
   /** Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`). */
@@ -10651,10 +10651,10 @@ export type TaskRun = {
   /** Its pods, newest last, for their logs. */
   pods: string[]
   /**
-   * When it started, in RFC 3339.
+   * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /** How it stands. */
   status: RunStatus
 }
@@ -10867,7 +10867,7 @@ export type Writer = {
  * One thing that happened.
  */
 export type TimelineEntry = {
-  /** When, RFC 3339: the release's creation, the write, the last event, the termination. */
+  /** When: the release's creation, the write, the last event, the termination. */
   at: string
   /**
    * How many times, for warnings.
@@ -10930,12 +10930,12 @@ export type ToolsPodStatus = {
   /** Whether a terminal can open in it now. */
   ready: boolean
   /**
-   * When it started, RFC 3339.
+   * When it started.
    * @nullable
    */
   startedAt?: string | null
   /**
-   * When it stops whatever happens (`activeDeadlineSeconds` after it started), RFC 3339.
+   * When it stops whatever happens (`activeDeadlineSeconds` after it started).
    * @nullable
    */
   stopsAt?: string | null
@@ -11007,8 +11007,8 @@ export type Upgrades = {
   /** The states someone has to act on, red and amber, most severe first. */
   attention: UpgradeFinding[]
   badge?: UpgradeFinding | null
-  /** When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`). */
-  dataAsOf: string
+  /** When the bundled table was copied from the Kubernetes schedule. */
+  dataCopiedAt: string
   /**
    * `k3s`, `rke2` or `kubesolo`, when the version names one.
    * @nullable
@@ -11074,10 +11074,10 @@ export type VolumeRestore = {
   /** It deletes what the snapshot does not have. */
   delete: boolean
   /**
-   * When it finished, RFC 3339.
+   * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The claim it restores into; absent for a restore to anywhere else.
    * @nullable
@@ -11101,20 +11101,20 @@ export type VolumeRestore = {
   /** The snapshot. */
   snapshot: string
   /**
-   * When it was created, RFC 3339.
+   * When it was created.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
 }
 
 /**
  * A snapshot of a claim that can be restored.
  */
 export type VolumeSnapshot = {
-  /** When it was taken, RFC 3339. */
-  date: string
   /** restic's ID. */
   id: string
+  /** When it was taken. */
+  takenAt: string
 }
 
 /**
@@ -11216,10 +11216,10 @@ export type WorkloadRelease = {
    */
   changeCause?: string | null
   /**
-   * When it was made, RFC 3339.
+   * When it was made.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** It is the template the workload runs now. */
   current: boolean
   /** The images of its containers, in order. */

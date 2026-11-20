@@ -21,9 +21,45 @@ use std::fmt;
 use base64::Engine as _;
 use base64::engine::general_purpose::URL_SAFE_NO_PAD;
 use zeabur_core::crypto::{RandomError, hmac_sha256, open, random, seal};
+use zeabur_core::problem::{Kind, Problem};
+use zeabur_kube::k8s_openapi::jiff::{RoundMode, SignedDuration, Timestamp, TimestampRound, Unit};
 pub use zeabur_plan::token::{Claims, LIFETIME_SECONDS};
 
+use crate::error::ApiError;
+
 const PREFIX: &str = "v2.";
+
+/// `now` to the whole second, as a plan records when it was made and an evidence bundle when it
+/// was read.
+///
+/// # Errors
+///
+/// When the time rounded is out of range.
+pub(crate) fn whole_second(now: Timestamp) -> Result<Timestamp, ApiError> {
+    now.round(
+        TimestampRound::new()
+            .smallest(Unit::Second)
+            .mode(RoundMode::Trunc),
+    )
+    .map_err(|_overflow| clock_problem())
+}
+
+/// When a plan made at `now` expires: [`LIFETIME_SECONDS`] later.
+///
+/// # Errors
+///
+/// When that is past the last time Zeabur can represent.
+pub(crate) fn expiry(now: Timestamp) -> Result<Timestamp, ApiError> {
+    now.checked_add(SignedDuration::from_secs(LIFETIME_SECONDS))
+        .map_err(|_overflow| clock_problem())
+}
+
+fn clock_problem() -> ApiError {
+    ApiError::from(Problem::new(
+        Kind::Internal,
+        "The server clock is too far in the future, so Zeabur could not date what it made.",
+    ))
+}
 
 /// The key plan tokens are sealed with (AES-256-GCM, 32 bytes).
 #[derive(Clone)]

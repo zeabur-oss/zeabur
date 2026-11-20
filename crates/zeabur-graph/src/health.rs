@@ -91,12 +91,11 @@ pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) ->
     let Some(last) = &status.last_termination else {
         return false;
     };
-    let parse = |time: &Option<String>| time.as_deref().and_then(|t| t.parse::<Timestamp>().ok());
-    let last_run_short = match (parse(&last.started), parse(&last.finished)) {
+    let last_run_short = match (last.started_at, last.finished_at) {
         (Some(started), Some(finished)) => finished.duration_since(started) < BACKOFF_RESET,
         _ => true,
     };
-    let current_run_short = match (parse(&status.started_at), now) {
+    let current_run_short = match (status.started_at, now) {
         (Some(since), Some(now)) => now.duration_since(since) < BACKOFF_RESET,
         (Some(_), None) => false,
         (None, _) => true,
@@ -212,7 +211,7 @@ mod tests {
                 phase,
                 replicas: replicas.map(|(ready, desired)| Replicas { ready, desired }),
                 image: None,
-                created: None,
+                created_at: None,
                 schedule: None,
                 provenance: Provenance {
                     tool: None,
@@ -236,7 +235,7 @@ mod tests {
             containers: vec!["y".to_owned()],
             reason: reason.map(str::to_owned),
             cause: None,
-            created: None,
+            created_at: None,
             node: None,
             container_statuses: Vec::new(),
             origin: Origin::object("Pod", "y-1"),
@@ -365,13 +364,13 @@ mod tests {
             ready: true,
             restarts,
             waiting: None,
-            started_at: Some(since.to_string()),
+            started_at: Some(since),
             terminated: None,
             last_termination: Some(ContainerTermination {
                 reason: Some("Error".to_owned()),
                 exit_code: 1,
-                started: Some(finished.checked_sub(previous).unwrap().to_string()),
-                finished: Some(finished.to_string()),
+                started_at: Some(finished.checked_sub(previous).unwrap()),
+                finished_at: Some(finished),
                 message: None,
             }),
         }];
@@ -430,8 +429,8 @@ mod tests {
         status.terminated = Some(ContainerTermination {
             reason: Some("Completed".to_owned()),
             exit_code: 0,
-            started: Some(now.to_string()),
-            finished: Some(now.to_string()),
+            started_at: Some(now),
+            finished_at: Some(now),
             message: None,
         });
         assert_eq!(pod_health(&pod, Some(now)), Health::Ok);

@@ -3,6 +3,7 @@
 use std::collections::BTreeMap;
 
 use k8s_openapi::api::apps::v1::ReplicaSet;
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Deserializer};
 use serde_json::{Value, from_value, json, to_value};
 use zeabur_graph::Snapshot;
@@ -394,7 +395,7 @@ struct PlanParams {
     #[serde(default)]
     issuers: BTreeMap<String, IssuerParam>,
     #[serde(default)]
-    certificates: BTreeMap<String, String>,
+    certificates: BTreeMap<String, Timestamp>,
     #[serde(default)]
     build_registry: Option<String>,
 }

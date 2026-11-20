@@ -485,9 +485,9 @@ export function RestoreList({
               <StatusPill health={outcomeHealth[r.outcome]} size="sm">
                 {t(`backups.${r.outcome}`)}
               </StatusPill>
-              {r.started ? (
+              {r.startedAt ? (
                 <Ago
-                  iso={r.started}
+                  iso={r.startedAt}
                   className="shrink-0 text-right type-meta text-muted-foreground sm:w-24"
                 />
               ) : (

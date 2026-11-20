@@ -313,7 +313,7 @@ pub(crate) fn tools_plan(
         namespace,
         scope,
         person: planner.person,
-        credential_expires_at: Some(handoff.expires_at.to_string()),
+        credential_expires_at: Some(handoff.expires_at),
         image: &settings.tools_image,
         deadline_seconds: settings.tools_deadline_seconds,
         grace_seconds: i64::try_from(settings.tools_grace.as_secs()).unwrap_or(i64::MAX),

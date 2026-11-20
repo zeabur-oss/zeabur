@@ -47,7 +47,7 @@ use crate::cluster::{backup_download, s3_destinations};
 use crate::error::{ApiError, get_read, list_read, read_problem};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
-use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
+use crate::plan_token::{self as token, TokenError};
 use crate::projects::backups::{BackupProvider, ProviderState, provider};
 use crate::projects::namespace::Permission;
 use crate::projects::writes::token_problem;
@@ -393,8 +393,8 @@ pub struct Held {
 pub struct BackupsPlan {
     /// Send this to `apply` to carry out exactly this plan.
     pub token: String,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// The writes, in order; empty when nothing changes.
     pub writes: Vec<BackupWrite>,
     /// The backup a `backupNow` plan creates.
@@ -623,7 +623,11 @@ pub(crate) async fn get(
         .collect();
     // Newest first; one Velero has not started yet is the newest.
     restores.sort_by(|a, b| {
-        (b.started.is_none(), &b.started, &b.name).cmp(&(a.started.is_none(), &a.started, &a.name))
+        (b.started_at.is_none(), &b.started_at, &b.name).cmp(&(
+            a.started_at.is_none(),
+            &a.started_at,
+            &a.name,
+        ))
     });
     restores.truncate(SHOWN);
     locations.sort_by(|a, b| (!a.default, &a.name).cmp(&(!b.default, &b.name)));
@@ -1590,7 +1594,7 @@ pub(crate) async fn plan(
     } else {
         (None, None)
     };
-    let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
+    let expires_at = token::expiry(now)?;
     let claims = Claims {
         person: identity.username,
         groups: identity.groups,
@@ -1598,7 +1602,7 @@ pub(crate) async fn plan(
         request,
         versions: computed.versions,
         made,
-        expires_at,
+        expires_at: expires_at.as_second(),
     };
     let token = token::sign_as(&sealing, PREFIX, &claims).map_err(|_random| {
         ApiError::from(Problem::new(
@@ -1608,9 +1612,7 @@ pub(crate) async fn plan(
     })?;
     Ok(Json(BackupsPlan {
         token,
-        expires_at: Timestamp::from_second(expires_at)
-            .unwrap_or(Timestamp::UNIX_EPOCH)
-            .to_string(),
+        expires_at,
         writes: computed
             .writes
             .iter()

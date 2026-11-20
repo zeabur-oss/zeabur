@@ -15,14 +15,15 @@
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_kube::k8s_openapi::api::core::v1::NamespaceStatus;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, DynamicObject, ResourceRef};
 
 /// A project whose Namespace is being deleted.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDeleting {
-    /// When the deletion started, RFC 3339.
-    pub since: String,
+    /// When the deletion started.
+    pub started_at: Timestamp,
     /// What is left, by resource, as the namespace controller counts it.
     pub remaining: Vec<RemainingContent>,
     /// The finalizers that hold objects back, as the namespace controller counts them.
@@ -76,12 +77,7 @@ pub(super) async fn read(
     project: &str,
     namespace: &DynamicObject,
 ) -> Option<ProjectDeleting> {
-    let since = namespace
-        .metadata
-        .deletion_timestamp
-        .as_ref()?
-        .0
-        .to_string();
+    let since = namespace.metadata.deletion_timestamp.as_ref()?.0;
     let remaining = remaining(&condition(namespace, "NamespaceContentRemaining"));
     let finalizers = finalizers(&condition(namespace, "NamespaceFinalizersRemaining"));
     let held = if finalizers.is_empty() {
@@ -100,7 +96,7 @@ pub(super) async fn read(
             .collect()
     };
     Some(ProjectDeleting {
-        since,
+        started_at: since,
         remaining,
         finalizers,
         held,

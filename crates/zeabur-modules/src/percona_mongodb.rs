@@ -36,7 +36,7 @@ use zeabur_kube::DynamicObject;
 
 use crate::backups::{Outcome, Run, Schedule, Target, TargetKind, newest};
 use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
-use crate::{Module, Read, filled, read_as};
+use crate::{Module, Read, filled, filled_time, read_as};
 
 /// The module.
 pub static MODULE: Module = Module {
@@ -308,13 +308,9 @@ fn backups_of(
                 provider: MODULE.id.to_owned(),
                 targets: vec![target.clone()],
                 outcome,
-                started: filled(status.start.as_ref()).or_else(|| {
-                    b.metadata
-                        .creation_timestamp
-                        .as_ref()
-                        .map(|t| t.0.to_string())
-                }),
-                finished: filled(status.completed.as_ref()),
+                started_at: filled_time(status.start.as_ref())
+                    .or_else(|| b.metadata.creation_timestamp.as_ref().map(|t| t.0)),
+                finished_at: filled_time(status.completed.as_ref()),
                 message: filled(status.error.as_ref()),
                 restore_from: (outcome == Outcome::Succeeded)
                     .then(|| filled(status.destination.as_ref()))
@@ -438,11 +434,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
         },
         app: app_user(&read, &name),
         backups: backups_of(namespace, cluster, &read, &name, backups),
-        created: cluster
-            .metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|t| t.0.to_string()),
+        created_at: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),

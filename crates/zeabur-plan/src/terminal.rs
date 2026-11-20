@@ -70,6 +70,7 @@ use k8s_openapi::api::core::v1::{
 };
 use k8s_openapi::apimachinery::pkg::api::resource::Quantity;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use k8s_openapi::jiff::Timestamp;
 use serde_json::{Value, json};
 use zeabur_model::kernel::digest::{hex, sha256};
 pub use zeabur_model::kernel::names::{
@@ -536,8 +537,8 @@ pub struct ToolsPod<'a> {
     pub scope: ToolsScope<'a>,
     /// The person's user name.
     pub person: &'a str,
-    /// When that credential expires, RFC 3339; `None` when Zeabur does not know.
-    pub credential_expires_at: Option<String>,
+    /// When that credential expires; `None` when Zeabur does not know.
+    pub credential_expires_at: Option<Timestamp>,
     /// The image, with `kubectl` and `helm`.
     pub image: &'a str,
     /// `activeDeadlineSeconds`.
@@ -796,7 +797,7 @@ pub fn tools_pod_with(request: &ToolsPod<'_>, conventions: &Conventions) -> Plan
             pod: name,
             image: request.image.to_owned(),
             person: request.person.to_owned(),
-            credential_expires_at: request.credential_expires_at.clone(),
+            credential_expires_at: request.credential_expires_at,
             deadline_seconds: request.deadline_seconds,
             grace_seconds: request.grace_seconds,
         }],
@@ -972,7 +973,7 @@ mod tests {
             namespace: "zeabur-terminals",
             scope: ToolsScope::Project("shop"),
             person: Box::leak(person.to_owned().into_boxed_str()),
-            credential_expires_at: Some("2026-10-21T00:10:00Z".to_owned()),
+            credential_expires_at: Some("2026-10-21T00:10:00Z".parse().unwrap()),
             image: "alpine/k8s:1.36.5",
             deadline_seconds: 1800,
             grace_seconds: 60,

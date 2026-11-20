@@ -7,6 +7,7 @@
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use zeabur_kube::k8s_openapi::jiff::civil::Date;
 use zeabur_model::kernel::quantity;
 
 use crate::bundle;
@@ -21,8 +22,8 @@ pub struct IdleUse {
     pub cpu_millicores: u64,
     /// Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`.
     pub environment: String,
-    /// The day it was measured (`2026-10-25`).
-    pub measured_at: String,
+    /// The day it was measured.
+    pub measured_at: Date,
     /// Each workload's pod.
     pub pods: Vec<MeasuredPod>,
 }
@@ -57,7 +58,7 @@ struct Environment {
     /// `passed`; any other value, or none, is a run that did not pass.
     #[serde(default)]
     result: String,
-    measured_at: String,
+    measured_at: Date,
 }
 
 #[derive(Deserialize)]
@@ -112,8 +113,8 @@ fn idle_from(text: &str) -> Option<IdleUse> {
     let measured = passed
         .clone()
         .filter(preferred)
-        .max_by(|a, b| a.measured_at.cmp(&b.measured_at))
-        .or_else(|| passed.max_by(|a, b| a.measured_at.cmp(&b.measured_at)))?;
+        .max_by_key(|e| e.measured_at)
+        .or_else(|| passed.max_by_key(|e| e.measured_at))?;
     let pods = measured
         .pods
         .iter()
@@ -129,13 +130,15 @@ fn idle_from(text: &str) -> Option<IdleUse> {
         memory_bytes: pods.iter().map(|p| p.memory_bytes).sum(),
         cpu_millicores: pods.iter().map(|p| p.cpu_millicores).sum(),
         environment: measured.name(),
-        measured_at: measured.measured_at.clone(),
+        measured_at: measured.measured_at,
         pods,
     })
 }
 
 #[cfg(test)]
 mod tests {
+    use zeabur_kube::k8s_openapi::jiff::civil::date;
+
     use super::*;
 
     fn run(distribution: &str, arch: &str, memory: &str, result: &str, at: &str) -> String {
@@ -165,7 +168,7 @@ mod tests {
                 memory_bytes: 310 * 1024 * 1024,
                 cpu_millicores: 4,
                 environment: "kind-single-node-amd64-v1.36.4".to_owned(),
-                measured_at: "2026-10-25".to_owned(),
+                measured_at: date(2026, 10, 25),
                 pods: vec![
                     MeasuredPod {
                         workload: "app".to_owned(),
@@ -179,6 +182,21 @@ mod tests {
                     },
                 ],
             })
+        );
+    }
+
+    #[test]
+    fn the_newest_day_wins_and_reads_back_as_a_date() {
+        let text = format!(
+            r#"{{"environments": [{}, {}]}}"#,
+            run("kind", "amd64", "300Mi", "passed", "2026-11-10"),
+            run("kind", "amd64", "900Mi", "passed", "2026-11-09"),
+        );
+        let idle = idle_from(&text).unwrap();
+        assert_eq!(idle.measured_at, date(2026, 11, 10));
+        assert_eq!(
+            serde_json::to_value(&idle).unwrap()["measuredAt"],
+            "2026-11-10"
         );
     }
 
@@ -203,7 +221,7 @@ mod tests {
                 .replace(r#""result": "passed", "#, ""),
         );
         let idle = idle_from(&text).unwrap();
-        assert_eq!(idle.measured_at, "2026-10-11");
+        assert_eq!(idle.measured_at, date(2026, 10, 11));
     }
 
     #[test]

@@ -1,5 +1,6 @@
 //! Why a service is unhealthy, in words a client translates.
 
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 
 pub use crate::kernel::message::Message;
@@ -60,9 +61,9 @@ pub struct Diagnosis {
     pub fix: Message,
     /// The status fields and events it rests on.
     pub evidence: Vec<Origin>,
-    /// When it last happened, in RFC 3339, when known.
+    /// When it last happened, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_seen: Option<String>,
+    pub last_seen_at: Option<Timestamp>,
     /// Where the cause lies and who can remove it.
     #[serde(default)]
     pub fault: Fault,
@@ -258,9 +259,9 @@ pub struct Incident {
     pub projects: Vec<String>,
     /// The objects and fields it rests on.
     pub evidence: Vec<Origin>,
-    /// Since when, in RFC 3339, when known.
+    /// Since when, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub since: Option<String>,
+    pub started_at: Option<Timestamp>,
 }
 
 #[cfg(test)]

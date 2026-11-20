@@ -16,6 +16,6 @@
         "fieldPath": "status.containerStatuses[name=web].state.waiting"
       }
     ],
-    "lastSeen": "2026-10-15T11:59:30Z"
+    "lastSeenAt": "2026-10-15T11:59:30Z"
   }
 ]

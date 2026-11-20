@@ -12,13 +12,14 @@
 //! may not read Secrets, and the host, port, database and user are not secret. The Secret that
 //! holds the password is named, so the interface can reveal it as the person when asked.
 
+use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 use zeabur_model::readiness::GenericStatus;
 
 use crate::backups::{Outcome, Run, Schedule, Target, TargetKind};
-use crate::{Read, text};
+use crate::{Read, text, time};
 
 /// `batch/v1` `Job`, in the project's namespace: MOCO and mariadb-operator take each backup in a
 /// Job.
@@ -168,8 +169,8 @@ pub struct Backups {
 #[serde(rename_all = "camelCase")]
 #[schema(as = DatabaseRecoveryWindow)]
 pub struct RecoveryWindow {
-    /// The earliest time, RFC 3339: when the oldest backup in the store finished.
-    pub first: String,
+    /// The earliest time: when the oldest backup in the store finished.
+    pub earliest_at: Timestamp,
     /// The newest time is this many seconds before now: the archive may not hold the most
     /// recent writes yet.
     pub lag_seconds: u64,
@@ -186,9 +187,9 @@ pub struct Restored {
     /// The backup's name.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub backup: Option<String>,
-    /// When the backup was taken, RFC 3339.
+    /// When the backup was taken.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time: Option<String>,
+    pub taken_at: Option<Timestamp>,
 }
 
 /// One database cluster.
@@ -255,9 +256,9 @@ pub struct Database {
     pub app: Option<AppUser>,
     /// Its backups.
     pub backups: Backups,
-    /// When it was created, RFC 3339.
+    /// When it was created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
+    pub created_at: Option<Timestamp>,
     /// The object as written, without `status` and `managedFields`: what an edit (turning
     /// backups on) starts from, so the edit changes only what it adds.
     #[schema(value_type = Object)]
@@ -304,7 +305,7 @@ pub(crate) fn restored(object: &DynamicObject) -> Option<Restored> {
     Some(Restored {
         from: annotations.get(RESTORED_FROM)?.clone(),
         backup: annotations.get(RESTORED_BACKUP).cloned(),
-        time: annotations.get(RESTORED_TIME).cloned(),
+        taken_at: annotations.get(RESTORED_TIME).and_then(|t| t.parse().ok()),
     })
 }
 
@@ -341,15 +342,11 @@ pub(crate) fn job_runs(
                     name: target.to_owned(),
                 }],
                 outcome,
-                started: text(job, "/status/startTime").or_else(|| {
-                    job.metadata
-                        .creation_timestamp
-                        .as_ref()
-                        .map(|t| t.0.to_string())
-                }),
+                started_at: time(job, "/status/startTime")
+                    .or_else(|| job.metadata.creation_timestamp.as_ref().map(|t| t.0)),
                 message: failed.then(|| condition_message(job, "Failed")).flatten(),
                 restore_from: finished.clone(),
-                finished,
+                finished_at: finished.and_then(|t| t.parse().ok()),
             }
         })
         .collect()

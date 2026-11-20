@@ -126,11 +126,7 @@ pub fn database(namespace: &str, store: &DynamicObject) -> Database {
             password_key: password.1,
         }),
         backups: Backups::default(),
-        created: store
-            .metadata
-            .creation_timestamp
-            .as_ref()
-            .map(|t| t.0.to_string()),
+        created_at: store.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(store),
         pods: Vec::new(),
         restored: databases::restored(store),

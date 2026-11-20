@@ -189,7 +189,7 @@ export function eolItem(
   upgrades?: Schemas.Upgrades,
 ): ClusterItem | undefined {
   const minor = upgrades?.minor ?? ""
-  const eol = upgrades?.release?.endOfLife
+  const eol = upgrades?.release?.endOfLifeAt
   const finding = upgrades?.attention.find(
     (f) => f.state === "end-of-life" || (f.state === "maintenance" && eol),
   )

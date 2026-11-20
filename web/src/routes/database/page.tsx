@@ -233,7 +233,7 @@ function Body({
       name={database.name}
       state={<DatabaseState database={database} size="md" />}
       kind={`${engineName(database.engine)}${database.version ? ` ${database.version}` : ""}`}
-      created={database.created}
+      created={database.createdAt}
       updatedAt={updatedAt}
       failed={failed}
       tab={tab}
@@ -415,7 +415,7 @@ function LastBackup({ database }: { database: Database }) {
       <StatusPill health={outcomeHealth[run.outcome]} size="sm">
         {t(`backups.${run.outcome}`)}
       </StatusPill>
-      <Ago iso={run.finished ?? run.started} />
+      <Ago iso={run.finishedAt ?? run.startedAt} />
     </>
   )
 }
@@ -811,7 +811,7 @@ function Runs({ database }: { database: Database }) {
                 {t(`backups.${r.outcome}`)}
               </StatusPill>
               <Ago
-                iso={r.finished ?? r.started}
+                iso={r.finishedAt ?? r.startedAt}
                 className="w-20 shrink-0 text-right type-meta text-muted-foreground"
               />
             </li>

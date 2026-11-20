@@ -26,6 +26,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::problem::KubernetesStatus;
 use zeabur_kube::Unreadable;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_model::{
     Endpoint, Health, Origin, Project, ProjectDetails, ProjectHealth, Route, Service, WorkloadKind,
 };
@@ -227,7 +228,7 @@ pub struct LeaderLease {
     pub holder: Option<String>,
     /// When the leader last renewed the lease.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub renewed: Option<String>,
+    pub renewed_at: Option<Timestamp>,
     /// How long the lease holds without a renewal.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub duration_seconds: Option<i32>,
@@ -374,9 +375,9 @@ pub struct EventView {
     pub note: String,
     /// How many times it happened.
     pub count: i32,
-    /// When it last happened (RFC 3339).
+    /// When it last happened.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_seen: Option<String>,
+    pub last_seen_at: Option<Timestamp>,
     /// The component that reported it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub reporter: Option<String>,
@@ -418,7 +419,7 @@ impl WarningKind {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct EventList {
-    /// Newest first (by `lastSeen`, events without one last), then by name.
+    /// Newest first (by `lastSeenAt`, events without one last), then by name.
     pub items: Vec<EventView>,
     /// How many events matched, also those past `limit`.
     pub total_size: usize,
@@ -593,9 +594,9 @@ pub struct NodeView {
     /// volumes live, from the metrics store; absent when the store has no value for this node.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub disk: Option<DiskUsage>,
-    /// When it joined the cluster (RFC 3339).
+    /// When it joined the cluster.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<String>,
+    pub created_at: Option<Timestamp>,
     /// What is wrong with it, worst first.
     pub issues: Vec<crate::cluster::node_health::NodeIssue>,
 }
@@ -739,8 +740,8 @@ pub struct Upgrades {
     /// That minor's support window, from Zeabur's bundled table.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub release: Option<zeabur_catalog::versions::Release>,
-    /// When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`).
-    pub data_as_of: String,
+    /// When the bundled table was copied from the Kubernetes schedule.
+    pub data_copied_at: zeabur_kube::k8s_openapi::jiff::civil::Date,
     /// Every state that applies, most severe first. An open set.
     pub states: Vec<zeabur_catalog::versions::UpgradeState>,
     /// The one state the cluster's header and Home show: the most severe that shows.
@@ -779,7 +780,7 @@ pub struct UpgradeExtensions {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterEventList {
-    /// Newest first (by `lastSeen`, events without one last), then by namespace and name.
+    /// Newest first (by `lastSeenAt`, events without one last), then by namespace and name.
     pub items: Vec<EventView>,
     /// How many events matched, also those past `limit`.
     pub total_size: usize,

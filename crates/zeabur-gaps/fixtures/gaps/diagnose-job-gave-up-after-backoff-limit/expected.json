@@ -16,6 +16,6 @@
       {"kind": "Job", "name": "migrate", "fieldPath": "status.conditions[type=Failed]", "value": "BackoffLimitExceeded"},
       {"kind": "Pod", "name": "migrate-x7k2p", "fieldPath": "status.containerStatuses[name=migrate].state.terminated.exitCode", "value": "2"}
     ],
-    "lastSeen": "2026-10-15T11:58:00Z"
+    "lastSeenAt": "2026-10-15T11:58:00Z"
   }
 ]

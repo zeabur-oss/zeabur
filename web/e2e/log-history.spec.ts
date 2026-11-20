@@ -59,8 +59,13 @@ test("history shows replaced replicas' lines, oldest first, and keeps the range"
     page,
     logHistory("available", {
       lines: [
-        { time: "2026-10-22T09:00:00Z", pod: gone, container: "talker", message: "from before" },
-        { time: "2026-10-22T09:00:01.5Z", pod, container: "talker", message: "error: now" },
+        {
+          writtenAt: "2026-10-22T09:00:00Z",
+          pod: gone,
+          container: "talker",
+          message: "from before",
+        },
+        { writtenAt: "2026-10-22T09:00:01.5Z", pod, container: "talker", message: "error: now" },
       ],
     }),
   )
@@ -95,8 +100,8 @@ test("history in each state: not allowed, not answering, cut at the limit", asyn
       limit: 2,
       truncated: true,
       lines: [
-        { time: "2026-10-22T09:00:00Z", pod, container: "talker", message: "one" },
-        { time: "2026-10-22T09:00:01Z", pod, container: "talker", message: "two" },
+        { writtenAt: "2026-10-22T09:00:00Z", pod, container: "talker", message: "one" },
+        { writtenAt: "2026-10-22T09:00:01Z", pod, container: "talker", message: "two" },
       ],
     }),
   )

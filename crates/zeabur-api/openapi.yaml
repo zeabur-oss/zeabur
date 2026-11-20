@@ -4716,7 +4716,8 @@ components:
           type:
           - string
           - "null"
-          description: When it was made, RFC 3339.
+          format: date-time
+          description: When it was made.
         createdBy:
           type:
           - string
@@ -4726,7 +4727,8 @@ components:
           type:
           - string
           - "null"
-          description: When its latest token expires, RFC 3339, as kube-apiserver answered.
+          format: date-time
+          description: When its latest token expires, as kube-apiserver answered.
         name:
           type: string
           description: Its name, which is its ServiceAccount's.
@@ -4875,11 +4877,12 @@ components:
       - targets
       - outcome
       properties:
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
-          description: When it finished, RFC 3339.
+          format: date-time
+          description: When it finished.
         message:
           type:
           - string
@@ -4901,11 +4904,12 @@ components:
           description: |-
             What a restore of this backup names: CloudNativePG's backup ID, Percona's destination, or
             the time MOCO and mariadb-operator restore to. Absent when it cannot be restored yet.
-        started:
+        startedAt:
           type:
           - string
           - "null"
-          description: When it started, RFC 3339.
+          format: date-time
+          description: When it started.
         targets:
           type: array
           items:
@@ -5099,7 +5103,8 @@ components:
           - type: "null"
         expiresAt:
           type: string
-          description: When the token stops working, RFC 3339.
+          format: date-time
+          description: When the token stops working.
         held:
           type: array
           items:
@@ -5529,6 +5534,7 @@ components:
           type:
           - string
           - "null"
+          format: date-time
           description: When it expires (`status.notAfter`).
         rateLimited:
           type: boolean
@@ -5553,10 +5559,12 @@ components:
       properties:
         notAfter:
           type: string
-          description: When it expires, RFC 3339.
+          format: date-time
+          description: When it expires.
         notBefore:
           type: string
-          description: From when the certificate is valid, RFC 3339.
+          format: date-time
+          description: From when the certificate is valid.
         secret:
           type: string
           description: The Secret.
@@ -7039,7 +7047,8 @@ components:
             type:
             - string
             - "null"
-            description: When it finished, else when it started (RFC 3339).
+            format: date-time
+            description: When it finished, else when it started.
           outcome:
             $ref: "#/components/schemas/BackupOutcome"
             description: How it went.
@@ -7057,7 +7066,7 @@ components:
           items:
             $ref: "#/components/schemas/EventView"
           description: >-
-            Newest first (by `lastSeen`, events without one last), then by namespace and
+            Newest first (by `lastSeenAt`, events without one last), then by namespace and
             name.
         partial:
           type: boolean
@@ -7248,7 +7257,8 @@ components:
       properties:
         expiresAt:
           type: string
-          description: When the token stops working, RFC 3339.
+          format: date-time
+          description: When the token stops working.
         exposed:
           type: array
           items:
@@ -7309,11 +7319,12 @@ components:
           type: integer
           description: How many unfinished pods were read.
           minimum: 0
-        timestamp:
+        sampledAt:
           type:
           - string
           - "null"
-          description: When the newest sample was taken (RFC 3339).
+          format: date-time
+          description: When the newest sample was taken.
         totals:
           $ref: "#/components/schemas/UsageTotals"
           description: Every namespace together.
@@ -8021,7 +8032,8 @@ components:
           type:
           - string
           - "null"
-          description: When the current run started, in RFC 3339, when it is running.
+          format: date-time
+          description: When the current run started, when it is running.
         terminated:
           oneOf:
           - $ref: "#/components/schemas/ContainerTermination"
@@ -8042,11 +8054,12 @@ components:
           type: integer
           format: int32
           description: The process's exit code.
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
-          description: When it ended, in RFC 3339.
+          format: date-time
+          description: When it ended.
         message:
           type:
           - string
@@ -8057,11 +8070,12 @@ components:
           - string
           - "null"
           description: "`Error`, `Completed`, `OOMKilled`, `ContainerCannotRun`, …"
-        started:
+        startedAt:
           type:
           - string
           - "null"
-          description: When it started, in RFC 3339.
+          format: date-time
+          description: When it started.
     ContainerUsage:
       type: object
       description: What one container uses.
@@ -8327,11 +8341,12 @@ components:
         connection:
           $ref: "#/components/schemas/DatabaseConnection"
           description: Where and as whom to connect.
-        created:
+        createdAt:
           type:
           - string
           - "null"
-          description: When it was created, RFC 3339.
+          format: date-time
+          description: When it was created.
         engine:
           $ref: "#/components/schemas/DatabaseEngine"
           description: The engine.
@@ -8617,12 +8632,13 @@ components:
       type: object
       description: The times a new database can recover to.
       required:
-      - first
+      - earliestAt
       - lagSeconds
       properties:
-        first:
+        earliestAt:
           type: string
-          description: "The earliest time, RFC 3339: when the oldest backup in the store finished."
+          format: date-time
+          description: "The earliest time: when the oldest backup in the store finished."
         lagSeconds:
           type: integer
           format: int64
@@ -8646,11 +8662,12 @@ components:
         from:
           type: string
           description: The database the backup is of.
-        time:
+        takenAt:
           type:
           - string
           - "null"
-          description: When the backup was taken, RFC 3339.
+          format: date-time
+          description: When the backup was taken.
     DatabaseStart:
       type: object
       description: "A CloudNativePG `Cluster` a plan creates: its operator starts its instances."
@@ -8862,11 +8879,12 @@ components:
         kind:
           $ref: "#/components/schemas/DiagnosisKind"
           description: What kind of failure.
-        lastSeen:
+        lastSeenAt:
           type:
           - string
           - "null"
-          description: When it last happened, in RFC 3339, when known.
+          format: date-time
+          description: When it last happened, when known.
         pods:
           type: array
           items:
@@ -9315,7 +9333,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EventView"
-          description: Newest first (by `lastSeen`, events without one last), then by name.
+          description: Newest first (by `lastSeenAt`, events without one last), then by name.
         totalSize:
           type: integer
           description: How many events matched, also those past `limit`.
@@ -9338,11 +9356,12 @@ components:
         id:
           type: string
           description: "`projects/<project>/events/<name>`."
-        lastSeen:
+        lastSeenAt:
           type:
           - string
           - "null"
-          description: When it last happened (RFC 3339).
+          format: date-time
+          description: When it last happened.
         note:
           type: string
           description: What happened, as the component reported it.
@@ -9381,7 +9400,8 @@ components:
       properties:
         generatedAt:
           type: string
-          description: When it was read, RFC 3339.
+          format: date-time
+          description: When it was read.
         id:
           type: string
           description: "`projects/<project>/services/<kind>/<name>/evidence`."
@@ -9448,6 +9468,12 @@ components:
           - string
           - "null"
           description: The container it concerns.
+        happenedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: When it happened.
         origin:
           $ref: "#/components/schemas/Origin"
           description: The report result it was read from.
@@ -9468,11 +9494,6 @@ components:
         source:
           type: string
           description: Falco's event source (`syscall`, `k8s_audit`).
-        time:
-          type:
-          - string
-          - "null"
-          description: When it happened, RFC 3339.
         user:
           type:
           - string
@@ -10337,7 +10358,8 @@ components:
       properties:
         expiresAt:
           type: string
-          description: When the token stops working, RFC 3339.
+          format: date-time
+          description: When the token stops working.
         token:
           type: string
           description: Send this to `apply` to carry out exactly this plan.
@@ -10845,7 +10867,8 @@ components:
           description: "Where it was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`."
         measuredAt:
           type: string
-          description: The day it was measured (`2026-10-25`).
+          format: date
+          description: The day it was measured.
         memoryBytes:
           type: integer
           format: int64
@@ -11091,11 +11114,12 @@ components:
           items:
             $ref: "#/components/schemas/AffectedService"
           description: The services it reaches, sorted by id, as far as the reader could see them.
-        since:
+        startedAt:
           type:
           - string
           - "null"
-          description: Since when, in RFC 3339, when known.
+          format: date-time
+          description: Since when, when known.
         why:
           $ref: "#/components/schemas/Message"
           description: What stops working because of it.
@@ -11255,10 +11279,12 @@ components:
           type:
           - string
           - "null"
+          format: date-time
           description: When it was made.
         expiresAt:
           type: string
-          description: When it stops working, RFC 3339.
+          format: date-time
+          description: When it stops working.
         id:
           type: string
           description: "`members/invitations/<name>`."
@@ -11310,7 +11336,8 @@ components:
           description: kube-apiserver's CA bundle, PEM; absent when it could not be read.
         expiresAt:
           type: string
-          description: When it expires, RFC 3339, as kube-apiserver answered.
+          format: date-time
+          description: When it expires, as kube-apiserver answered.
         kubeconfig:
           type: string
           description: |-
@@ -11504,10 +11531,11 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The Lease.
-        renewed:
+        renewedAt:
           type:
           - string
           - "null"
+          format: date-time
           description: When the leader last renewed the lease.
     LinkedAccountView:
       type: object
@@ -11521,6 +11549,7 @@ components:
           type:
           - string
           - "null"
+          format: date-time
           description: When it was linked.
         id:
           type: string
@@ -11529,6 +11558,7 @@ components:
           type:
           - string
           - "null"
+          format: date-time
           description: When it last signed in, where recorded.
         origin:
           $ref: "#/components/schemas/Origin"
@@ -11592,7 +11622,7 @@ components:
       type: object
       description: One line.
       required:
-      - time
+      - writtenAt
       - pod
       - container
       - message
@@ -11606,9 +11636,10 @@ components:
         pod:
           type: string
           description: The pod that wrote it, which may be gone.
-        time:
+        writtenAt:
           type: string
-          description: When it was written, RFC 3339.
+          format: date-time
+          description: When it was written.
     LogHistoryState:
       type: string
       description: Whether the history could be read, as the person. An open set.
@@ -11687,7 +11718,8 @@ components:
           description: Whether the node is cordoned now.
         expiresAt:
           type: string
-          description: When the token stops working, RFC 3339.
+          format: date-time
+          description: When the token stops working.
         node:
           type: string
           description: The node.
@@ -11951,7 +11983,8 @@ components:
       properties:
         expiresAt:
           type: string
-          description: When the token stops working, RFC 3339.
+          format: date-time
+          description: When the token stops working.
         linkSeconds:
           type:
           - integer
@@ -12017,6 +12050,7 @@ components:
             type:
             - string
             - "null"
+            format: date-time
             description: "The latest sign-in Zeabur Identity knows of: from live sessions and recorded last use."
           linked:
             type: array
@@ -12825,7 +12859,8 @@ components:
           description: How long it runs at most, in seconds.
         expiresAt:
           type: string
-          description: When the token stops working, RFC 3339.
+          format: date-time
+          description: When the token stops working.
         exposed:
           type: array
           items:
@@ -12917,7 +12952,8 @@ components:
           type:
           - string
           - "null"
-          description: When it was created, RFC 3339.
+          format: date-time
+          description: When it was created.
         message:
           type:
           - string
@@ -12951,7 +12987,8 @@ components:
           type:
           - string
           - "null"
-          description: When its deadline stops it, RFC 3339.
+          format: date-time
+          description: When its deadline stops it.
     NodeShells:
       type: object
       description: The node shell pods.
@@ -13065,11 +13102,12 @@ components:
         cordoned:
           type: boolean
           description: "Cordoned: new pods are not scheduled here (`spec.unschedulable`)."
-        created:
+        createdAt:
           type:
           - string
           - "null"
-          description: When it joined the cluster (RFC 3339).
+          format: date-time
+          description: When it joined the cluster.
         disk:
           oneOf:
           - $ref: "#/components/schemas/DiskUsage"
@@ -13289,7 +13327,8 @@ components:
       properties:
         expiresAt:
           type: string
-          description: When the token stops working, RFC 3339.
+          format: date-time
+          description: When the token stops working.
         token:
           type: string
           description: Send this to `apply` to carry out exactly this plan.
@@ -13553,11 +13592,12 @@ components:
       - id
       - name
       properties:
-        created:
+        createdAt:
           type:
           - string
           - "null"
-          description: When it was created, RFC 3339.
+          format: date-time
+          description: When it was created.
         id:
           type: string
           description: "`projects/<p>/objects/<group>/<version>/<resource>/<name>`, `core` for the empty group."
@@ -13730,7 +13770,8 @@ components:
           type:
           - string
           - "null"
-          description: When it was added, RFC 3339.
+          format: date-time
+          description: When it was added.
         id:
           type: string
           description: The `Credential` object's name.
@@ -13743,6 +13784,7 @@ components:
           type:
           - string
           - "null"
+          format: date-time
           description: When it last signed in, where Zeabur Identity records it.
         origin:
           $ref: "#/components/schemas/Origin"
@@ -13780,12 +13822,14 @@ components:
           description: That pod.
         podStartedAt:
           type: string
-          description: When the oldest running pod started (`status.startTime`), RFC 3339.
+          format: date-time
+          description: When the oldest running pod started (`status.startTime`).
         writtenAt:
           type: string
+          format: date-time
           description: |-
             When the object was last written by a field manager that owns the key (for an `envFrom`
-            import, any key), RFC 3339.
+            import, any key).
     Permission:
       type: string
       description: >-
@@ -13871,7 +13915,8 @@ components:
         properties:
           expiresAt:
             type: string
-            description: When the token stops working, RFC 3339.
+            format: date-time
+            description: When the token stops working.
           gaps:
             type: array
             items:
@@ -14006,7 +14051,8 @@ components:
             description: The hostname.
           notAfter:
             type: string
-            description: When the certificate expires, RFC 3339.
+            format: date-time
+            description: When the certificate expires.
       - type: object
         description: |-
           The issuer is set on the whole Ingress, so these other hostnames also get their
@@ -14390,9 +14436,10 @@ components:
             type:
             - string
             - "null"
+            format: date-time
             description: |-
-              When the credential written into the pod expires, RFC 3339; `kubectl` is refused
-              from then until a terminal opens again with a fresh one.
+              When the credential written into the pod expires; `kubectl` is refused from then until
+              a terminal opens again with a fresh one.
           deadlineSeconds:
             type: integer
             format: int64
@@ -14830,11 +14877,12 @@ components:
           items:
             type: string
           description: Its containers' names, for picking whose log to read.
-        created:
+        createdAt:
           type:
           - string
           - "null"
-          description: When it was created, in RFC 3339.
+          format: date-time
+          description: When it was created.
         health:
           $ref: "#/components/schemas/Health"
           description: "`fail` when it keeps failing, `ok` when ready, `idle` when it succeeded, `warn` otherwise."
@@ -15493,7 +15541,7 @@ components:
       type: object
       description: A project whose Namespace is being deleted.
       required:
-      - since
+      - startedAt
       - remaining
       - finalizers
       - held
@@ -15513,9 +15561,10 @@ components:
           items:
             $ref: "#/components/schemas/RemainingContent"
           description: What is left, by resource, as the namespace controller counts it.
-        since:
+        startedAt:
           type: string
-          description: When the deletion started, RFC 3339.
+          format: date-time
+          description: When the deletion started.
     ProjectDeletion:
       type: object
       description: What deleting the project takes with it ([`Warning::DeletesProject`]).
@@ -15735,7 +15784,8 @@ components:
           description: Its ID.
         refreshedAt:
           type: string
-          description: When the list was read from GitHub, RFC 3339.
+          format: date-time
+          description: When the list was read from GitHub.
         repositories:
           type: array
           items:
@@ -16022,14 +16072,15 @@ components:
           items:
             $ref: "#/components/schemas/PodUsage"
           description: Every pod with a sample, by name. A running pod missing here has none yet.
-        state:
-          $ref: "#/components/schemas/MetricsState"
-          description: Whether usage could be read.
-        timestamp:
+        sampledAt:
           type:
           - string
           - "null"
-          description: When the newest sample was taken (RFC 3339).
+          format: date-time
+          description: When the newest sample was taken.
+        state:
+          $ref: "#/components/schemas/MetricsState"
+          description: Whether usage could be read.
         unreadable:
           type: array
           items:
@@ -16278,21 +16329,24 @@ components:
       description: One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`.
       required:
       - minor
-      - released
-      - maintenanceFrom
-      - endOfLife
+      - releasedAt
+      - maintenanceStartsAt
+      - endOfLifeAt
       properties:
-        endOfLife:
+        endOfLifeAt:
           type: string
+          format: date
           description: The last day it gets patches.
-        maintenanceFrom:
+        maintenanceStartsAt:
           type: string
+          format: date
           description: From this day only critical fixes are made ("maintenance mode").
         minor:
           type: string
           description: "`1.34`."
-        released:
+        releasedAt:
           type: string
+          format: date
           description: Its first release.
     ReleaseRef:
       type: object
@@ -17400,7 +17454,8 @@ components:
             for copies.
         expiresAt:
           type: string
-          description: When the token stops working, RFC 3339.
+          format: date-time
+          description: When the token stops working.
         keptCopies:
           type: array
           items:
@@ -17539,11 +17594,12 @@ components:
               Where to connect, inside the cluster, and the Secret with the access key. Absent until the
               store has an access key.
           - type: "null"
-        created:
+        createdAt:
           type:
           - string
           - "null"
-          description: When it was created, RFC 3339.
+          format: date-time
+          description: When it was created.
         iam:
           type: array
           items:
@@ -18114,7 +18170,8 @@ components:
           description: Whether the member was created now.
         expiresAt:
           type: string
-          description: When it stops working, RFC 3339.
+          format: date-time
+          description: When it stops working.
         name:
           type: string
           description: The `Invitation` object's name, to revoke it.
@@ -18535,11 +18592,12 @@ components:
       - manual
       - pods
       properties:
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
-          description: When it ended, in RFC 3339.
+          format: date-time
+          description: When it ended.
         health:
           $ref: "#/components/schemas/Health"
           description: "Its status dot: a failed run fails, a running one is fine, a finished one is idle."
@@ -18554,11 +18612,12 @@ components:
           items:
             type: string
           description: Its pods, newest last, for their logs.
-        started:
+        startedAt:
           type:
           - string
           - "null"
-          description: When it started, in RFC 3339.
+          format: date-time
+          description: When it started.
         status:
           $ref: "#/components/schemas/RunStatus"
           description: How it stands.
@@ -18612,11 +18671,12 @@ components:
           type: integer
           format: int32
           description: How many succeeded runs Kubernetes keeps (`spec.successfulJobsHistoryLimit`).
-        lastScheduled:
+        lastScheduledAt:
           type:
           - string
           - "null"
-          description: When a run was last started, in RFC 3339.
+          format: date-time
+          description: When a run was last started.
         suspended:
           type: boolean
           description: The controller starts no new runs (`spec.suspend`).
@@ -18955,7 +19015,8 @@ components:
       properties:
         at:
           type: string
-          description: "When, RFC 3339: the release's creation, the write, the last event, the termination."
+          format: date-time
+          description: "When: the release's creation, the write, the last event, the termination."
         count:
           type:
           - integer
@@ -19048,14 +19109,14 @@ components:
           type:
           - string
           - "null"
-          description: When it started, RFC 3339.
+          format: date-time
+          description: When it started.
         stopsAt:
           type:
           - string
           - "null"
-          description: >-
-            When it stops whatever happens (`activeDeadlineSeconds` after it started), RFC
-            3339.
+          format: date-time
+          description: When it stops whatever happens (`activeDeadlineSeconds` after it started).
         terminals:
           type: integer
           description: How many terminals are open in it on this server.
@@ -19238,7 +19299,7 @@ components:
       required:
       - id
       - kubernetesVersion
-      - dataAsOf
+      - dataCopiedAt
       - states
       - attention
       - skew
@@ -19256,9 +19317,10 @@ components:
           - $ref: "#/components/schemas/UpgradeFinding"
             description: "The one state the cluster's header and Home show: the most severe that shows."
           - type: "null"
-        dataAsOf:
+        dataCopiedAt:
           type: string
-          description: When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`).
+          format: date
+          description: When the bundled table was copied from the Kubernetes schedule.
         distribution:
           type:
           - string
@@ -19482,21 +19544,23 @@ components:
           format: int64
           description: Errors Velero counted.
           minimum: 0
-        expires:
+        expiresAt:
           type:
           - string
           - "null"
-          description: When Velero deletes it, RFC 3339.
+          format: date-time
+          description: When Velero deletes it.
         failure:
           oneOf:
           - $ref: "#/components/schemas/VeleroFailure"
             description: Why it did not finish well.
           - type: "null"
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
-          description: When it finished, RFC 3339.
+          format: date-time
+          description: When it finished.
         items:
           type:
           - integer
@@ -19530,11 +19594,12 @@ components:
           - string
           - "null"
           description: The schedule that made it.
-        started:
+        startedAt:
           type:
           - string
           - "null"
-          description: When it started, RFC 3339.
+          format: date-time
+          description: When it started.
         totalItems:
           type:
           - integer
@@ -19613,11 +19678,12 @@ components:
           - string
           - "null"
           description: The S3-compatible endpoint (`s3Url`); absent for AWS itself.
-        lastValidated:
+        lastValidatedAt:
           type:
           - string
           - "null"
-          description: When Velero last checked, RFC 3339.
+          format: date-time
+          description: When Velero last checked.
         message:
           type:
           - string
@@ -19671,11 +19737,12 @@ components:
           format: int64
           description: Errors Velero counted.
           minimum: 0
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
-          description: When it finished, RFC 3339.
+          format: date-time
+          description: When it finished.
         into:
           type:
           - string
@@ -19709,11 +19776,12 @@ components:
           description: >-
             The only kinds it restores (`includedResources`), as `resource.group`; empty
             for all.
-        started:
+        startedAt:
           type:
           - string
           - "null"
-          description: When it started, RFC 3339.
+          format: date-time
+          description: When it started.
         warnings:
           type: integer
           format: int64
@@ -19755,7 +19823,8 @@ components:
           type:
           - string
           - "null"
-          description: When it last made a backup, RFC 3339.
+          format: date-time
+          description: When it last made a backup.
         name:
           type: string
           description: Its name.
@@ -19878,11 +19947,12 @@ components:
         delete:
           type: boolean
           description: It deletes what the snapshot does not have.
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
-          description: When it finished, RFC 3339.
+          format: date-time
+          description: When it finished.
         into:
           type:
           - string
@@ -19910,11 +19980,12 @@ components:
         snapshot:
           type: string
           description: The snapshot.
-        started:
+        startedAt:
           type:
           - string
           - "null"
-          description: When it was created, RFC 3339.
+          format: date-time
+          description: When it was created.
     VolumeRestores:
       type: object
       description: What a claim can be restored from.
@@ -19956,14 +20027,15 @@ components:
       description: A snapshot of a claim that can be restored.
       required:
       - id
-      - date
+      - takenAt
       properties:
-        date:
-          type: string
-          description: When it was taken, RFC 3339.
         id:
           type: string
           description: restic's ID.
+        takenAt:
+          type: string
+          format: date-time
+          description: When it was taken.
     VolumeUsage:
       type: object
       description: How full one claim's volume is.
@@ -20112,11 +20184,12 @@ components:
           - string
           - "null"
           description: Why it was made, from `kubernetes.io/change-cause`.
-        created:
+        createdAt:
           type:
           - string
           - "null"
-          description: When it was made, RFC 3339.
+          format: date-time
+          description: When it was made.
         current:
           type: boolean
           description: It is the template the workload runs now.
@@ -20196,11 +20269,12 @@ components:
         - provenance
         - origin
         properties:
-          created:
+          createdAt:
             type:
             - string
             - "null"
-            description: When the workload was created, in RFC 3339.
+            format: date-time
+            description: When the workload was created.
           image:
             type:
             - string
@@ -20391,10 +20465,11 @@ components:
         suspended:
           type: boolean
           description: Whether builds are paused.
-        uploadExpires:
+        uploadExpiresAt:
           type:
           - string
           - "null"
+          format: date-time
           description: When that upload token expires.
         uploadRequest:
           type:
@@ -20451,10 +20526,11 @@ components:
           description: >-
             The controller's reason, such as `RefNotFound`, `AuthFailed` or
             `HostKeyMismatch`.
-        since:
+        startedAt:
           type:
           - string
           - "null"
+          format: date-time
           description: When the condition turned `False`.
     ZeaburBuilderRun:
       type: object
@@ -20467,20 +20543,22 @@ components:
         build:
           type: string
           description: The `Build`.
-        created:
+        createdAt:
           type:
           - string
           - "null"
+          format: date-time
           description: When it was created.
         digest:
           type:
           - string
           - "null"
           description: The pushed manifest's digest.
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
+          format: date-time
           description: When it finished.
         gitRef:
           type:
@@ -20510,10 +20588,11 @@ components:
           - string
           - "null"
           description: The commit.
-        started:
+        startedAt:
           type:
           - string
           - "null"
+          format: date-time
           description: When it started.
         tags:
           type: array

@@ -38,7 +38,7 @@ use zeabur_plan::node_shell::{self as shell, NAMESPACE, NodeShell, ShellState};
 use crate::error::{ApiError, get_read, list_read, read_problem, review_refusal};
 use crate::extract::{Json, Path, WebSocketUpgrade};
 use crate::handlers::{AppState, Person};
-use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
+use crate::plan_token::{self as token, TokenError};
 use crate::pods::exec::{self, ServerFrame, Terminal};
 use crate::projects::writes::token_problem;
 
@@ -71,12 +71,12 @@ pub struct NodeShellView {
     pub person: Option<String>,
     /// Whether the person asking opened it, so may enter it.
     pub mine: bool,
-    /// When it was created, RFC 3339.
+    /// When it was created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created_at: Option<String>,
-    /// When its deadline stops it, RFC 3339.
+    pub created_at: Option<Timestamp>,
+    /// When its deadline stops it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub stops_at: Option<String>,
+    pub stops_at: Option<Timestamp>,
     /// How it is doing.
     pub phase: ShellPhase,
     /// The kubelet's reason: `ErrImagePull` while starting, `DeadlineExceeded` or `Completed`
@@ -180,8 +180,8 @@ pub struct NodeShellPlan {
     /// bindings.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub token: Option<String>,
-    /// When the token stops working, RFC 3339.
-    pub expires_at: String,
+    /// When the token stops working.
+    pub expires_at: Timestamp,
     /// `open` or `remove`.
     pub op: String,
     /// The node.
@@ -584,7 +584,7 @@ struct Planning<'a> {
     identity: &'a Identity,
     image: &'a str,
     made_at: &'a str,
-    expires_at: i64,
+    expires_at: Timestamp,
 }
 
 async fn plan_open(
@@ -635,11 +635,11 @@ async fn plan_open(
         image: planning.image.to_owned(),
         uid: opening.node_uid.clone(),
         namespace_version: opening.namespace.as_ref().map(namespace_version),
-        expires_at: planning.expires_at,
+        expires_at: planning.expires_at.as_second(),
     };
     let plan = NodeShellPlan {
         token: None,
-        expires_at: String::new(),
+        expires_at: planning.expires_at,
         op: claims.op.clone(),
         kubectl: Some(shell::kubectl_command(&node, planning.image)),
         node,
@@ -672,11 +672,11 @@ async fn plan_remove(
         image: text(&found, "/spec/containers/0/image").unwrap_or_default(),
         uid: text(&found, "/metadata/uid"),
         namespace_version: None,
-        expires_at: planning.expires_at,
+        expires_at: planning.expires_at.as_second(),
     };
     let plan = NodeShellPlan {
         token: None,
-        expires_at: String::new(),
+        expires_at: planning.expires_at,
         op: claims.op.clone(),
         node,
         writes: vec![ShellWrite {
@@ -723,12 +723,11 @@ pub(crate) async fn plan(
         .await
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     let now = (state.clock)();
-    let expires_at = now.as_second().saturating_add(LIFETIME_SECONDS);
     let planning = Planning {
         identity: &identity,
         image: &state.settings.terminal.debug_image,
         made_at: &now.to_string(),
-        expires_at,
+        expires_at: token::expiry(now)?,
     };
     let (claims, mut plan) = match request {
         NodeShellPlanRequest::Open { node } => plan_open(cluster.as_ref(), &planning, node).await?,
@@ -736,9 +735,6 @@ pub(crate) async fn plan(
             plan_remove(cluster.as_ref(), &planning, pod).await?
         }
     };
-    plan.expires_at = Timestamp::from_second(expires_at)
-        .unwrap_or(Timestamp::UNIX_EPOCH)
-        .to_string();
     if plan.exposed.is_empty() {
         plan.token = Some(seal(&sealing, PREFIX, &claims)?);
     }

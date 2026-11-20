@@ -149,8 +149,8 @@ fn building(builds: &[ProjectBuild], runs: &[ProjectBuildRun], now: Timestamp) -
         };
         now.duration_since(asked) <= REBUILD_WINDOW
             && newest
-                .and_then(|r| r.created.as_deref())
-                .is_none_or(|created| created.parse::<Timestamp>().is_ok_and(|c| c < asked))
+                .and_then(|r| r.created_at)
+                .is_none_or(|created| created < asked)
     })
 }
 
@@ -384,7 +384,7 @@ mod tests {
     fn run(phase: Option<&str>, reason: Option<&str>, created: Option<&str>) -> ProjectBuildRun {
         let run: ZeaburBuilderRun = serde_json::from_value(json!({
             "name": "web-1", "build": "web", "phase": phase, "reason": reason,
-            "created": created, "tags": [],
+            "createdAt": created, "tags": [],
         }))
         .unwrap();
         ProjectBuildRun {

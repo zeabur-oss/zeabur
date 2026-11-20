@@ -11,6 +11,6 @@
       "key": "diagnosis.crashLoop.why.exitsZero",
       "params": {"container": "worker", "restarts": "3"}
     },
-    "lastSeen": "2026-10-29T03:04:01Z"
+    "lastSeenAt": "2026-10-29T03:04:01Z"
   }
 ]

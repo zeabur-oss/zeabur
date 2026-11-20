@@ -145,7 +145,7 @@ function Body({
       name={store.name}
       state={<ObjectStorageState store={store} size="md" />}
       kind={`${t("s3.engine")}${store.version ? ` ${store.version}` : ""}`}
-      created={store.created}
+      created={store.createdAt}
       updatedAt={updatedAt}
       failed={failed}
       tab={tab}

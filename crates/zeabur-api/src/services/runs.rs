@@ -9,6 +9,7 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_model::adapters::controller_of;
 use zeabur_model::{Health, WorkloadKind};
 
@@ -53,12 +54,12 @@ pub struct TaskRun {
     pub health: Health,
     /// Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`).
     pub manual: bool,
-    /// When it started, in RFC 3339.
+    /// When it started.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub started: Option<String>,
-    /// When it ended, in RFC 3339.
+    pub started_at: Option<Timestamp>,
+    /// When it ended.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub finished: Option<String>,
+    pub finished_at: Option<Timestamp>,
     /// Its pods, newest last, for their logs.
     pub pods: Vec<String>,
 }
@@ -155,12 +156,8 @@ fn run(job: &Job, pods: &[zeabur_kube::k8s_openapi::api::core::v1::Pod]) -> Task
             .as_ref()
             .and_then(|a| a.get("cronjob.kubernetes.io/instantiate"))
             .is_some_and(|v| v == "manual"),
-        started: status
-            .and_then(|s| s.start_time.as_ref())
-            .map(|t| t.0.to_string()),
-        finished: status
-            .and_then(|s| s.completion_time.as_ref())
-            .map(|t| t.0.to_string()),
+        started_at: status.and_then(|s| s.start_time.as_ref()).map(|t| t.0),
+        finished_at: status.and_then(|s| s.completion_time.as_ref()).map(|t| t.0),
         pods: owned
             .into_iter()
             .filter_map(|p| p.metadata.name.clone())
