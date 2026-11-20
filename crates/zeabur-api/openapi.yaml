@@ -1782,6 +1782,49 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/builds/{build}/deploy-key":
+    post:
+      tags:
+      - projects
+      summary: |-
+        The public key of the deploy key `Build` `build` reads its repository with, read as the
+        person, for adding it to the Git host. Only on the person's request: the Secret holds the
+        private key too.
+      operationId: revealDeployKey
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: build
+        in: path
+        description: The `Build`
+        required: true
+        schema:
+          type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeployKeyPublic"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/builds/{build}/source":
     post:
       tags:
@@ -2071,48 +2114,6 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
-  "/api/v1/projects/{project}/deploy-keys/{name}/public":
-    post:
-      tags:
-      - projects
-      summary: |-
-        The public key of the deploy key in Secret `name`, read as the person, for adding it to the
-        Git host again. Only on the person's request: the Secret holds the private key too.
-      operationId: revealDeployKey
-      parameters:
-      - name: project
-        in: path
-        description: The project's namespace
-        required: true
-        schema:
-          $ref: "#/components/schemas/ProjectName"
-      - name: name
-        in: path
-        description: The Secret holding the key
-        required: true
-        schema:
-          type: string
-      responses:
-        "200":
-          content:
-            application/json:
-              schema:
-                $ref: "#/components/schemas/DeployKeyPublic"
-        "400":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "403":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
-        "404":
-          content:
-            application/problem+json:
-              schema:
-                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/events":
     get:
       tags:
@@ -2236,6 +2237,40 @@ paths:
               schema:
                 $ref: "#/components/schemas/ProjectGitHubApp"
         "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/image-service/yaml":
+    post:
+      tags:
+      - projects
+      operationId: previewImageService
+      parameters:
+      - name: project
+        in: path
+        description: The project's namespace
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ImageServiceChange"
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ServiceYaml"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "422":
           content:
             application/problem+json:
               schema:
@@ -5277,6 +5312,12 @@ components:
           description: >-
             Whether it is the one Zeabur made for this `Build` (`<name>-git`), which goes
             with it.
+    BuildMethod:
+      type: string
+      description: How Zeabur Builder builds a folder.
+      enum:
+      - railpack
+      - dockerfile
     BuildOptionsChange:
       type: object
       description: A [`Change::BuildOptions`]. A field left out stays as it is.
@@ -6327,7 +6368,7 @@ components:
           description: |-
             Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
             uploaded-folder source that asks for its upload token, and the objects of the service that
-            runs the image it builds (see the `upload_service` module).
+            runs the image it builds (see the `built_service` module).
         - type: object
           required:
           - op
@@ -6339,38 +6380,41 @@ components:
         description: |-
           Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
           uploaded-folder source that asks for its upload token, and the objects of the service that
-          runs the image it builds (see the `upload_service` module).
-      - type: object
+          runs the image it builds (see the `built_service` module).
+      - allOf:
+        - $ref: "#/components/schemas/GitServiceChange"
+          description: |-
+            Create a service from a Git repository: a Zeabur Builder `Build` of the repository, its
+            credentials, and the objects of the service that runs the image it builds (see the
+            `built_service` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - createGitService
         description: |-
-          Create the Secret that holds an SSH deploy key, for Zeabur Builder to fetch a private
-          repository: a `kubernetes.io/ssh-auth` Secret with the private key and the Git host's
-          `known_hosts`, labelled `builder.zeabur.com/git-credentials: "true"`. The API plans the
-          Secret as a `create` with its values hidden and makes the key pair at apply, so the
-          private key never leaves the server.
-        required:
-        - name
-        - host
-        - op
-        properties:
-          host:
-            type: string
-            description: >-
-              The Git host as the repository's SSH URL names it, with `:port` when it is not
-              22.
-          knownHosts:
-            type:
-            - string
-            - "null"
-            description: |-
-              The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
-              `github.com` and `gitlab.com`, whose keys Zeabur pins.
-          name:
-            type: string
-            description: The Secret's name.
-          op:
-            type: string
-            enum:
-            - deployKey
+          Create a service from a Git repository: a Zeabur Builder `Build` of the repository, its
+          credentials, and the objects of the service that runs the image it builds (see the
+          `built_service` module).
+      - allOf:
+        - $ref: "#/components/schemas/ImageServiceChange"
+          description: |-
+            Create a service that runs a container image: its Deployment, and the Secrets, claims,
+            Service and Ingress the change asks for (see the `image_service` module).
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - createImageService
+        description: |-
+          Create a service that runs a container image: its Deployment, and the Secrets, claims,
+          Service and Ingress the change asks for (see the `image_service` module).
       - allOf:
         - $ref: "#/components/schemas/CopyS3KeysChange"
           description: |-
@@ -10132,6 +10176,70 @@ components:
         encoding:
           $ref: "#/components/schemas/Encoding"
           description: How to encode them.
+    GitAccess:
+      oneOf:
+      - type: object
+        description: A public repository, over HTTPS.
+        required:
+        - type
+        properties:
+          type:
+            type: string
+            enum:
+            - public
+      - type: object
+        description: A user name and an access token, over HTTPS.
+        required:
+        - username
+        - token
+        - type
+        properties:
+          token:
+            type: string
+            description: The token.
+          type:
+            type: string
+            enum:
+            - token
+          username:
+            type: string
+            description: The user name the host takes with a token.
+      - type: object
+        description: |-
+          An SSH deploy key the apply makes, over SSH. The person adds its public key to the
+          repository on the Git host.
+        required:
+        - type
+        properties:
+          knownHosts:
+            type:
+            - string
+            - "null"
+            description: |-
+              The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+              `github.com` and `gitlab.com`, whose keys Zeabur pins.
+          type:
+            type: string
+            enum:
+            - deployKey
+      - type: object
+        description: The cluster's GitHub App, through an installation granted to the project.
+        required:
+        - installationId
+        - type
+        properties:
+          installationId:
+            type: integer
+            format: int64
+            description: The installation.
+            minimum: 0
+          type:
+            type: string
+            enum:
+            - githubApp
+      description: >-
+        How Zeabur Builder reads a repository. Credentials go in the Secret
+        `<name>-git`.
     GitHubApp:
       type: object
       description: The cluster's GitHub App.
@@ -10380,6 +10488,87 @@ components:
           description: >-
             Builder's webhook URL, `https://<host>/hooks/github-app`; empty when its
             receiver is off.
+    GitServiceChange:
+      type: object
+      description: A [`crate::Change::CreateGitService`].
+      required:
+      - name
+      - url
+      - method
+      - access
+      properties:
+        access:
+          $ref: "#/components/schemas/GitAccess"
+          description: How Zeabur Builder reads the repository.
+        branch:
+          type:
+          - string
+          - "null"
+          description: "The branch. Left out: the repository's default branch."
+          pattern: ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
+        buildVariables:
+          type: array
+          items:
+            $ref: "#/components/schemas/NameValue"
+          description: Variables of the build, kept in the Secret `<name>-build-env`.
+        directory:
+          type:
+          - string
+          - "null"
+          description: "The folder inside the repository to build. Left out: its root."
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+        dockerfile:
+          type:
+          - string
+          - "null"
+          description: The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+        host:
+          type:
+          - string
+          - "null"
+          description: A public hostname for the port, with HTTPS where the cluster has an issuer.
+        method:
+          $ref: "#/components/schemas/BuildMethod"
+          description: How the folder is built.
+        name:
+          type: string
+          description: The service's name, which its `Build`, workload and Service share.
+          maxLength: 40
+          pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
+        port:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "The port the app listens on. Left out: a worker, which takes no connections."
+          minimum: 0
+        security:
+          oneOf:
+          - $ref: "#/components/schemas/PodSecurityLevel"
+            description: |-
+              `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
+              regular user, and `baseline` for a Dockerfile, which often runs as root.
+          - type: "null"
+        size:
+          oneOf:
+          - $ref: "#/components/schemas/ServiceSize"
+            description: "What the app asks for. Left out: small."
+          - type: "null"
+        url:
+          type: string
+          description: |-
+            The repository: `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
+            `ssh://git@host/owner/repo.git`.
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/NameValue"
+          description: >-
+            Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from
+            `port`.
     Headline:
       oneOf:
       - type: object
@@ -10586,6 +10775,21 @@ components:
       - service
       - targetPort
       - ready
+    HostPort:
+      type: object
+      description: A host and a port.
+      required:
+      - host
+      - port
+      properties:
+        host:
+          type: string
+          description: The host.
+        port:
+          type: integer
+          format: int32
+          description: The port.
+          minimum: 0
     HttpOnlyReason:
       type: string
       description: Why a new hostname gets no HTTPS.
@@ -10669,6 +10873,96 @@ components:
           description: |-
             `config.User` as written (`nginx`, `1000:1000`); empty when the image sets none and runs
             as root. Kubernetes' `runAsNonRoot` cannot check a name, only a number.
+    ImageServiceChange:
+      type: object
+      description: A [`crate::Change::CreateImageService`].
+      required:
+      - name
+      - image
+      - secretVariables
+      - size
+      - replicas
+      - security
+      properties:
+        args:
+          type: array
+          items:
+            type: string
+          description: The container's arguments, when not the image's.
+        command:
+          type: array
+          items:
+            type: string
+          description: The container's command, when not the image's.
+        host:
+          type:
+          - string
+          - "null"
+          description: A public hostname for the port, with HTTPS where the cluster has an issuer.
+        image:
+          type: string
+          description: The image reference.
+          pattern: ^[a-z0-9][A-Za-z0-9._/:@-]*$
+        morePorts:
+          type: array
+          items:
+            type: integer
+            format: int32
+            minimum: 0
+          description: Ports besides `port` the Kubernetes Service carries.
+        name:
+          type: string
+          description: The service's name, which its workload, Service and Ingress share.
+          maxLength: 40
+          pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
+        port:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "The port the app listens on. Left out: a worker, which takes no connections."
+          minimum: 1
+        registry:
+          oneOf:
+          - $ref: "#/components/schemas/RegistryLogin"
+            description: >-
+              The registry login the image is pulled with, kept in the Secret
+              `<name>-registry`.
+          - type: "null"
+        replicas:
+          type: integer
+          format: int32
+          description: How many pods run.
+          maximum: 20
+          minimum: 1
+        secretVariables:
+          type: boolean
+          description: |-
+            Keep plain values in the Secret `<name>-env` rather than in the Deployment. A value that
+            `expands` stays in the Deployment, as Kubernetes expands `$(…)` only there.
+        security:
+          $ref: "#/components/schemas/PodSecurityLevel"
+          description: "`restricted`, or `baseline` for any other level."
+        size:
+          $ref: "#/components/schemas/ServiceSize"
+          description: What the app asks for.
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceVariable"
+          description: The app's variables.
+        volumes:
+          type: array
+          items:
+            $ref: "#/components/schemas/ServiceVolume"
+          description: |-
+            Claims `<name>-<volume>`; a service with one runs one replica and replaces its pod by
+            stopping the old one first.
+        waitFor:
+          oneOf:
+          - $ref: "#/components/schemas/WaitFor"
+            description: Hosts and ports an init container waits for before the app starts.
+          - type: "null"
     ImportedEnv:
       type: object
       description: |-
@@ -15911,7 +16205,7 @@ components:
       - token
     RegistryLogin:
       type: object
-      description: Credentials for the image's registry.
+      description: A login to a private registry.
       required:
       - server
       - username
@@ -15919,13 +16213,13 @@ components:
       properties:
         password:
           type: string
-          description: The password or access token.
+          description: The password or token.
         server:
           type: string
-          description: The registry, such as `ghcr.io`; used only when it is the image's.
+          description: The registry's host, such as `ghcr.io`.
         username:
           type: string
-          description: The username.
+          description: The user name.
     Release:
       type: object
       description: One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`.
@@ -17533,11 +17827,6 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: The settings ConfigMap or the store, when the person may not read it.
-    ServiceReplicas:
-      type: integer
-      description: How many replicas a new service may run.
-      maximum: 20
-      minimum: 1
     ServiceRole:
       type: string
       description: What a service does for its project, for how a client groups and draws it.
@@ -17664,6 +17953,28 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: Reads the person was refused; hops that needed them are unknown.
+    ServiceVariable:
+      type: object
+      description: "A variable of a new service: a value, or a key of a Secret."
+      required:
+      - name
+      properties:
+        expands:
+          type: boolean
+          description: |-
+            The value reads other variables with `$(…)`, so it stays in the Deployment, where
+            Kubernetes expands it. A value without this is literal, whatever it contains.
+        name:
+          type: string
+          description: The variable's name.
+        value:
+          type: string
+          description: Its value, when it has no `valueFrom`.
+        valueFrom:
+          oneOf:
+          - $ref: "#/components/schemas/EnvValueFrom"
+            description: The Secret key it reads instead.
+          - type: "null"
     ServiceVerdict:
       type: object
       description: A service's verdict, from its status, its diagnoses and its pods.
@@ -17677,6 +17988,37 @@ components:
         tone:
           $ref: "#/components/schemas/Health"
           description: The colour of the verdict.
+    ServiceVolume:
+      type: object
+      description: A claim of a new service and where it is mounted.
+      required:
+      - name
+      - mountPath
+      - size
+      properties:
+        mountPath:
+          type: string
+          description: Where the container sees it; absolute.
+        name:
+          type: string
+          description: The volume's name; the claim is `<service>-<name>`.
+          maxLength: 63
+          pattern: ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+        readOnly:
+          type: boolean
+          description: Mounted read-only.
+        size:
+          type: string
+          description: The size, a Kubernetes quantity such as `1Gi`.
+    ServiceYaml:
+      type: object
+      description: The objects as YAML documents, in the order a plan creates them.
+      required:
+      - yaml
+      properties:
+        yaml:
+          type: string
+          description: One document per object, separated by `---`.
     SessionView:
       type: object
       description: How the person is signed in to Zeabur.
@@ -18887,12 +19229,6 @@ components:
           items:
             type: string
           description: Nodes system-upgrade-controller is upgrading now.
-    UploadMethod:
-      type: string
-      description: How Zeabur Builder builds an uploaded folder.
-      enum:
-      - railpack
-      - dockerfile
     UploadServiceChange:
       type: object
       description: A [`Change::CreateUploadService`].
@@ -18917,7 +19253,7 @@ components:
           type:
           - string
           - "null"
-          description: The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`].
+          description: The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
           maxLength: 1024
           pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
         host:
@@ -18926,7 +19262,7 @@ components:
           - "null"
           description: A public hostname for the port, with HTTPS where the cluster has an issuer.
         method:
-          $ref: "#/components/schemas/UploadMethod"
+          $ref: "#/components/schemas/BuildMethod"
           description: How the folder is built.
         name:
           type: string
@@ -19594,6 +19930,21 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: The settings ConfigMap or the store, when the person may not read it.
+    WaitFor:
+      type: object
+      description: Hosts an init container waits for, with the image that waits.
+      required:
+      - hosts
+      - image
+      properties:
+        hosts:
+          type: array
+          items:
+            $ref: "#/components/schemas/HostPort"
+          description: Each host and port, waited for in turn.
+        image:
+          type: string
+          description: An image with `sh` and `nc`.
     WarningKind:
       type: string
       description: What a `Warning` event says went wrong, from its reason. An open set.

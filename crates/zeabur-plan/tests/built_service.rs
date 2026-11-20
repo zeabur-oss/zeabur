@@ -1,5 +1,6 @@
-//! A service from an uploaded folder is one change that makes the `Build` and the objects of the
-//! service that runs what it builds, the same for the web interface and `zeaburctl up`.
+//! A service from an uploaded folder or a Git repository is one change that makes the `Build` and
+//! the objects of the service that runs what it builds, the same for the web interface and
+//! `zeaburctl up`.
 
 #[cfg(test)]
 mod tests {
@@ -8,8 +9,8 @@ mod tests {
     use zeabur_graph::pod_security::level;
     use zeabur_model::PodSecurityLevel;
     use zeabur_plan::{
-        Change, Input, NameValue, Plan, PlanError, PlanRequest, ServedKind, ServiceSize,
-        UploadMethod, UploadServiceChange, Write, plan,
+        BuildMethod, Change, DeployKeySecret, GitAccess, GitServiceChange, Input, NameValue, Plan,
+        PlanError, PlanRequest, ServedKind, ServiceSize, UploadServiceChange, Write, plan,
     };
 
     fn kind(group: &str, kind: &str, plural: &str) -> ServedKind {
@@ -25,7 +26,7 @@ mod tests {
         UploadServiceChange {
             name: "site".to_owned(),
             request: "up-1".to_owned(),
-            method: UploadMethod::Railpack,
+            method: BuildMethod::Railpack,
             directory: None,
             dockerfile: None,
             port: None,
@@ -39,6 +40,14 @@ mod tests {
 
     fn planned(
         change: UploadServiceChange,
+        registry: Option<&str>,
+        issuer: Option<&str>,
+    ) -> Result<Plan, PlanError> {
+        planned_change(Change::CreateUploadService(change), registry, issuer)
+    }
+
+    fn planned_change(
+        change: Change,
         registry: Option<&str>,
         issuer: Option<&str>,
     ) -> Result<Plan, PlanError> {
@@ -61,7 +70,7 @@ mod tests {
                 ..Input::new(&snapshot, "2026-10-23T00:00:00Z")
             },
             &PlanRequest {
-                changes: vec![Change::CreateUploadService(change)],
+                changes: vec![change],
             },
         )
     }
@@ -186,7 +195,7 @@ mod tests {
         };
         assert_eq!(level_of(service()), PodSecurityLevel::Restricted);
         let mut docker = service();
-        docker.method = UploadMethod::Dockerfile;
+        docker.method = BuildMethod::Dockerfile;
         docker.directory = Some("./apps/web/".to_owned());
         docker.dockerfile = Some("docker/Dockerfile.prod".to_owned());
         assert_eq!(level_of(docker.clone()), PodSecurityLevel::Baseline);
@@ -244,7 +253,7 @@ mod tests {
     #[test]
     fn a_privileged_choice_plans_no_privileged_pod() {
         let mut change = service();
-        change.method = UploadMethod::Dockerfile;
+        change.method = BuildMethod::Dockerfile;
         change.security = Some(PodSecurityLevel::Privileged);
         let plan = planned(change, Some("zot:5000"), None).unwrap();
         let deployment = created(&plan, "Deployment").unwrap();
@@ -266,7 +275,7 @@ mod tests {
     fn unsafe_hosts_paths_and_build_variables_are_refused() {
         let code = |edit: &dyn Fn(&mut UploadServiceChange)| {
             let mut change = service();
-            change.method = UploadMethod::Dockerfile;
+            change.method = BuildMethod::Dockerfile;
             change.port = Some(80);
             edit(&mut change);
             planned(change, Some("zot:5000"), None).unwrap_err().code
@@ -291,6 +300,153 @@ mod tests {
                 value: String::new()
             }]),
             "invalid_env_name"
+        );
+    }
+
+    fn git() -> GitServiceChange {
+        GitServiceChange {
+            name: "site".to_owned(),
+            url: "https://github.com/acme/site".to_owned(),
+            branch: None,
+            method: BuildMethod::Railpack,
+            directory: None,
+            dockerfile: None,
+            port: Some(8080),
+            host: None,
+            variables: Vec::new(),
+            build_variables: Vec::new(),
+            size: None,
+            security: None,
+            access: GitAccess::Public,
+            deploy_key: None,
+        }
+    }
+
+    fn git_plan(change: GitServiceChange) -> Result<Plan, PlanError> {
+        planned_change(Change::CreateGitService(change), Some("zot:5000"), None)
+    }
+
+    /// A public repository is read over HTTPS from its default branch, with no Secret; the
+    /// Deployment runs what the `Build` pushes and Keel moves it.
+    #[test]
+    fn a_public_repository_builds_from_its_default_branch() {
+        let plan = git_plan(git()).unwrap();
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["spec"]["source"],
+            json!({"git": {"url": "https://github.com/acme/site.git", "ref": "HEAD"}})
+        );
+        assert_eq!(build["spec"]["notify"][0]["type"], "keel");
+        let deployment = created(&plan, "Deployment").unwrap();
+        assert_eq!(
+            deployment["spec"]["template"]["spec"]["containers"][0]["image"],
+            "zot:5000/shop/site:pending"
+        );
+        let mut branch = git();
+        branch.branch = Some(" release/1.4 ".to_owned());
+        let build = created(&git_plan(branch).unwrap(), "Build").unwrap();
+        assert_eq!(build["spec"]["source"]["git"]["ref"], "release/1.4");
+    }
+
+    /// A token goes in a basic-auth Secret `<name>-git` that Zeabur Builder reads by its label,
+    /// and the `Build` names it.
+    #[test]
+    fn a_token_goes_in_a_secret_the_build_names() {
+        let mut change = git();
+        change.access = GitAccess::Token {
+            username: "x-access-token".to_owned(),
+            token: " ghp_1 ".to_owned(),
+        };
+        let plan = git_plan(change).unwrap();
+        let secret = plan
+            .objects
+            .iter()
+            .find(|o| o.target.name == "site-git")
+            .unwrap();
+        let Write::Create { body } = &secret.write else {
+            panic!("the Secret is created");
+        };
+        assert_eq!(body["type"], "kubernetes.io/basic-auth");
+        assert_eq!(
+            body["metadata"]["labels"]["builder.zeabur.com/git-credentials"],
+            "true"
+        );
+        assert_eq!(body["stringData"]["password"], "ghp_1");
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["spec"]["source"]["credentialsRef"]["name"],
+            "site-git"
+        );
+    }
+
+    /// A deploy key reads the repository over SSH, from the Secret the API made.
+    #[test]
+    fn a_deploy_key_reads_over_ssh() {
+        let mut change = git();
+        change.access = GitAccess::DeployKey { known_hosts: None };
+        assert_eq!(
+            git_plan(change.clone()).unwrap_err().code,
+            "unresolved_deploy_key"
+        );
+        change.deploy_key = Some(DeployKeySecret {
+            private_key: "KEY".to_owned(),
+            known_hosts: "github.com ssh-ed25519 AAAA\n".to_owned(),
+        });
+        let plan = git_plan(change).unwrap();
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["spec"]["source"]["git"]["url"],
+            "git@github.com:acme/site.git"
+        );
+        assert_eq!(
+            build["spec"]["source"]["credentialsRef"]["name"],
+            "site-git"
+        );
+        let secret = created(&plan, "Secret").unwrap();
+        assert_eq!(secret["type"], "kubernetes.io/ssh-auth");
+    }
+
+    /// A repository the GitHub App reads names its installation and no Secret.
+    #[test]
+    fn the_github_app_names_its_installation() {
+        let mut change = git();
+        change.access = GitAccess::GithubApp {
+            installation_id: 42,
+        };
+        let plan = git_plan(change).unwrap();
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["spec"]["source"]["githubApp"],
+            json!({"installationId": 42})
+        );
+        assert!(created(&plan, "Secret").is_none_or(|s| s["metadata"]["name"] != "site-git"));
+    }
+
+    /// The form's rules for a repository and a branch are the server's.
+    #[test]
+    fn a_repository_or_branch_git_would_refuse_plans_nothing() {
+        let code = |edit: &dyn Fn(&mut GitServiceChange)| {
+            let mut change = git();
+            edit(&mut change);
+            git_plan(change).unwrap_err().code
+        };
+        assert_eq!(
+            code(&|c| c.url = "github.com/acme".to_owned()),
+            "invalid_repository"
+        );
+        for branch in ["a..b", "main.lock", "/main"] {
+            assert_eq!(
+                code(&|c| c.branch = Some(branch.to_owned())),
+                "invalid_branch",
+                "{branch}"
+            );
+        }
+        assert_eq!(
+            code(&|c| c.access = GitAccess::Token {
+                username: String::new(),
+                token: "t".to_owned()
+            }),
+            "invalid_token"
         );
     }
 }

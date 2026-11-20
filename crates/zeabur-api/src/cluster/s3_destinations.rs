@@ -474,7 +474,8 @@ pub(crate) async fn open(
             | Change::Edit { .. }
             | Change::Create { .. }
             | Change::CreateUploadService(_)
-            | Change::DeployKey { .. }
+            | Change::CreateGitService(_)
+            | Change::CreateImageService(_)
             | Change::Delete { .. }
             | Change::Adopt
             | Change::Unadopt

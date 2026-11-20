@@ -87,7 +87,7 @@ pub(crate) fn measured(changes: &[Change], plan: &Plan) -> Option<Measured> {
         Change::Image { workload, .. } if workload.kind == WorkloadKind::Deployment => {
             Operation::DeployImage
         }
-        Change::Create { .. } => Operation::DeployImage,
+        Change::Create { .. } | Change::CreateImageService(_) => Operation::DeployImage,
         Change::Scale { workload, .. } if workload.kind == WorkloadKind::Deployment => {
             Operation::ScaleReplicas
         }

@@ -1,5 +1,5 @@
 // A Docker Compose file, as the server reads it (`POST /projects/{p}/compose`), turned into the
-// objects the "Docker image" and database forms create, in one plan.
+// changes the "Docker image" and database forms send, in one plan.
 import type { Schemas } from "@/api/client"
 import { pendingDatabase, variablesFor, type Connectable } from "@/model/connect"
 import {
@@ -17,7 +17,7 @@ import {
   type NewObjectStorage,
 } from "@/model/object-storage"
 import {
-  imageObjects,
+  createImageService,
   newImageService,
   suggestedHost,
   type DomainSettings,
@@ -109,7 +109,7 @@ const urlVariables = (v: Variable, database: Connectable): ServiceVariable[] =>
       edit.valueFrom
         ? {
             name: edit.name,
-            from: { secret: edit.valueFrom.secretName ?? "", key: edit.valueFrom.key ?? "" },
+            valueFrom: { secretName: edit.valueFrom.secretName, key: edit.valueFrom.key },
           }
         : { name: edit.name, value: edit.value ?? "", expands: true },
   )
@@ -133,13 +133,18 @@ const REWRITE: Record<
 > = {
   url: (v, database) => (database.engine === "s3" ? s3Url : urlVariables)(v, database),
   host: (v, database) => [{ name: v.name, value: withPort(database, v.value) }],
-  password: (v, _, app) => [{ name: v.name, from: { secret: app.secret, key: app.passwordKey } }],
+  password: (v, _, app) => [
+    { name: v.name, valueFrom: { secretName: app.secret, key: app.passwordKey } },
+  ],
   user: (v, database, app) =>
     database.engine === "s3"
       ? [
           {
             name: v.name,
-            from: { secret: app.secret, key: database.connection.usernameKey ?? "accessKey" },
+            valueFrom: {
+              secretName: app.secret,
+              key: database.connection.usernameKey ?? "accessKey",
+            },
           },
         ]
       : [{ name: v.name, value: app.username ?? v.value }],
@@ -274,12 +279,7 @@ export function composeChanges(
     )
     const hosts = service.dependsOn.flatMap((d) => reach(d) ?? [])
     if (hosts.length > 0) form.waitFor = { hosts, image: conversion.waitImage }
-    changes.push(
-      ...imageObjects(form, context.domains).map((object): Change => ({
-        op: "create",
-        object: { ...object },
-      })),
-    )
+    changes.push(...createImageService(form))
   }
   return changes
 }

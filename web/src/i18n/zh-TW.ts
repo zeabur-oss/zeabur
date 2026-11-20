@@ -1677,7 +1677,8 @@ export const zhTW: Messages = {
   "confirm.copyS3Keys": (name, destination) =>
     `建立機密變數 ${name}，金鑰從 S3 目的地 ${destination} 複製過來。`,
   "confirm.createUploadService": (name) => `建立服務 ${name}，並用你上傳的資料夾建置。`,
-  "confirm.deployKey": (name) => `用新的部署金鑰建立機密變數 ${name}。`,
+  "confirm.createGitService": (name) => `建立服務 ${name}，並用你的儲存庫建置。`,
+  "confirm.createImageService": (name) => `用映像檔建立服務 ${name}。`,
   "confirm.isolates": (name) =>
     `之後 ${name} 只收發這條和其他連線規則允許的流量，叢集會擋下其餘流量。`,
   "confirm.delete": (name: string) => `刪除 ${name}。刪除後無法復原。`,

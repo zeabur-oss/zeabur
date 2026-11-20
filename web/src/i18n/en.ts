@@ -1837,7 +1837,9 @@ export const en = {
     `Copy the keys of ${destination} into secret ${name}.`,
   "confirm.createUploadService": (name: string) =>
     `Create service ${name} and the build that runs the folder you uploaded.`,
-  "confirm.deployKey": (name: string) => `Create secret ${name} with the new deploy key.`,
+  "confirm.createGitService": (name: string) =>
+    `Create service ${name} and the build that runs your repository.`,
+  "confirm.createImageService": (name: string) => `Create service ${name} from its image.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
   "confirm.delete": (name: string) => `Delete ${name}. This can't be undone.`,

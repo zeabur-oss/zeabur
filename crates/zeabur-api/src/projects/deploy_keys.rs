@@ -1,11 +1,11 @@
 //! Deploy keys for Zeabur Builder.
 //!
-//! A plan's [`Change::DeployKey`] names the Secret and the Git host. The plan shows the `create`
-//! of a `kubernetes.io/ssh-auth` Secret with its values hidden, like every Secret it writes; the
-//! apply makes the SSH key pair and writes the private key and the host's `known_hosts`, which
-//! Zeabur Builder requires, into that Secret. The private key never leaves the server. The person
-//! then reads the public key from the Secret (`POST /projects/{p}/deploy-keys/{name}/public`) and
-//! adds it to the repository on its Git host.
+//! A plan's [`Change::CreateGitService`] with a deploy key names the Git host. The plan shows the
+//! `create` of a `kubernetes.io/ssh-auth` Secret with its values hidden, like every Secret it
+//! writes; the apply makes the SSH key pair and writes the private key and the host's
+//! `known_hosts`, which Zeabur Builder requires, into that Secret. The private key never leaves the
+//! server. The person then reads the public key from the Secret (`POST
+//! /projects/{p}/builds/{build}/deploy-key`) and adds it to the repository on its Git host.
 //!
 //! GitHub's and GitLab's host keys are pinned here. For any other host the person gives its
 //! `known_hosts` lines, from `ssh-keyscan` and checked against the fingerprints the host
@@ -13,20 +13,16 @@
 //! does not fetch a host key over the network, since a first connection cannot tell a real host
 //! from one in between.
 
-use std::collections::BTreeMap;
-
 use serde::{Deserialize, Serialize};
-use serde_json::json;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_plan::{Change, PlanRequest};
+use zeabur_modules::zeabur_builder;
+use zeabur_plan::builds::{BUILDER_GROUP, BUILDER_VERSION};
+use zeabur_plan::{Change, DeployKeySecret, GitAccess, PlanRequest};
 
 use crate::error::{ApiError, get_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::Person;
-
-/// The label Zeabur Builder reads credentials by.
-pub const GIT_CREDENTIALS_LABEL: &str = "builder.zeabur.com/git-credentials";
 
 /// The Git hosts a deploy key is made for, with their published Ed25519 host keys.
 ///
@@ -173,20 +169,42 @@ pub(crate) async fn host_keys(
     Ok(Json(DeployKeyHost { host_keys }))
 }
 
-/// The public key of the deploy key in Secret `name`, read as the person, for adding it to the
-/// Git host again. Only on the person's request: the Secret holds the private key too.
-#[utoipa::path(post, path = "/api/v1/projects/{project}/deploy-keys/{name}/public", tag = "projects",
+/// The public key of the deploy key `Build` `build` reads its repository with, read as the
+/// person, for adding it to the Git host. Only on the person's request: the Secret holds the
+/// private key too.
+#[utoipa::path(post, path = "/api/v1/projects/{project}/builds/{build}/deploy-key", tag = "projects",
     operation_id = "revealDeployKey",
     params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace"),
-           ("name" = String, Path, description = "The Secret holding the key")),
+           ("build" = String, Path, description = "The `Build`")),
     responses((status = 200, body = DeployKeyPublic),
               (status = 400, body = Problem, content_type = PROBLEM),
               (status = 403, body = Problem, content_type = PROBLEM),
               (status = 404, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn public(
     Person(cluster): Person,
-    Path((project, name)): Path<(String, String)>,
+    Path((project, build)): Path<(String, String)>,
 ) -> Result<Json<DeployKeyPublic>, ApiError> {
+    let resource = zeabur_kube::ResourceRef::new(BUILDER_GROUP, BUILDER_VERSION, "builds", "Build");
+    let found = cluster
+        .get_object(&resource, Some(&project), &build)
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("Build {build}"),
+                get_read(BUILDER_GROUP, "builds", Some(&project), &build),
+            )
+        })?;
+    let name = found
+        .as_ref()
+        .and_then(|object| zeabur_builder::builds(std::slice::from_ref(object), None).pop())
+        .and_then(|b| b.credentials)
+        .map(|c| c.name)
+        .ok_or_else(|| {
+            refused(&format!(
+                "Build {build} reads its repository without a key."
+            ))
+        })?;
     let values = cluster.reveal_secret(&project, &name).await.map_err(|e| {
         read_problem(
             e,
@@ -230,8 +248,8 @@ pub(crate) enum KeyPair {
 /// [k8s-ssh-auth]: https://github.com/kubernetes/kubernetes/blob/v1.34.0/pkg/apis/core/validation/validation.go#L7407-L7411
 const PLANNED_KEY: &str = "<made at apply>";
 
-/// `request` with each `deployKey` change turned into the `create` of its Secret; the request as
-/// it is when it has none.
+/// `request` with a deploy key made for each Git service that reads its repository with one;
+/// the request as it is when it has none.
 ///
 /// # Errors
 ///
@@ -242,28 +260,20 @@ pub(crate) fn open(
     request: &PlanRequest,
     pair: KeyPair,
 ) -> Result<PlanRequest, ApiError> {
-    if !request
-        .changes
-        .iter()
-        .any(|c| matches!(c, Change::DeployKey { .. }))
-    {
-        return Ok(request.clone());
-    }
     let changes = request
         .changes
         .iter()
         .map(|change| {
-            let Change::DeployKey {
-                name,
-                host,
-                known_hosts,
-            } = change
-            else {
+            let Change::CreateGitService(service) = change else {
                 return Ok(change.clone());
             };
-            let host = host.trim().to_ascii_lowercase();
+            let GitAccess::DeployKey { known_hosts } = &service.access else {
+                return Ok(change.clone());
+            };
+            let host = zeabur_plan::deploy_key_host(&service.url)
+                .ok_or_else(|| refused("Use a repository URL like git@github.com:acme/web.git."))?;
             let (lines, _) = trusted(&host, known_hosts.as_deref())?;
-            let private = match pair {
+            let private_key = match pair {
                 KeyPair::Hidden => PLANNED_KEY.to_owned(),
                 KeyPair::New => {
                     zeabur_core::ssh::deploy_key(&format!("zeabur {project}"))
@@ -271,28 +281,21 @@ pub(crate) fn open(
                         .private
                 }
             };
-            Ok(Change::Create {
-                object: secret(name, &private, &lines),
-                yaml: None,
-            })
+            let mut service = service.clone();
+            service.deploy_key = Some(DeployKeySecret {
+                private_key,
+                known_hosts: lines,
+            });
+            Ok(Change::CreateGitService(service))
         })
         .collect::<Result<Vec<_>, ApiError>>()?;
     Ok(PlanRequest { changes })
 }
 
-fn secret(name: &str, private: &str, known_hosts: &str) -> serde_json::Value {
-    let labels = BTreeMap::from([(GIT_CREDENTIALS_LABEL, "true")]);
-    json!({
-        "apiVersion": "v1",
-        "kind": "Secret",
-        "metadata": {"name": name, "labels": labels},
-        "type": "kubernetes.io/ssh-auth",
-        "stringData": {"ssh-privatekey": private, "known_hosts": known_hosts},
-    })
-}
-
 #[cfg(test)]
 mod tests {
+    use zeabur_plan::GitServiceChange;
+
     use super::*;
 
     #[test]
@@ -321,28 +324,29 @@ mod tests {
     #[test]
     fn a_planned_secret_holds_a_key_kubernetes_accepts() {
         let request = PlanRequest {
-            changes: vec![Change::DeployKey {
-                name: "web-git".to_owned(),
-                host: "github.com".to_owned(),
-                known_hosts: None,
-            }],
+            changes: vec![Change::CreateGitService(GitServiceChange {
+                name: "web".to_owned(),
+                url: "git@github.com:acme/web.git".to_owned(),
+                branch: None,
+                method: zeabur_plan::BuildMethod::Railpack,
+                directory: None,
+                dockerfile: None,
+                port: None,
+                host: None,
+                variables: Vec::new(),
+                build_variables: Vec::new(),
+                size: None,
+                security: None,
+                access: GitAccess::DeployKey { known_hosts: None },
+                deploy_key: None,
+            })],
         };
         let planned = open("shop", &request, KeyPair::Hidden).unwrap();
-        let [Change::Create { object, .. }] = planned.changes.as_slice() else {
+        let [Change::CreateGitService(service)] = planned.changes.as_slice() else {
             panic!("{:?}", planned.changes);
         };
-        assert_eq!(object["stringData"]["ssh-privatekey"], PLANNED_KEY);
-    }
-
-    #[test]
-    fn the_secret_is_one_zeabur_builder_reads() {
-        let object = secret("web-git", "PRIVATE", "github.com ssh-ed25519 AAAA\n");
-        assert_eq!(object["type"], "kubernetes.io/ssh-auth");
-        assert_eq!(object["metadata"]["labels"][GIT_CREDENTIALS_LABEL], "true");
-        assert_eq!(object["stringData"]["ssh-privatekey"], "PRIVATE");
-        assert_eq!(
-            object["stringData"]["known_hosts"],
-            "github.com ssh-ed25519 AAAA\n"
-        );
+        let key = service.deploy_key.as_ref().unwrap();
+        assert_eq!(key.private_key, PLANNED_KEY);
+        assert!(key.known_hosts.starts_with("github.com ssh-ed25519 "));
     }
 }

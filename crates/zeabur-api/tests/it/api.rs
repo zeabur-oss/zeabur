@@ -2107,14 +2107,30 @@ mod tests {
             zeabur_modules::alertmanager::NAME_MAX,
             RFC1035_LABEL_PATTERN,
         );
-        rule(
-            &field("UploadServiceChange", "name"),
-            zeabur_plan::compose::SERVICE_NAME_MAX,
-            RFC1035_LABEL_PATTERN,
+        for schema in [
+            "UploadServiceChange",
+            "GitServiceChange",
+            "ImageServiceChange",
+        ] {
+            rule(
+                &field(schema, "name"),
+                zeabur_plan::compose::SERVICE_NAME_MAX,
+                RFC1035_LABEL_PATTERN,
+            );
+        }
+        assert_eq!(
+            field("ImageServiceChange", "image")["pattern"],
+            zeabur_plan::IMAGE_PATTERN
+        );
+        assert_eq!(
+            field("GitServiceChange", "branch")["pattern"],
+            zeabur_plan::BRANCH_PATTERN
         );
         for (schema, name) in [
             ("UploadServiceChange", "directory"),
             ("UploadServiceChange", "dockerfile"),
+            ("GitServiceChange", "directory"),
+            ("GitServiceChange", "dockerfile"),
             ("BuildOptionsChange", "contextDir"),
             ("BuildOptionsChange", "dockerfile"),
         ] {
@@ -2161,7 +2177,7 @@ mod tests {
             assert_eq!(kept["minimum"], 0);
             assert_eq!(kept["maximum"], zeabur_plan::KEPT_RUNS_MAX);
         }
-        let replicas = &schemas["ServiceReplicas"];
+        let replicas = field("ImageServiceChange", "replicas");
         assert_eq!(replicas["minimum"], 1);
         assert_eq!(replicas["maximum"], zeabur_plan::compose::MAX_REPLICAS);
         let schedule = variant("BackupsPlanRequest", "schedule");

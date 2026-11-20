@@ -1,14 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import {
-  KEEL_WEBHOOK,
-  branchOf,
-  buildProblem,
-  builtContainers,
-  repositoryOf,
-  type Build,
-  type BuildRun,
-} from "@/model/builds"
+import { branchOf, buildProblem, builtContainers, type Build, type BuildRun } from "@/model/builds"
 import {
   branchProblem,
   buildOptionsChanges,
@@ -22,8 +14,8 @@ import {
   deployKeyPage,
   keyscanCommand,
   pinnedHost,
+  gitChange,
   gitNeeds,
-  gitObjects,
   newGitService,
   parseRepository,
   pathProblem,
@@ -40,9 +32,6 @@ const form = (patch: Partial<GitService>): GitService => ({
   publicUrl: false,
   ...patch,
 })
-
-type Object = Record<string, any>
-const find = (objects: Object[], kind: string) => objects.find((o) => o.kind === kind) as Object
 
 describe("repository addresses", () => {
   test("HTTPS, scp-like and ssh:// addresses name the same repository", () => {
@@ -104,24 +93,20 @@ describe("repository addresses", () => {
   })
 })
 
-describe("the objects", () => {
-  test("a public repository: a Build that tells Keel, and a Deployment Keel moves", () => {
-    const objects = gitObjects(form({}), "shop", "zot.zot.svc:5000", {})
-    expect(objects.map((o) => o.kind)).toEqual(["Secret", "Deployment", "Service", "Build"])
-    const build = find(objects, "Build")
-    expect(build.apiVersion).toBe("builder.zeabur.com/v1alpha1")
-    expect(build.spec).toEqual({
-      builderRef: "railpack",
-      source: { git: { url: "https://github.com/acme/site.git", ref: "HEAD" } },
-      output: { image: "zot.zot.svc:5000/shop/site" },
-      notify: [{ type: "keel", url: KEEL_WEBHOOK }],
+describe("the change", () => {
+  test("a public repository builds from its default branch, with the port and no host", () => {
+    expect(gitChange(form({ branch: "  " }))).toEqual({
+      name: "site",
+      url: "https://github.com/acme/site",
+      method: "railpack",
+      port: 3000,
+      variables: [],
+      buildVariables: [],
+      size: "small",
+      security: "restricted",
+      access: { type: "public" },
     })
-    const deployment = find(objects, "Deployment")
-    expect(deployment.metadata.annotations).toEqual({ "keel.sh/policy": "force" })
-    const image = deployment.spec.template.spec.containers[0].image
-    expect(image).toBe("zot.zot.svc:5000/shop/site:pending")
-    expect(repositoryOf(image)).toBe(repositoryOf(build.spec.output.image))
-    expect(find(objects, "Secret").stringData).toEqual({ PORT: "3000" })
+    expect(gitChange(form({ branch: " release/1.2 " })).branch).toBe("release/1.2")
   })
 
   test("the Builds tab finds the service's Build by repository, as for any built image", () => {
@@ -134,162 +119,63 @@ describe("the objects", () => {
     expect(builtContainers(service, [build]).map((b) => b.build.name)).toEqual(["site"])
   })
 
-  test("a token goes in a basic-auth Secret the Build names; the root directory is the context", () => {
-    const objects = gitObjects(
+  test("a token is trimmed; paths are cleaned; a Dockerfile only for a Dockerfile build", () => {
+    const change = gitChange(
       form({
         access: "token",
         username: "x-access-token",
         token: " ghp_1 ",
         directory: "./apps/web/",
         method: "dockerfile",
+        dockerfile: "./docker/Dockerfile.prod",
         port: "",
       }),
-      "shop",
-      "zot:5000",
-      {},
     )
-    const secret = objects.find((o) => (o.metadata as Object).name === "site-git") as Object
-    expect(secret.type).toBe("kubernetes.io/basic-auth")
-    expect(secret.metadata.labels["builder.zeabur.com/git-credentials"]).toBe("true")
-    expect(secret.stringData).toEqual({ username: "x-access-token", password: "ghp_1" })
-    const build = find(objects, "Build")
-    expect(build.spec.builderRef).toBe("dockerfile")
-    expect(build.spec.source.git.contextDir).toBe("apps/web")
-    expect(build.spec.source.credentialsRef).toEqual({ name: "site-git" })
-    expect(find(objects, "Service")).toBeUndefined()
+    expect(change.access).toEqual({ type: "token", username: "x-access-token", token: "ghp_1" })
+    expect(change.directory).toBe("apps/web")
+    expect(change.dockerfile).toBe("docker/Dockerfile.prod")
+    expect(change.port).toBeUndefined()
+    expect(gitChange(form({ dockerfile: "x" })).dockerfile).toBeUndefined()
   })
 
-  test("build variables go to their own Secret, which the Build reads key by key", () => {
-    const objects = gitObjects(
-      form({
-        method: "dockerfile",
-        dockerfile: "./docker/Dockerfile.prod",
-        buildVariables: [{ name: "NPM_TOKEN", value: "npm_1" }],
-      }),
-      "shop",
-      "zot:5000",
-      {},
-    )
-    const secret = objects.find((o) => (o.metadata as Object).name === "site-build-env") as Object
-    expect(secret.stringData).toEqual({ NPM_TOKEN: "npm_1" })
-    const build = find(objects, "Build")
-    expect(build.spec.source.git.dockerfile).toBe("docker/Dockerfile.prod")
-    expect(build.spec.env).toEqual([
-      {
-        name: "NPM_TOKEN",
-        valueFrom: { secretKeyRef: { name: "site-build-env", key: "NPM_TOKEN" } },
-      },
-    ])
-    expect(JSON.stringify(build)).not.toContain("npm_1")
-    const railpack = find(gitObjects(form({ dockerfile: "x" }), "shop", "zot:5000", {}), "Build")
-    expect(railpack.spec.source.git.dockerfile).toBeUndefined()
-    expect(railpack.spec.env).toBeUndefined()
-  })
-
-  test("a deploy key is a change of its own, made at apply, and the Build uses SSH", () => {
-    const changes = createGitService(
-      form({ access: "deployKey", knownHosts: "ignored for a pinned host" }),
-      "shop",
-      "zot:5000",
-      {},
-    )
-    expect(changes.at(-1)).toEqual({ op: "deployKey", name: "site-git", host: "github.com" })
-    const build = changes.find(
-      (c) => c.op === "create" && (c.object as Object).kind === "Build",
-    ) as { object: Object }
-    expect(build.object.spec.source.git.url).toBe("git@github.com:acme/site.git")
-    const typed = "ssh://git@git.example.com:2222/acme/site.git"
+  test("a deploy key sends the host's lines only for a host Zeabur does not pin", () => {
     const lines = "[git.example.com]:2222 ssh-ed25519 AAAA"
-    const other = createGitService(
-      form({ url: typed, access: "deployKey", knownHosts: lines }),
-      "shop",
-      "zot:5000",
-      {},
-    )
-    expect(other.at(-1)).toEqual({
-      op: "deployKey",
-      name: "site-git",
-      host: "git.example.com:2222",
+    expect(gitChange(form({ access: "deployKey", knownHosts: lines })).access).toEqual({
+      type: "deployKey",
+    })
+    const other = form({
+      url: "ssh://git@git.example.com:2222/acme/site.git",
+      access: "deployKey",
       knownHosts: lines,
     })
-    const otherBuild = other.find(
-      (c) => c.op === "create" && (c.object as Object).kind === "Build",
-    ) as { object: Object }
-    expect(otherBuild.object.spec.source.git.url).toBe(typed)
+    expect(gitChange(other).access).toEqual({ type: "deployKey", knownHosts: lines })
   })
 
-  test("a repository picked from the GitHub App names its installation and no Secret", () => {
-    const objects = gitObjects(
-      form({ access: "githubApp", installationId: 4242, branch: "trunk" }),
-      "shop",
-      "zot:5000",
-      {},
-    )
-    const build = find(objects, "Build")
-    expect(build.spec.source.git.url).toBe("https://github.com/acme/site.git")
-    expect(build.spec.source.git.ref).toBe("trunk")
-    expect(build.spec.source.githubApp).toEqual({ installationId: 4242 })
-    expect(build.spec.source.credentialsRef).toBeUndefined()
-    expect(objects.some((o) => (o.metadata as Object).name === "site-git")).toBe(false)
-  })
-
-  test("no branch follows the default branch; a branch is taken as typed", () => {
-    expect(newGitService().branch).toBe("")
-    const ref = (branch: string) =>
-      find(gitObjects(form({ branch }), "shop", "zot:5000", {}), "Build").spec.source.git.ref
-    expect(ref("  ")).toBe("HEAD")
-    expect(ref(" release/1.2 ")).toBe("release/1.2")
-  })
-
-  test("a new Git service is Strict and runs as the user its image names", () => {
-    expect(newGitService().security).toBe("restricted")
-    const pod = find(gitObjects(form({}), "shop", "zot:5000", {}), "Deployment").spec.template.spec
-    expect(pod.automountServiceAccountToken).toBe(false)
-    expect(pod.securityContext).toEqual({
-      runAsNonRoot: true,
-      seccompProfile: { type: "RuntimeDefault" },
-    })
-    expect(pod.containers[0].securityContext).toEqual({
-      allowPrivilegeEscalation: false,
-      capabilities: { drop: ["ALL"] },
+  test("a repository picked from the GitHub App names its installation", () => {
+    expect(gitChange(form({ access: "githubApp", installationId: 4242 })).access).toEqual({
+      type: "githubApp",
+      installationId: 4242,
     })
   })
 
   test("Railpack builds are Strict and Dockerfile builds Compatible", () => {
+    expect(newGitService().security).toBe("restricted")
     expect(buildProfile("railpack")).toBe("restricted")
     expect(buildProfile("dockerfile")).toBe("baseline")
   })
 
-  test("a Compatible Git service writes only its own objects", () => {
-    const changes = createGitService(form({ security: "baseline" }), "shop", "zot:5000", {})
-    expect(changes.every((c) => c.op === "create")).toBe(true)
-    const deployment = changes.find(
-      (c) => c.op === "create" && (c.object as Object).kind === "Deployment",
-    ) as { object: Object }
-    expect(deployment.object.spec.template.spec.securityContext).toEqual({
-      seccompProfile: { type: "RuntimeDefault" },
-    })
-  })
-
-  test("a new Git service listens on 8080 with a public URL, and a cleared port stays a background service", () => {
+  test("a public URL sends its host; a new service listens on 8080", () => {
     const fresh = { ...newGitService(), url: "https://github.com/acme/site", name: "site" }
-    const objects = gitObjects({ ...fresh, host: "site.example.com" }, "shop", "zot:5000", {})
-    expect(find(objects, "Service").spec.ports[0].port).toBe(8080)
-    expect(find(objects, "Secret").stringData).toEqual({ PORT: "8080" })
-    expect(find(objects, "Ingress").spec.rules[0].host).toBe("site.example.com")
-
-    const background = gitObjects({ ...fresh, port: "", publicUrl: false }, "shop", "zot:5000", {})
-    expect(background.some((o) => ["Service", "Ingress"].includes((o as Object).kind))).toBe(false)
+    const change = gitChange({ ...fresh, host: " site.example.com " })
+    expect(change.port).toBe(8080)
+    expect(change.host).toBe("site.example.com")
+    const background = gitChange({ ...fresh, port: "", publicUrl: false })
+    expect(background.port).toBeUndefined()
+    expect(background.host).toBeUndefined()
   })
 
-  test("a public domain adds an Ingress", () => {
-    const objects = gitObjects(
-      form({ publicUrl: true, host: "site.example.com" }),
-      "shop",
-      "zot:5000",
-      { clusterIssuer: "letsencrypt" },
-    )
-    expect(find(objects, "Ingress").spec.rules[0].host).toBe("site.example.com")
+  test("the form is one createGitService change", () => {
+    expect(createGitService(form({}))).toEqual([{ op: "createGitService", ...gitChange(form({})) }])
   })
 })
 

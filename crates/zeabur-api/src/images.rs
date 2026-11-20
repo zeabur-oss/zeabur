@@ -167,28 +167,6 @@ impl Transport for Broken {
     }
 }
 
-/// Credentials for the image's registry.
-#[derive(Clone, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct RegistryLogin {
-    /// The registry, such as `ghcr.io`; used only when it is the image's.
-    pub server: String,
-    /// The username.
-    pub username: String,
-    /// The password or access token.
-    #[schema(value_type = String)]
-    pub password: SecretString,
-}
-
-impl std::fmt::Debug for RegistryLogin {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("RegistryLogin")
-            .field("server", &self.server)
-            .field("username", &self.username)
-            .finish_non_exhaustive()
-    }
-}
-
 /// The image to read.
 #[derive(Debug, Clone, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -201,7 +179,7 @@ pub struct InspectRequest {
     pub pull_secret: Option<String>,
     /// Credentials typed in, used instead of `pullSecret`.
     #[serde(default)]
-    pub registry: Option<RegistryLogin>,
+    pub registry: Option<zeabur_plan::RegistryLogin>,
 }
 
 /// A port the image declares (`EXPOSE`).
@@ -303,7 +281,7 @@ pub(crate) async fn inspect(
         (Some(login), _) => {
             (registry_name(&login.server) == reference.registry).then(|| Credential {
                 username: login.username.clone(),
-                password: login.password.clone(),
+                password: SecretString::from(login.password.clone()),
             })
         }
         (None, Some(secret)) => match cluster.reveal_secret(&project, secret).await {

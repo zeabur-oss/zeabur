@@ -1014,6 +1014,16 @@ export type BuildCredentials = {
 }
 
 /**
+ * How Zeabur Builder builds a folder.
+ */
+export type BuildMethod = (typeof BuildMethod)[keyof typeof BuildMethod]
+
+export const BuildMethod = {
+  railpack: "railpack",
+  dockerfile: "dockerfile",
+} as const
+
+/**
  * A value read from a Secret or ConfigMap key, or a pod field.
  */
 export type EnvValueFrom = {
@@ -1690,16 +1700,6 @@ export type NameValue = {
 }
 
 /**
- * How Zeabur Builder builds an uploaded folder.
- */
-export type UploadMethod = (typeof UploadMethod)[keyof typeof UploadMethod]
-
-export const UploadMethod = {
-  railpack: "railpack",
-  dockerfile: "dockerfile",
-} as const
-
-/**
  * How much a new service asks for.
  */
 export type ServiceSize = (typeof ServiceSize)[keyof typeof ServiceSize]
@@ -1724,7 +1724,7 @@ export type UploadServiceChange = {
    */
   directory?: string | null
   /**
-   * The Dockerfile, relative to the directory, for [`UploadMethod::Dockerfile`].
+   * The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
    * @maxLength 1024
    * @nullable
    * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
@@ -1736,7 +1736,7 @@ export type UploadServiceChange = {
    */
   host?: string | null
   /** How the folder is built. */
-  method: UploadMethod
+  method: BuildMethod
   /**
    * The service's name, which its `Build`, workload and Service share.
    * @maxLength 40
@@ -1758,6 +1758,226 @@ export type UploadServiceChange = {
   size?: ServiceSize | null
   /** Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`. */
   variables?: NameValue[]
+}
+
+/**
+ * How Zeabur Builder reads a repository. Credentials go in the Secret `<name>-git`.
+ */
+export type GitAccess =
+  | {
+      type: "public"
+    }
+  | {
+      /** The token. */
+      token: string
+      type: "token"
+      /** The user name the host takes with a token. */
+      username: string
+    }
+  | {
+      /**
+       * The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+       * `github.com` and `gitlab.com`, whose keys Zeabur pins.
+       * @nullable
+       */
+      knownHosts?: string | null
+      type: "deployKey"
+    }
+  | {
+      /**
+       * The installation.
+       * @minimum 0
+       */
+      installationId: number
+      type: "githubApp"
+    }
+
+/**
+ * A [`crate::Change::CreateGitService`].
+ */
+export type GitServiceChange = {
+  /** How Zeabur Builder reads the repository. */
+  access: GitAccess
+  /**
+   * The branch. Left out: the repository's default branch.
+   * @nullable
+   * @pattern ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
+   */
+  branch?: string | null
+  /** Variables of the build, kept in the Secret `<name>-build-env`. */
+  buildVariables?: NameValue[]
+  /**
+   * The folder inside the repository to build. Left out: its root.
+   * @maxLength 1024
+   * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+   */
+  directory?: string | null
+  /**
+   * The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
+   * @maxLength 1024
+   * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+   */
+  dockerfile?: string | null
+  /**
+   * A public hostname for the port, with HTTPS where the cluster has an issuer.
+   * @nullable
+   */
+  host?: string | null
+  /** How the folder is built. */
+  method: BuildMethod
+  /**
+   * The service's name, which its `Build`, workload and Service share.
+   * @maxLength 40
+   * @pattern ^[a-z]([-a-z0-9]*[a-z0-9])?$
+   */
+  name: string
+  /**
+   * The port the app listens on. Left out: a worker, which takes no connections.
+   * @minimum 0
+   * @nullable
+   */
+  port?: number | null
+  security?: PodSecurityLevel | null
+  size?: ServiceSize | null
+  /**
+   * The repository: `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
+   * `ssh://git@host/owner/repo.git`.
+   */
+  url: string
+  /** Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`. */
+  variables?: NameValue[]
+}
+
+/**
+ * A login to a private registry.
+ */
+export type RegistryLogin = {
+  /** The password or token. */
+  password: string
+  /** The registry's host, such as `ghcr.io`. */
+  server: string
+  /** The user name. */
+  username: string
+}
+
+/**
+ * A variable of a new service: a value, or a key of a Secret.
+ */
+export type ServiceVariable = {
+  /**
+   * The value reads other variables with `$(…)`, so it stays in the Deployment, where
+   * Kubernetes expands it. A value without this is literal, whatever it contains.
+   */
+  expands?: boolean
+  /** The variable's name. */
+  name: string
+  /** Its value, when it has no `valueFrom`. */
+  value?: string
+  valueFrom?: EnvValueFrom | null
+}
+
+/**
+ * A claim of a new service and where it is mounted.
+ */
+export type ServiceVolume = {
+  /** Where the container sees it; absolute. */
+  mountPath: string
+  /**
+   * The volume's name; the claim is `<service>-<name>`.
+   * @maxLength 63
+   * @pattern ^[a-z0-9]([-a-z0-9]*[a-z0-9])?$
+   */
+  name: string
+  /** Mounted read-only. */
+  readOnly?: boolean
+  /** The size, a Kubernetes quantity such as `1Gi`. */
+  size: string
+}
+
+/**
+ * A host and a port.
+ */
+export type HostPort = {
+  /** The host. */
+  host: string
+  /**
+   * The port.
+   * @minimum 0
+   */
+  port: number
+}
+
+/**
+ * Hosts an init container waits for, with the image that waits.
+ */
+export type WaitFor = {
+  /** Each host and port, waited for in turn. */
+  hosts: HostPort[]
+  /** An image with `sh` and `nc`. */
+  image: string
+}
+
+/**
+ * A [`crate::Change::CreateImageService`].
+ */
+export type ImageServiceChange = {
+  /** The container's arguments, when not the image's. */
+  args?: string[]
+  /** The container's command, when not the image's. */
+  command?: string[]
+  /**
+   * A public hostname for the port, with HTTPS where the cluster has an issuer.
+   * @nullable
+   */
+  host?: string | null
+  /**
+   * The image reference.
+   * @pattern ^[a-z0-9][A-Za-z0-9._/:@-]*$
+   */
+  image: string
+  /**
+   * Ports besides `port` the Kubernetes Service carries.
+   * @items.minimum 0
+   */
+  morePorts?: number[]
+  /**
+   * The service's name, which its workload, Service and Ingress share.
+   * @maxLength 40
+   * @pattern ^[a-z]([-a-z0-9]*[a-z0-9])?$
+   */
+  name: string
+  /**
+   * The port the app listens on. Left out: a worker, which takes no connections.
+   * @minimum 1
+   * @nullable
+   */
+  port?: number | null
+  registry?: RegistryLogin | null
+  /**
+   * How many pods run.
+   * @minimum 1
+   * @maximum 20
+   */
+  replicas: number
+  /**
+   * Keep plain values in the Secret `<name>-env` rather than in the Deployment. A value that
+   * `expands` stays in the Deployment, as Kubernetes expands `$(…)` only there.
+   */
+  secretVariables: boolean
+  /** `restricted`, or `baseline` for any other level. */
+  security: PodSecurityLevel
+  /** What the app asks for. */
+  size: ServiceSize
+  /** The app's variables. */
+  variables?: ServiceVariable[]
+  /**
+   * Claims `<name>-<volume>`; a service with one runs one replica and replaces its pod by
+   * stopping the old one first.
+   */
+  volumes?: ServiceVolume[]
+  waitFor?: WaitFor | null
 }
 
 /**
@@ -2122,19 +2342,12 @@ export type Change =
   | (UploadServiceChange & {
       op: "createUploadService"
     })
-  | {
-      /** The Git host as the repository's SSH URL names it, with `:port` when it is not 22. */
-      host: string
-      /**
-       * The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
-       * `github.com` and `gitlab.com`, whose keys Zeabur pins.
-       * @nullable
-       */
-      knownHosts?: string | null
-      /** The Secret's name. */
-      name: string
-      op: "deployKey"
-    }
+  | (GitServiceChange & {
+      op: "createGitService"
+    })
+  | (ImageServiceChange & {
+      op: "createImageService"
+    })
   | (CopyS3KeysChange & {
       op: "copyS3Keys"
     })
@@ -6730,18 +6943,6 @@ export type InputLocale = {
 }
 
 /**
- * Credentials for the image's registry.
- */
-export type RegistryLogin = {
-  /** The password or access token. */
-  password: string
-  /** The registry, such as `ghcr.io`; used only when it is the image's. */
-  server: string
-  /** The username. */
-  username: string
-}
-
-/**
  * The image to read.
  */
 export type InspectRequest = {
@@ -10274,13 +10475,6 @@ export type ServiceHistory = {
 }
 
 /**
- * How many replicas a new service may run.
- * @minimum 1
- * @maximum 20
- */
-export type ServiceReplicas = number
-
-/**
  * Every way to a service, and the diagnoses where they stop.
  */
 export type ServiceTrace = {
@@ -10297,6 +10491,14 @@ export type ServiceTrace = {
   routes: RouteTraceView[]
   /** Reads the person was refused; hops that needed them are unknown. */
   unreadable: UnreadableView[]
+}
+
+/**
+ * The objects as YAML documents, in the order a plan creates them.
+ */
+export type ServiceYaml = {
+  /** One document per object, separated by `---`. */
+  yaml: string
 }
 
 /**
@@ -12773,6 +12975,26 @@ export const getProjectBuilds = async (
   })
 }
 
+export const getRevealDeployKeyUrl = (project: ProjectName, build: string) => {
+  return `/api/v1/projects/${encodeURIComponent(String(project))}/builds/${encodeURIComponent(String(build))}/deploy-key`
+}
+
+/**
+ * @summary The public key of the deploy key `Build` `build` reads its repository with, read as the
+person, for adding it to the Git host. Only on the person's request: the Secret holds the
+private key too.
+ */
+export const revealDeployKey = async (
+  project: ProjectName,
+  build: string,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<DeployKeyPublic> => {
+  return zeaburFetch<DeployKeyPublic>(getRevealDeployKeyUrl(project, build), {
+    ...options,
+    method: "POST",
+  })
+}
+
 export const getUploadBuildSourceUrl = (
   project: ProjectName,
   build: string,
@@ -12999,25 +13221,6 @@ export const inspectDeployKeyHost = async (
   })
 }
 
-export const getRevealDeployKeyUrl = (project: ProjectName, name: string) => {
-  return `/api/v1/projects/${encodeURIComponent(String(project))}/deploy-keys/${encodeURIComponent(String(name))}/public`
-}
-
-/**
- * @summary The public key of the deploy key in Secret `name`, read as the person, for adding it to the
-Git host again. Only on the person's request: the Secret holds the private key too.
- */
-export const revealDeployKey = async (
-  project: ProjectName,
-  name: string,
-  options?: Parameters<typeof zeaburFetch>[1],
-): Promise<DeployKeyPublic> => {
-  return zeaburFetch<DeployKeyPublic>(getRevealDeployKeyUrl(project, name), {
-    ...options,
-    method: "POST",
-  })
-}
-
 export const getListProjectEventsUrl = (project: ProjectName, params?: ListProjectEventsParams) => {
   const normalizedParams = new URLSearchParams()
 
@@ -13099,6 +13302,42 @@ export const getProjectGitHubApp = async (
   return zeaburFetch<ProjectGitHubApp>(getGetProjectGitHubAppUrl(project), {
     ...options,
     method: "GET",
+  })
+}
+
+export const getPreviewImageServiceUrl = (project: ProjectName) => {
+  return `/api/v1/projects/${encodeURIComponent(String(project))}/image-service/yaml`
+}
+
+export const previewImageService = async (
+  project: ProjectName,
+  imageServiceChange: ImageServiceChange,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<ServiceYaml> => {
+  const getHeaders = (
+    h?: NonNullable<RequestInit["headers"]>,
+  ): Record<string, string | readonly string[]> => {
+    if (!h) return {}
+    if (h instanceof Headers) return Object.fromEntries(h.entries())
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(
+          h as Iterable<Iterable<string>>,
+          (entry) => Array.from(entry) as [string, string],
+        ),
+      )
+    }
+    const headers: Record<string, string | readonly string[]> = {}
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value
+    }
+    return headers
+  }
+  return zeaburFetch<ServiceYaml>(getPreviewImageServiceUrl(project), {
+    ...options,
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    body: JSON.stringify(imageServiceChange),
   })
 }
 

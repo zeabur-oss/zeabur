@@ -6,7 +6,7 @@ import {
   hasTag,
   hostPlaceholder,
   hostProblem,
-  imageObjects,
+  imageChange,
   imageOptions,
   imageProblem,
   nameFromImage,
@@ -25,9 +25,6 @@ const form = (patch: Partial<ImageService>): ImageService => ({
   name: "web",
   ...patch,
 })
-
-const kinds = (objects: Record<string, unknown>[]) =>
-  objects.map((o) => `${String(o.kind)}/${String((o.metadata as { name: string }).name)}`)
 
 describe("names", () => {
   test("come from the image's last segment, without tag or digest, past those taken", () => {
@@ -87,111 +84,41 @@ describe("variables", () => {
   })
 })
 
-describe("objects", () => {
-  test("only an image is a worker: one Deployment, no Service", () => {
-    const objects = imageObjects(form({ security: "restricted" }), {})
-    expect(kinds(objects)).toEqual(["Deployment/web"])
-    const container = (objects[0] as any).spec.template.spec.containers[0]
-    expect(container).toEqual({
-      name: "web",
-      image: "ghcr.io/acme/web:1.4",
-      resources: { requests: { cpu: "100m", memory: "128Mi" }, limits: { memory: "256Mi" } },
-      securityContext: { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } },
-    })
-    const pod = (objects[0] as any).spec.template.spec
-    expect(pod.automountServiceAccountToken).toBe(false)
-    expect(pod.securityContext.runAsNonRoot).toBe(true)
-    expect((objects[0] as any).spec.selector.matchLabels).toEqual({
-      "app.kubernetes.io/name": "web",
-    })
-    expect(JSON.stringify(objects)).not.toContain("managed-by")
+describe("the change", () => {
+  test("only an image is a worker: no port, no host", () => {
+    const change = imageChange(form({ publicUrl: true, host: "web.example.com" }))
+    expect(change.port).toBeUndefined()
+    expect(change.host).toBeUndefined()
+    expect(change.image).toBe("ghcr.io/acme/web:1.4")
   })
 
-  test("a port adds a Service and a readiness probe; a public URL an Ingress", () => {
-    const objects = imageObjects(
-      form({ port: "8080", publicUrl: true, host: "web.example.com" }),
-      {},
+  test("a port carries the more ports; a public URL its host", () => {
+    const change = imageChange(
+      form({ port: "8080", morePorts: [9090], publicUrl: true, host: " web.example.com " }),
     )
-    expect(kinds(objects)).toEqual(["Deployment/web", "Service/web", "Ingress/web"])
-    const ingress = objects[2] as any
-    expect(ingress.metadata.annotations).toBeUndefined()
-    expect(ingress.spec.tls).toBeUndefined()
-    expect(ingress.spec.rules[0].http.paths[0].backend).toEqual({
-      service: { name: "web", port: { number: 8080 } },
-    })
+    expect(change.port).toBe(8080)
+    expect(change.morePorts).toEqual([9090])
+    expect(change.host).toBe("web.example.com")
+    expect(imageChange(form({ port: "8080" })).host).toBeUndefined()
   })
 
-  test("a named ClusterIssuer adds cert-manager's annotation and a tls block", () => {
-    const objects = imageObjects(form({ port: "80", publicUrl: true, host: "web.example.com" }), {
-      clusterIssuer: "letsencrypt",
-    })
-    const ingress = objects.at(-1) as any
-    expect(ingress.metadata.annotations).toEqual({
-      "cert-manager.io/cluster-issuer": "letsencrypt",
-    })
-    expect(ingress.spec.tls).toEqual([{ hosts: ["web.example.com"], secretName: "web-tls" }])
-  })
-
-  test("variables go in a Secret unless asked not to; a Secret key stays a reference", () => {
+  test("a Secret key stays a reference", () => {
     const variables = [
       { name: "A", value: "1" },
-      { name: "DATABASE_URL", from: { secret: "postgres-app", key: "uri" } },
+      { name: "DATABASE_URL", valueFrom: { secretName: "postgres-app", key: "uri" } },
     ]
-    const kept = imageObjects(form({ variables }), {})
-    expect(kinds(kept)).toEqual(["Secret/web-env", "Deployment/web"])
-    const container = (kept[1] as any).spec.template.spec.containers[0]
-    expect(container.envFrom).toEqual([{ secretRef: { name: "web-env" } }])
-    expect(container.env).toEqual([
-      { name: "DATABASE_URL", valueFrom: { secretKeyRef: { name: "postgres-app", key: "uri" } } },
-    ])
-    const plain = imageObjects(form({ variables, secretVariables: false }), {})
-    expect(kinds(plain)).toEqual(["Deployment/web"])
-    expect((plain[0] as any).spec.template.spec.containers[0].env[0]).toEqual({
-      name: "A",
-      value: "1",
-    })
+    expect(imageChange(form({ variables })).variables).toEqual(variables)
   })
 
-  test("a volume makes one replica that is recreated, not rolled", () => {
-    const objects = imageObjects(
-      form({ replicas: 3, volumes: [{ name: "data", mountPath: "/data", size: "1Gi" }] }),
-      {},
-    )
-    expect(kinds(objects)).toEqual(["PersistentVolumeClaim/web-data", "Deployment/web"])
-    const spec = (objects[1] as any).spec
-    expect(spec.replicas).toBe(1)
-    expect(spec.strategy).toEqual({ type: "Recreate" })
-    expect(spec.template.spec.volumes[0].persistentVolumeClaim.claimName).toBe("web-data")
-  })
-
-  test("a private registry is a dockerconfigjson Secret the pods pull with", () => {
-    const objects = imageObjects(
-      form({ registry: { server: "ghcr.io", username: "me", password: "pw" } }),
-      {},
-    )
-    const secret = objects[0] as any
-    expect(secret.type).toBe("kubernetes.io/dockerconfigjson")
-    expect(JSON.parse(secret.stringData[".dockerconfigjson"])).toEqual({
-      auths: { "ghcr.io": { username: "me", password: "pw", auth: btoa("me:pw") } },
-    })
-    expect((objects[1] as any).spec.template.spec.imagePullSecrets).toEqual([
-      { name: "web-registry" },
+  test("the form is one createImageService change", () => {
+    expect(createImageService(form({ port: "80" }))).toEqual([
+      { op: "createImageService", ...imageChange(form({ port: "80" })) },
     ])
   })
 
-  test("each object is one create change", () => {
-    expect(createImageService(form({ port: "80" }), {}).map((c) => c.op)).toEqual([
-      "create",
-      "create",
-    ])
-  })
-
-  test("a new image service is Compatible: root may run, nothing else is let in", () => {
+  test("a new image service is Compatible: root may run", () => {
     expect(newImageService().security).toBe("baseline")
-    expect(createImageService(form({}), {}).map((c) => c.op)).toEqual(["create"])
-    const pod = (imageObjects(form({}), {})[0] as any).spec.template.spec
-    expect(pod.securityContext).toEqual({ seccompProfile: { type: "RuntimeDefault" } })
-    expect(pod.containers[0].securityContext).toEqual({ allowPrivilegeEscalation: false })
+    expect(imageChange(form({})).security).toBe("baseline")
   })
 })
 
