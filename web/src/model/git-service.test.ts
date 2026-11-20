@@ -366,9 +366,10 @@ describe("build options in the service's settings", () => {
 })
 
 describe("what the cluster lacks", () => {
-  const capability = (name: string, existing: boolean) =>
-    ({ name, existing, components: [], evidence: [], installations: [] }) as never
-  const noKeel = capability("image-updates", false)
+  const builder = { id: "zeabur-builder", name: "Zeabur Builder" }
+  const keel = { id: "keel", name: "Keel" }
+  const noKeel = { name: "image-updates", existing: false, install: keel }
+  const keelUnsupported = { name: "image-updates", existing: false, install: null }
   const zot = "zot.zot.svc:5000"
   test.each([
     [
@@ -376,33 +377,41 @@ describe("what the cluster lacks", () => {
       "not-installed",
       [noKeel],
       zot,
-      { install: ["builds", "image-updates"], registrySetting: false },
+      { install: [builder, keel], keelUnavailable: false, registrySetting: false },
     ],
     [
       "the Builder alone",
       "not-installed",
       [],
       zot,
-      { install: ["builds"], registrySetting: false },
+      { install: [builder], keelUnavailable: false, registrySetting: false },
     ],
     [
       "the registry setting, which no component gives",
       "installed",
       [],
       "",
-      { install: [], registrySetting: true },
+      { install: [], keelUnavailable: false, registrySetting: true },
     ],
     [
       "Keel, with another registry",
       "installed",
       [noKeel],
       "ghcr.io/acme",
-      { install: ["image-updates"], registrySetting: false },
+      { install: [keel], keelUnavailable: false, registrySetting: false },
+    ],
+    [
+      "Keel that this Kubernetes version cannot install, so nothing opens it",
+      "installed",
+      [keelUnsupported],
+      zot,
+      { install: [], keelUnavailable: true, registrySetting: false },
     ],
     ["nothing with a configured registry", "installed", [], "harbor.example.com", undefined],
     ["nothing while unknown", undefined, undefined, undefined, undefined],
   ] as const)("%s", (_, builds, capabilities, registry, needs) => {
-    expect(gitNeeds({ builds, capabilities: capabilities as never, registry })).toEqual(
+    const read = builds && { state: builds, component: builder }
+    expect(gitNeeds({ builds: read, capabilities: capabilities as never, registry })).toEqual(
       needs as never,
     )
   })

@@ -29,6 +29,7 @@ use crate::{Module, Read, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "dragonfly-operator",
+    component: Some("dragonfly-operator"),
     capability: "redis",
     reads: &[STORES],
     http: &[],

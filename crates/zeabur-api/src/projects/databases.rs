@@ -49,6 +49,8 @@ pub struct DatabaseOperator {
     /// Whether what backups need could be read: the Barman Cloud plugin's `ObjectStore`s for
     /// PostgreSQL; the operator itself for MongoDB.
     pub backups: ProviderState,
+    /// The catalogue component that installs the operator.
+    pub component: Option<zeabur_catalog::ComponentRef>,
 }
 
 /// A project's databases.
@@ -75,23 +77,35 @@ pub(crate) async fn get(
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectDatabases>, ApiError> {
-    read(cluster.as_ref(), &project, (state.clock)())
-        .await
-        .map(Json)
+    read(
+        cluster.as_ref(),
+        &state.catalogue,
+        &project,
+        (state.clock)(),
+    )
+    .await
+    .map(Json)
 }
 
 /// An operator whose backups are read with the database objects.
-fn operator(engine: Engine, module: &Module, state: ProviderState) -> DatabaseOperator {
+fn operator(
+    catalogue: &[zeabur_catalog::Component],
+    engine: Engine,
+    module: &Module,
+    state: ProviderState,
+) -> DatabaseOperator {
     DatabaseOperator {
         engine,
         module: module.id.to_owned(),
         state,
         backups: state,
+        component: crate::cluster::modules::component(catalogue, module),
     }
 }
 
 async fn read(
     cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
     project: &str,
     now: Timestamp,
 ) -> Result<ProjectDatabases, ApiError> {
@@ -142,6 +156,7 @@ async fn read(
         module: cloudnative_pg::MODULE.id.to_owned(),
         state,
         backups: store_state,
+        component: crate::cluster::modules::component(catalogue, &cloudnative_pg::MODULE),
     });
 
     let mongo = read_all(
@@ -163,10 +178,16 @@ async fn read(
         }
         Err(state) => state,
     };
-    operators.push(operator(Engine::Mongodb, &percona_mongodb::MODULE, state));
+    operators.push(operator(
+        catalogue,
+        Engine::Mongodb,
+        &percona_mongodb::MODULE,
+        state,
+    ));
 
     read_moco_mariadb_dragonfly(
         cluster,
+        catalogue,
         project,
         &mut items,
         &mut operators,
@@ -225,6 +246,7 @@ fn add_members(project: &str, items: &mut [Database], pods: &[Pod], now: Timesta
 /// read only when MOCO or mariadb-operator has a database there.
 async fn read_moco_mariadb_dragonfly(
     cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
     project: &str,
     items: &mut Vec<Database>,
     operators: &mut Vec<DatabaseOperator>,
@@ -266,7 +288,7 @@ async fn read_moco_mariadb_dragonfly(
         }
         Err(state) => state,
     };
-    operators.push(operator(Engine::Mysql, &moco::MODULE, state));
+    operators.push(operator(catalogue, Engine::Mysql, &moco::MODULE, state));
     let state = match mariadb {
         Ok([servers, backups]) => {
             items.extend(
@@ -278,7 +300,12 @@ async fn read_moco_mariadb_dragonfly(
         }
         Err(state) => state,
     };
-    operators.push(operator(Engine::Mariadb, &mariadb_operator::MODULE, state));
+    operators.push(operator(
+        catalogue,
+        Engine::Mariadb,
+        &mariadb_operator::MODULE,
+        state,
+    ));
     let state = match read_all(cluster, [&dragonfly::STORES], Some(project), unreadable).await? {
         Ok([stores]) => {
             items.extend(stores.iter().map(|s| dragonfly::database(project, s)));
@@ -286,7 +313,12 @@ async fn read_moco_mariadb_dragonfly(
         }
         Err(state) => state,
     };
-    operators.push(operator(Engine::Dragonfly, &dragonfly::MODULE, state));
+    operators.push(operator(
+        catalogue,
+        Engine::Dragonfly,
+        &dragonfly::MODULE,
+        state,
+    ));
 
     Ok(())
 }

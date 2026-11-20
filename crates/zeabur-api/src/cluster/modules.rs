@@ -6,6 +6,7 @@
 
 use std::time::Duration;
 
+use zeabur_catalog::{Component, ComponentRef};
 use zeabur_kube::{Cluster, ClusterError};
 
 /// How long a `metrics.k8s.io` read may take. metrics-server answers in milliseconds; when
@@ -64,4 +65,29 @@ pub(crate) async fn read_metrics(
                 METRICS_DEADLINE.as_secs()
             )))
         })
+}
+
+/// The catalogue component that installs `module`.
+pub(crate) fn component(
+    catalogue: &[Component],
+    module: &zeabur_modules::Module,
+) -> Option<ComponentRef> {
+    zeabur_catalog::component_ref(catalogue, module.component?)
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn every_module_names_a_component_of_the_catalogue() {
+        let catalogue = zeabur_catalog::catalogue().unwrap();
+        for module in zeabur_modules::modules() {
+            if let Some(id) = module.component {
+                assert!(
+                    super::component(&catalogue, module).is_some(),
+                    "{}: {id}",
+                    module.id
+                );
+            }
+        }
+    }
 }

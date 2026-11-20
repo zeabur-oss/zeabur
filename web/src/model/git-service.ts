@@ -498,10 +498,12 @@ export function buildOptionsChanges(build: Build, options: BuildOptions): Change
   return changes
 }
 
-/** What "Deploy from Git" lacks in this cluster: components to install (`enable` entries), and
- * whether Zeabur's chart names no registry. Unknown counts as there. */
+/** What "Deploy from Git" lacks in this cluster: components to install, whether Keel is missing
+ * with nothing that installs it here, and whether Zeabur's chart names no registry. Unknown counts
+ * as there. */
 export interface GitNeeds {
-  install: string[]
+  install: Schemas.ComponentRef[]
+  keelUnavailable: boolean
   registrySetting: boolean
 }
 
@@ -510,15 +512,25 @@ export function gitNeeds({
   capabilities,
   registry,
 }: {
-  builds: Schemas.ProjectBuilds["state"] | undefined
+  builds: Pick<Schemas.ProjectBuilds, "state" | "component"> | undefined
   capabilities: Schemas.Capability[] | undefined
   /** `""` when Zeabur has no registry setting; `undefined` while unknown. */
   registry: string | undefined
 }): GitNeeds | undefined {
-  const absent = (name: string) => capabilities?.find((c) => c.name === name)?.existing === false
-  const install: string[] = []
-  if (builds === "not-installed") install.push("builds")
-  if (absent("image-updates")) install.push("image-updates")
+  const install: Schemas.ComponentRef[] = []
+  if (builds?.state === "not-installed" && builds.component) install.push(builds.component)
+  const keel = missingKeel(capabilities)
+  if (keel?.install) install.push(keel.install)
+  const keelUnavailable = keel !== undefined && !keel.install
   const registrySetting = registry === ""
-  return install.length > 0 || registrySetting ? { install, registrySetting } : undefined
+  return install.length > 0 || keelUnavailable || registrySetting
+    ? { install, keelUnavailable, registrySetting }
+    : undefined
+}
+
+/** Image updates (Keel) when the cluster has none, with the component that installs it here if
+ * any; `undefined` when it is there or unknown. */
+export const missingKeel = (capabilities: Schemas.Capability[] | undefined) => {
+  const keel = capabilities?.find((c) => c.name === "image-updates")
+  return keel?.existing === false ? { install: keel.install ?? undefined } : undefined
 }

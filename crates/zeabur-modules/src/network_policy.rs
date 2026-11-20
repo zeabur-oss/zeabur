@@ -66,6 +66,7 @@ use crate::{Finding, Module, Read};
 /// The module.
 pub static MODULE: Module = Module {
     id: "network-policy",
+    component: None,
     capability: "network-policy",
     reads: &[NETWORK_POLICIES],
     http: &[],

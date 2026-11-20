@@ -53,6 +53,7 @@ use crate::{Module, Read, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "k8up",
+    component: Some("k8up"),
     capability: "volume-backup",
     reads: &[SCHEDULES, BACKUPS],
     http: &[],

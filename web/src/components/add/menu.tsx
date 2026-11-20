@@ -17,9 +17,8 @@ import { GatedMenuItem, GateTip, useGates } from "@/components/gate"
 import { LazyInstallerSheet } from "@/components/lazy-installer-sheet"
 import { useT, type Translate } from "@/i18n"
 import { openAdd, type AddWhat } from "@/lib/adding"
-import { engineName, engineOperator, engines, type Engine } from "@/model/databases"
+import { engineName, engines, type Engine } from "@/model/databases"
 import { gitNeeds } from "@/model/git-service"
-import { needed, type Needed } from "@/model/installer"
 import type { Gate } from "@/model/rights"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import {
@@ -34,12 +33,18 @@ import {
 export interface AddChoices {
   image: boolean
   /** Offered engines; `installed` false offers the operator's install steps instead. */
-  databases: { engine: Engine; installed: boolean; operator: Needed }[]
+  databases: { engine: Engine; installed: boolean; operator?: Component }[]
   /** Object storage, when the person may create it and whether its operator is installed is
    * known. */
-  objectStorage?: { installed: boolean; operator: Needed }
+  objectStorage?: { installed: boolean; operator?: Component }
   /** "Deploy from Git": open, or closed by the person's role or by what the cluster lacks. */
-  git: { open: boolean; gate: Gate; install: Needed[]; registrySetting: boolean }
+  git: {
+    open: boolean
+    gate: Gate
+    install: Component[]
+    keelUnavailable: boolean
+    registrySetting: boolean
+  }
   yaml: boolean
   /** Nothing to offer: the person may only look. */
   none: boolean
@@ -47,22 +52,19 @@ export interface AddChoices {
   gates: { image: Gate; database: Gate }
 }
 
-type Capabilities = Schemas.Capability[] | undefined
+type Component = Schemas.ComponentRef
 
 /** Engines whose operator is known to be installed or not. An operator whose databases can't be
  * read is left out. */
-function knownEngines(
-  operators: { engine: Engine; state: string }[] = [],
-  capabilities: Capabilities,
-) {
+function knownEngines(operators: Schemas.DatabaseOperator[] = []) {
   return engines.flatMap((engine) => {
-    const state = operators.find((o) => o.engine === engine)?.state
-    return state === "installed" || state === "not-installed"
+    const operator = operators.find((o) => o.engine === engine)
+    return operator?.state === "installed" || operator?.state === "not-installed"
       ? [
           {
             engine,
-            installed: state === "installed",
-            operator: needed(engineOperator[engine], capabilities),
+            installed: operator.state === "installed",
+            operator: operator.component ?? undefined,
           },
         ]
       : []
@@ -70,42 +72,37 @@ function knownEngines(
 }
 
 /** Object storage, when the role allows it and whether the operator is installed is known. */
-function useObjectStorageChoice(project: string | undefined, capabilities: Capabilities) {
+function useObjectStorageChoice(project: string | undefined) {
   const gate = useGates(project)("changeObjectStorage")
-  const state = useQuery({ ...objectStorageQuery(project ?? ""), enabled: !!project }).data?.state
-  if (!gate.open || (state !== "installed" && state !== "not-installed")) return undefined
-  return { installed: state === "installed", operator: needed("object-storage", capabilities) }
+  const data = useQuery({ ...objectStorageQuery(project ?? ""), enabled: !!project }).data
+  if (!gate.open || (data?.state !== "installed" && data?.state !== "not-installed"))
+    return undefined
+  return { installed: data.state === "installed", operator: data.component ?? undefined }
 }
 
 /** "Deploy from Git": open, or closed by the person's role or by what the cluster lacks. */
-function useGitChoice(project: string | undefined, capabilities: Capabilities): AddChoices["git"] {
+function useGitChoice(project: string | undefined): AddChoices["git"] {
   const builds = useQuery({
     ...buildsQuery(project ?? ""),
     enabled: !!project,
     refetchInterval: false,
   })
+  // Readable by cluster administrators only; for anyone else whether Keel is there stays unknown.
+  const capabilities = useQuery({ ...capabilitiesQuery, retry: false }).data?.items
   const cluster = useQuery(clusterQuery).data
   const gate = useGates(project)("deployFromGit")
   const needs = gitNeeds({
-    builds: builds.data?.state,
+    builds: builds.data,
     capabilities,
     registry: cluster && (cluster.builds.registry ?? ""),
   })
-  return gitChoice(gate, needs, capabilities)
+  return gitChoice(gate, needs)
 }
 
-function gitChoice(
-  gate: Gate,
-  needs: ReturnType<typeof gitNeeds>,
-  capabilities: Capabilities,
-): AddChoices["git"] {
-  if (!needs) return { open: gate.open, gate, install: [], registrySetting: false }
-  return {
-    open: false,
-    gate,
-    install: needs.install.map((id) => needed(id, capabilities)),
-    registrySetting: needs.registrySetting,
-  }
+function gitChoice(gate: Gate, needs: ReturnType<typeof gitNeeds>): AddChoices["git"] {
+  if (!needs)
+    return { open: gate.open, gate, install: [], keelUnavailable: false, registrySetting: false }
+  return { open: false, gate, ...needs }
 }
 
 /** What "New" offers in the project: a kind the person's role cannot add is closed, one unknown
@@ -113,15 +110,13 @@ function gitChoice(
 export function useAddChoices(project: string | undefined): AddChoices | undefined {
   const creatable = useQuery({ ...creatableQuery(project ?? ""), enabled: !!project })
   const databases = useQuery({ ...databasesQuery(project ?? ""), enabled: !!project })
-  // Readable by cluster administrators only; for anyone else what is installed stays unknown.
-  const capabilities = useQuery({ ...capabilitiesQuery, retry: false }).data?.items
   const gates = useGates(project)
-  const store = useObjectStorageChoice(project, capabilities)
-  const git = useGitChoice(project, capabilities)
+  const store = useObjectStorageChoice(project)
+  const git = useGitChoice(project)
   if (!project || creatable.isPending) return undefined
   const imageGate = gates("deploy")
   const databaseGate = gates("changeDatabases")
-  const offered = databaseGate.open ? knownEngines(databases.data?.operators, capabilities) : []
+  const offered = databaseGate.open ? knownEngines(databases.data?.operators) : []
   const yaml = (creatable.data?.items ?? []).some((k) => k.access !== "denied")
   return {
     image: imageGate.open,
@@ -136,7 +131,7 @@ export function useAddChoices(project: string | undefined): AddChoices | undefin
 
 /** The install steps a closed item opens. */
 export interface Steps {
-  components: Needed[]
+  components: Component[]
   reason?: string
   note?: string
 }
@@ -160,6 +155,7 @@ export const entryTestid = (what: AddWhat) =>
 function gitEntry(git: AddChoices["git"], what: "git" | "upload", t: Translate): AddEntry {
   const entry: AddEntry = { what, group: "service", label: t(`add.${what}`), gate: git.gate }
   if (git.open || !git.gate.open) return entry
+  if (git.keelUnavailable) return { ...entry, why: t("add.gitMissing.keel") }
   const note = git.registrySetting ? t("add.gitMissing.registrySetting") : undefined
   if (git.install.length === 0) return { ...entry, why: note ?? "" }
   const names = t(
@@ -177,11 +173,11 @@ function operatorEntry(
   what: AddWhat,
   group: AddEntry["group"],
   label: string,
-  { installed, operator }: { installed: boolean; operator: Needed },
+  { installed, operator }: { installed: boolean; operator?: Component },
   t: Translate,
 ): AddEntry {
   const entry: AddEntry = { what, group, label, gate: { open: true } }
-  if (installed) return entry
+  if (installed || !operator) return entry
   return { ...entry, why: t("add.installFirst", operator.name), steps: { components: [operator] } }
 }
 

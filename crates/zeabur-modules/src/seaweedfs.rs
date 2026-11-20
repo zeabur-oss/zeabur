@@ -29,6 +29,7 @@ use crate::{Module, Read, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "seaweedfs-operator",
+    component: Some("seaweedfs-operator"),
     capability: "object-storage",
     reads: &[
         SEAWEEDS,

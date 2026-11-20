@@ -616,6 +616,16 @@ mod tests {
         assert_eq!(state("k8up"), "installed");
         assert_eq!(state("velero"), "refused");
         assert_eq!(state("cloudnative-pg"), "not-installed");
+        let installs: Vec<&Value> = backups["providers"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|p| &p["component"]["id"])
+            .collect();
+        assert_eq!(
+            installs,
+            [&json!("k8up"), &json!("velero"), &json!("cloudnative-pg")]
+        );
         assert_eq!(backups["unreadable"][0]["resource"], "schedules.velero.io");
     }
 
@@ -774,6 +784,7 @@ mod tests {
         let cluster = cluster();
         let missing = get(&cluster, "/api/v1/projects/shop/builds").await;
         assert_eq!(missing["state"], "not-installed");
+        assert_eq!(missing["component"]["id"], "zeabur-builder");
         cluster.update(|s| {
             for (resource, kind) in [("builds", "Build"), ("buildruns", "BuildRun")] {
                 s.served.push(ServedResource::readable(

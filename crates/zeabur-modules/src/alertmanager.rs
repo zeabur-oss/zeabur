@@ -48,6 +48,7 @@ use crate::{Module, Read, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "alertmanager",
+    component: Some("victoria-metrics"),
     capability: "notifications",
     reads: &[CONFIGS],
     http: &[],

@@ -38,9 +38,9 @@ use zeabur_kube::{
     WriteRequest,
 };
 use zeabur_model::PodSecurityLevel;
-use zeabur_modules::Reading;
 use zeabur_modules::backups::Outcome;
 use zeabur_modules::velero::{self, cluster as v};
+use zeabur_modules::{Reading, k8up};
 
 use crate::cluster::restore_copy::{self, routes};
 use crate::cluster::{backup_download, s3_destinations};
@@ -48,7 +48,7 @@ use crate::error::{ApiError, get_read, list_read, read_problem};
 use crate::extract::Json;
 use crate::handlers::{AppState, Person};
 use crate::plan_token::{self as token, LIFETIME_SECONDS, TokenError};
-use crate::projects::backups::ProviderState;
+use crate::projects::backups::{BackupProvider, ProviderState, provider};
 use crate::projects::namespace::Permission;
 use crate::projects::writes::token_problem;
 use crate::views::UnreadableView;
@@ -88,6 +88,8 @@ pub struct ClusterBackups {
     pub keys_from: Option<String>,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
+    /// The backup tools of the cluster: K8up for volumes and Velero for whole projects.
+    pub providers: Vec<BackupProvider>,
 }
 
 /// What to plan.
@@ -423,7 +425,11 @@ async fn reading(
     }
 }
 
-fn empty(state: ProviderState, unreadable: Vec<UnreadableView>) -> ClusterBackups {
+fn empty(
+    state: ProviderState,
+    unreadable: Vec<UnreadableView>,
+    providers: Vec<BackupProvider>,
+) -> ClusterBackups {
     ClusterBackups {
         state,
         namespace: v::DEFAULT_NAMESPACE.to_owned(),
@@ -436,6 +442,7 @@ fn empty(state: ProviderState, unreadable: Vec<UnreadableView>) -> ClusterBackup
         can_restore: Permission::Unknown,
         keys_from: None,
         unreadable,
+        providers,
     }
 }
 
@@ -445,11 +452,26 @@ fn empty(state: ProviderState, unreadable: Vec<UnreadableView>) -> ClusterBackup
 #[utoipa::path(get, path = "/api/v1/cluster/backups", tag = "cluster",
     operation_id = "getClusterBackups",
     responses((status = 200, body = ClusterBackups), (status = 401, body = Problem, content_type = PROBLEM)))]
-pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>, ApiError> {
+pub(crate) async fn get(
+    State(state): State<AppState>,
+    Person(cluster): Person,
+) -> Result<Json<ClusterBackups>, ApiError> {
     let cluster = cluster.as_ref();
     let mut unreadable = Vec::new();
+    let k8up = k8up_state(cluster, &mut unreadable).await?;
+    let providers = |velero_state| {
+        vec![
+            provider(&state.catalogue, &k8up::MODULE, k8up),
+            provider(&state.catalogue, &velero::MODULE, velero_state),
+        ]
+    };
     let Some(schedules) = reading(cluster, &velero::SCHEDULES, &mut unreadable).await? else {
-        return Ok(Json(empty(ProviderState::NotInstalled, unreadable)));
+        let providers = providers(ProviderState::NotInstalled);
+        return Ok(Json(empty(
+            ProviderState::NotInstalled,
+            unreadable,
+            providers,
+        )));
     };
     let locations = reading(cluster, &v::LOCATIONS, &mut unreadable)
         .await?
@@ -457,7 +479,7 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
     let backups = reading(cluster, &velero::BACKUPS, &mut unreadable)
         .await?
         .unwrap_or_default();
-    let refused = unreadable.len();
+    let refused = unreadable.len() - usize::from(k8up == ProviderState::Refused);
     let volumes = reading(cluster, &v::POD_VOLUME_BACKUPS, &mut unreadable)
         .await?
         .unwrap_or_default();
@@ -465,7 +487,8 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
         .await?
         .unwrap_or_default();
     if refused == 3 {
-        return Ok(Json(empty(ProviderState::Refused, unreadable)));
+        let providers = providers(ProviderState::Refused);
+        return Ok(Json(empty(ProviderState::Refused, unreadable, providers)));
     }
     let namespace = v::velero_namespace(&locations, &schedules);
     let bytes = v::volume_bytes(&volumes);
@@ -505,7 +528,29 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterBackups>,
         can_restore,
         keys_from,
         unreadable,
+        providers: providers(ProviderState::Installed),
     }))
+}
+
+/// Whether K8up is installed, from a cluster-wide read of its schedules.
+async fn k8up_state(
+    cluster: &dyn Cluster,
+    unreadable: &mut Vec<UnreadableView>,
+) -> Result<ProviderState, ApiError> {
+    let resource = k8up::SCHEDULES.resource();
+    Ok(
+        match crate::cluster::modules::read(cluster, &k8up::SCHEDULES)
+            .await
+            .map_err(|e| ApiError::from(e.into_problem(&resource.key())))?
+        {
+            Reading::Objects(_) => ProviderState::Installed,
+            Reading::NotInstalled => ProviderState::NotInstalled,
+            Reading::Refused(refusal) => {
+                unreadable.push(refusal);
+                ProviderState::Refused
+            }
+        },
+    )
 }
 
 async fn may_create(cluster: &dyn Cluster, resource: &str, namespace: &str) -> Permission {

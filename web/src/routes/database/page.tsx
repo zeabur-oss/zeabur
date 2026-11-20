@@ -14,14 +14,7 @@ import TextAlignLeftIcon from "~icons/ph/text-align-left"
 import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
-import {
-  capabilitiesQuery,
-  databasesQuery,
-  objectQuery,
-  objectsQuery,
-  projectQuery,
-  queryClient,
-} from "@/api/queries"
+import { databasesQuery, objectQuery, objectsQuery, projectQuery, queryClient } from "@/api/queries"
 import { Ago } from "@/components/bits"
 import { ConnectServices } from "@/components/connect"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
@@ -71,7 +64,6 @@ import {
   backupKeys,
   daysOf,
   engineName,
-  engineOperator,
   eventsOf,
   backupNames,
   exportTool,
@@ -90,7 +82,6 @@ import {
   type BackupTarget,
   type Database,
 } from "@/model/databases"
-import { needed } from "@/model/installer"
 import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
 import { FormButtons } from "@/routes/cluster/section"
@@ -172,6 +163,7 @@ export function DatabasePage() {
       database={database}
       others={query.data.items}
       backupsReadable={operator?.backups === "installed"}
+      operator={operator?.component ?? undefined}
       updatedAt={query.dataUpdatedAt}
       failed={query.isRefetchError}
     />
@@ -191,6 +183,7 @@ function Body({
   database,
   others,
   backupsReadable,
+  operator,
   updatedAt,
   failed,
 }: {
@@ -198,6 +191,8 @@ function Body({
   database: Database
   others: Database[]
   backupsReadable: boolean
+  /** The component that installs the engine's operator and its backup plugin. */
+  operator?: Schemas.ComponentRef
   updatedAt: number
   failed: boolean
 }) {
@@ -308,7 +303,12 @@ function Body({
       </TabsContent>
       <TabsContent value="backups">
         {tab === "backups" ? (
-          <Backups project={project} database={database} readable={backupsReadable} />
+          <Backups
+            project={project}
+            database={database}
+            readable={backupsReadable}
+            operator={operator}
+          />
         ) : null}
       </TabsContent>
       <TabsContent value="events">
@@ -637,16 +637,17 @@ function Backups({
   project,
   database,
   readable,
+  operator,
 }: {
   project: string
   database: Database
   readable: boolean
+  operator?: Schemas.ComponentRef
 }) {
   const t = useT()
   const store = database.backups.store
   const on = backupsOn(database)
-  const pluginMissing = database.engine === "postgresql" && !readable
-  const capabilities = useQuery({ ...capabilitiesQuery, retry: false }).data?.items
+  const pluginMissing = database.engine === "postgresql" && !readable && operator
   return (
     <div className="flex flex-col gap-7">
       {pluginMissing ? (
@@ -654,7 +655,7 @@ function Backups({
           variant="warn"
           icon={<WarningIcon aria-hidden="true" />}
           text={t("db.backup.pluginMissing")}
-          components={[needed(engineOperator.postgresql, capabilities)]}
+          components={[operator]}
           reason={t("db.backup.pluginWhy")}
         />
       ) : null}

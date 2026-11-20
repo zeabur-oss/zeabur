@@ -27,7 +27,6 @@ import {
   FIELDS,
   formOf,
   KINDS,
-  METRICS_COMPONENT,
   missing,
   missingInEdit,
   NAME_MAX,
@@ -81,11 +80,11 @@ export function Notifications({ project }: { project?: string }) {
       />
     )
   if (query.isError) return <Problem error={query.error} />
-  if (data?.state === "not-installed") return <NotInstalled />
+  if (data?.state === "not-installed") return <NotInstalled component={data.component} />
   return data ? <Channels data={data} project={project} /> : null
 }
 
-function NotInstalled() {
+function NotInstalled({ component }: { component?: Schemas.ComponentRef | null }) {
   const t = useT()
   return (
     <Empty variant="outline">
@@ -96,15 +95,17 @@ function NotInstalled() {
         <EmptyTitle>{t("notify.notInstalled")}</EmptyTitle>
         <EmptyDescription>{t("notify.notInstalledBody")}</EmptyDescription>
       </EmptyHeader>
-      <EmptyContent>
-        <Link
-          to="/cluster/components"
-          search={{ component: METRICS_COMPONENT }}
-          className={buttonVariants({ size: "sm" })}
-        >
-          {t("notify.install")}
-        </Link>
-      </EmptyContent>
+      {component ? (
+        <EmptyContent>
+          <Link
+            to="/cluster/components"
+            search={{ component: component.id }}
+            className={buttonVariants({ size: "sm" })}
+          >
+            {t("notify.install")}
+          </Link>
+        </EmptyContent>
+      ) : null}
     </Empty>
   )
 }

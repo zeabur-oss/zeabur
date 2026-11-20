@@ -5,9 +5,6 @@ type Settings = Schemas.AlertmanagerChannelSettings
 export type ChannelKind = Settings["kind"]
 export type Event = Schemas.AlertmanagerEvent
 
-/** Alerting comes with the metrics component. */
-export const METRICS_COMPONENT = "victoria-metrics"
-
 /** `NAME_MAX` in zeabur-modules' alertmanager. */
 export const NAME_MAX = 30
 

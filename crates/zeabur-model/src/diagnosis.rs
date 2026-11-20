@@ -120,8 +120,9 @@ pub struct Fault {
     /// Where the cause lies.
     pub origin: FaultOrigin,
     /// The component or upstream service, for [`FaultOrigin::Component`] and
-    /// [`FaultOrigin::Upstream`]: `ingress-controller`, `cert-manager`, `cluster-dns`,
-    /// `metrics-server`, `node/<name>`, or a registry's host.
+    /// [`FaultOrigin::Upstream`]. A component is named as Zeabur Catalog names it: the
+    /// component (`cert-manager`, `metrics-server`), or the capability (`ingress`) when any of its
+    /// components can serve it. Otherwise `cluster-dns`, `node/<name>`, or a registry's host.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub component: Option<String>,
     /// Who can fix it.

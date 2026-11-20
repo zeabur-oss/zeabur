@@ -53,7 +53,7 @@ pub(crate) fn fault(kind: DiagnosisKind, cause: &Message) -> Fault {
         DiagnosisKind::Unreachable => match variant {
             "noReadyEndpoints" => Fault::new(Code, You),
             "controllerDown" => {
-                Fault::new(FaultOrigin::Component, Fixer::ComponentOwner).of("ingress-controller")
+                Fault::new(FaultOrigin::Component, Fixer::ComponentOwner).of("ingress")
             }
             "certificateNotReady" => Fault::new(FaultOrigin::Component, You).of("cert-manager"),
             _ => Fault::new(Configuration, You),

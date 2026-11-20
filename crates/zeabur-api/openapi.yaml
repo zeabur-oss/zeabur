@@ -4799,6 +4799,13 @@ components:
       - module
       - state
       properties:
+        component:
+          oneOf:
+          - $ref: "#/components/schemas/ComponentRef"
+            description: >-
+              The catalogue component that provides it, what to install when it is not
+              installed.
+          - type: "null"
         module:
           type: string
           description: The module (`k8up`).
@@ -5351,6 +5358,13 @@ components:
         existing:
           type: boolean
           description: "`true` when any component of it was found."
+        install:
+          oneOf:
+          - $ref: "#/components/schemas/ComponentRef"
+            description: |-
+              For a missing capability, the component to install: one recommended on this cluster's
+              profile, else the first that runs here; `None` when it exists or none runs here.
+          - type: "null"
         installations:
           type: array
           items:
@@ -6855,6 +6869,7 @@ components:
       - canChange
       - canRestore
       - unreadable
+      - providers
       properties:
         backups:
           type: array
@@ -6880,6 +6895,11 @@ components:
         namespace:
           type: string
           description: Velero's namespace.
+        providers:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupProvider"
+          description: "The backup tools of the cluster: K8up for volumes and Velero for whole projects."
         restores:
           type: array
           items:
@@ -7336,6 +7356,21 @@ components:
           items:
             $ref: "#/components/schemas/ComponentWarning"
           description: What to know.
+    ComponentRef:
+      type: object
+      description: A catalogue component, as an install link names it.
+      required:
+      - id
+      - name
+      properties:
+        id:
+          type: string
+          description: |-
+            The component's id (`k8up`), what `zeaburctl components export` and the component plan
+            take.
+        name:
+          type: string
+          description: Its human-readable name (`K8up`).
     ComponentRequest:
       type: object
       description: What to plan.
@@ -8436,6 +8471,11 @@ components:
           description: |-
             Whether what backups need could be read: the Barman Cloud plugin's `ObjectStore`s for
             PostgreSQL; the operator itself for MongoDB.
+        component:
+          oneOf:
+          - $ref: "#/components/schemas/ComponentRef"
+            description: The catalogue component that installs the operator.
+          - type: "null"
         engine:
           $ref: "#/components/schemas/DatabaseEngine"
           description: The engine.
@@ -9287,8 +9327,9 @@ components:
           - "null"
           description: |-
             The component or upstream service, for [`FaultOrigin::Component`] and
-            [`FaultOrigin::Upstream`]: `ingress-controller`, `cert-manager`, `cluster-dns`,
-            `metrics-server`, `node/<name>`, or a registry's host.
+            [`FaultOrigin::Upstream`]. A component is named as Zeabur Catalog names it: the
+            component (`cert-manager`, `metrics-server`), or the capability (`ingress`) when any of its
+            components can serve it. Otherwise `cluster-dns`, `node/<name>`, or a registry's host.
         fixer:
           $ref: "#/components/schemas/Fixer"
           description: Who can fix it.
@@ -12479,6 +12520,11 @@ components:
           items:
             $ref: "#/components/schemas/AlertmanagerChannel"
           description: The channels, Zeabur's first, by name.
+        component:
+          oneOf:
+          - $ref: "#/components/schemas/ComponentRef"
+            description: The catalogue component that installs the operator.
+          - type: "null"
         events:
           type: array
           items:
@@ -14654,6 +14700,11 @@ components:
           items:
             $ref: "#/components/schemas/ZeaburBuilderBuild"
           description: The `Build`s, by name.
+        component:
+          oneOf:
+          - $ref: "#/components/schemas/ComponentRef"
+            description: The catalogue component that installs Zeabur Builder.
+          - type: "null"
         keel:
           type: array
           items:
@@ -15062,6 +15113,11 @@ components:
       - items
       - unreadable
       properties:
+        component:
+          oneOf:
+          - $ref: "#/components/schemas/ComponentRef"
+            description: The catalogue component that installs the operator.
+          - type: "null"
         items:
           type: array
           items:

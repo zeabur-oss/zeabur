@@ -65,6 +65,7 @@ use crate::{Module, Read, strings, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "cloudnative-pg",
+    component: Some("cloudnative-pg"),
     capability: "postgres",
     reads: &[CLUSTERS, SCHEDULED_BACKUPS, BACKUPS],
     http: &[],
@@ -73,6 +74,7 @@ pub static MODULE: Module = Module {
 /// The Barman Cloud plugin's module: the `ObjectStore`s that say where a `Cluster`'s backups go.
 pub static BARMAN_CLOUD: Module = Module {
     id: "barman-cloud",
+    component: Some("cloudnative-pg"),
     capability: "postgres",
     reads: &[OBJECT_STORES],
     http: &[],

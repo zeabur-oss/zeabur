@@ -55,6 +55,8 @@ pub struct KeelPolicy {
 pub struct ProjectBuilds {
     /// Whether Zeabur Builder could be read.
     pub state: ProviderState,
+    /// The catalogue component that installs Zeabur Builder.
+    pub component: Option<zeabur_catalog::ComponentRef>,
     /// The `Build`s, by name.
     pub builds: Vec<ZeaburBuilderBuild>,
     /// Their runs, newest first.
@@ -76,10 +78,15 @@ pub(crate) async fn get(
     Person(cluster): Person,
     Path(project): Path<String>,
 ) -> Result<Json<ProjectBuilds>, ApiError> {
-    read(cluster.as_ref(), &project, (state.clock)())
-        .await
-        .map(Json)
-        .map_err(|e| ApiError::from(e.into_problem(&format!("builds of {project}"))))
+    read(
+        cluster.as_ref(),
+        &state.catalogue,
+        &project,
+        (state.clock)(),
+    )
+    .await
+    .map(Json)
+    .map_err(|e| ApiError::from(e.into_problem(&format!("builds of {project}"))))
 }
 
 /// Gives each service that runs a built image its build's status (see
@@ -114,12 +121,15 @@ pub(crate) async fn built_images(
 
 async fn read(
     cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
     project: &str,
     now: Timestamp,
 ) -> Result<ProjectBuilds, ClusterError> {
     let mut unreadable = Vec::new();
+    let component = || crate::cluster::modules::component(catalogue, &zeabur_builder::MODULE);
     let answer = |state| ProjectBuilds {
         state,
+        component: component(),
         builds: Vec::new(),
         runs: Vec::new(),
         keel: Vec::new(),
@@ -189,6 +199,7 @@ async fn read(
     };
     Ok(ProjectBuilds {
         state: ProviderState::Installed,
+        component: component(),
         builds: zeabur_builder::builds(&builds, Some(now)),
         runs,
         keel,

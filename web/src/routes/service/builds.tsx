@@ -66,8 +66,7 @@ import {
   type Builds,
   type Built,
 } from "@/model/builds"
-import { deployKeyPage, parseRepository } from "@/model/git-service"
-import { needed } from "@/model/installer"
+import { deployKeyPage, missingKeel, parseRepository } from "@/model/git-service"
 import { imageTag, isTask, type Service } from "@/model/service"
 
 /** The service's builds, when a Zeabur Builder `Build` makes one of its images. */
@@ -595,8 +594,7 @@ function AutoUpdate({
   const t = useT()
   const toggleGate = useHereGate("changeServices")
   const capabilities = useQuery({ ...capabilitiesQuery, retry: false })
-  const keel = capabilities.data?.items.find((c) => c.name === "image-updates")
-  const missing = keel !== undefined && !keel.existing
+  const missing = missingKeel(capabilities.data?.items)
   const policy = keelPolicy(data, service)
   const on = policy !== undefined
   const toggle = (enabled: boolean) =>
@@ -615,7 +613,7 @@ function AutoUpdate({
   const control = (
     <Switch
       checked={on}
-      disabled={!!managed || (missing && !on)}
+      disabled={!!managed || (!!missing && !on)}
       onCheckedChange={toggle}
       aria-labelledby={`auto-update-${build.name}`}
     />
@@ -642,11 +640,17 @@ function AutoUpdate({
         )}
       </div>
       {missing ? (
-        <InstallAlert
-          variant="info"
-          text={t("builds.keelMissing")}
-          components={[needed("image-updates", capabilities.data?.items)]}
-        />
+        missing.install ? (
+          <InstallAlert
+            variant="info"
+            text={t("builds.keelMissing")}
+            components={[missing.install]}
+          />
+        ) : (
+          <Alert variant="info">
+            <AlertDescription>{t("builds.keelUnavailable")}</AlertDescription>
+          </Alert>
+        )
       ) : null}
     </section>
   )

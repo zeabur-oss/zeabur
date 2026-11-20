@@ -9,7 +9,7 @@ import {
   DialogTitle,
 } from "@zeabur-oss/design-system/components/dialog"
 import { useT } from "@/i18n"
-import type { Needed } from "@/model/installer"
+import type { Schemas } from "@/api/client"
 
 /** The `zeaburctl components export` command that prints the manifests of components to install. */
 export function InstallerSheet({
@@ -18,7 +18,7 @@ export function InstallerSheet({
   note,
   onClose,
 }: {
-  components: Needed[]
+  components: Schemas.ComponentRef[]
   /** What needs them, as a sentence. */
   reason?: string
   /** What else to do, which no component gives. */

@@ -700,6 +700,8 @@ export const zhTW: Messages = {
   "builds.autoUpdateHint": "每次建置完成就立刻上線。",
   "builds.autoUpdatePolicy": (policy) =>
     `Keel 依 ${policy} 規則更新這個服務，這個規則是在 Zeabur 以外設定的。`,
+  "builds.keelUnavailable":
+    "自動部署需要 Keel 元件，但這個叢集沒有，它的 Kubernetes 版本也裝不了。",
   "builds.keelMissing": "自動部署需要叢集裡的 Keel 元件，目前還沒有安裝。",
   "builds.history": "紀錄",
   "builds.trigger.webhook": "推送觸發",
@@ -2638,6 +2640,7 @@ export const zhTW: Messages = {
   "add.card.git": "建置並執行 Git 儲存庫。",
   "add.palette.git": (project) => `在 ${project} 從 Git 部署`,
   "add.gitNeedsWhy": "從 Git 部署和上傳資料夾都要用到這些元件。",
+  "add.gitMissing.keel": "需要 Keel 元件，但這個叢集沒有，它的 Kubernetes 版本也裝不了。",
   "add.gitMissing.registrySetting":
     "Zeabur 沒有設定建置用的 registry，請在 chart 設定 builds.registry。",
   "add.upload": "上傳資料夾",

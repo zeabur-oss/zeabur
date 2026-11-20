@@ -21,6 +21,7 @@ use crate::{Module, Read};
 /// The module.
 pub static MODULE: Module = Module {
     id: "reloader",
+    component: Some("reloader"),
     capability: "config-reload",
     reads: &[DEPLOYMENTS],
     http: &[],

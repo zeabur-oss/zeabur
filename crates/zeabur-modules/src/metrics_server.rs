@@ -23,6 +23,7 @@ use crate::{Module, Read, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "metrics-server",
+    component: Some("metrics-server"),
     capability: "metrics",
     reads: &[NODE_METRICS, POD_METRICS],
     http: &[],

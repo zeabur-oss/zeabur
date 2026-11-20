@@ -17,6 +17,7 @@ use crate::{Module, Read, text};
 /// The module.
 pub static MODULE: Module = Module {
     id: "system-upgrade-controller",
+    component: Some("system-upgrade-controller"),
     capability: "node-updates",
     reads: &[PLANS],
     http: &[],

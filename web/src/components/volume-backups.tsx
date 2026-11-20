@@ -20,6 +20,7 @@ import {
   backUpVolumeNow,
   backupUser,
   type BackupUser,
+  k8upOf,
   k8upState,
   labelable,
   newVolumeTarget,
@@ -44,7 +45,6 @@ const userNote = (t: Translate, user: BackupUser) =>
       ? t("backups.volume.imageUser")
       : t("backups.volume.user", user.user)
 
-const K8UP_COMPONENT = "k8up"
 const RUNS_SHOWN = 5
 const BACKUP_COMMAND = "https://docs.k8up.io/k8up/2.16/how-tos/application-aware-backups.html"
 
@@ -65,6 +65,7 @@ export function VolumeBackups({
   const data = useBackups(project).data
   if (!data || claims.length === 0) return null
   const state = k8upState(data)
+  const k8up = k8upOf(data)?.component
   const rows = data.coverage.filter(
     (c) => c.target.kind === "volume" && claims.includes(c.target.name),
   )
@@ -91,14 +92,18 @@ export function VolumeBackups({
       {state === "not-installed" ? (
         <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
           {t("backups.volume.notInstalled")}
-          {t("common.gap")}
-          <Link
-            to="/cluster/components"
-            search={{ component: K8UP_COMPONENT }}
-            className="text-foreground hover:underline"
-          >
-            {t("backups.volume.openK8up")}
-          </Link>
+          {k8up ? (
+            <>
+              {t("common.gap")}
+              <Link
+                to="/cluster/components"
+                search={{ component: k8up.id }}
+                className="text-foreground hover:underline"
+              >
+                {t("backups.volume.openK8up")}
+              </Link>
+            </>
+          ) : null}
         </p>
       ) : state === "refused" ? (
         <p className="border-t border-rule py-2.5 type-meta text-muted-foreground">
