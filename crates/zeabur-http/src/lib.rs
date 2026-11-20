@@ -36,6 +36,8 @@ pub use connect::{Connector, Proxies, connector, connector_with};
 
 /// How long one exchange may take, connection included.
 pub const DEADLINE: Duration = Duration::from_secs(5);
+/// How many redirects [`Https::download`] follows; a GitHub release asset redirects once.
+pub const REDIRECTS: usize = 5;
 /// How long a connection may sit unused in the pool.
 pub const IDLE: Duration = Duration::from_secs(30);
 /// How many unused connections the pool keeps per host.
@@ -126,21 +128,100 @@ impl Https {
         request: Request<Full<Bytes>>,
         limit: usize,
     ) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
-        let exchange = async {
-            let response = self.request(request).await?;
-            let status = response.status().as_u16();
-            let headers = response.headers().clone();
-            let body = Limited::new(response.into_body(), limit)
-                .collect()
-                .await
-                .map_err(|e| e.to_string())?
-                .to_bytes()
-                .to_vec();
-            Ok((status, headers, body))
-        };
-        tokio::time::timeout(DEADLINE, exchange)
+        within(DEADLINE, self.read(request, limit)).await
+    }
+
+    /// `GET url`'s body, following at most [`REDIRECTS`] redirects to HTTPS URLs, reading at most
+    /// `limit` bytes of each answer, all within `deadline`. For files larger or slower than
+    /// [`Self::exchange`] allows, such as a release asset.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::exchange`], and when a URL is not HTTPS, the answer is neither `200` nor a
+    /// redirect, or the redirects do not end.
+    pub async fn download(
+        &self,
+        url: &str,
+        limit: usize,
+        deadline: Duration,
+    ) -> Result<Vec<u8>, String> {
+        within(deadline, async {
+            let mut url = url.to_owned();
+            for _ in 0..=REDIRECTS {
+                let uri: http::Uri = url.parse().map_err(|_e| format!("{url} is not a URL"))?;
+                if uri.scheme() != Some(&http::uri::Scheme::HTTPS) {
+                    return Err(format!("{url} is not an HTTPS URL"));
+                }
+                let request = Request::get(uri.clone())
+                    .header(http::header::USER_AGENT, "zeabur")
+                    .body(Full::default())
+                    .map_err(|e| e.to_string())?;
+                let (status, headers, body) = self.read(request, limit).await?;
+                match status {
+                    200 => return Ok(body),
+                    301 | 302 | 303 | 307 | 308 => {
+                        let location = headers
+                            .get(http::header::LOCATION)
+                            .and_then(|v| v.to_str().ok())
+                            .ok_or_else(|| format!("{url} redirects without a Location"))?;
+                        url = resolve(&uri, location)?;
+                    }
+                    _ => return Err(format!("{url} answered {status}")),
+                }
+            }
+            Err(format!("{url} redirects more than {REDIRECTS} times"))
+        })
+        .await
+    }
+
+    /// Sends `request` and reads at most `limit` bytes of the answer, with no time bound.
+    async fn read(
+        &self,
+        request: Request<Full<Bytes>>,
+        limit: usize,
+    ) -> Result<(u16, http::HeaderMap, Vec<u8>), String> {
+        let response = self.request(request).await?;
+        let status = response.status().as_u16();
+        let headers = response.headers().clone();
+        let body = Limited::new(response.into_body(), limit)
+            .collect()
             .await
-            .map_err(|_elapsed| "the server did not answer in time".to_owned())?
+            .map_err(|e| e.to_string())?
+            .to_bytes()
+            .to_vec();
+        Ok((status, headers, body))
+    }
+}
+
+/// `exchange`, failed when it takes longer than `deadline`.
+async fn within<T>(
+    deadline: Duration,
+    exchange: impl Future<Output = Result<T, String>>,
+) -> Result<T, String> {
+    tokio::time::timeout(deadline, exchange)
+        .await
+        .map_err(|_elapsed| "the server did not answer in time".to_owned())?
+}
+
+/// The URL a `Location` names from `base`: as it is when it names a scheme, or on `base`'s scheme
+/// and host when it starts with `//` or `/`.
+///
+/// # Errors
+///
+/// Another relative reference, which Zeabur does not join.
+fn resolve(base: &http::Uri, location: &str) -> Result<String, String> {
+    let scheme = base.scheme_str().unwrap_or("https");
+    let authority = base.authority().map_or("", http::uri::Authority::as_str);
+    if location.contains("://") {
+        Ok(location.to_owned())
+    } else if let Some(rest) = location.strip_prefix("//") {
+        Ok(format!("{scheme}://{rest}"))
+    } else if location.starts_with('/') {
+        Ok(format!("{scheme}://{authority}{location}"))
+    } else {
+        Err(format!(
+            "{base} redirects to {location}, which Zeabur does not follow"
+        ))
     }
 }
 

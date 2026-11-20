@@ -51,8 +51,8 @@ const RETRY: Duration = Duration::from_mins(1);
 const RETRY_FIRST: Duration = Duration::from_secs(5);
 /// The largest manifest file Zeabur downloads; the Gateway API's is over 1 MiB.
 const MAX_MANIFEST: usize = 16 << 20;
-/// How many redirects a download follows; a GitHub release asset redirects once.
-const REDIRECTS: usize = 5;
+/// How long downloading one manifest file may take, redirects included.
+const DOWNLOAD: Duration = Duration::from_mins(1);
 
 /// One answer of the API.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -114,34 +114,8 @@ impl Fetch for Https {
         })
     }
 
-    /// Follows redirects to HTTPS URLs only.
     fn download(&self, url: String) -> BoxFuture<'_, Result<Vec<u8>, String>> {
-        Box::pin(async move {
-            let mut url = url;
-            for _ in 0..=REDIRECTS {
-                if !url.starts_with("https://") {
-                    return Err(format!("{url} is not an HTTPS URL"));
-                }
-                let request = axum::http::Request::get(&url)
-                    .header(axum::http::header::USER_AGENT, "zeabur")
-                    .body(http_body_util::Full::default())
-                    .map_err(|e| e.to_string())?;
-                let (status, headers, bytes) =
-                    self.0.exchange_with_headers(request, MAX_MANIFEST).await?;
-                match status {
-                    200 => return Ok(bytes),
-                    301 | 302 | 303 | 307 | 308 => {
-                        url = headers
-                            .get(axum::http::header::LOCATION)
-                            .and_then(|v| v.to_str().ok())
-                            .ok_or_else(|| format!("{url} redirects without a Location"))?
-                            .to_owned();
-                    }
-                    _ => return Err(format!("{url} answered {status}")),
-                }
-            }
-            Err(format!("{url} redirects more than {REDIRECTS} times"))
-        })
+        Box::pin(async move { self.0.download(&url, MAX_MANIFEST, DOWNLOAD).await })
     }
 }
 
