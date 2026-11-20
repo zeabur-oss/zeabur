@@ -691,11 +691,14 @@ impl World {
             .into_iter()
             .map(ComponentWarning::from)
             .collect();
-        for step in &install.steps {
+        for (i, step) in install.steps.iter().enumerate() {
             let earlier_ready = steps
                 .iter()
                 .all(|s: &ComponentStep| s.state == StepState::Ready);
-            let planned = self.install_step(cluster, step, earlier_ready).await?;
+            let later = install.steps.get(i + 1..).unwrap_or_default();
+            let planned = self
+                .install_step(cluster, step, later, earlier_ready)
+                .await?;
             if planned.foreign.is_some()
                 && let Some(values) = config_values(step)
             {
@@ -788,10 +791,15 @@ impl World {
     /// One step of an install: how far it has come, its objects, and whether Zeabur wrote one
     /// of them. An object whose kind the cluster does not serve waits for an earlier step, and
     /// fails once those are ready.
+    ///
+    /// An object a `later` step of the plan writes again is also current when it holds that
+    /// write: a target written before its contributor and again after it is done once it has
+    /// the contributor's values.
     async fn install_step(
         &self,
         cluster: &dyn Cluster,
         step: &engine::Step,
+        later: &[engine::Step],
         earlier_ready: bool,
     ) -> Result<PlannedStep, ApiError> {
         let mut progress = Vec::new();
@@ -840,8 +848,18 @@ impl World {
                     foreign.get_or_insert_with(|| format!("{} {}", target.kind, target.name));
                 }
             }
+            let again = later
+                .iter()
+                .flat_map(|s| &s.objects)
+                .rev()
+                .find(|d| self.place(d).as_ref() == Some(&target));
             progress.push(match &found {
-                Some(found) if !engine::holds(&body, found) => Progress::Pending,
+                Some(found)
+                    if !engine::holds(&body, found)
+                        && !again.is_some_and(|d| engine::holds(&d.object, found)) =>
+                {
+                    Progress::Pending
+                }
                 _ => self.progress(cluster, &target, found.as_ref()).await?,
             });
             writes.push(view(&body, Some(&target), None));
@@ -1052,7 +1070,9 @@ impl World {
             let earlier_ready = planned_steps
                 .iter()
                 .all(|s| s.view.state == StepState::Ready);
-            let planned = self.install_step(cluster, &step, earlier_ready).await?;
+            let planned = self
+                .install_step(cluster, &step, &[], earlier_ready)
+                .await?;
             if planned.foreign.is_some() {
                 continue;
             }

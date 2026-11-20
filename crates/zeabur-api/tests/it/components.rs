@@ -99,12 +99,14 @@ mod tests {
 
     /// Zeabur Catalog v0.5.3 with the components of `FIXTURES`, or no answer at all; `tampered`
     /// answers each manifest file with other bytes than the catalog's digest. With
-    /// `contributes`, cert-manager adds [`BOUNCER`] to Traefik.
+    /// `contributes`, cert-manager adds [`BOUNCER`] to Traefik; with `cnpg_contributes`,
+    /// cloudnative-pg adds a value to cert-manager, which it needs.
     #[derive(Default)]
     struct Api {
         down: bool,
         tampered: bool,
         contributes: bool,
+        cnpg_contributes: bool,
     }
 
     const BOUNCER: &str = "ports:\n  web:\n    middlewares:\n    - bouncer\n";
@@ -163,6 +165,12 @@ mod tests {
                         file["declaration"]["contributes"] = json!([{
                             "target": {"component": "traefik", "release": "traefik"},
                             "values": BOUNCER,
+                        }]);
+                    }
+                    if self.cnpg_contributes && id == "cloudnative-pg" {
+                        file["declaration"]["contributes"] = json!([{
+                            "target": {"component": "cert-manager", "release": "cert-manager"},
+                            "values": "# Added by cloudnative-pg.\nadded: cnpg\n",
                         }]);
                     }
                     serde_json::to_vec(&file).unwrap()
@@ -1079,6 +1087,51 @@ mod tests {
             let kube_system = s.objects.get_mut("kube-system").unwrap();
             kube_system.jobs.push(serde_json::from_value(job).unwrap());
         });
+    }
+
+    #[tokio::test]
+    async fn a_chart_written_before_and_after_its_contributor_is_done_with_the_values() {
+        let cluster = cluster();
+        let app = TestApi::new(&cluster)
+            .signed_in(TOKEN)
+            .with_catalog(Arc::new(Api {
+                cnpg_contributes: true,
+                ..Api::default()
+            }))
+            .router();
+        let (status, plan) = call_for(&app, "cloudnative-pg", "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(
+            states(&plan),
+            [
+                "cert-manager pending",
+                "issuers pending",
+                "cloudnative-pg pending",
+                "plugin-barman-cloud pending",
+                "cert-manager pending"
+            ]
+        );
+        call_for(&app, "cloudnative-pg", "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        // The last step writes the chart again with cloudnative-pg's value, and
+        // helm-controller installs it.
+        let mut chart = dynamic(&cluster, "HelmChart", "cert-manager").unwrap();
+        let values = chart["spec"]["valuesContent"].as_str().unwrap().to_owned();
+        chart["spec"]["valuesContent"] = json!(format!("added: cnpg\n{values}"));
+        put(&cluster, chart);
+        let (_, plan) = call_for(&app, "cloudnative-pg", "plan", "install", "").await;
+        let states = states(&plan);
+        // The first write is done too: applying it again would take the value out.
+        assert_eq!(
+            states.first().map(String::as_str),
+            Some("cert-manager ready"),
+            "{states:?}"
+        );
+        assert_eq!(
+            states.last().map(String::as_str),
+            Some("cert-manager ready"),
+            "{states:?}"
+        );
     }
 
     #[tokio::test]
