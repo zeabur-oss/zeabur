@@ -221,23 +221,14 @@ impl Report {
     }
 }
 
-pub(crate) fn run(args: &DoctorArgs) -> ExitCode {
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            output::error(&format!("cannot start: {error}"));
-            return ExitCode::from(3);
-        }
-    };
-    let report = runtime.block_on(async {
+pub(crate) async fn run(args: &DoctorArgs) -> ExitCode {
+    let report = async {
         let api =
             InProcess::from_kubeconfig(args.context.as_deref(), zeabur_api::Settings::default())
                 .await?;
         examine(&api).await.map_err(|problem| detail(&problem))
-    });
+    }
+    .await;
     let report = match report {
         Ok(report) => report,
         Err(message) => {

@@ -60,7 +60,8 @@ enum Command {
     Telemetry(telemetry::TelemetryArgs),
 }
 
-fn main() -> ExitCode {
+#[tokio::main]
+async fn main() -> ExitCode {
     let args = Args::parse();
     // Every command holds the kubeconfig's credential in memory.
     if let Err(error) = zeabur_core::secret::forbid_core_dumps() {
@@ -68,15 +69,15 @@ fn main() -> ExitCode {
     }
     let check = update::Check::start();
     let code = match args.command {
-        Command::Ui(ui_args) => ui::run(&ui_args),
-        Command::Doctor(doctor_args) => doctor::run(&doctor_args),
-        Command::Up(up_args) => up::run(&up_args),
-        Command::Connect(connect_args) => connect::run(&connect_args),
+        Command::Ui(ui_args) => ui::run(&ui_args).await,
+        Command::Doctor(doctor_args) => doctor::run(&doctor_args).await,
+        Command::Up(up_args) => up::run(&up_args).await,
+        Command::Connect(connect_args) => connect::run(&connect_args).await,
         Command::Components(components_args) => components::run(&components_args),
         Command::Telemetry(telemetry_args) => telemetry::run(&telemetry_args),
     };
     if let Some(check) = check {
-        check.finish();
+        check.finish().await;
     }
     code
 }

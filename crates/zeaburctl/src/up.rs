@@ -87,18 +87,8 @@ pub(crate) struct UpArgs {
     yes: bool,
 }
 
-pub(crate) fn run(args: &UpArgs) -> ExitCode {
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            output::error(&format!("cannot start: {error}"));
-            return ExitCode::FAILURE;
-        }
-    };
-    match runtime.block_on(up(args)) {
+pub(crate) async fn run(args: &UpArgs) -> ExitCode {
+    match up(args).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             output::error(&message);

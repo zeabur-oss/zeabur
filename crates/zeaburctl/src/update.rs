@@ -1,5 +1,5 @@
 //! The update check (docs/reference/telemetry.mdx, "Update check"). Each command asks GitHub for
-//! the releases on a thread of its own while it runs, and prints one line when they name a newer
+//! the releases in a task of its own while it runs, and prints one line when they name a newer
 //! `zeaburctl`. At its end the command waits at most [`GRACE`] for the answer.
 //!
 //! Without a token GitHub answers 60 requests an hour from one address [gh-limit]. With a token in
@@ -10,9 +10,9 @@
 
 use std::ffi::OsString;
 use std::io::IsTerminal as _;
-use std::sync::mpsc::{self, Receiver};
 use std::time::Duration;
 
+use tokio::task::JoinHandle;
 use zeabur_api::releases::{self, Answer, RELEASES_URL};
 use zeabur_api::views::ZeaburNewer;
 use zeabur_http::{Https, Reach, tls};
@@ -58,7 +58,7 @@ fn token(env: &dyn Fn(&str) -> Option<OsString>) -> Option<String> {
 /// A check under way.
 #[derive(Debug)]
 pub(crate) struct Check {
-    notice: Receiver<Option<String>>,
+    notice: JoinHandle<Option<String>>,
 }
 
 impl Check {
@@ -72,38 +72,30 @@ impl Check {
     }
 
     fn start_at(url: &str, token: Option<String>) -> Self {
-        let (send, receive) = mpsc::channel();
         let url = url.to_owned();
-        std::thread::spawn(move || drop(send.send(fetch(&url, token.as_deref()))));
-        Self { notice: receive }
+        Self {
+            notice: tokio::spawn(async move { fetch(&url, token.as_deref()).await }),
+        }
     }
 
     /// Prints the notice once the answer comes, waiting at most [`GRACE`].
-    pub(crate) fn finish(self) {
-        if let Some(notice) = self.notice(GRACE) {
+    pub(crate) async fn finish(self) {
+        if let Some(notice) = self.notice(GRACE).await {
             output::info(&notice);
         }
     }
 
-    fn notice(self, grace: Duration) -> Option<String> {
-        self.notice.recv_timeout(grace).ok().flatten()
+    async fn notice(self, grace: Duration) -> Option<String> {
+        tokio::time::timeout(grace, self.notice).await.ok()?.ok()?
     }
 }
 
 /// The line to print for GitHub's answer, if any. A failure says nothing.
-fn fetch(url: &str, token: Option<&str>) -> Option<String> {
+async fn fetch(url: &str, token: Option<&str>) -> Option<String> {
     let tls = tls(None).ok()?;
-    let runtime = tokio::runtime::Builder::new_current_thread()
-        .enable_all()
-        .build()
-        .ok()?;
-    let answer = runtime
-        .block_on(async {
-            let http = Https::new(Reach::Any, &tls);
-            let agent = format!("zeaburctl/{RUNNING}");
-            releases::ask(&http, url, &agent, None, token).await
-        })
-        .ok()?;
+    let http = Https::new(Reach::Any, &tls);
+    let agent = format!("zeaburctl/{RUNNING}");
+    let answer = releases::ask(&http, url, &agent, None, token).await.ok()?;
     match answer {
         Answer::Releases { releases, .. } => {
             releases::newer(&releases, RUNNING).map(|newer| notice(&newer, RUNNING))
@@ -129,6 +121,7 @@ mod tests {
     use std::collections::BTreeMap;
     use std::io::{Read as _, Write as _};
     use std::net::TcpListener;
+    use std::sync::mpsc::{self, Receiver};
     use std::time::Instant;
 
     use zeabur_api::views::ZeaburRelease;
@@ -210,51 +203,55 @@ mod tests {
     const RELEASES_JSON: &str = r####"[{"tag_name":"v99.0.0","html_url":"https://example.test/99","body":"### Security\n- x"}]"####;
     const WAIT: Duration = Duration::from_secs(10);
 
-    #[test]
-    fn a_slow_answer_holds_the_command_up_no_longer_than_the_grace() {
+    #[tokio::test]
+    async fn a_slow_answer_holds_the_command_up_no_longer_than_the_grace() {
         let (url, _) = github("200 OK", "", RELEASES_JSON, Duration::from_secs(30));
         let started = Instant::now();
         assert_eq!(
-            Check::start_at(&url, None).notice(Duration::from_millis(200)),
+            Check::start_at(&url, None)
+                .notice(Duration::from_millis(200))
+                .await,
             None
         );
         assert!(started.elapsed() < Duration::from_secs(1));
     }
 
-    #[test]
-    fn every_command_asks_and_names_a_newer_release() {
+    #[tokio::test]
+    async fn every_command_asks_and_names_a_newer_release() {
         let (url, requests) = github("200 OK", "", RELEASES_JSON, Duration::ZERO);
         for _ in 0..2 {
-            let notice = Check::start_at(&url, None).notice(WAIT).unwrap();
+            let notice = Check::start_at(&url, None).notice(WAIT).await.unwrap();
             assert!(notice.contains("99.0.0"), "{notice}");
             assert!(requests.recv_timeout(WAIT).is_ok());
         }
     }
 
-    #[test]
-    fn a_token_is_sent_to_github_as_a_bearer() {
+    #[tokio::test]
+    async fn a_token_is_sent_to_github_as_a_bearer() {
         let (url, requests) = github("200 OK", "", "[]", Duration::ZERO);
-        Check::start_at(&url, Some("t0ken".to_owned())).notice(WAIT);
+        Check::start_at(&url, Some("t0ken".to_owned()))
+            .notice(WAIT)
+            .await;
         let request = requests.recv_timeout(WAIT).unwrap().to_ascii_lowercase();
         assert!(request.contains("authorization: bearer t0ken"), "{request}");
         let (url, requests) = github("200 OK", "", "[]", Duration::ZERO);
-        Check::start_at(&url, None).notice(WAIT);
+        Check::start_at(&url, None).notice(WAIT).await;
         let request = requests.recv_timeout(WAIT).unwrap().to_ascii_lowercase();
         assert!(!request.contains("authorization"), "{request}");
     }
 
-    #[test]
-    fn a_used_up_limit_says_to_set_a_token_and_other_failures_say_nothing() {
+    #[tokio::test]
+    async fn a_used_up_limit_says_to_set_a_token_and_other_failures_say_nothing() {
         let used_up = "x-ratelimit-remaining: 0\r\n";
         for status in ["403 Forbidden", "429 Too Many Requests"] {
             let (url, _) = github(status, used_up, "{}", Duration::ZERO);
-            let notice = Check::start_at(&url, None).notice(WAIT).unwrap();
+            let notice = Check::start_at(&url, None).notice(WAIT).await.unwrap();
             assert!(notice.contains("GH_TOKEN"), "{notice}");
         }
         let (url, _) = github("403 Forbidden", "", "{}", Duration::ZERO);
-        assert_eq!(Check::start_at(&url, None).notice(WAIT), None);
+        assert_eq!(Check::start_at(&url, None).notice(WAIT).await, None);
         let (url, _) = github("500 Internal Server Error", "", "{}", Duration::ZERO);
-        assert_eq!(Check::start_at(&url, None).notice(WAIT), None);
+        assert_eq!(Check::start_at(&url, None).notice(WAIT).await, None);
     }
 
     #[test]
