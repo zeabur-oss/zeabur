@@ -10,6 +10,7 @@ import {
   sumUsage,
   templateAmounts,
   total,
+  usageBar,
   type ProjectUsage,
 } from "@/model/usage"
 
@@ -28,6 +29,7 @@ const usage = (pods: [string, number, number][]): ProjectUsage =>
   ({
     id: "projects/shop/usage",
     state: "available",
+    nearLimit: 0.9,
     unreadable: [],
     pods: pods.map(([name, cpu, memory]) => ({
       pod: name,
@@ -69,7 +71,7 @@ describe("live usage", () => {
     const rows = measured(web, usage([["web-1", 40, 100 * MiB]]))
     expect(sumUsage(rows)).toStrictEqual({ cpu: 40, memory: 100 * MiB, pods: 1 })
     expect(
-      notesFor(rows[1]!, { memory: 128 * MiB }, { memory: 256 * MiB }).map((n) => n.kind),
+      notesFor(rows[1]!, { memory: 128 * MiB }, { memory: 256 * MiB }, 0.9).map((n) => n.kind),
     ).toStrictEqual(["no-sample"])
   })
 
@@ -79,12 +81,20 @@ describe("live usage", () => {
       { pod: pod("w", { reason: "OOMKilled" }), cpu: 95, memory: 240 * MiB },
       { memory: 128 * MiB },
       limits,
+      0.9,
     )
     expect(near.map((n) => n.kind)).toStrictEqual(["oom", "memory-near-limit", "cpu-at-limit"])
     // Above the request matters only without a limit: with one, the limit is the wall.
-    const over = notesFor({ pod: pod("w"), cpu: 10, memory: 200 * MiB }, { memory: 128 * MiB }, {})
+    const over = notesFor(
+      { pod: pod("w"), cpu: 10, memory: 200 * MiB },
+      { memory: 128 * MiB },
+      {},
+      0.9,
+    )
     expect(over.map((n) => n.kind)).toStrictEqual(["memory-over-request"])
-    expect(notesFor({ pod: pod("w"), cpu: 10, memory: 200 * MiB }, {}, limits)).toStrictEqual([])
+    expect(notesFor({ pod: pod("w"), cpu: 10, memory: 200 * MiB }, {}, limits, 0.9)).toStrictEqual(
+      [],
+    )
   })
 
   test("the services table shows a service only with a measured replica", () => {
@@ -123,5 +133,21 @@ describe("history", () => {
       "var(--chart-5)",
       "var(--chart-3)",
     ])
+  })
+})
+
+describe("usage bar", () => {
+  test("warns near the limit, marks use over the request, and is fine otherwise", () => {
+    expect(usageBar({ used: 95, limit: 100, nearLimit: 0.9 }).tone).toBe("warn")
+    expect(usageBar({ used: 60, request: 50, limit: 100, nearLimit: 0.9 }).tone).toBe("over")
+    expect(usageBar({ used: 40, request: 50, limit: 100, nearLimit: 0.9 })).toStrictEqual({
+      share: 0.4,
+      mark: 0.5,
+      tone: "ok",
+    })
+  })
+
+  test("without a limit the room is a quarter over the larger of use and request", () => {
+    expect(usageBar({ used: 80, request: 40 })).toMatchObject({ share: 0.8, mark: 0.4 })
   })
 })

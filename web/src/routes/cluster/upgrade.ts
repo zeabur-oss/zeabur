@@ -12,33 +12,27 @@ export function useDate() {
     )
 }
 
-/** The one upgrade fact the cluster's header and the home page show: the most severe state,
+/** The one upgrade fact the cluster's header and the home page show: the server's badge,
  * worded. */
 export function useUpgradeBadge(
   upgrades?: Schemas.Upgrades,
 ): { health: Health; text: string } | null {
   const t = useT()
   const date = useDate()
-  if (!upgrades) return null
+  const badge = upgrades?.badge
+  if (!upgrades || !badge) return null
   const eol = upgrades.release?.endOfLife
-  for (const state of upgrades.states) {
-    switch (state) {
-      case "end-of-life":
-        return { health: "fail", text: t("cluster.endOfLife") }
-      case "maintenance":
-        return { health: "warn", text: t("cluster.endOfLifeOn", eol ? date(eol) : "") }
-      case "skew-unsupported":
-        return { health: "fail", text: t("cluster.skewBadge") }
-      case "upgrading":
-        return { health: "progress", text: t("cluster.upgrading") }
-      case "patch-available":
-        return { health: "progress", text: t("cluster.available", upgrades.patch ?? "") }
-      case "minor-available":
-        return { health: "progress", text: t("cluster.available", upgrades.nextMinor ?? "") }
-      case "skew-mixed":
-      case "newer-than-data":
-        break
-    }
+  const words = {
+    "end-of-life": () => t("cluster.endOfLife"),
+    maintenance: () => t("cluster.endOfLifeOn", eol ? date(eol) : ""),
+    "skew-unsupported": () => t("cluster.skewBadge"),
+    upgrading: () => t("cluster.upgrading"),
+    "patch-available": () => t("cluster.available", upgrades.patch ?? ""),
+    "minor-available": () => t("cluster.available", upgrades.nextMinor ?? ""),
+    "skew-mixed": () => null,
+    "newer-than-data": () => null,
   }
-  return null
+  // A state newer than this build shows no pill.
+  const text = Object.hasOwn(words, badge.state) ? words[badge.state]() : null
+  return text === null ? null : { health: badge.health, text }
 }

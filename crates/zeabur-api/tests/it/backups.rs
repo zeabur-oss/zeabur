@@ -111,6 +111,10 @@ mod tests {
         let (status, found) = send(&app, "GET", "/api/v1/cluster/backups", None).await;
         assert_eq!(status, StatusCode::OK, "{found}");
         assert_eq!(found["state"], "not-installed");
+        assert_eq!(
+            found["verdict"],
+            json!({"state": "notInstalled", "health": "idle"})
+        );
         let (status, _) = plan(&app, &json!({"op": "backupNow"})).await;
         assert_eq!(status, StatusCode::NOT_FOUND);
     }
@@ -152,6 +156,86 @@ mod tests {
                 ]),
                 "{k8up_state}"
             );
+        }
+    }
+
+    #[tokio::test]
+    async fn the_verdict_says_what_stops_backups_first_then_how_the_newest_went() {
+        let paused = || {
+            let mut paused = schedule();
+            paused.data["spec"]["paused"] = json!(true);
+            paused
+        };
+        let named = |name: &str, default: bool| {
+            let mut location = location();
+            location.metadata.name = Some(name.to_owned());
+            location.data["spec"]["default"] = json!(default);
+            location
+        };
+        let unavailable = || {
+            let mut location = location();
+            location.data["status"]["phase"] = json!("Unavailable");
+            location
+        };
+        for (objects, state, health, about) in [
+            (vec![schedule()], "noLocation", "warn", None),
+            (
+                vec![unavailable(), schedule()],
+                "locationUnavailable",
+                "fail",
+                None,
+            ),
+            (vec![location()], "noSchedule", "warn", None),
+            (
+                vec![named("default", false), schedule()],
+                "waiting",
+                "progress",
+                None,
+            ),
+            (
+                vec![named("other", false), schedule()],
+                "noLocation",
+                "warn",
+                None,
+            ),
+            (vec![location(), paused()], "paused", "idle", None),
+            (vec![location(), schedule()], "waiting", "progress", None),
+            (
+                vec![location(), schedule(), backup("b1", "Failed")],
+                "failed",
+                "fail",
+                Some("b1"),
+            ),
+            (
+                vec![location(), schedule(), backup("b1", "PartiallyFailed")],
+                "failed",
+                "fail",
+                Some("b1"),
+            ),
+            (
+                vec![location(), paused(), backup("b1", "InProgress")],
+                "running",
+                "progress",
+                Some("b1"),
+            ),
+            (
+                vec![location(), schedule(), backup("b1", "Completed")],
+                "ok",
+                "ok",
+                Some("b1"),
+            ),
+        ] {
+            let (status, found) = send(
+                &app(&velero(objects)),
+                "GET",
+                "/api/v1/cluster/backups",
+                None,
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{found}");
+            assert_eq!(found["verdict"]["state"], state);
+            assert_eq!(found["verdict"]["health"], health, "{state}");
+            assert_eq!(found["verdict"]["backup"].as_str(), about, "{state}");
         }
     }
 
@@ -1010,5 +1094,9 @@ mod tests {
         let (status, found) = send(&app, "GET", "/api/v1/cluster/backups", None).await;
         assert_eq!(status, StatusCode::OK, "{found}");
         assert_eq!(found["state"], "refused");
+        assert_eq!(
+            found["verdict"],
+            json!({"state": "refused", "health": "idle"})
+        );
     }
 }

@@ -15,10 +15,10 @@ use axum::extract::State;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_model::Origin;
+use zeabur_model::{Health, Origin};
 use zeabur_modules::Reading;
 
-use crate::cluster::{disks, modules};
+use crate::cluster::{disks, modules, node_health};
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
@@ -53,7 +53,7 @@ pub struct PodUsage {
 }
 
 /// What a project's pods use now.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectUsage {
     /// `projects/{project}/usage`.
@@ -68,6 +68,8 @@ pub struct ProjectUsage {
     pub window: Option<String>,
     /// Every pod with a sample, by name. A running pod missing here has none yet.
     pub pods: Vec<PodUsage>,
+    /// The share of a pod's memory or CPU limit at or above which it is close to the limit.
+    pub near_limit: f64,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
 }
@@ -97,6 +99,7 @@ pub(crate) async fn get(
         timestamp: None,
         window: None,
         pods: Vec::new(),
+        near_limit: crate::cluster::usage::NEAR_LIMIT,
         unreadable: Vec::new(),
     };
     match read {
@@ -158,6 +161,8 @@ pub struct VolumeUsage {
     pub used_bytes: u64,
     /// Free to use.
     pub available_bytes: u64,
+    /// How full it shows: amber from 85% taken, red from 95%.
+    pub health: Health,
 }
 
 /// How full a project's volumes are.
@@ -211,6 +216,7 @@ pub(crate) async fn volumes(
             .into_iter()
             .map(|(claim, disk)| VolumeUsage {
                 claim,
+                health: node_health::VOLUME.health(node_health::disk_share(Some(&disk))),
                 capacity_bytes: disk.capacity_bytes,
                 used_bytes: disk.used_bytes,
                 available_bytes: disk.available_bytes,

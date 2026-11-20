@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { groups, lead, maximum, nearMaximum, type NamespaceUsage } from "@/model/cluster-usage"
+import { groups, lead, maximum, type NamespaceUsage } from "@/model/cluster-usage"
 
 const MiB = 1024 * 1024
 
@@ -58,22 +58,5 @@ describe("cluster usage", () => {
     const allLimited = namespace("shop", { limits, unlimited: { cpu: 0, memory: 0 } })
     expect(maximum(someUnlimited, "memory")).toBeUndefined()
     expect(maximum(allLimited, "memory")).toBe(512 * MiB)
-  })
-
-  test("memory close to the maximum is called out", () => {
-    const limited = {
-      limits: { cpuMillicores: 1000, memoryBytes: 512 * MiB },
-      unlimited: { cpu: 0, memory: 0 },
-    }
-    const near = namespace("shop", {
-      ...limited,
-      usage: { cpuMillicores: 10, memoryBytes: 500 * MiB, pods: 1 },
-    })
-    const far = namespace("shop", {
-      ...limited,
-      usage: { cpuMillicores: 10, memoryBytes: 100 * MiB, pods: 1 },
-    })
-    expect(nearMaximum(near)).toBe(true)
-    expect(nearMaximum(far)).toBe(false)
   })
 })

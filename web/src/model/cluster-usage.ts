@@ -1,7 +1,6 @@
 // What each namespace's pods use across the cluster (`GET /cluster/usage`), grouped as the
 // cluster page shows it: projects, other namespaces, and those Kubernetes keeps for itself.
 import type { Schemas } from "@/api/client"
-import { NEAR_LIMIT } from "@/model/usage"
 
 export type ClusterUsage = Schemas.ClusterUsage
 export type NamespaceUsage = Schemas.NamespaceUsage
@@ -19,14 +18,6 @@ export const reserved = (item: NamespaceUsage, resource: Resource) => item.reque
 /** The most the namespace's pods may use together; unknown while any pod sets no limit. */
 export function maximum(item: NamespaceUsage, resource: Resource): number | undefined {
   return item.pods > 0 && item.unlimited[resource] === 0 ? item.limits[field[resource]] : undefined
-}
-
-/** Measured memory at or above `NEAR_LIMIT` of a known maximum. */
-export function nearMaximum(item: NamespaceUsage): boolean {
-  const most = maximum(item, "memory")
-  return item.usage && most !== undefined && most > 0
-    ? item.usage.memoryBytes / most >= NEAR_LIMIT
-    : false
 }
 
 const byLead = (resource: Resource) => (a: NamespaceUsage, b: NamespaceUsage) =>

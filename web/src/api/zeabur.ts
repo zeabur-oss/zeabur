@@ -662,6 +662,53 @@ export type BackupSchedule = {
 }
 
 /**
+ * A service's health, from worst to best: what a status dot shows.
+ */
+export type Health = (typeof Health)[keyof typeof Health]
+
+export const Health = {
+  fail: "fail",
+  warn: "warn",
+  progress: "progress",
+  ok: "ok",
+  idle: "idle",
+} as const
+
+/**
+ * The cluster's backups in one state. An open set.
+ */
+export type VerdictState = (typeof VerdictState)[keyof typeof VerdictState]
+
+export const VerdictState = {
+  notInstalled: "notInstalled",
+  refused: "refused",
+  noLocation: "noLocation",
+  locationUnavailable: "locationUnavailable",
+  noSchedule: "noSchedule",
+  paused: "paused",
+  waiting: "waiting",
+  failed: "failed",
+  running: "running",
+  ok: "ok",
+} as const
+
+/**
+ * What the Backups tab says first: the state, how it shows, and the backup it is about.
+ */
+export type BackupVerdict = {
+  /**
+   * The backup it is about: the newest one with a known outcome, for `failed`, `running`
+   * and `ok`.
+   * @nullable
+   */
+  backup?: string | null
+  /** How it shows. */
+  health: Health
+  /** The state. */
+  state: VerdictState
+}
+
+/**
  * What a write does.
  */
 export type BackupWriteAction = (typeof BackupWriteAction)[keyof typeof BackupWriteAction]
@@ -2264,19 +2311,6 @@ export const ChannelsOutcome = {
 } as const
 
 /**
- * A service's health, from worst to best: what a status dot shows.
- */
-export type Health = (typeof Health)[keyof typeof Health]
-
-export const Health = {
-  fail: "fail",
-  warn: "warn",
-  progress: "progress",
-  ok: "ok",
-  idle: "idle",
-} as const
-
-/**
  * The first line of a set of channels: whether alerts reach anyone, and what is wrong when not.
  */
 export type ChannelsVerdict = {
@@ -2811,7 +2845,33 @@ export type ClusterBackups = {
   totalBackups: number
   /** What could not be read. */
   unreadable: UnreadableView[]
+  /** What the Backups tab says first. */
+  verdict: BackupVerdict
 }
+
+/**
+ * What the cluster's Velero backups do for one project.
+ */
+export type ClusterCoverage =
+  | {
+      as: "noVelero"
+    }
+  | {
+      as: "notCovered"
+    }
+  | {
+      as: "waiting"
+    }
+  | {
+      as: "last"
+      /**
+       * When it finished, else when it started (RFC 3339).
+       * @nullable
+       */
+      at?: string | null
+      /** How it went. */
+      outcome: BackupOutcome
+    }
 
 /**
  * One event about an object.
@@ -3629,6 +3689,11 @@ export type NamespaceUsage = {
   limits: Resources
   /** The namespace. */
   namespace: string
+  /**
+   * Measured memory is at or above [`NEAR_LIMIT`] of what its pods may use at most, known
+   * only when every pod sets a memory limit.
+   */
+  nearMaximum: boolean
   /** Its Namespace. */
   origin: Origin
   /**
@@ -7294,6 +7359,71 @@ export type NodeCondition = {
 }
 
 /**
+ * What is wrong with a node, in the order it hurts.
+ */
+export type NodeIssueKind = (typeof NodeIssueKind)[keyof typeof NodeIssueKind]
+
+export const NodeIssueKind = {
+  notReady: "notReady",
+  memoryPressure: "memoryPressure",
+  diskPressure: "diskPressure",
+  networkUnavailable: "networkUnavailable",
+  memoryFull: "memoryFull",
+  diskFull: "diskFull",
+  pidPressure: "pidPressure",
+  cordoned: "cordoned",
+  draining: "draining",
+  maintenance: "maintenance",
+  reservedMemory: "reservedMemory",
+  reservedCpu: "reservedCpu",
+} as const
+
+/**
+ * One thing wrong with a node.
+ */
+export type NodeIssue = {
+  /** How it shows. */
+  health: Health
+  /** What. */
+  kind: NodeIssueKind
+  /**
+   * The share it is about: memory or disk in use, or reserved.
+   * @nullable
+   */
+  share?: number | null
+}
+
+/**
+ * One issue on a node, in a group.
+ */
+export type NodeIssueAt = {
+  /** How it shows there. */
+  health: Health
+  /** The node. */
+  node: string
+  /**
+   * The share it is about there.
+   * @nullable
+   */
+  share?: number | null
+}
+
+/**
+ * One kind of issue over every node that has it, so twelve nodes over-reserved on memory read
+ * as one line.
+ */
+export type NodeIssueGroup = {
+  /** The worst health of its nodes. */
+  health: Health
+  /** Each node with it, worst first. */
+  issues: NodeIssueAt[]
+  /** What. */
+  kind: NodeIssueKind
+  /** It takes services down, or is about to. */
+  problem: boolean
+}
+
+/**
  * A node taint.
  */
 export type Taint = {
@@ -7330,6 +7460,8 @@ export type NodeView = {
   disk?: DiskUsage | null
   /** `cluster/nodes/<name>`. */
   id: string
+  /** What is wrong with it, worst first. */
+  issues: NodeIssue[]
   /** The kernel version. */
   kernelVersion: string
   /** The kubelet's version. */
@@ -7377,6 +7509,31 @@ export type NodeView = {
 }
 
 /**
+ * The shares at which a fill turns amber and red.
+ */
+export type Threshold = {
+  /** Red from this share. */
+  fail: number
+  /** Amber from this share. */
+  warn: number
+}
+
+/**
+ * The thresholds a node is judged by.
+ */
+export type NodeThresholds = {
+  /**
+   * The kubelet's filesystem: the kubelet starts evicting pods below 10% free
+   * (`nodefs.available<10%`).
+   */
+  disk: Threshold
+  /** Memory in use: the kernel kills processes as it runs out. */
+  memory: Threshold
+  /** The share of allocatable reserved above which new pods may not fit. */
+  tight: number
+}
+
+/**
  * The cluster's totals over every node.
  */
 export type NodeTotals = {
@@ -7392,6 +7549,8 @@ export type NodeTotals = {
  * The nodes, with the cluster's totals.
  */
 export type NodeList = {
+  /** Each kind of issue over every node that has it, worst first. */
+  attention: NodeIssueGroup[]
   /** Whether the nodes' disks could be read. */
   disk: DiskState
   /** Sorted by name. */
@@ -7405,6 +7564,8 @@ export type NodeList = {
    * @minimum 0
    */
   podsScanned: number
+  /** The thresholds the nodes are judged by. */
+  thresholds: NodeThresholds
   /** Totals over every node. */
   totals: NodeTotals
   /** What could not be read. */
@@ -7414,6 +7575,14 @@ export type NodeList = {
    * @minimum 0
    */
   unscheduledPods: number
+  /**
+   * The node the totals would hide: the worst one, when there is more than one node and its
+   * worst issue takes services down.
+   * @nullable
+   */
+  worst?: string | null
+  /** The nodes' names, worst first. */
+  worstFirst: string[]
 }
 
 /**
@@ -8471,6 +8640,7 @@ export type ProjectBackupsKeysFrom = { [key: string]: string }
  * A project's backups across providers.
  */
 export type ProjectBackups = {
+  cluster?: ClusterCoverage | null
   /**
    * One row per claim, then per database, then the namespace. A database's claims have no
    * row of their own: they are backed up with the database.
@@ -9255,6 +9425,8 @@ export type ProjectStorage = {
 export type ProjectUsage = {
   /** `projects/{project}/usage`. */
   id: string
+  /** The share of a pod's memory or CPU limit at or above which it is close to the limit. */
+  nearLimit: number
   /** Every pod with a sample, by name. A running pod missing here has none yet. */
   pods: PodUsage[]
   /** Whether usage could be read. */
@@ -9875,18 +10047,6 @@ export type SetupLinkRequest = {
 }
 
 /**
- * How much a state matters, from nothing to act on to act now.
- */
-export type Severity = (typeof Severity)[keyof typeof Severity]
-
-export const Severity = {
-  none: "none",
-  info: "info",
-  warning: "warning",
-  danger: "danger",
-} as const
-
-/**
  * How many teams share the cluster.
  */
 export type Teams = (typeof Teams)[keyof typeof Teams]
@@ -10291,9 +10451,22 @@ export const UpgradeState = {
 } as const
 
 /**
+ * A state of the cluster's version with how it shows.
+ */
+export type UpgradeFinding = {
+  /** How it shows. */
+  health: Health
+  /** The state. */
+  state: UpgradeState
+}
+
+/**
  * The cluster's own version and what it calls for.
  */
 export type Upgrades = {
+  /** The states someone has to act on, red and amber, most severe first. */
+  attention: UpgradeFinding[]
+  badge?: UpgradeFinding | null
   /** When the bundled table was copied from the Kubernetes schedule (`YYYY-MM-DD`). */
   dataAsOf: string
   /**
@@ -10327,8 +10500,6 @@ export type Upgrades = {
    */
   patch?: string | null
   release?: Release | null
-  /** The most severe state's severity. */
-  severity: Severity
   /** Nodes whose kubelet minor differs from kube-apiserver's. */
   skew: NodeSkew[]
   /** Every state that applies, most severe first. An open set. */
@@ -10443,6 +10614,8 @@ export type VolumeUsage = {
   capacityBytes: number
   /** The PersistentVolumeClaim. */
   claim: string
+  /** How full it shows: amber from 85% taken, red from 95%. */
+  health: Health
   /**
    * In use.
    * @minimum 0
@@ -10549,6 +10722,8 @@ export type ZeaburRelease = {
  * A newer release than the running one.
  */
 export type ZeaburNewer = {
+  /** Red while a release fixes vulnerabilities the running version has, else amber. */
+  health: Health
   /** The newest normal release, or the newest pre-release when the running version is one. */
   latest: ZeaburRelease
   /**

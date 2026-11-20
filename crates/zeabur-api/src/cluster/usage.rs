@@ -31,6 +31,17 @@ use crate::extract::Json;
 use crate::handlers::Person;
 use crate::views::{MetricsState, PodScan, Resources, UnreadableView};
 
+/// The share of a memory or CPU limit at or above which a pod is close to it: OOM-killed for
+/// memory, throttled for CPU. Zeabur's, not a Kubernetes threshold.
+pub const NEAR_LIMIT: f64 = 0.9;
+
+/// Whether `used` is at or above [`NEAR_LIMIT`] of `limit`; `false` when either is unknown.
+pub(crate) fn near_limit(used: Option<u64>, limit: Option<u64>) -> bool {
+    limit
+        .and_then(|l| crate::cluster::node_health::share(used, l))
+        .is_some_and(|s| s >= NEAR_LIMIT)
+}
+
 /// How many pods set no limit, for each resource.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -70,6 +81,9 @@ pub struct NamespaceUsage {
     /// `available`.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub usage: Option<Resources>,
+    /// Measured memory is at or above [`NEAR_LIMIT`] of what its pods may use at most, known
+    /// only when every pod sets a memory limit.
+    pub near_maximum: bool,
 }
 
 /// Every namespace together.
@@ -251,6 +265,10 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterUsage>, A
                 limits: resources(sum.limits, None),
                 unlimited: sum.unlimited,
                 usage: measured.then(|| resources(sum.usage, Some(sum.sampled))),
+                near_maximum: near_limit(
+                    measured.then_some(sum.usage.memory),
+                    (sum.pods > 0 && sum.unlimited.memory == 0).then_some(sum.limits.memory),
+                ),
                 namespace,
             }
         })
@@ -263,15 +281,25 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterUsage>, A
             limits: resources(totals.limits, None),
             usage: measured.then(|| resources(totals.usage, Some(totals.sampled))),
         },
-        pod_scan: if pods.truncated {
-            PodScan::Partial
-        } else {
-            PodScan::Complete
-        },
+        pod_scan: PodScan::of(Some(&pods)),
         pods_scanned: pods.pods.len(),
         metrics: state,
         timestamp,
         window,
         unreadable,
     }))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::near_limit;
+
+    #[test]
+    fn use_near_a_known_limit_is_called_out() {
+        assert!(near_limit(Some(470), Some(512)));
+        assert!(!near_limit(Some(100), Some(512)));
+        assert!(!near_limit(Some(500), None));
+        assert!(!near_limit(None, Some(512)));
+        assert!(!near_limit(Some(10), Some(0)));
+    }
 }

@@ -22,7 +22,6 @@ import {
   colours,
   hasValues,
   measured,
-  NEAR_LIMIT,
   notesFor,
   podsAtEnd,
   ranges,
@@ -30,6 +29,7 @@ import {
   sumUsage,
   templateAmounts,
   total,
+  usageBar,
   type Amount,
   type Measured,
   type Note,
@@ -63,7 +63,10 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
   // adds neither.
   const counted = available && sum.pods > 0 ? sum.pods : replicas
   const scale = (value?: number) => (value === undefined ? undefined : value * counted)
-  const noteRows = rows.map((row) => ({ row, notes: notesFor(row, requests, limits) }))
+  const noteRows = rows.map((row) => ({
+    row,
+    notes: notesFor(row, requests, limits, usage.data?.nearLimit),
+  }))
   const nearLimit = available
     ? noteRows.filter((r) => r.notes.some((n) => n.kind === "memory-near-limit"))
     : []
@@ -106,6 +109,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
             replicas={replicas}
             measuredPods={sum.pods}
             showUsage={available}
+            nearLimit={usage.data?.nearLimit}
           />
           <TotalBlock
             title={t("resources.memory")}
@@ -116,6 +120,7 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
             replicas={replicas}
             measuredPods={sum.pods}
             showUsage={available}
+            nearLimit={usage.data?.nearLimit}
           />
         </div>
         <VolumesBlock project={project} service={service} />
@@ -147,7 +152,12 @@ export function UsagePanel({ project, service }: { project: string; service: Ser
           </p>
         ) : null}
         {available ? (
-          <ReplicaTable rows={noteRows} requests={requests} limits={limits} />
+          <ReplicaTable
+            rows={noteRows}
+            requests={requests}
+            limits={limits}
+            nearLimit={usage.data?.nearLimit}
+          />
         ) : (
           <TemplateLine requests={requests} limits={limits} replicas={replicas} />
         )}
@@ -234,6 +244,7 @@ export function UsageGlance({
           replicas={replicas}
           measuredPods={pods}
           showUsage
+          nearLimit={usage.data?.nearLimit}
           pending={pending}
         />
       ))}
@@ -245,28 +256,23 @@ function UsageBar({
   used,
   request,
   limit,
+  nearLimit,
   label,
   size = "md",
 }: {
   used?: number
   request?: number
   limit?: number
+  nearLimit?: number
   label: string
   size?: "sm" | "md"
 }) {
-  const room = limit ?? Math.max(request ?? 0, used ?? 0) * 1.25
-  const share = used !== undefined && room > 0 ? used / room : undefined
-  const tone =
-    limit && share !== undefined && share >= NEAR_LIMIT
-      ? "warn"
-      : request && used !== undefined && used > request
-        ? "over"
-        : "ok"
+  const bar = usageBar({ used, request, limit, nearLimit })
   return (
     <Meter
-      value={share}
-      mark={request !== undefined && room > 0 ? request / room : undefined}
-      tone={tone}
+      value={bar.share}
+      mark={bar.mark}
+      tone={bar.tone}
       size={size}
       unbounded={!limit}
       label={label}
@@ -283,6 +289,7 @@ function TotalBlock({
   replicas,
   measuredPods,
   showUsage,
+  nearLimit,
   pending = false,
 }: {
   title: string
@@ -293,12 +300,13 @@ function TotalBlock({
   replicas: number
   measuredPods: number
   showUsage: boolean
+  /** The share of the limit from which the bar warns, from the server. */
+  nearLimit?: number
   pending?: boolean
 }) {
   const t = useT()
   const f = useFormat()
   const fmt = kind === "cpu" ? f.cpu : f.memory
-  const share = used !== undefined && limit ? used / limit : undefined
   const label = [
     title,
     used !== undefined ? t("usage.usedWord", fmt(used)) : "",
@@ -314,37 +322,84 @@ function TotalBlock({
           {title}
           {replicas > 1 ? ` ${t("usage.acrossPods", replicas)}` : ""}
         </span>
-        {pending ? (
-          <span key="pending" className="type-figure">
-            <Skeleton className="inline-block h-5 w-16" />
-          </span>
-        ) : showUsage && used !== undefined ? (
-          <span className="flex items-baseline gap-1.5">
-            <span className="type-figure tabular-nums">{fmt(used)}</span>
-            {share !== undefined ? (
-              <span className="type-meta text-muted-foreground tabular-nums">
-                {t("usage.ofMax", f.percent(share))}
-              </span>
-            ) : null}
-          </span>
-        ) : null}
+        <TotalFigure
+          pending={pending}
+          used={showUsage ? used : undefined}
+          limit={limit}
+          fmt={fmt}
+        />
       </div>
       <UsageBar
         used={showUsage ? used : undefined}
         request={pending ? undefined : request}
         limit={limit}
+        nearLimit={nearLimit}
         label={label}
       />
-      <span className="flex flex-wrap gap-x-3 type-meta text-muted-foreground tabular-nums">
-        <span>
-          {request !== undefined ? t("usage.reservedWord", fmt(request)) : t("usage.noReserved")}
-        </span>
-        <span>{limit !== undefined ? t("usage.maxWord", fmt(limit)) : t("usage.noMax")}</span>
-        {showUsage && measuredPods < replicas ? (
-          <span>{t("usage.sampledOf", measuredPods, replicas)}</span>
-        ) : null}
-      </span>
+      <TotalFoot
+        request={request}
+        limit={limit}
+        fmt={fmt}
+        sampled={showUsage && measuredPods < replicas ? [measuredPods, replicas] : undefined}
+      />
     </div>
+  )
+}
+
+/** A total's figure: what was used and its share of the maximum. */
+function TotalFigure({
+  pending,
+  used,
+  limit,
+  fmt,
+}: {
+  pending: boolean
+  used?: number
+  limit?: number
+  fmt: (value: number) => string
+}) {
+  const t = useT()
+  const f = useFormat()
+  if (pending)
+    return (
+      <span key="pending" className="type-figure">
+        <Skeleton className="inline-block h-5 w-16" />
+      </span>
+    )
+  if (used === undefined) return null
+  return (
+    <span className="flex items-baseline gap-1.5">
+      <span className="type-figure tabular-nums">{fmt(used)}</span>
+      {limit ? (
+        <span className="type-meta text-muted-foreground tabular-nums">
+          {t("usage.ofMax", f.percent(used / limit))}
+        </span>
+      ) : null}
+    </span>
+  )
+}
+
+/** A total's reserved and maximum amounts, and how many replicas were sampled. */
+function TotalFoot({
+  request,
+  limit,
+  fmt,
+  sampled,
+}: {
+  request?: number
+  limit?: number
+  fmt: (value: number) => string
+  sampled?: [number, number]
+}) {
+  const t = useT()
+  return (
+    <span className="flex flex-wrap gap-x-3 type-meta text-muted-foreground tabular-nums">
+      <span>
+        {request !== undefined ? t("usage.reservedWord", fmt(request)) : t("usage.noReserved")}
+      </span>
+      <span>{limit !== undefined ? t("usage.maxWord", fmt(limit)) : t("usage.noMax")}</span>
+      {sampled ? <span>{t("usage.sampledOf", ...sampled)}</span> : null}
+    </span>
   )
 }
 
@@ -377,10 +432,12 @@ function ReplicaTable({
   rows,
   requests,
   limits,
+  nearLimit,
 }: {
   rows: { row: Measured; notes: Note[] }[]
   requests: Amount
   limits: Amount
+  nearLimit?: number
 }) {
   const t = useT()
   const f = useFormat()
@@ -423,6 +480,7 @@ function ReplicaTable({
                 text={row.cpu !== undefined ? f.millicores(row.cpu) : undefined}
                 request={requests.cpu}
                 limit={limits.cpu}
+                nearLimit={nearLimit}
                 label={`${t("resources.cpu")} ${row.pod.name}`}
               />
             </td>
@@ -432,6 +490,7 @@ function ReplicaTable({
                 text={row.memory !== undefined ? f.memory(row.memory) : undefined}
                 request={requests.memory}
                 limit={limits.memory}
+                nearLimit={nearLimit}
                 label={`${t("resources.memory")} ${row.pod.name}`}
               />
             </td>
@@ -454,12 +513,14 @@ function Cell({
   text,
   request,
   limit,
+  nearLimit,
   label,
 }: {
   value?: number
   text?: string
   request?: number
   limit?: number
+  nearLimit?: number
   label: string
 }) {
   return (
@@ -467,7 +528,14 @@ function Cell({
       <span className="w-16 shrink-0 text-right tabular-nums">
         {text ?? <span className="text-muted-foreground">—</span>}
       </span>
-      <UsageBar used={value} request={request} limit={limit} label={label} size="sm" />
+      <UsageBar
+        used={value}
+        request={request}
+        limit={limit}
+        nearLimit={nearLimit}
+        label={label}
+        size="sm"
+      />
     </span>
   )
 }

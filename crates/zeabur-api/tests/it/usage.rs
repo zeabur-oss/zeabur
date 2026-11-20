@@ -676,7 +676,7 @@ mod tests {
         assert_eq!(
             volumes["items"],
             json!([{"claim": "data-db-0", "capacityBytes": 10, "usedBytes": 9,
-                    "availableBytes": 1}])
+                    "availableBytes": 1, "health": "warn"}])
         );
         let nodes = get(&cluster, "/api/v1/cluster/nodes").await;
         assert_eq!(nodes["disk"], "available");

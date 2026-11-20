@@ -13,14 +13,12 @@ export const severity = {
   noneReady: "fail",
   unreachable: "fail",
   certificateFailed: "fail",
-  nodeNotReady: "fail",
   errorLine: "fail",
 
   warningEvent: "warn",
   restarted: "warn",
   fewerReady: "warn",
   dnsElsewhere: "warn",
-  overReservation: "warn",
   warningLine: "warn",
 
   deploying: "progress",

@@ -44,8 +44,6 @@ import {
   scheduleRequest,
   takenAt,
   providerOf,
-  verdict,
-  verdictHealth,
   type LocationForm,
   type LocationProblem,
   type ScheduleForm,
@@ -191,7 +189,6 @@ function Installed({ data }: { data: Data }) {
 
 function Verdict({ data, gate, onPlan }: { data: Data; gate: Gate; onPlan: OnPlan }) {
   const t = useT()
-  const v = verdict(data)
   const good = lastGood(data.backups)
   const ready = mainLocation(data) !== undefined && mainSchedule(data) !== undefined
   return (
@@ -199,8 +196,8 @@ function Verdict({ data, gate, onPlan }: { data: Data; gate: Gate; onPlan: OnPla
       <div className="flex flex-wrap items-center gap-x-4 gap-y-2">
         <div className="flex min-w-0 flex-1 flex-col gap-0.5">
           <p className="flex items-center gap-2 type-body font-medium text-main" role="status">
-            <StatusDot health={verdictHealth[v.as]} />
-            {t(`clusterBackups.verdict.${v.as as "ok"}`)}
+            <StatusDot health={data.verdict.health} />
+            {t(`clusterBackups.verdict.${data.verdict.state as "ok"}`)}
           </p>
           {good ? (
             <p className="pl-4 type-meta text-muted-foreground">
