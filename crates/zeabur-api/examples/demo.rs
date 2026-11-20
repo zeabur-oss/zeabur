@@ -396,7 +396,8 @@ fn docs_build() -> [DynamicObject; 2] {
             json!({})
         } else if failed {
             json!({"conditions": [{"type": "Ready", "status": "False", "reason": "BuildFailed",
-                "message": "railpack: no start command found"}]})
+                "message": "railpack: no start command found",
+                "lastTransitionTime": "2026-10-23T08:01:00Z"}]})
         } else {
             json!({})
         }
@@ -434,8 +435,10 @@ fn storefront_build() -> DynamicObject {
             "output": {"image": "zot.zot.svc:5000/lab/storefront"}},
         "status": {"latestImage": "zot.zot.svc:5000/lab/storefront:main-12-c81e4a0",
             "exposedPorts": ["3000/tcp"],
-            "conditions": [{"type": "SourceReady", "status": "True", "reason": "Git"},
-                {"type": "Ready", "status": "True", "reason": "Succeeded"}]}
+            "conditions": [{"type": "SourceReady", "status": "True", "reason": "Resolved",
+                    "lastTransitionTime": "2026-10-23T08:00:00Z"},
+                {"type": "Ready", "status": "True", "reason": "Succeeded",
+                    "lastTransitionTime": "2026-10-23T08:00:00Z"}]}
     }))
     .expect("a Build")
 }
@@ -465,8 +468,10 @@ fn checkout_build() -> Vec<DynamicObject> {
                 "output": {"image": "zot.zot.svc:5000/lab/checkout"}},
             "status": {"latestImage": "zot.zot.svc:5000/lab/checkout:main-1-5d41402",
                 "exposedPorts": ports,
-                "conditions": [{"type": "SourceReady", "status": "True", "reason": "Git"},
-                    {"type": "Ready", "status": "True", "reason": "Succeeded"}]}
+                "conditions": [{"type": "SourceReady", "status": "True", "reason": "Resolved",
+                        "lastTransitionTime": "2026-10-23T08:00:00Z"},
+                    {"type": "Ready", "status": "True", "reason": "Succeeded",
+                        "lastTransitionTime": "2026-10-23T08:00:00Z"}]}
         }))
         .expect("a Build"),
     ]
@@ -3001,8 +3006,10 @@ fn finish_builds(s: &mut State, now: Timestamp) {
             set_status(
                 build,
                 "conditions",
-                json!([{"type": "SourceReady", "status": "True", "reason": "Archive"},
-                    {"type": "Ready", "status": "True", "reason": "Succeeded"}]),
+                json!([{"type": "SourceReady", "status": "True", "reason": "Archive",
+                        "lastTransitionTime": now.to_string()},
+                    {"type": "Ready", "status": "True", "reason": "Succeeded",
+                        "lastTransitionTime": now.to_string()}]),
             );
         }
     }

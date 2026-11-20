@@ -14,6 +14,7 @@ workspace = true
 zeabur-model.workspace = true
 zeabur-kube.workspace = true
 k8s-openapi.workspace = true
+zeabur-builder-api.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 utoipa.workspace = true

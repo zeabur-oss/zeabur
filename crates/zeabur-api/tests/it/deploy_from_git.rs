@@ -301,7 +301,7 @@ mod tests {
             build["metadata"]["namespace"] = json!("shop");
             if run_phase == Some("Failed") {
                 build["status"] = json!({"conditions": [{"type": "Ready", "status": "False",
-                    "reason": "BuildFailed"}]});
+                    "reason": "BuildFailed", "lastTransitionTime": "2026-10-23T08:00:00Z"}]});
             }
             if let Some(status) = build_status {
                 build["status"] = status.clone();
@@ -313,7 +313,8 @@ mod tests {
                         "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "BuildRun",
                         "metadata": {"name": "site-x1", "namespace": "shop",
                             "creationTimestamp": "2026-10-23T08:00:00Z"},
-                        "spec": {"buildRef": "site"},
+                        "spec": {"buildRef": "site",
+                            "revision": "1ce75d01b6978863647da42557a707a479da3a51"},
                         "status": {"phase": phase}
                     }))
                     .unwrap(),
@@ -362,8 +363,10 @@ mod tests {
                 &json!({"uploadToken": {"request": "u1", "secretName": "site-upload",
                     "expiresAt": "2026-10-23T08:15:00Z"},
                 "conditions": [
-                    {"type": "SourceReady", "status": "False", "reason": "WaitingForUpload"},
-                    {"type": "Ready", "status": "False", "reason": "SourceNotReady"}]}),
+                    {"type": "SourceReady", "status": "False", "reason": "WaitingForUpload",
+                        "lastTransitionTime": "2026-10-23T08:00:00Z"},
+                    {"type": "Ready", "status": "False", "reason": "NotBuilt",
+                        "lastTransitionTime": "2026-10-23T08:00:00Z"}]}),
             ),
         );
         cluster.update(|s| {
@@ -383,10 +386,12 @@ mod tests {
 
     fn source_not_ready(reason: &str, since: &str) -> Value {
         json!({"conditions": [
-            {"type": "BuilderReady", "status": "True", "reason": "Found"},
+            {"type": "BuilderReady", "status": "True", "reason": "Found",
+                "lastTransitionTime": "2026-10-23T08:00:00Z"},
             {"type": "SourceReady", "status": "False", "reason": reason,
                 "message": "no branch or tag `main`", "lastTransitionTime": since},
-            {"type": "Ready", "status": "Unknown", "reason": "NotBuilt"}]})
+            {"type": "Ready", "status": "Unknown", "reason": "NotBuilt",
+                "lastTransitionTime": "2026-10-23T08:00:00Z"}]})
     }
 
     /// A ref that cannot be resolved never builds: the service fails with the build at once, and
@@ -449,8 +454,10 @@ mod tests {
                         "state": {"running": {"startedAt": "2026-10-23T08:00:00Z"}}}]}
             }))
             .unwrap();
-            let mut conditions =
-                vec![json!({"type": "Ready", "status": "True", "reason": "Built"})];
+            let mut conditions = vec![
+                json!({"type": "Ready", "status": "True", "reason": "Succeeded",
+                    "lastTransitionTime": "2026-10-23T08:00:00Z"}),
+            ];
             if let Some((reason, since)) = problem {
                 conditions.push(
                     json!({"type": "SourceReady", "status": "False", "reason": reason,

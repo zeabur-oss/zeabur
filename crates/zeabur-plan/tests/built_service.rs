@@ -442,4 +442,80 @@ mod tests {
             "invalid_token"
         );
     }
+
+    /// The whole `Build` a service from an uploaded folder makes. `triggers` and `concurrency`
+    /// hold the values the `Build`'s schema defaults them to.
+    #[test]
+    fn an_uploaded_folder_makes_this_build() {
+        let mut change = service();
+        change.method = BuildMethod::Dockerfile;
+        change.directory = Some("apps/web".to_owned());
+        change.dockerfile = Some("Dockerfile.prod".to_owned());
+        change.build_variables = vec![NameValue {
+            name: "NPM_TOKEN".to_owned(),
+            value: "s3cret".to_owned(),
+        }];
+        let build = created(&planned(change, Some("zot:5000"), None).unwrap(), "Build").unwrap();
+        assert_eq!(
+            build,
+            json!({
+                "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+                "metadata": {"name": "site", "namespace": "shop",
+                    "labels": {"app.kubernetes.io/name": "site"},
+                    "annotations": {"builder.zeabur.com/upload-token-request": "up-1"}},
+                "spec": {"builderRef": "dockerfile",
+                    "source": {"archive": {"contextDir": "apps/web",
+                        "dockerfile": "Dockerfile.prod"}},
+                    "output": {"image": "zot:5000/shop/site"},
+                    "env": [{"name": "NPM_TOKEN", "valueFrom": {"secretKeyRef":
+                        {"name": "site-build-env", "key": "NPM_TOKEN"}}}],
+                    "notify": [{"type": "keel",
+                        "url": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"}],
+                    "triggers": {}, "concurrency": "Replace"}
+            })
+        );
+    }
+
+    /// The whole `Build` a service from a Git repository makes, with a token and with the GitHub
+    /// App.
+    #[test]
+    fn a_git_repository_makes_this_build() {
+        let build = |access: GitAccess, branch: Option<&str>| {
+            let mut change = git();
+            change.access = access;
+            change.branch = branch.map(str::to_owned);
+            created(&git_plan(change).unwrap(), "Build").unwrap()
+        };
+        let expected = |source: Value| {
+            json!({
+                "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+                "metadata": {"name": "site", "namespace": "shop",
+                    "labels": {"app.kubernetes.io/name": "site"}},
+                "spec": {"builderRef": "railpack", "source": source,
+                    "output": {"image": "zot:5000/shop/site"},
+                    "notify": [{"type": "keel",
+                        "url": "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"}],
+                    "triggers": {}, "concurrency": "Replace"}
+            })
+        };
+        let token = GitAccess::Token {
+            username: "x-access-token".to_owned(),
+            token: "ghp_1".to_owned(),
+        };
+        assert_eq!(
+            build(token, Some("main")),
+            expected(json!({
+                "git": {"url": "https://github.com/acme/site.git", "ref": "main"},
+                "credentialsRef": {"name": "site-git"}}))
+        );
+        let app = GitAccess::GithubApp {
+            installation_id: 42,
+        };
+        assert_eq!(
+            build(app, None),
+            expected(json!({
+                "git": {"url": "https://github.com/acme/site.git", "ref": "HEAD"},
+                "githubApp": {"installationId": 42}}))
+        );
+    }
 }
