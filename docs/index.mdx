@@ -1,19 +1,19 @@
 ---
 title: Get started with Zeabur
-description: Start managing services on an existing Kubernetes cluster.
+description: Install Zeabur on a new server or an existing Kubernetes cluster, then manage your services with it.
 ---
 
 Use Zeabur to see the services, logs, and domains in your Kubernetes cluster. When you change a setting, **Review changes** comes before anything is applied. Pick the starting point that matches your environment.
 
 ## Start with one server
 
-Installing Zeabur on a bare server comes back with Zeatend. Until then, install Zeabur on a cluster you already have.
+On a new Linux server, Zeatend sets up Kubernetes, then one `helm install` adds Zeabur.
 
 [Install Zeabur on a server](get-started/quickstart.mdx)
 
 ## Use an existing Kubernetes cluster
 
-You need cluster admin access, Helm, and a Zeabur Identity that kube-apiserver already trusts. The Zeabur address must open over HTTPS so the browser offers passkeys.
+You need cluster admin access and Helm. The same `helm install` adds Zeabur Identity, which handles sign-in. The Zeabur address must open over HTTPS so the browser offers passkeys.
 
 When the install finishes, sign in to Zeabur with a passkey, then find an existing Namespace under **Projects** or add a project to deploy services.
 

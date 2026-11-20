@@ -53,14 +53,14 @@ sudo /var/lib/rancher/rke2/bin/kubectl \
 | 项目的 `zeabur.com/project` 标签和显示信息 | 保留，不影响工作负载运行 |
 | 成员的 RoleBinding／ClusterRoleBinding | `helm uninstall` 会保留，需要自行删除 |
 | `zeabur-s3-destinations` | Chart 标记为保留的 Namespace，已添加的目的地和密钥留在其中 |
-| Zeabur Identity | 只移除 Zeabur 时会保留，用户和其他 OAuth client 继续留在原 Namespace |
+| Zeabur Identity | `helm uninstall` 会移除 Identity 的服务器。账号和通行密钥留在 `zeabur-identity` Namespace，重新安装时会继续使用。见[同时移除 Zeabur Identity](#同时移除-zeabur-identity) |
 
 备份使用的密钥已复制到各备份所在的 Namespace，运行时不会再读取 S3 目的地列表。删除列表不会撤销这些密钥，也不会删除远程备份。
 
 维护页和自定义错误页在项目内有自己的工作负载、Service 和配置。移除 Zeabur 不会把维护中的域名自动切回应用。需要恢复流量时，先按[维护模式](../configure/maintenance.mdx)完成切换。
 
 <Callout type="warn">
-保留服务时，不要运行 `k3s-uninstall.sh` 或 `rke2-uninstall.sh`，不要删除项目 Namespace、PVC 或 operator 的 CRD，也不要同时卸载 ingress、cert-manager、存储和数据库 operator。这些操作会停止服务，或移除数据和后续运维所需的组件。
+保留服务时，不要运行 `zeatend uninstall`、`k3s-uninstall.sh` 或 `rke2-uninstall.sh`，不要删除项目 Namespace、PVC 或 operator 的 CRD，也不要同时卸载 ingress、cert-manager、存储和数据库 operator。这些操作会停止服务，或移除数据和后续运维所需的组件。
 </Callout>
 
 ## 移除管理界面
@@ -83,7 +83,7 @@ kubectl get deployments,services,ingresses,configmaps,secrets --namespace zeabur
 helm uninstall zeabur --namespace zeabur --wait
 ```
 
-Chart 管理的 Deployment、Service、Ingress／HTTPRoute、ServiceAccount、生成的变更密钥和可选的 Proxy 都会移除，成员角色和 Namespace 准入策略也会移除。Zeabur 运行时创建的成员 binding 不属于 chart，会保留下来，删除方式见[成员权限和准入策略](#成员权限和准入策略)。
+Chart 管理的 Deployment、Service、Ingress／HTTPRoute、ServiceAccount、生成的变更密钥和可选的 Proxy 都会移除，成员角色、Namespace 准入策略和 chart 安装的 Zeabur Identity 服务器也会移除。Zeabur 运行时创建的成员 binding 不属于 chart，会保留下来，删除方式见[成员权限和准入策略](#成员权限和准入策略)。
 
 你预先创建的 OAuth client 机密变量、外部指定的变更密钥或 CA 配置文件不属于 chart，会保留。通过界面创建的 `zeabur-settings` 配置文件也不会随 chart 卸载。先检查这些对象是否仍有用途，再逐一删除。不需要为了移除界面而删除整个 Namespace。
 
@@ -160,22 +160,29 @@ kubectl delete namespace zeabur-s3-destinations
 
 ## 同时移除 Zeabur Identity
 
-如果其他 client、用户 kubeconfig 或自动化仍在使用 Zeabur Identity，先保留 Identity。把这些登录来源迁到替代认证系统，确认不依赖 Identity 也能管理集群后，再按当初安装 Identity 的来源移除。卸载 Zeabur chart 不会移除 Identity 的 OAuth client 或 Kubernetes API 的 issuer 配置。
+`helm uninstall` 已经移除了 chart 安装的 Zeabur Identity 服务器，账号和通行密钥还留在 `zeabur-identity` Namespace。如果其他 client、用户 kubeconfig 或自动化仍用 Zeabur Identity 登录，先把它们迁到其他登录系统，确认不依赖 Identity 也能管理集群。然后删除账号和通行密钥：
+
+```sh
+kubectl delete namespace zeabur-identity
+```
+
+删除后无法恢复。kube-apiserver 的认证配置里仍保留着 Zeabur Identity 的 issuer，需要自己移除。在用 Zeatend 装好的服务器上，这份配置是 `/etc/zeatend/config.yaml` 中的 `apiServer.authenticationConfig`。
+
+如果你用 `identity.enabled=false` 保留了自己的 Zeabur Identity，按当初安装的来源移除。
 
 ## 不再使用整个集群时
 
-要保留服务，就停在前面的流程。确定不再使用整个 K3s 或 RKE2 集群，且重要数据已备份、还原所需凭证已另行保存后，才在主机上运行：
+要保留服务，就停在前面的流程。确定不再使用整个集群，且重要数据已备份、还原所需凭证已另行保存后，才在服务器上运行：
 
 ```sh
-sudo /usr/local/bin/k3s-uninstall.sh    # K3s
-sudo /usr/local/bin/rke2-uninstall.sh   # RKE2
+sudo zeatend uninstall
 ```
 
-K3s 或 RKE2 的脚本会移除 Kubernetes 和数据，所有依赖 Kubernetes 的工作负载都会停止。
+命令会先列出要移除和保留的内容，确认后才开始。它会移除 K3s、RKE2 或 KubeSolo 和数据，以及 Zeatend 写入的文件，集群上所有工作负载都会停止。用 zeabur-installer 安装的服务器也由 Zeatend 接管，同样用这条命令。集群是你自己装的，就用发行版自带的卸载脚本，例如 `k3s-uninstall.sh`。
 
-脚本不会删除 `/var/lib/zeabur/storage` 中的 local-path 数据和 `/var/lib/longhorn` 中的 replica 数据。即使保留原始数据目录，也仍需要对应的 PV／PVC 和存储系统信息，才能重新接入服务。确认已有可还原的备份后，再决定如何处理这些目录。
+不加 `--delete-volumes` 时，`zeatend uninstall` 会保留 `/var/lib/zeabur/storage` 中的 local-path 数据和 `/var/lib/longhorn` 中的 replica 数据。即使保留原始数据目录，也仍需要对应的 PV／PVC 和存储系统信息，才能重新接入服务。确认已有可还原的备份后，再决定如何处理这些目录。
 
-只需要移除一台已加入的节点时，按[移除节点](../cluster/nodes.mdx#移除节点)的步骤，用 kubectl 迁移副本并删除节点，再到那台 VM 上卸载。如果服务仍需使用该节点的 local-path 数据，不要直接让节点退出集群。
+只需要移除一台已加入的节点时，按[移除节点](../cluster/nodes.mdx#移除节点)的步骤，用 kubectl 迁移副本并删除节点，再到那台 VM 上运行 `sudo zeatend uninstall`。如果服务仍需使用该节点的 local-path 数据，不要直接让节点退出集群。
 
 ## 移除未完成时
 

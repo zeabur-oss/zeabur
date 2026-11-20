@@ -1,6 +1,6 @@
 ---
 title: 升級 Zeabur
-description: 查看目前的 Zeabur 版本，依安裝方式用 Helm、Argo CD、Flux 或 zeaburctl 升級，並在升級後確認新版本。
+description: 查看目前的 Zeabur 版本，依安裝方式用 Helm、Argo CD、Flux 或 zeaburctl 升級，用 Zeatend 升級 Kubernetes，並在升級後確認新版本。
 ---
 
 先看你是怎麼安裝的，再照該段升級。升級不會自動發生，Zeabur 只會告訴你有新版本。
@@ -31,6 +31,8 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 `--reset-then-reuse-values` 會先採用新版 chart 的預設值，包括映像檔，再套用你先前設定的值。用 `--reuse-values` 的話，映像檔會停在舊版。
 
+在用 [Zeatend](../install/one-command.mdx) 裝好的伺服器上，和安裝時一樣在伺服器上執行：先 `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`，再執行 `sudo -E helm upgrade …` 和 `sudo k3s kubectl -n zeabur rollout status deployment/zeabur`。
+
 ## 用 Argo CD 升級
 
 把 Argo CD Application 裡的 chart 版本改成新版，再同步。Argo CD 不連叢集就產生 manifest，所以要事先建立固定的簽章金鑰並設定 `planKey.existingSecret`，做法見[用 GitOps 管理 chart](../install/existing-cluster.mdx#用-gitops-管理-chart)。
@@ -42,6 +44,22 @@ kubectl -n zeabur rollout status deployment/zeabur
 ## 用 zeaburctl ui 升級
 
 Zeabur 跑在你自己的電腦上，沒有伺服器要升級。到[發行檔與驗證](../reference/releases.mdx)下載新版 `zeaburctl`，驗證後取代舊檔，再執行一次 `zeaburctl ui`。
+
+## 用 Zeatend 升級 Kubernetes
+
+在用 Zeatend 裝好的伺服器上，K3s、RKE2 或 KubeSolo 由 Zeatend 升級，和 Zeabur 分開。每一版 Zeatend 都固定安裝一個版本，所以換上新版 Zeatend，Kubernetes 也會跟著更新。
+
+1. 在伺服器上照 [Zeatend 的 README](https://github.com/zeabur-oss/zeatend#download-zeatend) 下載新版 Zeatend。
+2. 執行 `sudo zeatend plan`，看會升到哪一版和主機檢查的結果。這一步不會改動任何東西。
+3. 執行 `sudo zeatend apply`。
+
+`apply` 會裝上新版本，再重新啟動 K3s、RKE2 或 KubeSolo。Kubernetes API 會有一小段時間沒有回應，執行中的服務照常運作。有多個節點時，先一台一台升級伺服器，再升級工作節點。
+
+Kubernetes 一次只能升一個小版本。新版本跳得更遠時，`plan` 會在改動任何東西之前停下，並寫出要先套用哪一版。把那一版寫進 `/etc/zeatend/config.yaml` 的 `version`，執行 `apply`，再刪掉 `version`，執行一次 `apply`。
+
+### 用 zeabur-installer 裝的伺服器
+
+Zeatend 可以直接接手這些伺服器。沒有 `/etc/zeatend/config.yaml` 時，Zeatend 會讀 `/etc/zeabur-installer/config.yaml`，安裝程式關掉的元件也會繼續關著。下載 Zeatend 後，一樣執行 `plan` 和 `apply`。Zeatend 不會更動 Zeabur 本身；要升級 Zeabur，先讀[升級須知](notes.mdx)。
 
 ## 升級後
 

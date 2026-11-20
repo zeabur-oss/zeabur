@@ -18,14 +18,24 @@ description: 加入新節點，停止排程，用 kubectl 移走副本與移除�
 | 方向 | K3s | RKE2 |
 | --- | --- | --- |
 | 連到伺服器 | TCP 6443（[限制來源](../reference/security.mdx#kubernetes-api)） | TCP 9345、6443 |
-| 所有節點之間 | TCP 10250，UDP 4789（Calico VXLAN） | TCP 10250、9099，UDP 8472（Canal VXLAN） |
+| 所有節點之間 | TCP 10250，UDP 8472（flannel VXLAN） | TCP 10250、9099，UDP 8472（Canal VXLAN） |
 | 伺服器之間 | 不用 | TCP 2379–2381 |
 
-UDP 連接埠只對叢集節點開放，不要對網際網路開放。防火牆擋住 UDP 時，不同節點上的副本會連不到彼此。
+用 zeabur-installer 裝的 K3s 叢集使用 Calico，UDP 連接埠是 4789，不是 8472。UDP 連接埠只對叢集節點開放，不要對網際網路開放。防火牆擋住 UDP 時，不同節點上的副本會連不到彼此。
 
 ## 加入節點
 
-Zeabur 不負責加入節點。照你所用發行版自己的步驟，把新 VM 加進來：K3s 加工作節點，RKE2 加工作節點或伺服器。先開好上面的防火牆連接埠。節點在**節點**清單顯示 `Ready` 後，新的副本就能排到它上面。
+Zeabur 不負責加入節點；用 Zeatend 裝好的叢集，由 Zeatend 加入。先開好上面的防火牆連接埠，再到伺服器執行：
+
+```sh
+sudo zeatend node add
+```
+
+指令會印出一份含加入權杖的設定，以及要在新 VM 執行的指令。RKE2 要加伺服器而不是工作節點時，加上 `--role server`。在新 VM 上先[下載 Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend)，再以 root 執行印出來的指令。`zeatend plan` 會檢查連接埠和到伺服器的距離，`zeatend apply` 會讓 VM 加入叢集，並等節點變成 `Ready`。
+
+工作節點的權杖一小時內有效，可以用 `--ttl` 調整。節點 `Ready` 後，用 `node add` 印出的最後一行指令撤銷權杖。RKE2 伺服器拿到的是叢集的伺服器權杖，不會過期，不要貼到聊天室或工單裡。
+
+不是用 Zeatend 裝的叢集，照發行版自己的步驟把 VM 加進來。節點在**節點**清單顯示 `Ready` 後，新的副本就能排到它上面。
 
 RKE2 的 etcd 需要過半數的伺服器才能運作。要在少一台時繼續運作，至少要三台伺服器。只有兩台時，任一台停機整個叢集就會停擺。K3s 叢集只有一台伺服器，這台停機時控制平面也會停止，伺服器回來後才會恢復。
 
@@ -101,16 +111,17 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 kubectl delete node <node>
 ```
 
-接著登入移除的那台 VM，以 `root` 執行叢集對應的移除腳本，再執行 `--purge`：
+接著登入移除的那台 VM，執行：
 
 ```sh
-/usr/local/bin/k3s-agent-uninstall.sh   # K3s
-/usr/local/bin/rke2-uninstall.sh        # RKE2
+sudo zeatend uninstall
 ```
+
+節點不是用 Zeatend 加入的，就改用發行版的解除安裝腳本，例如 `k3s-agent-uninstall.sh`。
 
 **刪除 Kubernetes 節點後，還要完成 VM 上的解除安裝**。在執行解除安裝前，只要 `k3s-agent` 或 RKE2 重新啟動，這台 VM 就會再次加入叢集。
 
-`/var/lib/zeabur/storage` 底下的磁碟區會留在 VM 上。確認不再需要這些資料後，再手動刪除。
+`/var/lib/zeabur/storage` 底下的磁碟區會留在 VM 上。確認不再需要這些資料後，再加上 `--delete-volumes`。
 
 如果叢集使用 Longhorn，Longhorn 會替已刪除的節點留著節點資料。節點上還有副本時，Longhorn 不會讓你刪除。請先確認每個磁碟區在其他節點都有健康的副本，再執行：
 
@@ -134,8 +145,8 @@ kubectl -n longhorn-system delete nodes.longhorn.io <node>
 
 ## 常見失敗
 
-- 加入時連不到伺服器：確認新 VM 連得到伺服器的位址。K3s 要通 TCP 6443，RKE2 要通 TCP 9345 和 6443，上面表格的其他連接埠也要開。
-- 新節點已就緒，但不同節點上的服務連不到彼此：檢查 UDP 4789（K3s）或 8472（RKE2），以及網路政策是否已放行新節點。
+- 加入時連不到伺服器：在新 VM 執行 `sudo zeatend plan`，它會逐一檢查連接埠。K3s 要通 TCP 6443，RKE2 要通 TCP 9345 和 6443，上面表格的其他連接埠也要開。
+- 新節點已就緒，但不同節點上的服務連不到彼此：檢查 UDP 8472（用 zeabur-installer 裝的 K3s 叢集是 4789），以及網路政策是否已放行新節點。
 - `drain` 一直停著：`drain` 在等 PodDisruptionBudget 放行，或停在不屬於任何控制器的副本上。用 `kubectl get pdb -A` 看哪個預算擋住了，處理後再執行一次。
 - 副本在新節點 `Pending`：副本用的是舊節點的 `local-path` 磁碟區，要等舊節點回來。
 - 終端機副本**無法啟動**：看該副本的事件，常見原因是映像檔下載失敗。

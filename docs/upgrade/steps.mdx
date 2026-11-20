@@ -1,6 +1,6 @@
 ---
 title: Upgrade Zeabur
-description: See which Zeabur version you run, upgrade with Helm, Argo CD, Flux or zeaburctl, and confirm the new version afterwards.
+description: See which Zeabur version you run, upgrade with Helm, Argo CD, Flux or zeaburctl, upgrade Kubernetes with Zeatend, and confirm the new version afterwards.
 ---
 
 Find how you installed Zeabur, then follow that section. Nothing upgrades on its own. Zeabur only tells you when a newer version is out.
@@ -31,6 +31,8 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 With `--reset-then-reuse-values`, Helm starts from the new chart's defaults, including the image, then applies the values you set. With `--reuse-values`, the image stays on the old version.
 
+On a server you set up with [Zeatend](../install/one-command.mdx), run the commands on the server, as in the install: `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml` first, then `sudo -E helm upgrade …` and `sudo k3s kubectl -n zeabur rollout status deployment/zeabur`.
+
 ## Upgrade with Argo CD
 
 Change the chart version in your Argo CD Application, then sync. Argo CD generates manifests without connecting to the cluster, so create a fixed signing key beforehand and set `planKey.existingSecret`. See [Manage the chart with GitOps](../install/existing-cluster.mdx#manage-the-chart-with-gitops).
@@ -42,6 +44,22 @@ Change the chart version in your Flux HelmRelease, commit it, and wait for Flux 
 ## Upgrade with zeaburctl ui
 
 Zeabur runs on your own computer, so there is no server to upgrade. Download the new `zeaburctl` from [Release files and verification](../reference/releases.mdx), verify it, replace the old file, and run `zeaburctl ui` again.
+
+## Upgrade Kubernetes with Zeatend
+
+On a server you set up with Zeatend, Zeatend upgrades K3s, RKE2 or KubeSolo, apart from Zeabur. Each Zeatend version installs one release that it names, so a newer Zeatend brings a newer Kubernetes.
+
+1. On the server, download the new Zeatend as [Zeatend's README](https://github.com/zeabur-oss/zeatend#download-zeatend) shows.
+2. Run `sudo zeatend plan` to see the release it moves to and the host checks. It changes nothing.
+3. Run `sudo zeatend apply`.
+
+`apply` installs the new release and restarts K3s, RKE2 or KubeSolo. The Kubernetes API stops answering for a short time, and running services keep serving. With more than one node, upgrade the servers first, one at a time, then the workers.
+
+Kubernetes moves up one minor version at a time. When the new release is further ahead, `plan` stops before it changes anything and names the release to apply first. Set that release as `version` in `/etc/zeatend/config.yaml`, run `apply`, then remove `version` and run `apply` again.
+
+### A server that zeabur-installer set up
+
+Zeatend takes over these servers as they are. With no `/etc/zeatend/config.yaml`, it reads `/etc/zeabur-installer/config.yaml`, and it keeps off the components the installer turned off. Download Zeatend and run the same `plan` and `apply`. Zeatend doesn't change Zeabur itself; to upgrade Zeabur, read the [upgrade notes](notes.mdx) first.
 
 ## After you upgrade
 
