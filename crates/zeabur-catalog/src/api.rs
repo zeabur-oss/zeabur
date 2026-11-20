@@ -213,6 +213,15 @@ pub struct Release {
     /// The manifests of an inline release, as YAML.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub manifests: Option<String>,
+    /// The manifests of a manifest release: URLs, with `{version}` for `version`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub urls: Vec<String>,
+    /// The `sha256:<hex>` digest of each URL's file, in the order of `urls`.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub url_digests: Vec<String>,
+    /// CRDs, as `plural.group`: when every one exists, the release is not installed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub skip_if_present: Vec<String>,
 }
 
 impl Release {
@@ -220,6 +229,20 @@ impl Release {
     #[must_use]
     pub fn helm_name(&self) -> &str {
         self.helm.as_deref().unwrap_or(&self.name)
+    }
+
+    /// The URLs of a manifest release, with `{version}` replaced.
+    #[expect(
+        clippy::literal_string_with_formatting_args,
+        reason = "`{version}` is the catalog's URL placeholder, not a format argument"
+    )]
+    #[must_use]
+    pub fn manifest_urls(&self) -> Vec<String> {
+        let version = self.version.as_deref().unwrap_or_default();
+        self.urls
+            .iter()
+            .map(|u| u.replace("{version}", version))
+            .collect()
     }
 }
 

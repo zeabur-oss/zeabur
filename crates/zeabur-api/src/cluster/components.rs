@@ -6,18 +6,22 @@
 //! | `POST /api/v1/cluster/components/{id}/apply` | writes the next step whose earlier steps are ready, and answers with each write's result and the plan |
 //!
 //! An install is the steps of [`zeabur_catalog::engine::install`]: each release's objects,
-//! server-side applied with field manager `zeabur` and never forced, so a field someone else owns
-//! fails the write and names them. A release often needs the one before it (cert-manager's
-//! `ClusterIssuers` need its CRDs), so `apply` writes one step at a time, with a dry run first,
-//! and the page calls it again until every step and health check is ready. The server keeps
-//! nothing between calls, and calling `apply` again writes the same objects, which changes
-//! nothing.
+//! with the files of manifest releases downloaded and checked by
+//! [`super::catalog::Catalog::manifests`], server-side applied with field manager `zeabur` and
+//! never forced, so a field someone else owns fails the write and names them. A release often needs
+//! the one before it (cert-manager's `ClusterIssuers` need its CRDs), so `apply` writes one step at
+//! a time, with a dry run first, and the page calls it again until every step and health check is
+//! ready. The server keeps nothing between calls, and calling `apply` again writes the same
+//! objects, which changes nothing. A release with `skipIfPresent` is left out when every CRD it
+//! lists exists and Zeabur did not write it.
 //!
-//! A removal deletes, in reverse order, the objects Zeabur wrote, except namespaces: deleting a
-//! `HelmChart` makes helm-controller uninstall its release, and what the catalog lists as
-//! `leftovers` stays. It is refused while a component that another tool or Zeabur installed needs
-//! this one, while objects of its custom resources exist outside its namespaces, or while volumes
-//! use its CSI drivers [installers].
+//! A removal deletes, in reverse order, the objects Zeabur wrote, except namespaces and CRDs:
+//! deleting a `HelmChart` makes helm-controller uninstall its release, and what the catalog lists
+//! as `leftovers` stays. Deleting a CRD deletes every object of its kind, including ones a person
+//! or another component made, so the CRDs Zeabur wrote are added to the leftovers. It is refused
+//! while a component that another tool or Zeabur installed needs this one, while objects of its
+//! custom resources exist outside its namespaces, or while volumes use its CSI drivers
+//! [installers].
 //!
 //! Every route is refused unless the person may do everything everywhere: writing a `HelmChart`
 //! makes helm-controller run Helm as a cluster administrator.
@@ -33,13 +37,14 @@ use utoipa::ToSchema;
 use zeabur_catalog::InstallSource;
 use zeabur_catalog::api::{ComponentFile, Snapshot};
 use zeabur_catalog::engine::{
-    self, CHART_NAMESPACE, COMPONENT, Desired, HelmChart, MANAGED_BY, MANAGED_BY_ZEABUR, Progress,
-    Refusal, Target,
+    self, CHART_NAMESPACE, COMPONENT, Desired, HelmChart, MANAGED_BY, MANAGED_BY_ZEABUR, Manifests,
+    Progress, Refusal, Target,
 };
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::Resource as _;
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
 use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, PersistentVolume};
+use zeabur_kube::k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{
@@ -48,6 +53,7 @@ use zeabur_kube::{
 };
 use zeabur_model::PodSecurityLevel;
 
+use super::catalog::Catalog;
 use super::node_shells::{require_admin, send, yaml};
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
@@ -395,6 +401,7 @@ struct PlannedStep {
 /// What a plan is made against.
 struct World {
     snapshot: Arc<Snapshot>,
+    catalog: Arc<Catalog>,
     served: Vec<ServedResource>,
     profile: &'static str,
     distribution: Option<&'static str>,
@@ -477,6 +484,7 @@ impl World {
             .map_or_else(|| "linux/amd64".to_owned(), |arch| format!("linux/{arch}"));
         Ok(Self {
             snapshot,
+            catalog: Arc::clone(&state.catalog),
             served,
             profile: zeabur_catalog::profile(&facts),
             distribution: zeabur_catalog::distribution(&facts),
@@ -529,8 +537,7 @@ impl World {
                 ),
             )));
         }
-        let install =
-            engine::install(&self.snapshot, id, &self.target()).map_err(|r| refusal(&r))?;
+        let install = self.engine_install(cluster, id).await?;
         let mut steps = Vec::new();
         let mut placed_steps = Vec::new();
         let mut managed = BTreeSet::new();
@@ -694,10 +701,13 @@ impl World {
             )));
         }
         let version = &self.snapshot.index.catalog.version;
-        let own = engine::steps_of(file, version, self.profile).map_err(|r| refusal(&r))?;
+        let manifests = self.manifests([file]).await?;
+        let own =
+            engine::steps_of(file, version, self.profile, &manifests).map_err(|r| refusal(&r))?;
         let mut steps = Vec::new();
         let mut placed_steps = Vec::new();
         let mut zeaburs = false;
+        let mut leftovers = file.declaration.leftovers.clone();
         for step in own.iter().rev() {
             let mut writes = Vec::new();
             let mut placed = Vec::new();
@@ -712,6 +722,16 @@ impl World {
                 let found = read(cluster, &target)
                     .await?
                     .filter(|o| ours(&o.metadata, id));
+                if target.kind == CustomResourceDefinition::KIND {
+                    if found.is_some() {
+                        leftovers.push(format!(
+                            "{}/{}",
+                            CustomResourceDefinition::URL_PATH_SEGMENT,
+                            target.name
+                        ));
+                    }
+                    continue;
+                }
                 zeaburs |= found.is_some();
                 progress.push(match &found {
                     None => Progress::Ready,
@@ -730,6 +750,9 @@ impl World {
                     target,
                     body: None,
                 });
+            }
+            if writes.is_empty() {
+                continue;
             }
             let (state, message) = combine(&progress);
             steps.push(ComponentStep {
@@ -753,11 +776,47 @@ impl World {
                 steps,
                 checks: Vec::new(),
                 warnings: Vec::new(),
-                leftovers: file.declaration.leftovers.clone(),
+                leftovers,
             },
             objects: placed_steps,
             zeaburs,
         })
+    }
+
+    /// The engine's install of `id`, with the files of its manifest releases, without the
+    /// steps whose `skipIfPresent` CRDs the cluster has.
+    async fn engine_install(
+        &self,
+        cluster: &dyn Cluster,
+        id: &str,
+    ) -> Result<engine::Install, ApiError> {
+        let order =
+            engine::components(&self.snapshot, id, &self.target()).map_err(|r| refusal(&r))?;
+        let manifests = self
+            .manifests(order.iter().filter_map(|c| self.snapshot.components.get(c)))
+            .await?;
+        let mut install = engine::install(&self.snapshot, id, &self.target(), &manifests)
+            .map_err(|r| refusal(&r))?;
+        let mut kept = Vec::new();
+        for step in install.steps {
+            if !skipped(cluster, &step).await? {
+                kept.push(step);
+            }
+        }
+        install.steps = kept;
+        Ok(install)
+    }
+
+    /// The files of the manifest releases of `files`.
+    async fn manifests(
+        &self,
+        files: impl IntoIterator<Item = &ComponentFile>,
+    ) -> Result<Manifests, ApiError> {
+        let mut downloads = Vec::new();
+        for file in files {
+            downloads.extend(engine::downloads(file).map_err(|r| refusal(&r))?);
+        }
+        self.catalog.manifests(downloads).await
     }
 
     /// Refuses a removal while objects of the component's custom resources are in use, or volumes
@@ -1053,6 +1112,27 @@ fn keep_looser_level(desired: &mut ObjectMeta, found: &ObjectMeta) {
 }
 
 /// Whether Zeabur wrote the object for `component`.
+/// Whether every CRD of the step's `skipIfPresent` exists and Zeabur did not write it for the
+/// component: the cluster already has what the release installs.
+async fn skipped(cluster: &dyn Cluster, step: &engine::Step) -> Result<bool, ApiError> {
+    if step.skip_if_present.is_empty() {
+        return Ok(false);
+    }
+    let resource = ResourceRef::of::<CustomResourceDefinition>();
+    for name in &step.skip_if_present {
+        let found = cluster
+            .find_object(&resource, None, name)
+            .await
+            .map_err(|e| {
+                ApiError::from(e.into_problem(&format!("CustomResourceDefinition {name}")))
+            })?;
+        if found.is_none_or(|o| ours(&o.metadata, &step.component)) {
+            return Ok(false);
+        }
+    }
+    Ok(true)
+}
+
 fn ours(metadata: &ObjectMeta, component: &str) -> bool {
     metadata.labels.as_ref().is_some_and(|l| {
         l.get(COMPONENT).is_some_and(|c| c == component)

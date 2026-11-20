@@ -11,6 +11,9 @@
 //! network still has the catalog, and replicas share it. On a person's computer there is no such
 //! account, and the snapshot lives in memory only.
 //!
+//! The files of manifest releases are downloaded when a plan needs them, checked against the
+//! catalog's `urlDigests`, and kept in memory by digest, as a file of one digest never changes.
+//!
 //! | Route | What it does |
 //! |---|---|
 //! | `GET /api/v1/cluster/catalog` | the catalog release Zeabur reads, when it was read, and why the last read failed |
@@ -24,7 +27,8 @@ use futures_util::future::BoxFuture;
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_catalog::api::{self, ApiError as CatalogError, ComponentFile, MAX_FILE, Snapshot};
-use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_catalog::engine::{self, Download, Manifests};
+use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
@@ -45,6 +49,10 @@ const FRESH: Duration = Duration::from_mins(10);
 const RETRY: Duration = Duration::from_mins(1);
 /// How long a failed first read waits before the next one: short, as there is nothing to serve.
 const RETRY_FIRST: Duration = Duration::from_secs(5);
+/// The largest manifest file Zeabur downloads; the Gateway API's is over 1 MiB.
+const MAX_MANIFEST: usize = 16 << 20;
+/// How many redirects a download follows; a GitHub release asset redirects once.
+const REDIRECTS: usize = 5;
 
 /// One answer of the API.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -64,6 +72,16 @@ pub enum Fetched {
 pub trait Fetch: Send + Sync {
     /// `GET url`, with `If-None-Match: etag` when there is one.
     fn get(&self, url: String, etag: Option<String>) -> BoxFuture<'_, Result<Fetched, String>>;
+
+    /// `GET url` of a manifest file: its body.
+    fn download(&self, url: String) -> BoxFuture<'_, Result<Vec<u8>, String>> {
+        Box::pin(async move {
+            match self.get(url.clone(), None).await? {
+                Fetched::Body { bytes, .. } => Ok(bytes),
+                Fetched::NotModified => Err(format!("{url} answered 304")),
+            }
+        })
+    }
 }
 
 /// [`Fetch`] over HTTPS.
@@ -95,6 +113,36 @@ impl Fetch for Https {
             }
         })
     }
+
+    /// Follows redirects to HTTPS URLs only.
+    fn download(&self, url: String) -> BoxFuture<'_, Result<Vec<u8>, String>> {
+        Box::pin(async move {
+            let mut url = url;
+            for _ in 0..=REDIRECTS {
+                if !url.starts_with("https://") {
+                    return Err(format!("{url} is not an HTTPS URL"));
+                }
+                let request = axum::http::Request::get(&url)
+                    .header(axum::http::header::USER_AGENT, "zeabur")
+                    .body(http_body_util::Full::default())
+                    .map_err(|e| e.to_string())?;
+                let (status, headers, bytes) =
+                    self.0.exchange_with_headers(request, MAX_MANIFEST).await?;
+                match status {
+                    200 => return Ok(bytes),
+                    301 | 302 | 303 | 307 | 308 => {
+                        url = headers
+                            .get(axum::http::header::LOCATION)
+                            .and_then(|v| v.to_str().ok())
+                            .ok_or_else(|| format!("{url} redirects without a Location"))?
+                            .to_owned();
+                    }
+                    _ => return Err(format!("{url} answered {status}")),
+                }
+            }
+            Err(format!("{url} redirects more than {REDIRECTS} times"))
+        })
+    }
 }
 
 /// The catalog, kept for every request.
@@ -104,6 +152,8 @@ pub struct Catalog {
     /// Zeabur's own service account and its namespace, which hold the cache.
     cache: Option<(Arc<dyn Cluster>, String)>,
     kept: tokio::sync::Mutex<Kept>,
+    /// The manifest files downloaded, by their hex SHA-256.
+    files: std::sync::Mutex<BTreeMap<String, Arc<str>>>,
 }
 
 impl std::fmt::Debug for Catalog {
@@ -156,7 +206,54 @@ impl Catalog {
                 error,
                 ..Kept::default()
             }),
+            files: std::sync::Mutex::default(),
         }
+    }
+
+    /// The files of `downloads`, each downloaded once and used only when its SHA-256 is the
+    /// catalog's.
+    ///
+    /// # Errors
+    ///
+    /// `503` when a file cannot be downloaded; `422` when its digest differs. Both name the URL.
+    pub async fn manifests(&self, downloads: Vec<Download>) -> Result<Manifests, ApiError> {
+        let mut manifests = Manifests::new();
+        for download in downloads {
+            let kept = self
+                .files
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(&download.sha256)
+                .cloned();
+            let text = if let Some(text) = kept {
+                text
+            } else {
+                let unavailable = |why: String| {
+                    Problem::new(
+                        Kind::Unavailable,
+                        format!("Zeabur cannot download {}: {why}", download.url),
+                    )
+                };
+                let fetch = self
+                    .fetch
+                    .as_ref()
+                    .ok_or_else(|| unavailable("it has no HTTPS client".to_owned()))?;
+                let bytes = fetch
+                    .download(download.url.clone())
+                    .await
+                    .map_err(unavailable)?;
+                let text: Arc<str> = engine::verify(&download, bytes)
+                    .map_err(|why| Problem::new(Kind::Invalid, why))?
+                    .into();
+                self.files
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .insert(download.sha256.clone(), Arc::clone(&text));
+                text
+            };
+            manifests.insert(download.url, text);
+        }
+        Ok(manifests)
     }
 
     /// The API's base URL, ending in `/`.
