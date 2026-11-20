@@ -301,7 +301,7 @@ paths:
       summary: |-
         Writes the next step of the plan whose earlier steps are ready, dry run first, and answers with
         each write's result and the plan after it. `409` when Zeabur has read another catalog release
-        than the plan's.
+        than the plan's; `422` while a required input has no value.
       operationId: applyComponent
       parameters:
       - name: id
@@ -349,7 +349,8 @@ paths:
         What installing or removing component `id` writes, and how far each step has come; writes
         nothing. `403` unless the person may do everything everywhere; `503` while Zeabur has never
         read the catalog; `409` when the component was installed by someone else, or another
-        component needs it; `422` when Zeabur cannot install it on this cluster.
+        component needs it; `422` when Zeabur cannot install it on this cluster, or a value is not of
+        its input's kind. A required input without a value is `missing` in the plan.
       operationId: planComponent
       parameters:
       - name: id
@@ -7391,6 +7392,13 @@ components:
             type: string
           propertyNames:
             type: string
+        unsupported:
+          oneOf:
+          - $ref: "#/components/schemas/Unsupported"
+            description: |-
+              What it uses that Zeabur cannot install yet, from the catalog release Zeabur read; absent
+              when Zeabur installs it, or has not read the catalog.
+          - type: "null"
     ComponentAction:
       type: string
       description: Install or remove.
@@ -7443,6 +7451,49 @@ components:
           type: integer
           format: int64
           description: How long it may take once every step is ready, in seconds.
+    ComponentInput:
+      type: object
+      description: An input of a component in the plan, with the value the plan writes.
+      required:
+      - component
+      - name
+      - description
+      - kind
+      - required
+      - generated
+      - state
+      properties:
+        component:
+          type: string
+          description: The component.
+        default:
+          oneOf:
+          - $ref: "#/components/schemas/InputValue"
+            description: The catalog's value when none is given.
+          - type: "null"
+        description:
+          type: string
+          description: What it is, in English, from the catalog.
+        generated:
+          type: boolean
+          description: Zeabur makes a random value when none is given or kept.
+        kind:
+          $ref: "#/components/schemas/InputKind"
+          description: How to ask for it.
+        name:
+          type: string
+          description: The input's name, the key in `values`.
+        required:
+          type: boolean
+          description: An install needs a value.
+        state:
+          $ref: "#/components/schemas/InputState"
+          description: Where the plan's value comes from.
+        value:
+          oneOf:
+          - $ref: "#/components/schemas/InputValue"
+            description: The value the plan writes; never for a Secret.
+          - type: "null"
     ComponentPlan:
       type: object
       description: What installing or removing a component writes, and how far it has come.
@@ -7453,6 +7504,7 @@ components:
       - steps
       - checks
       - warnings
+      - inputs
       - leftovers
       - done
       properties:
@@ -7475,6 +7527,13 @@ components:
         done:
           type: boolean
           description: Every step and check is ready.
+        inputs:
+          type: array
+          items:
+            $ref: "#/components/schemas/ComponentInput"
+          description: |-
+            The inputs of the components it installs, in order; none for a removal. `apply` refuses
+            while one is `missing`.
         leftovers:
           type: array
           items:
@@ -7523,6 +7582,20 @@ components:
           description: |-
             For `apply`: the catalog release the plan was made from; `409` when Zeabur has read
             another since.
+        values:
+          type: object
+          description: |-
+            For an install: the values of inputs, by component and then by input name. Send the same
+            to `plan` and to every `apply`; an input left out keeps the value an earlier install
+            wrote, and an empty text is no value.
+          additionalProperties:
+            type: object
+            additionalProperties:
+              $ref: "#/components/schemas/InputValue"
+            propertyNames:
+              type: string
+          propertyNames:
+            type: string
     ComponentStep:
       type: object
       description: "One step: a release's objects."
@@ -11178,6 +11251,14 @@ components:
       - appProtocol
       - name
       - protocol
+    InputKind:
+      type: string
+      description: How a form asks for an input.
+      enum:
+      - text
+      - flag
+      - integer
+      - secret
     InputLocale:
       type: object
       description: An input's words in one language.
@@ -11191,6 +11272,26 @@ components:
         label:
           type: string
           description: A short name for the field.
+    InputState:
+      type: string
+      description: Where an input's value comes from.
+      enum:
+      - given
+      - kept
+      - default
+      - generated
+      - empty
+      - missing
+    InputValue:
+      oneOf:
+      - type: boolean
+        description: "`true` or `false`."
+      - type: integer
+        format: int64
+        description: A whole number.
+      - type: string
+        description: Text.
+      description: "An input's value: the catalog's `default`, or what a person gives."
     InspectRequest:
       type: object
       description: The image to read.
@@ -19287,6 +19388,12 @@ components:
         resource:
           type: string
           description: The resource (`secrets`, `deployments.apps`, …).
+    Unsupported:
+      type: string
+      description: What a component uses that Zeabur cannot install yet.
+      enum:
+      - contributes
+      - newerRelease
     UpgradeExtensions:
       type: object
       description: What integrations add to the cluster's upgrades, one member per module.

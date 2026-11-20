@@ -1,0 +1,154 @@
+{
+  "id": "tailscale-operator",
+  "sourceDigest": "h1:1Vio02sPXLqIiV9uBsAU8KetuhapDN/s7bAFcrXtcgc=",
+  "declaration": {
+    "apiVersion": "catalog.zeabur.com/v1",
+    "defaults": {
+      "multi-node": "optional",
+      "single-node": "optional"
+    },
+    "detection": {
+      "crds": [
+        "proxyclasses.tailscale.com",
+        "connectors.tailscale.com"
+      ],
+      "helmCharts": [
+        "tailscale-operator"
+      ],
+      "ingressControllers": [
+        "tailscale.com/ts-ingress"
+      ]
+    },
+    "distributions": [
+      "k3s",
+      "rke2",
+      "kubesolo"
+    ],
+    "inputs": [
+      {
+        "description": "The operator uses the Tailscale OAuth client with this ID. The client needs write scope for Services, Devices Core and Auth Keys, and the tag tag:k8s-operator. The tailnet policy must make tag:k8s-operator an owner of tag:k8s, the proxies' default tag.\n",
+        "name": "oauthClientId",
+        "required": true,
+        "secret": {
+          "key": "client_id",
+          "name": "operator-oauth",
+          "namespace": "tailscale"
+        },
+        "testValue": "catalog-ci"
+      },
+      {
+        "description": "The operator authenticates with this OAuth client secret.",
+        "name": "oauthClientSecret",
+        "required": true,
+        "secret": {
+          "key": "client_secret",
+          "name": "operator-oauth",
+          "namespace": "tailscale"
+        },
+        "testValue": "catalog-ci"
+      }
+    ],
+    "kind": "Component",
+    "kubeVersion": "\u003e=1.34.0-0",
+    "metadata": {
+      "homepage": "https://tailscale.com/kb/1236/kubernetes-operator",
+      "license": "BSD-3-Clause",
+      "locales": {
+        "zh-CN": {
+          "summary": "把服务放到你的 tailnet 上，提供受信任的 HTTPS，无需对互联网开放端口。"
+        },
+        "zh-TW": {
+          "summary": "把服務放上你的 tailnet，提供受信任的 HTTPS，不必對網際網路開放連接埠。"
+        }
+      },
+      "name": "Tailscale Kubernetes operator",
+      "summary": "Puts services on your tailnet with trusted HTTPS and no port open to the internet."
+    },
+    "provides": {
+      "capability": "remote-access"
+    },
+    "releases": [
+      {
+        "chart": "tailscale-operator",
+        "chartDigest": "sha256:971ff11ecc285613cd29d6f48a8ada180d7bdf716ac3301a1e663837f6419998",
+        "name": "tailscale-operator",
+        "namespace": "tailscale",
+        "profiles": {
+          "multi-node": "operatorConfig:\n  resources:\n    # More Services and Ingresses to reconcile.\n    requests: {cpu: 50m, memory: 128Mi}\n    limits: {memory: 512Mi}\n",
+          "single-node": "operatorConfig:\n  resources:\n    # Chart sets none; one controller and one tailnet node.\n    requests: {cpu: 20m, memory: 64Mi}\n    limits: {memory: 256Mi}\n"
+        },
+        "repo": "https://pkgs.tailscale.com/helmcharts",
+        "type": "helm",
+        "values": "oauth:\n  # Empty, so the chart renders no Secret; the operator mounts\n  # operator-oauth, created from the inputs before install.\n  clientId: \"\"\n  clientSecret: \"\"\noperatorConfig:\n  image:\n    # Pinned by digest; a tag alone can move. Always pulls on every restart.\n    repository: tailscale/k8s-operator\n    tag: v1.104.4@sha256:68fc0aa4e1c3d7ba19ca41c0bc27f17b2a5a8dca6c10efcdd18020a6bf97768d\n    pullPolicy: IfNotPresent\nproxyConfig:\n  # The proxies the operator creates, pinned by digest.\n  image:\n    repository: tailscale/tailscale\n    tag: v1.104.4@sha256:ed6480b33c6eb67c9cbd203ed42b9fb57e361986725b6856def71b7a3d9e276c\napiServerProxyConfig:\n  # No Kubernetes API proxy and no impersonation ClusterRole.\n  mode: \"false\"\n  allowImpersonation: \"false\"\n",
+        "version": "1.104.4"
+      }
+    ],
+    "security": {
+      "podSecurity": "privileged",
+      "summary": "Creates, updates and deletes Services and Ingresses (and their status) in every namespace; reads nodes and EndpointSlices; manages ValidatingAdmissionPolicies and their bindings. In its own namespace it manages Secrets, ConfigMaps, ServiceAccounts, StatefulSets, Deployments, Roles and RoleBindings. Installs eight CRDs (connectors, dnsconfigs, peerrelays, proxyclasses, proxygrouppolicies, proxygroups, recorders, tailnets) and the IngressClass tailscale.\n"
+    },
+    "smoke": [
+      {
+        "name": "crds-established",
+        "wait": [
+          "crd/proxyclasses.tailscale.com --for=condition=Established",
+          "crd/connectors.tailscale.com --for=condition=Established"
+        ]
+      }
+    ]
+  },
+  "render": {
+    "kubernetesVersion": "1.37.0",
+    "profiles": {
+      "multi-node": {
+        "workloads": [
+          {
+            "release": "tailscale-operator",
+            "namespace": "tailscale",
+            "name": "operator",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "operator",
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "128Mi"
+                },
+                "limits": {
+                  "memory": "512Mi"
+                }
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      },
+      "single-node": {
+        "workloads": [
+          {
+            "release": "tailscale-operator",
+            "namespace": "tailscale",
+            "name": "operator",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "operator",
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "64Mi"
+                },
+                "limits": {
+                  "memory": "256Mi"
+                }
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      }
+    }
+  },
+  "measurements": []
+}

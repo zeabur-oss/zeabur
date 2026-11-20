@@ -1108,6 +1108,16 @@ export type BuildSettings = {
 }
 
 /**
+ * What a component uses that Zeabur cannot install yet.
+ */
+export type Unsupported = (typeof Unsupported)[keyof typeof Unsupported]
+
+export const Unsupported = {
+  contributes: "contributes",
+  newerRelease: "newerRelease",
+} as const
+
+/**
  * Whether the catalogue installs it by default, per profile (`single-node`, `multi-node`):
  * `recommended` or `optional`.
  */
@@ -1145,6 +1155,7 @@ export type Component = {
    * `en` is always there.
    */
   summary: ComponentSummary
+  unsupported?: Unsupported | null
 }
 
 /**
@@ -4055,6 +4066,59 @@ export type ComponentCheck = {
 }
 
 /**
+ * An input's value: the catalog's `default`, or what a person gives.
+ */
+export type InputValue = boolean | number | string
+
+/**
+ * How a form asks for an input.
+ */
+export type InputKind = (typeof InputKind)[keyof typeof InputKind]
+
+export const InputKind = {
+  text: "text",
+  flag: "flag",
+  integer: "integer",
+  secret: "secret",
+} as const
+
+/**
+ * Where an input's value comes from.
+ */
+export type InputState = (typeof InputState)[keyof typeof InputState]
+
+export const InputState = {
+  given: "given",
+  kept: "kept",
+  default: "default",
+  generated: "generated",
+  empty: "empty",
+  missing: "missing",
+} as const
+
+/**
+ * An input of a component in the plan, with the value the plan writes.
+ */
+export type ComponentInput = {
+  /** The component. */
+  component: string
+  default?: InputValue | null
+  /** What it is, in English, from the catalog. */
+  description: string
+  /** Zeabur makes a random value when none is given or kept. */
+  generated: boolean
+  /** How to ask for it. */
+  kind: InputKind
+  /** The input's name, the key in `values`. */
+  name: string
+  /** An install needs a value. */
+  required: boolean
+  /** Where the plan's value comes from. */
+  state: InputState
+  value?: InputValue | null
+}
+
+/**
  * One write of a step.
  */
 export type ObjectWrite = {
@@ -4125,6 +4189,11 @@ export type ComponentPlan = {
   /** Every step and check is ready. */
   done: boolean
   /**
+   * The inputs of the components it installs, in order; none for a removal. `apply` refuses
+   * while one is `missing`.
+   */
+  inputs: ComponentInput[]
+  /**
    * What a removal leaves, as the catalog lists it (`customresourcedefinitions`,
    * `secrets/<name>`).
    */
@@ -4176,6 +4245,13 @@ export type ComponentApplied = {
 }
 
 /**
+ * For an install: the values of inputs, by component and then by input name. Send the same
+ * to `plan` and to every `apply`; an input left out keeps the value an earlier install
+ * wrote, and an empty text is no value.
+ */
+export type ComponentRequestValues = { [key: string]: { [key: string]: InputValue } }
+
+/**
  * What to plan.
  */
 export type ComponentRequest = {
@@ -4187,6 +4263,12 @@ export type ComponentRequest = {
    * @nullable
    */
   catalogVersion?: string | null
+  /**
+   * For an install: the values of inputs, by component and then by input name. Send the same
+   * to `plan` and to every `apply`; an input left out keeps the value an earlier install
+   * wrote, and an empty text is no value.
+   */
+  values?: ComponentRequestValues
 }
 
 /**
@@ -11733,7 +11815,7 @@ export const getApplyComponentUrl = (id: string) => {
 /**
  * @summary Writes the next step of the plan whose earlier steps are ready, dry run first, and answers with
 each write's result and the plan after it. `409` when Zeabur has read another catalog release
-than the plan's.
+than the plan's; `422` while a required input has no value.
  */
 export const applyComponent = async (
   id: string,
@@ -11775,7 +11857,8 @@ export const getPlanComponentUrl = (id: string) => {
  * @summary What installing or removing component `id` writes, and how far each step has come; writes
 nothing. `403` unless the person may do everything everywhere; `503` while Zeabur has never
 read the catalog; `409` when the component was installed by someone else, or another
-component needs it; `422` when Zeabur cannot install it on this cluster.
+component needs it; `422` when Zeabur cannot install it on this cluster, or a value is not of
+its input's kind. A required input without a value is `missing` in the plan.
  */
 export const planComponent = async (
   id: string,

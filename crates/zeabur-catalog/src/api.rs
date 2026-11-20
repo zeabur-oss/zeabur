@@ -16,9 +16,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read as _, Write as _};
 
 use serde::{Deserialize, Serialize};
+use utoipa::ToSchema;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_model::PodSecurityLevel;
 use zeabur_model::kernel::dns::is_dns_label;
+
+use crate::templates::Encoding;
 
 /// Where the API is when no mirror is set.
 pub const DEFAULT_URL: &str = "https://oss-catalog.zeabur.com/v1/";
@@ -124,9 +127,9 @@ pub struct Declaration {
     /// CRDs of `detection.crds` whose objects it writes itself.
     #[serde(default, rename = "internalCRDs")]
     pub internal_crds: Vec<String>,
-    /// Values asked for or generated; Zeabur does not install a component that has any yet.
+    /// Values asked for or generated.
     #[serde(default)]
-    pub inputs: Vec<Named>,
+    pub inputs: Vec<Input>,
     /// Values it adds to other components' releases; Zeabur does not install a component that
     /// has any yet.
     #[serde(default)]
@@ -305,11 +308,100 @@ pub struct Detection {
     pub csi_drivers: Vec<String>,
 }
 
-/// An entry with a name, of a list Zeabur only counts.
+/// A value an installer asks for or generates [component-format].
+///
+/// [component-format]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/component-format.mdx
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Named {
-    /// Its name.
+#[serde(rename_all = "camelCase")]
+pub struct Input {
+    /// Its name, camelCase.
     pub name: String,
+    /// What it is, in English.
+    #[serde(default)]
+    pub description: String,
+    /// The release whose values take a `path` input; the first chart release when absent.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub release: Option<String>,
+    /// Where it goes in the release's values: a dotted path, where a number indexes a list.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub path: Option<String>,
+    /// The Secret key it is stored in, created before the install.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub secret: Option<SecretRef>,
+    /// How an installer makes it when it is not given.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub generate: Option<Generate>,
+    /// An install needs a value.
+    #[serde(default)]
+    pub required: bool,
+    /// The value when none is given.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub default: Option<InputValue>,
+}
+
+/// A key of a Secret.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SecretRef {
+    /// The Secret's name.
+    pub name: String,
+    /// The key.
+    pub key: String,
+    /// The Secret's namespace.
+    pub namespace: String,
+}
+
+/// How an installer makes an input's value.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type")]
+pub enum Generate {
+    /// `bytes` random bytes in `encoding`.
+    #[serde(rename = "random")]
+    Random {
+        /// How many, 12 to 64.
+        bytes: u8,
+        /// How they are written.
+        encoding: Encoding,
+    },
+    /// A free address in the cluster's Service CIDR.
+    #[serde(rename = "clusterIP")]
+    ClusterIp,
+    /// A way this build does not know: the input is not filled in.
+    #[serde(other)]
+    Unknown,
+}
+
+/// An input's value: the catalog's `default`, or what a person gives.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(untagged)]
+pub enum InputValue {
+    /// `true` or `false`.
+    Flag(bool),
+    /// A whole number.
+    Integer(i64),
+    /// Text.
+    Text(String),
+}
+
+impl InputValue {
+    /// The value in a chart's values.
+    #[must_use]
+    pub fn to_json(&self) -> serde_json::Value {
+        match self {
+            Self::Flag(b) => (*b).into(),
+            Self::Integer(i) => (*i).into(),
+            Self::Text(s) => s.clone().into(),
+        }
+    }
+
+    /// The value as a Secret stores it.
+    #[must_use]
+    pub fn text(&self) -> String {
+        match self {
+            Self::Flag(b) => b.to_string(),
+            Self::Integer(i) => i.to_string(),
+            Self::Text(s) => s.clone(),
+        }
+    }
 }
 
 /// Values a component adds to another's release.

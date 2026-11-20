@@ -227,6 +227,14 @@ pub(crate) async fn capabilities(
     }
     let mut capabilities = zeabur_catalog::detect(&state.catalogue, &facts);
     capabilities.sort_by(|a, b| a.name.cmp(&b.name));
+    if let Some(snapshot) = catalog::current(&state).await.snapshot {
+        for component in capabilities.iter_mut().flat_map(|c| &mut c.components) {
+            component.unsupported = snapshot
+                .components
+                .get(&component.id)
+                .and_then(zeabur_catalog::engine::unsupported);
+        }
+    }
     let installed = capabilities.iter().filter(|c| c.existing).count();
     let recommended = capabilities
         .iter()

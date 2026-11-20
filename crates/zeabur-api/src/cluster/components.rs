@@ -23,6 +23,13 @@
 //! custom resources exist outside its namespaces, or while volumes use its CSI drivers
 //! [installers].
 //!
+//! A component's inputs travel in `values`, the same in `plan` and every `apply`. `path` inputs go
+//! into their release's values, and the given ones are kept in the `catalog.zeabur.com/inputs`
+//! annotation of its `HelmChart`; `secret` inputs go into Secrets written before the release. A
+//! later plan reads both back, so an upgrade or a change of one value keeps the others, and a
+//! generated Secret key is never made again. A removal leaves the Secrets. A `HelmChart` or Secret
+//! that holds other content than the plan's is written again.
+//!
 //! Every route is refused unless the person may do everything everywhere: writing a `HelmChart`
 //! makes helm-controller run Helm as a cluster administrator.
 //!
@@ -35,18 +42,20 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_catalog::InstallSource;
-use zeabur_catalog::api::{ComponentFile, Snapshot};
+use zeabur_catalog::api::{ComponentFile, InputValue, ReleaseType, Snapshot};
 use zeabur_catalog::engine::{
-    self, CHART_NAMESPACE, COMPONENT, Desired, FIELD_MANAGER, HelmChart, MANAGED_BY,
-    MANAGED_BY_ZEABUR, Manifests, Progress, Refusal, Target,
+    self, CHART_NAMESPACE, COMPONENT, Desired, FIELD_MANAGER, HelmChart, INPUTS, InputKind,
+    InputState, Inputs, MANAGED_BY, MANAGED_BY_ZEABUR, Manifests, Progress, Refusal, Target,
+    Values,
 };
+use zeabur_core::message::Message;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::k8s_openapi::Resource as _;
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
-use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, PersistentVolume};
+use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, PersistentVolume, Secret};
 use zeabur_kube::k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::k8s_openapi::{ByteString, Resource as _};
 use zeabur_kube::{
     Cluster, ClusterExt, DynamicObject, ObjectTarget, Preconditions, ResourceRef, ServedResource,
     WriteBody,
@@ -82,6 +91,12 @@ pub struct ComponentRequest {
     /// another since.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catalog_version: Option<String>,
+    /// For an install: the values of inputs, by component and then by input name. Send the same
+    /// to `plan` and to every `apply`; an input left out keeps the value an earlier install
+    /// wrote, and an empty text is no value.
+    #[serde(default)]
+    #[schema(value_type = BTreeMap<String, BTreeMap<String, InputValue>>)]
+    pub values: Values,
 }
 
 /// How far a step or check has come.
@@ -202,6 +217,43 @@ pub enum ComponentWarning {
     },
 }
 
+/// An input of a component in the plan, with the value the plan writes.
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ComponentInput {
+    /// The component.
+    pub component: String,
+    /// The input's name, the key in `values`.
+    pub name: String,
+    /// What it is, in English, from the catalog.
+    pub description: String,
+    /// How to ask for it.
+    pub kind: InputKind,
+    /// An install needs a value.
+    pub required: bool,
+    /// The catalog's value when none is given.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub default: Option<InputValue>,
+    /// Zeabur makes a random value when none is given or kept.
+    pub generated: bool,
+    /// Where the plan's value comes from.
+    pub state: InputState,
+    /// The value the plan writes; never for a Secret.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub value: Option<InputValue>,
+}
+
+impl From<engine::Warning> for ComponentWarning {
+    fn from(warning: engine::Warning) -> Self {
+        match warning {
+            engine::Warning::Untested { component } => Self::Untested { component },
+            engine::Warning::Privileged { component, level } => {
+                Self::Privileged { component, level }
+            }
+        }
+    }
+}
+
 /// What installing or removing a component writes, and how far it has come.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -218,6 +270,9 @@ pub struct ComponentPlan {
     pub checks: Vec<ComponentCheck>,
     /// What to know.
     pub warnings: Vec<ComponentWarning>,
+    /// The inputs of the components it installs, in order; none for a removal. `apply` refuses
+    /// while one is `missing`.
+    pub inputs: Vec<ComponentInput>,
     /// What a removal leaves, as the catalog lists it (`customresourcedefinitions`,
     /// `secrets/<name>`).
     pub leftovers: Vec<String>,
@@ -231,12 +286,15 @@ struct Planned {
     plan: ComponentPlan,
     objects: Vec<Vec<Placed>>,
     zeaburs: bool,
+    /// The first required input without a value.
+    missing: Option<Refusal>,
 }
 
 /// What installing or removing component `id` writes, and how far each step has come; writes
 /// nothing. `403` unless the person may do everything everywhere; `503` while Zeabur has never
 /// read the catalog; `409` when the component was installed by someone else, or another
-/// component needs it; `422` when Zeabur cannot install it on this cluster.
+/// component needs it; `422` when Zeabur cannot install it on this cluster, or a value is not of
+/// its input's kind. A required input without a value is `missing` in the plan.
 #[utoipa::path(post, path = "/api/v1/cluster/components/{id}/plan", tag = "cluster",
     operation_id = "planComponent", request_body = ComponentRequest,
     params(("id" = String, Path)),
@@ -253,7 +311,7 @@ pub(crate) async fn plan(
 ) -> Result<Json<ComponentPlan>, ApiError> {
     require_admin(cluster.as_ref(), WHAT, WHY).await?;
     let world = World::read(&state, cluster.as_ref()).await?;
-    let Planned { plan, zeaburs, .. } = world.plan(cluster.as_ref(), &id, request.action).await?;
+    let Planned { plan, zeaburs, .. } = world.plan(cluster.as_ref(), &id, &request).await?;
     if request.action == ComponentAction::Remove && !zeaburs {
         return Err(ApiError::from(Problem::new(
             Kind::Conflict,
@@ -265,7 +323,7 @@ pub(crate) async fn plan(
 
 /// Writes the next step of the plan whose earlier steps are ready, dry run first, and answers with
 /// each write's result and the plan after it. `409` when Zeabur has read another catalog release
-/// than the plan's.
+/// than the plan's; `422` while a required input has no value.
 #[utoipa::path(post, path = "/api/v1/cluster/components/{id}/apply", tag = "cluster",
     operation_id = "applyComponent", request_body = ComponentRequest,
     params(("id" = String, Path)),
@@ -289,7 +347,15 @@ pub(crate) async fn apply(
             format!("Zeabur now reads Zeabur Catalog {version}. Review the plan again."),
         )));
     }
-    let Planned { plan, objects, .. } = world.plan(cluster.as_ref(), &id, request.action).await?;
+    let Planned {
+        plan,
+        objects,
+        missing,
+        ..
+    } = world.plan(cluster.as_ref(), &id, &request).await?;
+    if let Some(missing) = missing {
+        return Err(refusal(&missing));
+    }
     let next = plan
         .steps
         .iter()
@@ -355,10 +421,7 @@ pub(crate) async fn apply(
             }
         }
     }
-    let plan = world
-        .plan(cluster.as_ref(), &id, request.action)
-        .await?
-        .plan;
+    let plan = world.plan(cluster.as_ref(), &id, &request).await?.plan;
     Ok(Json(ComponentApplied { plan, written }))
 }
 
@@ -503,12 +566,68 @@ impl World {
         &self,
         cluster: &dyn Cluster,
         id: &str,
-        action: ComponentAction,
+        request: &ComponentRequest,
     ) -> Result<Planned, ApiError> {
-        match action {
-            ComponentAction::Install => self.install(cluster, id).await,
+        match request.action {
+            ComponentAction::Install => self.install(cluster, id, &request.values).await,
             ComponentAction::Remove => self.remove(cluster, id).await,
         }
+    }
+
+    /// The values earlier installs of `components` wrote: the `INPUTS` annotation of each
+    /// `HelmChart` and the keys of each Secret, where Zeabur wrote them for the component.
+    async fn kept(&self, cluster: &dyn Cluster, components: &[String]) -> Result<Values, ApiError> {
+        let mut kept = Values::new();
+        for id in components {
+            let Some(file) = self.snapshot.components.get(id) else {
+                continue;
+            };
+            let d = &file.declaration;
+            let first_chart = d.releases.iter().find(|r| r.kind == ReleaseType::Helm);
+            let mut charts = BTreeMap::new();
+            let mut secrets = BTreeMap::new();
+            for input in &d.inputs {
+                let value = if let Some(at) = &input.secret {
+                    let key = (at.namespace.clone(), at.name.clone());
+                    if !secrets.contains_key(&key) {
+                        let found = our_secret(cluster, &at.namespace, &at.name, id).await?;
+                        secrets.insert(key.clone(), found);
+                    }
+                    secrets
+                        .get(&key)
+                        .and_then(Option::as_ref)
+                        .and_then(|values| values.get(&at.key))
+                        .and_then(|b| String::from_utf8(b.clone()).ok())
+                        .map(InputValue::Text)
+                } else {
+                    let release = input.release.as_ref().map_or(first_chart, |name| {
+                        d.releases.iter().find(|r| &r.name == name)
+                    });
+                    let Some(release) = release else { continue };
+                    let name = release.helm_name().to_owned();
+                    if !charts.contains_key(&name) {
+                        let found = find::<HelmChart>(cluster, Some(CHART_NAMESPACE), &name, id)
+                            .await?
+                            .and_then(|c| c.metadata.annotations?.remove(INPUTS))
+                            .and_then(|text| {
+                                serde_json::from_str::<BTreeMap<String, InputValue>>(&text).ok()
+                            });
+                        charts.insert(name.clone(), found);
+                    }
+                    charts
+                        .get(&name)
+                        .and_then(Option::as_ref)
+                        .and_then(|values| values.get(&input.name))
+                        .cloned()
+                };
+                if let Some(value) = value {
+                    kept.entry(id.clone())
+                        .or_default()
+                        .insert(input.name.clone(), value);
+                }
+            }
+        }
+        Ok(kept)
     }
 
     fn target(&self) -> Target<'_> {
@@ -523,7 +642,12 @@ impl World {
         }
     }
 
-    async fn install(&self, cluster: &dyn Cluster, id: &str) -> Result<Planned, ApiError> {
+    async fn install(
+        &self,
+        cluster: &dyn Cluster,
+        id: &str,
+        given: &Values,
+    ) -> Result<Planned, ApiError> {
         if self
             .sources
             .get(id)
@@ -537,7 +661,8 @@ impl World {
                 ),
             )));
         }
-        let install = self.engine_install(cluster, id).await?;
+        let install = self.engine_install(cluster, id, given).await?;
+        let missing = install.missing();
         let mut steps = Vec::new();
         let mut placed_steps = Vec::new();
         let mut managed = BTreeSet::new();
@@ -596,16 +721,8 @@ impl World {
             checks.extend(self.checks(cluster, file, ready).await?);
         }
         let done = ready && checks.iter().all(|c| c.state == StepState::Ready);
-        let warnings = install
-            .warnings
-            .into_iter()
-            .map(|w| match w {
-                engine::Warning::Untested { component } => ComponentWarning::Untested { component },
-                engine::Warning::Privileged { component, level } => {
-                    ComponentWarning::Privileged { component, level }
-                }
-            })
-            .collect();
+        let inputs = install.inputs.iter().map(input_view).collect();
+        let warnings = install.warnings.into_iter().map(Into::into).collect();
         Ok(Planned {
             plan: ComponentPlan {
                 action: ComponentAction::Install,
@@ -614,11 +731,13 @@ impl World {
                 steps,
                 checks,
                 warnings,
+                inputs,
                 leftovers: Vec::new(),
                 done,
             },
             objects: placed_steps,
             zeaburs: !managed.is_empty(),
+            missing,
         })
     }
 
@@ -651,7 +770,23 @@ impl World {
             if let Some(namespace) = target.namespace() {
                 body.metadata.namespace = Some(namespace.to_owned());
             }
-            let found = read(cluster, &target).await?;
+            let mut found = read(cluster, &target).await?;
+            if target.kind == Secret::KIND
+                && let Some(found) = found.as_mut()
+                && let Some(namespace) = target.namespace()
+                && let Some(values) =
+                    our_secret(cluster, namespace, &target.name, &step.component).await?
+                && let Some(fields) = found.data.as_object_mut()
+            {
+                let values: BTreeMap<String, ByteString> = values
+                    .into_iter()
+                    .map(|(k, v)| (k, ByteString(v)))
+                    .collect();
+                fields.insert(
+                    "data".to_owned(),
+                    serde_json::to_value(values).unwrap_or_default(),
+                );
+            }
             if let Some(found) = &found {
                 if target.kind == Namespace::KIND {
                     keep_looser_level(&mut body.metadata, &found.metadata);
@@ -661,7 +796,10 @@ impl World {
                     foreign.get_or_insert_with(|| format!("{} {}", target.kind, target.name));
                 }
             }
-            progress.push(self.progress(cluster, &target, found.as_ref()).await?);
+            progress.push(match &found {
+                Some(found) if !engine::holds(&body, found) => Progress::Pending,
+                _ => self.progress(cluster, &target, found.as_ref()).await?,
+            });
             writes.push(view(&body, Some(&target), None));
             placed.push(Placed {
                 target,
@@ -702,12 +840,13 @@ impl World {
         }
         let version = &self.snapshot.index.catalog.version;
         let manifests = self.manifests([file]).await?;
-        let own =
-            engine::steps_of(file, version, self.profile, &manifests).map_err(|r| refusal(&r))?;
+        let own = engine::steps_of(file, version, self.profile, &manifests, &[])
+            .map_err(|r| refusal(&r))?;
         let mut steps = Vec::new();
         let mut placed_steps = Vec::new();
         let mut zeaburs = false;
         let mut leftovers = file.declaration.leftovers.clone();
+        leftovers.extend(engine::input_secrets(file));
         for step in own.iter().rev() {
             let mut writes = Vec::new();
             let mut placed = Vec::new();
@@ -776,27 +915,33 @@ impl World {
                 steps,
                 checks: Vec::new(),
                 warnings: Vec::new(),
+                inputs: Vec::new(),
                 leftovers,
             },
             objects: placed_steps,
             zeaburs,
+            missing: None,
         })
     }
 
-    /// The engine's install of `id`, with the files of its manifest releases. A step whose
+    /// The engine's install of `id` with `given` values over the kept ones, and the files of its
+    /// manifest releases. A step whose
     /// `skipIfPresent` CRDs the cluster has keeps only its namespaces: the engine writes each
     /// namespace in the first release that uses it, and later releases need it.
     async fn engine_install(
         &self,
         cluster: &dyn Cluster,
         id: &str,
+        given: &Values,
     ) -> Result<engine::Install, ApiError> {
-        let order =
-            engine::components(&self.snapshot, id, &self.target()).map_err(|r| refusal(&r))?;
+        let target = self.target();
+        let order = engine::components(&self.snapshot, id, &target).map_err(|r| refusal(&r))?;
+        let kept = self.kept(cluster, &order).await?;
         let manifests = self
             .manifests(order.iter().filter_map(|c| self.snapshot.components.get(c)))
             .await?;
-        let mut install = engine::install(&self.snapshot, id, &self.target(), &manifests)
+        let inputs = Inputs { given, kept: &kept };
+        let mut install = engine::install(&self.snapshot, id, &target, &manifests, inputs)
             .map_err(|r| refusal(&r))?;
         for step in &mut install.steps {
             if skipped(cluster, step).await? {
@@ -1064,17 +1209,19 @@ impl World {
     }
 }
 
-/// A step's state from its objects': failed, else pending, else waiting, else ready.
+/// A step's state from its objects': pending while one still needs a write, so changed values
+/// replace a failed release; else failed, else waiting, else ready.
 fn combine(progress: &[Progress]) -> (StepState, Option<String>) {
+    if progress.contains(&Progress::Pending) {
+        return (StepState::Pending, None);
+    }
     if let Some(message) = progress.iter().find_map(|p| match p {
         Progress::Failed(m) => Some(m.clone()),
         Progress::Pending | Progress::Waiting | Progress::Ready => None,
     }) {
         return (StepState::Failed, Some(message));
     }
-    let state = if progress.contains(&Progress::Pending) {
-        StepState::Pending
-    } else if progress.contains(&Progress::Waiting) {
+    let state = if progress.contains(&Progress::Waiting) {
         StepState::Waiting
     } else {
         StepState::Ready
@@ -1156,11 +1303,35 @@ fn kind(object: &DynamicObject) -> &str {
     object.types.as_ref().map_or("", |t| t.kind.as_str())
 }
 
+/// An input as the plan shows it: a Secret's value stays on the server.
+fn input_view(r: &engine::Resolved) -> ComponentInput {
+    ComponentInput {
+        component: r.component.clone(),
+        name: r.input.name.clone(),
+        description: r.input.description.trim().to_owned(),
+        kind: InputKind::of(&r.input),
+        required: r.input.required,
+        default: r.input.default.clone(),
+        generated: matches!(
+            r.input.generate,
+            Some(zeabur_catalog::api::Generate::Random { .. })
+        ),
+        state: r.state,
+        value: r.input.secret.is_none().then(|| r.value.clone()).flatten(),
+    }
+}
+
+/// What a step writes, as the review shows it: a Secret without its values.
 fn view(
     object: &DynamicObject,
     target: Option<&ObjectTarget>,
     namespace: Option<&str>,
 ) -> ObjectWrite {
+    let mut shown = object.clone();
+    if kind(object) == Secret::KIND {
+        shown.data.as_object_mut().map(|o| o.remove("data"));
+    }
+    let object = &shown;
     ObjectWrite {
         kind: kind(object).to_owned(),
         name: object.metadata.name.clone().unwrap_or_default(),
@@ -1173,6 +1344,69 @@ fn view(
     }
 }
 
+/// An object Zeabur wrote for `component`, typed; `None` when there is none.
+async fn find<
+    K: zeabur_kube::k8s_openapi::Resource
+        + zeabur_kube::k8s_openapi::Metadata<Ty = ObjectMeta>
+        + serde::de::DeserializeOwned,
+>(
+    cluster: &dyn Cluster,
+    namespace: Option<&str>,
+    name: &str,
+    component: &str,
+) -> Result<Option<K>, ApiError> {
+    let found = cluster
+        .find_object(&ResourceRef::of::<K>(), namespace, name)
+        .await
+        .map_err(|e| ApiError::from(e.into_problem(&format!("{} {name}", K::KIND))))?;
+    Ok(found
+        .filter(|o| ours(&o.metadata, component))
+        .and_then(|o| o.try_parse().ok()))
+}
+
+/// The values of the Secret Zeabur wrote for `component`, read only to keep them: Zeabur reads
+/// Secrets without their values otherwise.
+async fn our_secret(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    name: &str,
+    component: &str,
+) -> Result<Option<BTreeMap<String, Vec<u8>>>, ApiError> {
+    if find::<Secret>(cluster, Some(namespace), name, component)
+        .await?
+        .is_none()
+    {
+        return Ok(None);
+    }
+    cluster
+        .reveal_secret(namespace, name)
+        .await
+        .map(Some)
+        .map_err(|e| ApiError::from(e.into_problem(&format!("Secret {name}"))))
+}
+
+/// A refusal of the engine, with what to do about it in place of the kind's "correct the
+/// fields".
 fn refusal(refusal: &Refusal) -> ApiError {
-    ApiError::from(Problem::new(Kind::Invalid, refusal.to_string()))
+    let mut problem = Problem::new(Kind::Invalid, refusal.to_string());
+    let (fix, key) = match refusal {
+        Refusal::Unsupported { .. } => (
+            "Install it with Helm, Flux or Argo CD. `zeaburctl components export` prints what to apply."
+                .to_owned(),
+            Message::new("problem.invalid.fix.componentUnsupported"),
+        ),
+        Refusal::Missing { input, .. } | Refusal::WrongValue { input, .. } => (
+            format!("Fill in {input}, then review the plan again."),
+            Message::new("problem.invalid.fix.componentValue").with("input", input),
+        ),
+        Refusal::Unknown(_) | Refusal::NotHere { .. } | Refusal::NoProvider(_) => (
+            "Choose a component the catalog offers on this cluster.".to_owned(),
+            Message::new("problem.invalid.fix.componentElsewhere"),
+        ),
+        Refusal::Broken { .. } => {
+            return ApiError::from(Problem::new(Kind::Internal, refusal.to_string()));
+        }
+    };
+    problem.fix_for_occasion(fix, key);
+    ApiError::from(problem)
 }

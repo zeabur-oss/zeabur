@@ -6,6 +6,7 @@
 //! command asks for the plan and applies it, one step at a time, until every step and health
 //! check is ready, as the page does.
 
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Duration;
@@ -121,6 +122,7 @@ async fn install(api: &Api, id: &str) -> Result<(), String> {
         let request = ComponentRequest {
             action: ComponentAction::Install,
             catalog_version: None,
+            values: BTreeMap::new(),
         };
         let plan: ComponentPlan = api.post(&plan_path, &request).await.map_err(describe)?;
         match progress(&plan) {
@@ -285,7 +287,7 @@ mod tests {
             .collect();
         serde_json::from_value(json!({
             "action": "install", "catalogVersion": "0.5.3", "components": ["cert-manager"],
-            "steps": steps, "checks": checks, "warnings": [], "leftovers": [], "done": done,
+            "steps": steps, "checks": checks, "warnings": [], "inputs": [], "leftovers": [], "done": done,
         }))
         .unwrap()
     }
