@@ -16096,7 +16096,7 @@ components:
         freeCpu:
           type: integer
           format: int64
-          description: "What the nodes have left: millicores."
+          description: "What the nodes have left in total: millicores."
           minimum: 0
         freeMemory:
           type: integer
