@@ -10939,8 +10939,7 @@ components:
           type: boolean
           description: |-
             Keep plain values in the Secret `<name>-env` rather than in the Deployment. A value that
-            reads another variable with `$(…)` stays in the Deployment, as Kubernetes expands it only
-            there.
+            `expands` stays in the Deployment, as Kubernetes expands `$(…)` only there.
         security:
           $ref: "#/components/schemas/PodSecurityLevel"
           description: "`restricted`, or `baseline` for any other level."
@@ -17960,6 +17959,11 @@ components:
       required:
       - name
       properties:
+        expands:
+          type: boolean
+          description: |-
+            The value reads other variables with `$(…)`, so it stays in the Deployment, where
+            Kubernetes expands it. A value without this is literal, whatever it contains.
         name:
           type: string
           description: The variable's name.
