@@ -12,8 +12,9 @@ What is Zeabur's own. Commits and pull requests: `zeabur-workflow`.
   `docs/internal/crates.md`). Binaries: `zeabur` (in-cluster server) and `zeaburctl` (CLI: `ui`,
   `doctor`). Servers get their cluster from Zeatend (zeabur-oss/zeatend), not from this repo.
 - `zeabur-kube` is the only crate that talks to kube-apiserver, and only through clients bound to
-  a person's credential. Never build a client from Zeabur's service account token (the one
-  exception is tools pods in the terminal namespace, `zeabur_api::tools`), and never
+  a person's credential. Never build a client from Zeabur's service account token (the
+  exceptions are tools pods in the terminal namespace, `zeabur_api::tools`, and `zeabur components
+  install`, which acts as the service account of the chart's hook Job), and never
   impersonate.
 
 ## Checks (what CI runs)

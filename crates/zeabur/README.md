@@ -5,6 +5,14 @@ people in through Zeabur Identity. Every request to the cluster carries the toke
 it. Zeabur's own service account is used only for tools pods in the terminal namespace, after
 kube-apiserver says the person may run commands in the project's pods (see `zeabur_api::tools`).
 
+## Installing components
+
+`zeabur components install <id>…` does what **Cluster → Components** does, in the same process,
+as the pod's service account, which must be a cluster administrator. It waits for every step and
+health check, up to `--timeout` (default `10m`), and leaves a component that someone other than
+Zeabur installed as it is. The chart runs it in a `post-install` hook Job to install cert-manager.
+It reads `--catalog-url` (`ZEABUR_CATALOG_URL`) and `--extra-ca-file` (`ZEABUR_EXTRA_CA_FILE`).
+
 ## Configuration
 
 Flags, or the environment variable after each:
