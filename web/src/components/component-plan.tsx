@@ -446,9 +446,16 @@ function PlanBody({ plan, readySince }: { plan: Schemas.ComponentPlan; readySinc
       {plan.warnings.map((warning) => (
         <Alert key={`${warning.kind}/${warning.component}`} variant="warn" role="note">
           <AlertDescription>
-            {warning.kind === "untested"
-              ? t("components.untested", warning.component)
-              : t("components.privileged", warning.component, warning.level)}
+            {warning.kind === "untested" ? t("components.untested", warning.component) : null}
+            {warning.kind === "privileged"
+              ? t("components.privileged", warning.component, warning.level)
+              : null}
+            {warning.kind === "unchanged" ? (
+              <>
+                {t("components.unchanged", warning.component)}
+                <YamlBlock yaml={warning.values} label={warning.component} className="mt-2" />
+              </>
+            ) : null}
           </AlertDescription>
         </Alert>
       ))}

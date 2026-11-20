@@ -130,8 +130,7 @@ pub struct Declaration {
     /// Values asked for or generated.
     #[serde(default)]
     pub inputs: Vec<Input>,
-    /// Values it adds to other components' releases; Zeabur does not install a component that
-    /// has any yet.
+    /// Values it adds to other components' releases.
     #[serde(default)]
     pub contributes: Vec<Contribution>,
 }
@@ -407,15 +406,20 @@ impl InputValue {
 /// Values a component adds to another's release.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Contribution {
-    /// The other component.
+    /// The other component's release.
     pub target: ContributionTarget,
+    /// The values, as YAML.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub values: Option<String>,
 }
 
-/// The component values are added to.
+/// The release values are added to.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ContributionTarget {
-    /// Its id.
+    /// The component's id.
     pub component: String,
+    /// The release's name in its file.
+    pub release: String,
 }
 
 /// One e2e run of a component.

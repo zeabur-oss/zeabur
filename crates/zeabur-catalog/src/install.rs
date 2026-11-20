@@ -1248,18 +1248,24 @@ mod tests {
                 .map(|d| (d.url, "".into()))
                 .collect();
             for profile in PROFILES {
-                let mut written: Vec<Value> =
-                    engine::steps_of(&component, "", profile, &manifests, &[])
-                        .unwrap()
-                        .into_iter()
-                        .flat_map(|step| step.objects)
-                        .map(|desired| {
-                            let mut object = desired.object;
-                            object.metadata.annotations = None;
-                            serde_json::to_value(object).unwrap()
-                        })
-                        .filter(|o| o["kind"] == "HelmChart" || o["kind"] == "Namespace")
-                        .collect();
+                let mut written: Vec<Value> = engine::steps_of(
+                    &component,
+                    "",
+                    profile,
+                    &manifests,
+                    &[],
+                    &engine::Contributions::default(),
+                )
+                .unwrap()
+                .into_iter()
+                .flat_map(|step| step.objects)
+                .map(|desired| {
+                    let mut object = desired.object;
+                    object.metadata.annotations = None;
+                    serde_json::to_value(object).unwrap()
+                })
+                .filter(|o| o["kind"] == "HelmChart" || o["kind"] == "Namespace")
+                .collect();
                 let k3s = guide(id, profile)
                     .unwrap()
                     .formats

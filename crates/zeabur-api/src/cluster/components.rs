@@ -15,13 +15,17 @@
 //! objects, which changes nothing. A release with `skipIfPresent` is left out when every CRD it
 //! lists exists and Zeabur did not write it.
 //!
-//! A removal deletes, in reverse order, the objects Zeabur wrote, except namespaces and CRDs:
-//! deleting a `HelmChart` makes helm-controller uninstall its release, and what the catalog lists
-//! as `leftovers` stays. Deleting a CRD deletes every object of its kind, including ones a person
-//! or another component made, so the CRDs Zeabur wrote are added to the leftovers. It is refused
-//! while a component that another tool or Zeabur installed needs this one, while objects of its
-//! custom resources exist outside its namespaces, or while volumes use its CSI drivers
-//! [installers].
+//! A component that adds values to another's release writes that release again, as
+//! [`zeabur_catalog::engine`] describes. Zeabur never changes a `HelmChartConfig` it did not
+//! write: the plan warns, with the values to add, and leaves it as it is.
+//!
+//! A removal first writes again the releases the component added values to, then deletes, in
+//! reverse order, the objects Zeabur wrote, except namespaces and CRDs: deleting a `HelmChart`
+//! makes helm-controller uninstall its release, and what the catalog lists as `leftovers` stays.
+//! Deleting a CRD deletes every object of its kind, including ones a person or another component
+//! made, so the CRDs Zeabur wrote are added to the leftovers. It is refused while a component that
+//! another tool or Zeabur installed needs this one, while objects of its custom resources exist
+//! outside its namespaces, or while volumes use its CSI drivers [installers].
 //!
 //! A component's inputs travel in `values`, the same in `plan` and every `apply`. `path` inputs go
 //! into their release's values, and the given ones are kept in the `catalog.zeabur.com/inputs`
@@ -44,9 +48,9 @@ use utoipa::ToSchema;
 use zeabur_catalog::InstallSource;
 use zeabur_catalog::api::{ComponentFile, InputValue, ReleaseType, Snapshot};
 use zeabur_catalog::engine::{
-    self, CHART_NAMESPACE, COMPONENT, Desired, FIELD_MANAGER, HelmChart, INPUTS, InputKind,
-    InputState, Inputs, MANAGED_BY, MANAGED_BY_ZEABUR, Manifests, Progress, Refusal, Target,
-    Values,
+    self, CHART_NAMESPACE, COMPONENT, Desired, FIELD_MANAGER, HelmChart, HelmChartConfig, INPUTS,
+    InputKind, InputState, Inputs, MANAGED_BY, MANAGED_BY_ZEABUR, Manifests, Progress, Refusal,
+    Target, Values,
 };
 use zeabur_core::message::Message;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -215,6 +219,29 @@ pub enum ComponentWarning {
         /// `baseline` or `privileged`.
         level: PodSecurityLevel,
     },
+    /// Another tool installed or configured a component the install adds values to, so Zeabur
+    /// leaves it as it is.
+    #[serde(rename_all = "camelCase")]
+    Unchanged {
+        /// The component.
+        component: String,
+        /// The values to add to it, YAML.
+        values: String,
+    },
+}
+
+impl From<engine::Warning> for ComponentWarning {
+    fn from(warning: engine::Warning) -> Self {
+        match warning {
+            engine::Warning::Untested { component } => Self::Untested { component },
+            engine::Warning::Privileged { component, level } => {
+                Self::Privileged { component, level }
+            }
+            engine::Warning::Unchanged { component, values } => {
+                Self::Unchanged { component, values }
+            }
+        }
+    }
 }
 
 /// An input of a component in the plan, with the value the plan writes.
@@ -241,17 +268,6 @@ pub struct ComponentInput {
     /// The value the plan writes; never for a Secret.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub value: Option<InputValue>,
-}
-
-impl From<engine::Warning> for ComponentWarning {
-    fn from(warning: engine::Warning) -> Self {
-        match warning {
-            engine::Warning::Untested { component } => Self::Untested { component },
-            engine::Warning::Privileged { component, level } => {
-                Self::Privileged { component, level }
-            }
-        }
-    }
 }
 
 /// What installing or removing a component writes, and how far it has come.
@@ -385,26 +401,21 @@ pub(crate) async fn apply(
         (false, &rest),
     ] {
         for object in group {
-            let (body, verb) = match request.action {
-                ComponentAction::Install => {
-                    let Some(body) = &object.body else {
-                        continue;
-                    };
+            let (body, verb) = match (&object.body, &object.uid) {
+                (Some(body), _) => {
                     let body = serde_json::to_value(body)
                         .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e.to_string())))?;
                     (WriteBody::Apply(body), "patch")
                 }
-                ComponentAction::Remove => {
-                    let Some(uid) = object.uid.clone() else {
-                        continue;
-                    };
+                (None, Some(uid)) => {
                     let preconditions = Preconditions {
-                        uid: Some(uid),
+                        uid: Some(uid.clone()),
                         resource_version: object.resource_version.clone(),
                         ..Preconditions::default()
                     };
                     (WriteBody::Delete(preconditions), "delete")
                 }
+                (None, None) => continue,
             };
             let target = object.target.clone();
             let refused = right(verb, &target);
@@ -440,14 +451,14 @@ fn right(verb: &str, target: &ObjectTarget) -> Denied {
     }
 }
 
-/// One object of a step, as written or to delete.
+/// One object of a step, to apply or to delete.
 struct Placed {
     target: ObjectTarget,
-    /// For an install: the object to apply.
+    /// The object to apply.
     body: Option<DynamicObject>,
-    /// For a removal: the uid of the object found, `None` when it is gone.
+    /// Without `body`: the uid of the object to delete, `None` when it is gone.
     uid: Option<String>,
-    /// For a removal: the `resourceVersion` of the object found.
+    /// Without `body`: the `resourceVersion` of the object to delete.
     resource_version: Option<String>,
 }
 
@@ -479,6 +490,8 @@ struct World {
     sources: BTreeMap<String, InstallSource>,
     /// The components Zeabur wrote.
     written: BTreeSet<String>,
+    /// The components the distribution packages, with their `HelmChart` in `kube-system`.
+    packaged: BTreeMap<String, String>,
     helm_releases: BTreeSet<String>,
     now: Timestamp,
 }
@@ -520,6 +533,11 @@ impl World {
                     .map(|i| (i.component.clone(), i.source))
             })
             .collect();
+        let packaged = detected
+            .iter()
+            .flat_map(|c| &c.installations)
+            .filter_map(|i| Some((i.component.clone(), i.packaged_chart.clone()?)))
+            .collect();
         let written = engine::written(&facts).into_values().collect();
         let served = cluster
             .served_resources()
@@ -557,6 +575,7 @@ impl World {
             running,
             sources,
             written,
+            packaged,
             helm_releases: facts.helm_releases.clone(),
             now: (state.clock)(),
         })
@@ -639,6 +658,7 @@ impl World {
             capabilities: &self.capabilities,
             components: &self.running,
             written: &self.written,
+            packaged: &self.packaged,
         }
     }
 
@@ -666,11 +686,25 @@ impl World {
         let mut steps = Vec::new();
         let mut placed_steps = Vec::new();
         let mut managed = BTreeSet::new();
+        let mut warnings: Vec<ComponentWarning> = install
+            .warnings
+            .into_iter()
+            .map(ComponentWarning::from)
+            .collect();
         for step in &install.steps {
             let earlier_ready = steps
                 .iter()
                 .all(|s: &ComponentStep| s.state == StepState::Ready);
             let planned = self.install_step(cluster, step, earlier_ready).await?;
+            if planned.foreign.is_some()
+                && let Some(values) = config_values(step)
+            {
+                warnings.push(ComponentWarning::Unchanged {
+                    component: step.component.clone(),
+                    values,
+                });
+                continue;
+            }
             if let Some(object) = planned.foreign {
                 return Err(ApiError::from(Problem::new(
                     Kind::Conflict,
@@ -687,31 +721,7 @@ impl World {
             steps.push(planned.view);
             placed_steps.push(planned.placed);
         }
-        // A Helm release of the same name that no `HelmChart` of Zeabur's made: removing the
-        // chart would uninstall someone else's release.
-        let elsewhere = install.steps.iter().find(|step| {
-            let Some(file) = self.snapshot.components.get(&step.component) else {
-                return false;
-            };
-            !managed.contains(&step.component)
-                && file.declaration.releases.iter().any(|r| {
-                    r.name == step.release
-                        && self.helm_releases.contains(&format!(
-                            "{}/{}",
-                            r.namespace,
-                            r.helm_name()
-                        ))
-                })
-        });
-        if let Some(elsewhere) = elsewhere.map(|s| &s.component) {
-            return Err(ApiError::from(Problem::new(
-                Kind::Conflict,
-                format!(
-                    "{elsewhere} is already installed, and not by Zeabur. Zeabur does not change \
-                     a component it did not install."
-                ),
-            )));
-        }
+        self.refuse_releases_elsewhere(&install.steps, &managed)?;
         let ready = steps.iter().all(|s| s.state == StepState::Ready);
         let mut checks = Vec::new();
         for component in &install.components {
@@ -722,7 +732,6 @@ impl World {
         }
         let done = ready && checks.iter().all(|c| c.state == StepState::Ready);
         let inputs = install.inputs.iter().map(input_view).collect();
-        let warnings = install.warnings.into_iter().map(Into::into).collect();
         Ok(Planned {
             plan: ComponentPlan {
                 action: ComponentAction::Install,
@@ -739,6 +748,41 @@ impl World {
             zeaburs: !managed.is_empty(),
             missing,
         })
+    }
+
+    /// Refuses a Helm release of the same name that no `HelmChart` of Zeabur's made: removing the
+    /// chart would uninstall someone else's release.
+    fn refuse_releases_elsewhere(
+        &self,
+        steps: &[engine::Step],
+        managed: &BTreeSet<String>,
+    ) -> Result<(), ApiError> {
+        let elsewhere = steps.iter().find(|step| {
+            let Some(file) = self.snapshot.components.get(&step.component) else {
+                return false;
+            };
+            config_values(step).is_none()
+                && !managed.contains(&step.component)
+                && file.declaration.releases.iter().any(|r| {
+                    r.name == step.release
+                        && self.helm_releases.contains(&format!(
+                            "{}/{}",
+                            r.namespace,
+                            r.helm_name()
+                        ))
+                })
+        });
+        if let Some(step) = elsewhere {
+            return Err(ApiError::from(Problem::new(
+                Kind::Conflict,
+                format!(
+                    "{} is already installed, and not by Zeabur. Zeabur does not change a \
+                     component it did not install.",
+                    step.component
+                ),
+            )));
+        }
+        Ok(())
     }
 
     /// One step of an install: how far it has come, its objects, and whether Zeabur wrote one
@@ -786,6 +830,31 @@ impl World {
                     "data".to_owned(),
                     serde_json::to_value(values).unwrap_or_default(),
                 );
+            }
+            if target.kind == HelmChartConfig::KIND && config_values(step).is_none() {
+                // A config with no values is deleted, so none of Zeabur's stays empty.
+                let found = found.filter(|o| {
+                    let ours = ours(&o.metadata, &step.component);
+                    if !ours {
+                        foreign.get_or_insert_with(|| format!("{} {}", target.kind, target.name));
+                    }
+                    ours
+                });
+                zeaburs |= found.is_some();
+                progress.push(gone(found.as_ref()));
+                let mut write = view(&desired.object, Some(&target), None);
+                write.yaml = None;
+                writes.push(write);
+                let (uid, resource_version) = found.map_or((None, None), |o| {
+                    (o.metadata.uid, o.metadata.resource_version)
+                });
+                placed.push(Placed {
+                    target,
+                    body: None,
+                    uid,
+                    resource_version,
+                });
+                continue;
             }
             if let Some(found) = &found {
                 if target.kind == Namespace::KIND {
@@ -840,13 +909,18 @@ impl World {
         }
         let version = &self.snapshot.index.catalog.version;
         let manifests = self.manifests([file]).await?;
-        let own = engine::steps_of(file, version, self.profile, &manifests, &[])
+        let none = engine::Contributions::default();
+        let own = engine::steps_of(file, version, self.profile, &manifests, &[], &none)
             .map_err(|r| refusal(&r))?;
         let mut steps = Vec::new();
         let mut placed_steps = Vec::new();
         let mut zeaburs = false;
         let mut leftovers = file.declaration.leftovers.clone();
         leftovers.extend(engine::input_secrets(file));
+        for planned in self.rewrites_without(cluster, id).await? {
+            steps.push(planned.view);
+            placed_steps.push(planned.placed);
+        }
         for step in own.iter().rev() {
             let mut writes = Vec::new();
             let mut placed = Vec::new();
@@ -872,11 +946,7 @@ impl World {
                     continue;
                 }
                 zeaburs |= found.is_some();
-                progress.push(match &found {
-                    None => Progress::Ready,
-                    Some(o) if o.metadata.deletion_timestamp.is_some() => Progress::Waiting,
-                    Some(_) => Progress::Pending,
-                });
+                progress.push(gone(found.as_ref()));
                 let mut write = view(&desired.object, Some(&target), None);
                 write.yaml = None;
                 writes.push(write);
@@ -936,7 +1006,15 @@ impl World {
     ) -> Result<engine::Install, ApiError> {
         let target = self.target();
         let order = engine::components(&self.snapshot, id, &target).map_err(|r| refusal(&r))?;
-        let kept = self.kept(cluster, &order).await?;
+        // A contribution writes its target's chart again, with the target's kept values.
+        let written: Vec<String> = order
+            .iter()
+            .cloned()
+            .chain(self.targets(&order))
+            .collect::<BTreeSet<_>>()
+            .into_iter()
+            .collect();
+        let kept = self.kept(cluster, &written).await?;
         let manifests = self
             .manifests(order.iter().filter_map(|c| self.snapshot.components.get(c)))
             .await?;
@@ -962,6 +1040,38 @@ impl World {
             downloads.extend(engine::downloads(file).map_err(|r| refusal(&r))?);
         }
         self.catalog.manifests(downloads).await
+    }
+
+    /// The components that `ids` add values to.
+    fn targets(&self, ids: &[String]) -> Vec<String> {
+        ids.iter()
+            .filter_map(|id| self.snapshot.components.get(id))
+            .flat_map(|f| &f.declaration.contributes)
+            .map(|c| c.target.component.clone())
+            .collect()
+    }
+
+    /// The steps that write the targets of `id`'s contributions again without them. Zeabur
+    /// leaves a config it did not write as it is.
+    async fn rewrites_without(
+        &self,
+        cluster: &dyn Cluster,
+        id: &str,
+    ) -> Result<Vec<PlannedStep>, ApiError> {
+        let kept = self.kept(cluster, &self.targets(&[id.to_owned()])).await?;
+        let rewrites =
+            engine::without(&self.snapshot, id, &self.target(), &kept).map_err(|r| refusal(&r))?;
+        let mut planned_steps: Vec<PlannedStep> = Vec::new();
+        for step in &rewrites {
+            let earlier_ready = planned_steps
+                .iter()
+                .all(|s| s.view.state == StepState::Ready);
+            let planned = self.install_step(cluster, step, earlier_ready).await?;
+            if planned.foreign.is_none() {
+                planned_steps.push(planned);
+            }
+        }
+        Ok(planned_steps)
     }
 
     /// Refuses a removal while objects of the component's custom resources are in use, or volumes
@@ -1100,6 +1210,21 @@ impl World {
         let Some(found) = found else {
             return Ok(Progress::Pending);
         };
+        if target.kind == HelmChartConfig::KIND {
+            let resource = ResourceRef::of::<HelmChart>();
+            let chart = cluster
+                .find_object(&resource, Some(CHART_NAMESPACE), &target.name)
+                .await
+                .map_err(|e| ApiError::from(e.into_problem(&format!("HelmChart {}", target.name))))?
+                .and_then(|o| o.try_parse::<HelmChart>().ok())
+                .unwrap_or_default();
+            let job = self.job(cluster, &chart).await?;
+            return Ok(engine::config_progress(
+                &found.metadata,
+                &chart,
+                job.as_ref(),
+            ));
+        }
         if target.kind != HelmChart::KIND {
             let (group, _) = target
                 .api_version
@@ -1113,6 +1238,12 @@ impl World {
             ));
         }
         let chart: HelmChart = found.clone().try_parse().unwrap_or_default();
+        let job = self.job(cluster, &chart).await?;
+        Ok(engine::chart_progress(&chart, job.as_ref()))
+    }
+
+    /// The Job a `HelmChart`'s status names.
+    async fn job(&self, cluster: &dyn Cluster, chart: &HelmChart) -> Result<Option<Job>, ApiError> {
         let job_name = chart.status.as_ref().and_then(|s| s.job_name.clone());
         let job = match job_name {
             Some(name) => {
@@ -1125,7 +1256,7 @@ impl World {
             }
             None => None,
         };
-        Ok(engine::chart_progress(&chart, job.as_ref()))
+        Ok(job)
     }
 
     async fn checks(
@@ -1207,6 +1338,29 @@ impl World {
             })
             .collect())
     }
+}
+
+/// How far deleting `found` has come.
+const fn gone(found: Option<&DynamicObject>) -> Progress {
+    match found {
+        None => Progress::Ready,
+        Some(o) if o.metadata.deletion_timestamp.is_some() => Progress::Waiting,
+        Some(_) => Progress::Pending,
+    }
+}
+
+/// The values of a step's `HelmChartConfig`; `None` when it has none or the step writes
+/// something else.
+fn config_values(step: &engine::Step) -> Option<String> {
+    step.objects.iter().find_map(|d| {
+        let config: HelmChartConfig = d
+            .object
+            .clone()
+            .try_parse()
+            .ok()
+            .filter(|_| kind(&d.object) == HelmChartConfig::KIND)?;
+        config.spec.values_content
+    })
 }
 
 /// A step's state from its objects': pending while one still needs a write, so changed values

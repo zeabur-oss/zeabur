@@ -10,6 +10,14 @@
 //! The engine does no I/O: the caller downloads the files of each [`Download`], checks them with
 //! [`verify`] and passes them in as [`Manifests`].
 //!
+//! A chart release's values are its own, then its profile's, then the `contributes` of every
+//! component Zeabur wrote or installs that targets it, merged in id order [releases]. Every plan
+//! computes them, so upgrading a release keeps what others add to it. Installing a contributor
+//! adds a step that writes its target again: the `HelmChart` Zeabur wrote, or, for a chart the
+//! distribution packages, a `HelmChartConfig` of the same name [k3s-config]. Removing one writes
+//! the target without it, and deletes a `HelmChartConfig` left with no values. A contribution to
+//! a component that is not installed waits until Zeabur installs it.
+//!
 //! Readiness follows kstatus [kstatus] through `zeabur_model::readiness`. A `HelmChart` has no
 //! `observedGeneration`, and helm-controller replaces its Job whenever the chart changes, so a
 //! chart is ready when the Job its status names was created at or after Zeabur's last write of
@@ -19,6 +27,8 @@
 //! [k3s-helm]: https://docs.k3s.io/helm
 //! [kstatus]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/README.md
 //! [helm-controller]: https://github.com/k3s-io/helm-controller/blob/v0.16.27/pkg/controllers/chart/chart.go
+//! [releases]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/releases.mdx
+//! [k3s-config]: https://docs.k3s.io/add-ons/helm#customizing-packaged-components-with-helmchartconfig
 
 use std::collections::{BTreeMap, BTreeSet};
 
@@ -161,6 +171,8 @@ pub struct Target<'a> {
     /// The components Zeabur wrote, finished or not; [`install`] plans them again so that one
     /// it began is finished.
     pub written: &'a BTreeSet<String>,
+    /// The components the distribution packages, with their `HelmChart` in `kube-system`.
+    pub packaged: &'a BTreeMap<String, String>,
 }
 
 /// One release to apply.
@@ -213,6 +225,14 @@ pub enum Warning {
         /// `baseline` or `privileged`.
         level: PodSecurityLevel,
     },
+    /// Another tool installed a component that the install adds values to, so Zeabur leaves
+    /// it as it is.
+    Unchanged {
+        /// The component.
+        component: String,
+        /// Every value Zeabur's components add to it, as YAML, for the person to add.
+        values: String,
+    },
 }
 
 /// An install.
@@ -246,8 +266,10 @@ impl Install {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum Unsupported {
-    /// It adds values to other components' releases.
-    Contributes,
+    /// It adds values to other components' releases and has no Helm chart: Zeabur knows the
+    /// components it installed by their `HelmChart`s, so its values would leave their targets
+    /// when they are written again.
+    ContributesWithoutChart,
     /// It has a release of a type this build does not know.
     NewerRelease,
 }
@@ -255,7 +277,9 @@ pub enum Unsupported {
 impl std::fmt::Display for Unsupported {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(match self {
-            Self::Contributes => "adds values to other components",
+            Self::ContributesWithoutChart => {
+                "adds values to other components but has no Helm chart"
+            }
             Self::NewerRelease => "has a release of a type this version does not know",
         })
     }
@@ -265,8 +289,8 @@ impl std::fmt::Display for Unsupported {
 #[must_use]
 pub fn unsupported(file: &ComponentFile) -> Option<Unsupported> {
     let d = &file.declaration;
-    if !d.contributes.is_empty() {
-        return Some(Unsupported::Contributes);
+    if !d.contributes.is_empty() && !d.releases.iter().any(|r| r.kind == ReleaseType::Helm) {
+        return Some(Unsupported::ContributesWithoutChart);
     }
     d.releases.iter().find_map(|r| match r.kind {
         ReleaseType::Helm | ReleaseType::Inline | ReleaseType::Manifest => None,
@@ -368,10 +392,13 @@ pub fn install(
     inputs: Inputs<'_>,
 ) -> Result<Install, Refusal> {
     let order = components(snapshot, id, target)?;
+    let version = &snapshot.index.catalog.version;
+    let contributors = target.written.iter().chain(&order).cloned().collect();
+    let contributions = Contributions::of(snapshot, &contributors)?;
     let mut steps = Vec::new();
     let mut warnings = Vec::new();
     let mut resolved = Vec::new();
-    for component in &order {
+    for (i, component) in order.iter().enumerate() {
         let file = snapshot
             .components
             .get(component)
@@ -393,11 +420,36 @@ pub fn install(
         let own = resolve(file, inputs)?;
         steps.extend(steps_of(
             file,
-            &snapshot.index.catalog.version,
+            version,
             target.profile,
             manifests,
             &own,
+            &contributions,
         )?);
+        for c in &file.declaration.contributes {
+            let (to, release) = (&c.target.component, &c.target.release);
+            let again = |id: &String| {
+                snapshot.components.get(id).is_some_and(|f| {
+                    f.declaration
+                        .contributes
+                        .iter()
+                        .any(|o| o.target == c.target)
+                })
+            };
+            // The target's own step has the values; a later contributor writes it once.
+            if order.contains(to) || order.iter().skip(i + 1).any(again) {
+                continue;
+            }
+            let values = contributions.to(to, release);
+            match rewrite(snapshot, target, to, release, inputs, &contributions)? {
+                Some(step) => steps.push(step),
+                None if target.components.contains(to) => warnings.push(Warning::Unchanged {
+                    component: to.clone(),
+                    values: yaml_values(&values).map_err(broken(&file.id))?,
+                }),
+                None => {}
+            }
+        }
         resolved.extend(own);
     }
     Ok(Install {
@@ -558,6 +610,171 @@ fn check(file: &ComponentFile, target: &Target<'_>) -> Result<(), Refusal> {
     })
 }
 
+/// What components add to other components' releases.
+#[derive(Debug, Clone, Default)]
+pub struct Contributions(BTreeMap<(String, String), Value>);
+
+impl Contributions {
+    /// What `contributors` add, each release's merged in id order, so the later id wins a key
+    /// both set.
+    ///
+    /// # Errors
+    ///
+    /// A contribution does not read.
+    pub fn of(snapshot: &Snapshot, contributors: &BTreeSet<String>) -> Result<Self, Refusal> {
+        let mut added = BTreeMap::new();
+        for id in contributors {
+            let Some(file) = snapshot.components.get(id) else {
+                continue;
+            };
+            for c in &file.declaration.contributes {
+                let values = parse_values(c.values.as_deref()).map_err(broken(id))?;
+                let key = (c.target.component.clone(), c.target.release.clone());
+                merge(
+                    added
+                        .entry(key)
+                        .or_insert_with(|| Value::Object(serde_json::Map::new())),
+                    values,
+                );
+            }
+        }
+        Ok(Self(added))
+    }
+
+    /// What is added to `component`'s `release`; an empty map when nothing is.
+    #[must_use]
+    pub fn to(&self, component: &str, release: &str) -> Value {
+        self.0
+            .get(&(component.to_owned(), release.to_owned()))
+            .cloned()
+            .unwrap_or_else(|| Value::Object(serde_json::Map::new()))
+    }
+}
+
+/// The steps that write again what removing `id` takes its values out of: a `HelmChart` Zeabur
+/// wrote, or a `HelmChartConfig` of a packaged chart. A `HelmChartConfig` left with no values
+/// has no `valuesContent`.
+///
+/// # Errors
+///
+/// A release or contribution does not read.
+pub fn without(
+    snapshot: &Snapshot,
+    id: &str,
+    target: &Target<'_>,
+    kept: &Values,
+) -> Result<Vec<Step>, Refusal> {
+    let Some(file) = snapshot.components.get(id) else {
+        return Ok(Vec::new());
+    };
+    let rest = target
+        .written
+        .iter()
+        .filter(|c| *c != id)
+        .cloned()
+        .collect();
+    let contributions = Contributions::of(snapshot, &rest)?;
+    let mut steps: Vec<Step> = Vec::new();
+    for c in &file.declaration.contributes {
+        let (to, release) = (&c.target.component, &c.target.release);
+        if steps
+            .iter()
+            .any(|s| &s.component == to && &s.release == release)
+        {
+            continue;
+        }
+        let inputs = Inputs {
+            given: &Values::new(),
+            kept,
+        };
+        steps.extend(rewrite(
+            snapshot,
+            target,
+            to,
+            release,
+            inputs,
+            &contributions,
+        )?);
+    }
+    Ok(steps)
+}
+
+/// The step that writes `component`'s `release` again with `contributions`: its `HelmChart`
+/// when Zeabur wrote it, else the `HelmChartConfig` of the chart the distribution packages;
+/// `None` for any other component.
+fn rewrite(
+    snapshot: &Snapshot,
+    target: &Target<'_>,
+    component: &str,
+    release: &str,
+    inputs: Inputs<'_>,
+    contributions: &Contributions,
+) -> Result<Option<Step>, Refusal> {
+    let version = &snapshot.index.catalog.version;
+    let Some(file) = snapshot.components.get(component) else {
+        return Ok(None);
+    };
+    if target.written.contains(component) {
+        let Some(r) = file
+            .declaration
+            .releases
+            .iter()
+            .find(|r| r.name == release && r.kind == ReleaseType::Helm)
+        else {
+            return Ok(None);
+        };
+        let own = resolve(file, inputs)?;
+        let mut object =
+            chart_of(file, r, target.profile, contributions, &own).map_err(broken(component))?;
+        mark(&mut object.metadata, file, r, version);
+        return Ok(Some(Step {
+            component: component.to_owned(),
+            release: release.to_owned(),
+            objects: vec![Desired {
+                object,
+                namespace: r.namespace.clone(),
+            }],
+            skip_if_present: Vec::new(),
+        }));
+    }
+    let Some(chart) = target.packaged.get(component) else {
+        return Ok(None);
+    };
+    let values = contributions.to(component, release);
+    let mut config = HelmChartConfig {
+        metadata: ObjectMeta {
+            name: Some(chart.clone()),
+            namespace: Some(CHART_NAMESPACE.to_owned()),
+            ..ObjectMeta::default()
+        },
+        spec: HelmChartConfigSpec {
+            values_content: values_content(&values).map_err(broken(component))?,
+        },
+    };
+    label_release(&mut config.metadata, component, release);
+    config
+        .metadata
+        .annotations
+        .get_or_insert_default()
+        .insert(CATALOG_VERSION.to_owned(), version.clone());
+    Ok(Some(Step {
+        component: component.to_owned(),
+        release: release.to_owned(),
+        objects: vec![Desired {
+            object: dynamic(&config).map_err(broken(component))?,
+            namespace: CHART_NAMESPACE.to_owned(),
+        }],
+        skip_if_present: Vec::new(),
+    }))
+}
+
+fn broken(component: &str) -> impl Fn(String) -> Refusal + Copy {
+    move |message| Refusal::Broken {
+        component: component.to_owned(),
+        message,
+    }
+}
+
 /// The files the manifest releases of `file` install.
 ///
 /// # Errors
@@ -622,16 +839,10 @@ pub fn steps_of(
     profile: &str,
     manifests: &Manifests,
     inputs: &[Resolved],
+    contributions: &Contributions,
 ) -> Result<Vec<Step>, Refusal> {
-    let broken = |message: String| Refusal::Broken {
-        component: file.id.clone(),
-        message,
-    };
+    let broken = broken(&file.id);
     let releases = &file.declaration.releases;
-    let first_chart = releases
-        .iter()
-        .find(|r| r.kind == ReleaseType::Helm)
-        .map(|r| r.name.as_str());
     let mut secrets = secrets(inputs);
     let mut namespaces = BTreeSet::new();
     let mut steps = Vec::new();
@@ -671,32 +882,7 @@ pub fn steps_of(
             .map_err(broken)?;
         made.extend(match release.kind {
             ReleaseType::Helm => {
-                let mut values = profile_values(release, profile).map_err(broken)?;
-                let mut kept = serde_json::Map::new();
-                for r in inputs {
-                    let (Some(path), Some(value)) = (&r.input.path, &r.value) else {
-                        continue;
-                    };
-                    if r.input.release.as_deref().or(first_chart) != Some(release.name.as_str()) {
-                        continue;
-                    }
-                    set_path(&mut values, path, value.to_json());
-                    if matches!(
-                        r.state,
-                        InputState::Given | InputState::Kept | InputState::Generated
-                    ) {
-                        kept.insert(r.input.name.clone(), value.to_json());
-                    }
-                }
-                let mut chart = helm_chart(release, &values).map_err(broken)?;
-                if !kept.is_empty() {
-                    chart
-                        .metadata
-                        .annotations
-                        .get_or_insert_default()
-                        .insert(INPUTS.to_owned(), Value::Object(kept).to_string());
-                }
-                vec![dynamic(&chart).map_err(broken)?]
+                vec![chart_of(file, release, profile, contributions, inputs).map_err(broken)?]
             }
             ReleaseType::Inline => {
                 objects_of(release.manifests.as_deref().unwrap_or_default()).map_err(broken)?
@@ -799,13 +985,14 @@ pub fn input_secrets(file: &ComponentFile) -> Vec<String> {
 /// Whether `found` already holds what `desired` writes.
 ///
 /// Only the kinds whose content an input or a catalog release changes are compared: a
-/// `HelmChart`'s `spec` and `INPUTS` annotation, and a Secret's `data`. A step with an object that
+/// `HelmChart`'s `spec` and `INPUTS` annotation, a `HelmChartConfig`'s `spec`, and a Secret's
+/// `data`. A step with an object that
 /// does not hold it is written again. Other kinds count as current once they exist.
 #[must_use]
 pub fn holds(desired: &DynamicObject, found: &DynamicObject) -> bool {
     let field = match desired.types.as_ref().map(|t| t.kind.as_str()) {
         Some(HelmChart::KIND) if kept_inputs(desired) != kept_inputs(found) => return false,
-        Some(HelmChart::KIND) => "spec",
+        Some(HelmChart::KIND | HelmChartConfig::KIND) => "spec",
         Some(Secret::KIND) => "data",
         _ => return true,
     };
@@ -829,6 +1016,51 @@ fn covers(found: &Value, desired: &Value) -> bool {
         (_, Value::Null) => true,
         _ => found == desired,
     }
+}
+
+/// The `HelmChart` of a Helm release: its values with the profile's, then the contributions,
+/// then the values of `inputs` at their paths. The inputs given, kept or generated go in its
+/// `INPUTS` annotation, so a later install keeps them.
+fn chart_of(
+    file: &ComponentFile,
+    release: &Release,
+    profile: &str,
+    contributions: &Contributions,
+    inputs: &[Resolved],
+) -> Result<DynamicObject, String> {
+    let first_chart = file
+        .declaration
+        .releases
+        .iter()
+        .find(|r| r.kind == ReleaseType::Helm)
+        .map(|r| r.name.as_str());
+    let mut values = profile_values(release, profile)?;
+    merge(&mut values, contributions.to(&file.id, &release.name));
+    let mut kept = serde_json::Map::new();
+    for r in inputs {
+        let (Some(path), Some(value)) = (&r.input.path, &r.value) else {
+            continue;
+        };
+        if r.input.release.as_deref().or(first_chart) != Some(release.name.as_str()) {
+            continue;
+        }
+        set_path(&mut values, path, value.to_json());
+        if matches!(
+            r.state,
+            InputState::Given | InputState::Kept | InputState::Generated
+        ) {
+            kept.insert(r.input.name.clone(), value.to_json());
+        }
+    }
+    let mut chart = helm_chart(release, &values)?;
+    if !kept.is_empty() {
+        chart
+            .metadata
+            .annotations
+            .get_or_insert_default()
+            .insert(INPUTS.to_owned(), Value::Object(kept).to_string());
+    }
+    dynamic(&chart)
 }
 
 /// `object` as a [`DynamicObject`], with its `apiVersion` and `kind`.
@@ -901,11 +1133,7 @@ pub(crate) struct ChartRelease<'a> {
 /// or upgrade as it is, for a person to see, rather than helm-controller's default of
 /// uninstalling and installing again.
 pub(crate) fn chart_object(chart: &ChartRelease<'_>, values: &Value) -> Result<HelmChart, String> {
-    let values_content = if values.as_object().is_none_or(|v| !v.is_empty()) {
-        Some(serde_saphyr::to_string(values).map_err(|e| e.to_string())?)
-    } else {
-        None
-    };
+    let values_content = values_content(values)?;
     Ok(HelmChart {
         metadata: ObjectMeta {
             name: Some(chart.name.to_owned()),
@@ -922,6 +1150,18 @@ pub(crate) fn chart_object(chart: &ChartRelease<'_>, values: &Value) -> Result<H
         },
         status: None,
     })
+}
+
+/// `values` as YAML; `None` for no values.
+fn values_content(values: &Value) -> Result<Option<String>, String> {
+    if values.as_object().is_some_and(serde_json::Map::is_empty) {
+        return Ok(None);
+    }
+    yaml_values(values).map(Some)
+}
+
+fn yaml_values(values: &Value) -> Result<String, String> {
+    serde_saphyr::to_string(values).map_err(|e| e.to_string())
 }
 
 fn helm_chart(release: &Release, values: &Value) -> Result<HelmChart, String> {
@@ -1059,7 +1299,7 @@ impl Metadata for HelmChart {
 }
 
 /// `HelmChart.spec`.
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct HelmChartSpec {
     /// The chart's name in `repo`, or an OCI reference.
@@ -1090,6 +1330,50 @@ pub enum FailurePolicy {
     Reinstall,
     /// Keep the failed release as it is.
     Abort,
+}
+
+/// A K3s/RKE2 `HelmChartConfig`, which changes the values of the `HelmChart` of the same name
+/// [helm-controller-types].
+///
+/// [helm-controller-types]: https://github.com/k3s-io/helm-controller/blob/v0.16.27/pkg/apis/helm.cattle.io/v1/types.go
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+pub struct HelmChartConfig {
+    /// Its metadata; `managedFields` tells when Zeabur last wrote it.
+    #[serde(default)]
+    pub metadata: ObjectMeta,
+    /// The values.
+    #[serde(default)]
+    pub spec: HelmChartConfigSpec,
+}
+
+impl Resource for HelmChartConfig {
+    const API_VERSION: &'static str = "helm.cattle.io/v1";
+    const GROUP: &'static str = "helm.cattle.io";
+    const KIND: &'static str = "HelmChartConfig";
+    const VERSION: &'static str = "v1";
+    const URL_PATH_SEGMENT: &'static str = "helmchartconfigs";
+    type Scope = NamespaceResourceScope;
+}
+
+impl Metadata for HelmChartConfig {
+    type Ty = ObjectMeta;
+
+    fn metadata(&self) -> &ObjectMeta {
+        &self.metadata
+    }
+
+    fn metadata_mut(&mut self) -> &mut ObjectMeta {
+        &mut self.metadata
+    }
+}
+
+/// `HelmChartConfig.spec`.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct HelmChartConfigSpec {
+    /// The values merged over the chart's, as YAML.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub values_content: Option<String>,
 }
 
 /// `HelmChart.status`.
@@ -1135,13 +1419,24 @@ fn written_at(metadata: &ObjectMeta) -> Option<Timestamp> {
 /// only while its Job is not older than the write.
 #[must_use]
 pub fn chart_progress(chart: &HelmChart, job: Option<&Job>) -> Progress {
+    progress_since(written_at(&chart.metadata), chart, job)
+}
+
+/// Whether the `HelmChart` a `HelmChartConfig` changes is installed with it: as
+/// [`chart_progress`], with the Job created at or after Zeabur's last write of the config.
+#[must_use]
+pub fn config_progress(config: &ObjectMeta, chart: &HelmChart, job: Option<&Job>) -> Progress {
+    progress_since(written_at(config), chart, job)
+}
+
+fn progress_since(written: Option<Timestamp>, chart: &HelmChart, job: Option<&Job>) -> Progress {
     let conditions = chart
         .status
         .as_ref()
         .map_or(&[][..], |s| s.conditions.as_slice());
     let current = job.map(|job| {
         let created = job.metadata.creation_timestamp.as_ref().map(|t| t.0);
-        match (written_at(&chart.metadata), created) {
+        match (written, created) {
             (Some(written), Some(created)) => created >= truncate(written),
             (None, Some(_)) => true,
             (_, None) => false,
@@ -1503,6 +1798,7 @@ mod tests {
             capabilities: &empty,
             components: &empty,
             written: &empty,
+            packaged: &BTreeMap::new(),
         };
         install(
             &snapshot(),
@@ -1739,7 +2035,15 @@ mod tests {
     #[test]
     fn a_removal_writes_no_secrets() {
         let velero = &snapshot().components["velero"];
-        let steps = steps_of(velero, "0.5.3", "single-node", &Manifests::new(), &[]).unwrap();
+        let steps = steps_of(
+            velero,
+            "0.5.3",
+            "single-node",
+            &Manifests::new(),
+            &[],
+            &Contributions::default(),
+        )
+        .unwrap();
         assert!(
             steps
                 .iter()
@@ -1759,10 +2063,7 @@ mod tests {
     #[test]
     fn what_zeabur_cannot_install_yet_says_why() {
         let snapshot = snapshot();
-        assert_eq!(
-            unsupported(&snapshot.components["crowdsec"]),
-            Some(Unsupported::Contributes)
-        );
+        assert_eq!(unsupported(&snapshot.components["crowdsec"]), None);
         assert_eq!(unsupported(&snapshot.components["traefik"]), None);
         assert_eq!(unsupported(&snapshot.components["velero"]), None);
     }
@@ -1839,6 +2140,7 @@ mod tests {
             capabilities: &capabilities,
             components: &components,
             written: &written,
+            packaged: &BTreeMap::new(),
         };
         install(&snapshot(), id, &target, &manifests(), none())
     }
@@ -1934,11 +2236,7 @@ mod tests {
     }
 
     #[test]
-    fn components_zeabur_cannot_install_yet_are_refused() {
-        let refusal = plan("crowdsec", &["ingress", "certificates"], &["traefik"]).unwrap_err();
-        assert!(
-            matches!(refusal, Refusal::Unsupported { component, .. } if component == "crowdsec")
-        );
+    fn an_unknown_component_is_refused() {
         assert!(matches!(
             plan("nothing", &[], &[]),
             Err(Refusal::Unknown(_))
@@ -1957,6 +2255,7 @@ mod tests {
             capabilities: &capabilities,
             components: &components,
             written: &BTreeSet::new(),
+            packaged: &BTreeMap::new(),
         };
         let refusal =
             install(&snapshot(), "cert-manager", &target, &manifests(), none()).unwrap_err();
@@ -1975,6 +2274,7 @@ mod tests {
             capabilities: &capabilities,
             components: &components,
             written: &BTreeSet::new(),
+            packaged: &BTreeMap::new(),
         };
         let refusal =
             install(&snapshot(), "victoria-logs", &target, &manifests(), none()).unwrap_err();
@@ -1987,13 +2287,20 @@ mod tests {
     #[test]
     fn a_namespace_kubernetes_keeps_is_not_written() {
         let traefik = &snapshot().components["traefik"];
-        let namespaces: Vec<String> = steps_of(traefik, "0.5.3", "single-node", &manifests(), &[])
-            .unwrap()
-            .into_iter()
-            .flat_map(|s| s.objects)
-            .filter(|d| kind(&d.object) == "Namespace")
-            .filter_map(|d| d.object.metadata.name)
-            .collect();
+        let namespaces: Vec<String> = steps_of(
+            traefik,
+            "0.5.3",
+            "single-node",
+            &manifests(),
+            &[],
+            &Contributions::default(),
+        )
+        .unwrap()
+        .into_iter()
+        .flat_map(|s| s.objects)
+        .filter(|d| kind(&d.object) == "Namespace")
+        .filter_map(|d| d.object.metadata.name)
+        .collect();
         assert_eq!(namespaces, ["traefik"]);
     }
 
@@ -2041,7 +2348,15 @@ mod tests {
     #[test]
     fn a_manifest_release_without_its_files_is_refused() {
         let file = &snapshot().components["system-upgrade-controller"];
-        let refusal = steps_of(file, "0.5.5", "single-node", &Manifests::new(), &[]).unwrap_err();
+        let refusal = steps_of(
+            file,
+            "0.5.5",
+            "single-node",
+            &Manifests::new(),
+            &[],
+            &Contributions::default(),
+        )
+        .unwrap_err();
         assert!(refusal.to_string().contains(&format!("{SUC}/crd.yaml")));
     }
 
@@ -2410,5 +2725,303 @@ mod tests {
         assert_eq!(timeout_seconds("60s"), 60);
         assert_eq!(timeout_seconds("5m"), 300);
         assert_eq!(timeout_seconds("soon"), 300);
+    }
+
+    /// The test snapshot where `from` adds `values` to keda's release.
+    fn contributing(snapshot: &mut Snapshot, from: &str, values: &str) {
+        let file = snapshot.components.get_mut(from).unwrap();
+        file.declaration.contributes.push(api::Contribution {
+            target: api::ContributionTarget {
+                component: "keda".to_owned(),
+                release: "keda".to_owned(),
+            },
+            values: Some(values.to_owned()),
+        });
+    }
+
+    struct Cluster {
+        components: BTreeSet<String>,
+        written: BTreeSet<String>,
+        packaged: BTreeMap<String, String>,
+        capabilities: BTreeSet<String>,
+    }
+
+    impl Cluster {
+        fn new(components: &[&str], written: &[&str]) -> Self {
+            Self {
+                components: set(components),
+                written: set(written),
+                packaged: BTreeMap::new(),
+                capabilities: set(&["ingress", "certificates"]),
+            }
+        }
+
+        fn target(&self) -> Target<'_> {
+            Target {
+                profile: "single-node",
+                distribution: Some("k3s"),
+                platform: "linux/amd64",
+                kube_version: "v1.36.5+k3s1",
+                capabilities: &self.capabilities,
+                components: &self.components,
+                written: &self.written,
+                packaged: &self.packaged,
+            }
+        }
+    }
+
+    fn values_of(step: &Step) -> Value {
+        let content = step
+            .objects
+            .iter()
+            .find_map(|d| d.object.data["spec"]["valuesContent"].as_str())
+            .unwrap_or("{}");
+        serde_saphyr::from_str(content).unwrap()
+    }
+
+    #[test]
+    fn a_contributor_without_a_helm_chart_is_refused() {
+        let mut snapshot = snapshot();
+        contributing(&mut snapshot, "system-upgrade-controller", "a: 1");
+        let cluster = Cluster::new(&[], &[]);
+        let refusal = install(
+            &snapshot,
+            "system-upgrade-controller",
+            &cluster.target(),
+            &manifests(),
+            none(),
+        )
+        .unwrap_err();
+        assert!(
+            refusal.to_string().contains("has no Helm chart"),
+            "{refusal}"
+        );
+    }
+
+    #[test]
+    fn contributions_merge_over_the_release_values_in_id_order() {
+        let mut snapshot = snapshot();
+        contributing(&mut snapshot, "keda-http-add-on", "a: http\nonly: http");
+        contributing(&mut snapshot, "cloudnative-pg", "a: cnpg");
+        let cluster = Cluster::new(&[], &["keda-http-add-on", "cloudnative-pg"]);
+        let install = install(&snapshot, "keda", &cluster.target(), &manifests(), none()).unwrap();
+        let values = values_of(&install.steps[0]);
+        // keda-http-add-on comes after cloudnative-pg by id, so its value wins.
+        assert_eq!(values["a"], "http");
+        assert_eq!(values["only"], "http");
+        let own = values_of(
+            &steps_of(
+                &snapshot.components["keda"],
+                "0.5.3",
+                "single-node",
+                &manifests(),
+                &[],
+                &Contributions::default(),
+            )
+            .unwrap()[0],
+        );
+        for (key, value) in own.as_object().unwrap() {
+            assert_eq!(&values[key], value, "{key}");
+        }
+    }
+
+    #[test]
+    fn a_rewritten_target_keeps_its_input_values() {
+        let mut snapshot = snapshot();
+        snapshot
+            .components
+            .get_mut("keda")
+            .unwrap()
+            .declaration
+            .contributes
+            .push(api::Contribution {
+                target: api::ContributionTarget {
+                    component: "velero".to_owned(),
+                    release: "velero".to_owned(),
+                },
+                values: Some("added: keda".to_owned()),
+            });
+        let cluster = Cluster::new(&["velero"], &["velero"]);
+        let kept = values(&[
+            ("velero", "bucket", text("old")),
+            ("velero", "credentials", text("old credentials")),
+        ]);
+        let inputs = Inputs {
+            given: &NO_VALUES,
+            kept: &kept,
+        };
+        let install = install(&snapshot, "keda", &cluster.target(), &manifests(), inputs).unwrap();
+        let velero = install.steps.last().unwrap();
+        assert_eq!(velero.component, "velero");
+        assert_eq!(
+            velero
+                .objects
+                .iter()
+                .map(|d| kind(&d.object))
+                .collect::<Vec<_>>(),
+            ["HelmChart"]
+        );
+        let values = values_of(velero);
+        assert_eq!(values["added"], "keda");
+        assert_eq!(
+            values["configuration"]["backupStorageLocation"][0]["bucket"],
+            "old"
+        );
+        assert!(install.inputs.iter().all(|r| r.component != "velero"));
+    }
+
+    #[test]
+    fn installing_a_contributor_writes_the_chart_zeabur_installed_again() {
+        let mut snapshot = snapshot();
+        contributing(&mut snapshot, "keda-http-add-on", "a: http");
+        let cluster = Cluster::new(&["keda"], &["keda"]);
+        let install = install(
+            &snapshot,
+            "keda-http-add-on",
+            &cluster.target(),
+            &manifests(),
+            none(),
+        )
+        .unwrap();
+        let steps: Vec<(&str, &str)> = install
+            .steps
+            .iter()
+            .map(|s| (s.component.as_str(), s.release.as_str()))
+            .collect();
+        // keda is written, so the plan has it again first, with the value already in it.
+        assert_eq!(
+            steps,
+            [("keda", "keda"), ("keda-http-add-on", "http-add-on")]
+        );
+        assert_eq!(values_of(&install.steps[0])["a"], "http");
+
+        // cloudnative-pg does not need keda: its own steps, then keda's chart again.
+        contributing(&mut snapshot, "cloudnative-pg", "b: cnpg");
+        let install = super::install(
+            &snapshot,
+            "cloudnative-pg",
+            &cluster.target(),
+            &manifests(),
+            none(),
+        )
+        .unwrap();
+        let last = install.steps.last().unwrap();
+        assert_eq!(
+            (last.component.as_str(), last.release.as_str()),
+            ("keda", "keda")
+        );
+        assert_eq!(last.objects.len(), 1);
+        assert_eq!(kind(&last.objects[0].object), HelmChart::KIND);
+        assert_eq!(values_of(last)["b"], "cnpg");
+    }
+
+    #[test]
+    fn a_packaged_target_gets_a_helm_chart_config() {
+        let mut snapshot = snapshot();
+        contributing(&mut snapshot, "cloudnative-pg", "b: cnpg");
+        let mut cluster = Cluster::new(&["keda"], &[]);
+        cluster
+            .packaged
+            .insert("keda".to_owned(), "rke2-keda".to_owned());
+        let install = install(
+            &snapshot,
+            "cloudnative-pg",
+            &cluster.target(),
+            &manifests(),
+            none(),
+        )
+        .unwrap();
+        let last = install.steps.last().unwrap();
+        let config: HelmChartConfig = last.objects[0].object.clone().try_parse().unwrap();
+        assert_eq!(config.metadata.name.as_deref(), Some("rke2-keda"));
+        assert_eq!(config.metadata.namespace.as_deref(), Some(CHART_NAMESPACE));
+        assert_eq!(label(&last.objects[0].object, COMPONENT), Some("keda"));
+        assert_eq!(
+            label(&last.objects[0].object, MANAGED_BY),
+            Some(MANAGED_BY_ZEABUR)
+        );
+        // Only the contributions: the packaged chart keeps the distribution's own values.
+        assert_eq!(values_of(last), serde_json::json!({"b": "cnpg"}));
+
+        let without = without(
+            &snapshot,
+            "cloudnative-pg",
+            &cluster.target(),
+            &Values::new(),
+        )
+        .unwrap();
+        let config: HelmChartConfig = without[0].objects[0].object.clone().try_parse().unwrap();
+        assert_eq!(config.spec.values_content, None);
+    }
+
+    #[test]
+    fn a_contribution_to_a_component_not_installed_waits() {
+        let mut snapshot = snapshot();
+        contributing(&mut snapshot, "cloudnative-pg", "b: cnpg");
+        let cluster = Cluster::new(&[], &[]);
+        let install = install(
+            &snapshot,
+            "cloudnative-pg",
+            &cluster.target(),
+            &manifests(),
+            none(),
+        )
+        .unwrap();
+        assert!(install.steps.iter().all(|s| s.component != "keda"));
+        assert!(
+            install
+                .warnings
+                .iter()
+                .all(|w| !matches!(w, Warning::Unchanged { .. }))
+        );
+
+        // Installing keda later picks it up.
+        let cluster = Cluster::new(&["cloudnative-pg"], &["cloudnative-pg"]);
+        let install =
+            super::install(&snapshot, "keda", &cluster.target(), &manifests(), none()).unwrap();
+        assert_eq!(values_of(&install.steps[0])["b"], "cnpg");
+    }
+
+    #[test]
+    fn a_target_another_tool_installed_is_left_with_a_warning() {
+        let mut snapshot = snapshot();
+        contributing(&mut snapshot, "cloudnative-pg", "b: cnpg");
+        let cluster = Cluster::new(&["keda"], &[]);
+        let install = install(
+            &snapshot,
+            "cloudnative-pg",
+            &cluster.target(),
+            &manifests(),
+            none(),
+        )
+        .unwrap();
+        assert!(install.steps.iter().all(|s| s.component != "keda"));
+        assert!(install.warnings.contains(&Warning::Unchanged {
+            component: "keda".to_owned(),
+            values: "b: cnpg\n".to_owned(),
+        }));
+    }
+
+    #[test]
+    fn removing_a_contributor_writes_its_target_without_it() {
+        let mut snapshot = snapshot();
+        contributing(&mut snapshot, "cloudnative-pg", "b: cnpg");
+        contributing(&mut snapshot, "keda-http-add-on", "a: http");
+        let cluster = Cluster::new(
+            &["keda", "keda-http-add-on", "cloudnative-pg"],
+            &["keda", "keda-http-add-on", "cloudnative-pg"],
+        );
+        let steps = without(
+            &snapshot,
+            "cloudnative-pg",
+            &cluster.target(),
+            &Values::new(),
+        )
+        .unwrap();
+        assert_eq!(steps.len(), 1);
+        assert_eq!(kind(&steps[0].objects[0].object), HelmChart::KIND);
+        let values = values_of(&steps[0]);
+        assert_eq!(values["a"], "http");
+        assert!(values.get("b").is_none());
     }
 }
