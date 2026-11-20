@@ -1,5 +1,6 @@
 import type { Page } from "@playwright/test"
 
+import type { Service, ServiceStatus, ServiceVerdict } from "../src/api/zeabur.ts"
 import { expect, test } from "./fixtures.ts"
 
 // States a test cluster does not reach on its own, stubbed with page.route. ZEABUR_E2E_NAMESPACE
@@ -111,20 +112,24 @@ test("a pod that runs again after a recent crash keeps the service failing, in p
   page,
 }) => {
   const finished = new Date(Date.now() - 4 * 60_000).toISOString()
-  type Document = {
-    services: {
-      kind: string
-      name: string
-      status: object
-      pods: { ready: boolean; restarts: number; health: string; containerStatuses?: object[] }[]
-    }[]
+  // What the server sends for a Ready pod whose last run ended with an error: the reason means a
+  // crash (StatusCause::of in zeabur-model), and the verdict names it (services/verdict.rs).
+  const crashed: ServiceStatus = {
+    health: "fail",
+    word: "failing",
+    reason: "Error",
+    cause: "crashing",
   }
-  await change<Document>(page, /\/api\/v1\/projects\/[^/]+$/, (body) => {
+  const verdict: ServiceVerdict = {
+    tone: "fail",
+    headline: { as: "problem", trouble: { as: "reason", word: "crashing" } },
+  }
+  await change<{ services: Service[] }>(page, /\/api\/v1\/projects\/[^/]+$/, (body) => {
     const target = body.services.find((s) => s.kind === "Deployment" && s.name === service)
     const pod = target?.pods[0]
     if (target && pod) {
-      // What the health rule reports for a Ready pod whose last run ended with an error.
-      target.status = { health: "fail", word: "failing", reason: "Error" }
+      target.status = crashed
+      target.verdict = verdict
       Object.assign(pod, {
         ready: true,
         phase: "Running",
