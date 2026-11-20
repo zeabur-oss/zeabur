@@ -113,7 +113,9 @@ async function startDemo(demo: Record<string, string>): Promise<Server> {
   const url = /^listening on (http:\/\/\S+)$/.exec(line ?? "")?.[1]
   if (!url) {
     await stop()
-    throw new Error(`the zeabur demo server did not start (${JSON.stringify(demo)}):\n${line ?? ""}\n${log}`)
+    throw new Error(
+      `the zeabur demo server did not start (${JSON.stringify(demo)}):\n${line ?? ""}\n${log}`,
+    )
   }
   // The demo's controllers settle its fixtures on their first ticks, such as a build that
   // started days ago finishing, 400 ms after it starts.
@@ -147,7 +149,9 @@ async function startDesktop(): Promise<Server> {
     try {
       if (!file.startsWith(`${dist}/`)) throw new Error("outside dist")
       const body = await readFile(file)
-      response.writeHead(200, { "content-type": types[extname(file)] ?? "application/octet-stream" })
+      response.writeHead(200, {
+        "content-type": types[extname(file)] ?? "application/octet-stream",
+      })
       response.end(body)
     } catch {
       response.writeHead(404).end()
