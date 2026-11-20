@@ -17,6 +17,7 @@ static() {
   bun fmt --check scripts/*.ts
   bun check scripts/
   bun test scripts/
+  bun scripts/api-break.ts
 }
 
 cargo_checks() {
