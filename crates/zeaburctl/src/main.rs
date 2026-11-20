@@ -77,7 +77,7 @@ async fn main() -> ExitCode {
         Command::Telemetry(telemetry_args) => telemetry::run(&telemetry_args),
     };
     if let Some(check) = check {
-        check.finish().await;
+        check.finish();
     }
     code
 }
