@@ -3338,7 +3338,10 @@ fn github_app(s: &mut State, fake: &FakeGitHub) {
 }
 
 #[tokio::main]
-#[expect(clippy::print_stdout, reason = "scripts/shots reads the address from the first line")]
+#[expect(
+    clippy::print_stdout,
+    reason = "scripts/shots reads the address from the first line"
+)]
 async fn main() -> std::io::Result<()> {
     let mut state = state();
     if std::env::var_os("ZEABUR_DEMO_DELETING").is_some() {
