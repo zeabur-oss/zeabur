@@ -60,7 +60,7 @@ Backup keys have already been copied to the namespaces where the backups run. Ba
 Maintenance pages and custom error pages have their own workloads, Kubernetes Services, and configuration in the project. Removing Zeabur doesn't automatically route domains in maintenance mode back to the application. To restore traffic, follow [Maintenance mode](../configure/maintenance.mdx) first.
 
 <Callout type="warn">
-To keep services running, don't run `k3s-uninstall.sh` or `rke2-uninstall.sh`, delete project namespaces, disks, or operator CRDs, or uninstall ingress, cert-manager, storage operators, or database operators along with Zeabur. These actions stop services or remove components needed for data access and ongoing maintenance.
+To keep services running, don't run `zeatend uninstall`, `k3s-uninstall.sh` or `rke2-uninstall.sh`, delete project namespaces, disks, or operator CRDs, or uninstall ingress, cert-manager, storage operators, or database operators along with Zeabur. These actions stop services or remove components needed for data access and ongoing maintenance.
 </Callout>
 
 ## Remove the management interface
@@ -164,18 +164,17 @@ If other clients, user kubeconfigs, or automation still use Zeabur Identity, kee
 
 ## When you no longer need the cluster
 
-If you want to keep services running, stop after the earlier steps. Run the following commands on the host only when you're sure you no longer need the entire K3s or RKE2 cluster, have backed up important data, and have stored the credentials needed for restoration separately:
+If you want to keep services running, stop after the earlier steps. Run the following command on the server only when you're sure you no longer need the entire cluster, have backed up important data, and have stored the credentials needed for restoration separately:
 
 ```sh
-sudo /usr/local/bin/k3s-uninstall.sh    # K3s
-sudo /usr/local/bin/rke2-uninstall.sh   # RKE2
+sudo zeatend uninstall
 ```
 
-The K3s or RKE2 script removes Kubernetes and its data. All workloads that depend on it stop.
+It lists what it removes and what stays, and asks before it starts. It removes K3s, RKE2 or KubeSolo with their data, and the files Zeatend wrote. All workloads on the cluster stop. Zeatend also takes over a server that zeabur-installer set up, so use the same command there. On a cluster you set up yourself, use the distribution's own uninstall script, such as `k3s-uninstall.sh`.
 
-The script doesn't delete local-path data in `/var/lib/zeabur/storage` or replica data in `/var/lib/longhorn`. Reattaching the original data directories to services also requires the corresponding PVs, disks, and storage system information. Confirm that you have backups you can restore before deciding what to do with these directories.
+`zeatend uninstall` keeps local-path data in `/var/lib/zeabur/storage` and replica data in `/var/lib/longhorn` unless you add `--delete-volumes`. Reattaching the original data directories to services also requires the corresponding PVs, disks, and storage system information. Confirm that you have backups you can restore before deciding what to do with these directories.
 
-To remove only a node that joined the cluster, follow [Remove a node](../cluster/nodes.mdx#remove-a-node): drain and delete it with kubectl, then uninstall on that VM. Don't remove a node while services still need its local-path data.
+To remove only a node that joined the cluster, follow [Remove a node](../cluster/nodes.mdx#remove-a-node): drain and delete it with kubectl, then run `sudo zeatend uninstall` on that VM. Don't remove a node while services still need its local-path data.
 
 ## If removal doesn't finish
 

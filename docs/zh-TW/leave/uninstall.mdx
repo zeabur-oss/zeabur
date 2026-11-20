@@ -60,7 +60,7 @@ sudo /var/lib/rancher/rke2/bin/kubectl \
 維護頁與自訂錯誤頁在專案內有自己的工作負載、Service 與設定。移除 Zeabur 不會把維護中的網域自動切回應用程式。需要恢復流量時，先依[維護模式](../configure/maintenance.mdx)完成切換。
 
 <Callout type="warn">
-保留服務時，不要執行 `k3s-uninstall.sh` 或 `rke2-uninstall.sh`、刪除專案 Namespace、PVC 或 operator 的 CRD，也不要一起卸載 ingress、cert-manager、儲存與資料庫 operator。這些動作會停止服務，或使資料與後續維運失去必要元件。
+保留服務時，不要執行 `zeatend uninstall`、`k3s-uninstall.sh` 或 `rke2-uninstall.sh`，不要刪除專案 Namespace、PVC 或 operator 的 CRD，也不要一起卸載 ingress、cert-manager、儲存與資料庫 operator。這些動作會停止服務，或使資料與後續維運失去必要元件。
 </Callout>
 
 ## 移除管理介面
@@ -164,18 +164,17 @@ kubectl delete namespace zeabur-s3-destinations
 
 ## 整個叢集都不用時
 
-要保留服務就停在前面的流程。確定整個 K3s 或 RKE2 叢集都不用，且重要資料已備份、還原所需認證資訊另有保存時，才在主機執行：
+要保留服務就停在前面的流程。確定整個叢集都不用，且重要資料已備份、還原所需認證資訊另有保存時，才在伺服器執行：
 
 ```sh
-sudo /usr/local/bin/k3s-uninstall.sh    # K3s
-sudo /usr/local/bin/rke2-uninstall.sh   # RKE2
+sudo zeatend uninstall
 ```
 
-K3s 或 RKE2 的腳本會移除 Kubernetes 和資料，所有依賴 Kubernetes 的工作負載都會停止。
+指令會先列出要移除和保留的項目，問過你才開始。它會移除 K3s、RKE2 或 KubeSolo 和資料，以及 Zeatend 寫入的檔案，叢集上所有工作負載都會停止。用 zeabur-installer 裝的伺服器也由 Zeatend 接手，一樣用這個指令。叢集是你自己裝的，就用發行版自己的解除安裝腳本，例如 `k3s-uninstall.sh`。
 
-`/var/lib/zeabur/storage` 的 local-path 資料與 `/var/lib/longhorn` 的 replica 資料都不會被腳本刪除。只保留原始資料目錄不夠，還要有對應的 PV／PVC 與儲存系統資訊，才能重新接回服務。確認已有可還原的備份後，再決定這些目錄如何處理。
+沒加 `--delete-volumes` 時，`zeatend uninstall` 會留下 `/var/lib/zeabur/storage` 的 local-path 資料與 `/var/lib/longhorn` 的 replica 資料。只保留原始資料目錄不夠，還要有對應的 PV／PVC 與儲存系統資訊，才能重新接回服務。確認已有可還原的備份後，再決定這些目錄如何處理。
 
-只要移除一台加入的節點時，照[移除節點](../cluster/nodes.mdx#移除節點)的步驟，用 kubectl 移走副本並刪除節點，再到那台 VM 解除安裝。不要在服務仍需使用該節點的 local-path 資料時直接退出節點。
+只要移除一台加入的節點時，照[移除節點](../cluster/nodes.mdx#移除節點)的步驟，用 kubectl 移走副本並刪除節點，再到那台 VM 執行 `sudo zeatend uninstall`。不要在服務仍需使用該節點的 local-path 資料時直接退出節點。
 
 ## 移除沒有完成時
 

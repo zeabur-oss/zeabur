@@ -18,14 +18,24 @@ Open these firewall ports between nodes:
 | Direction | K3s | RKE2 |
 | --- | --- | --- |
 | To servers | TCP 6443 ([restrict the source](../reference/security.mdx#kubernetes-api)) | TCP 9345, 6443 |
-| Between all nodes | TCP 10250, UDP 4789 (Calico VXLAN) | TCP 10250, 9099, UDP 8472 (Canal VXLAN) |
+| Between all nodes | TCP 10250, UDP 8472 (flannel VXLAN) | TCP 10250, 9099, UDP 8472 (Canal VXLAN) |
 | Between servers | None | TCP 2379–2381 |
 
-Allow the UDP port only between cluster nodes. Don't expose it to the internet. If the port is blocked, replicas on different nodes can't reach each other.
+A K3s cluster that zeabur-installer set up uses Calico, with UDP 4789 in place of 8472. Allow the UDP port only between cluster nodes. Don't expose it to the internet. If the port is blocked, replicas on different nodes can't reach each other.
 
 ## Add a node
 
-Zeabur doesn't add nodes. Join the new VM with your distribution's own steps: a K3s worker, or an RKE2 worker or server. Open the firewall ports above first. When the node shows `Ready` under **Nodes**, new replicas can run on it.
+Zeabur doesn't add nodes; on a cluster set up with Zeatend, Zeatend does. Open the firewall ports above first, then run this on a server:
+
+```sh
+sudo zeatend node add
+```
+
+It prints the commands to run on the new VM: they write `/etc/zeatend/config.yaml` with the join token in it, then run `zeatend plan` and `zeatend apply`. On RKE2, add `--role server` to add a server instead of a worker. On the new VM, [download Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend), then run the printed commands as root. `zeatend plan` checks the ports and the network latency to the server, and `zeatend apply` joins the VM and waits until the node is `Ready`.
+
+A worker's token joins workers for one hour; change that with `--ttl`. Once the node is `Ready`, revoke the token with the last command `node add` printed. An RKE2 server gets the cluster's server token, which doesn't expire. Keep it out of chats and tickets.
+
+On a cluster you set up another way, join the VM with your distribution's own steps. When the node shows `Ready` under **Nodes**, new replicas can run on it.
 
 On RKE2, etcd needs a majority of servers to operate. To keep running with one server down, you need at least three servers. With only two, taking either server down stops the entire cluster. A K3s cluster has one server; when it goes down, the control plane stops until it returns.
 
@@ -101,16 +111,17 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 kubectl delete node <node>
 ```
 
-Next, sign in to the removed VM and run these as `root`, with the uninstall script for the cluster's distribution:
+Next, sign in to the removed VM and run:
 
 ```sh
-/usr/local/bin/k3s-agent-uninstall.sh   # K3s
-/usr/local/bin/rke2-uninstall.sh        # RKE2
+sudo zeatend uninstall
 ```
+
+On a node you joined without Zeatend, run the distribution's uninstall script instead, such as `k3s-agent-uninstall.sh`.
 
 **After deleting the Kubernetes node, you must also complete the uninstall on the VM.** Until you do, the VM rejoins the cluster whenever `k3s-agent` or RKE2 restarts.
 
-Volumes under `/var/lib/zeabur/storage` remain on the VM. Delete them manually only after confirming you no longer need the data.
+Volumes under `/var/lib/zeabur/storage` remain on the VM. Add `--delete-volumes` only after confirming you no longer need the data.
 
 If the cluster runs Longhorn, it keeps a node entry for the deleted node. Longhorn won't delete a node that still has replicas. Make sure every volume has a healthy replica on another node, then run:
 
@@ -134,8 +145,8 @@ When you close the terminal, Zeabur removes the terminal replica. A terminal rep
 
 ## Common failures
 
-- Can't reach the server when joining: Check that the new VM can reach the server's address on TCP 6443 (K3s) or TCP 9345 and 6443 (RKE2), along with the other ports in the table above.
-- The new node is ready, but services on different nodes can't reach each other: Check UDP 4789 (K3s) or 8472 (RKE2) and whether network policies allow traffic from the new node.
+- Can't reach the server when joining: Run `sudo zeatend plan` on the new VM; it checks each port. The VM must reach the server on TCP 6443 (K3s) or TCP 9345 and 6443 (RKE2), along with the other ports in the table above.
+- The new node is ready, but services on different nodes can't reach each other: Check UDP 8472, or 4789 on a K3s cluster that zeabur-installer set up, and whether network policies allow traffic from the new node.
 - `drain` is stuck: It's waiting for PodDisruptionBudget to allow eviction or has stopped at a replica that isn't managed by a controller. Run `kubectl get pdb -A` to see which budget is blocking eviction, resolve it, and run the command again.
 - A replica is `Pending` on the new node: It uses a `local-path` volume on the old node and must wait for that node to return.
 - A terminal replica **Can't start**: Check its events. A failed image download is a common cause.
