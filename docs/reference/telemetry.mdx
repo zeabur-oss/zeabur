@@ -112,7 +112,7 @@ Zeabur offers newer templates without an upgrade. It reads Zeabur Catalog's API 
 
 **What is sent.** Plain requests with no ID or cookie. The Zeabur server sends `zeabur` as its user agent. GitHub Pages, which serves `oss-catalog.zeabur.com`, sees the IP address they come from. Nothing about your cluster or its people is sent, so `DO_NOT_TRACK` doesn't turn this off.
 
-**Use a mirror.** For a cluster without internet access, serve a Zeabur Catalog release and set `catalog.url` to it, as [Use a mirror](../cluster/components.mdx#use-a-mirror) describes. Templates come from the same address as components. Zeabur trusts the mirror as it trusts `oss-catalog.zeabur.com`. To trust a release rather than a server, verify its signature before you copy it, as Zeabur Catalog's [Releases and the API](https://github.com/zeabur-oss/catalog/blob/main/docs/reference/releases.mdx#verify-and-read-a-release) describes.
+**Use a mirror.** For a cluster without internet access, serve a Zeabur Catalog release and set `catalog.url` to it, as [Use a mirror](../cluster/components.mdx#use-a-mirror) describes. Templates come from the same address as components. Zeabur trusts the mirror as it trusts `oss-catalog.zeabur.com`. To trust a release rather than a server, verify its signature before you copy it, as Zeabur Catalog's [Releases and the API](https://oss.zeabur.com/docs/catalog/reference/releases/#verify-and-read-a-release) describes.
 
 **Turn it off.** Any one of these is enough. Once it's off, Zeabur offers only the templates it was built with and makes no request for them.
 
