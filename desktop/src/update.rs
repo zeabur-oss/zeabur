@@ -201,21 +201,7 @@ pub(crate) async fn install_update(app: AppHandle) -> Result<(), String> {
 /// Opens the newest release's page in the browser.
 #[tauri::command]
 pub(crate) fn open_releases() -> Result<(), String> {
-    #[cfg(target_os = "macos")]
-    let mut command = std::process::Command::new("/usr/bin/open");
-    #[cfg(windows)]
-    let mut command = {
-        let mut command = std::process::Command::new("rundll32.exe");
-        command.arg("url.dll,FileProtocolHandler");
-        command
-    };
-    #[cfg(all(unix, not(target_os = "macos")))]
-    let mut command = std::process::Command::new("xdg-open");
-    command
-        .arg(RELEASES)
-        .spawn()
-        .map(drop)
-        .map_err(|e| e.to_string())
+    crate::links::open_in_browser(RELEASES).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

@@ -9,6 +9,7 @@ mod cluster;
 mod env;
 #[cfg(any(target_os = "linux", windows, test))]
 mod keys;
+mod links;
 mod menu;
 mod output;
 mod sources;
@@ -206,9 +207,10 @@ async fn open_cluster(
         "localStorage.removeItem('zeabur.locale')".to_owned()
     };
     let script = format!("try {{ {locale} }} catch {{}}");
-    let builder = WebviewWindowBuilder::new(&handle, label, url)
+    let builder = WebviewWindowBuilder::new(&handle, &label, url)
         .title(format!("{name} - Zeabur"))
         .initialization_script(&script);
+    let builder = links::open_new_windows(&handle, &label, builder);
     let builder = chrome::cluster_window(&handle, builder);
     let window = builder.build().map_err(|e| e.to_string())?;
     chrome::window_built(&window);
