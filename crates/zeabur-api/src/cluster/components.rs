@@ -783,8 +783,9 @@ impl World {
         })
     }
 
-    /// The engine's install of `id`, with the files of its manifest releases, without the
-    /// steps whose `skipIfPresent` CRDs the cluster has.
+    /// The engine's install of `id`, with the files of its manifest releases. A step whose
+    /// `skipIfPresent` CRDs the cluster has keeps only its namespaces: the engine writes each
+    /// namespace in the first release that uses it, and later releases need it.
     async fn engine_install(
         &self,
         cluster: &dyn Cluster,
@@ -797,13 +798,12 @@ impl World {
             .await?;
         let mut install = engine::install(&self.snapshot, id, &self.target(), &manifests)
             .map_err(|r| refusal(&r))?;
-        let mut kept = Vec::new();
-        for step in install.steps {
-            if !skipped(cluster, &step).await? {
-                kept.push(step);
+        for step in &mut install.steps {
+            if skipped(cluster, step).await? {
+                step.objects.retain(|d| kind(&d.object) == Namespace::KIND);
             }
         }
-        install.steps = kept;
+        install.steps.retain(|s| !s.objects.is_empty());
         Ok(install)
     }
 

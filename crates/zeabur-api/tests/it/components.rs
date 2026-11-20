@@ -857,7 +857,25 @@ mod tests {
         );
         let (status, plan) = call_for(&app(&cluster, false), "falco", "plan", "install", "").await;
         assert_eq!(status, StatusCode::OK, "{plan}");
-        assert_eq!(states(&plan), ["alert-readers pending", "falco pending"]);
+        assert_eq!(
+            states(&plan),
+            [
+                "policy-report-crds pending",
+                "alert-readers pending",
+                "falco pending"
+            ]
+        );
+        let kept: Vec<(&str, &str)> = plan["steps"][0]["writes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| (w["kind"].as_str().unwrap(), w["name"].as_str().unwrap()))
+            .collect();
+        assert_eq!(
+            kept,
+            [("Namespace", "falco")],
+            "the release's CRDs are left out, the component's namespace is not"
+        );
 
         // Once Zeabur wrote them, the release stays in the plan.
         let cluster = cluster_with_crds();
