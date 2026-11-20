@@ -93,6 +93,8 @@
               cargo-cyclonedx
               # Zeabur Proxy's parser fuzz target (crates/zeabur-proxy/fuzz)
               cargo-fuzz
+              # Breaking changes to crates/zeabur-api/openapi.yaml (scripts/api-break.ts)
+              oasdiff
               # Web interfaces (the Bun workspace: dependencies come from the root bun.lock)
               brotli
               # Documentation screenshots (scripts/docs-shots.sh)

@@ -41,7 +41,8 @@ same script with their set, `readme` or `cover`.
 - Every response item carries its `origin` (`zeabur_model::Origin`); errors are
   `zeabur_core::problem::Problem`. Gets return the resource itself, lists
   `{items}` with every item; event lists take a `limit` and add `totalSize`. Every answer is
-  `Cache-Control: no-store`. A change that breaks a client gets a `BREAKING CHANGE:` footer.
+  `Cache-Control: no-store`. A change that breaks a client gets a `BREAKING CHANGE:` footer;
+  the lint job's oasdiff step (`scripts/api-break.ts`) fails without one.
 
 ## Tests
 - Read `docs/internal/testing.md` before adding, changing or removing a test: the level each behaviour
