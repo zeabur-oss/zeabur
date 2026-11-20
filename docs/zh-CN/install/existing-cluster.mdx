@@ -182,14 +182,18 @@ Zeabur 拒绝连接的目标与没有代理时相同。镜像仓库或备份地�
 
 ## 用 GitOps 管理 chart
 
-Zeabur 用一个密钥签署已检查的变更。chart 在首次安装时创建这个密钥，之后通过 `helm upgrade` 升级时会读取并复用它。Argo CD 或 `helm template` 不连接集群就生成 manifest，每次都会生成新密钥，导致已检查但尚未应用的变更失效。这时先创建固定的密钥，再设置 `planKey.existingSecret`：
+Zeabur 用一个密钥签署已检查的变更，通过 Zeabur Identity 登录时则使用一个客户端密码。chart 在首次安装时创建这两者，之后通过 `helm upgrade` 升级时会读取并复用。Argo CD 或 `helm template` 不连接集群就生成 manifest，每次都会生成新的。密钥变了，已检查但尚未应用的变更就会失效；客户端密码变了，Zeabur 重启前都无法登录。这时先创建固定的密钥和客户端密码：
 
 ```sh
 kubectl -n zeabur create secret generic zeabur-plan-key \
   --from-literal=plan-key="$(openssl rand -hex 32)"
+CLIENT_SECRET="$(openssl rand -hex 32)"
+kubectl -n zeabur create secret generic zeabur-client \
+  --from-literal=client-secret="$CLIENT_SECRET"
+printf 'sha256:%s\n' "$(printf %s "$CLIENT_SECRET" | openssl dgst -sha256 -r | cut -d' ' -f1)"
 ```
 
-将 `planKey.existingSecret` 设为 `zeabur-plan-key`。chart 的所有配置可用 `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>` 查看。这些工具也读取不到服务器的 IP 地址，所以需要设置 `global.domain`。
+将 `planKey.existingSecret` 设为 `zeabur-plan-key`，`issuer.clientSecret.existingSecret` 设为 `zeabur-client`，`issuer.clientSecret.hash` 设为命令输出的最后一行。chart 的所有配置可用 `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>` 查看。这些工具也读取不到服务器的 IP 地址，所以需要设置 `global.domain`。
 
 ## 安装 Zeabur 需要的组件
 

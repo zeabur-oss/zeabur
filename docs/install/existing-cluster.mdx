@@ -182,14 +182,18 @@ This setting does not change Zeabur Proxy (`proxy.*`), which serves logs and met
 
 ## Manage the chart with GitOps
 
-Zeabur uses a key to sign reviewed changes. The chart creates that key on the first install and reads it back on subsequent `helm upgrade` runs. Argo CD and `helm template` generate manifests without connecting to the cluster, so they generate a new key each time, and the new key invalidates changes you reviewed but haven't applied yet. For these tools, create a fixed key first, then set `planKey.existingSecret`:
+Zeabur uses a key to sign reviewed changes, and a client secret to sign people in through Zeabur Identity. The chart creates both on the first install and reads them back on subsequent `helm upgrade` runs. Argo CD and `helm template` generate manifests without connecting to the cluster, so they create new ones each time. A new key invalidates changes you reviewed but haven't applied yet, and a new client secret stops sign-in until Zeabur restarts. For these tools, create both first:
 
 ```sh
 kubectl -n zeabur create secret generic zeabur-plan-key \
   --from-literal=plan-key="$(openssl rand -hex 32)"
+CLIENT_SECRET="$(openssl rand -hex 32)"
+kubectl -n zeabur create secret generic zeabur-client \
+  --from-literal=client-secret="$CLIENT_SECRET"
+printf 'sha256:%s\n' "$(printf %s "$CLIENT_SECRET" | openssl dgst -sha256 -r | cut -d' ' -f1)"
 ```
 
-Set `planKey.existingSecret` to `zeabur-plan-key`. These tools can't read the server's IP address either, so set `global.domain`. To view all chart settings, run `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>`.
+Set `planKey.existingSecret` to `zeabur-plan-key`, `issuer.clientSecret.existingSecret` to `zeabur-client`, and `issuer.clientSecret.hash` to the last line the commands print. These tools can't read the server's IP address either, so set `global.domain`. To view all chart settings, run `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>`.
 
 ## Install the components Zeabur needs
 

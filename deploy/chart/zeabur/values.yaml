@@ -41,12 +41,15 @@ issuer:
   # The client's ID at the issuer.
   clientId: zeabur
   clientSecret:
-    # The Secret holding the client secret, for an issuer this chart does not install. The chart
-    # never takes the secret as a value, so it stays out of Helm's release records. Empty, with
-    # identity.enabled: the chart registers the client in Zeabur Identity and makes the Secret
+    # The Secret holding the client secret. The chart never takes the secret as a value, so it
+    # stays out of Helm's release records. Empty, with identity.enabled: the chart makes the Secret
     # <release>-client with a random secret, kept on upgrades.
     existingSecret: ""
     key: client-secret
+    # With identity.enabled and existingSecret: the secret's SHA-256 as `sha256:<64 hex digits>`,
+    # which the chart registers in Zeabur Identity. For Argo CD and `helm template`, which can't
+    # read a random secret back.
+    hash: ""
   # A ConfigMap with extra CA certificates (PEM) to trust for the issuer only; set extraTrustedCA
   # for a CA every connection trusts. Empty: extraTrustedCA and the image's Mozilla CA bundle.
   caBundle:

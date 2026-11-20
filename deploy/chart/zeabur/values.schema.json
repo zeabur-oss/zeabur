@@ -88,7 +88,8 @@
           "required": ["existingSecret", "key"],
           "properties": {
             "existingSecret": { "anyOf": [{ "const": "" }, { "$ref": "#/definitions/name" }] },
-            "key": { "$ref": "#/definitions/key" }
+            "key": { "$ref": "#/definitions/key" },
+            "hash": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64})?$" }
           }
         },
         "caBundle": {

@@ -12,6 +12,6 @@ sources:
 dependencies:
   # Zeabur Identity: sign-in, installed into the namespace zeabur-identity.
   - name: identity
-    version: 0.3.1
+    version: 0.3.2
     repository: oci://ghcr.io/zeabur-oss/charts
     condition: identity.enabled

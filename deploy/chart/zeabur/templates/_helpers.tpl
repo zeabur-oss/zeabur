@@ -65,24 +65,24 @@ https://identity.{{ include "zeabur.domain" . }}
 {{- end -}}
 {{- end -}}
 
-{{/* The client registered with Zeabur Identity: the chart's own when it installs Identity. */}}
-{{- define "zeabur.ownClient" -}}
+{{/* The chart makes the client secret: it installs Identity and no Secret is given. */}}
+{{- define "zeabur.ownClientSecret" -}}
 {{- if and .Values.identity.enabled (not .Values.issuer.clientSecret.existingSecret) -}}true{{- end -}}
 {{- end -}}
 
 {{- define "zeabur.clientSecret" -}}
-{{- if include "zeabur.ownClient" . -}}
+{{- if include "zeabur.ownClientSecret" . -}}
 {{- printf "%s-client" (include "zeabur.fullname" .) -}}
 {{- else -}}
 {{- required "issuer.clientSecret.existingSecret is required when identity.enabled is false" .Values.issuer.clientSecret.existingSecret -}}
 {{- end -}}
 {{- end -}}
 
-{{/* The domains new URLs are suggested under: domains.suffixes, else the sslip.io domain. */}}
+{{/* The domains new URLs are suggested under: domains.suffixes, else an sslip.io domain. */}}
 {{- define "zeabur.domainSuffixes" -}}
 {{- if .Values.domains.suffixes -}}
 {{- join "," .Values.domains.suffixes -}}
-{{- else if not .Values.global.domain -}}
+{{- else if or (not .Values.global.domain) (hasSuffix ".sslip.io" .Values.global.domain) -}}
 {{- include "zeabur.domain" . -}}
 {{- end -}}
 {{- end -}}

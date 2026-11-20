@@ -218,6 +218,14 @@ expect full "$(render -f "$chart/ci/full-values.yaml")" "$cluster_env" shop-prod
 domain_env='[select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_DOMAIN_SUFFIXES" or .name == "ZEABUR_CLUSTER_ISSUER") | .value] | join(",")'
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$domain_env" letsencrypt
 expect full "$(render -f "$chart/ci/full-values.yaml")" "$domain_env" "apps.example.test,example.test,letsencrypt"
+expect sslip "$(render -f "$chart/ci/minimal-values.yaml" --set global.domain=192.0.2.10.sslip.io)" \
+  "$domain_env" "192.0.2.10.sslip.io,letsencrypt"
+
+# A client secret from a Secret of one's own: Identity gets the given hash, and the chart makes no Secret.
+own_client='[(select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.volumes[] | select(.name == "client-secret") | .secret.secretName), (select(.kind == "OAuthClient") | .spec.secretHash), (select(.kind == "Secret" and (.metadata.name | test("-client$"))) | .metadata.name)] | join(",")'
+client_hash="sha256:$(printf '%064d' 0)"
+expect "own client secret" "$(render -f "$chart/ci/minimal-values.yaml" --set issuer.clientSecret.existingSecret=zeabur-client \
+  --set issuer.clientSecret.hash="$client_hash")" "$own_client" "zeabur-client,$client_hash"
 
 # Extra CAs reach Zeabur only when given, from a ConfigMap or a Secret.
 extra_ca='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec | [(.containers[0].env[] | select(.name == "ZEABUR_EXTRA_CA_FILE") | .value), (.volumes[] | select(.name == "extra-ca") | .secret.secretName // .configMap.name)] | join(",")'
@@ -298,6 +306,9 @@ refuse "a domain that is not a domain" --set global.domain=Example_Test
 refuse "no issuer without Zeabur Identity" --set identity.enabled=false
 refuse "no client secret without Zeabur Identity" --set identity.enabled=false \
   --set issuer.url=https://identity.example.test
+refuse "a client Secret without its hash" --set issuer.clientSecret.existingSecret=zeabur-client
+refuse "a client secret hash that is not sha256" --set issuer.clientSecret.existingSecret=zeabur-client \
+  --set issuer.clientSecret.hash="$(printf '%064d' 0)"
 refuse "an HTTPRoute with no parent" --set httpRoute.enabled=true
 refuse "a metrics store without a port" --set metricsStore.service=observability/vm
 refuse "a plain http catalog" --set catalog.url=http://catalog.example.test/v1/

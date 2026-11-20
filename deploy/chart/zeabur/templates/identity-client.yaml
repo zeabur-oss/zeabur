@@ -1,6 +1,8 @@
-{{- if include "zeabur.ownClient" . }}
-{{- /* Zeabur's client at the Zeabur Identity this chart installs. The secret is random on install
-       and kept on upgrades; Identity stores only its hash. */}}
+{{- if .Values.identity.enabled }}
+{{- /* Zeabur's client at the Zeabur Identity this chart installs. A secret the chart makes is
+       random on install and kept on upgrades; Identity stores only its hash. */}}
+{{- $hash := "" }}
+{{- if include "zeabur.ownClientSecret" . }}
 {{- $name := include "zeabur.clientSecret" . }}
 {{- $key := .Values.issuer.clientSecret.key }}
 {{- $existing := lookup "v1" "Secret" .Release.Namespace $name }}
@@ -10,7 +12,7 @@
 {{- else }}
 {{- $secret = randAlphaNum 43 }}
 {{- end }}
-{{- $publicUrl := include "zeabur.publicUrl" . }}
+{{- $hash = printf "sha256:%s" ($secret | sha256sum) }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -22,6 +24,10 @@ type: Opaque
 data:
   {{ $key }}: {{ $secret | b64enc }}
 ---
+{{- else }}
+{{- $hash = required "issuer.clientSecret.hash is required with identity.enabled and issuer.clientSecret.existingSecret" .Values.issuer.clientSecret.hash }}
+{{- end }}
+{{- $publicUrl := include "zeabur.publicUrl" . }}
 apiVersion: identity.zeabur.com/v1alpha1
 kind: OAuthClient
 metadata:
@@ -35,5 +41,5 @@ spec:
   redirectUris: [{{ printf "%s/auth/callback" $publicUrl | quote }}]
   homeUrl: {{ printf "%s/" $publicUrl | quote }}
   audiences: [kubernetes]
-  secretHash: sha256:{{ $secret | sha256sum }}
+  secretHash: {{ $hash }}
 {{- end }}
