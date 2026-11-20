@@ -538,7 +538,7 @@ export type BackupRun = {
    * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The provider's message, for a failure.
    * @nullable
@@ -560,7 +560,7 @@ export type BackupRun = {
    * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /** What it covered. */
   targets: BackupTarget[]
 }
@@ -2797,13 +2797,13 @@ export type VeleroBackup = {
    * When Velero deletes it.
    * @nullable
    */
-  expires?: string | null
+  expiresAt?: string | null
   failure?: VeleroFailure | null
   /**
    * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * Objects copied.
    * @minimum 0
@@ -2835,7 +2835,7 @@ export type VeleroBackup = {
    * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /**
    * Objects it set out to copy.
    * @minimum 0
@@ -2882,7 +2882,7 @@ export type VeleroLocation = {
    * When Velero last checked.
    * @nullable
    */
-  lastValidated?: string | null
+  lastValidatedAt?: string | null
   /**
    * Velero's message about the last check.
    * @nullable
@@ -2923,7 +2923,7 @@ export type VeleroRestore = {
    * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The new namespace it restores into, when it maps one.
    * @nullable
@@ -2951,7 +2951,7 @@ export type VeleroRestore = {
    * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /**
    * Warnings Velero counted, such as objects that were already there.
    * @minimum 0
@@ -3117,7 +3117,7 @@ export type EventView = {
    * When it last happened.
    * @nullable
    */
-  lastSeen?: string | null
+  lastSeenAt?: string | null
   /** What happened, as the component reported it. */
   note: string
   /** The Event object itself. */
@@ -3139,7 +3139,7 @@ export type EventView = {
  * Events of the whole cluster, the newest `limit` of them.
  */
 export type ClusterEventList = {
-  /** Newest first (by `lastSeen`, events without one last), then by namespace and name. */
+  /** Newest first (by `lastSeenAt`, events without one last), then by namespace and name. */
   items: EventView[]
   /**
    * `true` when the cluster holds more events than Zeabur read (5,000): older ones may be
@@ -3190,7 +3190,7 @@ export type LeaderLease = {
    * When the leader last renewed the lease.
    * @nullable
    */
-  renewed?: string | null
+  renewedAt?: string | null
 }
 
 /**
@@ -3999,7 +3999,7 @@ export type ClusterUsage = {
    * When the newest sample was taken.
    * @nullable
    */
-  timestamp?: string | null
+  sampledAt?: string | null
   /** Every namespace together. */
   totals: UsageTotals
   /** What could not be read. */
@@ -4843,7 +4843,7 @@ export type ContainerTermination = {
    * When it ended.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The container's termination message, or the runtime's.
    * @nullable
@@ -4858,7 +4858,7 @@ export type ContainerTermination = {
    * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
 }
 
 /**
@@ -5049,7 +5049,7 @@ export type DatabaseAppUser = {
  */
 export type DatabaseRecoveryWindow = {
   /** The earliest time: when the oldest backup in the store finished. */
-  first: string
+  earliestAt: string
   /**
    * The newest time is this many seconds before now: the archive may not hold the most
    * recent writes yet.
@@ -5198,7 +5198,7 @@ export type PodSummary = {
    * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** `fail` when it keeps failing, `ok` when ready, `idle` when it succeeded, `warn` otherwise. */
   health: Health
   /** Its resource name, `projects/<project>/pods/<name>`; see [`crate::id`]. */
@@ -5243,7 +5243,7 @@ export type DatabaseRestored = {
    * When the backup was taken.
    * @nullable
    */
-  time?: string | null
+  takenAt?: string | null
 }
 
 /**
@@ -5281,7 +5281,7 @@ export type Database = {
    * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** The engine. */
   engine: DatabaseEngine
   /**
@@ -5708,7 +5708,7 @@ export type Diagnosis = {
    * When it last happened, when known.
    * @nullable
    */
-  lastSeen?: string | null
+  lastSeenAt?: string | null
   /** The pods it was seen in, sorted. */
   pods: string[]
   /**
@@ -5996,7 +5996,7 @@ export const EntryKind = {
  * Events of a project, the newest `limit` of them.
  */
 export type EventList = {
-  /** Newest first (by `lastSeen`, events without one last), then by name. */
+  /** Newest first (by `lastSeenAt`, events without one last), then by name. */
   items: EventView[]
   /**
    * How many events matched, also those past `limit`.
@@ -6069,6 +6069,11 @@ export type FalcoAlert = {
    * @nullable
    */
   container?: string | null
+  /**
+   * When it happened.
+   * @nullable
+   */
+  happenedAt?: string | null
   /** The report result it was read from. */
   origin: Origin
   /** Falco's own sentence, with every field it names. */
@@ -6084,11 +6089,6 @@ export type FalcoAlert = {
   severity: FalcoSeverity
   /** Falco's event source (`syscall`, `k8s_audit`). */
   source: string
-  /**
-   * When it happened.
-   * @nullable
-   */
-  time?: string | null
   /**
    * The user it ran as.
    * @nullable
@@ -6937,7 +6937,7 @@ export type Incident = {
    * Since when, when known.
    * @nullable
    */
-  since?: string | null
+  startedAt?: string | null
   /** What stops working because of it. */
   why: Message
 }
@@ -7096,7 +7096,7 @@ export type LogHistoryLine = {
   /** The pod that wrote it, which may be gone. */
   pod: string
   /** When it was written. */
-  time: string
+  writtenAt: string
 }
 
 /**
@@ -7845,7 +7845,7 @@ export type NodeView = {
    * When it joined the cluster.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   disk?: DiskUsage | null
   /** `cluster/nodes/<name>`. */
   id: string
@@ -8315,7 +8315,7 @@ export type ObjectSummary = {
    * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** `projects/<p>/objects/<group>/<version>/<resource>/<name>`, `core` for the empty group. */
   id: string
   /** Its name. */
@@ -8892,7 +8892,7 @@ export type TaskSchedule = {
    * When a run was last started.
    * @nullable
    */
-  lastScheduled?: string | null
+  lastScheduledAt?: string | null
   /** The controller starts no new runs (`spec.suspend`). */
   suspended?: boolean
   /**
@@ -8915,7 +8915,7 @@ export type WorkloadSummary = Classification & {
    * When the workload was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /**
    * The first container's image, as a quick identifier.
    * @nullable
@@ -9155,7 +9155,7 @@ export type ZeaburBuilderProblem = {
    * When the condition turned `False`.
    * @nullable
    */
-  since?: string | null
+  startedAt?: string | null
 }
 
 /**
@@ -9263,7 +9263,7 @@ export type ZeaburBuilderBuild = {
    * When that upload token expires.
    * @nullable
    */
-  uploadExpires?: string | null
+  uploadExpiresAt?: string | null
   /**
    * The upload token request the controller last answered
    * (`status.uploadToken.request`).
@@ -9318,7 +9318,7 @@ export type ZeaburBuilderRun = {
    * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /**
    * The pushed manifest's digest.
    * @nullable
@@ -9328,7 +9328,7 @@ export type ZeaburBuilderRun = {
    * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The ref the commit came from, such as `refs/heads/master`.
    * @nullable
@@ -9360,7 +9360,7 @@ export type ZeaburBuilderRun = {
    * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /** The tags pushed. */
   tags: string[]
   /**
@@ -9455,7 +9455,7 @@ export type ProjectDeleting = {
   /** What is left, by resource, as the namespace controller counts it. */
   remaining: RemainingContent[]
   /** When the deletion started. */
-  since: string
+  startedAt: string
 }
 
 /**
@@ -9789,7 +9789,7 @@ export type SeaweedObjectStorage = {
    * When it was created.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** Its IAM objects: identities, credentials, policies and policy bindings, by kind and name. */
   iam: Origin[]
   /**
@@ -9911,13 +9911,13 @@ export type ProjectUsage = {
   nearLimit: number
   /** Every pod with a sample, by name. A running pod missing here has none yet. */
   pods: PodUsage[]
-  /** Whether usage could be read. */
-  state: MetricsState
   /**
    * When the newest sample was taken.
    * @nullable
    */
-  timestamp?: string | null
+  sampledAt?: string | null
+  /** Whether usage could be read. */
+  state: MetricsState
   /** What could not be read. */
   unreadable: UnreadableView[]
   /**
@@ -9954,13 +9954,13 @@ export type PrometheusSeries = {
  */
 export type Release = {
   /** The last day it gets patches. */
-  endOfLife: string
+  endOfLifeAt: string
   /** From this day only critical fixes are made ("maintenance mode"). */
-  maintenanceFrom: string
+  maintenanceStartsAt: string
   /** `1.34`. */
   minor: string
   /** Its first release. */
-  released: string
+  releasedAt: string
 }
 
 /**
@@ -10641,7 +10641,7 @@ export type TaskRun = {
    * When it ended.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /** Its status dot: a failed run fails, a running one is fine, a finished one is idle. */
   health: Health
   /** Someone started it by hand (`cronjob.kubernetes.io/instantiate: manual`). */
@@ -10654,7 +10654,7 @@ export type TaskRun = {
    * When it started.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
   /** How it stands. */
   status: RunStatus
 }
@@ -11008,7 +11008,7 @@ export type Upgrades = {
   attention: UpgradeFinding[]
   badge?: UpgradeFinding | null
   /** When the bundled table was copied from the Kubernetes schedule. */
-  dataAsOf: string
+  dataCopiedAt: string
   /**
    * `k3s`, `rke2` or `kubesolo`, when the version names one.
    * @nullable
@@ -11077,7 +11077,7 @@ export type VolumeRestore = {
    * When it finished.
    * @nullable
    */
-  finished?: string | null
+  finishedAt?: string | null
   /**
    * The claim it restores into; absent for a restore to anywhere else.
    * @nullable
@@ -11104,17 +11104,17 @@ export type VolumeRestore = {
    * When it was created.
    * @nullable
    */
-  started?: string | null
+  startedAt?: string | null
 }
 
 /**
  * A snapshot of a claim that can be restored.
  */
 export type VolumeSnapshot = {
-  /** When it was taken. */
-  date: string
   /** restic's ID. */
   id: string
+  /** When it was taken. */
+  takenAt: string
 }
 
 /**
@@ -11219,7 +11219,7 @@ export type WorkloadRelease = {
    * When it was made.
    * @nullable
    */
-  created?: string | null
+  createdAt?: string | null
   /** It is the template the workload runs now. */
   current: boolean
   /** The images of its containers, in order. */

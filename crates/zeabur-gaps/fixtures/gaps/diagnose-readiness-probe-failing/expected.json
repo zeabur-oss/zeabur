@@ -24,6 +24,6 @@
     },
     "fix": {"key": "diagnosis.probeFailure.fix.readiness", "params": {"container": "api"}},
     "evidence": [{"kind": "Event", "name": "api-2.unhealthy"}],
-    "lastSeen": "2026-10-15T11:58:00Z"
+    "lastSeenAt": "2026-10-15T11:58:00Z"
   }
 ]

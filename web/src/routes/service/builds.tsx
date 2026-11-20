@@ -290,7 +290,7 @@ function Summary({
   const { locale } = useI18n()
   const { build, image } = built
   const current = runsLatest(image, build)
-  const since = latest?.started ?? latest?.created
+  const since = latest?.startedAt ?? latest?.createdAt
   const problem = buildProblem(build, latest)
   const branch = branchOf(build)
   const failedRun = !problem && latest?.phase === "Failed" ? latest : undefined
@@ -674,7 +674,7 @@ function History({ project, runs }: { project: string; runs: BuildRun[] }) {
             <TimelineItem
               key={run.name}
               tone={dotTone(run.health)}
-              time={<Ago iso={run.started ?? run.created} />}
+              time={<Ago iso={run.startedAt ?? run.createdAt} />}
               title={
                 <span className="flex flex-wrap items-baseline gap-x-2">
                   {phaseWord(t, run)}

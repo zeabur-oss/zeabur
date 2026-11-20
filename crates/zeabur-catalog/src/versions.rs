@@ -54,11 +54,11 @@ pub struct Release {
     /// `1.34`.
     pub minor: Cow<'static, str>,
     /// Its first release.
-    pub released: Date,
+    pub released_at: Date,
     /// From this day only critical fixes are made ("maintenance mode").
-    pub maintenance_from: Date,
+    pub maintenance_starts_at: Date,
     /// The last day it gets patches.
-    pub end_of_life: Date,
+    pub end_of_life_at: Date,
 }
 
 /// Kubernetes minors still supported or recently ended, newest first.
@@ -70,33 +70,33 @@ pub struct Release {
 pub const RELEASES: &[Release] = &[
     Release {
         minor: Cow::Borrowed("1.37"),
-        released: date(2026, 8, 26),
-        maintenance_from: date(2027, 8, 28),
-        end_of_life: date(2027, 10, 28),
+        released_at: date(2026, 8, 26),
+        maintenance_starts_at: date(2027, 8, 28),
+        end_of_life_at: date(2027, 10, 28),
     },
     Release {
         minor: Cow::Borrowed("1.36"),
-        released: date(2026, 4, 22),
-        maintenance_from: date(2027, 4, 28),
-        end_of_life: date(2027, 6, 28),
+        released_at: date(2026, 4, 22),
+        maintenance_starts_at: date(2027, 4, 28),
+        end_of_life_at: date(2027, 6, 28),
     },
     Release {
         minor: Cow::Borrowed("1.35"),
-        released: date(2025, 12, 17),
-        maintenance_from: date(2026, 12, 28),
-        end_of_life: date(2027, 2, 28),
+        released_at: date(2025, 12, 17),
+        maintenance_starts_at: date(2026, 12, 28),
+        end_of_life_at: date(2027, 2, 28),
     },
     Release {
         minor: Cow::Borrowed("1.34"),
-        released: date(2025, 8, 27),
-        maintenance_from: date(2026, 8, 27),
-        end_of_life: date(2026, 10, 27),
+        released_at: date(2025, 8, 27),
+        maintenance_starts_at: date(2026, 8, 27),
+        end_of_life_at: date(2026, 10, 27),
     },
     Release {
         minor: Cow::Borrowed("1.33"),
-        released: date(2025, 4, 23),
-        maintenance_from: date(2026, 4, 28),
-        end_of_life: date(2026, 6, 28),
+        released_at: date(2025, 4, 23),
+        maintenance_starts_at: date(2026, 4, 28),
+        end_of_life_at: date(2026, 6, 28),
     },
 ];
 
@@ -293,8 +293,8 @@ pub fn assess(inputs: &Inputs<'_>) -> Assessment {
     let minor = current.minor_label();
     out.release = release(&minor);
     match &out.release {
-        Some(row) if inputs.today > row.end_of_life => out.states.push(UpgradeState::EndOfLife),
-        Some(row) if inputs.today >= row.maintenance_from => {
+        Some(row) if inputs.today > row.end_of_life_at => out.states.push(UpgradeState::EndOfLife),
+        Some(row) if inputs.today >= row.maintenance_starts_at => {
             out.states.push(UpgradeState::Maintenance);
         }
         Some(_) => {}
@@ -409,9 +409,12 @@ mod tests {
             assert_eq!(minor_order(&newer.minor, &older.minor), Ordering::Greater);
         }
         for row in RELEASES {
-            assert!(row.released < row.maintenance_from && row.maintenance_from < row.end_of_life);
+            assert!(
+                row.released_at < row.maintenance_starts_at
+                    && row.maintenance_starts_at < row.end_of_life_at
+            );
         }
-        assert_eq!(release("1.34").unwrap().end_of_life, date(2026, 10, 27));
+        assert_eq!(release("1.34").unwrap().end_of_life_at, date(2026, 10, 27));
     }
 
     #[test]

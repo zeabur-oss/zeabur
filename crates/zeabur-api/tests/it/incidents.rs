@@ -136,7 +136,7 @@ mod tests {
             controller["services"][0]["id"],
             "projects/shop/services/deployment/web"
         );
-        assert_eq!(controller["since"], "2026-10-20T08:00:00Z");
+        assert_eq!(controller["startedAt"], "2026-10-20T08:00:00Z");
         assert_eq!(
             controller["cause"]["key"],
             "incident.componentDown.cause.ingressController"

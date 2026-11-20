@@ -487,7 +487,7 @@ fn component_incident(
                 .with_field("status.readyReplicas".to_owned())
                 .with_value(component.ready.to_string()),
         ],
-        since: component.since,
+        started_at: component.since,
     }
 }
 
@@ -596,7 +596,7 @@ fn node_incident(node: &NodeState, projects: &[Reach<'_>], wide: &Wide<'_>) -> I
                 .with_field("status.conditions[type=Ready]".to_owned())
                 .with_value(node.status.clone()),
         ],
-        since: node.since,
+        started_at: node.since,
     }
 }
 
@@ -718,7 +718,7 @@ mod tests {
             why: Message::new("diagnosis.crashLoop.why"),
             fix: Message::new("diagnosis.crashLoop.fix"),
             evidence: Vec::new(),
-            last_seen: None,
+            last_seen_at: None,
             fault: Fault::new(FaultOrigin::Code, Fixer::You),
             incident: None,
             group: zeabur_model::DiagnosisGroup::of(

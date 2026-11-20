@@ -447,11 +447,11 @@ function Summary({
   const facts = useStatusFacts()(undefined, status.pod)
   const term = status.pod?.running ? undefined : status.reason
   const started = service.pods
-    .map((pod) => pod.created)
+    .map((pod) => pod.createdAt)
     .filter((created): created is string => !!created)
     .toSorted()
     .at(-1)
-  const since = started ?? service.created ?? undefined
+  const since = started ?? service.createdAt ?? undefined
   const setup = verdict.reach ? reachSetup(verdict.reach) : undefined
   const buildSaid = buildSays(service)
   return (
@@ -621,7 +621,7 @@ function Replicas({
                         {pod.node}
                       </span>
                     ) : null}
-                    {pod.created ? <Ago iso={pod.created} /> : null}
+                    {pod.createdAt ? <Ago iso={pod.createdAt} /> : null}
                     {pod.restarts > 0 ? <span>{t("pod.restarts", pod.restarts)}</span> : null}
                   </span>
                 </li>

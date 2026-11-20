@@ -277,9 +277,9 @@ function ServiceView({
                   ) : null}
                 </div>
                 <div className="flex min-w-0 flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-secondary">
-                  {service.created ? (
+                  {service.createdAt ? (
                     <span className="whitespace-nowrap">
-                      {t("service.created", formatDate(service.created, locale))}
+                      {t("service.created", formatDate(service.createdAt, locale))}
                     </span>
                   ) : null}
                   <Freshness

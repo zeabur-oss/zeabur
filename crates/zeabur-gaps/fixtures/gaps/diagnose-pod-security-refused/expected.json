@@ -27,6 +27,6 @@
         "fieldPath": "status.conditions[type=ReplicaFailure]"
       }
     ],
-    "lastSeen": "2026-10-23T11:55:00Z"
+    "lastSeenAt": "2026-10-23T11:55:00Z"
   }
 ]

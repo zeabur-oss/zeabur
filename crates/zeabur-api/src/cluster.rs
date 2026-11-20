@@ -353,7 +353,7 @@ fn node_view(node: &Node) -> NodeView {
         pinned_pods: None,
         usage: None,
         disk: None,
-        created: node.metadata.creation_timestamp.as_ref().map(|t| t.0),
+        created_at: node.metadata.creation_timestamp.as_ref().map(|t| t.0),
         issues: Vec::new(),
     }
 }
@@ -598,7 +598,7 @@ pub(crate) async fn upgrades(
         kubernetes_version: version,
         minor: assessment.minor,
         release: assessment.release,
-        data_as_of: versions::DATA_AS_OF,
+        data_copied_at: versions::DATA_AS_OF,
         badge,
         attention,
         states: assessment.states,

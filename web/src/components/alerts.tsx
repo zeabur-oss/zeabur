@@ -71,7 +71,7 @@ export function AlertList({
               </CollapsibleContent>
             </Collapsible>
           </div>
-          <Ago iso={alert.time} className="type-meta text-muted-foreground" />
+          <Ago iso={alert.happenedAt} className="type-meta text-muted-foreground" />
         </li>
       ))}
     </ol>

@@ -56,10 +56,10 @@ pub struct TaskRun {
     pub manual: bool,
     /// When it started.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub started: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
     /// When it ended.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub finished: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
     /// Its pods, newest last, for their logs.
     pub pods: Vec<String>,
 }
@@ -156,8 +156,8 @@ fn run(job: &Job, pods: &[zeabur_kube::k8s_openapi::api::core::v1::Pod]) -> Task
             .as_ref()
             .and_then(|a| a.get("cronjob.kubernetes.io/instantiate"))
             .is_some_and(|v| v == "manual"),
-        started: status.and_then(|s| s.start_time.as_ref()).map(|t| t.0),
-        finished: status.and_then(|s| s.completion_time.as_ref()).map(|t| t.0),
+        started_at: status.and_then(|s| s.start_time.as_ref()).map(|t| t.0),
+        finished_at: status.and_then(|s| s.completion_time.as_ref()).map(|t| t.0),
         pods: owned
             .into_iter()
             .filter_map(|p| p.metadata.name.clone())

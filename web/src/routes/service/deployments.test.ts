@@ -44,7 +44,7 @@ const release = (revision: number, created: string) =>
   ({
     name: `api-${revision}`,
     revision,
-    created,
+    createdAt: created,
     current: false,
     images: [],
     pods: { ready: 0, total: 0 },
@@ -53,7 +53,15 @@ const release = (revision: number, created: string) =>
   }) as never
 
 const event = (type: string, lastSeen: string, id: string) =>
-  ({ id, type, lastSeen, reason: "BackOff", note: "", count: 1, origin: {} }) as unknown as Event
+  ({
+    id,
+    type,
+    lastSeenAt: lastSeen,
+    reason: "BackOff",
+    note: "",
+    count: 1,
+    origin: {},
+  }) as unknown as Event
 
 describe("A service's changes", () => {
   test("interleave releases and warnings, newest first, and leave out normal events", () => {

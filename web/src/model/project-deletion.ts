@@ -24,8 +24,8 @@ export function dataFate(volume: Schemas.VolumeDeletion): DataFate {
 
 /** Whether `run` is a backup that succeeded within the last day. */
 export function recentBackup(run: Run | null | undefined, now = Date.now()): boolean {
-  if (!run || run.outcome !== "succeeded" || !run.finished) return false
-  const finished = new Date(run.finished).getTime()
+  if (!run || run.outcome !== "succeeded" || !run.finishedAt) return false
+  const finished = new Date(run.finishedAt).getTime()
   return !Number.isNaN(finished) && now - finished < RECENT_MS
 }
 

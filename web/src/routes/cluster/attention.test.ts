@@ -102,7 +102,7 @@ describe("version items", () => {
       date,
       upgrades({
         attention: [{ state: "end-of-life", health: "fail" }],
-        release: { endOfLife: "2025-06-28" } as Schemas.Upgrades["release"],
+        release: { endOfLifeAt: "2025-06-28" } as Schemas.Upgrades["release"],
       }),
     )
     expect(past).toMatchObject({ health: "fail" })
@@ -112,7 +112,7 @@ describe("version items", () => {
       date,
       upgrades({
         attention: [{ state: "maintenance", health: "warn" }],
-        release: { endOfLife: "2026-12-28" } as Schemas.Upgrades["release"],
+        release: { endOfLifeAt: "2026-12-28" } as Schemas.Upgrades["release"],
       }),
     )
     expect(soon).toMatchObject({ health: "warn" })

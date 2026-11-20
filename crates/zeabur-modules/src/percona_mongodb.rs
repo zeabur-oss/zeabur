@@ -308,9 +308,9 @@ fn backups_of(
                 provider: MODULE.id.to_owned(),
                 targets: vec![target.clone()],
                 outcome,
-                started: filled_time(status.start.as_ref())
+                started_at: filled_time(status.start.as_ref())
                     .or_else(|| b.metadata.creation_timestamp.as_ref().map(|t| t.0)),
-                finished: filled_time(status.completed.as_ref()),
+                finished_at: filled_time(status.completed.as_ref()),
                 message: filled(status.error.as_ref()),
                 restore_from: (outcome == Outcome::Succeeded)
                     .then(|| filled(status.destination.as_ref()))
@@ -434,7 +434,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
         },
         app: app_user(&read, &name),
         backups: backups_of(namespace, cluster, &read, &name, backups),
-        created: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
+        created_at: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),

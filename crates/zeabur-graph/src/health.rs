@@ -91,7 +91,7 @@ pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) ->
     let Some(last) = &status.last_termination else {
         return false;
     };
-    let last_run_short = match (last.started, last.finished) {
+    let last_run_short = match (last.started_at, last.finished_at) {
         (Some(started), Some(finished)) => finished.duration_since(started) < BACKOFF_RESET,
         _ => true,
     };
@@ -211,7 +211,7 @@ mod tests {
                 phase,
                 replicas: replicas.map(|(ready, desired)| Replicas { ready, desired }),
                 image: None,
-                created: None,
+                created_at: None,
                 schedule: None,
                 provenance: Provenance {
                     tool: None,
@@ -235,7 +235,7 @@ mod tests {
             containers: vec!["y".to_owned()],
             reason: reason.map(str::to_owned),
             cause: None,
-            created: None,
+            created_at: None,
             node: None,
             container_statuses: Vec::new(),
             origin: Origin::object("Pod", "y-1"),
@@ -369,8 +369,8 @@ mod tests {
             last_termination: Some(ContainerTermination {
                 reason: Some("Error".to_owned()),
                 exit_code: 1,
-                started: Some(finished.checked_sub(previous).unwrap()),
-                finished: Some(finished),
+                started_at: Some(finished.checked_sub(previous).unwrap()),
+                finished_at: Some(finished),
                 message: None,
             }),
         }];
@@ -429,8 +429,8 @@ mod tests {
         status.terminated = Some(ContainerTermination {
             reason: Some("Completed".to_owned()),
             exit_code: 0,
-            started: Some(now),
-            finished: Some(now),
+            started_at: Some(now),
+            finished_at: Some(now),
             message: None,
         });
         assert_eq!(pod_health(&pod, Some(now)), Health::Ok);

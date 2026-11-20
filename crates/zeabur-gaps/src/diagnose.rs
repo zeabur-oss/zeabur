@@ -357,7 +357,7 @@ impl Found {
                 why: gathered.why,
                 fix: gathered.fix,
                 evidence: gathered.evidence.into_iter().collect(),
-                last_seen: gathered.last,
+                last_seen_at: gathered.last,
                 incident: None,
             })
             .collect()
@@ -564,7 +564,7 @@ fn out_of_memory(
             status_field(pod, status, &format!("{field}.reason"))
                 .with_value(termination.reason.clone().unwrap_or_default()),
         ],
-        termination.finished,
+        termination.finished_at,
     );
 }
 
@@ -597,7 +597,7 @@ fn crash_loop(
         .waiting
         .as_ref()
         .is_some_and(|w| w.reason.as_deref() == Some("CrashLoopBackOff"));
-    let when = last.finished;
+    let when = last.finished_at;
     if status.restarts < 1 {
         return;
     }
@@ -678,7 +678,7 @@ fn run_failed(
         (None, Some(t)) => ("lastState.terminated", t),
         (None, None) => return,
     };
-    let when = termination.finished;
+    let when = termination.finished_at;
     if termination.exit_code == 0 {
         let passed = found.succeeded.entry(status.name.clone()).or_insert(when);
         *passed = (*passed).max(when);
@@ -1366,7 +1366,7 @@ fn unexplained<'e, 's>(
         why,
         fix,
         evidence,
-        last_seen,
+        last_seen_at: last_seen,
         incident: None,
         refused_port: None,
     }

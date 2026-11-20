@@ -152,7 +152,7 @@ pub struct Location {
     pub phase: LocationPhase,
     /// When Velero last checked.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub last_validated: Option<Timestamp>,
+    pub last_validated_at: Option<Timestamp>,
     /// Velero's message about the last check.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -226,13 +226,13 @@ pub struct BackupView {
     pub outcome: Outcome,
     /// When it started.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub started: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
     /// When it finished.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
     /// When Velero deletes it.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub expires: Option<Timestamp>,
+    pub expires_at: Option<Timestamp>,
     /// Objects copied.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub items: Option<u64>,
@@ -258,7 +258,7 @@ impl BackupView {
     /// The time it is sorted by: started, else finished.
     #[must_use]
     pub fn time(&self) -> Option<Timestamp> {
-        self.started.or(self.finished)
+        self.started_at.or(self.finished_at)
     }
 }
 
@@ -283,10 +283,10 @@ pub struct RestoreView {
     pub outcome: Outcome,
     /// When it started.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub started: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
     /// When it finished.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
     /// Errors Velero counted.
     pub errors: u64,
     /// Warnings Velero counted, such as objects that were already there.
@@ -334,7 +334,7 @@ pub fn location(object: &DynamicObject) -> Location {
         endpoint: text(object, "/spec/config/s3Url"),
         credential: text(object, "/spec/credential/name"),
         phase,
-        last_validated: time(object, "/status/lastValidationTime"),
+        last_validated_at: time(object, "/status/lastValidationTime"),
         message: text(object, "/status/message"),
     }
 }
@@ -468,9 +468,9 @@ pub fn backup(
         failure: failure(phase.as_deref(), location, errors),
         phase,
         outcome,
-        started: time(object, "/status/startTimestamp"),
-        finished: time(object, "/status/completionTimestamp"),
-        expires: time(object, "/status/expiration"),
+        started_at: time(object, "/status/startTimestamp"),
+        finished_at: time(object, "/status/completionTimestamp"),
+        expires_at: time(object, "/status/expiration"),
         items: number(object, "/status/progress/itemsBackedUp"),
         total_items: number(object, "/status/progress/totalItems"),
         errors,
@@ -512,8 +512,8 @@ pub fn restore(object: &DynamicObject) -> RestoreView {
             .map(str::to_owned),
         namespaces: covered(object, "/spec"),
         outcome,
-        started: time(object, "/status/startTimestamp"),
-        finished: time(object, "/status/completionTimestamp"),
+        started_at: time(object, "/status/startTimestamp"),
+        finished_at: time(object, "/status/completionTimestamp"),
         errors: number(object, "/status/errors").unwrap_or(0),
         warnings: number(object, "/status/warnings").unwrap_or(0),
         reason: text(object, "/status/failureReason")

@@ -155,8 +155,8 @@ pub fn findings(
             provider: MODULE.id.to_owned(),
             targets: targets(backup, "/spec", namespace, volumes),
             outcome,
-            started: time(backup, "/status/startTimestamp"),
-            finished: time(backup, "/status/completionTimestamp"),
+            started_at: time(backup, "/status/startTimestamp"),
+            finished_at: time(backup, "/status/completionTimestamp"),
             message: errors.map(|n| format!("{n} errors")),
             restore_from: None,
         });

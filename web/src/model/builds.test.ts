@@ -82,12 +82,12 @@ describe("runsLatest", () => {
 
 test("a run's duration runs to now until it finishes", () => {
   const run = {
-    started: "2026-10-23T08:00:00Z",
-    finished: null,
+    startedAt: "2026-10-23T08:00:00Z",
+    finishedAt: null,
   } as unknown as BuildRun
   expect(durationOf(run, Date.parse("2026-10-23T08:01:30Z"))).toBe(90_000)
-  expect(durationOf({ ...run, finished: "2026-10-23T08:00:20Z" }, 0)).toBe(20_000)
-  expect(durationOf({ ...run, started: null }, 0)).toBeUndefined()
+  expect(durationOf({ ...run, finishedAt: "2026-10-23T08:00:20Z" }, 0)).toBe(20_000)
+  expect(durationOf({ ...run, startedAt: null }, 0)).toBeUndefined()
 })
 
 describe("buildDeletions", () => {

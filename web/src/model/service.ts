@@ -129,11 +129,11 @@ function podFacts(pod: Pod): PodFacts {
   const ended = (pod.containerStatuses ?? [])
     .map((c) => c.lastTermination)
     .filter((t): t is NonNullable<typeof t> => !!t && t.exitCode !== 0)
-    .toSorted((a, b) => (b.finished ?? "").localeCompare(a.finished ?? ""))[0]
+    .toSorted((a, b) => (b.finishedAt ?? "").localeCompare(a.finishedAt ?? ""))[0]
   return {
     running: pod.ready && pod.phase === "Running",
     restarts: pod.restarts,
-    lastExit: ended ? { code: ended.exitCode, finished: ended.finished ?? undefined } : undefined,
+    lastExit: ended ? { code: ended.exitCode, finished: ended.finishedAt ?? undefined } : undefined,
   }
 }
 
@@ -321,7 +321,7 @@ export function claimsOf(project: Project): Claim[] {
 }
 
 export const newestFirst = (a: Event, b: Event) =>
-  (b.lastSeen ?? "").localeCompare(a.lastSeen ?? "")
+  (b.lastSeenAt ?? "").localeCompare(a.lastSeenAt ?? "")
 
 /** About the workload itself or one of its pods. */
 export function eventsFor(events: Event[], service: Service): Event[] {

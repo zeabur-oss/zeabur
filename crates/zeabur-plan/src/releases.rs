@@ -56,7 +56,7 @@ pub struct Release {
     pub images: Vec<String>,
     /// When it was made.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created: Option<Timestamp>,
+    pub created_at: Option<Timestamp>,
     /// Why it was made, from `kubernetes.io/change-cause`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub change_cause: Option<String>,
@@ -141,7 +141,7 @@ fn deployment_releases(name: &str, object: &Value, replica_sets: &[ReplicaSet]) 
                 revision,
                 name: rs.metadata.name.clone().unwrap_or_default(),
                 images: images(&template),
-                created: created(&rs.metadata),
+                created_at: created(&rs.metadata),
                 change_cause: annotation(&rs.metadata, CHANGE_CAUSE),
                 current: current == Some(revision),
                 pods: ReleasePods {
@@ -207,7 +207,7 @@ fn revision_releases(
             Some(Release {
                 revision: r.revision,
                 images: images(&template),
-                created: created(&r.metadata),
+                created_at: created(&r.metadata),
                 change_cause: annotation(&r.metadata, CHANGE_CAUSE),
                 current,
                 pods: ReleasePods {

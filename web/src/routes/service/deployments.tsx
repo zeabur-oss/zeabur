@@ -122,10 +122,10 @@ export function DeploymentsTab({
                 {current ? (
                   <>
                     {t("changes.lead.current", current.revision)}
-                    {current.created ? (
+                    {current.createdAt ? (
                       <>
                         {t("common.sep")}
-                        {t("changes.lead.deployed")} <Ago iso={current.created} />
+                        {t("changes.lead.deployed")} <Ago iso={current.createdAt} />
                       </>
                     ) : null}
                     {current.pods.total > 0 ? (

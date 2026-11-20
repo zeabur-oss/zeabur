@@ -16,6 +16,6 @@
         "fieldPath": "status.containerStatuses[name=worker].lastState.terminated.exitCode", "value": "1"
       }
     ],
-    "lastSeen": "2026-10-15T11:58:10Z"
+    "lastSeenAt": "2026-10-15T11:58:10Z"
   }
 ]

@@ -23,7 +23,7 @@ use zeabur_kube::{Cluster, DynamicObject, ResourceRef};
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDeleting {
     /// When the deletion started.
-    pub since: Timestamp,
+    pub started_at: Timestamp,
     /// What is left, by resource, as the namespace controller counts it.
     pub remaining: Vec<RemainingContent>,
     /// The finalizers that hold objects back, as the namespace controller counts them.
@@ -96,7 +96,7 @@ pub(super) async fn read(
             .collect()
     };
     Some(ProjectDeleting {
-        since,
+        started_at: since,
         remaining,
         finalizers,
         held,

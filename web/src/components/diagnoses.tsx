@@ -159,7 +159,7 @@ function diagnosisText(
     `${fixLead(t, fixer) ?? `${t("problem.whatToDo")}${t("common.colon")}`}${write(d.fix)}`,
     ...rawRows(t, d, service).map(([label, value]) => `${label}: ${value}`),
     ...d.evidence.map((e) => `${t("diagnosis.evidence")}: ${e.kind} ${e.name}`),
-    ...(d.lastSeen ? [`${t("diagnosis.lastSeen")}: ${d.lastSeen}`] : []),
+    ...(d.lastSeenAt ? [`${t("diagnosis.lastSeen")}: ${d.lastSeenAt}`] : []),
   ].join("\n")
 }
 
@@ -278,7 +278,7 @@ function DiagnosisItem({
             />
           }
           evidence={d.evidence}
-          lastSeen={d.lastSeen}
+          lastSeen={d.lastSeenAt}
         >
           {raw.length > 0 ? <Raw rows={raw} /> : null}
         </Layers>

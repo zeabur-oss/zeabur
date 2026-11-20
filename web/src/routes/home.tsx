@@ -664,7 +664,7 @@ function WarningsSection({ adopted }: { adopted: ProjectItem[] }) {
                         <span className="text-muted-foreground"> {row.event.note}</span>
                       ) : null}
                     </span>
-                    <Ago iso={row.event.lastSeen} className="type-meta text-muted-foreground" />
+                    <Ago iso={row.event.lastSeenAt} className="type-meta text-muted-foreground" />
                   </li>
                 )
               })}

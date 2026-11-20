@@ -89,7 +89,7 @@ pub struct PodUsage {
     /// The pod.
     pub pod: String,
     /// When the sample was taken.
-    pub timestamp: Option<Timestamp>,
+    pub sampled_at: Option<Timestamp>,
     /// The window CPU was averaged over (`15s`, `1m0.5s`).
     pub window: Option<String>,
     /// Its containers.
@@ -104,7 +104,7 @@ pub fn pod_usage(objects: &[DynamicObject]) -> Vec<PodUsage> {
         .map(|object| PodUsage {
             namespace: object.metadata.namespace.clone().unwrap_or_default(),
             pod: object.metadata.name.clone().unwrap_or_default(),
-            timestamp: time(object, "/timestamp"),
+            sampled_at: time(object, "/timestamp"),
             window: text(object, "/window"),
             containers: object
                 .data

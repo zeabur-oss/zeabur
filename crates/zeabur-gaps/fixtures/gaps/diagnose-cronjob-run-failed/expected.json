@@ -8,6 +8,6 @@
       "params": {"container": "run", "exitCode": "1", "reason": "Error"}
     },
     "fix": {"key": "diagnosis.runFailed.fix.logs", "params": {"container": "run"}},
-    "lastSeen": "2026-10-15T11:59:05Z"
+    "lastSeenAt": "2026-10-15T11:59:05Z"
   }
 ]

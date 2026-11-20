@@ -63,7 +63,7 @@ pub struct Diagnosis {
     pub evidence: Vec<Origin>,
     /// When it last happened, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_seen: Option<Timestamp>,
+    pub last_seen_at: Option<Timestamp>,
     /// Where the cause lies and who can remove it.
     #[serde(default)]
     pub fault: Fault,
@@ -261,7 +261,7 @@ pub struct Incident {
     pub evidence: Vec<Origin>,
     /// Since when, when known.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub since: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
 }
 
 #[cfg(test)]

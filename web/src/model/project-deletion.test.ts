@@ -21,8 +21,8 @@ describe("project deletion", () => {
       name: "b",
       provider: "k8up",
       outcome,
-      finished,
-      started: finished,
+      finishedAt: finished,
+      startedAt: finished,
       targets: [],
     })
     expect(recentBackup(run("succeeded", "2026-10-26T02:00:00Z"), now)).toBe(true)

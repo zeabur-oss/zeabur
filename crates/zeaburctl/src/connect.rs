@@ -414,7 +414,7 @@ mod tests {
             connection: connection(Some("app")),
             app: None,
             backups: Backups::default(),
-            created: None,
+            created_at: None,
             object: json!({}),
             pods: Vec::new(),
             restored: None,

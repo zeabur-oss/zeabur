@@ -91,7 +91,7 @@ pub struct Alert {
     pub severity: Severity,
     /// When it happened.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub time: Option<Timestamp>,
+    pub happened_at: Option<Timestamp>,
     /// The pod it concerns.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub pod: Option<String>,
@@ -143,7 +143,11 @@ pub fn alerts(objects: &[DynamicObject]) -> Vec<Alert> {
                 })
         })
         .collect();
-    alerts.sort_by(|a, b| b.time.cmp(&a.time).then_with(|| a.rule.cmp(&b.rule)));
+    alerts.sort_by(|a, b| {
+        b.happened_at
+            .cmp(&a.happened_at)
+            .then_with(|| a.rule.cmp(&b.rule))
+    });
     alerts
 }
 
@@ -172,7 +176,7 @@ fn alert(result: &Value, origin: Origin) -> Alert {
     Alert {
         rule: text("rule").unwrap_or_default(),
         severity: Severity::parse(&text("severity").unwrap_or_default()),
-        time: time(result).or_else(|| {
+        happened_at: time(result).or_else(|| {
             property("evt.time")
                 .and_then(|ns| ns.parse::<i128>().ok())
                 .and_then(|ns| Timestamp::from_nanosecond(ns).ok())
@@ -246,7 +250,7 @@ mod tests {
         assert_eq!(alert.rule, "Read sensitive file untrusted");
         assert_eq!(alert.severity, Severity::Medium);
         assert_eq!(
-            alert.time.map(|t| t.to_string()).as_deref(),
+            alert.happened_at.map(|t| t.to_string()).as_deref(),
             Some("2026-10-22T14:34:14.423441584Z")
         );
         assert_eq!(alert.pod.as_deref(), Some("talker-5896db5447-9fr5j"));
@@ -264,14 +268,14 @@ mod tests {
         old["timestamp"] = json!({"seconds": 14, "nanos": 423_441_584});
         let alerts = alerts(&[report(&json!([old]))]);
         assert_eq!(
-            alerts[0].time.map(|t| t.to_string()).as_deref(),
+            alerts[0].happened_at.map(|t| t.to_string()).as_deref(),
             Some("2026-10-22T14:34:14.423441584Z")
         );
         old["properties"]
             .as_object_mut()
             .unwrap()
             .remove("evt.time");
-        assert_eq!(super::alerts(&[report(&json!([old]))])[0].time, None);
+        assert_eq!(super::alerts(&[report(&json!([old]))])[0].happened_at, None);
     }
 
     #[test]

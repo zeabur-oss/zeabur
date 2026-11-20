@@ -417,7 +417,7 @@ mod tests {
         assert!(all.get("nextPageToken").is_none());
         let first = &all["items"][0];
         assert_eq!(first["id"], "projects/shop/events/e5");
-        assert_eq!(first["lastSeen"], "2026-10-14T08:05:00Z");
+        assert_eq!(first["lastSeenAt"], "2026-10-14T08:05:00Z");
         assert_eq!(first["regarding"]["kind"], "Deployment");
 
         let newest = get(&cluster, "/api/v1/projects/shop/events?limit=3").await;
@@ -962,7 +962,10 @@ mod tests {
             certificates["items"][0]["id"],
             "projects/shop/objects/cert-manager.io/v1/certificates/shop-tls"
         );
-        assert_eq!(certificates["items"][0]["created"], "2026-10-15T00:00:00Z");
+        assert_eq!(
+            certificates["items"][0]["createdAt"],
+            "2026-10-15T00:00:00Z"
+        );
         assert_eq!(kind_of(&list, "Event").unwrap()["listed"], true);
         assert_eq!(
             kind_of(&list, "ConfigMap").unwrap()["listed"],
@@ -1479,7 +1482,7 @@ mod tests {
         };
         let before = on(|| "2026-10-15T00:00:00Z".parse().unwrap()).await;
         assert_eq!(before["minor"], "1.34");
-        assert_eq!(before["release"]["endOfLife"], "2026-10-27");
+        assert_eq!(before["release"]["endOfLifeAt"], "2026-10-27");
         assert!(before.get("patch").is_none() && before.get("nextMinor").is_none());
         assert!(before.get("updateCheck").is_none() && before.get("latestFrom").is_none());
         assert_eq!(before["states"], json!(["maintenance"]));
