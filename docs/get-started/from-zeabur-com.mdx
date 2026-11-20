@@ -1,9 +1,9 @@
 ---
 title: Coming from zeabur.com
-description: What works the same way as on zeabur.com, what is different, and where to start.
+description: What works the same way as on zeabur.com, what is different, and how to move your services, yourself or with a coding agent.
 ---
 
-Used zeabur.com and now want your services on your own server? This page tells you what works the same way in Zeabur, what you look after yourself, and which page to start from.
+Used zeabur.com and now want your services on your own server? zeabur.com stops running on December 31, 2026. This page tells you what works the same way in Zeabur, what you look after yourself, and how to move your services over.
 
 <Figure label="Projects, services, domains, variables and templates work the same as on zeabur.com; the difference is that they run on your own server, which you look after">
 <FigFlow>
@@ -44,3 +44,195 @@ For the Zeabur Catalog template that matches each popular zeabur.com template, s
 ## Where to start
 
 Zeabur runs on Kubernetes, open-source software that runs containers on one or more servers. [Install Zeabur on a server](quickstart.mdx) shows the ways to install it and which one fits you. Then [deploy your first service](first-project.mdx).
+
+To move your zeabur.com services, [hand the move to a coding agent](#hand-the-move-to-a-coding-agent), or [move step by step](#move-step-by-step) yourself.
+
+## Hand the move to a coding agent
+
+A coding agent such as Claude Code or Codex can get a server, install Zeabur, and move your services over. It asks you before anything that costs money or changes something.
+
+### Paste this sentence
+
+Paste this into Claude Code or Codex:
+
+```text
+Read https://oss.zeabur.com/docs/zeabur/get-started/from-zeabur-com.md and move my services off zeabur.com onto my own server, managed by Zeabur.
+```
+
+Run the agent on your own computer. The computer needs to reach the new server over SSH and to sign in to the zeabur.com CLI.
+
+### What the agent does
+
+1. Lists the projects, services, variables, databases and domains on zeabur.com, and exports the data.
+2. Suggests a server, with the plan, region and monthly price.
+3. Sets up Kubernetes on the new server with Zeatend, then installs Zeabur with one `helm install`.
+4. Creates each service again in Zeabur, restores the databases and volumes, and tests each service at an `sslip.io` address.
+5. When you agree, switches over: stops the services on zeabur.com and syncs the data one last time. Then you change DNS.
+6. Gives you Zeabur's address, and how to deploy and back up from then on.
+
+### What you do yourself
+
+The agent stops at these steps and waits for you:
+
+- Confirm the server's plan and price, and pay on the provider's own page.
+- Before each write to the new cluster, look at what changes and agree.
+- Open the admin link and create a passkey on your own device. Only you can create it; the agent doesn't open the link.
+- Agree on when to switch over, and change your domain's DNS records.
+- Delete the services on zeabur.com, once you're sure you no longer need them.
+
+Until you delete them or your zeabur.com plan ends, the old services are still there, and you can switch back.
+
+## Move step by step
+
+A coding agent follows these steps, and you can follow them too. When you move by hand, skip the places where the steps ask the user.
+
+### Rules for the agent
+
+Read this page again at the start of each session; it changes with new versions. Talk to the user in their language.
+
+- First read the zeabur.com guide at https://zeabur.com/blogs/migrate-from-zeabur.md and follow its rules, inventory, data export and cutover. This page replaces its "Choosing a destination" and any step that asks the user to create the destination: the destination is always a server that runs Zeabur, and you set it up.
+- Never print secrets. Keep variables, exported settings and database dumps in files with mode `600`. At handover, delete the working copies, keep the backups the user wants, and tell them where those are.
+- Ask the user, and wait for a clear yes, before you buy a server, before each write to the new cluster, before the cutover, and before you delete anything on zeabur.com. The user changes DNS themselves.
+- Never open, forward or use the admin setup link. Only hand it to the user.
+- Don't change the services on zeabur.com before the cutover.
+- When these docs don't match what you see, trust what you see and tell the user.
+
+### 1. Take stock of zeabur.com
+
+Follow "Before you start", "Inventory", "Container images", "Variables" and "Data" in the zeabur.com guide. Ask the user for their own expiry date and plan around it, not around December 31.
+
+Make a list with one row for each service in each environment:
+
+- The source: a Git repository and branch, an image, a template, or a database's engine and version.
+- The expanded variables, and the `.zeabur.internal` addresses that point at other services.
+- Each volume's mount path and size.
+- The `*.zeabur.app` domains and custom domains.
+- The memory and disk the service uses now.
+
+### 2. Get the server
+
+Always use a new server. Keep the old one: until the cutover is done, it is the way back. If the user already has an empty server, use that one.
+
+The server needs:
+
+- Linux with systemd, on x86-64 or ARM64.
+- A public IP address, with ports 80 and 443 open to the internet. Let's Encrypt connects on port 80 to check the addresses.
+- Memory for what the services use on zeabur.com, plus about 1900 MiB for K3s, and room for Zeabur and its components. At least 30 GiB of free disk, plus the size of the data you move, with room to spare.
+
+Create the server only through the provider's own MCP server or CLI, such as Hetzner (`hcloud`), DigitalOcean (`doctl`), Vultr (`vultr-cli`), Alibaba Cloud (`aliyun`) or Tencent Cloud (`tccli`). The user sets up the account and payment method on the provider's own site. Billing starts when you create the server, so first show the plan, region and monthly price, and wait for the user to agree.
+
+When you create the server, add an SSH public key that the user agrees to, such as the migration key from "Server access" in the zeabur.com guide.
+
+### 3. Set up Kubernetes with Zeatend
+
+On the server, get Zeatend, Helm 4 and `zeabur-identityctl`, as "Before you begin" in [Install with Zeatend](../install/one-command.mdx) lists. [Zeatend's README](https://github.com/zeabur-oss/zeatend#download-zeatend) shows how to download Zeatend. Then write `/etc/zeatend/config.yaml` as "Choose the domain" and "Set up Kubernetes with Zeatend" on that page show. Keep `distribution: k3s`, and use `<IP>.sslip.io` as the domain.
+
+Don't run `zeatend apply` directly. Make a plan and show it to the user first:
+
+```sh
+sudo zeatend plan --json > plan.json
+```
+
+Tell the user the distribution, release, node name and every warning. When they agree, apply the same plan:
+
+```sh
+sudo zeatend apply --plan plan.json
+```
+
+If `apply` refuses the plan because the server changed after it was made, make a new plan and ask again.
+
+### 4. Install Zeabur with one helm install
+
+Run the `helm install` from "Install Zeabur" on the same page. When it finishes, it prints the link that creates the first admin account. The link works once and expires in 24 hours.
+
+Hand the link to the user. Ask them to open it, create a passkey, and sign in with it at `https://zeabur.<IP>.sslip.io`. Wait until they say they are signed in.
+
+Work on the cluster with `sudo k3s kubectl` on the server. Don't copy the admin kubeconfig to another computer.
+
+### 5. Install the components the services need
+
+Choose the components from the inventory:
+
+| On zeabur.com | Component |
+| --- | --- |
+| Services built from Git | `zeabur-builder`, `keel` |
+| PostgreSQL | `cloudnative-pg` |
+| MySQL | `moco` |
+| MariaDB | `mariadb-operator` |
+| MongoDB | `percona-mongodb` |
+| Redis | `dragonfly-operator`. Check that the app works with Dragonfly; if not, run Redis as an image service |
+| Backups of volumes or databases | `velero`, `k8up` |
+
+The user can install them on Zeabur's **Cluster** → **Components** page, which lists the changes first. To install them yourself, print the manifests on your computer with [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) and copy the file to the server. Show the diff to the user, and apply it once the user agrees:
+
+```sh
+zeaburctl components export cloudnative-pg zeabur-builder keel > components.yaml
+sudo k3s kubectl diff --server-side -f components.yaml
+sudo k3s kubectl apply --server-side -f components.yaml
+```
+
+Wait until the components' pods are running before you go on.
+
+### 6. Create the projects and services again
+
+Each zeabur.com environment becomes one Zeabur project. Production keeps the project's name; other environments are `<project>-<environment>`.
+
+Write each service as YAML, using the table below. The section "Do the same with kubectl" on each linked page shows how to write each object:
+
+| zeabur.com | Zeabur |
+| --- | --- |
+| Project | A namespace with the `zeabur.com/project: "true"` label. See [Create and manage projects](../configure/projects.mdx) |
+| Service built from Git by zbpack | A Build of the same repository: `dockerfile` when it has a Dockerfile, otherwise `railpack`. Carry over the root directory, commands and runtime versions from "Build" in the zeabur.com guide. See [Build and deploy a service from Git](../deploy/git.mdx). An exported image is only a stopgap |
+| Prebuilt image or template service | The same image, pinned to the running digest. See [Deploy a container image](../deploy/image.mdx) |
+| Database template | A Zeabur database. See [Create, back up, and restore databases](../deploy/databases.mdx) |
+| Expanded variables, `.zeabur.internal` addresses | The expanded values from "Variables" in the zeabur.com guide, with internal addresses changed to Zeabur service names. See [Configure environment variables](../configure/variables.mdx) |
+| Volume | A new disk. See [Store files and back up volumes](../configure/volumes.mdx) |
+| `*.zeabur.app` | `<service>-<project>.<IP>.sslip.io` |
+| Custom domain | A domain with an HTTP-01 certificate, added at the cutover. See [Add public domains and HTTPS](../configure/domains.mdx) |
+| Daily backup | Zeabur backups. See [Back up a cluster and restore from a backup](../cluster/backups.mdx) |
+| Team members | Zeabur Identity invitation links. See [Invite members and assign project permissions](../cluster/members.mdx) |
+
+Create the project's namespace before the other objects. Before each write, show the user the diff, and apply only after they agree:
+
+```sh
+sudo k3s kubectl diff --server-side -f shop/
+sudo k3s kubectl apply --server-side -f shop/
+```
+
+Put secret values in Secrets, not in ConfigMaps or a Deployment's `env`.
+
+### 7. Restore the data and test
+
+- Databases: create the Zeabur database with the same engine and major version as on zeabur.com. When it is ready, restore it with the tools of the same major version you exported with, such as `pg_restore`. See "Connect from outside the cluster" on the databases page for how to connect.
+- Volumes: copy the exported files to the server. Start a temporary pod named `copy-data` from a small image such as `busybox`, with the new disk mounted at `/data`, and wait until it is ready. Stream the files into it with tar, then delete the pod.
+
+  ```sh
+  tar czf - -C /path/to/old/data . | sudo k3s kubectl -n shop exec -i copy-data -- tar xzf - -C /data
+  ```
+
+Test each service: open the web services at their `sslip.io` addresses and go through the main tasks, and check that workers and databases run and connect. Then ask the user to check too. Don't start the cutover until the services work.
+
+### 8. Switch over
+
+Follow "Cutover and rollback" in the zeabur.com guide, and stop at these points:
+
+1. Ask the user when to switch over, and wait for them to agree.
+2. Stop the application services on zeabur.com. Keep the databases running.
+3. Stop the services in Zeabur too, export the data once more, restore it in Zeabur, and start the services again.
+4. Add the custom domains to the services in Zeabur.
+5. Ask the user to point the domain's DNS records at the new server's IP address.
+6. Wait for the certificates with `sudo k3s kubectl wait --for=condition=Ready certificate --all -n <project> --timeout=10m`, then open the domain.
+
+To switch back, the user points DNS at the old records again, and you restart the services as the zeabur.com guide shows. Data written to the new server after the cutover is not on zeabur.com; copy it back before you switch.
+
+### 9. Hand over
+
+Give the user:
+
+- Zeabur's address, `https://zeabur.<IP>.sslip.io`, and each service's address.
+- How to deploy a new version: [Deploy your first service](first-project.mdx).
+- How to set up backups. Suggest S3 backups, with one test restore: [Back up a cluster and restore from a backup](../cluster/backups.mdx).
+- How to invite the team: [Invite members and assign project permissions](../cluster/members.mdx).
+- How to upgrade: [Upgrade Zeabur](../upgrade/steps.mdx).
+
+Last, delete the secret files and working copies of database dumps you left on your computer, and any copy of an admin kubeconfig. Keep the backups the user wants. Ask the user before you remove the migration SSH key. Delete the services on zeabur.com only after the user clearly agrees.
