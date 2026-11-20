@@ -44,7 +44,7 @@ Run every command on the first server, in a root shell (`sudo -i`). First point 
 | RKE2 | `export KUBECONFIG=/etc/rancher/rke2/rke2.yaml PATH=$PATH:/var/lib/rancher/rke2/bin` |
 | KubeSolo | `export KUBECONFIG=/var/lib/kubesolo/pki/admin/admin.kubeconfig PATH=$PATH:/var/lib/zeabur-installer/bin` |
 
-The server also needs Helm 4. The commands below work in `/root/zeabur-upgrade`:
+The server also needs Helm 4. If `helm version` doesn't print `v4`, install it as [Installing Helm](https://helm.sh/docs/intro/install/) shows. The commands below work in `/root/zeabur-upgrade`:
 
 ```sh
 umask 077
@@ -71,7 +71,7 @@ cp /etc/zeabur-installer/config.yaml installer-config.yaml
 From these two files, note:
 
 - **Access mode**: `access.mode` in `installer-config.yaml`. `domain` means certificates from Let's Encrypt for real DNS names. `local` means a CA made on the server, with the ClusterIssuer `zeabur-local-ca`.
-- **Invitations**: `access.invitations: false` means Zeabur Identity takes no invitation links.
+- **Invitations**: `access.invitations: false` means Zeabur Identity takes no invitation links. When the key is missing, invitations are on.
 - **Which Zeabur Identity Zeabur uses**: `issuer.url` in `old-values.yaml`. If it is `https://` followed by `access.identity`, Zeabur uses the Zeabur Identity the installer made. If it is any other address, someone pointed Zeabur at an external Zeabur Identity. Ask the owner before you go on, and write the values as step 2 says for that case.
 - **Projects' own domains**: `kubectl get ingress,httproute,certificate -A`. Save the list to compare after the upgrade. The upgrade doesn't touch them.
 - **Databases**: `kubectl get clusters.postgresql.cnpg.io -A` and `kubectl get statefulsets -A`. Save the list too. The upgrade doesn't touch them.
@@ -88,7 +88,7 @@ Write `values.yaml` from `old-values.yaml`. Don't use `--reuse-values` or `--res
 | `issuer.caBundle` (local mode only) | Keep it. |
 | `ingress.annotations` with `cert-manager.io/cluster-issuer: <issuer>` | Leave the annotation out. Set `ingress.clusterIssuer` and `identity.ingress.clusterIssuer` to `<issuer>`. |
 | `ingress.className` | Keep it, and set `identity.ingress.className` to the same value. |
-| Every other key, such as `publicUrl`, `clusterName`, `planKey`, `domains`, `ingress.tls`, `builds`, `proxy`, `telemetry` and `updateCheck` | Keep it as it is. |
+| Every other key, such as `publicUrl`, `clusterName`, `planKey`, `domains`, `ingress.enabled`, `ingress.tls`, `builds`, `proxy`, `telemetry` and `updateCheck` | Keep it as it is. |
 
 Then add:
 
@@ -199,8 +199,8 @@ The address must equal the one in `discoveryURL` in `installer-record.yaml`. If 
 
 Then check that nothing else changed:
 
-- `kubectl get ingress,httproute,certificate -A` lists what step 1 listed, and each Certificate is `True`.
-- `kubectl get clusters.postgresql.cnpg.io -A` and `kubectl get statefulsets -A` list what step 1 listed, all ready.
+- `kubectl get ingress,httproute,certificate -A` lists the same names as in step 1, and each Certificate is `True`.
+- `kubectl get clusters.postgresql.cnpg.io -A` and `kubectl get statefulsets -A` list the same names as in step 1, all ready.
 - `curl -sS -o /dev/null -w '%{http_code}\n' https://<a project's domain>/` answers as it did before. In local mode, add `--cacert /var/lib/rancher/zeabur-installer/local-ca.crt`, or `/var/lib/zeabur-installer/local-ca.crt` on KubeSolo.
 - `curl -sS https://<identity.issuer>/.well-known/openid-configuration` returns JSON with the same `issuer`.
 
