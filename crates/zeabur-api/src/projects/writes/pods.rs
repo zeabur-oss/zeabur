@@ -148,11 +148,13 @@ async fn admitted(
     }
 }
 
-/// A Pod of `workload`'s template named `name`. A StatefulSet's claim templates become empty
-/// volumes, so the containers' mounts resolve; each replaces a template volume of its name, as
-/// the StatefulSet controller's `updateStorage` does. A ServiceAccount that `plan` creates does not
-/// exist yet, and the ServiceAccount admission plugin refuses a Pod that names a missing one, so
-/// the Pod runs as `default` instead: quotas, limit ranges and Pod Security do not read it.
+/// A Pod of `workload`'s template named `name`. A StatefulSet's claim templates become claim
+/// volumes named as the StatefulSet controller names them, so both `volumeMounts` and
+/// `volumeDevices` resolve (a block device takes only a claim); each replaces a template volume of
+/// its name, as the controller's `updateStorage` does. A dry run doesn't read the claim. A
+/// ServiceAccount that `plan` creates does not exist yet, and the ServiceAccount admission plugin
+/// refuses a Pod that names a missing one, so the Pod runs as `default` instead: quotas, limit
+/// ranges and Pod Security do not read it.
 fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
     let mut metadata = workload
         .template
@@ -174,7 +176,10 @@ fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
         .into_iter()
         .flatten()
         .filter_map(|c| c.pointer("/metadata/name"))
-        .map(|name| json!({"name": name, "emptyDir": {}}))
+        .filter_map(Value::as_str)
+        .map(|claim| {
+            json!({"name": claim, "persistentVolumeClaim": {"claimName": format!("{claim}-{name}")}})
+        })
         .collect();
     if let Some(spec) = spec.as_object_mut() {
         let account = spec
@@ -333,7 +338,7 @@ mod tests {
     }
 
     #[test]
-    fn a_claim_template_replaces_the_template_volume_of_its_name() {
+    fn a_claim_template_becomes_a_claim_volume_in_place_of_the_template_volume_of_its_name() {
         let mut plan: Plan = serde_json::from_value(json!({
             "objects": [planned("StatefulSet", "db", &json!({}))],
             "impact": [], "warnings": []
@@ -354,7 +359,10 @@ mod tests {
         let pod = pod(&workload, "db-dry-run", &plan);
         assert_eq!(
             pod.pointer("/spec/volumes").unwrap(),
-            &json!([{"name": "tmp", "emptyDir": {}}, {"name": "data", "emptyDir": {}}])
+            &json!([
+                {"name": "tmp", "emptyDir": {}},
+                {"name": "data", "persistentVolumeClaim": {"claimName": "data-db-dry-run"}}
+            ])
         );
     }
 }
