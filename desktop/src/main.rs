@@ -210,7 +210,7 @@ async fn open_cluster(
     let builder = WebviewWindowBuilder::new(&handle, &label, url)
         .title(format!("{name} - Zeabur"))
         .initialization_script(&script);
-    let builder = links::keep_to_service(&handle, &label, builder);
+    let builder = links::open_new_windows(&handle, &label, builder);
     let builder = chrome::cluster_window(&handle, builder);
     let window = builder.build().map_err(|e| e.to_string())?;
     chrome::window_built(&window);

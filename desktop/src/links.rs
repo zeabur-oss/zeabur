@@ -1,83 +1,67 @@
-//! Links in a cluster window. The window shows the app's own page and then its local service; a web
-//! page anywhere else opens in the default browser. `WKWebView` drops a new-window request that
-//! nobody handles, so without this a `target="_blank"` link does nothing.
+//! New-window requests in a cluster window: a `target="_blank"` link or a `window.open` call.
+//! `WKWebView` drops a request that nobody handles, so without this such a link does nothing.
+//! Navigation in the window itself is not changed: flows such as GitHub's App manifest post to
+//! another site and come back to the local service in the same window.
 
 use tauri::webview::NewWindowResponse;
 use tauri::{AppHandle, Manager, Url, WebviewWindowBuilder, Wry};
 
 use crate::output;
 
-/// Where a cluster window loads a URL.
+/// Where a cluster window opens a new-window request.
 #[derive(Debug, PartialEq, Eq)]
 enum Route {
+    /// A page of the local service: in this window, which has the session.
     Window,
+    /// Any other web page: in the default browser.
     Browser,
+    /// Not a web page, such as `about:blank`: nowhere.
+    Nothing,
 }
 
-/// A web page outside the local service goes to the browser. Until the service runs, the window
-/// shows only the app's own page, and every URL stays.
 fn route(url: &Url, service: Option<&Url>) -> Route {
-    match service {
-        Some(service)
-            if matches!(url.scheme(), "http" | "https") && url.origin() != service.origin() =>
-        {
-            Route::Browser
-        }
-        _ => Route::Window,
+    if !matches!(url.scheme(), "http" | "https") {
+        Route::Nothing
+    } else if service.is_some_and(|service| url.origin() == service.origin()) {
+        Route::Window
+    } else {
+        Route::Browser
     }
 }
 
-/// Sends the cluster window `label`'s links to the browser when they leave its local service.
-pub(crate) fn keep_to_service<'a>(
+/// Opens the new-window requests of the cluster window `label` in the browser, or in the window
+/// when they are pages of its local service. The app never opens a second web view.
+pub(crate) fn open_new_windows<'a>(
     handle: &AppHandle,
     label: &str,
     builder: WebviewWindowBuilder<'a, Wry, AppHandle>,
 ) -> WebviewWindowBuilder<'a, Wry, AppHandle> {
-    let service = {
-        let handle = handle.clone();
-        let label = label.to_owned();
-        move || handle.state::<crate::App>().clusters.service(&label)
-    };
-    let on_navigation = {
-        let service = service.clone();
-        move |url: &Url| match route(url, service().as_ref()) {
-            Route::Window => true,
-            Route::Browser => {
-                open_or_warn(url);
-                false
-            }
-        }
-    };
     let handle = handle.clone();
     let label = label.to_owned();
-    builder
-        .on_navigation(on_navigation)
-        .on_new_window(move |url, _| {
-            match route(&url, service().as_ref()) {
-                Route::Browser => open_or_warn(&url),
-                // A link to the service itself loads in this window. The navigation runs later,
-                // outside the web view's callback.
-                Route::Window if matches!(url.scheme(), "http" | "https") => {
-                    let handle = handle.clone();
-                    let label = label.clone();
-                    tauri::async_runtime::spawn(async move {
-                        if let Some(window) = handle.get_webview_window(&label)
-                            && let Err(err) = window.navigate(url)
-                        {
-                            output::warn(&format!("cannot open the link: {err}"));
-                        }
-                    });
+    builder.on_new_window(move |url, _| {
+        let service = handle.state::<crate::App>().clusters.service(&label);
+        match route(&url, service.as_ref()) {
+            Route::Browser => {
+                if let Err(err) = open_in_browser(url.as_str()) {
+                    output::warn(&format!("cannot open {url} in the browser: {err}"));
                 }
-                Route::Window => {}
             }
-            NewWindowResponse::Deny
-        })
-}
-
-fn open_or_warn(url: &Url) {
-    if let Err(err) = open_in_browser(url.as_str()) {
-        output::warn(&format!("cannot open {url} in the browser: {err}"));
-    }
+            // The navigation runs later, outside the web view's callback.
+            Route::Window => {
+                let handle = handle.clone();
+                let label = label.clone();
+                tauri::async_runtime::spawn(async move {
+                    if let Some(window) = handle.get_webview_window(&label)
+                        && let Err(err) = window.navigate(url)
+                    {
+                        output::warn(&format!("cannot open the link: {err}"));
+                    }
+                });
+            }
+            Route::Nothing => {}
+        }
+        NewWindowResponse::Deny
+    })
 }
 
 /// Opens a web page in the default browser.
@@ -104,25 +88,30 @@ mod tests {
     }
 
     #[test]
-    fn the_service_stays_and_other_web_pages_go_to_the_browser() {
+    fn the_service_opens_in_the_window_and_other_web_pages_in_the_browser() {
         let service = url("http://127.0.0.1:52011/?code=one-time");
         let at = |text| route(&url(text), Some(&service));
         assert_eq!(at("http://127.0.0.1:52011/projects/a"), Route::Window);
         assert_eq!(at("https://app.example.com/"), Route::Browser);
         assert_eq!(at("http://127.0.0.1:3000/"), Route::Browser);
         assert_eq!(at("https://127.0.0.1:52011/"), Route::Browser);
-        assert_eq!(at("about:blank"), Route::Window);
     }
 
     #[test]
-    fn before_the_service_runs_the_app_page_stays() {
+    fn a_request_that_is_not_a_web_page_opens_nowhere() {
+        let service = url("http://127.0.0.1:52011/");
+        assert_eq!(route(&url("about:blank"), Some(&service)), Route::Nothing);
         assert_eq!(
-            route(&url("http://tauri.localhost/cluster.html"), None),
-            Route::Window
+            route(&url("file:///Applications/Calculator.app"), Some(&service)),
+            Route::Nothing
         );
+    }
+
+    #[test]
+    fn before_the_service_runs_a_web_page_goes_to_the_browser() {
         assert_eq!(
-            route(&url("tauri://localhost/cluster.html"), None),
-            Route::Window
+            route(&url("https://github.com/zeabur-oss/zeabur"), None),
+            Route::Browser
         );
     }
 }
