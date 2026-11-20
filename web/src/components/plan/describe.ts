@@ -590,7 +590,7 @@ export function describe(
     said,
     cost: costOf(t, ask, plan, podsOf, mountsOf),
     facts: outcomes
-      ? outcomeFacts(t, outcomes, plan)
+      ? outcomeFacts(t, outcomes)
       : edits
         ? editFacts(t, edits, ask, plan, podsOf)
         : undefined,
@@ -712,45 +712,11 @@ function costOf(
   return parts.length > 0 ? t("common.sentences", parts) : undefined
 }
 
-/** What happens when the new pods do not fit, and how to make room; undefined when they fit. */
-export function shortfall(
-  t: Translate,
-  preview: Schemas.Preview,
-): { cost: string; fix: string } | undefined {
-  const { fit } = preview
-  if (fit.status !== "blocked") return undefined
-  const blockers = fit.blockers ?? []
-  const quota = blockers.some((b) => b.kind === "quota")
-  const nodes = blockers.some((b) => b.kind === "node")
-  const down = preview.rollouts
-    .filter(
-      (r) =>
-        r.actions.includes("start") ||
-        (r.actions.includes("roll") && r.downtime) ||
-        (r.actions.includes("scale") && r.fromReplicas === 0),
-    )
-    .map((r) => r.workload.name)
-  const names = bounded(t, down).text
-  return {
-    cost: quota
-      ? t("plan.short.quota", names, down.length)
-      : t("plan.short.nodes", names, down.length),
-    fix: t("plan.short.fix", quota, nodes),
-  }
-}
-
-function fitFact(t: Translate, plan: Plan): Fact[] {
-  return plan.preview?.fit.status === "fits" ? [{ text: t("plan.fact.fits"), tone: "ok" }] : []
-}
-
-function outcomeFacts(t: Translate, groups: readonly OutcomeGroup[], plan: Plan): Fact[] {
-  return [
-    ...groups.map((g): Fact => ({
-      text: t(`plan.outcome.${g.outcome}.count`, g.rows.length),
-      tone: g.outcome === "up" || g.outcome === "starts" ? undefined : "warn",
-    })),
-    ...fitFact(t, plan),
-  ]
+function outcomeFacts(t: Translate, groups: readonly OutcomeGroup[]): Fact[] {
+  return groups.map((g): Fact => ({
+    text: t(`plan.outcome.${g.outcome}.count`, g.rows.length),
+    tone: g.outcome === "up" || g.outcome === "starts" ? undefined : "warn",
+  }))
 }
 
 function editFacts(
@@ -783,7 +749,7 @@ function editFacts(
           ? { text: t("plan.fact.stops"), tone: "warn" }
           : { text: t("plan.fact.staysUp") },
     )
-  return [...facts, ...fitFact(t, plan)]
+  return facts
 }
 
 const minutes = (seconds: number) => Math.max(1, Math.ceil(seconds / 60))

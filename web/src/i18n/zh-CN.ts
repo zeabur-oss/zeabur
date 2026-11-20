@@ -1454,21 +1454,6 @@ export const zhCN: Messages = {
   "plan.col.service": "服务",
   "plan.col.replicas": "副本",
   "plan.col.effect": "影响",
-  "plan.short.title": "空间不足",
-  "plan.short.nodes": (names, n) =>
-    n === 0
-      ? "新的副本会停在 Pending，等节点有空间才启动。旧的副本会继续运行，服务不中断，但变更要到那时才完成。"
-      : `新的副本会停在 Pending，等节点有空间才启动。在那之前，${names}${latinEnd(names)}不会运行。`,
-  "plan.short.quota": (names, n) =>
-    n === 0
-      ? "配额不够，新的副本要等配额空出来才能创建。旧的副本会继续运行，服务不中断，但变更要到那时才完成。"
-      : `配额不够，新的副本要等配额空出来才能创建。在那之前，${names}${latinEnd(names)}不会运行。`,
-  "plan.short.fix": (quota, nodes) =>
-    quota && nodes
-      ? "要完成变更，调高配额并腾出节点空间，或调低每个副本的预留量。"
-      : quota
-        ? "要完成变更，调高配额或调低每个副本的预留量。"
-        : "要完成变更，腾出节点空间或调低每个副本的预留量。",
   "plan.fact.removed": (n) => `移除 ${n} 项`,
   "plan.fact.changed": (n) => `更改 ${n} 项`,
   "plan.fact.added": (n) => `添加 ${n} 项`,
@@ -1476,7 +1461,6 @@ export const zhCN: Messages = {
   "plan.fact.staysUp": "服务不中断",
   "plan.fact.downBriefly": "会短暂中断",
   "plan.fact.stops": "停止服务",
-  "plan.fact.fits": "资源足够",
   "plan.outcome.stops.label": "停止服务",
   "plan.outcome.stops.count": (n) => `${n} 个停止服务`,
   "plan.outcome.down.label": "重启时中断",
@@ -4002,20 +3986,6 @@ export const zhCN: Messages = {
   "preview.domain": (host) => `域名 ${host} 会开始对外提供服务。`,
   "preview.pendingRestart": (name) => `${name} 重新启动前会继续使用旧的值。`,
   "preview.downtime": "会有短暂的时间没有副本提供服务。",
-  "preview.fits": (pods, cpu, memory) =>
-    `资源足够：峰值时会多出 ${pods} 个副本、${cpu}和 ${memory}。`,
-  "preview.fitsPods": (pods) => `资源足够：峰值时会多出 ${pods} 个副本。`,
-  "preview.blockedQuota": (name, resource, need, left) =>
-    resource === "pods"
-      ? `配额 ${name} 只允许再多 ${left} 个副本，这次需要 ${need} 个。`
-      : `配额 ${name} 只剩 ${left}，这次需要 ${need}。`,
-  "preview.blockedNodes": (_name, resource, need, left) =>
-    resource === "pods"
-      ? `没有节点放得下 ${need} 个新的副本，最空的节点只能再放 ${left} 个。`
-      : `没有节点有 ${need} 的空间，最空的节点只有 ${left}。`,
-  "preview.fitUnknown": (pods, cpu, memory) =>
-    `峰值时会多出 ${pods} 个副本、${cpu}和 ${memory}。Zeabur 无法确认是否放得下。`,
-  "preview.fitUnknownPods": (pods) => `峰值时会多出 ${pods} 个副本。Zeabur 无法确认是否放得下。`,
   "preview.dataLoss": "会丢失的数据",
   "preview.loss.claimDeleted": (claim, paths) =>
     `会删除卷 ${claim}${paths ? `，以及 ${paths} 里的数据` : ""}。`,

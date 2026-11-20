@@ -1,5 +1,5 @@
-//! A plan's preview: the pods it replaces, whether new ones fit the quota and the nodes, the data
-//! and the fields it removes.
+//! A plan's preview: the pods it replaces, the data and the fields it removes. It predicts no
+//! fit: a quota or a full node shows as the rollout's reason after apply.
 
 #[cfg(test)]
 mod tests {
@@ -7,7 +7,7 @@ mod tests {
 
     use serde_json::{Value, json};
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
-    use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, ResourceQuota};
+    use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, ResourceQuota};
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource};
 
@@ -40,12 +40,6 @@ mod tests {
             "status": {"hard": {"requests.cpu": "1"}, "used": {"requests.cpu": quota_used}}
         }))
         .unwrap();
-        let node: Node = serde_json::from_value(json!({
-            "metadata": {"name": "node-1"},
-            "status": {"allocatable": {"cpu": "4", "memory": "8Gi", "pods": "110"},
-                "conditions": [{"type": "Ready", "status": "True"}]}
-        }))
-        .unwrap();
         MemoryCluster::new(State {
             identity: Identity {
                 username: "alice".to_owned(),
@@ -61,7 +55,6 @@ mod tests {
                 },
             )]),
             resource_quotas: BTreeMap::from([("shop".to_owned(), vec![quota])]),
-            nodes: vec![node],
             ..State::default()
         })
     }
@@ -84,7 +77,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_scale_past_the_quota_is_blocked_by_name() {
+    async fn a_scale_past_the_quota_is_previewed_without_a_fit_verdict() {
         let preview = preview(
             &cluster("700m"),
             json!([{"op": "scale", "workload": workload(), "replicas": 3}]),
@@ -92,13 +85,7 @@ mod tests {
         .await;
         assert_eq!(preview["rollouts"][0]["actions"], json!(["scale"]));
         assert_eq!(preview["rollouts"][0]["fromReplicas"], 1);
-        assert_eq!(preview["fit"]["status"], "blocked", "{preview}");
-        assert_eq!(preview["fit"]["pods"], 2);
-        assert_eq!(
-            preview["fit"]["blockers"],
-            json!([{"kind": "quota", "name": "compute", "resource": "requests.cpu",
-                "need": 400, "available": 300}])
-        );
+        assert_eq!(preview.get("fit"), None, "{preview}");
         assert_eq!(preview["dataLoss"], json!([]));
     }
 
@@ -118,7 +105,6 @@ mod tests {
             rollout["fields"],
             json!(["spec.template.spec.containers[name=app].env[name=MODE].value"])
         );
-        assert_eq!(preview["fit"]["status"], "fits", "{preview}");
         assert_eq!(
             preview["dataLoss"],
             json!([{"kind": "emptyDir", "workload": workload(), "volume": "cache",

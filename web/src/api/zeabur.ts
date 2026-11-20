@@ -1004,41 +1004,6 @@ export type BasicAuthChange = {
 }
 
 /**
- * What keeps a pod from being created or placed.
- */
-export type BlockerKind = (typeof BlockerKind)[keyof typeof BlockerKind]
-
-export const BlockerKind = {
-  quota: "quota",
-  node: "node",
-} as const
-
-/**
- * One limit the new pods exceed.
- */
-export type Blocker = {
-  /**
-   * What is left.
-   * @minimum 0
-   */
-  available: number
-  /** A quota or the nodes. */
-  kind: BlockerKind
-  /**
-   * The quota's name.
-   * @nullable
-   */
-  name?: string | null
-  /**
-   * What the plan needs, in the resource's unit: millicores, bytes or pods.
-   * @minimum 0
-   */
-  need: number
-  /** The resource: `requests.cpu`, `limits.memory`, `pods`, `cpu`, `memory`, … */
-  resource: string
-}
-
-/**
  * The Secret a `Build` reads its repository's credentials from.
  */
 export type BuildCredentials = {
@@ -6083,43 +6048,6 @@ export type Files = {
 }
 
 /**
- * Whether the plan's new pods fit.
- */
-export type FitStatus = (typeof FitStatus)[keyof typeof FitStatus]
-
-export const FitStatus = {
-  notNeeded: "notNeeded",
-  fits: "fits",
-  blocked: "blocked",
-  unknown: "unknown",
-} as const
-
-/**
- * Whether the plan's new pods fit, and what blocks them.
- */
-export type Fit = {
-  /** What blocks them, quotas first. */
-  blockers?: Blocker[]
-  /**
-   * CPU requests it adds at its peak, millicores.
-   * @minimum 0
-   */
-  cpuMillicores: number
-  /**
-   * Memory requests it adds at its peak, bytes.
-   * @minimum 0
-   */
-  memoryBytes: number
-  /**
-   * Pods the plan adds at its peak.
-   * @minimum 0
-   */
-  pods: number
-  /** The verdict. */
-  status: FitStatus
-}
-
-/**
  * What the template or component is filled in with.
  */
 export type FixParams = { [key: string]: string }
@@ -8251,18 +8179,14 @@ export type Rollout = {
 export type Preview = {
   /** The data it loses. */
   dataLoss: DataLoss[]
-  /** The databases it creates, by name. Their instances count in `fit`. */
+  /** The databases it creates, by name. */
   databases: DatabaseStart[]
   /** The public domains its new Ingresses and `HTTPRoutes` route, sorted. */
   domains: string[]
-  /** Whether the new pods fit. */
-  fit: Fit
   /** The fields it removes, by object then path. */
   removals: Removal[]
   /** The workloads whose pods change, sorted. */
   rollouts: Rollout[]
-  /** Reads the person was refused, and what they left unchecked. */
-  unreadable: UnreadableView[]
 }
 
 /**

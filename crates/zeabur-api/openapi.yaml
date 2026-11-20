@@ -5262,42 +5262,6 @@ components:
         username:
           type: string
           description: The user name; no colon.
-    Blocker:
-      type: object
-      description: One limit the new pods exceed.
-      required:
-      - kind
-      - resource
-      - need
-      - available
-      properties:
-        available:
-          type: integer
-          format: int64
-          description: What is left.
-          minimum: 0
-        kind:
-          $ref: "#/components/schemas/BlockerKind"
-          description: A quota or the nodes.
-        name:
-          type:
-          - string
-          - "null"
-          description: The quota's name.
-        need:
-          type: integer
-          format: int64
-          description: "What the plan needs, in the resource's unit: millicores, bytes or pods."
-          minimum: 0
-        resource:
-          type: string
-          description: "The resource: `requests.cpu`, `limits.memory`, `pods`, `cpu`, `memory`, …"
-    BlockerKind:
-      type: string
-      description: What keeps a pod from being created or placed.
-      enum:
-      - quota
-      - node
     BuildCredentials:
       type: object
       description: The Secret a `Build` reads its repository's credentials from.
@@ -9886,46 +9850,6 @@ components:
             enum:
             - renamed
       description: A field of a service that is left out, or a difference to know of.
-    Fit:
-      type: object
-      description: Whether the plan's new pods fit, and what blocks them.
-      required:
-      - status
-      - pods
-      - cpuMillicores
-      - memoryBytes
-      properties:
-        blockers:
-          type: array
-          items:
-            $ref: "#/components/schemas/Blocker"
-          description: What blocks them, quotas first.
-        cpuMillicores:
-          type: integer
-          format: int64
-          description: CPU requests it adds at its peak, millicores.
-          minimum: 0
-        memoryBytes:
-          type: integer
-          format: int64
-          description: Memory requests it adds at its peak, bytes.
-          minimum: 0
-        pods:
-          type: integer
-          format: int64
-          description: Pods the plan adds at its peak.
-          minimum: 0
-        status:
-          $ref: "#/components/schemas/FitStatus"
-          description: The verdict.
-    FitStatus:
-      type: string
-      description: Whether the plan's new pods fit.
-      enum:
-      - notNeeded
-      - fits
-      - blocked
-      - unknown
     Fix:
       type: object
       description: The fix of a gap.
@@ -14478,10 +14402,8 @@ components:
       - rollouts
       - databases
       - domains
-      - fit
       - dataLoss
       - removals
-      - unreadable
       properties:
         dataLoss:
           type: array
@@ -14492,15 +14414,12 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DatabaseStart"
-          description: The databases it creates, by name. Their instances count in `fit`.
+          description: The databases it creates, by name.
         domains:
           type: array
           items:
             type: string
           description: The public domains its new Ingresses and `HTTPRoutes` route, sorted.
-        fit:
-          $ref: "#/components/schemas/Fit"
-          description: Whether the new pods fit.
         removals:
           type: array
           items:
@@ -14511,11 +14430,6 @@ components:
           items:
             $ref: "#/components/schemas/Rollout"
           description: The workloads whose pods change, sorted.
-        unreadable:
-          type: array
-          items:
-            $ref: "#/components/schemas/UnreadableView"
-          description: Reads the person was refused, and what they left unchecked.
     ProbeHandler:
       type: string
       description: How a probe checks the container.

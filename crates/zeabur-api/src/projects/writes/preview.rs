@@ -1,6 +1,8 @@
 //! What a plan does once applied, beyond the fields it writes: which workloads roll and whether
-//! that leaves a moment with no pod, whether the new pods fit, what data goes, and which fields
-//! it removes.
+//! that leaves a moment with no pod, what data goes, and which fields it removes.
+//!
+//! The preview does not predict whether new pods fit. After apply, the rollout shows its progress
+//! and the reason a pod cannot start.
 //!
 //! # Rollouts
 //!
@@ -19,16 +21,6 @@
 //! A ConfigMap or Secret change reaches containers that read it into variables only when they
 //! restart (the plan's `restartNeeded` warning); those workloads are listed as `pendingRestart`.
 //!
-//! # Fit
-//!
-//! The pods a plan adds (the surge of a rolling Deployment, new replicas) and the growth of each
-//! replaced pod's requests are checked against the namespace's `ResourceQuotas` (`hard - used`)
-//! [k8s-quota] and against what the ready, schedulable nodes have left (`allocatable` minus the
-//! requests of their pods, summed as `kubectl describe node` sums them, see
-//! `crate::cluster::capacity`) [k8s-scheduling]. Only requests are compared: node selectors,
-//! affinity, taints and volume topology can still keep a pod off a node with room, so `fits`
-//! means the requests fit, and a blocker is certain.
-//!
 //! # Data
 //!
 //! A deleted claim's data may go with it (the plan's `claimDataMayBeLost` warning names the reclaim
@@ -46,8 +38,6 @@
 //! [k8s-deployment-strategy]: https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#strategy
 //! [k8s-statefulset-updates]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#update-strategies
 //! [k8s-daemonset-updates]: https://kubernetes.io/docs/tasks/manage-daemon/update-daemon-set/
-//! [k8s-quota]: https://kubernetes.io/docs/concepts/policy/resource-quotas/
-//! [k8s-scheduling]: https://kubernetes.io/docs/concepts/scheduling-eviction/kube-scheduler/
 //! [k8s-emptydir]: https://kubernetes.io/docs/concepts/storage/volumes/#emptydir
 //! [k8s-statefulset-pvc-retention]: https://kubernetes.io/docs/concepts/workloads/controllers/statefulset/#persistentvolumeclaim-retention
 
@@ -56,16 +46,9 @@ use std::collections::{BTreeMap, BTreeSet};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
-use zeabur_kube::k8s_openapi::api::core::v1::{Node, PodSpec, ResourceQuota};
-use zeabur_kube::{Cluster, ClusterExt as _, NamespaceObjects};
+use zeabur_kube::{Cluster, NamespaceObjects};
 use zeabur_model::{WorkloadKind, WorkloadRef};
 use zeabur_plan::{Change, ObjectName, Plan, PlanRequest, PlannedObject, Warning, Write};
-
-use crate::cluster::WIDE_LIMIT;
-use crate::cluster::capacity::{Amount, NodeRoom, bytes, millicores, node_room, spec_amounts};
-use crate::error::ApiError;
-use crate::incidents::allowed;
-use crate::views::UnreadableView;
 
 /// What happens to a workload's pods.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -106,64 +89,6 @@ pub struct Rollout {
     /// The pod template fields that change, at most ten.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub fields: Vec<String>,
-}
-
-/// Whether the plan's new pods fit.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum FitStatus {
-    /// The plan adds no pod and grows none.
-    NotNeeded,
-    /// Their requests fit the quotas and the nodes' room.
-    Fits,
-    /// A quota or the nodes' room keeps at least one from being created or placed.
-    Blocked,
-    /// Quotas or nodes could not be read (see `unreadable`), or the read stopped early.
-    Unknown,
-}
-
-/// What keeps a pod from being created or placed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub enum BlockerKind {
-    /// A `ResourceQuota` of the namespace: kube-apiserver refuses the pod.
-    Quota,
-    /// No ready, schedulable node has room: the pod stays `Pending`.
-    Node,
-}
-
-/// One limit the new pods exceed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Blocker {
-    /// A quota or the nodes.
-    pub kind: BlockerKind,
-    /// The quota's name.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    /// The resource: `requests.cpu`, `limits.memory`, `pods`, `cpu`, `memory`, …
-    pub resource: String,
-    /// What the plan needs, in the resource's unit: millicores, bytes or pods.
-    pub need: u64,
-    /// What is left.
-    pub available: u64,
-}
-
-/// Whether the plan's new pods fit, and what blocks them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct Fit {
-    /// The verdict.
-    pub status: FitStatus,
-    /// Pods the plan adds at its peak.
-    pub pods: u64,
-    /// CPU requests it adds at its peak, millicores.
-    pub cpu_millicores: u64,
-    /// Memory requests it adds at its peak, bytes.
-    pub memory_bytes: u64,
-    /// What blocks them, quotas first.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub blockers: Vec<Blocker>,
 }
 
 /// What kind of data a plan loses.
@@ -231,28 +156,14 @@ pub struct DatabaseStart {
 pub struct Preview {
     /// The workloads whose pods change, sorted.
     pub rollouts: Vec<Rollout>,
-    /// The databases it creates, by name. Their instances count in `fit`.
+    /// The databases it creates, by name.
     pub databases: Vec<DatabaseStart>,
     /// The public domains its new Ingresses and `HTTPRoutes` route, sorted.
     pub domains: Vec<String>,
-    /// Whether the new pods fit.
-    pub fit: Fit,
     /// The data it loses.
     pub data_loss: Vec<DataLoss>,
     /// The fields it removes, by object then path.
     pub removals: Vec<Removal>,
-    /// Reads the person was refused, and what they left unchecked.
-    pub unreadable: Vec<UnreadableView>,
-}
-
-/// What the nodes and quotas give the fit, as far as they were read.
-#[derive(Debug, Clone, Default)]
-pub(crate) struct Room {
-    /// Per ready, schedulable node: CPU, memory and pods left. `None` when nodes or pods could
-    /// not be read, or the pod read stopped early.
-    pub(crate) nodes: Option<Vec<NodeRoom>>,
-    /// The namespace's quotas; `None` when they could not be read.
-    pub(crate) quotas: Option<Vec<ResourceQuota>>,
 }
 
 /// The workload a planned object is, when it is one.
@@ -361,17 +272,6 @@ fn strategy(kind: WorkloadKind, object: &Value) -> (String, bool, i32) {
     }
 }
 
-/// What one pod of a template requests and limits.
-fn template_amounts(object: &Value) -> (Amount, Amount) {
-    let Some(spec) = object
-        .pointer("/spec/template/spec")
-        .and_then(|s| serde_json::from_value::<PodSpec>(s.clone()).ok())
-    else {
-        return (Amount::default(), Amount::default());
-    };
-    spec_amounts(&spec)
-}
-
 fn template_fields(object: &PlannedObject) -> Vec<String> {
     object
         .changes
@@ -382,36 +282,9 @@ fn template_fields(object: &PlannedObject) -> Vec<String> {
         .collect()
 }
 
-/// What the plan adds at its peak: pods, requests and limits.
-#[derive(Debug, Clone, Copy, Default)]
-struct Need {
-    pods: u64,
-    requests: Amount,
-    limits: Amount,
-    /// One new pod's requests, for the node check.
-    pod: Amount,
-    /// Pods that each need `pod` on some node.
-    placed: u64,
-}
-
-const fn times(amount: Amount, n: u64) -> Amount {
-    Amount {
-        cpu: amount.cpu.saturating_mul(n),
-        memory: amount.memory.saturating_mul(n),
-    }
-}
-
-const fn growth(new: Amount, old: Amount) -> Amount {
-    Amount {
-        cpu: new.cpu.saturating_sub(old.cpu),
-        memory: new.memory.saturating_sub(old.memory),
-    }
-}
-
-/// The rollouts of `plan` and what they add at their peak.
-fn rollouts(plan: &Plan) -> (Vec<Rollout>, Need) {
+/// The rollouts of `plan`.
+fn rollouts(plan: &Plan) -> Vec<Rollout> {
     let mut out: BTreeMap<WorkloadRef, Rollout> = BTreeMap::new();
-    let mut need = Need::default();
     for object in &plan.objects {
         let Some(workload) = workload_of(object) else {
             continue;
@@ -433,51 +306,20 @@ fn rollouts(plan: &Plan) -> (Vec<Rollout>, Need) {
                 rollout.replicas = None;
                 rollout.downtime = true;
             }
-            (None, Some(after), _) => {
-                rollout.actions.push(RolloutAction::Start);
-                let (requests, limits) = template_amounts(after);
-                let count = u64::try_from(replicas(Some(after)).unwrap_or(1)).unwrap_or(0);
-                need.pods += count;
-                need.requests.add(times(requests, count));
-                need.limits.add(times(limits, count));
-                need.pod = requests;
-                need.placed += count;
-            }
+            (None, Some(_), _) => rollout.actions.push(RolloutAction::Start),
             (Some(before), Some(after), _) => {
-                let (old_requests, old_limits) = template_amounts(before);
-                let (new_requests, new_limits) = template_amounts(after);
                 let from = replicas(Some(before)).unwrap_or(1);
                 let to = replicas(Some(after)).unwrap_or(1);
                 if before.pointer("/spec/template") != after.pointer("/spec/template") {
-                    let (kind, downtime, surge) = strategy(workload.kind, after);
+                    let (kind, downtime, _) = strategy(workload.kind, after);
                     rollout.actions.push(RolloutAction::Roll);
                     rollout.downtime = downtime;
                     rollout.fields = template_fields(object);
-                    let surge = u64::try_from(surge.min(to)).unwrap_or(0);
-                    let kept = u64::try_from(to).unwrap_or(0);
-                    if kind != "OnDelete" {
-                        need.pods += surge;
-                        need.requests.add(times(new_requests, surge));
-                        need.limits.add(times(new_limits, surge));
-                        need.requests
-                            .add(times(growth(new_requests, old_requests), kept));
-                        need.limits.add(times(growth(new_limits, old_limits), kept));
-                        need.pod = new_requests;
-                        need.placed += surge.max(u64::from(new_requests != old_requests));
-                    }
                     rollout.strategy = Some(kind);
                 }
                 if from != to {
                     rollout.actions.push(RolloutAction::Scale);
                     rollout.from_replicas = Some(from);
-                    if to > from {
-                        let added = u64::try_from(to - from).unwrap_or(0);
-                        need.pods += added;
-                        need.requests.add(times(new_requests, added));
-                        need.limits.add(times(new_limits, added));
-                        need.pod = new_requests;
-                        need.placed += added;
-                    }
                 }
             }
             _ => {}
@@ -504,11 +346,11 @@ fn rollouts(plan: &Plan) -> (Vec<Rollout>, Need) {
             }
         }
     }
-    (out.into_values().collect(), need)
+    out.into_values().collect()
 }
 
-/// The CloudNativePG `Clusters` `plan` creates, with what their instances add to `need`.
-fn databases(plan: &Plan, need: &mut Need) -> Vec<DatabaseStart> {
+/// The CloudNativePG `Clusters` `plan` creates.
+fn databases(plan: &Plan) -> Vec<DatabaseStart> {
     let mut out = Vec::new();
     for object in &plan.objects {
         let Some(after) = after_of(object) else {
@@ -525,25 +367,6 @@ fn databases(plan: &Plan, need: &mut Need) -> Vec<DatabaseStart> {
             .and_then(Value::as_i64)
             .and_then(|n| i32::try_from(n).ok())
             .unwrap_or(1);
-        let amount = |at: &str| Amount {
-            cpu: after
-                .pointer(&format!("/spec/resources/{at}/cpu"))
-                .and_then(Value::as_str)
-                .and_then(millicores)
-                .unwrap_or(0),
-            memory: after
-                .pointer(&format!("/spec/resources/{at}/memory"))
-                .and_then(Value::as_str)
-                .and_then(bytes)
-                .unwrap_or(0),
-        };
-        let count = u64::try_from(instances).unwrap_or(0);
-        let requests = amount("requests");
-        need.pods += count;
-        need.requests.add(times(requests, count));
-        need.limits.add(times(amount("limits"), count));
-        need.pod = requests;
-        need.placed += count;
         out.push(DatabaseStart {
             name: object.target.name.clone(),
             engine: "PostgreSQL".to_owned(),
@@ -603,122 +426,6 @@ fn domains(plan: &Plan, serving: &BTreeSet<String>) -> Vec<String> {
         );
     }
     out.into_iter().filter(|h| !serving.contains(h)).collect()
-}
-
-/// The quotas `need` exceeds.
-fn quota_blockers(need: Need, quotas: &[ResourceQuota]) -> Vec<Blocker> {
-    let mut out = Vec::new();
-    for quota in quotas {
-        let status = quota.status.as_ref();
-        let hard = status.and_then(|s| s.hard.as_ref());
-        let used = status.and_then(|s| s.used.as_ref());
-        for (resource, limit) in hard.into_iter().flatten() {
-            let wanted = match resource.as_str() {
-                "pods" => need.pods,
-                "requests.cpu" | "cpu" => need.requests.cpu,
-                "requests.memory" | "memory" => need.requests.memory,
-                "limits.cpu" => need.limits.cpu,
-                "limits.memory" => need.limits.memory,
-                _ => continue,
-            };
-            if wanted == 0 {
-                continue;
-            }
-            let amount = |text: &str| match resource.as_str() {
-                "pods" => text.parse::<u64>().ok(),
-                r if r.ends_with("cpu") => millicores(text),
-                _ => bytes(text),
-            };
-            let left = amount(&limit.0).unwrap_or(0).saturating_sub(
-                used.and_then(|u| u.get(resource))
-                    .and_then(|u| amount(&u.0))
-                    .unwrap_or(0),
-            );
-            if wanted > left {
-                out.push(Blocker {
-                    kind: BlockerKind::Quota,
-                    name: quota.metadata.name.clone(),
-                    resource: resource.clone(),
-                    need: wanted,
-                    available: left,
-                });
-            }
-        }
-    }
-    out
-}
-
-/// What keeps `need`'s new pods off the nodes: the resource one pod needs more of than any node
-/// has left, else the count of pods that fit.
-fn node_blockers(need: Need, nodes: &[NodeRoom]) -> Vec<Blocker> {
-    if need.placed == 0 {
-        return Vec::new();
-    }
-    let per_node = |node: &NodeRoom| -> u64 {
-        let by = |free: u64, one: u64| free.checked_div(one).unwrap_or(u64::MAX);
-        by(node.free.cpu, need.pod.cpu)
-            .min(by(node.free.memory, need.pod.memory))
-            .min(node.pods)
-    };
-    let placeable: u64 = nodes.iter().map(per_node).fold(0, u64::saturating_add);
-    if placeable >= need.placed {
-        return Vec::new();
-    }
-    let most =
-        |pick: fn(&Amount) -> u64| nodes.iter().map(|node| pick(&node.free)).max().unwrap_or(0);
-    let short: Vec<Blocker> = [
-        ("cpu", need.pod.cpu, most(|a| a.cpu)),
-        ("memory", need.pod.memory, most(|a| a.memory)),
-    ]
-    .into_iter()
-    .filter(|(_, one, available)| one > available)
-    .map(|(resource, one, available)| Blocker {
-        kind: BlockerKind::Node,
-        name: None,
-        resource: resource.to_owned(),
-        need: one,
-        available,
-    })
-    .collect();
-    if short.is_empty() {
-        vec![Blocker {
-            kind: BlockerKind::Node,
-            name: None,
-            resource: "pods".to_owned(),
-            need: need.placed,
-            available: placeable,
-        }]
-    } else {
-        short
-    }
-}
-
-/// Whether `need` fits the quotas and nodes of `room`.
-fn fit(need: Need, room: &Room) -> Fit {
-    let mut fit = Fit {
-        status: FitStatus::NotNeeded,
-        pods: need.pods,
-        cpu_millicores: need.requests.cpu,
-        memory_bytes: need.requests.memory,
-        blockers: Vec::new(),
-    };
-    if need.pods == 0 && need.requests == Amount::default() {
-        return fit;
-    }
-    if let Some(quotas) = &room.quotas {
-        fit.blockers.extend(quota_blockers(need, quotas));
-    }
-    if let Some(nodes) = &room.nodes {
-        fit.blockers.extend(node_blockers(need, nodes));
-    }
-    fit.status = if !fit.blockers.is_empty() {
-        FitStatus::Blocked
-    } else if room.quotas.is_none() || room.nodes.is_none() {
-        FitStatus::Unknown
-    } else {
-        FitStatus::Fits
-    };
-    fit
 }
 
 fn mounts(template: &Value, volume: &str) -> Vec<String> {
@@ -858,57 +565,25 @@ fn removals(plan: &Plan, request: &PlanRequest) -> Vec<Removal> {
         .collect()
 }
 
-/// What `plan`, made for `request`, does once applied, with the room `room` gives its pods.
-pub(crate) fn preview(
-    plan: &Plan,
-    request: &PlanRequest,
-    room: &Room,
-    serving: &BTreeSet<String>,
-    unreadable: Vec<UnreadableView>,
-) -> Preview {
-    let (rollouts, mut need) = rollouts(plan);
-    let databases = databases(plan, &mut need);
+/// What `plan`, made for `request`, does once applied.
+pub(crate) fn preview(plan: &Plan, request: &PlanRequest, serving: &BTreeSet<String>) -> Preview {
+    let rollouts = rollouts(plan);
     Preview {
-        fit: fit(need, room),
         data_loss: data_loss(plan, &rollouts),
         removals: removals(plan, request),
-        rollouts,
-        databases,
+        databases: databases(plan),
         domains: domains(plan, serving),
-        unreadable,
+        rollouts,
     }
 }
 
-/// Reads what `plan`'s new pods need to fit, when it adds or grows any, and previews it.
+/// Reads the routes the namespace serves now, when `plan` creates one, and previews it.
 pub(crate) async fn read(
     cluster: &dyn Cluster,
     project: &str,
     plan: &Plan,
     request: &PlanRequest,
-) -> Result<Preview, ApiError> {
-    let mut unreadable = Vec::new();
-    let (_, mut need) = rollouts(plan);
-    databases(plan, &mut need);
-    let room = if need.pods == 0 && need.requests == Amount::default() {
-        Room::default()
-    } else {
-        let (quotas, nodes, pods) = futures_util::join!(
-            cluster.list::<ResourceQuota>(Some(project)),
-            cluster.list::<Node>(None),
-            cluster.cluster_pods(WIDE_LIMIT),
-        );
-        let quotas_read = quotas.is_ok();
-        let quotas = allowed(quotas, "resourcequotas", &mut unreadable)?;
-        let nodes_read = nodes.is_ok();
-        let nodes = allowed(nodes, "nodes", &mut unreadable)?;
-        let pods_read = pods.is_ok();
-        let pods = allowed(pods, "pods", &mut unreadable)?;
-        Room {
-            nodes: (nodes_read && pods_read && !pods.truncated)
-                .then(|| node_room(&nodes, &pods.pods)),
-            quotas: quotas_read.then_some(quotas),
-        }
-    };
+) -> Preview {
     let creates_route = plan
         .objects
         .iter()
@@ -921,7 +596,7 @@ pub(crate) async fn read(
     } else {
         BTreeSet::new()
     };
-    Ok(preview(plan, request, &room, &serving, unreadable))
+    preview(plan, request, &serving)
 }
 
 #[cfg(test)]
@@ -962,61 +637,5 @@ mod tests {
         assert!(strategy(WorkloadKind::StatefulSet, &json!({"spec": {"replicas": 1}})).1);
         assert!(!strategy(WorkloadKind::StatefulSet, &json!({"spec": {"replicas": 3}})).1);
         assert!(strategy(WorkloadKind::DaemonSet, &json!({"spec": {}})).1);
-    }
-
-    #[test]
-    fn a_quota_and_full_nodes_each_block_with_numbers() {
-        let need = Need {
-            pods: 1,
-            requests: Amount {
-                cpu: 500,
-                memory: 256 << 20,
-            },
-            limits: Amount::default(),
-            pod: Amount {
-                cpu: 500,
-                memory: 256 << 20,
-            },
-            placed: 1,
-        };
-        let quota: ResourceQuota = serde_json::from_value(json!({
-            "metadata": {"name": "compute"},
-            "status": {"hard": {"requests.cpu": "1", "pods": "10"},
-                "used": {"requests.cpu": "800m", "pods": "2"}}
-        }))
-        .unwrap();
-        let room = Room {
-            nodes: Some(vec![NodeRoom {
-                free: Amount {
-                    cpu: 200,
-                    memory: 1 << 30,
-                },
-                pods: 50,
-            }]),
-            quotas: Some(vec![quota]),
-        };
-        let fit = fit(need, &room);
-        assert_eq!(fit.status, FitStatus::Blocked);
-        assert_eq!(fit.blockers.len(), 2);
-        assert_eq!(fit.blockers[0].kind, BlockerKind::Quota);
-        assert_eq!(fit.blockers[0].available, 200);
-        assert_eq!(fit.blockers[1].kind, BlockerKind::Node);
-        assert_eq!(fit.blockers[1].resource, "cpu");
-
-        let roomy = Room {
-            nodes: Some(vec![NodeRoom {
-                free: Amount {
-                    cpu: 4000,
-                    memory: 8 << 30,
-                },
-                pods: 50,
-            }]),
-            quotas: Some(Vec::new()),
-        };
-        assert_eq!(super::fit(need, &roomy).status, FitStatus::Fits);
-        assert_eq!(
-            super::fit(need, &Room::default()).status,
-            FitStatus::Unknown
-        );
     }
 }

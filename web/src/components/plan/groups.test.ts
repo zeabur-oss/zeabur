@@ -60,10 +60,8 @@ const preview = (over: Partial<Schemas.Preview> = {}): Schemas.Preview => ({
   rollouts: [],
   databases: [],
   domains: [],
-  fit: { status: "notNeeded", pods: 0, cpuMillicores: 0, memoryBytes: 0 },
   dataLoss: [],
   removals: [],
-  unreadable: [],
   ...over,
 })
 
@@ -269,7 +267,6 @@ group("describe at 1, 5 and 45 changes", () => {
               replicas: 5,
             },
           ],
-          fit: { status: "fits", pods: 2, cpuMillicores: 0, memoryBytes: 0 },
         }),
       }),
       pods({ api: { desired: 3, ready: 3 } }),
@@ -280,7 +277,6 @@ group("describe at 1, 5 and 45 changes", () => {
       "plan.fact.added(45)",
       "plan.fact.replicas(3, 5)",
       "plan.fact.staysUp",
-      "plan.fact.fits",
     ])
     expect(d.edits?.map((g) => [g.part, g.rows.length])).toStrictEqual([
       ["variables", 45],

@@ -1,11 +1,8 @@
 import type { ReactNode } from "react"
 
 import type { Schemas } from "@/api/client"
-import { shortfall } from "@/components/plan/describe"
-import { RefusedKinds } from "@/components/refused"
 import { StatusDot } from "@/components/status"
 import { useT, type Translate } from "@/i18n"
-import { useQuantityFormat } from "@/lib/quantity"
 import type { Health } from "@/model/service"
 
 type Preview = Schemas.Preview
@@ -37,29 +34,6 @@ function rolloutText(t: Translate, rollout: Rollout): string {
   return t("common.sentences", parts)
 }
 
-/** Whether the new pods fit: their count, and what they request at the peak when it is more than
- * nothing. */
-function FitLine({ fit }: { fit: Preview["fit"] }) {
-  const t = useT()
-  const { cpuRequest, memory } = useQuantityFormat()
-  if (fit.status !== "fits" && fit.status !== "unknown") return null
-  const fits = fit.status === "fits"
-  const nothing = fit.cpuMillicores === 0 && fit.memoryBytes === 0
-  const text = nothing
-    ? t(fits ? "preview.fitsPods" : "preview.fitUnknownPods", fit.pods)
-    : t(
-        fits ? "preview.fits" : "preview.fitUnknown",
-        fit.pods,
-        cpuRequest(fit.cpuMillicores),
-        memory(fit.memoryBytes),
-      )
-  return (
-    <ul>
-      <Line health={fits ? "ok" : "idle"}>{text}</Line>
-    </ul>
-  )
-}
-
 function Line({ health, children }: { health: Health; children: ReactNode }) {
   return (
     <li className="flex items-start gap-2 text-sm">
@@ -74,33 +48,6 @@ const envEntry = /\.env\[name=[^\]]+\]/
 
 /** Whether a rollout says more than the sentences: a strategy other than one replica at a time. */
 const tellsMore = (r: Rollout) => r.strategy === "Recreate" || r.strategy === "OnDelete"
-
-/** Why the plan's new pods do not fit, what that costs and how to make room; undefined when
- * they fit. */
-export function useShortfall(
-  preview?: Preview,
-): { cost: string; reasons: string[]; fix: string } | undefined {
-  const t = useT()
-  const { cpuRequest, memory } = useQuantityFormat()
-  const short = preview ? shortfall(t, preview) : undefined
-  if (!preview || !short) return undefined
-  const amount = (resource: string, value: number) =>
-    resource.endsWith("cpu")
-      ? cpuRequest(value)
-      : resource.endsWith("memory")
-        ? memory(value)
-        : String(value)
-  const reasons = (preview.fit.blockers ?? []).map((b) =>
-    t(
-      b.kind === "quota" ? "preview.blockedQuota" : "preview.blockedNodes",
-      b.name ?? "",
-      b.resource,
-      amount(b.resource, b.need),
-      amount(b.resource, b.available),
-    ),
-  )
-  return { ...short, reasons }
-}
 
 /** What the plan does to running pods beyond what its sentences or rows already say. */
 export function PlanPreview({
@@ -121,7 +68,6 @@ export function PlanPreview({
   removals?: boolean
 }) {
   const t = useT()
-  const { fit } = preview
   const isSaid = (r: Rollout) =>
     said.some((w) => w.kind === r.workload.kind && w.name === r.workload.name)
   const rollouts = showRollouts
@@ -176,7 +122,6 @@ export function PlanPreview({
           </section>
         ) : null,
       )}
-      <FitLine fit={fit} />
       {dataLoss.length > 0 ? (
         <ul className="flex flex-col gap-1.5" aria-label={t("preview.dataLoss")}>
           {dataLoss.map((loss, i) => {
@@ -213,7 +158,6 @@ export function PlanPreview({
           ))}
         </ul>
       ) : null}
-      <RefusedKinds unreadable={preview.unreadable} line />
     </div>
   )
 }

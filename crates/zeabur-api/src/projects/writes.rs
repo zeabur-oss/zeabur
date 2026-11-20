@@ -366,7 +366,7 @@ pub(crate) async fn plan(
         creations::dry_run(cluster.as_ref(), &project, &plan).await?;
     }
     let from_yaml = creations::from_yaml(&opened);
-    let preview = preview::read(cluster.as_ref(), &project, &plan, &opened).await?;
+    let preview = preview::read(cluster.as_ref(), &project, &plan, &opened).await;
     let gaps = if from_yaml {
         creations::gaps(&project, &plan)
     } else {
