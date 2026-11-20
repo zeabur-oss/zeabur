@@ -4,7 +4,9 @@
 //! and the refusals: someone who is not a cluster administrator, a plan of an older catalog
 //! release, a release someone else installed, a component another one needs (not its leftover
 //! CRDs), a cluster without
-//! helm-controller and a catalog Zeabur cannot reach.
+//! helm-controller and a catalog Zeabur cannot reach. Manifest releases: the System Upgrade
+//! Controller from its files, Falco without the policy report CRDs another tool installed, and a
+//! file that does not match its digest.
 
 #[cfg(test)]
 mod tests {
@@ -14,6 +16,7 @@ mod tests {
     use axum::http::StatusCode;
     use futures_util::future::BoxFuture;
     use serde_json::{Value, json};
+    use sha2::{Digest as _, Sha256};
     use zeabur_api::cluster::catalog::{Fetch, Fetched};
     use zeabur_kube::k8s_openapi::api::core::v1::Node;
     use zeabur_kube::memory::{MemoryCluster, State};
@@ -33,17 +36,74 @@ mod tests {
             include_bytes!("../../../zeabur-catalog/tests/api/cloudnative-pg.json"),
         ),
         (
+            "falco",
+            include_bytes!("../../../zeabur-catalog/tests/api/falco.json"),
+        ),
+        (
+            "system-upgrade-controller",
+            include_bytes!("../../../zeabur-catalog/tests/api/system-upgrade-controller.json"),
+        ),
+        (
             "traefik",
             include_bytes!("../../../zeabur-catalog/tests/api/traefik.json"),
         ),
     ];
 
-    /// Zeabur Catalog v0.5.3 with the components of `FIXTURES`, or no answer at all.
+    const SUC: &str =
+        "https://github.com/rancher/system-upgrade-controller/releases/download/v0.20.2";
+    const POLICY_REPORTS: &str = "https://raw.githubusercontent.com/kubernetes-retired/\
+        wg-policy-prototypes/ed0ca5a1c7788055074c7500915b76fc4518ed33/policy-report/crd/\
+        wgpolicyk8s.io/v1alpha2/wgpolicyk8s.io_";
+
+    fn crd(name: &str) -> String {
+        format!(
+            "apiVersion: apiextensions.k8s.io/v1\nkind: CustomResourceDefinition\nmetadata:\n  name: {name}\n"
+        )
+    }
+
+    /// Short stand-ins for the files of the manifest releases; the catalog's digests are
+    /// replaced with theirs.
+    fn files() -> Vec<(String, String)> {
+        vec![
+            (format!("{SUC}/crd.yaml"), crd("plans.upgrade.cattle.io")),
+            (
+                format!("{SUC}/system-upgrade-controller.yaml"),
+                "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: system-upgrade\n---\n\
+                 apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  \
+                 name: system-upgrade-controller\n  namespace: system-upgrade\nspec:\n  \
+                 selector: {}\n  template: {}\n"
+                    .to_owned(),
+            ),
+            (
+                format!("{POLICY_REPORTS}policyreports.yaml"),
+                crd("policyreports.wgpolicyk8s.io"),
+            ),
+            (
+                format!("{POLICY_REPORTS}clusterpolicyreports.yaml"),
+                crd("clusterpolicyreports.wgpolicyk8s.io"),
+            ),
+            (
+                "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/\
+                 standard-install.yaml"
+                    .to_owned(),
+                crd("httproutes.gateway.networking.k8s.io"),
+            ),
+        ]
+    }
+
+    /// Zeabur Catalog v0.5.3 with the components of `FIXTURES`, or no answer at all; `tampered`
+    /// answers each manifest file with other bytes than the catalog's digest.
+    #[derive(Default)]
     struct Api {
         down: bool,
+        tampered: bool,
     }
 
     impl Fetch for Api {
+        #[expect(
+            clippy::literal_string_with_formatting_args,
+            reason = "`{version}` is the catalog's URL placeholder, not a format argument"
+        )]
         fn get(
             &self,
             url: String,
@@ -52,6 +112,13 @@ mod tests {
             Box::pin(async move {
                 if self.down {
                     return Err("dns error: no such host".to_owned());
+                }
+                if let Some((_, text)) = files().into_iter().find(|(u, _)| *u == url) {
+                    let mut bytes = text.into_bytes();
+                    if self.tampered {
+                        bytes.extend(b"# changed");
+                    }
+                    return Ok(Fetched::Body { bytes, etag: None });
                 }
                 let bytes = if url.ends_with("/catalog.json") {
                     let mut index: Value = serde_json::from_slice(include_bytes!(
@@ -65,7 +132,24 @@ mod tests {
                     serde_json::to_vec(&index).unwrap()
                 } else {
                     let id = url.rsplit('/').next().unwrap().trim_end_matches(".json");
-                    FIXTURES.iter().find(|(f, _)| *f == id).unwrap().1.to_vec()
+                    let bytes = FIXTURES.iter().find(|(f, _)| *f == id).unwrap().1;
+                    let mut file: Value = serde_json::from_slice(bytes).unwrap();
+                    for release in file["declaration"]["releases"].as_array_mut().unwrap() {
+                        let version = release["version"].as_str().unwrap_or_default().to_owned();
+                        let Some(urls) = release["urls"].as_array() else {
+                            continue;
+                        };
+                        let digests: Vec<String> = urls
+                            .iter()
+                            .map(|u| {
+                                let u = u.as_str().unwrap().replace("{version}", &version);
+                                let (_, text) = files().into_iter().find(|(f, _)| *f == u).unwrap();
+                                format!("sha256:{}", hex::encode(Sha256::digest(text)))
+                            })
+                            .collect();
+                        release["urlDigests"] = json!(digests);
+                    }
+                    serde_json::to_vec(&file).unwrap()
                 };
                 Ok(Fetched::Body { bytes, etag: None })
             })
@@ -110,15 +194,28 @@ mod tests {
     fn app(cluster: &MemoryCluster, down: bool) -> Router {
         TestApi::new(cluster)
             .signed_in(TOKEN)
-            .with_catalog(Arc::new(Api { down }))
+            .with_catalog(Arc::new(Api {
+                down,
+                ..Api::default()
+            }))
             .router()
     }
 
     async fn call(app: &Router, verb: &str, action: &str, version: &str) -> (StatusCode, Value) {
+        call_for(app, "cert-manager", verb, action, version).await
+    }
+
+    async fn call_for(
+        app: &Router,
+        id: &str,
+        verb: &str,
+        action: &str,
+        version: &str,
+    ) -> (StatusCode, Value) {
         send(
             app,
             "POST",
-            &format!("/api/v1/cluster/components/cert-manager/{verb}"),
+            &format!("/api/v1/cluster/components/{id}/{verb}"),
             Some(&json!({"action": action, "catalogVersion": version})),
         )
         .await
@@ -620,5 +717,199 @@ mod tests {
         assert_eq!(status, StatusCode::OK);
         assert!(catalog["version"].is_null());
         assert_eq!(catalog["error"], "dns error: no such host");
+    }
+
+    /// The cluster of [`cluster`], serving CRDs, Deployments and ClusterRoles.
+    fn cluster_with_crds() -> MemoryCluster {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.served.push(served(
+                "apiextensions.k8s.io",
+                "customresourcedefinitions",
+                "CustomResourceDefinition",
+                false,
+            ));
+            s.served
+                .push(served("apps", "deployments", "Deployment", true));
+            s.served.push(served(
+                "rbac.authorization.k8s.io",
+                "clusterroles",
+                "ClusterRole",
+                false,
+            ));
+        });
+        cluster
+    }
+
+    /// What the API server does with a CRD once it is written: it serves it.
+    fn established(cluster: &MemoryCluster, name: &str) {
+        let mut crd = dynamic(cluster, "CustomResourceDefinition", name).unwrap();
+        crd["status"] = json!({"conditions": [
+            {"type": "NamesAccepted", "status": "True"},
+            {"type": "Established", "status": "True"},
+        ]});
+        put(cluster, crd);
+    }
+
+    #[tokio::test]
+    async fn a_component_installs_from_manifest_files_and_its_removal_keeps_the_crds() {
+        let cluster = cluster_with_crds();
+        let app = app(&cluster, false);
+        let suc = "system-upgrade-controller";
+
+        let (status, plan) = call_for(&app, suc, "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(states(&plan), ["crds pending", "controller pending"]);
+        let kinds: Vec<&str> = plan["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|s| s["writes"].as_array().unwrap())
+            .map(|w| w["kind"].as_str().unwrap())
+            .collect();
+        assert_eq!(
+            kinds,
+            ["Namespace", "CustomResourceDefinition", "Deployment"],
+            "the controller file's Namespace is written once, by the first step"
+        );
+
+        let (_, applied) = call_for(&app, suc, "apply", "install", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            ["crds waiting", "controller pending"]
+        );
+        let crd = dynamic(
+            &cluster,
+            "CustomResourceDefinition",
+            "plans.upgrade.cattle.io",
+        )
+        .unwrap();
+        assert_eq!(
+            crd["metadata"]["labels"]["catalog.zeabur.com/component"],
+            suc
+        );
+        established(&cluster, "plans.upgrade.cattle.io");
+        let (_, applied) = call_for(&app, suc, "apply", "install", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            ["crds ready", "controller waiting"]
+        );
+        let deployments = cluster
+            .inspect(|s| s.objects.get("system-upgrade").map(|n| n.deployments.len()))
+            .flatten();
+        assert_eq!(deployments, Some(1));
+
+        // Removal deletes the controller; the CRD stays, as deleting it would delete every Plan.
+        let (status, plan) = call_for(&app, suc, "plan", "remove", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(states(&plan), ["controller pending"]);
+        assert_eq!(
+            plan["leftovers"],
+            json!(["customresourcedefinitions/plans.upgrade.cattle.io"])
+        );
+        let (_, applied) = call_for(&app, suc, "apply", "remove", "0.5.3").await;
+        assert_eq!(applied["plan"]["done"], true, "{applied}");
+        assert!(
+            dynamic(
+                &cluster,
+                "CustomResourceDefinition",
+                "plans.upgrade.cattle.io"
+            )
+            .is_some()
+        );
+    }
+
+    #[tokio::test]
+    async fn a_crd_whose_labels_its_controller_replaced_stays_zeaburs() {
+        let cluster = cluster_with_crds();
+        let app = app(&cluster, false);
+        let suc = "system-upgrade-controller";
+        call_for(&app, suc, "apply", "install", "0.5.3").await;
+        // The controller updates its embedded CRD on start: Zeabur's labels go, its fields stay.
+        let mut crd = dynamic(
+            &cluster,
+            "CustomResourceDefinition",
+            "plans.upgrade.cattle.io",
+        )
+        .unwrap();
+        crd["metadata"]["labels"] = json!({});
+        crd["metadata"]["managedFields"] = json!([
+            {"manager": "zeabur", "operation": "Apply", "apiVersion": "apiextensions.k8s.io/v1"},
+        ]);
+        put(&cluster, crd);
+        established(&cluster, "plans.upgrade.cattle.io");
+        let (status, plan) = call_for(&app, suc, "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(states(&plan), ["crds ready", "controller pending"]);
+    }
+
+    #[tokio::test]
+    async fn a_release_whose_crds_another_tool_installed_is_left_out() {
+        let cluster = cluster_with_crds();
+        put(
+            &cluster,
+            json!({
+                "apiVersion": "apiextensions.k8s.io/v1",
+                "kind": "CustomResourceDefinition",
+                "metadata": {"name": "policyreports.wgpolicyk8s.io",
+                             "labels": {"app.kubernetes.io/managed-by": "kyverno"}},
+            }),
+        );
+        let (status, plan) = call_for(&app(&cluster, false), "falco", "plan", "install", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(
+            states(&plan),
+            [
+                "policy-report-crds pending",
+                "alert-readers pending",
+                "falco pending"
+            ]
+        );
+        let kept: Vec<(&str, &str)> = plan["steps"][0]["writes"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|w| (w["kind"].as_str().unwrap(), w["name"].as_str().unwrap()))
+            .collect();
+        assert_eq!(
+            kept,
+            [("Namespace", "falco")],
+            "the release's CRDs are left out, the component's namespace is not"
+        );
+
+        // Once Zeabur wrote them, the release stays in the plan.
+        let cluster = cluster_with_crds();
+        let app = app(&cluster, false);
+        let (_, applied) = call_for(&app, "falco", "apply", "install", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"])[0],
+            "policy-report-crds waiting",
+            "{applied}"
+        );
+        let (_, plan) = call_for(&app, "falco", "plan", "install", "").await;
+        assert_eq!(states(&plan)[0], "policy-report-crds waiting");
+    }
+
+    #[tokio::test]
+    async fn a_manifest_file_unlike_its_digest_is_refused_with_its_url() {
+        let cluster = cluster_with_crds();
+        let app = TestApi::new(&cluster)
+            .signed_in(TOKEN)
+            .with_catalog(Arc::new(Api {
+                tampered: true,
+                ..Api::default()
+            }))
+            .router();
+        let (status, problem) =
+            call_for(&app, "system-upgrade-controller", "plan", "install", "").await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{problem}");
+        assert!(
+            problem["detail"]
+                .as_str()
+                .unwrap()
+                .contains(&format!("{SUC}/crd.yaml")),
+            "{problem}"
+        );
+        assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
     }
 }

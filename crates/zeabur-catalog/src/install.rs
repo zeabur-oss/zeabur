@@ -1277,8 +1277,14 @@ mod tests {
                 declaration: serde_saphyr::from_str(text).unwrap(),
                 measurements: Vec::new(),
             };
+            // The files of manifest releases hold neither kind.
+            let manifests: engine::Manifests = engine::downloads(&component)
+                .unwrap()
+                .into_iter()
+                .map(|d| (d.url, "".into()))
+                .collect();
             for profile in PROFILES {
-                let mut written: Vec<Value> = engine::steps_of(&component, "", profile)
+                let mut written: Vec<Value> = engine::steps_of(&component, "", profile, &manifests)
                     .unwrap()
                     .into_iter()
                     .flat_map(|step| step.objects)

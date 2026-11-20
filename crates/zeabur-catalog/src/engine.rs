@@ -3,8 +3,12 @@
 //! An install is a list of [`Step`]s, one per release, in the catalog's install order
 //! [installers]: the components the asked one needs and does not find on the cluster, then it.
 //! A step holds the objects to server-side apply: the release's namespace with its Pod Security
-//! label, then a K3s/RKE2 `HelmChart` for a chart [k3s-helm] or the objects of an inline release.
-//! A step waits for the one before it, because a release often uses the CRDs of an earlier one.
+//! label, then a K3s/RKE2 `HelmChart` for a chart [k3s-helm], or the objects of an inline
+//! release or of a manifest release's files. A step waits for the one before it, because a
+//! release often uses the CRDs of an earlier one.
+//!
+//! The engine does no I/O: the caller downloads the files of each [`Download`], checks them with
+//! [`verify`] and passes them in as [`Manifests`].
 //!
 //! Readiness follows kstatus [kstatus] through `zeabur_model::readiness`. A `HelmChart` has no
 //! `observedGeneration`, and helm-controller replaces its Job whenever the chart changes, so a
@@ -20,6 +24,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use sha2::{Digest as _, Sha256};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
 use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -79,6 +84,21 @@ pub struct Step {
     pub release: String,
     /// The objects to apply, in order.
     pub objects: Vec<Desired>,
+    /// CRDs, as `plural.group`: when every one exists and Zeabur did not write it, the step is
+    /// left out.
+    pub skip_if_present: Vec<String>,
+}
+
+/// The text of each file of the manifest releases, by URL.
+pub type Manifests = BTreeMap<String, std::sync::Arc<str>>;
+
+/// One file of a manifest release.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Download {
+    /// Its URL.
+    pub url: String,
+    /// The hex SHA-256 the catalog lists for it.
+    pub sha256: String,
 }
 
 /// One object to apply.
@@ -145,15 +165,41 @@ pub enum Refusal {
     NoProvider(String),
 }
 
-/// How to install `id` on `target`.
+/// The components installing `id` on `target` installs, in order: the ones needed, then `id`.
 ///
 /// # Errors
 ///
 /// The component or one it needs is unknown, not offered here, or uses what Zeabur cannot
 /// install yet.
-pub fn install(snapshot: &Snapshot, id: &str, target: &Target<'_>) -> Result<Install, Refusal> {
+pub fn components(
+    snapshot: &Snapshot,
+    id: &str,
+    target: &Target<'_>,
+) -> Result<Vec<String>, Refusal> {
     let mut order = Vec::new();
     install_order(snapshot, id, target, &mut order, &mut BTreeSet::new())?;
+    for component in &order {
+        let file = snapshot
+            .components
+            .get(component)
+            .ok_or_else(|| Refusal::Unknown(component.clone()))?;
+        check(file, target)?;
+    }
+    Ok(order)
+}
+
+/// How to install `id` on `target`, with the files of its manifest releases.
+///
+/// # Errors
+///
+/// As [`components`], and when a release does not read or a file of `manifests` is missing.
+pub fn install(
+    snapshot: &Snapshot,
+    id: &str,
+    target: &Target<'_>,
+    manifests: &Manifests,
+) -> Result<Install, Refusal> {
+    let order = components(snapshot, id, target)?;
     let mut steps = Vec::new();
     let mut warnings = Vec::new();
     for component in &order {
@@ -161,7 +207,6 @@ pub fn install(snapshot: &Snapshot, id: &str, target: &Target<'_>) -> Result<Ins
             .components
             .get(component)
             .ok_or_else(|| Refusal::Unknown(component.clone()))?;
-        check(file, target)?;
         if let Some(distribution) = target.distribution
             && !file.tested_on(&snapshot.index, distribution, target.platform)
         {
@@ -180,6 +225,7 @@ pub fn install(snapshot: &Snapshot, id: &str, target: &Target<'_>) -> Result<Ins
             file,
             &snapshot.index.catalog.version,
             target.profile,
+            manifests,
         )?);
     }
     Ok(Install {
@@ -278,24 +324,72 @@ fn check(file: &ComponentFile, target: &Target<'_>) -> Result<(), Refusal> {
     if !d.contributes.is_empty() {
         return Err(unsupported("adds values to other components"));
     }
-    if d.releases
-        .iter()
-        .any(|r| r.kind != ReleaseType::Helm && r.kind != ReleaseType::Inline)
-    {
-        return Err(unsupported("installs manifests from URLs"));
+    if d.releases.iter().any(|r| r.kind == ReleaseType::Unknown) {
+        return Err(unsupported(
+            "has a release of a type this version does not know",
+        ));
     }
     Ok(())
 }
 
-/// The steps of one component alone, which a removal deletes in reverse.
+/// The files the manifest releases of `file` install.
 ///
 /// # Errors
 ///
-/// A release does not read.
+/// The catalog lists no `sha256` digest for a URL.
+pub fn downloads(file: &ComponentFile) -> Result<Vec<Download>, Refusal> {
+    let mut downloads = Vec::new();
+    for release in &file.declaration.releases {
+        if release.kind != ReleaseType::Manifest {
+            continue;
+        }
+        for (index, url) in release.manifest_urls().into_iter().enumerate() {
+            let Some(sha256) = release
+                .url_digests
+                .get(index)
+                .and_then(|d| d.strip_prefix("sha256:"))
+            else {
+                return Err(Refusal::Unsupported {
+                    component: file.id.clone(),
+                    reason: format!("lists no sha256 digest for {url}"),
+                });
+            };
+            downloads.push(Download {
+                url,
+                sha256: sha256.to_ascii_lowercase(),
+            });
+        }
+    }
+    Ok(downloads)
+}
+
+/// The text of a downloaded file when its SHA-256 is the catalog's.
+///
+/// # Errors
+///
+/// The digest differs, or the file is not UTF-8.
+pub fn verify(download: &Download, bytes: Vec<u8>) -> Result<String, String> {
+    let got = hex::encode(Sha256::digest(&bytes));
+    if got != download.sha256 {
+        return Err(format!(
+            "{} has sha256 {got}, and Zeabur Catalog lists {}",
+            download.url, download.sha256
+        ));
+    }
+    String::from_utf8(bytes).map_err(|_e| format!("{} is not UTF-8 text", download.url))
+}
+
+/// The steps of one component alone, which a removal deletes in reverse, with the files of its
+/// manifest releases.
+///
+/// # Errors
+///
+/// A release does not read, or a file of `manifests` is missing.
 pub fn steps_of(
     file: &ComponentFile,
     catalog_version: &str,
     profile: &str,
+    manifests: &Manifests,
 ) -> Result<Vec<Step>, Refusal> {
     let broken = |message: String| Refusal::Unsupported {
         component: file.id.clone(),
@@ -319,8 +413,29 @@ pub fn steps_of(
                 let values = profile_values(release, profile).map_err(broken)?;
                 vec![dynamic(&helm_chart(release, &values).map_err(broken)?).map_err(broken)?]
             }
-            ReleaseType::Inline => inline(release).map_err(broken)?,
-            ReleaseType::Manifest | ReleaseType::Unknown => Vec::new(),
+            ReleaseType::Inline => {
+                objects_of(release.manifests.as_deref().unwrap_or_default()).map_err(broken)?
+            }
+            ReleaseType::Manifest => {
+                let mut made = Vec::new();
+                for url in release.manifest_urls() {
+                    let text = manifests
+                        .get(&url)
+                        .ok_or_else(|| broken(format!("{url} was not downloaded")))?;
+                    made.extend(objects_of(text).map_err(broken)?);
+                }
+                // A namespace of the component is written once, with its Pod Security level.
+                made.retain(|o| {
+                    o.types.as_ref().is_none_or(|t| t.kind != Namespace::KIND)
+                        || !file
+                            .declaration
+                            .releases
+                            .iter()
+                            .any(|r| o.metadata.name.as_ref() == Some(&r.namespace))
+                });
+                made
+            }
+            ReleaseType::Unknown => Vec::new(),
         };
         objects.extend(made.into_iter().map(|mut object| {
             mark(&mut object.metadata, file, release, catalog_version);
@@ -333,6 +448,7 @@ pub fn steps_of(
             component: file.id.clone(),
             release: release.name.clone(),
             objects,
+            skip_if_present: release.skip_if_present.clone(),
         });
     }
     Ok(steps)
@@ -452,15 +568,14 @@ fn helm_chart(release: &Release, values: &Value) -> Result<HelmChart, String> {
     )
 }
 
-/// The objects of an inline release.
-fn inline(release: &Release) -> Result<Vec<DynamicObject>, String> {
-    let text = release.manifests.as_deref().unwrap_or_default();
+/// The objects of a YAML stream.
+fn objects_of(text: &str) -> Result<Vec<DynamicObject>, String> {
     let documents: Vec<Value> = serde_saphyr::from_multiple(text).map_err(|e| e.to_string())?;
     let mut objects = Vec::new();
     for document in documents.into_iter().filter(|d| !d.is_null()) {
         let object: DynamicObject = serde_json::from_value(document).map_err(|e| e.to_string())?;
         if object.types.is_none() || object.metadata.name.is_none() {
-            return Err("an inline object has no kind or name".to_owned());
+            return Err("an object has no kind or name".to_owned());
         }
         objects.push(object);
     }
@@ -881,10 +996,15 @@ mod tests {
             include_str!("../tests/api/cloudnative-pg.json"),
         ),
         ("crowdsec", include_str!("../tests/api/crowdsec.json")),
+        ("falco", include_str!("../tests/api/falco.json")),
         ("keda", include_str!("../tests/api/keda.json")),
         (
             "keda-http-add-on",
             include_str!("../tests/api/keda-http-add-on.json"),
+        ),
+        (
+            "system-upgrade-controller",
+            include_str!("../tests/api/system-upgrade-controller.json"),
         ),
         ("traefik", include_str!("../tests/api/traefik.json")),
         (
@@ -896,6 +1016,35 @@ mod tests {
             include_str!("../tests/api/victoria-metrics-operator.json"),
         ),
     ];
+
+    const SUC: &str =
+        "https://github.com/rancher/system-upgrade-controller/releases/download/v0.20.2";
+
+    /// Short stand-ins for the files of the manifest releases of `FILES`.
+    fn manifests() -> Manifests {
+        let crd = |name: &str| {
+            format!(
+                "apiVersion: apiextensions.k8s.io/v1\nkind: CustomResourceDefinition\nmetadata:\n  name: {name}\n"
+            )
+        };
+        [
+            (
+                "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml".to_owned(),
+                crd("httproutes.gateway.networking.k8s.io"),
+            ),
+            (format!("{SUC}/crd.yaml"), crd("plans.upgrade.cattle.io")),
+            (
+                format!("{SUC}/system-upgrade-controller.yaml"),
+                "apiVersion: v1\nkind: Namespace\nmetadata:\n  name: system-upgrade\n---\n\
+                 apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: system-upgrade-controller\n  \
+                 namespace: system-upgrade\n"
+                    .to_owned(),
+            ),
+        ]
+        .into_iter()
+        .map(|(url, text)| (url, text.into()))
+        .collect()
+    }
 
     /// Zeabur Catalog v0.5.3 with the components of `FILES` only.
     fn snapshot() -> Snapshot {
@@ -954,7 +1103,7 @@ mod tests {
             components: &components,
             written: &written,
         };
-        install(&snapshot(), id, &target)
+        install(&snapshot(), id, &target, &manifests())
     }
 
     #[test]
@@ -1016,11 +1165,8 @@ mod tests {
 
     #[test]
     fn a_needed_capability_the_cluster_lacks_comes_first() {
-        // The ingress provider, traefik, installs manifests from URLs, which Zeabur cannot yet.
-        let refusal = plan("cert-manager", &[], &[]).unwrap_err();
-        assert!(
-            matches!(refusal, Refusal::Unsupported { component, .. } if component == "traefik")
-        );
+        let install = plan("cert-manager", &[], &[]).unwrap();
+        assert_eq!(install.components, ["traefik", "cert-manager"]);
 
         let install = plan("cloudnative-pg", &["ingress"], &[]).unwrap();
         assert_eq!(install.components, ["cert-manager", "cloudnative-pg"]);
@@ -1075,7 +1221,7 @@ mod tests {
             components: &components,
             written: &BTreeSet::new(),
         };
-        let refusal = install(&snapshot(), "cert-manager", &target).unwrap_err();
+        let refusal = install(&snapshot(), "cert-manager", &target, &manifests()).unwrap_err();
         assert!(matches!(refusal, Refusal::NotHere { place, .. } if place == "minikube"));
     }
 
@@ -1092,17 +1238,17 @@ mod tests {
             components: &components,
             written: &BTreeSet::new(),
         };
-        let refusal = install(&snapshot(), "victoria-logs", &target).unwrap_err();
+        let refusal = install(&snapshot(), "victoria-logs", &target, &manifests()).unwrap_err();
         assert!(
             matches!(refusal, Refusal::NotHere { component, place } if component == "victoria-logs" && place == "Kubernetes v1.33.4+k3s1")
         );
-        assert!(install(&snapshot(), "cert-manager", &target).is_ok());
+        assert!(install(&snapshot(), "cert-manager", &target, &manifests()).is_ok());
     }
 
     #[test]
     fn a_namespace_kubernetes_keeps_is_not_written() {
         let traefik = &snapshot().components["traefik"];
-        let namespaces: Vec<String> = steps_of(traefik, "0.5.3", "single-node")
+        let namespaces: Vec<String> = steps_of(traefik, "0.5.3", "single-node", &manifests())
             .unwrap()
             .into_iter()
             .flat_map(|s| s.objects)
@@ -1110,6 +1256,96 @@ mod tests {
             .filter_map(|d| d.object.metadata.name)
             .collect();
         assert_eq!(namespaces, ["traefik"]);
+    }
+
+    #[test]
+    fn a_manifest_release_writes_the_objects_of_its_files() {
+        let install = plan("system-upgrade-controller", &[], &[]).unwrap();
+        let steps: Vec<(&str, Vec<&str>)> = install
+            .steps
+            .iter()
+            .map(|s| {
+                (
+                    s.release.as_str(),
+                    s.objects.iter().map(|d| kind(&d.object)).collect(),
+                )
+            })
+            .collect();
+        // The controller file's own Namespace is left out: the first step writes it with the
+        // component's Pod Security level.
+        assert_eq!(
+            steps,
+            [
+                ("crds", vec!["Namespace", "CustomResourceDefinition"]),
+                ("controller", vec!["Deployment"]),
+            ]
+        );
+        let namespace = &install.steps[0].objects[0].object;
+        assert_eq!(
+            label(namespace, PodSecurityLevel::ENFORCE),
+            Some("privileged")
+        );
+        let deployment = &install.steps[1].objects[0];
+        assert_eq!(label(&deployment.object, RELEASE), Some("controller"));
+        assert_eq!(
+            label(&deployment.object, COMPONENT),
+            Some("system-upgrade-controller")
+        );
+
+        let traefik = plan("traefik", &[], &[]).unwrap();
+        assert_eq!(
+            traefik.steps[0].skip_if_present,
+            ["httproutes.gateway.networking.k8s.io"]
+        );
+    }
+
+    #[test]
+    fn a_manifest_release_without_its_files_is_refused() {
+        let file = &snapshot().components["system-upgrade-controller"];
+        let refusal = steps_of(file, "0.5.5", "single-node", &Manifests::new()).unwrap_err();
+        assert!(refusal.to_string().contains(&format!("{SUC}/crd.yaml")));
+    }
+
+    #[test]
+    fn each_file_of_a_manifest_release_has_the_catalogs_digest() {
+        let snapshot = snapshot();
+        let file = &snapshot.components["system-upgrade-controller"];
+        assert_eq!(
+            downloads(file).unwrap(),
+            [
+                Download {
+                    url: format!("{SUC}/crd.yaml"),
+                    sha256: "1fb061e0d8bf9534da0145e614a9e03ca376cd5d1adcca17d13cfa12e211c48c"
+                        .to_owned(),
+                },
+                Download {
+                    url: format!("{SUC}/system-upgrade-controller.yaml"),
+                    sha256: "fd474b662d1f2b74ab150d95b6482869e1fd1f27ceee54b13e94b92292097969"
+                        .to_owned(),
+                },
+            ]
+        );
+
+        let mut unlisted = file.clone();
+        unlisted.declaration.releases[1].url_digests.clear();
+        let refusal = downloads(&unlisted).unwrap_err();
+        assert!(refusal.to_string().contains(&format!(
+            "no sha256 digest for {SUC}/system-upgrade-controller.yaml"
+        )));
+    }
+
+    #[test]
+    fn a_download_is_used_only_when_its_digest_matches() {
+        let empty = Download {
+            url: "https://example.com/empty.yaml".to_owned(),
+            sha256: "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855".to_owned(),
+        };
+        assert_eq!(verify(&empty, Vec::new()).unwrap(), "");
+        let changed = verify(&empty, b"kind: Namespace".to_vec()).unwrap_err();
+        assert!(
+            changed.contains("https://example.com/empty.yaml"),
+            "{changed}"
+        );
     }
 
     #[test]

@@ -416,3 +416,74 @@ async fn fake_proxy_refusing_first(onward: SocketAddr) -> (SocketAddr, Seen) {
     });
     (address, seen)
 }
+
+/// A TLS server whose `/file` answers `ok` and whose other paths redirect with `Location: <path
+/// after /to>`, such as `/to/file` to `/file`.
+async fn redirecting() -> SocketAddr {
+    zeabur_test_support::tls::serve_answering(|target| match target.strip_prefix("/to") {
+        Some(location) => {
+            format!("HTTP/1.1 302 Found\r\nlocation: {location}\r\ncontent-length: 0\r\nconnection: close\r\n\r\n")
+        }
+        None if target == "/file" => {
+            "HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok".to_owned()
+        }
+        None => "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+            .to_owned(),
+    })
+    .await
+}
+
+async fn download(url: &str) -> Result<Vec<u8>, String> {
+    let tls = tls(Some(zeabur_test_support::tls::ca_a().as_bytes())).unwrap();
+    Https::new(Reach::Any, &tls)
+        .download(url, 1024, Duration::from_secs(5))
+        .await
+}
+
+#[tokio::test]
+async fn a_download_follows_redirects_to_https_urls() {
+    let address = redirecting().await;
+    assert_eq!(
+        download(&format!("https://{address}/file")).await.unwrap(),
+        b"ok"
+    );
+    assert_eq!(
+        download(&format!("https://{address}/to/file"))
+            .await
+            .unwrap(),
+        b"ok"
+    );
+    let absolute = format!("https://{address}/tohttps://{address}/file");
+    assert_eq!(download(&absolute).await.unwrap(), b"ok");
+    let host = format!("https://{address}/to//{address}/file");
+    assert_eq!(download(&host).await.unwrap(), b"ok");
+}
+
+#[tokio::test]
+async fn a_download_is_refused_off_https_or_after_too_many_redirects() {
+    let address = redirecting().await;
+    let plain = download(&format!("https://{address}/tohttp://{address}/file")).await;
+    assert_eq!(
+        plain.unwrap_err(),
+        format!("http://{address}/file is not an HTTPS URL")
+    );
+    let relative = download(&format!("https://{address}/tofile")).await;
+    assert!(relative.unwrap_err().contains("does not follow"));
+    let missing = download(&format!("https://{address}/missing")).await;
+    assert_eq!(
+        missing.unwrap_err(),
+        format!("https://{address}/missing answered 404")
+    );
+    let mut url = format!("https://{address}/file");
+    for _ in 0..=REDIRECTS {
+        url = format!(
+            "https://{address}/to{}",
+            url.trim_start_matches(&format!("https://{address}"))
+        );
+    }
+    let endless = download(&url).await.unwrap_err();
+    assert!(
+        endless.ends_with(&format!("redirects more than {REDIRECTS} times")),
+        "{endless}"
+    );
+}

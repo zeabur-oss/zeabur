@@ -88,8 +88,24 @@ pub fn ca_b() -> &'static str {
 /// # Panics
 ///
 /// When the port cannot be bound.
-#[expect(clippy::expect_used, reason = "a test cannot go on without its server")]
 pub async fn serve() -> SocketAddr {
+    serve_answering(|_target| {
+        "HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok".to_owned()
+    })
+    .await
+}
+
+/// [`serve`], answering each request with what `answer` makes of its request target, such as
+/// `/file`.
+///
+/// # Panics
+///
+/// When the port cannot be bound.
+#[expect(clippy::expect_used, reason = "a test cannot go on without its server")]
+pub async fn serve_answering(
+    answer: impl Fn(&str) -> String + Send + Sync + 'static,
+) -> SocketAddr {
+    let answer = Arc::new(answer);
     let chain = vec![CERTIFICATES.leaf.clone()];
     let key = PrivateKeyDer::from(PrivatePkcs8KeyDer::from(CERTIFICATES.leaf_key.clone()));
     let config = rustls::ServerConfig::builder_with_provider(Arc::new(
@@ -111,17 +127,17 @@ pub async fn serve() -> SocketAddr {
                 return;
             };
             let acceptor = acceptor.clone();
+            let answer = Arc::clone(&answer);
             tokio::spawn(async move {
                 let Ok(mut stream) = acceptor.accept(socket).await else {
                     return;
                 };
                 let mut buffer = [0; 1024];
-                let _request: std::io::Result<usize> = stream.read(&mut buffer).await;
-                let _written: std::io::Result<()> = stream
-                    .write_all(
-                        b"HTTP/1.1 200 OK\r\ncontent-length: 2\r\nconnection: close\r\n\r\nok",
-                    )
-                    .await;
+                let read = stream.read(&mut buffer).await.unwrap_or_default();
+                let request = String::from_utf8_lossy(buffer.get(..read).unwrap_or_default());
+                let target = request.split(' ').nth(1).unwrap_or_default();
+                let _written: std::io::Result<()> =
+                    stream.write_all(answer(target).as_bytes()).await;
                 let _closed: std::io::Result<()> = stream.shutdown().await;
             });
         }
