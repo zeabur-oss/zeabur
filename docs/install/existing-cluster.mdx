@@ -1,110 +1,100 @@
 ---
 title: Install Zeabur in an existing cluster
-description: Use Helm to install Zeabur into the Kubernetes cluster you already have, then sign in with a passkey.
+description: Install Zeabur and Zeabur Identity with one Helm command, then sign in with a passkey.
 ---
 
 When you finish this page, you have Zeabur at an HTTPS address, and you sign in to it with a passkey. The applications already in your cluster show up on the **Projects** page.
 
-This page is the manual install. [Let an agent install it](agent.mdx) and [Zeatend's one-command install](one-command.mdx) are still in development.
+No cluster yet? [Install with Zeatend](one-command.mdx) sets one up on a new server first. To have an agent do these steps, see [Let an agent install for you](agent.mdx).
 
-<Figure label="Zeabur goes into its own zeabur namespace with a sign-in client from Zeabur Identity, adds member roles for you to give out, and leaves your applications where they are">
+<Figure label="One helm install puts Zeabur in the zeabur namespace and Zeabur Identity in zeabur-identity, adds cert-manager for HTTPS, and leaves your applications where they are">
 <FigFlow>
-<FigCard title="Zeabur Identity" note="Handles sign-in. Install it first." />
-<FigArrow label="Sign-in client" />
+<FigCard title="helm install" note="One command" />
+<FigArrow label="Installs" />
 <FigGroup label="Your Kubernetes cluster">
-<FigCard accent title="zeabur namespace" note="Zeabur, its address and the client secret" />
-<FigCard title="Member roles" note="Given out on Members" />
+<FigCard accent title="zeabur namespace" note="Zeabur and its address" />
+<FigCard title="zeabur-identity namespace" note="Zeabur Identity, for sign-in" />
+<FigCard title="cert-manager" note="HTTPS certificates from Let's Encrypt" />
 <FigCard title="Your applications" note="Stay where they are" />
 </FigGroup>
 </FigFlow>
 </Figure>
 
-This page installs Zeabur by hand with Helm, for cluster admins who want to see every object Zeabur adds. Kubernetes is open-source software that runs containers on one or more servers, and Zeabur runs on top of it. Helm is Kubernetes' package installer; the commands below use it to install and upgrade Zeabur. Coming from zeabur.com and want to know what is different first? See [Coming from zeabur.com](../get-started/from-zeabur-com.mdx).
+Kubernetes is open-source software that runs containers on one or more servers, and Zeabur runs on top of it. Helm is Kubernetes' package installer; the commands below use it to install and upgrade Zeabur. Coming from zeabur.com and want to know what is different first? See [Coming from zeabur.com](../get-started/from-zeabur-com.mdx).
 
 ## Before you begin
 
-Have these ready. Most are things a cluster administrator already has:
-
 - **A Kubernetes cluster**, version 1.30 or later, and a kubeconfig that can manage it. A kubeconfig is the file `kubectl` uses to reach a cluster.
+- **An Ingress controller** that is the cluster's default IngressClass, such as the Traefik that K3s and RKE2 include. Ports 80 and 443 must be open to the internet, so that Let's Encrypt can check the addresses and issue their certificates.
 - **Tools on your computer**: `kubectl`, Helm 4, and `zeabur-identityctl`.
-- **Zeabur Identity**, which handles sign-in to Zeabur. Sign-in must work over HTTPS, and the cluster must already trust the sign-in tokens it issues. See [Zeabur Identity's get started guide](https://oss.zeabur.com/docs/identity/get-started).
-- **An address and HTTPS certificate for Zeabur**: a domain such as `zeabur.example.com`, an Ingress controller in the cluster that routes the address to Zeabur, such as Traefik, and a certificate for the domain, such as a TLS secret named `zeabur-tls`.
 - **The version to install.** The examples use `<version>`. The chart is published at `oci://ghcr.io/zeabur-oss/charts/zeabur`, and its default image is pinned to the digest of the same version. See [Release artifacts](../reference/releases.mdx) to download and verify it.
 
 Kubernetes must be 1.30 or later because, by default, the chart creates project member roles and uses `ValidatingAdmissionPolicy` to limit which namespace fields Developers can change. That API is generally available starting in 1.30. A namespace is how Kubernetes groups things, and each Zeabur project is one namespace.
-
-Zeabur's own address and the addresses of services you deploy later are set up separately. Get sign-in to Zeabur working first, then set up addresses for services.
 
 ## Install Zeabur
 
 <Steps>
 <Step>
 
-### Register Zeabur in Zeabur Identity
+### Choose the domain
 
-This lets Zeabur Identity know Zeabur, so sign-in returns to Zeabur. The example uses `https://identity.example.com` as Zeabur Identity's address. Replace both domains with yours, and run this with the cluster admin's kubeconfig:
+Zeabur opens at `zeabur.<domain>`, and Zeabur Identity, which handles sign-in, at `identity.<domain>`. With no domain of your own, use `<IP>.sslip.io`, where `<IP>` is the server's public IP address. sslip.io is a public DNS service that answers each such name with the IP address in it, so there is no DNS record to add:
 
 ```sh
-zeabur-identityctl client create zeabur \
-  --type confidential \
-  --audience kubernetes \
-  --display-name Zeabur \
-  --redirect-uri https://zeabur.example.com/auth/callback \
-  --home-url https://zeabur.example.com/ \
-  | kubectl apply -f -
+DOMAIN=203.0.113.10.sslip.io
 ```
 
-The command prints the client secret once, on stderr. Zeabur uses it to prove who it is to Zeabur Identity. You need it in the next step.
+To use your own domain, such as `example.com`, point `zeabur.example.com` and `identity.example.com`, or `*.example.com`, at the Ingress controller, and set `DOMAIN=example.com`.
 
 </Step>
 <Step>
 
-### Store the client secret in the cluster
+### Let the cluster trust sign-in
 
-Create the `zeabur` namespace, then read the client secret in Bash:
+Zeabur acts on the cluster with each person's own sign-in token, so kube-apiserver must accept the tokens Zeabur Identity issues. On K3s, this prints the configuration and where to put it:
 
-```bash
-kubectl create namespace zeabur
-read -rs CLIENT_SECRET
-printf %s "$CLIENT_SECRET" | kubectl -n zeabur create secret generic zeabur-oidc \
-  --from-file=client-secret=/dev/stdin
-unset CLIENT_SECRET
+```sh
+zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public
 ```
 
-After running `read`, paste the client secret and press Enter. Keeping the value out of command arguments stops other users on the machine from seeing it in the process list. The chart records only the secret's name, so the value stays out of Helm's release records.
+On RKE2, use `--distro rke2`. Follow the printed steps on each server node. The cluster starts accepting tokens once Zeabur Identity is up in the next step.
 
 </Step>
 <Step>
 
 ### Install with Helm
 
-Make sure `zeabur-tls` is in the `zeabur` namespace, then run:
-
 ```sh
 helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
-  --namespace zeabur \
-  --set clusterName=production \
-  --set publicUrl=https://zeabur.example.com \
-  --set issuer.url=https://identity.example.com \
-  --set issuer.clientSecret.existingSecret=zeabur-oidc \
-  --set ingress.enabled=true \
-  --set ingress.className=traefik \
-  --set ingress.tls.secretName=zeabur-tls
-kubectl -n zeabur rollout status deployment/zeabur
+  --namespace zeabur --create-namespace \
+  --set global.domain="$DOMAIN"
 ```
 
-- `clusterName` is the cluster name shown in the interface.
-- The domain in `publicUrl` must match the callback domain from the first step. The chart refuses an address that uses HTTP or includes a path.
+This one command does all of the following:
 
-When `rollout status` reports success, Zeabur is installed. The install adds Zeabur's Deployment, Service, Ingress, configuration, and the key that signs changes, along with the ClusterRoles and namespace admission policy for project members. The chart doesn't give the member roles to anyone. After signing in, an admin sets each person's access on **Members**.
+- Installs Zeabur in the `zeabur` namespace, and Zeabur Identity in `zeabur-identity`.
+- Registers Zeabur in Zeabur Identity and stores the client secret in the cluster. The value stays out of Helm's release records.
+- Installs cert-manager from Zeabur Catalog, the same way **Cluster** → **Components** does, with the ClusterIssuer `letsencrypt`. Helm waits for this, which takes a few minutes.
+- Adds the ClusterRoles and namespace admission policy for project members. The chart doesn't give the member roles to anyone. After signing in, an admin sets each person's access on **Members**.
+
+When `helm install` finishes, it prints the link that creates the first admin account. Keep it: the link works once and expires in 24 hours.
 
 </Step>
 <Step>
 
-### Sign in and find your applications
+### Create the admin account
 
-Open `https://zeabur.example.com` and sign in with a passkey. An admin account has full rights over the cluster, with nothing more to set up in Zeabur.
+Open the link from the previous step and create a passkey. The certificates can take a minute after the install. If the browser warns about the certificate, wait and reload.
+
+When the passkey is saved, the page links to Zeabur. Open it and sign in with the passkey. An admin account has full rights over the cluster, with nothing more to set up in Zeabur.
+
+If the link has expired, `helm install` printed the command that issues another.
+
+</Step>
+<Step>
+
+### Find your applications
 
 Go to **Projects**. The applications already in the cluster are under **Other namespaces**.
 
@@ -119,30 +109,30 @@ Next, [invite members](../cluster/members.mdx) or [deploy your first service](..
 
 ## Give new services a public URL
 
+With an sslip.io domain, new services already get a public URL with HTTPS. When you deploy `web` in the `shop` project, the form suggests `web-shop.203.0.113.10.sslip.io`.
 
-Prepare an application domain, such as `apps.example.com`. Point the DNS record for `*.apps.example.com` at the Ingress controller's address, and prepare a cert-manager ClusterIssuer that can issue certificates, such as `letsencrypt`. Update the same release:
+With your own domain, choose an application domain, such as `apps.example.com`, and point the DNS record for `*.apps.example.com` at the Ingress controller's address. Then update the same release:
 
 ```sh
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
   --namespace zeabur --reset-then-reuse-values \
-  --set 'domains.suffixes={apps.example.com}' \
-  --set domains.clusterIssuer=letsencrypt
+  --set 'domains.suffixes={apps.example.com}'
 ```
 
 With `--reset-then-reuse-values`, Helm starts from the new chart's defaults, including the image, then applies the values you set. With `--reuse-values`, Helm also keeps the old chart's defaults, and the image stays on the old version.
 
-When you deploy `web` in the `shop` project, the form suggests `web-shop.apps.example.com`. You can list multiple application domains separated by commas; the first is the default. You can also change them later in the **Domains** section of the **Cluster** page, which checks DNS records and lists the records to add. See [Set up DNS records](../configure/dns.mdx). If `domains.suffixes` is empty, enter the full domain by hand. If `domains.clusterIssuer` is empty, new services' public URLs use HTTP.
-
-These settings only name the issuer services should use. Prepare the ClusterIssuer and DNS first; Zeabur doesn't create them from these two values.
+You can list multiple application domains separated by commas; the first is the default. You can also change them later in the **Domains** section of the **Cluster** page, which checks DNS records and lists the records to add. See [Set up DNS records](../configure/dns.mdx). If `domains.suffixes` is empty and the domain is your own, enter the full domain by hand. New services' certificates come from the ClusterIssuer in `domains.clusterIssuer`, `letsencrypt` by default.
 
 ## If something goes wrong
 
 | What you see | What to check |
 | --- | --- |
-| The browser can't open Zeabur | Check that `kubectl -n zeabur rollout status deployment/zeabur` succeeds, then check public DNS, the Ingress class, the TLS secret, and connectivity to the entry point. |
-| Sign-in doesn't return to Zeabur | Check `publicUrl`, the `/auth/callback` registered in Zeabur Identity, and `issuer.url`. |
-| Zeabur Identity uses a private CA | Set `extraTrustedCA` so Zeabur trusts the CA that signed Zeabur Identity's certificate. See [Trust a private CA](#trust-a-private-ca). |
+| The browser can't open Zeabur | Check that `kubectl -n zeabur rollout status deployment/zeabur` succeeds, then check DNS, the Ingress class, and that ports 80 and 443 are open. |
+| The browser warns about the certificate for minutes | Run `kubectl get certificate -A`. A certificate that stays not ready usually means Let's Encrypt can't reach port 80, or the IP address in an sslip.io domain isn't the public one. |
+| `helm install` says the `zeabur-components` job failed | Zeabur is installed, but cert-manager isn't. `kubectl -n zeabur logs job/zeabur-components` shows why. Fix that, then run the commands that `zeaburctl components export cert-manager --format helm` prints. |
+| The cluster already has cert-manager | The install leaves it as it is. Make sure it has a ClusterIssuer named `letsencrypt`, or set `ingress.clusterIssuer`, `identity.ingress.clusterIssuer` and `domains.clusterIssuer` to yours. |
+| Every page says you are not signed in to the cluster | kube-apiserver doesn't accept the tokens yet. Check the steps of [Let the cluster trust sign-in](#let-the-cluster-trust-sign-in). |
 | You can sign in but see no services | Zeabur reads the cluster with the signed-in person's own rights. An admin gives them project roles on [Members](../cluster/members.mdx). |
 | Reads are denied after sign-in | Check the member's identity and groups in Zeabur Identity, then the namespace's RoleBinding. See [Permissions](../reference/permissions.mdx). |
 | A new service is ready, but its URL doesn't open | Check the application domain's DNS and certificate. Zeabur and your services use different domains, set up separately. |
@@ -199,11 +189,11 @@ kubectl -n zeabur create secret generic zeabur-plan-key \
   --from-literal=plan-key="$(openssl rand -hex 32)"
 ```
 
-Set `planKey.existingSecret` to `zeabur-plan-key`. To view all chart settings, run `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>`.
+Set `planKey.existingSecret` to `zeabur-plan-key`. These tools can't read the server's IP address either, so set `global.domain`. To view all chart settings, run `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>`.
 
 ## Install the components Zeabur needs
 
-On K3s and RKE2, a cluster administrator installs components from **Cluster** → **Components**. See [Install from the page](../cluster/components.mdx#install-from-the-page). Zeabur downloads the list of components from Zeabur Catalog; for a cluster without internet access, see [Use a mirror](../cluster/components.mdx#use-a-mirror).
+The install adds cert-manager. On K3s and RKE2, a cluster administrator installs the other components from **Cluster** → **Components**. See [Install from the page](../cluster/components.mdx#install-from-the-page). Zeabur downloads the list of components from Zeabur Catalog; for a cluster without internet access, see [Use a mirror](../cluster/components.mdx#use-a-mirror).
 
 On other clusters, or to keep components in a GitOps repository, use [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) to print a component's manifests, then apply them with `kubectl` or commit them:
 
@@ -219,4 +209,4 @@ The default `helmchart` format is for the built-in helm-controller of K3s and RK
 helm uninstall zeabur --namespace zeabur
 ```
 
-Applications and the components that provide ingress, certificates, and storage stay in place. The member roles the chart created are removed with the release, so give members their rights another way. See [Remove Zeabur](../leave/uninstall.mdx) for the full list of what stays and the steps to migrate sign-in.
+This removes Zeabur and Zeabur Identity's server. Zeabur Identity's accounts and passkeys stay in the `zeabur-identity` namespace, so a new install keeps them. Applications and the components that provide ingress, certificates, and storage stay in place. The member roles the chart created are removed with the release, so give members their rights another way. See [Remove Zeabur](../leave/uninstall.mdx) for the full list of what stays and the steps to migrate sign-in.

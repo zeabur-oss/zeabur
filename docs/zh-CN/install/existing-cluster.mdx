@@ -1,110 +1,100 @@
 ---
 title: 将 Zeabur 安装到已有集群
-description: 用 Helm 把 Zeabur 装进你已有的 Kubernetes 集群，再用通行密钥登录。
+description: 用一条 Helm 命令装好 Zeabur 和 Zeabur Identity，再用通行密钥登录。
 ---
 
 照这一页做完，你会有一个通过 HTTPS 打开、用通行密钥登录的 Zeabur。集群里原有的应用，会出现在**项目**页。
 
-这一页是手动安装。[交给 Agent 安装](agent.mdx)和 [Zeatend 一条命令安装](one-command.mdx)还在开发中。
+还没有集群？[用 Zeatend 安装](one-command.mdx)会先在新服务器上装好 Kubernetes。想让 Agent 替你完成这些步骤，见[交给 Agent 安装](agent.mdx)。
 
-<Figure label="Zeabur 装进自己的 zeabur Namespace，使用 Zeabur Identity 的登录客户端，新增由你分配的成员角色，你原有的应用留在原处">
+<Figure label="一条 helm install 把 Zeabur 装进 zeabur Namespace、Zeabur Identity 装进 zeabur-identity，并加上负责 HTTPS 的 cert-manager，你原有的应用留在原处">
 <FigFlow>
-<FigCard title="Zeabur Identity" note="负责登录，需要先装好" />
-<FigArrow label="登录客户端" />
+<FigCard title="helm install" note="一条命令" />
+<FigArrow label="安装" />
 <FigGroup label="你的 Kubernetes 集群">
-<FigCard accent title="zeabur Namespace" note="Zeabur、它的网址和 client secret" />
-<FigCard title="成员角色" note="在成员页由你分配" />
+<FigCard accent title="zeabur Namespace" note="Zeabur 和它的网址" />
+<FigCard title="zeabur-identity Namespace" note="Zeabur Identity，负责登录" />
+<FigCard title="cert-manager" note="向 Let's Encrypt 申请 HTTPS 证书" />
 <FigCard title="你原有的应用" note="留在原处，不会迁移" />
 </FigGroup>
 </FigFlow>
 </Figure>
 
-这一页用 Helm 手动安装 Zeabur，适合想看清楚 Zeabur 添加了哪些东西的集群管理员。Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur 就装在它上面。Helm 是 Kubernetes 的安装工具，下面的命令都用它安装和升级 Zeabur。如果你从 zeabur.com 过来，想先了解有哪些不同，见[从 zeabur.com 过来](../get-started/from-zeabur-com.mdx)。
+Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur 就装在它上面。Helm 是 Kubernetes 的安装工具，下面的命令都用它安装和升级 Zeabur。如果你从 zeabur.com 过来，想先了解有哪些不同，见[从 zeabur.com 过来](../get-started/from-zeabur-com.mdx)。
 
 ## 开始之前
 
-先准备好这些。大多是集群管理员平时就有的东西：
-
 - **一个 Kubernetes 集群**，版本 1.30 或更高，以及能管理它的 kubeconfig。kubeconfig 是 `kubectl` 连接集群用的配置文件。
+- **一个 Ingress controller**，并且是集群默认的 IngressClass，例如 K3s 和 RKE2 自带的 Traefik。80 和 443 端口要能从互联网访问，Let's Encrypt 才能检查网址、签发证书。
 - **电脑上的工具**：`kubectl`、Helm 4 和 `zeabur-identityctl`。
-- **Zeabur Identity**，负责 Zeabur 的登录。它要支持 HTTPS 登录，而且集群已信任它签发的登录令牌。安装方法见 [Zeabur Identity 入门](https://oss.zeabur.com/docs/identity/get-started)。
-- **Zeabur 的网址和 HTTPS 证书**：一个域名，例如 `zeabur.example.com`。集群里要有把网址转到服务的 Ingress controller，例如 Traefik，以及这个域名的证书，例如名为 `zeabur-tls` 的 TLS 机密变量。
 - **要安装的版本**。下面用 `<version>` 表示版本号。chart 发布在 `oci://ghcr.io/zeabur-oss/charts/zeabur`，默认镜像固定为同一版本的 digest。下载与验证方法见[发布产物](../reference/releases.mdx)。
 
 Kubernetes 需要 1.30 或更高版本，是因为 chart 默认会创建项目成员角色，并用 `ValidatingAdmissionPolicy` 限制开发者可以修改的 Namespace 字段。这个 API 从 1.30 起正式可用。Namespace 是 Kubernetes 用来分组的单位，Zeabur 的每个项目就是一个 Namespace。
-
-Zeabur 自己的网址，和之后部署的服务所用的网址，需要分别配置。先确保能登录 Zeabur，再处理服务的网址。
 
 ## 安装 Zeabur
 
 <Steps>
 <Step>
 
-### 在 Zeabur Identity 注册 Zeabur
+### 选好域名
 
-这一步让 Zeabur Identity 认识 Zeabur，登录后才会回到 Zeabur。以下用 `https://identity.example.com` 作为 Zeabur Identity 的网址。把两个域名换成你的，用集群管理员的 kubeconfig 运行：
+Zeabur 的网址是 `zeabur.<域名>`，负责登录的 Zeabur Identity 是 `identity.<域名>`。没有自己的域名时，用 `<IP>.sslip.io`，`<IP>` 填服务器的公网 IP 地址。sslip.io 是公共 DNS 服务，这类名称一律解析为名称中的 IP 地址，所以无需添加 DNS 记录：
 
 ```sh
-zeabur-identityctl client create zeabur \
-  --type confidential \
-  --audience kubernetes \
-  --display-name Zeabur \
-  --redirect-uri https://zeabur.example.com/auth/callback \
-  --home-url https://zeabur.example.com/ \
-  | kubectl apply -f -
+DOMAIN=203.0.113.10.sslip.io
 ```
 
-命令会在 stderr 显示一次 client secret。Zeabur 用它向 Zeabur Identity 证明身份，下一步会用到。
+要用自己的域名，例如 `example.com`，把 `zeabur.example.com` 和 `identity.example.com`（或 `*.example.com`）指向 Ingress controller，再设置 `DOMAIN=example.com`。
 
 </Step>
 <Step>
 
-### 把 client secret 存入集群
+### 让集群信任登录
 
-先创建 `zeabur` Namespace，再在 Bash 中读入 client secret：
+Zeabur 用每个人自己的登录令牌操作集群，所以 kube-apiserver 要接受 Zeabur Identity 签发的令牌。在 K3s 上，下面的命令会输出配置和存放位置：
 
-```bash
-kubectl create namespace zeabur
-read -rs CLIENT_SECRET
-printf %s "$CLIENT_SECRET" | kubectl -n zeabur create secret generic zeabur-oidc \
-  --from-file=client-secret=/dev/stdin
-unset CLIENT_SECRET
+```sh
+zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public
 ```
 
-运行 `read` 后，粘贴 client secret，按回车。值不放在命令参数里，同一台电脑上的其他用户就无法从进程列表看到。chart 只记录机密变量的名称，实际值不会进入 Helm 的安装记录。
+RKE2 改用 `--distro rke2`。在每个服务器节点上按输出的步骤操作。下一步装好 Zeabur Identity 后，集群就会开始接受令牌。
 
 </Step>
 <Step>
 
 ### 用 Helm 安装
 
-确认 `zeabur-tls` 在 `zeabur` Namespace 中，再运行：
-
 ```sh
 helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
-  --namespace zeabur \
-  --set clusterName=production \
-  --set publicUrl=https://zeabur.example.com \
-  --set issuer.url=https://identity.example.com \
-  --set issuer.clientSecret.existingSecret=zeabur-oidc \
-  --set ingress.enabled=true \
-  --set ingress.className=traefik \
-  --set ingress.tls.secretName=zeabur-tls
-kubectl -n zeabur rollout status deployment/zeabur
+  --namespace zeabur --create-namespace \
+  --set global.domain="$DOMAIN"
 ```
 
-- `clusterName` 是界面上显示的集群名称。
-- `publicUrl` 的域名要和第一步的 callback 域名一致。chart 不接受 HTTP 或带路径的网址。
+这一条命令会完成以下工作：
 
-`rollout status` 输出成功，就装好了。这次安装会新增 Zeabur 的 Deployment、Service、Ingress、配置、签署变更用的密钥，以及项目成员用的 ClusterRole 和 Namespace admission policy。chart 不会把成员角色分配给任何人，登录后由管理员在**成员**中设置每个人的权限。
+- 把 Zeabur 装进 `zeabur` Namespace，Zeabur Identity 装进 `zeabur-identity`。
+- 在 Zeabur Identity 注册 Zeabur，并把 client secret 存入集群。实际值不会进入 Helm 的安装记录。
+- 从 Zeabur Catalog 安装 cert-manager，方式和**集群** → **组件**相同，并附带 ClusterIssuer `letsencrypt`。Helm 会等它装完，大约需要几分钟。
+- 添加项目成员用的 ClusterRole 和 Namespace admission policy。chart 不会把成员角色分配给任何人，登录后由管理员在**成员**中设置每个人的权限。
+
+`helm install` 结束时会输出创建第一个管理员账号的链接。请保存好：链接只能用一次，24 小时后失效。
 
 </Step>
 <Step>
 
-### 登录，找到原有的应用
+### 创建管理员账号
 
-打开 `https://zeabur.example.com`，用通行密钥登录。管理员账号拥有整个集群的权限，无需在 Zeabur 中另外配置。
+打开上一步的链接，创建通行密钥。安装完成后，证书可能要等一分钟。如果浏览器提示证书有问题，稍等片刻再刷新。
+
+通行密钥保存好后，页面会链接到 Zeabur。打开它，用通行密钥登录。管理员账号拥有整个集群的权限，无需在 Zeabur 中另外配置。
+
+如果链接已过期，`helm install` 输出的内容里有重新签发链接的命令。
+
+</Step>
+<Step>
+
+### 找到原有的应用
 
 进入**项目**。集群里原有的应用在**其他 Namespace** 中。
 
@@ -115,34 +105,34 @@ kubectl -n zeabur rollout status deployment/zeabur
 </Step>
 </Steps>
 
-接下来可以[邀请成员](../cluster/members.mdx)，或[部署第一个服务](../get-started/first-project.mdx)。管理员账号、登录时间和**设置**页中的登录选项，见[权限](../reference/permissions.mdx#管理员账号和普通账号)。
+接下来可以[邀请成员](../cluster/members.mdx)，或[部署第一个服务](../get-started/first-project.mdx)。管理员账号、登录时限和**设置**页中的登录选项，见[权限](../reference/permissions.mdx#管理员账号和普通账号)。
 
 ## 让新服务有公开网址
 
+使用 sslip.io 域名时，新服务已经有 HTTPS 的公开网址。部署 `shop` 项目的 `web` 时，表单会建议使用 `web-shop.203.0.113.10.sslip.io`。
 
-准备应用域名，例如 `apps.example.com`。将 `*.apps.example.com` 的 DNS 指向 Ingress controller 的入口，并准备可签发证书的 cert-manager ClusterIssuer，例如 `letsencrypt`。更新同一个 release：
+使用自己的域名时，准备一个应用域名，例如 `apps.example.com`，将 `*.apps.example.com` 的 DNS 指向 Ingress controller 的入口，再更新同一个 release：
 
 ```sh
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --version <version> \
   --namespace zeabur --reset-then-reuse-values \
-  --set 'domains.suffixes={apps.example.com}' \
-  --set domains.clusterIssuer=letsencrypt
+  --set 'domains.suffixes={apps.example.com}'
 ```
 
 加上 `--reset-then-reuse-values` 后，Helm 会先采用新版 chart 的默认值（包括镜像），再套用你设置过的值。改用 `--reuse-values` 时，Helm 会连旧版 chart 的默认值一起保留，镜像就停在旧版。
 
-之后部署 `shop` 项目的 `web` 时，表单会建议使用 `web-shop.apps.example.com`。可以用逗号分隔多个应用域名，默认使用第一个。之后也能在**集群**页的**域名**区域修改，那里会检查 DNS 记录并列出需要添加的记录，方法见[配置 DNS 记录](../configure/dns.mdx)。如果 `domains.suffixes` 留空，需要手动填写完整域名。如果 `domains.clusterIssuer` 留空，新服务的公开网址会使用 HTTP。
-
-这里仅指定服务使用的签发者名称。需要提前准备好 ClusterIssuer 和 DNS，Zeabur 不会根据这两个值创建 ClusterIssuer 或 DNS 记录。
+可以用逗号分隔多个应用域名，默认使用第一个。之后也能在**集群**页的**域名**区域修改，那里会检查 DNS 记录并列出需要添加的记录，方法见[配置 DNS 记录](../configure/dns.mdx)。使用自己的域名且 `domains.suffixes` 留空时，需要手动填写完整域名。新服务的证书由 `domains.clusterIssuer` 指定的 ClusterIssuer 签发，默认是 `letsencrypt`。
 
 ## 遇到问题
 
 | 看到的情况 | 先检查 |
 | --- | --- |
-| 浏览器打不开 Zeabur | 先确认 `kubectl -n zeabur rollout status deployment/zeabur` 成功，再核对公网 DNS、Ingress class、TLS 机密变量和入口连通性。 |
-| 登录后回不到 Zeabur | 核对 `publicUrl`、在 Zeabur Identity 注册的 `/auth/callback`，以及 `issuer.url`。 |
-| Zeabur Identity 使用私有 CA | 设置 `extraTrustedCA`，让 Zeabur 信任签发 Zeabur Identity 证书的 CA。见[信任私有 CA](#信任私有-ca)。 |
+| 浏览器打不开 Zeabur | 先确认 `kubectl -n zeabur rollout status deployment/zeabur` 成功，再核对 DNS、Ingress class，以及 80 和 443 端口是否开放。 |
+| 浏览器提示证书有问题，几分钟后仍未消失 | 运行 `kubectl get certificate -A`。证书一直未就绪，通常是 Let's Encrypt 访问不到 80 端口，或 sslip.io 域名中的 IP 不是公网 IP。 |
+| `helm install` 提示 `zeabur-components` job 失败 | Zeabur 已经装好，但 cert-manager 没有装上。`kubectl -n zeabur logs job/zeabur-components` 会显示原因。排除后，运行 `zeaburctl components export cert-manager --format helm` 输出的命令。 |
+| 集群已经有 cert-manager | 安装不会改动它。确认它有名为 `letsencrypt` 的 ClusterIssuer，或将 `ingress.clusterIssuer`、`identity.ingress.clusterIssuer` 和 `domains.clusterIssuer` 改为你的 ClusterIssuer。 |
+| 每个页面都提示你没有登录集群 | kube-apiserver 还不接受令牌。按[让集群信任登录](#让集群信任登录)的步骤检查。 |
 | 能登录，却看不到服务 | Zeabur 用登录者自己的权限读取集群。管理员在[成员](../cluster/members.mdx)中为他分配项目角色。 |
 | 登录后读取被拒绝 | 在 Zeabur Identity 确认成员的身份和群组，再核对该 Namespace 的 RoleBinding。见[权限](../reference/permissions.mdx)。 |
 | 新服务已就绪，但网址打不开 | 核对应用域名的 DNS 和证书。Zeabur 和服务用的是不同域名，需要分别配置。 |
@@ -199,11 +189,11 @@ kubectl -n zeabur create secret generic zeabur-plan-key \
   --from-literal=plan-key="$(openssl rand -hex 32)"
 ```
 
-将 `planKey.existingSecret` 设为 `zeabur-plan-key`。chart 的所有配置可用 `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>` 查看。
+将 `planKey.existingSecret` 设为 `zeabur-plan-key`。chart 的所有配置可用 `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>` 查看。这些工具也读取不到服务器的 IP 地址，所以需要设置 `global.domain`。
 
 ## 安装 Zeabur 需要的组件
 
-在 K3s 和 RKE2 上，集群管理员可以在**集群** → **组件**中安装组件，参见[在页面上安装](../cluster/components.mdx#在页面上安装)。Zeabur 会从 Zeabur Catalog 下载组件列表；集群无法访问互联网时，参见[使用镜像](../cluster/components.mdx#使用镜像)。
+安装时会添加 cert-manager。在 K3s 和 RKE2 上，集群管理员可以在**集群** → **组件**中安装其他组件，参见[在页面上安装](../cluster/components.mdx#在页面上安装)。Zeabur 会从 Zeabur Catalog 下载组件列表；集群无法访问互联网时，参见[使用镜像](../cluster/components.mdx#使用镜像)。
 
 其他集群，或者想把组件放在 GitOps 仓库中管理时，用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 输出组件的 manifest，再用 `kubectl` 应用，或提交到仓库：
 
@@ -219,4 +209,4 @@ zeaburctl components export cert-manager --format flux > cert-manager.yaml
 helm uninstall zeabur --namespace zeabur
 ```
 
-应用和提供入口、证书、存储空间的组件都会保留。chart 创建的成员角色会随 release 一起移除，成员的权限需要另外接管。完整保留清单与登录迁移步骤见[移除 Zeabur](../leave/uninstall.mdx)。
+这会移除 Zeabur 和 Zeabur Identity 的服务器。Zeabur Identity 的账号和通行密钥保留在 `zeabur-identity` Namespace 中，重新安装后依然存在。应用和提供入口、证书、存储空间的组件都会保留。chart 创建的成员角色会随 release 一起移除，成员的权限需要另外接管。完整保留清单与登录迁移步骤见[移除 Zeabur](../leave/uninstall.mdx)。

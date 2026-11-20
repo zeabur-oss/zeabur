@@ -1,32 +1,32 @@
 ---
 title: 交給 Agent 安裝或搬家
-description: 開發中。之後把一段提示貼進 Claude 或 Codex，它會幫你準備伺服器、裝好 Zeabur，也能把 zeabur.com 的專案搬過來。
+description: 把一段提示貼進 Claude Code 或 Codex，它會照這份文件幫你把 Zeabur 裝到伺服器上，也能把 zeabur.com 的專案搬過來。
 ---
 
-<Callout type="info" title="開發中">
-這個方式還不能用。進度見 [#544](https://github.com/zeabur-oss/zeabur/issues/544) 和 [#430](https://github.com/zeabur-oss/zeabur/issues/430)。現在要安裝，請[手動把 Zeabur 裝進既有叢集](existing-cluster.mdx)。
-</Callout>
+Claude Code 或 Codex 這類 Agent 可以替你照著安裝步驟做。它讀的頁面和你一樣，會自己執行指令，遇到要你決定或付錢的地方就停下來。
 
-想自己動手？現在可以[手動安裝](existing-cluster.mdx)。[Zeatend 一個指令安裝](one-command.mdx)也還在開發中。
+## 貼上這段提示
 
-## 完成後你會有
+```text
+照著 https://oss.zeabur.com/zh-TW/docs/zeabur/install/one-command/ 把 Zeabur 裝到我的伺服器上。
+如果伺服器已經在跑 Kubernetes，改照 https://oss.zeabur.com/zh-TW/docs/zeabur/install/existing-cluster/ 安裝。
+```
 
-- 一台你自己的伺服器，上面跑著 Zeabur。
-- 一個 Zeabur 的網址，以及第一次登入的方式。
-- 如果你要搬家，zeabur.com 上的服務和資料也會在新伺服器上執行。
+在能用 SSH 連到伺服器的電腦上執行 Agent，並告訴它伺服器的位址。
 
-## 之後的流程
+## Agent 會做的事
 
-1. 你把一段提示貼進 Claude Code 或 Codex。提示只有一句話，裡面附上這一頁的網址。
-2. Agent 讀這一頁，問你要用哪一家的伺服器、哪個方案，並列出價格。你確認之後，它才會購買。
-3. Agent 用 Zeatend 在新伺服器上裝好 Kubernetes 和 Zeabur。
-4. 要搬家時，Agent 依照 zeabur.com 的[搬家指南](https://zeabur.com/zh-TW/blogs/migrate-from-zeabur)列出你的服務、備份資料庫，再在 Zeabur 上重建服務、還原資料。
-5. 最後，Agent 會告訴你 Zeabur 的網址，以及第一次怎麼登入。
+1. 檢查伺服器，改動任何東西前先問你。
+2. 伺服器還沒有 Kubernetes 時，用 Zeatend 裝好。
+3. 用一個 `helm install` 安裝 Zeabur。
+4. 給你 Zeabur 的網址，以及建立管理員帳號的連結。
 
 ## 你自己要做的事
 
-Agent 會在這幾步停下來，等你處理：
+- 準備伺服器並付費。
+- 想用自己的網域而不是 sslip.io 網址時，把網域的 DNS 紀錄指向伺服器。
+- 打開連結，建立通行密鑰。通行密鑰只能由你在自己的裝置上建立。
 
-- 確認要買的伺服器和價格。
-- 付款。
-- 修改網域的 DNS，把網址指到新伺服器。
+## 從 zeabur.com 搬過來
+
+想把專案一起搬過來，在提示後面加上：「接著照 https://zeabur.com/zh-TW/blogs/migrate-from-zeabur 把我在 zeabur.com 的專案搬過來」。Agent 會列出你的服務、備份資料庫，在 Zeabur 重建服務，再還原資料。

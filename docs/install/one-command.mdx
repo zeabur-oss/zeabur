@@ -1,30 +1,76 @@
 ---
-title: One-command install with Zeatend
-description: In development. On a new Linux server, Zeatend's install screens will set up Kubernetes, and one command will install Zeabur.
+title: Install with Zeatend
+description: On a new Linux server, Zeatend sets up Kubernetes, then one Helm command installs Zeabur.
 ---
 
-<Callout type="info" title="In development">
-You can't use this yet. Follow [#430](https://github.com/zeabur-oss/zeabur/issues/430). To install today, [install Zeabur in an existing cluster by hand](existing-cluster.mdx).
-</Callout>
+When you finish this page, a new Linux server runs Kubernetes and Zeabur, and you sign in to Zeabur over HTTPS with a passkey.
 
-Want to see every object? [Install by hand](existing-cluster.mdx) works today. [Letting an agent install for you](agent.mdx) is also in development.
+Already have a cluster? [Install Zeabur in an existing cluster](existing-cluster.mdx). To have an agent do these steps, see [Let an agent install for you](agent.mdx).
 
-## What you will have
+## Before you begin
 
-- A Linux server with a Kubernetes cluster on it.
-- Zeabur on that cluster, and Zeabur Identity for sign-in.
-- An address that opens Zeabur over HTTPS.
+- **A Linux server** with a public IP address, and ports 80 and 443 open to the internet. Let's Encrypt checks the addresses over port 80.
+- **Root on the server**, over SSH.
+- **Zeatend, Helm 4 and `zeabur-identityctl` on the server.** See [Zeatend's README](https://github.com/zeabur-oss/zeatend#readme) for how to get Zeatend.
 
-## How it will work
+<Steps>
+<Step>
 
-[Zeatend](https://github.com/zeabur-oss/zeatend) sets up Kubernetes on the server. Its install screens are in English, Traditional Chinese and Simplified Chinese; F2 switches between them.
+### Choose the domain
 
-1. Run Zeatend on the server to open the install screens.
-2. **Server**: the screen shows the server's details and the results of its checks. You choose K3s, RKE2 or KubeSolo, three Kubernetes distributions. If a check fails, you stay on this screen.
-3. **Access**: enter the address of the server's Kubernetes API. Your computer uses it to manage the cluster. A DNS name and a node name are optional.
-4. **Review**: the screen lists the version and the settings it will install.
-5. **Install**: the screen shows each step and its log. The install runs in the background, so it keeps going if your SSH session drops.
-6. One more command installs Zeabur. It also installs Zeabur Identity for sign-in, Traefik for addresses, cert-manager for HTTPS certificates, and metrics-server for usage. It skips any of them the cluster already has.
-7. Open Zeabur's address and sign in. Add the other components you need later on the **Cluster** → **Components** page.
+Zeabur opens at `zeabur.<domain>`, and Zeabur Identity, which handles sign-in, at `identity.<domain>`. With no domain of your own, use `<IP>.sslip.io`, where `<IP>` is the server's public IP address. sslip.io answers each such name with the IP address in it, so there is no DNS record to add:
 
-Zeatend's [docs/screens](https://github.com/zeabur-oss/zeatend/tree/main/docs/screens) has a picture of every install screen.
+```sh
+DOMAIN=203.0.113.10.sslip.io
+```
+
+To use your own domain, such as `example.com`, point `zeabur.example.com` and `identity.example.com`, or `*.example.com`, at the server, and set `DOMAIN=example.com`.
+
+</Step>
+<Step>
+
+### Set up Kubernetes with Zeatend
+
+Write Zeatend's configuration. Its `apiServer.authenticationConfig` lets Kubernetes accept the sign-in tokens of the Zeabur Identity you install in the next step, and `zeabur-identityctl kube-config` prints it:
+
+```sh
+sudo mkdir -p /etc/zeatend
+{
+  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
+  zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public 2>/dev/null | sed 's/^/    /'
+} | sudo tee /etc/zeatend/config.yaml
+sudo zeatend apply
+```
+
+`zeatend apply` installs K3s and shows each step. The install keeps running if your SSH session drops; run `sudo zeatend apply` again to follow it.
+
+</Step>
+<Step>
+
+### Install Zeabur
+
+Replace `<version>` with the version to install, listed in [Release artifacts](../reference/releases.mdx).
+
+```sh
+export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+sudo -E helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
+  --version <version> \
+  --namespace zeabur --create-namespace \
+  --set global.domain="$DOMAIN"
+```
+
+The command installs Zeabur, Zeabur Identity for sign-in, and cert-manager for HTTPS certificates from Let's Encrypt. Helm waits for cert-manager, which takes a few minutes. [Install Zeabur in an existing cluster](existing-cluster.mdx#install-with-helm) lists everything it adds.
+
+When it finishes, it prints the link that creates the first admin account. The link works once and expires in 24 hours.
+
+</Step>
+<Step>
+
+### Create the admin account and sign in
+
+Open the link and create a passkey. The certificates can take a minute after the install. If the browser warns about the certificate, wait and reload.
+
+When the passkey is saved, the page links to Zeabur. Open it and sign in with the passkey. Add the other components you need on the **Cluster** → **Components** page.
+
+</Step>
+</Steps>

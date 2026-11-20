@@ -9,7 +9,9 @@ description: 每一版不相容的變更，以及升級前要先做的事。一�
 
 ## v0.2 → v0.3
 
-zeabur-installer 已經移除。Zeabur 用 Helm chart 裝進既有的叢集；全新的伺服器見 [zeabur-oss/zeabur#430](https://github.com/zeabur-oss/zeabur/issues/430)。
+zeabur-installer 已經移除。一個 `helm install` 就能把 Zeabur 裝進既有的叢集；全新的伺服器先用 [Zeatend](../install/one-command.mdx) 裝好 Kubernetes。
+
+chart 現在會一起安裝 Zeabur Identity 和 cert-manager，並開啟 Ingress，用 ClusterIssuer `letsencrypt` 取得憑證。要繼續用你自己架的 Zeabur Identity，升級時加上 `--set identity.enabled=false`。要繼續用你自己建立的 TLS 機密變數，加上 `--set ingress.clusterIssuer=`。升級不會安裝 cert-manager。
 
 chart 現在自帶 `zeabur-system-hosts` 准入政策。在沒有標上 `zeabur.com/platform: "true"` 的命名空間裡，新增或修改的 Ingress 規則都要寫主機名稱，HTTPRoute 都要寫 hostnames，而且不能用 Zeabur 或 Zeabur Identity 的網域。已經存在的物件照常運作，直到改了 `spec` 為止。不想要這個政策，就設定 `systemHosts.enabled: false`。
 

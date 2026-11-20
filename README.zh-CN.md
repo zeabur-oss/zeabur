@@ -25,7 +25,7 @@
 
 - **服务器是你的**：服务在你自己的服务器上运行，费用按你选的云厂商或机房计算。
 - **由你维护**：升级 Zeabur、备份数据和维护服务器，都由你或你的团队负责。
-- **目前需要先有 Kubernetes 集群**：Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur 就装在它上面。在全新服务器上用一条命令完成安装的功能还在开发中，进展见 [#430](https://github.com/zeabur-oss/zeabur/issues/430)。
+- **运行在 Kubernetes 上**：Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur 就装在它上面。全新的服务器先用 [Zeatend](https://oss.zeabur.com/zh-CN/docs/zeabur/install/one-command/) 装好 Kubernetes。
 
 [从 zeabur.com 过来](https://oss.zeabur.com/zh-CN/docs/zeabur/get-started/from-zeabur-com/)列出这些功能在文档的哪一页，以及从哪里开始。文档的每一步都附有截图。
 

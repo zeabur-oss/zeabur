@@ -9,7 +9,9 @@ If you're skipping versions, start at the version you run now and read every sec
 
 ## v0.2 → v0.3
 
-zeabur-installer is gone. Zeabur installs onto an existing cluster with the Helm chart; for a bare server, see [zeabur-oss/zeabur#430](https://github.com/zeabur-oss/zeabur/issues/430).
+zeabur-installer is gone. One `helm install` sets up Zeabur on an existing cluster; on a new server, [Zeatend](../install/one-command.mdx) sets up Kubernetes first.
+
+The chart now installs Zeabur Identity and cert-manager, and turns on the Ingress with a certificate from the ClusterIssuer `letsencrypt`. To keep the Zeabur Identity you run, upgrade with `--set identity.enabled=false`. To keep a TLS secret you make yourself, add `--set ingress.clusterIssuer=`. Upgrades never install cert-manager.
 
 The chart now carries the `zeabur-system-hosts` admission policy. Outside namespaces labelled `zeabur.com/platform: "true"`, a new or changed Ingress rule needs a host and an HTTPRoute needs hostnames, and neither can use Zeabur's or Zeabur Identity's domain. Objects that already exist keep working until their `spec` changes. To leave the policy out, set `systemHosts.enabled: false`.
 
