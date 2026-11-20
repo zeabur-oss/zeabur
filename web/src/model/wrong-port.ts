@@ -25,15 +25,6 @@ export interface WrongPort {
   offer?: PortOffer
 }
 
-/** The port the diagnosed container's readiness check was refused on, when the connection was
- * refused. */
-function refusedPort(d: Diagnosis): number | undefined {
-  if (d.kind !== "probeFailure" || d.cause.key !== "diagnosis.probeFailure.cause.readiness")
-    return undefined
-  const port = /:(\d+): connect: connection refused/.exec(d.cause.params?.output ?? "")?.[1]
-  return port === undefined ? undefined : Number(port)
-}
-
 /** Whether the container is still not ready in one of the replicas the diagnosis names, after
  * longer than {@link BIND_WINDOW_MS} to listen. */
 function stillNotListening(service: Service, d: Diagnosis, now: number): boolean {
@@ -54,7 +45,7 @@ export function wrongPort(
 ): WrongPort | undefined {
   for (const diagnosis of service.diagnoses ?? []) {
     const container = diagnosis.container
-    const port = refusedPort(diagnosis)
+    const port = diagnosis.refusedPort ?? undefined
     if (container === undefined || port === undefined) continue
     if (!builtContainers(service, builds).some((b) => b.container === container)) continue
     if (!stillNotListening(service, diagnosis, now)) continue

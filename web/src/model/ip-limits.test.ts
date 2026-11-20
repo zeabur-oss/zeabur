@@ -1,7 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
 import {
-  blocksOf,
   incomingVerdict,
   isAddress,
   isUnchanged,
@@ -46,12 +45,6 @@ describe("what Zeabur wrote, read back from the object's YAML", () => {
     ).toStrictEqual(["203.0.113.0/24", "198.51.100.7"])
     expect(sourceRangeOf(undefined)).toStrictEqual([])
   })
-
-  test("a policy's ranges are its ipBlock entries", () => {
-    const yaml =
-      "egress:\n- to:\n  - podSelector: {}\n- to:\n  - ipBlock:\n      cidr: 203.0.113.0/24\n  - ipBlock:\n      cidr: 198.51.100.7/32\n"
-    expect(blocksOf(yaml)).toStrictEqual(["203.0.113.0/24", "198.51.100.7/32"])
-  })
 })
 
 describe("what a row says", () => {
@@ -67,9 +60,9 @@ describe("what a row says", () => {
   })
 
   test("pods: another policy's limit is not called free", () => {
-    expect(outgoingVerdict(false, false, undefined)).toStrictEqual({ is: "noLimit" })
-    expect(outgoingVerdict(false, true, undefined)).toStrictEqual({ is: "rules" })
-    expect(outgoingVerdict(true, true, ["10.0.0.0/8"])).toStrictEqual({
+    expect(outgoingVerdict(false, undefined)).toStrictEqual({ is: "noLimit" })
+    expect(outgoingVerdict(true, undefined)).toStrictEqual({ is: "rules" })
+    expect(outgoingVerdict(true, ["10.0.0.0/8"])).toStrictEqual({
       is: "only",
       addresses: ["10.0.0.0/8"],
     })

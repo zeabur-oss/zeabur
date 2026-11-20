@@ -142,6 +142,10 @@ pub struct ServiceReachability {
     pub to_dns: Access,
     /// Addresses outside the cluster's pods.
     pub to_outside: Access,
+    /// The address ranges Zeabur's egress limit lets its pods reach; absent when no such limit
+    /// selects them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub egress_limit: Option<Vec<String>>,
 }
 
 /// A service and how far it may reach another.
@@ -638,7 +642,27 @@ fn service(policies: &[NetworkPolicy], input: Input<'_>, w: &Workload) -> Servic
             true,
         ),
         to_outside: egress(policies, namespace, &w.labels, None, false),
+        egress_limit: egress_limit(policies, w),
     }
+}
+
+/// The `ipBlock` ranges of Zeabur's egress limit, `<workload>-egress-limit`, when it selects the
+/// pods of `w`.
+fn egress_limit(policies: &[NetworkPolicy], w: &Workload) -> Option<Vec<String>> {
+    let workload = w.id.rsplit('/').next().unwrap_or_default();
+    let name = format!("{workload}-egress-limit");
+    let policy = policies
+        .iter()
+        .find(|p| p.metadata.name.as_deref() == Some(name.as_str()) && selects(p, &w.labels))?;
+    Some(
+        policy
+            .spec
+            .iter()
+            .flat_map(|spec| spec.egress.iter().flatten())
+            .flat_map(|rule| rule.to.iter().flatten())
+            .filter_map(|peer| Some(peer.ip_block.as_ref()?.cidr.clone()))
+            .collect(),
+    )
 }
 
 /// The project's reachability.
@@ -1224,6 +1248,29 @@ mod tests {
         assert_eq!(blocked(&isolated).map(|p| p.len()), Some(1));
         assert_eq!(blocked(&[isolated[0].clone(), open]), None);
         assert_eq!(blocked(&[]), None);
+    }
+
+    #[test]
+    fn the_egress_limit_says_its_ranges_only_for_the_pods_it_selects() {
+        let workloads = [workload("web", "web"), workload("api", "api")];
+        let limit = object(json!({
+            "apiVersion": "networking.k8s.io/v1", "kind": "NetworkPolicy",
+            "metadata": {"name": "web-egress-limit", "namespace": "shop"},
+            "spec": {"podSelector": {"matchLabels": {"app": "web"}}, "policyTypes": ["Egress"],
+                "egress": [{"to": [{"ipBlock": {"cidr": "10.0.0.0/8"}},
+                    {"ipBlock": {"cidr": "203.0.113.7/32"}}]}]}
+        }));
+        let r = reachability(Input {
+            namespace: "shop",
+            workloads: &workloads,
+            policies: &[limit],
+            connections: &[],
+        });
+        assert_eq!(
+            r.services[0].egress_limit,
+            Some(vec!["10.0.0.0/8".to_owned(), "203.0.113.7/32".to_owned()])
+        );
+        assert_eq!(r.services[1].egress_limit, None);
     }
 
     #[test]

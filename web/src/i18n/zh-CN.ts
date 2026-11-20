@@ -3958,16 +3958,6 @@ export const zhCN: Messages = {
   "sentence.rollout.stuck.runFailed": (p) => `${p.name} 的部署卡住了：新副本运行失败。`,
   "sentence.rollout.stuck.podSecurity": (p) =>
     `${p.name} 的部署卡住了：安全性设置让新副本无法启动。`,
-  "sentence.fix.multiAttach": (p) =>
-    `旧副本还占着卷，而卷一次只能挂载到一个节点上。在 YAML 中把 ${p.service || "服务"} 的 strategy.type 设为 Recreate，让旧副本先停止。代价是每次部署时，新副本启动的那几秒服务会中断。`,
-  "sentence.fix.outOfMemory": (p) =>
-    `把内存上限调高${p.limit ? `到超过 ${p.limit}` : ""}，“用量”会显示离上限还有多远。上限不会提前预留内存，所以节点上要有足够的可用内存。`,
-  "sentence.fix.evicted.disk":
-    "节点的磁盘空间不足，停止了这个副本。新副本会自动启动，但旧副本写在卷以外的数据不会保留。把数据放在卷里、减少日志，或请集群管理员清理那个节点的磁盘空间。",
-  "sentence.fix.evicted.memory":
-    "节点的内存不足，先停止了这个副本。把内存预留量设成接近实际用量，这个副本就会排到最后才停止，代价是空闲时这些内存也会一直保留着。",
-  "sentence.fix.evicted":
-    "节点资源不足，停止了这个副本。新副本会自动启动，副本的事件会说明是哪种资源不足。",
   "sentence.rollout.stuck.deadlineExceeded": (p) =>
     `${p.name} 的部署卡住了：期限（progressDeadlineSeconds）内没有进展。`,
   "sentence.rollout.stuck.replicaFailure": (p) => `${p.name} 的部署卡住了：集群无法创建新副本。`,

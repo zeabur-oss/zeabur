@@ -147,7 +147,14 @@ describe("the projects list", () => {
     adopted: true,
     system: false,
     origin: { apiVersion: "v1", kind: "Namespace", name },
-    health: { services: 2, healthy: 2 - failing, failing, warning: 0, progressing: 0 },
+    health: {
+      services: 2,
+      healthy: 2 - failing,
+      failing,
+      warning: 0,
+      progressing: 0,
+      worst: failing > 0 ? "fail" : "ok",
+    },
     ...extra,
   })
 

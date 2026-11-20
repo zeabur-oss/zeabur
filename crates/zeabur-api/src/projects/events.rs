@@ -18,7 +18,7 @@ use crate::error::{ApiError, list_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::Person;
 use crate::query::{EventQuery, LimitParams};
-use crate::views::{EventList, EventView};
+use crate::views::{EventList, EventView, WarningKind};
 
 /// The parameters of the events list (for the description; parsed by [`EventQuery`]).
 #[expect(
@@ -145,13 +145,17 @@ pub(crate) fn event_view(project: &str, event: &Event) -> EventView {
         .or(event.deprecated_count)
         .unwrap_or(1);
     let name = event.metadata.name.as_deref().unwrap_or_default();
+    let r#type = event.type_.clone().unwrap_or_default();
+    let reason = event.reason.clone().unwrap_or_default();
+    let note = event.note.clone().unwrap_or_default();
     EventView {
         id: id::event(project, name),
         origin: Origin::complete("events.k8s.io/v1", "Event", Some(project), name),
         regarding,
-        r#type: event.type_.clone().unwrap_or_default(),
-        reason: event.reason.clone().unwrap_or_default(),
-        note: event.note.clone().unwrap_or_default(),
+        warning: (r#type == "Warning").then(|| WarningKind::of(&reason, &note)),
+        r#type,
+        reason,
+        note,
         count,
         last_seen: last_seen(event).map(|t| t.to_string()),
         reporter: event.reporting_controller.clone().or_else(|| {

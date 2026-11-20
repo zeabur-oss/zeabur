@@ -29,6 +29,9 @@ pub struct PodSummary {
     /// container that is not ready, why it last stopped (`OOMKilled`, `Error`).
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// What that reason means, when Zeabur knows it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<crate::StatusCause>,
     /// When it was created, in RFC 3339.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created: Option<String>,

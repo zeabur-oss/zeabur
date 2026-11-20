@@ -10,7 +10,7 @@ import QueueIcon from "~icons/ph/queue"
 import type { Icon } from "@/lib/icon"
 import { cn } from "@/lib/utils"
 import type { Schemas } from "@/api/client"
-import { roleOf, type Role, type Service } from "@/model/service"
+import type { Role, Service } from "@/model/service"
 
 const flavourIcons: Record<Schemas.DataStore, Icon> = {
   postgres: DatabaseIcon,
@@ -36,7 +36,7 @@ const glyphs: Record<string, Icon> = {
 }
 
 function glyphKey(service: Service): string {
-  return service.dataStore ? `flavour:${service.dataStore}` : `role:${roleOf(service)}`
+  return service.dataStore ? `flavour:${service.dataStore}` : `role:${service.role}`
 }
 
 export function ServiceIcon({

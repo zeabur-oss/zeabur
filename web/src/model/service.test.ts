@@ -5,7 +5,6 @@ import {
   canonicalKind,
   domainsOf,
   envSecretsOf,
-  roleOf,
   serviceOfPod,
   type Network,
   type Pod,
@@ -22,27 +21,14 @@ const service = (name: string, fields: Partial<Service> = {}) =>
     endpointNames: [],
     routeNames: [],
     status: { health: "ok", word: "running" },
+    role: "worker",
     ...fields,
   }) as unknown as Service
 
 describe("a service's role", () => {
-  test("is data when the server says it is a data store, whatever its image", () => {
-    expect(roleOf(service("db", { image: "example/db:1", dataStore: "other" }))).toBe("data")
-    // The image's name alone decides nothing here: the server classifies images.
-    expect(roleOf(service("cache", { image: "redis:7" }))).toBe("worker")
-  })
-
-  test("is web before data when an Ingress exposes it", () => {
-    const exposed = service("search", {
-      dataStore: "search",
-      endpointNames: ["search"],
-      routeNames: ["public"],
-    })
-    expect(roleOf(exposed)).toBe("web")
-  })
-
   test("places a data store in the canvas's data lane", () => {
-    const laid = layout([service("api"), service("db", { dataStore: "postgres" })], [])
+    const db = service("db", { dataStore: "postgres", role: "data" })
+    const laid = layout([service("api"), db], [])
     const lanes = Object.fromEntries(laid.nodes.map((node) => [node.id, node.lane]))
     expect(lanes).toStrictEqual({
       "Deployment/api": "workers",

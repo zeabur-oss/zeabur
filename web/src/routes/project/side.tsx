@@ -57,14 +57,14 @@ import {
   isWarning,
   serviceId,
   statusOf,
-  summarise,
+  projectDomains,
   type Domain,
   type Event,
   type Project,
   type Service,
 } from "@/model/service"
 import { folded, serviceOf, type Alert } from "@/model/alerts"
-import { activityTone, warningTone, warningVariant } from "@/model/severity"
+import { activityTone, warningTone } from "@/model/severity"
 import { refusedPlaces } from "@/routes/project/data"
 import { FilterBox } from "@/routes/project/filter-box"
 import { MeterStack, meterPartTone } from "@zeabur-oss/design-system/components/meter"
@@ -365,7 +365,7 @@ function EventEntries({
             key={event.id}
             tone={
               isWarning(event)
-                ? warningTone(warningVariant(event), service && statusOf(service).health)
+                ? warningTone(event.warning, service && statusOf(service).health)
                 : "neutral"
             }
             time={event.lastSeen ? <Ago iso={event.lastSeen} /> : undefined}
@@ -540,7 +540,7 @@ export function Domains({
 }) {
   const t = useT()
   const [query, setQuery] = useState("")
-  const domains = byException(summarise(data).domains)
+  const domains = byException(projectDomains(data))
   if (domains.length === 0 && refused.length === 0) return null
   if (bare)
     return (
@@ -1074,7 +1074,7 @@ export function SectionChips({
     "alerts" | "activity" | "domains" | "storage" | "databases" | "objectStorage" | "backups"
   >()
   const { trouble } = useActivityCounts(project, events)
-  const domains = summarise(data).domains.length
+  const domains = projectDomains(data).length
   const volumes = claimsOf(data).length
   const backups = useBackupCount(project)
   const alerts = useProjectAlerts(project)

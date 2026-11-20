@@ -15,7 +15,7 @@ use zeabur_model::{
     Attribution, BackendRef, Container, ContainerResources, Endpoint, HttpRoute, HttpRouteRule,
     NamespaceAttribution, Origin, PageServer, ProbeHandler, ProbeSummary, Probes, Project,
     Provenance, Quantities, Resource, ResourceKind, Route, RouteMiddleware, RouteRule, RouteTls,
-    Service, WorkloadRef, WorkloadSelector,
+    Service, ServiceRole, WorkloadRef, WorkloadSelector,
 };
 
 use crate::attribution::{attribution_of, ingress_backends, relations_of};
@@ -332,6 +332,7 @@ pub fn with_http_routes(project: &mut Project, http_routes: &[Value]) {
                 service.route_names.push(route.name.clone());
                 service.route_names.sort();
                 service.route_names.dedup();
+                service.role = service.role_now();
             }
         }
         project.routes.push(route);
@@ -550,8 +551,11 @@ fn service(
                 .is_some_and(|e| !e.is_empty()),
         }),
         diagnoses: Vec::new(),
+        role: ServiceRole::default(),
+        verdict: None,
     };
     service.data_store = data_store(&service);
+    service.role = service.role_now();
     service
 }
 

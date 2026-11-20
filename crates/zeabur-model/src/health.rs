@@ -3,7 +3,9 @@
 use serde::{Deserialize, Serialize};
 
 /// A service's health, from worst to best: what a status dot shows.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
 pub enum Health {
@@ -14,6 +16,7 @@ pub enum Health {
     /// A rollout is under way.
     Progress,
     /// Every wanted replica is ready.
+    #[default]
     Ok,
     /// Nothing is meant to run now: paused, suspended, completed, scaled to zero, a CronJob
     /// between runs, or a status too thin to judge.
@@ -68,6 +71,68 @@ pub struct ServiceStatus {
     /// when no pod fails or the kubelet gives no reason.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub reason: Option<String>,
+    /// What `reason` means, in one word a client translates; absent for a reason with no word.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub cause: Option<StatusCause>,
+}
+
+/// What a failing pod's reason means for a person. An open set.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum StatusCause {
+    /// A long-running container keeps exiting (`CrashLoopBackOff`, or `Error`).
+    Crashing,
+    /// A run of a Job or CronJob ended with an error (`Error`).
+    RunFailed,
+    /// The kernel stopped a container for its memory (`OOMKilled`).
+    OutOfMemory,
+    /// The image cannot be pulled.
+    ImagePull,
+    /// The image name is not valid.
+    ImageName,
+    /// A Secret or ConfigMap that it reads is missing.
+    ConfigMissing,
+    /// The container cannot start.
+    CantStart,
+    /// No node has room for it.
+    WaitingForRoom,
+    /// Its containers are being made.
+    Starting,
+    /// The node stopped it.
+    Evicted,
+    /// The release made no progress before its deadline.
+    ReleaseStuck,
+    /// The Job stopped after its retries.
+    GaveUp,
+    /// The build of its image failed.
+    BuildFailed,
+    /// Pod Security keeps it from running. Only a diagnosis gives this word, never a reason.
+    Security,
+}
+
+impl StatusCause {
+    /// The word for `reason`, as `kubectl get pods` shows it. `Error` is how a run ended: the
+    /// run of a task (`task`) failed, and a service that keeps restarting crashed.
+    #[must_use]
+    pub fn of(reason: Option<&str>, task: bool) -> Option<Self> {
+        Some(match reason? {
+            "Error" if task => Self::RunFailed,
+            "Error" | "CrashLoopBackOff" => Self::Crashing,
+            "OOMKilled" => Self::OutOfMemory,
+            "ErrImagePull" | "ImagePullBackOff" => Self::ImagePull,
+            "InvalidImageName" => Self::ImageName,
+            "CreateContainerConfigError" => Self::ConfigMissing,
+            "ContainerCannotRun" | "RunContainerError" | "StartError" => Self::CantStart,
+            "Unschedulable" => Self::WaitingForRoom,
+            "ContainerCreating" | "PodInitializing" => Self::Starting,
+            "Evicted" => Self::Evicted,
+            "ProgressDeadlineExceeded" => Self::ReleaseStuck,
+            "BackoffLimitExceeded" => Self::GaveUp,
+            "BuildFailed" => Self::BuildFailed,
+            _ => return None,
+        })
+    }
 }
 
 /// How many of a project's services are in each state, for lists that show a project's health
@@ -86,6 +151,8 @@ pub struct ProjectHealth {
     pub warning: usize,
     /// Services failing ([`Health::Fail`]).
     pub failing: usize,
+    /// The worst health of any service; [`Health::Ok`] when every one is fine or there are none.
+    pub worst: Health,
 }
 
 impl ProjectHealth {
@@ -102,20 +169,52 @@ impl ProjectHealth {
                 Health::Ok | Health::Idle => out.healthy += 1,
             }
         }
-        out
-    }
-
-    /// The worst health of any service; [`Health::Ok`] when every one is fine or there are none.
-    #[must_use]
-    pub const fn worst(&self) -> Health {
-        if self.failing > 0 {
+        out.worst = if out.failing > 0 {
             Health::Fail
-        } else if self.warning > 0 {
+        } else if out.warning > 0 {
             Health::Warn
-        } else if self.progressing > 0 {
+        } else if out.progressing > 0 {
             Health::Progress
         } else {
             Health::Ok
-        }
+        };
+        out
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn the_worst_health_ranks_fail_warn_progress_then_ok() {
+        let worst = |healths: &[Health]| ProjectHealth::count(healths.iter().copied()).worst;
+        assert_eq!(worst(&[]), Health::Ok);
+        assert_eq!(worst(&[Health::Idle, Health::Ok]), Health::Ok);
+        assert_eq!(worst(&[Health::Ok, Health::Progress]), Health::Progress);
+        assert_eq!(worst(&[Health::Progress, Health::Warn]), Health::Warn);
+        assert_eq!(worst(&[Health::Warn, Health::Fail]), Health::Fail);
+    }
+
+    #[test]
+    fn a_reason_names_its_cause() {
+        assert_eq!(
+            StatusCause::of(Some("Error"), false),
+            Some(StatusCause::Crashing)
+        );
+        assert_eq!(
+            StatusCause::of(Some("Error"), true),
+            Some(StatusCause::RunFailed)
+        );
+        assert_eq!(
+            StatusCause::of(Some("ImagePullBackOff"), false),
+            Some(StatusCause::ImagePull)
+        );
+        assert_eq!(
+            StatusCause::of(Some("Unschedulable"), false),
+            Some(StatusCause::WaitingForRoom)
+        );
+        assert_eq!(StatusCause::of(Some("Whatever"), false), None);
+        assert_eq!(StatusCause::of(None, false), None);
     }
 }

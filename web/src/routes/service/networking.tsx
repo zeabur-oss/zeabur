@@ -60,7 +60,7 @@ import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import { useT } from "@/i18n"
 import { createdKey, entrance } from "@/lib/created"
 import { cn } from "@/lib/utils"
-import { domainsLead, filterRoutes, needsSetup, plainFirst } from "@/model/domains"
+import { domainsLead, filterRoutes, plainFirst } from "@/model/domains"
 import { stagedDomains, stagedSettings } from "@/model/draft"
 import type { Gate } from "@/model/rights"
 import { canIssue } from "@/model/cluster-issuers"
@@ -346,7 +346,7 @@ export function NetworkingTab({
                             className={cn(
                               row,
                               route.host && entrance(createdKey.domain(route.host)),
-                              check && firstOfHost && needsSetup(check) && "border-b-0",
+                              check && firstOfHost && check.setup !== "valid" && "border-b-0",
                             )}
                           >
                             <td className={`${cell} max-w-72 pl-4 max-sm:w-full max-sm:max-w-none`}>
@@ -507,7 +507,7 @@ export function NetworkingTab({
                               ) : null}
                             </td>
                           </tr>
-                          {check && firstOfHost && route.host && needsSetup(check) ? (
+                          {check && firstOfHost && route.host && check.setup !== "valid" ? (
                             <tr className="max-sm:block">
                               <td colSpan={4} className="px-4 pt-1 pb-3 max-sm:block">
                                 <DomainSetup

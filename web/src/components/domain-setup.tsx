@@ -12,15 +12,7 @@ import {
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import {
-  configuration,
-  dnsSetup,
-  isSslip,
-  rateLimited,
-  recordsFor,
-  wildcardFor,
-  type DnsRecord,
-} from "@/model/domains"
+import { dnsSetup, isSslip, recordsFor, wildcardFor, type DnsRecord } from "@/model/domains"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { severity } from "@/model/severity"
 
@@ -44,7 +36,7 @@ export function DomainState({
 }) {
   const t = useT()
   const { locale } = useI18n()
-  const state = configuration(check)
+  const state = check.setup
   const certificate = check.certificate
   const cert =
     certificate?.state === "ready"
@@ -89,7 +81,7 @@ export function DomainSetup({
       : undefined
   if (dns.as === "valid" && !certTrouble) return null
   const wildcard = wildcardFor(host, suffixes)
-  const limited = certTrouble?.state === "failed" && rateLimited(certTrouble.message)
+  const limited = certTrouble?.rateLimited ?? false
   return (
     <div className="flex flex-col gap-3 text-sm">
       {dns.as === "valid" ? null : (

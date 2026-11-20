@@ -36,7 +36,6 @@ import { originOf, originRank, type Origin } from "@/model/origin"
 import { otherNamespaces } from "@/model/project"
 import {
   byHealth,
-  countsHealth,
   healthRank,
   needsAttention,
   statusOf,
@@ -467,7 +466,7 @@ function Group({
 }
 
 function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
-  const rank = (p: ProjectItem) => (p.health ? healthRank[countsHealth(p.health)] : healthRank.ok)
+  const rank = (p: ProjectItem) => (p.health ? healthRank[p.health.worst] : healthRank.ok)
   return rank(a) - rank(b) || a.name.localeCompare(b.name)
 }
 

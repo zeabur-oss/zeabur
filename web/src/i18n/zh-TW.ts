@@ -3972,16 +3972,6 @@ export const zhTW: Messages = {
   "sentence.rollout.stuck.runFailed": (p) => `${p.name} 的部署卡住了：新副本執行失敗。`,
   "sentence.rollout.stuck.podSecurity": (p) =>
     `${p.name} 的部署卡住了：安全性設定讓新副本無法啟動。`,
-  "sentence.fix.multiAttach": (p) =>
-    `舊副本還占著磁碟區，而磁碟區一次只能掛在一個節點上。在 YAML 把 ${p.service || "服務"} 的 strategy.type 設為 Recreate，讓舊副本先停止。代價是每次部署時，新副本啟動的那幾秒服務會中斷。`,
-  "sentence.fix.outOfMemory": (p) =>
-    `把記憶體上限調高${p.limit ? `到超過 ${p.limit}` : ""}，「用量」會顯示離上限還有多遠。上限不會預先保留記憶體，所以節點上要有足夠的可用記憶體。`,
-  "sentence.fix.evicted.disk":
-    "節點的磁碟空間不足，停止了這個副本。新副本會自動啟動，但舊副本寫在磁碟區以外的資料不會保留。把資料放在磁碟區、減少日誌，或請叢集管理員清出那個節點的磁碟空間。",
-  "sentence.fix.evicted.memory":
-    "節點的記憶體不足，先停止了這個副本。把記憶體保留量設成接近實際用量，這個副本就會排到最後才停止，代價是閒置時這些記憶體也會一直保留著。",
-  "sentence.fix.evicted":
-    "節點資源不足，停止了這個副本。新副本會自動啟動，副本的事件會說明是哪種資源不足。",
   "sentence.rollout.stuck.deadlineExceeded": (p) =>
     `${p.name} 的部署卡住了：期限（progressDeadlineSeconds）內沒有進展。`,
   "sentence.rollout.stuck.replicaFailure": (p) => `${p.name} 的部署卡住了：叢集無法建立新副本。`,

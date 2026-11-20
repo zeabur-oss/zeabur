@@ -21,8 +21,8 @@
 
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_model::{
-    ContainerStatusSummary, Health, Phase, PodSummary, ServiceStatus, StatusWord, WorkloadKind,
-    WorkloadSummary,
+    ContainerStatusSummary, Health, Phase, PodSummary, ServiceStatus, StatusCause, StatusWord,
+    WorkloadKind, WorkloadSummary,
 };
 
 /// Waiting and termination reasons that mean a container keeps failing, as the kubelet reports
@@ -129,7 +129,9 @@ pub fn status(
         health,
         word,
         reason: None,
+        cause: None,
     };
+    let task = matches!(workload.kind, WorkloadKind::Job | WorkloadKind::CronJob);
     let serving = workload.kind == WorkloadKind::Deployment
         && matches!(workload.phase, Phase::Progressing | Phase::Failed)
         && workload.replicas.is_some_and(|r| r.ready > 0);
@@ -139,13 +141,15 @@ pub fn status(
         } else {
             StatusWord::Failing
         };
+        let reason = pod.reason.clone().or_else(|| {
+            pod.container_statuses
+                .iter()
+                .filter(|status| crash_looping(status, now))
+                .find_map(|status| status.last_termination.as_ref()?.reason.clone())
+        });
         return ServiceStatus {
-            reason: pod.reason.clone().or_else(|| {
-                pod.container_statuses
-                    .iter()
-                    .filter(|status| crash_looping(status, now))
-                    .find_map(|status| status.last_termination.as_ref()?.reason.clone())
-            }),
+            cause: StatusCause::of(reason.as_deref(), task),
+            reason,
             ..of(Health::Fail, word)
         };
     }
@@ -231,6 +235,7 @@ mod tests {
             health: Health::Warn,
             containers: vec!["y".to_owned()],
             reason: reason.map(str::to_owned),
+            cause: None,
             created: None,
             node: None,
             container_statuses: Vec::new(),

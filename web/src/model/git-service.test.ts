@@ -31,7 +31,6 @@ import {
   urlProblem,
   type GitService,
 } from "@/model/git-service"
-import { reasonWord } from "@/model/service"
 
 const form = (patch: Partial<GitService>): GitService => ({
   ...newGitService(),
@@ -415,10 +414,6 @@ describe("what the cluster lacks", () => {
       needs as never,
     )
   })
-})
-
-test("a failed first build reads as one", () => {
-  expect(reasonWord("BuildFailed", false)).toBe("buildFailed")
 })
 
 describe("the Builds tab", () => {

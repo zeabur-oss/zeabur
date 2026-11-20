@@ -5470,6 +5470,11 @@ components:
           - string
           - "null"
           description: When it expires (`status.notAfter`).
+        rateLimited:
+          type: boolean
+          description: >-
+            It failed because Let's Encrypt refused for its rate limit, in cert-manager's
+            words.
         reason:
           type:
           - string
@@ -8804,6 +8809,13 @@ components:
           items:
             type: string
           description: The pods it was seen in, sorted.
+        refusedPort:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "The port a failing readiness check was refused on: nothing listens there."
+          minimum: 0
         why:
           $ref: "#/components/schemas/Message"
           description: "Why: the rule that applies, with this occurrence's numbers where Zeabur knows them."
@@ -8888,6 +8900,7 @@ components:
       required:
       - target
       - dns
+      - setup
       properties:
         certificate:
           oneOf:
@@ -8902,6 +8915,9 @@ components:
           items:
             type: string
           description: The addresses it resolved to.
+        setup:
+          $ref: "#/components/schemas/DomainSetup"
+          description: How far its setup is, from `dns` and `certificate`.
         target:
           type: array
           items:
@@ -8930,6 +8946,15 @@ components:
             The domains a new URL is suggested under, as `<service>-<project>.<suffix>`, the first by
             default; a wildcard DNS record sends each to the cluster's ingress. Empty: people type the
             whole host. The list chosen on the cluster page, when there is one (see [`domains`]).
+    DomainSetup:
+      type: string
+      description: How far setting up a domain is.
+      enum:
+      - valid
+      - invalid
+      - pending
+      - elsewhere
+      - unknown
     DomainsChange:
       type: object
       description: A change of the suffixes.
@@ -9277,6 +9302,11 @@ components:
         type:
           type: string
           description: "`Normal` or `Warning`."
+        warning:
+          oneOf:
+          - $ref: "#/components/schemas/WarningKind"
+            description: What a `Warning` says went wrong; absent for a `Normal` event.
+          - type: "null"
     EvidenceBundle:
       type: object
       description: A service's evidence, as Markdown.
@@ -10350,6 +10380,62 @@ components:
           description: >-
             Builder's webhook URL, `https://<host>/hooks/github-app`; empty when its
             receiver is off.
+    Headline:
+      oneOf:
+      - type: object
+        description: It runs and nothing is wrong.
+        required:
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - running
+      - type: object
+        description: A rollout is under way.
+        required:
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - deploying
+      - type: object
+        description: It is scaled to zero.
+        required:
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - stopped
+      - type: object
+        description: Something is wrong.
+        required:
+        - trouble
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - problem
+          trouble:
+            $ref: "#/components/schemas/Trouble"
+            description: What is wrong.
+      - type: object
+        description: "The word of a task or of an idle service: completed, scheduled, paused."
+        required:
+        - word
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - status
+          word:
+            $ref: "#/components/schemas/StatusWord"
+            description: The status word.
+      description: What a verdict says.
     Health:
       type: string
       description: "A service's health, from worst to best: what a status dot shows."
@@ -12132,6 +12218,15 @@ components:
         egressIsolated:
           type: boolean
           description: A policy limits where it goes.
+        egressLimit:
+          type:
+          - array
+          - "null"
+          items:
+            type: string
+          description: |-
+            The address ranges Zeabur's egress limit lets its pods reach; absent when no such limit
+            selects them.
         fromIngressController:
           $ref: "#/components/schemas/NetworkPolicyAccess"
           description: The ingress controller (Traefik).
@@ -14371,6 +14466,11 @@ components:
       - containers
       - origin
       properties:
+        cause:
+          oneOf:
+          - $ref: "#/components/schemas/StatusCause"
+            description: What that reason means, when Zeabur knows it.
+          - type: "null"
         containerStatuses:
           type: array
           items:
@@ -14919,6 +15019,25 @@ components:
           items:
             $ref: "#/components/schemas/BackupTarget"
           description: Claims and databases no active schedule covers.
+    ProjectBuild:
+      allOf:
+      - $ref: "#/components/schemas/ZeaburBuilderBuild"
+        description: The `Build`.
+      - type: object
+        required:
+        - outOfMemory
+        properties:
+          outOfMemory:
+            type: boolean
+            description: "Its newest build ran out of memory: a higher build memory fixes it."
+          refused:
+            oneOf:
+            - $ref: "#/components/schemas/RefusedCredentials"
+              description: >-
+                The credentials the Git host refused, when it refused them and no run is under
+                way.
+            - type: "null"
+      description: A `Build`, and what its problem and its newest run say.
     ProjectBuildLimits:
       type: object
       description: |-
@@ -14942,12 +15061,16 @@ components:
       - type: object
         required:
         - containers
+        - health
         properties:
           containers:
             type: array
             items:
               type: string
             description: The pod's containers, in the order they run (`fetch`, `plan`, `build`).
+          health:
+            $ref: "#/components/schemas/Health"
+            description: "`ok` when it succeeded, `fail` when it failed, `progress` while it runs, else `idle`."
           pod:
             type:
             - string
@@ -14961,13 +15084,17 @@ components:
       - state
       - builds
       - runs
+      - building
       - keel
       - unreadable
       properties:
+        building:
+          type: boolean
+          description: A build is under way or about to be, so a client polls sooner.
         builds:
           type: array
           items:
-            $ref: "#/components/schemas/ZeaburBuilderBuild"
+            $ref: "#/components/schemas/ProjectBuild"
           description: The `Build`s, by name.
         component:
           oneOf:
@@ -15107,6 +15234,7 @@ components:
       - type: object
         required:
         - id
+        - health
         - unreadable
         - extensions
         properties:
@@ -15115,6 +15243,9 @@ components:
             description: >-
               What the integrations add, by module; a module whose API is not served adds
               nothing.
+          health:
+            $ref: "#/components/schemas/ProjectHealth"
+            description: How many of its services are in each state, and the worst.
           id:
             type: string
             description: "`projects/<name>`."
@@ -15190,6 +15321,7 @@ components:
       - progressing
       - warning
       - failing
+      - worst
       properties:
         failing:
           type: integer
@@ -15211,6 +15343,11 @@ components:
           type: integer
           description: Services with too few ready replicas ([`Health::Warn`]).
           minimum: 0
+        worst:
+          $ref: "#/components/schemas/Health"
+          description: >-
+            The worst health of any service; [`Health::Ok`] when every one is fine or there
+            are none.
     ProjectIcon:
       type: string
       description: |-
@@ -15766,6 +15903,12 @@ components:
         service:
           type: string
           description: The database service, by Kubernetes name.
+    RefusedCredentials:
+      type: string
+      description: Which credentials a Git host refused.
+      enum:
+      - deployKey
+      - token
     RegistryLogin:
       type: object
       description: Credentials for the image's registry.
@@ -17204,6 +17347,7 @@ components:
         - containers
         - endpointNames
         - routeNames
+        - role
         properties:
           configReload:
             oneOf:
@@ -17257,6 +17401,9 @@ components:
             items:
               $ref: "#/components/schemas/PodSummary"
             description: Its pods, sorted by name.
+          role:
+            $ref: "#/components/schemas/ServiceRole"
+            description: What it does for the project; see [`Service::role_now`].
           routeNames:
             type: array
             items:
@@ -17279,6 +17426,13 @@ components:
           status:
             $ref: "#/components/schemas/ServiceStatus"
             description: Its health and the word for it, from the workload and its pods.
+          verdict:
+            oneOf:
+            - $ref: "#/components/schemas/ServiceVerdict"
+              description: >-
+                What its overview says first. The projection leaves this empty, as it does
+                `diagnoses`.
+            - type: "null"
       description: "A workload and what it uses: what people think of as \"a service\"."
     ServiceDocument:
       allOf:
@@ -17384,6 +17538,15 @@ components:
       description: How many replicas a new service may run.
       maximum: 20
       minimum: 1
+    ServiceRole:
+      type: string
+      description: What a service does for its project, for how a client groups and draws it.
+      enum:
+      - web
+      - internal
+      - worker
+      - job
+      - data
     ServiceSize:
       type: string
       description: How much a new service asks for.
@@ -17398,6 +17561,13 @@ components:
       - health
       - word
       properties:
+        cause:
+          oneOf:
+          - $ref: "#/components/schemas/StatusCause"
+            description: >-
+              What `reason` means, in one word a client translates; absent for a reason with
+              no word.
+          - type: "null"
         health:
           $ref: "#/components/schemas/Health"
           description: What its status dot shows.
@@ -17494,6 +17664,19 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: Reads the person was refused; hops that needed them are unknown.
+    ServiceVerdict:
+      type: object
+      description: A service's verdict, from its status, its diagnoses and its pods.
+      required:
+      - tone
+      - headline
+      properties:
+        headline:
+          $ref: "#/components/schemas/Headline"
+          description: What it says.
+        tone:
+          $ref: "#/components/schemas/Health"
+          description: The colour of the verdict.
     SessionView:
       type: object
       description: How the person is signed in to Zeabur.
@@ -17728,6 +17911,24 @@ components:
       - PodField
       - ResourceField
       - File
+    StatusCause:
+      type: string
+      description: What a failing pod's reason means for a person. An open set.
+      enum:
+      - crashing
+      - runFailed
+      - outOfMemory
+      - imagePull
+      - imageName
+      - configMissing
+      - cantStart
+      - waitingForRoom
+      - starting
+      - evicted
+      - releaseStuck
+      - gaveUp
+      - buildFailed
+      - security
     StatusWord:
       type: string
       description: |-
@@ -18456,6 +18657,53 @@ components:
           description: |-
             The person's tools pods there that have not stopped and are not being deleted, oldest
             first.
+    Trouble:
+      oneOf:
+      - type: object
+        description: The word for the reason of a failing pod, or for a diagnosis.
+        required:
+        - word
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - reason
+          word:
+            $ref: "#/components/schemas/StatusCause"
+            description: The word.
+      - type: object
+        description: The status word, when no reason or diagnosis has a word.
+        required:
+        - word
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - status
+          word:
+            $ref: "#/components/schemas/StatusWord"
+            description: The status word.
+      - type: object
+        description: A health check keeps failing.
+        required:
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - healthCheck
+      - type: object
+        description: A `ResourceQuota` keeps its pods from being created.
+        required:
+        - as
+        properties:
+          as:
+            type: string
+            enum:
+            - quota
+      description: What is wrong, in a few words.
     TrustedHostKey:
       type: object
       description: A host key a deploy key's Secret trusts.
@@ -19346,6 +19594,14 @@ components:
           items:
             $ref: "#/components/schemas/UnreadableView"
           description: The settings ConfigMap or the store, when the person may not read it.
+    WarningKind:
+      type: string
+      description: What a `Warning` event says went wrong, from its reason. An open set.
+      enum:
+      - crashLoop
+      - imagePull
+      - unschedulable
+      - other
     WhoAmI:
       type: object
       description: Who the cluster says the person is.

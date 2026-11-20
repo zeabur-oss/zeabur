@@ -542,6 +542,7 @@ pub fn built_image(
         health: zeabur_model::Health::Fail,
         word,
         reason: Some(BUILD_FAILED.to_owned()),
+        cause: Some(zeabur_model::StatusCause::BuildFailed),
     };
     if build.latest_image.is_some() {
         if failed && service.status.health != zeabur_model::Health::Fail {
@@ -556,12 +557,14 @@ pub fn built_image(
             health: zeabur_model::Health::Idle,
             word: zeabur_model::StatusWord::WaitingUpload,
             reason: None,
+            cause: None,
         }
     } else {
         zeabur_model::ServiceStatus {
             health: zeabur_model::Health::Progress,
             word: zeabur_model::StatusWord::Building,
             reason: None,
+            cause: None,
         }
     };
     service.diagnoses.clear();

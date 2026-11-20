@@ -16,7 +16,6 @@ import {
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { projectTitle } from "@/model/project"
-import { countsHealth } from "@/model/service"
 
 const triggerClass = "inline-flex shrink-0 items-center justify-center"
 
@@ -66,7 +65,7 @@ export function ProjectSwitcher({ current }: { current: string }) {
                 </span>
                 {p.adopted ? (
                   p.health && p.health.services > 0 ? (
-                    <StatusDot health={countsHealth(p.health)} className="shrink-0" />
+                    <StatusDot health={p.health.worst} className="shrink-0" />
                   ) : null
                 ) : (
                   <span className="type-meta text-muted-foreground">
