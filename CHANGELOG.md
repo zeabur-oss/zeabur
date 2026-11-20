@@ -2,6 +2,234 @@
 
 All notable changes to Zeabur. Versions follow [Semantic Versioning](https://semver.org/); before 1.0.0, a minor or patch release may break the API. Each section comes from the change files in `.changeset/` (CONTRIBUTING.md, "Releases").
 
+## 0.3.0-beta.1 (2026-11-20)
+
+### Breaking Changes
+
+#### Apply answers with its writes, and the deploy key is made at apply
+
+`POST /components/{id}/apply` now answers with the plan and the result of each write, so a client sees which writes landed. A Git service's deploy key is now made when the service is applied: the Git drawer shows its public key after the service is created, and `createDeployKey` is replaced by `inspectDeployKeyHost`, which only checks the Git host. Removing a component now sends the objects it reviewed as preconditions, so a change made in the meantime stops the removal. Clients of the old answers must read the new shapes.
+
+#### Catalog components are named by id
+
+Zeabur now uses Zeabur Catalog v0.5, which names each component by its id alone, such as `traefik` or `cloudnative-pg`, instead of `<capability>/<id>`. `zeaburctl components export` takes these ids, and the Components page links use them. Scripts that pass `ingress/traefik` must pass `traefik` instead. Velero moves to chart 12.2.3.
+
+#### The server judges the cluster's health
+
+The API now says what the cluster page shows, so every client reads the same verdicts. `GET /cluster/nodes` gives each node its issues, groups them for the attention list, sorts the nodes worst first and names the worst one, with the thresholds the bars use. `GET /cluster/upgrades` replaces `severity` with `badge` and `attention`, and a newer Zeabur release carries its `health`. `GET /cluster/backups` gives a `verdict`, a project's backups say whether cluster backups cover it, namespace usage says whether memory is near its maximum, and volumes carry their `health`. Clients that read `severity` from the upgrades must read `badge` instead.
+
+#### Plans say their risk and fixes carry their values
+
+A plan now says how much its changes can hurt. `POST /projects/{project}/plan` returns `risk`, with a `level` (`low`, `normal` or `high`) and the `reasons` for it, each with the workloads it is about. A restart reads the ready pods when the plan is made, so every client confirms the same changes the same way.
+
+A gap's fix names the `workload` it changes and, where Zeabur can choose them, the `values` the plan sets: the requests and limits, the port of a readiness check, or the path and size of a new disk. The `service`, `container` and `mountPath` parameters of these fixes are gone; clients must read `workload` and `values` instead. A volume's backup fix names the workload that mounts the volume.
+
+A diagnosis carries a `group`. Services whose diagnoses have the same group key fail the same way, and `sharedCause` says whether their cause can be said once for all of them.
+
+#### The server says which component installs a missing tool
+
+`BackupProvider`, `Notifications`, `DatabaseOperator`, `ProjectObjectStorage` and `ProjectBuilds` add `component`: the catalogue component that installs the tool, with its id and name. `GET /cluster/backups` adds `providers` with K8up and Velero, each with its state and component. A missing capability on `GET /cluster/capabilities` adds `install`: a recommended component that runs on the cluster, else the first that does. A component incident names the component as Zeabur Catalog does, so a down ingress controller is now `ingress` instead of `ingress-controller`. The web no longer keeps its own component ids or picks a component for a capability.
+
+#### The plan review no longer predicts whether new pods fit
+
+The plan preview used to add up requests against quotas and the nodes' free room, and could warn "Not enough room" before you applied. That guess missed what the host uses, affinity, taints and LimitRange defaults, so it could be wrong either way. The preview now says only what is certain: which services restart or stop, the data that goes and the fields that are removed. If a pod can't start after you apply, the service shows the real reason from the cluster.
+
+API: `Preview` loses `fit` and `unreadable`, and the `Fit`, `FitStatus`, `Blocker` and `BlockerKind` schemas are removed.
+
+#### Rights come from Kubernetes reviews, not from matching rules
+
+A project is read-only when its rules review grants no write. Each action, the Admin and Viewer roles and the cluster actions now come from access reviews, and cluster actions are checked cluster-wide. A `cluster-admin` bound only by a RoleBinding can no longer change nodes or cluster backups in the interface. `GET /projects/{p}/namespace` drops `can` and `workloadPatch` and adds `readOnly`, `canReadLogs` and `canReadSecrets`. On `GET /projects/{p}/creatable`, a kind's `access` is now `unknown` unless the project is read-only. `GET /projects/{p}/objects` answers 403 only when the person can list no kind in the project. Clients of the old fields must read the new ones.
+
+#### The server names the role and rule behind each right
+
+`GET /api/v1/rights` lists the rights the interface gates actions by, the least role and the Kubernetes rule behind each, and the right that covers each resource. `GET /api/v1/whoami` adds `member` and `admin`. Members carry `canRemove` and `canChangeAccess`, and an API token's `createdBy` is the Zeabur Identity user name without the `zeabur:` prefix. The web no longer keeps its own copy of these.
+
+#### The server makes the objects of a new image or Git service
+
+The "Docker image" form and a Compose import send one `createImageService` change per service, and "Deploy from Git" sends one `createGitService` change. The server makes the Secrets, claims, Deployment, Service, Ingress and Build from them, with the pod settings of the security profile, and checks the service name, the image, the replicas, the branch and the host. `POST /projects/{project}/image-service/yaml` gives the objects of an image service as YAML for the YAML editor. The `deployKey` change is gone: a Git service with `access.type` `deployKey` gets its key at apply. The public key is now read by `POST /projects/{project}/builds/{build}/deploy-key`, which replaces `…/deploy-keys/{name}/public`. The `ServiceReplicas` schema is gone; the limit is on `ImageServiceChange.replicas`. `UploadMethod` is renamed `BuildMethod`. The web interface builds every API address with the generated client.
+
+#### The server judges each service
+
+The API now says what the service pages show, so every client reads the same conclusions. A service carries its `role` and a `verdict` with its headline and tone, its status says the `cause` in plain words, and a project's `health` names the `worst` one. A pod summary says its `cause`, a diagnosis says the `refusedPort` and a concrete fix, a Warning event says which `warning` it is, and a domain check says its `setup` and whether Let's Encrypt refused for its rate limit. `GET /projects/{project}/builds` says whether a build is under way, gives each run its `health`, and says when a build ran out of memory or the Git host refused its credentials. A service's reachability gives the ranges of its outgoing IP limit.
+
+#### Times in the API are typed and end in `At`
+
+Every time the API returns is an RFC 3339 instant in UTC, stated as `date-time` in `openapi.yaml`. Calendar days, such as release dates and idle measurements, are `date`. A time that another tool wrote and that is not RFC 3339 is left out. Time fields are renamed to end in `At`: for example, `created` becomes `createdAt`, `since` becomes `startedAt`, and a usage `timestamp` becomes `sampledAt`. The commit that renames them lists every field. Clients must read the new names.
+
+#### Forms check names and limits by the server's rules
+
+The OpenAPI description now carries the length limits, patterns and defaults the server checks: project, task, volume, token, notification, S3 destination and uploaded service names, build paths, bucket names, kept task runs and the backup schedule. New schemas `ProjectName`, `DatabaseName` and `ServiceReplicas` name rules no request field carries. The web reads all of them from the generated rules instead of its own copies, so a bucket name may now have dots everywhere. A backup schedule may leave out `cron` and `keepDays` for daily at 03:00 UTC, kept 7 days. A plan that creates objects is now checked by a dry run, so what Kubernetes refuses in a built object, such as a bad name, is refused at review, and a plan refuses an object whose `zeabur.com/database` label is not a database name. The YAML editor no longer checks documents itself: the review shows what the server refuses, at its line.
+
+### Features
+
+#### API tokens on the Members page
+
+Admins can now create API tokens on the Members page, so scripts and CI can call the Kubernetes API. Each token is a ServiceAccount in the `zeabur-api-tokens` namespace, which the chart creates, and gets roles the same way a member does: Developer or Viewer in chosen projects. A token is never an admin; cluster-wide work uses an admin's own kubeconfig. A token expires and is shown once with a kubeconfig template and the cluster's CA certificate. Renew issues a new token for the same ServiceAccount, and Delete revokes every token issued for it. Tokens work without Zeabur Identity, so the Members page lists them even when Identity isn't installed.
+
+#### The experience program reports changes of a Deployment and their rollout
+
+When it is on, Zeabur sends `app_change_submitted` when the cluster answers a new image, a new replica count or new environment variables for one Deployment, and `rollout_finished` when an accepted change becomes available or passes its progress deadline. Zeabur reads the Deployment with the person's own credential to see it.
+
+#### `zeaburctl ui` joins the experience program
+
+`zeaburctl ui` joins the experience program by default and says so each time it starts. It sends `cluster_connected`: whether it could connect to the cluster of your kubeconfig. It keeps a random ID in its configuration directory, made only when the first event is about to be sent; `zeaburctl telemetry reset` deletes it. `zeaburctl telemetry status` shows whether it sends and which setting decides it; `zeaburctl telemetry disable` (or `DO_NOT_TRACK=1`) turns it off and `zeaburctl telemetry enable` turns it back on. Sending never delays the link or the browser.
+
+#### Install and remove components from the Components page
+
+On K3s and RKE2, a cluster administrator installs a component from **Cluster** → **Components**: Zeabur shows each step and the objects it writes, then writes one step at a time and waits for it to be ready, starting with cert-manager. **Manage** continues an unfinished install, or removes a finished one: Zeabur deletes what it installed in reverse order and keeps CRDs and keys. Template updates read the same `catalog.url`. Zeabur downloads Zeabur Catalog from `https://oss-catalog.zeabur.com/v1/` and keeps the last release in the ConfigMap `zeabur-catalog`; set `catalog.url` to serve a mirror to a cluster without internet access.
+
+#### Connect to any service from outside the cluster
+
+`zeaburctl connect <project>/<name>` also reaches a service that is not a database: it forwards a local port to the service's Kubernetes Service and prints `127.0.0.1:<port>`. When the service has several ports, pick one with `<project>/<name>:<port>`.
+
+#### Connect to a database from outside the cluster
+
+`zeaburctl connect <project>/<database>` forwards a local port to any database and prints a connection string on 127.0.0.1. The database page shows the command, and says when your role can't use it.
+
+#### Zeabur Desktop on the release page, with updates
+
+Each release now carries Zeabur Desktop for macOS on Apple silicon (`.dmg`), Windows on x64 (an installer and a portable `.exe`) and Linux on amd64 and arm64 (`.deb`, `.rpm` and `.AppImage`), covered by the release's signed `SHA256SUMS` and attestation. The app checks for a new version when it starts and from **Check for updates**, shows what changed, and installs only when you confirm. The macOS app, the Windows installer and the AppImage update themselves; the others open the release page.
+
+Releases are now signed by this repository's own release workflow, `zeabur-oss/zeabur/.github/workflows/release.yml`. To verify a release, accept that signer as well as the shared workflow that signed earlier releases; [Releases](docs/reference/releases.mdx) shows the command.
+
+#### Dragonfly has no backups
+
+A Dragonfly database no longer has a **Backups** tab. Dragonfly keeps its data in snapshots on its volume and loads the newest one when it starts. A snapshot folder in a bucket is where the store keeps its data, not a separate copy, so Zeabur no longer sets one up or restores a new database from it.
+
+#### Remove zeabur-installer; the chart guards system hosts
+
+`zeabur-installer` and its release archives are gone. To run Zeabur, install the chart on an existing Kubernetes cluster. Setting up a server from nothing moves to Zeatend ([#430](https://github.com/zeabur-oss/zeabur/issues/430)). The cluster page no longer shows installer steps for upgrades, and "How to install" on a missing component prints the `zeaburctl components export` command.
+
+The chart now has the `zeabur-system-hosts` ValidatingAdmissionPolicy that the installer used to apply. Outside namespaces labelled `zeabur.com/platform: "true"`, a new or changed Ingress rule needs a host and an HTTPRoute needs hostnames, and neither can claim the host of Zeabur or Zeabur Identity. It reads those hosts from the release's namespace and from each namespace in `systemHosts.namespaces` (default `zeabur-identity`). Set `systemHosts.enabled: false` to leave it out.
+
+#### Edit or turn off a database's backups
+
+A database's **Backups** tab now has **Edit** and **Turn off backups**. Edit changes the destination, schedule, retention or access keys. The form never shows the saved keys, and leaving them empty keeps them. Turning off stops the schedule and keeps the keys secret and the backups already in the bucket.
+
+#### Force delete a project held by finalizers
+
+When a project stays in Deleting because an object's controller is gone, the banner offers **Force delete**. After you type the project name, Zeabur removes the finalizers from the objects Kubernetes is still waiting on, running as you, and never from the namespace itself. The plan lists each object and finalizer and warns that their controllers won't clean up what they made outside the cluster. For a Kubernetes finalizer such as `kubernetes.io/pvc-protection`, it adds a separate warning to deal with the Pod or node that holds it first.
+
+#### Install with Homebrew
+
+On macOS and Linux, `brew tap zeabur-oss/tap` and then `brew install zeabur-oss/tap/zeaburctl` installs `zeaburctl`, and `brew upgrade` updates it. On a Mac, `brew install --cask zeabur-oss/tap/zeabur-desktop` installs Zeabur Desktop, which keeps updating itself. Both install the signed files of the release and check them against its `SHA256SUMS`, and each new release updates them.
+
+#### Change settings of K3s and RKE2 built-in components
+
+The card of a component that K3s or RKE2 installed as a Helm chart, such as Traefik, names the `HelmChartConfig` that changes its settings and links to an example in the docs.
+
+#### A plan dry-runs the pods it starts
+
+A plan that starts or scales up a Deployment or StatefulSet sends one of its Pods as a dry run. A quota, a LimitRange maximum or a Pod Security level that would refuse the pods now refuses the plan at its change. The pods the plan adds, with the LimitRange's default requests, are held against the project's quotas.
+
+#### Zeabur offers Zeabur Catalog's newest templates without an upgrade
+
+When someone opens the template list, at most once every 6 hours, the Zeabur server reads `catalog.json` from Zeabur Catalog's API at `https://oss-catalog.zeabur.com/v1/`, fetches `templates/<id>.json` for each template that changed, and offers those templates in place of the ones it was built with. Zeabur trusts the HTTPS address it fetches from; the files carry no signature. A template that does not read or needs a component this Zeabur does not know is not offered, and the one offered before stays. Components stay as built, and deployed services do not change. Turn it off with the chart's `templateFetch.enabled=false` or `ZEABUR_TEMPLATE_FETCH=false`; `DO_NOT_TRACK` does not turn it off. It reads the same address as component installs, the chart's `catalog.url` or `ZEABUR_CATALOG_URL`, so one setting points both at a mirror. See [Template updates](docs/reference/telemetry.mdx#template-updates).
+
+#### Template room is counted node by node
+
+Whether the cluster has room for a template now comes from Zeabur (`GET /api/v1/cluster/template-rooms`). Each pod must fit on one ready, schedulable node that keeps a tenth of its room free, so room spread over several nodes no longer counts.
+
+### Fixes
+
+- A long list of services no longer makes the page scrollable
+
+#### Zeabur Catalog 0.5.5
+
+Zeabur embeds Zeabur Catalog 0.5.5. Its `builder` component installs Zeabur Builder 0.2.3: builds can be capped per cluster, run on build nodes set aside by a taint, and record their steps. Build Jobs get a memory limit.
+
+#### A Compose variable such as `discovery.type` imports again
+
+Creating an image or built service no longer refuses a runtime variable name that is not a C identifier. Kubernetes judges the name in the plan's dry run, so names such as `discovery.type` from a Compose file plan as before. Build variables keep the stricter rule.
+
+#### Every create checks the kinds the cluster serves
+
+A plan that creates an object from a form, such as a database, a bucket or a backup, now reads the cluster's API discovery, as a create from YAML already did. A kind the cluster does not serve, for example a database whose operator is not installed, is refused when the plan is made instead of when it is applied. Zeabur no longer keeps its own list of kinds to fall back on. When discovery cannot be read, the plan is refused.
+
+#### A database operator's volumes no longer get volume-backup advice
+
+Missing setup suggested a K8up or Velero volume backup for each volume of a database that an operator runs, such as a CloudNativePG `Cluster` or a `MariaDB`. Copying the files of a running database does not give a consistent backup, and the database has its own backups. These volumes now have no row of their own under Backups and no volume-backup advice. Other volumes keep their advice, and a CloudNativePG database without a `ScheduledBackup` still shows its warning.
+
+#### The Desktop screenshots are taken with Playwright
+
+The Desktop images in the docs come from the pages of the app in Chromium with the app's commands mocked, in English, zh-TW and zh-CN, light and dark. `scripts/docs-shots.sh desktop` takes them.
+
+#### digests.txt lists the images Zeabur runs by default
+
+A release's `digests.txt` now also names the busybox image used for debug containers (`debug index`) and the `alpine/k8s` image used by terminals (`tools index`). Zeabur runs both without publishing them, so a registry mirror built from `digests.txt` alone left terminals stuck in `ImagePullBackOff`. The release checks that each is still served for `linux/amd64` and `linux/arm64`, and `verify` checks that `digests.txt` names the images the code pins. Zeabur does not sign these two.
+
+#### Experience program also counts log, terminal and invitation use
+
+With the experience program on, Zeabur's server also sends `feature_used` with `logs_viewed` when a log stream opens, `terminal_opened` when a terminal session is ready and `member_invited` when an invitation succeeds, at most once a day for each.
+
+#### Experience program counts how services, databases and domains are created
+
+With the experience program on, Zeabur's server sends `feature_used` after a successful apply that creates a service (`git`, `upload`, `image` or a catalog `template`), a database or object storage (its kind), or a domain (`generated` or `custom`), at most once a day for each feature and set of values. See the Experience program page for what is sent.
+
+#### Flux and Argo CD commands in the component install dialog
+
+The install dialog on **Cluster** → **Components** shows the `zeaburctl components export` commands that print the component for Flux or Argo CD, for a cluster managed with either. On a cluster without helm-controller, the refusal names the same command.
+
+#### Growing a volume names only the StatefulSet it belongs to
+
+Before you grow a volume, the confirmation says which services the change also affects. It also named a StatefulSet whose name only ended the volume's name, such as `replica` for `data-db-replica-0`. Now it names the StatefulSet that created the volume from its claim template or controls it, and the services that mount it.
+
+#### The status light shows a StatefulSet or DaemonSet update until it finishes
+
+After an image change on a StatefulSet or a DaemonSet, the status light said Running while the old pods still served, and the rollout panel said the update was still under way. Both now use the same kstatus rules, so both show the update until every pod runs the new template. A Deployment whose old ReplicaSet still has pods also shows as rolling out. An `OnDelete` StatefulSet still waits for its pods to be deleted, and the rollout panel now shows it as done once every pod was recreated.
+
+#### A MongoDB database shows the user and password the operator wrote
+
+A new MongoDB database names its users Secret `<name>-secrets`, and the database page and `zeaburctl connect` read the Secret the cluster names. A cluster that names none is read at the operator's own default, `percona-server-mongodb-users`, which is where its users really are.
+
+#### Zeabur's outbound requests can go through an HTTP proxy
+
+Set `outboundProxy` in the chart to send the requests Zeabur makes itself (images, backups, GitHub) through an `http://` proxy with a `CONNECT` tunnel. Local addresses, `.svc`, `.cluster.local` and the cluster network are never sent to the proxy, and the same addresses are refused as without one.
+
+#### The project overview decodes each object once
+
+Reading a project overview allocates about 22% fewer bytes and 41% fewer times, and runs faster, because each list is decoded straight into its type. Secrets read through the generic path are decoded without their values.
+
+#### Open a replica's YAML from the service page
+
+The replica list under a service's squares links each pod to its YAML, so a person can read why one pod is not ready without leaving the page.
+
+#### Registry credentials go only to the token service the registry names, over HTTPS
+
+When Zeabur reads an image's ports and user, it sends the registry's username and password only to the token service in the registry's `WWW-Authenticate` challenge, and only over HTTPS. A token service on a loopback, link-local or private address is refused unless it is on the registry's own host. Redirects of registry requests carry no credentials or token, and a challenge after a redirect is not answered.
+
+#### A restore copy fits only when each pod fits on one node
+
+A restored copy used to fit when the nodes' free room added up to what its pods request. Each pod is now placed on one ready node that has its CPU, memory and a free pod slot, the largest pods first. Three nodes with 1 GiB free each no longer report room for a pod that requests 2 GiB.
+
+#### A secret key change checks who owns each key it writes
+
+Setting one key of a secret no longer fails because Helm, Argo CD or Flux owns another key. Removing a key and setting it again is refused when one of those tools owns it. A key removed in a later change of the same plan is removed.
+
+#### A secret's YAML shows its values, and its keys are edited one at a time
+
+The YAML of a secret is the object as the cluster stores it, with `data` in base64, for a person who may read the secret. In the key editor each value is masked until you press its eye, a copy button copies the decoded value, and a binary value shows its size with a download. Saving sends only the keys you changed. A secret's YAML is planned like any other object's: removing a key from `data` removes it from the secret.
+
+#### Diagnoses and build times follow the server's clock
+
+Project, database, object storage and build reads, and the cluster events' `sinceSeconds`, count time from the server's clock instead of the machine's. On a real cluster nothing changes; a fixed clock (tests, the demo's screenshots) now sees recent events as recent.
+
+#### Focus, hidden tabs, small targets and form fields on the web
+
+Links and buttons show the design system's focus outline. Pages behind the object list, the create menu, settings and the project switcher load ahead, and switching projects uses a plain link, so it opens in a new tab too. Log follow and clocks stop while the tab is hidden. Small controls have a 24 by 24 px hit area, and the design system 0.1.5 gives checkboxes, radios and the dock and sidebar buttons the same. A cleared number field no longer writes 0, and trimmed text fields keep the cursor where it was.
+
+#### A built app that doesn't listen on its port says so
+
+When a built service's health check is refused on its port a minute after the container started, Overview says the app isn't listening there and how to fix it: read `PORT`, or listen on `0.0.0.0` instead of `127.0.0.1`. When the image declares another port with `EXPOSE`, that message also offers **Use port …**, which moves the container port, health checks, `PORT` and the port the service's private addresses send traffic to.
+
+#### zeaburctl reads a newer server's answers
+
+`zeaburctl up` against a newer Zeabur server no longer fails on a field or value this version does not know. It reads only the fields it uses, and a problem kind or backup provider state it does not know reads as unknown.
+
+#### zeaburctl reads the API with the server's own types
+
+`zeaburctl doctor`, `up` and `connect` send and read the API's requests and answers as the types the server writes, not as copies of their own. A field the server renames or retypes now stops the build of zeaburctl instead of failing when a command runs. A refusal reads as the server's problem, so a missing permission is named as before.
+
 ## 0.3.0-beta.0 (2026-11-19)
 
 ### Breaking Changes
