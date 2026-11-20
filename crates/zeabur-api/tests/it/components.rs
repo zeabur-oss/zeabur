@@ -99,14 +99,21 @@ mod tests {
 
     /// Zeabur Catalog v0.5.3 with the components of `FIXTURES`, or no answer at all; `tampered`
     /// answers each manifest file with other bytes than the catalog's digest. With
-    /// `contributes`, cert-manager adds [`BOUNCER`] to Traefik; with `cnpg_contributes`,
-    /// cloudnative-pg adds a value to cert-manager, which it needs.
+    /// `contributes` adds values to another component.
     #[derive(Default)]
     struct Api {
         down: bool,
         tampered: bool,
-        contributes: bool,
-        cnpg_contributes: bool,
+        contributes: Option<Contributes>,
+    }
+
+    /// A contribution the catalog files do not have.
+    #[derive(Clone, Copy, PartialEq, Eq)]
+    enum Contributes {
+        /// cert-manager adds [`BOUNCER`] to Traefik.
+        Bouncer,
+        /// cloudnative-pg adds a value to cert-manager, which it needs.
+        ToNeeded,
     }
 
     const BOUNCER: &str = "ports:\n  web:\n    middlewares:\n    - bouncer\n";
@@ -161,13 +168,13 @@ mod tests {
                             .collect();
                         release["urlDigests"] = json!(digests);
                     }
-                    if self.contributes && id == "cert-manager" {
+                    if self.contributes == Some(Contributes::Bouncer) && id == "cert-manager" {
                         file["declaration"]["contributes"] = json!([{
                             "target": {"component": "traefik", "release": "traefik"},
                             "values": BOUNCER,
                         }]);
                     }
-                    if self.cnpg_contributes && id == "cloudnative-pg" {
+                    if self.contributes == Some(Contributes::ToNeeded) && id == "cloudnative-pg" {
                         file["declaration"]["contributes"] = json!([{
                             "target": {"component": "cert-manager", "release": "cert-manager"},
                             "values": "# Added by cloudnative-pg.\nadded: cnpg\n",
@@ -1054,7 +1061,7 @@ mod tests {
         let app = TestApi::new(&cluster)
             .signed_in(TOKEN)
             .with_catalog(Arc::new(Api {
-                contributes: true,
+                contributes: Some(Contributes::Bouncer),
                 ..Api::default()
             }))
             .router();
@@ -1095,7 +1102,7 @@ mod tests {
         let app = TestApi::new(&cluster)
             .signed_in(TOKEN)
             .with_catalog(Arc::new(Api {
-                cnpg_contributes: true,
+                contributes: Some(Contributes::ToNeeded),
                 ..Api::default()
             }))
             .router();
@@ -1120,17 +1127,17 @@ mod tests {
         chart["spec"]["valuesContent"] = json!(format!("added: cnpg\n{values}"));
         put(&cluster, chart);
         let (_, plan) = call_for(&app, "cloudnative-pg", "plan", "install", "").await;
-        let states = states(&plan);
+        let now = states(&plan);
         // The first write is done too: applying it again would take the value out.
         assert_eq!(
-            states.first().map(String::as_str),
+            now.first().map(String::as_str),
             Some("cert-manager ready"),
-            "{states:?}"
+            "{now:?}"
         );
         assert_eq!(
-            states.last().map(String::as_str),
+            now.last().map(String::as_str),
             Some("cert-manager ready"),
-            "{states:?}"
+            "{now:?}"
         );
     }
 
