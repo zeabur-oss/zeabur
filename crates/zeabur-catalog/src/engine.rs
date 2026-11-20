@@ -17,7 +17,8 @@
 //! adds a step that writes its target again: the `HelmChart` Zeabur wrote, or, for a chart the
 //! distribution packages, a `HelmChartConfig` of the same name [k3s-config]. Removing one writes
 //! the target without it, before its own objects go: a `HelmChartConfig` left with no values
-//! stays, empty, so the removal waits until helm-controller installs the chart without them. A
+//! is written empty, so the removal waits until helm-controller installs the chart without
+//! them, and is deleted after the component's own objects. A
 //! contribution to a component that is not installed waits until Zeabur installs it.
 //!
 //! Readiness follows kstatus [kstatus] through `zeabur_model::readiness`. A `HelmChart` has no

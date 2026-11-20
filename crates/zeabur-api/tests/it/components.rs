@@ -1053,6 +1053,34 @@ mod tests {
         (cluster, app)
     }
 
+    /// helm-controller installs the packaged Traefik with its config, after Zeabur's writes.
+    fn traefik_installed(cluster: &MemoryCluster) {
+        put(
+            cluster,
+            json!({
+                "apiVersion": "helm.cattle.io/v1",
+                "kind": "HelmChart",
+                "metadata": {"name": "traefik", "namespace": "kube-system"},
+                "spec": {"chart": "traefik"},
+                "status": {"jobName": "helm-install-traefik"},
+            }),
+        );
+        cluster.update(|s| {
+            let job = json!({
+                "apiVersion": "batch/v1",
+                "kind": "Job",
+                "metadata": {"name": "helm-install-traefik", "namespace": "kube-system",
+                             "creationTimestamp": "2030-01-01T00:00:00Z"},
+                "status": {"conditions": [
+                    {"type": "SuccessCriteriaMet", "status": "True"},
+                    {"type": "Complete", "status": "True"},
+                ]},
+            });
+            let kube_system = s.objects.get_mut("kube-system").unwrap();
+            kube_system.jobs.push(serde_json::from_value(job).unwrap());
+        });
+    }
+
     #[tokio::test]
     async fn values_for_packaged_traefik_go_in_its_config_and_leave_with_the_component() {
         let (cluster, app) = packaged();
@@ -1085,7 +1113,12 @@ mod tests {
         assert_eq!(status, StatusCode::OK, "{plan}");
         assert_eq!(
             states(&plan),
-            ["traefik pending", "issuers pending", "cert-manager pending"]
+            [
+                "traefik pending",
+                "issuers pending",
+                "cert-manager pending",
+                "traefik pending"
+            ]
         );
         // The config stays, empty, and cert-manager waits until Traefik is installed without
         // the values: its middleware is still in Traefik until then.
@@ -1094,8 +1127,51 @@ mod tests {
         assert_eq!(config["spec"]["valuesContent"], "");
         assert_eq!(
             states(&applied["plan"]),
-            ["traefik waiting", "issuers pending", "cert-manager pending"]
+            [
+                "traefik waiting",
+                "issuers pending",
+                "cert-manager pending",
+                "traefik pending"
+            ]
         );
+        // helm-controller installs Traefik without the values: cert-manager goes, then the
+        // empty config.
+        traefik_installed(&cluster);
+        let (_, plan) = call(&app, "plan", "remove", "").await;
+        assert_eq!(
+            states(&plan),
+            [
+                "traefik ready",
+                "issuers pending",
+                "cert-manager pending",
+                "traefik pending"
+            ]
+        );
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            [
+                "traefik ready",
+                "issuers ready",
+                "cert-manager pending",
+                "traefik pending"
+            ]
+        );
+        assert!(dynamic(&cluster, "HelmChartConfig", "traefik").is_some());
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(
+            states(&applied["plan"]),
+            [
+                "traefik ready",
+                "issuers ready",
+                "cert-manager ready",
+                "traefik pending"
+            ]
+        );
+        let (status, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(applied["plan"]["done"], true, "{applied}");
+        assert!(dynamic(&cluster, "HelmChartConfig", "traefik").is_none());
     }
 
     #[tokio::test]
@@ -1106,30 +1182,7 @@ mod tests {
         call(&app, "apply", "install", "0.5.3").await;
         call(&app, "apply", "install", "0.5.3").await;
         // helm-controller installs Traefik with the config.
-        put(
-            &cluster,
-            json!({
-                "apiVersion": "helm.cattle.io/v1",
-                "kind": "HelmChart",
-                "metadata": {"name": "traefik", "namespace": "kube-system"},
-                "spec": {"chart": "traefik"},
-                "status": {"jobName": "helm-install-traefik"},
-            }),
-        );
-        cluster.update(|s| {
-            let job = json!({
-                "apiVersion": "batch/v1",
-                "kind": "Job",
-                "metadata": {"name": "helm-install-traefik", "namespace": "kube-system",
-                             "creationTimestamp": "2030-01-01T00:00:00Z"},
-                "status": {"conditions": [
-                    {"type": "SuccessCriteriaMet", "status": "True"},
-                    {"type": "Complete", "status": "True"},
-                ]},
-            });
-            let kube_system = s.objects.get_mut("kube-system").unwrap();
-            kube_system.jobs.push(serde_json::from_value(job).unwrap());
-        });
+        traefik_installed(&cluster);
         let (_, plan) = call(&app, "plan", "install", "").await;
         assert_eq!(
             states(&plan),

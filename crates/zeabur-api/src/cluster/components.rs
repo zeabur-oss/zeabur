@@ -887,16 +887,13 @@ impl World {
         let none = engine::Contributions::default();
         let own = engine::steps_of(file, version, self.profile, &manifests, &[], &none)
             .map_err(|r| refusal(&r))?;
-        let mut steps = Vec::new();
-        let mut placed_steps = Vec::new();
         let mut zeaburs = false;
         let mut leftovers = file.declaration.leftovers.clone();
         leftovers.extend(engine::input_secrets(file));
-        for planned in self.rewrites_without(cluster, id).await? {
-            steps.push(planned.view);
-            placed_steps.push(planned.placed);
-        }
-        for step in own.iter().rev() {
+        let (rewrites, emptied) = self.rewrites_without(cluster, id).await?;
+        let (mut steps, mut placed_steps): (Vec<_>, Vec<_>) =
+            rewrites.into_iter().map(|p| (p.view, p.placed)).unzip();
+        for step in own.iter().rev().chain(&emptied) {
             let mut writes = Vec::new();
             let mut placed = Vec::new();
             let mut progress = Vec::new();
@@ -909,7 +906,7 @@ impl World {
                 };
                 let found = read(cluster, &target)
                     .await?
-                    .filter(|o| ours(&o.metadata, id));
+                    .filter(|o| ours(&o.metadata, &step.component));
                 if target.kind == CustomResourceDefinition::KIND {
                     if found.is_some() {
                         leftovers.push(format!(
@@ -1026,27 +1023,45 @@ impl World {
             .collect()
     }
 
-    /// The steps that write the targets of `id`'s contributions again without them. Zeabur
-    /// leaves a config it did not write as it is.
+    /// The steps that write the targets of `id`'s contributions again without them, and the ones
+    /// of those that leave a config empty. Zeabur leaves a config it did not write as it is.
+    ///
+    /// A removal runs them first, so helm-controller installs each target without the values
+    /// before the objects it used go, and deletes an empty config last.
     async fn rewrites_without(
         &self,
         cluster: &dyn Cluster,
         id: &str,
-    ) -> Result<Vec<PlannedStep>, ApiError> {
+    ) -> Result<(Vec<PlannedStep>, Vec<engine::Step>), ApiError> {
         let kept = self.kept(cluster, &self.targets(&[id.to_owned()])).await?;
         let rewrites =
             engine::without(&self.snapshot, id, &self.target(), &kept).map_err(|r| refusal(&r))?;
         let mut planned_steps: Vec<PlannedStep> = Vec::new();
-        for step in &rewrites {
+        let mut emptied = Vec::new();
+        for step in rewrites {
+            if config_values(&step).is_some_and(|v| v.is_empty()) {
+                let found = match step.objects.first().and_then(|d| self.place(d)) {
+                    Some(target) => read(cluster, &target).await?,
+                    None => None,
+                };
+                // A config already deleted has no values to clear.
+                if found.is_none() {
+                    continue;
+                }
+            }
             let earlier_ready = planned_steps
                 .iter()
                 .all(|s| s.view.state == StepState::Ready);
-            let planned = self.install_step(cluster, step, earlier_ready).await?;
-            if planned.foreign.is_none() {
-                planned_steps.push(planned);
+            let planned = self.install_step(cluster, &step, earlier_ready).await?;
+            if planned.foreign.is_some() {
+                continue;
             }
+            if config_values(&step).is_some_and(|v| v.is_empty()) {
+                emptied.push(step);
+            }
+            planned_steps.push(planned);
         }
-        Ok(planned_steps)
+        Ok((planned_steps, emptied))
     }
 
     /// Refuses a removal while objects of the component's custom resources are in use, or volumes
