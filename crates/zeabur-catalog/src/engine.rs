@@ -932,22 +932,25 @@ pub fn steps_of(
             skip_if_present: release.skip_if_present.clone(),
         });
     }
-    let zeaburs = crate::zeabur::objects(&file.id, zeabur_namespace).map_err(broken)?;
-    if !zeaburs.is_empty() {
-        steps.push(Step {
-            component: file.id.clone(),
-            release: crate::zeabur::RELEASE.to_owned(),
-            objects: zeaburs
-                .into_iter()
-                .map(|object| Desired {
-                    namespace: object.metadata.namespace.clone().unwrap_or_default(),
-                    object,
-                })
-                .collect(),
-            skip_if_present: Vec::new(),
-        });
-    }
+    steps.extend(zeabur_step(file, zeabur_namespace).map_err(broken)?);
     Ok(steps)
+}
+
+/// The step with the objects Zeabur adds to `file`'s component, if it adds any.
+fn zeabur_step(file: &ComponentFile, zeabur_namespace: &str) -> Result<Option<Step>, String> {
+    let objects = crate::zeabur::objects(&file.id, zeabur_namespace)?;
+    Ok((!objects.is_empty()).then(|| Step {
+        component: file.id.clone(),
+        release: crate::zeabur::RELEASE.to_owned(),
+        objects: objects
+            .into_iter()
+            .map(|object| Desired {
+                namespace: object.metadata.namespace.clone().unwrap_or_default(),
+                object,
+            })
+            .collect(),
+        skip_if_present: Vec::new(),
+    }))
 }
 
 /// The objects of a manifest release's files, without the component's namespaces: each is written
