@@ -28,7 +28,7 @@ export function ProblemGroupRow({ project, group }: { project: string; group: Pr
   if (!first) return null
   if (group.services.length === 1) return <ProblemRow project={project} service={first} />
   const d = group.diagnosis
-  const cause = d ? sharedCause(d.cause, t("attention.eachOne")) : undefined
+  const cause = d ? sharedCause(d, t("attention.eachOne")) : undefined
   const action = d ? diagnosisAction(d, logs) : undefined
   const pod = action?.pod ?? worstPod(first)?.name
   const names = expanded ? group.services : group.services.slice(0, NAMES)

@@ -12,7 +12,8 @@
     "fix": {
       "kind": "plan",
       "id": "probes.readiness",
-      "params": {"service": "projects/demo/services/deployment/api", "container": "api"}
+      "workload": {"kind": "Deployment", "name": "api"},
+      "values": {"set": "tcpReadiness", "container": "api", "port": 8080, "periodSeconds": 10}
     }
   }
 ]

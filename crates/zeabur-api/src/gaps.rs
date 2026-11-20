@@ -261,10 +261,20 @@ async fn module_findings(
                 k8up: installed("k8up"),
                 velero: installed("velero"),
             },
+            |claim| claim_owner(projection, claim),
         ));
         unreadable.extend(backups.unreadable);
     }
     Ok(found)
+}
+
+/// The first workload that mounts the claim `name`, as the project's attribution says.
+fn claim_owner(project: &zeabur_model::Project, name: &str) -> Option<zeabur_model::WorkloadRef> {
+    project
+        .resources
+        .iter()
+        .find(|r| r.kind == zeabur_model::ResourceKind::PersistentVolumeClaim && r.name == name)
+        .and_then(|r| r.attribution.owners.first().cloned())
 }
 
 /// The cluster's namespaces and which hold the project policy. A refused read is added to

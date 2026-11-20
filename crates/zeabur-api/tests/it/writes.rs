@@ -455,6 +455,34 @@ mod tests {
         );
     }
 
+    /// A restart is low risk while two pods are ready to keep serving, and high otherwise, with
+    /// the workload named.
+    #[tokio::test]
+    async fn a_restarts_risk_comes_from_the_ready_pods_the_plan_read() {
+        let cluster = cluster();
+        let app = app(&cluster);
+        let restart = json!({"changes": [{"op": "restart",
+            "workload": {"kind": "Deployment", "name": "web"}}]});
+        let few = plan(&app, &restart).await;
+        assert_eq!(few["risk"]["level"], "high", "{few}");
+        assert_eq!(
+            few["risk"]["reasons"],
+            json!([{"reason": "fewPods", "workloads": [{"kind": "Deployment", "name": "web"}]}])
+        );
+        cluster.update(|s| {
+            let web = s.objects.get_mut("shop").and_then(|o| {
+                o.deployments
+                    .iter_mut()
+                    .find(|d| d.metadata.name.as_deref() == Some("web"))
+            });
+            if let Some(web) = web {
+                web.status = serde_json::from_value(json!({"readyReplicas": 2})).ok();
+            }
+        });
+        let two = plan(&app, &restart).await;
+        assert_eq!(two["risk"], json!({"level": "low", "reasons": []}));
+    }
+
     /// Given a plan, when Argo CD takes over the field it changes before the apply, then the
     /// apply is refused with `409` and `managedBy: "Argo CD"`, which the interface reads instead
     /// of the wording of `detail`, and nothing is written.

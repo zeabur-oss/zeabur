@@ -15,7 +15,7 @@ use std::collections::BTreeMap;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
-use zeabur_model::{Citation, Fix, FixKind, Gap, Message, Origin, Severity};
+use zeabur_model::{Citation, Fix, FixKind, Gap, Message, Origin, Severity, WorkloadRef};
 
 /// What a backup covers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
@@ -230,14 +230,19 @@ pub const DATABASE_WITHOUT_BACKUP: &str = "database-without-backup";
 /// A database is a warning, as its data cannot be rebuilt and its operator backs it up natively
 /// [cnpg-backup]; a claim is advice, as many hold rebuildable data. Each fix ends in a plan: the
 /// database's backups (`backups.scheduledBackup`), or for a claim its K8up backups when K8up is
-/// installed (`backups.k8upSchedule`) [k8up-schedule], else Velero's (`backups.veleroSchedule`)
+/// installed (`backups.k8upSchedule`, on the page of the workload `owner` says mounts the claim)
+/// [k8up-schedule], else Velero's (`backups.veleroSchedule`)
 /// [velero-fs], else installing K8up.
 ///
 /// [cnpg-backup]: https://cloudnative-pg.io/documentation/current/backup/
 /// [k8up-schedule]: https://docs.k8up.io/k8up/references/schedule-specification.html
 /// [velero-fs]: https://velero.io/docs/main/file-system-backup/
 #[must_use]
-pub fn gaps(coverage: &[Coverage], installed: Installed) -> Vec<crate::Finding> {
+pub fn gaps(
+    coverage: &[Coverage],
+    installed: Installed,
+    owner: impl Fn(&str) -> Option<WorkloadRef>,
+) -> Vec<crate::Finding> {
     unscheduled(coverage)
         .into_iter()
         .map(|c| {
@@ -258,7 +263,7 @@ pub fn gaps(coverage: &[Coverage], installed: Installed) -> Vec<crate::Finding> 
                     },
                 }
             } else {
-                let fix = volume_fix(name, installed);
+                let fix = volume_fix(name, owner(name).as_ref(), installed);
                 crate::Finding {
                     gap: Gap {
                         rule: VOLUME_WITHOUT_BACKUP.to_owned(),
@@ -293,25 +298,21 @@ fn cite(title: &str, url: &str) -> Citation {
 
 /// A fix that opens the form named `id`, which plans the change.
 fn form_fix(id: &str, param: &str, value: &str) -> Fix {
-    Fix {
-        kind: FixKind::Plan,
-        id: id.to_owned(),
-        params: BTreeMap::from([(param.to_owned(), value.to_owned())]),
-    }
+    Fix::new(FixKind::Plan, id).with(param, value)
 }
 
-/// A claim's fix: its volume's K8up backups, the cluster's Velero schedule, or installing K8up.
-fn volume_fix(claim: &str, installed: Installed) -> Fix {
+/// A claim's fix: its volume's K8up backups, on the page of the workload that mounts it, the
+/// cluster's Velero schedule, or installing K8up.
+fn volume_fix(claim: &str, owner: Option<&WorkloadRef>, installed: Installed) -> Fix {
     if installed.k8up {
-        form_fix("backups.k8upSchedule", "claim", claim)
+        Fix {
+            workload: owner.cloned(),
+            ..form_fix("backups.k8upSchedule", "claim", claim)
+        }
     } else if installed.velero {
         form_fix("backups.veleroSchedule", "claim", claim)
     } else {
-        Fix {
-            kind: FixKind::Install,
-            id: "k8up".to_owned(),
-            params: BTreeMap::new(),
-        }
+        Fix::new(FixKind::Install, "k8up")
     }
 }
 
@@ -336,4 +337,38 @@ pub(crate) fn condition(
             let text = |key: &str| c[key].as_str().map(str::to_owned);
             (text("lastTransitionTime"), text("reason"), text("message"))
         })
+}
+
+#[cfg(test)]
+mod tests {
+    use zeabur_model::WorkloadKind;
+
+    use super::*;
+
+    #[test]
+    fn a_claims_k8up_fix_names_the_workload_that_mounts_it() {
+        let coverage = [Coverage {
+            target: Target {
+                kind: TargetKind::Volume,
+                name: "data-db-0".to_owned(),
+            },
+            scheduled_by: Vec::new(),
+            last_run: None,
+        }];
+        let db = WorkloadRef {
+            kind: WorkloadKind::StatefulSet,
+            name: "db".to_owned(),
+        };
+        let k8up = Installed {
+            k8up: true,
+            velero: false,
+        };
+        let found = gaps(&coverage, k8up, |claim| {
+            (claim == "data-db-0").then(|| db.clone())
+        });
+        assert_eq!(found[0].gap.fix.id, "backups.k8upSchedule");
+        assert_eq!(found[0].gap.fix.workload, Some(db));
+        let unowned = gaps(&coverage, k8up, |_| None);
+        assert_eq!(unowned[0].gap.fix.workload, None);
+    }
 }

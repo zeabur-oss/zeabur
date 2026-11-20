@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
+import type { Schemas } from "@/api/client"
 import { groupProblems, sharedCause } from "@/model/attention"
 import type { Service } from "@/model/service"
 
-const pull = (container: string, image: string) => ({
+/** An image pull diagnosis, grouped by its image as the server groups it. */
+const pull = (container: string, image: string): Schemas.Diagnosis => ({
   kind: "imagePull",
   container,
   pods: [],
@@ -11,6 +13,7 @@ const pull = (container: string, image: string) => ({
   why: { key: "diagnosis.imagePull.why" },
   fix: { key: "diagnosis.imagePull.fix.notFound" },
   evidence: [],
+  group: { key: `ImagePull/diagnosis.imagePull.cause.notFound/image=${image}`, sharedCause: true },
 })
 
 const service = (name: string, health: string, diagnoses: unknown[] = []) =>
@@ -41,7 +44,7 @@ describe("Needs attention", () => {
     ).toStrictEqual([["api"]])
   })
 
-  test("says a cause once for every service it stops, whatever their names", () => {
+  test("says a cause once for every service in the server's group, whatever their names", () => {
     const services = [
       service("b", "fail", [pull("b", "a:1")]),
       service("a", "fail", [pull("a", "a:1")]),
@@ -65,17 +68,14 @@ describe("Needs attention", () => {
 
 describe("a shared cause", () => {
   test("names no one service", () => {
-    expect(sharedCause(pull("api", "a:1").cause, "Each one")).toStrictEqual({
+    expect(sharedCause(pull("api", "a:1"), "Each one")).toStrictEqual({
       key: "diagnosis.imagePull.cause.notFound",
       params: { container: "Each one", image: "a:1" },
     })
   })
 
-  test("is left out when the sentence names the service another way", () => {
-    const cause = {
-      key: "diagnosis.unreachable.cause.noReadyEndpoints",
-      params: { endpoint: "web", service: "web" },
-    }
-    expect(sharedCause(cause, "Each one")).toBeUndefined()
+  test("is left out when the server says the sentence names the service another way", () => {
+    const named = { ...pull("api", "a:1"), group: { key: "ImagePull/x/" } }
+    expect(sharedCause(named, "Each one")).toBeUndefined()
   })
 })

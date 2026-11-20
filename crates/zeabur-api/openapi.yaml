@@ -8760,6 +8760,7 @@ components:
       - why
       - fix
       - evidence
+      - group
       properties:
         cause:
           $ref: "#/components/schemas/Message"
@@ -8780,6 +8781,9 @@ components:
         fix:
           $ref: "#/components/schemas/Message"
           description: What to do about it, in one sentence.
+        group:
+          $ref: "#/components/schemas/DiagnosisGroup"
+          description: What it shares with the diagnoses of other services that fail the same way.
         incident:
           type:
           - string
@@ -8803,6 +8807,22 @@ components:
         why:
           $ref: "#/components/schemas/Message"
           description: "Why: the rule that applies, with this occurrence's numbers where Zeabur knows them."
+    DiagnosisGroup:
+      type: object
+      description: What diagnoses of several services share when they fail the same way.
+      required:
+      - key
+      properties:
+        key:
+          type: string
+          description: |-
+            The same for diagnoses of one kind and cause whose values differ only where they name
+            the service itself (its container, pods, address, restart count).
+        sharedCause:
+          type: boolean
+          description: |-
+            The cause names the service only by its container, so a group can say it once, with
+            the container replaced by words for each service.
     DiagnosisKind:
       type: string
       description: What kind of failure a diagnosis explains.
@@ -9870,12 +9890,100 @@ components:
             type: string
           propertyNames:
             type: string
+        values:
+          oneOf:
+          - $ref: "#/components/schemas/FixValues"
+            description: The values the plan sets; absent when a person must choose them.
+          - type: "null"
+        workload:
+          oneOf:
+          - $ref: "#/components/schemas/WorkloadRef"
+            description: The workload the fix changes, or whose page asks for what the fix needs.
+          - type: "null"
     FixKind:
       type: string
       description: How a gap is closed.
       enum:
       - plan
       - install
+    FixValues:
+      oneOf:
+      - type: object
+        description: |-
+          CPU and memory requests and limits: what the container sets, and starting values for
+          what it does not.
+        required:
+        - container
+        - requests
+        - limits
+        - set
+        properties:
+          container:
+            type: string
+            description: The container.
+          limits:
+            type: object
+            description: Limits, the same way.
+            additionalProperties:
+              type: string
+            propertyNames:
+              type: string
+          requests:
+            type: object
+            description: Requests, by resource (`cpu`, `memory`).
+            additionalProperties:
+              type: string
+            propertyNames:
+              type: string
+          set:
+            type: string
+            enum:
+            - resources
+      - type: object
+        description: A TCP readiness check on the port the Service sends traffic to.
+        required:
+        - container
+        - port
+        - periodSeconds
+        - set
+        properties:
+          container:
+            type: string
+            description: The container.
+          periodSeconds:
+            type: integer
+            format: int32
+            description: Seconds between checks.
+          port:
+            type: integer
+            format: int32
+            description: The port.
+          set:
+            type: string
+            enum:
+            - tcpReadiness
+      - type: object
+        description: A new disk mounted at a directory.
+        required:
+        - container
+        - mountPath
+        - size
+        - set
+        properties:
+          container:
+            type: string
+            description: The container.
+          mountPath:
+            type: string
+            description: Where the container sees the disk.
+          set:
+            type: string
+            enum:
+            - volume
+          size:
+            type: string
+            description: The disk's size, a Kubernetes quantity.
+      description: The values a fix's plan sets in one container.
     Fixer:
       type: string
       description: Who can remove the cause.
@@ -13317,6 +13425,7 @@ components:
         - token
         - expiresAt
         - preview
+        - risk
         properties:
           expiresAt:
             type: string
@@ -13331,6 +13440,9 @@ components:
             description: |-
               What the plan does once applied: the pods it replaces, whether new ones fit, the data
               and fields it removes.
+          risk:
+            $ref: "#/components/schemas/Risk"
+            description: How much the asked changes can hurt, which decides how they are confirmed.
           token:
             type: string
             description: Send this to `apply` to carry out exactly this plan.
@@ -16120,6 +16232,44 @@ components:
           items:
             $ref: "#/components/schemas/RightNeeds"
           description: Every right, with what holds it.
+    Risk:
+      type: object
+      description: The risk of a plan's changes.
+      required:
+      - level
+      - reasons
+      properties:
+        level:
+          $ref: "#/components/schemas/RiskLevel"
+          description: The highest of the changes.
+        reasons:
+          type: array
+          items:
+            $ref: "#/components/schemas/RiskCause"
+          description: The reasons of the high-risk changes, each once, in the order of the changes.
+    RiskCause:
+      type: object
+      description: One reason of a high risk, with the workloads it names.
+      required:
+      - reason
+      properties:
+        reason:
+          $ref: "#/components/schemas/RiskReason"
+          description: The reason.
+        workloads:
+          type: array
+          items:
+            $ref: "#/components/schemas/WorkloadRef"
+          description: |-
+            For `fewPods`, the restarted workloads with fewer than two ready pods; for
+            `scaleToZero`, the stopped workloads; empty otherwise.
+    RiskLevel:
+      type: string
+      description: How much a change can hurt.
+      enum:
+      - low
+      - normal
+      - high
     RiskLocale:
       type: object
       description: A risk's words in one language.
@@ -16133,6 +16283,20 @@ components:
         risk:
           type: string
           description: The risk.
+    RiskReason:
+      type: string
+      description: Why a change is high risk.
+      enum:
+      - fewPods
+      - scaleToZero
+      - deletesKeys
+      - rollback
+      - storage
+      - yamlEdit
+      - removesDomain
+      - isolates
+      - opensPort
+      - deletes
     Rollout:
       type: object
       description: One workload whose pods a plan changes.

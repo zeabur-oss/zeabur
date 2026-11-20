@@ -4,6 +4,7 @@ import {
   bucketProblem,
   createObjectStorage,
   deleteObjectStorage,
+  growObjectStorage,
   newObjectStorage,
   type ObjectStorage,
 } from "@/model/object-storage"
@@ -42,6 +43,17 @@ describe("object storage", () => {
     expect(deleteObjectStorage(store).map((c) => c.op === "delete" && c.resource.resource)).toEqual(
       ["buckets", "s3identities", "s3credentials", "seaweeds"],
     )
+  })
+
+  test("growing the disks changes only the spec, keeping its other requests", () => {
+    const store = {
+      name: "files",
+      object: { spec: { volume: { requests: { cpu: "1", storage: "10Gi" } } } },
+    } as unknown as ObjectStorage
+    const [grow] = growObjectStorage(store, " 20Gi ")
+    expect(grow).toMatchObject({ op: "edit", name: "files", specOnly: true })
+    const yaml = grow?.op === "edit" ? JSON.parse(grow.yaml) : undefined
+    expect(yaml.spec.volume.requests).toEqual({ cpu: "1", storage: "20Gi" })
   })
 
   test("bucket names follow the server's bucket rule", () => {

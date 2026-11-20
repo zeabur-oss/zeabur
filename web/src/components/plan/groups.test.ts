@@ -5,7 +5,7 @@ import { describe, undoTitle } from "@/components/plan/describe"
 import { bounded, editGroups, outcomeGroups, segments } from "@/components/plan/groups"
 import { translator, type Translate } from "@/i18n"
 import { en } from "@/i18n/en"
-import type { Pods, PodsOf } from "@/model/risk"
+import type { Pods, PodsOf } from "@/model/undo"
 
 const show = (value: unknown): string =>
   Array.isArray(value) ? `[${value.map(show).join(", ")}]` : String(value)
@@ -15,6 +15,7 @@ const english = translator(en)
 
 type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings"> & {
   preview?: Schemas.Preview
+  risk?: Schemas.Risk
 }
 const api = { kind: "Deployment", name: "api" } as const
 
@@ -290,9 +291,14 @@ group("describe at 1, 5 and 45 changes", () => {
     const d = describe(
       t,
       { changes: names.map((name) => ({ op: "restart" as const, workload: workload(name) })) },
-      plan({ preview: preview({ rollouts }) }),
+      plan({
+        preview: preview({ rollouts }),
+        risk: {
+          level: "high",
+          reasons: [{ reason: "fewPods", workloads: names.slice(0, 27).map(workload) }],
+        },
+      }),
       pods(known),
-      ["fewPods"],
     )
     expect(d.lines).toStrictEqual([])
     expect(d.facts?.map((f) => f.text)).toStrictEqual([
@@ -312,7 +318,11 @@ group("describe at 1, 5 and 45 changes", () => {
       workload: workload(name),
       replicas: 0,
     }))
-    const d = describe(t, { changes }, plan(), pods(known), ["scaleToZero"])
+    const risk: Schemas.Risk = {
+      level: "high",
+      reasons: [{ reason: "scaleToZero", workloads: changes.map((c) => c.workload) }],
+    }
+    const d = describe(t, { changes }, plan({ risk }), pods(known))
     expect(d.action).toBe("action.pauseMany(45)")
     expect(d.risk).toStartWith("common.sentences([risk.scaleToZero(")
     expect(d.cost).toBe("common.sentences([plan.cost.undo])")
@@ -327,7 +337,6 @@ group("describe at 1, 5 and 45 changes", () => {
       { changes: [{ op: "restart", workload: db }] },
       plan(),
       pods({ db: { desired: 1, ready: 1 } }),
-      ["fewPods"],
       () => ["/data"],
     )
     expect(d.cost).toBe("common.sentences([plan.cost.dataStaysOne(db, common.list([/data]))])")

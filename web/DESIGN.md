@@ -262,7 +262,7 @@ it will write, and a confirmation shows it in three layers
    the fields other tools own. An object is named above its diff only when the plan changes
    more than one.
 
-The weight follows the risk (`model/risk.ts`, one function per rule, unit-tested): a low-risk
+The weight follows the plan's `risk`, which the server decides when it plans: a low-risk
 change (a restart with at least two ready pods, scaling) gets the smaller dialog; a high-risk one
 (a restart with fewer, scaling to zero, deleting a ConfigMap or Secret key, a rollback, any storage
 change, a YAML edit, removing a domain, a policy that isolates) the wide one with the consequence

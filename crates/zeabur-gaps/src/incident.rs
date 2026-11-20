@@ -720,6 +720,10 @@ mod tests {
             last_seen: None,
             fault: Fault::new(FaultOrigin::Code, Fixer::You),
             incident: None,
+            group: zeabur_model::DiagnosisGroup::of(
+                DiagnosisKind::CrashLoop,
+                &Message::new("diagnosis.crashLoop.cause.exitCode"),
+            ),
         };
         project.services[0].diagnoses = vec![crash(vec!["web-1".to_owned()])];
         let nodes = [NodeState {

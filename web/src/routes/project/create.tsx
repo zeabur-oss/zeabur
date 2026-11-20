@@ -29,7 +29,7 @@ import {
   type Found,
   type YamlDocument,
 } from "@/model/create"
-import { deletionOf } from "@/model/risk"
+import { deletionOf } from "@/model/undo"
 import { dropHandoff, handedOff } from "@/lib/adding"
 import { appended, offered, templateOf } from "@/model/templates"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"

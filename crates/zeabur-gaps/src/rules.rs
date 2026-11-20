@@ -5,15 +5,15 @@
 //! list stays explicit and the core never depends on a module (a module's rule keeps the facts
 //! it needs in its own value).
 
-use std::collections::BTreeSet;
+use std::collections::{BTreeMap, BTreeSet};
 
 use serde_json::Value;
 use zeabur_graph::{Snapshot, ingress_backends};
 use zeabur_model::kernel::isolation::{PROJECT_POLICY, project_policy};
 use zeabur_model::kernel::names::GatewayRef;
 use zeabur_model::{
-    Citation, Fix, FixKind, Gap, HttpRoute, Message, Origin, Project, Service, Severity,
-    WorkloadKind,
+    Citation, Container, Fix, FixKind, FixValues, Gap, HttpRoute, Message, Origin, Project,
+    Service, Severity, WorkloadKind, WorkloadRef,
 };
 
 /// What a rule may look at.
@@ -82,14 +82,75 @@ fn cite(title: &str, url: &str) -> Citation {
 }
 
 fn plan(template: &str, params: &[(&str, &str)]) -> Fix {
+    params
+        .iter()
+        .fold(Fix::new(FixKind::Plan, template), |fix, (k, v)| {
+            fix.with(k, *v)
+        })
+}
+
+/// The plan template `template` for a container of `service`, with the values it sets.
+pub(crate) fn container_plan(template: &str, service: &Service, values: Option<FixValues>) -> Fix {
     Fix {
-        kind: FixKind::Plan,
-        id: template.to_owned(),
-        params: params
-            .iter()
-            .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
-            .collect(),
+        workload: Some(WorkloadRef {
+            kind: service.workload.kind,
+            name: service.workload.name.clone(),
+        }),
+        values,
+        ..Fix::new(FixKind::Plan, template)
     }
+}
+
+/// Starting values for a container that sets none: small enough for a 2 GB node, a memory limit
+/// at twice the request. The person sees them in the plan before anything is written.
+const STARTING_CPU: &str = "100m";
+const STARTING_MEMORY: &str = "128Mi";
+const STARTING_MEMORY_LIMIT: &str = "256Mi";
+
+/// The container's requests and limits, with the starting values where it sets none. The CPU
+/// limit stays unset when the container sets none.
+fn starting_resources(container: &Container) -> FixValues {
+    let set = container.resources.clone().unwrap_or_default();
+    let or = |value: Option<String>, start: &str| Some(value.unwrap_or_else(|| start.to_owned()));
+    let amounts = |entries: [(&str, Option<String>); 2]| -> BTreeMap<String, String> {
+        entries
+            .into_iter()
+            .filter_map(|(name, value)| Some((name.to_owned(), value?)))
+            .collect()
+    };
+    FixValues::Resources {
+        container: container.name.clone(),
+        requests: amounts([
+            ("cpu", or(set.requests.cpu, STARTING_CPU)),
+            ("memory", or(set.requests.memory, STARTING_MEMORY)),
+        ]),
+        limits: amounts([
+            ("cpu", set.limits.cpu),
+            ("memory", or(set.limits.memory, STARTING_MEMORY_LIMIT)),
+        ]),
+    }
+}
+
+/// Seconds between the checks of a readiness probe Zeabur proposes.
+const READINESS_PERIOD_SECONDS: i32 = 10;
+
+/// A TCP readiness check on the first numeric port the service's Kubernetes Services send
+/// traffic to. It holds traffic back until the process listens, without guessing an HTTP path.
+/// `None` when no port is a number: a person must choose.
+fn tcp_readiness(project: &Project, service: &Service, container: &Container) -> Option<FixValues> {
+    let port = project
+        .endpoints_of(service)
+        .flat_map(|endpoint| &endpoint.ports)
+        .find_map(|port| {
+            port.target_port
+                .as_deref()
+                .map_or(Some(port.port), |target| target.parse().ok())
+        })?;
+    Some(FixValues::TcpReadiness {
+        container: container.name.clone(),
+        port,
+        period_seconds: READINESS_PERIOD_SECONDS,
+    })
 }
 
 /// Long-running workloads: what a Service routes traffic to and the kubelet keeps restarting.
@@ -165,9 +226,10 @@ impl Rule for ResourceLimits {
                     })
                     .with("container", &container.name)
                     .with("missing", missing.join(",")),
-                    fix: plan(
+                    fix: container_plan(
                         "compute.resources",
-                        &[("service", &service.id), ("container", &container.name)],
+                        service,
+                        Some(starting_resources(container)),
                     ),
                     citations: self.citations(),
                 });
@@ -232,9 +294,10 @@ impl Rule for HealthChecks {
                         "gap.healthChecks.none"
                     })
                     .with("container", &container.name),
-                    fix: plan(
+                    fix: container_plan(
                         "probes.readiness",
-                        &[("service", &service.id), ("container", &container.name)],
+                        service,
+                        tcp_readiness(input.project, service, container),
                     ),
                     citations: self.citations(),
                 });
@@ -628,11 +691,7 @@ pub fn cluster_gaps(classes: &[IngressClassFact], namespaces: &[NamespaceFact]) 
             message: Message::new("gap.retiredIngressController")
                 .with("class", &class.name)
                 .with("controller", &class.controller),
-            fix: Fix {
-                kind: FixKind::Install,
-                id: "traefik".to_owned(),
-                params: std::collections::BTreeMap::new(),
-            },
+            fix: Fix::new(FixKind::Install, "traefik"),
             citations: rule.citations(),
         })
         .collect();
@@ -649,14 +708,10 @@ pub fn cluster_gaps(classes: &[IngressClassFact], namespaces: &[NamespaceFact]) 
                     message: Message::new("gap.projectWithoutNetworkPolicy")
                         .with("namespace", &namespace.name)
                         .with("policy", PROJECT_POLICY),
-                    fix: Fix {
-                        kind: FixKind::Plan,
-                        id: "networkPolicy.isolateProject".to_owned(),
-                        params: std::collections::BTreeMap::from([(
-                            "objects".to_owned(),
-                            Value::Array(vec![project_policy(&namespace.name)]).to_string(),
-                        )]),
-                    },
+                    fix: Fix::new(FixKind::Plan, "networkPolicy.isolateProject").with(
+                        "objects",
+                        Value::Array(vec![project_policy(&namespace.name)]).to_string(),
+                    ),
                     citations: project_policy_citations(),
                 }),
         );
@@ -753,11 +808,7 @@ mod tests {
                     subject: Origin::object("PersistentVolumeClaim", self.0),
                     service: None,
                     message: Message::new("gap.module"),
-                    fix: Fix {
-                        kind: FixKind::Install,
-                        id: "k8up".to_owned(),
-                        params: std::collections::BTreeMap::new(),
-                    },
+                    fix: Fix::new(FixKind::Install, "k8up"),
                     citations: self.citations(),
                 }]
             }
@@ -787,5 +838,110 @@ mod tests {
         );
         assert_eq!(gaps.len(), 1);
         assert_eq!(gaps[0].rule, "module-rule");
+    }
+
+    /// The gaps `rule` finds in a Deployment `api` with one container `app` set as `container`,
+    /// behind a Service with `ports`.
+    fn found(rule: &dyn Rule, container: &Value, ports: &Value) -> Vec<Gap> {
+        let mut app = json!({"name": "app", "image": "api:1"});
+        if let (Some(app), Some(set)) = (app.as_object_mut(), container.as_object()) {
+            app.extend(set.clone());
+        }
+        let mut snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            ..Snapshot::default()
+        };
+        snapshot
+            .insert(json!({"apiVersion": "apps/v1", "kind": "Deployment",
+                "metadata": {"name": "api"},
+                "spec": {"selector": {"matchLabels": {"app": "api"}},
+                    "template": {"metadata": {"labels": {"app": "api"}},
+                        "spec": {"containers": [app]}}}}))
+            .unwrap();
+        snapshot
+            .insert(
+                json!({"apiVersion": "v1", "kind": "Service", "metadata": {"name": "api"},
+                "spec": {"selector": {"app": "api"}, "ports": ports}}),
+            )
+            .unwrap();
+        let project = zeabur_graph::project(&snapshot);
+        rule.check(&Input {
+            project: &project,
+            snapshot: &snapshot,
+            http_routes: &[],
+            services_readable: true,
+            cluster: &ClusterTraits::default(),
+        })
+    }
+
+    fn values(gaps: &[Gap]) -> Option<&FixValues> {
+        gaps.first().and_then(|gap| gap.fix.values.as_ref())
+    }
+
+    #[test]
+    fn a_resources_fix_keeps_what_the_container_sets_and_starts_the_rest() {
+        let none = found(&ResourceLimits, &json!({}), &json!([{"port": 80}]));
+        assert_eq!(
+            none[0].fix.workload,
+            Some(WorkloadRef {
+                kind: WorkloadKind::Deployment,
+                name: "api".to_owned(),
+            })
+        );
+        let amounts = |pairs: &[(&str, &str)]| -> BTreeMap<String, String> {
+            pairs
+                .iter()
+                .map(|(k, v)| ((*k).to_owned(), (*v).to_owned()))
+                .collect()
+        };
+        assert_eq!(
+            values(&none),
+            Some(&FixValues::Resources {
+                container: "app".to_owned(),
+                requests: amounts(&[("cpu", "100m"), ("memory", "128Mi")]),
+                limits: amounts(&[("memory", "256Mi")]),
+            })
+        );
+        let own = found(
+            &ResourceLimits,
+            &json!({"resources": {"requests": {"memory": "1Gi"}, "limits": {"cpu": "2"}}}),
+            &json!([{"port": 80}]),
+        );
+        assert_eq!(
+            values(&own),
+            Some(&FixValues::Resources {
+                container: "app".to_owned(),
+                requests: amounts(&[("cpu", "100m"), ("memory", "1Gi")]),
+                limits: amounts(&[("cpu", "2"), ("memory", "256Mi")]),
+            })
+        );
+    }
+
+    #[test]
+    fn a_readiness_fix_checks_the_first_numeric_port_and_sets_nothing_without_one() {
+        let readiness = |port: i32| {
+            Some(FixValues::TcpReadiness {
+                container: "app".to_owned(),
+                port,
+                period_seconds: 10,
+            })
+        };
+        let named = found(
+            &HealthChecks,
+            &json!({}),
+            &json!([{"port": 80, "targetPort": "http"}]),
+        );
+        assert_eq!(named[0].fix.id, "probes.readiness");
+        assert_eq!(values(&named), None);
+        let numeric = found(
+            &HealthChecks,
+            &json!({}),
+            &json!([{"name": "a", "port": 80, "targetPort": "http"},
+                {"name": "b", "port": 443, "targetPort": 8443}]),
+        );
+        assert_eq!(values(&numeric), readiness(8443).as_ref());
+        // Without a targetPort, the Service sends to its own port.
+        let same = found(&HealthChecks, &json!({}), &json!([{"port": 8080}]));
+        assert_eq!(values(&same), readiness(8080).as_ref());
     }
 }

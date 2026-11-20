@@ -50,15 +50,9 @@ import { useI18n, useT, writeSentence, type Translate } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
 import { cn } from "@/lib/utils"
 import { toolNotes, type Skipped, type ToolNote } from "@/model/managed"
-import {
-  aroundName,
-  awaitsName,
-  destinationOf,
-  typedName,
-  undoOf,
-  weigh,
-  type PodsOf,
-} from "@/model/risk"
+import { destinationOf } from "@/model/destination"
+import { aroundName, awaitsName, typedName } from "@/model/typed-name"
+import { undoOf, type PodsOf } from "@/model/undo"
 import type { Health } from "@/model/service"
 
 /** A sentence, and the full names behind its "and N more". */
@@ -83,10 +77,6 @@ interface PlanProps {
   hooks?: PlanHooks
 }
 
-/** A form's summary already says what its edits do; they are not hand-written YAML. */
-const weighAsk = (ask: PlanAsk, podsOf: PodsOf) =>
-  weigh(ask.summary ? ask.changes.filter((c) => c.op !== "edit") : ask.changes, podsOf)
-
 /** The plan of an ask: what it says, and its buttons. */
 function usePlan(
   { project, ask, reviewed, onClose, onConfirmed, onApplied, reopen, onRefused, hooks }: PlanProps,
@@ -105,14 +95,12 @@ function usePlan(
     (serviceOf(workload)?.containers ?? []).flatMap((c) =>
       c.mounts.filter((m) => m.category === "persistent").map((m) => m.mountPath),
     )
-  const weight = weighAsk(ask, podsOf)
+  const level = plan.data?.risk.level
   const left = useSecondsLeft(plan.data?.expiresAt)
   const expired = left !== undefined && left <= 0
-  const description = plan.data
-    ? describe(t, ask, plan.data, podsOf, weight.reasons, mountsOf)
-    : undefined
+  const description = plan.data ? describe(t, ask, plan.data, podsOf, mountsOf) : undefined
   const grouped = !!description?.facts
-  const light = weight.risk === "low" && !grouped
+  const light = level === "low" && !grouped
   const named = typedName(ask.changes, project)
   const [typed, setTyped] = useState("")
   const typedInput = useRef<HTMLInputElement>(null)
@@ -151,7 +139,7 @@ function usePlan(
     <Conclusion
       replanned={reviewed ? <Replanned reviewed={reviewed} plan={plan.data} /> : undefined}
       description={description}
-      high={weight.risk === "high"}
+      high={level === "high"}
       grouped={grouped}
       bare={bare}
     />
@@ -178,7 +166,7 @@ function usePlan(
           skipped={ask.skipped}
           notes={ask.notes}
           description={description}
-          alerted={!grouped && !description.risk && weight.risk === "high"}
+          alerted={!grouped && !description.risk && level === "high"}
         />
       ) : null}
       {plan.data && !plan.isFetching ? (
@@ -231,7 +219,7 @@ function usePlan(
   ) : (
     <Button
       size="sm"
-      variant={weight.risk === "high" ? "destructive" : "default"}
+      variant={level === "high" ? "destructive" : "default"}
       disabled={!plan.data || plan.isFetching || unconfirmed}
       onClick={confirm}
     >

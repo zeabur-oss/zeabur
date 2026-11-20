@@ -4,6 +4,7 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 
+use crate::attribution::WorkloadRef;
 use crate::diagnosis::Message;
 use crate::source::Origin;
 
@@ -54,6 +55,71 @@ pub struct Fix {
     /// What the template or component is filled in with.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub params: BTreeMap<String, String>,
+    /// The workload the fix changes, or whose page asks for what the fix needs.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workload: Option<WorkloadRef>,
+    /// The values the plan sets; absent when a person must choose them.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub values: Option<FixValues>,
+}
+
+impl Fix {
+    /// A fix of `kind` and `id` without parameters, workload or values.
+    #[must_use]
+    pub fn new(kind: FixKind, id: &str) -> Self {
+        Self {
+            kind,
+            id: id.to_owned(),
+            params: BTreeMap::new(),
+            workload: None,
+            values: None,
+        }
+    }
+
+    /// Adds the parameter `name`.
+    #[must_use]
+    pub fn with(mut self, name: &str, value: impl Into<String>) -> Self {
+        self.params.insert(name.to_owned(), value.into());
+        self
+    }
+}
+
+/// The values a fix's plan sets in one container.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(tag = "set", rename_all = "camelCase")]
+pub enum FixValues {
+    /// CPU and memory requests and limits: what the container sets, and starting values for
+    /// what it does not.
+    #[serde(rename_all = "camelCase")]
+    Resources {
+        /// The container.
+        container: String,
+        /// Requests, by resource (`cpu`, `memory`).
+        requests: BTreeMap<String, String>,
+        /// Limits, the same way.
+        limits: BTreeMap<String, String>,
+    },
+    /// A TCP readiness check on the port the Service sends traffic to.
+    #[serde(rename_all = "camelCase")]
+    TcpReadiness {
+        /// The container.
+        container: String,
+        /// The port.
+        port: i32,
+        /// Seconds between checks.
+        period_seconds: i32,
+    },
+    /// A new disk mounted at a directory.
+    #[serde(rename_all = "camelCase")]
+    Volume {
+        /// The container.
+        container: String,
+        /// Where the container sees the disk.
+        mount_path: String,
+        /// The disk's size, a Kubernetes quantity.
+        size: String,
+    },
 }
 
 /// One finding of a rule.

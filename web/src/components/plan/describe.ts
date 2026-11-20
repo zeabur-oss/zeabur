@@ -16,14 +16,34 @@ import { plainAmount } from "@/lib/quantity"
 import { editCount, partOf } from "@/model/draft"
 import { problemText } from "@/model/problem"
 import { limitSentence } from "@/model/ip-limits"
-import { isolates, undoOf, type AccessChange, type PodsOf, type Reason } from "@/model/risk"
+import { undoOf, type PodsOf } from "@/model/undo"
 import { imageTag } from "@/model/service"
 
 type Change = Schemas.Change
 type WorkloadRef = Schemas.WorkloadRef
+type Reason = Schemas.RiskReason
 type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings"> & {
   preview?: Schemas.Preview
+  risk?: Schemas.Risk
 }
+
+/** The changes of scheduled tasks, routes, shared variables and public ports. */
+type AccessChange = Extract<
+  Change,
+  {
+    op:
+      | "scheduleTask"
+      | "runTask"
+      | "editTask"
+      | "redirect"
+      | "basicAuth"
+      | "ipAllow"
+      | "egressLimit"
+      | "certificate"
+      | "envImport"
+      | "publicPort"
+  }
+>
 
 const workloadKinds = new Set(["Deployment", "StatefulSet", "DaemonSet", "Job", "CronJob"])
 
@@ -460,8 +480,14 @@ const consequences: Record<Reason, ((t: Translate, service?: WorkloadRef) => str
     deletes: undefined,
   }
 
-function consequence(t: Translate, reason: Reason, service?: WorkloadRef): string | undefined {
-  return consequences[reason]?.(t, service)
+/** The consequences the plan's risk reasons have beyond its lines, as one text. */
+function consequenceOf(
+  t: Translate,
+  risk: Schemas.Risk | undefined,
+  service?: WorkloadRef,
+): string | undefined {
+  const said = (risk?.reasons ?? []).flatMap((c) => consequences[c.reason]?.(t, service) ?? [])
+  return said.length > 0 ? t("common.sentences", said) : undefined
 }
 
 interface Fact {
@@ -502,7 +528,6 @@ export function describe(
   ask: Asked,
   plan: Plan,
   podsOf: PodsOf,
-  reasons: readonly Reason[] = [],
   mountsOf: MountsOf = () => [],
 ): Description {
   if (writtenCreates(ask.changes)) return describeWritten(t, ask, plan)
@@ -520,9 +545,6 @@ export function describe(
   const edits = fields.length > 0 ? fields : undefined
   const lines = sentencesOf(t, ask, plan, podsOf, !!outcomes, !!edits)
   const said = ask.changes.flatMap((c) => (c.op === "restart" ? [c.workload] : []))
-  const consequences = reasons
-    .map((r) => consequence(t, r, ask.service))
-    .filter((s): s is string => !!s)
   if (edits && ask.service) said.push(ask.service)
   lines.push(...terminalLines(t, plan))
   if (ask.changes.some((c) => c.op === "rollback") && hasWarning(plan, "configNotRolledBack"))
@@ -582,11 +604,11 @@ export function describe(
       ),
     )
   return {
-    consequence: consequences.length > 0 ? t("common.sentences", consequences) : undefined,
-    risk: ask.changes.length > 1 ? riskOf(t, reasons, ask, podsOf, named) : undefined,
+    consequence: consequenceOf(t, plan.risk, ask.service),
+    risk: riskOf(t, plan.risk, ask, named),
     lines,
     more,
-    action: actionOf(t, ask),
+    action: actionOf(t, ask, plan.risk),
     said,
     cost: costOf(t, ask, plan, podsOf, mountsOf),
     facts: outcomes
@@ -662,25 +684,18 @@ const risks: Record<
 /** What several high-risk changes put at risk, one sentence per reason. */
 function riskOf(
   t: Translate,
-  reasons: readonly Reason[],
+  risk: Schemas.Risk | undefined,
   ask: Asked,
-  podsOf: PodsOf,
   named: Named,
 ): string | undefined {
-  const sentences = reasons.map((reason) => {
+  if (ask.changes.length < 2) return undefined
+  const sentences = (risk?.reasons ?? []).map(({ reason, workloads = [] }) => {
+    const names = workloads.map((w) => w.name)
     switch (reason) {
-      case "fewPods": {
-        const few = ask.changes.flatMap((c) =>
-          c.op === "restart" && (podsOf(c.workload)?.ready ?? 0) < 2 ? [c.workload.name] : [],
-        )
-        return named(few, (names) => t("risk.fewPods", names, few.length))
-      }
-      case "scaleToZero": {
-        const stopped = ask.changes.flatMap((c) =>
-          c.op === "scale" && c.replicas === 0 ? [c.workload.name] : [],
-        )
-        return named(stopped, (names) => t("risk.scaleToZero", names, stopped.length))
-      }
+      case "fewPods":
+        return named(names, (list) => t("risk.fewPods", list, names.length))
+      case "scaleToZero":
+        return named(names, (list) => t("risk.scaleToZero", list, names.length))
       default:
         return risks[reason](t, ask)
     }
@@ -845,7 +860,9 @@ const plainAction: Partial<Record<Change["op"], PlainKey>> = {
   clusterTools: "action.openToolsTerminal",
 }
 
-export function actionOf(t: Translate, ask: Asked): string {
+/** The button's words; `risk` is the plan's, which tells an isolating policy from one that
+ * lets traffic in. */
+export function actionOf(t: Translate, ask: Asked, risk?: Schemas.Risk): string {
   const [change] = ask.changes
   if (!change) return t("plan.apply")
   if (ask.summary) return ask.summary.action
@@ -853,7 +870,7 @@ export function actionOf(t: Translate, ask: Asked): string {
   if (many) return many
   const plain = plainAction[change.op]
   if (plain) return t(plain)
-  return oneAction(t, change, ask.changes)
+  return oneAction(t, change, ask.changes, risk)
 }
 
 function scaleAction(t: Translate, replicas: number, changes: readonly Change[]): string {
@@ -863,13 +880,19 @@ function scaleAction(t: Translate, replicas: number, changes: readonly Change[])
   return count > 1 ? t("action.scaleMany", count) : t("action.scale", replicas)
 }
 
-function createAction(t: Translate, object: unknown): string {
-  if ((object as { kind?: unknown } | null)?.kind !== "NetworkPolicy") return t("action.create")
-  return isolates(object) ? t("action.isolate") : t("action.allow")
+function createAction(t: Translate, object: unknown, risk?: Schemas.Risk): string {
+  if ((object as { kind?: unknown } | null)?.kind !== "NetworkPolicy" || !risk)
+    return t("action.create")
+  return risk.reasons.some((c) => c.reason === "isolates") ? t("action.isolate") : t("action.allow")
 }
 
 /** The button of one kind of change whose words depend on it. */
-function oneAction(t: Translate, change: Change, changes: readonly Change[]): string {
+function oneAction(
+  t: Translate,
+  change: Change,
+  changes: readonly Change[],
+  risk?: Schemas.Risk,
+): string {
   const count = changes.length
   switch (change.op) {
     case "restart":
@@ -883,7 +906,7 @@ function oneAction(t: Translate, change: Change, changes: readonly Change[]): st
     case "scale":
       return scaleAction(t, change.replicas, changes)
     case "create":
-      return createAction(t, change.object)
+      return createAction(t, change.object, risk)
     default:
       return switchAction(t, change)
   }

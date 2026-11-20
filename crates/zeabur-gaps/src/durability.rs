@@ -25,9 +25,12 @@
 //! [docker-valkey]: https://github.com/valkey-io/valkey-container
 //! [docker-rabbitmq]: https://github.com/docker-library/rabbitmq
 
-use zeabur_model::{Citation, Container, Fix, FixKind, Gap, Message, MountCategory, Severity};
+use zeabur_model::{Citation, Container, FixValues, Gap, Message, MountCategory, Severity};
 
-use crate::rules::{Input, Rule};
+use crate::rules::{Input, Rule, container_plan};
+
+/// The size a new disk starts at, as in the storage form.
+const DISK_SIZE: &str = "1Gi";
 
 /// Where an official image keeps its data, by repository; `None` for an image this rule does
 /// not know.
@@ -96,6 +99,16 @@ fn kept_by(container: &Container, directory: &str) -> Option<MountCategory> {
     }
 }
 
+/// A new disk at `directory`. `None` when a volume is mounted there already: a person must
+/// replace it, as only they know whether its data matters.
+fn new_disk(container: &Container, directory: &str) -> Option<FixValues> {
+    (!container.mounts.iter().any(|m| m.mount_path == directory)).then(|| FixValues::Volume {
+        container: container.name.clone(),
+        mount_path: directory.to_owned(),
+        size: DISK_SIZE.to_owned(),
+    })
+}
+
 /// A database whose data directory is on no persistent volume; see the module documentation.
 #[derive(Debug, Clone, Copy)]
 pub struct EphemeralData;
@@ -145,18 +158,11 @@ impl Rule for EphemeralData {
                         .with("container", &container.name)
                         .with("software", software)
                         .with("path", directory),
-                    fix: Fix {
-                        kind: FixKind::Plan,
-                        id: "storage.addVolume".to_owned(),
-                        params: [
-                            ("service", service.id.as_str()),
-                            ("container", container.name.as_str()),
-                            ("mountPath", directory),
-                        ]
-                        .into_iter()
-                        .map(|(k, v)| (k.to_owned(), v.to_owned()))
-                        .collect(),
-                    },
+                    fix: container_plan(
+                        "storage.addVolume",
+                        service,
+                        new_disk(container, directory),
+                    ),
                     citations: self.citations(),
                 });
             }
@@ -223,14 +229,24 @@ mod tests {
         assert_eq!(none[0].message.key, "gap.ephemeralData.none");
         assert_eq!(none[0].fix.id, "storage.addVolume");
         assert_eq!(
-            none[0].fix.params.get("mountPath").map(String::as_str),
-            Some("/var/lib/postgresql/data")
+            none[0].fix.workload.as_ref().map(|w| w.name.as_str()),
+            Some("db")
         );
+        assert_eq!(
+            none[0].fix.values,
+            Some(FixValues::Volume {
+                container: "postgres".to_owned(),
+                mount_path: "/var/lib/postgresql/data".to_owned(),
+                size: "1Gi".to_owned(),
+            })
+        );
+        // A temporary volume there: a person replaces it, so the fix sets no values.
         let scratch = gaps(
             &serde_json::json!([{"name": "data", "emptyDir": {}}]),
             &serde_json::json!([{"name": "data", "mountPath": "/var/lib/postgresql/data"}]),
         );
         assert_eq!(scratch[0].message.key, "gap.ephemeralData.ephemeral");
+        assert_eq!(scratch[0].fix.values, None);
         let kept = gaps(
             &serde_json::json!([{"name": "data",
                 "persistentVolumeClaim": {"claimName": "db-data"}}]),
