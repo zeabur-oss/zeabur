@@ -831,31 +831,6 @@ impl World {
                     serde_json::to_value(values).unwrap_or_default(),
                 );
             }
-            if target.kind == HelmChartConfig::KIND && config_values(step).is_none() {
-                // A config with no values is deleted, so none of Zeabur's stays empty.
-                let found = found.filter(|o| {
-                    let ours = ours(&o.metadata, &step.component);
-                    if !ours {
-                        foreign.get_or_insert_with(|| format!("{} {}", target.kind, target.name));
-                    }
-                    ours
-                });
-                zeaburs |= found.is_some();
-                progress.push(gone(found.as_ref()));
-                let mut write = view(&desired.object, Some(&target), None);
-                write.yaml = None;
-                writes.push(write);
-                let (uid, resource_version) = found.map_or((None, None), |o| {
-                    (o.metadata.uid, o.metadata.resource_version)
-                });
-                placed.push(Placed {
-                    target,
-                    body: None,
-                    uid,
-                    resource_version,
-                });
-                continue;
-            }
             if let Some(found) = &found {
                 if target.kind == Namespace::KIND {
                     keep_looser_level(&mut body.metadata, &found.metadata);

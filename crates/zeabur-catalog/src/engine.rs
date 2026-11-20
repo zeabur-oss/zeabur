@@ -11,12 +11,14 @@
 //! [`verify`] and passes them in as [`Manifests`].
 //!
 //! A chart release's values are its own, then its profile's, then the `contributes` of every
-//! component Zeabur wrote or installs that targets it, merged in id order [releases]. Every plan
+//! component Zeabur wrote or installs that targets it, merged in id order [releases], then its
+//! inputs. Every plan
 //! computes them, so upgrading a release keeps what others add to it. Installing a contributor
 //! adds a step that writes its target again: the `HelmChart` Zeabur wrote, or, for a chart the
 //! distribution packages, a `HelmChartConfig` of the same name [k3s-config]. Removing one writes
-//! the target without it, and deletes a `HelmChartConfig` left with no values. A contribution to
-//! a component that is not installed waits until Zeabur installs it.
+//! the target without it, before its own objects go: a `HelmChartConfig` left with no values
+//! stays, empty, so the removal waits until helm-controller installs the chart without them. A
+//! contribution to a component that is not installed waits until Zeabur installs it.
 //!
 //! Readiness follows kstatus [kstatus] through `zeabur_model::readiness`. A `HelmChart` has no
 //! `observedGeneration`, and helm-controller replaces its Job whenever the chart changes, so a
@@ -651,9 +653,10 @@ impl Contributions {
     }
 }
 
-/// The steps that write again what removing `id` takes its values out of: a `HelmChart` Zeabur
-/// wrote, or a `HelmChartConfig` of a packaged chart. A `HelmChartConfig` left with no values
-/// has no `valuesContent`.
+/// The steps that write again what removing `id` takes its values out of.
+///
+/// Each writes a `HelmChart` Zeabur wrote, or a `HelmChartConfig` of a packaged chart. A
+/// `HelmChartConfig` left with no values has an empty `valuesContent`.
 ///
 /// # Errors
 ///
@@ -748,7 +751,11 @@ fn rewrite(
             ..ObjectMeta::default()
         },
         spec: HelmChartConfigSpec {
-            values_content: values_content(&values).map_err(broken(component))?,
+            values_content: Some(
+                values_content(&values)
+                    .map_err(broken(component))?
+                    .unwrap_or_default(),
+            ),
         },
     };
     label_release(&mut config.metadata, component, release);
@@ -2951,7 +2958,8 @@ mod tests {
         )
         .unwrap();
         let config: HelmChartConfig = without[0].objects[0].object.clone().try_parse().unwrap();
-        assert_eq!(config.spec.values_content, None);
+        // An empty config stays, so the removal waits for the chart without the values.
+        assert_eq!(config.spec.values_content.as_deref(), Some(""));
     }
 
     #[test]

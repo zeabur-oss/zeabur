@@ -1087,8 +1087,15 @@ mod tests {
             states(&plan),
             ["traefik pending", "issuers pending", "cert-manager pending"]
         );
-        call(&app, "apply", "remove", "0.5.3").await;
-        assert!(dynamic(&cluster, "HelmChartConfig", "traefik").is_none());
+        // The config stays, empty, and cert-manager waits until Traefik is installed without
+        // the values: its middleware is still in Traefik until then.
+        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
+        assert_eq!(config["spec"]["valuesContent"], "");
+        assert_eq!(
+            states(&applied["plan"]),
+            ["traefik waiting", "issuers pending", "cert-manager pending"]
+        );
     }
 
     #[tokio::test]
