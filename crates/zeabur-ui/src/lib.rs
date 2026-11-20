@@ -248,24 +248,26 @@ fn respond_with(
         *response.status_mut() = StatusCode::NOT_MODIFIED;
     }
     let h = response.headers_mut();
-    insert(h, header::CONTENT_TYPE, asset.content_type);
-    insert(
-        h,
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static(asset.content_type),
+    );
+    h.insert(
         header::CACHE_CONTROL,
-        if asset.immutable {
+        HeaderValue::from_static(if asset.immutable {
             IMMUTABLE
         } else {
             REVALIDATE
-        },
+        }),
     );
     if let Ok(value) = HeaderValue::from_str(&etag) {
         h.insert(header::ETAG, value);
     }
     if asset.brotli.is_some() {
-        insert(h, header::VARY, "accept-encoding");
+        h.insert(header::VARY, HeaderValue::from_static("accept-encoding"));
     }
     if let Some(coding) = encoding.token() {
-        insert(h, header::CONTENT_ENCODING, coding);
+        h.insert(header::CONTENT_ENCODING, HeaderValue::from_static(coding));
     }
     if method == Method::HEAD && !not_modified {
         h.insert(header::CONTENT_LENGTH, HeaderValue::from(length));
@@ -359,40 +361,38 @@ fn if_none_match(headers: &HeaderMap, etag: &str) -> bool {
 
 /// `csp` is the policy of an HTML page, `None` for other files.
 fn harden(headers: &mut HeaderMap, csp: Option<HeaderValue>) {
-    insert(headers, header::X_CONTENT_TYPE_OPTIONS, "nosniff");
-    insert(
-        headers,
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
         header::HeaderName::from_static("cross-origin-resource-policy"),
-        "same-origin",
+        HeaderValue::from_static("same-origin"),
     );
     if let Some(csp) = csp {
         headers.insert(header::CONTENT_SECURITY_POLICY, csp);
-        insert(headers, header::X_FRAME_OPTIONS, "DENY");
-        insert(headers, header::REFERRER_POLICY, "no-referrer");
-        insert(
-            headers,
-            header::HeaderName::from_static("cross-origin-opener-policy"),
-            "same-origin",
+        headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+        headers.insert(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("no-referrer"),
         );
-        insert(
-            headers,
+        headers.insert(
+            header::HeaderName::from_static("cross-origin-opener-policy"),
+            HeaderValue::from_static("same-origin"),
+        );
+        headers.insert(
             header::HeaderName::from_static("permissions-policy"),
-            "camera=(), microphone=(), geolocation=()",
+            HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
         );
     }
-}
-
-fn insert(headers: &mut HeaderMap, name: header::HeaderName, value: &'static str) {
-    headers.insert(name, HeaderValue::from_static(value));
 }
 
 fn not_found() -> Response {
     let mut response = status(StatusCode::NOT_FOUND, |_| {});
     *response.body_mut() = Body::from(r#"{"type":"about:blank","title":"Not Found","status":404}"#);
-    insert(
-        response.headers_mut(),
+    response.headers_mut().insert(
         header::CONTENT_TYPE,
-        "application/problem+json",
+        HeaderValue::from_static("application/problem+json"),
     );
     response
 }
@@ -401,10 +401,9 @@ fn status(code: StatusCode, headers: impl FnOnce(&mut HeaderMap)) -> Response {
     let mut response = Response::new(Body::empty());
     *response.status_mut() = code;
     headers(response.headers_mut());
-    insert(
-        response.headers_mut(),
+    response.headers_mut().insert(
         header::X_CONTENT_TYPE_OPTIONS,
-        "nosniff",
+        HeaderValue::from_static("nosniff"),
     );
     response
 }
