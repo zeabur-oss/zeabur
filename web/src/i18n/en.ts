@@ -3129,6 +3129,11 @@ export const en = {
   "githubApp.problem.name.long": "A name can have up to 34 characters.",
   "githubApp.problem.webhook": "The URL starts with https://.",
   "githubApp.continue": "Continue on GitHub",
+  "githubApp.handoff.body":
+    "GitHub asks you to confirm the new App, then brings you back to Zeabur when it is made.",
+  "githubApp.handoff.account": "Account",
+  "githubApp.handoff.personal": "Your own account",
+  "githubApp.handoff.expired": "This link has expired. Create the App again.",
   "githubApp.install": "Install on GitHub",
   "githubApp.open": "Open on GitHub",
   "githubApp.pollsOnly": "No webhook: Zeabur Builder checks GitHub once a minute.",

@@ -7,11 +7,12 @@ import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import GithubLogoIcon from "~icons/ph/github-logo"
 import WarningIcon from "~icons/ph/warning"
 
-import type { Schemas } from "@/api/client"
+import { ApiError, type Schemas } from "@/api/client"
 import {
   conversionPlanQuery,
   gitHubAppQuery,
   grantPlanQuery,
+  manifestFormQuery,
   startManifest,
 } from "@/api/github-app"
 import { clusterQuery, projectsQuery } from "@/api/queries"
@@ -466,6 +467,67 @@ function BackToProject({ project }: { project: string }) {
       >
         {t("githubApp.return.action")}
       </Button>
+    </div>
+  )
+}
+
+const continueRoute = getRouteApi("/cluster/github-app/continue")
+
+/** Cluster → GitHub, between the form and GitHub: sends the manifest to GitHub. Only this page
+ * may post forms to GitHub, so the way here loads a new page. */
+export function GitHubAppContinuePage() {
+  const t = useT()
+  const { state = "" } = continueRoute.useSearch()
+  const form = useQuery({ ...manifestFormQuery(state), enabled: state !== "" })
+  const expired = state === "" || (form.error instanceof ApiError && form.error.status === 400)
+  return (
+    <ClusterFrame tab="github">
+      <Section id="github-app" title={t("githubApp.title")}>
+        {expired ? (
+          <Expired />
+        ) : form.error ? (
+          <Problem error={form.error} />
+        ) : form.data ? (
+          <ManifestForm form={form.data} />
+        ) : null}
+      </Section>
+    </ClusterFrame>
+  )
+}
+
+function ManifestForm({ form }: { form: Schemas.GitHubManifestForm }) {
+  const t = useT()
+  return (
+    <form method="post" action={form.action} className={formBox}>
+      <p className="type-body">{t("githubApp.handoff.body")}</p>
+      <dl className="grid grid-cols-pairs gap-x-6 gap-y-1.5 type-body">
+        <dt className="text-muted-foreground">{t("githubApp.field.name")}</dt>
+        <dd className="truncate">{form.name}</dd>
+        <dt className="text-muted-foreground">{t("githubApp.handoff.account")}</dt>
+        <dd className="truncate">{form.organization || t("githubApp.handoff.personal")}</dd>
+      </dl>
+      <input type="hidden" name="manifest" value={form.manifest} />
+      <div className="flex justify-end gap-2">
+        <a href={CALLBACK_PATH} className={buttonVariants({ size: "sm", variant: "ghost" })}>
+          {t("clusterBackups.cancel")}
+        </a>
+        <Button size="sm" type="submit">
+          <GithubLogoIcon aria-hidden="true" data-icon="inline-start" />
+          {t("githubApp.continue")}
+        </Button>
+      </div>
+    </form>
+  )
+}
+
+function Expired() {
+  const t = useT()
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-3">
+      <p className="type-body">{t("githubApp.handoff.expired")}</p>
+      <a href={CALLBACK_PATH} className={buttonVariants({ size: "sm", variant: "outline" })}>
+        {t("githubApp.create")}
+      </a>
     </div>
   )
 }

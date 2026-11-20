@@ -585,8 +585,8 @@ paths:
       tags:
       - cluster
       summary: |-
-        The page that sends the manifest to GitHub: a form with one button, no script, whose policy
-        lets forms go to GitHub only.
+        Where the page [`CONTINUE_PATH`] sends the manifest, and the manifest. Anyone with the
+        `state` may read them; the conversion checks the person.
       operationId: getGitHubAppForm
       parameters:
       - name: state
@@ -597,13 +597,15 @@ paths:
           type: string
       responses:
         "200":
-          description: The page
           content:
-            text/html: {}
+            application/json:
+              schema:
+                $ref: "#/components/schemas/GitHubManifestForm"
         "400":
-          description: The state is not valid
           content:
-            text/html: {}
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/github-app/manifest:
     post:
       tags:
@@ -10513,6 +10515,27 @@ components:
         formUrl:
           type: string
           description: Open this page, which sends the manifest to GitHub.
+    GitHubManifestForm:
+      type: object
+      description: The form that sends the manifest to GitHub.
+      required:
+      - name
+      - organization
+      - action
+      - manifest
+      properties:
+        action:
+          type: string
+          description: "Where the form posts: GitHub's new App page, with the `state`."
+        manifest:
+          type: string
+          description: The `manifest` field, JSON.
+        name:
+          type: string
+          description: The App's name on GitHub.
+        organization:
+          type: string
+          description: The organization the App is made in; empty for the person's own account.
     GitHubManifestRequest:
       type: object
       description: What the manifest flow needs.

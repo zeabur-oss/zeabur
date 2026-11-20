@@ -7,6 +7,7 @@ use axum::Router;
 use axum::body::{Body, Bytes};
 use axum::http::{HeaderMap, HeaderValue, Method, Request, StatusCode, header};
 use axum::response::Response;
+use axum::routing::any;
 
 #[cfg(feature = "interface")]
 mod embedded {
@@ -130,6 +131,40 @@ pub fn router_for(assets: &'static [Asset], csp: &'static str) -> Router {
     })
 }
 
+/// [`router_for`] with [`CSP`], except the page at `path`, whose forms may also go to `origin`, a
+/// bare `https://host[:port]` (the one page that posts to another site). Without `origin`, that
+/// page gets [`CSP`] too.
+pub fn router_with_form_page(
+    assets: &'static [Asset],
+    path: &'static str,
+    origin: Option<&str>,
+) -> Router {
+    let router = router_for(assets, CSP);
+    let Some(csp) = origin.and_then(csp_with_form_action) else {
+        return router;
+    };
+    router.route(
+        path,
+        any(move |request: Request<Body>| async move {
+            respond_with(
+                assets,
+                csp,
+                request.method(),
+                request.uri().path(),
+                request.headers(),
+            )
+        }),
+    )
+}
+
+fn csp_with_form_action(origin: &str) -> Option<HeaderValue> {
+    HeaderValue::from_str(&CSP.replace(
+        "form-action 'self';",
+        &format!("form-action 'self' {origin};"),
+    ))
+    .ok()
+}
+
 /// Whether `path` is a page of the interface: a client-side route answered with `index.html`,
 /// not a file, an API path or a missing build output.
 #[cfg(feature = "interface")]
@@ -161,6 +196,16 @@ pub fn is_page_in(assets: &[Asset], path: &str) -> bool {
 pub fn respond(
     assets: &[Asset],
     csp: &'static str,
+    method: &Method,
+    path: &str,
+    headers: &HeaderMap,
+) -> Response {
+    respond_with(assets, HeaderValue::from_static(csp), method, path, headers)
+}
+
+fn respond_with(
+    assets: &[Asset],
+    csp: HeaderValue,
     method: &Method,
     path: &str,
     headers: &HeaderMap,
@@ -203,24 +248,26 @@ pub fn respond(
         *response.status_mut() = StatusCode::NOT_MODIFIED;
     }
     let h = response.headers_mut();
-    insert(h, header::CONTENT_TYPE, asset.content_type);
-    insert(
-        h,
+    h.insert(
+        header::CONTENT_TYPE,
+        HeaderValue::from_static(asset.content_type),
+    );
+    h.insert(
         header::CACHE_CONTROL,
-        if asset.immutable {
+        HeaderValue::from_static(if asset.immutable {
             IMMUTABLE
         } else {
             REVALIDATE
-        },
+        }),
     );
     if let Ok(value) = HeaderValue::from_str(&etag) {
         h.insert(header::ETAG, value);
     }
     if asset.brotli.is_some() {
-        insert(h, header::VARY, "accept-encoding");
+        h.insert(header::VARY, HeaderValue::from_static("accept-encoding"));
     }
     if let Some(coding) = encoding.token() {
-        insert(h, header::CONTENT_ENCODING, coding);
+        h.insert(header::CONTENT_ENCODING, HeaderValue::from_static(coding));
     }
     if method == Method::HEAD && !not_modified {
         h.insert(header::CONTENT_LENGTH, HeaderValue::from(length));
@@ -313,41 +360,39 @@ fn if_none_match(headers: &HeaderMap, etag: &str) -> bool {
 }
 
 /// `csp` is the policy of an HTML page, `None` for other files.
-fn harden(headers: &mut HeaderMap, csp: Option<&'static str>) {
-    insert(headers, header::X_CONTENT_TYPE_OPTIONS, "nosniff");
-    insert(
-        headers,
+fn harden(headers: &mut HeaderMap, csp: Option<HeaderValue>) {
+    headers.insert(
+        header::X_CONTENT_TYPE_OPTIONS,
+        HeaderValue::from_static("nosniff"),
+    );
+    headers.insert(
         header::HeaderName::from_static("cross-origin-resource-policy"),
-        "same-origin",
+        HeaderValue::from_static("same-origin"),
     );
     if let Some(csp) = csp {
-        insert(headers, header::CONTENT_SECURITY_POLICY, csp);
-        insert(headers, header::X_FRAME_OPTIONS, "DENY");
-        insert(headers, header::REFERRER_POLICY, "no-referrer");
-        insert(
-            headers,
-            header::HeaderName::from_static("cross-origin-opener-policy"),
-            "same-origin",
+        headers.insert(header::CONTENT_SECURITY_POLICY, csp);
+        headers.insert(header::X_FRAME_OPTIONS, HeaderValue::from_static("DENY"));
+        headers.insert(
+            header::REFERRER_POLICY,
+            HeaderValue::from_static("no-referrer"),
         );
-        insert(
-            headers,
+        headers.insert(
+            header::HeaderName::from_static("cross-origin-opener-policy"),
+            HeaderValue::from_static("same-origin"),
+        );
+        headers.insert(
             header::HeaderName::from_static("permissions-policy"),
-            "camera=(), microphone=(), geolocation=()",
+            HeaderValue::from_static("camera=(), microphone=(), geolocation=()"),
         );
     }
-}
-
-fn insert(headers: &mut HeaderMap, name: header::HeaderName, value: &'static str) {
-    headers.insert(name, HeaderValue::from_static(value));
 }
 
 fn not_found() -> Response {
     let mut response = status(StatusCode::NOT_FOUND, |_| {});
     *response.body_mut() = Body::from(r#"{"type":"about:blank","title":"Not Found","status":404}"#);
-    insert(
-        response.headers_mut(),
+    response.headers_mut().insert(
         header::CONTENT_TYPE,
-        "application/problem+json",
+        HeaderValue::from_static("application/problem+json"),
     );
     response
 }
@@ -356,10 +401,9 @@ fn status(code: StatusCode, headers: impl FnOnce(&mut HeaderMap)) -> Response {
     let mut response = Response::new(Body::empty());
     *response.status_mut() = code;
     headers(response.headers_mut());
-    insert(
-        response.headers_mut(),
+    response.headers_mut().insert(
         header::X_CONTENT_TYPE_OPTIONS,
-        "nosniff",
+        HeaderValue::from_static("nosniff"),
     );
     response
 }
@@ -710,6 +754,34 @@ mod tests {
             header(&response, "cross-origin-resource-policy"),
             Some("same-origin")
         );
+    }
+
+    #[tokio::test]
+    async fn only_the_page_with_its_own_policy_may_send_forms_elsewhere() {
+        let app = router_with_form_page(
+            &TEST_ASSETS,
+            "/cluster/github-app/continue",
+            Some("https://github.com"),
+        );
+        let policy = async |path: &str| {
+            let response = app
+                .clone()
+                .oneshot(Request::get(path).body(Body::empty()).unwrap())
+                .await
+                .unwrap();
+            assert_eq!(response.status(), StatusCode::OK);
+            header(&response, "content-security-policy")
+                .unwrap_or_default()
+                .to_owned()
+        };
+        let page = policy("/cluster/github-app/continue?state=s").await;
+        assert!(
+            page.contains("; form-action 'self' https://github.com;"),
+            "{page}"
+        );
+        assert_eq!(page.replace(" https://github.com;", ";"), CSP);
+        assert_eq!(policy("/cluster/github-app").await, CSP);
+        assert_eq!(policy("/cluster/github-app/continue/x").await, CSP);
     }
 
     #[test]

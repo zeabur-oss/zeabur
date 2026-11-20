@@ -144,6 +144,8 @@ pub async fn start_with(
 
 /// The API, acting as the person `cluster` signs in as, and the web interface.
 fn app(cluster: Arc<dyn Cluster>, settings: Settings) -> Router {
+    #[cfg(feature = "ui")]
+    let origin = settings.github.web_origin();
     let router = zeabur_api::router_with(
         Arc::new(SingleCluster(cluster)),
         zeabur_api::Options {
@@ -152,8 +154,11 @@ fn app(cluster: Arc<dyn Cluster>, settings: Settings) -> Router {
         },
     );
     #[cfg(feature = "ui")]
-    let router =
-        router.fallback_service(zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP));
+    let router = router.fallback_service(zeabur_ui::router_with_form_page(
+        zeabur_ui::assets(),
+        zeabur_api::cluster::github_app::CONTINUE_PATH,
+        origin.as_deref(),
+    ));
     router
 }
 

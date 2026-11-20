@@ -128,6 +128,12 @@ pub(crate) fn app(
         origin: auth.public.origin(),
         sessions: Arc::clone(&auth.sessions),
     });
+    #[cfg(feature = "ui")]
+    let interface = zeabur_ui::router_with_form_page(
+        zeabur_ui::assets(),
+        zeabur_api::cluster::github_app::CONTINUE_PATH,
+        settings.github.web_origin().as_deref(),
+    );
     let options = zeabur_api::Options {
         terminals: zeabur_api::tools::connect(&settings.terminal),
         settings,
@@ -163,11 +169,10 @@ pub(crate) fn app(
         .with_state(Arc::clone(auth));
     let guarded = api.merge(sign_in);
     #[cfg(feature = "ui")]
-    let guarded = guarded.fallback_service(
-        zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP).layer(
-            axum::middleware::from_fn_with_state(Arc::clone(auth), sign_in_first),
-        ),
-    );
+    let guarded = guarded.fallback_service(interface.layer(axum::middleware::from_fn_with_state(
+        Arc::clone(auth),
+        sign_in_first,
+    )));
     let guarded = guarded.layer(axum::middleware::from_fn_with_state(
         Arc::clone(auth),
         check,
