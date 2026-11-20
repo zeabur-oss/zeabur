@@ -5,6 +5,16 @@ description: See which Zeabur version you run, upgrade with Helm, Argo CD, Flux 
 
 Find how you installed Zeabur, then follow that section. Nothing upgrades on its own. Zeabur only tells you when a newer version is out.
 
+## Let an agent upgrade for you
+
+An agent such as Claude Code or Codex can follow this page and the upgrade notes for you. Paste this prompt, run the agent on a computer that can reach the server over SSH, and tell it the server's address:
+
+```text
+Upgrade Zeabur on my server to the latest version by following https://oss.zeabur.com/docs/zeabur/upgrade/steps.
+```
+
+The agent finds how Zeabur was installed, reads the upgrade notes for each version in between, and shows you what it will change. You take the snapshot and sign in afterwards with your passkey; the agent waits for you at those steps.
+
 ## See your version
 
 The cluster page always shows `Zeabur v<version>`. When a newer version is out, a notice appears with its version and a link to the release notes. **Settings** › **About** shows the version too. In either place, **How to upgrade** opens the steps for how you installed Zeabur, with the commands to copy and a link to this page.
@@ -19,6 +29,8 @@ Under `zeaburctl ui`, the page shows `zeaburctl`'s own version. For the details 
 - Back up project data separately with Velero. See [Back up a cluster and restore from a backup](../cluster/backups.mdx).
 
 ## Upgrade with Helm
+
+If `kubectl -n kube-system get configmap zeabur-installer` finds a ConfigMap, zeabur-installer set up this server. To move from v0.2 to v0.3, follow [Installed with zeabur-installer](notes.mdx#installed-with-zeabur-installer) in the upgrade notes instead of this section.
 
 Replace `<version>` with the version you're moving to:
 

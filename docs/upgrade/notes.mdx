@@ -17,12 +17,208 @@ The chart now carries the `zeabur-system-hosts` admission policy. Outside namesp
 
 ### Installed with zeabur-installer
 
-zeabur-installer applied the same policy outside the chart, so Helm refuses to take it over. Delete it before you upgrade, and the chart creates it again:
+zeabur-installer v0.2 installed Zeabur through a K3s `HelmChart`, and Zeabur Identity, its admission policy and its sign-in client as plain manifests. v0.3 installs all of them with one Helm release. These steps move what the installer made into that release without deleting it. Projects, services, databases, domains, members and passkeys stay as they are, and nobody needs a new account.
+
+What stays the same:
+
+- K3s, RKE2 or KubeSolo, and the file that lets Kubernetes accept Zeabur Identity's tokens. To upgrade Kubernetes later, use Zeatend, as in [A server that zeabur-installer set up](steps.mdx#a-server-that-zeabur-installer-set-up).
+- The components the installer installed, such as Traefik, cert-manager, Zeabur Builder and CloudNativePG. Zeabur doesn't change a component it didn't install, so they stay at their current versions.
+- Zeabur Identity's Service address and signing keys, so accounts and passkeys keep working and kube-apiserver still accepts Zeabur Identity's tokens.
+
+After the upgrade, never run `zeabur-installer apply` again. It would put back the v0.2 `HelmChart` and Zeabur Identity v0.1.
+
+An agent can follow these steps. It stops and waits for the server's owner at these points:
+
+- Before it changes anything: the owner reads the new values file and takes a snapshot of each server (step 3).
+- When a check in step 1 finds something these steps don't cover.
+- After the upgrade: the owner signs in with a passkey (step 8).
+- Before it deletes anything, even the leftovers in step 9.
+
+#### 1. Check what the installer made
+
+Run every command on the first server, in a root shell (`sudo -i`). First point `kubectl` and `helm` at the cluster:
+
+| Distribution | Commands |
+| --- | --- |
+| K3s | `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml` |
+| RKE2 | `export KUBECONFIG=/etc/rancher/rke2/rke2.yaml PATH=$PATH:/var/lib/rancher/rke2/bin` |
+| KubeSolo | `export KUBECONFIG=/var/lib/kubesolo/pki/admin/admin.kubeconfig PATH=$PATH:/var/lib/zeabur-installer/bin` |
+
+The server also needs Helm 4. If `helm version` doesn't print `v4`, install it as [Installing Helm](https://helm.sh/docs/intro/install/) shows. Run the rest of the commands in `/root/zeabur-upgrade`:
 
 ```sh
-kubectl delete validatingadmissionpolicybinding zeabur-system-hosts-zeabur zeabur-system-hosts-zeabur-identity
-kubectl delete validatingadmissionpolicy zeabur-system-hosts
+umask 077
+mkdir -p /root/zeabur-upgrade && cd /root/zeabur-upgrade
 ```
+
+Then check each of these. Stop and ask the owner when a result differs from what the right column expects.
+
+| Command | Expected |
+| --- | --- |
+| `kubectl -n kube-system get configmap zeabur-installer -o jsonpath='{.data.installer}'` | `0.2.0` or another `0.2.x`. For `0.1.x`, do [v0.1 → v0.2](#v01--v02) first. |
+| `kubectl -n kube-system get helmchart zeabur` | One `HelmChart`. If there is none, the installer ran with `zeabur: false` and installed no Zeabur: install Zeabur as [Install Zeabur in an existing cluster](../install/existing-cluster.mdx) shows instead. |
+| `helm status zeabur -n zeabur` | `STATUS: deployed` |
+| `kubectl -n zeabur-identity get deployment zeabur-identity -o jsonpath='{.spec.template.spec.containers[0].args}'` | Nothing, or only `["--invitations"]`. Other options were added by hand, and Zeabur Identity v0.3 refuses many old ones. See [its upgrade notes](https://oss.zeabur.com/docs/identity/operations/upgrade). |
+| `kubectl get crd upstreamproviders.identity.zeabur.com` | `NotFound`. If it exists, someone set up GitHub or Google sign-in by hand; follow Zeabur Identity's upgrade notes for those providers first. |
+
+Save the current values and the installer's configuration:
+
+```sh
+helm get values zeabur -n zeabur -o yaml > old-values.yaml
+cp /etc/zeabur-installer/config.yaml installer-config.yaml
+```
+
+From these two files, note:
+
+- **Access mode**: `access.mode` in `installer-config.yaml`. `domain` means certificates from Let's Encrypt for real DNS names. `local` means a CA made on the server, with the ClusterIssuer `zeabur-local-ca`.
+- **Invitations**: `access.invitations: false` means Zeabur Identity doesn't accept invitation links. When the key is missing, invitations are on.
+- **Which Zeabur Identity Zeabur uses**: `issuer.url` in `old-values.yaml`. If it is `https://` followed by `access.identity`, Zeabur uses the Zeabur Identity the installer made. If it is any other address, someone pointed Zeabur at an external Zeabur Identity. Ask the owner before you go on, and write the values as step 2 says for that case.
+- **Projects' own domains**: `kubectl get ingress,httproute,certificate -A > domains-before.txt`. Also pick one project domain and save what `curl -sS -o /dev/null -w '%{http_code}\n' https://<domain>/` prints. In local mode, add `--cacert /var/lib/rancher/zeabur-installer/local-ca.crt`, or `/var/lib/zeabur-installer/local-ca.crt` on KubeSolo. The upgrade doesn't touch them.
+- **Databases**: `kubectl get clusters.postgresql.cnpg.io,statefulsets -A > databases-before.txt`. The upgrade doesn't touch them.
+
+#### 2. Write the new values file
+
+Write `values.yaml` from `old-values.yaml`. Don't use `--reuse-values` or `--reset-then-reuse-values`: they keep the installer's `image`, which pins v0.2.
+
+Change the keys as the table shows. With an external Zeabur Identity, there are three differences: set `identity.enabled: false`, keep `issuer.url` and `issuer.clientSecret` as they are, and leave out every other `identity` key that the table and the list below it add.
+
+| In `old-values.yaml` | In `values.yaml` |
+| --- | --- |
+| `image` | Leave it out, so the chart uses its own image. |
+| `issuer.url` | Move it to `identity.issuer`, unchanged. |
+| `issuer.clientSecret` | Leave it out. The chart makes the Secret `zeabur-client` and registers its hash in Zeabur Identity. |
+| `issuer.caBundle` (local mode only) | Keep it. |
+| `ingress.annotations` with `cert-manager.io/cluster-issuer: <issuer>` | Leave the annotation out. Set `ingress.clusterIssuer` and `identity.ingress.clusterIssuer` to `<issuer>`. |
+| `ingress.className` | Keep it, and set `identity.ingress.className` to the same value. |
+| Every other key, such as `publicUrl`, `clusterName`, `planKey`, `domains`, `ingress.enabled`, `ingress.tls`, `builds`, `proxy`, `telemetry` and `updateCheck` | Keep it as it is. |
+
+Then add:
+
+- `identity.admin.setupLink: false`. The administrator already exists, so the chart makes no new setup link.
+- `identity.invitations: false`, only when `access.invitations` is `false`.
+
+A local-mode server ends up like this, with your own addresses and values:
+
+```yaml
+publicUrl: https://zeabur.203.0.113.10.sslip.io
+clusterName: vps-1
+identity:
+  issuer: https://login.203.0.113.10.sslip.io
+  admin:
+    setupLink: false
+  ingress:
+    className: traefik
+    clusterIssuer: zeabur-local-ca
+issuer:
+  caBundle:
+    configMap: zeabur-identity-ca
+planKey:
+  existingSecret: zeabur-plan-key
+ingress:
+  className: traefik
+  clusterIssuer: zeabur-local-ca
+  tls:
+    secretName: zeabur-tls
+domains:
+  clusterIssuer: zeabur-local-ca
+  suffixes: [203-0-113-10.sslip.io]
+builds:
+  registry: zot.zot.svc:5000
+  caBundle:
+    configMap: zeabur-registry-ca
+```
+
+In domain mode, `ingress.clusterIssuer`, `identity.ingress.clusterIssuer` and `domains.clusterIssuer` are `letsencrypt`, and there is no `issuer.caBundle`.
+
+#### 3. Back up, and take a snapshot
+
+Save what the upgrade takes over, so you can compare or put it back:
+
+```sh
+kubectl get crd -o name | grep identity.zeabur.com | xargs kubectl get -o yaml > identity-crds.yaml
+kubectl -n zeabur-identity get users,credentials,grants,invitations,oauthclients,secrets,configmaps,services -o yaml > identity.yaml
+kubectl -n zeabur get secrets,configmaps -o yaml > zeabur.yaml
+kubectl -n kube-system get helmchart zeabur -o yaml > helmchart.yaml
+kubectl -n kube-system get configmap zeabur-installer zeabur-identity-authn --ignore-not-found -o yaml > installer-record.yaml
+```
+
+These files hold secrets, such as Zeabur Identity's signing keys. Keep them on the server.
+
+**Stop.** Show the owner `values.yaml` and the results of step 1. Ask them to take a snapshot of each server and to tell you when it is done. To go back, they restore this snapshot.
+
+#### 4. Detach the installer's `HelmChart`
+
+K3s's helm-controller owns the release through the `HelmChart` `kube-system/zeabur`. Deleting the `HelmChart` as it is uninstalls Zeabur. Tell helm-controller to leave the release alone first, then remove the `HelmChart`:
+
+```sh
+kubectl -n kube-system annotate helmchart zeabur helmcharts.helm.cattle.io/unmanaged=true
+kubectl -n kube-system patch helmchart zeabur --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]'
+kubectl -n kube-system delete helmchart zeabur
+```
+
+Check that the release and its pods are still there before you go on:
+
+```sh
+helm status zeabur -n zeabur          # STATUS: deployed
+kubectl -n zeabur get pods
+```
+
+#### 5. Update Zeabur Identity's CRDs
+
+Helm installs a chart's CRDs only on a first install and never upgrades them. Download the chart and apply the new ones yourself. Replace `<version>` with the version you're moving to, the newest one on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) unless the owner named another:
+
+```sh
+helm pull oci://ghcr.io/zeabur-oss/charts/zeabur --version <version> --untar
+kubectl apply --server-side --force-conflicts -f zeabur/charts/identity/crds/
+```
+
+`--force-conflicts` is needed because the installer applied the old CRDs with its own field manager.
+
+#### 6. Upgrade
+
+```sh
+helm upgrade zeabur ./zeabur -n zeabur -f values.yaml \
+  --take-ownership --force-conflicts --wait --timeout 10m
+```
+
+- `--take-ownership` lets the release take over Zeabur Identity, the sign-in client and the admission policy that the installer made.
+- `--force-conflicts` takes over fields that the installer set. Fields the chart doesn't set, such as the signing keys in Zeabur Identity's Secret, stay as they are.
+
+If the command fails, read the error, fix `values.yaml` and run the same command again. A failed attempt leaves a failed revision, and the next attempt replaces it.
+
+#### 7. Check the cluster
+
+```sh
+helm status zeabur -n zeabur                                   # STATUS: deployed
+kubectl -n zeabur rollout status deployment/zeabur
+kubectl -n zeabur-identity rollout status deployment/zeabur-identity
+kubectl -n zeabur-identity get service zeabur-identity -o jsonpath='{.spec.clusterIP}'
+```
+
+The address must equal the one in `discoveryURL` in `installer-record.yaml`. If it changed, kube-apiserver can't reach Zeabur Identity and every sign-in fails: stop and ask the owner.
+
+Then check that nothing else changed:
+
+- `kubectl get ingress,httproute,certificate -A` lists the same names as `domains-before.txt`, and each Certificate shows `True` under `READY`.
+- `kubectl get clusters.postgresql.cnpg.io,statefulsets -A` lists the same names as `databases-before.txt`, all ready.
+- The `curl` from step 1 prints the same status code.
+- `curl -sS <identity.issuer>/.well-known/openid-configuration` returns JSON with the same `issuer`.
+
+#### 8. Sign in
+
+**Stop.** Ask the owner to open Zeabur, sign in with their passkey, open a project and check its services and databases. Only a person can use their passkey. Ask them to have a member sign in too, if they can.
+
+Everyone signs in again once, because the Zeabur pod was replaced.
+
+#### 9. Clean up
+
+Zeabur no longer reads the Secret `zeabur/zeabur-oidc`, the installer's sign-in client secret, unless it uses an external Zeabur Identity. In that case `values.yaml` still names it, so keep it. Otherwise, once the owner agrees, delete it:
+
+```sh
+kubectl -n zeabur delete secret zeabur-oidc
+```
+
+Keep `/root/zeabur-upgrade` and the snapshot until everything works for a few days.
 
 ## v0.1 → v0.2
 
