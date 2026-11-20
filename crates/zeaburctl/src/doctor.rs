@@ -28,8 +28,16 @@
 use std::process::ExitCode;
 
 use futures_util::StreamExt as _;
-use serde::Serialize;
-use serde_json::Value;
+use serde::{Deserialize, Serialize};
+use zeabur_api::gaps::GapList;
+use zeabur_api::projects::namespace::ProjectNamespace;
+use zeabur_api::resources::objects::{ObjectDocument, ObjectList};
+use zeabur_api::views::{CapabilityList, ProjectList, UnreadableView, Upgrades, WhoAmI};
+use zeabur_catalog::versions::UpgradeState;
+use zeabur_catalog::{ComponentUpgrade, Suggestion};
+use zeabur_core::problem::{Kind, Problem};
+use zeabur_model::kernel::denied::Denied;
+use zeabur_model::{FixKind, Health};
 
 use crate::in_process::InProcess;
 use crate::output;
@@ -145,9 +153,9 @@ impl Check {
 
     /// A check that ends at a refused or failed read: skipped with the rule the API names in
     /// `denied`, an error otherwise.
-    fn from_problem(name: &'static str, problem: &Value) -> Self {
+    fn from_problem(name: &'static str, problem: &Problem) -> Self {
         let mut check = Self::new(name);
-        if let Some(denied) = problem.get("denied") {
+        if let Some(denied) = &problem.denied {
             check.status = Status::Skipped;
             check
                 .findings
@@ -156,7 +164,7 @@ impl Check {
             check.status = Status::Error;
             check.findings.push(detail(problem));
         }
-        check.add_fix(text(problem, "fix"));
+        check.add_fix(&problem.fix);
         check
     }
 
@@ -252,35 +260,31 @@ pub(crate) fn run(args: &DoctorArgs) -> ExitCode {
 
 /// Every check; `Err` with the API's problem when the cluster does not even say who the person
 /// is.
-async fn examine(api: &InProcess) -> Result<Report, Value> {
-    let whoami = api.get("/api/v1/whoami").await?;
+async fn examine(api: &InProcess) -> Result<Report, Box<Problem>> {
+    let whoami: WhoAmI = api.get("/api/v1/whoami").await?;
     let zeabur_identity_kinds = format!(
         "/api/v1/projects/{ZEABUR_IDENTITY_NAMESPACE}/objects?kinds={ZEABUR_IDENTITY_GROUP}/oauthclients"
     );
     let zeabur_identity_namespace =
         format!("/api/v1/projects/{ZEABUR_IDENTITY_NAMESPACE}/namespace");
     let (upgrades, capabilities, gaps, kinds, namespace, dashboard) = tokio::join!(
-        api.get("/api/v1/cluster/upgrades"),
-        api.get("/api/v1/cluster/capabilities"),
-        api.get("/api/v1/cluster/gaps"),
-        api.get(&zeabur_identity_kinds),
-        api.get(&zeabur_identity_namespace),
+        api.get::<Upgrades>("/api/v1/cluster/upgrades"),
+        api.get::<CapabilityList>("/api/v1/cluster/capabilities"),
+        api.get::<GapList>("/api/v1/cluster/gaps"),
+        api.get::<ObjectList>(&zeabur_identity_kinds),
+        api.get::<ProjectNamespace>(&zeabur_identity_namespace),
         zeabur_dashboard(api),
     );
     let client_kind = kinds.as_ref().ok().and_then(|list| {
-        list.get("items")?
-            .as_array()?
+        list.items
             .iter()
-            .find(|k| {
-                text(k, "group") == ZEABUR_IDENTITY_GROUP && text(k, "resource") == "oauthclients"
-            })
-            .cloned()
+            .find(|k| k.group == ZEABUR_IDENTITY_GROUP && k.resource == "oauthclients")
     });
-    let client = match &client_kind {
+    let client = match client_kind {
         Some(kind) => Some(
-            api.get(&format!(
+            api.get::<ObjectDocument>(&format!(
                 "/api/v1/projects/{ZEABUR_IDENTITY_NAMESPACE}/objects/{ZEABUR_IDENTITY_GROUP}/{}/oauthclients/{ZEABUR_CLIENT}",
-                text(kind, "version")
+                kind.version
             ))
             .await,
         ),
@@ -317,16 +321,13 @@ async fn examine(api: &InProcess) -> Result<Report, Value> {
 /// Whether the Zeabur dashboard runs in a project the person can see; `None` when a project or
 /// its Deployments cannot be read and none of the others has it.
 async fn zeabur_dashboard(api: &InProcess) -> Option<bool> {
-    let projects = api.get("/api/v1/projects").await.ok()?;
-    let names: Vec<String> = list(&projects, "items")
-        .iter()
-        .map(|p| text(p, "name").to_owned())
-        .collect();
-    let mut reads = futures_util::stream::iter(names)
-        .map(|name| async move {
+    let projects: ProjectList = api.get("/api/v1/projects").await.ok()?;
+    let mut reads = futures_util::stream::iter(projects.items)
+        .map(|project| async move {
             let answer = api
-                .get(&format!(
-                    "/api/v1/projects/{name}/objects?kinds=apps/deployments&label={ZEABUR_DASHBOARD_LABEL}"
+                .get::<ObjectList>(&format!(
+                    "/api/v1/projects/{}/objects?kinds=apps/deployments&label={ZEABUR_DASHBOARD_LABEL}",
+                    project.name
                 ))
                 .await;
             has_zeabur_dashboard(&answer)
@@ -344,13 +345,14 @@ async fn zeabur_dashboard(api: &InProcess) -> Option<bool> {
 }
 
 /// A project's Deployments with the Zeabur dashboard's label, from `GET /projects/{p}/objects`.
-fn has_zeabur_dashboard(answer: &Result<Value, Value>) -> Option<bool> {
-    let objects = answer.as_ref().ok()?;
-    let deployments = list(objects, "items")
+fn has_zeabur_dashboard(answer: &Result<ObjectList, Box<Problem>>) -> Option<bool> {
+    let deployments = answer
+        .as_ref()
+        .ok()?
+        .items
         .iter()
-        .find(|k| text(k, "group") == "apps" && text(k, "resource") == "deployments")?;
-    (deployments.get("listed") == Some(&Value::Bool(true)))
-        .then(|| !list(deployments, "items").is_empty())
+        .find(|k| k.group == "apps" && k.resource == "deployments")?;
+    deployments.listed.then_some(!deployments.items.is_empty())
 }
 
 fn without_zeabur_dashboard(name: &'static str) -> Check {
@@ -365,35 +367,37 @@ fn without_zeabur_dashboard(name: &'static str) -> Check {
 }
 
 /// The version's badge and states, from `GET /cluster/upgrades`.
-fn cluster_version(answer: &Result<Value, Value>) -> Check {
+fn cluster_version(answer: &Result<Upgrades, Box<Problem>>) -> Check {
     const NAME: &str = "cluster-version";
     let upgrades = match answer {
         Ok(upgrades) => upgrades,
         Err(problem) => return Check::from_problem(NAME, problem),
     };
     let mut check = Check::new(NAME);
-    let minor = text(upgrades, "minor");
+    let minor = upgrades.minor.as_deref().unwrap_or_default();
     let end_of_life = upgrades
-        .get("release")
-        .map_or("", |release| text(release, "endOfLife"));
-    let version = text(upgrades, "kubernetesVersion");
+        .release
+        .as_ref()
+        .map_or("", |release| &release.end_of_life);
+    let version = &upgrades.kubernetes_version;
     check.findings.push(if end_of_life.is_empty() {
         format!("kube-apiserver {version}")
     } else {
         format!("kube-apiserver {version} ({minor}, end of life {end_of_life})")
     });
-    check.status = match upgrades.get("badge").map_or("ok", |b| text(b, "health")) {
-        "fail" => Status::Critical,
-        "warn" => Status::Warning,
+    check.status = match upgrades.badge.map(|b| b.health) {
+        Some(Health::Fail) => Status::Critical,
+        Some(Health::Warn) => Status::Warning,
         _ => Status::Ok,
     };
-    let skew = list(upgrades, "skew");
-    let newer = Some(text(upgrades, "nextMinor"))
+    let patch = upgrades.patch.as_deref().unwrap_or_default();
+    let next_minor = upgrades.next_minor.as_deref().unwrap_or_default();
+    let newer = Some(next_minor)
         .filter(|v| !v.is_empty())
-        .or_else(|| Some(text(upgrades, "patch")).filter(|v| !v.is_empty()));
-    for state in list(upgrades, "states") {
-        match state.as_str().unwrap_or_default() {
-            "end-of-life" => {
+        .or_else(|| Some(patch).filter(|v| !v.is_empty()));
+    for state in &upgrades.states {
+        match state {
+            UpgradeState::EndOfLife => {
                 check
                     .findings
                     .push(format!("{minor} gets no fixes any more"));
@@ -402,7 +406,7 @@ fn cluster_version(answer: &Result<Value, Value>) -> Check {
                     |v| format!("upgrade to {v}, one minor at a time"),
                 ));
             }
-            "maintenance" => {
+            UpgradeState::Maintenance => {
                 check.findings.push(format!(
                     "{minor} gets critical fixes only, until {end_of_life}"
                 ));
@@ -411,91 +415,91 @@ fn cluster_version(answer: &Result<Value, Value>) -> Check {
                     |v| format!("upgrade to {v} before {end_of_life}"),
                 ));
             }
-            "skew-unsupported" => {
-                for node in skew
-                    .iter()
-                    .filter(|n| n.get("unsupported") == Some(&Value::Bool(true)))
-                {
-                    check.findings.push(format!(
-                        "node {}: kubelet {} is outside the supported version skew",
-                        text(node, "node"),
-                        text(node, "kubeletVersion")
-                    ));
-                }
+            UpgradeState::SkewUnsupported => {
+                check
+                    .findings
+                    .extend(upgrades.skew.iter().filter(|n| n.unsupported).map(|n| {
+                        format!(
+                            "node {}: kubelet {} is outside the supported version skew",
+                            n.node, n.kubelet_version
+                        )
+                    }));
                 check.add_fix(&format!(
                     "keep every kubelet at kube-apiserver's minor or up to three older \
                      ({VERSION_SKEW_POLICY})"
                 ));
             }
-            "skew-mixed" => {
-                let nodes: Vec<String> = skew
+            UpgradeState::SkewMixed => {
+                let nodes: Vec<String> = upgrades
+                    .skew
                     .iter()
-                    .map(|n| format!("{} ({})", text(n, "node"), text(n, "kubeletVersion")))
+                    .map(|n| format!("{} ({})", n.node, n.kubelet_version))
                     .collect();
                 check
                     .findings
                     .push(format!("nodes run other minors: {}", nodes.join(", ")));
             }
-            "upgrading" => {
-                let nodes: Vec<&str> = list(upgrades, "upgrading")
-                    .iter()
-                    .filter_map(Value::as_str)
-                    .collect();
-                check
-                    .findings
-                    .push(format!("upgrading nodes: {}", nodes.join(", ")));
-            }
-            "patch-available" => check
-                .findings
-                .push(format!("{} is available", text(upgrades, "patch"))),
-            "minor-available" => check
-                .findings
-                .push(format!("{} is available", text(upgrades, "nextMinor"))),
-            "newer-than-data" => check.findings.push(format!(
-                "{minor} is newer than Zeabur's release table ({})",
-                text(upgrades, "dataAsOf")
+            UpgradeState::Upgrading => check.findings.push(format!(
+                "upgrading nodes: {}",
+                upgrades.upgrading.join(", ")
             )),
-            other => check.findings.push(other.to_owned()),
+            UpgradeState::PatchAvailable => check.findings.push(format!("{patch} is available")),
+            UpgradeState::MinorAvailable => {
+                check.findings.push(format!("{next_minor} is available"));
+            }
+            UpgradeState::NewerThanData => check.findings.push(format!(
+                "{minor} is newer than Zeabur's release table ({})",
+                upgrades.data_as_of
+            )),
         }
     }
-    unreadable(&mut check, upgrades);
+    unreadable(&mut check, &upgrades.unreadable);
     check
 }
 
 /// Missing recommended components and installed ones behind the tested version, from
 /// `GET /cluster/capabilities`.
-fn components(answer: &Result<Value, Value>) -> Check {
+fn components(answer: &Result<CapabilityList, Box<Problem>>) -> Check {
     const NAME: &str = "components";
     let capabilities = match answer {
         Ok(capabilities) => capabilities,
         Err(problem) => return Check::from_problem(NAME, problem),
     };
     let mut check = Check::new(NAME);
-    for capability in list(capabilities, "items") {
-        let name = text(capability, "name");
-        if capability.get("existing") == Some(&Value::Bool(false))
-            && text(capability, "suggestion") == "recommended"
-        {
-            let choices: Vec<&str> = list(capability, "components")
+    for capability in &capabilities.items {
+        if !capability.existing && capability.suggestion == Some(Suggestion::Recommended) {
+            let choices: Vec<&str> = capability
+                .components
                 .iter()
-                .map(|c| text(c, "displayName"))
+                .map(|c| c.display_name.as_str())
                 .collect();
             check.raise(Status::Warning);
             check.findings.push(format!(
-                "{name} is missing (recommended: {})",
+                "{} is missing (recommended: {})",
+                capability.name,
                 choices.join(" or ")
             ));
         }
         check.findings.extend(
-            list(capability, "installations")
+            capability
+                .installations
                 .iter()
-                .filter(|installation| text(installation, "upgrade").starts_with("behind-"))
+                .filter(|installation| {
+                    matches!(
+                        installation.upgrade,
+                        Some(
+                            ComponentUpgrade::BehindPatch
+                                | ComponentUpgrade::BehindMinor
+                                | ComponentUpgrade::BehindMajor
+                        )
+                    )
+                })
                 .map(|installation| {
                     format!(
                         "{} {} is behind the tested {}",
-                        text(installation, "displayName"),
-                        text(installation, "version"),
-                        text(installation, "tested")
+                        installation.display_name,
+                        installation.version.as_deref().unwrap_or_default(),
+                        installation.tested.as_deref().unwrap_or_default()
                     )
                 }),
         );
@@ -507,60 +511,49 @@ fn components(answer: &Result<Value, Value>) -> Check {
 }
 
 /// What the cluster itself is missing, from `GET /cluster/gaps`.
-fn cluster_gaps(answer: &Result<Value, Value>) -> Check {
+fn cluster_gaps(answer: &Result<GapList, Box<Problem>>) -> Check {
     const NAME: &str = "cluster-gaps";
     let gaps = match answer {
         Ok(gaps) => gaps,
         Err(problem) => return Check::from_problem(NAME, problem),
     };
     let mut check = Check::new(NAME);
-    let items = list(gaps, "items");
-    for gap in items {
-        if text(gap, "severity") == "warning" {
+    for gap in &gaps.items {
+        if gap.severity == zeabur_model::Severity::Warning {
             check.raise(Status::Warning);
         }
-        let subject = gap.get("subject").unwrap_or(&Value::Null);
         let params: Vec<String> = gap
-            .get("message")
-            .and_then(|m| m.get("params"))
-            .and_then(Value::as_object)
-            .into_iter()
-            .flatten()
-            .map(|(k, v)| format!("{k} {}", v.as_str().unwrap_or_default()))
+            .message
+            .params
+            .iter()
+            .map(|(k, v)| format!("{k} {v}"))
             .collect();
-        let finding = format!(
-            "{}: {} {}",
-            text(gap, "rule"),
-            text(subject, "kind"),
-            text(subject, "name")
-        );
+        let finding = format!("{}: {} {}", gap.rule, gap.subject.kind, gap.subject.name);
         check.findings.push(if params.is_empty() {
             finding
         } else {
             format!("{finding} ({})", params.join(", "))
         });
-        let fix = gap.get("fix").unwrap_or(&Value::Null);
-        let how = match text(fix, "kind") {
-            "install" => format!("install {}", text(fix, "id")),
-            "plan" => format!("apply the {} plan in `zeaburctl ui`", text(fix, "id")),
-            other => format!("{other} {} in `zeaburctl ui`", text(fix, "id")),
+        let how = match gap.fix.kind {
+            FixKind::Install => format!("install {}", gap.fix.id),
+            FixKind::Plan => format!("apply the {} plan in `zeaburctl ui`", gap.fix.id),
         };
-        match list(gap, "citations").first() {
-            Some(citation) => check.add_fix(&format!("{how} ({})", text(citation, "url"))),
+        match gap.citations.first() {
+            Some(citation) => check.add_fix(&format!("{how} ({})", citation.url)),
             None => check.add_fix(&how),
         }
     }
-    if items.is_empty() && !list(gaps, "unreadable").is_empty() {
+    if gaps.items.is_empty() && !gaps.unreadable.is_empty() {
         check.status = Status::Skipped;
     }
-    unreadable(&mut check, gaps);
+    unreadable(&mut check, &gaps.unreadable);
     check
 }
 
 /// Zeabur Identity's `OAuthClient` kind is served and its namespace exists.
 fn zeabur_identity_installed(
-    kinds: &Result<Value, Value>,
-    namespace: &Result<Value, Value>,
+    kinds: &Result<ObjectList, Box<Problem>>,
+    namespace: &Result<ProjectNamespace, Box<Problem>>,
 ) -> Check {
     const NAME: &str = "zeabur-identity-installed";
     let kinds = match kinds {
@@ -568,16 +561,17 @@ fn zeabur_identity_installed(
         Err(problem) => return Check::from_problem(NAME, problem),
     };
     let mut check = Check::new(NAME);
-    let mut served: Vec<&str> = list(kinds, "items")
+    let mut served: Vec<&str> = kinds
+        .items
         .iter()
-        .filter(|k| text(k, "group") == ZEABUR_IDENTITY_GROUP)
-        .map(|k| text(k, "kind"))
+        .filter(|k| k.group == ZEABUR_IDENTITY_GROUP)
+        .map(|k| k.kind.as_str())
         .collect();
     served.sort_unstable();
     let has_client = served.contains(&"OAuthClient");
     let has_namespace = match namespace {
         Ok(_) => Some(true),
-        Err(problem) if text(problem, "kind") == "not-found" => Some(false),
+        Err(problem) if problem.kind == Kind::NotFound => Some(false),
         Err(problem) => {
             // The namespace part only: the kinds still say whether Zeabur Identity is installed.
             let refused = Check::from_problem(NAME, problem);
@@ -638,7 +632,7 @@ fn zeabur_identity_installed(
 }
 
 /// The `OAuthClient` `zeabur` exists and gets tokens for kube-apiserver.
-fn zeabur_identity_client(answer: Option<&Result<Value, Value>>) -> Check {
+fn zeabur_identity_client(answer: Option<&Result<ObjectDocument, Box<Problem>>>) -> Check {
     const NAME: &str = "zeabur-identity-client";
     let mut check = Check::new(NAME);
     let document = match answer {
@@ -649,7 +643,7 @@ fn zeabur_identity_client(answer: Option<&Result<Value, Value>>) -> Check {
                 .push("skipped: Zeabur Identity's OAuthClient kind is not served".to_owned());
             return check;
         }
-        Some(Err(problem)) if text(problem, "kind") == "not-found" => {
+        Some(Err(problem)) if problem.kind == Kind::NotFound => {
             check.status = Status::Warning;
             check.findings.push(format!(
                 "no OAuthClient {ZEABUR_CLIENT} in {ZEABUR_IDENTITY_NAMESPACE}"
@@ -664,7 +658,7 @@ fn zeabur_identity_client(answer: Option<&Result<Value, Value>>) -> Check {
         Some(Err(problem)) => return Check::from_problem(NAME, problem),
         Some(Ok(document)) => document,
     };
-    let object: Value = match serde_saphyr::from_str(text(document, "yaml")) {
+    let object: OAuthClient = match serde_saphyr::from_str(&document.yaml) {
         Ok(object) => object,
         Err(error) => {
             check.status = Status::Error;
@@ -674,11 +668,12 @@ fn zeabur_identity_client(answer: Option<&Result<Value, Value>>) -> Check {
             return check;
         }
     };
-    let spec = object.get("spec").unwrap_or(&Value::Null);
     let where_ = format!("OAuthClient {ZEABUR_IDENTITY_NAMESPACE}/{ZEABUR_CLIENT}");
-    if list(spec, "audiences")
+    if object
+        .spec
+        .audiences
         .iter()
-        .any(|a| a.as_str() == Some(KUBERNETES_AUDIENCE))
+        .any(|a| a == KUBERNETES_AUDIENCE)
     {
         check
             .findings
@@ -700,9 +695,9 @@ fn zeabur_identity_client(answer: Option<&Result<Value, Value>>) -> Check {
 /// server signs people in only through Zeabur Identity, so what this kubeconfig may do is not what
 /// the browser gets. Without Zeabur Identity, `zeabur-identity-installed` already warns and this
 /// check is skipped.
-fn zeabur_identity_user(whoami: &Value, zeabur_identity_installed: bool) -> Check {
+fn zeabur_identity_user(whoami: &WhoAmI, zeabur_identity_installed: bool) -> Check {
     let mut check = Check::new("zeabur-identity-user");
-    let username = text(whoami, "username");
+    let username = &whoami.username;
     if username.starts_with(ZEABUR_IDENTITY_USER_PREFIX) {
         check
             .findings
@@ -738,54 +733,55 @@ fn zeabur_identity_issuer_trust() -> Check {
 }
 
 /// The reads a response names in `unreadable`, as findings.
-fn unreadable(check: &mut Check, answer: &Value) {
+fn unreadable(check: &mut Check, refused: &[UnreadableView]) {
     check.findings.extend(
-        list(answer, "unreadable")
+        refused
             .iter()
-            .map(|refused| format!("partly checked: needs list {}", text(refused, "resource"))),
+            .map(|r| format!("partly checked: needs list {}", r.resource)),
     );
 }
 
 /// A refused request as the rule that allows it: `get oauthclients.identity.zeabur.com/zeabur
 /// in zeabur-identity`.
-fn rule(denied: &Value) -> String {
-    let part = |key: &str, before: &str| {
-        let value = text(denied, key);
-        if value.is_empty() {
-            String::new()
-        } else {
-            format!("{before}{value}")
-        }
-    };
+fn rule(denied: &Denied) -> String {
+    let group = Some(denied.group.as_str())
+        .filter(|g| !g.is_empty())
+        .map_or_else(String::new, |g| format!(".{g}"));
+    let name = denied
+        .name
+        .as_ref()
+        .map_or_else(String::new, |n| format!("/{n}"));
+    let namespace = denied
+        .namespace
+        .as_ref()
+        .map_or_else(String::new, |n| format!(" in {n}"));
     format!(
-        "{} {}{}{}{}",
-        text(denied, "verb"),
-        text(denied, "resource"),
-        part("group", "."),
-        part("name", "/"),
-        part("namespace", " in ")
+        "{} {}{group}{name}{namespace}",
+        denied.verb, denied.resource
     )
 }
 
 /// A problem's `detail`, or its title when it has none.
-fn detail(problem: &Value) -> String {
-    let detail = text(problem, "detail");
-    if detail.is_empty() {
-        text(problem, "title").to_owned()
+fn detail(problem: &Problem) -> String {
+    if problem.detail.is_empty() {
+        problem.title.clone()
     } else {
-        detail.to_owned()
+        problem.detail.clone()
     }
 }
 
-fn text<'a>(value: &'a Value, key: &str) -> &'a str {
-    value.get(key).and_then(Value::as_str).unwrap_or_default()
+/// The part of Zeabur Identity's `OAuthClient` the client check reads.
+#[derive(Debug, Deserialize)]
+struct OAuthClient {
+    #[serde(default)]
+    spec: OAuthClientSpec,
 }
 
-fn list<'a>(value: &'a Value, key: &str) -> &'a [Value] {
-    value
-        .get(key)
-        .and_then(Value::as_array)
-        .map_or(&[], Vec::as_slice)
+#[derive(Debug, Default, Deserialize)]
+struct OAuthClientSpec {
+    /// The audiences its tokens are for.
+    #[serde(default)]
+    audiences: Vec<String>,
 }
 
 #[cfg(test)]
@@ -794,7 +790,7 @@ mod tests {
     use std::sync::Arc;
 
     use axum::Router;
-    use serde_json::json;
+    use serde_json::{Value, json};
     use zeabur_api::access::SingleCluster;
     use zeabur_core::problem::KubernetesStatus;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;

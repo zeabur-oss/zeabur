@@ -11,7 +11,7 @@ use axum::body::Body;
 use axum::extract::{RawQuery, State};
 use axum::http::{HeaderMap, header};
 use secrecy::SecretString;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -25,7 +25,7 @@ use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
 /// The folder as pushed.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UploadedSource {
     /// The `Build`.

@@ -7,7 +7,7 @@
 //! (`keel.sh/policy`), for the automatic-update switch.
 
 use axum::extract::State;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
@@ -25,7 +25,7 @@ use crate::projects::backups::ProviderState;
 use crate::views::UnreadableView;
 
 /// A run and the pod that ran it.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectBuildRun {
     /// The run.
@@ -38,7 +38,7 @@ pub struct ProjectBuildRun {
 }
 
 /// A workload's Keel policy.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct KeelPolicy {
     /// `Deployment`, `StatefulSet` or `DaemonSet`.
@@ -50,7 +50,7 @@ pub struct KeelPolicy {
 }
 
 /// A project's builds.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectBuilds {
     /// Whether Zeabur Builder could be read.

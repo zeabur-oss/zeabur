@@ -2,6 +2,7 @@
 
 #![forbid(unsafe_code)]
 
+mod answer;
 mod components;
 mod connect;
 mod doctor;

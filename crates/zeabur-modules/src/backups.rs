@@ -12,13 +12,13 @@
 
 use std::collections::BTreeMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_model::{Citation, Fix, FixKind, Gap, Message, Origin, Severity};
 
 /// What a backup covers.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = BackupTargetKind)]
 pub enum TargetKind {
@@ -31,7 +31,7 @@ pub enum TargetKind {
 }
 
 /// One thing a backup covers.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = BackupTarget)]
 pub struct Target {
@@ -42,7 +42,7 @@ pub struct Target {
 }
 
 /// How a backup run went.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = BackupOutcome)]
 pub enum Outcome {
@@ -59,7 +59,7 @@ pub enum Outcome {
 }
 
 /// One backup run.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = BackupRun)]
 pub struct Run {
@@ -95,7 +95,7 @@ impl Run {
 }
 
 /// One backup schedule.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = BackupSchedule)]
 pub struct Schedule {
@@ -117,7 +117,7 @@ pub struct Schedule {
     pub destination: Option<String>,
     /// How many backups it keeps, by period (`last`, `hourly`, `daily`, `weekly`, `monthly`,
     /// `yearly`), when the provider counts them.
-    #[serde(skip_serializing_if = "BTreeMap::is_empty")]
+    #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]
     pub retention: BTreeMap<String, i64>,
     /// The object that runs it once, without `metadata`: for K8up, a `Backup` with the schedule's
     /// backup spec and backend.

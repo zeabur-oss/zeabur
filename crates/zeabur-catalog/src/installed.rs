@@ -34,14 +34,14 @@
 
 use std::cmp::Ordering;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_kube::ClusterFacts;
 
 use crate::Component;
 
 /// How a component was installed.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum InstallSource {
     /// Packaged and upgraded by k3s.
@@ -59,7 +59,7 @@ pub enum InstallSource {
 }
 
 /// The installed version against the tested one. An open set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum ComponentUpgrade {
     /// The tested version.
@@ -77,7 +77,7 @@ pub enum ComponentUpgrade {
 }
 
 /// One installed component.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Installation {
     /// The catalogue component (`traefik`).

@@ -8,7 +8,7 @@
 //!
 //! [suc-plan]: https://github.com/rancher/system-upgrade-controller/blob/v0.20.2/pkg/apis/upgrade.cattle.io/v1/types.go
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
 
@@ -32,7 +32,7 @@ pub const PLANS: Read = Read {
 };
 
 /// A Plan, reduced to what an upgrade overview needs.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = SystemUpgradeControllerPlan)]
 pub struct Plan {
@@ -54,7 +54,7 @@ pub struct Plan {
 }
 
 /// What system-upgrade-controller adds to the cluster's upgrades.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = SystemUpgradeControllerUpgrades)]
 pub struct Upgrades {

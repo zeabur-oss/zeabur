@@ -5,14 +5,14 @@
 //! ([`InProcess`]). The forward goes through kube-apiserver with the kubeconfig's own rights
 //! ([`forward`]). A database's password comes from its Secret when the kubeconfig may read it.
 
-use std::collections::BTreeMap;
 use std::process::ExitCode;
 
-use serde::Deserialize;
-use serde::de::DeserializeOwned;
-use serde_json::{Value, json};
+use zeabur_api::projects::databases::ProjectDatabases;
+use zeabur_api::views::{ProjectDocument, RevealedSecret, UnreadableView};
 use zeabur_core::problem::Problem;
 use zeabur_kube::UserClient;
+use zeabur_model::PortProtocol;
+use zeabur_modules::databases::{Connection, Database, Engine};
 
 use crate::forward::{self, ServiceAddress};
 use crate::in_process::InProcess;
@@ -32,97 +32,13 @@ pub(crate) struct ConnectArgs {
     context: Option<String>,
 }
 
-/// The part of `getProjectDatabases` this command reads.
-#[derive(Debug, Deserialize)]
-struct ProjectDatabases {
-    items: Vec<Database>,
-    unreadable: Vec<Unreadable>,
-}
-
-/// The part of `getProject` this command reads.
-#[derive(Debug, Deserialize)]
-struct ProjectDocument {
-    services: Vec<Service>,
-    endpoints: Vec<Endpoint>,
-    unreadable: Vec<Unreadable>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Service {
-    name: String,
-    endpoint_names: Vec<String>,
-}
-
-/// A Kubernetes Service.
-#[derive(Debug, Deserialize)]
-struct Endpoint {
-    name: String,
-    ports: Vec<EndpointPort>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EndpointPort {
-    port: i32,
-    /// The transport, `TCP` or `UDP`: the forwarder opens a TCP listener only.
-    protocol: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Unreadable {
-    resource: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Database {
-    name: String,
-    engine: Engine,
-    members: i64,
-    connection: Connection,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
-#[serde(rename_all = "camelCase")]
-enum Engine {
-    Postgresql,
-    Mongodb,
-    Mysql,
-    Mariadb,
-    Dragonfly,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Connection {
-    host: String,
-    port: u16,
-    database: Option<String>,
-    username: Option<String>,
-    secret: String,
-    username_key: Option<String>,
-    password_key: String,
-}
-
-/// The part of `revealProjectSecret` this command reads.
-#[derive(Debug, Deserialize)]
-struct RevealedSecret {
-    values: BTreeMap<String, SecretValue>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SecretValue {
-    value: String,
-    encoding: String,
-}
-
-impl RevealedSecret {
-    /// The text value of `key`; `None` for a missing key or binary data.
-    fn text(&self, key: &str) -> Option<String> {
-        self.values
-            .get(key)
-            .filter(|v| v.encoding == "utf-8")
-            .map(|v| v.value.clone())
-    }
+/// The text value of `key`; `None` for a missing key or binary data.
+fn text(secret: &RevealedSecret, key: &str) -> Option<String> {
+    secret
+        .values
+        .get(key)
+        .filter(|v| v.encoding == "utf-8")
+        .map(|v| v.value.clone())
 }
 
 pub(crate) fn run(args: &ConnectArgs) -> ExitCode {
@@ -167,15 +83,14 @@ async fn connect(args: &ConnectArgs) -> Result<(), String> {
     let sign_in = if secret.is_empty() {
         SignIn::Open
     } else {
-        let revealed: Option<RevealedSecret> = read(
-            api.post(
+        let revealed: Option<RevealedSecret> = api
+            .post(
                 &format!("/api/v1/projects/{project}/secrets/{secret}/reveal"),
-                &json!({}),
+                &(),
             )
-            .await,
-        )
-        .ok();
-        let value = |key: &str| revealed.as_ref().and_then(|r| r.text(key));
+            .await
+            .ok();
+        let value = |key: &str| revealed.as_ref().and_then(|r| text(r, key));
         let password = value(&connection.password_key);
         if password.is_none() {
             output::info(&format!(
@@ -211,10 +126,10 @@ async fn target(
     name: &str,
     port: Option<u16>,
 ) -> Result<(Option<Database>, ServiceAddress), String> {
-    let databases: ProjectDatabases = read(
-        api.get(&format!("/api/v1/projects/{project}/databases"))
-            .await,
-    )?;
+    let databases: ProjectDatabases = api
+        .get(&format!("/api/v1/projects/{project}/databases"))
+        .await
+        .map_err(said)?;
     let database = find(databases.items, project, name)?;
     let ports = if let Some(database) = &database {
         let connection = &database.connection;
@@ -229,8 +144,10 @@ async fn target(
             )?,
         ]
     } else {
-        let document: ProjectDocument =
-            read(api.get(&format!("/api/v1/projects/{project}")).await)?;
+        let document: ProjectDocument = api
+            .get(&format!("/api/v1/projects/{project}"))
+            .await
+            .map_err(said)?;
         service_ports(document, &databases.unreadable, project, name)?
     };
     Ok((database, pick(&ports, project, name, port)?))
@@ -257,17 +174,9 @@ fn parse(target: &str) -> Result<(&str, &str, Option<u16>), String> {
     Ok((project, name, port))
 }
 
-/// The API's answer as `T`, or the problem's words.
-fn read<T: DeserializeOwned>(answer: Result<Value, Value>) -> Result<T, String> {
-    match answer {
-        Ok(body) => {
-            serde_json::from_value(body).map_err(|e| format!("cannot read the answer: {e}"))
-        }
-        Err(problem) => Err(serde_json::from_value::<Problem>(problem).map_or_else(
-            |_| "The API refused without saying why.".to_owned(),
-            |p| p.detail,
-        )),
-    }
+/// What the API's problem says.
+fn said(problem: Box<Problem>) -> String {
+    problem.detail
 }
 
 /// The database `name` of the API's list of databases, if there is one.
@@ -284,16 +193,24 @@ fn find(databases: Vec<Database>, project: &str, name: &str) -> Result<Option<Da
 /// The ports of the Kubernetes Services of the service `name`, each with the Service it is of.
 fn service_ports(
     document: ProjectDocument,
-    databases_unreadable: &[Unreadable],
+    databases_unreadable: &[UnreadableView],
     project: &str,
     name: &str,
 ) -> Result<Vec<ServiceAddress>, String> {
     let ProjectDocument {
-        services,
-        endpoints,
+        project:
+            zeabur_model::Project {
+                services,
+                endpoints,
+                ..
+            },
         unreadable,
+        ..
     } = document;
-    let services: Vec<Service> = services.into_iter().filter(|s| s.name == name).collect();
+    let services: Vec<_> = services
+        .into_iter()
+        .filter(|s| s.workload.name == name)
+        .collect();
     if services.len() > 1 {
         return Err(format!(
             "Project {project} has more than one service named {name}. Connect to it from the cluster instead."
@@ -322,7 +239,7 @@ fn service_ports(
         .flat_map(|e| {
             e.ports
                 .into_iter()
-                .filter(|p| p.protocol != "UDP")
+                .filter(|p| p.protocol.protocol != PortProtocol::Udp)
                 .filter_map(move |p| {
                     Some(ServiceAddress {
                         namespace: project.to_owned(),
@@ -458,27 +375,63 @@ fn encode(text: &str) -> String {
 mod tests {
     use std::sync::Arc;
 
+    use serde_json::json;
     use zeabur_api::access::SingleCluster;
+    use zeabur_api::views::SecretValue;
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Service as KubeService};
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects};
+    use zeabur_model::Origin;
+    use zeabur_modules::databases::{Backups, State as DatabaseState};
 
     use super::*;
 
-    fn database(engine: &str, name: &str, connection: &Value) -> Value {
-        json!({"engine": engine, "name": name, "provider": "x", "state": "ready", "members": 1, "connection": connection})
+    /// A database as `getProjectDatabases` lists it.
+    fn database(engine: Engine, name: &str, members: i64) -> Database {
+        Database {
+            origin: Origin::complete("postgresql.cnpg.io/v1", "Cluster", Some("shop"), name),
+            engine,
+            provider: "cloudnative-pg".to_owned(),
+            api_version: "postgresql.cnpg.io/v1".to_owned(),
+            api_group: "postgresql.cnpg.io".to_owned(),
+            api_group_version: "v1".to_owned(),
+            kind: "Cluster".to_owned(),
+            resource: "clusters".to_owned(),
+            name: name.to_owned(),
+            state: DatabaseState::Ready,
+            phase: None,
+            message: None,
+            members,
+            ready: members,
+            primary: None,
+            version: None,
+            image: None,
+            storage: None,
+            storage_class: None,
+            claims: Vec::new(),
+            resources: None,
+            connection: connection(Some("app")),
+            app: None,
+            backups: Backups::default(),
+            created: None,
+            object: json!({}),
+            pods: Vec::new(),
+            restored: None,
+        }
     }
 
     fn connection(database: Option<&str>) -> Connection {
-        serde_json::from_value(json!({
-            "host": "orders-rw.shop.svc",
-            "port": 5432,
-            "database": database,
-            "secret": "orders-app",
-            "passwordKey": "password",
-        }))
-        .unwrap()
+        Connection {
+            host: "orders-rw.shop.svc".to_owned(),
+            port: 5432,
+            database: database.map(str::to_owned),
+            username: None,
+            secret: "orders-app".to_owned(),
+            username_key: None,
+            password_key: "password".to_owned(),
+            options: None,
+        }
     }
 
     fn password(username: Option<&str>, password: Option<&str>) -> SignIn {
@@ -534,14 +487,7 @@ mod tests {
 
     #[test]
     fn a_mongodb_replica_set_of_several_members_says_writes_may_be_refused() {
-        let mongo = |members: i64| -> Database {
-            serde_json::from_value(json!({
-                "name": "orders", "engine": "mongodb", "members": members,
-                "connection": {"host": "orders-rs0.shop.svc", "port": 27017,
-                               "secret": "orders-secrets", "passwordKey": "password"},
-            }))
-            .unwrap()
-        };
+        let mongo = |members| database(Engine::Mongodb, "orders", members);
         let note = one_member_note(&mongo(3)).unwrap();
         assert!(note.contains("primary"), "{note}");
         assert_eq!(one_member_note(&mongo(1)), None);
@@ -549,14 +495,12 @@ mod tests {
 
     #[test]
     fn a_database_is_found_by_its_name_alone_once() {
-        let pg = json!({"host": "h", "port": 5432, "secret": "s", "passwordKey": "password"});
-        let listed = || -> Vec<Database> {
-            serde_json::from_value(json!([
-                database("postgresql", "orders", &pg),
-                database("postgresql", "shared", &pg),
-                database("mysql", "shared", &pg),
-            ]))
-            .unwrap()
+        let listed = || {
+            vec![
+                database(Engine::Postgresql, "orders", 1),
+                database(Engine::Postgresql, "shared", 1),
+                database(Engine::Mysql, "shared", 1),
+            ]
         };
         assert_eq!(
             find(listed(), "shop", "orders").unwrap().unwrap().engine,
@@ -564,6 +508,37 @@ mod tests {
         );
         assert!(find(listed(), "shop", "web").unwrap().is_none());
         assert!(find(listed(), "shop", "shared").is_err());
+    }
+
+    /// The databases and the Secret read back as the server wrote them.
+    #[test]
+    fn the_servers_answers_read_back_unchanged() {
+        let databases = ProjectDatabases {
+            operators: Vec::new(),
+            items: vec![database(Engine::Mongodb, "orders", 3)],
+            unreadable: Vec::new(),
+        };
+        let body = serde_json::to_vec(&databases).unwrap();
+        assert_eq!(
+            crate::answer::read::<ProjectDatabases>(http::StatusCode::OK, &body, "test"),
+            Ok(databases)
+        );
+        let revealed = RevealedSecret {
+            origin: Origin::complete("v1", "Secret", Some("shop"), "orders-app"),
+            values: [(
+                "password".to_owned(),
+                SecretValue {
+                    value: "pw".to_owned(),
+                    encoding: "utf-8".to_owned(),
+                },
+            )]
+            .into(),
+        };
+        let body = serde_json::to_vec(&revealed).unwrap();
+        assert_eq!(
+            crate::answer::read::<RevealedSecret>(http::StatusCode::OK, &body, "test"),
+            Ok(revealed)
+        );
     }
 
     /// Project `shop` with the Deployment `web`, reached through the Services `web` (80, 9090)
@@ -763,27 +738,20 @@ mod tests {
 
     #[test]
     fn only_text_values_of_the_secret_go_into_the_uri() {
-        let revealed: RevealedSecret = serde_json::from_value(json!({
-            "origin": {},
-            "values": {
-                "username": {"value": "app", "encoding": "utf-8"},
-                "password": {"value": "AAEC", "encoding": "base64"},
-            },
-        }))
-        .unwrap();
-        assert_eq!(revealed.text("username").as_deref(), Some("app"));
-        assert_eq!(revealed.text("password"), None);
-        assert_eq!(revealed.text("missing"), None);
-    }
-
-    #[test]
-    fn a_refusal_reads_as_the_problem_detail() {
-        let problem = serde_json::to_value(Problem::new(
-            zeabur_core::problem::Kind::Forbidden,
-            "You cannot list databases in shop.",
-        ))
-        .unwrap();
-        let read: Result<ProjectDatabases, String> = read(Err(problem));
-        assert_eq!(read.unwrap_err(), "You cannot list databases in shop.");
+        let value = |value: &str, encoding: &str| SecretValue {
+            value: value.to_owned(),
+            encoding: encoding.to_owned(),
+        };
+        let revealed = RevealedSecret {
+            origin: Origin::complete("v1", "Secret", Some("shop"), "orders-app"),
+            values: [
+                ("username".to_owned(), value("app", "utf-8")),
+                ("password".to_owned(), value("AAEC", "base64")),
+            ]
+            .into(),
+        };
+        assert_eq!(text(&revealed, "username").as_deref(), Some("app"));
+        assert_eq!(text(&revealed, "password"), None);
+        assert_eq!(text(&revealed, "missing"), None);
     }
 }

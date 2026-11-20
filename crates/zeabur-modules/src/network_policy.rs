@@ -53,7 +53,7 @@ use k8s_openapi::api::networking::v1::{
 };
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::{LabelSelector, ObjectMeta};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::DynamicObject;
@@ -93,7 +93,7 @@ pub struct Workload {
 }
 
 /// How far a peer may reach.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = NetworkPolicyAccess)]
 pub enum Access {
@@ -120,7 +120,7 @@ impl Access {
 }
 
 /// One service's reachability.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = NetworkPolicyService)]
 pub struct ServiceReachability {
@@ -145,7 +145,7 @@ pub struct ServiceReachability {
 }
 
 /// A service and how far it may reach another.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = NetworkPolicyPeer)]
 pub struct Peer {
@@ -161,7 +161,7 @@ pub struct Peer {
 
 /// A connection the project shows (inferred from configuration), and whether the policies let it
 /// through.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = NetworkPolicyConnection)]
 pub struct Connection {
@@ -176,7 +176,7 @@ pub struct Connection {
 }
 
 /// The project's reachability.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = NetworkPolicyReachability)]
 pub struct Reachability {
@@ -193,7 +193,7 @@ pub struct Reachability {
 }
 
 /// A namespace that a policy lets reach every pod of the project.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 #[schema(as = NetworkPolicyAllowedNamespace)]
 pub struct AllowedNamespace {

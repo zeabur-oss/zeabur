@@ -12,13 +12,13 @@
 //! [k8s-ns-conditions]: https://kubernetes.io/docs/reference/kubernetes-api/cluster-resources/namespace-v1/#NamespaceStatus
 //! [k8s-ns-messages]: https://github.com/kubernetes/kubernetes/blob/v1.34.1/pkg/controller/namespace/deletion/status_condition_utils.go
 
-use serde::{Deserialize as _, Serialize};
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_kube::k8s_openapi::api::core::v1::NamespaceStatus;
 use zeabur_kube::{Cluster, DynamicObject, ResourceRef};
 
 /// A project whose Namespace is being deleted.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDeleting {
     /// When the deletion started, RFC 3339.
@@ -32,7 +32,7 @@ pub struct ProjectDeleting {
 }
 
 /// Objects of one resource that are left.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RemainingContent {
     /// The API group; empty for the core group.
@@ -44,7 +44,7 @@ pub struct RemainingContent {
 }
 
 /// One finalizer that holds objects back.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RemainingFinalizer {
     /// The finalizer (`cnpg.io/cleanup`).
@@ -54,7 +54,7 @@ pub struct RemainingFinalizer {
 }
 
 /// An object whose finalizers keep the Namespace.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct HeldObject {
     /// The API group; empty for the core group.

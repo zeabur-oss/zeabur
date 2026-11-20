@@ -37,7 +37,7 @@ use std::sync::Arc;
 
 use axum::extract::State;
 use futures_util::StreamExt as _;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, admin_only_namespace, is_system_namespace};
 use zeabur_core::problem::{Denied, MEDIA_TYPE as PROBLEM, Problem};
@@ -69,7 +69,7 @@ impl SignInPage for Fixed {
 }
 
 /// A product role in a project, from the person's rights there.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum AccountRole {
     /// Rights short of Viewer, or none.

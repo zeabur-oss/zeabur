@@ -46,7 +46,7 @@ pub const BUILD_RUNS: Read = Read {
 pub const RUN_LABEL: &str = "builder.zeabur.com/buildrun";
 
 /// A `Build`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ZeaburBuilderBuild {
     /// Its name.
@@ -108,7 +108,7 @@ pub struct ZeaburBuilderBuild {
 }
 
 /// A build variable of a `Build`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ZeaburBuilderEnv {
     /// The name.
@@ -138,7 +138,7 @@ fn env(spec: &BuildSpec) -> Vec<ZeaburBuilderEnv> {
 
 /// A `Build` that cannot build: the ref cannot be resolved (`SourceReady`) or its
 /// `ClusterBuilder` is missing (`BuilderReady`).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ZeaburBuilderProblem {
     /// `SourceReady` or `BuilderReady`.
@@ -197,7 +197,7 @@ fn problem(build: &BuildView, now: Option<Timestamp>) -> Option<ZeaburBuilderPro
 }
 
 /// A `BuildRun`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ZeaburBuilderRun {
     /// Its name, also its Job's and its pod's label.
@@ -370,7 +370,7 @@ struct RunStatus {
 }
 
 /// The Secret a `Build` reads its repository's credentials from.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 pub struct BuildCredentials {
     /// Its name.
     pub name: String,

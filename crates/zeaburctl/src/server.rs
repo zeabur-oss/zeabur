@@ -14,8 +14,12 @@ use hyper_rustls::HttpsConnector;
 use hyper_util::client::legacy::Client;
 use hyper_util::client::legacy::connect::HttpConnector;
 use hyper_util::rt::TokioExecutor;
-use serde_json::{Value, json};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
+use zeabur_core::problem::Problem;
 use zeabur_kube::UserToken;
+
+use crate::answer::{self, internal as problem};
 
 /// The largest answer read.
 const MAX_BODY: usize = 64 * 1024 * 1024;
@@ -76,14 +80,21 @@ impl Server {
         })
     }
 
-    /// `GET` `path_and_query`: the JSON of a success, or the problem the server answered with.
-    pub(crate) async fn get(&self, path_and_query: &str) -> Result<Value, Value> {
+    /// `GET` `path_and_query`: the answer as `T`, or the problem the server answered with.
+    pub(crate) async fn get<T: DeserializeOwned>(
+        &self,
+        path_and_query: &str,
+    ) -> Result<T, Box<Problem>> {
         self.send(Method::GET, path_and_query, None, Vec::new(), QUICK)
             .await
     }
 
     /// `POST` `body` as JSON.
-    pub(crate) async fn post(&self, path_and_query: &str, body: &Value) -> Result<Value, Value> {
+    pub(crate) async fn post<B: Serialize + Sync, T: DeserializeOwned>(
+        &self,
+        path_and_query: &str,
+        body: &B,
+    ) -> Result<T, Box<Problem>> {
         let bytes = serde_json::to_vec(body)
             .map_err(|e| problem(&format!("The request is not JSON: {e}")))?;
         self.send(
@@ -97,12 +108,12 @@ impl Server {
     }
 
     /// `POST` `bytes` as `content_type`.
-    pub(crate) async fn post_bytes(
+    pub(crate) async fn post_bytes<T: DeserializeOwned>(
         &self,
         path_and_query: &str,
         content_type: &str,
         bytes: Vec<u8>,
-    ) -> Result<Value, Value> {
+    ) -> Result<T, Box<Problem>> {
         self.send(
             Method::POST,
             path_and_query,
@@ -113,14 +124,14 @@ impl Server {
         .await
     }
 
-    async fn send(
+    async fn send<T: DeserializeOwned>(
         &self,
         method: Method,
         path_and_query: &str,
         content_type: Option<&str>,
         body: Vec<u8>,
         deadline: Duration,
-    ) -> Result<Value, Value> {
+    ) -> Result<T, Box<Problem>> {
         let mut authorization = self.token.authorization().clone();
         authorization.set_sensitive(true);
         let mut request = Request::builder()
@@ -152,27 +163,12 @@ impl Server {
                 .await
                 .map_err(|e| problem(&format!("Unable to read the answer: {e}")))?
                 .to_bytes();
-            let value: Value = serde_json::from_slice(&body).unwrap_or_else(|_| {
-                problem(&format!(
-                    "{} answered {status}, which is not JSON.",
-                    self.origin
-                ))
-            });
-            if status.is_success() {
-                Ok(value)
-            } else {
-                Err(value)
-            }
+            answer::read(status, &body, &self.origin)
         };
         tokio::time::timeout(deadline, exchange)
             .await
             .map_err(|_elapsed| problem(&format!("{} did not answer in time.", self.origin)))?
     }
-}
-
-/// A problem of `zeaburctl`'s own, in the server's shape.
-fn problem(detail: &str) -> Value {
-    json!({"title": "zeaburctl", "detail": detail})
 }
 
 /// The innermost cause, which names what failed (DNS, TLS, a refused connection).

@@ -26,7 +26,7 @@ pub use templates::{Catalog, Dropped, Index, RenderError, RenderOptions, Templat
 pub const CATALOGUE_COMMIT: &str = env!("ZEABUR_CATALOG_COMMIT");
 
 /// One component of the catalogue: an upstream project that provides a capability.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Component {
     /// Its id, the file name in the catalogue (`traefik`).
@@ -227,7 +227,7 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
 }
 
 /// Whether a capability is present on the cluster, and on what evidence.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Capability {
     /// The capability (`ingress`, `certificates`, …).
@@ -279,7 +279,7 @@ pub fn component_ref(catalogue: &[Component], id: &str) -> Option<ComponentRef> 
 }
 
 /// How strongly the catalogue suggests a missing capability.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "kebab-case")]
 pub enum Suggestion {
     /// Installed by default on clusters of this shape.

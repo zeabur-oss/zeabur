@@ -22,7 +22,7 @@
 
 use std::collections::BTreeMap;
 
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::problem::KubernetesStatus;
 use zeabur_kube::Unreadable;
@@ -33,7 +33,7 @@ use zeabur_model::{
 use crate::projects::namespace::Permission;
 
 /// A kind the person could not read, and kube-apiserver's answer.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UnreadableView {
     /// The resource (`secrets`, `deployments.apps`, …).
@@ -52,7 +52,7 @@ impl From<Unreadable> for UnreadableView {
 }
 
 /// Who the cluster says the person is.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct WhoAmI {
     /// User name.
@@ -236,7 +236,7 @@ pub struct LeaderLease {
 }
 
 /// A project in the list.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectSummary {
     /// `projects/<name>`.
@@ -270,7 +270,7 @@ pub struct ProjectSummary {
 
 /// One service of a project in the list: which it is, how healthy and why, without its
 /// containers, variables or configuration (those are in the project document).
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ServiceSummary {
     /// `projects/<project>/services/<kind>/<name>`.
@@ -296,7 +296,7 @@ pub struct ServiceSummary {
 }
 
 /// The projects (namespaces) the person may list.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectList {
     /// Adopted projects first, then the other namespaces, each sorted by name.
@@ -309,7 +309,7 @@ pub struct ProjectList {
 ///
 /// The one document a client needs for a project: the service, variables and objects views are
 /// cut from it rather than read again.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDocument {
     /// `projects/<name>`.
@@ -324,7 +324,7 @@ pub struct ProjectDocument {
 }
 
 /// What integrations add to a project document, one member per module.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectExtensions {
     /// Who may reach each service, from the project's NetworkPolicy objects. Whether the
@@ -423,7 +423,7 @@ pub struct ConfigMapList {
 }
 
 /// One value of a revealed Secret.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct SecretValue {
     /// The value: text as is, binary data as base64.
@@ -433,7 +433,7 @@ pub struct SecretValue {
 }
 
 /// A Secret's values, shown because the person asked.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct RevealedSecret {
     /// The Secret.
@@ -443,7 +443,7 @@ pub struct RevealedSecret {
 }
 
 /// Which capabilities the cluster has.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct CapabilityList {
     /// Zeabur Catalog's commit.
@@ -689,7 +689,7 @@ pub struct NodeList {
 }
 
 /// The cluster's own version and what it calls for.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Upgrades {
     /// `cluster/upgrades`.
@@ -733,7 +733,7 @@ pub struct Upgrades {
 }
 
 /// What integrations add to the cluster's upgrades, one member per module.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Default, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct UpgradeExtensions {
     /// system-upgrade-controller's Plans.

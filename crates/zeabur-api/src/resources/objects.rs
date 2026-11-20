@@ -41,7 +41,7 @@ use axum::extract::RawQuery;
 use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use futures_util::StreamExt as _;
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use serde_json::json;
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
@@ -89,7 +89,7 @@ pub(crate) const CURATED: [(&str, &str); 15] = [
 ];
 
 /// Whether the person may list a kind, as a list answered.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum ObjectAccess {
     /// The list was answered.
@@ -139,7 +139,7 @@ impl ListQuery {
 }
 
 /// One object in a listing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectSummary {
     /// `projects/<p>/objects/<group>/<version>/<resource>/<name>`, `core` for the empty group.
@@ -155,7 +155,7 @@ pub struct ObjectSummary {
 }
 
 /// The objects of one kind.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectKind {
     /// The API group; empty for the core group.
@@ -179,7 +179,7 @@ pub struct ObjectKind {
 }
 
 /// Every object of a project, by kind.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectList {
     /// `projects/<p>/objects`.
@@ -193,7 +193,7 @@ pub struct ObjectList {
 }
 
 /// One object as YAML.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectDocument {
     /// `projects/<p>/objects/<group>/<version>/<resource>/<name>`.
