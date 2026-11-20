@@ -1111,7 +1111,6 @@ fn keep_looser_level(desired: &mut ObjectMeta, found: &ObjectMeta) {
     }
 }
 
-/// Whether Zeabur wrote the object for `component`.
 /// Whether every CRD of the step's `skipIfPresent` exists and Zeabur did not write it for the
 /// component: the cluster already has what the release installs.
 async fn skipped(cluster: &dyn Cluster, step: &engine::Step) -> Result<bool, ApiError> {
