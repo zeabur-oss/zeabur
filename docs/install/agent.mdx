@@ -1,32 +1,32 @@
 ---
-title: Let an agent install or migrate for you
-description: In development. You will paste a prompt into Claude or Codex, and it will get a server, install Zeabur, and can also move your zeabur.com project over.
+title: Let an agent install for you
+description: Paste one prompt into Claude Code or Codex, and it installs Zeabur on a server for you by following these docs.
 ---
 
-<Callout type="info" title="In development">
-You can't use this yet. Follow [#544](https://github.com/zeabur-oss/zeabur/issues/544) and [#430](https://github.com/zeabur-oss/zeabur/issues/430). To install today, [install Zeabur in an existing cluster by hand](existing-cluster.mdx).
-</Callout>
+An agent such as Claude Code or Codex can follow the install steps for you. It reads the same pages you would, runs the commands, and stops where a decision or a payment is yours.
 
-Prefer to do it yourself? [Install by hand](existing-cluster.mdx) works today. The [one-command install with Zeatend](one-command.mdx) is also in development.
+## Paste this prompt
 
-## What you will have
+```text
+Install Zeabur on my server by following https://oss.zeabur.com/docs/zeabur/install/one-command/.
+If the server already runs Kubernetes, follow https://oss.zeabur.com/docs/zeabur/install/existing-cluster/ instead.
+```
 
-- A server of your own, running Zeabur.
-- Zeabur's address and a way to sign in for the first time.
-- If you move from zeabur.com, your services and data running on the new server.
+Run the agent on a computer that can reach the server over SSH, and tell it the server's address.
 
-## How it will work
+## What the agent does
 
-1. You paste a prompt into Claude Code or Codex. It is one sentence with the address of this page.
-2. The agent reads this page and asks which provider and plan you want, with the price. It buys the server only after you confirm.
-3. The agent uses Zeatend to install Kubernetes and Zeabur on the new server.
-4. To move from zeabur.com, the agent follows zeabur.com's [migration guide](https://zeabur.com/blogs/migrate-from-zeabur): it lists your services and backs up the databases. Then it creates the services again in Zeabur and restores the data.
-5. At the end, the agent gives you Zeabur's address and how to sign in for the first time.
+1. Checks the server and asks you before it changes anything.
+2. Sets up Kubernetes with Zeatend, unless the server already runs it.
+3. Installs Zeabur with one `helm install`.
+4. Gives you Zeabur's address and the link that creates your admin account.
 
 ## What you do yourself
 
-The agent stops at these steps and waits for you:
+- Get the server and pay for it.
+- To use your own domain instead of an sslip.io address, point its DNS records at the server.
+- Open the link and create your passkey. Only you can make it, on your own device.
 
-- Confirm the server and its price.
-- Pay for it.
-- Change your domain's DNS so the address points to the new server.
+## Coming from zeabur.com
+
+To move a project too, add to the prompt: "Then move my zeabur.com project by following https://zeabur.com/blogs/migrate-from-zeabur". The agent lists your services, backs up the databases, creates the services again in Zeabur, and restores the data.

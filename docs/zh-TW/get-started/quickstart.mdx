@@ -1,14 +1,14 @@
 ---
 title: 安裝 Zeabur
-description: 選一種安裝方式：交給 Claude 或 Codex、用 Zeatend 的安裝畫面，或自己用 Helm 安裝。
+description: 選一種安裝方式：交給 Claude 或 Codex、在新伺服器上用 Zeatend，或裝進你已經有的叢集。
 ---
 
-<Figure label="安裝 Zeabur 的三種方式：交給 Claude 或 Codex、用 Zeatend 的安裝畫面、手動安裝。三種方式都裝出同一個 Zeabur。">
+<Figure label="安裝 Zeabur 的三種方式：交給 Claude 或 Codex、在新伺服器上用 Zeatend、裝進已經有的叢集。三種方式都裝出同一個 Zeabur。">
 <FigFlow>
 <FigGroup label="安裝 Zeabur 的三種方式">
-<FigCard title="交給 Claude 或 Codex" note="貼上一段提示，它幫你裝好" tag="開發中" />
-<FigCard title="用 Zeatend 的安裝畫面" note="在伺服器上自己一步步操作" tag="開發中" />
-<FigCard title="手動安裝" note="用 Helm，每個物件都看得到" tag="現在可用" hot />
+<FigCard title="交給 Claude 或 Codex" note="貼上一段提示，它幫你裝好" />
+<FigCard title="新伺服器用 Zeatend" note="先裝 Kubernetes，再一個 helm install" />
+<FigCard title="已經有的叢集" note="一個 helm install" />
 </FigGroup>
 <FigArrow />
 <FigCard accent title="你的伺服器上的 Zeabur" note="同樣的專案、服務和網域" />
@@ -17,14 +17,12 @@ description: 選一種安裝方式：交給 Claude 或 Codex、用 Zeatend 的�
 
 三種方式裝出來的 Zeabur 都一樣。差別在於誰來動手，以及你想看到多少細節。
 
-| 你是 | 選這個 | 現在能用嗎 |
-| --- | --- | --- |
-| 想要最省事，讓 AI 助手代勞 | [交給 Agent 安裝或搬家](../install/agent.mdx) | 開發中 |
-| 喜歡在伺服器上自己動手 | [用 Zeatend 一個指令安裝](../install/one-command.mdx) | 開發中 |
-| 管理叢集，想看清楚每個物件 | [手動把 Zeabur 裝進既有叢集](../install/existing-cluster.mdx) | 可以 |
+| 你的情況 | 選這個 |
+| --- | --- |
+| 想讓 AI 助手代勞 | [交給 Agent 安裝或搬家](../install/agent.mdx) |
+| 有一台全新的 Linux 伺服器 | [用 Zeatend 安裝](../install/one-command.mdx) |
+| 已經在跑 Kubernetes 叢集 | [把 Zeabur 裝進既有叢集](../install/existing-cluster.mdx) |
 
-現在能用的是手動安裝：用 Helm 把 Zeabur 裝進已有的 Kubernetes 叢集。Kubernetes 是在一台或多台伺服器上執行容器的開源系統，叢集就是一組由它管理的伺服器。Helm 是 Kubernetes 的安裝工具。
-
-另外兩種方式完成後，這一頁的表格會改成「可以」，你可以先追蹤 [#430](https://github.com/zeabur-oss/zeabur/issues/430) 和 [#544](https://github.com/zeabur-oss/zeabur/issues/544)。
+三種方式最後都是同一個 `helm install`。Helm 是 Kubernetes 的安裝工具。Kubernetes 是在一台或多台伺服器上執行容器的開源系統，叢集就是一組由它管理的伺服器。Zeatend 會在新伺服器上裝好 Kubernetes。
 
 只想在自己的電腦上看看叢集，不必安裝到叢集裡，見 [Zeabur Desktop](../install/desktop.mdx)。

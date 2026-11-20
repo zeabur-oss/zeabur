@@ -30,9 +30,9 @@ What is different:
   center you chose for it.
 - **You look after it.** You or your team upgrade Zeabur, back up data, and maintain the
   server.
-- **For now, you need a Kubernetes cluster.** Kubernetes is open-source software that runs
-  containers on one or more servers, and Zeabur runs on top of it. Installing on a new server with
-  one command is still in development; see [#430](https://github.com/zeabur-oss/zeabur/issues/430).
+- **It runs on Kubernetes.** Kubernetes is open-source software that runs containers on one or
+  more servers, and Zeabur runs on top of it. On a new server,
+  [Zeatend](https://oss.zeabur.com/docs/zeabur/install/one-command/) sets it up first.
 
 [Coming from zeabur.com](https://oss.zeabur.com/docs/zeabur/get-started/from-zeabur-com/) shows where each of these is in the
 documentation, with a screenshot for each step, and where to start. It is also in

@@ -1,14 +1,14 @@
 ---
 title: Install Zeabur
-description: "Choose how to install Zeabur. Let Claude or Codex do it, use Zeatend's install screens, or install by hand with Helm."
+description: "Choose how to install Zeabur: let Claude or Codex do it, set up a new server with Zeatend, or install into a cluster you already have."
 ---
 
-<Figure label="Three ways to install Zeabur: hand it to Claude or Codex, use Zeatend's install screens, or install by hand. All three end in the same Zeabur.">
+<Figure label="Three ways to install Zeabur: hand it to Claude or Codex, set up a new server with Zeatend, or install into a cluster you already have. All three end in the same Zeabur.">
 <FigFlow>
 <FigGroup label="Three ways to install Zeabur">
-<FigCard title="Hand it to Claude or Codex" note="Paste a prompt and it installs for you" tag="In development" />
-<FigCard title="Zeatend's install screens" note="Go step by step on the server yourself" tag="In development" />
-<FigCard title="Install by hand" note="With Helm, every object in view" tag="Available now" hot />
+<FigCard title="Hand it to Claude or Codex" note="Paste a prompt and it installs for you" />
+<FigCard title="A new server with Zeatend" note="Kubernetes first, then one helm install" />
+<FigCard title="A cluster you already have" note="One helm install" />
 </FigGroup>
 <FigArrow />
 <FigCard accent title="Zeabur on your own server" note="The same projects, services and domains" />
@@ -17,14 +17,12 @@ description: "Choose how to install Zeabur. Let Claude or Codex do it, use Zeate
 
 All three ways give you the same Zeabur. They differ in who does the work and how much of it you see.
 
-| If | Pick | Available |
-| --- | --- | --- |
-| You want an AI assistant to do it | [Let an agent install or migrate for you](../install/agent.mdx) | In development |
-| You prefer to work on the server yourself | [One-command install with Zeatend](../install/one-command.mdx) | In development |
-| You run a cluster and want to see every object | [Install Zeabur in an existing cluster by hand](../install/existing-cluster.mdx) | Yes |
+| If | Pick |
+| --- | --- |
+| You want an AI assistant to do it | [Let an agent install for you](../install/agent.mdx) |
+| You have a new Linux server | [Install with Zeatend](../install/one-command.mdx) |
+| You already run a Kubernetes cluster | [Install Zeabur in an existing cluster](../install/existing-cluster.mdx) |
 
-Today you install by hand. Helm, Kubernetes' install tool, puts Zeabur into a Kubernetes cluster you already have. Kubernetes is open-source software that runs containers on one or more servers, and a cluster is a group of servers it manages.
-
-When the other two ways are ready, this table will say so. To follow them, watch [#430](https://github.com/zeabur-oss/zeabur/issues/430) and [#544](https://github.com/zeabur-oss/zeabur/issues/544).
+Each way ends with the same `helm install`. Helm is Kubernetes' install tool. Kubernetes is open-source software that runs containers on one or more servers, and a cluster is a group of servers it manages. Zeatend sets up Kubernetes on a new server.
 
 To look at a cluster from your own computer without installing anything in it, see [Zeabur Desktop](../install/desktop.mdx).
