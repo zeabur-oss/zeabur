@@ -5,8 +5,8 @@
 //!
 //! Where CloudNativePG is not installed (the bare profile), a stand-in for its `Cluster` CRD is
 //! made and deleted with the sandbox. A running pod the `Cluster` owns has CloudNativePG's grace
-//! period (1800s), so a Namespace deleted while it is still there waits for the namespace
-//! controller's 5-minute resync.
+//! period (1800s) and, like PostgreSQL, takes some seconds to stop, so a Namespace deleted while it
+//! is still there waits for the namespace controller's 5-minute resync.
 //!
 //! A project held by a finalizer no controller removes is force deleted by a person whose rights
 //! come from a ClusterRole, since the namespace controller deletes the Roles inside the project.
@@ -127,7 +127,9 @@ async fn a_project_with_a_database_goes_away() {
                    "uid": database.metadata.uid, "controller": true,
                    "blockOwnerDeletion": true}]},
                "spec": {"terminationGracePeriodSeconds": 1800,
-                        "containers": [{"name": "pause", "image": "registry.k8s.io/pause:3.10"}]}}),
+                        "containers": [{"name": "db", "image": "busybox:1.37",
+                            "command": ["sh", "-c",
+                                "trap 'sleep 20; exit 0' TERM; while true; do sleep 1; done"]}]}}),
     )
     .await;
     let deadline = tokio::time::Instant::now() + WAIT;
@@ -165,6 +167,10 @@ async fn a_project_with_a_database_goes_away() {
         .filter_map(|a| a["target"]["kind"].as_str())
         .collect();
     assert_eq!(kinds, ["Cluster", "Namespace"], "{applied}");
+    assert!(
+        pods.get_opt("db-1").await.unwrap().is_none(),
+        "the Namespace was deleted before the database pod was gone"
+    );
     gone(&namespaces, &ns, PROMPT).await;
 }
 
