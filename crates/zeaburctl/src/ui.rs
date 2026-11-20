@@ -26,17 +26,7 @@ pub(crate) struct UiArgs {
     metrics_service: Option<String>,
 }
 
-pub(crate) fn run(args: &UiArgs) -> ExitCode {
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            output::error(&format!("cannot start: {error}"));
-            return ExitCode::FAILURE;
-        }
-    };
+pub(crate) async fn run(args: &UiArgs) -> ExitCode {
     let settings = match crate::in_process::settings(args.metrics_service.as_deref()) {
         Ok(settings) => settings,
         Err(message) => {
@@ -45,13 +35,13 @@ pub(crate) fn run(args: &UiArgs) -> ExitCode {
         }
     };
     let telemetry = Local::from_env();
-    let served = runtime.block_on(serve(args, settings, &telemetry));
+    let served = serve(args, settings, &telemetry).await;
     if let Err(message) = &served {
         output::error(message);
     }
     // The event goes out while the interface runs; only a start that failed waits for it here,
     // after the error is shown.
-    runtime.block_on(telemetry.finish());
+    telemetry.finish().await;
     if served.is_ok() {
         ExitCode::SUCCESS
     } else {

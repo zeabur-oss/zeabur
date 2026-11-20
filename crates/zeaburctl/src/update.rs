@@ -1,6 +1,8 @@
 //! The update check (docs/reference/telemetry.mdx, "Update check"). Each command asks GitHub for
 //! the releases on a thread of its own while it runs, and prints one line when they name a newer
-//! `zeaburctl`. At its end the command waits at most [`GRACE`] for the answer.
+//! `zeaburctl`. At its end the command waits at most [`GRACE`] for the answer. The thread has its
+//! own runtime: on the command's runtime, a stalled DNS lookup on the blocking pool would hold up
+//! the exit.
 //!
 //! Without a token GitHub answers 60 requests an hour from one address [gh-limit]. With a token in
 //! `GH_TOKEN` or `GITHUB_TOKEN`, the variables `gh` reads, the requests count against the token's

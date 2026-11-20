@@ -41,18 +41,8 @@ fn text(secret: &RevealedSecret, key: &str) -> Option<String> {
         .map(|v| v.value.clone())
 }
 
-pub(crate) fn run(args: &ConnectArgs) -> ExitCode {
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            output::error(&format!("cannot start: {error}"));
-            return ExitCode::FAILURE;
-        }
-    };
-    match runtime.block_on(connect(args)) {
+pub(crate) async fn run(args: &ConnectArgs) -> ExitCode {
+    match connect(args).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             output::error(&message);

@@ -63,7 +63,8 @@ fn log_filter() -> Targets {
         .with_target("kube", LevelFilter::OFF)
 }
 
-fn main() -> ExitCode {
+#[tokio::main]
+async fn main() -> ExitCode {
     let args = Args::parse();
     tracing_subscriber::fmt()
         .with_target(true)
@@ -73,19 +74,7 @@ fn main() -> ExitCode {
     if let Err(error) = forbid_core_dumps() {
         tracing::warn!(%error, "core dumps stay possible");
     }
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(2)
-        .max_blocking_threads(2)
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            output::error(&format!("cannot start the async runtime: {error}"));
-            return ExitCode::FAILURE;
-        }
-    };
-    match runtime.block_on(run(args)) {
+    match run(args).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             output::error(&message);

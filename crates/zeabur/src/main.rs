@@ -1,8 +1,7 @@
 //! `zeabur`: the in-cluster server.
 //!
-//! **Memory.** The server aims to sit under 30 MiB at rest. The async runtime has two worker
-//! threads, enough for one cluster's people, and at most four threads for blocking work (DNS
-//! lookups, file reads); a session keeps one connection pool to kube-apiserver.
+//! **Memory.** The server aims to sit under 30 MiB at rest. A session keeps one connection pool to
+//! kube-apiserver.
 //!
 //! **One replica.** Sessions are held in memory (see `zeabur_auth::session`), so the server runs
 //! as one replica; a restart signs everyone out.
@@ -33,10 +32,6 @@ use zeabur_kube::{ClusterEndpoint, UserClient, UserToken};
 use crate::config::{Args, Config};
 use crate::server::{Auth, Connection, IssuerPage};
 
-/// Worker threads of the async runtime.
-const WORKERS: usize = 2;
-/// Threads for blocking work.
-const BLOCKING: usize = 4;
 /// How often sessions that are over are removed.
 const SWEEP: Duration = Duration::from_secs(60);
 /// How long answers in progress may take to finish once the server is asked to stop; well inside
@@ -52,7 +47,8 @@ fn log_filter() -> Targets {
         .with_target("kube", LevelFilter::OFF)
 }
 
-fn main() -> ExitCode {
+#[tokio::main]
+async fn main() -> ExitCode {
     let args = Args::parse();
     tracing_subscriber::fmt()
         .with_target(false)
@@ -69,19 +65,7 @@ fn main() -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let runtime = match tokio::runtime::Builder::new_multi_thread()
-        .worker_threads(WORKERS)
-        .max_blocking_threads(BLOCKING)
-        .enable_all()
-        .build()
-    {
-        Ok(runtime) => runtime,
-        Err(error) => {
-            output::error(&format!("cannot start the async runtime: {error}"));
-            return ExitCode::FAILURE;
-        }
-    };
-    match runtime.block_on(serve(&args, config)) {
+    match serve(&args, config).await {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             output::error(&message);
