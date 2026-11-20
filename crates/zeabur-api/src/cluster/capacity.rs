@@ -225,24 +225,54 @@ pub(crate) fn node_room(nodes: &[Node], pods: &[ClusterPod]) -> Vec<NodeRoom> {
         .collect()
 }
 
-/// Whether `pods` can each be placed on a node of `nodes`, largest first, each on the first node
-/// that still has its CPU, memory and a pod slot. A pod never spans nodes, so room that is free
-/// only in total does not count.
+/// Whether `pods` can each be placed on a node of `nodes` that still has its CPU, memory and a pod
+/// slot. A pod never spans nodes, so room that is free only in total does not count. The search
+/// tries the largest pod first on each node in turn and backs up when one is left over, so a fit
+/// that a first-fit pass misses is found. It stops after `PLACE_STEPS` tries; a shortage it could
+/// not prove counts as a fit.
 pub(crate) fn place(pods: &[Amount], nodes: &[NodeRoom]) -> bool {
     let mut nodes = nodes.to_vec();
     let mut pods = pods.to_vec();
     pods.sort_by_key(|pod| std::cmp::Reverse((pod.memory, pod.cpu)));
-    pods.iter().all(|pod| {
-        let node = nodes.iter_mut().find(|node| {
-            node.pods > 0 && node.free.cpu >= pod.cpu && node.free.memory >= pod.memory
-        });
-        node.map(|node| {
-            node.free.cpu -= pod.cpu;
-            node.free.memory -= pod.memory;
-            node.pods -= 1;
-        })
-        .is_some()
-    })
+    let mut steps = PLACE_STEPS;
+    fits(&pods, &mut nodes, &mut steps)
+}
+
+const PLACE_STEPS: u32 = 10_000;
+
+fn fits(pods: &[Amount], nodes: &mut [NodeRoom], steps: &mut u32) -> bool {
+    let Some((pod, rest)) = pods.split_first() else {
+        return true;
+    };
+    // A node with the same room as one already tried leads to the same answer.
+    let mut tried: Vec<NodeRoom> = Vec::new();
+    for i in 0..nodes.len() {
+        if *steps == 0 {
+            return true;
+        }
+        *steps -= 1;
+        let Some(&node) = nodes.get(i) else { break };
+        let room = node.pods > 0 && node.free.cpu >= pod.cpu && node.free.memory >= pod.memory;
+        if !room || tried.contains(&node) {
+            continue;
+        }
+        tried.push(node);
+        let set = |nodes: &mut [NodeRoom], to: NodeRoom| {
+            if let Some(slot) = nodes.get_mut(i) {
+                *slot = to;
+            }
+        };
+        let mut taken = node;
+        taken.free.cpu -= pod.cpu;
+        taken.free.memory -= pod.memory;
+        taken.pods -= 1;
+        set(nodes, taken);
+        if fits(rest, nodes, steps) {
+            return true;
+        }
+        set(nodes, node);
+    }
+    false
 }
 
 #[cfg(test)]
@@ -309,6 +339,27 @@ mod tests {
     fn the_largest_pod_is_placed_first() {
         let nodes = [node(GIB, 110), node(2 * GIB, 110)];
         assert!(place(&[pod(GIB), pod(2 * GIB)], &nodes));
+    }
+
+    #[test]
+    fn a_fit_that_first_fit_misses_is_found() {
+        let room = |cpu, memory| {
+            let mut node = node(memory, 110);
+            node.free.cpu = cpu;
+            node
+        };
+        let nodes = [room(2000, 2 * GIB), room(1000, 2 * GIB)];
+        let pods = [
+            Amount {
+                cpu: 1000,
+                memory: 2 * GIB,
+            },
+            Amount {
+                cpu: 2000,
+                memory: GIB,
+            },
+        ];
+        assert!(place(&pods, &nodes));
     }
 
     #[test]
