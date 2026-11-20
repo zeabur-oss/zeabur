@@ -267,7 +267,8 @@ pub struct Health {
     pub name: String,
     /// The objects it reads.
     pub resource: HealthResource,
-    /// The condition they reach.
+    /// The condition they reach. A workload kind names none: kstatus decides when it is ready.
+    #[serde(default)]
     pub condition: String,
     /// How long to wait, such as `60s`.
     #[serde(default)]
@@ -697,6 +698,20 @@ mod tests {
         let mut index = index(INDEX).unwrap();
         index.components.retain(|c| c.id == "cert-manager");
         index
+    }
+
+    /// Catalog 0.5.6 names no condition for a Deployment, StatefulSet or DaemonSet.
+    #[test]
+    fn a_health_check_of_a_workload_reads_without_a_condition() {
+        let check: Health = serde_json::from_value(serde_json::json!({
+            "name": "controller",
+            "resource": {"kind": "Deployment", "name": "cert-manager", "namespace": "cert-manager"},
+            "timeout": "60s",
+            "advice": "Check its pods with kubectl -n cert-manager get pods."
+        }))
+        .unwrap();
+        assert_eq!(check.resource.kind, "Deployment");
+        assert_eq!(check.condition, "");
     }
 
     #[test]
