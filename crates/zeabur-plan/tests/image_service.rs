@@ -191,6 +191,24 @@ mod tests {
         assert!(created(&plain, "Secret").is_none());
     }
 
+    /// A Compose file may name a variable `discovery.type`; kube-apiserver judges the name in the
+    /// plan's dry run, not a stricter rule here.
+    #[test]
+    fn a_variable_name_kubernetes_takes_plans() {
+        let variable = ServiceVariable {
+            name: "discovery.type".to_owned(),
+            value: "single-node".to_owned(),
+            value_from: None,
+            expands: false,
+        };
+        let plan = planned(with(|c| c.variables = vec![variable]), None).unwrap();
+        let secret = created(&plan, "Secret").unwrap();
+        assert_eq!(
+            secret["stringData"],
+            json!({"discovery.type": "single-node"})
+        );
+    }
+
     /// A volume makes one replica that is recreated, not rolled, with a claim per volume.
     #[test]
     fn a_volume_runs_one_replica_recreated() {

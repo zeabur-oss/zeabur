@@ -269,10 +269,6 @@ fn check(change: &ImageServiceChange) -> Result<(), PlanError> {
             "replicas",
         ));
     }
-    check_variable_names(
-        change.variables.iter().map(|v| v.name.as_str()),
-        "variables",
-    )?;
     let mut paths: Vec<&str> = Vec::new();
     for volume in &change.volumes {
         let request = VolumeRequest {
