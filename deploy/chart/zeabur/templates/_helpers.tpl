@@ -20,6 +20,13 @@ app.kubernetes.io/managed-by: {{ .Release.Service }}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- end -}}
 
+{{/* The sslip.io name of an IP address. sslip.io reads an IPv6 address with each ":" written as "-"
+     (https://github.com/cunnie/sslip.io/blob/9f98ba8d30deb426ddddb889c09ed8740e1585fc/xip/xip.go#L763-L766),
+     because a DNS label cannot hold ":". */}}
+{{- define "zeabur.sslipDomain" -}}
+{{- printf "%s.sslip.io" (. | replace ":" "-" | lower) -}}
+{{- end -}}
+
 {{/* The domain the addresses are under: global.domain, else <ip>.sslip.io from the first node's
      ExternalIP, else its InternalIP. Read once per render. */}}
 {{- define "zeabur.domain" -}}
@@ -33,7 +40,7 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- range $node.status.addresses -}}{{- if and (eq .type "InternalIP") (not $ip) -}}{{- $ip = .address -}}{{- end -}}{{- end -}}
 {{- end -}}
 {{- end -}}
-{{- $domain = printf "%s.sslip.io" (required "global.domain is required when the chart cannot read the cluster's nodes (helm template)" $ip) -}}
+{{- $domain = include "zeabur.sslipDomain" (required "global.domain is required when the chart cannot read the cluster's nodes (helm template)" $ip) -}}
 {{- end -}}
 {{- if not (regexMatch "^[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?(\\.[a-z0-9]([-a-z0-9]{0,61}[a-z0-9])?)*$" $domain) -}}
 {{- fail (printf "global.domain must be a lowercase domain name, not %q" $domain) -}}

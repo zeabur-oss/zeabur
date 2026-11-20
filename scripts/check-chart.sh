@@ -221,6 +221,16 @@ expect full "$(render -f "$chart/ci/full-values.yaml")" "$domain_env" "apps.exam
 expect sslip "$(render -f "$chart/ci/minimal-values.yaml" --set global.domain=192.0.2.10.sslip.io)" \
   "$domain_env" "192.0.2.10.sslip.io,letsencrypt"
 
+# A node's address becomes its sslip.io name; an IPv6 address has "-" for ":". `helm template` reads no
+# nodes, so a copy of the chart renders the helper for each address.
+sslip_chart="$(mktemp -d)/zeabur"
+cp -R "$chart" "$sslip_chart"
+printf '%s\n' 'names: {{ range list "192.0.2.10" "2001:DB8::10" }}{{ include "zeabur.sslipDomain" . }} {{ end }}' \
+  >"$sslip_chart/templates/sslip-names.yaml"
+got=$(helm template zeabur "$sslip_chart" -f "$chart/ci/minimal-values.yaml" --show-only templates/sslip-names.yaml | yq .names)
+[[ "$got" == "192.0.2.10.sslip.io 2001-db8--10.sslip.io" ]] || fail "sslip.io names: got '$got'"
+rm -rf "$(dirname "$sslip_chart")"
+
 # A client secret from a Secret of one's own: Identity gets the given hash, and the chart makes no Secret.
 own_client='[(select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.volumes[] | select(.name == "client-secret") | .secret.secretName), (select(.kind == "OAuthClient") | .spec.secretHash), (select(.kind == "Secret" and (.metadata.name | test("-client$"))) | .metadata.name)] | join(",")'
 client_hash="sha256:$(printf '%064d' 0)"
