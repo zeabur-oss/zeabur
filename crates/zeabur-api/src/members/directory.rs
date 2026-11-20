@@ -262,15 +262,18 @@ impl Directory {
     }
 
     /// The member `user`, as `you` (the person's Kubernetes user name) sees them, with their
-    /// projects when the bindings could be read.
+    /// projects when the bindings could be read. `project_roles` says whether Zeabur Identity
+    /// gives roles per project.
     pub(crate) fn member(
         &self,
         user: &Object<UserSpec>,
         namespace: &str,
         you: Option<&str>,
         projects: Option<Vec<ProjectGrant>>,
+        project_roles: bool,
     ) -> MemberView {
         let username = user.name().to_owned();
+        let is_you = you.is_some_and(|you| you == format!("{USER_PREFIX}{username}"));
         let mine = |owner: &str| owner == username;
         let mut passkeys = Vec::new();
         let mut linked = Vec::new();
@@ -337,6 +340,10 @@ impl Directory {
             } else {
                 MemberRole::Member
             },
+            actions: MemberActions {
+                can_remove: !is_you,
+                can_change_access: !is_you && (!project_roles || admin || projects.is_some()),
+            },
             projects: projects.filter(|_| !admin),
             disabled: spec.disabled,
             passkeys,
@@ -348,7 +355,7 @@ impl Directory {
                 .iter()
                 .filter(|i| mine(&i.spec.user))
                 .count(),
-            you: you.is_some_and(|you| you == format!("{USER_PREFIX}{username}")),
+            you: is_you,
             origin: Origin::complete(API_VERSION, "User", Some(namespace), &username),
             username,
         }
@@ -387,6 +394,7 @@ impl Directory {
         now: Timestamp,
         setup_links: SetupLinks,
         can_manage: Permission,
+        project_roles: bool,
     ) -> MembersView {
         let mut items: Vec<MemberView> = self
             .users
@@ -396,7 +404,7 @@ impl Directory {
                     .projects
                     .as_ref()
                     .map(|grants| grants.get(user.name()).cloned().unwrap_or_default());
-                self.member(user, namespace, you, projects)
+                self.member(user, namespace, you, projects, project_roles)
             })
             .collect();
         items.sort_by(|a, b| a.username.cmp(&b.username));
@@ -414,7 +422,7 @@ impl Directory {
             invitations,
             setup_links,
             can_manage,
-            project_roles: false,
+            project_roles,
             assignable_roles: super::access::ProjectRole::ALL.to_vec(),
             default_role: super::access::ProjectRole::DEFAULT,
             api_tokens: Vec::new(),
@@ -613,8 +621,22 @@ pub struct MemberView {
     pub invitations: usize,
     /// Whether this is the person asking.
     pub you: bool,
+    /// What the person asking may do to this member.
+    #[serde(flatten)]
+    pub actions: MemberActions,
     /// The `User`.
     pub origin: Origin,
+}
+
+/// What the person asking may do to a member.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct MemberActions {
+    /// Remove them: never yourself.
+    pub can_remove: bool,
+    /// Change their access: never your own, and not when their project roles could not be read,
+    /// since saving would replace roles nobody saw.
+    pub can_change_access: bool,
 }
 
 /// A pending one-time setup link. Its token is not kept anywhere: it can be revoked, not shown
@@ -740,6 +762,7 @@ mod tests {
                 accepted: None,
             },
             Permission::Allowed,
+            true,
         );
         let ada = &view.items[0];
         assert_eq!(ada.username, "ada");
@@ -757,6 +780,9 @@ mod tests {
         assert_eq!(bob.linked[0].provider, "GitHub");
         assert_eq!(bob.last_sign_in_at, None);
         assert_eq!(bob.invitations, 1);
+        assert!(!ada.actions.can_remove && !ada.actions.can_change_access);
+        // Bob's project roles were not read: saving his access would replace roles nobody saw.
+        assert!(bob.actions.can_remove && !bob.actions.can_change_access);
     }
 
     #[test]
@@ -770,6 +796,7 @@ mod tests {
                 accepted: None,
             },
             Permission::Allowed,
+            true,
         );
         assert_eq!(view.invitations.len(), 1);
         assert_eq!(view.invitations[0].username, "cy");

@@ -7,12 +7,13 @@ import LockSimpleIcon from "~icons/ph/lock-simple"
 
 import type { Schemas } from "@/api/client"
 import { accountQuery } from "@/api/members"
-import { clusterQuery, namespaceQuery, whoamiQuery } from "@/api/queries"
+import { clusterQuery, namespaceQuery, rightsQuery, whoamiQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import {
   askerOf,
   gate,
+  needsOf,
   projectPermission,
   type ClusterRights,
   type Gate,
@@ -69,11 +70,16 @@ export function useClusterAdmin(): boolean {
 /** Why an action is closed, in a sentence; nothing when it is open. */
 export function useGateReason(): (gate: Gate) => string | undefined {
   const t = useT()
+  const rights = useQuery(rightsQuery).data
   return (g) => {
     if (g.open) return undefined
-    return g.member
-      ? t("rights.needs", t(g.role === "admin" ? "account.role.admin" : "account.role.developer"))
-      : t("rights.needsRule", g.rule)
+    const needs = needsOf(rights, g.right)
+    if (g.member && needs)
+      return t(
+        "rights.needs",
+        t(needs.role === "admin" ? "account.role.admin" : "account.role.developer"),
+      )
+    return t("rights.needsRule", needs?.rule ?? g.right)
   }
 }
 

@@ -34,8 +34,6 @@ import { RefusedSome } from "@/components/refused"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo, formatTime } from "@/lib/format"
 import {
-  canChangeAccess,
-  canRemoveMember,
   filterMembers,
   linkState,
   memberName,
@@ -118,12 +116,7 @@ export function MembersPage() {
       {open?.kind === "invite" ? (
         <InviteDialog members={data?.items ?? []} projectRoles={projectRoles} onClose={close} />
       ) : open?.kind === "details" ? (
-        <MemberPanel
-          member={current(open.member)}
-          projectRoles={projectRoles}
-          onOpen={setOpen}
-          onClose={close}
-        />
+        <MemberPanel member={current(open.member)} onOpen={setOpen} onClose={close} />
       ) : open?.kind === "access" ? (
         <AccessDialog member={current(open.member)} projectRoles={projectRoles} onClose={close} />
       ) : open?.kind === "link" ? (
@@ -150,7 +143,7 @@ function MembersBody({
         <>
           <LinksUnavailable links={data.setupLinks} />
           <ManageDenied hint={data.canManage} denied={t("members.denied")} />
-          <MemberList items={data.items} projectRoles={data.projectRoles} onOpen={onOpen} />
+          <MemberList items={data.items} onOpen={onOpen} />
         </>
       ) : (
         <Empty variant="outline">
@@ -175,15 +168,7 @@ function MembersBody({
 }
 
 /** Every member, one line each; a filter above the table once there are many. */
-function MemberList({
-  items,
-  projectRoles,
-  onOpen,
-}: {
-  items: Member[]
-  projectRoles: boolean
-  onOpen: (open: Open) => void
-}) {
+function MemberList({ items, onOpen }: { items: Member[]; onOpen: (open: Open) => void }) {
   const t = useT()
   const [query, setQuery] = useState("")
   const layout = membersLayout(items.length)
@@ -221,12 +206,7 @@ function MemberList({
         ) : (
           <ul className="divide-y divide-main">
             {shown.map((member) => (
-              <MemberRow
-                key={member.username}
-                member={member}
-                projectRoles={projectRoles}
-                onOpen={onOpen}
-              />
+              <MemberRow key={member.username} member={member} onOpen={onOpen} />
             ))}
           </ul>
         )}
@@ -250,15 +230,7 @@ function PasskeyCount({ member }: { member: Member }) {
   )
 }
 
-function MemberRow({
-  member,
-  projectRoles,
-  onOpen,
-}: {
-  member: Member
-  projectRoles: boolean
-  onOpen: (open: Open) => void
-}) {
+function MemberRow({ member, onOpen }: { member: Member; onOpen: (open: Open) => void }) {
   const t = useT()
   const accessLines = useAccessLines()
   const name = memberName(member)
@@ -308,21 +280,13 @@ function MemberRow({
         {member.lastSignInAt ? <Ago iso={member.lastSignInAt} /> : <span>—</span>}
       </span>
       <span className="flex justify-end">
-        <MemberMenu member={member} projectRoles={projectRoles} onOpen={onOpen} />
+        <MemberMenu member={member} onOpen={onOpen} />
       </span>
     </li>
   )
 }
 
-function MemberMenu({
-  member,
-  projectRoles,
-  onOpen,
-}: {
-  member: Member
-  projectRoles: boolean
-  onOpen: (open: Open) => void
-}) {
+function MemberMenu({ member, onOpen }: { member: Member; onOpen: (open: Open) => void }) {
   const t = useT()
   const name = memberName(member)
   const manage = useManageGate()
@@ -334,7 +298,7 @@ function MemberMenu({
         <DotsThreeIcon aria-hidden="true" />
       </MenuTrigger>
       <MenuContent align="end">
-        {canChangeAccess(member, projectRoles) ? (
+        {member.canChangeAccess ? (
           <GatedMenuItem gate={manage} onClick={() => onOpen({ kind: "access", member })}>
             <UserGearIcon aria-hidden="true" />
             {t("roles.change")}
@@ -356,7 +320,7 @@ function MemberMenu({
             {t("members.reset")}
           </GatedMenuItem>
         )}
-        {canRemoveMember(member) ? (
+        {member.canRemove ? (
           <GatedMenuItem gate={manage} onClick={() => onOpen({ kind: "remove", member })}>
             <TrashIcon aria-hidden="true" />
             {t("members.remove")}
@@ -370,12 +334,10 @@ function MemberMenu({
 /** One member: their passkeys and linked accounts, and what can be done about them. */
 function MemberPanel({
   member,
-  projectRoles,
   onOpen,
   onClose,
 }: {
   member: Member
-  projectRoles: boolean
   onOpen: (open: Open) => void
   onClose: () => void
 }) {
@@ -455,7 +417,7 @@ function MemberPanel({
           </section>
         </div>
         <div className="flex flex-wrap items-center gap-2 border-t px-6 py-3">
-          {canChangeAccess(member, projectRoles) ? (
+          {member.canChangeAccess ? (
             <GateTip gate={manage}>
               <Button
                 size="sm"
@@ -488,7 +450,7 @@ function MemberPanel({
               </Button>
             </GateTip>
           )}
-          {canRemoveMember(member) ? (
+          {member.canRemove ? (
             <span className="ml-auto">
               <GateTip gate={manage}>
                 <Button

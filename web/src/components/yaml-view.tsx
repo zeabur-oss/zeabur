@@ -1,8 +1,9 @@
+import { useQuery } from "@tanstack/react-query"
 import { lazy, Suspense, useState } from "react"
 import PencilSimpleIcon from "~icons/ph/pencil-simple"
 import TrashIcon from "~icons/ph/trash"
 
-import type { ObjectAddress } from "@/api/queries"
+import { rightsQuery, type ObjectAddress } from "@/api/queries"
 import { GateTip, useGates } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -40,6 +41,17 @@ function Intro({ address, note }: { address: ObjectAddress; note?: string }) {
   )
 }
 
+/** Whether the person may change and delete an object of `resource`: closed by the right the
+ * server names for it, open for any other kind. */
+function useObjectGates(project: string, resource: string): { editGate: Gate; deleteGate: Gate } {
+  const gates = useGates(project)
+  const rights = useQuery(rightsQuery).data
+  const gateOf = (change: "edit" | "delete") => {
+    const right = rightOfResource(rights, resource, change)
+    return right ? gates(right) : open
+  }
+  return { editGate: gateOf("edit"), deleteGate: gateOf("delete") }
+}
 /** A Delete or Edit button: disabled with the reason when blocked, else behind its gate. */
 function YamlAction({
   icon: Icon,
@@ -99,13 +111,7 @@ export function YamlView({
   const planner = usePlanner(project, () => setDraft(null))
   const deleter = usePlanner(project, onDeleted)
   const label = t("yaml.label", address.name)
-  const gates = useGates(project)
-  const gateOf = (change: "edit" | "delete") => {
-    const right = rightOfResource(address.resource, change)
-    return right ? gates(right) : open
-  }
-  const editGate = gateOf("edit")
-  const deleteGate = gateOf("delete")
+  const { editGate, deleteGate } = useObjectGates(project, address.resource)
   const blocked = managedBy
     ? t("common.managedByDetail", managedBy)
     : readOnlyResources.has(address.resource)

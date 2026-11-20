@@ -32,7 +32,7 @@ pub struct ApiTokenView {
     pub name: String,
     /// Its roles in projects.
     pub projects: Vec<ProjectGrant>,
-    /// The Kubernetes user name of whoever made it.
+    /// Whoever made it: a Zeabur Identity user name, or the Kubernetes user name of anyone else.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub created_by: Option<String>,
     /// When it was made, RFC 3339.
@@ -171,7 +171,10 @@ pub(crate) async fn list(
         .map(|token| ApiTokenView {
             projects: grants_of(bindings, &Holder::token(&token.name)),
             name: token.name,
-            created_by: token.created_by,
+            created_by: token.created_by.map(|by| {
+                by.strip_prefix(super::USER_PREFIX)
+                    .map_or_else(|| by.clone(), str::to_owned)
+            }),
             created_at: token.created_at,
             expires_at: token.expires_at,
         })

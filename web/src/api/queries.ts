@@ -95,6 +95,13 @@ export const whoamiQuery = queryOptions({
   staleTime: Infinity,
 })
 
+/** The rights the interface gates by, the same for everyone. */
+export const rightsQuery = queryOptions({
+  queryKey: ["rights"],
+  queryFn: async ({ signal }) => await zeabur.listRights({ signal }),
+  staleTime: Infinity,
+})
+
 export const sessionQuery = queryOptions({
   queryKey: ["session"],
   queryFn: async ({ signal }) => await zeabur.getSession({ signal }),

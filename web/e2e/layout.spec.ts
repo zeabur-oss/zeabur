@@ -235,6 +235,8 @@ test("the account card's lines share one left edge", async ({ page }) => {
       json: {
         username: "zeabur:ada.lovelace.with.a.rather.long.address@example.com",
         groups: ["system:authenticated"],
+        member: true,
+        admin: false,
       },
     }),
   )

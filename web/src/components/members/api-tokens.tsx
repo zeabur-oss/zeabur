@@ -119,7 +119,7 @@ function TokenRow({
     ? t(late ? "apiTokens.expired" : "apiTokens.expires", formatTime(token.expiresAt, locale))
     : ""
   const whenTone = late ? "text-warn-strong" : "text-muted-foreground"
-  const by = token.createdBy ? t("apiTokens.by", shortUser(token.createdBy)) : ""
+  const by = token.createdBy ? t("apiTokens.by", token.createdBy) : ""
   return (
     <li className="grid grid-cols-invitation-phone items-center gap-3 px-4 py-2.5 md:grid-cols-member md:gap-4">
       <span className="flex min-w-0 items-center gap-3">
@@ -223,10 +223,6 @@ function Opened({
     case "shown":
       return <TokenShown issued={open.issued} onClose={onClose} />
   }
-}
-
-function shortUser(user: string): string {
-  return user.startsWith("zeabur:") ? user.slice("zeabur:".length) : user
 }
 
 /** What a token's access comes to, in the plan's words. */

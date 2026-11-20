@@ -74,6 +74,8 @@ pub const EXPIRES_AT_ANNOTATION: &str = "identity.zeabur.com/expires-at";
 pub const EXPIRY_BUCKET_LABEL: &str = "identity.zeabur.com/expiry-bucket";
 /// How Kubernetes sees a Zeabur Identity user: `zeabur:<username>`.
 pub const USER_PREFIX: &str = "zeabur:";
+/// The group Zeabur Identity's admins are in, bound to `cluster-admin`.
+pub const ADMINS_GROUP: &str = "zeabur:admins";
 /// The Identity Deployment, read for its issuer and whether it redeems invitations.
 pub const DEPLOYMENT: &str = "zeabur-identity";
 
