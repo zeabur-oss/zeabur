@@ -59,12 +59,81 @@ describe("cask", () => {
   });
 });
 
+const pre = parseVersion("v0.3.0-beta.1") as Version;
+const preChecksums = new Map(
+  [...checksums].map(([file, c]) => [file.replace("v0.3.0", pre.tag), c]),
+);
+
+describe("a normal release", () => {
+  test("names the formula and the cask zeaburctl and zeabur-desktop", () => {
+    expect(formula(v, checksums)).toContain("class Zeaburctl < Formula");
+    expect(cask(v, checksums)).toContain('cask "zeabur-desktop" do');
+  });
+
+  test("conflicts with the beta formula and cask", () => {
+    expect(formula(v, checksums)).toContain(
+      'conflicts_with "zeabur-oss/tap/zeaburctl-beta"',
+    );
+    expect(cask(v, checksums)).toContain(
+      'conflicts_with cask: "zeabur-desktop@beta"',
+    );
+  });
+});
+
+describe("a pre-release", () => {
+  test("names the formula zeaburctl-beta, as Homebrew cannot load a formula named zeaburctl@beta", () => {
+    expect(formula(pre, preChecksums)).toContain(
+      "class ZeaburctlBeta < Formula",
+    );
+  });
+
+  test("names the cask with Homebrew's @beta channel token", () => {
+    expect(cask(pre, preChecksums)).toContain('cask "zeabur-desktop@beta" do');
+  });
+
+  test("conflicts with the normal formula and cask, which install the same files", () => {
+    expect(formula(pre, preChecksums)).toContain(
+      'conflicts_with "zeabur-oss/tap/zeaburctl"',
+    );
+    expect(cask(pre, preChecksums)).toContain(
+      'conflicts_with cask: "zeabur-desktop"',
+    );
+  });
+
+  test("installs the pre-release's files", () => {
+    expect(formula(pre, preChecksums)).toContain(
+      'url "https://github.com/zeabur-oss/zeabur/releases/download/v0.3.0-beta.1/zeaburctl-v0.3.0-beta.1-darwin-arm64.tar.gz"',
+    );
+    expect(cask(pre, preChecksums)).toContain('version "0.3.0-beta.1"');
+  });
+});
+
 describe("write", () => {
   test("puts the formula under Formula and the cask under Casks", async () => {
     const out = await mkdtemp(join(tmpdir(), "homebrew-"));
     await write(v, checksums, out);
     expect(await readdir(join(out, "Formula"))).toEqual(["zeaburctl.rb"]);
     expect(await readdir(join(out, "Casks"))).toEqual(["zeabur-desktop.rb"]);
+  });
+
+  test("puts a pre-release under the beta names, beside the normal release's files", async () => {
+    const out = await mkdtemp(join(tmpdir(), "homebrew-"));
+    await write(v, checksums, out);
+    await write(pre, preChecksums, out);
+    expect((await readdir(join(out, "Formula"))).sort()).toEqual([
+      "zeaburctl-beta.rb",
+      "zeaburctl.rb",
+    ]);
+    expect((await readdir(join(out, "Casks"))).sort()).toEqual([
+      "zeabur-desktop.rb",
+      "zeabur-desktop@beta.rb",
+    ]);
+    expect(await Bun.file(join(out, "Formula/zeaburctl.rb")).text()).toBe(
+      formula(v, checksums),
+    );
+    expect(await Bun.file(join(out, "Casks/zeabur-desktop.rb")).text()).toBe(
+      cask(v, checksums) ?? "",
+    );
   });
 
   test("writes no cask for a release without the macOS app", async () => {

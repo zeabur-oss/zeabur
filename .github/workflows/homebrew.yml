@@ -1,18 +1,18 @@
 name: Homebrew
 
 # Publishes the Homebrew formula and cask for a release to the zeabur-oss/homebrew-tap repository
-# (docs/internal/releasing.md#homebrew). generate writes them from the release's signed
-# SHA256SUMS, check installs them on macOS and Linux from a copy of the tap, and only then does
-# publish commit them to the tap's main, so a broken file never lands. The push uses the
-# organization's GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`, `ZEABUR_OSS_BOT_PRIVATE_KEY`), which
-# needs the tap repository.
+# (docs/internal/releasing.md#homebrew), under the beta names for a pre-release. generate writes
+# them from the release's signed SHA256SUMS, check installs them on macOS and Linux from a copy of
+# the tap, and only then does publish commit them to the tap's main, so a broken file never lands.
+# The push uses the organization's GitHub App (`ZEABUR_OSS_BOT_CLIENT_ID`,
+# `ZEABUR_OSS_BOT_PRIVATE_KEY`), which needs the tap repository.
 on:
   release:
-    types: [released]
+    types: [published]
   workflow_dispatch:
     inputs:
       version:
-        description: "A published release to move the formula and the cask to (v0.3.0)"
+        description: "A published release to move the formula and the cask to (v0.3.0, or v0.3.0-beta.1 for the beta names)"
         required: true
 
 permissions: {}
@@ -84,20 +84,26 @@ jobs:
           git -C "$RUNNER_TEMP/tap" -c user.name=ci -c user.email=ci@invalid commit --quiet --allow-empty -m check
           brew tap zeabur-oss/tap "$RUNNER_TEMP/tap"
       # Installing by the full name trusts it, as it does for people, so audit comes after.
-      - name: Install and test zeaburctl
+      - name: Install and test the formula
         run: |
-          brew style zeabur-oss/tap/zeaburctl
-          brew install zeabur-oss/tap/zeaburctl
-          brew audit --strict zeabur-oss/tap/zeaburctl
-          brew test zeabur-oss/tap/zeaburctl
+          for file in "$RUNNER_TEMP"/tap-files/Formula/*.rb; do
+            name="zeabur-oss/tap/$(basename "$file" .rb)"
+            brew style "$name"
+            brew install "$name"
+            brew audit --strict "$name"
+            brew test "$name"
+          done
       - name: Install Zeabur Desktop
         if: runner.os == 'macOS'
         run: |
           # A release without the macOS app has no cask.
-          [[ -f "$RUNNER_TEMP/tap-files/Casks/zeabur-desktop.rb" ]] || exit 0
-          brew style --cask zeabur-oss/tap/zeabur-desktop
-          brew install --cask zeabur-oss/tap/zeabur-desktop
-          brew audit --strict --cask zeabur-oss/tap/zeabur-desktop
+          [[ -d "$RUNNER_TEMP/tap-files/Casks" ]] || exit 0
+          for file in "$RUNNER_TEMP"/tap-files/Casks/*.rb; do
+            name="zeabur-oss/tap/$(basename "$file" .rb)"
+            brew style --cask "$name"
+            brew install --cask "$name"
+            brew audit --strict --cask "$name"
+          done
           spctl --assess --type execute -vv /Applications/Zeabur.app
 
   publish:
