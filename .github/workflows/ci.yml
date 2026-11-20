@@ -1,7 +1,8 @@
 name: CI
 
-# Each job runs scripts/ci/<job>.sh in the Nix dev shell, the same as locally. Pull requests and
-# pushes run lint, test, ui and desktop. The merge queue runs the jobs that gate a merge on the commit about
+# Each job runs scripts/ci/<job>.sh in the Nix dev shell, the same as locally, except docs, which
+# runs the website's check of docs/ (locally: bun scripts/docs-check.ts <this checkout> in the
+# website). Pull requests and pushes run lint, test, ui, desktop and docs. The merge queue runs the jobs that gate a merge on the commit about
 # to land. The nightly run runs everything, also fuzz and the canary, which are not in the merge
 # queue, and keeps main's caches for the merge queue's jobs. A failed nightly-only job (fuzz,
 # canary, e2e-full) opens or updates one issue (scripts/nightly-issues.sh), and closes it when the
@@ -236,11 +237,17 @@ jobs:
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: scripts/nightly-issues.sh
 
+  docs:
+    runs-on: instabox-small
+    timeout-minutes: 10
+    steps:
+      - uses: zeabur-oss/website/.github/actions/docs-check@c27d70f71fa537b6f06748a87bdbdc474206319e # main
+
   # The check rulesets require.
   ok:
     name: ci / ok
     if: always()
-    needs: [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full]
+    needs: [lint, test, ui, desktop, fuzz, canary, no-ui, wording, cluster, e2e, e2e-full, docs]
     runs-on: instabox-small
     timeout-minutes: 5
     steps:
