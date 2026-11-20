@@ -33,6 +33,8 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
+          # scripts/api-break.ts reads the commits since the base for a `BREAKING CHANGE:` footer.
+          fetch-depth: 0
       - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
         with:
           rust-cache: true
