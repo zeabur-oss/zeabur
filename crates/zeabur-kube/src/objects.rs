@@ -57,7 +57,8 @@ pub const LAST_APPLIED: &str = "kubectl.kubernetes.io/last-applied-configuration
 /// What replaces a hidden value.
 pub const HIDDEN: &str = "(hidden)";
 
-/// A resource kube-apiserver serves, as discovery describes it (its preferred version).
+/// A resource kube-apiserver serves, as discovery describes it, at the version [`served_resources`]
+/// picks for it.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
 pub struct ServedResource {
     /// The API group; empty for the core group.
@@ -193,6 +194,10 @@ pub(crate) fn hide_metadata(resource: &ResourceRef, metadata: &mut ObjectMeta) {
 /// Every resource the cluster serves, from discovery: the aggregated form (two requests, served
 /// since Kubernetes 1.30 [aggregated-discovery]) and, when that fails, one request per group.
 ///
+/// A resource is served when any version of its group serves it, not only the group's preferred
+/// version: an operator can move some kinds of a group to a new version and keep the others at
+/// the old one. Each resource is listed once, at the version [`one_version`] picks.
+///
 /// [aggregated-discovery]: https://kubernetes.io/docs/concepts/overview/kubernetes-api/#aggregated-discovery
 pub(crate) async fn served_resources(
     client: &kube::Client,
@@ -203,18 +208,42 @@ pub(crate) async fn served_resources(
     };
     let mut served: Vec<ServedResource> = discovery
         .groups()
-        .flat_map(kube::discovery::ApiGroup::recommended_resources)
-        .map(|(resource, capabilities)| ServedResource {
-            group: resource.group,
-            version: resource.version,
-            resource: resource.plural,
-            kind: resource.kind,
-            namespaced: capabilities.scope == Scope::Namespaced,
-            verbs: capabilities.operations,
+        .flat_map(|group| {
+            let every = group
+                .versions()
+                .flat_map(|version| group.versioned_resources(version))
+                .map(|(resource, capabilities)| ServedResource {
+                    group: resource.group,
+                    version: resource.version,
+                    resource: resource.plural,
+                    kind: resource.kind,
+                    namespaced: capabilities.scope == Scope::Namespaced,
+                    verbs: capabilities.operations,
+                })
+                .collect();
+            one_version(group.preferred_version_or_latest(), every)
         })
         .collect();
     served.sort();
     Ok(served)
+}
+
+/// One entry per resource of a group, as kubectl picks it [server-preferred]: the group's
+/// `preferred` version when it serves the resource, else the first version in `every` that does.
+/// `every` holds the group's resources at each of its versions, in kube-rs's order of Kubernetes
+/// version priority (`v1` before `v1beta1`) [version-priority].
+///
+/// [server-preferred]: https://github.com/kubernetes/client-go/blob/master/discovery/discovery_client.go
+/// [version-priority]: https://kubernetes.io/docs/tasks/extend-kubernetes/custom-resources/custom-resource-definition-versioning/#version-priority
+fn one_version(preferred: &str, every: Vec<ServedResource>) -> Vec<ServedResource> {
+    let (mut chosen, others): (Vec<_>, Vec<_>) =
+        every.into_iter().partition(|r| r.version == preferred);
+    for other in others {
+        if !chosen.iter().any(|r| r.resource == other.resource) {
+            chosen.push(other);
+        }
+    }
+    chosen
 }
 
 fn api(
@@ -556,6 +585,46 @@ async fn request_object(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn served(version: &str, resource: &str, kind: &str) -> ServedResource {
+        ServedResource {
+            group: "operator.victoriametrics.com".to_owned(),
+            version: version.to_owned(),
+            resource: resource.to_owned(),
+            kind: kind.to_owned(),
+            namespaced: true,
+            verbs: vec!["get".to_owned(), "list".to_owned()],
+        }
+    }
+
+    #[test]
+    fn a_kind_outside_the_preferred_version_is_served_at_its_own_version() {
+        let every = vec![
+            served("v1", "vlogs", "VLogs"),
+            served("v1beta1", "vmrules", "VMRule"),
+            served("v1beta1", "vlogs", "VLogs"),
+            served("v1alpha1", "vmrules", "VMRule"),
+        ];
+        assert_eq!(
+            one_version("v1", every),
+            [
+                served("v1", "vlogs", "VLogs"),
+                served("v1beta1", "vmrules", "VMRule"),
+            ]
+        );
+    }
+
+    #[test]
+    fn the_preferred_version_wins_over_a_more_stable_one() {
+        let every = vec![
+            served("v1", "widgets", "Widget"),
+            served("v1beta1", "widgets", "Widget"),
+        ];
+        assert_eq!(
+            one_version("v1beta1", every),
+            [served("v1beta1", "widgets", "Widget")]
+        );
+    }
 
     fn rule(verbs: &[&str], groups: &[&str]) -> AccessRule {
         AccessRule {
