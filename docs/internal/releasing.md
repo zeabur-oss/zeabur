@@ -99,13 +99,23 @@ on macOS arm64 and Linux amd64 and arm64, and `Casks/zeabur-desktop.rb`, which i
 Desktop's `.dmg` on macOS arm64. Both point at the newest normal release's files, with the SHA-256
 its `SHA256SUMS` lists, so Homebrew installs the same signed files and checks them.
 
-`scripts/homebrew.ts` writes both files; do not edit them in the tap by hand. Publishing a normal
-release starts `.github/workflows/homebrew.yml` (`release: released`; pre-releases do not). It
-checks that the release workflow signed the release's `SHA256SUMS` for this tag, installs
-the files on macOS and Linux (and `spctl` must accept the app), and then zeabur-oss-bot commits
-them to the tap's `main`. Nothing is committed when a check fails or the tap already has the
-version. To redo it for a published release, run **Actions → Homebrew → Run workflow** with the
-version.
+A pre-release goes to the beta channel: `Formula/zeaburctl-beta.rb` and
+`Casks/zeabur-desktop@beta.rb`, which never replace the normal files. The cask takes Homebrew's
+`@<channel>` token for an
+[alternative release channel](https://docs.brew.sh/Cask-Cookbook#casks-for-alternative-release-channels).
+The formula cannot be `zeaburctl@beta`: Homebrew turns `@` into `AT` in a formula's class name
+only before a digit, so `zeaburctl@beta` has no class it can load. Each beta file conflicts with
+its normal one and the other way round, as both install the same `zeaburctl` or `Zeabur.app`. The
+beta files stay at the newest pre-release, so after a normal release they can be older than the
+normal files.
+
+`scripts/homebrew.ts` writes the files; do not edit them in the tap by hand. Publishing a release
+starts `.github/workflows/homebrew.yml` (`release: published`), and the tag picks the channel. It
+checks that the release workflow signed the release's `SHA256SUMS` for this tag, installs the
+files it wrote on macOS and Linux (and `spctl` must accept the app), and then zeabur-oss-bot
+commits them to the tap's `main`. Nothing is committed when a check fails or the tap already has
+the version. To redo it for a published release, run **Actions → Homebrew → Run workflow** with
+the version.
 
 The workflow needs the `ZEABUR_OSS_BOT_CLIENT_ID` variable and the `ZEABUR_OSS_BOT_PRIVATE_KEY`
 secret to reach this repository, and the bot's GitHub App to be installed on the tap with

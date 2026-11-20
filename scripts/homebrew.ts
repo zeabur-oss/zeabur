@@ -6,9 +6,8 @@
 //
 // <sums-dir> holds the release's SHA256SUMS and SHA256SUMS.sigstore.json. The command checks that
 // the release workflow (this repository's, or the shared one before v0.3.0) signed SHA256SUMS for
-// this repository at the tag, then writes
-// <out-dir>/Formula/zeaburctl.rb and, when the release has the macOS app,
-// <out-dir>/Casks/zeabur-desktop.rb.
+// this repository at the tag, then writes <out-dir>/Formula/<formula>.rb and, when the release has
+// the macOS app, <out-dir>/Casks/<cask>.rb, under the names of the release's channel.
 import { Failure, sums } from "@zeabur-oss/release";
 import { $ } from "bun";
 import { mkdir } from "node:fs/promises";
@@ -20,6 +19,25 @@ const homepage = "https://oss.zeabur.com/docs/zeabur/";
 
 const download = (version: Version, file: string) =>
   `https://github.com/${repository}/releases/download/${version.tag}/${file}`;
+
+// A pre-release goes to the beta channel, under names of its own, so it never replaces a normal
+// release. The cask takes Homebrew's @<channel> token; a formula cannot, because its class name
+// keeps an @ that a digit does not follow, and Ruby refuses that constant.
+export type Channel = { formula: string; className: string; cask: string };
+
+const stable: Channel = {
+  formula: "zeaburctl",
+  className: "Zeaburctl",
+  cask: "zeabur-desktop",
+};
+const beta: Channel = {
+  formula: "zeaburctl-beta",
+  className: "ZeaburctlBeta",
+  cask: "zeabur-desktop@beta",
+};
+
+const channel = (version: Version) => (version.prerelease ? beta : stable);
+const other = (version: Version) => (version.prerelease ? stable : beta);
 
 function sha(checksums: Map<string, string>, file: string): string {
   const sum = checksums.get(file);
@@ -41,7 +59,7 @@ export function formula(
   return `# frozen_string_literal: true
 
 # Written by scripts/homebrew.ts in zeabur-oss/zeabur for each release; do not edit.
-class Zeaburctl < Formula
+class ${channel(version).className} < Formula
   desc "Open Zeabur for any cluster in your kubeconfig"
   homepage "${homepage}"
   license "Apache-2.0"
@@ -64,6 +82,8 @@ ${build("linux-arm64", "      ")}
     end
   end
 
+  conflicts_with "zeabur-oss/tap/${other(version).formula}", because: "both install \`zeaburctl\`"
+
   def install
     bin.install "zeaburctl"
   end
@@ -84,7 +104,7 @@ export function cask(
   if (!checksums.has(file)) return undefined;
   const id = "com.zeabur.oss.desktop";
   return `# Written by scripts/homebrew.ts in zeabur-oss/zeabur for each release; do not edit.
-cask "zeabur-desktop" do
+cask "${channel(version).cask}" do
   version "${version.plain}"
   sha256 "${sha(checksums, file)}"
 
@@ -95,6 +115,7 @@ cask "zeabur-desktop" do
 
   # The app updates itself, so brew upgrade leaves it to the app unless asked with --greedy.
   auto_updates true
+  conflicts_with cask: "${other(version).cask}"
   depends_on arch: :arm64
   depends_on :macos
 
@@ -114,15 +135,16 @@ export async function write(
   checksums: Map<string, string>,
   out: string,
 ) {
+  const names = channel(version);
   await mkdir(join(out, "Formula"), { recursive: true });
   await Bun.write(
-    join(out, "Formula/zeaburctl.rb"),
+    join(out, `Formula/${names.formula}.rb`),
     formula(version, checksums),
   );
   const desktop = cask(version, checksums);
   if (!desktop) return;
   await mkdir(join(out, "Casks"), { recursive: true });
-  await Bun.write(join(out, "Casks/zeabur-desktop.rb"), desktop);
+  await Bun.write(join(out, `Casks/${names.cask}.rb`), desktop);
 }
 
 if (import.meta.main) {
@@ -133,10 +155,6 @@ if (import.meta.main) {
       "usage: bun scripts/homebrew.ts <version> <sums-dir> <out-dir>",
     );
     process.exit(2);
-  }
-  if (version.prerelease) {
-    console.error(`${tag} is a pre-release, which Homebrew does not offer`);
-    process.exit(1);
   }
   const list = join(dir, "SHA256SUMS");
   await $`cosign verify-blob --bundle ${join(dir, "SHA256SUMS.sigstore.json")} \
