@@ -143,16 +143,14 @@ fn pin_url(url_env: &str, url: &str) -> String {
         .unwrap_or_else(|| url.to_owned())
 }
 
-/// A checkout of the pin in file `pin_file` of this repository, from `$url_env` or `url`, kept
-/// between runs for its build cache.
+/// A checkout of `pin` from `$url_env` or `url`, kept between runs for its build cache.
 pub(crate) fn pinned_checkout(
-    dev: &DevCluster,
     dir: &Path,
-    pin_file: &str,
+    pin: &Pin,
     url_env: &str,
     url: &str,
 ) -> Result<(), String> {
-    checkout::checkout(dir, &read_pin(dev, pin_file)?, &pin_url(url_env, url))
+    checkout::checkout(dir, pin, &pin_url(url_env, url))
 }
 
 /// Tags `image` by its content, so that a changed image gets a new tag and the cluster a new

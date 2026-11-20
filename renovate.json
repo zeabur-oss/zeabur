@@ -51,18 +51,6 @@
       ],
       "depNameTemplate": "zeabur-oss/identity",
       "datasourceTemplate": "github-tags"
-    },
-    {
-      "customType": "regex",
-      "description": "Zeabur Builder release tag that the full profile builds.",
-      "managerFilePatterns": [
-        "/^xtask/pins/zeabur-builder$/"
-      ],
-      "matchStrings": [
-        "(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?)"
-      ],
-      "depNameTemplate": "zeabur-oss/builder",
-      "datasourceTemplate": "github-tags"
     }
   ]
 }

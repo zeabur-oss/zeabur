@@ -8,6 +8,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::Serialize;
 
 use super::{DevCluster, ZOT_CA, ZOT_HOST, ZOT_IP, catalog, cluster, images};
+use crate::checkout::Pin;
 use crate::process::wait_for;
 
 const BUILDER_IMAGES: [&str; 3] = ["builder", "builder-job", "builder-railpack"];
@@ -118,16 +119,17 @@ fn zot(dev: &DevCluster) -> Result<(), String> {
         .quiet()
 }
 
-/// Zeabur Builder, built from source and installed from its chart.
+/// Zeabur Builder, built from source and installed from its chart: the release the catalog
+/// installs, unless `builder_src` is given.
 fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
     let src = if let Some(src) = builder_src {
         src.to_path_buf()
     } else {
         let dir = dev.state.join("builder");
+        let version = catalog::tested_version(dev, "zeabur-builder")?;
         images::pinned_checkout(
-            dev,
             &dir,
-            "xtask/pins/zeabur-builder",
+            &Pin::parse(&format!("v{version}"))?,
             "ZEABUR_BUILDER_GIT",
             "https://github.com/zeabur-oss/builder.git",
         )?;

@@ -14,7 +14,7 @@ use clap::{Parser, Subcommand};
 
 const AFTER_HELP: &str = "\
 Without --identity-src, Zeabur Identity is the signed release that xtask/pins/zeabur-identity names.
-xtask/pins/zeabur-builder and ZEABUR_BUILDER_GIT give the commit Zeabur Builder is built from.
+Zeabur Builder is built from the release Zeabur Catalog installs, fetched from ZEABUR_BUILDER_GIT.
 ZEABUR_REGISTRY_MIRRORS (`docker.io=http://mirror:5001,ghcr.io=...`) makes the node pull through
 those mirrors; K3S_IMAGE picks the k3s release; CATALOG_STOP_AT leaves out the catalog's releases
 from that one on. State is in target/dev-cluster (kubeconfig, CA, zeabur-identityctl).";

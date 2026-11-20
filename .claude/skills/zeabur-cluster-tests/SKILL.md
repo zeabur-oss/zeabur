@@ -21,7 +21,7 @@ release `xtask/pins/zeabur-identity` names, or built from `--identity-src`) and 
 from its chart with `helm upgrade --install` (values in `xtask/src/dev_cluster/zeabur.rs`;
 `proxy.enabled` when Zeabur Proxy's image is built), and imports busybox for the exec test. `--profile full` adds cert-manager,
 CloudNativePG with Barman Cloud, Percona MongoDB, Keel and zot (each with the Helm commands Zeabur
-Catalog gives), the test S3, and Zeabur Builder's chart from `xtask/pins/zeabur-builder`, pushing
+Catalog gives), the test S3, and Zeabur Builder's chart at the release Zeabur Catalog installs, pushing
 anonymously to zot. The node pulls `zot.zot.svc:5000` through a mirror to
 zot's fixed ClusterIP 10.43.0.50, checked against zot's CA.
 `--profile bare` is the cluster alone: run `binary(kubernetes)` and `e2e-ui.sh` there (the

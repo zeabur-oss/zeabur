@@ -252,7 +252,7 @@ prints the setup link that enrols the first admin's passkey. Your browser accept
 after a change: it rebuilds and redeploys what changed. Options:
 
 - `--profile full`: also CloudNativePG with the Barman Cloud plugin, the Percona Operator for
-  MongoDB, Keel, cert-manager, zot, a test S3 and Zeabur Builder (from `xtask/pins/zeabur-builder`).
+  MongoDB, Keel, cert-manager, zot, a test S3 and Zeabur Builder (built from the release Zeabur Catalog installs).
 - `--identity-src ../identity`: Zeabur Identity from that working tree, as it is. To move to a newer
   Zeabur Identity, write its release tag to `xtask/pins/zeabur-identity`.
 - `ZEABUR_REGISTRY_MIRRORS=docker.io=http://mirror:5001,ghcr.io=http://mirror:5002`: the node pulls
