@@ -16,6 +16,7 @@ use kube::api::{Api, DeleteParams, DynamicObject, PostParams};
 use kube::core::{ApiResource, GroupVersionKind};
 use serde_json::{Value, json};
 use tracing_subscriber::util::SubscriberInitExt as _;
+use zeabur_kube::k8s_openapi::api::core::v1::ResourceQuota;
 use zeabur_test_support::sandbox::{Sandbox, create};
 
 use crate::common::{app, send};
@@ -498,14 +499,15 @@ async fn the_pods_a_plan_starts_carry_the_limit_range_defaults_into_the_quota() 
                "spec": {"hard": {"requests.memory": "600Mi"}}}),
     )
     .await;
+    let quota = Api::<ResourceQuota>::namespaced(admin.clone(), &ns);
     let deadline = Instant::now() + Duration::from_secs(60);
-    while quotas
+    while quota
         .get("memory")
         .await
         .unwrap()
-        .data
-        .pointer("/status/used/requests.memory")
-        .is_none()
+        .status
+        .and_then(|status| status.used)
+        .is_none_or(|used| !used.contains_key("requests.memory"))
     {
         assert!(Instant::now() < deadline, "no quota status");
         tokio::time::sleep(Duration::from_millis(500)).await;

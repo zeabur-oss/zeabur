@@ -15,11 +15,17 @@
 //! [k8s-quota]: https://kubernetes.io/docs/concepts/policy/resource-quotas/
 //! [k8s-limitrange]: https://kubernetes.io/docs/concepts/policy/limit-range/
 
-use serde_json::{Value, json};
+use serde::de::DeserializeOwned;
+use serde_json::Value;
 use zeabur_core::message::Message;
 use zeabur_core::origin::Origin;
 use zeabur_core::problem::{Kind, Problem, ProblemAt};
-use zeabur_kube::k8s_openapi::api::core::v1::{Pod, ResourceQuota};
+use zeabur_kube::k8s_openapi::api::apps::v1::{Deployment, StatefulSet};
+use zeabur_kube::k8s_openapi::api::core::v1::{
+    PersistentVolumeClaim, PersistentVolumeClaimVolumeSource, Pod, PodTemplateSpec, ResourceQuota,
+    Volume,
+};
+use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::{Cluster, ClusterExt as _, ClusterPod, WriteRequest};
 use zeabur_plan::{Change, Plan, PlanRequest, PlannedObject, Target, Write};
 
@@ -31,7 +37,9 @@ use crate::error::ApiError;
 /// A workload whose pods the plan adds.
 struct Added<'p> {
     object: &'p PlannedObject,
-    template: &'p Value,
+    template: PodTemplateSpec,
+    /// A StatefulSet's `volumeClaimTemplates`.
+    claims: Vec<PersistentVolumeClaim>,
     pods: u64,
     /// The index of the change that adds them, in the request.
     change: Option<usize>,
@@ -45,29 +53,82 @@ struct Need {
     limits: Amount,
 }
 
+/// A Deployment's or StatefulSet's replicas, pod template and claim templates.
+struct Workload {
+    replicas: u64,
+    template: Option<PodTemplateSpec>,
+    claims: Vec<PersistentVolumeClaim>,
+}
+
+impl Workload {
+    /// `object` read as `kind`; `None` for a kind that starts no pods this way.
+    fn read(kind: &str, object: &Value) -> Option<Result<Self, ApiError>> {
+        let replicas = |r: Option<i32>| u64::try_from(r.unwrap_or(1)).unwrap_or(0);
+        match kind {
+            "Deployment" => Some(parse::<Deployment>(kind, object).map(|d| {
+                let spec = d.spec.unwrap_or_default();
+                Self {
+                    replicas: replicas(spec.replicas),
+                    template: Some(spec.template),
+                    claims: Vec::new(),
+                }
+            })),
+            "StatefulSet" => Some(parse::<StatefulSet>(kind, object).map(|s| {
+                let spec = s.spec.unwrap_or_default();
+                Self {
+                    replicas: replicas(spec.replicas),
+                    template: Some(spec.template),
+                    claims: spec.volume_claim_templates.unwrap_or_default(),
+                }
+            })),
+            _ => None,
+        }
+    }
+}
+
+/// `object` as a `K`. The plan holds objects of any kind as JSON; one that does not parse as
+/// the kind it names is a fault in Zeabur.
+fn parse<K: DeserializeOwned>(kind: &str, object: &Value) -> Result<K, ApiError> {
+    serde_json::from_value(object.clone()).map_err(|error| {
+        ApiError::from(Problem::new(
+            Kind::Internal,
+            format!("A planned {kind} is not a {kind}: {error}"),
+        ))
+    })
+}
+
 /// The Deployments and StatefulSets `plan` starts or scales up, with the pods each adds.
-fn added<'p>(request: &PlanRequest, plan: &'p Plan) -> Vec<Added<'p>> {
-    let replicas = |o: &Value| {
-        o.pointer("/spec/replicas")
-            .and_then(Value::as_u64)
-            .unwrap_or(1)
-    };
-    plan.objects
-        .iter()
-        .filter(|o| matches!(o.target.kind.as_str(), "Deployment" | "StatefulSet"))
-        .filter(|o| !matches!(o.write, Write::Delete { .. }) && !o.raw_after.is_null())
-        .filter_map(|object| {
-            let after = &object.raw_after;
-            let pods = replicas(after).saturating_sub(object.before.as_ref().map_or(0, replicas));
-            let template = after.pointer("/spec/template")?;
-            (pods > 0).then(|| Added {
+fn added<'p>(request: &PlanRequest, plan: &'p Plan) -> Result<Vec<Added<'p>>, ApiError> {
+    let mut added = Vec::new();
+    for object in &plan.objects {
+        let kind = object.target.kind.as_str();
+        if object.target.api_version != "apps/v1"
+            || matches!(object.write, Write::Delete { .. })
+            || object.raw_after.is_null()
+        {
+            continue;
+        }
+        let Some(after) = Workload::read(kind, &object.raw_after).transpose()? else {
+            continue;
+        };
+        let before = match &object.before {
+            Some(before) => Workload::read(kind, before)
+                .transpose()?
+                .map_or(0, |w| w.replicas),
+            None => 0,
+        };
+        let pods = after.replicas.saturating_sub(before);
+        if let (true, Some(template)) = (pods > 0, after.template) {
+            added.push(Added {
                 object,
                 template,
+                claims: after.claims,
                 pods,
                 change: object.change.or_else(|| changed_by(request, object)),
-            })
-        })
-        .collect()
+            });
+        }
+    }
+    Ok(added)
 }
 
 /// The change of `request` that scales or edits `object`.
@@ -89,7 +150,7 @@ pub(super) async fn dry_run(
     request: &PlanRequest,
     plan: &Plan,
 ) -> Result<(), ApiError> {
-    let added = added(request, plan);
+    let added = added(request, plan)?;
     if added.is_empty() {
         return Ok(());
     }
@@ -132,12 +193,27 @@ async fn admitted(
             project,
             &target,
             &Write::Create {
-                body: pod(workload, &name, plan),
+                body: serde_json::to_value(pod(workload, &name, plan)).map_err(|error| {
+                    ApiError::from(Problem::new(
+                        Kind::Internal,
+                        format!("The dry-run Pod does not serialize: {error}"),
+                    ))
+                })?,
             },
         )
     };
     match cluster.write(&write).await {
-        Ok(written) => Ok(written.object.and_then(|o| ClusterPod::from_object(o).ok())),
+        Ok(written) => written
+            .object
+            .map(|object| {
+                ClusterPod::from_object(object).map_err(|error| {
+                    ApiError::from(Problem::new(
+                        Kind::Internal,
+                        format!("kube-apiserver answered the dry-run Pod with no Pod: {error}"),
+                    ))
+                })
+            })
+            .transpose(),
         Err(error) => {
             let mut problem = refused(cluster, project, &target, &write, error).await;
             if !matches!(problem.kind, Kind::QuotaExceeded | Kind::PolicyDenied) {
@@ -156,53 +232,43 @@ async fn admitted(
 /// A ServiceAccount that `plan` creates does not exist yet, and the ServiceAccount admission plugin
 /// refuses a Pod that names a missing one, so the Pod runs as `default` instead: quotas, limit
 /// ranges and Pod Security do not read it.
-fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Value {
-    let mut metadata = workload
-        .template
-        .get("metadata")
-        .and_then(Value::as_object)
-        .cloned()
-        .unwrap_or_default();
-    metadata.remove("name");
-    metadata.insert("generateName".to_owned(), json!(name));
-    let mut spec = workload
-        .template
-        .get("spec")
-        .cloned()
-        .unwrap_or_else(|| json!({}));
-    let claims: Vec<Value> = workload
-        .object
-        .raw_after
-        .pointer("/spec/volumeClaimTemplates")
-        .and_then(Value::as_array)
-        .into_iter()
-        .flatten()
-        .filter_map(|c| c.pointer("/metadata/name"))
-        .filter_map(Value::as_str)
-        .map(|claim| {
-            json!({"name": claim, "persistentVolumeClaim": {"claimName": format!("{claim}-{}-0", workload.object.target.name)}})
+fn pod(workload: &Added<'_>, name: &str, plan: &Plan) -> Pod {
+    let mut spec = workload.template.spec.clone().unwrap_or_default();
+    let account = spec
+        .service_account_name
+        .as_deref()
+        .or(spec.service_account.as_deref());
+    if account.is_some_and(|account| creates_account(plan, account)) {
+        spec.service_account_name = None;
+        spec.service_account = None;
+    }
+    let claims: Vec<Volume> = workload
+        .claims
+        .iter()
+        .filter_map(|claim| claim.metadata.name.as_deref())
+        .map(|claim| Volume {
+            name: claim.to_owned(),
+            persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
+                claim_name: format!("{claim}-{}-0", workload.object.target.name),
+                read_only: None,
+            }),
+            ..Volume::default()
         })
         .collect();
-    if let Some(spec) = spec.as_object_mut() {
-        let account = spec
-            .get("serviceAccountName")
-            .or_else(|| spec.get("serviceAccount"))
-            .and_then(Value::as_str);
-        if account.is_some_and(|account| creates_account(plan, account)) {
-            spec.remove("serviceAccountName");
-            spec.remove("serviceAccount");
-        }
-    }
     if !claims.is_empty() {
-        let volumes = spec
-            .as_object_mut()
-            .map(|s| s.entry("volumes").or_insert_with(|| json!([])));
-        if let Some(Value::Array(volumes)) = volumes {
-            volumes.retain(|v| !claims.iter().any(|c| c.get("name") == v.get("name")));
-            volumes.extend(claims);
-        }
+        let volumes = spec.volumes.get_or_insert_default();
+        volumes.retain(|v| !claims.iter().any(|c| c.name == v.name));
+        volumes.extend(claims);
     }
-    json!({"apiVersion": "v1", "kind": "Pod", "metadata": metadata, "spec": spec})
+    Pod {
+        metadata: ObjectMeta {
+            name: None,
+            generate_name: Some(name.to_owned()),
+            ..workload.template.metadata.clone().unwrap_or_default()
+        },
+        spec: Some(spec),
+        status: None,
+    }
 }
 
 fn creates_account(plan: &Plan, account: &str) -> bool {
@@ -298,73 +364,121 @@ fn exceeded<'q>(quota: &'q ResourceQuota, need: &Need) -> Option<(&'q str, Strin
 
 #[cfg(test)]
 mod tests {
+    use serde_json::json;
+    use zeabur_kube::k8s_openapi::api::core::v1::{
+        ConfigMapVolumeSource, EmptyDirVolumeSource, PodSpec,
+    };
+
     use super::*;
 
-    fn planned(kind: &str, name: &str, body: &Value) -> Value {
+    fn planned(kind: &str, name: &str) -> Value {
         json!({
             "target": {"apiVersion": if kind == "ServiceAccount" { "v1" } else { "apps/v1" },
                        "kind": kind, "plural": format!("{}s", kind.to_lowercase()), "name": name},
-            "changes": [], "owners": [], "write": {"type": "create", "body": body}
+            "changes": [], "owners": [], "write": {"type": "create", "body": {}}
         })
     }
 
+    fn plan(objects: &[Value]) -> Plan {
+        serde_json::from_value(json!({"objects": objects, "impact": [], "warnings": []})).unwrap()
+    }
+
     fn account_of(plan: &Plan) -> Option<String> {
-        let template = json!({"spec": {"serviceAccountName": "worker", "containers": []}});
         let workload = Added {
             object: &plan.objects[0],
-            template: &template,
+            template: PodTemplateSpec {
+                metadata: None,
+                spec: Some(PodSpec {
+                    service_account_name: Some("worker".to_owned()),
+                    ..PodSpec::default()
+                }),
+            },
+            claims: Vec::new(),
             pods: 1,
             change: Some(0),
         };
         pod(&workload, "web-dry-run-", plan)
-            .pointer("/spec/serviceAccountName")
-            .and_then(Value::as_str)
-            .map(str::to_owned)
+            .spec?
+            .service_account_name
     }
 
     #[test]
     fn a_service_account_the_plan_creates_is_left_out_of_the_dry_run() {
-        let with: Plan = serde_json::from_value(json!({
-            "objects": [planned("Deployment", "web", &json!({})),
-                        planned("ServiceAccount", "worker", &json!({}))],
-            "impact": [], "warnings": []
-        }))
-        .unwrap();
+        let with = plan(&[
+            planned("Deployment", "web"),
+            planned("ServiceAccount", "worker"),
+        ]);
         assert_eq!(account_of(&with), None);
-        let without: Plan = serde_json::from_value(json!({
-            "objects": [planned("Deployment", "web", &json!({}))],
-            "impact": [], "warnings": []
-        }))
-        .unwrap();
+        let without = plan(&[planned("Deployment", "web")]);
         assert_eq!(account_of(&without).as_deref(), Some("worker"));
     }
 
     #[test]
     fn a_claim_template_becomes_a_claim_volume_in_place_of_the_template_volume_of_its_name() {
-        let mut plan: Plan = serde_json::from_value(json!({
-            "objects": [planned("StatefulSet", "db", &json!({}))],
-            "impact": [], "warnings": []
-        }))
-        .unwrap();
-        plan.objects[0].raw_after =
-            json!({"spec": {"volumeClaimTemplates": [{"metadata": {"name": "data"}}]}});
-        let template = json!({"spec": {"containers": [], "volumes": [
-            {"name": "data", "configMap": {"name": "seed"}},
-            {"name": "tmp", "emptyDir": {}}
-        ]}});
+        let plan = plan(&[planned("StatefulSet", "db")]);
+        let volume = |name: &str| Volume {
+            name: name.to_owned(),
+            ..Volume::default()
+        };
         let workload = Added {
             object: &plan.objects[0],
-            template: &template,
+            template: PodTemplateSpec {
+                metadata: None,
+                spec: Some(PodSpec {
+                    volumes: Some(vec![
+                        Volume {
+                            config_map: Some(ConfigMapVolumeSource {
+                                name: "seed".to_owned(),
+                                ..ConfigMapVolumeSource::default()
+                            }),
+                            ..volume("data")
+                        },
+                        Volume {
+                            empty_dir: Some(EmptyDirVolumeSource::default()),
+                            ..volume("tmp")
+                        },
+                    ]),
+                    ..PodSpec::default()
+                }),
+            },
+            claims: vec![PersistentVolumeClaim {
+                metadata: ObjectMeta {
+                    name: Some("data".to_owned()),
+                    ..ObjectMeta::default()
+                },
+                ..PersistentVolumeClaim::default()
+            }],
             pods: 1,
             change: Some(0),
         };
         let pod = pod(&workload, "db-dry-run-", &plan);
+        assert_eq!(pod.metadata.generate_name.as_deref(), Some("db-dry-run-"));
         assert_eq!(
-            pod.pointer("/spec/volumes").unwrap(),
-            &json!([
-                {"name": "tmp", "emptyDir": {}},
-                {"name": "data", "persistentVolumeClaim": {"claimName": "data-db-0"}}
+            pod.spec.and_then(|s| s.volumes),
+            Some(vec![
+                Volume {
+                    empty_dir: Some(EmptyDirVolumeSource::default()),
+                    ..volume("tmp")
+                },
+                Volume {
+                    persistent_volume_claim: Some(PersistentVolumeClaimVolumeSource {
+                        claim_name: "data-db-0".to_owned(),
+                        read_only: None,
+                    }),
+                    ..volume("data")
+                },
             ])
         );
+    }
+
+    #[test]
+    fn a_planned_workload_that_is_not_its_kind_is_a_fault() {
+        let mut plan = plan(&[planned("Deployment", "web")]);
+        plan.objects[0].raw_after = json!({"spec": {"replicas": "three"}});
+        let request: PlanRequest = serde_json::from_value(json!({"changes": []})).unwrap();
+        let Err(ApiError(problem)) = added(&request, &plan) else {
+            panic!("a Deployment with text replicas parsed");
+        };
+        assert_eq!(problem.kind, Kind::Internal);
     }
 }
