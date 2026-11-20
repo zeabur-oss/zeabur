@@ -17,12 +17,208 @@ chart 现在自带 `zeabur-system-hosts` 准入策略。在没有标上 `zeabur.
 
 ### 用 zeabur-installer 安装的集群
 
-zeabur-installer 在 chart 之外应用过同一个策略，Helm 不会接管它。升级前先删掉，chart 会重新创建：
+zeabur-installer v0.2 用 K3s 的 `HelmChart` 安装 Zeabur，再用普通 manifest 安装 Zeabur Identity、它的准入策略和登录客户端。v0.3 改用一个 Helm release 安装这些内容。下面的步骤会把安装程序创建的对象交给这个 release 管理，不会删除它们。项目、服务、数据库、域名、成员和通行密钥都保持不变，也不用重新注册账号。
+
+这些内容不会改变：
+
+- K3s、RKE2 或 KubeSolo，以及让 Kubernetes 接受 Zeabur Identity 令牌的文件。以后要升级 Kubernetes，用 Zeatend，见[用 zeabur-installer 安装的服务器](steps.mdx#用-zeabur-installer-安装的服务器)。
+- 安装程序装好的组件，例如 Traefik、cert-manager、Zeabur Builder 和 CloudNativePG。Zeabur 不会改动不是自己安装的组件，所以这些组件会保持当前版本。
+- Zeabur Identity 的 Service 地址和签名密钥，账号和通行密钥照常可用，kube-apiserver 也继续接受 Zeabur Identity 的令牌。
+
+升级后，不要再运行 `zeabur-installer apply`，否则会重新装回 v0.2 的 `HelmChart` 和 Zeabur Identity v0.1。
+
+这些步骤适合交给 Agent 操作。遇到下面这些情况，Agent 要停下来，等待服务器所有者操作或确认：
+
+- 做任何改动之前：所有者先检查新的 values 文件，再给每台服务器创建快照（第 3 步）。
+- 第 1 步的检查发现这些步骤没有涵盖的情况。
+- 升级之后：所有者用通行密钥登录（第 8 步）。
+- 删除任何内容之前，包括第 9 步清理剩余对象时。
+
+#### 1. 检查安装程序创建的内容
+
+所有命令都在第一台服务器上用 root shell（`sudo -i`）运行。先让 `kubectl` 和 `helm` 连接到集群：
+
+| 发行版 | 命令 |
+| --- | --- |
+| K3s | `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml` |
+| RKE2 | `export KUBECONFIG=/etc/rancher/rke2/rke2.yaml PATH=$PATH:/var/lib/rancher/rke2/bin` |
+| KubeSolo | `export KUBECONFIG=/var/lib/kubesolo/pki/admin/admin.kubeconfig PATH=$PATH:/var/lib/zeabur-installer/bin` |
+
+服务器还需要 Helm 4。如果 `helm version` 的输出里没有 `v4`，按[安装 Helm](https://helm.sh/docs/intro/install/)装好。下面的命令都在 `/root/zeabur-upgrade` 中运行：
 
 ```sh
-kubectl delete validatingadmissionpolicybinding zeabur-system-hosts-zeabur zeabur-system-hosts-zeabur-identity
-kubectl delete validatingadmissionpolicy zeabur-system-hosts
+umask 077
+mkdir -p /root/zeabur-upgrade && cd /root/zeabur-upgrade
 ```
+
+接着逐项检查。结果和右栏不符时，先停下来询问所有者。
+
+| 命令 | 预期结果 |
+| --- | --- |
+| `kubectl -n kube-system get configmap zeabur-installer -o jsonpath='{.data.installer}'` | `0.2.0` 或其他 `0.2.x`。如果是 `0.1.x`，先完成 [v0.1 → v0.2](#v01--v02)。 |
+| `kubectl -n kube-system get helmchart zeabur` | 一个 `HelmChart`。如果没有，说明安装程序运行时设置了 `zeabur: false`，没有安装 Zeabur：改为按[在现有集群安装 Zeabur](../install/existing-cluster.mdx)操作。 |
+| `helm status zeabur -n zeabur` | `STATUS: deployed` |
+| `kubectl -n zeabur-identity get deployment zeabur-identity -o jsonpath='{.spec.template.spec.containers[0].args}'` | 没有输出，或只有 `["--invitations"]`。其他选项是有人手动加的，Zeabur Identity v0.3 不再接受许多旧选项，见[它的升级须知](https://oss.zeabur.com/docs/identity/operations/upgrade)。 |
+| `kubectl get crd upstreamproviders.identity.zeabur.com` | `NotFound`。如果存在，说明有人手动配置了 GitHub 或 Google 登录；先按 Zeabur Identity 的升级须知处理这些登录方式。 |
+
+保存当前的 values 和安装程序的配置：
+
+```sh
+helm get values zeabur -n zeabur -o yaml > old-values.yaml
+cp /etc/zeabur-installer/config.yaml installer-config.yaml
+```
+
+从这两个文件中记下：
+
+- **访问模式**：`installer-config.yaml` 中的 `access.mode`。`domain` 表示为真实 DNS 域名申请 Let's Encrypt 证书。`local` 表示使用服务器上创建的 CA，ClusterIssuer 是 `zeabur-local-ca`。
+- **邀请链接**：`access.invitations: false` 表示 Zeabur Identity 不接受邀请链接。没有这个键时，默认启用邀请。
+- **Zeabur 使用哪个 Zeabur Identity**：`old-values.yaml` 中的 `issuer.url`。如果是 `https://` 加上 `access.identity`，用的就是安装程序创建的 Zeabur Identity。如果是其他地址，说明有人让 Zeabur 使用外部的 Zeabur Identity。继续之前先询问所有者，再按第 2 步中对应的说明编写 values。
+- **项目自己的域名**：`kubectl get ingress,httproute,certificate -A > domains-before.txt`。再选一个项目域名，保存 `curl -sS -o /dev/null -w '%{http_code}\n' https://<domain>/` 的输出。local 模式要加上 `--cacert /var/lib/rancher/zeabur-installer/local-ca.crt`，KubeSolo 则用 `/var/lib/zeabur-installer/local-ca.crt`。升级不会改动这些对象。
+- **数据库**：`kubectl get clusters.postgresql.cnpg.io,statefulsets -A > databases-before.txt`。升级不会改动这些对象。
+
+#### 2. 编写新的 values 文件
+
+根据 `old-values.yaml` 编写 `values.yaml`。不要用 `--reuse-values` 或 `--reset-then-reuse-values`：它们会保留安装程序设置的 `image`，让版本停在 v0.2。
+
+使用外部 Zeabur Identity 时，设置 `identity.enabled: false`，原样保留 `issuer`（包括 `issuer.clientSecret`），不要添加其他 `identity` 键，也不用按下表修改。其他情况按下表修改：
+
+| `old-values.yaml` 中的内容 | `values.yaml` 中的写法 |
+| --- | --- |
+| `image` | 不要保留，让 chart 使用自己的镜像。 |
+| `issuer.url` | 原样移到 `identity.issuer`。 |
+| `issuer.clientSecret` | 不要保留。chart 会创建 Secret `zeabur-client`，并把它的哈希值注册到 Zeabur Identity。 |
+| `issuer.caBundle`（仅 local 模式） | 保留。 |
+| `ingress.annotations` 中的 `cert-manager.io/cluster-issuer: <issuer>` | 去掉这条注解。把 `ingress.clusterIssuer` 和 `identity.ingress.clusterIssuer` 都设为 `<issuer>`。 |
+| `ingress.className` | 保留，并把 `identity.ingress.className` 设为相同的值。 |
+| 其他所有键，例如 `publicUrl`、`clusterName`、`planKey`、`domains`、`ingress.enabled`、`ingress.tls`、`builds`、`proxy`、`telemetry` 和 `updateCheck` | 原样保留。 |
+
+再加上：
+
+- `identity.admin.setupLink: false`。管理员已经存在，不需要 chart 创建新的设置链接。
+- 只有 `access.invitations` 为 `false` 时，才加上 `identity.invitations: false`。
+
+local 模式的服务器最后会类似下面这样，地址和值要换成你自己的：
+
+```yaml
+publicUrl: https://zeabur.203.0.113.10.sslip.io
+clusterName: vps-1
+identity:
+  issuer: https://login.203.0.113.10.sslip.io
+  admin:
+    setupLink: false
+  ingress:
+    className: traefik
+    clusterIssuer: zeabur-local-ca
+issuer:
+  caBundle:
+    configMap: zeabur-identity-ca
+planKey:
+  existingSecret: zeabur-plan-key
+ingress:
+  className: traefik
+  clusterIssuer: zeabur-local-ca
+  tls:
+    secretName: zeabur-tls
+domains:
+  clusterIssuer: zeabur-local-ca
+  suffixes: [203-0-113-10.sslip.io]
+builds:
+  registry: zot.zot.svc:5000
+  caBundle:
+    configMap: zeabur-registry-ca
+```
+
+domain 模式的 `ingress.clusterIssuer`、`identity.ingress.clusterIssuer` 和 `domains.clusterIssuer` 都是 `letsencrypt`，也没有 `issuer.caBundle`。
+
+#### 3. 备份并创建快照
+
+保存这次升级要接管的对象，方便对比或还原：
+
+```sh
+kubectl get crd -o name | grep identity.zeabur.com | xargs kubectl get -o yaml > identity-crds.yaml
+kubectl -n zeabur-identity get users,credentials,grants,invitations,oauthclients,secrets,configmaps,services -o yaml > identity.yaml
+kubectl -n zeabur get secrets,configmaps -o yaml > zeabur.yaml
+kubectl -n kube-system get helmchart zeabur -o yaml > helmchart.yaml
+kubectl -n kube-system get configmap zeabur-installer zeabur-identity-authn --ignore-not-found -o yaml > installer-record.yaml
+```
+
+这些文件含有机密信息，例如 Zeabur Identity 的签名密钥。请留在服务器上。
+
+**先停下来。**把 `values.yaml` 和第 1 步的检查结果交给所有者查看。请所有者给每台服务器创建快照，完成后再告诉你。需要退回旧版时，就还原这份快照。
+
+#### 4. 让安装程序的 `HelmChart` 不再管理 release
+
+K3s 的 helm-controller 通过 `HelmChart` `kube-system/zeabur` 管理 release。直接删除这个 `HelmChart` 会卸载 Zeabur。先告诉 helm-controller 不要再管理这个 release，然后再删除 `HelmChart`：
+
+```sh
+kubectl -n kube-system annotate helmchart zeabur helmcharts.helm.cattle.io/unmanaged=true
+kubectl -n kube-system patch helmchart zeabur --type=json -p '[{"op":"remove","path":"/metadata/finalizers"}]'
+kubectl -n kube-system delete helmchart zeabur
+```
+
+确认 release 和它的副本都还在，再继续：
+
+```sh
+helm status zeabur -n zeabur          # STATUS: deployed
+kubectl -n zeabur get pods
+```
+
+#### 5. 更新 Zeabur Identity 的 CRD
+
+Helm 只在首次安装时安装 chart 中的 CRD，不会升级它们。下载 chart，再自己应用新版 CRD。把 `<version>` 换成要升级到的版本；除非所有者指定了别的版本，就用 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 上最新的那一版：
+
+```sh
+helm pull oci://ghcr.io/zeabur-oss/charts/zeabur --version <version> --untar
+kubectl apply --server-side --force-conflicts -f zeabur/charts/identity/crds/
+```
+
+安装程序应用旧 CRD 时用了自己的 field manager，所以这里需要 `--force-conflicts`。
+
+#### 6. 升级
+
+```sh
+helm upgrade zeabur ./zeabur -n zeabur -f values.yaml \
+  --take-ownership --force-conflicts --wait --timeout 10m
+```
+
+- `--take-ownership` 让 release 接管安装程序创建的 Zeabur Identity、登录客户端和准入策略。
+- `--force-conflicts` 接管安装程序设置的字段。chart 没有设置的字段会保持不变，例如 Zeabur Identity 的 Secret 中的签名密钥。
+
+如果命令失败，先读错误信息，修改 `values.yaml`，再运行同一条命令。失败的尝试会留下一条失败的修订版本记录，下次尝试会替换它。
+
+#### 7. 检查集群
+
+```sh
+helm status zeabur -n zeabur                                   # STATUS: deployed
+kubectl -n zeabur rollout status deployment/zeabur
+kubectl -n zeabur-identity rollout status deployment/zeabur-identity
+kubectl -n zeabur-identity get service zeabur-identity -o jsonpath='{.spec.clusterIP}'
+```
+
+地址必须和 `installer-record.yaml` 中 `discoveryURL` 的地址相同。如果变了，kube-apiserver 就无法连接 Zeabur Identity，所有人都会登录失败：先停下来询问所有者。
+
+再确认其他内容都没变：
+
+- `kubectl get ingress,httproute,certificate -A` 列出的名称和 `domains-before.txt` 相同，每个 Certificate 的 `READY` 都是 `True`。
+- `kubectl get clusters.postgresql.cnpg.io,statefulsets -A` 列出的名称和 `databases-before.txt` 相同，并且都已就绪。
+- 第 1 步的 `curl` 输出相同的状态码。
+- `curl -sS <identity.issuer>/.well-known/openid-configuration` 返回 JSON，其中的 `issuer` 和升级前相同。
+
+#### 8. 登录
+
+**先停下来。**请所有者打开 Zeabur，用通行密钥登录，再打开一个项目，检查服务和数据库。通行密钥只能由本人使用。如果方便，也请一位成员登录检查。
+
+Zeabur 的副本已经换新，所有人都需要重新登录一次。
+
+#### 9. 清理
+
+Zeabur 不再读取 Secret `zeabur/zeabur-oidc`，这是安装程序创建的登录客户端密钥。征得所有者同意后再删除：
+
+```sh
+kubectl -n zeabur delete secret zeabur-oidc
+```
+
+先保留 `/root/zeabur-upgrade` 和快照，等一切正常运行几天后再清理。
 
 ## v0.1 → v0.2
 

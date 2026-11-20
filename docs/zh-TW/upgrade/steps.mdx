@@ -5,6 +5,16 @@ description: 查看目前的 Zeabur 版本，依安裝方式用 Helm、Argo CD�
 
 先看你是怎麼安裝的，再照該段升級。升級不會自動發生，Zeabur 只會告訴你有新版本。
 
+## 交給 Agent 升級
+
+Claude Code 或 Codex 這類 Agent 可以替你照著這一頁和升級須知執行。貼上這段提示，在能用 SSH 連到伺服器的電腦上執行 Agent，並告訴它伺服器的位址：
+
+```text
+Upgrade Zeabur on my server to the latest version by following https://oss.zeabur.com/docs/zeabur/upgrade/steps.
+```
+
+Agent 會查出 Zeabur 的安裝方式，讀過中間每一版的升級須知，並列出要改動的內容。快照由你建立，升級後也要由你用通行密鑰登入；到了這些步驟，Agent 會停下來等你。
+
 ## 查看版本
 
 叢集頁面一律顯示 `Zeabur v<版本>`。有新版本時，頁面會出現通知，寫出是哪一版，並附上發行說明連結。「設定」›「關於」也會顯示版本。在這兩個地方按「升級方式」，都會依你的安裝方式列出步驟，附上可以複製的指令和這一頁的連結。
@@ -19,6 +29,8 @@ description: 查看目前的 Zeabur 版本，依安裝方式用 Helm、Argo CD�
 - 專案的資料另外用 Velero 備份，見[備份叢集並從備份還原](../cluster/backups.mdx)。
 
 ## 用 Helm 升級
+
+如果 `kubectl -n kube-system get configmap zeabur-installer` 找到 ConfigMap，表示這台伺服器是用 zeabur-installer 裝好的。從 v0.2 升到 v0.3 時，請改照升級須知裡的[用 zeabur-installer 安裝的叢集](notes.mdx#用-zeabur-installer-安裝的叢集)，不要照這一節操作。
 
 把 `<版本>` 換成要升級的版本：
 
