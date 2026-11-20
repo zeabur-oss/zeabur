@@ -3338,6 +3338,10 @@ fn github_app(s: &mut State, fake: &FakeGitHub) {
 }
 
 #[tokio::main]
+#[expect(
+    clippy::print_stdout,
+    reason = "scripts/shots reads the address from the first line"
+)]
 async fn main() -> std::io::Result<()> {
     let mut state = state();
     if std::env::var_os("ZEABUR_DEMO_DELETING").is_some() {
@@ -3449,9 +3453,10 @@ async fn main() -> std::io::Result<()> {
     };
     let app = zeabur_api::router_with(Arc::new(access), options)
         .fallback_service(zeabur_ui::router_for(zeabur_ui::assets(), zeabur_ui::CSP));
-    // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090.
+    // Another port when 8080 is taken: ZEABUR_DEMO_ADDR=127.0.0.1:8090, or port 0 for any free one.
     let addr = std::env::var("ZEABUR_DEMO_ADDR").unwrap_or_else(|_| "127.0.0.1:8080".to_owned());
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    println!("listening on http://{}", listener.local_addr()?);
     axum::serve(listener, app).await
 }
 

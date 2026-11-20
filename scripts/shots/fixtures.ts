@@ -3,8 +3,12 @@
 //   ZEABUR_SHOTS_DEMO  the demo server (crates/zeabur-api/examples/demo.rs), for app zeabur
 //   ZEABUR_DEMO_NOW    the time now, for the demo and the browser
 import { spawn } from "node:child_process"
-import { connect, createServer } from "node:net"
-import { resolve } from "node:path"
+import { once } from "node:events"
+import { readFile } from "node:fs/promises"
+import { createServer } from "node:http"
+import type { AddressInfo } from "node:net"
+import { extname, join, resolve } from "node:path"
+import { createInterface } from "node:readline"
 import type { Page } from "@playwright/test"
 import { expect, test as base } from "zeabur-web/e2e/fixtures"
 import type { App } from "./sets.ts"
@@ -83,55 +87,40 @@ export const test = base.extend<
   },
 })
 
-async function freePort(): Promise<number> {
-  const server = createServer()
-  await new Promise<void>((done) => server.listen(0, "127.0.0.1", done))
-  const { port } = server.address() as { port: number }
-  await new Promise((done) => server.close(done))
-  return port
+// Each server binds port 0 itself, so the system hands it a free port; a port chosen before the
+// server starts can be taken by another worker's server in between.
+async function start(app: App, demo: Record<string, string>): Promise<Server> {
+  return app === "zeabur" ? startDemo(demo) : startDesktop()
 }
 
-// The desktop's is Vite's preview server of the pages in desktop/web/dist, where
-// desktop/web/scripts/shots-demo.ts answers the commands in the page.
-async function start(app: App, demo: Record<string, string>): Promise<Server> {
-  const port = await freePort()
-  const env = { ...process.env, ...demo }
-  const child =
-    app !== "zeabur"
-      ? spawn(
-          "bun",
-          [
-            "node_modules/vite/bin/vite.js",
-            "preview",
-            "--host",
-            "127.0.0.1",
-            "--port",
-            String(port),
-            "--strictPort",
-          ],
-          { cwd: resolve(import.meta.dirname, "../../desktop/web"), env },
-        )
-      : spawn(demoServer(), [], { env: { ...env, ZEABUR_DEMO_ADDR: `127.0.0.1:${port}` } })
+// The demo prints the address it listens on as its first line.
+async function startDemo(demo: Record<string, string>): Promise<Server> {
+  const child = spawn(demoServer(), [], {
+    env: { ...process.env, ...demo, ZEABUR_DEMO_ADDR: "127.0.0.1:0" },
+    stdio: ["ignore", "pipe", "pipe"],
+  })
   let log = ""
-  child.stdout.on("data", (chunk) => (log += chunk))
   child.stderr.on("data", (chunk) => (log += chunk))
   const exited = new Promise((done) => child.once("exit", done))
   const stop = async () => {
     child.kill()
     await exited
   }
-  for (let i = 0; i < 300; i++) {
-    if (child.exitCode !== null) break
-    if (await listening(port)) {
-      // The demo's controllers settle its fixtures on their first ticks, such as a build that
-      // started days ago finishing, 400 ms after it starts.
-      if (app === "zeabur") await new Promise((done) => setTimeout(done, 1000))
-      return { url: `http://127.0.0.1:${port}`, stop }
-    }
-    await new Promise((done) => setTimeout(done, 100))
+  const [line] = await Promise.race([
+    once(createInterface({ input: child.stdout }), "line"),
+    exited.then(() => [undefined]),
+  ])
+  const url = /^listening on (http:\/\/\S+)$/.exec(line ?? "")?.[1]
+  if (!url) {
+    await stop()
+    throw new Error(
+      `the zeabur demo server did not start (${JSON.stringify(demo)}):\n${line ?? ""}\n${log}`,
+    )
   }
-  await stop()
-  throw new Error(`the ${app} demo server did not start (${JSON.stringify(demo)}):\n${log}`)
+  // The demo's controllers settle its fixtures on their first ticks, such as a build that
+  // started days ago finishing, 400 ms after it starts.
+  await new Promise((done) => setTimeout(done, 1000))
+  return { url, stop }
 }
 
 function demoServer(): string {
@@ -140,15 +129,39 @@ function demoServer(): string {
   return demo
 }
 
-function listening(port: number): Promise<boolean> {
-  return new Promise((done) => {
-    const socket = connect(port, "127.0.0.1")
-    socket.once("connect", () => {
-      socket.end()
-      done(true)
-    })
-    socket.once("error", () => done(false))
+// The desktop's pages are the files of desktop/web/dist, where desktop/web/scripts/shots-demo.ts
+// answers the commands in the page.
+const dist = resolve(import.meta.dirname, "../../desktop/web/dist")
+const types: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript",
+  ".css": "text/css",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".woff2": "font/woff2",
+  ".json": "application/json",
+}
+
+async function startDesktop(): Promise<Server> {
+  const server = createServer(async (request, response) => {
+    const path = new URL(request.url ?? "/", "http://desktop").pathname
+    const file = join(dist, path.endsWith("/") ? `${path}index.html` : path)
+    try {
+      if (!file.startsWith(`${dist}/`)) throw new Error("outside dist")
+      const body = await readFile(file)
+      response.writeHead(200, {
+        "content-type": types[extname(file)] ?? "application/octet-stream",
+      })
+      response.end(body)
+    } catch {
+      response.writeHead(404).end()
+    }
   })
+  server.listen(0, "127.0.0.1")
+  await once(server, "listening")
+  const { port } = server.address() as AddressInfo
+  const stop = () => new Promise<void>((done) => server.close(() => done()))
+  return { url: `http://127.0.0.1:${port}`, stop }
 }
 
 const options = (blank: string | undefined) =>
