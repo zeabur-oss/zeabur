@@ -70,8 +70,7 @@ pub struct ImageServiceChange {
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub variables: Vec<ServiceVariable>,
     /// Keep plain values in the Secret `<name>-env` rather than in the Deployment. A value that
-    /// reads another variable with `$(…)` stays in the Deployment, as Kubernetes expands it only
-    /// there.
+    /// `expands` stays in the Deployment, as Kubernetes expands `$(…)` only there.
     pub secret_variables: bool,
     /// Claims `<name>-<volume>`; a service with one runs one replica and replaces its pod by
     /// stopping the old one first.
@@ -111,6 +110,10 @@ pub struct ServiceVariable {
     /// The Secret key it reads instead.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub value_from: Option<EnvValueFrom>,
+    /// The value reads other variables with `$(…)`, so it stays in the Deployment, where
+    /// Kubernetes expands it. A value without this is literal, whatever it contains.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub expands: bool,
 }
 
 /// A claim of a new service and where it is mounted.
@@ -411,9 +414,9 @@ fn claim(
     }
 }
 
-/// A plain value that may go in the Secret: one that reads no other variable with `$(…)`.
-fn secretable(variable: &ServiceVariable) -> bool {
-    variable.value_from.is_none() && !variable.value.contains("$(")
+/// A plain value that may go in the Secret: one that does not expand other variables.
+const fn secretable(variable: &ServiceVariable) -> bool {
+    variable.value_from.is_none() && !variable.expands
 }
 
 fn env_var(variable: &ServiceVariable) -> EnvVar {
@@ -745,6 +748,7 @@ pub(crate) fn plain_variables(variables: &[NameValue]) -> Vec<ServiceVariable> {
             name: v.name.clone(),
             value: v.value.clone(),
             value_from: None,
+            expands: false,
         })
         .collect()
 }

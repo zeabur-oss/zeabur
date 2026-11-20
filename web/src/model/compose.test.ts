@@ -113,7 +113,11 @@ describe("composeChanges", () => {
       { name: "DB_HOST", value: "db-rw.shop.svc:5432" },
       { name: "DB_PASSWORD", valueFrom: { secretName: "db-app", key: "password" } },
       { name: "REDIS_PASSWORD", valueFrom: { secretName: "cache-auth", key: "password" } },
-      { name: "REDIS_URL", value: "redis://:$(REDIS_PASSWORD)@cache.shop.svc:6379" },
+      {
+        name: "REDIS_URL",
+        value: "redis://:$(REDIS_PASSWORD)@cache.shop.svc:6379",
+        expands: true,
+      },
     ])
     expect(web.waitFor?.hosts).toEqual([
       { host: "cache.shop.svc", port: 6379 },

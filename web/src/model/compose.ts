@@ -111,7 +111,7 @@ const urlVariables = (v: Variable, database: Connectable): ServiceVariable[] =>
             name: edit.name,
             valueFrom: { secretName: edit.valueFrom.secretName, key: edit.valueFrom.key },
           }
-        : { name: edit.name, value: edit.value ?? "" },
+        : { name: edit.name, value: edit.value ?? "", expands: true },
   )
 
 /** The host, with the port when the value has one: the value's own, or object storage's. */

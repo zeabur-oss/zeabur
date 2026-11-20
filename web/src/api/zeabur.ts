@@ -1866,6 +1866,11 @@ export type RegistryLogin = {
  * A variable of a new service: a value, or a key of a Secret.
  */
 export type ServiceVariable = {
+  /**
+   * The value reads other variables with `$(…)`, so it stays in the Deployment, where
+   * Kubernetes expands it. A value without this is literal, whatever it contains.
+   */
+  expands?: boolean
   /** The variable's name. */
   name: string
   /** Its value, when it has no `valueFrom`. */
@@ -1958,8 +1963,7 @@ export type ImageServiceChange = {
   replicas: number
   /**
    * Keep plain values in the Secret `<name>-env` rather than in the Deployment. A value that
-   * reads another variable with `$(…)` stays in the Deployment, as Kubernetes expands it only
-   * there.
+   * `expands` stays in the Deployment, as Kubernetes expands `$(…)` only there.
    */
   secretVariables: boolean
   /** `restricted`, or `baseline` for any other level. */

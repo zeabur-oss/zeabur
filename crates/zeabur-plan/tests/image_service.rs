@@ -127,8 +127,8 @@ mod tests {
         );
     }
 
-    /// Plain values go in `<name>-env` unless asked not to; a Secret key and a value that reads
-    /// another variable stay in the Deployment.
+    /// Plain values go in `<name>-env` unless asked not to, a literal `$(` too; a Secret key and
+    /// a value that expands other variables stay in the Deployment.
     #[test]
     fn variables_go_in_a_secret_unless_they_cannot() {
         let variables = vec![
@@ -136,11 +136,19 @@ mod tests {
                 name: "MODE".to_owned(),
                 value: "production".to_owned(),
                 value_from: None,
+                expands: false,
+            },
+            ServiceVariable {
+                name: "TOKEN".to_owned(),
+                value: "a$(PORT)b".to_owned(),
+                value_from: None,
+                expands: false,
             },
             ServiceVariable {
                 name: "URL".to_owned(),
                 value: "http://$(HOST)".to_owned(),
                 value_from: None,
+                expands: true,
             },
             ServiceVariable {
                 name: "PASSWORD".to_owned(),
@@ -151,12 +159,16 @@ mod tests {
                     key: Some("password".to_owned()),
                     field_path: None,
                 }),
+                expands: false,
             },
         ];
         let kept = planned(with(|c| c.variables = variables.clone()), None).unwrap();
         let secret = created(&kept, "Secret").unwrap();
         assert_eq!(secret["metadata"]["name"], "web-env");
-        assert_eq!(secret["stringData"], json!({"MODE": "production"}));
+        assert_eq!(
+            secret["stringData"],
+            json!({"MODE": "production", "TOKEN": "a$(PORT)b"})
+        );
         let container =
             &created(&kept, "Deployment").unwrap()["spec"]["template"]["spec"]["containers"][0];
         assert_eq!(container["envFrom"][0]["secretRef"]["name"], "web-env");
