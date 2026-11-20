@@ -690,6 +690,9 @@ pub struct Written {
     pub generation: Option<i64>,
     /// The object's `metadata.uid` after the write.
     pub uid: Option<String>,
+    /// The object as kube-apiserver answered, with its defaults and admission's changes; `None`
+    /// for a delete.
+    pub object: Option<serde_json::Value>,
 }
 
 pub use zeabur_core::names::GatewayRef;

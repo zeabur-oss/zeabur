@@ -1,5 +1,6 @@
 //! A plan's preview: the pods it replaces, the data and the fields it removes. It predicts no
-//! fit: a quota or a full node shows as the rollout's reason after apply.
+//! node fit: a full node shows as the rollout's reason after apply. The pods a plan adds are
+//! dry-run and held against the project's quotas.
 
 #[cfg(test)]
 mod tests {
@@ -76,17 +77,87 @@ mod tests {
         json!({"kind": "Deployment", "name": "web"})
     }
 
-    #[tokio::test]
-    async fn a_scale_past_the_quota_is_previewed_without_a_fit_verdict() {
-        let preview = preview(
-            &cluster("700m"),
-            json!([{"op": "scale", "workload": workload(), "replicas": 3}]),
+    async fn refused(cluster: &MemoryCluster, changes: Value) -> Value {
+        let (status, body) = send(
+            &app(cluster),
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({ "changes": changes })),
         )
         .await;
+        assert_eq!(status.as_u16(), 403, "{body}");
+        body
+    }
+
+    fn scale(replicas: u32) -> Value {
+        json!([{"op": "scale", "workload": workload(), "replicas": replicas}])
+    }
+
+    #[tokio::test]
+    async fn a_scale_within_the_quota_is_previewed_without_a_fit_verdict() {
+        let preview = preview(&cluster("700m"), scale(2)).await;
         assert_eq!(preview["rollouts"][0]["actions"], json!(["scale"]));
         assert_eq!(preview["rollouts"][0]["fromReplicas"], 1);
         assert_eq!(preview.get("fit"), None, "{preview}");
         assert_eq!(preview["dataLoss"], json!([]));
+    }
+
+    /// Two more pods of 200m go past a quota of 1 CPU with 700m used: the plan is refused at the
+    /// scale, with the quota's numbers.
+    #[tokio::test]
+    async fn a_scale_past_the_quota_is_refused_at_its_change() {
+        let problem = refused(&cluster("700m"), scale(3)).await;
+        assert_eq!(problem["kind"], "quota-exceeded", "{problem}");
+        assert_eq!(problem["at"]["change"], 0, "{problem}");
+        assert_eq!(
+            problem["why"]["params"],
+            json!({"quota": "compute", "resource": "requests.cpu", "hard": "1", "used": "700m"})
+        );
+    }
+
+    /// A roll replaces pods without adding any, so a full quota does not refuse it.
+    #[tokio::test]
+    async fn a_roll_is_not_held_to_the_quota() {
+        let preview = preview(
+            &cluster("1"),
+            json!([{"op": "env", "workload": workload(),
+                "changes": [{"op": "set", "name": "MODE", "value": "maintenance"}]}]),
+        )
+        .await;
+        assert_eq!(preview["rollouts"][0]["actions"], json!(["roll"]));
+    }
+
+    /// A person who may not create Pods cannot dry-run one, so the quota is not known and the
+    /// plan goes on.
+    #[tokio::test]
+    async fn without_the_right_to_create_pods_a_scale_is_not_held_to_the_quota() {
+        let cluster = cluster("700m");
+        cluster.update(|s| {
+            s.forbidden_writes.insert("Pod/web-dry-run-".to_owned());
+            s.refused_rights.insert("create pods".to_owned());
+        });
+        let preview = preview(&cluster, scale(3)).await;
+        assert_eq!(preview["rollouts"][0]["actions"], json!(["scale"]));
+    }
+
+    /// Pod Security admits a Deployment and refuses its Pods; the plan is refused at the change.
+    #[tokio::test]
+    async fn a_pod_that_pod_security_refuses_refuses_the_plan() {
+        let cluster = cluster("0");
+        cluster.update(|s| {
+            s.admission_refusals.insert(
+                "Pod/web-dry-run-".to_owned(),
+                zeabur_core::problem::KubernetesStatus::new(
+                    403,
+                    "Forbidden",
+                    "pods \"web-dry-run\" is forbidden: violates PodSecurity \"restricted:latest\": \
+                     runAsNonRoot != true",
+                ),
+            );
+        });
+        let problem = refused(&cluster, scale(2)).await;
+        assert_eq!(problem["kind"], "policy-denied", "{problem}");
+        assert_eq!(problem["at"]["change"], 0, "{problem}");
     }
 
     #[tokio::test]

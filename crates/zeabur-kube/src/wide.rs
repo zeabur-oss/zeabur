@@ -174,6 +174,17 @@ struct RawPodStatus {
     phase: Option<String>,
 }
 
+impl ClusterPod {
+    /// The pod a Pod's JSON describes, as kube-apiserver answered it.
+    ///
+    /// # Errors
+    ///
+    /// When `object` is not a Pod's JSON.
+    pub fn from_object(object: serde_json::Value) -> Result<Self, serde_json::Error> {
+        serde_json::from_value::<RawPod>(object).map(Self::from)
+    }
+}
+
 impl From<RawPod> for ClusterPod {
     fn from(raw: RawPod) -> Self {
         let container = |c: RawContainer| ContainerResources {

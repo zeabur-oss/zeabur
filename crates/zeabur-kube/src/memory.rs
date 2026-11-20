@@ -1252,6 +1252,7 @@ impl Cluster for MemoryCluster {
                     resource_version: version,
                     generation: None,
                     uid: None,
+                    object: None,
                 });
             }
             let mut object = match (&request.body, &current) {
@@ -1302,6 +1303,7 @@ impl Cluster for MemoryCluster {
                     resource_version: version,
                     generation: None,
                     uid: None,
+                    object: Some(object),
                 });
             }
             let next = version
@@ -1325,13 +1327,14 @@ impl Cluster for MemoryCluster {
                 .pointer("/metadata/uid")
                 .and_then(Value::as_str)
                 .map(str::to_owned);
-            state.store(target, object)?;
+            state.store(target, object.clone())?;
             state.writes.push(request.clone());
             drop(state);
             Ok(Written {
                 resource_version: Some(next),
                 generation,
                 uid,
+                object: Some(object),
             })
         })
     }
