@@ -7,6 +7,7 @@ import type { Schemas } from "@/api/client"
 import { applyComponent, planComponent } from "@/api/zeabur"
 import { capabilitiesQuery, refresh, reviewOnce } from "@/api/queries"
 import { Command } from "@/components/bits"
+import { InputsForm, InputsReview, isMissing, type Values } from "@/components/component-inputs"
 import { Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
 import { Problem } from "@/components/problem"
@@ -28,9 +29,10 @@ const health = {
   failed: "fail",
 } as const
 
-const planQuery = (id: string, action: Schemas.ComponentAction) => ({
-  queryKey: ["component-plan", id, action],
-  queryFn: ({ signal }: { signal: AbortSignal }) => planComponent(id, { action }, { signal }),
+const planQuery = (id: string, action: Schemas.ComponentAction, values: Values = {}) => ({
+  queryKey: ["component-plan", id, action, values],
+  queryFn: ({ signal }: { signal: AbortSignal }) =>
+    planComponent(id, { action, values }, { signal }),
   ...reviewOnce,
 })
 
@@ -38,7 +40,8 @@ const planQuery = (id: string, action: Schemas.ComponentAction) => ({
  * decides, since only it sees every object Zeabur wrote; the action stays while the dialog is
  * open, so a failed install is tried again rather than removed. Once Zeabur wrote a step, the
  * install dialog also offers removal, for an install that cannot finish. An installed component
- * is offered removal when its install plan is refused, such as when a dependency was removed. */
+ * is offered removal when its install plan is refused, such as when a dependency was removed,
+ * and new values when its component asks for any. */
 export function ComponentPlan({
   id,
   name,
@@ -50,10 +53,14 @@ export function ComponentPlan({
   installed: boolean
   onClose: () => void
 }) {
-  const t = useT()
   const install = useQuery(planQuery(id, "install"))
   const [action, setAction] = useState<Schemas.ComponentAction>()
+  const [editing, setEditing] = useState(false)
   if (action === undefined && install.data) setAction(install.data.done ? "remove" : "install")
+  const changeValues = () => {
+    setEditing(true)
+    setAction("install")
+  }
   if (action)
     return (
       <PlanDialog
@@ -61,10 +68,41 @@ export function ComponentPlan({
         id={id}
         name={name}
         action={action}
+        editing={editing}
         onClose={onClose}
         onRemove={action === "install" ? () => setAction("remove") : undefined}
+        onEdit={action === "remove" && install.data?.inputs.length ? changeValues : undefined}
       />
     )
+  return (
+    <PlanLoading
+      id={id}
+      name={name}
+      installed={installed}
+      error={install.isError ? install.error : undefined}
+      onClose={onClose}
+      onRemove={() => setAction("remove")}
+    />
+  )
+}
+
+/** The install plan while it loads, or why it was refused. */
+function PlanLoading({
+  id,
+  name,
+  installed,
+  error,
+  onClose,
+  onRemove,
+}: {
+  id: string
+  name: string
+  installed: boolean
+  error: Error | undefined
+  onClose: () => void
+  onRemove: () => void
+}) {
+  const t = useT()
   return (
     <Frame
       title={t("installer.installTitle", name)}
@@ -75,17 +113,17 @@ export function ComponentPlan({
           <Button variant="ghost" size="sm" onClick={onClose}>
             {t("plan.cancel")}
           </Button>
-          {installed && install.isError ? (
-            <Button variant="outline" size="sm" onClick={() => setAction("remove")}>
+          {installed && error ? (
+            <Button variant="outline" size="sm" onClick={onRemove}>
               {t("settings.removeCommand")}
             </Button>
           ) : null}
         </>
       }
     >
-      {install.isError ? (
+      {error ? (
         <div className="flex flex-col gap-5">
-          <Problem error={install.error} />
+          <Problem error={error} />
           {installed ? null : <GitOpsExport id={id} action="install" />}
         </div>
       ) : (
@@ -95,70 +133,162 @@ export function ComponentPlan({
   )
 }
 
+/** An install whose component asks for values shows a field for each until none is missing and
+ * the person checks the changes; every apply then sends the values the plan was made with. */
 function PlanDialog({
   id,
   name,
   action,
+  editing,
   onClose,
   onRemove,
+  onEdit,
 }: {
   id: string
   name: string
   action: Schemas.ComponentAction
+  editing: boolean
   onClose: () => void
   onRemove?: () => void
+  onEdit?: () => void
 }) {
   const t = useT()
-  const plan = useQuery(planQuery(id, action))
-  const { shown, running, readySince, start, apply } = useApplying(id, action, plan.data)
-
-  const title =
-    action === "install" ? t("installer.installTitle", name) : t("installer.removeTitle", name)
+  const [values, setValues] = useState<Values>({})
+  const plan = useQuery(planQuery(id, action, values))
+  const { shown, running, readySince, start, apply } = useApplying(id, action, values, plan.data)
+  const form = useInputs(shown, running, editing, setValues)
   return (
     <Frame
-      title={title}
+      title={t(titles[action], name)}
       wide
       onClose={onClose}
       footer={
         <Footer
           action={action}
-          plan={shown}
           running={running}
           onClose={onClose}
           onStart={start}
-          onRemove={
-            !running && shown?.steps.some((s) => s.state !== "pending") ? onRemove : undefined
-          }
+          {...footerOf({
+            shown,
+            running,
+            form,
+            onEdit: action === "remove" ? onEdit : form.edit,
+            onRemove,
+          })}
         />
       }
     >
-      {plan.isPending ? (
-        <LoadingRows label={t("plan.planning")} rows={3} />
-      ) : plan.isError ? (
-        <Problem error={plan.error} />
-      ) : shown ? (
-        <PlanBody plan={shown} readySince={readySince} />
+      {form.asking ? (
+        <InputsForm
+          inputs={form.inputs}
+          values={form.draft}
+          checked={form.checked}
+          onChange={form.setDraft}
+        />
       ) : null}
+      <PlanContent
+        pending={plan.isPending}
+        error={plan.isError ? plan.error : undefined}
+        plan={form.asking ? undefined : shown}
+        readySince={readySince}
+      />
       {apply.isError ? <Problem error={apply.error} /> : null}
       <GitOpsExport id={id} action={action} plan={shown} />
     </Frame>
   )
 }
 
+const titles = { install: "installer.installTitle", remove: "installer.removeTitle" } as const
+
+/** The footer's plan and buttons: none of them change an install that runs or is done, and the
+ * plan waits while the form asks for values. */
+function footerOf({
+  shown,
+  running,
+  form,
+  onEdit,
+  onRemove,
+}: {
+  shown: Schemas.ComponentPlan | undefined
+  running: boolean
+  form: { asking: boolean; check: () => void }
+  onEdit?: () => void
+  onRemove?: () => void
+}) {
+  const idle = !running && !shown?.done
+  const written = shown?.steps.some((s) => s.state !== "pending") ?? false
+  return {
+    plan: form.asking ? undefined : shown,
+    onCheck: form.asking ? form.check : undefined,
+    onEdit: idle ? onEdit : undefined,
+    onRemove: !running && written ? onRemove : undefined,
+  }
+}
+
+/** The values a component asks for: the form shows while one is missing or the person changes
+ * them, and checking the changes plans with them. */
+function useInputs(
+  shown: Schemas.ComponentPlan | undefined,
+  running: boolean,
+  editFirst: boolean,
+  onCheck: (values: Values) => void,
+) {
+  const [draft, setDraft] = useState<Values>({})
+  const [checked, setChecked] = useState(false)
+  const [editing, setEditing] = useState(editFirst)
+  const inputs = useLastInputs(shown)
+  const wanted = editing || (isMissing(inputs) && !shown?.done)
+  const asking = !running && wanted && inputs.length > 0
+  const check = () => {
+    onCheck(draft)
+    setChecked(true)
+    setEditing(false)
+  }
+  const edit = asking || inputs.length === 0 ? undefined : () => setEditing(true)
+  return { inputs, draft, setDraft, checked, asking, check, edit }
+}
+
+/** The inputs of the last plan, kept while a new plan loads. */
+function useLastInputs(shown: Schemas.ComponentPlan | undefined) {
+  const [inputs, setInputs] = useState<Schemas.ComponentInput[]>([])
+  const next = shown?.inputs
+  if (next && next !== inputs && next.length + inputs.length > 0) setInputs(next)
+  return inputs
+}
+
+function PlanContent({
+  pending,
+  error,
+  plan,
+  readySince,
+}: {
+  pending: boolean
+  error: Error | undefined
+  plan: Schemas.ComponentPlan | undefined
+  readySince: number | undefined
+}) {
+  const t = useT()
+  if (pending) return <LoadingRows label={t("plan.planning")} rows={3} />
+  if (error) return <Problem error={error} />
+  return plan ? <PlanBody plan={plan} readySince={readySince} /> : null
+}
+
 /** Applies the plan's next step, then asks again every few seconds until the plan is done or a
- * step or health check failed. */
+ * step or health check failed. An apply's plan shows only while the values it sent stay the same. */
 function useApplying(
   id: string,
   action: Schemas.ComponentAction,
+  values: Values,
   planned: Schemas.ComponentPlan | undefined,
 ) {
   const [running, setRunning] = useState(false)
-  const [latest, setLatest] = useState<Schemas.ComponentPlan>()
+  const [latest, setLatest] = useState<{ plan: Schemas.ComponentPlan; values: Values }>()
   const [readySince, setReadySince] = useState<number>()
   const apply = useMutation({
-    mutationFn: (version: string) => applyComponent(id, { action, catalogVersion: version }),
+    mutationFn: (version: string) =>
+      applyComponent(id, { action, catalogVersion: version, values }),
     onSuccess: ({ plan: next }) => {
-      setLatest(next)
+      setLatest({ plan: next, values })
       if (next.done || [...next.steps, ...next.checks].some((s) => s.state === "failed")) {
         setRunning(false)
         void refresh(capabilitiesQuery)
@@ -166,7 +296,7 @@ function useApplying(
     },
     onError: () => setRunning(false),
   })
-  const shown = latest ?? planned
+  const shown = latest?.values === values ? latest.plan : planned
   const stepsReady = shown?.steps.every((s) => s.state === "ready") ?? false
 
   useEffect(() => {
@@ -198,6 +328,8 @@ function Footer({
   running,
   onClose,
   onStart,
+  onCheck,
+  onEdit,
   onRemove,
 }: {
   action: Schemas.ComponentAction
@@ -205,6 +337,8 @@ function Footer({
   running: boolean
   onClose: () => void
   onStart: (version: string) => void
+  onCheck?: () => void
+  onEdit?: () => void
   onRemove?: () => void
 }) {
   const t = useT()
@@ -226,16 +360,51 @@ function Footer({
           {t("settings.removeCommand")}
         </Button>
       ) : null}
-      <Button
-        size="sm"
-        variant={install ? "default" : "destructive"}
-        disabled={!plan || running}
-        loading={running}
-        onClick={() => plan && onStart(plan.catalogVersion)}
-      >
-        {t(running ? busy : idle)}
-      </Button>
+      {onEdit ? (
+        <Button variant="outline" size="sm" onClick={onEdit}>
+          {t("components.changeValues")}
+        </Button>
+      ) : null}
+      {onCheck ? (
+        <Button size="sm" onClick={onCheck}>
+          {t("components.check")}
+        </Button>
+      ) : (
+        <StartButton
+          install={install}
+          plan={plan}
+          running={running}
+          label={t(running ? busy : idle)}
+          onStart={onStart}
+        />
+      )}
     </>
+  )
+}
+
+function StartButton({
+  install,
+  plan,
+  running,
+  label,
+  onStart,
+}: {
+  install: boolean
+  plan?: Schemas.ComponentPlan
+  running: boolean
+  label: string
+  onStart: (version: string) => void
+}) {
+  return (
+    <Button
+      size="sm"
+      variant={install ? "default" : "destructive"}
+      disabled={!plan || running}
+      loading={running}
+      onClick={() => plan && onStart(plan.catalogVersion)}
+    >
+      {label}
+    </Button>
   )
 }
 
@@ -273,6 +442,7 @@ function PlanBody({ plan, readySince }: { plan: Schemas.ComponentPlan; readySinc
           </AlertDescription>
         </Alert>
       ) : null}
+      {plan.inputs.length > 0 ? <InputsReview inputs={plan.inputs} /> : null}
       {plan.warnings.map((warning) => (
         <Alert key={`${warning.kind}/${warning.component}`} variant="warn" role="note">
           <AlertDescription>

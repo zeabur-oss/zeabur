@@ -1576,15 +1576,23 @@ fn created(target: &ObjectTarget, body: &Value) -> Result<Value, ClusterError> {
     Ok(object)
 }
 
-/// A written Secret's `stringData`, kept as its values for [`Cluster::reveal_secret`].
+/// A written Secret's `data` and `stringData`, kept as its values for
+/// [`Cluster::reveal_secret`]; `stringData` wins, as in kube-apiserver.
 fn keep_string_data(state: &mut State, target: &ObjectTarget, object: &Value) {
-    let values: BTreeMap<String, Vec<u8>> = object
+    let data = object
+        .get("data")
+        .cloned()
+        .and_then(|d| serde_json::from_value::<BTreeMap<String, k8s_openapi::ByteString>>(d).ok())
+        .into_iter()
+        .flatten()
+        .map(|(k, v)| (k, v.0));
+    let string_data = object
         .get("stringData")
         .and_then(Value::as_object)
         .into_iter()
         .flatten()
-        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.as_bytes().to_vec())))
-        .collect();
+        .filter_map(|(k, v)| Some((k.clone(), v.as_str()?.as_bytes().to_vec())));
+    let values: BTreeMap<String, Vec<u8>> = data.chain(string_data).collect();
     if !values.is_empty() {
         state
             .secret_values

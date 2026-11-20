@@ -1,0 +1,485 @@
+{
+  "id": "velero",
+  "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+  "declaration": {
+    "apiVersion": "catalog.zeabur.com/v1",
+    "defaults": {
+      "multi-node": "optional",
+      "single-node": "optional"
+    },
+    "detection": {
+      "crds": [
+        "backups.velero.io",
+        "schedules.velero.io"
+      ],
+      "helmCharts": [
+        "velero"
+      ],
+      "workloads": [
+        {
+          "kind": "Deployment",
+          "labels": {
+            "app.kubernetes.io/name": "velero"
+          }
+        }
+      ]
+    },
+    "distributions": [
+      "k3s",
+      "rke2",
+      "kubesolo"
+    ],
+    "inputs": [
+      {
+        "description": "Velero stores backups in this S3 bucket.",
+        "name": "bucket",
+        "path": "configuration.backupStorageLocation.0.bucket",
+        "required": true,
+        "testValue": "catalog-ci"
+      },
+      {
+        "description": "Velero connects to this S3 endpoint URL; any S3-compatible service works.",
+        "name": "s3Url",
+        "path": "configuration.backupStorageLocation.0.config.s3Url",
+        "required": true,
+        "testValue": "http://minio.invalid:9000"
+      },
+      {
+        "default": "us-east-1",
+        "description": "The bucket's region; S3-compatible services that have none accept the default.",
+        "name": "region",
+        "path": "configuration.backupStorageLocation.0.config.region"
+      },
+      {
+        "description": "Velero reads the bucket's credentials from this AWS-style credentials file.",
+        "name": "credentials",
+        "required": true,
+        "secret": {
+          "key": "cloud",
+          "name": "velero-credentials",
+          "namespace": "velero"
+        },
+        "testValue": "[default]\naws_access_key_id=ci\naws_secret_access_key=ci\n"
+      },
+      {
+        "description": "Kopia encrypts file-system backups with this password. Without the Secret, Velero uses its built-in password, which is public.\n",
+        "generate": {
+          "bytes": 64,
+          "encoding": "hex",
+          "type": "random"
+        },
+        "name": "repositoryPassword",
+        "secret": {
+          "key": "repository-password",
+          "name": "velero-repo-credentials",
+          "namespace": "velero"
+        }
+      },
+      {
+        "description": "The S3 server encrypts every backup object, Secrets included, with this SSE-C key. The AWS plugin needs exactly 32 bytes.\n",
+        "generate": {
+          "bytes": 24,
+          "encoding": "base64url",
+          "type": "random"
+        },
+        "name": "backupKey",
+        "secret": {
+          "key": "key",
+          "name": "velero-backup-key",
+          "namespace": "velero"
+        }
+      },
+      {
+        "default": false,
+        "description": "Off by default. Set true to install the node agent on every node, so Velero can copy volume files with Kopia. The agent runs as root, mounts host paths, holds Velero's cluster-admin token, and needs the velero namespace to allow the privileged Pod Security level. Each Backup and Schedule must then set defaultVolumesToFsBackup to true. Zeabur's schedule does. While the input is false, such a backup fails partly.\n",
+        "name": "fileBackup",
+        "path": "deployNodeAgent"
+      }
+    ],
+    "kind": "Component",
+    "kubeVersion": "\u003e=1.16.0-0",
+    "leftovers": [
+      "customresourcedefinitions"
+    ],
+    "metadata": {
+      "homepage": "https://velero.io",
+      "license": "Apache-2.0",
+      "locales": {
+        "zh-CN": {
+          "summary": "备份并还原整个集群，数据库备份不需要它。"
+        },
+        "zh-TW": {
+          "summary": "備份並還原整個叢集，資料庫備份不需要它。"
+        }
+      },
+      "name": "Velero",
+      "summary": "Backs up and restores the whole cluster; database backups don't need it."
+    },
+    "provides": {
+      "capability": "volume-backup"
+    },
+    "releases": [
+      {
+        "chart": "velero",
+        "chartDigest": "sha256:81741f2ac7e6013663b5482e5cc6e2258e9f393d2d0eb982b1a278e52bfcd08b",
+        "name": "velero",
+        "namespace": "velero",
+        "profiles": {
+          "multi-node": "resources:\n  # Bigger clusters, bigger backup item lists.\n  requests: {cpu: 50m, memory: 128Mi}\n  limits: {memory: 1Gi}\n",
+          "single-node": "resources:\n  # Idle between backups; chart sets none.\n  requests: {cpu: 20m, memory: 64Mi}\n  limits: {memory: 512Mi}\n"
+        },
+        "repo": "https://vmware-tanzu.github.io/helm-charts",
+        "type": "helm",
+        "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: docker.io/velero/velero\n  tag: v1.18.4@sha256:c89fb5b6d1fd6afd368e0f483e6f5555fd62851a1eada8ac5c72482e674ca17b\n# The chart sets no security context; the namespace enforces Pod Security restricted.\n# The image runs as the name cnb, so runAsNonRoot needs its numeric ids from /etc/passwd.\npodSecurityContext:\n  runAsNonRoot: true\n  runAsUser: 1002\n  runAsGroup: 1000\n  seccompProfile: {type: RuntimeDefault}\n# Pod Security restricted requires both settings.\ncontainerSecurityContext:\n  allowPrivilegeEscalation: false\n  capabilities: {drop: [ALL]}\ninitContainers:\n  # AWS plugin covers any S3-compatible store; v1.14.x matches Velero 1.18.\n  - name: velero-plugin-for-aws\n    image: velero/velero-plugin-for-aws:v1.14.4@sha256:c85a7fa803569e3128c33e4f5766f84ab156c8d171c9f1dd2715581d45ce98fa\n    securityContext:\n      allowPrivilegeEscalation: false\n      capabilities: {drop: [ALL]}\n    volumeMounts:\n      - mountPath: /target\n        name: plugins\ncredentials:\n  # Secret comes from the credentials input, not the chart.\n  useSecret: true\n  existingSecret: velero-credentials\nconfiguration:\n  backupStorageLocation:\n    # One S3 location; bucket and URL are inputs.\n    - name: default\n      provider: aws\n      default: true\n      config:\n        region: us-east-1\n        s3ForcePathStyle: \"true\"\n        # Velero writes Secrets into the backup as they are. The\n        # store encrypts them with the backupKey input (SSE-C).\n        customerKeyEncryptionSecret: velero-backup-key/key\n  # Kopia file-system backups work on any storage class, local-path included.\n  uploaderType: kopia\n  # No node agent by default, so no volume copy. Backups opt in with fileBackup.\n  defaultVolumesToFsBackup: false\n# CSI snapshots need per-driver setup; use file-system backups instead.\nsnapshotsEnabled: false\n",
+        "version": "12.2.3"
+      }
+    ],
+    "security": {
+      "podSecurity": "restricted",
+      "summary": "Bound to cluster-admin; reads and restores every object. By default no Pod is privileged and the velero namespace needs only the baseline Pod Security level. With the fileBackup input, a root node agent on every node holds the same token, mounts host paths and needs the privileged level.\n"
+    }
+  },
+  "render": {
+    "kubernetesVersion": "1.37.0",
+    "profiles": {
+      "multi-node": {
+        "workloads": [
+          {
+            "release": "velero",
+            "namespace": "velero",
+            "name": "velero",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "velero",
+                "requests": {
+                  "cpu": "50m",
+                  "memory": "128Mi"
+                },
+                "limits": {
+                  "memory": "1Gi"
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "name": "velero-plugin-for-aws"
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      },
+      "single-node": {
+        "workloads": [
+          {
+            "release": "velero",
+            "namespace": "velero",
+            "name": "velero",
+            "kind": "Deployment",
+            "replicas": 1,
+            "containers": [
+              {
+                "name": "velero",
+                "requests": {
+                  "cpu": "20m",
+                  "memory": "64Mi"
+                },
+                "limits": {
+                  "memory": "512Mi"
+                }
+              }
+            ],
+            "initContainers": [
+              {
+                "name": "velero-plugin-for-aws"
+              }
+            ]
+          }
+        ],
+        "persistentVolumeClaims": []
+      }
+    }
+  },
+  "measurements": [
+    {
+      "distribution": "k3s",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+k3s1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "24Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "k3s",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+k3s1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "23Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "multi-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "22Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "multi-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "22Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "23Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kind",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "22Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kubesolo",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.36.6",
+      "distributionVersion": "v1.3.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "23Mi",
+          "cpu": "2m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "kubesolo",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.36.6",
+      "distributionVersion": "v1.3.0",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "24Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "24Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-12"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "velero",
+          "kind": "Deployment",
+          "memory": "23Mi",
+          "cpu": "1m"
+        }
+      ],
+      "versions": [
+        {
+          "release": "velero",
+          "version": "12.2.3"
+        }
+      ],
+      "sourceDigest": "h1:ZAjeSquGs4bcSfoRXKPFWK0DGEjiR+ObqEC6oRmDBjs=",
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-12"
+    }
+  ]
+}

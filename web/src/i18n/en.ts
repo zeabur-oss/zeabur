@@ -1228,6 +1228,25 @@ export const en = {
     `A built-in ${by} component. To change its settings, create a HelmChartConfig named ${chart}.`,
   "components.packagedHow": "Example",
   "components.packagedAnchor": "change-settings-of-built-in-components",
+  "components.values": "Values",
+  "components.required": "Required",
+  "components.needsValue": "Fill this in.",
+  "components.keptSecret": "Set at the last install. Paste a new value to replace it.",
+  "components.generatedSecret": "Leave it empty and Zeabur makes a random value.",
+  "components.check": "Check changes",
+  "components.changeValues": "Change values",
+  "components.value.set": "Set",
+  "components.value.kept": "Kept from the last install",
+  "components.value.generated": "Random, made by Zeabur",
+  "components.value.default": (value: string) => `${value} (default)`,
+  "components.value.empty": "Not set",
+  "components.value.on": "On",
+  "components.value.off": "Off",
+  "components.unsupported.contributes":
+    "Zeabur can't install this yet because it changes other components' settings.",
+  "components.unsupported.newerRelease":
+    "This version of Zeabur can't install it. Update Zeabur first.",
+  "components.howToInstall": "How to install",
   "settings.homepage": "Home page",
   "settings.opensInNewTab": "(opens in a new tab)",
   "category.traffic": "Traffic",
@@ -3688,6 +3707,12 @@ export const en = {
     "Change what it names, or ask whoever runs the policy.",
   "sentence.problem.invalid.fix.ephemeralContainers": () =>
     "Ask a cluster administrator to turn on ephemeral containers (on by default since Kubernetes 1.23), or use an image with a shell.",
+  "sentence.problem.invalid.fix.componentUnsupported": () =>
+    "Install it with Helm, Flux or Argo CD. zeaburctl components export prints what to apply.",
+  "sentence.problem.invalid.fix.componentValue": (p: P) =>
+    `Fill in ${p.input}, then check the changes again.`,
+  "sentence.problem.invalid.fix.componentElsewhere": () =>
+    "Choose a component the catalog offers on this cluster.",
   "sentence.problem.conflict.fix.terminalImage": (p: P) =>
     `Ask a cluster administrator to let the nodes pull ${p.image}, or to set ${p.setting} in Zeabur's chart to an image they can pull.`,
   "sentence.problem.conflict.fix.terminalContainerStart": () =>

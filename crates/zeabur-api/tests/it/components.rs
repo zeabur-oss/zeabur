@@ -47,6 +47,10 @@ mod tests {
             "traefik",
             include_bytes!("../../../zeabur-catalog/tests/api/traefik.json"),
         ),
+        (
+            "velero",
+            include_bytes!("../../../zeabur-catalog/tests/api/velero.json"),
+        ),
     ];
 
     const SUC: &str =
@@ -217,6 +221,17 @@ mod tests {
             "POST",
             &format!("/api/v1/cluster/components/{id}/{verb}"),
             Some(&json!({"action": action, "catalogVersion": version})),
+        )
+        .await
+    }
+
+    /// An install of Velero with `values`.
+    async fn velero(app: &Router, verb: &str, values: &Value) -> (StatusCode, Value) {
+        send(
+            app,
+            "POST",
+            &format!("/api/v1/cluster/components/velero/{verb}"),
+            Some(&json!({"action": "install", "catalogVersion": "0.5.3", "values": values})),
         )
         .await
     }
@@ -419,6 +434,93 @@ mod tests {
         assert!(dynamic(&cluster, "HelmChart", "cert-manager").is_none());
         let namespaces = cluster.inspect(|s| s.namespaces.len()).unwrap();
         assert_eq!(namespaces, 1, "the namespace stays");
+    }
+
+    #[tokio::test]
+    async fn an_install_asks_for_values_and_keeps_the_ones_zeabur_made() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        let backup_key = || {
+            cluster
+                .inspect(|s| s.secret_values.get("velero/velero-backup-key").cloned())
+                .flatten()
+        };
+
+        let (status, plan) = velero(&app, "plan", &json!({})).await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        let bucket = plan["inputs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["name"] == "bucket")
+            .unwrap();
+        assert_eq!(bucket["state"], "missing");
+        let (status, refused) = velero(&app, "apply", &json!({})).await;
+        assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
+        assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
+
+        let values = json!({"velero": {
+            "bucket": "backups",
+            "s3Url": "http://s3.test:9000",
+            "credentials": "[default]\naws_access_key_id=a\naws_secret_access_key=b\n",
+        }});
+        let (status, applied) = velero(&app, "apply", &values).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(states(&applied["plan"]), ["velero waiting"]);
+        let made = backup_key().expect("Zeabur makes the SSE-C key");
+
+        // The next apply reads the key back instead of making another, so the step goes on.
+        let (_, applied) = velero(&app, "apply", &values).await;
+        assert_eq!(states(&applied["plan"]), ["velero waiting"], "{applied}");
+        assert_eq!(backup_key(), Some(made));
+        let key = applied["plan"]["inputs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["name"] == "backupKey")
+            .unwrap();
+        assert_eq!(key["state"], "kept");
+        assert!(
+            key.get("value").is_none(),
+            "a Secret's value stays on the server"
+        );
+    }
+
+    #[tokio::test]
+    async fn changed_values_are_written_after_a_failed_release() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        let credentials = || {
+            cluster
+                .inspect(|s| s.secret_values.get("velero/velero-credentials").cloned())
+                .flatten()
+        };
+        let values = |secret: &str| {
+            json!({"velero": {
+                "bucket": "backups",
+                "s3Url": "https://s3.test",
+                "credentials": format!("[default]\naws_access_key_id=a\naws_secret_access_key={secret}\n"),
+            }})
+        };
+        let (status, applied) = velero(&app, "apply", &values("old")).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let mut chart = dynamic(&cluster, "HelmChart", "velero").unwrap();
+        chart["status"] = json!({"conditions": [
+            {"type": "Failed", "status": "True", "message": "the release failed"},
+        ]});
+        put(&cluster, chart);
+        let (_, planned) = velero(&app, "plan", &values("old")).await;
+        assert_eq!(states(&planned), ["velero failed"], "{planned}");
+
+        let (status, applied) = velero(&app, "apply", &values("new")).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let written = credentials().expect("the credentials Secret");
+        assert!(
+            written
+                .values()
+                .any(|v| String::from_utf8_lossy(v).contains("=new")),
+            "{written:?}"
+        );
     }
 
     #[tokio::test]

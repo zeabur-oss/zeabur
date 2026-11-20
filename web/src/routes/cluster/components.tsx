@@ -372,6 +372,7 @@ function ComponentCard({
       {installation?.packagedChart ? (
         <PackagedNote by={t(sourceKey[installation.source])} chart={installation.packagedChart} />
       ) : null}
+      {installation ? null : <UnsupportedNote why={component.unsupported} />}
       <div className="mt-auto flex min-h-8 items-center gap-2 pt-1">
         <span className="type-meta text-muted-foreground" translate="no">
           {component.license}
@@ -386,7 +387,11 @@ function ComponentCard({
           <ArrowSquareOutIcon className="size-3" aria-hidden="true" />
           <span className="sr-only">{t("settings.opensInNewTab")}</span>
         </a>
-        <CardAction id={component.id} button={buttonOf(installation)} />
+        <CardAction
+          id={component.id}
+          button={buttonOf(installation)}
+          unsupported={Boolean(component.unsupported)}
+        />
       </div>
     </article>
   )
@@ -413,7 +418,17 @@ function PackagedNote({ by, chart }: { by: string; chart: string }) {
 }
 
 /** Opens the component's plan. */
-function CardAction({ id, button }: { id: string; button: "install" | "manage" | undefined }) {
+/** A component Zeabur cannot install yet opens the same dialog, which says how to install it
+ * another way. */
+function CardAction({
+  id,
+  button,
+  unsupported,
+}: {
+  id: string
+  button: "install" | "manage" | undefined
+  unsupported: boolean
+}) {
   const t = useT()
   const catalog = useQuery(catalogQuery).data
   const offline = catalog !== undefined && !catalog.version
@@ -433,11 +448,13 @@ function CardAction({ id, button }: { id: string; button: "install" | "manage" |
       )}
     >
       {button === "manage" ? (
-        <SlidersHorizontalIcon aria-hidden="true" data-icon="inline-start" />
+        <>
+          <SlidersHorizontalIcon aria-hidden="true" data-icon="inline-start" />
+          {t("components.manage")}
+        </>
       ) : (
-        <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
+        <InstallLabel unsupported={unsupported} />
       )}
-      {button === "manage" ? t("components.manage") : t("settings.installCommand")}
     </Link>
   )
 }
@@ -514,6 +531,28 @@ function UpgradeTag({ installation }: { installation: Schemas.Installation }) {
     case undefined:
       return null
   }
+}
+
+/** Why Zeabur cannot install a component yet, on its card. */
+function UnsupportedNote({ why }: { why: Schemas.Component["unsupported"] }) {
+  const t = useT()
+  if (!why) return null
+  return (
+    <p className="type-meta text-pretty text-muted-foreground">
+      {t(`components.unsupported.${why}`)}
+    </p>
+  )
+}
+
+function InstallLabel({ unsupported }: { unsupported: boolean }) {
+  const t = useT()
+  if (unsupported) return t("components.howToInstall")
+  return (
+    <>
+      <DownloadSimpleIcon aria-hidden="true" data-icon="inline-start" />
+      {t("settings.installCommand")}
+    </>
+  )
 }
 
 const sourceKey = {

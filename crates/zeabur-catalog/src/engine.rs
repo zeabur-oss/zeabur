@@ -26,17 +26,20 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
-use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
+use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Secret};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
-use zeabur_kube::k8s_openapi::{Metadata, NamespaceResourceScope, Resource};
+use zeabur_kube::k8s_openapi::{ByteString, Metadata, NamespaceResourceScope, Resource};
 use zeabur_kube::{ClusterFacts, DynamicObject, ServedResource};
 use zeabur_model::PodSecurityLevel;
 use zeabur_model::kernel::names::is_system_namespace;
 use zeabur_model::readiness::{self, Explained, GenericStatus, Reason, Status};
 
-use crate::api::{ComponentFile, Health, Release, ReleaseType, Snapshot};
-use crate::install::{merge, parse_values};
+use crate::api::{
+    ComponentFile, Generate, Health, Input, InputValue, Release, ReleaseType, Snapshot,
+};
+use crate::install::{merge, parse_values, set_path};
+use crate::templates::Encoding;
 
 /// The label that marks what Zeabur installed, with [`MANAGED_BY_ZEABUR`].
 pub const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
@@ -54,6 +57,91 @@ pub const CATALOG_VERSION: &str = "catalog.zeabur.com/version";
 pub const CHART_NAMESPACE: &str = "kube-system";
 /// The field manager Zeabur writes as.
 pub const FIELD_MANAGER: &str = "zeabur";
+/// The annotation on a `HelmChart` that keeps the given and generated values of its release's
+/// `path` inputs, as a JSON object of input name to value, for the next install to reuse.
+pub const INPUTS: &str = "catalog.zeabur.com/inputs";
+
+/// Values of inputs, by component and then by input name.
+pub type Values = BTreeMap<String, BTreeMap<String, InputValue>>;
+
+/// The values an install starts from.
+#[derive(Debug, Clone, Copy)]
+pub struct Inputs<'a> {
+    /// What the person gives; an empty text is no value.
+    pub given: &'a Values,
+    /// What an earlier install wrote: the `INPUTS` annotation and the keys of the Secrets Zeabur
+    /// wrote.
+    pub kept: &'a Values,
+}
+
+/// Where an input's value comes from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum InputState {
+    /// The person gives it.
+    Given,
+    /// An earlier install wrote it.
+    Kept,
+    /// The catalog's default.
+    Default,
+    /// Zeabur makes it at random.
+    Generated,
+    /// None, and none is needed.
+    Empty,
+    /// None, and the install needs one.
+    Missing,
+}
+
+/// How a form asks for an input.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum InputKind {
+    /// Text.
+    Text,
+    /// `true` or `false`.
+    Flag,
+    /// A whole number.
+    Integer,
+    /// Text stored in a Secret, never shown back.
+    Secret,
+}
+
+impl InputKind {
+    /// The kind of `input`: a Secret's, else its default's.
+    #[must_use]
+    pub const fn of(input: &Input) -> Self {
+        if input.secret.is_some() {
+            return Self::Secret;
+        }
+        match input.default {
+            Some(InputValue::Flag(_)) => Self::Flag,
+            Some(InputValue::Integer(_)) => Self::Integer,
+            Some(InputValue::Text(_)) | None => Self::Text,
+        }
+    }
+
+    const fn admits(self, value: &InputValue) -> bool {
+        matches!(
+            (self, value),
+            (Self::Text | Self::Secret, InputValue::Text(_))
+                | (Self::Flag, InputValue::Flag(_))
+                | (Self::Integer, InputValue::Integer(_))
+        )
+    }
+}
+
+/// One input of an install, with the value it writes.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Resolved {
+    /// The component.
+    pub component: String,
+    /// The input, as the catalog declares it.
+    pub input: Input,
+    /// Where the value comes from.
+    pub state: InputState,
+    /// The value; `None` when [`InputState::Empty`] or [`InputState::Missing`].
+    pub value: Option<InputValue>,
+}
 
 /// The cluster an install is for.
 #[derive(Debug, Clone, Copy)]
@@ -136,6 +224,54 @@ pub struct Install {
     pub steps: Vec<Step>,
     /// What to know.
     pub warnings: Vec<Warning>,
+    /// The inputs of its components, in order.
+    pub inputs: Vec<Resolved>,
+}
+
+impl Install {
+    /// The refusal of the first required input without a value.
+    #[must_use]
+    pub fn missing(&self) -> Option<Refusal> {
+        self.inputs
+            .iter()
+            .find(|r| r.state == InputState::Missing)
+            .map(|r| Refusal::Missing {
+                component: r.component.clone(),
+                input: r.input.name.clone(),
+            })
+    }
+}
+
+/// What a component uses that Zeabur cannot install yet.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, utoipa::ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum Unsupported {
+    /// It adds values to other components' releases.
+    Contributes,
+    /// It has a release of a type this build does not know.
+    NewerRelease,
+}
+
+impl std::fmt::Display for Unsupported {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(match self {
+            Self::Contributes => "adds values to other components",
+            Self::NewerRelease => "has a release of a type this version does not know",
+        })
+    }
+}
+
+/// What `file` uses that Zeabur cannot install yet, wherever it is installed.
+#[must_use]
+pub fn unsupported(file: &ComponentFile) -> Option<Unsupported> {
+    let d = &file.declaration;
+    if !d.contributes.is_empty() {
+        return Some(Unsupported::Contributes);
+    }
+    d.releases.iter().find_map(|r| match r.kind {
+        ReleaseType::Helm | ReleaseType::Inline | ReleaseType::Manifest => None,
+        ReleaseType::Unknown => Some(Unsupported::NewerRelease),
+    })
 }
 
 /// Why a component cannot be installed.
@@ -145,12 +281,38 @@ pub enum Refusal {
     #[error("Zeabur Catalog has no component {0}")]
     Unknown(String),
     /// Zeabur cannot install it yet.
-    #[error("Zeabur cannot install {component} yet: it {reason}")]
+    #[error("Zeabur cannot install {component} yet: it {why}")]
     Unsupported {
         /// The component.
         component: String,
-        /// What it has.
-        reason: String,
+        /// What it uses.
+        why: Unsupported,
+    },
+    /// Its catalog file does not read.
+    #[error("Zeabur Catalog's file of {component} does not read: {message}")]
+    Broken {
+        /// The component.
+        component: String,
+        /// Why.
+        message: String,
+    },
+    /// A required input has no value.
+    #[error("{component} needs a value for {input}.")]
+    Missing {
+        /// The component.
+        component: String,
+        /// The input.
+        input: String,
+    },
+    /// A given value is not of the input's kind.
+    #[error("{input} of {component} takes {expected}.")]
+    WrongValue {
+        /// The component.
+        component: String,
+        /// The input.
+        input: String,
+        /// What it takes, in words.
+        expected: &'static str,
     },
     /// The catalog does not offer it here.
     #[error("Zeabur Catalog does not offer {component} on {place}")]
@@ -165,7 +327,8 @@ pub enum Refusal {
     NoProvider(String),
 }
 
-/// The components installing `id` on `target` installs, in order: the ones needed, then `id`.
+/// The components installing `id` on `target` installs, in order: the ones it needs and the
+/// cluster lacks, then `id`.
 ///
 /// # Errors
 ///
@@ -188,20 +351,26 @@ pub fn components(
     Ok(order)
 }
 
-/// How to install `id` on `target`, with the files of its manifest releases.
+/// How to install `id` on `target` with `inputs` and the files of its manifest releases.
+///
+/// A required input without a value is [`InputState::Missing`], and [`Install::missing`] refuses
+/// it, so a plan can still show the form.
 ///
 /// # Errors
 ///
-/// As [`components`], and when a release does not read or a file of `manifests` is missing.
+/// What [`components`] refuses, a given value of the wrong kind, or a catalog file that does
+/// not read, or a file of `manifests` is missing.
 pub fn install(
     snapshot: &Snapshot,
     id: &str,
     target: &Target<'_>,
     manifests: &Manifests,
+    inputs: Inputs<'_>,
 ) -> Result<Install, Refusal> {
     let order = components(snapshot, id, target)?;
     let mut steps = Vec::new();
     let mut warnings = Vec::new();
+    let mut resolved = Vec::new();
     for component in &order {
         let file = snapshot
             .components
@@ -221,17 +390,84 @@ pub fn install(
                 level,
             });
         }
+        let own = resolve(file, inputs)?;
         steps.extend(steps_of(
             file,
             &snapshot.index.catalog.version,
             target.profile,
             manifests,
+            &own,
         )?);
+        resolved.extend(own);
     }
     Ok(Install {
         components: order,
         steps,
         warnings,
+        inputs: resolved,
+    })
+}
+
+/// The value of each input of `file`: given, else kept, else the default, else generated.
+fn resolve(file: &ComponentFile, inputs: Inputs<'_>) -> Result<Vec<Resolved>, Refusal> {
+    let of = |values: &Values, name: &str| {
+        values
+            .get(&file.id)
+            .and_then(|m| m.get(name))
+            .filter(|v| !matches!(v, InputValue::Text(t) if t.is_empty()))
+            .cloned()
+    };
+    let mut resolved = Vec::new();
+    for input in &file.declaration.inputs {
+        let kind = InputKind::of(input);
+        let (state, value) = if let Some(given) = of(inputs.given, &input.name) {
+            if !kind.admits(&given) {
+                return Err(Refusal::WrongValue {
+                    component: file.id.clone(),
+                    input: input.name.clone(),
+                    expected: match kind {
+                        InputKind::Flag => "true or false",
+                        InputKind::Integer => "a whole number",
+                        InputKind::Text | InputKind::Secret => "text",
+                    },
+                });
+            }
+            (InputState::Given, Some(given))
+        } else if let Some(kept) = of(inputs.kept, &input.name) {
+            (InputState::Kept, Some(kept))
+        } else if let Some(default) = &input.default {
+            (InputState::Default, Some(default.clone()))
+        } else if let Some(Generate::Random { bytes, encoding }) = &input.generate {
+            let value = random(*bytes, *encoding).map_err(|message| Refusal::Broken {
+                component: file.id.clone(),
+                message,
+            })?;
+            (InputState::Generated, Some(InputValue::Text(value)))
+        } else if input.required {
+            (InputState::Missing, None)
+        } else {
+            (InputState::Empty, None)
+        };
+        resolved.push(Resolved {
+            component: file.id.clone(),
+            input: input.clone(),
+            state,
+            value,
+        });
+    }
+    Ok(resolved)
+}
+
+/// `bytes` random bytes in `encoding`.
+fn random(bytes: u8, encoding: Encoding) -> Result<String, String> {
+    let mut buffer = vec![0; usize::from(bytes)];
+    aws_lc_rs::rand::fill(&mut buffer).map_err(|_unspecified| "no random bytes".to_owned())?;
+    Ok(match encoding {
+        Encoding::Hex => hex::encode(buffer),
+        Encoding::Base64url => {
+            use base64::Engine as _;
+            base64::engine::general_purpose::URL_SAFE_NO_PAD.encode(buffer)
+        }
     })
 }
 
@@ -291,10 +527,6 @@ fn written_provider(snapshot: &Snapshot, target: &Target<'_>, capability: &str) 
 /// Refuses what the catalog does not offer here and what Zeabur cannot install yet.
 fn check(file: &ComponentFile, target: &Target<'_>) -> Result<(), Refusal> {
     let d = &file.declaration;
-    let unsupported = |reason: &str| Refusal::Unsupported {
-        component: file.id.clone(),
-        reason: reason.to_owned(),
-    };
     match d.defaults.get(target.profile).map(String::as_str) {
         Some("recommended" | "optional") => {}
         _ => {
@@ -318,18 +550,12 @@ fn check(file: &ComponentFile, target: &Target<'_>) -> Result<(), Refusal> {
             place: format!("Kubernetes {}", target.kube_version),
         });
     }
-    if !d.inputs.is_empty() {
-        return Err(unsupported("asks for values"));
-    }
-    if !d.contributes.is_empty() {
-        return Err(unsupported("adds values to other components"));
-    }
-    if d.releases.iter().any(|r| r.kind == ReleaseType::Unknown) {
-        return Err(unsupported(
-            "has a release of a type this version does not know",
-        ));
-    }
-    Ok(())
+    unsupported(file).map_or(Ok(()), |why| {
+        Err(Refusal::Unsupported {
+            component: file.id.clone(),
+            why,
+        })
+    })
 }
 
 /// The files the manifest releases of `file` install.
@@ -349,9 +575,9 @@ pub fn downloads(file: &ComponentFile) -> Result<Vec<Download>, Refusal> {
                 .get(index)
                 .and_then(|d| d.strip_prefix("sha256:"))
             else {
-                return Err(Refusal::Unsupported {
+                return Err(Refusal::Broken {
                     component: file.id.clone(),
-                    reason: format!("lists no sha256 digest for {url}"),
+                    message: format!("it lists no sha256 digest for {url}"),
                 });
             };
             downloads.push(Download {
@@ -379,8 +605,13 @@ pub fn verify(download: &Download, bytes: Vec<u8>) -> Result<String, String> {
     String::from_utf8(bytes).map_err(|_e| format!("{} is not UTF-8 text", download.url))
 }
 
-/// The steps of one component alone, which a removal deletes in reverse, with the files of its
-/// manifest releases.
+/// The steps of one component alone, with the files of its manifest releases and its `inputs`.
+///
+/// A removal passes no inputs, and deletes the steps' objects in reverse; the Secrets of inputs
+/// stay.
+///
+/// Each Secret goes in the step of the first release in its namespace, or the first step, after
+/// the namespace and before the release, so a chart finds it.
 ///
 /// # Errors
 ///
@@ -390,14 +621,21 @@ pub fn steps_of(
     catalog_version: &str,
     profile: &str,
     manifests: &Manifests,
+    inputs: &[Resolved],
 ) -> Result<Vec<Step>, Refusal> {
-    let broken = |message: String| Refusal::Unsupported {
+    let broken = |message: String| Refusal::Broken {
         component: file.id.clone(),
-        reason: format!("does not read: {message}"),
+        message,
     };
+    let releases = &file.declaration.releases;
+    let first_chart = releases
+        .iter()
+        .find(|r| r.kind == ReleaseType::Helm)
+        .map(|r| r.name.as_str());
+    let mut secrets = secrets(inputs);
     let mut namespaces = BTreeSet::new();
     let mut steps = Vec::new();
-    for release in &file.declaration.releases {
+    for (index, release) in releases.iter().enumerate() {
         let mut objects = Vec::new();
         let level = file.declaration.security.pod_security;
         if namespaces.insert(release.namespace.clone())
@@ -408,35 +646,64 @@ pub fn steps_of(
                 namespace: String::new(),
             });
         }
-        let made = match release.kind {
+        let here: Vec<Secret> = if index == 0 {
+            let homeless = |s: &Secret| {
+                !releases
+                    .iter()
+                    .any(|r| Some(&r.namespace) == s.metadata.namespace.as_ref())
+            };
+            let (here, rest) = secrets.into_iter().partition(|s| {
+                s.metadata.namespace.as_ref() == Some(&release.namespace) || homeless(s)
+            });
+            secrets = rest;
+            here
+        } else {
+            let (here, rest) = secrets
+                .into_iter()
+                .partition(|s| s.metadata.namespace.as_ref() == Some(&release.namespace));
+            secrets = rest;
+            here
+        };
+        let mut made = here
+            .iter()
+            .map(dynamic)
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(broken)?;
+        made.extend(match release.kind {
             ReleaseType::Helm => {
-                let values = profile_values(release, profile).map_err(broken)?;
-                vec![dynamic(&helm_chart(release, &values).map_err(broken)?).map_err(broken)?]
+                let mut values = profile_values(release, profile).map_err(broken)?;
+                let mut kept = serde_json::Map::new();
+                for r in inputs {
+                    let (Some(path), Some(value)) = (&r.input.path, &r.value) else {
+                        continue;
+                    };
+                    if r.input.release.as_deref().or(first_chart) != Some(release.name.as_str()) {
+                        continue;
+                    }
+                    set_path(&mut values, path, value.to_json());
+                    if matches!(
+                        r.state,
+                        InputState::Given | InputState::Kept | InputState::Generated
+                    ) {
+                        kept.insert(r.input.name.clone(), value.to_json());
+                    }
+                }
+                let mut chart = helm_chart(release, &values).map_err(broken)?;
+                if !kept.is_empty() {
+                    chart
+                        .metadata
+                        .annotations
+                        .get_or_insert_default()
+                        .insert(INPUTS.to_owned(), Value::Object(kept).to_string());
+                }
+                vec![dynamic(&chart).map_err(broken)?]
             }
             ReleaseType::Inline => {
                 objects_of(release.manifests.as_deref().unwrap_or_default()).map_err(broken)?
             }
-            ReleaseType::Manifest => {
-                let mut made = Vec::new();
-                for url in release.manifest_urls() {
-                    let text = manifests
-                        .get(&url)
-                        .ok_or_else(|| broken(format!("{url} was not downloaded")))?;
-                    made.extend(objects_of(text).map_err(broken)?);
-                }
-                // A namespace of the component is written once, with its Pod Security level.
-                made.retain(|o| {
-                    o.types.as_ref().is_none_or(|t| t.kind != Namespace::KIND)
-                        || !file
-                            .declaration
-                            .releases
-                            .iter()
-                            .any(|r| o.metadata.name.as_ref() == Some(&r.namespace))
-                });
-                made
-            }
+            ReleaseType::Manifest => manifest_objects(file, release, manifests).map_err(broken)?,
             ReleaseType::Unknown => Vec::new(),
-        };
+        });
         objects.extend(made.into_iter().map(|mut object| {
             mark(&mut object.metadata, file, release, catalog_version);
             Desired {
@@ -452,6 +719,116 @@ pub fn steps_of(
         });
     }
     Ok(steps)
+}
+
+/// The objects of a manifest release's files, without the component's namespaces: each is written
+/// once, with its Pod Security level.
+fn manifest_objects(
+    file: &ComponentFile,
+    release: &Release,
+    manifests: &Manifests,
+) -> Result<Vec<DynamicObject>, String> {
+    let mut objects = Vec::new();
+    for url in release.manifest_urls() {
+        let text = manifests
+            .get(&url)
+            .ok_or_else(|| format!("{url} was not downloaded"))?;
+        objects.extend(objects_of(text)?);
+    }
+    objects.retain(|o| {
+        o.types.as_ref().is_none_or(|t| t.kind != Namespace::KIND)
+            || !file
+                .declaration
+                .releases
+                .iter()
+                .any(|r| o.metadata.name.as_ref() == Some(&r.namespace))
+    });
+    Ok(objects)
+}
+
+/// The Secrets of the `secret` inputs that have a value: the inputs that share a Secret are its
+/// keys.
+fn secrets(inputs: &[Resolved]) -> Vec<Secret> {
+    let mut secrets: Vec<Secret> = Vec::new();
+    for r in inputs {
+        let (Some(at), Some(value)) = (&r.input.secret, &r.value) else {
+            continue;
+        };
+        let index = secrets
+            .iter()
+            .position(|s| {
+                s.metadata.name.as_ref() == Some(&at.name)
+                    && s.metadata.namespace.as_ref() == Some(&at.namespace)
+            })
+            .unwrap_or_else(|| {
+                secrets.push(Secret {
+                    metadata: ObjectMeta {
+                        name: Some(at.name.clone()),
+                        namespace: Some(at.namespace.clone()),
+                        ..ObjectMeta::default()
+                    },
+                    ..Secret::default()
+                });
+                secrets.len() - 1
+            });
+        if let Some(secret) = secrets.get_mut(index) {
+            secret
+                .data
+                .get_or_insert_default()
+                .insert(at.key.clone(), ByteString(value.text().into_bytes()));
+        }
+    }
+    secrets
+}
+
+/// The Secrets a component's inputs are kept in, as `namespace/name`; a removal leaves them,
+/// since a new install reads their keys back.
+#[must_use]
+pub fn input_secrets(file: &ComponentFile) -> Vec<String> {
+    let mut names: Vec<String> = file
+        .declaration
+        .inputs
+        .iter()
+        .filter_map(|i| i.secret.as_ref())
+        .map(|s| format!("{}/{}", s.namespace, s.name))
+        .collect();
+    names.dedup();
+    names
+}
+
+/// Whether `found` already holds what `desired` writes.
+///
+/// Only the kinds whose content an input or a catalog release changes are compared: a
+/// `HelmChart`'s `spec` and `INPUTS` annotation, and a Secret's `data`. A step with an object that
+/// does not hold it is written again. Other kinds count as current once they exist.
+#[must_use]
+pub fn holds(desired: &DynamicObject, found: &DynamicObject) -> bool {
+    let field = match desired.types.as_ref().map(|t| t.kind.as_str()) {
+        Some(HelmChart::KIND) if kept_inputs(desired) != kept_inputs(found) => return false,
+        Some(HelmChart::KIND) => "spec",
+        Some(Secret::KIND) => "data",
+        _ => return true,
+    };
+    let empty = Value::Null;
+    covers(
+        found.data.get(field).unwrap_or(&empty),
+        desired.data.get(field).unwrap_or(&empty),
+    )
+}
+
+fn kept_inputs(chart: &DynamicObject) -> Option<&String> {
+    chart.metadata.annotations.as_ref()?.get(INPUTS)
+}
+
+/// Whether every field of `desired` is in `found` with the same value.
+fn covers(found: &Value, desired: &Value) -> bool {
+    match (found, desired) {
+        (Value::Object(found), Value::Object(desired)) => desired
+            .iter()
+            .all(|(k, v)| found.get(k).is_some_and(|f| covers(f, v))),
+        (_, Value::Null) => true,
+        _ => found == desired,
+    }
 }
 
 /// `object` as a [`DynamicObject`], with its `apiVersion` and `kind`.
@@ -751,30 +1128,36 @@ fn written_at(metadata: &ObjectMeta) -> Option<Timestamp> {
         .max()
 }
 
-/// Whether a `HelmChart` is installed as last written: its `Failed` condition is not `True`, and
-/// `job` (the Job its status names) was created at or after Zeabur's last write and completed.
+/// Whether a `HelmChart` is installed as last written.
+///
+/// `job`, the Job its status names, must be created at or after Zeabur's last write and complete,
+/// and the `Failed` condition must not be `True`. The condition has no time, so a failure counts
+/// only while its Job is not older than the write.
 #[must_use]
 pub fn chart_progress(chart: &HelmChart, job: Option<&Job>) -> Progress {
     let conditions = chart
         .status
         .as_ref()
         .map_or(&[][..], |s| s.conditions.as_slice());
-    if let Some(failed) = conditions
-        .iter()
-        .find(|c| c.kind == "Failed" && c.status == "True")
+    let current = job.map(|job| {
+        let created = job.metadata.creation_timestamp.as_ref().map(|t| t.0);
+        match (written_at(&chart.metadata), created) {
+            (Some(written), Some(created)) => created >= truncate(written),
+            (None, Some(_)) => true,
+            (_, None) => false,
+        }
+    });
+    if current != Some(false)
+        && let Some(failed) = conditions
+            .iter()
+            .find(|c| c.kind == "Failed" && c.status == "True")
     {
         return Progress::Failed(failed.message.clone().unwrap_or_default());
     }
     let Some(job) = job else {
         return Progress::Waiting;
     };
-    let created = job.metadata.creation_timestamp.as_ref().map(|t| t.0);
-    let current = match (written_at(&chart.metadata), created) {
-        (Some(written), Some(created)) => created >= truncate(written),
-        (None, Some(_)) => true,
-        (_, None) => false,
-    };
-    if !current {
+    if current != Some(true) {
         return Progress::Waiting;
     }
     let state = readiness::job(job);
@@ -1006,7 +1389,12 @@ mod tests {
             "system-upgrade-controller",
             include_str!("../tests/api/system-upgrade-controller.json"),
         ),
+        (
+            "tailscale-operator",
+            include_str!("../tests/api/tailscale-operator.json"),
+        ),
         ("traefik", include_str!("../tests/api/traefik.json")),
+        ("velero", include_str!("../tests/api/velero.json")),
         (
             "victoria-logs",
             include_str!("../tests/api/victoria-logs.json"),
@@ -1064,6 +1452,15 @@ mod tests {
         Snapshot::assemble(index, fetched, None, Timestamp::UNIX_EPOCH).unwrap()
     }
 
+    static NO_VALUES: Values = BTreeMap::new();
+
+    const fn none() -> Inputs<'static> {
+        Inputs {
+            given: &NO_VALUES,
+            kept: &NO_VALUES,
+        }
+    }
+
     fn set(items: &[&str]) -> BTreeSet<String> {
         items.iter().map(|s| (*s).to_owned()).collect()
     }
@@ -1079,6 +1476,346 @@ mod tests {
             .as_ref()?
             .get(key)
             .map(String::as_str)
+    }
+
+    fn values(items: &[(&str, &str, InputValue)]) -> Values {
+        let mut values = Values::new();
+        for (component, input, value) in items {
+            values
+                .entry((*component).to_owned())
+                .or_default()
+                .insert((*input).to_owned(), value.clone());
+        }
+        values
+    }
+
+    fn text(s: &str) -> InputValue {
+        InputValue::Text(s.to_owned())
+    }
+
+    fn with_inputs(id: &str, given: &Values, kept: &Values) -> Result<Install, Refusal> {
+        let empty = BTreeSet::new();
+        let target = Target {
+            profile: "single-node",
+            distribution: Some("k3s"),
+            platform: "linux/amd64",
+            kube_version: "v1.36.5+k3s1",
+            capabilities: &empty,
+            components: &empty,
+            written: &empty,
+        };
+        install(
+            &snapshot(),
+            id,
+            &target,
+            &manifests(),
+            Inputs { given, kept },
+        )
+    }
+
+    fn velero_given() -> Values {
+        values(&[
+            ("velero", "bucket", text("backups")),
+            ("velero", "s3Url", text("http://minio.minio:9000")),
+            (
+                "velero",
+                "credentials",
+                text("[default]\naws_access_key_id=a\n"),
+            ),
+        ])
+    }
+
+    /// The objects of an install, by `kind/name`.
+    fn objects(install: &Install) -> Vec<String> {
+        install
+            .steps
+            .iter()
+            .flat_map(|s| &s.objects)
+            .map(|d| {
+                format!(
+                    "{}/{}",
+                    kind(&d.object),
+                    d.object.metadata.name.clone().unwrap_or_default()
+                )
+            })
+            .collect()
+    }
+
+    fn secret(install: &Install, name: &str) -> BTreeMap<String, String> {
+        let object = install
+            .steps
+            .iter()
+            .flat_map(|s| &s.objects)
+            .find(|d| {
+                kind(&d.object) == "Secret" && d.object.metadata.name.as_deref() == Some(name)
+            })
+            .unwrap();
+        let secret: Secret = object.object.clone().try_parse().unwrap();
+        secret
+            .data
+            .unwrap_or_default()
+            .into_iter()
+            .map(|(k, v)| (k, String::from_utf8(v.0).unwrap()))
+            .collect()
+    }
+
+    fn chart_of(install: &Install) -> HelmChart {
+        install
+            .steps
+            .iter()
+            .flat_map(|s| &s.objects)
+            .find(|d| kind(&d.object) == HelmChart::KIND)
+            .unwrap()
+            .object
+            .clone()
+            .try_parse()
+            .unwrap()
+    }
+
+    fn state(install: &Install, input: &str) -> InputState {
+        install
+            .inputs
+            .iter()
+            .find(|r| r.input.name == input)
+            .unwrap()
+            .state
+    }
+
+    #[test]
+    fn path_inputs_go_into_the_chart_and_secret_inputs_into_secrets_before_it() {
+        let install = with_inputs("velero", &velero_given(), &Values::new()).unwrap();
+        assert_eq!(install.missing(), None);
+        assert_eq!(
+            objects(&install),
+            [
+                "Namespace/velero",
+                "Secret/velero-credentials",
+                "Secret/velero-repo-credentials",
+                "Secret/velero-backup-key",
+                "HelmChart/velero",
+            ]
+        );
+
+        let chart = chart_of(&install);
+        let values: Value =
+            serde_saphyr::from_str(chart.spec.values_content.as_deref().unwrap()).unwrap();
+        let location = &values["configuration"]["backupStorageLocation"][0];
+        assert_eq!(location["bucket"], "backups");
+        assert_eq!(location["config"]["s3Url"], "http://minio.minio:9000");
+        // The rest of the list item stays as the catalog wrote it.
+        assert_eq!(location["provider"], "aws");
+        assert_eq!(location["config"]["region"], "us-east-1");
+        assert_eq!(values["deployNodeAgent"], false);
+        assert_eq!(state(&install, "region"), InputState::Default);
+
+        // Only given and generated values are kept for the next install, not defaults.
+        let kept: Value =
+            serde_json::from_str(&chart.metadata.annotations.unwrap_or_default()[INPUTS]).unwrap();
+        assert_eq!(
+            kept,
+            json!({"bucket": "backups", "s3Url": "http://minio.minio:9000"})
+        );
+
+        assert_eq!(
+            secret(&install, "velero-credentials")["cloud"],
+            "[default]\naws_access_key_id=a\n"
+        );
+        let password = &secret(&install, "velero-repo-credentials")["repository-password"];
+        assert_eq!(password.len(), 128);
+        assert!(password.chars().all(|c| c.is_ascii_hexdigit()));
+        let key = &secret(&install, "velero-backup-key")["key"];
+        assert_eq!(key.len(), 32);
+        assert!(
+            key.chars()
+                .all(|c| c.is_ascii_alphanumeric() || c == '-' || c == '_')
+        );
+        assert_eq!(state(&install, "backupKey"), InputState::Generated);
+    }
+
+    #[test]
+    fn a_required_input_without_a_value_is_missing_and_refused() {
+        let install = with_inputs("velero", &Values::new(), &Values::new()).unwrap();
+        assert_eq!(state(&install, "bucket"), InputState::Missing);
+        assert_eq!(state(&install, "credentials"), InputState::Missing);
+        assert_eq!(
+            install.missing(),
+            Some(Refusal::Missing {
+                component: "velero".to_owned(),
+                input: "bucket".to_owned(),
+            })
+        );
+        // An empty text is no value.
+        let given = values(&[("velero", "bucket", text(""))]);
+        let install = with_inputs("velero", &given, &Values::new()).unwrap();
+        assert_eq!(state(&install, "bucket"), InputState::Missing);
+    }
+
+    #[test]
+    fn kept_values_are_reused_and_a_kept_secret_is_never_generated_again() {
+        let kept = values(&[
+            ("velero", "bucket", text("old")),
+            ("velero", "s3Url", text("http://old:9000")),
+            ("velero", "credentials", text("old credentials")),
+            ("velero", "repositoryPassword", text("kept password")),
+        ]);
+        let given = values(&[("velero", "bucket", text("new"))]);
+        let install = with_inputs("velero", &given, &kept).unwrap();
+        assert_eq!(install.missing(), None);
+        assert_eq!(state(&install, "bucket"), InputState::Given);
+        assert_eq!(state(&install, "s3Url"), InputState::Kept);
+        assert_eq!(state(&install, "repositoryPassword"), InputState::Kept);
+        assert_eq!(
+            secret(&install, "velero-repo-credentials")["repository-password"],
+            "kept password"
+        );
+        assert_eq!(
+            secret(&install, "velero-credentials")["cloud"],
+            "old credentials"
+        );
+        let chart = chart_of(&install);
+        let kept: Value =
+            serde_json::from_str(&chart.metadata.annotations.unwrap_or_default()[INPUTS]).unwrap();
+        assert_eq!(kept, json!({"bucket": "new", "s3Url": "http://old:9000"}));
+    }
+
+    #[test]
+    fn inputs_that_share_a_secret_are_its_keys() {
+        let given = values(&[
+            ("tailscale-operator", "oauthClientId", text("id")),
+            ("tailscale-operator", "oauthClientSecret", text("secret")),
+        ]);
+        let install = with_inputs("tailscale-operator", &given, &Values::new()).unwrap();
+        assert_eq!(
+            objects(&install),
+            [
+                "Namespace/tailscale",
+                "Secret/operator-oauth",
+                "HelmChart/tailscale-operator",
+            ]
+        );
+        assert_eq!(
+            secret(&install, "operator-oauth"),
+            BTreeMap::from([
+                ("client_id".to_owned(), "id".to_owned()),
+                ("client_secret".to_owned(), "secret".to_owned()),
+            ])
+        );
+        // A chart without path inputs keeps nothing.
+        assert!(
+            !chart_of(&install)
+                .metadata
+                .annotations
+                .unwrap_or_default()
+                .contains_key(INPUTS)
+        );
+    }
+
+    #[test]
+    fn a_value_of_another_kind_is_refused() {
+        let mut given = velero_given();
+        given
+            .get_mut("velero")
+            .unwrap()
+            .insert("fileBackup".to_owned(), text("yes"));
+        assert_eq!(
+            with_inputs("velero", &given, &Values::new()),
+            Err(Refusal::WrongValue {
+                component: "velero".to_owned(),
+                input: "fileBackup".to_owned(),
+                expected: "true or false",
+            })
+        );
+        given
+            .get_mut("velero")
+            .unwrap()
+            .insert("fileBackup".to_owned(), InputValue::Flag(true));
+        let install = with_inputs("velero", &given, &Values::new()).unwrap();
+        let values: Value =
+            serde_saphyr::from_str(chart_of(&install).spec.values_content.as_deref().unwrap())
+                .unwrap();
+        assert_eq!(values["deployNodeAgent"], true);
+    }
+
+    #[test]
+    fn a_removal_writes_no_secrets() {
+        let velero = &snapshot().components["velero"];
+        let steps = steps_of(velero, "0.5.3", "single-node", &Manifests::new(), &[]).unwrap();
+        assert!(
+            steps
+                .iter()
+                .flat_map(|s| &s.objects)
+                .all(|d| kind(&d.object) != "Secret")
+        );
+        assert_eq!(
+            input_secrets(velero),
+            [
+                "velero/velero-credentials",
+                "velero/velero-repo-credentials",
+                "velero/velero-backup-key",
+            ]
+        );
+    }
+
+    #[test]
+    fn what_zeabur_cannot_install_yet_says_why() {
+        let snapshot = snapshot();
+        assert_eq!(
+            unsupported(&snapshot.components["crowdsec"]),
+            Some(Unsupported::Contributes)
+        );
+        assert_eq!(unsupported(&snapshot.components["traefik"]), None);
+        assert_eq!(unsupported(&snapshot.components["velero"]), None);
+    }
+
+    #[test]
+    fn a_chart_or_secret_with_other_content_is_written_again() {
+        let install = with_inputs("velero", &velero_given(), &Values::new()).unwrap();
+        let desired: Vec<&DynamicObject> = install
+            .steps
+            .iter()
+            .flat_map(|s| &s.objects)
+            .map(|d| &d.object)
+            .collect();
+        let chart = desired.iter().find(|o| kind(o) == HelmChart::KIND).unwrap();
+        // The cluster adds fields; what Zeabur writes is still there.
+        let mut found = (*chart).clone();
+        found.data["spec"]["bootstrap"] = json!(false);
+        found.data["status"] = json!({"jobName": "helm-install-velero"});
+        assert!(holds(chart, &found));
+
+        let mut other_bucket = velero_given();
+        other_bucket
+            .get_mut("velero")
+            .unwrap()
+            .insert("bucket".to_owned(), text("other"));
+        let changed = with_inputs("velero", &other_bucket, &Values::new()).unwrap();
+        let changed = dynamic(&chart_of(&changed)).unwrap();
+        assert!(!holds(&changed, &found));
+
+        // The same spec, with a value that was a default and is now given.
+        let mut defaulted = found.clone();
+        defaulted
+            .metadata
+            .annotations
+            .get_or_insert_default()
+            .insert(INPUTS.to_owned(), "{}".to_owned());
+        assert!(!holds(chart, &defaulted));
+
+        let credentials = desired
+            .iter()
+            .find(|o| o.metadata.name.as_deref() == Some("velero-credentials"))
+            .unwrap();
+        let mut other = (*credentials).clone();
+        other.data["data"]["cloud"] = json!("b3RoZXI=");
+        assert!(!holds(credentials, &other));
+        assert!(holds(credentials, credentials));
+        let namespace = desired.first().unwrap();
+        assert!(holds(
+            namespace,
+            &object(
+                json!({"apiVersion": "v1", "kind": "Namespace", "metadata": {"name": "velero"}})
+            )
+        ));
     }
 
     fn plan(id: &str, capabilities: &[&str], components: &[&str]) -> Result<Install, Refusal> {
@@ -1103,7 +1840,7 @@ mod tests {
             components: &components,
             written: &written,
         };
-        install(&snapshot(), id, &target, &manifests())
+        install(&snapshot(), id, &target, &manifests(), none())
     }
 
     #[test]
@@ -1221,7 +1958,8 @@ mod tests {
             components: &components,
             written: &BTreeSet::new(),
         };
-        let refusal = install(&snapshot(), "cert-manager", &target, &manifests()).unwrap_err();
+        let refusal =
+            install(&snapshot(), "cert-manager", &target, &manifests(), none()).unwrap_err();
         assert!(matches!(refusal, Refusal::NotHere { place, .. } if place == "minikube"));
     }
 
@@ -1238,17 +1976,18 @@ mod tests {
             components: &components,
             written: &BTreeSet::new(),
         };
-        let refusal = install(&snapshot(), "victoria-logs", &target, &manifests()).unwrap_err();
+        let refusal =
+            install(&snapshot(), "victoria-logs", &target, &manifests(), none()).unwrap_err();
         assert!(
             matches!(refusal, Refusal::NotHere { component, place } if component == "victoria-logs" && place == "Kubernetes v1.33.4+k3s1")
         );
-        assert!(install(&snapshot(), "cert-manager", &target, &manifests()).is_ok());
+        assert!(install(&snapshot(), "cert-manager", &target, &manifests(), none()).is_ok());
     }
 
     #[test]
     fn a_namespace_kubernetes_keeps_is_not_written() {
         let traefik = &snapshot().components["traefik"];
-        let namespaces: Vec<String> = steps_of(traefik, "0.5.3", "single-node", &manifests())
+        let namespaces: Vec<String> = steps_of(traefik, "0.5.3", "single-node", &manifests(), &[])
             .unwrap()
             .into_iter()
             .flat_map(|s| s.objects)
@@ -1302,7 +2041,7 @@ mod tests {
     #[test]
     fn a_manifest_release_without_its_files_is_refused() {
         let file = &snapshot().components["system-upgrade-controller"];
-        let refusal = steps_of(file, "0.5.5", "single-node", &Manifests::new()).unwrap_err();
+        let refusal = steps_of(file, "0.5.5", "single-node", &Manifests::new(), &[]).unwrap_err();
         assert!(refusal.to_string().contains(&format!("{SUC}/crd.yaml")));
     }
 
@@ -1447,6 +2186,27 @@ mod tests {
             &json!([{"type": "Failed", "status": "True", "reason": "BackoffLimitExceeded"}]),
         );
         assert!(matches!(chart_progress(&c, Some(&j)), Progress::Failed(_)));
+    }
+
+    #[test]
+    fn a_failure_of_the_job_before_the_last_write_waits_for_the_next_job() {
+        let failed = chart(
+            "2026-11-19T10:00:00Z",
+            &json!([{"type": "Failed", "status": "True", "message": "the old values"}]),
+        );
+        let before = job(
+            "2026-11-19T09:59:00Z",
+            &json!([{"type": "Failed", "status": "True", "reason": "BackoffLimitExceeded"}]),
+        );
+        assert_eq!(chart_progress(&failed, Some(&before)), Progress::Waiting);
+        let after = job(
+            "2026-11-19T10:00:01Z",
+            &json!([{"type": "Failed", "status": "True", "reason": "BackoffLimitExceeded"}]),
+        );
+        assert!(matches!(
+            chart_progress(&failed, Some(&after)),
+            Progress::Failed(_)
+        ));
     }
 
     fn object(v: Value) -> DynamicObject {

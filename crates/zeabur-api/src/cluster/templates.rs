@@ -286,6 +286,7 @@ mod tests {
                 ..Detection::default()
             },
             tested_version: None,
+            unsupported: None,
         }
     }
 

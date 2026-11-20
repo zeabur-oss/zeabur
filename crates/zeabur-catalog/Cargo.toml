@@ -11,6 +11,8 @@ publish.workspace = true
 workspace = true
 
 [dependencies]
+# Random values of generated component inputs.
+aws-lc-rs.workspace = true
 flate2.workspace = true
 zeabur-kube.workspace = true
 zeabur-model.workspace = true

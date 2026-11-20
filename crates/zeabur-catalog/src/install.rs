@@ -52,8 +52,10 @@ use utoipa::ToSchema;
 use zeabur_kube::k8s_openapi::Resource;
 use zeabur_model::PodSecurityLevel;
 
+use crate::api::{Generate, Input, InputValue};
 use crate::bundle;
 use crate::engine::{self, ChartRelease};
+use crate::templates::Encoding;
 
 /// The profiles the catalogue sizes components for.
 pub const PROFILES: [&str; 2] = ["single-node", "multi-node"];
@@ -205,56 +207,18 @@ struct Target {
     component: String,
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Input {
-    name: String,
-    description: String,
-    #[serde(default)]
-    release: Option<String>,
-    #[serde(default)]
-    path: Option<String>,
-    #[serde(default)]
-    secret: Option<SecretRef>,
-    #[serde(default)]
-    generate: Option<Generate>,
-    #[serde(default)]
-    required: bool,
-    #[serde(default)]
-    default: Option<Value>,
-}
-
-/// How Zeabur makes an input's value.
-#[derive(Debug, Deserialize)]
-#[serde(tag = "type")]
-enum Generate {
-    #[serde(rename = "random")]
-    Random { bytes: u32, encoding: String },
-    #[serde(rename = "clusterIP")]
-    ClusterIp,
-    #[serde(other)]
-    Unknown,
-}
-
 impl Input {
     /// The shell command that makes a random value like the one Zeabur generates.
     fn random(&self) -> Option<String> {
         let Some(Generate::Random { bytes, encoding }) = &self.generate else {
             return None;
         };
-        Some(if encoding == "base64url" {
+        Some(if *encoding == Encoding::Base64url {
             format!("openssl rand -base64 {bytes} | tr '+/' '-_' | tr -d '='")
         } else {
             format!("openssl rand -hex {bytes}")
         })
     }
-}
-
-#[derive(Debug, Deserialize)]
-struct SecretRef {
-    name: String,
-    key: String,
-    namespace: String,
 }
 
 #[derive(Debug, Deserialize)]
@@ -1047,10 +1011,10 @@ impl<'a> Rendered<'a> {
 fn placeholder(input: &Input) -> Value {
     input.random().map_or_else(
         || {
-            input
-                .default
-                .clone()
-                .unwrap_or_else(|| Value::String(format!("<{}>", input.name)))
+            input.default.as_ref().map_or_else(
+                || Value::String(format!("<{}>", input.name)),
+                InputValue::to_json,
+            )
         },
         |random| Value::String(format!("<random: {random}>")),
     )
@@ -1097,7 +1061,7 @@ fn list_of(path: &str) -> Option<String> {
 }
 
 /// Sets `value` at a dotted path; numeric segments index lists, which grow as needed.
-fn set_path(root: &mut Value, path: &str, value: Value) {
+pub(crate) fn set_path(root: &mut Value, path: &str, value: Value) {
     let mut node = root;
     let segments: Vec<&str> = path.split('.').collect();
     for (i, segment) in segments.iter().enumerate() {
@@ -1284,17 +1248,18 @@ mod tests {
                 .map(|d| (d.url, "".into()))
                 .collect();
             for profile in PROFILES {
-                let mut written: Vec<Value> = engine::steps_of(&component, "", profile, &manifests)
-                    .unwrap()
-                    .into_iter()
-                    .flat_map(|step| step.objects)
-                    .map(|desired| {
-                        let mut object = desired.object;
-                        object.metadata.annotations = None;
-                        serde_json::to_value(object).unwrap()
-                    })
-                    .filter(|o| o["kind"] == "HelmChart" || o["kind"] == "Namespace")
-                    .collect();
+                let mut written: Vec<Value> =
+                    engine::steps_of(&component, "", profile, &manifests, &[])
+                        .unwrap()
+                        .into_iter()
+                        .flat_map(|step| step.objects)
+                        .map(|desired| {
+                            let mut object = desired.object;
+                            object.metadata.annotations = None;
+                            serde_json::to_value(object).unwrap()
+                        })
+                        .filter(|o| o["kind"] == "HelmChart" || o["kind"] == "Namespace")
+                        .collect();
                 let k3s = guide(id, profile)
                     .unwrap()
                     .formats

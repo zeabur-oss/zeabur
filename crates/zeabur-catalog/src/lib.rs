@@ -60,6 +60,10 @@ pub struct Component {
     #[serde(skip)]
     #[schema(ignore)]
     pub tested_version: Option<String>,
+    /// What it uses that Zeabur cannot install yet, from the catalog release Zeabur read; absent
+    /// when Zeabur installs it, or has not read the catalog.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub unsupported: Option<engine::Unsupported>,
 }
 
 /// A release of a catalogue file: only its chart and version are read.
@@ -219,6 +223,7 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
                 kube_version: file.kube_version,
                 tested_version: tested_version(&file.releases, &file.detection),
                 detection: file.detection,
+                unsupported: None,
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -644,6 +649,7 @@ mod tests {
             kube_version: kube_version.to_owned(),
             detection: Detection::default(),
             tested_version: None,
+            unsupported: None,
         }
     }
 
