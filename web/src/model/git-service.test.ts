@@ -318,7 +318,7 @@ describe("the Builds tab", () => {
       condition: "SourceReady",
       reason: "RefNotFound",
       message: "no branch or tag `main`",
-      since: null,
+      startedAt: null,
       lasting: true,
     }
     const failed = build({ problem })

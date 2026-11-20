@@ -298,7 +298,7 @@ fn releases(workload: &WorkloadRef, releases: &[Release]) -> Vec<TimelineEntry> 
                 message = message.with("changeCause", cause.clone());
             }
             Some(TimelineEntry {
-                at: release.created?,
+                at: release.created_at?,
                 kind: EntryKind::Release,
                 workload: workload.clone(),
                 message,
@@ -671,7 +671,7 @@ mod tests {
     fn release(name: &str, revision: i64, current: bool) -> Release {
         serde_json::from_value(
             json!({"revision": revision, "name": name, "images": ["app:1"],
-            "created": "2026-10-01T00:00:00Z", "current": current,
+            "createdAt": "2026-10-01T00:00:00Z", "current": current,
             "pods": {"ready": 0, "total": 0}, "template": {}, "templateYaml": ""}),
         )
         .unwrap()

@@ -180,7 +180,7 @@ export function scheduleRequest(
 }
 
 /** When a backup was taken: when it finished, else when it started. */
-export const takenAt = (backup: Backup) => backup.finished ?? backup.started
+export const takenAt = (backup: Backup) => backup.finishedAt ?? backup.startedAt
 
 /** The newest backup that finished, with or without some items. */
 export function lastGood(backups: Backup[]): Backup | undefined {

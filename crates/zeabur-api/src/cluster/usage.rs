@@ -118,7 +118,7 @@ pub struct ClusterUsage {
     pub metrics: MetricsState,
     /// When the newest sample was taken.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<Timestamp>,
+    pub sampled_at: Option<Timestamp>,
     /// The window CPU is averaged over, as metrics-server writes it (`15s`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<String>,
@@ -156,8 +156,11 @@ fn add_usage(
     let state = match metrics {
         Ok(Reading::Objects(objects)) => {
             let samples = zeabur_modules::metrics_server::pod_usage(&objects);
-            if let Some(newest) = samples.iter().max_by(|a, b| a.timestamp.cmp(&b.timestamp)) {
-                timestamp = newest.timestamp;
+            if let Some(newest) = samples
+                .iter()
+                .max_by(|a, b| a.sampled_at.cmp(&b.sampled_at))
+            {
+                timestamp = newest.sampled_at;
                 window.clone_from(&newest.window);
             }
             for sample in samples {
@@ -285,7 +288,7 @@ pub(crate) async fn get(Person(cluster): Person) -> Result<Json<ClusterUsage>, A
         pod_scan: PodScan::of(Some(&pods)),
         pods_scanned: pods.pods.len(),
         metrics: state,
-        timestamp,
+        sampled_at: timestamp,
         window,
         unreadable,
     }))

@@ -394,7 +394,7 @@ export function Restored({ project, database }: { project: string; database: Dat
           here={database}
           other={source}
           otherName={database.restored.from}
-          time={database.restored.time}
+          time={database.restored.takenAt}
           copy={false}
         />
       ) : null}
@@ -407,7 +407,7 @@ export function Restored({ project, database }: { project: string; database: Dat
             here={database}
             other={copy}
             otherName={copy.name}
-            time={copy.restored?.time}
+            time={copy.restored?.takenAt}
             copy
           />
         ))}

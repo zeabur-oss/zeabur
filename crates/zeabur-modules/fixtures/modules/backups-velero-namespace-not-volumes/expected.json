@@ -19,7 +19,7 @@
       "name": "daily-20261014030000",
       "provider": "velero",
       "outcome": "partiallyFailed",
-      "finished": "2026-10-14T03:04:00Z"
+      "finishedAt": "2026-10-14T03:04:00Z"
     }
   }
 ]

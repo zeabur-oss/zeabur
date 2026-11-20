@@ -221,7 +221,7 @@ function RunRow({
           {run.name}
         </span>
       </span>
-      <Ago iso={run.started} className="shrink-0 type-meta text-muted-foreground" />
+      <Ago iso={run.startedAt} className="shrink-0 type-meta text-muted-foreground" />
       {pod && logs ? (
         <Link
           {...podLogsLink(project, service, pod)}

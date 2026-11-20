@@ -30,7 +30,7 @@ const run = (name: string, restoreFrom?: string, outcome = "succeeded") => ({
   provider: "x",
   outcome,
   restoreFrom,
-  finished: "2026-10-22T03:01:00Z",
+  finishedAt: "2026-10-22T03:01:00Z",
   targets: [],
 })
 
@@ -179,7 +179,7 @@ describe("restoring into a new database", () => {
   })
 
   test("PostgreSQL recovers to a point in time inside the window, given in UTC", () => {
-    const window = { first: "2026-10-20T03:00:00Z", lagSeconds: 300 }
+    const window = { earliestAt: "2026-10-20T03:00:00Z", lagSeconds: 300 }
     const pg = base({
       engine: "postgresql",
       apiVersion: "postgresql.cnpg.io/v1",

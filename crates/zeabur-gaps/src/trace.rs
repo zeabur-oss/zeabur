@@ -1074,7 +1074,7 @@ pub fn diagnoses(traces: &[RouteTrace], service: &Service) -> Vec<Diagnosis> {
             why: sentence("why"),
             fix: sentence("fix"),
             evidence: hop.evidence.clone(),
-            last_seen: None,
+            last_seen_at: None,
             incident: (variant == "controllerDown")
                 .then(|| "incidents/component/ingress".to_owned()),
             refused_port: None,

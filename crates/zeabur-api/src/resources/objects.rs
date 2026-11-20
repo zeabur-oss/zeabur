@@ -149,7 +149,7 @@ pub struct ObjectSummary {
     pub name: String,
     /// When it was created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<Timestamp>,
+    pub created_at: Option<Timestamp>,
     /// The kind of its controlling owner, when it has one (`ReplicaSet` for a pod).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub owner_kind: Option<String>,
@@ -246,7 +246,7 @@ fn summary(project: &str, resource: &ResourceRef, metadata: ObjectMeta) -> Objec
     ObjectSummary {
         id: object_id(project, resource, &name),
         owner_kind,
-        created: metadata.creation_timestamp.map(|t| t.0),
+        created_at: metadata.creation_timestamp.map(|t| t.0),
         name,
     }
 }

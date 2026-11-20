@@ -35,7 +35,7 @@ pub struct PodSummary {
     pub cause: Option<crate::StatusCause>,
     /// When it was created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created: Option<Timestamp>,
+    pub created_at: Option<Timestamp>,
     /// The node it runs on, once scheduled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
@@ -102,10 +102,10 @@ pub struct ContainerTermination {
     pub exit_code: i32,
     /// When it started.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub started: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
     /// When it ended.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub finished: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
     /// The container's termination message, or the runtime's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -275,7 +275,7 @@ pub struct WorkloadSummary {
     pub image: Option<String>,
     /// When the workload was created.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub created: Option<Timestamp>,
+    pub created_at: Option<Timestamp>,
     /// The tool that manages the workload, if any.
     pub provenance: Provenance,
     /// A CronJob's schedule; absent for other kinds.
@@ -302,7 +302,7 @@ pub struct TaskSchedule {
     pub suspended: bool,
     /// When a run was last started.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub last_scheduled: Option<Timestamp>,
+    pub last_scheduled_at: Option<Timestamp>,
     /// The service it was made from: its `zeabur.com/task-of` label.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub task_of: Option<String>,

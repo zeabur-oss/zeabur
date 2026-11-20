@@ -670,7 +670,7 @@ mod tests {
                 revision: 1,
                 name: "app-1".to_owned(),
                 images: vec!["example/app:1".to_owned()],
-                created: None,
+                created_at: None,
                 change_cause: None,
                 current: false,
                 pods: ReleasePods { ready: 0, total: 0 },

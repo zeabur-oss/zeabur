@@ -4877,7 +4877,7 @@ components:
       - targets
       - outcome
       properties:
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
@@ -4904,7 +4904,7 @@ components:
           description: |-
             What a restore of this backup names: CloudNativePG's backup ID, Percona's destination, or
             the time MOCO and mariadb-operator restore to. Absent when it cannot be restored yet.
-        started:
+        startedAt:
           type:
           - string
           - "null"
@@ -7066,7 +7066,7 @@ components:
           items:
             $ref: "#/components/schemas/EventView"
           description: >-
-            Newest first (by `lastSeen`, events without one last), then by namespace and
+            Newest first (by `lastSeenAt`, events without one last), then by namespace and
             name.
         partial:
           type: boolean
@@ -7319,7 +7319,7 @@ components:
           type: integer
           description: How many unfinished pods were read.
           minimum: 0
-        timestamp:
+        sampledAt:
           type:
           - string
           - "null"
@@ -8054,7 +8054,7 @@ components:
           type: integer
           format: int32
           description: The process's exit code.
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
@@ -8070,7 +8070,7 @@ components:
           - string
           - "null"
           description: "`Error`, `Completed`, `OOMKilled`, `ContainerCannotRun`, …"
-        started:
+        startedAt:
           type:
           - string
           - "null"
@@ -8341,7 +8341,7 @@ components:
         connection:
           $ref: "#/components/schemas/DatabaseConnection"
           description: Where and as whom to connect.
-        created:
+        createdAt:
           type:
           - string
           - "null"
@@ -8632,10 +8632,10 @@ components:
       type: object
       description: The times a new database can recover to.
       required:
-      - first
+      - earliestAt
       - lagSeconds
       properties:
-        first:
+        earliestAt:
           type: string
           format: date-time
           description: "The earliest time: when the oldest backup in the store finished."
@@ -8662,7 +8662,7 @@ components:
         from:
           type: string
           description: The database the backup is of.
-        time:
+        takenAt:
           type:
           - string
           - "null"
@@ -8879,7 +8879,7 @@ components:
         kind:
           $ref: "#/components/schemas/DiagnosisKind"
           description: What kind of failure.
-        lastSeen:
+        lastSeenAt:
           type:
           - string
           - "null"
@@ -9333,7 +9333,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/EventView"
-          description: Newest first (by `lastSeen`, events without one last), then by name.
+          description: Newest first (by `lastSeenAt`, events without one last), then by name.
         totalSize:
           type: integer
           description: How many events matched, also those past `limit`.
@@ -9356,7 +9356,7 @@ components:
         id:
           type: string
           description: "`projects/<project>/events/<name>`."
-        lastSeen:
+        lastSeenAt:
           type:
           - string
           - "null"
@@ -9468,6 +9468,12 @@ components:
           - string
           - "null"
           description: The container it concerns.
+        happenedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: When it happened.
         origin:
           $ref: "#/components/schemas/Origin"
           description: The report result it was read from.
@@ -9488,12 +9494,6 @@ components:
         source:
           type: string
           description: Falco's event source (`syscall`, `k8s_audit`).
-        time:
-          type:
-          - string
-          - "null"
-          format: date-time
-          description: When it happened.
         user:
           type:
           - string
@@ -11114,7 +11114,7 @@ components:
           items:
             $ref: "#/components/schemas/AffectedService"
           description: The services it reaches, sorted by id, as far as the reader could see them.
-        since:
+        startedAt:
           type:
           - string
           - "null"
@@ -11531,7 +11531,7 @@ components:
         origin:
           $ref: "#/components/schemas/Origin"
           description: The Lease.
-        renewed:
+        renewedAt:
           type:
           - string
           - "null"
@@ -11622,7 +11622,7 @@ components:
       type: object
       description: One line.
       required:
-      - time
+      - writtenAt
       - pod
       - container
       - message
@@ -11636,7 +11636,7 @@ components:
         pod:
           type: string
           description: The pod that wrote it, which may be gone.
-        time:
+        writtenAt:
           type: string
           format: date-time
           description: When it was written.
@@ -13102,7 +13102,7 @@ components:
         cordoned:
           type: boolean
           description: "Cordoned: new pods are not scheduled here (`spec.unschedulable`)."
-        created:
+        createdAt:
           type:
           - string
           - "null"
@@ -13592,7 +13592,7 @@ components:
       - id
       - name
       properties:
-        created:
+        createdAt:
           type:
           - string
           - "null"
@@ -14877,7 +14877,7 @@ components:
           items:
             type: string
           description: Its containers' names, for picking whose log to read.
-        created:
+        createdAt:
           type:
           - string
           - "null"
@@ -15541,7 +15541,7 @@ components:
       type: object
       description: A project whose Namespace is being deleted.
       required:
-      - since
+      - startedAt
       - remaining
       - finalizers
       - held
@@ -15561,7 +15561,7 @@ components:
           items:
             $ref: "#/components/schemas/RemainingContent"
           description: What is left, by resource, as the namespace controller counts it.
-        since:
+        startedAt:
           type: string
           format: date-time
           description: When the deletion started.
@@ -16072,15 +16072,15 @@ components:
           items:
             $ref: "#/components/schemas/PodUsage"
           description: Every pod with a sample, by name. A running pod missing here has none yet.
-        state:
-          $ref: "#/components/schemas/MetricsState"
-          description: Whether usage could be read.
-        timestamp:
+        sampledAt:
           type:
           - string
           - "null"
           format: date-time
           description: When the newest sample was taken.
+        state:
+          $ref: "#/components/schemas/MetricsState"
+          description: Whether usage could be read.
         unreadable:
           type: array
           items:
@@ -16329,22 +16329,22 @@ components:
       description: One Kubernetes minor release and its support window. Dates are `YYYY-MM-DD`.
       required:
       - minor
-      - released
-      - maintenanceFrom
-      - endOfLife
+      - releasedAt
+      - maintenanceStartsAt
+      - endOfLifeAt
       properties:
-        endOfLife:
+        endOfLifeAt:
           type: string
           format: date
           description: The last day it gets patches.
-        maintenanceFrom:
+        maintenanceStartsAt:
           type: string
           format: date
           description: From this day only critical fixes are made ("maintenance mode").
         minor:
           type: string
           description: "`1.34`."
-        released:
+        releasedAt:
           type: string
           format: date
           description: Its first release.
@@ -17594,7 +17594,7 @@ components:
               Where to connect, inside the cluster, and the Secret with the access key. Absent until the
               store has an access key.
           - type: "null"
-        created:
+        createdAt:
           type:
           - string
           - "null"
@@ -18592,7 +18592,7 @@ components:
       - manual
       - pods
       properties:
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
@@ -18612,7 +18612,7 @@ components:
           items:
             type: string
           description: Its pods, newest last, for their logs.
-        started:
+        startedAt:
           type:
           - string
           - "null"
@@ -18671,7 +18671,7 @@ components:
           type: integer
           format: int32
           description: How many succeeded runs Kubernetes keeps (`spec.successfulJobsHistoryLimit`).
-        lastScheduled:
+        lastScheduledAt:
           type:
           - string
           - "null"
@@ -19299,7 +19299,7 @@ components:
       required:
       - id
       - kubernetesVersion
-      - dataAsOf
+      - dataCopiedAt
       - states
       - attention
       - skew
@@ -19317,7 +19317,7 @@ components:
           - $ref: "#/components/schemas/UpgradeFinding"
             description: "The one state the cluster's header and Home show: the most severe that shows."
           - type: "null"
-        dataAsOf:
+        dataCopiedAt:
           type: string
           format: date
           description: When the bundled table was copied from the Kubernetes schedule.
@@ -19544,7 +19544,7 @@ components:
           format: int64
           description: Errors Velero counted.
           minimum: 0
-        expires:
+        expiresAt:
           type:
           - string
           - "null"
@@ -19555,7 +19555,7 @@ components:
           - $ref: "#/components/schemas/VeleroFailure"
             description: Why it did not finish well.
           - type: "null"
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
@@ -19594,7 +19594,7 @@ components:
           - string
           - "null"
           description: The schedule that made it.
-        started:
+        startedAt:
           type:
           - string
           - "null"
@@ -19678,7 +19678,7 @@ components:
           - string
           - "null"
           description: The S3-compatible endpoint (`s3Url`); absent for AWS itself.
-        lastValidated:
+        lastValidatedAt:
           type:
           - string
           - "null"
@@ -19737,7 +19737,7 @@ components:
           format: int64
           description: Errors Velero counted.
           minimum: 0
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
@@ -19776,7 +19776,7 @@ components:
           description: >-
             The only kinds it restores (`includedResources`), as `resource.group`; empty
             for all.
-        started:
+        startedAt:
           type:
           - string
           - "null"
@@ -19947,7 +19947,7 @@ components:
         delete:
           type: boolean
           description: It deletes what the snapshot does not have.
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
@@ -19980,7 +19980,7 @@ components:
         snapshot:
           type: string
           description: The snapshot.
-        started:
+        startedAt:
           type:
           - string
           - "null"
@@ -20027,15 +20027,15 @@ components:
       description: A snapshot of a claim that can be restored.
       required:
       - id
-      - date
+      - takenAt
       properties:
-        date:
-          type: string
-          format: date-time
-          description: When it was taken.
         id:
           type: string
           description: restic's ID.
+        takenAt:
+          type: string
+          format: date-time
+          description: When it was taken.
     VolumeUsage:
       type: object
       description: How full one claim's volume is.
@@ -20184,7 +20184,7 @@ components:
           - string
           - "null"
           description: Why it was made, from `kubernetes.io/change-cause`.
-        created:
+        createdAt:
           type:
           - string
           - "null"
@@ -20269,7 +20269,7 @@ components:
         - provenance
         - origin
         properties:
-          created:
+          createdAt:
             type:
             - string
             - "null"
@@ -20465,7 +20465,7 @@ components:
         suspended:
           type: boolean
           description: Whether builds are paused.
-        uploadExpires:
+        uploadExpiresAt:
           type:
           - string
           - "null"
@@ -20526,7 +20526,7 @@ components:
           description: >-
             The controller's reason, such as `RefNotFound`, `AuthFailed` or
             `HostKeyMismatch`.
-        since:
+        startedAt:
           type:
           - string
           - "null"
@@ -20543,7 +20543,7 @@ components:
         build:
           type: string
           description: The `Build`.
-        created:
+        createdAt:
           type:
           - string
           - "null"
@@ -20554,7 +20554,7 @@ components:
           - string
           - "null"
           description: The pushed manifest's digest.
-        finished:
+        finishedAt:
           type:
           - string
           - "null"
@@ -20588,7 +20588,7 @@ components:
           - string
           - "null"
           description: The commit.
-        started:
+        startedAt:
           type:
           - string
           - "null"

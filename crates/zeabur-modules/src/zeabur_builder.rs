@@ -66,7 +66,7 @@ pub struct ZeaburBuilderBuild {
     /// (`status.uploadToken.request`).
     pub upload_request: Option<String>,
     /// When that upload token expires.
-    pub upload_expires: Option<Timestamp>,
+    pub upload_expires_at: Option<Timestamp>,
     /// The branch or tag it follows; `HEAD` (or none) follows the repository's default branch.
     pub git_ref: Option<String>,
     /// The ref the newest commit came from, such as `refs/heads/master`, when the controller
@@ -148,7 +148,7 @@ pub struct ZeaburBuilderProblem {
     /// The controller's message.
     pub message: Option<String>,
     /// When the condition turned `False`.
-    pub since: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
     /// Whether it needs someone to act. Only `ResolveFailed` (a timeout or a server error) may
     /// clear by itself, so it counts once it has lasted [`TRANSIENT`].
     pub lasting: bool,
@@ -187,7 +187,7 @@ fn problem(build: &BuildView, now: Option<Timestamp>) -> Option<ZeaburBuilderPro
                 condition: kind.to_owned(),
                 reason,
                 message: filled(found.message.as_ref()),
-                since,
+                started_at: since,
                 lasting,
             })
         })
@@ -214,11 +214,11 @@ pub struct ZeaburBuilderRun {
     /// Details, at most 1 KiB of the Job's output.
     pub message: Option<String>,
     /// When it was created.
-    pub created: Option<Timestamp>,
+    pub created_at: Option<Timestamp>,
     /// When it started.
-    pub started: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
     /// When it finished.
-    pub finished: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
     /// The tags pushed.
     pub tags: Vec<String>,
     /// The pushed manifest's digest.
@@ -421,7 +421,7 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                         .as_ref()
                         .and_then(|t| t.request.as_ref()),
                 ),
-                upload_expires: filled_time(
+                upload_expires_at: filled_time(
                     status
                         .upload_token
                         .as_ref()
@@ -477,15 +477,15 @@ pub fn runs(objects: &[DynamicObject]) -> Vec<ZeaburBuilderRun> {
                 phase: filled(status.phase.as_ref()),
                 reason: filled(status.reason.as_ref()),
                 message: filled(status.message.as_ref()),
-                created: r.metadata.creation_timestamp.as_ref().map(|t| t.0),
-                started: filled_time(status.start_time.as_ref()),
-                finished: filled_time(status.completion_time.as_ref()),
+                created_at: r.metadata.creation_timestamp.as_ref().map(|t| t.0),
+                started_at: filled_time(status.start_time.as_ref()),
+                finished_at: filled_time(status.completion_time.as_ref()),
                 tags: status.tags,
                 digest: filled(status.image_digest.as_ref()),
             })
         })
         .collect();
-    out.sort_by(|a, b| (b.created, &b.name).cmp(&(a.created, &a.name)));
+    out.sort_by(|a, b| (b.created_at, &b.name).cmp(&(a.created_at, &a.name)));
     out
 }
 

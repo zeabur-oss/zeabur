@@ -283,9 +283,9 @@ function LocationSection({ data, gate, onPlan }: { data: Data; gate: Gate; onPla
               <StatusPill health={phaseHealth[location.phase]} size="sm">
                 {t(`clusterBackups.phase.${location.phase}`)}
               </StatusPill>
-              {location.lastValidated ? (
+              {location.lastValidatedAt ? (
                 <span className="type-meta text-muted-foreground">
-                  {t("clusterBackups.checked")} <Ago iso={location.lastValidated} />
+                  {t("clusterBackups.checked")} <Ago iso={location.lastValidatedAt} />
                 </span>
               ) : null}
             </Row>
@@ -799,7 +799,7 @@ function useBackupFacts(backup: Schemas.VeleroBackup) {
     backup.bytes ? memory(backup.bytes) : "",
     backup.errors > 0 ? t("clusterBackups.errors", backup.errors) : "",
     backup.warnings > 0 ? t("clusterBackups.warnings", backup.warnings) : "",
-    backup.expires ? t("clusterBackups.keptUntil", formatDate(backup.expires, locale)) : "",
+    backup.expiresAt ? t("clusterBackups.keptUntil", formatDate(backup.expiresAt, locale)) : "",
   ].filter(Boolean)
 }
 

@@ -67,7 +67,7 @@ export function IncidentGroupRow({
       </Link>
     )
   const since = group.incidents
-    .map((i) => i.since)
+    .map((i) => i.startedAt)
     .filter((s): s is string => !!s)
     .toSorted()[0]
   const serviceLinkOf = (s: Affected) => (
@@ -96,7 +96,7 @@ export function IncidentGroupRow({
             items={group.incidents.map((i) => ({
               key: i.id,
               node: <span translate="no">{i.cause.params?.node ?? i.id}</span>,
-              note: i.since ? <Ago iso={i.since} /> : null,
+              note: i.startedAt ? <Ago iso={i.startedAt} /> : null,
             }))}
           />
         ) : null}

@@ -222,7 +222,10 @@ fn recovery_window(
     let lag_seconds = text(cluster, "/spec/postgresql/parameters/archive_timeout")
         .map_or(Some(300), |t| seconds(&t))
         .filter(|s| *s > 0)?;
-    Some(RecoveryWindow { first, lag_seconds })
+    Some(RecoveryWindow {
+        earliest_at: first,
+        lag_seconds,
+    })
 }
 
 /// When the condition `kind` last turned true, if it is true.
@@ -397,7 +400,7 @@ pub fn database(
             runs: found.runs,
             recovery_window,
         },
-        created: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
+        created_at: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),
@@ -461,8 +464,8 @@ fn findings_limited(
             provider: MODULE.id.to_owned(),
             targets: vec![target],
             outcome,
-            started: time(backup, "/status/startedAt"),
-            finished: time(backup, "/status/stoppedAt"),
+            started_at: time(backup, "/status/startedAt"),
+            finished_at: time(backup, "/status/stoppedAt"),
             message: text(backup, "/status/error"),
             restore_from: (outcome == Outcome::Succeeded)
                 .then(|| text(backup, "/status/backupId"))
@@ -647,7 +650,7 @@ mod tests {
             database("shop", pg, std::slice::from_ref(&store), &[], &[])
                 .backups
                 .recovery_window
-                .map(|w| (w.first, w.lag_seconds))
+                .map(|w| (w.earliest_at, w.lag_seconds))
         };
         let first: Timestamp = "2026-10-20T03:05:00Z".parse().unwrap();
         let cases = [

@@ -34,7 +34,7 @@
       }
     },
     "kind": "unexplained",
-    "lastSeen": "2026-10-21T11:55:00Z",
+    "lastSeenAt": "2026-10-21T11:55:00Z",
     "pods": [
       "demo-gateway-7d9c8b6f5-new1"
     ],

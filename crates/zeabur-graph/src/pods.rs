@@ -89,7 +89,7 @@ pub fn summary(namespace: &str, pod: &Pod, now: Option<Timestamp>) -> PodSummary
             .collect(),
         reason: reason(statuses),
         cause: None,
-        created: pod.metadata.creation_timestamp.as_ref().map(|time| time.0),
+        created_at: pod.metadata.creation_timestamp.as_ref().map(|time| time.0),
         node: pod.spec.as_ref().and_then(|spec| spec.node_name.clone()),
         container_statuses: status
             .and_then(|s| s.init_container_statuses.as_deref())
@@ -141,8 +141,8 @@ fn termination(terminated: &ContainerStateTerminated) -> ContainerTermination {
     ContainerTermination {
         reason: terminated.reason.clone(),
         exit_code: terminated.exit_code,
-        started: terminated.started_at.as_ref().map(|time| time.0),
-        finished: terminated.finished_at.as_ref().map(|time| time.0),
+        started_at: terminated.started_at.as_ref().map(|time| time.0),
+        finished_at: terminated.finished_at.as_ref().map(|time| time.0),
         message: terminated.message.clone(),
     }
 }

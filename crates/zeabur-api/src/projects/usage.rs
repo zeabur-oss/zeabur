@@ -63,7 +63,7 @@ pub struct ProjectUsage {
     pub state: MetricsState,
     /// When the newest sample was taken.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub timestamp: Option<Timestamp>,
+    pub sampled_at: Option<Timestamp>,
     /// The window CPU is averaged over, as metrics-server writes it (`15s`).
     #[serde(skip_serializing_if = "Option::is_none")]
     pub window: Option<String>,
@@ -97,7 +97,7 @@ pub(crate) async fn get(
     let mut usage = ProjectUsage {
         id: format!("projects/{project}/usage"),
         state: MetricsState::Available,
-        timestamp: None,
+        sampled_at: None,
         window: None,
         pods: Vec::new(),
         near_limit: crate::cluster::usage::NEAR_LIMIT,
@@ -106,8 +106,8 @@ pub(crate) async fn get(
     match read {
         Ok(Reading::Objects(objects)) => {
             let pods = zeabur_modules::metrics_server::pod_usage(&objects);
-            if let Some(newest) = pods.iter().max_by(|a, b| a.timestamp.cmp(&b.timestamp)) {
-                usage.timestamp = newest.timestamp;
+            if let Some(newest) = pods.iter().max_by(|a, b| a.sampled_at.cmp(&b.sampled_at)) {
+                usage.sampled_at = newest.sampled_at;
                 usage.window.clone_from(&newest.window);
             }
             usage.pods = pods.into_iter().map(|pod| view(&project, pod)).collect();

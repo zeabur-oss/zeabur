@@ -93,7 +93,7 @@ export function DatabaseRow({ project, database }: { project: string; database: 
           {t("common.sep")}
           {run ? (
             <>
-              {t("db.backup.last")} <Ago iso={run.finished ?? run.started} />
+              {t("db.backup.last")} <Ago iso={run.finishedAt ?? run.startedAt} />
             </>
           ) : database.backups.schedules.length > 0 ? (
             t("db.backup.noRun")

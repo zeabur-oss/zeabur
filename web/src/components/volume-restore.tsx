@@ -135,8 +135,8 @@ function RestoreRow({
         <StatusPill health={outcomeHealth[restore.outcome]} size="sm">
           {t(`backups.${restore.outcome}`)}
         </StatusPill>
-        {restore.started ? (
-          <Ago iso={restore.started} className="shrink-0 type-meta text-muted-foreground" />
+        {restore.startedAt ? (
+          <Ago iso={restore.startedAt} className="shrink-0 type-meta text-muted-foreground" />
         ) : null}
       </div>
       {restore.outcome === "failed" && restore.message ? (
@@ -295,7 +295,7 @@ function RestoreDrawer({
     const ask = {
       template,
       point,
-      when: formatTime(point.date, locale),
+      when: formatTime(point.takenAt, locale),
       claim,
       into,
       mount,
@@ -399,7 +399,7 @@ function SnapshotField({
         onValueChange={onChange}
         items={snapshots.map((s) => ({
           value: s.id,
-          label: `${formatTime(s.date, locale)}${t("common.sep")}${s.id.slice(0, 8)}`,
+          label: `${formatTime(s.takenAt, locale)}${t("common.sep")}${s.id.slice(0, 8)}`,
         }))}
       />
     </FormField>

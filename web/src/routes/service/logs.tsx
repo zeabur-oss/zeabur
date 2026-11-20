@@ -471,7 +471,7 @@ function History({
   const prefix = `${service.name}-`
   return (
     <LogView
-      lines={data.lines.map((line) => `${line.time} ${line.message}`)}
+      lines={data.lines.map((line) => `${line.writtenAt} ${line.message}`)}
       sources={data.lines.map((line) =>
         line.pod.startsWith(prefix) ? line.pod.slice(prefix.length) : line.pod,
       )}

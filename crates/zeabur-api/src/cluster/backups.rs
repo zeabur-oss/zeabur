@@ -623,7 +623,11 @@ pub(crate) async fn get(
         .collect();
     // Newest first; one Velero has not started yet is the newest.
     restores.sort_by(|a, b| {
-        (b.started.is_none(), &b.started, &b.name).cmp(&(a.started.is_none(), &a.started, &a.name))
+        (b.started_at.is_none(), &b.started_at, &b.name).cmp(&(
+            a.started_at.is_none(),
+            &a.started_at,
+            &a.name,
+        ))
     });
     restores.truncate(SHOWN);
     locations.sort_by(|a, b| (!a.default, &a.name).cmp(&(!b.default, &b.name)));

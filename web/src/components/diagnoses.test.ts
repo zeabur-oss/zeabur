@@ -123,7 +123,7 @@ describe("the status's plain word", () => {
           name: "worker",
           ready: true,
           restarts: 5,
-          lastTermination: { exitCode: 1, reason: "Error", finished: "2026-10-17T02:57:13Z" },
+          lastTermination: { exitCode: 1, reason: "Error", finishedAt: "2026-10-17T02:57:13Z" },
         },
       ],
       ...extra,

@@ -21,7 +21,7 @@ export function useUpgradeBadge(
   const date = useDate()
   const badge = upgrades?.badge
   if (!upgrades || !badge) return null
-  const eol = upgrades.release?.endOfLife
+  const eol = upgrades.release?.endOfLifeAt
   const words = {
     "end-of-life": () => t("cluster.endOfLife"),
     maintenance: () => t("cluster.endOfLifeOn", eol ? date(eol) : ""),

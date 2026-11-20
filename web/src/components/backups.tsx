@@ -73,7 +73,7 @@ export function CoverageRow({
           <StatusPill health={outcomeHealth[run.outcome]} size="sm">
             {t(`backups.${run.outcome}`)}
           </StatusPill>
-          <Ago iso={run.finished ?? run.started} className="type-meta text-muted-foreground" />
+          <Ago iso={run.finishedAt ?? run.startedAt} className="type-meta text-muted-foreground" />
         </span>
       ) : coverage.target.kind !== "namespace" && providers.length === 0 ? (
         <StatusPill health="warn" size="sm" dot={false}>
@@ -170,7 +170,7 @@ export function RunRow({ run }: { run: Schemas.BackupRun }) {
       <StatusPill health={outcomeHealth[run.outcome]} size="sm">
         {t(`backups.${run.outcome}`)}
       </StatusPill>
-      <Ago iso={run.finished ?? run.started} className="type-meta text-muted-foreground" />
+      <Ago iso={run.finishedAt ?? run.startedAt} className="type-meta text-muted-foreground" />
     </li>
   )
 }

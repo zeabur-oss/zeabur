@@ -84,7 +84,7 @@ export function EventList({
             <p className="text-sm break-words text-muted-foreground">{event.note}</p>
           )}
         </div>
-        <Ago iso={event.lastSeen} className="type-meta text-muted-foreground" />
+        <Ago iso={event.lastSeenAt} className="type-meta text-muted-foreground" />
       </li>
     )
   }

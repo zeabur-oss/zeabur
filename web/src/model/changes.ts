@@ -32,14 +32,14 @@ export function changesOf(
       .filter((r) => !joined.has(r.revision))
       .map((release): ChangeEntry => ({
         kind: "release",
-        at: release.created ?? undefined,
+        at: release.createdAt ?? undefined,
         release,
       })),
     ...(timeline
       ? []
       : events.filter(isWarning).map((event): ChangeEntry => ({
           kind: "warning",
-          at: event.lastSeen ?? undefined,
+          at: event.lastSeenAt ?? undefined,
           event,
         }))),
   ].toSorted(

@@ -74,10 +74,10 @@ pub struct Run {
     pub outcome: Outcome,
     /// When it started.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub started: Option<Timestamp>,
+    pub started_at: Option<Timestamp>,
     /// When it finished.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub finished: Option<Timestamp>,
+    pub finished_at: Option<Timestamp>,
     /// The provider's message, for a failure.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
@@ -91,7 +91,7 @@ impl Run {
     /// The time it is sorted by: finished, else started.
     #[must_use]
     pub fn time(&self) -> Option<Timestamp> {
-        self.finished.or(self.started)
+        self.finished_at.or(self.started_at)
     }
 }
 

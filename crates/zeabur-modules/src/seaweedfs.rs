@@ -183,7 +183,7 @@ pub struct ObjectStorage {
     pub buckets: Vec<Bucket>,
     /// When it was created.
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub created: Option<Timestamp>,
+    pub created_at: Option<Timestamp>,
     /// The object as written, without `status` and `managedFields`.
     #[schema(value_type = Object)]
     pub object: Value,
@@ -381,7 +381,7 @@ pub fn object_storage(
             phase: text(k, "/status/phase"),
         }),
         buckets,
-        created: seaweed.metadata.creation_timestamp.as_ref().map(|t| t.0),
+        created_at: seaweed.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(seaweed),
         pods: Vec::new(),
         name,

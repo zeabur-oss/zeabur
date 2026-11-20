@@ -45,7 +45,7 @@ pub enum LogHistoryState {
 #[serde(rename_all = "camelCase")]
 pub struct LogHistoryLine {
     /// When it was written.
-    pub time: Timestamp,
+    pub written_at: Timestamp,
     /// The pod that wrote it, which may be gone.
     pub pod: String,
     /// Its container.
@@ -176,14 +176,14 @@ fn lines(body: &[u8]) -> Vec<LogHistoryLine> {
         .filter_map(|line| serde_json::from_slice::<serde_json::Value>(line).ok())
         .filter_map(|entry| {
             Some(LogHistoryLine {
-                time: field(&entry, "_time").parse().ok()?,
+                written_at: field(&entry, "_time").parse().ok()?,
                 pod: field(&entry, "kubernetes.pod_name"),
                 container: field(&entry, "kubernetes.container_name"),
                 message: field(&entry, "_msg"),
             })
         })
         .collect();
-    lines.sort_by_key(|line| line.time);
+    lines.sort_by_key(|line| line.written_at);
     lines
 }
 
