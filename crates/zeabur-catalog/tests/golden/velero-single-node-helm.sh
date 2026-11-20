@@ -5,6 +5,10 @@ kubectl create namespace velero --dry-run=client -o yaml | kubectl apply -f -
 kubectl -n velero create secret generic velero-credentials \
   --from-literal=cloud='<credentials>' \
   --dry-run=client -o yaml | kubectl apply -f -
+# The CA certificate, in PEM, that signs the S3 endpoint's certificate, such as a self-hosted MinIO's own CA. Leave it empty for a store with a public certificate.
+kubectl -n velero create secret generic velero-ca \
+  --from-literal=ca.crt='<caCert>' \
+  --dry-run=client -o yaml | kubectl apply -f -
 # Kopia encrypts file-system backups with this password. Without the Secret, Velero uses its built-in password, which is public.
 kubectl -n velero create secret generic velero-repo-credentials \
   --from-literal=repository-password="$(openssl rand -hex 64)" \
@@ -51,6 +55,8 @@ configuration:
     - name: default
       provider: aws
       default: true
+      # The caCert input; Velero checks the store's certificate with it.
+      caCertRef: {name: velero-ca, key: ca.crt}
       config:
         region: us-east-1
         s3ForcePathStyle: "true"
@@ -75,6 +81,9 @@ cat > velero-inputs.yaml <<'ZEABUR_VALUES'
 configuration:
   backupStorageLocation:
   - bucket: <bucket>
+    caCertRef:
+      key: ca.crt
+      name: velero-ca
     config:
       customerKeyEncryptionSecret: velero-backup-key/key
       region: us-east-1
@@ -86,7 +95,7 @@ configuration:
 ZEABUR_VALUES
 helm upgrade --install velero velero \
   --repo https://vmware-tanzu.github.io/helm-charts \
-  --version 12.2.3 \
+  --version 12.2.5 \
   --namespace velero --create-namespace \
   --values velero-values.yaml \
   --values velero-single-node.yaml \

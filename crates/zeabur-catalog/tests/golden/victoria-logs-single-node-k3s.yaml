@@ -71,8 +71,9 @@ spec:
     requests: {cpu: 20m, memory: 16Mi}
     limits: {memory: 128Mi}
 ---
-# Only the collector, the metrics stack's vmagent (the operator's scrape of
-# /metrics) and Zeabur Proxy in the zeabur namespace reach the log store.
+# Only the collector and the metrics stack's vmagent (the operator's scrape
+# of /metrics) reach the log store. A reader that needs logs adds its own
+# policy; Kubernetes admits the union of every policy that selects a pod.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -89,11 +90,6 @@ spec:
             matchLabels: {app.kubernetes.io/name: vlagent, app.kubernetes.io/instance: collector}
         - podSelector:
             matchLabels: {app.kubernetes.io/name: vmagent}
-        # Both selectors: anyone can label a pod in their own namespace.
-        - namespaceSelector:
-            matchLabels: {kubernetes.io/metadata.name: zeabur}
-          podSelector:
-            matchLabels: {app.kubernetes.io/name: zeabur-proxy}
 ---
 # Zeabur's objects for victoria-logs: apply them once it is installed.
 apiVersion: networking.k8s.io/v1
