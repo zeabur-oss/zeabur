@@ -250,8 +250,8 @@ pub trait Cluster: Send + Sync {
         namespace: &'a str,
     ) -> Answer<'a, Option<Vec<ObjectMeta>>>;
 
-    /// What the person may do in `namespace`, from one `SelfSubjectRulesReview`: a hint for
-    /// which kinds a listing would be refused. See [`crate::objects`].
+    /// What the person may do in `namespace`, from one `SelfSubjectRulesReview`; read only through
+    /// [`AccessRules::read_only`]. See [`crate::objects`].
     fn access_rules<'a>(&'a self, namespace: &'a str) -> Answer<'a, AccessRules>;
 
     /// Whether kube-apiserver's authorizers allow the person `request`, from one

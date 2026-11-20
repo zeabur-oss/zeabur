@@ -11,10 +11,14 @@
 //!
 //! kube-apiserver authorises a request for `/api/v1/namespaces/{name}` as one in namespace
 //! `name` ([requestinfo]): RBAC rules from the ClusterRoleBindings and from the RoleBindings of
-//! that namespace apply. One `SelfSubjectRulesReview` for the namespace returns exactly those
-//! rules [k8s-ssrr], so `patch` on `namespaces` (all, or by `resourceNames` this one) answers
-//! it. The review is a hint, as it says itself: when another authorizer (a webhook) may allow
-//! more, it is incomplete and the answer is `unknown`; the apply's dry run decides.
+//! that namespace apply. One `SelfSubjectAccessReview` for `patch` on this Namespace answers it
+//! [k8s-ssar]; when the review fails, the answer is `unknown` and the apply's dry run decides.
+//!
+//! # Read-only
+//!
+//! A project is read-only when the namespace's `SelfSubjectRulesReview` [k8s-ssar] has no write
+//! verb on any resource. An incomplete review (another authorizer, such as a webhook, may allow
+//! more) gives unknown.
 //!
 //! RBAC cannot limit a patch to some labels: a rule names verbs, resources and object names,
 //! never fields [k8s-rbac-names]. So the right to adopt a namespace is also the right to change
@@ -28,7 +32,7 @@
 //! label, so there they also need that verb.
 //!
 //! [requestinfo]: https://github.com/kubernetes/kubernetes/blob/master/staging/src/k8s.io/apiserver/pkg/endpoints/request/requestinfo.go
-//! [k8s-ssrr]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/#checking-api-access
+//! [k8s-ssar]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/#checking-api-access
 //! [k8s-rbac-names]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#referring-to-resources
 //! [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
 
@@ -40,25 +44,24 @@ pub use deleting::{HeldObject, ProjectDeleting, RemainingContent, RemainingFinal
 use serde::Serialize;
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, MANAGE_VERB, is_system_namespace};
-use zeabur_core::problem::{MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{Access, AccessRules, ResourceRef};
+use zeabur_core::problem::{Denied, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_kube::{AccessRules, ClusterError, ResourceRef};
 use zeabur_model::{Origin, PodSecurityLevel, ProjectBuildLimits, ProjectDetails};
 
-use super::rights::ProjectRights;
 use crate::account::{AccountRole, role};
 use crate::error::{ApiError, get_read, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
-/// Whether the person may change something, as far as their RBAC rules tell.
+/// Whether the person may change something, as one `SelfSubjectAccessReview` answers.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum Permission {
-    /// A rule allows it.
+    /// kube-apiserver allows it.
     Allowed,
-    /// No rule allows it, and the rules are complete.
+    /// kube-apiserver refuses it.
     Denied,
-    /// No rule allows it, but another authorizer may: only trying tells.
+    /// The review failed: only trying tells.
     Unknown,
 }
 
@@ -73,12 +76,12 @@ impl Permission {
     }
 }
 
-impl From<Access> for Permission {
-    fn from(access: Access) -> Self {
-        match access {
-            Access::Allowed => Self::Allowed,
-            Access::Denied => Self::Denied,
-            Access::Unknown => Self::Unknown,
+impl From<Result<bool, ClusterError>> for Permission {
+    fn from(answer: Result<bool, ClusterError>) -> Self {
+        match answer {
+            Ok(true) => Self::Allowed,
+            Ok(false) => Self::Denied,
+            Err(_) => Self::Unknown,
         }
     }
 }
@@ -122,64 +125,21 @@ pub struct ProjectNamespace {
     /// Your role in the project, from your rights there; absent when they could not be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub role: Option<AccountRole>,
-    /// What you may change in the project. A project Viewer may change nothing, nor read the
-    /// pods' logs.
-    pub can: ProjectRights,
+    /// You may write nothing in the project: the namespace's rules review has no write verb.
+    /// Absent when the review failed or is incomplete.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub read_only: Option<bool>,
+    /// Whether you may read the pods' logs (`get` on `pods/log`), which a Viewer may not.
+    pub can_read_logs: Permission,
+    /// Whether you may read secret values (`get` on `secrets`), which a Viewer may not. A
+    /// read-only project may still allow it.
+    pub can_read_secrets: Permission,
     /// The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
     /// changes only its details.
     pub labels_guarded: bool,
-    /// Which Deployments, StatefulSets and DaemonSets the person may patch (change their
-    /// variables).
-    pub workload_patch: Vec<WorkloadPatch>,
     /// The project is being deleted: what is left, and what holds it back. Absent otherwise.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub deleting: Option<ProjectDeleting>,
-}
-
-/// Whether the person may patch the workloads of one kind.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct WorkloadPatch {
-    /// `Deployment`, `StatefulSet` or `DaemonSet`.
-    pub kind: String,
-    /// Every one of them.
-    pub all: Permission,
-    /// The ones a rule limited to names (`resourceNames`) allows.
-    pub names: Vec<String>,
-}
-
-fn workload_patch(rules: Option<&AccessRules>) -> Vec<WorkloadPatch> {
-    [
-        ("Deployment", "deployments"),
-        ("StatefulSet", "statefulsets"),
-        ("DaemonSet", "daemonsets"),
-    ]
-    .into_iter()
-    .map(|(kind, plural)| {
-        let resource = ResourceRef::new("apps", "v1", plural, kind);
-        let Some(rules) = rules else {
-            return WorkloadPatch {
-                kind: kind.to_owned(),
-                all: Permission::Unknown,
-                names: Vec::new(),
-            };
-        };
-        let has = |values: &[String], wanted: &str| values.iter().any(|v| v == "*" || v == wanted);
-        let names = rules
-            .rules
-            .iter()
-            .filter(|r| {
-                has(&r.verbs, "patch") && has(&r.groups, "apps") && has(&r.resources, plural)
-            })
-            .flat_map(|r| r.names.iter().cloned())
-            .collect();
-        WorkloadPatch {
-            kind: kind.to_owned(),
-            all: rules.allows("patch", &resource, "").into(),
-            names,
-        }
-    })
-    .collect()
 }
 
 /// A project's Namespace: adopted or not, its details, and whether you may change them.
@@ -213,22 +173,38 @@ pub(crate) async fn get(
     let capacity = super::writes::node_capacity(cluster.as_ref()).await;
     let metadata = namespace.metadata;
     let guarded = state.settings.identity.project_roles;
-    let workload_patch = workload_patch(rules.as_ref().ok());
-    let (can, role) = rules
-        .as_ref()
-        .map_or((ProjectRights::unknown(), None), |rules| {
-            (ProjectRights::of(rules), Some(role(rules)))
-        });
-    let (can_change, can_adopt) =
-        rules.map_or((Permission::Unknown, Permission::Unknown), |rules| {
-            let patch = Permission::from(rules.allows("patch", &resource, &project));
-            let manage = if guarded {
-                rules.allows(MANAGE_VERB, &resource, &project).into()
+    let read_only = rules.as_ref().ok().and_then(AccessRules::read_only);
+    let review = |verb: &str| Denied {
+        verb: verb.to_owned(),
+        group: String::new(),
+        resource: "namespaces".to_owned(),
+        name: Some(project.clone()),
+        namespace: Some(project.clone()),
+    };
+    let patch = review("patch");
+    let get = |resource: &str| Denied {
+        verb: "get".to_owned(),
+        group: String::new(),
+        resource: resource.to_owned(),
+        name: None,
+        namespace: Some(project.clone()),
+    };
+    let (logs, secrets) = (get("pods/log"), get("secrets"));
+    let (patch, logs, secrets, manage, role) = futures_util::join!(
+        cluster.review_access(&patch),
+        cluster.review_access(&logs),
+        cluster.review_access(&secrets),
+        async {
+            if guarded {
+                Permission::from(cluster.review_access(&review(MANAGE_VERB)).await)
             } else {
                 Permission::Allowed
-            };
-            (patch, patch.and(manage))
-        });
+            }
+        },
+        role(cluster.as_ref(), &project, read_only),
+    );
+    let can_change = Permission::from(patch);
+    let can_adopt = can_change.and(manage);
     Ok(Json(ProjectNamespace {
         origin: Origin::complete("v1", "Namespace", None, &project),
         adopted: metadata
@@ -248,9 +224,10 @@ pub(crate) async fn get(
             .and_then(|labels| labels.get(PodSecurityLevel::ENFORCE))
             .and_then(|level| PodSecurityLevel::parse(level)),
         role,
-        can,
+        read_only,
+        can_read_logs: logs.into(),
+        can_read_secrets: secrets.into(),
         labels_guarded: guarded,
-        workload_patch,
         deleting,
         name: project,
     }))

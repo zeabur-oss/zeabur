@@ -501,13 +501,14 @@ pub(crate) async fn setup_links(cluster: &dyn Cluster, settings: &IdentitySettin
 /// Whether the person may create invitations: the right every change here starts with.
 pub(crate) async fn can_manage(cluster: &dyn Cluster, namespace: &str) -> Permission {
     cluster
-        .access_rules(namespace)
+        .review_access(&request(
+            "create",
+            IdentityKind::Invitation,
+            namespace,
+            None,
+        ))
         .await
-        .map_or(Permission::Unknown, |rules| {
-            rules
-                .allows("create", &IdentityKind::Invitation.resource(), "")
-                .into()
-        })
+        .into()
 }
 
 /// A request Zeabur makes to `kind`, as a refusal names it.

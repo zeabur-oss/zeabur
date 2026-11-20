@@ -4,10 +4,9 @@ import type { Schemas } from "@/api/client"
 import { logsReadable } from "@/api/logs-access"
 import { diagnosisAction, type Diagnosis } from "@/components/diagnoses"
 import { en } from "@/i18n/en"
-import { unknownRights } from "@/model/rights"
 import { reasonWord, statusOf, type Service } from "@/model/service"
 
-const withLogs = (readLogs: Schemas.Permission) => ({ can: { ...unknownRights(), readLogs } })
+const withLogs = (canReadLogs: Schemas.Permission) => ({ canReadLogs })
 
 const diagnosis = (kind: Diagnosis["kind"], cause: string): Diagnosis => ({
   kind,

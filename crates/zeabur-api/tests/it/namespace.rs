@@ -10,6 +10,7 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_api::Settings;
     use zeabur_api::settings::IdentitySettings;
+    use zeabur_core::names::MANAGE_VERB;
     use zeabur_core::problem::KubernetesStatus;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
@@ -171,19 +172,6 @@ mod tests {
         assert_eq!(cluster.inspect(|s| s.writes.len()), Some(0));
     }
 
-    /// What `zeabur-project-developer` holds on the Namespace through its RoleBinding.
-    fn developer_rules() -> AccessRules {
-        AccessRules {
-            rules: vec![AccessRule {
-                verbs: vec!["get".to_owned(), "patch".to_owned()],
-                groups: vec![String::new()],
-                resources: vec!["namespaces".to_owned()],
-                names: Vec::new(),
-            }],
-            incomplete: false,
-        }
-    }
-
     fn with_roles(project_roles: bool) -> Settings {
         Settings {
             identity: IdentitySettings {
@@ -200,8 +188,7 @@ mod tests {
     async fn adopting_needs_the_manage_verb_only_where_the_policy_guards_the_labels() {
         let cluster = cluster();
         cluster.update(|s| {
-            s.access_rules
-                .insert("shop".to_owned(), Some(developer_rules()));
+            s.refused_rights.insert(format!("{MANAGE_VERB} namespaces"));
         });
         let uri = "/api/v1/projects/shop/namespace";
         let (status, guarded) = send(
@@ -222,12 +209,6 @@ mod tests {
             ),
             (&json!("allowed"), &json!("denied"), &json!(true))
         );
-        // The rules hold no `pods/log`, as for a Viewer.
-        assert_eq!(guarded["can"]["readLogs"], "denied");
-        assert_eq!(
-            guarded["workloadPatch"][0],
-            json!({"kind": "Deployment", "all": "denied", "names": []})
-        );
         let (_, open) = send(
             &TestApi::new(&cluster)
                 .with_settings(with_roles(false))
@@ -246,11 +227,7 @@ mod tests {
             (&json!("allowed"), &json!("allowed"), &json!(false))
         );
 
-        cluster.update(|s| {
-            let mut manager = developer_rules();
-            manager.rules[0].verbs.push("zeabur-manage".to_owned());
-            s.access_rules.insert("shop".to_owned(), Some(manager));
-        });
+        cluster.update(|s| s.refused_rights.clear());
         let (_, manager) = send(
             &TestApi::new(&cluster)
                 .with_settings(with_roles(true))
@@ -261,31 +238,6 @@ mod tests {
         )
         .await;
         assert_eq!(manager["canAdopt"], "allowed");
-
-        // A rule limited to names allows patching only those.
-        cluster.update(|s| {
-            let mut named = developer_rules();
-            named.rules.push(AccessRule {
-                verbs: vec!["patch".to_owned()],
-                groups: vec!["apps".to_owned()],
-                resources: vec!["deployments".to_owned()],
-                names: vec!["web".to_owned()],
-            });
-            s.access_rules.insert("shop".to_owned(), Some(named));
-        });
-        let (_, named) = send(
-            &TestApi::new(&cluster)
-                .with_settings(with_roles(true))
-                .router(),
-            "GET",
-            uri,
-            None,
-        )
-        .await;
-        assert_eq!(
-            named["workloadPatch"][0],
-            json!({"kind": "Deployment", "all": "denied", "names": ["web"]})
-        );
     }
 
     fn node(name: &str, memory: &str, cpu: &str) -> zeabur_kube::k8s_openapi::api::core::v1::Node {
@@ -343,103 +295,74 @@ mod tests {
         assert_eq!(status, StatusCode::FORBIDDEN, "{problem}");
     }
 
-    fn rule(verbs: &[&str], group: &str, resources: &[&str]) -> AccessRule {
+    fn rule(verbs: &[&str], group: &str) -> AccessRule {
         AccessRule {
             verbs: verbs.iter().map(|&v| v.to_owned()).collect(),
             groups: vec![group.to_owned()],
-            resources: resources.iter().map(|&r| r.to_owned()).collect(),
-            names: Vec::new(),
         }
     }
 
-    /// A Viewer's rules: read what runs, change nothing.
+    /// A Viewer's rules: read what runs, change nothing, and ask about themselves.
     fn viewer_rules() -> AccessRules {
         AccessRules {
             rules: vec![
-                rule(
-                    &["get", "list", "watch"],
-                    "",
-                    &["pods", "services", "configmaps"],
-                ),
-                rule(&["get", "list", "watch"], "apps", &["deployments"]),
+                rule(&["get", "list", "watch"], ""),
+                rule(&["get", "list", "watch"], "apps"),
+                rule(&["create"], "authorization.k8s.io"),
             ],
             incomplete: false,
         }
     }
 
-    /// The namespace says what the person may change there and their role, from the one review;
-    /// what an incomplete review does not allow, or a failed one, is unknown.
+    /// A project is read-only when its rules review has no write verb; an incomplete or failed
+    /// review leaves it unknown.
     #[tokio::test]
-    async fn the_namespace_says_what_the_person_may_change_and_their_role() {
+    async fn the_namespace_says_whether_the_project_is_read_only_and_the_role() {
         let cluster = cluster();
+        cluster.update(|s| {
+            s.refused_rights.insert("create rolebindings".to_owned());
+        });
         let uri = "/api/v1/projects/shop/namespace";
         let app = app(&cluster);
+        let shown = |rules: Option<AccessRules>| {
+            cluster.update(|s| {
+                s.access_rules.insert("shop".to_owned(), rules);
+            });
+            async {
+                let (status, body) = send(&app, "GET", uri, None).await;
+                assert_eq!(status, StatusCode::OK, "{body}");
+                (body["readOnly"].clone(), body["role"].clone())
+            }
+        };
 
-        cluster.update(|s| {
-            s.access_rules
-                .insert("shop".to_owned(), Some(viewer_rules()));
-        });
-        let (status, viewer) = send(&app, "GET", uri, None).await;
-        assert_eq!(status, StatusCode::OK, "{viewer}");
-        assert_eq!(viewer["role"], "viewer");
-        for (right, answer) in viewer["can"].as_object().unwrap() {
-            assert_eq!(answer, "denied", "{right}");
-        }
-
-        cluster.update(|s| {
-            let mut developer = viewer_rules();
-            developer.rules.extend([
-                rule(&["get"], "", &["pods/log", "secrets"]),
-                rule(&["create"], "", &["pods/exec"]),
-                rule(
-                    &["create", "update", "patch", "delete"],
-                    "apps",
-                    &["deployments"],
-                ),
-                rule(&["create", "update", "patch", "delete"], "", &["services"]),
-            ]);
-            s.access_rules.insert("shop".to_owned(), Some(developer));
-        });
-        let (_, developer) = send(&app, "GET", uri, None).await;
-        assert_eq!(developer["role"], "developer");
-        let can = &developer["can"];
+        let viewer = viewer_rules();
         assert_eq!(
-            (
-                &can["deploy"],
-                &can["changeServices"],
-                &can["deleteServices"]
-            ),
-            (&json!("allowed"), &json!("allowed"), &json!("allowed"))
+            shown(Some(viewer.clone())).await,
+            (json!(true), json!("viewer"))
         );
-        assert_eq!(
-            (&can["readLogs"], &can["openTerminal"], &can["readSecrets"]),
-            (&json!("allowed"), &json!("allowed"), &json!("allowed"))
-        );
-        assert_eq!(
-            (&can["changeDomains"], &can["changeMembers"], &can["scale"]),
-            (&json!("denied"), &json!("denied"), &json!("denied"))
-        );
-
         cluster.update(|s| {
-            let mut incomplete = viewer_rules();
-            incomplete.incomplete = true;
-            s.access_rules.insert("shop".to_owned(), Some(incomplete));
+            s.refused_rights.insert("get pods/log".to_owned());
         });
-        let (_, incomplete) = send(&app, "GET", uri, None).await;
-        assert_eq!(incomplete["can"]["deploy"], "unknown");
-        assert_eq!(incomplete["role"], "viewer");
-
-        cluster.update(|s| {
-            s.access_rules.insert("shop".to_owned(), None);
-        });
-        let (status, failed) = send(&app, "GET", uri, None).await;
-        assert_eq!(status, StatusCode::OK, "{failed}");
-        assert!(failed.get("role").is_none(), "{failed}");
-        assert_eq!(failed["can"]["changeMembers"], "unknown");
+        let (_, logs) = send(&app, "GET", uri, None).await;
+        assert_eq!(logs["canReadLogs"], "denied");
+        // A read-only project may still let the person read secret values.
+        assert_eq!(logs["canReadSecrets"], "allowed");
+        let mut developer = viewer.clone();
+        developer.rules.push(rule(&["patch"], "apps"));
+        assert_eq!(
+            shown(Some(developer)).await,
+            (json!(false), json!("developer"))
+        );
+        let incomplete = AccessRules {
+            incomplete: true,
+            ..viewer
+        };
+        assert_eq!(shown(Some(incomplete)).await, (Value::Null, Value::Null));
+        assert_eq!(shown(None).await, (Value::Null, Value::Null));
     }
 
-    /// The cluster says whether the person may install components, from a review in
-    /// `kube-system`.
+    /// Cluster actions are cluster-wide access reviews: every right in `kube-system`, as a
+    /// RoleBinding of `cluster-admin` there gives, allows none of them.
     #[tokio::test]
     async fn the_cluster_says_whether_the_person_may_change_nodes_and_backups() {
         let cluster = cluster();
@@ -451,13 +374,9 @@ mod tests {
             json!({"changeNodes": "allowed", "changeBackups": "allowed"})
         );
         cluster.update(|s| {
-            s.access_rules.insert(
-                "kube-system".to_owned(),
-                Some(AccessRules {
-                    rules: vec![rule(&["get", "list"], "", &["nodes", "namespaces"])],
-                    incomplete: false,
-                }),
-            );
+            s.access_rules
+                .insert("kube-system".to_owned(), Some(AccessRules::everything()));
+            s.cluster_wide_denied = true;
         });
         let (_, member) = send(&app, "GET", "/api/v1/cluster", None).await;
         assert_eq!(

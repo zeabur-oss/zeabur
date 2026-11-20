@@ -2416,7 +2416,7 @@ export type ClientFrame = {
 }
 
 /**
- * Whether the person may change something, as far as their RBAC rules tell.
+ * Whether the person may change something, as one `SelfSubjectAccessReview` answers.
  */
 export type Permission = (typeof Permission)[keyof typeof Permission]
 
@@ -2427,12 +2427,13 @@ export const Permission = {
 } as const
 
 /**
- * What the person may change in the cluster itself.
+ * What the person may change in the cluster itself, one cluster-wide `SelfSubjectAccessReview`
+ * per action. A binding in one namespace, even of `cluster-admin`, allows none of them.
  */
 export type ClusterRights = {
   /**
-   * Set up Velero backups: `create` on `schedules.velero.io`. The backups page asks again in
-   * Velero's own namespace.
+   * Set up Velero backups: `create` on `schedules.velero.io` in every namespace. The backups
+   * page asks again in Velero's own namespace.
    */
   changeBackups: Permission
   /** Change nodes (labels, taints, cordon): `patch` on nodes. */
@@ -4627,8 +4628,7 @@ export const CopyKept = {
 } as const
 
 /**
- * Whether the person may list a kind, as one `SelfSubjectRulesReview` hints, or as a list
- * answered.
+ * Whether the person may list a kind, as a list answered.
  */
 export type ObjectAccess = (typeof ObjectAccess)[keyof typeof ObjectAccess]
 
@@ -4642,7 +4642,7 @@ export const ObjectAccess = {
  * A kind that can be created in a project.
  */
 export type CreatableKind = {
-  /** Whether the person may create it, as the review hints. */
+  /** Whether the person may create it: denied in a read-only project, else unknown. */
   access: ObjectAccess
   /** Not one of Kubernetes' own groups: a custom resource, or an extension API. */
   custom: boolean
@@ -8965,87 +8965,12 @@ export type ProjectList = {
 }
 
 /**
- * What the person may change in one project.
- */
-export type ProjectRights = {
-  /** Back up databases: `create` on an operator's backups. */
-  backUpDatabases: Permission
-  /** Back up volumes: `create` on K8up's schedules, backups and pod configs. */
-  backUpVolumes: Permission
-  /** Build again: `patch` on Zeabur Builder's builds. */
-  build: Permission
-  /** Create and change ConfigMaps: `create` and `patch` on configmaps. */
-  changeConfig: Permission
-  /** Create, change and delete databases of any operator Zeabur knows. */
-  changeDatabases: Permission
-  /** Add, change and remove domains: `create`, `patch` and `delete` on ingresses or HTTPRoutes. */
-  changeDomains: Permission
-  /** Give people access to the project: `create` on rolebindings. */
-  changeMembers: Permission
-  /** Change network policies: `create` and `patch` on networkpolicies. */
-  changeNetworkPolicies: Permission
-  /**
-   * Create, change and delete object storage: `create`, `patch` and `delete` on the `SeaweedFS`
-   * Operator's seaweeds.
-   */
-  changeObjectStorage: Permission
-  /** Create and change Secrets: `create` and `patch` on secrets. */
-  changeSecrets: Permission
-  /** Change, restart and redeploy services: `patch` on a workload kind. */
-  changeServices: Permission
-  /** Add and change volumes: `create` and `patch` on persistentvolumeclaims. */
-  changeStorage: Permission
-  /** Delete services: `delete` on a workload kind. */
-  deleteServices: Permission
-  /** Create services: `create` on deployments and services. */
-  deploy: Permission
-  /** Deploy a service from Git: `create` on deployments, services and Zeabur Builder's builds. */
-  deployFromGit: Permission
-  /** Open a terminal in a container: `create` on `pods/exec`. */
-  openTerminal: Permission
-  /**
-   * Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
-   * on `pods/portforward`.
-   */
-  portForward: Permission
-  /** Read the pods' logs: `get` on `pods/log`. */
-  readLogs: Permission
-  /** Read Secret values: `get` on secrets. */
-  readSecrets: Permission
-  /**
-   * Restore volumes from their backups: `create` on K8up's restores and on
-   * persistentvolumeclaims. A Developer has both. An in-place restore overwrites the volume,
-   * and whoever may restore can read every backup in the project's repository.
-   */
-  restoreVolumes: Permission
-  /** Change the number of replicas: `patch` on `deployments/scale` or `statefulsets/scale`. */
-  scale: Permission
-}
-
-/**
- * Whether the person may patch the workloads of one kind.
- */
-export type WorkloadPatch = {
-  /** Every one of them. */
-  all: Permission
-  /** `Deployment`, `StatefulSet` or `DaemonSet`. */
-  kind: string
-  /** The ones a rule limited to names (`resourceNames`) allows. */
-  names: string[]
-}
-
-/**
  * A project's Namespace.
  */
 export type ProjectNamespace = ProjectDetails &
   ProjectBuildLimits & {
     /** It carries Zeabur's project label. */
     adopted: boolean
-    /**
-     * What you may change in the project. A project Viewer may change nothing, nor read the
-     * pods' logs.
-     */
-    can: ProjectRights
     /**
      * Whether the person may adopt it or let it go: patch it, and where the admission policy
      * guards its labels, also `zeabur-manage` it. Changing its Pod Security level or its build
@@ -9054,6 +8979,13 @@ export type ProjectNamespace = ProjectDetails &
     canAdopt: Permission
     /** Whether the person may patch the Namespace: change its details. */
     canChange: Permission
+    /** Whether you may read the pods' logs (`get` on `pods/log`), which a Viewer may not. */
+    canReadLogs: Permission
+    /**
+     * Whether you may read secret values (`get` on `secrets`), which a Viewer may not. A
+     * read-only project may still allow it.
+     */
+    canReadSecrets: Permission
     deleting?: ProjectDeleting | null
     /**
      * The chart's admission policy is installed: patching the Namespace without `zeabur-manage`
@@ -9079,14 +9011,15 @@ export type ProjectNamespace = ProjectDetails &
     /** The Namespace. */
     origin: Origin
     podSecurity?: PodSecurityLevel | null
+    /**
+     * You may write nothing in the project: the namespace's rules review has no write verb.
+     * Absent when the review failed or is incomplete.
+     * @nullable
+     */
+    readOnly?: boolean | null
     role?: AccountRole | null
     /** Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted. */
     system: boolean
-    /**
-     * Which Deployments, StatefulSets and DaemonSets the person may patch (change their
-     * variables).
-     */
-    workloadPatch: WorkloadPatch[]
   }
 
 /**
@@ -12839,8 +12772,8 @@ export const getListObjectsUrl = (project: string, params?: ListObjectsParams) =
 /**
  * @summary Every listable namespaced kind of a project, kinds first: the usual kinds (or only those named
 in `kinds`) and, with `all`, every kind that controllers do not generate are read (names, ages
-and owners only); the rest come back unread. Each kind carries an access hint; kinds refused
-when read are named in `unreadable`. With `label`, only the objects with that label.
+and owners only); the rest come back unread. Kinds refused when read are named in
+`unreadable`. With `label`, only the objects with that label.
  */
 export const listObjects = async (
   project: string,

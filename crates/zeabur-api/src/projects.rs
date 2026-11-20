@@ -48,7 +48,6 @@ pub mod namespace;
 pub mod network_policy;
 pub mod object_storage;
 pub mod oci_push;
-pub mod rights;
 pub mod source_upload;
 pub mod storage;
 pub(crate) mod templates;

@@ -982,6 +982,24 @@ mod tests {
         });
         let (status, ..) = call(app(&cluster), "GET", "/api/v1/projects/shop/objects").await;
         assert_eq!(status, StatusCode::FORBIDDEN);
+
+        // Every usual kind refused, but the rules review lists a custom kind: the refusals are
+        // answered kind by kind, not as a project out of reach.
+        cluster.update(|s| {
+            s.access_rules.insert(
+                "shop".to_owned(),
+                Some(zeabur_kube::AccessRules {
+                    rules: vec![zeabur_kube::AccessRule {
+                        verbs: vec!["list".to_owned()],
+                        groups: vec!["example.com".to_owned()],
+                    }],
+                    incomplete: false,
+                }),
+            );
+        });
+        let (status, _, body) = call(app(&cluster), "GET", "/api/v1/projects/shop/objects").await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_ne!(json(&body)["unreadable"], serde_json::json!([]));
     }
 
     #[tokio::test]

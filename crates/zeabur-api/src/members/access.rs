@@ -366,7 +366,6 @@ pub(crate) mod tests {
         ANNOTATION_DESCRIPTION, ANNOTATION_DISPLAY_NAME, ANNOTATION_ICON, LABEL_PROJECT,
         MANAGE_VERB,
     };
-    use zeabur_kube::{AccessRule, AccessRules};
 
     use super::*;
 
@@ -525,7 +524,7 @@ pub(crate) mod tests {
 
     #[derive(Clone, Deserialize)]
     #[serde(rename_all = "camelCase")]
-    struct Rule {
+    pub(crate) struct Rule {
         api_groups: Vec<String>,
         resources: Vec<String>,
         verbs: Vec<String>,
@@ -543,9 +542,8 @@ pub(crate) mod tests {
         serde_saphyr::from_str(file).unwrap()
     }
 
-    /// The roles Zeabur binds, as `SelfSubjectRulesReview` would report them once Kubernetes has
-    /// aggregated them.
-    pub(crate) fn roles() -> BTreeMap<String, AccessRules> {
+    /// The roles Zeabur binds, with their rules once Kubernetes has aggregated them.
+    pub(crate) fn roles() -> BTreeMap<String, Vec<Rule>> {
         let mut sets = rule_sets();
         let gathered = gathered();
         for name in gathered.values().flatten() {
@@ -561,32 +559,16 @@ pub(crate) mod tests {
         sets.retain(|name, _| !gathered.values().flatten().any(|n| n == name));
         bound.extend(sets);
         bound
-            .into_iter()
-            .map(|(name, listed)| {
-                let rules = listed
-                    .into_iter()
-                    .map(|r| AccessRule {
-                        verbs: r.verbs,
-                        groups: r.api_groups,
-                        resources: r.resources,
-                        names: Vec::new(),
-                    })
-                    .collect();
-                (
-                    name,
-                    AccessRules {
-                        rules,
-                        incomplete: false,
-                    },
-                )
-            })
-            .collect()
     }
 
-    fn allows(rules: &AccessRules, verb: &str, resource: &str) -> bool {
+    /// Whether the chart's `rules` name `verb` on `resource` (`plural.group`). This reads the
+    /// chart's own files; what a person may do is kube-apiserver's answer.
+    fn allows(rules: &[Rule], verb: &str, resource: &str) -> bool {
         let (resource, group) = resource.split_once('.').unwrap_or((resource, ""));
-        rules.allows(verb, &ResourceRef::new(group, "v1", resource, ""), "")
-            == zeabur_kube::Access::Allowed
+        let has = |values: &[String], wanted: &str| values.iter().any(|v| v == "*" || v == wanted);
+        rules.iter().any(|r| {
+            has(&r.verbs, verb) && has(&r.api_groups, group) && has(&r.resources, resource)
+        })
     }
 
     /// What a project page lists (`namespace_objects`, events, releases).
@@ -621,8 +603,13 @@ pub(crate) mod tests {
             ]
         );
         for (name, role) in &roles {
-            for rule in &role.rules {
-                for value in rule.verbs.iter().chain(&rule.groups).chain(&rule.resources) {
+            for rule in role {
+                for value in rule
+                    .verbs
+                    .iter()
+                    .chain(&rule.api_groups)
+                    .chain(&rule.resources)
+                {
                     assert_ne!(value, "*", "{name}");
                 }
             }

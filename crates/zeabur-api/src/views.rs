@@ -30,6 +30,8 @@ use zeabur_model::{
     Endpoint, Health, Origin, Project, ProjectDetails, ProjectHealth, Route, Service, WorkloadKind,
 };
 
+use crate::projects::namespace::Permission;
+
 /// A kind the person could not read, and kube-apiserver's answer.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -78,7 +80,42 @@ pub struct Cluster {
     /// Where a service deployed from Git keeps its images.
     pub builds: crate::settings::BuildSettings,
     /// What you may change in the cluster itself.
-    pub can: crate::projects::rights::ClusterRights,
+    pub can: ClusterRights,
+}
+
+/// What the person may change in the cluster itself, one cluster-wide `SelfSubjectAccessReview`
+/// per action. A binding in one namespace, even of `cluster-admin`, allows none of them.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct ClusterRights {
+    /// Change nodes (labels, taints, cordon): `patch` on nodes.
+    pub change_nodes: Permission,
+    /// Set up Velero backups: `create` on `schedules.velero.io` in every namespace. The backups
+    /// page asks again in Velero's own namespace.
+    pub change_backups: Permission,
+}
+
+impl ClusterRights {
+    /// Asks `cluster` for each right.
+    pub async fn read(cluster: &dyn zeabur_kube::Cluster) -> Self {
+        let review = |verb: &str, group: &str, resource: &str| zeabur_core::problem::Denied {
+            verb: verb.to_owned(),
+            group: group.to_owned(),
+            resource: resource.to_owned(),
+            name: None,
+            namespace: None,
+        };
+        let nodes = review("patch", "", "nodes");
+        let schedules = review("create", "velero.io", "schedules");
+        let (nodes, schedules) = futures_util::join!(
+            cluster.review_access(&nodes),
+            cluster.review_access(&schedules)
+        );
+        Self {
+            change_nodes: nodes.into(),
+            change_backups: schedules.into(),
+        }
+    }
 }
 
 /// Zeabur itself: its version, and what the interface needs to say how to upgrade it.
@@ -259,7 +296,7 @@ pub struct ProjectList {
     /// Adopted projects first, then the other namespaces, each sorted by name.
     pub items: Vec<ProjectSummary>,
     /// Whether the person may create a project (`create` on `namespaces`, cluster-wide).
-    pub can_create: crate::projects::namespace::Permission,
+    pub can_create: Permission,
 }
 
 /// A project: its services, the resources they use and how they relate, read as the person.

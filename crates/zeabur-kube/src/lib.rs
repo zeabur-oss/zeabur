@@ -46,7 +46,7 @@ mod write;
 pub use k8s_openapi;
 pub use kube::api::DynamicObject;
 pub use logs::unavailable_log;
-pub use objects::{Access, AccessRule, AccessRules, ResourceRef, ServedResource};
+pub use objects::{AccessRule, AccessRules, ResourceRef, ServedResource};
 pub use port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterExt, ClusterFacts, ClusterPod,
     ClusterPods, ContainerResources, ExecRequest, ExecSession, ExecStream, ExitStatus,

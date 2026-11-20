@@ -160,9 +160,9 @@ pub(crate) async fn get(
     Person(cluster): Person,
     headers: HeaderMap,
 ) -> Result<Json<Cluster>, ApiError> {
-    let (version, rules, (suffixes, ..)) = futures_util::future::join3(
+    let (version, can, (suffixes, ..)) = futures_util::future::join3(
         cluster.version(),
-        cluster.access_rules("kube-system"),
+        crate::views::ClusterRights::read(cluster.as_ref()),
         crate::settings::domains::effective(cluster.as_ref(), &state.settings),
     )
     .await;
@@ -178,7 +178,7 @@ pub(crate) async fn get(
             ..state.settings.domains.clone()
         },
         builds: state.settings.builds.clone(),
-        can: crate::projects::rights::ClusterRights::of(rules.as_ref().ok()),
+        can,
     }))
 }
 

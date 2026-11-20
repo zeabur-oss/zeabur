@@ -31,10 +31,10 @@
 //! costs less but may be slightly behind the latest write [rv-semantics]. A listing of what
 //! exists is a fair use of that; a page about one object reads it fresh.
 //!
-//! [`Cluster::access_rules`](crate::Cluster::access_rules) asks one `SelfSubjectRulesReview`
-//! which kinds the person may list in a namespace [ssrr], so a page can mark the kinds it would
-//! only be refused. The answer is a hint: it may be incomplete when another authorizer (a
-//! webhook) decides too, and then a kind is listed to find out.
+//! [`Cluster::access_rules`](crate::Cluster::access_rules) asks one `SelfSubjectRulesReview` of a
+//! namespace [ssrr], which says only whether the person may write there at all. It may be
+//! incomplete when another authorizer (a webhook) decides too. A right that must be known before
+//! a click is one `SelfSubjectAccessReview`; the rest is decided by the dry run.
 //!
 //! [authz]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/
 //! [rv-semantics]: https://kubernetes.io/docs/reference/using-api/api-concepts/#semantics-for-get-and-list
@@ -368,29 +368,13 @@ pub(crate) async fn list_served_metadata(
     }
 }
 
-/// Whether the person may list a kind, as a `SelfSubjectRulesReview` hints.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Access {
-    /// A rule allows listing it.
-    Allowed,
-    /// No rule allows it, and the review is complete.
-    Denied,
-    /// No rule allows it, but the review is incomplete (or could not be made): only a list
-    /// tells.
-    Unknown,
-}
-
-/// One rule of a `SelfSubjectRulesReview`, as far as listing needs it.
+/// One rule of a `SelfSubjectRulesReview`, as far as [`AccessRules::read_only`] needs it.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct AccessRule {
     /// Verbs (`list`, `*`).
     pub verbs: Vec<String>,
     /// API groups (`""` for the core group, `*`).
     pub groups: Vec<String>,
-    /// Resources (`deployments`, `*`).
-    pub resources: Vec<String>,
-    /// Names the rule is limited to; a limited rule does not allow listing.
-    pub names: Vec<String>,
 }
 
 /// What a person may do in a namespace, from one `SelfSubjectRulesReview`.
@@ -410,50 +394,55 @@ impl AccessRules {
             rules: vec![AccessRule {
                 verbs: vec!["*".to_owned()],
                 groups: vec!["*".to_owned()],
-                resources: vec!["*".to_owned()],
-                names: Vec::new(),
             }],
             incomplete: false,
         }
     }
 
-    /// Whether these rules let the person list `resource`.
+    /// Whether the person may only read in the namespace: no rule has a write verb.
+    /// `None` when the review is incomplete and no rule writes, since another authorizer may
+    /// allow a write. Creating the self reviews every signed-in person may make
+    /// (`system:basic-user`) is not a write.
     #[must_use]
-    pub fn list(&self, resource: &ResourceRef) -> Access {
-        let has = |values: &[String], wanted: &str| values.iter().any(|v| v == "*" || v == wanted);
-        let allowed = self.rules.iter().any(|rule| {
-            rule.names.is_empty()
-                && has(&rule.verbs, "list")
-                && has(&rule.groups, &resource.group)
-                && has(&rule.resources, &resource.resource)
-        });
-        self.answer(allowed)
+    pub fn read_only(&self) -> Option<bool> {
+        self.grants(&WRITE_VERBS).map(|writes| !writes)
     }
 
-    /// Whether these rules let the person `verb` the object `name` of `resource`: a rule limited
-    /// to names (`resourceNames`) allows it when it names `name`.
+    /// Whether the person may list some resource in the namespace. `None` when the review is
+    /// incomplete and no rule lists.
     #[must_use]
-    pub fn allows(&self, verb: &str, resource: &ResourceRef, name: &str) -> Access {
-        let has = |values: &[String], wanted: &str| values.iter().any(|v| v == "*" || v == wanted);
-        let allowed = self.rules.iter().any(|rule| {
-            (rule.names.is_empty() || rule.names.iter().any(|n| n == name))
-                && has(&rule.verbs, verb)
-                && has(&rule.groups, &resource.group)
-                && has(&rule.resources, &resource.resource)
-        });
-        self.answer(allowed)
+    pub fn lists_any(&self) -> Option<bool> {
+        self.grants(&["*", "list"])
     }
 
-    const fn answer(&self, allowed: bool) -> Access {
-        if allowed {
-            Access::Allowed
-        } else if self.incomplete {
-            Access::Unknown
-        } else {
-            Access::Denied
-        }
+    /// Whether a rule outside the self-review groups has one of `verbs`; `None` when none does
+    /// but the review is incomplete.
+    fn grants(&self, verbs: &[&str]) -> Option<bool> {
+        let granted = self.rules.iter().any(|rule| {
+            rule.verbs.iter().any(|v| verbs.contains(&v.as_str()))
+                && rule
+                    .groups
+                    .iter()
+                    .any(|g| !SELF_REVIEW_GROUPS.contains(&g.as_str()))
+        });
+        (granted || !self.incomplete).then_some(granted)
     }
 }
+
+/// Verbs that change objects ([verbs]).
+///
+/// [verbs]: https://kubernetes.io/docs/reference/access-authn-authz/authorization/#determine-the-request-verb
+const WRITE_VERBS: [&str; 6] = [
+    "*",
+    "create",
+    "update",
+    "patch",
+    "delete",
+    "deletecollection",
+];
+
+/// Groups of the reviews a person makes about themselves.
+const SELF_REVIEW_GROUPS: [&str; 2] = ["authorization.k8s.io", "authentication.k8s.io"];
 
 pub(crate) async fn review_access(
     client: &kube::Client,
@@ -524,8 +513,6 @@ pub(crate) async fn access_rules(
             .map(|rule| AccessRule {
                 verbs: rule.verbs,
                 groups: rule.api_groups.unwrap_or_default(),
-                resources: rule.resources.unwrap_or_default(),
-                names: rule.resource_names.unwrap_or_default(),
             })
             .collect(),
     })
@@ -570,40 +557,44 @@ async fn request_object(
 mod tests {
     use super::*;
 
+    fn rule(verbs: &[&str], groups: &[&str]) -> AccessRule {
+        AccessRule {
+            verbs: verbs.iter().map(|v| (*v).to_owned()).collect(),
+            groups: groups.iter().map(|g| (*g).to_owned()).collect(),
+        }
+    }
+
     #[test]
-    fn access_rules_hint_which_kinds_may_be_listed() {
-        let deployments = ResourceRef::new("apps", "v1", "deployments", "Deployment");
-        let secrets = ResourceRef::new("", "v1", "secrets", "Secret");
-        let rules = AccessRules {
+    fn a_namespace_without_a_write_verb_is_read_only() {
+        let viewer = AccessRules {
             rules: vec![
-                AccessRule {
-                    verbs: vec!["get".into(), "list".into()],
-                    groups: vec!["apps".into()],
-                    resources: vec!["*".into()],
-                    names: Vec::new(),
-                },
-                // A rule limited to names never allows a list.
-                AccessRule {
-                    verbs: vec!["*".into()],
-                    groups: vec![String::new()],
-                    resources: vec!["secrets".into()],
-                    names: vec!["one".into()],
-                },
+                rule(&["get", "list", "watch"], &["*"]),
+                rule(&["create"], &["authorization.k8s.io"]),
             ],
             incomplete: false,
         };
-        assert_eq!(rules.list(&deployments), Access::Allowed);
-        assert_eq!(rules.list(&secrets), Access::Denied);
-        // A rule limited to names allows a verb on the objects it names.
-        assert_eq!(rules.allows("patch", &secrets, "one"), Access::Allowed);
-        assert_eq!(rules.allows("patch", &secrets, "two"), Access::Denied);
-        assert_eq!(rules.allows("patch", &deployments, "web"), Access::Denied);
-        assert_eq!(rules.allows("get", &deployments, "web"), Access::Allowed);
-        let partial = AccessRules {
+        assert_eq!(viewer.read_only(), Some(true));
+        let incomplete = AccessRules {
             incomplete: true,
-            ..rules
+            ..viewer
         };
-        assert_eq!(partial.list(&secrets), Access::Unknown);
-        assert_eq!(AccessRules::everything().list(&secrets), Access::Allowed);
+        assert_eq!(incomplete.read_only(), None);
+        let mut editor = incomplete;
+        editor.rules.push(rule(&["patch"], &["apps"]));
+        assert_eq!(editor.read_only(), Some(false));
+        assert_eq!(AccessRules::everything().read_only(), Some(false));
+        assert_eq!(AccessRules::default().read_only(), Some(true));
+    }
+
+    #[test]
+    fn listing_one_custom_kind_is_listing_something() {
+        let reviewer = AccessRules {
+            rules: vec![rule(&["create"], &["authorization.k8s.io"])],
+            incomplete: false,
+        };
+        assert_eq!(reviewer.lists_any(), Some(false));
+        let mut widgets = reviewer;
+        widgets.rules.push(rule(&["list"], &["example.com"]));
+        assert_eq!(widgets.lists_any(), Some(true));
     }
 }

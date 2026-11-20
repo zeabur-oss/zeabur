@@ -13,9 +13,10 @@ import { cn } from "@/lib/utils"
 import {
   askerOf,
   gate,
+  projectPermission,
   type ClusterRights,
   type Gate,
-  type ProjectRights,
+  type ProjectRight,
   type Right,
 } from "@/model/rights"
 
@@ -25,25 +26,29 @@ function useAsker() {
   return askerOf(useQuery(whoamiQuery).data)
 }
 
-/** Whether the person may do `right` in `project`, from the namespace's rights. */
-export function useGate(project: string | undefined, right: keyof ProjectRights): Gate {
-  const asker = useAsker()
-  const namespace = useQuery({ ...namespaceQuery(project ?? ""), enabled: Boolean(project) })
-  return gate(right, namespace.data?.can[right], asker)
+/** Whether the person may do `right` in `project`: a change is closed when the project is read-only
+ * for them, a read when its own review refuses it; otherwise left to the plan's dry run. */
+export function useGate(project: string | undefined, right: ProjectRight): Gate {
+  return useGates(project)(right)
 }
 
 /** `useGate` in the project of the current route, for a control deep in a page. */
-export function useHereGate(right: keyof ProjectRights): Gate {
+export function useHereGate(right: ProjectRight): Gate {
   const { project } = useParams({ strict: false }) as { project?: string }
   return useGate(project, right)
 }
 
 /** Every project right at once, for a page with many actions. */
-export function useGates(project: string | undefined): (right: keyof ProjectRights) => Gate {
+export function useGates(project: string | undefined): (right: ProjectRight) => Gate {
   const asker = useAsker()
   const namespace = useQuery({ ...namespaceQuery(project ?? ""), enabled: Boolean(project) })
-  const can = namespace.data?.can
-  return (right) => gate(right, can?.[right], asker)
+  const permission = projectPermission(namespace.data?.readOnly)
+  // Reads are not closed by a read-only project; each has its own review.
+  const reads: Partial<Record<ProjectRight, Permission | undefined>> = {
+    readSecrets: namespace.data?.canReadSecrets,
+    readLogs: namespace.data?.canReadLogs,
+  }
+  return (right) => gate(right, right in reads ? reads[right] : permission, asker)
 }
 
 /** A right from a hint another answer carries, such as the members list's `canManage`. */

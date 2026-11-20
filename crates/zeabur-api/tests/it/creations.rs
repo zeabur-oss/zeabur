@@ -498,7 +498,7 @@ stringData:
             .find(|k| k["kind"] == "Certificate")
             .unwrap();
         assert_eq!(certificate["custom"], true);
-        assert_eq!(certificate["access"], "allowed");
+        assert_eq!(certificate["access"], "unknown");
         assert!(
             list["clusterScoped"]
                 .as_array()

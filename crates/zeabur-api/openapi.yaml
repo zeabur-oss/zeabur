@@ -2512,8 +2512,8 @@ paths:
       summary: |-
         Every listable namespaced kind of a project, kinds first: the usual kinds (or only those named
         in `kinds`) and, with `all`, every kind that controllers do not generate are read (names, ages
-        and owners only); the rest come back unread. Each kind carries an access hint; kinds refused
-        when read are named in `unreadable`. With `label`, only the objects with that label.
+        and owners only); the rest come back unread. Kinds refused when read are named in
+        `unreadable`. With `label`, only the objects with that label.
       operationId: listObjects
       parameters:
       - name: project
@@ -7038,7 +7038,9 @@ components:
           description: The settings ConfigMap, when it could not be read.
     ClusterRights:
       type: object
-      description: What the person may change in the cluster itself.
+      description: |-
+        What the person may change in the cluster itself, one cluster-wide `SelfSubjectAccessReview`
+        per action. A binding in one namespace, even of `cluster-admin`, allows none of them.
       required:
       - changeNodes
       - changeBackups
@@ -7046,8 +7048,8 @@ components:
         changeBackups:
           $ref: "#/components/schemas/Permission"
           description: |-
-            Set up Velero backups: `create` on `schedules.velero.io`. The backups page asks again in
-            Velero's own namespace.
+            Set up Velero backups: `create` on `schedules.velero.io` in every namespace. The backups
+            page asks again in Velero's own namespace.
         changeNodes:
           $ref: "#/components/schemas/Permission"
           description: "Change nodes (labels, taints, cordon): `patch` on nodes."
@@ -7999,7 +8001,7 @@ components:
       properties:
         access:
           $ref: "#/components/schemas/ObjectAccess"
-          description: Whether the person may create it, as the review hints.
+          description: "Whether the person may create it: denied in a read-only project, else unknown."
         custom:
           type: boolean
           description: "Not one of Kubernetes' own groups: a custom resource, or an extension API."
@@ -12601,9 +12603,7 @@ components:
       description: What to plan.
     ObjectAccess:
       type: string
-      description: |-
-        Whether the person may list a kind, as one `SelfSubjectRulesReview` hints, or as a list
-        answered.
+      description: Whether the person may list a kind, as a list answered.
       enum:
       - allowed
       - denied
@@ -12993,7 +12993,9 @@ components:
             import, any key), RFC 3339.
     Permission:
       type: string
-      description: Whether the person may change something, as far as their RBAC rules tell.
+      description: >-
+        Whether the person may change something, as one `SelfSubjectAccessReview`
+        answers.
       enum:
       - allowed
       - denied
@@ -14927,18 +14929,13 @@ components:
         - system
         - canChange
         - canAdopt
-        - can
+        - canReadLogs
+        - canReadSecrets
         - labelsGuarded
-        - workloadPatch
         properties:
           adopted:
             type: boolean
             description: It carries Zeabur's project label.
-          can:
-            $ref: "#/components/schemas/ProjectRights"
-            description: |-
-              What you may change in the project. A project Viewer may change nothing, nor read the
-              pods' logs.
           canAdopt:
             $ref: "#/components/schemas/Permission"
             description: |-
@@ -14948,6 +14945,16 @@ components:
           canChange:
             $ref: "#/components/schemas/Permission"
             description: "Whether the person may patch the Namespace: change its details."
+          canReadLogs:
+            $ref: "#/components/schemas/Permission"
+            description: >-
+              Whether you may read the pods' logs (`get` on `pods/log`), which a Viewer may
+              not.
+          canReadSecrets:
+            $ref: "#/components/schemas/Permission"
+            description: |-
+              Whether you may read secret values (`get` on `secrets`), which a Viewer may not. A
+              read-only project may still allow it.
           deleting:
             oneOf:
             - $ref: "#/components/schemas/ProjectDeleting"
@@ -14989,6 +14996,13 @@ components:
                 The Pod Security level enforced in it, its `pod-security.kubernetes.io/enforce` label;
                 absent when the label is not set, and the cluster's default applies, or names no level.
             - type: "null"
+          readOnly:
+            type:
+            - boolean
+            - "null"
+            description: |-
+              You may write nothing in the project: the namespace's rules review has no write verb.
+              Absent when the review failed or is incomplete.
           role:
             oneOf:
             - $ref: "#/components/schemas/AccountRole"
@@ -14999,13 +15013,6 @@ components:
           system:
             type: boolean
             description: Kubernetes keeps it for itself (`kube-` prefix); it cannot be adopted.
-          workloadPatch:
-            type: array
-            items:
-              $ref: "#/components/schemas/WorkloadPatch"
-            description: |-
-              Which Deployments, StatefulSets and DaemonSets the person may patch (change their
-              variables).
       description: A project's Namespace.
     ProjectObjectStorage:
       type: object
@@ -15049,102 +15056,6 @@ components:
         private:
           type: boolean
           description: Whether it is private.
-    ProjectRights:
-      type: object
-      description: What the person may change in one project.
-      required:
-      - deploy
-      - changeServices
-      - deleteServices
-      - scale
-      - readSecrets
-      - changeSecrets
-      - changeConfig
-      - changeDomains
-      - changeStorage
-      - changeDatabases
-      - backUpDatabases
-      - changeObjectStorage
-      - backUpVolumes
-      - restoreVolumes
-      - openTerminal
-      - portForward
-      - readLogs
-      - build
-      - deployFromGit
-      - changeNetworkPolicies
-      - changeMembers
-      properties:
-        backUpDatabases:
-          $ref: "#/components/schemas/Permission"
-          description: "Back up databases: `create` on an operator's backups."
-        backUpVolumes:
-          $ref: "#/components/schemas/Permission"
-          description: "Back up volumes: `create` on K8up's schedules, backups and pod configs."
-        build:
-          $ref: "#/components/schemas/Permission"
-          description: "Build again: `patch` on Zeabur Builder's builds."
-        changeConfig:
-          $ref: "#/components/schemas/Permission"
-          description: "Create and change ConfigMaps: `create` and `patch` on configmaps."
-        changeDatabases:
-          $ref: "#/components/schemas/Permission"
-          description: Create, change and delete databases of any operator Zeabur knows.
-        changeDomains:
-          $ref: "#/components/schemas/Permission"
-          description: "Add, change and remove domains: `create`, `patch` and `delete` on ingresses or HTTPRoutes."
-        changeMembers:
-          $ref: "#/components/schemas/Permission"
-          description: "Give people access to the project: `create` on rolebindings."
-        changeNetworkPolicies:
-          $ref: "#/components/schemas/Permission"
-          description: "Change network policies: `create` and `patch` on networkpolicies."
-        changeObjectStorage:
-          $ref: "#/components/schemas/Permission"
-          description: |-
-            Create, change and delete object storage: `create`, `patch` and `delete` on the `SeaweedFS`
-            Operator's seaweeds.
-        changeSecrets:
-          $ref: "#/components/schemas/Permission"
-          description: "Create and change Secrets: `create` and `patch` on secrets."
-        changeServices:
-          $ref: "#/components/schemas/Permission"
-          description: "Change, restart and redeploy services: `patch` on a workload kind."
-        changeStorage:
-          $ref: "#/components/schemas/Permission"
-          description: "Add and change volumes: `create` and `patch` on persistentvolumeclaims."
-        deleteServices:
-          $ref: "#/components/schemas/Permission"
-          description: "Delete services: `delete` on a workload kind."
-        deploy:
-          $ref: "#/components/schemas/Permission"
-          description: "Create services: `create` on deployments and services."
-        deployFromGit:
-          $ref: "#/components/schemas/Permission"
-          description: "Deploy a service from Git: `create` on deployments, services and Zeabur Builder's builds."
-        openTerminal:
-          $ref: "#/components/schemas/Permission"
-          description: "Open a terminal in a container: `create` on `pods/exec`."
-        portForward:
-          $ref: "#/components/schemas/Permission"
-          description: |-
-            Forward a port from the person's computer to a pod, as `zeaburctl connect` does: `create`
-            on `pods/portforward`.
-        readLogs:
-          $ref: "#/components/schemas/Permission"
-          description: "Read the pods' logs: `get` on `pods/log`."
-        readSecrets:
-          $ref: "#/components/schemas/Permission"
-          description: "Read Secret values: `get` on secrets."
-        restoreVolumes:
-          $ref: "#/components/schemas/Permission"
-          description: |-
-            Restore volumes from their backups: `create` on K8up's restores and on
-            persistentvolumeclaims. A Developer has both. An in-place restore overwrites the volume,
-            and whoever may restore can read every backup in the project's repository.
-        scale:
-          $ref: "#/components/schemas/Permission"
-          description: "Change the number of replicas: `patch` on `deployments/scale` or `statefulsets/scale`."
     ProjectRole:
       type: string
       description: What a member may do in one project.
@@ -18878,25 +18789,6 @@ components:
       - Deployment
       - Job
       - StatefulSet
-    WorkloadPatch:
-      type: object
-      description: Whether the person may patch the workloads of one kind.
-      required:
-      - kind
-      - all
-      - names
-      properties:
-        all:
-          $ref: "#/components/schemas/Permission"
-          description: Every one of them.
-        kind:
-          type: string
-          description: "`Deployment`, `StatefulSet` or `DaemonSet`."
-        names:
-          type: array
-          items:
-            type: string
-          description: The ones a rule limited to names (`resourceNames`) allows.
     WorkloadRef:
       type: object
       description: |-
