@@ -14,7 +14,7 @@ description: 移除 Zeabur 管理界面，保留应用、数据和仍在使用�
 1. 用 kubectl 连接目标集群，确认 context 和当前权限。K3s 或 RKE2 服务器可使用 root 保管的 `/etc/rancher/k3s/k3s.yaml`（K3s）或 `/etc/rancher/rke2/rke2.yaml`（RKE2），不要把这份管理员凭证交给普通成员。
 2. 记下 Zeabur 的安装方式、release 名称和 Namespace。下文 Helm 示例使用 release `zeabur`、Namespace `zeabur`，自行安装时要替换为实际名称。
 3. 关闭已打开的容器终端、kubectl 终端和节点终端，并应用或放弃已检查的变更。移除后，这些连接会中断，尚未应用的变更也会失效。
-4. 移除时也会移除 Zeabur Identity 的服务器，之后就没有人能用 Zeabur Identity 登录。如果成员、其他 client、用户 kubeconfig 或自动化仍用它登录，先把它们迁到其他登录系统，并提前安排[替代 RBAC 和准入策略](#成员权限和准入策略)。Chart 提供的成员角色和 Zeabur 创建的成员 binding 都会在移除时删除。
+4. 如果成员仍需要以 Zeabur Identity 身份操作，保留 Identity，并提前安排[替代 RBAC 和准入策略](#成员权限和准入策略)。Chart 提供的成员角色和 Zeabur 创建的成员 binding 都会在移除时删除。
 5. 用原来的备份工具备份重要数据，确认还原所需的机密变量、目标位置和控制器都在。此流程不会删除应用的卷。
 
 在自己的电脑上确认连接并记下服务现状：
@@ -53,7 +53,7 @@ sudo /var/lib/rancher/rke2/bin/kubectl \
 | 项目的 `zeabur.com/project` 标签和显示信息 | 保留，不影响工作负载运行 |
 | 成员的 RoleBinding／ClusterRoleBinding | `helm uninstall` 会保留，需要自行删除 |
 | `zeabur-s3-destinations` | Chart 标记为保留的 Namespace，已添加的目的地和密钥留在其中 |
-| Zeabur Identity | `helm uninstall` 会移除 Identity 的服务器。账号和通行密钥留在 `zeabur-identity` Namespace，重新安装时会继续使用。见[同时移除 Zeabur Identity](#同时移除-zeabur-identity) |
+| Zeabur Identity | 只移除 Zeabur 时会保留，用户和其他 OAuth client 继续留在原 Namespace |
 
 备份使用的密钥已复制到各备份所在的 Namespace，运行时不会再读取 S3 目的地列表。删除列表不会撤销这些密钥，也不会删除远程备份。
 
@@ -83,7 +83,7 @@ kubectl get deployments,services,ingresses,configmaps,secrets --namespace zeabur
 helm uninstall zeabur --namespace zeabur --wait
 ```
 
-Chart 管理的 Deployment、Service、Ingress／HTTPRoute、ServiceAccount、生成的变更密钥和可选的 Proxy 都会移除，成员角色、Namespace 准入策略和 chart 安装的 Zeabur Identity 服务器也会移除。Zeabur 运行时创建的成员 binding 不属于 chart，会保留下来，删除方式见[成员权限和准入策略](#成员权限和准入策略)。
+Chart 管理的 Deployment、Service、Ingress／HTTPRoute、ServiceAccount、生成的变更密钥和可选的 Proxy 都会移除，成员角色和 Namespace 准入策略也会移除。Zeabur 运行时创建的成员 binding 不属于 chart，会保留下来，删除方式见[成员权限和准入策略](#成员权限和准入策略)。
 
 你预先创建的 OAuth client 机密变量、外部指定的变更密钥或 CA 配置文件不属于 chart，会保留。通过界面创建的 `zeabur-settings` 配置文件也不会随 chart 卸载。先检查这些对象是否仍有用途，再逐一删除。不需要为了移除界面而删除整个 Namespace。
 
@@ -160,15 +160,7 @@ kubectl delete namespace zeabur-s3-destinations
 
 ## 同时移除 Zeabur Identity
 
-`helm uninstall` 已经移除了 chart 安装的 Zeabur Identity 服务器，账号和通行密钥还留在 `zeabur-identity` Namespace。确定没有人需要这些账号，不依赖 Zeabur Identity 也能管理集群后，再删除：
-
-```sh
-kubectl delete namespace zeabur-identity
-```
-
-删除后无法恢复。kube-apiserver 的认证配置里仍保留着 Zeabur Identity 的 issuer，需要自己移除。在用 Zeatend 装好的服务器上，删掉 `/etc/zeatend/config.yaml` 中的 `apiServer.authenticationConfig`，再运行 `sudo zeatend apply`。
-
-如果你用 `identity.enabled=false` 保留了自己的 Zeabur Identity，按当初安装的来源移除。
+如果其他 client、用户 kubeconfig 或自动化仍在使用 Zeabur Identity，先保留 Identity。把这些登录来源迁到替代认证系统，确认不依赖 Identity 也能管理集群后，再按当初安装 Identity 的来源移除。卸载 Zeabur chart 不会移除 Identity 的 OAuth client 或 Kubernetes API 的 issuer 配置。
 
 ## 不再使用整个集群时
 
