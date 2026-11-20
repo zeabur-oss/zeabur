@@ -67,19 +67,19 @@ pub enum ComponentAction {
 }
 
 /// What to plan.
-#[derive(Debug, Clone, Deserialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentRequest {
     /// Install or remove.
     pub action: ComponentAction,
     /// For `apply`: the catalog release the plan was made from; `409` when Zeabur has read
     /// another since.
-    #[serde(default)]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
     pub catalog_version: Option<String>,
 }
 
 /// How far a step or check has come.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub enum StepState {
     /// Not written yet.
@@ -93,7 +93,7 @@ pub enum StepState {
 }
 
 /// One write of a step.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectWrite {
     /// The object's kind.
@@ -109,7 +109,7 @@ pub struct ObjectWrite {
 }
 
 /// What one write of `apply` left on the cluster.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectWritten {
     /// The object's kind.
@@ -131,7 +131,7 @@ pub struct ObjectWritten {
 }
 
 /// What `apply` wrote, and the plan as it is after the writes.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentApplied {
     /// The plan after the writes, as `plan` answers it.
@@ -141,7 +141,7 @@ pub struct ComponentApplied {
 }
 
 /// One step: a release's objects.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentStep {
     /// The component.
@@ -158,7 +158,7 @@ pub struct ComponentStep {
 }
 
 /// One health check of the catalog, run once every step is ready.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentCheck {
     /// The component.
@@ -177,7 +177,7 @@ pub struct ComponentCheck {
 }
 
 /// What to know before installing.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase", tag = "kind")]
 pub enum ComponentWarning {
     /// The catalog's tests have not passed the component on this distribution and platform.
@@ -197,7 +197,7 @@ pub enum ComponentWarning {
 }
 
 /// What installing or removing a component writes, and how far it has come.
-#[derive(Debug, Clone, Serialize, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentPlan {
     /// Install or remove.

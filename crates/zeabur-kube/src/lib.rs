@@ -6,9 +6,10 @@
 //! type has no field for a credential, and [`ClusterEndpoint::in_cluster`] reads only the
 //! address and the CA bundle of the pod's service account, never its token. So the only identity
 //! a request from this crate can carry is the one the person brought, and kube-apiserver
-//! authorises it with that person's own RBAC rights [k8s-authn] [k8s-authz]. The one exception
+//! authorises it with that person's own RBAC rights [k8s-authn] [k8s-authz]. The exception
 //! is [`UserClient::with_token_file`]: Zeabur's own service account, which the chart lets into
-//! the terminal namespace only (see `zeabur_api::tools`). Zeabur does not
+//! the terminal namespace only (see `zeabur_api::tools`), and the service account of the chart's
+//! hook Job, which is the person `zeabur components install` acts as. Zeabur does not
 //! impersonate: impersonation would need `impersonate` rights on Zeabur's service account, which
 //! would then be able to do anything any user can [k8s-impersonation].
 //!
@@ -273,7 +274,8 @@ impl UserClient {
     }
 
     /// Acts as the holder of the token in `path`, which is read again as it rotates. Only for
-    /// Zeabur's own service account in the terminal namespace (see `zeabur_api::tools`).
+    /// Zeabur's own service account in the terminal namespace (see `zeabur_api::tools`), and for
+    /// the service account `zeabur components install` acts as.
     ///
     /// # Errors
     ///

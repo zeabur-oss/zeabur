@@ -16,6 +16,8 @@ use zeabur_auth::url::BaseUrl;
 ///
 /// People sign in through Zeabur Identity; register Zeabur there as a confidential client with the
 /// redirect URI `<public URL>/auth/callback` and the audience kube-apiserver accepts.
+///
+/// To install Zeabur Catalog components from the command line, run `zeabur components --help`.
 #[derive(Debug, clap::Parser)]
 #[command(version)]
 #[expect(clippy::struct_excessive_bools, reason = "each is a flag of its own")]
@@ -274,7 +276,7 @@ impl Args {
 }
 
 /// The PEM files given, each checked, joined into one bundle; `None` when none is given.
-fn bundle(files: &[(&Option<PathBuf>, &str)]) -> Result<Option<Vec<u8>>, String> {
+pub(crate) fn bundle(files: &[(&Option<PathBuf>, &str)]) -> Result<Option<Vec<u8>>, String> {
     let mut bundle: Option<Vec<u8>> = None;
     for &(path, flag) in files {
         let Some(path) = path else { continue };
@@ -435,7 +437,6 @@ fn plan_key(bytes: &[u8]) -> Option<PlanKey> {
     Some(PlanKey::from_bytes(key))
 }
 
-/// `--catalog-url` as Zeabur reads it: `https://`, ending in `/`.
 /// The host of an authority: without its port, and an IPv6 address without brackets.
 fn host(authority: &str) -> &str {
     authority
@@ -447,7 +448,8 @@ fn host(authority: &str) -> &str {
         )
 }
 
-fn catalog_url(text: &str) -> Result<String, String> {
+/// `--catalog-url` as Zeabur reads it: `https://`, ending in `/`.
+pub(crate) fn catalog_url(text: &str) -> Result<String, String> {
     let url: axum::http::Uri = text.parse().map_err(|e| format!("--catalog-url: {e}"))?;
     if url.scheme_str() != Some("https") || url.host().is_none() {
         return Err("--catalog-url: must be an https:// URL".to_owned());

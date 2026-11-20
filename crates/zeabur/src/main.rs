@@ -8,6 +8,7 @@
 
 #![forbid(unsafe_code)]
 
+mod components;
 mod config;
 mod output;
 mod pages;
@@ -15,6 +16,7 @@ mod proxy;
 mod server;
 mod telemetry;
 
+use std::ffi::OsString;
 use std::process::ExitCode;
 use std::sync::Arc;
 use std::time::Duration;
@@ -29,6 +31,7 @@ use zeabur_auth::passkey::PasskeyEndpoints;
 use zeabur_auth::session::{Bind, Clock, Sessions};
 use zeabur_kube::{ClusterEndpoint, UserClient, UserToken};
 
+use crate::components::ComponentsArgs;
 use crate::config::{Args, Config};
 use crate::server::{Auth, Connection, IssuerPage};
 
@@ -47,9 +50,33 @@ fn log_filter() -> Targets {
         .with_target("kube", LevelFilter::OFF)
 }
 
+/// What the command line asks for: `zeabur components …`, else the server.
+enum Command {
+    Components(ComponentsArgs),
+    Serve(Box<Args>),
+}
+
+impl Command {
+    fn parse() -> Self {
+        let mut argv = std::env::args_os();
+        let program = argv.next().unwrap_or_default();
+        let mut rest = argv.peekable();
+        if rest.next_if(|first| first == "components").is_some() {
+            let program = OsString::from("zeabur components");
+            Self::Components(ComponentsArgs::parse_from(
+                std::iter::once(program).chain(rest),
+            ))
+        } else {
+            Self::Serve(Box::new(Args::parse_from(
+                std::iter::once(program).chain(rest),
+            )))
+        }
+    }
+}
+
 #[tokio::main]
 async fn main() -> ExitCode {
-    let args = Args::parse();
+    let command = Command::parse();
     tracing_subscriber::fmt()
         .with_target(false)
         .finish()
@@ -58,14 +85,14 @@ async fn main() -> ExitCode {
     if let Err(error) = zeabur_core::secret::forbid_core_dumps() {
         tracing::warn!(event = "server.core_dumps", %error, "core dumps stay possible");
     }
-    let config = match args.check() {
-        Ok(config) => config,
-        Err(message) => {
-            output::error(&message);
-            return ExitCode::FAILURE;
-        }
+    let result = match &command {
+        Command::Components(components) => components::run(components).await,
+        Command::Serve(args) => match args.check() {
+            Ok(config) => serve(args, config).await,
+            Err(message) => Err(message),
+        },
     };
-    match serve(&args, config).await {
+    match result {
         Ok(()) => ExitCode::SUCCESS,
         Err(message) => {
             output::error(&message);
