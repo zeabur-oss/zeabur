@@ -39,7 +39,7 @@ jobs:
         with:
           ref: ${{ github.event.repository.default_branch }}
           persist-credentials: false
-      - uses: zeabur-oss/.github/actions/ci-setup@f3ae87d7ef3c37447432e398200d200b546dfa46 # main
+      - uses: zeabur-oss/.github/actions/ci-setup@993db7daf21a752dc7d3940f227e03478ee613cc # main
       - name: Write the formula and the cask
         env:
           GH_TOKEN: ${{ github.token }}

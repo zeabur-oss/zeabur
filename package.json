@@ -37,7 +37,7 @@
     }
   },
   "dependencies": {
-    "@zeabur-oss/release": "github:zeabur-oss/.github#fe73a0c68d3ef4b7557f15f7987f59f555714788"
+    "@zeabur-oss/release": "github:zeabur-oss/.github#993db7daf21a752dc7d3940f227e03478ee613cc"
   },
   "devDependencies": {
     "@types/bun": "catalog:"
