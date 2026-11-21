@@ -140,6 +140,8 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 | 新服务已就绪，但网址打不开 | 核对应用域名的 DNS 和证书。Zeabur 开源版和服务用的是不同域名，需要分别配置。 |
 | 升级后需要重新登录 | chart 只运行一个 Zeabur 开源版副本，登录状态保存在内存中。换成新副本后需要重新登录。 |
 
+表格里的命令用到 `kubectl` 和 `zeaburctl`，新的 K3s 服务器上两个都没有。在服务器上，把表格里的 `kubectl` 写成 `k3s kubectl`。`zeaburctl` 见[发行文件与验证](../reference/releases.mdx)。
+
 Zeabur 开源版自己的 ServiceAccount 只能在 `zeabur-terminals` 中使用 kubectl 终端的副本，不会代替登录者读取集群。
 
 ## 信任私有 CA

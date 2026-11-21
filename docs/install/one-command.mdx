@@ -11,9 +11,39 @@ Already have a cluster? [Install Zeabur OSS in an existing cluster](existing-clu
 
 - **A Linux server** with a public IP address, and ports 80 and 443 open to the internet. Let's Encrypt checks the addresses over port 80. For the memory and disk K3s needs, see Zeatend's [Supported servers and files](https://oss.zeabur.com/docs/zeatend/reference/hosts/). Zeabur OSS runs on top of that. In a test on a server with 1 vCPU and 2 GiB of memory, about 850 MiB of memory was left after Zeabur OSS, Zeabur Identity and cert-manager were installed, and one small app from a prebuilt image ran there. Zeabur Builder wasn't tried on a server that small.
 - **Root on the server**, over SSH. Run the commands below as root. If you sign in as a regular user, run `sudo -i` first.
-- **Zeatend, Helm 4 and `zeabur-identityctl` on the server.** To get Zeatend, see [Download Zeatend](https://oss.zeabur.com/docs/zeatend/get-started/install/#download-zeatend) in Zeatend's docs. For `zeabur-identityctl`, see Zeabur Identity's [Release files and verification](https://oss.zeabur.com/docs/identity/reference/releases/).
+- **Zeatend, Helm 4 and `zeabur-identityctl` on the server.** To get Zeatend, see [Download Zeatend](https://oss.zeabur.com/docs/zeatend/get-started/install/#download-zeatend) in Zeatend's docs. The first step below gets the other two.
 
 <Steps>
+<Step>
+
+### Get Helm 4 and `zeabur-identityctl`
+
+A new server has neither tool, and neither needs `gh`, `cosign` or Docker to install. Each block downloads a release from its project, checks the file against the project's checksum, and installs it to `/usr/local/bin`:
+
+```sh
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+
+helm=$(curl -fsSL https://get.helm.sh/helm-latest-version)
+curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz" &&
+  curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  sha256sum -c "helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  tar -xzf "helm-$helm-linux-$arch.tar.gz" --strip-components=1 "linux-$arch/helm" &&
+  install -m 0755 helm /usr/local/bin/helm &&
+  helm version --short
+
+ctl=$(basename "$(curl -fsSLo /dev/null -w '%{url_effective}' https://github.com/zeabur-oss/identity/releases/latest)")
+base="https://github.com/zeabur-oss/identity/releases/download/$ctl"
+curl -fsSLO "$base/zeabur-identityctl-$ctl-linux-$arch.tar.gz" &&
+  curl -fsSLO "$base/SHA256SUMS" &&
+  sha256sum --ignore-missing -c SHA256SUMS &&
+  tar -xzf "zeabur-identityctl-$ctl-linux-$arch.tar.gz" zeabur-identityctl &&
+  install -m 0755 zeabur-identityctl /usr/local/bin/zeabur-identityctl &&
+  zeabur-identityctl --version
+```
+
+`helm version --short` must show `v4`. The checksum of `zeabur-identityctl` comes from the same release as the file, so it catches a broken download but doesn't prove who built it. To check the signature too, follow Zeabur Identity's [Release files and verification](https://oss.zeabur.com/docs/identity/reference/releases/) on a computer that has `gh` and `cosign`, then copy the file to the server.
+
+</Step>
 <Step>
 
 ### Choose the domain
