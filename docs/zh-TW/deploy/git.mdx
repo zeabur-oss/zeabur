@@ -9,7 +9,7 @@ description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像�
 
 - 已有專案，以及在專案建立服務、Kubernetes Service 和 Build 的權限。使用私有儲存庫或建置變數時，也需要建立機密變數的權限。
 - 叢集已安裝 Zeabur Builder 和 Keel。從元件目錄安裝 Zeabur Builder 時，zot 會一起安裝。缺少元件時，**新增**選單會在**從 Git 部署**下方寫出缺哪些，點下去會一次列出全部的安裝指令，見[檢視與安裝叢集元件](../cluster/components.mdx)。
-- 建置好的映像檔推到 Zeabur chart 的 `builds.registry`，預設是和 Zeabur Builder 一起裝的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 時，管理員在 chart 設定 `builds.registry`，並讓 Builder 與節點能存取這個 registry。
+- 建置好的映像檔推到 Zeabur 開源版 chart 的 `builds.registry`，預設是和 Zeabur Builder 一起裝的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 時，管理員在 chart 設定 `builds.registry`，並讓 Builder 與節點能存取這個 registry。
 - 隨 Zeabur Builder 裝的 Zot 只讓 Builder、建置用的副本和節點連進來。專案裡其他的副本連不到 Zot，所以被入侵的應用程式拉不到別的專案的映像檔。
 - 準備應用程式實際監聽的連接埠。要公開網站，另備可指向叢集入口的網域。
 
@@ -118,7 +118,7 @@ Zeabur Builder 每分鐘檢查一次分支。有新的提交時，Builder 會建
 
 服務**建置**分頁的**新建置完成後自動部署**預設開啟，控制的是建置完成後要不要馬上上線。
 
-要馬上建置一次，在**建置**按**重新建置**，檢查變更後套用。Builder 會用分支最新的提交。想先確認建置結果再上線，就關閉**新建置完成後自動部署**，建置成功後按**部署最新版**，檢查並套用映像檔變更。
+要馬上建置一次，在**建置**按**重新建置**，檢查變更後套用。Zeabur Builder 會用分支最新的提交。想先確認建置結果再上線，就關閉**新建置完成後自動部署**，建置成功後按**部署最新版**，檢查並套用映像檔變更。
 
 要改建置資料夾、Dockerfile 或建置變數，到服務**設定**的**建置**修改，下一次建置開始生效。
 

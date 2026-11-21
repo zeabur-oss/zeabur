@@ -21,7 +21,7 @@ description: 添加新节点，停止调度，用 kubectl 迁移副本和移除�
 | 所有节点之间 | TCP 10250，UDP 8472（flannel VXLAN） | TCP 10250、9099，UDP 8472（Canal VXLAN） |
 | 服务器之间 | 不需要 | TCP 2379–2381 |
 
-用 zeabur-installer 安装的 K3s 集群使用 Calico，UDP 端口是 4789，而不是 8472。UDP 端口只对集群节点开放，不要对互联网开放。如果防火墙拦截了该端口，不同节点上的副本就无法互相连接。
+由 Zeabur 开源版 0.2 安装的 K3s 集群使用 Calico，UDP 端口是 4789，而不是 8472。UDP 端口只对集群节点开放，不要对互联网开放。如果防火墙拦截了该端口，不同节点上的副本就无法互相连接。
 
 ## 添加节点
 
@@ -146,7 +146,7 @@ kubectl -n longhorn-system delete nodes.longhorn.io <node>
 ## 常见问题
 
 - 加入时无法连接服务器：在新 VM 上运行 `sudo zeatend plan`，它会逐一检查端口。K3s 需要 TCP 6443，RKE2 需要 TCP 9345 和 6443，上表中的其他端口也要开放。
-- 新节点已就绪，但不同节点上的服务无法互相连接：检查 UDP 8472（用 zeabur-installer 安装的 K3s 集群是 4789），以及网络策略是否已放行新节点。
+- 新节点已就绪，但不同节点上的服务无法互相连接：检查 UDP 8472（由 Zeabur 开源版 0.2 安装的 K3s 集群是 4789），以及网络策略是否已放行新节点。
 - `drain` 一直没有进展：`drain` 在等待 PodDisruptionBudget 放行，或停在不属于任何控制器的副本上。用 `kubectl get pdb -A` 查看哪个预算阻止了驱逐，处理后再运行一次。
 - 副本在新节点上处于 `Pending` 状态：副本使用的是旧节点的 `local-path` 卷，需要等待旧节点恢复运行。
 - 终端副本**无法启动**：查看该副本的事件，常见原因是镜像下载失败。

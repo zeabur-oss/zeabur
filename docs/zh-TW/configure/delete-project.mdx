@@ -3,7 +3,7 @@ title: 刪除專案
 description: 刪除專案的 Namespace 和裡面的所有東西，先看清楚哪些資料會留下，再確認刪除。
 ---
 
-專案就是一個 Kubernetes Namespace。在專案**設定**的**危險區域**按**刪除專案**，Zeabur 會刪掉這個 Namespace 和裡面的服務、資料庫、磁碟區、設定與機密，效果和 `kubectl delete namespace` 一樣。刪除後無法復原，只能從備份建立回來。
+專案就是一個 Kubernetes Namespace。在專案**設定**的**危險區域**按**刪除專案**，Zeabur 開源版會刪掉這個 Namespace 和裡面的服務、資料庫、磁碟區、設定與機密，效果和 `kubectl delete namespace` 一樣。刪除後無法復原，只能從備份建立回來。
 
 只想讓 Namespace 不再出現在 Zeabur，改用同一處的**從 Zeabur 移除**：只拿掉專案標籤，什麼都不刪除。
 

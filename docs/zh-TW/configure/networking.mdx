@@ -25,7 +25,7 @@ description: 用私有位址連到同叢集的服務，把資料庫這類不走 
 
 只會主動往外連的背景服務不需要私有位址。要讓其他服務或公開網域連進來，填上應用程式監聽的連接埠，按**新增私有位址**。就緒檢查或容器有宣告連接埠時，會先幫你填好。勾選**同時加上公開網域**，位址建好後會接著新增網域。
 
-Zeabur 會像 `kubectl expose` 一樣，建立和服務同名的 ClusterIP Service：用服務的 `matchLabels` 挑選副本，並帶上容器宣告的每個連接埠。服務還用 `matchExpressions` 挑選副本時，Service 沒辦法照抄，就不能這樣新增。
+Zeabur 開源版會像 `kubectl expose` 一樣，建立和服務同名的 ClusterIP Service：用服務的 `matchLabels` 挑選副本，並帶上容器宣告的每個連接埠。服務還用 `matchExpressions` 挑選副本時，Service 沒辦法照抄，就不能這樣新增。
 
 想自己執行的話，打開**改用 kubectl**。只有一個連接埠的 Deployment 會是 `kubectl expose` 指令，例如：
 

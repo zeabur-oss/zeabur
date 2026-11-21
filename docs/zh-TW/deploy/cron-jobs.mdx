@@ -180,7 +180,7 @@ spec:
 | **恢復** | `kubectl -n shop patch cronjob nightly-report -p '{"spec":{"suspend":false}}'` |
 | 刪除 | `kubectl -n shop delete cronjob nightly-report` |
 
-Zeabur 的**立即執行**和 `kubectl create job --from` 一樣，Job 帶 annotation `cronjob.kubernetes.io/instantiate: manual`，擁有者是 CronJob。
+Zeabur 開源版的**立即執行**和 `kubectl create job --from` 一樣，Job 帶 annotation `cronjob.kubernetes.io/instantiate: manual`，擁有者是 CronJob。
 
 ## 常見失敗
 

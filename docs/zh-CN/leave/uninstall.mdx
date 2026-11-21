@@ -1,9 +1,9 @@
 ---
-title: 移除 Zeabur，保留服务
+title: 移除 Zeabur 开源版，保留服务
 description: 移除 Zeabur 管理界面，保留应用、数据和仍在使用的 Kubernetes 组件。
 ---
 
-只移除 Zeabur 的 chart，现有服务会留在 Kubernetes，继续由原生控制器和 operator 运行。保留 ingress、证书、存储和备份等依赖组件后，就能改用 kubectl、Helm 或原来的 GitOps 工具管理服务。
+只移除 Zeabur 开源版的 chart，现有服务会留在 Kubernetes，继续由原生控制器和 operator 运行。保留 ingress、证书、存储和备份等依赖组件后，就能改用 kubectl、Helm 或原来的 GitOps 工具管理服务。
 
 用 `zeaburctl ui` 在本地打开界面时，按 `Ctrl-C` 关闭即可。`zeaburctl ui` 不会在集群中安装任何东西，已应用的变更会留在集群中。
 
@@ -178,7 +178,7 @@ kube-apiserver 仍信任 Identity 的 issuer。用 Zeatend 配置的服务器，
 sudo zeatend uninstall
 ```
 
-命令会先列出要移除和保留的内容，确认后才开始。它会移除 K3s、RKE2 或 KubeSolo 和数据，以及 Zeatend 写入的文件，集群上所有工作负载都会停止。用 zeabur-installer 安装的服务器也由 Zeatend 接管，同样用这条命令。集群是你自己装的，就用发行版自带的卸载脚本，例如 `k3s-uninstall.sh`。
+命令会先列出要移除和保留的内容，确认后才开始。它会移除 K3s、RKE2 或 KubeSolo 和数据，以及 Zeatend 写入的文件，集群上所有工作负载都会停止。由 Zeabur 开源版 0.2 安装的服务器也由 Zeatend 接管，同样用这条命令。集群是你自己装的，就用发行版自带的卸载脚本，例如 `k3s-uninstall.sh`。
 
 不加 `--delete-volumes` 时，`zeatend uninstall` 会保留 `/var/lib/zeabur/storage` 中的 local-path 数据和 `/var/lib/longhorn` 中的 replica 数据。即使保留原始数据目录，也仍需要对应的 PV／PVC 和存储系统信息，才能重新接入服务。确认已有可还原的备份后，再决定如何处理这些目录。
 

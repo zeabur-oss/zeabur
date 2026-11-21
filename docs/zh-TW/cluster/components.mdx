@@ -21,7 +21,7 @@ description: 檢視叢集裝了哪些元件、狀態如何、還缺什麼，再�
 
 ## 從頁面安裝
 
-只有能在叢集裡做任何事的人（`cluster-admin`）可以從這裡安裝：Zeabur 會把每個 Chart 交給叢集的 helm-controller，由它用完整權限安裝。叢集要有 helm-controller，K3s 和 RKE2 都內建。
+只有能在叢集裡做任何事的人（`cluster-admin`）可以從這裡安裝：Zeabur 開源版會把每個 Chart 交給叢集的 helm-controller，由它用完整權限安裝。叢集要有 helm-controller，K3s 和 RKE2 都內建。
 
 如果叢集用 Flux 或 Argo CD 管理，元件也交給它安裝。安裝對話框會列出印出 Flux 或 Argo CD manifest 的 `zeaburctl components export` 指令。執行其中一個，再照下面**用 zeaburctl 安裝**的步驟，把輸出提交到叢集讀取的儲存庫。
 

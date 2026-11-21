@@ -101,7 +101,7 @@ HTML 保存在 ConfigMap 中，页面服务器每次收到请求都会读取挂�
 
 ## 页面服务器
 
-维护页面和错误页面由项目中的页面服务器提供，页面服务器来自 Zeabur Catalog 的 **Error pages** 模板：一个小型 nginx，HTML 保存在 ConfigMap `error-pages` 中。Zeabur 根据标签 `zeabur.com/page-server: "true"` 查找页面服务器，不依赖名称：
+维护页面和错误页面由项目中的页面服务器提供，页面服务器来自 Zeabur Catalog 的 **Error pages** 模板：一个小型 nginx，HTML 保存在 ConfigMap `error-pages` 中。Zeabur 开源版根据标签 `zeabur.com/page-server: "true"` 查找页面服务器，不依赖名称：
 
 | 对象 | 必需内容 |
 | --- | --- |

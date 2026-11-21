@@ -3,7 +3,7 @@ title: zeaburctl
 description: 用目前的 kubeconfig 開啟 Zeabur、上傳資料夾、檢查叢集，或匯出元件的安裝內容。
 ---
 
-已有能連線到叢集的 kubeconfig 時，執行 `zeaburctl ui` 就會在本機開啟 Zeabur。讀取、**檢查變更**與確認後的套用都使用該 context 的權限，叢集裡不需要先安裝 Zeabur 伺服器。
+已有能連線到叢集的 kubeconfig 時，執行 `zeaburctl ui` 就會在本機開啟 Zeabur 開源版。讀取、**檢查變更**與確認後的套用都使用該 context 的權限，叢集裡不需要先安裝 Zeabur 伺服器。
 
 在裝了 [Homebrew](https://brew.sh) 的 Apple 晶片 Mac 或 Linux 上，可以用它安裝，之後用 `brew upgrade` 更新：
 
@@ -41,7 +41,7 @@ zeaburctl components export cert-manager
 | `doctor` | 檢查叢集版本、元件和 Zeabur Identity 設定 | 只讀取，不修改設定 |
 | `up` | 把資料夾上傳到從資料夾建立的服務，並開始建置 | 修改該服務的 Build，把資料夾推到 registry |
 | `connect` | 把本機連接埠轉發到資料庫或服務，並印出連線方式 | 不改叢集裡的任何東西 |
-| `components export` | 印出安裝 Catalog 元件的 manifest 或 Helm 指令 | 不連叢集，什麼都不改 |
+| `components export` | 印出安裝 Zeabur Catalog 元件的 manifest 或 Helm 指令 | 不連叢集，什麼都不改 |
 | `telemetry status` | 顯示 `zeaburctl ui` 會不會傳送事件，以及是哪個設定決定的 | 不連叢集，什麼都不改 |
 | `telemetry disable`、`telemetry enable` | 退出或加入體驗計畫 | 在這台電腦的 `config.yaml` 寫入 `telemetry: false` 或 `true` |
 | `telemetry reset` | 刪除 `zeaburctl ui` 為體驗計畫保存的隨機代碼 | 不連叢集，什麼都不改 |

@@ -1,11 +1,11 @@
 ---
-title: 将 Zeabur 安装到已有集群
+title: 将 Zeabur 开源版安装到已有集群
 description: 用一条 Helm 命令装好 Zeabur 和 Zeabur Identity，再用通行密钥登录。
 ---
 
-照这一页做完，你会有一个通过 HTTPS 打开、用通行密钥登录的 Zeabur。集群里原有的应用，会出现在**项目**页。
+照这一页做完，你会有一个通过 HTTPS 打开、用通行密钥登录的 Zeabur 开源版。集群里原有的应用，会出现在**项目**页。
 
-还没有集群？[用 Zeatend 安装](one-command.mdx)会先在新服务器上装好 Kubernetes。想让 Agent 替你完成这些步骤，见[交给 Agent 安装](agent.mdx)。
+还没有集群？[用 Zeatend 安装](one-command.mdx)会先在新服务器上装好 Kubernetes。想让 Claude Code 或 Codex 这类 Coding Agent 替你完成这些步骤，见[交给 Agent 安装](agent.mdx)。Agent 读的是[本页的 Markdown 版](https://oss.zeabur.com/zh-CN/docs/zeabur/install/existing-cluster.md)。
 
 <Figure label="一条 helm install 把 Zeabur 装进 zeabur Namespace、Zeabur Identity 装进 zeabur-identity，并加上负责 HTTPS 的 cert-manager，你原有的应用留在原处">
 <FigFlow>

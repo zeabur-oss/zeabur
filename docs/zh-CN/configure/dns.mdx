@@ -5,7 +5,7 @@ description: 用一条通配符记录让所有生成的网址指向集群，并�
 
 应用域名是生成的网址共用的域名，只需为这个域名配置一次通配符记录，之后每个新服务的网址都会解析到集群。例如，应用域名是 `apps.example.com`，就添加一条 `*.apps.example.com` 的 A 记录，指向服务器的 IPv4 地址。如果服务器有 IPv6 地址，再添加一条 AAAA 记录。之后，`web-shop.apps.example.com` 这类新网址就不需要再添加记录。
 
-Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签发一张，因此互联网必须能访问服务器的 TCP 80 端口。Zeabur 不会替你修改 DNS，需要到自己的 DNS 提供商处添加记录。
+Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签发一张，因此互联网必须能访问服务器的 TCP 80 端口。Zeabur 开源版不会替你修改 DNS，需要到自己的 DNS 提供商处添加记录。
 
 ## 选择应用域名
 

@@ -1,11 +1,11 @@
 ---
-title: 把 Zeabur 裝進既有叢集
+title: 把 Zeabur 開源版裝進既有叢集
 description: 用一個 Helm 指令裝好 Zeabur 和 Zeabur Identity，再用通行密鑰登入。
 ---
 
-照這一頁做完，你會有一個用 HTTPS 打開、用通行密鑰登入的 Zeabur。叢集裡原本的應用程式，會出現在**專案**頁。
+照這一頁做完，你會有一個用 HTTPS 打開、用通行密鑰登入的 Zeabur 開源版。叢集裡原本的應用程式，會出現在**專案**頁。
 
-還沒有叢集？[用 Zeatend 安裝](one-command.mdx)會先在新伺服器上裝好 Kubernetes。想讓 Agent 代你做這些步驟，見[交給 Agent 安裝](agent.mdx)。
+還沒有叢集？[用 Zeatend 安裝](one-command.mdx)會先在新伺服器上裝好 Kubernetes。想讓 Claude Code 或 Codex 這類 Coding Agent 代你做這些步驟，見[交給 Agent 安裝](agent.mdx)。Agent 讀的是[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/install/existing-cluster.md)。
 
 <Figure label="一個 helm install 把 Zeabur 裝進 zeabur Namespace、Zeabur Identity 裝進 zeabur-identity，並加上負責 HTTPS 的 cert-manager，你原本的應用程式留在原處">
 <FigFlow>

@@ -178,7 +178,7 @@ If you want to keep services running, stop after the earlier steps. Run the foll
 sudo zeatend uninstall
 ```
 
-It lists what it removes and what stays, and asks before it starts. It removes K3s, RKE2 or KubeSolo with their data, and the files Zeatend wrote. All workloads on the cluster stop. Zeatend also takes over a server that zeabur-installer set up, so use the same command there. On a cluster you set up yourself, use the distribution's own uninstall script, such as `k3s-uninstall.sh`.
+It lists what it removes and what stays, and asks before it starts. It removes K3s, RKE2 or KubeSolo with their data, and the files Zeatend wrote. All workloads on the cluster stop. Zeatend also takes over a server that Zeabur 0.2 set up, so use the same command there. On a cluster you set up yourself, use the distribution's own uninstall script, such as `k3s-uninstall.sh`.
 
 `zeatend uninstall` keeps local-path data in `/var/lib/zeabur/storage` and replica data in `/var/lib/longhorn` unless you add `--delete-volumes`. Reattaching the original data directories to services also requires the corresponding PVs, disks, and storage system information. Confirm that you have backups you can restore before deciding what to do with these directories.
 

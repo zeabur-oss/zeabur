@@ -3,7 +3,7 @@ title: 升级须知
 description: 每一版不兼容的变更，以及升级前要先做的事。一次跨好几版时，依次看过中间每一节。
 ---
 
-这一页列出每一版不兼容的变更，以及升级前要先做的事。升级的步骤本身见[升级 Zeabur](steps.mdx)。
+这一页列出每一版不兼容的变更，以及升级前要先做的事。升级的步骤本身见[升级 Zeabur 开源版](steps.mdx)。
 
 一次跨好几版升级时，从你当前的版本开始，依次看过到目标版本为止的每一节。新的版本写在最上面。
 
@@ -31,7 +31,7 @@ zeabur-installer v0.2 用 K3s 的 `HelmChart` 安装 Zeabur，再用普通 manif
 
 升级后，不要再运行 `zeabur-installer apply`，否则会重新装回 v0.2 的 `HelmChart` 和 Zeabur Identity v0.1。
 
-这些步骤适合交给 Agent 操作。遇到下面这些情况，Agent 要停下来，等待服务器所有者操作或确认：
+这些步骤适合交给 Claude Code 或 Codex 这类 Coding Agent 操作。遇到下面这些情况，Agent 要停下来，等待服务器所有者操作或确认：
 
 - 做任何改动之前：所有者先检查新的 values 文件，再给每台服务器创建快照（第 3 步）。
 - 第 1 步的检查发现这些步骤没有涵盖的情况。

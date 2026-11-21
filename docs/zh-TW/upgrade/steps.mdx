@@ -1,19 +1,19 @@
 ---
-title: 升級 Zeabur
+title: 升級 Zeabur 開源版
 description: 查看目前的 Zeabur 版本，依安裝方式用 Helm、Argo CD、Flux 或 zeaburctl 升級，用 Zeatend 升級 Kubernetes，並在升級後確認新版本。
 ---
 
-先看你是怎麼安裝的，再照該段升級。升級不會自動發生，Zeabur 只會告訴你有新版本。
+先看你是怎麼安裝的，再照該段升級。升級不會自動發生，Zeabur 開源版只會告訴你有新版本。
 
 ## 交給 Agent 升級
 
-Claude Code 或 Codex 這類 Agent 可以替你照著這一頁和升級須知執行。貼上這段提示，在能用 SSH 連到伺服器的電腦上執行 Agent，並告訴它伺服器的位址：
+Claude Code 或 Codex 這類 Coding Agent 可以替你照著這一頁和升級須知執行。貼上這段提示，在能用 SSH 連到伺服器的電腦上執行 Agent，並告訴它伺服器的位址：
 
 ```text
-Upgrade Zeabur on my server to the latest version by following https://oss.zeabur.com/docs/zeabur/upgrade/steps.
+照著 https://oss.zeabur.com/zh-TW/docs/zeabur/upgrade/steps.md 把我伺服器上的 Zeabur 升級到最新版。
 ```
 
-Agent 會查出 Zeabur 的安裝方式，讀過中間每一版的升級須知，並列出要改動的內容。快照由你建立，升級後也要由你用通行密鑰登入；到了這些步驟，Agent 會停下來等你。
+這個網址指向[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/upgrade/steps.md)。Agent 會查出 Zeabur 的安裝方式，讀過中間每一版的升級須知，並列出要改動的內容。快照由你建立，升級後也要由你用通行密鑰登入；到了這些步驟，Agent 會停下來等你。
 
 ## 查看版本
 
