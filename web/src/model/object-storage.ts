@@ -6,6 +6,7 @@ import { rules } from "@/api/rules"
 import type { Connectable } from "@/model/connect"
 import { fits } from "@/model/rules"
 import type { Event } from "@/model/service"
+import { bytesOf } from "@/model/volume-edit"
 
 export type ObjectStorage = Schemas.SeaweedObjectStorage
 export type Bucket = Schemas.SeaweedBucket
@@ -53,6 +54,25 @@ const restrictedPod = {
 const restricted = { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
 const secured = { podSecurityContext: restrictedPod, containerSecurityContext: restricted }
 
+/** SeaweedFS writes each bucket to volumes of its own and makes 7 at a time, each up to
+ * `volumeSizeLimitMB` (30000 by default and at most). Without a count, a volume server takes as
+ * many volumes as fit in the free space of the node's disk, not of its claim: a small store gets
+ * one volume and cannot store a bucket.
+ * https://github.com/seaweedfs/seaweedfs/blob/4.48/weed/topology/volume_growth.go
+ * https://github.com/seaweedfs/seaweedfs/blob/4.48/weed/storage/store.go */
+const VOLUMES = 100
+const MAX_VOLUME_MB = 30_000
+
+/** The size of each volume and the number of volumes, so that they fill the disk. */
+function volumeLimits(storage: string) {
+  const bytes = bytesOf(storage)
+  if (!bytes) return { master: {}, volume: {} }
+  const mib = Math.floor(bytes / 2 ** 20)
+  const volumeSizeLimitMB = Math.max(1, Math.min(MAX_VOLUME_MB, Math.floor(mib / VOLUMES)))
+  const maxVolumeCounts = Math.max(1, Math.floor(mib / volumeSizeLimitMB))
+  return { master: { volumeSizeLimitMB }, volume: { maxVolumeCounts } }
+}
+
 const create = (object: Record<string, unknown>): Change => ({
   op: "create",
   object: { ...object },
@@ -81,6 +101,7 @@ export function createObjectStorage(form: NewObjectStorage): Change[] {
   const { name, storage, storageClass } = form
   const user = userOf(name)
   const ref = { seaweedRef: { name } }
+  const limits = volumeLimits(storage)
   return [
     create({
       apiVersion: API_VERSION,
@@ -89,10 +110,16 @@ export function createObjectStorage(form: NewObjectStorage): Change[] {
       spec: {
         image: IMAGE,
         volumeServerDiskCount: 1,
-        master: { replicas: 1, persistence: persisted(storageClass), ...secured },
+        master: {
+          replicas: 1,
+          persistence: persisted(storageClass),
+          ...limits.master,
+          ...secured,
+        },
         volume: {
           replicas: 1,
           requests: { storage },
+          ...limits.volume,
           ...(storageClass ? { storageClassName: storageClass } : {}),
           ...secured,
         },
@@ -203,11 +230,16 @@ export const storeAddress = (store: ObjectStorage) => ({
   name: store.name,
 })
 
-/** Growing the volume servers' disks; the operator grows each claim in place. */
+/** Growing the volume servers' disks, and the volumes to fill them; the operator grows each claim
+ * in place. */
 export function growObjectStorage(store: ObjectStorage, storage: string): Change[] {
-  type Spec = { volume?: { requests?: Record<string, string> } }
+  type Part = Record<string, unknown>
+  type Spec = { master?: Part; volume?: Part & { requests?: Record<string, string> } }
   const object = structuredClone(store.object) as { spec?: Spec }
-  const volume = ((object.spec ??= {}).volume ??= {})
+  const spec = (object.spec ??= {})
+  const limits = volumeLimits(storage.trim())
+  spec.master = { ...spec.master, ...limits.master }
+  const volume = (spec.volume = { ...spec.volume, ...limits.volume })
   volume.requests = { ...volume.requests, storage: storage.trim() }
   const { name, ...resource } = storeAddress(store)
   return [{ op: "edit", resource, name, yaml: JSON.stringify(object), specOnly: true }]
