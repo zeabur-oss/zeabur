@@ -2965,6 +2965,10 @@ export const zhCN: Messages = {
   "db.backup.saidNow": (name, where) => `立即把 ${name} 备份到 ${where}。`,
   "db.backup.now": "立即备份",
   "db.backup.starting": "数据库应用备份设置并重启后就能使用",
+  "db.backup.archiveFailing": "备份目的地写入失败",
+  "db.backup.archiveFailed":
+    "数据库无法把预写日志（WAL）归档到备份目的地，所以备份没有作用。operator 返回如下。",
+  "db.backup.archiveSince": "失败开始于",
   "db.backup.planNow": (name) => `立即备份 ${name}`,
   "db.backup.destination": "目的地",
   "db.backup.endpointFact": "端点",
