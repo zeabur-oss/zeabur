@@ -59,7 +59,8 @@ use zeabur_model::readiness::{self, Reason, Status};
 
 use crate::backups::{Findings, Outcome, Run, Schedule, Target, TargetKind, newest};
 use crate::databases::{
-    self, AppUser, Backups, Connection, Database, Engine, RecoveryWindow, State, Store,
+    self, AppUser, ArchiveFailure, Backups, Connection, Database, Engine, RecoveryWindow, State,
+    Store,
 };
 use crate::{Module, Read, strings, text, time};
 
@@ -240,6 +241,22 @@ fn true_since(cluster: &DynamicObject, kind: &str) -> Option<Timestamp> {
         .and_then(|t| t.parse().ok())
 }
 
+/// Archiving fails: `ContinuousArchiving` is `False`, with the operator's message.
+fn archive_failure(cluster: &DynamicObject) -> Option<ArchiveFailure> {
+    let failing = cluster
+        .data
+        .pointer("/status/conditions")?
+        .as_array()?
+        .iter()
+        .find(|c| c["type"] == "ContinuousArchiving" && c["status"] == "False")?;
+    Some(ArchiveFailure {
+        message: databases::condition_message(cluster, "ContinuousArchiving"),
+        since: failing["lastTransitionTime"]
+            .as_str()
+            .and_then(|t| t.parse().ok()),
+    })
+}
+
 /// A backup can start: the instances run with the plugin's sidecar. `ContinuousArchiving` is
 /// true even without an archiver, so the cluster must also have become ready again after the
 /// store was made (the operator restarts the instances to add the sidecar), or have finished a
@@ -399,6 +416,7 @@ pub fn database(
             schedules: found.schedules,
             runs: found.runs,
             recovery_window,
+            archive_failure: archive_failure(cluster),
         },
         created_at: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(cluster),
@@ -683,6 +701,61 @@ mod tests {
         for (case, parameters, archiving, want) in cases {
             assert_eq!(window(&cluster(parameters, archiving)), want, "{case}");
         }
+    }
+
+    #[test]
+    fn failing_archiving_carries_the_operators_message_and_is_not_starting() {
+        let cluster = |condition: serde_json::Value| {
+            object(serde_json::json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+                "metadata": {"name": "pg", "namespace": "shop"},
+                "spec": {"plugins": [{"name": "barman-cloud.cloudnative-pg.io", "isWALArchiver": true,
+                                      "parameters": {"barmanObjectName": "pg-backups"}}]},
+                "status": {"phase": "Cluster in healthy state", "readyInstances": 1,
+                           "conditions": [condition,
+                                          {"type": "Ready", "status": "True",
+                                           "lastTransitionTime": "2026-10-22T16:02:41Z"}]}
+            }))
+        };
+        let store = object(serde_json::json!({
+            "apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore",
+            "metadata": {"name": "pg-backups", "namespace": "shop"},
+        }));
+        let backups = |condition| {
+            database(
+                "shop",
+                &cluster(condition),
+                std::slice::from_ref(&store),
+                &[],
+                &[],
+            )
+            .backups
+        };
+
+        let message = "unexpected failure invoking barman-cloud-wal-archive: exit status 4";
+        let failing = backups(serde_json::json!({
+            "type": "ContinuousArchiving", "status": "False", "message": message,
+            "lastTransitionTime": "2026-10-22T16:02:32Z"
+        }));
+        assert!(!failing.ready);
+        assert_eq!(
+            failing.archive_failure,
+            Some(ArchiveFailure {
+                message: Some(message.to_owned()),
+                since: Some("2026-10-22T16:02:32Z".parse().unwrap()),
+            })
+        );
+
+        let working = backups(serde_json::json!({
+            "type": "ContinuousArchiving", "status": "True",
+            "lastTransitionTime": "2026-10-22T16:02:32Z"
+        }));
+        assert!(working.ready);
+        assert_eq!(working.archive_failure, None);
+
+        let unreported = backups(serde_json::json!({"type": "Other", "status": "True"}));
+        assert!(!unreported.ready);
+        assert_eq!(unreported.archive_failure, None);
     }
 
     #[test]
