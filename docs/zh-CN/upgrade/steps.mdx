@@ -7,10 +7,10 @@ description: 查看当前的 Zeabur 开源版版本，按安装方式用 Helm、
 
 ## 交给 Agent 升级
 
-Claude Code 或 Codex 这类 Coding Agent 可以替你按照这一页和升级须知操作。在能通过 SSH 连接服务器的电脑上运行 Agent，粘贴下面的提示词，并告诉它服务器的地址：
+Claude Code 或 Codex 这类 Coding Agent 可以替你按照这一页和升级须知操作。在能通过 SSH 连接服务器的电脑上运行 Agent，粘贴下面的提示词，并告诉它服务器的地址和版本，版本按[选哪一版](#选哪一版)确定：
 
 ```text
-按照 https://oss.zeabur.com/zh-CN/docs/zeabur/upgrade/steps.md 把我服务器上的 Zeabur 开源版升级到最新版。
+按照 https://oss.zeabur.com/zh-CN/docs/zeabur/upgrade/steps.md 把我服务器上的 Zeabur 开源版升级到 <版本> 版。我没说版本时，先问我，不要用 GitHub 的 Latest 标签决定版本。
 ```
 
 这个网址指向[本页的 Markdown 版](https://oss.zeabur.com/zh-CN/docs/zeabur/upgrade/steps.md)。Agent 会查明 Zeabur 开源版的安装方式，阅读中间每一版的升级须知，再告诉你要改哪些内容。创建快照和升级后用通行密钥登录需要你自己操作，Agent 会在这些步骤停下来等你。
@@ -20,6 +20,12 @@ Claude Code 或 Codex 这类 Coding Agent 可以替你按照这一页和升级�
 集群页面始终显示 `Zeabur v<版本>`。有新版本时，页面会出现通知，附上新版的版本号和发行说明链接。“设置”›“关于”也会显示版本。在这两个地方点击“升级方法”，都会按你的安装方式列出步骤，附上可以复制的命令和这一页的链接。
 
 用 `zeaburctl ui` 打开时，页面显示的是 `zeaburctl` 自己的版本。检查更新的细节，以及怎么关掉通知，见[检查更新](../reference/telemetry.mdx#检查更新)。
+
+## 选哪一版
+
+升级到这份文档写的版本，也就是 [CHANGELOG](../../../CHANGELOG.md) 最新标题里的版本号，不含日期，例如 `0.3.0` 或 `0.3.0-beta.2`。文档写的是预发行版时，就升级到那一版。GitHub 不会把预发行版标成 Latest，所以 Latest 标签可能指向较旧的版本。
+
+发行标签带 `v`，例如 `v0.3.0-beta.2`。`--version` 要给不带 `v` 的版本，也就是 `0.3.0-beta.2`。
 
 ## 升级前
 
@@ -32,7 +38,7 @@ Claude Code 或 Codex 这类 Coding Agent 可以替你按照这一页和升级�
 
 如果 `kubectl -n kube-system get configmap zeabur-installer` 找到了 ConfigMap，说明这台服务器是用 zeabur-installer 装好的。从 v0.2 升级到 v0.3 时，不要按这一节操作，改为按升级须知中的[用 zeabur-installer 安装的集群](notes.mdx#用-zeabur-installer-安装的集群)操作。
 
-把 `<版本>` 换成要升级的版本：
+把 `<版本>` 换成[选哪一版](#选哪一版)确定的版本：
 
 ```sh
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
@@ -81,4 +87,4 @@ Zeatend 可以直接接管这些服务器。没有 `/etc/zeatend/config.yaml` �
 
 ## 退回旧版
 
-要退回旧版，还原升级前的快照。
+要退回旧版，还原升级前的快照。没有快照就不支持退回。

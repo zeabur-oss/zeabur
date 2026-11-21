@@ -193,6 +193,8 @@ kubectl -n kube-system get configmap zeabur-installer zeabur-identity-authn --ig
 
 **先停下來**。把 `values.yaml` 和第 1 步的檢查結果給擁有者看，請擁有者替每台伺服器建立快照，完成後再告訴你。需要退回時，就還原這份快照。
 
+伺服器自己無法建立快照時，擁有者通常可以到服務商的管理頁面建立，等它完成。沒有快照就不支援退回。存下來的檔案不足以還原成 v0.2，因為第 4 步會刪掉安裝程式的 `HelmChart`，第 5 步會改動 Zeabur Identity 的 CRD。真的沒辦法建立快照時，告訴擁有者，升級後就無法退回 v0.2。擁有者確認每台伺服器的快照都已完成，或明確同意不做快照就繼續後，才開始第 4 步。
+
 #### 4. 讓安裝程式的 `HelmChart` 不再管理 release
 
 K3s 的 helm-controller 用 `HelmChart` `kube-system/zeabur` 管理這個 release。直接刪除 `HelmChart` 會一併解除安裝 Zeabur 開源版。先告訴 helm-controller 不要再管理這個 release，再移除 `HelmChart`：
@@ -212,7 +214,7 @@ kubectl -n zeabur get pods
 
 #### 5. 更新 Zeabur Identity 的 CRD
 
-Helm 只會在第一次安裝時安裝 chart 的 CRD，不會更新。請下載 chart，自己套用新的 CRD。把 `<version>` 換成要升級的版本；除非擁有者指定別的版本，就用 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 上最新的那一版：
+Helm 只會在第一次安裝時安裝 chart 的 CRD，不會更新。請下載 chart，自己套用新的 CRD。把 `<version>` 換成要升級的版本，照[選哪一版](steps.mdx#選哪一版)決定，不要加 `v`：
 
 ```sh
 helm pull oci://ghcr.io/zeabur-oss/charts/zeabur --version <version> --untar

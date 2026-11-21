@@ -7,10 +7,10 @@ Find how you installed Zeabur OSS, then follow that section. Nothing upgrades on
 
 ## Let an agent upgrade for you
 
-An agent such as Claude Code or Codex can follow this page and the upgrade notes for you. Paste this prompt, run the agent on a computer that can reach the server over SSH, and tell it the server's address:
+An agent such as Claude Code or Codex can follow this page and the upgrade notes for you. Paste this prompt, run the agent on a computer that can reach the server over SSH, and tell it the server's address and the version, as [Which version](#which-version) shows:
 
 ```text
-Upgrade Zeabur OSS on my server to the latest version by following https://oss.zeabur.com/docs/zeabur/upgrade/steps.md.
+Upgrade Zeabur OSS on my server to version <version> by following https://oss.zeabur.com/docs/zeabur/upgrade/steps.md. If I haven't named a version, ask me. Don't use GitHub's Latest label to choose the version.
 ```
 
 The address points to [the Markdown copy of this page](https://oss.zeabur.com/docs/zeabur/upgrade/steps.md). The agent finds how Zeabur OSS was installed, reads the upgrade notes for each version in between, and shows you what it will change. You take the snapshot and sign in afterwards with your passkey; the agent waits for you at those steps.
@@ -20,6 +20,12 @@ The address points to [the Markdown copy of this page](https://oss.zeabur.com/do
 The cluster page always shows `Zeabur v<version>`. When a newer version is out, a notice appears with its version and a link to the release notes. **Settings** › **About** shows the version too. In either place, **How to upgrade** opens the steps for how you installed Zeabur OSS, with the commands to copy and a link to this page.
 
 Under `zeaburctl ui`, the page shows `zeaburctl`'s own version. For the details of the check and how to turn the notice off, see [Update check](../reference/telemetry.mdx#update-check).
+
+## Which version
+
+Upgrade to the version these docs describe. It is the version number in the newest heading of the [CHANGELOG](../../CHANGELOG.md), without the date, such as `0.3.0` or `0.3.0-beta.2`. A pre-release counts when the docs describe one. GitHub never marks a pre-release as Latest, so the Latest label can point to an older version.
+
+The release tag has a `v`, such as `v0.3.0-beta.2`. Give `--version` the version without it, as `0.3.0-beta.2`.
 
 ## Before you upgrade
 
@@ -32,7 +38,7 @@ Under `zeaburctl ui`, the page shows `zeaburctl`'s own version. For the details 
 
 If `kubectl -n kube-system get configmap zeabur-installer` finds a ConfigMap, zeabur-installer set up this server. To move from v0.2 to v0.3, follow [Installed with zeabur-installer](notes.mdx#installed-with-zeabur-installer) in the upgrade notes instead of this section.
 
-Replace `<version>` with the version you're moving to:
+Replace `<version>` with the version from [Which version](#which-version):
 
 ```sh
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
@@ -81,4 +87,4 @@ Zeatend takes over these servers as they are. With no `/etc/zeatend/config.yaml`
 
 ## Go back
 
-To go back to an older version, restore a snapshot taken before the upgrade.
+To go back to an older version, restore a snapshot taken before the upgrade. Going back without a snapshot isn't supported.

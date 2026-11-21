@@ -193,6 +193,8 @@ These files hold secrets, such as Zeabur Identity's signing keys. Keep them on t
 
 **Stop.** Show the owner `values.yaml` and the results of step 1. Ask them to take a snapshot of each server and to tell you when it is done. To go back, they restore this snapshot.
 
+When the server can't take a snapshot itself, the owner can often take it in the provider's panel. Wait until it is done. Going back without a snapshot isn't supported. The saved files are not enough to put v0.2 back, because step 4 deletes the installer's `HelmChart` and step 5 changes Zeabur Identity's CRDs. When no snapshot is possible, tell the owner that the upgrade can't be undone. Start step 4 only after the owner confirms that every snapshot is done, or agrees in plain words to go on without one.
+
 #### 4. Detach the installer's `HelmChart`
 
 K3s's helm-controller owns the release through the `HelmChart` `kube-system/zeabur`. Deleting the `HelmChart` as it is uninstalls Zeabur OSS. Tell helm-controller to leave the release alone first, then remove the `HelmChart`:
@@ -212,7 +214,7 @@ kubectl -n zeabur get pods
 
 #### 5. Update Zeabur Identity's CRDs
 
-Helm installs a chart's CRDs only on a first install and never upgrades them. Download the chart and apply the new ones yourself. Replace `<version>` with the version you're moving to, the newest one on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) unless the owner named another:
+Helm installs a chart's CRDs only on a first install and never upgrades them. Download the chart and apply the new ones yourself. Replace `<version>` with the version you're moving to, as [Which version](steps.mdx#which-version) shows, without the `v`:
 
 ```sh
 helm pull oci://ghcr.io/zeabur-oss/charts/zeabur --version <version> --untar
