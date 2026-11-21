@@ -469,7 +469,7 @@ pub fn install(
     let mut steps = Vec::new();
     let mut warnings = Vec::new();
     let mut resolved = Vec::new();
-    let mut picked = BTreeSet::new();
+    let mut picked = fixed_addresses(snapshot, &order, inputs);
     for (i, component) in order.iter().enumerate() {
         let file = snapshot
             .components
@@ -534,6 +534,29 @@ pub fn install(
         warnings,
         inputs: resolved,
     })
+}
+
+/// The addresses that the `clusterIP` inputs of `order` already have, given, kept or by
+/// default, so that no generated address is the same.
+fn fixed_addresses(snapshot: &Snapshot, order: &[String], inputs: Inputs<'_>) -> BTreeSet<IpAddr> {
+    let mut fixed = BTreeSet::new();
+    for file in order.iter().filter_map(|id| snapshot.components.get(id)) {
+        for input in &file.declaration.inputs {
+            if input.generate != Some(Generate::ClusterIp) {
+                continue;
+            }
+            let set = [inputs.given, inputs.kept]
+                .map(|values| values.get(&file.id).and_then(|m| m.get(&input.name)));
+            for value in set.into_iter().chain([input.default.as_ref()]).flatten() {
+                if let InputValue::Text(text) = value
+                    && let Ok(address) = text.parse()
+                {
+                    fixed.insert(address);
+                }
+            }
+        }
+    }
+    fixed
 }
 
 /// The value of each input of `file`: given, else kept, else the default, else generated. An
@@ -2128,6 +2151,14 @@ mod tests {
         assert_eq!(
             written_value(&chosen, "clusterIp"),
             Some(text("10.43.0.50"))
+        );
+
+        // A given address that no Service holds yet is not generated for another input.
+        let given = values(&[("velero", "otherIp", text("10.43.0.2"))]);
+        let install = with_cluster_ips(&given, &Values::new(), Some(&k3s));
+        assert_eq!(
+            written_value(&install, "clusterIp"),
+            Some(text("10.43.0.3"))
         );
     }
 
