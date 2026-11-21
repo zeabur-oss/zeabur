@@ -894,6 +894,21 @@ impl World {
         })
     }
 
+    /// The steps of `file` a removal deletes: no inputs, and no values from other components.
+    async fn removed_steps(&self, file: &ComponentFile) -> Result<Vec<engine::Step>, ApiError> {
+        let manifests = self.manifests([file]).await?;
+        engine::steps_of(
+            file,
+            &self.snapshot.index.catalog.version,
+            self.profile,
+            &manifests,
+            &[],
+            &engine::Contributions::default(),
+            &self.zeabur_namespace,
+        )
+        .map_err(|r| refusal(&r))
+    }
+
     async fn remove(&self, cluster: &dyn Cluster, id: &str) -> Result<Planned, ApiError> {
         let file = self
             .snapshot
@@ -909,18 +924,7 @@ impl World {
             )));
         }
         let version = &self.snapshot.index.catalog.version;
-        let manifests = self.manifests([file]).await?;
-        let none = engine::Contributions::default();
-        let own = engine::steps_of(
-            file,
-            version,
-            self.profile,
-            &manifests,
-            &[],
-            &none,
-            &self.zeabur_namespace,
-        )
-        .map_err(|r| refusal(&r))?;
+        let own = self.removed_steps(file).await?;
         let mut zeaburs = false;
         let mut leftovers = file.declaration.leftovers.clone();
         leftovers.extend(engine::input_secrets(file));
