@@ -2,6 +2,8 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
   labels:
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/enforce: restricted
@@ -15,6 +17,8 @@ kind: Secret
 metadata:
   name: velero-credentials
   namespace: velero
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 stringData:
   cloud: "<credentials>"
 ---
@@ -25,6 +29,8 @@ kind: Secret
 metadata:
   name: velero-repo-credentials
   namespace: velero
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 stringData:
   repository-password: "<random: openssl rand -hex 64>"
 ---
@@ -35,6 +41,8 @@ kind: Secret
 metadata:
   name: velero-backup-key
   namespace: velero
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 stringData:
   key: "<random: openssl rand -base64 24 | tr '+/' '-_' | tr -d '='>"
 ---

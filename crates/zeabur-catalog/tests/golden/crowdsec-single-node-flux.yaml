@@ -2,6 +2,8 @@
 apiVersion: v1
 kind: Namespace
 metadata:
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
   labels:
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/enforce: privileged
@@ -15,6 +17,8 @@ kind: Secret
 metadata:
   name: crowdsec-bouncer-key
   namespace: crowdsec
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 stringData:
   key: "<random: openssl rand -hex 64>"
 ---
@@ -26,6 +30,8 @@ kind: Secret
 metadata:
   name: crowdsec-lapi
   namespace: crowdsec
+  annotations:
+    kustomize.toolkit.fluxcd.io/prune: disabled
 stringData:
   csLapiSecret: "<random: openssl rand -hex 64>"
   registrationToken: "<random: openssl rand -hex 64>"
@@ -65,6 +71,7 @@ spec:
   url: oci://ghcr.io/crowdsecurity/helm-charts/crowdsec
   ref:
     tag: 0.24.2
+    digest: sha256:9078b83a6ba27a9a258cbdb4d8aefba6992a833041ba07317133fd61c5e6b446
   layerSelector:
     mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip
     operation: copy
