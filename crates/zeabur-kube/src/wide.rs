@@ -19,6 +19,7 @@
 use std::collections::BTreeMap;
 
 use k8s_openapi::api::events::v1::Event;
+use k8s_openapi::jiff::Timestamp;
 use kube::api::ListParams;
 use serde::Deserialize;
 use serde::de::DeserializeOwned;
@@ -172,6 +173,19 @@ struct RawResources {
 struct RawPodStatus {
     #[serde(default)]
     phase: Option<String>,
+    #[serde(default)]
+    conditions: Vec<RawCondition>,
+}
+
+#[derive(Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+struct RawCondition {
+    #[serde(default, rename = "type")]
+    type_: String,
+    #[serde(default)]
+    status: String,
+    #[serde(default)]
+    last_transition_time: Option<Timestamp>,
 }
 
 impl ClusterPod {
@@ -212,6 +226,12 @@ impl From<RawPod> for ClusterPod {
             namespace: raw.metadata.namespace,
             name: raw.metadata.name,
             node_name: raw.spec.node_name.filter(|n| !n.is_empty()),
+            ready_since: raw
+                .status
+                .conditions
+                .iter()
+                .find(|c| c.type_ == "Ready" && c.status == "True")
+                .and_then(|c| c.last_transition_time),
             phase: raw.status.phase,
             containers: raw.spec.containers.into_iter().map(container).collect(),
             init_containers: raw
