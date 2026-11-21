@@ -37,12 +37,12 @@ description: 檢視叢集裝了哪些元件、狀態如何、還缺什麼，再�
 
 ### 安裝
 
-按**安裝**。Zeabur 用你的帳號一次寫入一個步驟，前一步就緒後才寫入下一步。視窗開著，等每個步驟和健康檢查都顯示**就緒**；中途關掉的話，在卡片按**管理**會從停下的地方接著做。健康檢查花的時間比預期久時，視窗會說明該檢查什麼。
+按**安裝**。Zeabur 開源版用你的帳號一次寫入一個步驟，前一步就緒後才寫入下一步。視窗開著，等每個步驟和健康檢查都顯示**就緒**；中途關掉的話，在卡片按**管理**會從停下的地方接著做。健康檢查花的時間比預期久時，視窗會說明該檢查什麼。
 
 </Step>
 </Steps>
 
-視窗顯示元件已經安裝、但不是 Zeabur 裝的時，Zeabur 不會動它。要升級或移除，用當初安裝它的工具。
+視窗顯示元件已經安裝、但不是 Zeabur 開源版裝的時，Zeabur 開源版不會動它。要升級或移除，用當初安裝它的工具。
 
 ## 用 zeaburctl 安裝
 
@@ -92,7 +92,7 @@ zeaburctl components export velero --format helm
 
 ## 修改內建元件的設定
 
-K3s 和 RKE2 會自己安裝一些元件，例如 Traefik。**已安裝**裡這些元件的來源是 K3s 或 RKE2，卡片上沒有**安裝**或**管理**按鈕，因為 Zeabur 只管理自己安裝的元件。不要改 server 上 manifests 目錄裡內建元件的 manifest 檔案，K3s 每次啟動都會重新寫一次。
+K3s 和 RKE2 會自己安裝一些元件，例如 Traefik。**已安裝**裡這些元件的來源是 K3s 或 RKE2，卡片上沒有**安裝**或**管理**按鈕，因為 Zeabur 開源版只管理自己安裝的元件。不要改 server 上 manifests 目錄裡內建元件的 manifest 檔案，K3s 每次啟動都會重新寫一次。
 
 發行版用 Helm chart 安裝的元件，卡片上會寫出它的 `HelmChart` 名稱，例如 K3s 上是 `traefik`，RKE2 上是 `rke2-traefik`。要改 chart 的值，就在 `kube-system` 寫一個同名的 `HelmChartConfig`。helm-controller 會把它的 `valuesContent` 當成額外的 values 檔交給 Helm，再升級 chart。K3s 的 metrics-server 是一般的 manifest，不是 chart，所以卡片上沒有 chart 名稱，`HelmChartConfig` 也改不到它。
 
@@ -125,9 +125,9 @@ helm-controller 接著會用發行版原本的值再升級一次 chart。
 
 ## 移除元件
 
-要移除 Zeabur 裝的元件，在卡片按**管理**。每個步驟和健康檢查都就緒後，視窗會改成移除；安裝還沒完成時，例如健康檢查失敗，視窗會在**安裝**旁邊顯示**移除**。檢查步驟後按**移除**。Zeabur 會照相反的順序刪除元件的物件；刪掉 Chart 後，helm-controller 會解除安裝。視窗會列出會留下的東西，例如 CRD 和金鑰。還有其他已安裝的元件需要這個元件，或它的自訂資源還有物件在用時，Zeabur 會拒絕移除，並列出是哪些。在用的物件包括 Zeabur 為其他元件寫入的物件，以及在這個元件自己的 Namespace 以外的物件。
+要移除 Zeabur 開源版裝的元件，在卡片按**管理**。每個步驟和健康檢查都就緒後，視窗會改成移除；安裝還沒完成時，例如健康檢查失敗，視窗會在**安裝**旁邊顯示**移除**。檢查步驟後按**移除**。Zeabur 開源版會照相反的順序刪除元件的物件；刪掉 Chart 後，helm-controller 會解除安裝。視窗會列出會留下的東西，例如 CRD 和金鑰。還有其他已安裝的元件需要這個元件，或它的自訂資源還有物件在用時，Zeabur 開源版會拒絕移除，並列出是哪些。在用的物件包括 Zeabur 開源版為其他元件寫入的物件，以及在這個元件自己的 Namespace 以外的物件。
 
-不是 Zeabur 裝的元件，用當初安裝它的檔案或工具移除，例如 `kubectl delete -f`、`helm uninstall`、Flux 或 Argo CD。
+不是 Zeabur 開源版裝的元件，用當初安裝它的檔案或工具移除，例如 `kubectl delete -f`、`helm uninstall`、Flux 或 Argo CD。
 
 移除前先確認沒有東西還在用它，例如還有這個元件的自訂資源、還有 Longhorn 的磁碟區，或還有副本從 zot 拉映像檔。Longhorn 這類保存資料的元件，移除時會連資料一起刪掉，先備份。
 
@@ -135,9 +135,9 @@ helm-controller 接著會用發行版原本的值再升級一次 chart。
 
 ## 目錄從哪裡下載
 
-Zeabur 從 `https://oss-catalog.zeabur.com/v1/` 下載 Zeabur Catalog，手上的版本超過 10 分鐘就重新下載。最後下載到的版本會存在它所在 Namespace 的 ConfigMap `zeabur-catalog`，重新啟動或目錄暫時連不上時都還在。元件頁會顯示目前用的版本和下載時間。
+Zeabur 開源版從 `https://oss-catalog.zeabur.com/v1/` 下載 Zeabur Catalog，手上的版本超過 10 分鐘就重新下載。最後下載到的版本會存在它所在 Namespace 的 ConfigMap `zeabur-catalog`，重新啟動或目錄暫時連不上時都還在。元件頁會顯示目前用的版本和下載時間。
 
-Zeabur 下載不到目錄、手上也沒有存好的版本時，頁面會說明原因，並提供**重試**。已安裝的元件和所有服務照常運作，只有安裝元件時才需要目錄。
+Zeabur 開源版下載不到目錄、手上也沒有存好的版本時，頁面會說明原因，並提供**重試**。已安裝的元件和所有服務照常運作，只有安裝元件時才需要目錄。
 
 ### 改用鏡像
 
@@ -145,7 +145,7 @@ Zeabur 下載不到目錄、手上也沒有存好的版本時，頁面會說明�
 
 1. 從 [Zeabur Catalog 的發行版本](https://github.com/zeabur-oss/catalog/releases)下載 `api-v1.tar.gz` 並解開，裡面是 `v1` 資料夾。
 2. 用任何網頁伺服器提供裝著 `v1` 的資料夾，走 HTTPS，憑證要是叢集信任的。用私有 CA 時，見[信任私有 CA](../install/existing-cluster.mdx#信任私有-ca)。
-3. 讓 Zeabur 改從鏡像下載：
+3. 讓 Zeabur 開源版改從鏡像下載：
 
    ```sh
    helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \

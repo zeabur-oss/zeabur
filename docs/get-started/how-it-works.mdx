@@ -1,23 +1,23 @@
 ---
-title: How Zeabur manages services
-description: Four scenarios explain how Zeabur and Kubernetes work together with existing deployments, concurrent edits, limited permissions, and removing Zeabur.
+title: How Zeabur OSS manages services
+description: Four scenarios explain how Zeabur OSS and Kubernetes work together with existing deployments, concurrent edits, limited permissions, and removing Zeabur OSS.
 ---
 
-Zeabur doesn't have its own database. Every project, service, and domain you see in Zeabur comes directly from Kubernetes. Changes you make in Zeabur write directly to Kubernetes objects. The four scenarios below explain what this means in everyday use.
+Zeabur OSS doesn't have its own database. Every project, service, and domain you see in Zeabur OSS comes directly from Kubernetes. Changes you make in Zeabur OSS write directly to Kubernetes objects. The four scenarios below explain what this means in everyday use.
 
 ## A service already deployed with Helm
 
-Suppose a teammate used Helm to deploy into the `shop` Namespace six months ago. Open **Projects** in Zeabur, find it under **Other namespaces**, and open it. The services, domains, and environment variables are already there. There's nothing to import.
+Suppose a teammate used Helm to deploy into the `shop` Namespace six months ago. Open **Projects** in Zeabur OSS, find it under **Other namespaces**, and open it. The services, domains, and environment variables are already there. There's nothing to import.
 
-To manage it as a project, click **Use this namespace**. Zeabur adds a label to the Namespace. It doesn't move anything inside it.
+To manage it as a project, click **Use this namespace**. Zeabur OSS adds a label to the Namespace. It doesn't move anything inside it.
 
-Next, you might try to increase the replica count directly in Zeabur. Zeabur blocks the change and tells you that Helm manages this service: even if the change succeeded, the next `helm upgrade` would overwrite it. To change the replica count, edit the Helm values. Restarting doesn't change the configuration, so you can still restart the service. The same applies to services managed by Argo CD and Flux.
+Next, you might try to increase the replica count directly in Zeabur OSS. Zeabur OSS blocks the change and tells you that Helm manages this service: even if the change succeeded, the next `helm upgrade` would overwrite it. To change the replica count, edit the Helm values. Restarting doesn't change the configuration, so you can still restart the service. The same applies to services managed by Argo CD and Flux.
 
 ## A teammate makes a change after your review
 
-You change the replica count from 2 to 3 and click **Review changes**. Zeabur shows the diff it would write to the cluster. Nothing in the cluster has changed yet.
+You change the replica count from 2 to 3 and click **Review changes**. Zeabur OSS shows the diff it would write to the cluster. Nothing in the cluster has changed yet.
 
-While you're getting a glass of water, a teammate uses `kubectl` to change the image in the same Deployment. When you return and click Apply, Zeabur rejects the change and asks you to review it again. The new diff uses your teammate's updated version, so you won't accidentally revert the image they changed.
+While you're getting a glass of water, a teammate uses `kubectl` to change the image in the same Deployment. When you return and click Apply, Zeabur OSS rejects the change and asks you to review it again. The new diff uses your teammate's updated version, so you won't accidentally revert the image they changed.
 
 Reviewed changes also expire if you leave them too long. When you see **These changes expired**, click **Review again**.
 
@@ -25,14 +25,14 @@ Reviewed changes also expire if you leave them too long. When you see **These ch
 
 A new teammate has the **Viewer** role in `shop`. They can see services and their status, but opening **Logs** shows a permission error.
 
-Every time Zeabur reads from or writes to the cluster, it uses the signed-in user's identity. Kubernetes RBAC determines what that user can do. The **Viewer** role can't read logs or secrets, so Zeabur can't read them either. Zeabur has no cluster permissions of its own and can't grant anyone extra access.
+Every time Zeabur OSS reads from or writes to the cluster, it uses the signed-in user's identity. Kubernetes RBAC determines what that user can do. The **Viewer** role can't read logs or secrets, so Zeabur OSS can't read them either. Zeabur OSS has no cluster permissions of its own and can't grant anyone extra access.
 
 To give the new teammate access to logs, an administrator can open [Members](../cluster/members.mdx) and change their role to **Developer**. Administrators signed in with an admin account already have access to the entire cluster and don't run into this. See [Permissions](../reference/permissions.mdx) for what each role can do.
 
-## You decide to stop using Zeabur
+## You decide to stop using Zeabur OSS
 
-The services are Kubernetes objects, so removing Zeabur leaves Deployments, Services, Ingresses, environment variables, and volumes in their original Namespace. The website keeps responding as usual.
+The services are Kubernetes objects, so removing Zeabur OSS leaves Deployments, Services, Ingresses, environment variables, and volumes in their original Namespace. The website keeps responding as usual.
 
-Removing Zeabur removes its management interface and the member roles it installed. Teammates who rely on those roles for cluster access need another way to get permissions before removal. Keep components such as database operators, Ingress controllers, and cert-manager, too. The services still depend on them.
+Removing Zeabur OSS removes its management interface and the member roles it installed. Teammates who rely on those roles for cluster access need another way to get permissions before removal. Keep components such as database operators, Ingress controllers, and cert-manager, too. The services still depend on them.
 
-For the full removal steps and the list of components to keep, see [Uninstall Zeabur](../leave/uninstall.mdx).
+For the full removal steps and the list of components to keep, see [Uninstall Zeabur OSS](../leave/uninstall.mdx).

@@ -22,7 +22,7 @@ description: 为集群创建 GitHub App 并向项目开放，成员就能直接�
 
 | 字段 | 填写方式 |
 | --- | --- |
-| **在 GitHub 上的名称** | 默认为“Zeabur”加上集群名称，最多 34 个字符，不能与 GitHub 上的其他 App 重名。 |
+| **在 GitHub 上的名称** | 默认为“Zeabur 开源版”加上集群名称，最多 34 个字符，不能与 GitHub 上的其他 App 重名。 |
 | **组织** | 留空则在你自己的账号下创建。 |
 | **Webhook 地址** | 以 `https://` 开头。只有 Zeabur Builder 启用了 Webhook 接收器时才需要填写。留空时，Zeabur Builder 每分钟检查一次 GitHub 是否有新提交。 |
 
@@ -31,11 +31,11 @@ description: 为集群创建 GitHub App 并向项目开放，成员就能直接�
 </Step>
 <Step>
 
-### 在 GitHub 创建后保存到 Zeabur
+### 在 GitHub 创建后保存到 Zeabur 开源版
 
 点击**前往 GitHub**，在 GitHub 确认创建。这个 App 不公开，权限仅限于读取仓库内容和写入提交状态。如果填写了 Webhook 地址，App 也会接收 push 事件。
 
-GitHub 会带你返回 Zeabur。检查要写入的机密变量（不会显示私钥），点击**保存 GitHub App**。从点击**创建 GitHub App** 起，必须在一小时内完成这一步。
+GitHub 会带你返回 Zeabur 开源版。检查要写入的机密变量（不会显示私钥），点击**保存 GitHub App**。从点击**创建 GitHub App** 起，必须在一小时内完成这一步。
 
 如果集群已有 App，新 App 会替换旧 App。使用旧 App 构建的服务，需要等你将新 App 向这些服务所在的项目开放后，才能再次获取新提交。
 
@@ -44,7 +44,7 @@ GitHub 会带你返回 Zeabur。检查要写入的机密变量（不会显示私
 
 ### 安装到仓库所在的账号
 
-点击**安装到 GitHub**，在 GitHub 选择账号或组织，再选择**所有仓库**或指定仓库。返回 Zeabur 后，**已安装的账号**会列出该账号。
+点击**安装到 GitHub**，在 GitHub 选择账号或组织，再选择**所有仓库**或指定仓库。返回 Zeabur 开源版后，**已安装的账号**会列出该账号。
 
 ![集群的 GitHub 选项卡，已安装的账号 acme 和 bob，分别列出向哪些项目开放](../images/shots/github-app-installed.avif)
 
@@ -72,7 +72,7 @@ GitHub 会带你返回 Zeabur。检查要写入的机密变量（不会显示私
 
 ## 用 kubectl 完成相同配置
 
-Zeabur Builder 从 `builder-system` 中的 Secret `github-app` 读取 App 的密钥。这些值都能在 GitHub 的 App 设置页面找到，私钥需要在那里生成并下载。如果使用 GitHub Enterprise Server，再添加一个 `api-url` 键，填入 Enterprise Server 的 API 地址。annotation 仅用于让 Zeabur 链接到 App 页面。
+Zeabur Builder 从 `builder-system` 中的 Secret `github-app` 读取 App 的密钥。这些值都能在 GitHub 的 App 设置页面找到，私钥需要在那里生成并下载。如果使用 GitHub Enterprise Server，再添加一个 `api-url` 键，填入 Enterprise Server 的 API 地址。annotation 仅用于让 Zeabur 开源版链接到 App 页面。
 
 ```yaml
 apiVersion: v1
@@ -105,7 +105,7 @@ data:
   "87654321": shop, blog
 ```
 
-Zeabur 还会在每个已开放的项目中写入一个 ConfigMap `zeabur-github-app`（label 为 `zeabur.com/github-app: "true"`），记录当时有权读取的仓库，让没有权限读取 `builder-system` 的成员也能选择仓库。Zeabur Builder 不读取这个 ConfigMap，用 kubectl 配置时可以不写，但页面上的列表会是空的，需要自行填写仓库地址。
+Zeabur 开源版还会在每个已开放的项目中写入一个 ConfigMap `zeabur-github-app`（label 为 `zeabur.com/github-app: "true"`），记录当时有权读取的仓库，让没有权限读取 `builder-system` 的成员也能选择仓库。Zeabur Builder 不读取这个 ConfigMap，用 kubectl 配置时可以不写，但页面上的列表会是空的，需要自行填写仓库地址。
 
 服务的 Build 通过 `spec.source.githubApp.installationId` 指定安装实例：
 
@@ -144,8 +144,8 @@ spec:
 | --- | --- |
 | 页面提示尚未安装 Zeabur Builder | 先安装 Zeabur Builder，参见[查看与安装集群组件](./components.mdx)。 |
 | 无法点击**创建 GitHub App** | 你没有写入 `builder-system` Secret 的权限，请集群管理员处理。 |
-| 返回 Zeabur 时提示 GitHub 未返回验证码 | 在同一页面重新创建一次 App。 |
-| 无法读取**已安装的账号** | Zeabur 无法连接 GitHub，或 App 的私钥不正确。到 GitHub 重新生成私钥，更新 Secret 的 `private-key`。 |
+| 返回 Zeabur 开源版时提示 GitHub 未返回验证码 | 在同一页面重新创建一次 App。 |
+| 无法读取**已安装的账号** | Zeabur 开源版无法连接 GitHub，或 App 的私钥不正确。到 GitHub 重新生成私钥，更新 Secret 的 `private-key`。 |
 | 在项目中找不到仓库 | 安装 App 时未选择该仓库，或列表尚未更新。到 GitHub 调整安装时选择的仓库，再到**选择项目**应用一次。 |
 | 推送后需要等一分钟才开始构建 | 未配置 Webhook，Zeabur Builder 每分钟检查一次。 |
 

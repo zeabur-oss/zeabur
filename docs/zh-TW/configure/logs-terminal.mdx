@@ -43,7 +43,7 @@ Kubernetes 只保留大約一小時內的事件。更早的問題要看日誌的
 - **目前用量**：每個副本的 CPU 和記憶體，和保留量、上限並列。快用到記憶體上限時會標**接近記憶體上限**，超過上限時容器會重新啟動。這需要叢集裝 metrics-server，沒裝時按**安裝**，看要在伺服器上執行的指令。
 - **歷史紀錄**：一段時間的用量圖，會標出 OOMKilled 和重新啟動的時間點。這需要相容 Prometheus 的指標儲存服務，例如 VictoriaMetrics 或 Prometheus。沒有時按**安裝 VictoriaMetrics**，已經有時按**改用其他儲存服務**，指定這個儲存服務的 Kubernetes Service。
 
-叢集管理員在 Helm chart 開啟 `proxy.enabled` 後，專案的檢視者和開發者都看得到自己專案的**歷史紀錄**。Zeabur Proxy 會先確認你是這個專案的成員，查詢也只拿得到這個專案的指標。沒開啟，或在設定裡改用其他儲存服務時，Zeabur 直接讀取儲存服務，能這樣讀的人看得到所有專案的指標，所以只有管理員看得到。
+叢集管理員在 Helm chart 開啟 `proxy.enabled` 後，專案的檢視者和開發者都看得到自己專案的**歷史紀錄**。Zeabur Proxy 會先確認你是這個專案的成員，查詢也只拿得到這個專案的指標。沒開啟，或在設定裡改用其他儲存服務時，Zeabur 開源版直接讀取儲存服務，能這樣讀的人看得到所有專案的指標，所以只有管理員看得到。
 
 ![服務的用量分頁，上方是每個副本目前的 CPU 和記憶體，下方是歷史用量圖](../images/shots/service-usage.avif)
 
@@ -108,7 +108,7 @@ Kubernetes 無法提早移除除錯容器。副本換成新的之前（例如重
 
 ## 開啟 kubectl 終端機
 
-要在瀏覽器裡用 kubectl 或 helm，從頁面下方的終端機區域或搜尋選**開啟 kubectl 終端機**。Zeabur 會在 `zeabur-terminals` Namespace 替你啟動一個暫時的容器，裡面的 kubectl 和 helm 以你的身分執行，用你自己的權限，預設在目前的專案。
+要在瀏覽器裡用 kubectl 或 helm，從頁面下方的終端機區域或搜尋選**開啟 kubectl 終端機**。Zeabur 開源版會在 `zeabur-terminals` Namespace 替你啟動一個暫時的容器，裡面的 kubectl 和 helm 以你的身分執行，用你自己的權限，預設在目前的專案。
 
 在專案以外的頁面（例如**叢集**頁）開啟時，開的是整個叢集的 kubectl 終端機，確認畫面標題是**開啟叢集的 kubectl 終端機**。預設在 `default` Namespace，你有權限的 Namespace 都能操作。
 
@@ -118,7 +118,7 @@ Kubernetes 無法提早移除除錯容器。副本換成新的之前（例如重
 
 以下以專案 `demo`、Deployment `web` 為例。
 
-| Zeabur 的動作 | kubectl |
+| Zeabur 開源版的動作 | kubectl |
 | --- | --- |
 | **日誌**，**持續追蹤** | `kubectl -n demo logs deployment/web -f` |
 | 指定副本和容器 | `kubectl -n demo logs web-7c9d8b6f5-x2k4p -c web` |

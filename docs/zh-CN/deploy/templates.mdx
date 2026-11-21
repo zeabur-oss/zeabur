@@ -68,9 +68,9 @@ description: 从 Zeabur Catalog 的模板中选择应用，填写域名和必要
 
 ### 自己生成 YAML 再应用
 
-Zeabur 使用内置的 Zeabur Catalog 将模板转换为 Kubernetes 的 YAML。转换在 Zeabur 内部完成，没有对应的集群对象，但你可以用 Catalog 的 `catalog` 命令生成相同的 YAML，再用 kubectl 应用。
+Zeabur 开源版使用内置的 Zeabur Catalog 将模板转换为 Kubernetes 的 YAML。转换在 Zeabur 开源版内部完成，没有对应的集群对象，但你可以用 Catalog 的 `catalog` 命令生成相同的 YAML，再用 kubectl 应用。
 
-先查看 Zeabur 使用的 Catalog 版本：打开**设置**中的**关于**，**Zeabur Catalog** 一行显示的就是 Catalog 的提交。在 Catalog 源码中切换到该提交，进入 `nix develop` 后运行：
+先查看 Zeabur 开源版使用的 Catalog 版本：打开**设置**中的**关于**，**Zeabur Catalog** 一行显示的就是 Catalog 的提交。在 Catalog 源码中切换到该提交，进入 `nix develop` 后运行：
 
 ```sh
 umask 077

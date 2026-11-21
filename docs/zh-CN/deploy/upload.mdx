@@ -11,7 +11,7 @@ description: 将电脑上的文件夹或 .zip 文件交给 Zeabur Builder 构建
 
 - 条件与[从 Git 部署](./git.mdx)相同：已安装 Zeabur Builder 和 Keel，chart 已配置 `builds.registry`，你有在项目中创建服务和 Build 的权限。缺少组件时，**上传文件夹**下方会写出缺少哪些，点击后会列出安装命令。
 - Zeabur Builder 必须配置 `registry.tokenKey`，上传时才能获取有时效的令牌。未配置时，上传会停在 **Zeabur Builder 不允许上传**。
-- 你需要有读取项目中机密变量的权限。Zeabur Builder 将上传令牌写入 `<服务名称>-upload` 机密变量，Zeabur 使用你的权限读取，不使用自身的权限。
+- 你需要有读取项目中机密变量的权限。Zeabur Builder 将上传令牌写入 `<服务名称>-upload` 机密变量，Zeabur 开源版使用你的权限读取，不使用自身的权限。
 
 ## 创建服务
 
@@ -20,7 +20,7 @@ description: 将电脑上的文件夹或 .zip 文件交给 Zeabur Builder 构建
 
 ### 选择文件夹
 
-打开**新建** → **上传文件夹**，将文件夹拖入虚线框，或点击**选择文件夹**。如果已有 `.zip` 文件，直接拖入或点击**选择 .zip 文件**。从 GitHub 下载的 `.zip` 通常会多包一层文件夹，Zeabur 会自动去掉这一层。
+打开**新建** → **上传文件夹**，将文件夹拖入虚线框，或点击**选择文件夹**。如果已有 `.zip` 文件，直接拖入或点击**选择 .zip 文件**。从 GitHub 下载的 `.zip` 通常会多包一层文件夹，Zeabur 开源版会自动去掉这一层。
 
 打包时：
 
@@ -58,11 +58,11 @@ description: 将电脑上的文件夹或 .zip 文件交给 Zeabur Builder 构建
 
 ## 上传新版本
 
-在服务的**构建**标签页点击**上传文件夹**，选择新版本的文件夹。Zeabur 会沿用该服务的构建方式和配置。
+在服务的**构建**标签页点击**上传文件夹**，选择新版本的文件夹。Zeabur 开源版会沿用该服务的构建方式和配置。
 
 ## 用 zeaburctl 上传
 
-在终端和脚本中可以使用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，无需知道 registry 或 Zeabur 的地址。使用 Zeabur Identity 登录时，文件夹会交给集群中的 Zeabur。使用管理员 kubeconfig 等其他凭证时，命令会在你的电脑上运行相同的步骤，凭证不会离开你的电脑。
+在终端和脚本中可以使用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，无需知道 registry 或 Zeabur 开源版的地址。使用 Zeabur Identity 登录时，文件夹会交给集群中的 Zeabur 开源版。使用管理员 kubeconfig 等其他凭证时，命令会在你的电脑上运行相同的步骤，凭证不会离开你的电脑。
 
 ```sh
 zeaburctl up ./site --project shop --service site
@@ -130,7 +130,7 @@ kubectl -n shop patch build site --type=merge \
 | --- | --- |
 | **等待文件夹** | 上传尚未开始，或上传途中关闭了页面。在**构建**中点击**上传文件夹**。 |
 | **Zeabur Builder 不允许上传** | 确认 Zeabur Builder 已配置 `registry.tokenKey`，且你能读取 `<服务名称>-upload` 机密变量。 |
-| **文件夹上传失败** | 点击**重试**。令牌在 15 分钟后失效，Zeabur 会重新获取一个。 |
+| **文件夹上传失败** | 点击**重试**。令牌在 15 分钟后失效，Zeabur 开源版会重新获取一个。 |
 | **文件夹已上传，但构建没有开始** | 点击**重试**。如果仍然失败，在**构建**中查看 Build 的状况。 |
 | 构建报告找不到来源 | 上传内容可能已由 registry 清理。registry 默认只保留每个服务最近 20 次上传的内容，重新上传即可。 |
 

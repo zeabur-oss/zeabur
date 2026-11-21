@@ -25,7 +25,7 @@ Zeabur 開源版 0.2 裝的 K3s 叢集使用 Calico，UDP 連接埠是 4789，�
 
 ## 加入節點
 
-Zeabur 不負責加入節點；用 Zeatend 裝好的叢集，由 Zeatend 加入。先開好上面的防火牆連接埠，再到伺服器執行：
+Zeabur 開源版不負責加入節點；用 Zeatend 裝好的叢集，由 Zeatend 加入。先開好上面的防火牆連接埠，再到伺服器執行：
 
 ```sh
 sudo zeatend node add
@@ -45,7 +45,7 @@ RKE2 的 etcd 需要過半數的伺服器才能運作。要在少一台時繼續
 
 在節點選單選**停止排程**，節點列就會標示已停止排程。新的副本不會再排到這台節點，已經在執行的副本會留在原處。只是要重開機，做到這一步就夠了，不需要執行 `drain`。
 
-也可以在 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，執行：
+也可以在 Zeabur 開源版**叢集**頁標題旁點**開啟 kubectl 終端機**，執行：
 
 ```sh
 kubectl cordon <node>
@@ -55,7 +55,7 @@ kubectl cordon <node>
 
 ### 要先移走副本再維護
 
-到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，先列出這台節點上的副本，以及這些副本使用的 PVC：
+到 Zeabur 開源版**叢集**頁標題旁點**開啟 kubectl 終端機**，先列出這台節點上的副本，以及這些副本使用的 PVC：
 
 ```sh
 kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
@@ -76,7 +76,7 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 - `--delete-emptydir-data` 會清空遭驅逐副本的 `emptyDir` 暫存資料。
 - 使用這台節點 `local-path` 磁碟區的副本也會一併驅逐。重新建立的副本無法在其他節點使用這些磁碟區，原節點回來之前都會維持 `Pending`。資料不會因為 `drain` 遺失；對這些副本來說，結果跟直接停機一樣，都得等這台節點恢復。
 
-如果 Zeabur 自己也在這台節點上執行，`drain` 時頁面會斷線約一分鐘。重新整理頁面並重新登入；kubectl 終端機也會斷線，需要重新開啟。
+如果 Zeabur 開源版自己也在這台節點上執行，`drain` 時頁面會斷線約一分鐘。重新整理頁面並重新登入；kubectl 終端機也會斷線，需要重新開啟。
 
 等 `drain` 完成後，再將節點停機維護。
 
@@ -84,7 +84,7 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 
 維護完成、節點恢復運作後，在節點選單選**恢復排程**。
 
-也可以到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，執行：
+也可以到 Zeabur 開源版**叢集**頁標題旁點**開啟 kubectl 終端機**，執行：
 
 ```sh
 kubectl uncordon <node>
@@ -96,7 +96,7 @@ kubectl uncordon <node>
 
 **不要移除叢集唯一的節點，也不要移除最後一台控制節點。**
 
-先到 Zeabur **叢集**頁標題旁點**開啟 kubectl 終端機**，確認控制節點數量：
+先到 Zeabur 開源版**叢集**頁標題旁點**開啟 kubectl 終端機**，確認控制節點數量：
 
 ```sh
 kubectl get nodes -l node-role.kubernetes.io/control-plane
@@ -136,12 +136,12 @@ kubectl -n longhorn-system delete nodes.longhorn.io <node>
 **節點終端機**會在主機上開一個完整的 root shell。用管理員帳號登入，在節點列按**節點終端機**，看過要建立的終端機副本和時限，再按**開啟終端機**。
 
 <Callout type="warn">
-節點終端機能動主機上所有的檔案、程序和網路介面。在裡面做的事不經過 Zeabur 和 Kubernetes 的權限檢查，也無法復原。
+節點終端機能動主機上所有的檔案、程序和網路介面。在裡面做的事不經過 Zeabur 開源版和 Kubernetes 的權限檢查，也無法復原。
 </Callout>
 
 節點會記下一筆事件，寫明是誰在什麼時候開啟的。畫面顯示**其他人也能進入這個終端機**時，表示有角色綁定讓叢集管理員以外的人能在終端機所在的 Namespace 建立副本。移除列出的角色綁定後再重新檢查。
 
-關閉終端機時，Zeabur 會移除終端機副本，副本最多保留 30 分鐘。如果副本留了下來，在節點下方的終端機副本清單按**移除終端機副本**，檢查後確認。
+關閉終端機時，Zeabur 開源版會移除終端機副本，副本最多保留 30 分鐘。如果副本留了下來，在節點下方的終端機副本清單按**移除終端機副本**，檢查後確認。
 
 ## 常見失敗
 

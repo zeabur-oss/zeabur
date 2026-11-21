@@ -1,23 +1,23 @@
 ---
-title: Upgrade Zeabur
-description: See which Zeabur version you run, upgrade with Helm, Argo CD, Flux or zeaburctl, upgrade Kubernetes with Zeatend, and confirm the new version afterwards.
+title: Upgrade Zeabur OSS
+description: See which Zeabur OSS version you run, upgrade with Helm, Argo CD, Flux or zeaburctl, upgrade Kubernetes with Zeatend, and confirm the new version afterwards.
 ---
 
-Find how you installed Zeabur, then follow that section. Nothing upgrades on its own. Zeabur only tells you when a newer version is out.
+Find how you installed Zeabur OSS, then follow that section. Nothing upgrades on its own. Zeabur OSS only tells you when a newer version is out.
 
 ## Let an agent upgrade for you
 
 An agent such as Claude Code or Codex can follow this page and the upgrade notes for you. Paste this prompt, run the agent on a computer that can reach the server over SSH, and tell it the server's address:
 
 ```text
-Upgrade Zeabur on my server to the latest version by following https://oss.zeabur.com/docs/zeabur/upgrade/steps.md.
+Upgrade Zeabur OSS on my server to the latest version by following https://oss.zeabur.com/docs/zeabur/upgrade/steps.md.
 ```
 
-The address points to [the Markdown copy of this page](https://oss.zeabur.com/docs/zeabur/upgrade/steps.md). The agent finds how Zeabur was installed, reads the upgrade notes for each version in between, and shows you what it will change. You take the snapshot and sign in afterwards with your passkey; the agent waits for you at those steps.
+The address points to [the Markdown copy of this page](https://oss.zeabur.com/docs/zeabur/upgrade/steps.md). The agent finds how Zeabur OSS was installed, reads the upgrade notes for each version in between, and shows you what it will change. You take the snapshot and sign in afterwards with your passkey; the agent waits for you at those steps.
 
 ## See your version
 
-The cluster page always shows `Zeabur v<version>`. When a newer version is out, a notice appears with its version and a link to the release notes. **Settings** › **About** shows the version too. In either place, **How to upgrade** opens the steps for how you installed Zeabur, with the commands to copy and a link to this page.
+The cluster page always shows `Zeabur v<version>`. When a newer version is out, a notice appears with its version and a link to the release notes. **Settings** › **About** shows the version too. In either place, **How to upgrade** opens the steps for how you installed Zeabur OSS, with the commands to copy and a link to this page.
 
 Under `zeaburctl ui`, the page shows `zeaburctl`'s own version. For the details of the check and how to turn the notice off, see [Update check](../reference/telemetry.mdx#update-check).
 
@@ -55,11 +55,11 @@ Change the chart version in your Flux HelmRelease, commit it, and wait for Flux 
 
 ## Upgrade with zeaburctl ui
 
-Zeabur runs on your own computer, so there is no server to upgrade. Download the new `zeaburctl` from [Release files and verification](../reference/releases.mdx), verify it, replace the old file, and run `zeaburctl ui` again.
+Zeabur OSS runs on your own computer, so there is no server to upgrade. Download the new `zeaburctl` from [Release files and verification](../reference/releases.mdx), verify it, replace the old file, and run `zeaburctl ui` again.
 
 ## Upgrade Kubernetes with Zeatend
 
-On a server you set up with Zeatend, Zeatend upgrades K3s, RKE2 or KubeSolo, apart from Zeabur. Each Zeatend version installs one release that it names, so a newer Zeatend brings a newer Kubernetes.
+On a server you set up with Zeatend, Zeatend upgrades K3s, RKE2 or KubeSolo, apart from Zeabur OSS. Each Zeatend version installs one release that it names, so a newer Zeatend brings a newer Kubernetes.
 
 1. On the server, download the new Zeatend as [Zeatend's README](https://github.com/zeabur-oss/zeatend#download-zeatend) shows.
 2. Run `sudo zeatend plan` to see the release it moves to and the host checks. It changes nothing.
@@ -71,11 +71,11 @@ Kubernetes moves up one minor version at a time. When the new release is further
 
 ### A server that zeabur-installer set up
 
-Zeatend takes over these servers as they are. With no `/etc/zeatend/config.yaml`, it reads `/etc/zeabur-installer/config.yaml`, and it keeps off the components the installer turned off. Download Zeatend and run the same `plan` and `apply`. Zeatend doesn't change Zeabur itself; to upgrade Zeabur, read the [upgrade notes](notes.mdx) first.
+Zeatend takes over these servers as they are. With no `/etc/zeatend/config.yaml`, it reads `/etc/zeabur-installer/config.yaml`, and it keeps off the components the installer turned off. Download Zeatend and run the same `plan` and `apply`. Zeatend doesn't change Zeabur OSS itself; to upgrade Zeabur OSS, read the [upgrade notes](notes.mdx) first.
 
 ## After you upgrade
 
-- Everyone signs in again once the Zeabur replica is replaced. The chart runs one replica, and sessions live in its memory.
+- Everyone signs in again once the Zeabur OSS replica is replaced. The chart runs one replica, and sessions live in its memory.
 - Run `zeaburctl --version`, or open the cluster page, to confirm the version.
 - With Helm, Argo CD or Flux, run `kubectl -n zeabur rollout status deployment/zeabur` to wait for the new replica.
 

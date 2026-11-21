@@ -110,7 +110,7 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" \
 
 ### 重启
 
-和 Zeabur 的**重启**一样，将 Pod template 的 annotation `kubectl.kubernetes.io/restartedAt` 设为当前时间。
+和 Zeabur 开源版的**重启**一样，将 Pod template 的 annotation `kubectl.kubernetes.io/restartedAt` 设为当前时间。
 
 ```sh
 kubectl rollout restart deployment/web
@@ -155,7 +155,7 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
 
 ### 重新构建
 
-和 Zeabur 的**重新构建**一样，在 Build 上设置 `builder.zeabur.com/rebuild` annotation，Zeabur Builder 会使用分支最新的提交构建。
+和 Zeabur 开源版的**重新构建**一样，在 Build 上设置 `builder.zeabur.com/rebuild` annotation，Zeabur Builder 会使用分支最新的提交构建。
 
 ```sh
 kubectl annotate build web --overwrite builder.zeabur.com/rebuild="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -191,9 +191,9 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
 
 令牌不属于创建它的人。创建者离开后，令牌在过期或被管理员删除之前都照样能用。
 
-## Zeabur 会创建什么
+## Zeabur 开源版会创建什么
 
-Zeabur 用管理员自己的权限写入这些对象：
+Zeabur 开源版用管理员自己的权限写入这些对象：
 
 | 对象 | 内容 |
 |---|---|
@@ -201,6 +201,6 @@ Zeabur 用管理员自己的权限写入这些对象：
 | 各项目中的 `RoleBinding zeabur-api-token-<name>` | 将 `zeabur-project-developer` 或 `zeabur-project-viewer` 绑定给该 ServiceAccount |
 | `ClusterRoleBinding zeabur-api-token-<name>` | 和成员一样绑定 `zeabur-member` |
 
-令牌本身来自对该 ServiceAccount 的 TokenRequest，Zeabur 不会存进 Secret 或其他地方。删除令牌会删除它的 binding 和 ServiceAccount。
+令牌本身来自对该 ServiceAccount 的 TokenRequest，Zeabur 开源版不会存进 Secret 或其他地方。删除令牌会删除它的 binding 和 ServiceAccount。
 
 Chart 会创建 `zeabur-api-tokens` Namespace，其中不运行其他东西。只有管理员在那里有权限，所以其他人无法申请令牌，也无法让 Pod 以令牌的身份运行。见[API 令牌和 RBAC](./permissions.mdx#api-令牌和-rbac)。

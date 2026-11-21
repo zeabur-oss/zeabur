@@ -67,7 +67,7 @@ kubectl -n demo expose deployment web --port=8080
 开放的端口前没有密码或 HTTPS 保护，互联网上任何人都能连接，服务需要自行验证连接者的身份。开放数据库时，界面会标注**数据库对外开放**。只有项目内的服务需要连接数据库时，改用私有地址。
 </Callout>
 
-ServiceLB 会在每个节点监听同一个端口号，因此整个集群内同一个端口号只能开放一次。同一项目内已有服务开放了相同端口时，Zeabur 会拒绝。
+ServiceLB 会在每个节点监听同一个端口号，因此整个集群内同一个端口号只能开放一次。同一项目内已有服务开放了相同端口时，Zeabur 开源版会拒绝。
 
 要关闭端口，点击对应行的**关闭**，检查后应用。
 
@@ -120,7 +120,7 @@ spec:
 
 ### 对外端口
 
-Zeabur 开放端口时会创建 `<Service 名称>-public-<端口>`，复制源 Service 的 `selector` 和对应端口，并将类型改为 `LoadBalancer`。标签 `app.kubernetes.io/name` 的值是服务名称，删除服务时会一并删除这个 Service。开放 `db` 的 5432 端口：
+Zeabur 开源版开放端口时会创建 `<Service 名称>-public-<端口>`，复制源 Service 的 `selector` 和对应端口，并将类型改为 `LoadBalancer`。标签 `app.kubernetes.io/name` 的值是服务名称，删除服务时会一并删除这个 Service。开放 `db` 的 5432 端口：
 
 ```yaml
 apiVersion: v1
@@ -149,7 +149,7 @@ kubectl -n demo delete service db-public-5432
 
 ### 连接规则
 
-Zeabur 创建的规则都带有 `app.kubernetes.io/managed-by: zeabur` 标签，名称为 `zeabur-<规则>-<服务>`，超过 63 个字符会截断。以下以服务 `api` 为例。
+Zeabur 开源版创建的规则都带有 `app.kubernetes.io/managed-by: zeabur` 标签，名称为 `zeabur-<规则>-<服务>`，超过 63 个字符会截断。以下以服务 `api` 为例。
 
 **隔离这个服务**：
 

@@ -105,7 +105,7 @@ description: 設定服務的副本數、CPU 和記憶體、健康檢查、啟動
 
 ## 啟動指令
 
-Zeabur 沒有啟動指令的欄位。要改容器啟動時執行的指令，到服務**設定**，把上方的切換從**設定**換到 **YAML**，按**編輯**，修改容器的 `command`（取代映像檔的 `ENTRYPOINT`）和 `args`（取代 `CMD`），再檢查並套用：
+Zeabur 開源版沒有啟動指令的欄位。要改容器啟動時執行的指令，到服務**設定**，把上方的切換從**設定**換到 **YAML**，按**編輯**，修改容器的 `command`（取代映像檔的 `ENTRYPOINT`）和 `args`（取代 `CMD`），再檢查並套用：
 
 ```yaml
 containers:
@@ -124,7 +124,7 @@ containers:
 
 ![服務設定的安全性，目前選的是相容，下方說明允許以 root 執行但無法存取主機](../images/shots/service-security.avif)
 
-選了之後會直接開啟檢查畫面，確認後套用，副本會換成新的。從映像檔建立服務時，Zeabur 依映像檔設定的使用者預先選好：以數字指定非 root 使用者時選嚴格，其他情況選相容。
+選了之後會直接開啟檢查畫面，確認後套用，副本會換成新的。從映像檔建立服務時，Zeabur 開源版依映像檔設定的使用者預先選好：以數字指定非 root 使用者時選嚴格，其他情況選相容。
 
 服務有超出相容範圍的設定（例如存取主機）時，這裡顯示**不受限**，要用 YAML 修改。管理員把專案的安全等級（Pod Security）改成 `restricted` 時，只有嚴格的服務能啟動，見[調整 Pod Security 等級](./projects.mdx#調整-pod-security-等級)。
 
@@ -146,7 +146,7 @@ containers:
 
 ## 用 kubectl 做同樣的事
 
-這些設定都是 Deployment 或 StatefulSet 的標準欄位，移除 Zeabur 之後照樣生效。以下以專案 `demo`、服務 `web` 為例。
+這些設定都是 Deployment 或 StatefulSet 的標準欄位，移除 Zeabur 開源版之後照樣生效。以下以專案 `demo`、服務 `web` 為例。
 
 副本數和資源：
 

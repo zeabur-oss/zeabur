@@ -5,7 +5,7 @@ description: When a service is down or the cluster has a problem, where to look 
 
 When a service has a problem, start with **What needs you** on **Home**, then open the service's **Overview** and read **What's wrong**. These screens only read the cluster. They don't change anything. Each item includes **Fix** or **What to do**. The step to review changes appears only when you change a setting.
 
-The sections below say where each screen is, what it reads, and how to query the same data with kubectl. Zeabur reads with your rights. Anything it can't read is explained on the screen, for example **Some checks need rights you don't have.**
+The sections below say where each screen is, what it reads, and how to query the same data with kubectl. Zeabur OSS reads with your rights. Anything it can't read is explained on the screen, for example **Some checks need rights you don't have.**
 
 ## Home: which services are down
 
@@ -13,9 +13,9 @@ The sections below say where each screen is, what it reads, and how to query the
 
 ![Needs you on Home, grouped by cause into node, outside the cluster, settings, errors in the app, and similar groups, with a logs or events button on each item](../images/shots/home-problems.avif)
 
-If the cause is on the cluster side, the screen labels it **Cluster** and shows **Caused by** and **Affects**: how many services, domains, and projects are affected. Fix that cause and those services recover together. Zeabur treats these situations as cluster problems:
+If the cause is on the cluster side, the screen labels it **Cluster** and shows **Caused by** and **Affects**: how many services, domains, and projects are affected. Fix that cause and those services recover together. Zeabur OSS treats these situations as cluster problems:
 
-| Cause | How Zeabur decides | What it affects |
+| Cause | How Zeabur OSS decides | What it affects |
 | --- | --- | --- |
 | The Ingress controller (Traefik or ingress-nginx) has no ready replica | A workload with a label such as `app.kubernetes.io/name: traefik` requests replicas, but none are ready | Every domain on this IngressClass |
 | cert-manager has no ready replica | The cert-manager controller or webhook has no ready replica | Ingresses that request a certificate from it don't get a certificate issued or renewed |
@@ -31,7 +31,7 @@ kubectl get deploy,daemonset -A -l app.kubernetes.io/name=traefik
 kubectl get deploy -A -l k8s-app=kube-dns
 ```
 
-Zeabur works out which services are affected by matching Ingresses, nodes, and services. kubectl has no command that returns it directly.
+Zeabur OSS works out which services are affected by matching Ingresses, nodes, and services. kubectl has no command that returns it directly.
 
 ## What's wrong on a service
 
@@ -39,7 +39,7 @@ When a service has a problem, **What's wrong** appears at the top of **Overview*
 
 ![What's wrong on the service Overview, explaining that worker keeps crashing, with What to do and Open logs and Terminal buttons](../images/shots/service-problem.avif)
 
-Zeabur reads the container status kubelet reports, the replica's scheduling status, and the workload's conditions and events. It recognizes these cases:
+Zeabur OSS reads the container status kubelet reports, the replica's scheduling status, and the workload's conditions and events. It recognizes these cases:
 
 - The container keeps crashing and restarting, or it is terminated after running out of memory (exit code 137).
 - A health check keeps failing, or one run of a scheduled job ends with an error.
@@ -51,7 +51,7 @@ Zeabur reads the container status kubelet reports, the replica's scheduling stat
 
 Only recent failures count. Once a container has run normally for 10 minutes or longer, earlier restarts drop off the list. kubelet uses the same rule when it resets backoff.
 
-When Zeabur finds no known cause, the screen states where the first not-ready replica is stuck, the latest event, and how many replicas are still in service.
+When Zeabur OSS finds no known cause, the screen states where the first not-ready replica is stuck, the latest event, and how many replicas are still in service.
 
 Query the same data with kubectl:
 
@@ -75,7 +75,7 @@ In `describe`, `Last State` has the reason and exit code from the previous termi
 - The project has no connection rules, so every service can connect to every other service.
 - A route points to a Service that doesn't exist, or the cluster still uses an Ingress controller that is no longer maintained.
 
-These rules are Zeabur's own checks. kubectl has no matching command. You can check individual items yourself, for example which containers have no memory maximum:
+These rules are Zeabur OSS's own checks. kubectl has no matching command. You can check individual items yourself, for example which containers have no memory maximum:
 
 ```sh
 kubectl -n shop get deploy -o custom-columns=NAME:.metadata.name,MEMORY:.spec.template.spec.containers[*].resources.limits.memory
@@ -93,11 +93,11 @@ kubectl get nodes -o wide
 kubectl describe node <node-name>
 ```
 
-`describe node`'s `Conditions` includes `MemoryPressure`, `DiskPressure`, and `Ready`. Zeabur works out version support windows and new component versions by comparing against Zeabur Catalog. kubectl has no matching command.
+`describe node`'s `Conditions` includes `MemoryPressure`, `DiskPressure`, and `Ready`. Zeabur OSS works out version support windows and new component versions by comparing against Zeabur Catalog. kubectl has no matching command.
 
 ## Warnings in the last hour
 
-**Warnings in the last hour** on **Cluster** → **Overview** lists the cluster's own `Warning` events: events with no Namespace, events about nodes, and events in Namespaces that start with `kube-`, such as `kube-system`. Project events aren't here. They're on the **Warnings** and **Events** tabs of the service **Overview**. When there are too many events, Zeabur reads only the latest 5,000, and the screen says **Only the newest 5,000 events were read.**
+**Warnings in the last hour** on **Cluster** → **Overview** lists the cluster's own `Warning` events: events with no Namespace, events about nodes, and events in Namespaces that start with `kube-`, such as `kube-system`. Project events aren't here. They're on the **Warnings** and **Events** tabs of the service **Overview**. When there are too many events, Zeabur OSS reads only the latest 5,000, and the screen says **Only the newest 5,000 events were read.**
 
 ```sh
 kubectl get events -A --field-selector type=Warning,involvedObject.kind=Node
@@ -125,9 +125,9 @@ To send alerts to Slack or email, see [Send cluster alerts to a notification cha
 
 The **Networking** card on the service **Overview** has one row for each domain and private address, marked **Reachable**, **Not reachable**, or **Not verified from inside the cluster**. Expand a row to see each hop the request takes. Each hop lists **Expected** and **Found**. The hop with a problem includes **Fix**:
 
-| Hop | What Zeabur checks | Check with kubectl or another command |
+| Hop | What Zeabur OSS checks | Check with kubectl or another command |
 | --- | --- | --- |
-| **DNS** | The domain resolves from where Zeabur runs | `dig +short shop.example.com` |
+| **DNS** | The domain resolves from where Zeabur OSS runs | `dig +short shop.example.com` |
 | **Entry address** | One of the resolved addresses is the Ingress `status.loadBalancer` address | `kubectl -n shop get ingress -o wide` |
 | **Ingress controller** | The controller for this IngressClass has a ready replica | `kubectl get ingressclass`, then check the controller's Deployment |
 | **Certificate** | For a host under `spec.tls`, the cert-manager `Certificate` is `Ready` | `kubectl -n shop get certificate` |
@@ -151,7 +151,7 @@ kubectl -n shop get networkpolicy
 kubectl -n shop describe networkpolicy <name>
 ```
 
-`describe` lists the replicas each rule selects and the sources it allows. Zeabur combines the rules to work out which service can connect to which. kubectl has no matching command.
+`describe` lists the replicas each rule selects and the sources it allows. Zeabur OSS combines the rules to work out which service can connect to which. kubectl has no matching command.
 
 ## Confirm the result
 

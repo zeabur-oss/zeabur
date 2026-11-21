@@ -25,7 +25,7 @@ These addresses only work inside the cluster. They aren't reachable from the int
 
 A background service that only makes outgoing connections doesn't need a private address. To let other services or a public domain connect to it, enter the port the app listens on and click **Add a private address**. The port is filled in from the traffic check or the port the container declares, when there is one. To go on to add a domain once the address exists, select **Also give it a public domain**.
 
-Zeabur creates a ClusterIP Service named like the service, as `kubectl expose` does: it selects the service's replicas by its `matchLabels` and carries every port the containers declare. A service that also selects its replicas with `matchExpressions` can't get one this way, since a Service can't repeat them.
+Zeabur OSS creates a ClusterIP Service named like the service, as `kubectl expose` does: it selects the service's replicas by its `matchLabels` and carries every port the containers declare. A service that also selects its replicas with `matchExpressions` can't get one this way, since a Service can't repeat them.
 
 To run it yourself, open **Use kubectl instead**. For a Deployment with one port, it's a `kubectl expose` command, for example:
 
@@ -67,7 +67,7 @@ The list shows each node's address and port, such as `203.0.113.7:5432`, with a 
 Public ports have no password or HTTPS protection in front of them. Anyone on the internet can connect, so the service must authenticate incoming connections itself. When you expose a database, the interface labels it **Database open to the internet**. If only services in the project need to connect to the database, use a private address instead.
 </Callout>
 
-ServiceLB listens on the same port number on every node, so a port number can only be exposed once across the cluster. Zeabur rejects the change if another service in the same project already exposes that port.
+ServiceLB listens on the same port number on every node, so a port number can only be exposed once across the cluster. Zeabur OSS rejects the change if another service in the same project already exposes that port.
 
 To close a port, click **Close** in its row, review the change, and apply it.
 
@@ -120,7 +120,7 @@ The `selector` must match the Deployment's replica labels.
 
 ### Public ports
 
-When Zeabur exposes a port, it creates `<Service name>-public-<port>`, copies the source Service's `selector` and that port, and sets the type to `LoadBalancer`. The `app.kubernetes.io/name` label holds the service name, so this Service is deleted along with the service. To expose port 5432 on `db`:
+When Zeabur OSS exposes a port, it creates `<Service name>-public-<port>`, copies the source Service's `selector` and that port, and sets the type to `LoadBalancer`. The `app.kubernetes.io/name` label holds the service name, so this Service is deleted along with the service. To expose port 5432 on `db`:
 
 ```yaml
 apiVersion: v1
@@ -149,7 +149,7 @@ kubectl -n demo delete service db-public-5432
 
 ### Connection rules
 
-All rules Zeabur creates have the label `app.kubernetes.io/managed-by: zeabur` and a name in the form `zeabur-<rule>-<service>`, truncated to 63 characters if needed. The examples below use the service `api`.
+All rules Zeabur OSS creates have the label `app.kubernetes.io/managed-by: zeabur` and a name in the form `zeabur-<rule>-<service>`, truncated to 63 characters if needed. The examples below use the service `api`.
 
 **Isolate this service**:
 

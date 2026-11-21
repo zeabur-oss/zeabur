@@ -5,12 +5,12 @@ description: 刪除專案的 Namespace 和裡面的所有東西，先看清楚�
 
 專案就是一個 Kubernetes Namespace。在專案**設定**的**危險區域**按**刪除專案**，Zeabur 開源版會刪掉這個 Namespace 和裡面的服務、資料庫、磁碟區、設定與機密，效果和 `kubectl delete namespace` 一樣。刪除後無法復原，只能從備份建立回來。
 
-只想讓 Namespace 不再出現在 Zeabur，改用同一處的**從 Zeabur 移除**：只拿掉專案標籤，什麼都不刪除。
+只想讓 Namespace 不再出現在 Zeabur 開源版，改用同一處的**從 Zeabur 開源版移除**：只拿掉專案標籤，什麼都不刪除。
 
 ## 開始前
 
 - 你要能刪除這個 Namespace（`delete namespaces/<專案>`），也要能刪除裡面的資料庫物件。少了哪一項，檢查畫面會列出來，套用時叢集也會拒絕。
-- Zeabur 自己的 Namespace、`kube-` 開頭的系統 Namespace、平台元件（標了 `zeabur.com/platform=true` 的 Namespace）和 `zeabur-terminals` 都不能從這裡刪除。
+- Zeabur 開源版自己的 Namespace、`kube-` 開頭的系統 Namespace、平台元件（標了 `zeabur.com/platform=true` 的 Namespace）和 `zeabur-terminals` 都不能從這裡刪除。
 
 ## 檢查要刪的東西
 
@@ -23,8 +23,8 @@ description: 刪除專案的 Namespace 和裡面的所有東西，先看清楚�
 
 - 服務的名稱。
 - 每個資料庫和上次備份的時間。
-- 每個磁碟區、上次備份的時間，以及資料會不會留下。磁碟區的 PersistentVolume 設定 `Retain` 時，資料會留在那個 PersistentVolume；設定 `Delete` 時，資料跟著刪除。讀不到 PersistentVolume 時，Zeabur 改看 StorageClass 的 `reclaimPolicy`，兩者都讀不到就直接說不確定。
-- 你在這個專案開過的工具 Pod。這些 Pod 在 `zeabur-terminals` 裡，Zeabur 會在 Namespace 刪除後一併清掉。
+- 每個磁碟區、上次備份的時間，以及資料會不會留下。磁碟區的 PersistentVolume 設定 `Retain` 時，資料會留在那個 PersistentVolume；設定 `Delete` 時，資料跟著刪除。讀不到 PersistentVolume 時，Zeabur 開源版改看 StorageClass 的 `reclaimPolicy`，兩者都讀不到就直接說不確定。
+- 你在這個專案開過的工具 Pod。這些 Pod 在 `zeabur-terminals` 裡，Zeabur 開源版會在 Namespace 刪除後一併清掉。
 
 資料庫或磁碟區一天內沒有成功的備份時，旁邊會出現**先備份一次**。按下去會改成檢查這次備份，套用後等備份完成，再回來刪除專案。這個按鈕用的是資料庫頁和磁碟區備份原本的**立即備份**，只有已經設定好備份的資料庫和磁碟區會出現。
 
@@ -64,9 +64,9 @@ kubectl -n shop get secret data-redis-0-backup -o jsonpath='{.data.RESTIC_PASSWO
 
 ## 刪除時發生什麼事
 
-Zeabur 用你的身分照順序刪除：
+Zeabur 開源版用你的身分照順序刪除：
 
-1. 先刪資料庫物件，例如 CloudNativePG 的 `Cluster`，讓 operator 有機會照自己的方式收尾。Zeabur 最多等一分鐘讓資料庫消失。operator 沒有在執行時就無法收尾，專案會卡在刪除中，專案頁面會列出還沒刪掉的物件和各自的 finalizer。
+1. 先刪資料庫物件，例如 CloudNativePG 的 `Cluster`，讓 operator 有機會照自己的方式收尾。Zeabur 開源版最多等一分鐘讓資料庫消失。operator 沒有在執行時就無法收尾，專案會卡在刪除中，專案頁面會列出還沒刪掉的物件和各自的 finalizer。
 2. 再刪 Namespace，Kubernetes 接著刪掉裡面剩下的東西。
 3. 最後刪掉你在這個專案開的工具 Pod。
 

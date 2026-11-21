@@ -67,7 +67,7 @@ kubectl -n demo expose deployment web --port=8080
 開放的連接埠前面沒有密碼或 HTTPS，網際網路上任何人都連得到，服務要自己檢查連線的是誰。開放資料庫時，畫面會標**資料庫對外開放**。只有專案裡的服務要連資料庫時，改用私有位址。
 </Callout>
 
-ServiceLB 會在每個節點監聽同一個連接埠號碼，所以整個叢集裡同一個連接埠號碼只能開放一次。同專案已經有服務開放了同一個連接埠時，Zeabur 會拒絕。
+ServiceLB 會在每個節點監聽同一個連接埠號碼，所以整個叢集裡同一個連接埠號碼只能開放一次。同專案已經有服務開放了同一個連接埠時，Zeabur 開源版會拒絕。
 
 要關閉，在那一列按**關閉**，檢查後套用。
 
@@ -120,7 +120,7 @@ spec:
 
 ### 對外連接埠
 
-Zeabur 開放連接埠時建立 `<Service 名稱>-public-<連接埠>`，複製來源 Service 的 `selector` 和那個連接埠，類型改成 `LoadBalancer`。標籤 `app.kubernetes.io/name` 是服務名稱，刪除服務時會一起刪掉。開放 `db` 的 5432：
+Zeabur 開源版開放連接埠時建立 `<Service 名稱>-public-<連接埠>`，複製來源 Service 的 `selector` 和那個連接埠，類型改成 `LoadBalancer`。標籤 `app.kubernetes.io/name` 是服務名稱，刪除服務時會一起刪掉。開放 `db` 的 5432：
 
 ```yaml
 apiVersion: v1
@@ -149,7 +149,7 @@ kubectl -n demo delete service db-public-5432
 
 ### 連線規則
 
-Zeabur 建立的規則都帶 `app.kubernetes.io/managed-by: zeabur` 標籤，名稱是 `zeabur-<規則>-<服務>`，超過 63 個字元會截斷。以下以服務 `api` 為例。
+Zeabur 開源版建立的規則都帶 `app.kubernetes.io/managed-by: zeabur` 標籤，名稱是 `zeabur-<規則>-<服務>`，超過 63 個字元會截斷。以下以服務 `api` 為例。
 
 **隔離這個服務**：
 

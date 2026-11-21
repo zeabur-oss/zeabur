@@ -14,7 +14,7 @@ makes, and lists the fields it leaves out.
 
 ## Hides
 
-How an edit maps to fields and to a write. Zeabur writes as the field manager `zeabur`, sends
+How an edit maps to fields and to a write. Zeabur OSS writes as the field manager `zeabur`, sends
 only what it changes, tests the `resourceVersion` it read, and never takes over a field Helm,
 Argo CD or Flux owns: an object one of them manages may be restarted but not edited or deleted.
 

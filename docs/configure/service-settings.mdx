@@ -28,7 +28,7 @@ For how to use the tabs, see [View logs, events, and usage, and open a terminal]
 ## Before you start
 
 - You need permission to edit the service. If Helm, Argo CD, or Flux manages the service, these fields are read-only. Make changes in the original values or Git repository.
-- Changing any setting other than the replica count makes Zeabur replace all replicas with the new settings. A service with only one replica may be unavailable for a few seconds during replacement.
+- Changing any setting other than the replica count makes Zeabur OSS replace all replicas with the new settings. A service with only one replica may be unavailable for a few seconds during replacement.
 
 ## Compute resources
 
@@ -105,7 +105,7 @@ A failed restart check restarts the container. If the app takes a long time to s
 
 ## Startup command
 
-Zeabur doesn't have a startup command field. To change the command a container runs at startup, open the service's **Settings**, switch from **Set up** to **YAML** at the top, and select **Edit**. Change the container's `command` (which replaces the image's `ENTRYPOINT`) and `args` (which replaces `CMD`), then review and apply:
+Zeabur OSS doesn't have a startup command field. To change the command a container runs at startup, open the service's **Settings**, switch from **Set up** to **YAML** at the top, and select **Edit**. Change the container's `command` (which replaces the image's `ENTRYPOINT`) and `args` (which replaces `CMD`), then review and apply:
 
 ```yaml
 containers:
@@ -124,7 +124,7 @@ Open the service's **Settings** → **Security** and choose what containers can 
 
 ![Security in service settings, with Compatible selected and a description stating that containers can run as root but can't access the host](../images/shots/service-security.avif)
 
-Selecting an option opens the review screen directly. Review and apply the change to replace the replicas. When you create a service from an image, Zeabur selects an option based on the image's configured user: Strict for a numeric non-root user, or Compatible otherwise.
+Selecting an option opens the review screen directly. Review and apply the change to replace the replicas. When you create a service from an image, Zeabur OSS selects an option based on the image's configured user: Strict for a numeric non-root user, or Compatible otherwise.
 
 If a service has settings beyond what Compatible permits, such as host access, this section shows **Unrestricted**. Use YAML to change those settings. If an administrator sets the project's security level (Pod Security) to `restricted`, only Strict services can start. See [Adjust the Pod Security level](./projects.mdx#change-the-pod-security-level).
 
@@ -146,7 +146,7 @@ If a service has settings beyond what Compatible permits, such as host access, t
 
 ## Do the same with kubectl
 
-These settings are standard Deployment or StatefulSet fields. They remain in effect after you remove Zeabur. The examples below use project `demo` and service `web`.
+These settings are standard Deployment or StatefulSet fields. They remain in effect after you remove Zeabur OSS. The examples below use project `demo` and service `web`.
 
 Replica count and resources:
 

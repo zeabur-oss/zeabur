@@ -1,6 +1,6 @@
 # Zeabur Desktop
 
-A Tauri 2 app that lists the contexts of your kubeconfig files and opens Zeabur on the one you
+A Tauri 2 app that lists the contexts of your kubeconfig files and opens Zeabur OSS on the one you
 pick. Each cluster window starts its own local service (`zeabur-local`, the one `zeaburctl ui`
 runs) and loads it, so the app needs no other program. How to install and use it is in
 [docs/install](../docs/install).

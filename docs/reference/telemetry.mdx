@@ -1,30 +1,30 @@
 ---
 title: Experience program
-description: What Zeabur and `zeaburctl ui` send when you join the experience program, what they never send, how Zeabur and zeaburctl check for a newer version, how Zeabur fetches newer templates, and how to turn each off.
+description: What Zeabur OSS and `zeaburctl ui` send when you join the experience program, what they never send, how Zeabur OSS and zeaburctl check for a newer version, how Zeabur OSS fetches newer templates, and how to turn each off.
 ---
 
-The experience program sends the version, how many people use Zeabur each day, which features they use, whether `zeaburctl ui` could connect to a cluster, and whether changes of a Deployment rolled out, so we know how many installations are in use and what to fix first. With Helm, Zeabur stays out until you turn it on. `zeaburctl ui` joins by default and says so, with how to turn it off, each time it starts.
+The experience program sends the version, how many people use Zeabur OSS each day, which features they use, whether `zeaburctl ui` could connect to a cluster, and whether changes of a Deployment rolled out, so we know how many installations are in use and what to fix first. With Helm, Zeabur OSS stays out until you turn it on. `zeaburctl ui` joins by default and says so, with how to turn it off, each time it starts.
 
 ## What is sent
 
-Zeabur sends one event the first time each person uses it in a UTC day, and one the first time each feature below is used with the same values in a UTC day. Each event carries a random installation ID, the properties below and nothing else. You make the ID with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
+Zeabur OSS sends one event the first time each person uses it in a UTC day, and one the first time each feature below is used with the same values in a UTC day. Each event carries a random installation ID, the properties below and nothing else. You make the ID with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
 
 | Event | Sent by | When |
 |---|---|---|
-| `zeabur_active` | Zeabur | The first time each person uses Zeabur's web interface in a UTC day |
-| `feature_used` | Zeabur | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import; once per UTC day for each feature and set of values |
+| `zeabur_active` | Zeabur OSS | The first time each person uses Zeabur OSS's web interface in a UTC day |
+| `feature_used` | Zeabur OSS | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import; once per UTC day for each feature and set of values |
 | `cluster_connected` | `zeaburctl ui` | It connected to a cluster with your kubeconfig, or could not |
-| `app_change_submitted` | Zeabur | The cluster answered a change of one Deployment: a new image, a new replica count or new environment variables |
-| `rollout_finished` | Zeabur | The rollout of an accepted change ended, as `kubectl rollout status` would say |
+| `app_change_submitted` | Zeabur OSS | The cluster answered a change of one Deployment: a new image, a new replica count or new environment variables |
+| `rollout_finished` | Zeabur OSS | The rollout of an accepted change ended, as `kubectl rollout status` would say |
 
 | Property | Events | Values |
 |---|---|---|
-| `zeabur_version` | `zeabur_active`, `feature_used` | Zeabur's version, such as `0.1.1` |
+| `zeabur_version` | `zeabur_active`, `feature_used` | Zeabur OSS's version, such as `0.1.1` |
 | `day` | `zeabur_active`, `feature_used` | The UTC date, such as `2026-10-30` |
 | `person` | `zeabur_active`, `app_change_submitted`, `rollout_finished` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `zeabur_version` | `cluster_connected` | The version of `zeaburctl`, such as `0.1.1` |
-| `zeabur_version` | `app_change_submitted`, `rollout_finished` | Zeabur's version |
-| `mode` | `zeabur_active`, `cluster_connected`, `app_change_submitted`, `rollout_finished` | `in-cluster` for Zeabur in a cluster, `local` for `zeaburctl ui` |
+| `zeabur_version` | `app_change_submitted`, `rollout_finished` | Zeabur OSS's version |
+| `mode` | `zeabur_active`, `cluster_connected`, `app_change_submitted`, `rollout_finished` | `in-cluster` for Zeabur OSS in a cluster, `local` for `zeaburctl ui` |
 | `result` | `cluster_connected` | `connected`, `unreachable`, `credential_refused`, `no_read_right` or `other` |
 | `change_id` | `app_change_submitted`, `rollout_finished` | A random UUID that ties the two events of one change together |
 | `operation` | `app_change_submitted`, `rollout_finished` | `deploy_image`, `scale_replicas` or `change_env` |
@@ -33,19 +33,19 @@ Zeabur sends one event the first time each person uses it in a UTC day, and one 
 | `feature` | `feature_used` | `service_created`, `database_created`, `domain_added`, `logs_viewed`, `terminal_opened`, `member_invited` or `compose` |
 | `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
 | `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID not in the catalog is left out |
-| `kind` | `feature_used` with `database_created` or `domain_added` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` when the name ends in a suffix Zeabur offers for new services, `custom` otherwise |
+| `kind` | `feature_used` with `database_created` or `domain_added` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` when the name ends in a suffix Zeabur OSS offers for new services, `custom` otherwise |
 | `$process_person_profile` | all | Always `false`: no person profile is made |
 | `$geoip_disable` | all | Always `true`: no location is looked up |
 
-The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur restarts, and a different one the next day, so their days can't be linked.
+The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur OSS's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur OSS restarts, and a different one the next day, so their days can't be linked.
 
-After an accepted change, Zeabur reads the Deployment with your own credential until the rollout ends, for at most a minute past its progress deadline (10 minutes unless the Deployment says otherwise) and never more than 30 minutes. Zeabur renews your credential for it as your session allows, without keeping the session alive. A newer change, a Deployment deleted and made again with the same name, signing out or a restart ends the reading, and then `rollout_finished` is not sent.
+After an accepted change, Zeabur OSS reads the Deployment with your own credential until the rollout ends, for at most a minute past its progress deadline (10 minutes unless the Deployment says otherwise) and never more than 30 minutes. Zeabur OSS renews your credential for it as your session allows, without keeping the session alive. A newer change, a Deployment deleted and made again with the same name, signing out or a restart ends the reading, and then `rollout_finished` is not sent.
 
-`feature_used` has no `person`. It says that something was used today, not by whom or how often. Nothing is sent from your browser: Zeabur's server sends it after the call succeeds.
+`feature_used` has no `person`. It says that something was used today, not by whom or how often. Nothing is sent from your browser: Zeabur OSS's server sends it after the call succeeds.
 
 `zeaburctl ui` has no installation ID, so it makes a random one the first time it is about to send an event, never when it is off. The ID is kept in a file named `local-id` in the `zeabur` folder of the configuration directory: `$XDG_CONFIG_HOME` or `~/.config` on Linux, `~/Library/Application Support` on macOS, `%APPDATA%` on Windows. Only you can read it, and nothing about your machine, kubeconfig, token or user name goes into it.
 
-Events go to PostHog through `oss-nori.zeabur.com` over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur. `zeaburctl ui` sends in the background, so it never delays the link or the browser. PostHog doesn't keep IP addresses.
+Events go to PostHog through `oss-nori.zeabur.com` over HTTPS, one try with a short timeout. A failed request isn't retried and doesn't affect Zeabur OSS. `zeaburctl ui` sends in the background, so it never delays the link or the browser. PostHog doesn't keep IP addresses.
 
 ## What is never sent
 
@@ -55,7 +55,7 @@ Domains, host names, IP addresses, Git URLs, image or service names, project nam
 
 Any one of these is enough, and `DO_NOT_TRACK` wins over all the others.
 
-- Set `DO_NOT_TRACK=1` in the environment of Zeabur or of `zeaburctl ui`. Any value but empty or `0` counts.
+- Set `DO_NOT_TRACK=1` in the environment of Zeabur OSS or of `zeaburctl ui`. Any value but empty or `0` counts.
 - With Helm, keep `telemetry.enabled=false`, the default. The chart refuses `telemetry.enabled=true` without an ID.
 - For `zeaburctl ui`, run `zeaburctl telemetry disable`, which writes `telemetry: false` to `config.yaml` in the same `zeabur` folder as `local-id`, or set `ZEABUR_TELEMETRY=off`. If `config.yaml` can't be read, `zeaburctl ui` sends nothing. `zeaburctl telemetry status` shows which setting is in effect.
 
@@ -71,7 +71,7 @@ helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
 
 ## See what would be sent
 
-Set `ZEABUR_TELEMETRY=debug` and Zeabur prints the exact request body instead of sending it. The line is in its log:
+Set `ZEABUR_TELEMETRY=debug` and Zeabur OSS prints the exact request body instead of sending it. The line is in its log:
 
 ```sh
 kubectl -n zeabur set env deployment/zeabur ZEABUR_TELEMETRY=debug
@@ -82,39 +82,39 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 ## Update check
 
-Zeabur and `zeaburctl` tell you when a newer version is out and how to upgrade. Nothing upgrades on its own. This check is separate from the experience program and on by default.
+Zeabur OSS and `zeaburctl` tell you when a newer version is out and how to upgrade. Nothing upgrades on its own. This check is separate from the experience program and on by default.
 
 **What is checked.** Both read `https://api.github.com/repos/zeabur-oss/zeabur/releases` and leave out drafts. They leave out pre-releases too, unless you run one. If the newest of the rest is newer than yours, you see its version, a link to its release notes and how to upgrade. If any newer release that is not a pre-release has a `### Security` section in its notes, you see that your version has known security problems, with links to those releases.
 
 **Where it runs.**
 
-- The cluster page always shows `Zeabur v<version>`. The Zeabur server asks GitHub at most once an hour, however many people open Zeabur, and the page reads its answer each time it opens and every hour while it stays open. The server keeps the last answer: if GitHub can't be reached, that answer stays and the server tries again a minute later, or after GitHub's reset when GitHub refuses. Browsers make no request to GitHub. **Settings** › **About** shows the version too, and **How to upgrade** opens the steps for how Zeabur was installed, with Helm, Argo CD or Flux. See [Upgrade Zeabur](../upgrade/steps.mdx). Under `zeaburctl ui`, the page shows `zeaburctl`'s own version and how to update it.
+- The cluster page always shows `Zeabur v<version>`. The Zeabur OSS server asks GitHub at most once an hour, however many people open Zeabur OSS, and the page reads its answer each time it opens and every hour while it stays open. The server keeps the last answer: if GitHub can't be reached, that answer stays and the server tries again a minute later, or after GitHub's reset when GitHub refuses. Browsers make no request to GitHub. **Settings** › **About** shows the version too, and **How to upgrade** opens the steps for how Zeabur OSS was installed, with Helm, Argo CD or Flux. See [Upgrade Zeabur OSS](../upgrade/steps.mdx). Under `zeaburctl ui`, the page shows `zeaburctl`'s own version and how to update it.
 - `zeaburctl` checks each time a command runs. The check runs beside the command. When the command ends, `zeaburctl` waits at most a second more for the answer. When a newer version is out, it prints one line to stderr. It keeps nothing on disk. It doesn't check when stderr isn't a terminal or when `CI` is set.
 - Without a token, GitHub answers 60 requests an hour from one IP address, shared by everyone behind it. When that's used up, `zeaburctl` says so instead. Set `GH_TOKEN` or `GITHUB_TOKEN` to a GitHub token, the same variables `gh` reads, and `zeaburctl` sends it so the requests count against your own limit. A fine-grained token with no permissions is enough.
 
-**What is sent.** A plain request to GitHub with no ID or cookie, and no token unless you set one for `zeaburctl`. GitHub sees the IP address it comes from. The Zeabur server sends `zeabur` as its user agent, and `zeaburctl` sends `zeaburctl/<version>`.
+**What is sent.** A plain request to GitHub with no ID or cookie, and no token unless you set one for `zeaburctl`. GitHub sees the IP address it comes from. The Zeabur OSS server sends `zeabur` as its user agent, and `zeaburctl` sends `zeaburctl/<version>`.
 
-**Turn it off.** Any one of these is enough. Once it is off, the Zeabur server makes no request to GitHub.
+**Turn it off.** Any one of these is enough. Once it is off, the Zeabur OSS server makes no request to GitHub.
 
 - With Helm, set `updateCheck.enabled=false`. The cluster page then only shows the version.
-- Set `DO_NOT_TRACK=1` in Zeabur's environment, or in yours for `zeaburctl`. It turns off the experience program too.
+- Set `DO_NOT_TRACK=1` in Zeabur OSS's environment, or in yours for `zeaburctl`. It turns off the experience program too.
 - Set `NO_UPDATE_NOTIFIER` to any value in your environment for `zeaburctl`, including `zeaburctl ui`. It turns off only the update check.
 
 ## Template updates
 
-Zeabur offers newer templates without an upgrade. It reads Zeabur Catalog's API and offers the templates there in place of the ones it was built with. Components, and how Zeabur finds them in your cluster, stay as they were built. Services you already deployed from a template don't change. This is separate from the experience program and the update check, and on by default.
+Zeabur OSS offers newer templates without an upgrade. It reads Zeabur Catalog's API and offers the templates there in place of the ones it was built with. Components, and how Zeabur OSS finds them in your cluster, stay as they were built. Services you already deployed from a template don't change. This is separate from the experience program and the update check, and on by default.
 
-**What is fetched.** From `https://oss-catalog.zeabur.com/v1/`: `catalog.json`, which lists each template with a digest of its files, and `templates/<id>.json` for each template whose digest isn't the one Zeabur offers now.
+**What is fetched.** From `https://oss-catalog.zeabur.com/v1/`: `catalog.json`, which lists each template with a digest of its files, and `templates/<id>.json` for each template whose digest isn't the one Zeabur OSS offers now.
 
-**What Zeabur trusts.** The address it fetches from: `https://oss-catalog.zeabur.com/v1/`, whose HTTPS certificate it checks, or the mirror you set. The files carry no signature, so whoever controls that address decides which templates Zeabur offers. Zeabur then checks each template on its own: it must read, it must be the revision `catalog.json` lists, and the components it needs must be ones this Zeabur knows. A template that fails isn't offered; the one offered before stays, if there is one, and Zeabur asks for it again at the next fetch. When a fetch fails, nothing changes.
+**What Zeabur OSS trusts.** The address it fetches from: `https://oss-catalog.zeabur.com/v1/`, whose HTTPS certificate it checks, or the mirror you set. The files carry no signature, so whoever controls that address decides which templates Zeabur OSS offers. Zeabur OSS then checks each template on its own: it must read, it must be the revision `catalog.json` lists, and the components it needs must be ones this Zeabur OSS knows. A template that fails isn't offered; the one offered before stays, if there is one, and Zeabur OSS asks for it again at the next fetch. When a fetch fails, nothing changes.
 
-**When it runs.** When someone opens the template list, at most once every 6 hours, or 10 minutes after a failure. The Zeabur server fetches; browsers don't. The templates are kept in memory only: after a restart, Zeabur offers the ones it was built with until the next fetch. `zeaburctl ui` doesn't fetch. If a template changes after you open its form, or after you plan it, Zeabur refuses the change; open the form again.
+**When it runs.** When someone opens the template list, at most once every 6 hours, or 10 minutes after a failure. The Zeabur OSS server fetches; browsers don't. The templates are kept in memory only: after a restart, Zeabur OSS offers the ones it was built with until the next fetch. `zeaburctl ui` doesn't fetch. If a template changes after you open its form, or after you plan it, Zeabur OSS refuses the change; open the form again.
 
-**What is sent.** Plain requests with no ID or cookie. The Zeabur server sends `zeabur` as its user agent. GitHub Pages, which serves `oss-catalog.zeabur.com`, sees the IP address they come from. Nothing about your cluster or its people is sent, so `DO_NOT_TRACK` doesn't turn this off.
+**What is sent.** Plain requests with no ID or cookie. The Zeabur OSS server sends `zeabur` as its user agent. GitHub Pages, which serves `oss-catalog.zeabur.com`, sees the IP address they come from. Nothing about your cluster or its people is sent, so `DO_NOT_TRACK` doesn't turn this off.
 
-**Use a mirror.** For a cluster without internet access, serve a Zeabur Catalog release and set `catalog.url` to it, as [Use a mirror](../cluster/components.mdx#use-a-mirror) describes. Templates come from the same address as components. Zeabur trusts the mirror as it trusts `oss-catalog.zeabur.com`. To trust a release rather than a server, verify its signature before you copy it, as Zeabur Catalog's [Releases and the API](https://oss.zeabur.com/docs/catalog/reference/releases/#verify-and-read-a-release) describes.
+**Use a mirror.** For a cluster without internet access, serve a Zeabur Catalog release and set `catalog.url` to it, as [Use a mirror](../cluster/components.mdx#use-a-mirror) describes. Templates come from the same address as components. Zeabur OSS trusts the mirror as it trusts `oss-catalog.zeabur.com`. To trust a release rather than a server, verify its signature before you copy it, as Zeabur Catalog's [Releases and the API](https://oss.zeabur.com/docs/catalog/reference/releases/#verify-and-read-a-release) describes.
 
-**Turn it off.** Any one of these is enough. Once it's off, Zeabur offers only the templates it was built with and makes no request for them.
+**Turn it off.** Any one of these is enough. Once it's off, Zeabur OSS offers only the templates it was built with and makes no request for them.
 
 - With Helm, set `templateFetch.enabled=false`.
-- Set `ZEABUR_TEMPLATE_FETCH=false` in Zeabur's environment.
+- Set `ZEABUR_TEMPLATE_FETCH=false` in Zeabur OSS's environment.

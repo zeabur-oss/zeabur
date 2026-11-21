@@ -8,7 +8,7 @@ How a request reaches the cluster. The port it exports reads and writes *as a gi
 caller hands over the user's credential (a bearer token issued by Zeabur Identity, or the local
 kubeconfig context) and gets back a client bound to it, so no layer above can act with more
 rights than the person using it; kube-apiserver makes every authorisation decision. The one
-exception is `UserClient::with_token_file`, for Zeabur's own service account, which the chart
+exception is `UserClient::with_token_file`, for Zeabur OSS's own service account, which the chart
 lets create, run commands in and delete pods in the terminal namespace and nothing else.
 
 The port ([`Cluster`](crate::port::Cluster)) has two adapters: kube-rs against a real cluster
@@ -57,7 +57,7 @@ only a test person's token:
   nothing) and real writes, and one winner among concurrent patches of one version.
 - **Identity**: `SelfSubjectReview` reports the person, and a namespace outside their rights
   answers `403`. That the first request after their `RoleBinding` is deleted answers `403` (Zeabur
-  holds no cache of permissions that could outlive them) is checked through the API, in
+  OSS holds no cache of permissions that could outlive them) is checked through the API, in
   `zeabur-api`'s cluster tests.
 
 - **Exec** over WebSocket [kep-4006] (kube's `ws` feature), behind the terminal: it runs as the

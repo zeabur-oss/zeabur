@@ -83,18 +83,18 @@ cause, a workaround, or the specification section, RFC or issue behind behaviour
 change (rustdoc cites it as the crates do). Usually one line; no design rationale, history,
 measurements or restatements of the code. Decisions and their reasons go in `docs/internal/`.
 Cite only what you have read; a source you have not read is not cited at all, and if it matters
-it goes in `docs/internal/` or an issue. Every claim that Zeabur does something better or safer
+it goes in `docs/internal/` or an issue. Every claim that Zeabur OSS does something better or safer
 is backed by a test, not only by documentation. Comments and rustdoc are written in English. The docs and interface strings come in en, zh-TW and zh-CN: write
 first in any of them, and change all three in the same pull request.
 
 ## Releases
 
-`.github/workflows/release.yml` releases Zeabur. Zeabur's own steps are the `scripts/release-*.sh`
+`.github/workflows/release.yml` releases Zeabur OSS. Zeabur OSS's own steps are the `scripts/release-*.sh`
 scripts; the steps every zeabur-oss release shares call `zeabur-oss-release` from
 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) directly.
 [docs/internal/releasing.md](docs/internal/releasing.md) has the steps.
 
-A pull request that changes what users of Zeabur, `zeaburctl` or the chart see adds a
+A pull request that changes what users of Zeabur OSS, `zeaburctl` or the chart see adds a
 change file. `nix develop -c knope document-change` asks for its level and summary and writes it
 to `.changeset/`; add paragraphs under the summary when it needs them:
 
@@ -174,7 +174,7 @@ cannot format.
 - [RustSec](https://rustsec.org/) advisories and yanked versions fail the check. Every ignored
   advisory carries its reason in `deny.toml`.
 
-`k8s-openapi` is built for Kubernetes 1.34 (`v1_34`), the oldest version Zeabur supports.
+`k8s-openapi` is built for Kubernetes 1.34 (`v1_34`), the oldest version Zeabur OSS supports.
 
 Web packages follow the same licence rule, with one exception: `caniuse-lite`, the browser
 support data that Babel's `browserslist` reads while svgr builds the icons, is CC-BY-4.0 (a data
@@ -232,8 +232,8 @@ What to test, at which level, and what not to test: [docs/internal/testing.md](d
 
 ### Development cluster
 
-Three commands give a k3d cluster with Zeabur Identity and Zeabur, installed from their
-manifests and chart, at <https://zeabur.localhost>. Run them from the Zeabur checkout on a Linux
+Three commands give a k3d cluster with Zeabur Identity and Zeabur OSS, installed from their
+manifests and chart, at <https://zeabur.localhost>. Run them from the Zeabur OSS checkout on a Linux
 machine or VM with Docker running, Nix with flakes, and permission to use Docker; the cluster
 uses port 443. Do not point anything at a production cluster: the tests create and delete
 namespaces, service accounts and RBAC.
@@ -244,7 +244,7 @@ nix run .#dev-cluster -- up       # prints the URL, a one-time setup link and th
 nix run .#dev-cluster -- down     # deletes the cluster, its volume and its images
 ```
 
-`up` builds Zeabur and Zeabur Proxy from the checkout (cargo profile `ci`, which compiles faster
+`up` builds Zeabur OSS and Zeabur Proxy from the checkout (cargo profile `ci`, which compiles faster
 than `release`) and installs the Zeabur Identity release that `xtask/pins/zeabur-identity` names, then
 prints the setup link that enrols the first admin's passkey. Your browser accepts the site once it trusts the printed CA
 (`target/dev-cluster/tls/ca.crt`). On a VM, forward port 443 from your machine
@@ -260,7 +260,7 @@ after a change: it rebuilds and redeploys what changed. Options:
   rate-limited link. `K3S_IMAGE` picks the K3s release.
 
 - `--profile bare`: only the cluster. The cluster tests and local mode run there: their people
-  are no admins, and Zeabur's admission policy would stop them changing a namespace's labels.
+  are no admins, and Zeabur OSS's admission policy would stop them changing a namespace's labels.
 
 The tests (`nix develop` first):
 
@@ -278,7 +278,7 @@ Each cluster test works in a namespace of its own with a person in it, from
 interface: `./scripts/build-ui.sh && ZEABUR_UI_DIST=$PWD/web/dist cargo build --release -p zeaburctl`.
 
 `scripts/e2e.sh` (the `e2e` job) is `up`, the browser tests, then checks from outside
-(Zeabur's service accounts have no extra rights beyond pods in `zeabur-terminals`, the idle pod's memory, removing Zeabur leaves the
+(Zeabur OSS's service accounts have no extra rights beyond pods in `zeabur-terminals`, the idle pod's memory, removing Zeabur OSS leaves the
 cluster as it was) and `down`. It takes `up`'s options; `ZEABUR_E2E_KEEP=1` keeps the cluster and
 skips the removal check. On a cluster of `--profile full`, a browser test that would skip for want
 of a component fails instead.

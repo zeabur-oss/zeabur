@@ -3,15 +3,15 @@ title: Invite members and assign project permissions
 description: Send a member a setup link, so they sign in with a passkey and use only the projects you give them.
 ---
 
-When you finish this page, your teammate is listed on **Members**, signs in to Zeabur with their own passkey, and can use only the projects you gave them. A passkey lives on their phone or computer. They unlock it with a fingerprint, their face, or the screen lock, so there is no password to remember.
+When you finish this page, your teammate is listed on **Members**, signs in to Zeabur OSS with their own passkey, and can use only the projects you gave them. A passkey lives on their phone or computer. They unlock it with a fingerprint, their face, or the screen lock, so there is no password to remember.
 
-<Figure label="A member signs in with a passkey through Zeabur Identity, and Zeabur shows them only what you allowed: their projects in full, other projects by name only">
+<Figure label="A member signs in with a passkey through Zeabur Identity, and Zeabur OSS shows them only what you allowed: their projects in full, other projects by name only">
 <FigFlow>
 <FigCard title="Member" note="Passkey on their phone or computer" />
 <FigArrow label="Signs in" />
 <FigCard title="Zeabur Identity" note="Checks that it's really them" />
 <FigArrow label="Who they are" />
-<FigCard title="Zeabur" note="Shows what you allowed" />
+<FigCard title="Zeabur OSS" note="Shows what you allowed" />
 <FigArrow />
 <FigGroup label="Your cluster">
 <FigCard accent title="Projects you gave them" note="shop: Developer, blog: Viewer" />
@@ -22,8 +22,8 @@ When you finish this page, your teammate is listed on **Members**, signs in to Z
 
 ## Before you begin
 
-- You're signed in to Zeabur with an admin account.
-- Zeabur Identity is installed in the cluster and handles sign-in to Zeabur. It must run with `--invitations` for setup links to work.
+- You're signed in to Zeabur OSS with an admin account.
+- Zeabur Identity is installed in the cluster and handles sign-in to Zeabur OSS. It must run with `--invitations` for setup links to work.
 - The chart's `memberRoles.enabled` setting is on, which is the default. When it's off, an invitation can only choose whether to give **Admin** rights.
 
 ## Invite a member
@@ -115,16 +115,16 @@ If a device is lost or stolen, click **⋯** and select **Reset after a lost dev
 
 First, revoke unused links under **Pending setup links**. Then click **⋯** on the member's row, select **Remove member**, and confirm.
 
-This deletes their passkeys, linked accounts, sessions, setup links, and the permissions Zeabur gave them. Projects and services stay.
+This deletes their passkeys, linked accounts, sessions, setup links, and the permissions Zeabur OSS gave them. Projects and services stay.
 
 ## If something goes wrong
 
 | What you see | What to do |
 | --- | --- |
-| **Zeabur Identity isn't installed** | Ask a cluster administrator to install Zeabur Identity, or start Zeabur with the namespace where Zeabur Identity runs. |
-| Zeabur doesn't know the Zeabur Identity URL | Start Zeabur with `--issuer-url`. |
+| **Zeabur Identity isn't installed** | Ask a cluster administrator to install Zeabur Identity, or start Zeabur OSS with the namespace where Zeabur Identity runs. |
+| Zeabur OSS doesn't know the Zeabur Identity URL | Start Zeabur OSS with `--issuer-url`. |
 | Zeabur Identity isn't accepting setup links | Run Zeabur Identity with `--invitations`. |
-| **Zeabur was installed without the member roles** | Upgrade the chart with `memberRoles.enabled=true`, or make the member an admin. [Permissions](../reference/permissions.mdx) has the full table. |
+| **Zeabur OSS was installed without the member roles** | Upgrade the chart with `memberRoles.enabled=true`, or make the member an admin. [Permissions](../reference/permissions.mdx) has the full table. |
 | You can't change your own permissions, reset your account, or remove yourself | Ask another admin. You can add a backup passkey yourself from the account page. |
 | The changes have expired | Click **Review changes** again. |
 | The person signs in but sees no projects | On **Members**, check that their row lists projects and roles. If not, add them with **Change access**. |
@@ -207,4 +207,4 @@ To check with kubectl:
 - After signing in, the person runs `kubectl auth whoami` on their computer. The username is `zeabur:erin`.
 - An admin can run `kubectl auth can-i --as zeabur:erin -n shop create deployments`. It prints `yes` for a Developer and `no` for a Viewer.
 
-Removing a member leaves role bindings that Zeabur didn't create but that name `zeabur:<username>`. An admin reviews those separately.
+Removing a member leaves role bindings that Zeabur OSS didn't create but that name `zeabur:<username>`. An admin reviews those separately.

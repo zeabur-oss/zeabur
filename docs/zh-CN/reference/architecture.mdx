@@ -1,28 +1,28 @@
 ---
 title: 架构
-description: 了解 Zeabur 如何从 Kubernetes 对象呈现项目、以用户权限应用变更并沿用已有控制器。
+description: 了解 Zeabur 开源版如何从 Kubernetes 对象呈现项目、以用户权限应用变更并沿用已有控制器。
 ---
 
-Zeabur 开源版显示的内容来自集群中的 Kubernetes 对象：用 kubectl 修改副本数后，Zeabur 下次读取时就会显示新的数值。服务、域名、卷和备份配置都保存在 Kubernetes 对象中。移除 Zeabur 后，原有控制器仍会管理这些对象。
+Zeabur 开源版显示的内容来自集群中的 Kubernetes 对象：用 kubectl 修改副本数后，Zeabur 开源版下次读取时就会显示新的数值。服务、域名、卷和备份配置都保存在 Kubernetes 对象中。移除 Zeabur 开源版后，原有控制器仍会管理这些对象。
 
-实际操作示例见 [Zeabur 如何管理服务](../get-started/how-it-works.mdx)。要移除 Zeabur 并保留工作负载及其依赖的组件，见[移除 Zeabur](../leave/uninstall.mdx)。
+实际操作示例见 [Zeabur 开源版如何管理服务](../get-started/how-it-works.mdx)。要移除 Zeabur 开源版并保留工作负载及其依赖的组件，见[移除 Zeabur 开源版](../leave/uninstall.mdx)。
 
 ## 请求从哪里进入集群
 
 | 使用方式 | 用户打开什么 | Kubernetes API 使用的凭证 |
 |---|---|---|
 | `zeaburctl ui` | 本机 `127.0.0.1` 上的网页 | 启动时选择的 kubeconfig context |
-| 集群内的 `zeabur` | 通过 Ingress 或 HTTPRoute 公开的 Zeabur 网址 | Zeabur Identity 向用户签发的令牌。管理员账号的令牌带有 `admins` 组 |
+| 集群内的 `zeabur` | 通过 Ingress 或 HTTPRoute 公开的 Zeabur 开源版网址 | Zeabur Identity 向用户签发的令牌。管理员账号的令牌带有 `admins` 组 |
 
 `zeabur` 同时提供 `/api` 下的 API 和网页界面。Chart 创建的 ServiceAccount 没有绑定任何 Role，Pod 也不挂载 ServiceAccount token，每次读写都使用登录用户的令牌。
 
-Zeabur Identity 负责登录、通行密钥和短期令牌。Zeabur 是 Zeabur Identity 的 OAuth client，保存 client secret。kube-apiserver 必须配置信任 Zeabur Identity 的 issuer，才会接受这些令牌。各项目分别负责什么，见[总览](https://oss.zeabur.com/zh-CN/docs/overview/)。
+Zeabur Identity 负责登录、通行密钥和短期令牌。Zeabur 开源版是 Zeabur Identity 的 OAuth client，保存 client secret。kube-apiserver 必须配置信任 Zeabur Identity 的 issuer，才会接受这些令牌。各项目分别负责什么，见[总览](https://oss.zeabur.com/zh-CN/docs/overview/)。
 
 ## 项目与服务如何组成
 
-项目就是带有 `zeabur.com/project: "true"` 标签的 Namespace。将已有 Namespace 加入 Zeabur 只会添加这个标签。从 Zeabur 移除项目只会去掉标签，其中的对象都会保留。
+项目就是带有 `zeabur.com/project: "true"` 标签的 Namespace。将已有 Namespace 加入 Zeabur 开源版只会添加这个标签。从 Zeabur 开源版移除项目只会去掉标签，其中的对象都会保留。
 
-Zeabur 读取 Deployment、StatefulSet、DaemonSet 和相关对象，根据以下关系组成服务：
+Zeabur 开源版读取 Deployment、StatefulSet、DaemonSet 和相关对象，根据以下关系组成服务：
 
 - ownerReferences 和工作负载的 selector：哪些 Pod 属于这个服务。
 - Service selector、Ingress backend 和 HTTPRoute backendRefs：流量如何进入。
@@ -30,7 +30,7 @@ Zeabur 读取 Deployment、StatefulSet、DaemonSet 和相关对象，根据以�
 - operator 自身的对象：数据库、对象存储和备份。
 - Helm、Argo CD、Flux 留下的标签和管理信息：服务是否由其他工具管理。
 
-Zeabur 没有自己的数据库。数据库是 operator 的 CR，从 Git 部署是 Zeabur Builder 的 `Build`，备份是各备份控制器的对象。
+Zeabur 开源版没有自己的数据库。数据库是 operator 的 CR，从 Git 部署是 Zeabur Builder 的 `Build`，备份是各备份控制器的对象。
 
 ## 变更如何进入 Kubernetes
 
@@ -41,7 +41,7 @@ Zeabur 没有自己的数据库。数据库是 operator 的 CR，从 Git 部署�
 
 一份变更可能修改多个对象，而 Kubernetes 不支持跨对象事务。如果后续写入失败，之前写入成功的对象会保留在集群中，错误信息会列出已应用的项目。重新加载当前状态，再检查下一份变更。
 
-对于 Helm、Argo CD、Flux 管理的对象，Zeabur 只接受重启操作，会拒绝其他修改，并提示到 Helm values 或 Git 仓库中修改。这样，下次同步时就不会覆盖其他人的修改。
+对于 Helm、Argo CD、Flux 管理的对象，Zeabur 开源版只接受重启操作，会拒绝其他修改，并提示到 Helm values 或 Git 仓库中修改。这样，下次同步时就不会覆盖其他人的修改。
 
 ## 移除界面后谁继续工作
 
@@ -55,24 +55,24 @@ Zeabur 没有自己的数据库。数据库是 operator 的 CR，从 Git 部署�
 | Secret／ConfigMap 变更后重启 | 已安装并配置好的 Reloader |
 | 定时备份 | 对应的数据库 operator、K8up 或 Velero |
 
-这些组件都不依赖 Zeabur。移除 Zeabur 时，需要保留服务仍在使用的组件、CRD 和配置。
+这些组件都不依赖 Zeabur 开源版。移除 Zeabur 开源版时，需要保留服务仍在使用的组件、CRD 和配置。
 
 ## 状态与历史记录从哪里来
 
-实时 CPU 和内存用量来自 metrics-server。历史用量、节点磁盘和卷用量来自支持 Prometheus HTTP API 的 metrics store，Zeabur 以用户权限通过 Kubernetes Service proxy 查询。启用 Zeabur Proxy 后，历史用量改由 Proxy 根据项目权限查询默认的 metrics store。
+实时 CPU 和内存用量来自 metrics-server。历史用量、节点磁盘和卷用量来自支持 Prometheus HTTP API 的 metrics store，Zeabur 开源版以用户权限通过 Kubernetes Service proxy 查询。启用 Zeabur Proxy 后，历史用量改由 Proxy 根据项目权限查询默认的 metrics store。
 
-**部署记录**来自工作负载保留的修订版本，时间和修改者来自事件、容器状态和 `managedFields`。集群已清理的修订版本、超过保留期的事件，Zeabur 也无法读取。
+**部署记录**来自工作负载保留的修订版本，时间和修改者来自事件、容器状态和 `managedFields`。集群已清理的修订版本、超过保留期的事件，Zeabur 开源版也无法读取。
 
 容器日志默认来自 kubelet，只包含副本本次和上次运行的内容。启用 Zeabur Proxy 后，可以根据项目权限读取 VictoriaLogs 中的历史日志。移除 chart 时会一并移除 Proxy，VictoriaLogs 中的日志不受影响。日志收集器的 `includePodLabels: false` 在 operator v0.75.0 中不起作用，日志仍会带有 `kubernetes.pod_labels.*`。
 
-## Zeabur 自己存储什么
+## Zeabur 开源版自己存储什么
 
 - Chart 创建或指定的 Secret：OAuth client secret、变更令牌密钥，以及启用 Proxy 时的 TLS 证书。
-- 集群名称和 metrics store 配置：Zeabur 所在 Namespace 中的 `zeabur-settings` ConfigMap。
+- 集群名称和 metrics store 配置：Zeabur 开源版所在 Namespace 中的 `zeabur-settings` ConfigMap。
 - 成员权限：Kubernetes 的 RoleBinding 和 ClusterRoleBinding。
 - 已添加的 S3 目的地：`zeabur-s3-destinations` Namespace 中的 ConfigMap 和 Secret。
-- kubectl 终端的 tools Pod：位于 `zeabur-terminals` Namespace，只有 Zeabur 的 ServiceAccount 能在其中创建和使用 Pod。
+- kubectl 终端的 tools Pod：位于 `zeabur-terminals` Namespace，只有 Zeabur 开源版的 ServiceAccount 能在其中创建和使用 Pod。
 - 登录设置：Zeabur Identity 所在 Namespace 中的 `zeabur-identity-settings` ConfigMap。**设置**页面写入，Zeabur Identity 读取，见[登录设置](./permissions.mdx#登录设置)。
-- 登录会话：只保存在服务器进程的内存中，空闲过久（最多 1 小时）或登录满 12 小时后结束，见[登录能维持多久](./permissions.mdx#登录有效期)。chart 使用单副本和 `Recreate` 策略，Zeabur 重启后，所有人都需要重新登录。
+- 登录会话：只保存在服务器进程的内存中，空闲过久（最多 1 小时）或登录满 12 小时后结束，见[登录能维持多久](./permissions.mdx#登录有效期)。chart 使用单副本和 `Recreate` 策略，Zeabur 开源版重启后，所有人都需要重新登录。
 
 终端会用到临时 Pod 和内存中的 kubeconfig，权限和存活时间见[安全性](./security.mdx#终端)。

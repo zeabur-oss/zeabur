@@ -180,7 +180,7 @@ Other actions:
 | **Resume** | `kubectl -n shop patch cronjob nightly-report -p '{"spec":{"suspend":false}}'` |
 | Delete | `kubectl -n shop delete cronjob nightly-report` |
 
-Like `kubectl create job --from`, Zeabur’s **Run now** creates a Job with the annotation `cronjob.kubernetes.io/instantiate: manual` and the CronJob as its owner.
+Like `kubectl create job --from`, Zeabur OSS’s **Run now** creates a Job with the annotation `cronjob.kubernetes.io/instantiate: manual` and the CronJob as its owner.
 
 ## Common failures
 

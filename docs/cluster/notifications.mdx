@@ -39,7 +39,7 @@ Choose a type under **Send to** and enter its settings:
 
 Under **Events**, select at least one event, such as **Node not ready** or **Runtime security (Falco)**.
 
-Click **Review changes** and check the channel and the secret that stores the URL and token (Zeabur doesn't show its contents). Then click **Add channel**.
+Click **Review changes** and check the channel and the secret that stores the URL and token (Zeabur OSS doesn't show its contents). Then click **Add channel**.
 
 ![Add notification channel dialog with a Slack webhook URL and three event types selected](../images/shots/notify-channel-add.avif)
 
@@ -48,7 +48,7 @@ Click **Review changes** and check the channel and the secret that stores the UR
 
 ### Send a test
 
-Wait until the channel no longer shows **Waiting**. In the channel row, click **Send test**, review the test Job Zeabur creates, and click **Send test** again.
+Wait until the channel no longer shows **Waiting**. In the channel row, click **Send test**, review the test Job Zeabur OSS creates, and click **Send test** again.
 
 The test is a Job that runs for up to two minutes. When the alerting rules detect it, they send a test alert to this channel. After the page shows that the test was sent, the message reaches the destination within a minute or two.
 
@@ -61,7 +61,7 @@ The test is a Job that runs for up to two minutes. When the alerting rules detec
 
 Click **Edit** in the channel row to change its events and destination settings. Then click **Review changes** and **Save channel**.
 
-The form fills in settings that aren't secret. URL, token, and password fields stay blank and show **Unchanged**. Leave a field blank to keep its saved value, or enter a value to replace it. Zeabur doesn't read stored secrets.
+The form fills in settings that aren't secret. URL, token, and password fields stay blank and show **Unchanged**. Leave a field blank to keep its saved value, or enter a value to replace it. Zeabur OSS doesn't read stored secrets.
 
 You can't change the channel type. To switch from Slack to email, for example, add another channel, send a test, and confirm that it arrives before removing the old channel.
 
@@ -138,7 +138,7 @@ Secret keys and receiver settings for other types:
 | Webhook | `url`; `token` is optional | `webhook_configs`, with `url_secret` pointing to `url`; if a token is set, add `http_config.authorization` with `type: Bearer` and `credentials` pointing to `token` |
 | ntfy | `url`; `token` is optional | Same as Webhook. Set `url` to `https://ntfy.sh/<topic>?template=alertmanager`. For a self-hosted server, replace the domain |
 
-Sending a test creates a Job with the label `zeabur.com/notification-test: <name>`. When Zeabur's alerting rules detect it, they send a test alert addressed to this channel:
+Sending a test creates a Job with the label `zeabur.com/notification-test: <name>`. When Zeabur OSS's alerting rules detect it, they send a test alert addressed to this channel:
 
 ```yaml
 apiVersion: batch/v1
@@ -192,9 +192,9 @@ kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
 
 - **Waiting**: Alertmanager hasn't loaded the channel yet. Check again later.
 - **Rejected**: The row shows the reason, such as an incomplete URL, a missing stored URL or token, or an SMTP server without a port. Click **Edit**, fix the settings, and save.
-- No test message arrives: Check the destination service's URL and token. If the page says Zeabur's alerting rules aren't installed or are from another Zeabur version, click **Install rules** or **Update rules**.
+- No test message arrives: Check the destination service's URL and token. If the page says Zeabur OSS's alerting rules aren't installed or are from another Zeabur OSS version, click **Install rules** or **Update rules**.
 - You can add a channel but can't test it: Sending a test requires permission to create Jobs. Ask an administrator to check this permission.
-- **Made outside Zeabur. Change it where it was made.**: Make the change in the original Helm or GitOps configuration.
+- **Made outside Zeabur OSS. Change it where it was made.**: Make the change in the original Helm or GitOps configuration.
 
 ## Remove a channel
 

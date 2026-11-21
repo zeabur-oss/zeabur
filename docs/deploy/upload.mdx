@@ -5,13 +5,13 @@ description: Send a local folder or .zip file to Zeabur Builder to build. Create
 
 In a project, choose **Add** → **Upload a folder**, drag a folder into the dashed box, enter a service name and port, then select **Review changes**. Once you apply the changes, the folder uploads immediately. The first build starts when the upload finishes.
 
-You don't need a Git repository. The browser packages the folder and sends it directly to the cluster's registry. Zeabur doesn't store the folder or put it in a config file, secret, or volume.
+You don't need a Git repository. The browser packages the folder and sends it directly to the cluster's registry. Zeabur OSS doesn't store the folder or put it in a config file, secret, or volume.
 
 ## Before you begin
 
 - The requirements are the same as for [deploying from Git](./git.mdx): Zeabur Builder and Keel are installed, the chart has `builds.registry` configured, and you have permission to create services and Builds in the project. If components are missing, **Upload a folder** lists them, and clicking it shows the install commands.
 - Zeabur Builder must have `registry.tokenKey` configured to issue a temporary upload token. Without it, the upload stops at **Zeabur Builder doesn't allow uploads**.
-- You need permission to read secrets in the project. Zeabur Builder writes the upload token to the `<service-name>-upload` secret. Zeabur reads it with your permissions, not its own.
+- You need permission to read secrets in the project. Zeabur Builder writes the upload token to the `<service-name>-upload` secret. Zeabur OSS reads it with your permissions, not its own.
 
 ## Create a service
 
@@ -20,7 +20,7 @@ You don't need a Git repository. The browser packages the folder and sends it di
 
 ### Choose a folder
 
-Open **Add** → **Upload a folder**, then drag a folder into the dashed box or click **Choose folder**. If you already have a `.zip` file, drag it in or click **Choose .zip file**. A `.zip` downloaded from GitHub often has an extra enclosing folder. Zeabur removes it automatically.
+Open **Add** → **Upload a folder**, then drag a folder into the dashed box or click **Choose folder**. If you already have a `.zip` file, drag it in or click **Choose .zip file**. A `.zip` downloaded from GitHub often has an extra enclosing folder. Zeabur OSS removes it automatically.
 
 When packaging the folder:
 
@@ -58,11 +58,11 @@ After the build succeeds, Keel updates the service to use the new image. **Auto-
 
 ## Upload a new version
 
-In the service's **Builds** tab, click **Upload a folder** and choose the updated folder. Zeabur reuses the service's build method and settings.
+In the service's **Builds** tab, click **Upload a folder** and choose the updated folder. Zeabur OSS reuses the service's build method and settings.
 
 ## Upload with zeaburctl
 
-Use [`zeaburctl up`](../reference/zeaburctl.mdx#up) from a terminal or script without knowing the registry or Zeabur address. When you sign in with Zeabur Identity, the folder is sent to Zeabur in the cluster. With other credentials, such as an admin kubeconfig, the command runs the same steps on your computer. The credentials never leave your computer.
+Use [`zeaburctl up`](../reference/zeaburctl.mdx#up) from a terminal or script without knowing the registry or Zeabur OSS address. When you sign in with Zeabur Identity, the folder is sent to Zeabur OSS in the cluster. With other credentials, such as an admin kubeconfig, the command runs the same steps on your computer. The credentials never leave your computer.
 
 ```sh
 zeaburctl up ./site --project shop --service site
@@ -130,7 +130,7 @@ To upload a new version, change the annotation value, push the new content, then
 | --- | --- |
 | **Waiting for folder** | The upload hasn't started, or the page was closed during the upload. Click **Upload a folder** in **Builds**. |
 | **Zeabur Builder doesn't allow uploads** | Check that Zeabur Builder has `registry.tokenKey` configured and that you can read the `<service-name>-upload` secret. |
-| **Folder upload failed** | Click **Try again**. Tokens expire after 15 minutes, so Zeabur requests a new one. |
+| **Folder upload failed** | Click **Try again**. Tokens expire after 15 minutes, so Zeabur OSS requests a new one. |
 | **Folder uploaded, but the build hasn't started** | Click **Try again**. If it still fails, check the Build's status in **Builds**. |
 | The build reports that the source couldn't be found | The registry may have removed the uploaded content. By default, the registry keeps only the 20 most recent uploads for each service. Upload the folder again. |
 

@@ -1,6 +1,6 @@
 # zeabur-http
 
-The one client for Zeabur's own outbound HTTP and HTTPS (images, object stores, GitHub).
+The one client for Zeabur OSS's own outbound HTTP and HTTPS (images, object stores, GitHub).
 
 - `Reach` decides which addresses the client may connect to. `Public` refuses loopback, link-local,
   unspecified, multicast and broadcast addresses, also as IPv4-mapped IPv6, after name resolution.

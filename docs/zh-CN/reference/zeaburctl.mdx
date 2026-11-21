@@ -1,9 +1,9 @@
 ---
 title: zeaburctl
-description: 使用当前 kubeconfig 打开 Zeabur、上传文件夹、检查集群，或导出组件的安装内容。
+description: 使用当前 kubeconfig 打开 Zeabur 开源版、上传文件夹、检查集群，或导出组件的安装内容。
 ---
 
-如果已有能连接集群的 kubeconfig，运行 `zeaburctl ui` 就会在本机打开 Zeabur 开源版。读取、**检查变更**和确认后的应用操作都使用该 context 的权限，无需先在集群中安装 Zeabur 服务器。
+如果已有能连接集群的 kubeconfig，运行 `zeaburctl ui` 就会在本机打开 Zeabur 开源版。读取、**检查变更**和确认后的应用操作都使用该 context 的权限，无需先在集群中安装 Zeabur 开源版服务器。
 
 在装了 [Homebrew](https://brew.sh) 的 Apple 芯片 Mac 或 Linux 上，可以用它安装，之后用 `brew upgrade` 更新：
 
@@ -37,7 +37,7 @@ zeaburctl components export cert-manager
 
 | 命令 | 结果 | 会修改什么 |
 |---|---|---|
-| `ui` | 在本机浏览器中打开 Zeabur | 不在集群中安装组件，在界面中应用的变更直接写入集群 |
+| `ui` | 在本机浏览器中打开 Zeabur 开源版 | 不在集群中安装组件，在界面中应用的变更直接写入集群 |
 | `doctor` | 检查集群版本、组件和 Zeabur Identity 配置 | 仅读取，不修改配置 |
 | `up` | 将文件夹上传到通过文件夹创建的服务，并开始构建 | 修改该服务的 Build，将文件夹推送到 registry |
 | `connect` | 把本机端口转发到数据库或服务，并打印连接方式 | 不修改集群中的任何内容 |
@@ -61,7 +61,7 @@ zeaburctl ui --context production \
   --metrics-service monitoring/prometheus:9090
 ```
 
-未指定时，读取 Zeabur Catalog 的 VictoriaMetrics：`observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`。Zeabur 通过 Kubernetes API 的 Service proxy 读取数据，因此你还需要这个 Service 的 `get services/proxy` 权限。实时 CPU 和内存用量来自 metrics-server。
+未指定时，读取 Zeabur Catalog 的 VictoriaMetrics：`observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`。Zeabur 开源版通过 Kubernetes API 的 Service proxy 读取数据，因此你还需要这个 Service 的 `get services/proxy` 权限。实时 CPU 和内存用量来自 metrics-server。
 
 `zeaburctl ui` 仅监听 `127.0.0.1`，端口由操作系统分配。终端输出的链接带有一次性令牌，首次打开后会换成浏览器会话，之后同一链接就无法再次使用。
 
@@ -90,7 +90,7 @@ JSON 最外层是 `checks` 数组，每一项都有 `name`、`status`、`finding
 
 同时出现多种结果时，按严重问题、警告、无法运行的顺序决定退出码。`skipped` 不影响退出码，监控程序需要另外读取 `checks`，才能知道哪些项目未检查。
 
-集群中没有 Zeabur 面板时，`zeaburctl doctor` 会跳过 Zeabur Identity 的检查，因为只有面板需要 Zeabur Identity。只用 `zeaburctl ui` 打开的集群没有面板。doctor 会在你能看到的项目中，查找带有 `app.kubernetes.io/name=zeabur` label 的 Deployment。读不到 Namespace 或某个项目的 Deployment 时，就照常检查。
+集群中没有 Zeabur 开源版面板时，`zeaburctl doctor` 会跳过 Zeabur Identity 的检查，因为只有面板需要 Zeabur Identity。只用 `zeaburctl ui` 打开的集群没有面板。doctor 会在你能看到的项目中，查找带有 `app.kubernetes.io/name=zeabur` label 的 Deployment。读不到 Namespace 或某个项目的 Deployment 时，就照常检查。
 
 kube-apiserver 是否信任 Zeabur Identity 的 issuer，记录在控制平面的 `AuthenticationConfiguration` 文件中，RBAC 无法读取，因此这一项会标记为未检查。要检查的话，到控制平面的主机上读取这个文件。
 
@@ -102,7 +102,7 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 
 将文件夹上传到集群，开始构建。省略文件夹时使用当前文件夹。如果服务尚不存在，命令会创建服务。项目必须已存在，命令不会创建项目。
 
-命令从集群 `kube-public` Namespace 中的 `zeabur-info` 配置文件读取 Zeabur 的网址和 Zeabur Identity 的地址，无需另行配置。已登录集群的用户都能读取这个配置文件，未登录的用户无法读取。要改用其他网址，添加 `--server`，或设置环境变量 `ZEABUR_SERVER`。
+命令从集群 `kube-public` Namespace 中的 `zeabur-info` 配置文件读取 Zeabur 开源版的网址和 Zeabur Identity 的地址，无需另行配置。已登录集群的用户都能读取这个配置文件，未登录的用户无法读取。要改用其他网址，添加 `--server`，或设置环境变量 `ZEABUR_SERVER`。
 
 命令和网页使用同一组 API 和相同的变更方案，你无需知道 registry 的地址。
 
@@ -112,8 +112,8 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 
 | 模式 | 何时使用 | 如何发送文件夹 |
 |---|---|---|
-| 服务器模式 | kubeconfig 使用 Zeabur Identity 的令牌登录，且集群中有 `zeabur-info` | 交给集群中的 Zeabur，由 Zeabur 推送到 registry |
-| 本机模式 | 其他情况，例如管理员 kubeconfig、云服务令牌、ServiceAccount 令牌，或集群中没有 Zeabur 服务器 | 与 `zeaburctl ui` 一样，在你的计算机上运行相同的步骤，再从这台计算机推送到 registry |
+| 服务器模式 | kubeconfig 使用 Zeabur Identity 的令牌登录，且集群中有 `zeabur-info` | 交给集群中的 Zeabur 开源版，由 Zeabur 开源版推送到 registry |
+| 本机模式 | 其他情况，例如管理员 kubeconfig、云服务令牌、ServiceAccount 令牌，或集群中没有 Zeabur 开源版服务器 | 与 `zeaburctl ui` 一样，在你的计算机上运行相同的步骤，再从这台计算机推送到 registry |
 
 本机模式使用 kubeconfig 中的证书直接连接 Kubernetes API，不会将证书发送到其他地方。使用管理员 kubeconfig，就能直接运行 `up`，无需另行配置。
 
@@ -121,15 +121,15 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 
 - 集群已安装 Zeabur Builder。如果尚未安装，命令会在上传前停止。未安装时改用镜像部署。
 - 能连接 registry。如果 registry 位于集群中（例如 `zot.zot.svc:5000`），命令会通过 Kubernetes API 自动转发端口，类似 `kubectl port-forward`。你需要在 registry 所在的 Namespace 中拥有 `get services`、`list endpointslices` 和 `create pods/portforward` 权限，还需要能读取 registry 证书的 CA 配置文件。管理员拥有这些权限，项目的开发者没有。
-- 集群中有 `zeabur-info`。命令从这里获取 registry 的地址。如果集群中没有 Zeabur 服务器，命令无法创建新服务，也不会自动转发端口。
+- 集群中有 `zeabur-info`。命令从这里获取 registry 的地址。如果集群中没有 Zeabur 开源版服务器，命令无法创建新服务，也不会自动转发端口。
 
 ### 登录与权限
 
 命令使用 kubeconfig 的当前 context 登录，也可以通过 `--context` 指定其他 context。两种模式都使用你的权限处理上传和变更，无法执行超出你权限的操作。
 
-命令只会将 Zeabur Identity 签发的令牌发送给集群中的 Zeabur。云服务令牌（例如 GKE、EKS）、ServiceAccount 令牌、固定令牌和客户端证书都不会发送，命令会改用本机模式。Zeabur 也只接受 Zeabur Identity 签发的令牌，使用其他令牌会视为未登录。
+命令只会将 Zeabur Identity 签发的令牌发送给集群中的 Zeabur 开源版。云服务令牌（例如 GKE、EKS）、ServiceAccount 令牌、固定令牌和客户端证书都不会发送，命令会改用本机模式。Zeabur 开源版也只接受 Zeabur Identity 签发的令牌，使用其他令牌会视为未登录。
 
-服务器模式下，Zeabur 的网址必须使用 `https://`。只有在自己的计算机上测试时（`localhost`、`127.0.0.1`、`::1`），才能使用 `http://`。
+服务器模式下，Zeabur 开源版的网址必须使用 `https://`。只有在自己的计算机上测试时（`localhost`、`127.0.0.1`、`::1`），才能使用 `http://`。
 
 ### 选择项目与服务
 
@@ -152,7 +152,7 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 上传依次分为三步：
 
 1. 向 Build 请求上传令牌。这是一份变更方案，会直接应用。
-2. 将压缩包推送到 registry。服务器模式由 Zeabur 推送，本机模式由这台计算机推送。
+2. 将压缩包推送到 registry。服务器模式由 Zeabur 开源版推送，本机模式由这台计算机推送。
 3. 将 digest 写入 Build，开始构建。这也是一份变更方案，会直接应用。
 
 这些变更方案与网页使用的相同。运行命令即表示你确认应用，命令不会再次询问。如果需要创建新服务，创建服务的变更方案中已包含上传令牌请求。

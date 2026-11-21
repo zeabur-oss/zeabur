@@ -84,13 +84,13 @@ Go to **Settings** → **Batch actions** in the project:
 - **Pause all services**: Click **Pause** to set the replica count to 0 for all running Deployments and StatefulSets in the project. Services, configuration, and data on volumes are preserved. Services managed by Helm, Argo CD, or Flux are skipped because those tools would revert the change on their next sync. The review screen lists the services that will be skipped.
 - **Restart all services**: Click **Restart** to replace replicas in batches for every Deployment, StatefulSet, and DaemonSet in the project.
 
-After you apply the pause, click **Undo** in the notification to restore each service's original replica count. If you miss the notification, open **Settings** → **Compute** for each service and restore its **Replicas** value. Zeabur doesn't otherwise save the original counts.
+After you apply the pause, click **Undo** in the notification to restore each service's original replica count. If you miss the notification, open **Settings** → **Compute** for each service and restore its **Replicas** value. Zeabur OSS doesn't otherwise save the original counts.
 
 ## Do the same with kubectl
 
 These actions write to the same fields as kubectl's built-in commands. They don't use Zeabur-specific objects. The examples below use the project `demo` and Deployment `web`.
 
-| Zeabur action | kubectl |
+| Zeabur OSS action | kubectl |
 | --- | --- |
 | **Restart** | `kubectl -n demo rollout restart deployment/web` |
 | **Roll back** to `#2` | `kubectl -n demo rollout undo deployment/web --to-revision=2` |

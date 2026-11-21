@@ -1,11 +1,11 @@
 ---
 title: 用 Zeatend 安装
-description: 在一台全新的 Linux 服务器上，先用 Zeatend 装好 Kubernetes，再用一条 Helm 命令装上 Zeabur。
+description: 在一台全新的 Linux 服务器上，先用 Zeatend 装好 Kubernetes，再用一条 Helm 命令装上 Zeabur 开源版。
 ---
 
-照这一页做完，新的 Linux 服务器上会运行 Kubernetes 和 Zeabur 开源版，你可以通过 HTTPS 打开 Zeabur，用通行密钥登录。
+照这一页做完，新的 Linux 服务器上会运行 Kubernetes 和 Zeabur 开源版，你可以通过 HTTPS 打开 Zeabur 开源版，用通行密钥登录。
 
-已经有集群？见[将 Zeabur 安装到已有集群](existing-cluster.mdx)。想让 Claude Code 或 Codex 这类 Coding Agent 替你完成这些步骤，见[交给 Agent 安装](agent.mdx)。Agent 读的是[本页的 Markdown 版](https://oss.zeabur.com/zh-CN/docs/zeabur/install/one-command.md)。
+已经有集群？见[将 Zeabur 开源版安装到已有集群](existing-cluster.mdx)。想让 Claude Code 或 Codex 这类 Coding Agent 替你完成这些步骤，见[交给 Agent 安装](agent.mdx)。Agent 读的是[本页的 Markdown 版](https://oss.zeabur.com/zh-CN/docs/zeabur/install/one-command.md)。
 
 ## 开始之前
 
@@ -18,7 +18,7 @@ description: 在一台全新的 Linux 服务器上，先用 Zeatend 装好 Kuber
 
 ### 选好域名
 
-Zeabur 的网址是 `zeabur.<域名>`，负责登录的 Zeabur Identity 是 `identity.<域名>`。没有自己的域名时，用 `<IP>.sslip.io`，`<IP>` 填服务器的公网 IP 地址。sslip.io 会把这类名称解析为名称中的 IP 地址，所以无需添加 DNS 记录：
+Zeabur 开源版的网址是 `zeabur.<域名>`，负责登录的 Zeabur Identity 是 `identity.<域名>`。没有自己的域名时，用 `<IP>.sslip.io`，`<IP>` 填服务器的公网 IP 地址。sslip.io 会把这类名称解析为名称中的 IP 地址，所以无需添加 DNS 记录：
 
 ```sh
 DOMAIN=203.0.113.10.sslip.io
@@ -47,7 +47,7 @@ sudo zeatend apply
 </Step>
 <Step>
 
-### 安装 Zeabur
+### 安装 Zeabur 开源版
 
 把 `<version>` 换成要安装的版本，版本列在[发布产物](../reference/releases.mdx)中。
 
@@ -59,7 +59,7 @@ sudo -E helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --set global.domain="$DOMAIN"
 ```
 
-这条命令会装好 Zeabur、负责登录的 Zeabur Identity，以及向 Let's Encrypt 申请 HTTPS 证书的 cert-manager。Helm 会等 cert-manager 装完，大约需要几分钟。它添加的全部内容，见[将 Zeabur 安装到已有集群](existing-cluster.mdx#用-helm-安装)。
+这条命令会装好 Zeabur 开源版、负责登录的 Zeabur Identity，以及向 Let's Encrypt 申请 HTTPS 证书的 cert-manager。Helm 会等 cert-manager 装完，大约需要几分钟。它添加的全部内容，见[将 Zeabur 开源版安装到已有集群](existing-cluster.mdx#用-helm-安装)。
 
 结束时会输出创建第一个管理员账号的链接。链接只能用一次，24 小时后失效。
 
@@ -70,7 +70,7 @@ sudo -E helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 打开链接，创建通行密钥。安装完成后，证书可能要等一分钟。如果浏览器提示证书有问题，稍等片刻再刷新。
 
-通行密钥保存好后，页面会链接到 Zeabur。打开它，用通行密钥登录。其他需要的组件，到**集群** → **组件**页面添加。
+通行密钥保存好后，页面会链接到 Zeabur 开源版。打开它，用通行密钥登录。其他需要的组件，到**集群** → **组件**页面添加。
 
 </Step>
 </Steps>

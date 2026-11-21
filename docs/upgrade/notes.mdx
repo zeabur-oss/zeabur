@@ -3,30 +3,30 @@ title: Upgrade notes
 description: Each version's breaking changes and what to do before you upgrade. When you skip versions, read every section in between, in order.
 ---
 
-This page lists each version's breaking changes and what to do before you upgrade. For the upgrade steps themselves, see [Upgrade Zeabur](steps.mdx).
+This page lists each version's breaking changes and what to do before you upgrade. For the upgrade steps themselves, see [Upgrade Zeabur OSS](steps.mdx).
 
 If you're skipping versions, start at the version you run now and read every section up to the version you're moving to. The newest version is at the top.
 
 ## v0.3.0 → v0.3.1
 
-Zeabur now writes its own alert rules and Zeabur Proxy's access to the logs when it installs VictoriaMetrics and VictoriaLogs. The catalog components no longer carry them, and the custom resource metrics are named `kube_customresource_*`. If you installed VictoriaMetrics with Helm, Flux or Argo CD, upgrade it from Zeabur Catalog, then print Zeabur's objects with `zeaburctl components export victoria-metrics victoria-logs` and apply the ones at the end of each component. If an old `zeabur-notifications` VMRule stays and the Notifications page cannot update it, delete it with `kubectl -n observability delete vmrule zeabur-notifications`, then click **Install rules** on that page.
+Zeabur OSS now writes its own alert rules and Zeabur Proxy's access to the logs when it installs VictoriaMetrics and VictoriaLogs. The catalog components no longer carry them, and the custom resource metrics are named `kube_customresource_*`. If you installed VictoriaMetrics with Helm, Flux or Argo CD, upgrade it from Zeabur Catalog, then print Zeabur OSS's objects with `zeaburctl components export victoria-metrics victoria-logs` and apply the ones at the end of each component. If an old `zeabur-notifications` VMRule stays and the Notifications page cannot update it, delete it with `kubectl -n observability delete vmrule zeabur-notifications`, then click **Install rules** on that page.
 
 ## v0.2 → v0.3
 
-zeabur-installer is gone. One `helm install` sets up Zeabur on an existing cluster; on a new server, [Zeatend](../install/one-command.mdx) sets up Kubernetes first.
+zeabur-installer is gone. One `helm install` sets up Zeabur OSS on an existing cluster; on a new server, [Zeatend](../install/one-command.mdx) sets up Kubernetes first.
 
 The chart now installs Zeabur Identity and cert-manager, and turns on the Ingress with a certificate from the ClusterIssuer `letsencrypt`. To keep the Zeabur Identity you run, upgrade with `--set identity.enabled=false`. To keep a TLS secret you make yourself, add `--set ingress.clusterIssuer=`. Upgrades never install cert-manager.
 
-The chart now carries the `zeabur-system-hosts` admission policy. Outside namespaces labelled `zeabur.com/platform: "true"`, a new or changed Ingress rule needs a host and an HTTPRoute needs hostnames, and neither can use Zeabur's or Zeabur Identity's domain. Objects that already exist keep working until their `spec` changes. To leave the policy out, set `systemHosts.enabled: false`.
+The chart now carries the `zeabur-system-hosts` admission policy. Outside namespaces labelled `zeabur.com/platform: "true"`, a new or changed Ingress rule needs a host and an HTTPRoute needs hostnames, and neither can use Zeabur OSS's or Zeabur Identity's domain. Objects that already exist keep working until their `spec` changes. To leave the policy out, set `systemHosts.enabled: false`.
 
 ### Installed with zeabur-installer
 
-zeabur-installer v0.2 installed Zeabur through a K3s `HelmChart`, and Zeabur Identity, its admission policy and its sign-in client as plain manifests. v0.3 installs all of them with one Helm release. These steps move what the installer made into that release without deleting it. Projects, services, databases, domains, members and passkeys stay as they are, and nobody needs a new account.
+zeabur-installer v0.2 installed Zeabur OSS through a K3s `HelmChart`, and Zeabur Identity, its admission policy and its sign-in client as plain manifests. v0.3 installs all of them with one Helm release. These steps move what the installer made into that release without deleting it. Projects, services, databases, domains, members and passkeys stay as they are, and nobody needs a new account.
 
 What stays the same:
 
 - K3s, RKE2 or KubeSolo, and the file that lets Kubernetes accept Zeabur Identity's tokens. To upgrade Kubernetes later, use Zeatend, as in [A server that zeabur-installer set up](steps.mdx#a-server-that-zeabur-installer-set-up).
-- The components the installer installed, such as Traefik, cert-manager, Zeabur Builder and CloudNativePG. Zeabur doesn't change a component it didn't install, so they stay at their current versions.
+- The components the installer installed, such as Traefik, cert-manager, Zeabur Builder and CloudNativePG. Zeabur OSS doesn't change a component it didn't install, so they stay at their current versions.
 - Zeabur Identity's Service address and signing keys, so accounts and passkeys keep working and kube-apiserver still accepts Zeabur Identity's tokens.
 
 After the upgrade, never run `zeabur-installer apply` again. It would put back the v0.2 `HelmChart` and Zeabur Identity v0.1.
@@ -60,7 +60,7 @@ Then check each of these. Stop and ask the owner when a result differs from what
 | Command | Expected |
 | --- | --- |
 | `kubectl -n kube-system get configmap zeabur-installer -o jsonpath='{.data.installer}'` | `0.2.0` or another `0.2.x`. For `0.1.x`, do [v0.1 → v0.2](#v01--v02) first. |
-| `kubectl -n kube-system get helmchart zeabur` | One `HelmChart`. If there is none, the installer ran with `zeabur: false` and installed no Zeabur: install Zeabur as [Install Zeabur in an existing cluster](../install/existing-cluster.mdx) shows instead. |
+| `kubectl -n kube-system get helmchart zeabur` | One `HelmChart`. If there is none, the installer ran with `zeabur: false` and installed no Zeabur OSS: install Zeabur OSS as [Install Zeabur OSS in an existing cluster](../install/existing-cluster.mdx) shows instead. |
 | `helm status zeabur -n zeabur` | `STATUS: deployed` |
 | `kubectl -n zeabur-identity get deployment zeabur-identity -o jsonpath='{.spec.template.spec.containers[0].args}'` | Nothing, or only `["--invitations"]`. Other options were added by hand, and Zeabur Identity v0.3 refuses many old ones. See [its upgrade notes](https://oss.zeabur.com/docs/identity/operations/upgrade). |
 | `kubectl get crd upstreamproviders.identity.zeabur.com` | `NotFound`. If it exists, someone set up GitHub or Google sign-in by hand; follow Zeabur Identity's upgrade notes for those providers first. |
@@ -76,7 +76,7 @@ From these two files, note:
 
 - **Access mode**: `access.mode` in `installer-config.yaml`. `domain` means certificates from Let's Encrypt for real DNS names. `local` means a CA made on the server, with the ClusterIssuer `zeabur-local-ca`.
 - **Invitations**: `access.invitations: false` means Zeabur Identity doesn't accept invitation links. When the key is missing, invitations are on.
-- **Which Zeabur Identity Zeabur uses**: `issuer.url` in `old-values.yaml`. If it is `https://` followed by `access.identity`, Zeabur uses the Zeabur Identity the installer made. If it is any other address, someone pointed Zeabur at an external Zeabur Identity. Ask the owner before you go on, and write the values as step 2 says for that case.
+- **Which Zeabur Identity Zeabur OSS uses**: `issuer.url` in `old-values.yaml`. If it is `https://` followed by `access.identity`, Zeabur OSS uses the Zeabur Identity the installer made. If it is any other address, someone pointed Zeabur OSS at an external Zeabur Identity. Ask the owner before you go on, and write the values as step 2 says for that case.
 - **Projects' own domains**: `kubectl get ingress,httproute,certificate -A > domains-before.txt`. Also pick one project domain and save what `curl -sS -o /dev/null -w '%{http_code}\n' https://<domain>/` prints. In local mode, add `--cacert /var/lib/rancher/zeabur-installer/local-ca.crt`, or `/var/lib/zeabur-installer/local-ca.crt` on KubeSolo. The upgrade doesn't touch them.
 - **Databases**: `kubectl get clusters.postgresql.cnpg.io,statefulsets -A > databases-before.txt`. The upgrade doesn't touch them.
 
@@ -152,7 +152,7 @@ These files hold secrets, such as Zeabur Identity's signing keys. Keep them on t
 
 #### 4. Detach the installer's `HelmChart`
 
-K3s's helm-controller owns the release through the `HelmChart` `kube-system/zeabur`. Deleting the `HelmChart` as it is uninstalls Zeabur. Tell helm-controller to leave the release alone first, then remove the `HelmChart`:
+K3s's helm-controller owns the release through the `HelmChart` `kube-system/zeabur`. Deleting the `HelmChart` as it is uninstalls Zeabur OSS. Tell helm-controller to leave the release alone first, then remove the `HelmChart`:
 
 ```sh
 kubectl -n kube-system annotate helmchart zeabur helmcharts.helm.cattle.io/unmanaged=true
@@ -210,13 +210,13 @@ Then check that nothing else changed:
 
 #### 8. Sign in
 
-**Stop.** Ask the owner to open Zeabur, sign in with their passkey, open a project and check its services and databases. Only a person can use their passkey. Ask them to have a member sign in too, if they can.
+**Stop.** Ask the owner to open Zeabur OSS, sign in with their passkey, open a project and check its services and databases. Only a person can use their passkey. Ask them to have a member sign in too, if they can.
 
-Everyone signs in again once, because the Zeabur pod was replaced.
+Everyone signs in again once, because the Zeabur OSS pod was replaced.
 
 #### 9. Clean up
 
-Zeabur no longer reads the Secret `zeabur/zeabur-oidc`, the installer's sign-in client secret, unless it uses an external Zeabur Identity. In that case `values.yaml` still names it, so keep it. Otherwise, once the owner agrees, delete it:
+Zeabur OSS no longer reads the Secret `zeabur/zeabur-oidc`, the installer's sign-in client secret, unless it uses an external Zeabur Identity. In that case `values.yaml` still names it, so keep it. Otherwise, once the owner agrees, delete it:
 
 ```sh
 kubectl -n zeabur delete secret zeabur-oidc
@@ -316,7 +316,7 @@ For `node add`'s options and how to revoke its token, see [Manage nodes](../clus
 
 ### Installed with Helm, Argo CD or Flux
 
-Zeabur and Zeabur Proxy dropped the flags that set session length and proxy limits. The values stay the same: people sign in again after 1 hour idle or 12 hours in total. The proxy times out after 30 seconds and caps requests at 16 MiB. The chart never set these flags. If you added them to the Deployment's `args` or `env` yourself, delete them before you upgrade:
+Zeabur OSS and Zeabur Proxy dropped the flags that set session length and proxy limits. The values stay the same: people sign in again after 1 hour idle or 12 hours in total. The proxy times out after 30 seconds and caps requests at 16 MiB. The chart never set these flags. If you added them to the Deployment's `args` or `env` yourself, delete them before you upgrade:
 
 - `zeabur`: `--session-idle-minutes`, `--session-max-hours`, or the `ZEABUR_SESSION_IDLE_MINUTES` and `ZEABUR_SESSION_MAX_HOURS` environment variables.
 - `zeabur-proxy`: `--timeout`, `--max-bytes`, `--review-cache`, `--max-inflight`, `--max-inflight-per-person`, or the `ZEABUR_PROXY_TIMEOUT`, `ZEABUR_PROXY_MAX_BYTES`, `ZEABUR_PROXY_REVIEW_CACHE`, `ZEABUR_PROXY_MAX_INFLIGHT` and `ZEABUR_PROXY_MAX_INFLIGHT_PER_PERSON` environment variables. Other `ZEABUR_PROXY_*` variables, such as the TLS certificate and key, still work.

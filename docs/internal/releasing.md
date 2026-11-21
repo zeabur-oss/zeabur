@@ -4,7 +4,7 @@ How a maintainer publishes a release. What a release contains and how to verify 
 [Releases](../reference/releases.mdx).
 
 `.github/workflows/release.yml` runs on a `v*` tag. Its jobs run in this repository's Nix dev
-shell, after `bun install`: Zeabur's own steps are `scripts/release-*.sh`, and the steps every
+shell, after `bun install`: Zeabur OSS's own steps are `scripts/release-*.sh`, and the steps every
 zeabur-oss release shares are `bun x zeabur-oss-release <command>` of `@zeabur-oss/release`
 (`package.json`, pinned in `bun.lock`), which pushes, signs and verifies images and charts, checks
 the `CHANGELOG.md` section, and writes and verifies `SHA256SUMS`. A manual run of the workflow
@@ -21,7 +21,7 @@ until every package is built (see [Zeabur Desktop](#zeabur-desktop)).
 |---|---|---|
 | knope's `prepare-release` | once, in the release pull request | Sets the version in every file of `versioned_files` in `knope.toml`: both `Cargo.toml` files, each workspace crate in both lock files, the chart's `version` and `web/package.json`. The chart has no `appVersion`; its templates use the chart's `version`. `openapi.yaml` carries the API's own version, which a release does not change. |
 | `check` job | once | The tag is SemVer without build metadata, `CHANGELOG.md` has its section, and a tag is on `main`. |
-| `build` job | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog pin resolves (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `xtask/pins/zeabur-identity` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. |
+| `build` job | Linux amd64 and arm64, macOS arm64 | On a tag, the catalog pin resolves (`release-pins.sh`). Builds the platform (`release-build.sh`; on Linux also Zeabur OSS's and Zeabur Proxy's images), then on Linux smokes the archive, the chart and the image on a k3s cluster with Zeabur Identity at `xtask/pins/zeabur-identity` (`release-smoke.sh`) and writes the image's size and the idle pod's working set to the run's summary. These are the release build's numbers; the CI jobs build with the faster `ci` profile. |
 | `scripts/release-sign.sh` | macOS arm64, in the `build` job | Signs `zeaburctl` with the Developer ID and notarizes it, in the `apple-signing` environment, on `main` and tags only. Without the certificate it leaves the build as it is and warns. |
 | `publish` job | once, tag only, after every build | Refuses when the release is already published. Its token cannot see a draft; the `release` job stops when the release is published. Pushes the images `zeabur` and `proxy`, then the chart with both pinned by digest, and signs them; stops when the chart would run any other image; records the debug and tools images the code pins in `digests.txt`, unsigned, and stops when the registry no longer serves either for both platforms (`release-default-images.sh`) and writes `published/subjects.json`, which `attest` attests. |
 | `release` job | once, tag only | Copies the assets that `release-assets.sh` lists into `assets/`, adds the signed `SHA256SUMS`, attests them and creates the draft release with them, its title and the `CHANGELOG.md` notes (`zeabur-oss-release draft`). A draft that an earlier run left is replaced. |
@@ -46,7 +46,7 @@ entries carry the commit's time, so the same commit gives the same archives.
 
 | Platform | Files |
 |---|---|
-| Linux amd64, arm64 | `zeaburctl-<version>-linux-<arch>.tar.gz` and `zeabur-<version>-linux-<arch>.tar.gz`, one static musl binary each with `LICENSE`; `image.tar` (Zeabur's image) and `proxy-image.tar` (Zeabur Proxy's) |
+| Linux amd64, arm64 | `zeaburctl-<version>-linux-<arch>.tar.gz` and `zeabur-<version>-linux-<arch>.tar.gz`, one static musl binary each with `LICENSE`; `image.tar` (Zeabur OSS's image) and `proxy-image.tar` (Zeabur Proxy's) |
 | macOS arm64 | `zeaburctl-<version>-darwin-arm64.tar.gz`. The server runs only in a pod, so there is no macOS `zeabur`. |
 
 `scripts/release-smoke.sh` tries these files as they will ship, on the development cluster
@@ -95,7 +95,7 @@ skips the Windows login and the updater job elsewhere.
 ## Homebrew
 
 The `zeabur-oss/homebrew-tap` repository holds `Formula/zeaburctl.rb`, which installs `zeaburctl`
-on macOS arm64 and Linux amd64 and arm64, and `Casks/zeabur-desktop.rb`, which installs Zeabur
+on macOS arm64 and Linux amd64 and arm64, and `Casks/zeabur-desktop.rb`, which installs Zeabur OSS
 Desktop's `.dmg` on macOS arm64. Both point at the newest normal release's files, with the SHA-256
 its `SHA256SUMS` lists, so Homebrew installs the same signed files and checks them.
 
@@ -219,7 +219,7 @@ These are repository and organization settings, not files; a maintainer sets the
     with the Developer role (**Users and Access → Integrations**): the `.p8` file's text, its key
     ID and the issuer ID.
 
-  Without them, releases go on with `zeaburctl` and Zeabur Desktop signed ad hoc only. Zeabur
+  Without them, releases go on with `zeaburctl` and Zeabur Desktop signed ad hoc only. Zeabur OSS
   Desktop's macOS build uses the same environment and secrets.
 - **Windows signing.** An Azure Artifact Signing account with a certificate profile for public
   trust, and a Microsoft Entra app registration whose service principal has the **Artifact

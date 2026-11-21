@@ -88,9 +88,9 @@ Job 和定时任务没有**重启**操作。要再次运行定时任务，使用
 
 ## 用 kubectl 执行相同操作
 
-这些操作与 kubectl 内置命令写入相同的字段，没有 Zeabur 专用的对象。以下以项目 `demo`、Deployment `web` 为例。
+这些操作与 kubectl 内置命令写入相同的字段，没有 Zeabur 开源版专用的对象。以下以项目 `demo`、Deployment `web` 为例。
 
-| Zeabur 的操作 | kubectl |
+| Zeabur 开源版的操作 | kubectl |
 | --- | --- |
 | **重启** | `kubectl -n demo rollout restart deployment/web` |
 | **回滚**到 `#2` | `kubectl -n demo rollout undo deployment/web --to-revision=2` |

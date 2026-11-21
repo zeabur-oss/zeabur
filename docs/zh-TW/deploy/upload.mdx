@@ -11,7 +11,7 @@ description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置。
 
 - 條件和[從 Git 部署](./git.mdx)相同：已安裝 Zeabur Builder 和 Keel，chart 已設定 `builds.registry`，你有在專案建立服務和 Build 的權限。缺少元件時，**上傳資料夾**下方會寫出缺哪些，點下去會列出安裝指令。
 - Zeabur Builder 要設定 `registry.tokenKey`，上傳才會拿到有時效的權杖。沒有設定時，上傳會停在 **Zeabur Builder 不允許上傳**。
-- 你要能讀取專案裡的機密變數。上傳用的權杖由 Zeabur Builder 寫在 `<服務名稱>-upload` 機密變數裡，Zeabur 用你的權限讀取，不用自己的權限。
+- 你要能讀取專案裡的機密變數。上傳用的權杖由 Zeabur Builder 寫在 `<服務名稱>-upload` 機密變數裡，Zeabur 開源版用你的權限讀取，不用自己的權限。
 
 ## 建立服務
 
@@ -20,7 +20,7 @@ description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置。
 
 ### 選擇資料夾
 
-開啟**新增** → **上傳資料夾**，把資料夾拖進虛線框，或按**選擇資料夾**。已有 `.zip` 檔時，直接拖進去或按**選擇 .zip 檔**。GitHub 下載的 `.zip` 常多包一層資料夾，Zeabur 會自動去掉。
+開啟**新增** → **上傳資料夾**，把資料夾拖進虛線框，或按**選擇資料夾**。已有 `.zip` 檔時，直接拖進去或按**選擇 .zip 檔**。GitHub 下載的 `.zip` 常多包一層資料夾，Zeabur 開源版會自動去掉。
 
 打包時：
 
@@ -58,11 +58,11 @@ description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置。
 
 ## 上傳新版本
 
-在服務的**建置**分頁按**上傳資料夾**，選擇新版的資料夾。Zeabur 會沿用這個服務的建置方式與設定。
+在服務的**建置**分頁按**上傳資料夾**，選擇新版的資料夾。Zeabur 開源版會沿用這個服務的建置方式與設定。
 
 ## 用 zeaburctl 上傳
 
-終端機和腳本可以用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，不用知道 registry 或 Zeabur 的位址。用 Zeabur Identity 登入時，資料夾交給叢集裡的 Zeabur。用管理員 kubeconfig 等其他憑證時，指令在你的電腦上執行同樣的步驟，憑證不會離開你的電腦。
+終端機和腳本可以用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，不用知道 registry 或 Zeabur 開源版的位址。用 Zeabur Identity 登入時，資料夾交給叢集裡的 Zeabur 開源版。用管理員 kubeconfig 等其他憑證時，指令在你的電腦上執行同樣的步驟，憑證不會離開你的電腦。
 
 ```sh
 zeaburctl up ./site --project shop --service site
@@ -130,7 +130,7 @@ kubectl -n shop patch build site --type=merge \
 | --- | --- |
 | **等待資料夾** | 上傳還沒開始，或中途關掉了頁面。在**建置**按**上傳資料夾**。 |
 | **Zeabur Builder 不允許上傳** | 確認 Zeabur Builder 設定了 `registry.tokenKey`，且你能讀取 `<服務名稱>-upload` 機密變數。 |
-| **資料夾上傳失敗** | 按**再試一次**。權杖 15 分鐘後失效，Zeabur 會重新要一個。 |
+| **資料夾上傳失敗** | 按**再試一次**。權杖 15 分鐘後失效，Zeabur 開源版會重新要一個。 |
 | **資料夾已上傳，但建置沒有開始** | 按**再試一次**。仍失敗時，到**建置**看 Build 的狀況。 |
 | 建置回報找不到來源 | registry 可能已經清掉上傳的內容。registry 預設只保留每個服務最近 20 次上傳，重新上傳即可。 |
 

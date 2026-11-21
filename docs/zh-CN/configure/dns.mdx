@@ -18,7 +18,7 @@ Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签�
 
 通配符只匹配一层名称。`*.example.com` 匹配 `web-shop.example.com`，不匹配 `example.com` 本身，也不匹配 `a.b.example.com`。
 
-## 在 Zeabur 查看要添加的记录
+## 在 Zeabur 开源版查看要添加的记录
 
 打开**集群**页的**域名**区域，每个应用域名下都列出了要添加的记录，包括类型、名称和值，旁边有复制按钮，也会显示当前是否已解析到集群。到 DNS 提供商处添加记录后，回来点击**重新检查**。
 
@@ -57,14 +57,14 @@ Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签�
 
 #### 保存并检查
 
-点击 **Save**，再回到 Zeabur 的**域名**区域，点击**重新检查**。
+点击 **Save**，再回到 Zeabur 开源版的**域名**区域，点击**重新检查**。
 
 </Step>
 </Steps>
 
-使用灰色云朵时，Let's Encrypt 会直接连接服务器完成 HTTP-01 验证，Zeabur 检查时也会查到服务器的地址。
+使用灰色云朵时，Let's Encrypt 会直接连接服务器完成 HTTP-01 验证，Zeabur 开源版检查时也会查到服务器的地址。
 
-如果想开启橙色云朵（**Proxied**），让流量经过 Cloudflare，就将 Cloudflare 的 SSL/TLS 模式设为 **Full (strict)**。此时 DNS 返回 Cloudflare 地址，Zeabur 会将域名显示为**指向别处**。
+如果想开启橙色云朵（**Proxied**），让流量经过 Cloudflare，就将 Cloudflare 的 SSL/TLS 模式设为 **Full (strict)**。此时 DNS 返回 Cloudflare 地址，Zeabur 开源版会将域名显示为**指向别处**。
 
 ### Route 53
 
@@ -93,7 +93,7 @@ Let's Encrypt 通过 HTTP-01 验证签发 HTTPS 证书，每个网址单独签�
 
 #### 保存并检查
 
-点击 **Create records**，再回到 Zeabur 的**域名**区域，点击**重新检查**。Route 53 通常会在一分钟内生效。
+点击 **Create records**，再回到 Zeabur 开源版的**域名**区域，点击**重新检查**。Route 53 通常会在一分钟内生效。
 
 </Step>
 </Steps>
@@ -131,9 +131,9 @@ web-shop.203-0-113-7.sslip.io
 
 ## 用 kubectl 查询应用域名和入口地址
 
-DNS 记录位于集群外，Zeabur 不会写入任何对象，只读取两项信息来列出需要添加的记录。
+DNS 记录位于集群外，Zeabur 开源版不会写入任何对象，只读取两项信息来列出需要添加的记录。
 
-应用域名：安装时填写的值是 Helm chart 的 `domains.suffixes`。如果在**集群**页修改过，新的列表会保存在 Zeabur Namespace 的配置文件 `zeabur-settings` 中，键为 `domain-suffixes`，每行一个域名：
+应用域名：安装时填写的值是 Helm chart 的 `domains.suffixes`。如果在**集群**页修改过，新的列表会保存在 Zeabur 开源版 Namespace 的配置文件 `zeabur-settings` 中，键为 `domain-suffixes`，每行一个域名：
 
 ```sh
 kubectl -n zeabur get configmap zeabur-settings -o jsonpath='{.data.domain-suffixes}'
@@ -141,7 +141,7 @@ kubectl -n zeabur get configmap zeabur-settings -o jsonpath='{.data.domain-suffi
 
 没有输出时，使用的是安装时的值。
 
-记录要指向的地址：Zeabur 读取 Ingress 的 `status.loadBalancer`，也就是入口对外的地址：
+记录要指向的地址：Zeabur 开源版读取 Ingress 的 `status.loadBalancer`，也就是入口对外的地址：
 
 ```sh
 kubectl get ingress -A

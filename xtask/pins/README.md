@@ -1,7 +1,7 @@
 # Pins for the development cluster
 
 The Zeabur Identity and Zeabur Builder releases that `nix run .#dev-cluster`, the cluster tests
-(`scripts/ci/e2e.sh`, `scripts/ci/cluster.sh`) and the release smoke install. A Zeabur release
+(`scripts/ci/e2e.sh`, `scripts/ci/cluster.sh`) and the release smoke install. A Zeabur OSS release
 does not ship or name them: people install Zeabur Identity and Zeabur Builder on their own.
 
 | File | Holds | Used for |

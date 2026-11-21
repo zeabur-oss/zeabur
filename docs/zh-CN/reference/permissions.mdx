@@ -25,7 +25,7 @@ description: 对照成员角色、管理员账号和 Kubernetes RBAC，确认各
 | 打开容器终端、添加调试容器 | 不可以 | 可以 |
 | 用 `zeaburctl connect` 连接数据库或服务 | 不可以 | 可以 |
 | 修改项目显示名称、描述和图标 | 不可以 | 可以 |
-| 创建／删除 Namespace、将 Namespace 加入或移出 Zeabur | 不可以 | 不可以 |
+| 创建／删除 Namespace、将 Namespace 加入或移出 Zeabur 开源版 | 不可以 | 不可以 |
 | 修改角色和成员访问权限、节点、集群组件 | 不可以 | 不可以 |
 | 创建和管理 [API 令牌](./api-tokens.mdx) | 不可以 | 不可以 |
 | 从卷的备份还原（K8up） | 不可以 | 可以 |
@@ -51,7 +51,7 @@ Chart 的 `memberRoles.enabled` 默认为 `true`，会创建：
 - `zeabur-project-viewer-rules`、`zeabur-project-developer-rules`、`zeabur-project-builds-read`、`zeabur-project-builds-write`：上面两个角色实际使用的 verb 和 resource。查看者能查看构建，开发者还能从 Git 部署和重新构建。
 - `zeabur-project-namespace` ValidatingAdmissionPolicy 及其 binding：限制开发者可以修改 Namespace 的哪些字段，需要 Kubernetes 1.30 及以上版本。
 
-Chart 本身不绑定任何人。管理员在 Zeabur 中邀请成员或变更成员权限时，Zeabur 用管理员的权限创建：
+Chart 本身不绑定任何人。管理员在 Zeabur 开源版中邀请成员或变更成员权限时，Zeabur 开源版用管理员的权限创建：
 
 | 对象 | 范围和内容 |
 |---|---|
@@ -74,7 +74,7 @@ zeabur.com/icon
 
 开发者不能修改其他 annotation、任何 label、finalizers、ownerReferences 和 spec。其中也包括决定 Pod Security 级别和 NetworkPolicy 选择范围的 label。
 
-对该 Namespace 有 `zeabur-manage` 权限，或对所有 Namespace 有 `patch`／`update` 权限的人，不受此限制。因此，将已有的 Namespace 加入或移出 Zeabur，都需要管理员或拥有这些额外权限的人操作。
+对该 Namespace 有 `zeabur-manage` 权限，或对所有 Namespace 有 `patch`／`update` 权限的人，不受此限制。因此，将已有的 Namespace 加入或移出 Zeabur 开源版，都需要管理员或拥有这些额外权限的人操作。
 
 ## 开发者能访问哪些机密
 
@@ -97,7 +97,7 @@ zeabur.com/icon
 
 这些 binding 和 ServiceAccount 都带有 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur` 标签。
 
-Chart 会创建 `zeabur-api-tokens` Namespace，但不在其中授予任何角色，因此只有管理员能在那里创建 ServiceAccount 或为它们申请令牌。Pod 只能以同一 Namespace 的 ServiceAccount 运行，成员又不能在 `zeabur-api-tokens` 创建 Pod，所以其他人无法让 Pod 以令牌的身份运行。Zeabur 不会把 `zeabur-api-tokens` 当作项目，也不会让任何人在其中获得角色。
+Chart 会创建 `zeabur-api-tokens` Namespace，但不在其中授予任何角色，因此只有管理员能在那里创建 ServiceAccount 或为它们申请令牌。Pod 只能以同一 Namespace 的 ServiceAccount 运行，成员又不能在 `zeabur-api-tokens` 创建 Pod，所以其他人无法让 Pod 以令牌的身份运行。Zeabur 开源版不会把 `zeabur-api-tokens` 当作项目，也不会让任何人在其中获得角色。
 
 ## 管理员账号和普通账号
 
@@ -133,7 +133,7 @@ zeabur-identityctl account-type alice admin     # 改回普通账号：regular
 | 管理员账号，默认 | 5 分钟 | 1 小时 | 登录后 12 小时 |
 | 管理员账号，改为 15 分钟或启用 AAL3 | 5 分钟 | 15 分钟 | 登录后 12 小时 |
 
-令牌到期时，Zeabur 会自动刷新，无需再次使用通行密钥验证。12 小时从通过通行密钥、GitHub 或 Google 登录的那一刻算起，刷新令牌不会延长有效期。Zeabur 网页的闲置上限为 1 小时；如果 Zeabur Identity 设置的时间更短，则以 Zeabur Identity 为准。
+令牌到期时，Zeabur 开源版会自动刷新，无需再次使用通行密钥验证。12 小时从通过通行密钥、GitHub 或 Google 登录的那一刻算起，刷新令牌不会延长有效期。Zeabur 开源版网页的闲置上限为 1 小时；如果 Zeabur Identity 设置的时间更短，则以 Zeabur Identity 为准。
 
 打开页面但不操作不算活跃使用。超过 60 秒没有操作后，页面自动更新状态的请求不再计为活动，闲置时间会继续累计。
 
@@ -150,7 +150,7 @@ zeabur-identityctl account-type alice admin     # 改回普通账号：regular
 
 安装时无法确定集群是供一个团队使用，还是由多个团队共用，因此一律默认为 1 小时。只有一个团队使用集群时，管理员通常就是唯一的用户，闲置时间与普通账号相同。多个团队共用集群时，记得改为 15 分钟。
 
-这两项没有对应的 Helm value，因为 Zeabur Identity 不在 Zeabur 的 chart 中。在**设置**页修改，或用 kubectl 修改同一个 ConfigMap：
+这两项没有对应的 Helm value，因为 Zeabur Identity 不在 Zeabur 开源版的 chart 中。在**设置**页修改，或用 kubectl 修改同一个 ConfigMap：
 
 ```sh
 kubectl -n zeabur-identity create configmap zeabur-identity-settings --from-literal=teams=multiple
@@ -163,7 +163,7 @@ kubectl -n zeabur-identity patch configmap zeabur-identity-settings --type merge
 
 启用 AAL3 后，管理员账号只能使用不会同步到其他设备的通行密钥，例如安全密钥，或仅保存在一台设备上的通行密钥。登录时，Zeabur Identity 会拒绝保存在 iCloud 钥匙串、Google 密码管理工具等服务中、会同步的通行密钥。界面会明确提示该通行密钥会同步，管理员账号需要使用安全密钥或仅保存在一台设备上的通行密钥。已经通过会同步的通行密钥登录的人，会在下次刷新令牌时退出登录。
 
-启用前，先确认每位管理员都有不会同步的通行密钥。如果你自己没有，Zeabur 不会允许你启用，以免将自己锁在账号外。启用后，其他没有此类通行密钥的管理员将无法登录，需要为他们各生成一条新的 Zeabur Identity 设置链接，让他注册安全密钥。检查每把通行密钥的方法见 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
+启用前，先确认每位管理员都有不会同步的通行密钥。如果你自己没有，Zeabur 开源版不会允许你启用，以免将自己锁在账号外。启用后，其他没有此类通行密钥的管理员将无法登录，需要为他们各生成一条新的 Zeabur Identity 设置链接，让他注册安全密钥。检查每把通行密钥的方法见 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
 
 ## 使用 kubectl 操作
 
@@ -188,4 +188,4 @@ kubectl auth can-i create pods/exec --namespace shop
 kubectl auth can-i patch deployments.apps --namespace shop
 ```
 
-Zeabur 用 `SelfSubjectRulesReview` 判断界面应显示哪些操作。如果策略或用量上限拒绝了操作，需要修正策略指出的条件。管理员账号同样需要通过 admission policy。
+Zeabur 开源版用 `SelfSubjectRulesReview` 判断界面应显示哪些操作。如果策略或用量上限拒绝了操作，需要修正策略指出的条件。管理员账号同样需要通过 admission policy。

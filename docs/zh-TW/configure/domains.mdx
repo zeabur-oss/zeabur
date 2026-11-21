@@ -50,7 +50,7 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 
 ![儲存前確認 web 的變更：app.example.com 會連到 web，並使用 HTTPS](../images/shots/domain-review.avif)
 
-表單沒有連接埠欄位。Zeabur 開源版沿用服務原本的路由，沒有路由時，Zeabur 會建立一條路由，轉送到服務第一個 Kubernetes Service 的第一個連接埠。Kubernetes Service 是服務在叢集裡的位址。路由是叢集把網域的請求送到服務的規則。
+表單沒有連接埠欄位。Zeabur 開源版沿用服務原本的路由，沒有路由時，Zeabur 開源版會建立一條路由，轉送到服務第一個 Kubernetes Service 的第一個連接埠。Kubernetes Service 是服務在叢集裡的位址。路由是叢集把網域的請求送到服務的規則。
 
 </Step>
 <Step>
@@ -63,9 +63,9 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 - 目標是 IPv6 位址時，使用 `AAAA`。
 - 目標是另一個主機名稱時，使用 `CNAME`。
 
-網域在叢集的應用程式網域底下時，例如 `shop.apps.example.com`，畫面會改成請管理員新增萬用字元紀錄 `*.apps.example.com`。已經有這筆紀錄，就不用另外設定。Zeabur 不會替你修改 DNS。
+網域在叢集的應用程式網域底下時，例如 `shop.apps.example.com`，畫面會改成請管理員新增萬用字元紀錄 `*.apps.example.com`。已經有這筆紀錄，就不用另外設定。Zeabur 開源版不會替你修改 DNS。
 
-畫面顯示 **Zeabur 不知道叢集的入口位址，請問管理員要指向哪個位址**時，先向叢集管理員要入口的對外位址，再設定 DNS。
+畫面顯示 **Zeabur 開源版不知道叢集的入口位址，請問管理員要指向哪個位址**時，先向叢集管理員要入口的對外位址，再設定 DNS。
 
 </Step>
 <Step>
@@ -101,7 +101,7 @@ description: 將網域接到服務，設定 HTTPS 憑證、轉址與訪客密碼
 
 ### 建立萬用字元網域的簽發者
 
-Let's Encrypt 只用 DNS-01 驗證簽發萬用字元憑證。叢集管理員需要用 `kubectl` 建立 DNS-01 簽發者，讓 cert-manager 的 DNS-01 solver 使用 DNS 供應商的 API token 完成驗證。Token 只放在叢集裡的 Secret，也就是叢集存放機密資料的地方，Zeabur 不經手。**叢集** → **概覽**的**憑證**只列出簽發者和狀態，不能新增。
+Let's Encrypt 只用 DNS-01 驗證簽發萬用字元憑證。叢集管理員需要用 `kubectl` 建立 DNS-01 簽發者，讓 cert-manager 的 DNS-01 solver 使用 DNS 供應商的 API token 完成驗證。Token 只放在叢集裡的 Secret，也就是叢集存放機密資料的地方，Zeabur 開源版不經手。**叢集** → **概覽**的**憑證**只列出簽發者和狀態，不能新增。
 
 以下以 Cloudflare 為例。先建立 API token，將 DNS 編輯權限限制在要使用的那個 zone，再把下方的佔位符換成你的 token：
 
@@ -141,7 +141,7 @@ EOF
 kubectl get clusterissuer letsencrypt-dns
 ```
 
-等 `READY` 顯示 `True`，回到 Zeabur 的**叢集** → **概覽**的**憑證**，就會看到 `letsencrypt-dns` 和就緒狀態。設定萬用字元網域時，在**簽發者**選擇 `letsencrypt-dns`。
+等 `READY` 顯示 `True`，回到 Zeabur 開源版的**叢集** → **概覽**的**憑證**，就會看到 `letsencrypt-dns` 和就緒狀態。設定萬用字元網域時，在**簽發者**選擇 `letsencrypt-dns`。
 
 使用 Route 53、Cloud DNS、DigitalOcean 或 Azure DNS 等其他供應商時，換成對應的 solver，再依照 [cert-manager 的 DNS-01 文件](https://cert-manager.io/docs/configuration/acme/dns01/)設定憑證與權限。
 
@@ -152,7 +152,7 @@ kubectl get clusterissuer letsencrypt-dns
 - **憑證（PEM）**：先放網站憑證，再放中繼憑證。
 - **私密金鑰（PEM）**：提供未加密、與憑證配對的私密金鑰。
 
-按**加入變更**，再從頁面下方檢查並套用。Zeabur 會檢查憑證的有效日期、網域名稱和金鑰是否配對，再把憑證和金鑰存進叢集，之後不會再顯示金鑰。自己的憑證不會自動更新，要在到期前上傳新的。
+按**加入變更**，再從頁面下方檢查並套用。Zeabur 開源版會檢查憑證的有效日期、網域名稱和金鑰是否配對，再把憑證和金鑰存進叢集，之後不會再顯示金鑰。自己的憑證不會自動更新，要在到期前上傳新的。
 
 同一條路由的其他網域還在向 cert-manager 申請憑證時，這個網域會移到自己的路由。新的路由沿用原本的規則、Ingress class、標籤、註解和錯誤頁面，檢查變更時會列出這次搬移。原本的路由設了密碼、轉址或維護模式時不能搬，面板會寫出要先取消哪一項。
 
@@ -208,19 +208,19 @@ kubectl get clusterissuer letsencrypt-dns
 | **指向別處** | 核對 DNS 紀錄和畫面列出的目標。前面有 CDN 或代理時也會顯示這個狀態，這時要確認 CDN 的來源指到叢集。 |
 | DNS 正確，憑證一直在簽發或**憑證簽發失敗** | 展開 **cert-manager 的訊息**，核對簽發者，以及驗證要用的 DNS 紀錄或入口設定。 |
 | 沒有轉址或密碼按鈕 | 網域由 Traefik 以外的 Ingress controller 提供。Ingress controller 是叢集裡接收外部請求的元件，要在那個元件自己的設定處理。 |
-| 狀態**尚未確認**，或瀏覽器連不上 | 依序核對 DNS、入口位址、服務是否就緒和連線規則。Zeabur 從叢集裡檢查，結果可能和你的瀏覽器不同。 |
+| 狀態**尚未確認**，或瀏覽器連不上 | 依序核對 DNS、入口位址、服務是否就緒和連線規則。Zeabur 開源版從叢集裡檢查，結果可能和你的瀏覽器不同。 |
 
 要暫時擋住訪客、保留網域和服務，用[維護模式](./maintenance.mdx)。
 
 ## 用 kubectl 做同樣的事
 
-網域、憑證、轉址和密碼都是一般的 Ingress、HTTPRoute、Secret 和 Traefik Middleware。Zeabur 沒有自己的 CRD 或控制器，移除 Zeabur 之後，網站照樣由 Traefik 和 cert-manager 提供。以下以專案 `demo`、服務 `web`（Service 連接埠 `8080`）、網域 `app.example.com` 為例。
+網域、憑證、轉址和密碼都是一般的 Ingress、HTTPRoute、Secret 和 Traefik Middleware。Zeabur 開源版沒有自己的 CRD 或控制器，移除 Zeabur 開源版之後，網站照樣由 Traefik 和 cert-manager 提供。以下以專案 `demo`、服務 `web`（Service 連接埠 `8080`）、網域 `app.example.com` 為例。
 
 ### 新增網域
 
 服務已經有 Ingress 時，新網域加在同一個 Ingress 上，沿用原本的後端。只有 HTTPRoute 時，新網域加在那條 HTTPRoute 上。選了 Gateway 時，新網域加在那個 Gateway 上轉送到這個服務的 HTTPRoute，沒有就建一條新的。
 
-服務還沒有路由時，Zeabur 建立名為 `<服務>-<網域，點換成破折號>` 的 Ingress。cert-manager 依 annotation 簽發憑證，存到 `<Ingress 名稱>-tls`：
+服務還沒有路由時，Zeabur 開源版建立名為 `<服務>-<網域，點換成破折號>` 的 Ingress。cert-manager 依 annotation 簽發憑證，存到 `<Ingress 名稱>-tls`：
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -247,7 +247,7 @@ spec:
                   number: 8080
 ```
 
-`letsencrypt` 換成叢集裡簽發者的名稱，用 `kubectl get clusterissuer` 查。服務已經有 Ingress 時，Zeabur 會把新網域加成同一個 Ingress 的另一條 `rules`，並在 `tls` 加一筆。
+`letsencrypt` 換成叢集裡簽發者的名稱，用 `kubectl get clusterissuer` 查。服務已經有 Ingress 時，Zeabur 開源版會把新網域加成同一個 Ingress 的另一條 `rules`，並在 `tls` 加一筆。
 
 選了 Gateway 的網域是一條 HTTPRoute，`parentRefs` 指向 Gateway 和其中的 listener：
 
@@ -271,7 +271,7 @@ spec:
 
 ### 使用自己的憑證
 
-自己的憑證是一個 `kubernetes.io/tls` Secret，Ingress 的 `tls.secretName` 指向它。Zeabur 建立的 Secret 名稱是 `<Ingress 名稱>-cert`，`ownerReferences` 指向 Ingress。Ingress 只有這個網域時，用 kubectl 建立 Secret，再把 Ingress 改成讀取這個 Secret，並拿掉 cert-manager 的 annotation：
+自己的憑證是一個 `kubernetes.io/tls` Secret，Ingress 的 `tls.secretName` 指向它。Zeabur 開源版建立的 Secret 名稱是 `<Ingress 名稱>-cert`，`ownerReferences` 指向 Ingress。Ingress 只有這個網域時，用 kubectl 建立 Secret，再把 Ingress 改成讀取這個 Secret，並拿掉 cert-manager 的 annotation：
 
 ```sh
 kubectl -n demo create secret tls web-app-example-com-cert --cert=fullchain.pem --key=privkey.pem
@@ -280,7 +280,7 @@ kubectl -n demo annotate ingress web-app-example-com cert-manager.io/cluster-iss
 kubectl -n demo delete certificate web-app-example-com-tls
 ```
 
-最後一行刪掉 cert-manager 之前為這個網域建立的 Certificate，Zeabur 換成自己的憑證時也會這樣做。
+最後一行刪掉 cert-manager 之前為這個網域建立的 Certificate，Zeabur 開源版換成自己的憑證時也會這樣做。
 
 ### 轉址和密碼
 

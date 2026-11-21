@@ -1,23 +1,23 @@
 ---
 title: Zeabur 開源版如何管理服務
-description: 用四個情境說明 Zeabur 和 Kubernetes 怎麼分工：既有部署、別人同時修改、權限不足、移除 Zeabur。
+description: 用四個情境說明 Zeabur 開源版和 Kubernetes 怎麼分工：既有部署、別人同時修改、權限不足、移除 Zeabur 開源版。
 ---
 
-Zeabur 開源版沒有自己的資料庫。你在 Zeabur 看到的專案、服務、網域，全部是直接從 Kubernetes 讀出來的。你在 Zeabur 改的東西，也直接寫回 Kubernetes 物件。下面四個情境會說明這件事在日常操作裡代表什麼。
+Zeabur 開源版沒有自己的資料庫。你在 Zeabur 開源版看到的專案、服務、網域，全部是直接從 Kubernetes 讀出來的。你在 Zeabur 開源版改的東西，也直接寫回 Kubernetes 物件。下面四個情境會說明這件事在日常操作裡代表什麼。
 
 ## 已經用 Helm 部署的服務
 
-假設 `shop` 這個 Namespace 是同事半年前用 Helm 裝的。打開 Zeabur 的**專案**，在**其他 Namespace** 裡找到 `shop`，點進去，服務、網域、環境變數都已經在那裡，不需要匯入。
+假設 `shop` 這個 Namespace 是同事半年前用 Helm 裝的。打開 Zeabur 開源版的**專案**，在**其他 Namespace** 裡找到 `shop`，點進去，服務、網域、環境變數都已經在那裡，不需要匯入。
 
-想把這個 Namespace 當成專案管理，就按**使用這個 Namespace**。Zeabur 只會在 Namespace 加上一個標籤，裡面的物件都不會移動。
+想把這個 Namespace 當成專案管理，就按**使用這個 Namespace**。Zeabur 開源版只會在 Namespace 加上一個標籤，裡面的物件都不會移動。
 
-接著你可能想直接在 Zeabur 調高副本數。Zeabur 會擋下來，告訴你這個服務歸 Helm 管：就算這次改成功，下次 `helm upgrade` 也會蓋回去。要改，就去改 Helm values。重新啟動不會動到設定，所以照樣可以按。Argo CD 和 Flux 管的服務也一樣。
+接著你可能想直接在 Zeabur 開源版調高副本數。Zeabur 開源版會擋下來，告訴你這個服務歸 Helm 管：就算這次改成功，下次 `helm upgrade` 也會蓋回去。要改，就去改 Helm values。重新啟動不會動到設定，所以照樣可以按。Argo CD 和 Flux 管的服務也一樣。
 
 ## 檢查完，同事又改了一次
 
 你把副本數從 2 改成 3，按**檢查變更**，畫面列出要寫進叢集的差異。這時候叢集還沒有任何變化。
 
-你去倒杯水的時候，同事用 `kubectl` 換了同一個 Deployment 的映像檔。你回來按下套用，Zeabur 會拒絕，請你重新檢查。重新算出的差異以同事改過的版本為準，你不會不小心把同事換上的映像檔改回舊的。
+你去倒杯水的時候，同事用 `kubectl` 換了同一個 Deployment 的映像檔。你回來按下套用，Zeabur 開源版會拒絕，請你重新檢查。重新算出的差異以同事改過的版本為準，你不會不小心把同事換上的映像檔改回舊的。
 
 檢查過的變更放太久也會過期，看到**這份變更已過期**時，按**重新檢查**就好。
 
@@ -25,14 +25,14 @@ Zeabur 開源版沒有自己的資料庫。你在 Zeabur 看到的專案、服�
 
 新進的同事在 `shop` 是**檢視者**，看得到服務和狀態，點開**日誌**卻顯示權限不足。
 
-這是因為 Zeabur 每次讀寫叢集，用的都是登入者自己的身分，能做什麼由 Kubernetes RBAC 決定。**檢視者**的角色不能讀日誌和機密變數，所以 Zeabur 也讀不到。Zeabur 自己沒有任何叢集權限，沒辦法替誰多讀一點。
+這是因為 Zeabur 開源版每次讀寫叢集，用的都是登入者自己的身分，能做什麼由 Kubernetes RBAC 決定。**檢視者**的角色不能讀日誌和機密變數，所以 Zeabur 開源版也讀不到。Zeabur 開源版自己沒有任何叢集權限，沒辦法替誰多讀一點。
 
 要讓新同事看日誌，管理員可以到[成員](../cluster/members.mdx)把角色改成**開發者**。管理員用管理員帳號登入，本來就有整個叢集的權限，不會遇到這種情況。每個角色能做的事，見[權限](../reference/permissions.mdx)。
 
-## 有一天決定不用 Zeabur
+## 有一天決定不用 Zeabur 開源版
 
-因為服務本來就是 Kubernetes 物件，移除 Zeabur 之後，Deployment、Service、Ingress、環境變數和磁碟區都還在原本的 Namespace，網站照常回應。
+因為服務本來就是 Kubernetes 物件，移除 Zeabur 開源版之後，Deployment、Service、Ingress、環境變數和磁碟區都還在原本的 Namespace，網站照常回應。
 
-會消失的是 Zeabur 的管理介面，以及 Zeabur 安裝的成員角色。原本靠這些角色登入叢集的同事，要先改用別的方式取得權限。資料庫 operator、Ingress controller、cert-manager 這些元件也要留著，服務還依賴這些元件。
+會消失的是 Zeabur 開源版的管理介面，以及 Zeabur 開源版安裝的成員角色。原本靠這些角色登入叢集的同事，要先改用別的方式取得權限。資料庫 operator、Ingress controller、cert-manager 這些元件也要留著，服務還依賴這些元件。
 
-完整的移除步驟和要保留的元件清單，見[移除 Zeabur](../leave/uninstall.mdx)。
+完整的移除步驟和要保留的元件清單，見[移除 Zeabur 開源版](../leave/uninstall.mdx)。

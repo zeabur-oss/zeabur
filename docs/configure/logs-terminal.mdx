@@ -28,7 +28,7 @@ When a replica is replaced, its logs disappear from the cluster. Use **History**
 
 ### History
 
-**History** lists logs from all replicas, including those that have been replaced. It reads from a log storage service and requires a cluster administrator to enable `proxy.enabled` in Zeabur's Helm chart. By default, it reads from VictoriaLogs at the address set in `proxy.logs.url`. If the cluster doesn't have VictoriaLogs, set `proxy.logs.enabled` to false. When log history isn't enabled, the screen shows **Log history isn't turned on**.
+**History** lists logs from all replicas, including those that have been replaced. It reads from a log storage service and requires a cluster administrator to enable `proxy.enabled` in Zeabur OSS's Helm chart. By default, it reads from VictoriaLogs at the address set in `proxy.logs.url`. If the cluster doesn't have VictoriaLogs, set `proxy.logs.enabled` to false. When log history isn't enabled, the screen shows **Log history isn't turned on**.
 
 ## View events
 
@@ -43,7 +43,7 @@ Open the service's **Usage** tab:
 - **Current usage**: CPU and memory usage for each replica, alongside its reserved resources and maximums. **Near memory max** appears when usage approaches the memory maximum. The container restarts if it exceeds that maximum. This requires metrics-server in the cluster. If it isn't installed, click **Install** to see the commands to run on the server.
 - **History**: A usage chart over time, with markers for OOMKilled events and restarts. This requires Prometheus-compatible metrics storage, such as VictoriaMetrics or Prometheus. If none is installed, click **Install VictoriaMetrics**. If you already have one, click **Choose another store** and specify its Kubernetes Service.
 
-Once a cluster administrator enables `proxy.enabled` in the Helm chart, Viewers and Developers can see **History** for their own projects. Zeabur Proxy checks that you're a member of the project and limits queries to that project's metrics. If the proxy isn't enabled, or you select another storage service in settings, Zeabur reads the storage service directly. Anyone who can read it this way can see metrics for all projects, so only administrators have access.
+Once a cluster administrator enables `proxy.enabled` in the Helm chart, Viewers and Developers can see **History** for their own projects. Zeabur Proxy checks that you're a member of the project and limits queries to that project's metrics. If the proxy isn't enabled, or you select another storage service in settings, Zeabur OSS reads the storage service directly. Anyone who can read it this way can see metrics for all projects, so only administrators have access.
 
 ![The service's Usage tab, with current CPU and memory usage for each replica at the top and a historical usage chart below](../images/shots/service-usage.avif)
 
@@ -108,7 +108,7 @@ File reads and writes use `tar`, just like `kubectl cp`. If the image doesn't ha
 
 ## Open a kubectl terminal
 
-To use kubectl or helm in the browser, select **Open kubectl terminal** from the terminal area at the bottom of the page or from search. Zeabur starts a temporary container for you in the `zeabur-terminals` namespace. The kubectl and helm commands inside run as you, with your permissions, and default to the current project.
+To use kubectl or helm in the browser, select **Open kubectl terminal** from the terminal area at the bottom of the page or from search. Zeabur OSS starts a temporary container for you in the `zeabur-terminals` namespace. The kubectl and helm commands inside run as you, with your permissions, and default to the current project.
 
 If you open it outside a project, such as on the **Cluster** page, it opens a cluster-wide kubectl terminal. Check that the dialog title is **Open a kubectl terminal for the cluster**. It defaults to the `default` namespace, and you can work in any namespace you have permission to access.
 
@@ -118,7 +118,7 @@ This container runs for at most 30 minutes and is deleted 1 minute after the las
 
 These examples use the project `demo` and Deployment `web`.
 
-| Zeabur action | kubectl |
+| Zeabur OSS action | kubectl |
 | --- | --- |
 | **Logs**, **Follow** | `kubectl -n demo logs deployment/web -f` |
 | Select a replica and container | `kubectl -n demo logs web-7c9d8b6f5-x2k4p -c web` |

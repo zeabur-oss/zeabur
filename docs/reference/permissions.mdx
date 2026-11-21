@@ -3,7 +3,7 @@ title: Permissions
 description: Compare member roles, admin accounts, and Kubernetes RBAC to check which operations each account can access and how long sign-in lasts.
 ---
 
-If you can see a project but can't read its logs, check your role in that project: a **Viewer** can only view status and events. A **Developer** can also read logs, read secrets, and deploy. Zeabur calls kube-apiserver with your identity. Kubernetes RBAC decides what you can do.
+If you can see a project but can't read its logs, check your role in that project: a **Viewer** can only view status and events. A **Developer** can also read logs, read secrets, and deploy. Zeabur OSS calls kube-apiserver with your identity. Kubernetes RBAC decides what you can do.
 
 For steps to assign member roles, see [Members](../cluster/members.mdx). When you run [`zeaburctl ui`](./zeaburctl.mdx) locally, your permissions come from kubeconfig. The Helm chart provides the member roles below, and admins bind them when inviting members.
 
@@ -25,7 +25,7 @@ For steps to assign member roles, see [Members](../cluster/members.mdx). When yo
 | Open container terminals and add debug containers | No | Yes |
 | Connect to databases and services with `zeaburctl connect` | No | Yes |
 | Edit a project's display name, description, and icon | No | Yes |
-| Create or delete namespaces and add namespaces to or remove them from Zeabur | No | No |
+| Create or delete namespaces and add namespaces to or remove them from Zeabur OSS | No | No |
 | Edit roles, member access, nodes, and cluster components | No | No |
 | Create and manage [API tokens](./api-tokens.mdx) | No | No |
 | Restore volumes from backups (K8up) | No | Yes |
@@ -51,14 +51,14 @@ The chart sets `memberRoles.enabled` to `true` by default and creates:
 - `zeabur-project-viewer-rules`, `zeabur-project-developer-rules`, `zeabur-project-builds-read`, `zeabur-project-builds-write`: The actual verbs and resources for the two roles above. Viewers can view builds. Developers can also deploy from Git and rebuild.
 - The `zeabur-project-namespace` ValidatingAdmissionPolicy and its binding: Restricts which namespace fields developers can change. Requires Kubernetes 1.30 or later.
 
-The chart doesn't bind roles to anyone. When an admin invites or updates a member in Zeabur, Zeabur uses the admin's permissions to create:
+The chart doesn't bind roles to anyone. When an admin invites or updates a member in Zeabur OSS, Zeabur OSS uses the admin's permissions to create:
 
 | Object | Scope and contents |
 |---|---|
 | `ClusterRoleBinding zeabur-member-<username>` | Binds `zeabur-member` to `zeabur:<username>` |
 | `RoleBinding zeabur-member-<username>` in each project | Binds the project's developer or viewer role to the same user |
 
-These bindings have the labels `zeabur.com/member: <username>` and `app.kubernetes.io/managed-by: zeabur`. If you remove Zeabur with `helm uninstall`, you must delete them yourself. See [Permissions after uninstalling](../leave/uninstall.mdx#member-permissions-and-admission-policies).
+These bindings have the labels `zeabur.com/member: <username>` and `app.kubernetes.io/managed-by: zeabur`. If you remove Zeabur OSS with `helm uninstall`, you must delete them yourself. See [Permissions after uninstalling](../leave/uninstall.mdx#member-permissions-and-admission-policies).
 
 When `memberRoles.enabled` is off, the chart doesn't create these roles or the namespace policy. When inviting a member, the only role choice is whether to make them an **Admin**.
 
@@ -74,7 +74,7 @@ zeabur.com/icon
 
 Developers can't change other annotations, any labels, finalizers, ownerReferences, or spec. This includes labels that control Pod Security levels and NetworkPolicy selection.
 
-This restriction doesn't apply to anyone with `zeabur-manage` permission on that namespace or `patch`/`update` permission on all namespaces. Adding an existing namespace to Zeabur or removing it therefore requires an admin or someone with these additional permissions.
+This restriction doesn't apply to anyone with `zeabur-manage` permission on that namespace or `patch`/`update` permission on all namespaces. Adding an existing namespace to Zeabur OSS or removing it therefore requires an admin or someone with these additional permissions.
 
 ## Which secrets developers can access
 
@@ -97,7 +97,7 @@ An [API token](./api-tokens.mdx) gets roles the same way a member does. Its subj
 
 These bindings and the ServiceAccount have the labels `zeabur.com/api-token: <name>` and `app.kubernetes.io/managed-by: zeabur`.
 
-The chart creates the `zeabur-api-tokens` namespace and grants no role in it, so only admins can create ServiceAccounts there or request tokens for them. A pod can run only as a ServiceAccount in its own namespace, and members can't create pods in `zeabur-api-tokens`, so nobody else can run a pod as a token. Zeabur refuses to make `zeabur-api-tokens` a project or give anyone a role in it.
+The chart creates the `zeabur-api-tokens` namespace and grants no role in it, so only admins can create ServiceAccounts there or request tokens for them. A pod can run only as a ServiceAccount in its own namespace, and members can't create pods in `zeabur-api-tokens`, so nobody else can run a pod as a token. Zeabur OSS refuses to make `zeabur-api-tokens` a project or give anyone a role in it.
 
 ## Admin accounts and regular accounts
 
@@ -133,7 +133,7 @@ Regular accounts must sign in again after 1 hour of inactivity. Admin accounts a
 | Admin account, default | 5 minutes | 1 hour | 12 hours after sign-in |
 | Admin account, set to 15 minutes or AAL3 enabled | 5 minutes | 15 minutes | 12 hours after sign-in |
 
-Zeabur automatically refreshes expired tokens without asking you to use your passkey again. The 12-hour limit starts when you sign in with a passkey, GitHub, or Google. Refreshing a token doesn't extend it. The Zeabur web interface has a 1-hour idle timeout, or the shorter timeout set by Zeabur Identity.
+Zeabur OSS automatically refreshes expired tokens without asking you to use your passkey again. The 12-hour limit starts when you sign in with a passkey, GitHub, or Google. Refreshing a token doesn't extend it. The Zeabur OSS web interface has a 1-hour idle timeout, or the shorter timeout set by Zeabur Identity.
 
 Leaving the page open without interacting doesn't count as activity. After 60 seconds without interaction, automatic status refresh requests no longer count as activity, and idle time continues to accumulate.
 
@@ -150,7 +150,7 @@ Terminals stay open while in use and close after 15 minutes of inactivity.
 
 Installation can't determine whether one team or multiple teams will use the cluster, so it always starts with 1 hour. In a single-team cluster, the admin is usually the only user, so the idle timeout matches regular accounts. If multiple teams share the cluster, change the setting to 15 minutes.
 
-Neither setting has a Helm value because Zeabur Identity isn't part of the Zeabur chart. Change them on the **Settings** page or use kubectl to edit the same config file:
+Neither setting has a Helm value because Zeabur Identity isn't part of the Zeabur OSS chart. Change them on the **Settings** page or use kubectl to edit the same config file:
 
 ```sh
 kubectl -n zeabur-identity create configmap zeabur-identity-settings --from-literal=teams=multiple
@@ -163,7 +163,7 @@ If the config file or a key is missing, Zeabur Identity uses the default.
 
 With AAL3 enabled, admin accounts can only use passkeys that don't sync to other devices, such as security keys or passkeys stored on a single device. Zeabur Identity rejects synced passkeys stored in services such as iCloud Keychain or Google Password Manager at sign-in. The interface explains that the passkey syncs and that admin accounts require a security key or a passkey stored on a single device. Anyone already signed in with a synced passkey is signed out at the next token refresh.
 
-Before enabling AAL3, make sure every admin has a device-bound passkey. Zeabur won't let you enable it until you have one yourself, so you can't lock yourself out. Other admins without one won't be able to sign in after you enable it. Generate a new Zeabur Identity setup link for each of them so they can register a security key. For steps to check each passkey, see [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins) in the Zeabur Identity docs.
+Before enabling AAL3, make sure every admin has a device-bound passkey. Zeabur OSS won't let you enable it until you have one yourself, so you can't lock yourself out. Other admins without one won't be able to sign in after you enable it. Generate a new Zeabur Identity setup link for each of them so they can register a security key. For steps to check each passkey, see [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins) in the Zeabur Identity docs.
 
 ## Using kubectl
 
@@ -188,4 +188,4 @@ kubectl auth can-i create pods/exec --namespace shop
 kubectl auth can-i patch deployments.apps --namespace shop
 ```
 
-Zeabur uses `SelfSubjectRulesReview` to decide which operations to show in the interface. If a policy or quota rejects the operation, fix the conditions it identifies. Admin accounts must also pass admission policies.
+Zeabur OSS uses `SelfSubjectRulesReview` to decide which operations to show in the interface. If a policy or quota rejects the operation, fix the conditions it identifies. Admin accounts must also pass admission policies.

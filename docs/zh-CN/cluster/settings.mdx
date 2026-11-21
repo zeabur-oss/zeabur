@@ -11,8 +11,8 @@ description: 在设置页修改集群名称、用量历史的数据源和登录�
 
 ## 开始之前
 
-- Zeabur 开源版已安装在集群中。用 `zeaburctl ui` 在本机运行时，Zeabur 不保存配置，名称沿用 kubeconfig 中的集群名称，用量历史需要用 `--metrics-service` 指定。
-- 你有权限更新 Zeabur 所在 Namespace（默认为 `zeabur`）中的 ConfigMap `zeabur-settings`，首次配置时还需要有权限创建这个 ConfigMap。
+- Zeabur 开源版已安装在集群中。用 `zeaburctl ui` 在本机运行时，Zeabur 开源版不保存配置，名称沿用 kubeconfig 中的集群名称，用量历史需要用 `--metrics-service` 指定。
+- 你有权限更新 Zeabur 开源版所在 Namespace（默认为 `zeabur`）中的 ConfigMap `zeabur-settings`，首次配置时还需要有权限创建这个 ConfigMap。
 
 ## 修改集群名称
 
@@ -30,16 +30,16 @@ description: 在设置页修改集群名称、用量历史的数据源和登录�
 
 ### 改回默认名称
 
-点击**改用默认名称**，即可改回安装时的 `clusterName`。如果安装时没有配置，则使用 Zeabur 网址的主机名。
+点击**改用默认名称**，即可改回安装时的 `clusterName`。如果安装时没有配置，则使用 Zeabur 开源版网址的主机名。
 
 </Step>
 </Steps>
 
 ## 选择用量历史的数据源
 
-服务和节点的**用量**图表、磁盘用量，都从支持 Prometheus HTTP API 的存储服务读取。Zeabur 通过 Kubernetes API，以各用户自己的权限读取数据。启用 Zeabur Proxy 后，服务的用量历史改由 Proxy 从默认存储服务读取，项目成员只能看到自己项目的指标。
+服务和节点的**用量**图表、磁盘用量，都从支持 Prometheus HTTP API 的存储服务读取。Zeabur 开源版通过 Kubernetes API，以各用户自己的权限读取数据。启用 Zeabur Proxy 后，服务的用量历史改由 Proxy 从默认存储服务读取，项目成员只能看到自己项目的指标。
 
-前往**设置** → **用量历史**，在**历史数据来源**中填写该存储服务的 Service，格式为 `namespace/name:port`。默认使用 Zeabur 推荐的 VictoriaMetrics：`observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`。点击**保存**后，**状态**会显示：
+前往**设置** → **用量历史**，在**历史数据来源**中填写该存储服务的 Service，格式为 `namespace/name:port`。默认使用 Zeabur 开源版推荐的 VictoriaMetrics：`observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`。点击**保存**后，**状态**会显示：
 
 | 状态 | 含义 |
 | --- | --- |
@@ -101,6 +101,6 @@ kubectl -n zeabur patch configmap zeabur-settings --type json -p '[{"op":"remove
 - 添加服务时，网址默认使用第一个域名。
 - 运行 `kubectl -n zeabur get configmap zeabur-settings -o yaml` 能看到你配置的值。
 
-## 移除 Zeabur 后
+## 移除 Zeabur 开源版后
 
-只有 Zeabur 会读取这些配置，删除 `zeabur-settings` 不影响任何服务。
+只有 Zeabur 开源版会读取这些配置，删除 `zeabur-settings` 不影响任何服务。

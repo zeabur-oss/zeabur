@@ -3,7 +3,7 @@ title: Restrict inbound and outbound IPs
 description: Allow only specified IPs to access a service's domains, and restrict which IPs its replicas can connect to.
 ---
 
-Open the service's **Networking** tab and configure two settings under **IP limits**: **Who can open its domains** allows only specified IPs or CIDR ranges to connect to the service's public domains, and **Where its replicas can connect** restricts which IPs the service's replicas can connect to. The settings are independent. Zeabur writes them to the cluster only after you review and apply the changes.
+Open the service's **Networking** tab and configure two settings under **IP limits**: **Who can open its domains** allows only specified IPs or CIDR ranges to connect to the service's public domains, and **Where its replicas can connect** restricts which IPs the service's replicas can connect to. The settings are independent. Zeabur OSS writes them to the cluster only after you review and apply the changes.
 
 ## Before you start
 
@@ -42,8 +42,8 @@ To remove the restriction, return to the same panel and turn off the setting. Ea
 By default, Traefik checks the connection's source address. If the cluster's entry point changes that address, Traefik never sees the visitor's IP. The restriction may then block everyone or allow everyone.
 
 - For Traefik installed from Zeabur Catalog, the Service's `externalTrafficPolicy` is `Local`. Requests sent to a node running Traefik retain the visitor's address. This setting comes from the Traefik template in Zeabur Catalog. Whether the address is preserved when ServiceLB forwards requests from other nodes hasn't been verified.
-- If a CDN, reverse proxy, or cloud load balancer sits in front of Traefik, Traefik sees its address. In that case, configure `ipStrategy` on the Middleware to read `X-Forwarded-For`, and configure Traefik's entry point to trust that proxy's addresses (`forwardedHeaders.trustedIPs`). Zeabur doesn't change these settings for you.
-- When you update the list later, Zeabur changes only `sourceRange`. It preserves any `ipStrategy` you've added to the Middleware.
+- If a CDN, reverse proxy, or cloud load balancer sits in front of Traefik, Traefik sees its address. In that case, configure `ipStrategy` on the Middleware to read `X-Forwarded-For`, and configure Traefik's entry point to trust that proxy's addresses (`forwardedHeaders.trustedIPs`). Zeabur OSS doesn't change these settings for you.
+- When you update the list later, Zeabur OSS changes only `sourceRange`. It preserves any `ipStrategy` you've added to the Middleware.
 
 After applying the changes, connect once from an allowed IP and once from an IP that isn't allowed to verify the results.
 
@@ -96,7 +96,7 @@ The rules select replicas using the labels in the replica template, so they appl
 
 ## Configure and remove restrictions with kubectl
 
-Both restrictions use standard Kubernetes objects, with no finalizers or fields that depend on Zeabur. They remain in effect after you remove Zeabur.
+Both restrictions use standard Kubernetes objects, with no finalizers or fields that depend on Zeabur OSS. They remain in effect after you remove Zeabur OSS.
 
 **Who can open its domains**: Each Ingress has a Middleware named `<Ingress name>-ip-allow`, with `ownerReferences` pointing to the Ingress. The Ingress lists it in the `traefik.ingress.kubernetes.io/router.middlewares` annotation. To remove the restriction, first remove `<project>-<Ingress name>-ip-allow@kubernetescrd` from the annotation, then delete the Middleware. If you delete the Middleware first, Traefik can't find it, and the domains return 404.
 
@@ -115,7 +115,7 @@ kubectl -n shop delete networkpolicy api-egress-limit
 
 To change the rules, edit this NetworkPolicy directly or create a separate NetworkPolicy. The allowed destinations from multiple policies add together; they don't override each other.
 
-## How restrictions interact with other Zeabur features
+## How restrictions interact with other Zeabur OSS features
 
 - Maintenance mode uses a separate Ingress without this restriction. All IPs can access the maintenance page.
 - Before moving a domain to a separate Ingress, which happens when changing certificates, turn off the IP restriction on the current Ingress.

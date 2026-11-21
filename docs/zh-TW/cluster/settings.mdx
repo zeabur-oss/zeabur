@@ -11,8 +11,8 @@ description: 在設定頁改叢集名稱、用量歷史的來源和登入設定�
 
 ## 開始之前
 
-- Zeabur 開源版裝在叢集裡。用 `zeaburctl ui` 在自己電腦上執行時，Zeabur 不保存設定，名稱沿用 kubeconfig 裡的叢集名稱，用量歷史要用 `--metrics-service` 指定。
-- 你能更新 Zeabur 所在 Namespace（預設是 `zeabur`）的 ConfigMap `zeabur-settings`，第一次設定時還要能建立這個 ConfigMap。
+- Zeabur 開源版裝在叢集裡。用 `zeaburctl ui` 在自己電腦上執行時，Zeabur 開源版不保存設定，名稱沿用 kubeconfig 裡的叢集名稱，用量歷史要用 `--metrics-service` 指定。
+- 你能更新 Zeabur 開源版所在 Namespace（預設是 `zeabur`）的 ConfigMap `zeabur-settings`，第一次設定時還要能建立這個 ConfigMap。
 
 ## 改叢集名稱
 
@@ -30,16 +30,16 @@ description: 在設定頁改叢集名稱、用量歷史的來源和登入設定�
 
 ### 改回預設
 
-按**改用預設名稱**，就改回安裝時的 `clusterName`。安裝時沒有設定 `clusterName`，就用 Zeabur 網址的主機名稱。
+按**改用預設名稱**，就改回安裝時的 `clusterName`。安裝時沒有設定 `clusterName`，就用 Zeabur 開源版網址的主機名稱。
 
 </Step>
 </Steps>
 
 ## 選擇用量歷史的來源
 
-服務和節點的**用量**圖表、磁碟用量，都從一個支援 Prometheus HTTP API 的儲存服務讀取。Zeabur 經由 Kubernetes API，以每個人自己的權限讀取。開啟 Zeabur Proxy 時，服務的用量歷史改由 Proxy 讀取預設的儲存服務，專案成員只看得到自己專案的指標。
+服務和節點的**用量**圖表、磁碟用量，都從一個支援 Prometheus HTTP API 的儲存服務讀取。Zeabur 開源版經由 Kubernetes API，以每個人自己的權限讀取。開啟 Zeabur Proxy 時，服務的用量歷史改由 Proxy 讀取預設的儲存服務，專案成員只看得到自己專案的指標。
 
-到**設定** → **用量歷史**，**歷史資料來源**填入儲存服務的 Service，格式是 `namespace/name:port`。預設是 Zeabur 推薦的 VictoriaMetrics：`observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`。按**儲存**後，**狀態**會顯示：
+到**設定** → **用量歷史**，**歷史資料來源**填入儲存服務的 Service，格式是 `namespace/name:port`。預設是 Zeabur 開源版推薦的 VictoriaMetrics：`observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`。按**儲存**後，**狀態**會顯示：
 
 | 狀態 | 意思 |
 | --- | --- |
@@ -101,6 +101,6 @@ kubectl -n zeabur patch configmap zeabur-settings --type json -p '[{"op":"remove
 - 新增服務時，網址預設用第一個網域。
 - `kubectl -n zeabur get configmap zeabur-settings -o yaml` 看得到你設定的值。
 
-## 移除 Zeabur 之後
+## 移除 Zeabur 開源版之後
 
-這些設定只有 Zeabur 會讀，刪掉 `zeabur-settings` 不影響任何服務。
+這些設定只有 Zeabur 開源版會讀，刪掉 `zeabur-settings` 不影響任何服務。

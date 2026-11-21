@@ -1,18 +1,18 @@
 ---
-title: Install Zeabur in an existing cluster
-description: Install Zeabur and Zeabur Identity with one Helm command, then sign in with a passkey.
+title: Install Zeabur OSS in an existing cluster
+description: Install Zeabur OSS and Zeabur Identity with one Helm command, then sign in with a passkey.
 ---
 
-When you finish this page, you have Zeabur at an HTTPS address, and you sign in to it with a passkey. The applications already in your cluster show up on the **Projects** page.
+When you finish this page, you have Zeabur OSS at an HTTPS address, and you sign in to it with a passkey. The applications already in your cluster show up on the **Projects** page.
 
 No cluster yet? [Install with Zeatend](one-command.mdx) sets one up on a new server first. To have an agent do these steps, see [Let an agent install for you](agent.mdx). The agent reads [the Markdown copy of this page](https://oss.zeabur.com/docs/zeabur/install/existing-cluster.md).
 
-<Figure label="One helm install puts Zeabur in the zeabur namespace and Zeabur Identity in zeabur-identity, adds cert-manager for HTTPS, and leaves your applications where they are">
+<Figure label="One helm install puts Zeabur OSS in the zeabur namespace and Zeabur Identity in zeabur-identity, adds cert-manager for HTTPS, and leaves your applications where they are">
 <FigFlow>
 <FigCard title="helm install" note="One command" />
 <FigArrow label="Installs" />
 <FigGroup label="Your Kubernetes cluster">
-<FigCard accent title="zeabur namespace" note="Zeabur and its address" />
+<FigCard accent title="zeabur namespace" note="Zeabur OSS and its address" />
 <FigCard title="zeabur-identity namespace" note="Zeabur Identity, for sign-in" />
 <FigCard title="cert-manager" note="HTTPS certificates from Let's Encrypt" />
 <FigCard title="Your applications" note="Stay where they are" />
@@ -20,7 +20,7 @@ No cluster yet? [Install with Zeatend](one-command.mdx) sets one up on a new ser
 </FigFlow>
 </Figure>
 
-Kubernetes is open-source software that runs containers on one or more servers, and Zeabur runs on top of it. Helm is Kubernetes' package installer; the commands below use it to install and upgrade Zeabur. Coming from zeabur.com and want to know what is different first? See [Coming from zeabur.com](../get-started/from-zeabur-com.mdx).
+Kubernetes is open-source software that runs containers on one or more servers, and Zeabur OSS runs on top of it. Helm is Kubernetes' package installer; the commands below use it to install and upgrade Zeabur OSS. Coming from Zeabur and want to know what is different first? See [Coming from Zeabur](../get-started/from-zeabur-com.mdx).
 
 ## Before you begin
 
@@ -29,16 +29,16 @@ Kubernetes is open-source software that runs containers on one or more servers, 
 - **Tools on your computer**: `kubectl`, Helm 4, and `zeabur-identityctl`.
 - **The version to install.** The examples use `<version>`. The chart is published at `oci://ghcr.io/zeabur-oss/charts/zeabur`, and its default image is pinned to the digest of the same version. See [Release artifacts](../reference/releases.mdx) to download and verify it.
 
-Kubernetes must be 1.30 or later because, by default, the chart creates project member roles and uses `ValidatingAdmissionPolicy` to limit which namespace fields Developers can change. That API is generally available starting in 1.30. A namespace is how Kubernetes groups things, and each Zeabur project is one namespace.
+Kubernetes must be 1.30 or later because, by default, the chart creates project member roles and uses `ValidatingAdmissionPolicy` to limit which namespace fields Developers can change. That API is generally available starting in 1.30. A namespace is how Kubernetes groups things, and each Zeabur OSS project is one namespace.
 
-## Install Zeabur
+## Install Zeabur OSS
 
 <Steps>
 <Step>
 
 ### Choose the domain
 
-Zeabur opens at `zeabur.<domain>`, and Zeabur Identity, which handles sign-in, at `identity.<domain>`. With no domain of your own, use `<IP>.sslip.io`, where `<IP>` is the server's public IP address. sslip.io is a public DNS service that answers each such name with the IP address in it, so there is no DNS record to add:
+Zeabur OSS opens at `zeabur.<domain>`, and Zeabur Identity, which handles sign-in, at `identity.<domain>`. With no domain of your own, use `<IP>.sslip.io`, where `<IP>` is the server's public IP address. sslip.io is a public DNS service that answers each such name with the IP address in it, so there is no DNS record to add:
 
 ```sh
 DOMAIN=203.0.113.10.sslip.io
@@ -51,7 +51,7 @@ To use your own domain, such as `example.com`, point `zeabur.example.com` and `i
 
 ### Let the cluster trust sign-in
 
-Zeabur acts on the cluster with each person's own sign-in token, so kube-apiserver must accept the tokens Zeabur Identity issues. On K3s, this prints the configuration and where to put it:
+Zeabur OSS acts on the cluster with each person's own sign-in token, so kube-apiserver must accept the tokens Zeabur Identity issues. On K3s, this prints the configuration and where to put it:
 
 ```sh
 zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public
@@ -73,8 +73,8 @@ helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 This one command does all of the following:
 
-- Installs Zeabur in the `zeabur` namespace, and Zeabur Identity in `zeabur-identity`.
-- Registers Zeabur in Zeabur Identity and stores the client secret in the cluster. The value stays out of Helm's release records.
+- Installs Zeabur OSS in the `zeabur` namespace, and Zeabur Identity in `zeabur-identity`.
+- Registers Zeabur OSS in Zeabur Identity and stores the client secret in the cluster. The value stays out of Helm's release records.
 - Installs cert-manager from Zeabur Catalog, the same way **Cluster** → **Components** does, with the ClusterIssuer `letsencrypt`. Helm waits for this, which takes a few minutes.
 - Adds the ClusterRoles and namespace admission policy for project members. The chart doesn't give the member roles to anyone. After signing in, an admin sets each person's access on **Members**.
 
@@ -87,7 +87,7 @@ When `helm install` finishes, it prints the link that creates the first admin ac
 
 Open the link from the previous step and create a passkey. The certificates can take a minute after the install. If the browser warns about the certificate, wait and reload.
 
-When the passkey is saved, the page links to Zeabur. Open it and sign in with the passkey. An admin account has full rights over the cluster, with nothing more to set up in Zeabur.
+When the passkey is saved, the page links to Zeabur OSS. Open it and sign in with the passkey. An admin account has full rights over the cluster, with nothing more to set up in Zeabur OSS.
 
 If the link has expired, `helm install` printed the command that issues another.
 
@@ -128,21 +128,21 @@ You can list multiple application domains separated by commas; the first is the 
 
 | What you see | What to check |
 | --- | --- |
-| The browser can't open Zeabur | Check that `kubectl -n zeabur rollout status deployment/zeabur` succeeds, then check DNS, the Ingress class, and that ports 80 and 443 are open. |
+| The browser can't open Zeabur OSS | Check that `kubectl -n zeabur rollout status deployment/zeabur` succeeds, then check DNS, the Ingress class, and that ports 80 and 443 are open. |
 | The browser warns about the certificate for minutes | Run `kubectl get certificate -A`. A certificate that stays not ready usually means Let's Encrypt can't reach port 80, or the IP address in an sslip.io domain isn't the public one. |
-| `helm install` says the `zeabur-components` job failed | Zeabur is installed, but cert-manager isn't. `kubectl -n zeabur logs job/zeabur-components` shows why. Fix that, then run the commands that `zeaburctl components export cert-manager --format helm` prints. |
+| `helm install` says the `zeabur-components` job failed | Zeabur OSS is installed, but cert-manager isn't. `kubectl -n zeabur logs job/zeabur-components` shows why. Fix that, then run the commands that `zeaburctl components export cert-manager --format helm` prints. |
 | The cluster already has cert-manager | The install leaves it as it is. Make sure it has a ClusterIssuer named `letsencrypt`, or set `ingress.clusterIssuer`, `identity.ingress.clusterIssuer` and `domains.clusterIssuer` to yours. |
 | Every page says you are not signed in to the cluster | kube-apiserver doesn't accept the tokens yet. Check the steps of [Let the cluster trust sign-in](#let-the-cluster-trust-sign-in). |
-| You can sign in but see no services | Zeabur reads the cluster with the signed-in person's own rights. An admin gives them project roles on [Members](../cluster/members.mdx). |
+| You can sign in but see no services | Zeabur OSS reads the cluster with the signed-in person's own rights. An admin gives them project roles on [Members](../cluster/members.mdx). |
 | Reads are denied after sign-in | Check the member's identity and groups in Zeabur Identity, then the namespace's RoleBinding. See [Permissions](../reference/permissions.mdx). |
-| A new service is ready, but its URL doesn't open | Check the application domain's DNS and certificate. Zeabur and your services use different domains, set up separately. |
-| You have to sign in again after an upgrade | The chart runs one Zeabur replica, and sessions live in memory. A new replica means signing in again. |
+| A new service is ready, but its URL doesn't open | Check the application domain's DNS and certificate. Zeabur OSS and your services use different domains, set up separately. |
+| You have to sign in again after an upgrade | The chart runs one Zeabur OSS replica, and sessions live in memory. A new replica means signing in again. |
 
-Zeabur's own ServiceAccount can only use kubectl terminal replicas in `zeabur-terminals`. It doesn't read the cluster on behalf of the signed-in person.
+Zeabur OSS's own ServiceAccount can only use kubectl terminal replicas in `zeabur-terminals`. It doesn't read the cluster on behalf of the signed-in person.
 
 ## Trust a private CA
 
-If Zeabur Identity, a registry, object storage, or GitHub Enterprise uses a certificate signed by a private CA, or the cluster connects through a proxy that inspects TLS, put the CA certificates in a ConfigMap in Zeabur's namespace and set `extraTrustedCA.configMap`:
+If Zeabur Identity, a registry, object storage, or GitHub Enterprise uses a certificate signed by a private CA, or the cluster connects through a proxy that inspects TLS, put the CA certificates in a ConfigMap in Zeabur OSS's namespace and set `extraTrustedCA.configMap`:
 
 ```sh
 kubectl -n zeabur create configmap corp-ca --from-file=ca.crt=corp-ca.pem
@@ -154,11 +154,11 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 If the certificates are in a secret, set `extraTrustedCA.secret` instead. Use only one of these settings. The key is `ca.crt` by default; change it with `extraTrustedCA.key`. The file may hold several certificates.
 
-Zeabur trusts these certificates in addition to the built-in Mozilla CA bundle when signing in to Identity, reading images, reading backups from object storage, and connecting to GitHub. Zeabur reads the file when it starts, so after you change the config file, run `kubectl -n zeabur rollout restart deployment/zeabur`.
+Zeabur OSS trusts these certificates in addition to the built-in Mozilla CA bundle when signing in to Identity, reading images, reading backups from object storage, and connecting to GitHub. Zeabur OSS reads the file when it starts, so after you change the config file, run `kubectl -n zeabur rollout restart deployment/zeabur`.
 
 ## Send outbound traffic through a proxy
 
-If the cluster can only reach the internet through a proxy, turn on `outboundProxy`. Zeabur then sends the requests it makes itself through that proxy, which are reading images from registries, reading backups from object storage, and connecting to GitHub.
+If the cluster can only reach the internet through a proxy, turn on `outboundProxy`. Zeabur OSS then sends the requests it makes itself through that proxy, which are reading images from registries, reading backups from object storage, and connecting to GitHub.
 
 ```sh
 helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
@@ -168,7 +168,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --set outboundProxy.httpsProxy=http://proxy.corp.example:3128
 ```
 
-Set `outboundProxy.httpsProxy` for HTTPS destinations, `outboundProxy.httpProxy` for HTTP ones, or both. The address must start with `http://`. Zeabur reaches an HTTPS destination through the proxy with a `CONNECT` tunnel. If the proxy needs a user name and password, write them in the address (`http://user:password@proxy.corp.example:3128`).
+Set `outboundProxy.httpsProxy` for HTTPS destinations, `outboundProxy.httpProxy` for HTTP ones, or both. The address must start with `http://`. Zeabur OSS reaches an HTTPS destination through the proxy with a `CONNECT` tunnel. If the proxy needs a user name and password, write them in the address (`http://user:password@proxy.corp.example:3128`).
 
 Some destinations never go through the proxy.
 
@@ -176,13 +176,13 @@ Some destinations never go through the proxy.
 - Names ending in `.svc` or `.cluster.local`, and the cluster's pod and Service ranges. They default to `10.42.0.0/16` and `10.43.0.0/16`, the k3s and RKE2 defaults. If your cluster uses other ranges, set `outboundProxy.clusterNetwork`.
 - Anything you add to `outboundProxy.noProxy`, as domain suffixes (`.corp.example`), addresses, or CIDR ranges.
 
-Zeabur still refuses the same targets as without a proxy. A registry or backup address that points to this machine, a link-local address, or a cloud metadata address is refused even when the proxy could reach it. Zeabur checks the address itself and asks the proxy to connect to that address, so the proxy's DNS answer cannot send the request somewhere else. The proxy's own address can be on a private network.
+Zeabur OSS still refuses the same targets as without a proxy. A registry or backup address that points to this machine, a link-local address, or a cloud metadata address is refused even when the proxy could reach it. Zeabur OSS checks the address itself and asks the proxy to connect to that address, so the proxy's DNS answer cannot send the request somewhere else. The proxy's own address can be on a private network.
 
 This setting does not change Zeabur Proxy (`proxy.*`), which serves logs and metrics. Signing in with Identity and requests to the Kubernetes API don't use the proxy. If the proxy inspects TLS, also trust its CA. See [Trust a private CA](#trust-a-private-ca).
 
 ## Manage the chart with GitOps
 
-Zeabur uses a key to sign reviewed changes, and a client secret to sign people in through Zeabur Identity. The chart creates both on the first install and reads them back on subsequent `helm upgrade` runs. Argo CD and `helm template` generate manifests without connecting to the cluster, so they create new ones each time. A new key invalidates changes you reviewed but haven't applied yet, and a new client secret stops sign-in until Zeabur restarts. For these tools, create both first:
+Zeabur OSS uses a key to sign reviewed changes, and a client secret to sign people in through Zeabur Identity. The chart creates both on the first install and reads them back on subsequent `helm upgrade` runs. Argo CD and `helm template` generate manifests without connecting to the cluster, so they create new ones each time. A new key invalidates changes you reviewed but haven't applied yet, and a new client secret stops sign-in until Zeabur OSS restarts. For these tools, create both first:
 
 ```sh
 kubectl -n zeabur create secret generic zeabur-plan-key \
@@ -195,9 +195,9 @@ printf 'sha256:%s\n' "$(printf %s "$CLIENT_SECRET" | openssl dgst -sha256 -r | c
 
 Set `planKey.existingSecret` to `zeabur-plan-key`, `issuer.clientSecret.existingSecret` to `zeabur-client`, and `issuer.clientSecret.hash` to the last line the commands print. These tools can't read the server's IP address either, so set `global.domain`. To view all chart settings, run `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>`.
 
-## Install the components Zeabur needs
+## Install the components Zeabur OSS needs
 
-The install adds cert-manager. On K3s and RKE2, a cluster administrator installs the other components from **Cluster** → **Components**. See [Install from the page](../cluster/components.mdx#install-from-the-page). Zeabur downloads the list of components from Zeabur Catalog; for a cluster without internet access, see [Use a mirror](../cluster/components.mdx#use-a-mirror).
+The install adds cert-manager. On K3s and RKE2, a cluster administrator installs the other components from **Cluster** → **Components**. See [Install from the page](../cluster/components.mdx#install-from-the-page). Zeabur OSS downloads the list of components from Zeabur Catalog; for a cluster without internet access, see [Use a mirror](../cluster/components.mdx#use-a-mirror).
 
 On other clusters, or to keep components in a GitOps repository, use [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) to print a component's manifests, then apply them with `kubectl` or commit them:
 
@@ -213,4 +213,4 @@ The default `helmchart` format is for the built-in helm-controller of K3s and RK
 helm uninstall zeabur --namespace zeabur
 ```
 
-This removes Zeabur and Zeabur Identity's server. Zeabur Identity's accounts and passkeys stay in the `zeabur-identity` namespace, so a new install keeps them. Applications and the components that provide ingress, certificates, and storage stay in place. The member roles the chart created are removed with the release, so give members their rights another way. See [Remove Zeabur](../leave/uninstall.mdx) for the full list of what stays and the steps to migrate sign-in.
+This removes Zeabur OSS and Zeabur Identity's server. Zeabur Identity's accounts and passkeys stay in the `zeabur-identity` namespace, so a new install keeps them. Applications and the components that provide ingress, certificates, and storage stay in place. The member roles the chart created are removed with the release, so give members their rights another way. See [Remove Zeabur OSS](../leave/uninstall.mdx) for the full list of what stays and the steps to migrate sign-in.

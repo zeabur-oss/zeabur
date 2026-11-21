@@ -149,7 +149,7 @@ LOG_LEVEL=info
 
 ## 用 kubectl 做同样的事
 
-环境变量写在工作负载的 Pod template 里，也就是集群创建每个副本时遵循的配置。共享变量是普通的 ConfigMap 或 Secret，Zeabur 不会另外保存任何数据。以下以项目 `demo`、服务 `web` 为例。
+环境变量写在工作负载的 Pod template 里，也就是集群创建每个副本时遵循的配置。共享变量是普通的 ConfigMap 或 Secret，Zeabur 开源版不会另外保存任何数据。以下以项目 `demo`、服务 `web` 为例。
 
 直接配置和移除一个变量，等于修改容器的 `env`：
 
@@ -244,7 +244,7 @@ kubectl -n demo annotate deployment web reloader.stakater.com/auto-
 kubectl -n demo rollout restart deployment/web
 ```
 
-移除 Zeabur 后，Kubernetes 仍会将这些变量注入容器。Reloader 是独立组件，也会继续根据 annotation 重启服务。
+移除 Zeabur 开源版后，Kubernetes 仍会将这些变量注入容器。Reloader 是独立组件，也会继续根据 annotation 重启服务。
 
 ### 确认设置
 

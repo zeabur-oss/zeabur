@@ -149,7 +149,7 @@ LOG_LEVEL=info
 
 ## 用 kubectl 做同樣的事
 
-環境變數寫在工作負載的 Pod template 裡，也就是叢集建立每個副本時照著用的設定。共用變數是一般的 ConfigMap 或 Secret，Zeabur 沒有另外保存任何資料。以下以專案 `demo`、服務 `web` 為例。
+環境變數寫在工作負載的 Pod template 裡，也就是叢集建立每個副本時照著用的設定。共用變數是一般的 ConfigMap 或 Secret，Zeabur 開源版沒有另外保存任何資料。以下以專案 `demo`、服務 `web` 為例。
 
 直接設定和移除一個變數，等於修改容器的 `env`：
 
@@ -244,7 +244,7 @@ kubectl -n demo annotate deployment web reloader.stakater.com/auto-
 kubectl -n demo rollout restart deployment/web
 ```
 
-移除 Zeabur 之後，這些變數照樣由 Kubernetes 注入容器。Reloader 是獨立的元件，也會繼續依 annotation 重新啟動服務。
+移除 Zeabur 開源版之後，這些變數照樣由 Kubernetes 注入容器。Reloader 是獨立的元件，也會繼續依 annotation 重新啟動服務。
 
 ### 確認設定
 

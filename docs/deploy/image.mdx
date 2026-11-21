@@ -28,7 +28,7 @@ Check the **Name**. It must be at most 40 characters, use lowercase letters, num
 
 ### Check the port and domain
 
-Zeabur reads the ports declared by the image. Check that **Port** matches the port the app actually listens on. If the image declares multiple ports, choose the one that matches the app's purpose.
+Zeabur OSS reads the ports declared by the image. Check that **Port** matches the port the app actually listens on. If the image declares multiple ports, choose the one that matches the app's purpose.
 
 For a background service that doesn't accept connections, leave **Port** empty. This creates only a Deployment, with no private address or option to add a public domain.
 
@@ -48,8 +48,8 @@ To serve an HTTP website, turn on **Public domain**. If an administrator has con
 | **Volume** | Turn this on and enter a **Mount path**, such as `/data`, and a **Volume size**, such as `5Gi`. This creates a new, empty volume. |
 | **Size** | Choose **Small**, **Medium**, or **Large**. The CPU reserved, memory reserved, and memory maximum appear below the field. |
 | **Replicas** | Choose from 1 to 20. Fixed at 1 when a volume is mounted. |
-| **Private registry** | Turn this on and enter **Registry**, **Username**, and **Password**. For example, use `ghcr.io` as the registry host. Zeabur creates a secret for pulling the image. |
-| **Security** | Zeabur reads the image's `User`. It selects **Strict** for a numeric UID other than 0, such as `101` or `1000:1000`. It selects **Compatible** if no user is specified, or if the value is `root`, `0`, or a username such as `nginx`. The form explains the choice, and you can change it before creating the service. |
+| **Private registry** | Turn this on and enter **Registry**, **Username**, and **Password**. For example, use `ghcr.io` as the registry host. Zeabur OSS creates a secret for pulling the image. |
+| **Security** | Zeabur OSS reads the image's `User`. It selects **Strict** for a numeric UID other than 0, such as `101` or `1000:1000`. It selects **Compatible** if no user is specified, or if the value is `root`, `0`, or a username such as `nginx`. The form explains the choice, and you can change it before creating the service. |
 
 <Callout type="warn">
 A service with a mounted volume runs only one replica. During an update, the old replica stops before the new one starts. The service is unavailable during that time.
@@ -71,13 +71,13 @@ If you need container fields that aren't in the form, select **Edit as YAML**. T
 
 ## Check the result
 
-In the service's **Overview**, check that the replica is ready, then check **Logs** to confirm the app has started. If you entered a port, Zeabur adds a TCP traffic check. The replica starts receiving traffic only after it can accept connections.
+In the service's **Overview**, check that the replica is ready, then check **Logs** to confirm the app has started. If you entered a port, Zeabur OSS adds a TCP traffic check. The replica starts receiving traffic only after it can accept connections.
 
 ![Service overview showing replica status and the public address](../images/shots/service-overview.avif)
 
 If the service has a public domain, open its address from **Networking** and check that the app responds. For a private service, connect from another service in the cluster using the address under **Private network**.
 
-When inspecting objects with kubectl, all objects Zeabur creates have the label `app.kubernetes.io/name: <service-name>`:
+When inspecting objects with kubectl, all objects Zeabur OSS creates have the label `app.kubernetes.io/name: <service-name>`:
 
 ```sh
 kubectl -n shop get deploy,svc,ingress,secret,pvc -l app.kubernetes.io/name=web

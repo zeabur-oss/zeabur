@@ -130,7 +130,7 @@ StatefulSet 的磁碟區在建立時就固定了（`volumeClaimTemplates` 建立
 </Steps>
 
 <Callout type="warn">
-另外保存備份 Secret 裡的 `RESTIC_PASSWORD`。這是 Zeabur 產生的 restic 儲存庫密碼，少了它，S3 裡的備份就讀不出來。刪除專案或備份 Secret 之前，先把這個密碼存到別處。
+另外保存備份 Secret 裡的 `RESTIC_PASSWORD`。這是 Zeabur 開源版產生的 restic 儲存庫密碼，少了它，S3 裡的備份就讀不出來。刪除專案或備份 Secret 之前，先把這個密碼存到別處。
 </Callout>
 
 ## 從備份還原檔案
@@ -141,7 +141,7 @@ StatefulSet 的磁碟區在建立時就固定了（`volumeClaimTemplates` 建立
 
 - 來源 S3 端點、儲存貯體與資料夾，可從 K8up Schedule 的 `spec.backend` 確認。
 - S3 存取金鑰，以及備份 Secret 的 `RESTIC_PASSWORD`。
-- 要還原哪一份備份。Zeabur 的執行紀錄沒有 restic 快照 ID，要從備份儲存庫查詢。
+- 要還原哪一份備份。Zeabur 開源版的執行紀錄沒有 restic 快照 ID，要從備份儲存庫查詢。
 - 目標 PVC，以及要接回這個 PVC 的服務。
 
 有讀取 Secret 權限的人可以用 `kubectl` 取出備份 Secret。以專案 `shop`、PVC `data-redis-0` 為例：
@@ -211,11 +211,11 @@ K8up 備份時應用程式照常執行，直接複製磁碟區上的檔案。磁
 
 ## 用 kubectl 做同樣的事
 
-磁碟區是一般的 PVC，備份是 K8up 的 Schedule 和 Secret。移除 Zeabur 之後，掛載和備份排程都照常運作。以下以專案 `demo`、Deployment `web`、磁碟區名稱 `uploads` 為例。
+磁碟區是一般的 PVC，備份是 K8up 的 Schedule 和 Secret。移除 Zeabur 開源版之後，掛載和備份排程都照常運作。以下以專案 `demo`、Deployment `web`、磁碟區名稱 `uploads` 為例。
 
 ### 新增磁碟區
 
-Zeabur 建立的 PVC 名稱是 `<服務>-<磁碟區名稱>`，存取模式預設 `ReadWriteOnce`。要指定儲存類別時，加上 `storageClassName`：
+Zeabur 開源版建立的 PVC 名稱是 `<服務>-<磁碟區名稱>`，存取模式預設 `ReadWriteOnce`。要指定儲存類別時，加上 `storageClassName`：
 
 ```yaml
 apiVersion: v1
@@ -230,7 +230,7 @@ spec:
       storage: 5Gi
 ```
 
-再把 PVC 掛到容器上：在 Pod template 加一筆 `volumes`，在容器加一筆 `volumeMounts`。這和 Zeabur 寫入的 JSON Patch 相同：
+再把 PVC 掛到容器上：在 Pod template 加一筆 `volumes`，在容器加一筆 `volumeMounts`。這和 Zeabur 開源版寫入的 JSON Patch 相同：
 
 ```sh
 kubectl -n demo patch deployment web --type=json -p='[
@@ -239,7 +239,7 @@ kubectl -n demo patch deployment web --type=json -p='[
 ]'
 ```
 
-Pod template 還沒有 `volumes` 或容器還沒有 `volumeMounts` 時，`/-` 會失敗，改用 `kubectl edit deployment web` 直接加上這兩段。建立服務時就加了磁碟區，Zeabur 會把 Deployment 設成 1 個副本和 `strategy: Recreate`，避免新舊副本搶同一個 ReadWriteOnce 磁碟。之後才加磁碟區時不會改這兩項，檢查畫面會提醒多個副本共用 ReadWriteOnce 磁碟的限制。
+Pod template 還沒有 `volumes` 或容器還沒有 `volumeMounts` 時，`/-` 會失敗，改用 `kubectl edit deployment web` 直接加上這兩段。建立服務時就加了磁碟區，Zeabur 開源版會把 Deployment 設成 1 個副本和 `strategy: Recreate`，避免新舊副本搶同一個 ReadWriteOnce 磁碟。之後才加磁碟區時不會改這兩項，檢查畫面會提醒多個副本共用 ReadWriteOnce 磁碟的限制。
 
 ### 擴充容量
 
@@ -299,7 +299,7 @@ spec:
       keepWeekly: 4
 ```
 
-`bucket` 是儲存貯體加上資料夾，Zeabur 預設的資料夾是 `<專案>/<PVC 名稱>`。S3 需要區域時，在 Secret 加上 `AWS_DEFAULT_REGION`，並在 `backend` 加上 `envFrom: [{secretRef: {name: web-uploads-backup}}]`。備份不以 root 執行時，Zeabur 會改寫一個同名的 K8up PodConfig，`podSecurityContext` 換成 `podConfigRef`。
+`bucket` 是儲存貯體加上資料夾，Zeabur 開源版預設的資料夾是 `<專案>/<PVC 名稱>`。S3 需要區域時，在 Secret 加上 `AWS_DEFAULT_REGION`，並在 `backend` 加上 `envFrom: [{secretRef: {name: web-uploads-backup}}]`。備份不以 root 執行時，Zeabur 開源版會改寫一個同名的 K8up PodConfig，`podSecurityContext` 換成 `podConfigRef`。
 
 接著替 PVC 加上 Schedule 選取的標籤，以及 K8up 的 annotation：
 
@@ -364,7 +364,7 @@ PVC 的 `STATUS` 是 `Bound`，`CAPACITY` 是目前的大小。擴充時，等 `
 | 磁碟區一直**等待儲存空間** | 查看副本和 PVC 的事件，確認儲存類別可用。磁碟區那一列寫著**固定在第一個副本執行的節點**時，要等副本排到節點後才會建立。 |
 | 副本換節點後無法啟動 | 看磁碟區是不是固定在某個節點。本機磁碟的資料不會跟著副本搬到新節點。 |
 | 多個副本無法同時掛載 | Deployment 的副本共用同一個 PVC。存取模式是 ReadWriteOnce 時，只有同一個節點上的副本能掛載，要改用支援多節點的儲存類別和存取模式。 |
-| **這個磁碟區名稱超過 63 個字元，K8up 無法用標籤選取它。** | Zeabur 用 PVC 名稱當標籤值選取磁碟區，名稱太長就無法從這裡設定備份，要請管理員另外寫 K8up Schedule。 |
+| **這個磁碟區名稱超過 63 個字元，K8up 無法用標籤選取它。** | Zeabur 開源版用 PVC 名稱當標籤值選取磁碟區，名稱太長就無法從這裡設定備份，要請管理員另外寫 K8up Schedule。 |
 | 備份**失敗**或**部分失敗** | 讀該次的失敗訊息，核對 S3 金鑰，以及備份使用者能不能讀檔案。 |
 | 建立後沒有執行紀錄 | 按**立即備份**執行一次，再看 K8up 和備份 Pod 的狀態。 |
 | 看不到備份設定或結果 | 備份區會說明是叢集沒裝 K8up，還是你沒有權限讀取。 |

@@ -88,7 +88,7 @@ To add a bucket, click **New bucket** under **Buckets** in **Overview**, enter a
 
 The bucket list shows storage usage and object counts. It shows **Not counted yet** when statistics aren't available. Use an S3 client to upload, download, and browse files. This page only manages buckets.
 
-To delete a bucket, click the delete button in its row, read the confirmation, and apply. Buckets created by Zeabur use the `Delete` reclaim policy, so deleting them also deletes their files. If an existing bucket uses a retain policy, the confirmation states that its files will remain in the storage service.
+To delete a bucket, click the delete button in its row, read the confirmation, and apply. Buckets created by Zeabur OSS use the `Delete` reclaim policy, so deleting them also deletes their files. If an existing bucket uses a retain policy, the confirmation states that its files will remain in the storage service.
 
 <Callout type="warn">
 Deleting a bucket with the `Delete` policy deletes its files. First, use an S3 client that can reach the endpoint to copy anything you want to keep. Confirm that you can read the copy at the destination before deleting the source.
@@ -116,7 +116,7 @@ SeaweedFS Operator creates the `files-app` secret from S3Credentials, with `acce
 
 ## Do the same with kubectl
 
-SeaweedFS Operator manages the object storage. Zeabur only writes the objects the operator reads, so the storage keeps running after you remove Zeabur. The YAML below is equivalent to using the form to create object storage named `files`, with capacity `10Gi` and bucket `uploads`. Save it as `files.yaml` and apply it with `kubectl -n shop apply -f files.yaml`:
+SeaweedFS Operator manages the object storage. Zeabur OSS only writes the objects the operator reads, so the storage keeps running after you remove Zeabur OSS. The YAML below is equivalent to using the form to create object storage named `files`, with capacity `10Gi` and bucket `uploads`. Save it as `files.yaml` and apply it with `kubectl -n shop apply -f files.yaml`:
 
 ```yaml
 apiVersion: seaweed.seaweedfs.com/v1
@@ -308,7 +308,7 @@ Delete buckets first, then the account, and finally Seaweed. This is the same or
 
 First, disconnect applications from the object storage or connect the services to the destination you want to keep. Then select **Delete object storage** from **More** in the upper-right corner of the object storage page.
 
-The deletion list includes buckets, identity and key objects, Seaweed, and any data volumes Zeabur finds. Review each item before applying. Whether the underlying disks remain depends on their reclaim policies.
+The deletion list includes buckets, identity and key objects, Seaweed, and any data volumes Zeabur OSS finds. Review each item before applying. Whether the underlying disks remain depends on their reclaim policies.
 
 <Callout type="warn">
 Deleting the entire object storage disconnects S3 clients. Deleting buckets and volumes may also remove all files. Finish copying the data and confirm that applications have switched to the new destination before deleting.

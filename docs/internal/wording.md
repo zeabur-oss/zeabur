@@ -1,11 +1,11 @@
 # Wording
 
-Zeabur's own wording: the term chosen for each concept, how each kind of interface element reads,
-and the rules that come from Zeabur's screens. It covers `web/src/i18n/` (`en.ts` defines the keys;
-`zh-TW.ts` and `zh-CN.ts` are typed against it), the English messages the API sends with a
-problem, the sign-in pages `zeabur` serves, `zeaburctl`'s output and the docs.
+The wording of Zeabur OSS: the term chosen for each concept, how each kind of interface element
+reads, and the rules that come from the screens of Zeabur OSS. It covers `web/src/i18n/` (`en.ts`
+defines the keys; `zh-TW.ts` and `zh-CN.ts` are typed against it), the English messages the API
+sends with a problem, the sign-in pages `zeabur` serves, `zeaburctl`'s output and the docs.
 
-## Zeabur's rules
+## Zeabur OSS rules
 
 1. **Alert titles describe the situation; buttons name the result.** Never "Error" as a title;
    "Delete disk" / "Cancel", not "OK" / "Yes". Body text only when it adds a consequence; do not
@@ -54,7 +54,7 @@ place to say what the feature is for and how to start [A1][N1].
 ### Section titles and terms
 
 - **A section title names its content** as the reader would ask for it ("Public domains",
-  "Private network"), not its position or source in Zeabur ("Set here", "From other objects")
+  "Private network"), not its position or source in Zeabur OSS ("Set here", "From other objects")
   and not a bare adjective (「公開」). Titles read as an outline of the page [F1].
 - **One always-visible sentence under a title** says what the section holds when the term is new
   to a beginner. It stays when the section fills, so it is not lost with the empty state [A1].
@@ -101,14 +101,15 @@ Source text, not a CSS transform. Product, API and code names keep their exact c
 
 ## Names
 
-- **Zeabur** is the product, always capitalized. The [overview](https://oss.zeabur.com/docs/overview/)
+- **Zeabur OSS** is the product, at every mention. **Zeabur** alone is the hosted service at
+  zeabur.com, and zeabur.com is only its address. The [overview](https://oss.zeabur.com/docs/overview/)
   gives each project's name and job: **Zeabur Identity** (sign-in), **Zeabur Catalog** (tested
   components and templates), **Zeabur Builder** (builds from Git), **Zeatend** (sets up Kubernetes
-  on a server), **Zeabur Desktop** and the agent. In Chinese the names stay in Latin letters;
-  Zeabur is 「Zeabur 開源版」／「Zeabur 开源版」 in a docs title and at its first mention on a page,
-  and the agent is 「Agent」. Docs never name the 0.2 installer outside the upgrade pages.
+  on a server), **Zeabur Desktop** and the agent. In Chinese the product is 「Zeabur 開源版」／
+  「Zeabur 开源版」 at every mention, the other names stay in Latin letters, and the agent is
+  「Agent」. Docs never name the 0.2 installer outside the upgrade pages.
 - A *service* is what the reader deploys (服務／服务); `Service` is the Kubernetes kind. A
-  *project* is a namespace Zeabur shows as one (專案／项目). A *replica* is a pod of a service
+  *project* is a namespace Zeabur OSS shows as one (專案／项目). A *replica* is a pod of a service
   (副本), and so is every other Pod, the cluster's own counts included.
 - Other Kubernetes kinds stay in Latin letters in Chinese, Namespace included, as Zeabur's hosted
   dashboard writes it; in English running text they are lower case unless the kind itself is
@@ -182,7 +183,7 @@ why. Add a row before introducing a new concept.
 | review changes (a plan, as the API and docs keep calling it) | 檢查變更 | 检查变更 | Never 計畫／计划 on screen: it reads as a schedule. Expired: 這份變更已過期 |
 | run a command | 執行 | 运行 | |
 | use an existing namespace (show it as a project) | 使用既有的 Namespace | 使用已有的 Namespace | A namespace's own row says 使用這個 Namespace; the API and zeaburctl keep adopt |
-| remove from Zeabur | 移除 | 移除 | |
+| remove from Zeabur OSS | 移除 | 移除 | |
 | read-only | 唯讀 | 只读 | |
 | view (compact action) | 檢視 | 查看 | |
 | jobs (Jobs and CronJobs together) | 批次工作 | 批处理任务 | One-off Jobs are not scheduled |
@@ -196,7 +197,7 @@ why. Add a row before introducing a new concept.
 | restart check (liveness) | 存活檢查 | 存活检查 | |
 | light / dark theme | 淺色／深色 | 亮色／暗色 | |
 | Overview / Logs / Deployments / Networking / Variables / Settings (a service's tabs) | 概覽／日誌／部署紀錄／網路／環境變數／設定 | 概览／日志／部署记录／网络／变量／设置 | The dashboard's tab names; Deployments holds the releases and what changed |
-| reachable / not reachable / not verified (a domain or address) | 可連線／無法連線／無法確認 | 可访问／无法访问／无法确认 | "Not verified" is never a failure: Zeabur could not check it from where it runs |
+| reachable / not reachable / not verified (a domain or address) | 可連線／無法連線／無法確認 | 可访问／无法访问／无法确认 | "Not verified" is never a failure: Zeabur OSS could not check it from where it runs |
 | connection check (one hop of the way to an address) | 連線檢查 | 连接检查 | |
 | configured connection / guessed from variables (where a line on the map comes from) | 已設定的連線／從變數推測 | 已配置的连接／从变量推测 | Configured: an Ingress or a shared Secret or ConfigMap; guessed: a variable's value names the Service |
 | waiting for web to be ready (an address whose only failing hop is a cause said above) | 等待 web 就緒 | 等待 web 就绪 | Neutral, never red; the cause is said once |
@@ -216,9 +217,9 @@ why. Add a row before introducing a new concept.
 | storage class | 儲存類別 | 存储类 | `StorageClass` |
 | debug container (a shell added beside a container that has none) | 除錯容器 | 调试容器 | An ephemeral container; it stays until the replica is replaced |
 | kubectl terminal (a shell with kubectl and helm in the cluster) | kubectl 終端機 | kubectl 终端 | Runs as the signed-in user |
-| node terminal (a root shell on a node's host); terminal replica (the privileged replica it runs in) | 節點終端機；終端機副本 | 节点终端；终端副本 | For cluster administrators only. Say plainly that it is full root on the host and bypasses Zeabur |
+| node terminal (a root shell on a node's host); terminal replica (the privileged replica it runs in) | 節點終端機；終端機副本 | 节点终端；终端副本 | For cluster administrators only. Say plainly that it is full root on the host and bypasses Zeabur OSS |
 | scratch space (an `emptyDir`) | 暫存空間 | 临时空间 | Emptied when the replica is replaced |
-| Strict (a service's security; the project allowing only Strict services) | 嚴格 | 严格 | Pod Security `restricted`: runs as non-root, no privilege escalation. Zeabur picks it for an image whose user is a numeric UID other than 0; the level is in the plan's YAML |
+| Strict (a service's security; the project allowing only Strict services) | 嚴格 | 严格 | Pod Security `restricted`: runs as non-root, no privilege escalation. Zeabur OSS picks it for an image whose user is a numeric UID other than 0; the level is in the plan's YAML |
 | Compatible (security that lets a container run as root) | 相容 | 兼容 | Pod Security `baseline`, which a new project enforces |
 | raw error (the folded raw answer under an error or a diagnosis) | 原始錯誤 | 原始错误 | Holds the API's own code, reason and message, the replica and exit code, and the link to the problem type's page. Sections have no Kubernetes-details disclosure |
 

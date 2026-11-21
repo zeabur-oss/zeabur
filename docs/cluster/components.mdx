@@ -21,7 +21,7 @@ If a feature such as backups or notifications already works, but its component c
 
 ## Install from the page
 
-Only someone allowed to do everything in the cluster (`cluster-admin`) can install here: Zeabur hands each chart to the cluster's helm-controller, which installs it with full rights. The cluster must run helm-controller, as K3s and RKE2 do.
+Only someone allowed to do everything in the cluster (`cluster-admin`) can install here: Zeabur OSS hands each chart to the cluster's helm-controller, which installs it with full rights. The cluster must run helm-controller, as K3s and RKE2 do.
 
 If you manage the cluster with Flux or Argo CD, install the component through it instead. The install dialog shows the `zeaburctl components export` commands that print the component's manifests for Flux or Argo CD. Run one and commit its output to the repository the cluster reads, as [Install with zeaburctl](#install-with-zeaburctl) describes.
 
@@ -37,12 +37,12 @@ Click **Install** on a component card. The dialog lists each step and the object
 
 ### Install
 
-Click **Install**. Zeabur writes one step at a time with your account, and starts the next step once the one before it is ready. Keep the dialog open until every step and health check shows **Ready**; if you close it, click **Manage** on its card to go on from where it stopped. When a health check takes longer than expected, the dialog says what to check.
+Click **Install**. Zeabur OSS writes one step at a time with your account, and starts the next step once the one before it is ready. Keep the dialog open until every step and health check shows **Ready**; if you close it, click **Manage** on its card to go on from where it stopped. When a health check takes longer than expected, the dialog says what to check.
 
 </Step>
 </Steps>
 
-If the dialog says the component is already installed and not by Zeabur, Zeabur leaves it alone. Upgrade or remove it with the tool that installed it.
+If the dialog says the component is already installed and not by Zeabur OSS, Zeabur OSS leaves it alone. Upgrade or remove it with the tool that installed it.
 
 ## Install with zeaburctl
 
@@ -92,7 +92,7 @@ Disabling the built-in Traefik deletes its CRDs and all IngressRoute and Middlew
 
 ## Change settings of built-in components
 
-K3s and RKE2 install some components themselves, such as Traefik. **Installed** shows K3s or RKE2 as their source, and their cards have no **Install** or **Manage** button, because Zeabur changes only components it installed. Don't edit their manifest files in the server's manifests directory: K3s rewrites them every time it starts.
+K3s and RKE2 install some components themselves, such as Traefik. **Installed** shows K3s or RKE2 as their source, and their cards have no **Install** or **Manage** button, because Zeabur OSS changes only components it installed. Don't edit their manifest files in the server's manifests directory: K3s rewrites them every time it starts.
 
 When the distribution installs a component as a Helm chart, its card names its `HelmChart`, for example `traefik` on K3s and `rke2-traefik` on RKE2. To change the chart's values, write a `HelmChartConfig` with the same name in `kube-system`. helm-controller passes its `valuesContent` to Helm as an extra values file and upgrades the chart. On K3s, metrics-server is plain manifests, not a chart, so its card names no chart and a `HelmChartConfig` doesn't change it.
 
@@ -125,9 +125,9 @@ helm-controller then upgrades the chart again with the distribution's values.
 
 ## Remove components
 
-To remove a component Zeabur installed, click **Manage** on its card. When every step and health check is ready, the dialog removes; while an install is unfinished, for example when a health check fails, the dialog shows **Remove** next to **Install**. Check the steps, then click **Remove**. Zeabur deletes its objects in the reverse order; deleting a chart makes helm-controller uninstall it. The dialog lists what stays, such as CRDs and keys. Zeabur refuses while another installed component needs it, or while objects of its custom resources are still in use, and names them. Objects in use are ones Zeabur wrote for another component, and others outside the component's own namespace.
+To remove a component Zeabur OSS installed, click **Manage** on its card. When every step and health check is ready, the dialog removes; while an install is unfinished, for example when a health check fails, the dialog shows **Remove** next to **Install**. Check the steps, then click **Remove**. Zeabur OSS deletes its objects in the reverse order; deleting a chart makes helm-controller uninstall it. The dialog lists what stays, such as CRDs and keys. Zeabur OSS refuses while another installed component needs it, or while objects of its custom resources are still in use, and names them. Objects in use are ones Zeabur OSS wrote for another component, and others outside the component's own namespace.
 
-Remove a component Zeabur didn't install through the same files or tools you used to install it, such as `kubectl delete -f`, `helm uninstall`, Flux, or Argo CD.
+Remove a component Zeabur OSS didn't install through the same files or tools you used to install it, such as `kubectl delete -f`, `helm uninstall`, Flux, or Argo CD.
 
 Before you remove one, check that nothing still uses it. For example, custom resources may still exist, Longhorn volumes may remain, or replicas may still pull images from zot. Removing a component that stores data, such as Longhorn, also deletes that data, so back it up first.
 
@@ -135,9 +135,9 @@ After removal, the component's namespace and volumes remain. Some charts also de
 
 ## Where the catalog comes from
 
-Zeabur downloads Zeabur Catalog from `https://oss-catalog.zeabur.com/v1/`, and again once its copy is more than 10 minutes old. It keeps the last release it downloaded in the ConfigMap `zeabur-catalog` in its namespace, so it stays available after a restart or while the catalog is down. The components page shows the release and when it was downloaded.
+Zeabur OSS downloads Zeabur Catalog from `https://oss-catalog.zeabur.com/v1/`, and again once its copy is more than 10 minutes old. It keeps the last release it downloaded in the ConfigMap `zeabur-catalog` in its namespace, so it stays available after a restart or while the catalog is down. The components page shows the release and when it was downloaded.
 
-If Zeabur can't download the catalog and has no saved copy, the page says why and offers **Try again**. Installed components and every service keep working; only installing a component needs the catalog.
+If Zeabur OSS can't download the catalog and has no saved copy, the page says why and offers **Try again**. Installed components and every service keep working; only installing a component needs the catalog.
 
 ### Use a mirror
 
@@ -145,7 +145,7 @@ For a cluster without internet access, serve a copy of the catalog over HTTPS:
 
 1. Download `api-v1.tar.gz` from a [Zeabur Catalog release](https://github.com/zeabur-oss/catalog/releases) and unpack it. It holds a `v1` folder.
 2. Serve the folder that holds `v1` with any web server, over HTTPS with a certificate the cluster trusts. For a private CA, see [Trust a private CA](../install/existing-cluster.mdx#trust-a-private-ca).
-3. Point Zeabur at it:
+3. Point Zeabur OSS at it:
 
    ```sh
    helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \

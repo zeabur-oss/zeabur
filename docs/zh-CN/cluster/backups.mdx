@@ -61,13 +61,13 @@ description: 配置 Velero 的 S3 存放位置与定时，确认备份结果，�
 
    ![定时表单，每天 03:00（UTC）、保留 7 天、范围是整个集群](../images/shots/backup-schedule-form.avif)
 
-3. 点击**检查变更**，确认执行时间和范围后应用。Zeabur 会创建或修改名为 `zeabur` 的 Velero Schedule，并开启卷文件备份。
+3. 点击**检查变更**，确认执行时间和范围后应用。Zeabur 开源版会创建或修改名为 `zeabur` 的 Velero Schedule，并开启卷文件备份。
 4. 点击**立即备份**，检查后应用。这次备份按刚配置的范围和保留天数执行，不用等定时。
 5. 在**备份记录**找到这条，等状态从**运行中**变成**成功**，再看记录列出的条目数和**保留到**的日期。
 
    ![备份记录列出每次备份的状态、条目数和保留期限](../images/shots/backup-list.avif)
 
-在 Zeabur 以外创建的定时会标为**在 Zeabur 以外配置**，要回到原来创建的地方修改。
+在 Zeabur 开源版以外创建的定时会标为**在 Zeabur 开源版以外配置**，要回到原来创建的地方修改。
 
 ## 从备份还原
 
@@ -82,7 +82,7 @@ description: 配置 Velero 的 S3 存放位置与定时，确认备份结果，�
    - **从备份创建新项目**：备份选定的项目都还在。
    - **还原已删除的项目**：备份选定的项目都已经删除。
    - **还原项目**：备份整个集群，或选定的项目有些还在、有些已删除。
-2. 在**要还原的项目**选择一个项目。选项是这份备份选定的项目；备份整个集群时，选项是当前的项目，加上备份里已经删除的项目，后面标 **（已删除）**。Zeabur 要下载备份才知道有哪些已删除的项目，表单会先显示“正在找备份里已删除的项目…”。
+2. 在**要还原的项目**选择一个项目。选项是这份备份选定的项目；备份整个集群时，选项是当前的项目，加上备份里已经删除的项目，后面标 **（已删除）**。Zeabur 开源版要下载备份才知道有哪些已删除的项目，表单会先显示“正在找备份里已删除的项目…”。
    - 原项目还在：**新项目名称**会填入一个新名称，可以改。
    - 原项目已经删除：界面会说明使用原来的名称还原。
 
@@ -120,7 +120,7 @@ Velero 会跳过已经存在的同名对象。另存为新项目后，原项目�
 
 ### 接回域名
 
-点击**接回域名**。Zeabur 从备份读出这个项目的域名，再检查集群里有没有其他项目正在使用。
+点击**接回域名**。Zeabur 开源版从备份读出这个项目的域名，再检查集群里有没有其他项目正在使用。
 
 - 没有其他项目在用：应用后 Velero 只还原这些路由，**还原记录**会多一条“域名接回”。cert-manager 会重新申请证书。
 
@@ -177,7 +177,7 @@ spec:
     name: blog-restored
 ```
 
-用原名称还原时，去掉 `namespaceMapping` 和 `resourceModifier`，也不用创建 ConfigMap。Zeabur 创建的 ConfigMap 会把 Restore 设为所有者，删除 Restore 时一起删除；自己创建的要在还原完成后用 `kubectl -n velero delete configmap blog-restored` 删掉。
+用原名称还原时，去掉 `namespaceMapping` 和 `resourceModifier`，也不用创建 ConfigMap。Zeabur 开源版创建的 ConfigMap 会把 Restore 设为所有者，删除 Restore 时一起删除；自己创建的要在还原完成后用 `kubectl -n velero delete configmap blog-restored` 删掉。
 
 确认项目后，用 `kubectl get ingress -A` 确认没有其他项目在用同一个域名，再创建只还原路由的 Restore：
 
@@ -213,7 +213,7 @@ Velero 把 Kubernetes 对象原样放进备份，Secret 也在里面，值只是
 | `velero-repo-credentials` 的 `repository-password` | Kopia 在上传前用这个密码加密卷里的文件。 |
 | `velero-backup-key` 的 `key`（32 个字符） | 存放位置配置 `customerKeyEncryptionSecret: velero-backup-key/key`，存储服务用这把密钥加密每个对象，包括对象清单和 Secret（SSE-C）。 |
 
-在**集群** → **备份**新增存放位置时，Zeabur 也会配置 `customerKeyEncryptionSecret`。`velero-backup-key` 不存在就创建一把，已经有的不会更换。已有的存放位置保持原样，之前没有用密钥的备份仍然读得到。
+在**集群** → **备份**新增存放位置时，Zeabur 开源版也会配置 `customerKeyEncryptionSecret`。`velero-backup-key` 不存在就创建一把，已经有的不会更换。已有的存放位置保持原样，之前没有用密钥的备份仍然读得到。
 
 SSE-C 每次请求都把密钥交给存储服务，由存储服务加密后再保存，所以端点要用 HTTPS。SeaweedFS、AWS S3、Cloudflare R2 和 Backblaze B2 支持 SSE-C，MinIO 只在 HTTPS 下接受。不支持的存储服务会拒绝上传，备份就会失败。
 
@@ -239,21 +239,21 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 
 ### 其他备份
 
-[卷备份](../configure/volumes.mdx)使用 restic，上传前用 Zeabur 生成的 `<claim>-backup` Secret 里的 `RESTIC_PASSWORD`（24 个随机字符）加密。CloudNativePG 的数据库备份只压缩、不加密，存储桶里读得到数据行（没有 Secret 的值）。数据库备份要放在有服务器端加密的存储桶，访问密钥只给集群使用。
+[卷备份](../configure/volumes.mdx)使用 restic，上传前用 Zeabur 开源版生成的 `<claim>-backup` Secret 里的 `RESTIC_PASSWORD`（24 个随机字符）加密。CloudNativePG 的数据库备份只压缩、不加密，存储桶里读得到数据行（没有 Secret 的值）。数据库备份要放在有服务器端加密的存储桶，访问密钥只给集群使用。
 
 ## 常见失败
 
 - **无法访问**：核对存储桶、端点、区域和密钥，并查看位置下方 Velero 的消息。
 - 连接成功但备份失败，存储服务拒绝上传：确认存储服务支持 SSE-C，端点也用 HTTPS，见[备份的加密](#备份的加密)。
-- 没有**立即备份**：要先有 Zeabur 创建的定时，而定时要先有存放位置。
+- 没有**立即备份**：要先有 Zeabur 开源版创建的定时，而定时要先有存放位置。
 - 还原按钮（**从备份创建新项目**、**还原已删除的项目**或**还原项目**）无法使用：你不能在 Velero 的 Namespace 创建 Restore。还原时 Velero 用自己的权限写入对象，所以只有管理员能还原，见[权限](../reference/permissions.mdx)。请管理员用管理员账号还原。
 - **部分失败**：有些对象或卷文件没有复制到，其余的已经保存。用 `velero backup describe <backup> --details` 查看失败的条目，处理后再备份一次。
 - 备份失败：查看备份下方 Velero 写的原因。如果是备份途中 Velero 重启，下一次会按定时执行，也可以点击**立即备份**补一次。
-- **卷**显示**只备份对象，不复制卷里的文件**：这是在 Zeabur 以外创建的定时，要到原来的配置开启 `defaultVolumesToFsBackup`。
+- **卷**显示**只备份对象，不复制卷里的文件**：这是在 Zeabur 开源版以外创建的定时，要到原来的配置开启 `defaultVolumesToFsBackup`。
 - 变更已过期：重新**检查变更**。
 
 ## 暂停与清除
 
 在**定时**点击**暂停**，检查后应用，之后就不会再备份。点击**恢复**恢复。已有的备份和存放位置都会保留，备份按各自的**保留到**日期到期。
 
-Zeabur 没有删除备份或定时的操作。要马上删掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx)只会删掉目的地本身，已经复制到 Velero 的密钥、定时和 S3 里的备份都会留下。
+Zeabur 开源版没有删除备份或定时的操作。要马上删掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx)只会删掉目的地本身，已经复制到 Velero 的密钥、定时和 S3 里的备份都会留下。

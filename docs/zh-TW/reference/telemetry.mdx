@@ -1,30 +1,30 @@
 ---
 title: 體驗計畫
-description: 加入體驗計畫後，Zeabur 和 `zeaburctl ui` 會傳送什麼、絕不傳送什麼；Zeabur 和 zeaburctl 怎麼檢查新版；Zeabur 怎麼取得較新的範本；以及怎麼分別關閉。
+description: 加入體驗計畫後，Zeabur 開源版和 `zeaburctl ui` 會傳送什麼、絕不傳送什麼；Zeabur 開源版和 zeaburctl 怎麼檢查新版；Zeabur 開源版怎麼取得較新的範本；以及怎麼分別關閉。
 ---
 
 體驗計畫會傳送版本、每天的使用人數、用過哪些功能、`zeaburctl ui` 有沒有連上叢集，以及 Deployment 的變更有沒有部署完成，讓我們知道有多少人在用、該先修哪裡。用 Helm 安裝時預設不加入，要自己開啟；`zeaburctl ui` 預設加入，每次啟動都會提醒，並說明怎麼關閉。
 
 ## 會傳送什麼
 
-每個人每天（UTC）第一次使用 Zeabur 開源版時，Zeabur 會傳一筆事件；同一項功能、同一組值每天（UTC）第一次出現時，Zeabur 也會傳一筆。每筆事件只有隨機的安裝代碼和下表列出的屬性。安裝代碼由你用 `uuidgen` 產生，不含任何機器的資訊。資料保留 13 個月。
+每個人每天（UTC）第一次使用 Zeabur 開源版時，Zeabur 開源版會傳一筆事件；同一項功能、同一組值每天（UTC）第一次出現時，Zeabur 開源版也會傳一筆。每筆事件只有隨機的安裝代碼和下表列出的屬性。安裝代碼由你用 `uuidgen` 產生，不含任何機器的資訊。資料保留 13 個月。
 
 | 事件 | 由誰傳送 | 時機 |
 |---|---|---|
-| `zeabur_active` | Zeabur | 每個人每天（UTC）第一次使用 Zeabur 網頁介面時 |
-| `feature_used` | Zeabur | 成功建立服務、資料庫或網域，開啟日誌串流或終端機，邀請成員，或套用 Docker Compose 匯入之後；同一項功能、同一組值每天（UTC）只傳一次 |
+| `zeabur_active` | Zeabur 開源版 | 每個人每天（UTC）第一次使用 Zeabur 開源版網頁介面時 |
+| `feature_used` | Zeabur 開源版 | 成功建立服務、資料庫或網域，開啟日誌串流或終端機，邀請成員，或套用 Docker Compose 匯入之後；同一項功能、同一組值每天（UTC）只傳一次 |
 | `cluster_connected` | `zeaburctl ui` | 用你的 kubeconfig 連上叢集，或連不上時 |
-| `app_change_submitted` | Zeabur | 叢集回應了一個 Deployment 的變更：換映像檔、改副本數或改環境變數 |
-| `rollout_finished` | Zeabur | 被接受的變更部署結束時，結果和 `kubectl rollout status` 一致 |
+| `app_change_submitted` | Zeabur 開源版 | 叢集回應了一個 Deployment 的變更：換映像檔、改副本數或改環境變數 |
+| `rollout_finished` | Zeabur 開源版 | 被接受的變更部署結束時，結果和 `kubectl rollout status` 一致 |
 
 | 屬性 | 事件 | 值 |
 |---|---|---|
-| `zeabur_version` | `zeabur_active`、`feature_used` | Zeabur 的版本，例如 `0.1.1` |
+| `zeabur_version` | `zeabur_active`、`feature_used` | Zeabur 開源版的版本，例如 `0.1.1` |
 | `day` | `zeabur_active`、`feature_used` | UTC 日期，例如 `2026-10-30` |
 | `person` | `zeabur_active`、`app_change_submitted`、`rollout_finished` | 32 位十六進位數字，只在同一個安裝、同一天裡分辨不同的人 |
 | `zeabur_version` | `cluster_connected` | `zeaburctl` 的版本，例如 `0.1.1` |
-| `zeabur_version` | `app_change_submitted`、`rollout_finished` | Zeabur 的版本 |
-| `mode` | `zeabur_active`、`cluster_connected`、`app_change_submitted`、`rollout_finished` | 叢集裡的 Zeabur 是 `in-cluster`，`zeaburctl ui` 是 `local` |
+| `zeabur_version` | `app_change_submitted`、`rollout_finished` | Zeabur 開源版的版本 |
+| `mode` | `zeabur_active`、`cluster_connected`、`app_change_submitted`、`rollout_finished` | 叢集裡的 Zeabur 開源版是 `in-cluster`，`zeaburctl ui` 是 `local` |
 | `result` | `cluster_connected` | `connected`、`unreachable`、`credential_refused`、`no_read_right` 或 `other` |
 | `change_id` | `app_change_submitted`、`rollout_finished` | 隨機 UUID，用來把同一個變更的兩筆事件連起來 |
 | `operation` | `app_change_submitted`、`rollout_finished` | `deploy_image`、`scale_replicas` 或 `change_env` |
@@ -33,19 +33,19 @@ description: 加入體驗計畫後，Zeabur 和 `zeaburctl ui` 會傳送什麼�
 | `feature` | `feature_used` | `service_created`、`database_created`、`domain_added`、`logs_viewed`、`terminal_opened`、`member_invited` 或 `compose` |
 | `source` | `service_created` 的 `feature_used` | 服務怎麼建立：`git`、`upload`、`image` 或 `template` |
 | `template` | `source` 為 `template` 的 `feature_used` | 範本在 Zeabur Catalog 裡的 ID，例如 `wordpress`；Catalog 沒有的 ID 不會傳送 |
-| `kind` | `database_created` 或 `domain_added` 的 `feature_used` | 資料庫或物件儲存：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。網域：名稱用的是 Zeabur 提供給新服務的網域後綴時是 `generated`，其他是 `custom` |
+| `kind` | `database_created` 或 `domain_added` 的 `feature_used` | 資料庫或物件儲存：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。網域：名稱用的是 Zeabur 開源版提供給新服務的網域後綴時是 `generated`，其他是 `custom` |
 | `$process_person_profile` | 全部 | 固定為 `false`：不建立個人檔案 |
 | `$geoip_disable` | 全部 | 固定為 `true`：不查詢所在位置 |
 
-事件不會說明是誰。`person` 是用金鑰算出的使用者名稱加日期的雜湊值。金鑰從 Zeabur 的 plan key 衍生，留在叢集的 Secret 裡，從不送出，所以我們無法從雜湊值反推使用者名稱。同一個人一整天的 `person` 都一樣，Zeabur 重新啟動也不變；隔天就換成另一個，所以不同天無法串在一起。
+事件不會說明是誰。`person` 是用金鑰算出的使用者名稱加日期的雜湊值。金鑰從 Zeabur 開源版的 plan key 衍生，留在叢集的 Secret 裡，從不送出，所以我們無法從雜湊值反推使用者名稱。同一個人一整天的 `person` 都一樣，Zeabur 開源版重新啟動也不變；隔天就換成另一個，所以不同天無法串在一起。
 
-變更被接受後，Zeabur 會用你自己的憑證讀取 Deployment，直到部署結束，最多讀到部署期限過後一分鐘（Deployment 沒有設定時是 10 分鐘），而且不超過 30 分鐘。憑證快到期時，Zeabur 會在登入狀態允許的範圍內更新它，但不會因此延長登入。有更新的變更、Deployment 被刪掉後用同一個名稱重建、你登出或 Zeabur 重新啟動時就停止讀取，這時不會傳送 `rollout_finished`。
+變更被接受後，Zeabur 開源版會用你自己的憑證讀取 Deployment，直到部署結束，最多讀到部署期限過後一分鐘（Deployment 沒有設定時是 10 分鐘），而且不超過 30 分鐘。憑證快到期時，Zeabur 開源版會在登入狀態允許的範圍內更新它，但不會因此延長登入。有更新的變更、Deployment 被刪掉後用同一個名稱重建、你登出或 Zeabur 開源版重新啟動時就停止讀取，這時不會傳送 `rollout_finished`。
 
-`feature_used` 沒有 `person`，只表示今天用過某項功能，不說是誰、用了幾次。瀏覽器不會傳送任何東西，是 Zeabur 的伺服器在操作成功之後傳送的。
+`feature_used` 沒有 `person`，只表示今天用過某項功能，不說是誰、用了幾次。瀏覽器不會傳送任何東西，是 Zeabur 開源版的伺服器在操作成功之後傳送的。
 
 `zeaburctl ui` 沒有安裝代碼，所以在第一次要傳事件時才產生一組隨機代碼，關閉時不會產生。這組代碼存在設定目錄裡 `zeabur` 資料夾中名為 `local-id` 的檔案：Linux 是 `$XDG_CONFIG_HOME` 或 `~/.config`，macOS 是 `~/Library/Application Support`，Windows 是 `%APPDATA%`。只有你能讀取它，裡面不含機器、kubeconfig、權杖或使用者名稱的任何資訊。
 
-事件用 HTTPS 送到 PostHog（經由 `oss-nori.zeabur.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur。PostHog 不保存 IP 位址。`zeaburctl ui` 在背景傳送，不會延遲印出連結或開啟瀏覽器。
+事件用 HTTPS 送到 PostHog（經由 `oss-nori.zeabur.com`），只試一次，逾時很短。傳送失敗時不會重試，也不影響 Zeabur 開源版。PostHog 不保存 IP 位址。`zeaburctl ui` 在背景傳送，不會延遲印出連結或開啟瀏覽器。
 
 ## 絕不傳送
 
@@ -55,7 +55,7 @@ description: 加入體驗計畫後，Zeabur 和 `zeaburctl ui` 會傳送什麼�
 
 以下任何一種都有效，其中 `DO_NOT_TRACK` 優先於其他設定。
 
-- 在 Zeabur 或 `zeaburctl ui` 的環境變數設定 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
+- 在 Zeabur 開源版或 `zeaburctl ui` 的環境變數設定 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
 - 用 Helm 安裝時，維持預設的 `telemetry.enabled=false`。沒有安裝代碼時，chart 不接受 `telemetry.enabled=true`。
 - `zeaburctl ui` 執行 `zeaburctl telemetry disable`，它會在 `local-id` 所在的 `zeabur` 資料夾裡的 `config.yaml` 寫上 `telemetry: false`；或設定 `ZEABUR_TELEMETRY=off`。`config.yaml` 讀不懂時，`zeaburctl ui` 什麼都不送。`zeaburctl telemetry status` 會顯示目前生效的設定。
 
@@ -71,7 +71,7 @@ helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
 
 ## 檢視會傳送的內容
 
-設定 `ZEABUR_TELEMETRY=debug`，Zeabur 會印出實際的請求內容，但不會送出。內容寫在日誌裡：
+設定 `ZEABUR_TELEMETRY=debug`，Zeabur 開源版會印出實際的請求內容，但不會送出。內容寫在日誌裡：
 
 ```sh
 kubectl -n zeabur set env deployment/zeabur ZEABUR_TELEMETRY=debug
@@ -82,39 +82,39 @@ kubectl -n zeabur logs deployment/zeabur | grep telemetry
 
 ## 檢查更新
 
-有新版時，Zeabur 和 `zeaburctl` 會提醒你，並說明怎麼升級，但不會自動升級。檢查更新和體驗計畫各自獨立，預設開啟。
+有新版時，Zeabur 開源版和 `zeaburctl` 會提醒你，並說明怎麼升級，但不會自動升級。檢查更新和體驗計畫各自獨立，預設開啟。
 
 **檢查什麼**。兩者都讀取 `https://api.github.com/repos/zeabur-oss/zeabur/releases`，略過草稿。除非你正在用預先發行版本，否則也會略過預先發行版本。剩下的版本中最新的一個比你的版本新時，會顯示它的版本、發行說明連結和升級方式。只要有任何一個較新的正式版本在說明裡有 `### Security` 段落，就會告訴你目前的版本有已知的安全性問題，並附上那些版本的連結。
 
 **在哪裡執行。**
 
-- 叢集頁一律顯示 `Zeabur v<版本>`。不管多少人打開 Zeabur，Zeabur 伺服器每小時最多問 GitHub 一次。頁面每次打開時讀它的結果，一直開著時每小時再讀一次。伺服器會留著上次的結果。連不到 GitHub 時先沿用，一分鐘後再試。GitHub 拒絕時，等 GitHub 重新計算後再試。瀏覽器不會連到 GitHub。「設定」›「關於」也會顯示版本，按「升級方式」會依 Zeabur 的安裝方式列出步驟，分為 Helm、Argo CD 和 Flux。請參閱[升級 Zeabur](../upgrade/steps.mdx)。用 `zeaburctl ui` 開啟時，頁面顯示的是 `zeaburctl` 本身的版本和更新方式。
+- 叢集頁一律顯示 `Zeabur v<版本>`。不管多少人打開 Zeabur 開源版，Zeabur 開源版伺服器每小時最多問 GitHub 一次。頁面每次打開時讀它的結果，一直開著時每小時再讀一次。伺服器會留著上次的結果。連不到 GitHub 時先沿用，一分鐘後再試。GitHub 拒絕時，等 GitHub 重新計算後再試。瀏覽器不會連到 GitHub。「設定」›「關於」也會顯示版本，按「升級方式」會依 Zeabur 開源版的安裝方式列出步驟，分為 Helm、Argo CD 和 Flux。請參閱[升級 Zeabur 開源版](../upgrade/steps.mdx)。用 `zeaburctl ui` 開啟時，頁面顯示的是 `zeaburctl` 本身的版本和更新方式。
 - `zeaburctl` 每次執行指令都會檢查。檢查和指令同時進行，指令結束後 `zeaburctl` 最多再等一秒。有新版時，會在 stderr 印出一行。它不在磁碟上存任何東西。stderr 不是終端機，或設定了 `CI` 時，不會檢查。
 - 沒有權杖時，GitHub 每小時只回應同一個 IP 位址 60 次，共用這個位址的人一起算。用完時，`zeaburctl` 會印出提示。把 GitHub 權杖設在 `GH_TOKEN` 或 `GITHUB_TOKEN`（和 `gh` 讀的變數相同），`zeaburctl` 就會帶上它，改用你自己的額度。不給任何權限的 fine-grained 權杖就夠了。
 
-**會傳送什麼**。一個普通的 GitHub 請求，不帶任何 ID 或 Cookie。除非你替 `zeaburctl` 設了權杖，否則也不帶權杖。GitHub 會看到請求來自哪個 IP 位址。Zeabur 伺服器的 user agent 是 `zeabur`，`zeaburctl` 的是 `zeaburctl/<版本>`。
+**會傳送什麼**。一個普通的 GitHub 請求，不帶任何 ID 或 Cookie。除非你替 `zeaburctl` 設了權杖，否則也不帶權杖。GitHub 會看到請求來自哪個 IP 位址。Zeabur 開源版伺服器的 user agent 是 `zeabur`，`zeaburctl` 的是 `zeaburctl/<版本>`。
 
-**關閉**。以下任何一種都有效。關閉後，Zeabur 伺服器完全不會連到 GitHub。
+**關閉**。以下任何一種都有效。關閉後，Zeabur 開源版伺服器完全不會連到 GitHub。
 
 - 用 Helm 安裝時，設定 `updateCheck.enabled=false`。叢集頁就只顯示版本。
-- 在 Zeabur 的環境變數設定 `DO_NOT_TRACK=1`。`zeaburctl` 則是在你自己的環境變數設定。這也會關閉體驗計畫。
+- 在 Zeabur 開源版的環境變數設定 `DO_NOT_TRACK=1`。`zeaburctl` 則是在你自己的環境變數設定。這也會關閉體驗計畫。
 - 為 `zeaburctl`（包括 `zeaburctl ui`）在你的環境變數設定 `NO_UPDATE_NOTIFIER`，任何值都可以。這只關閉檢查更新。
 
 ## 範本更新
 
-不用升級 Zeabur，也能用到較新的範本。Zeabur 會讀取 Zeabur Catalog 的 API，用那裡的範本取代 Zeabur 內建的範本。元件，以及 Zeabur 怎麼在叢集裡找到它們，仍以內建的為準。已經用範本部署的服務不會變動。範本更新和體驗計畫、檢查更新各自獨立，預設開啟。
+不用升級 Zeabur 開源版，也能用到較新的範本。Zeabur 開源版會讀取 Zeabur Catalog 的 API，用那裡的範本取代 Zeabur 開源版內建的範本。元件，以及 Zeabur 開源版怎麼在叢集裡找到它們，仍以內建的為準。已經用範本部署的服務不會變動。範本更新和體驗計畫、檢查更新各自獨立，預設開啟。
 
-**取得什麼**。從 `https://oss-catalog.zeabur.com/v1/` 取得 `catalog.json`，裡面列出每個範本和它的檔案雜湊值。雜湊值和 Zeabur 現在提供的不同時，才再取得那個範本的 `templates/<id>.json`。
+**取得什麼**。從 `https://oss-catalog.zeabur.com/v1/` 取得 `catalog.json`，裡面列出每個範本和它的檔案雜湊值。雜湊值和 Zeabur 開源版現在提供的不同時，才再取得那個範本的 `templates/<id>.json`。
 
-**信任什麼**。Zeabur 信任它取得檔案的網址：會檢查 HTTPS 憑證的 `https://oss-catalog.zeabur.com/v1/`，或你設定的鏡像站。這些檔案沒有簽章，所以掌控這個網址的人決定 Zeabur 提供哪些範本。接著 Zeabur 逐一檢查每個範本：要能讀取，要是 `catalog.json` 列出的那個版本，需要的元件也要是這個 Zeabur 認得的。沒通過的範本不會出現，原本提供的同一個範本會留著，下次取得時 Zeabur 會再要一次。取得失敗時，什麼都不會改變。
+**信任什麼**。Zeabur 開源版信任它取得檔案的網址：會檢查 HTTPS 憑證的 `https://oss-catalog.zeabur.com/v1/`，或你設定的鏡像站。這些檔案沒有簽章，所以掌控這個網址的人決定 Zeabur 開源版提供哪些範本。接著 Zeabur 開源版逐一檢查每個範本：要能讀取，要是 `catalog.json` 列出的那個版本，需要的元件也要是這個 Zeabur 開源版認得的。沒通過的範本不會出現，原本提供的同一個範本會留著，下次取得時 Zeabur 開源版會再要一次。取得失敗時，什麼都不會改變。
 
-**什麼時候執行**。有人打開範本清單時才會取得，每 6 小時最多一次，失敗時 10 分鐘後再試。取得的是 Zeabur 伺服器，瀏覽器不會連過去。範本只放在記憶體裡，重新啟動後，下次取得前先用內建的範本。`zeaburctl ui` 不會取得。打開範本表單或規劃好之後，範本如果有了新版，Zeabur 會拒絕這次變更，請重新打開表單。
+**什麼時候執行**。有人打開範本清單時才會取得，每 6 小時最多一次，失敗時 10 分鐘後再試。取得的是 Zeabur 開源版伺服器，瀏覽器不會連過去。範本只放在記憶體裡，重新啟動後，下次取得前先用內建的範本。`zeaburctl ui` 不會取得。打開範本表單或規劃好之後，範本如果有了新版，Zeabur 開源版會拒絕這次變更，請重新打開表單。
 
-**會傳送什麼**。普通的請求，不帶任何 ID 或 Cookie。Zeabur 伺服器的 user agent 是 `zeabur`。提供 `oss-catalog.zeabur.com` 的 GitHub Pages 會看到請求來自哪個 IP 位址。不會傳送任何關於叢集或使用者的資料，所以 `DO_NOT_TRACK` 不會關閉它。
+**會傳送什麼**。普通的請求，不帶任何 ID 或 Cookie。Zeabur 開源版伺服器的 user agent 是 `zeabur`。提供 `oss-catalog.zeabur.com` 的 GitHub Pages 會看到請求來自哪個 IP 位址。不會傳送任何關於叢集或使用者的資料，所以 `DO_NOT_TRACK` 不會關閉它。
 
-**使用鏡像站**。叢集連不到網際網路時，照[改用鏡像](../cluster/components.mdx#改用鏡像)架好 Zeabur Catalog 的鏡像，再把 `catalog.url` 設成它的網址。範本和元件都從這個網址讀取。Zeabur 信任鏡像站的方式和信任 `oss-catalog.zeabur.com` 一樣。想信任某一版而不是某個伺服器，請在複製前先驗證它的簽章，做法見 Zeabur Catalog 的[版本與 API](https://oss.zeabur.com/zh-TW/docs/catalog/reference/releases/#驗證並讀取版本)。
+**使用鏡像站**。叢集連不到網際網路時，照[改用鏡像](../cluster/components.mdx#改用鏡像)架好 Zeabur Catalog 的鏡像，再把 `catalog.url` 設成它的網址。範本和元件都從這個網址讀取。Zeabur 開源版信任鏡像站的方式和信任 `oss-catalog.zeabur.com` 一樣。想信任某一版而不是某個伺服器，請在複製前先驗證它的簽章，做法見 Zeabur Catalog 的[版本與 API](https://oss.zeabur.com/zh-TW/docs/catalog/reference/releases/#驗證並讀取版本)。
 
-**關閉**。以下任何一種都有效。關閉後，Zeabur 只提供內建的範本，也不會為範本發出任何請求。
+**關閉**。以下任何一種都有效。關閉後，Zeabur 開源版只提供內建的範本，也不會為範本發出任何請求。
 
 - 用 Helm 安裝時，設定 `templateFetch.enabled=false`。
-- 在 Zeabur 的環境變數設定 `ZEABUR_TEMPLATE_FETCH=false`。
+- 在 Zeabur 開源版的環境變數設定 `ZEABUR_TEMPLATE_FETCH=false`。

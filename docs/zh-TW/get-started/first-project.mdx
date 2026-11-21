@@ -13,7 +13,7 @@ description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽
 
 ![新增專案視窗，名稱填了 hello](../images/shots/project-new.avif)
 
-按**檢查變更**，畫面會列出 Zeabur 準備做的事：建立 `hello` Namespace，加上專案標籤，並套用 Pod Security `baseline` 設定，允許容器以 root 執行，但禁止存取主機。確認沒問題就按**建立**。
+按**檢查變更**，畫面會列出 Zeabur 開源版準備做的事：建立 `hello` Namespace，加上專案標籤，並套用 Pod Security `baseline` 設定，允許容器以 root 執行，但禁止存取主機。確認沒問題就按**建立**。
 
 ![建立專案 hello 前的確認畫面，說明會建立的 Namespace 與安全性設定](../images/shots/project-new-review.avif)
 
@@ -30,7 +30,7 @@ description: 用一個公開的 Nginx 映像檔，從建立專案走到在瀏覽
 | **連接埠** | `8080` |
 | **公開網域** | 開啟，用建議的網址或你準備的網域 |
 
-Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選**嚴格**，表單會說明選擇原因。這個映像檔監聽 `8080`。`nginx:latest` 也能執行，這時 Zeabur 會選**相容**；建立前仍能自行切換。
+Zeabur 開源版讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選**嚴格**，表單會說明選擇原因。這個映像檔監聽 `8080`。`nginx:latest` 也能執行，這時 Zeabur 開源版會選**相容**；建立前仍能自行切換。
 
 填完映像檔後，表單會讀出映像檔宣告的連接埠，正常會自動帶入 `8080`。
 
@@ -38,7 +38,7 @@ Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選**嚴�
 
 ## 檢查變更，再套用
 
-按**檢查變更**，Zeabur 會列出三個要建立的物件：
+按**檢查變更**，Zeabur 開源版會列出三個要建立的物件：
 
 - `web` Deployment，執行剛才的映像檔，1 個副本
 - `web` Service，把 `8080` 轉給容器
@@ -46,7 +46,7 @@ Zeabur 讀出 `nginx-unprivileged` 以使用者 101 執行，會自動選**嚴�
 
 ![部署 web 前的確認畫面，列出要建立的 Deployment、Service 和 Ingress](../images/shots/image-review.avif)
 
-這時候叢集裡還沒有任何新東西。發現網域填錯，就回到表單改。確認無誤再按**建立**，Zeabur 會帶你到服務頁。
+這時候叢集裡還沒有任何新東西。發現網域填錯，就回到表單改。確認無誤再按**建立**，Zeabur 開源版會帶你到服務頁。
 
 ## 打開網址
 
@@ -72,7 +72,7 @@ kubectl -n hello get deploy,svc,ingress -l app.kubernetes.io/name=web
 
 Namespace 帶 `zeabur.com/project=true`，Deployment 的 `READY` 是 `1/1`，Ingress 的 `HOSTS` 是你的網域。
 
-這些都是一般的 Kubernetes 物件，不用 Zeabur 也能用 `kubectl apply` 建出一模一樣的服務，完整的 YAML 見[部署容器映像檔](../deploy/image.mdx)的「用 kubectl 做同樣的事」。
+這些都是一般的 Kubernetes 物件，不用 Zeabur 開源版也能用 `kubectl apply` 建出一模一樣的服務，完整的 YAML 見[部署容器映像檔](../deploy/image.mdx)的「用 kubectl 做同樣的事」。
 
 ## 網頁沒有出來
 
@@ -87,9 +87,9 @@ Namespace 帶 `zeabur.com/project=true`，Deployment 的 `READY` 是 `1/1`，Ing
 
 在 `web` 服務右上角的**更多**選**刪除服務**。刪除也會先列出要刪的物件，這次是 Deployment、Service 和 Ingress，確認後套用。
 
-要連專案一起清掉，到專案**設定**的**危險區域**按**刪除專案**，檢查要刪的東西後輸入 `hello` 確認，見[刪除專案](../configure/delete-project.mdx)。同一處的**從 Zeabur 移除**只會拿掉專案標籤，Namespace 和裡面的東西都會留著。
+要連專案一起清掉，到專案**設定**的**危險區域**按**刪除專案**，檢查要刪的東西後輸入 `hello` 確認，見[刪除專案](../configure/delete-project.mdx)。同一處的**從 Zeabur 開源版移除**只會拿掉專案標籤，Namespace 和裡面的東西都會留著。
 
 ## 接下來
 
 - 部署自己的[映像檔](../deploy/image.mdx)，或[從 Git 建置](../deploy/git.mdx)
-- 了解 Zeabur 和既有工具怎麼共存：[Zeabur 如何管理服務](how-it-works.mdx)
+- 了解 Zeabur 開源版和既有工具怎麼共存：[Zeabur 開源版如何管理服務](how-it-works.mdx)

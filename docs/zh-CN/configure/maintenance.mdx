@@ -108,15 +108,15 @@ HTML 保存在 ConfigMap 中，页面服务器每次收到请求都会读取挂�
 | Service | 带有此标签，端口 `pages` 按文件名提供页面，端口 `maintenance` 对每个请求返回维护页面和 503 |
 | ConfigMap | 带有此标签，键为 `502.html`、`503.html`、`504.html` 和 `maintenance.html` |
 
-每个项目只能有一个带此标签的 Service。也可以自行用 `kubectl` 部署这个模板，或改用符合上表要求的其他服务器，Zeabur 都能识别。这些都是普通的 Kubernetes 对象，不使用 Zeabur 也能照常运行。
+每个项目只能有一个带此标签的 Service。也可以自行用 `kubectl` 部署这个模板，或改用符合上表要求的其他服务器，Zeabur 开源版都能识别。这些都是普通的 Kubernetes 对象，不使用 Zeabur 开源版也能照常运行。
 
 ## 用 kubectl 完成相同操作
 
-维护模式和错误页面只用到 Ingress、HTTPRoute、Traefik Middleware 和页面服务器，移除 Zeabur 后仍能运行。以下以项目 `demo`、Ingress `web-app-example-com`、域名 `app.example.com` 为例，假设项目已有页面服务器 `error-pages`。
+维护模式和错误页面只用到 Ingress、HTTPRoute、Traefik Middleware 和页面服务器，移除 Zeabur 开源版后仍能运行。以下以项目 `demo`、Ingress `web-app-example-com`、域名 `app.example.com` 为例，假设项目已有页面服务器 `error-pages`。
 
 ### 开启维护模式（Ingress）
 
-新增一个 Ingress，名称为 `<服务>-<域名，点换成连字符>-maintenance`，将同一域名的所有路径转发到页面服务器的 `maintenance` 端口。`router.priority` 必须高于该域名的所有其他路由，Traefik 才会优先使用。`ownerReferences` 指向原 Ingress，Zeabur 通过这个字段识别维护用的 Ingress，因此先查询原 Ingress 的 `uid`：
+新增一个 Ingress，名称为 `<服务>-<域名，点换成连字符>-maintenance`，将同一域名的所有路径转发到页面服务器的 `maintenance` 端口。`router.priority` 必须高于该域名的所有其他路由，Traefik 才会优先使用。`ownerReferences` 指向原 Ingress，Zeabur 开源版通过这个字段识别维护用的 Ingress，因此先查询原 Ingress 的 `uid`：
 
 ```sh
 kubectl -n demo get ingress web-app-example-com -o jsonpath='{.metadata.uid}'
@@ -155,7 +155,7 @@ spec:
                   name: maintenance
 ```
 
-Zeabur 创建的版本还会：
+Zeabur 开源版创建的版本还会：
 
 - 将 `router.priority` 设为该域名现有路由的最高优先级加 1。如果没有指定优先级，Traefik 会使用规则长度作为优先级，因此这个数值通常不大。上面的 `1000` 只需高于原路由即可。
 - 复制原 Ingress 的 `traefik.ingress.kubernetes.io/router.*` annotation（`router.middlewares` 和 `router.priority` 除外）、`ingressClassName` 和该域名的 `tls`。
@@ -170,7 +170,7 @@ kubectl -n demo delete ingress web-app-example-com-maintenance
 
 ### 开启维护模式（HTTPRoute）
 
-HTTPRoute 不会另外创建对象。Zeabur 会将每条规则中原后端的 `weight` 改为 `0`，再添加页面服务器的 `maintenance` 端口，权重设为 `1`。用 `kubectl edit httproute <名称>` 按以下方式修改，例如：
+HTTPRoute 不会另外创建对象。Zeabur 开源版会将每条规则中原后端的 `weight` 改为 `0`，再添加页面服务器的 `maintenance` 端口，权重设为 `1`。用 `kubectl edit httproute <名称>` 按以下方式修改，例如：
 
 ```yaml
 rules:

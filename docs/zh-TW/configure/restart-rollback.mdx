@@ -88,9 +88,9 @@ Job 和排程工作沒有**重新啟動**。要再執行一次排程工作，用
 
 ## 用 kubectl 做同樣的事
 
-這些動作和 kubectl 內建的指令寫入同樣的欄位，沒有 Zeabur 專用的物件。以下以專案 `demo`、Deployment `web` 為例。
+這些動作和 kubectl 內建的指令寫入同樣的欄位，沒有 Zeabur 開源版專用的物件。以下以專案 `demo`、Deployment `web` 為例。
 
-| Zeabur 的動作 | kubectl |
+| Zeabur 開源版的動作 | kubectl |
 | --- | --- |
 | **重新啟動** | `kubectl -n demo rollout restart deployment/web` |
 | **回滾**到 `#2` | `kubectl -n demo rollout undo deployment/web --to-revision=2` |

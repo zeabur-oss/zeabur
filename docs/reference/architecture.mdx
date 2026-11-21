@@ -1,28 +1,28 @@
 ---
 title: Architecture
-description: Learn how Zeabur presents Kubernetes objects as projects, applies changes with the user's permissions, and works with existing controllers.
+description: Learn how Zeabur OSS presents Kubernetes objects as projects, applies changes with the user's permissions, and works with existing controllers.
 ---
 
-Zeabur reads what it displays from Kubernetes objects in the cluster: if you change the replica count with kubectl, Zeabur shows the new count the next time it reads the cluster. Services, domains, volumes, and backup settings all live in Kubernetes objects. After you remove Zeabur, their existing controllers keep managing them.
+Zeabur OSS reads what it displays from Kubernetes objects in the cluster: if you change the replica count with kubectl, Zeabur OSS shows the new count the next time it reads the cluster. Services, domains, volumes, and backup settings all live in Kubernetes objects. After you remove Zeabur OSS, their existing controllers keep managing them.
 
-For a hands-on example, see [How Zeabur manages services](../get-started/how-it-works.mdx). To remove Zeabur while keeping workloads and the components they depend on, see [Uninstall Zeabur](../leave/uninstall.mdx).
+For a hands-on example, see [How Zeabur OSS manages services](../get-started/how-it-works.mdx). To remove Zeabur OSS while keeping workloads and the components they depend on, see [Uninstall Zeabur OSS](../leave/uninstall.mdx).
 
 ## How requests reach the cluster
 
 | Setup | What the user opens | Credentials used for the Kubernetes API |
 |---|---|---|
 | `zeaburctl ui` | A web page on the local `127.0.0.1` address | The kubeconfig context selected at startup |
-| In-cluster `zeabur` | The Zeabur address exposed through an Ingress or HTTPRoute | A token issued to the user by Zeabur Identity. Admin account tokens include the `admins` group |
+| In-cluster `zeabur` | The Zeabur OSS address exposed through an Ingress or HTTPRoute | A token issued to the user by Zeabur Identity. Admin account tokens include the `admins` group |
 
 `zeabur` serves both the API under `/api` and the web interface. The ServiceAccount created by the chart has no Role bindings, and replicas don't mount a ServiceAccount token. Every read and write uses the signed-in user's token.
 
-Zeabur Identity handles sign-in, passkeys, and short-lived tokens. Zeabur is its OAuth client and stores the client secret. kube-apiserver accepts these tokens only after you configure it to trust Zeabur Identity's issuer. For the job of each project, see the [overview](https://oss.zeabur.com/docs/overview/).
+Zeabur Identity handles sign-in, passkeys, and short-lived tokens. Zeabur OSS is its OAuth client and stores the client secret. kube-apiserver accepts these tokens only after you configure it to trust Zeabur Identity's issuer. For the job of each project, see the [overview](https://oss.zeabur.com/docs/overview/).
 
 ## How projects and services are organized
 
-A project is a Namespace with the label `zeabur.com/project: "true"`. Adding an existing Namespace to Zeabur only adds this label. Removing a project from Zeabur only removes the label; all objects inside it remain.
+A project is a Namespace with the label `zeabur.com/project: "true"`. Adding an existing Namespace to Zeabur OSS only adds this label. Removing a project from Zeabur OSS only removes the label; all objects inside it remain.
 
-Zeabur reads Deployments, StatefulSets, DaemonSets, and related objects, then groups them into services based on these relationships:
+Zeabur OSS reads Deployments, StatefulSets, DaemonSets, and related objects, then groups them into services based on these relationships:
 
 - ownerReferences and workload selectors: which replicas belong to the service.
 - Service selectors, Ingress backends, and HTTPRoute backendRefs: how traffic reaches the service.
@@ -30,7 +30,7 @@ Zeabur reads Deployments, StatefulSets, DaemonSets, and related objects, then gr
 - Operator objects: databases, object storage, and backups.
 - Labels and management information left by Helm, Argo CD, and Flux: whether another tool manages the service.
 
-Zeabur has no database of its own. Databases are operator CRs, deployments from Git are Zeabur Builder `Build` objects, and backups are objects managed by their respective backup controllers.
+Zeabur OSS has no database of its own. Databases are operator CRs, deployments from Git are Zeabur Builder `Build` objects, and backups are objects managed by their respective backup controllers.
 
 ## How changes reach Kubernetes
 
@@ -41,7 +41,7 @@ Zeabur has no database of its own. Databases are operator CRs, deployments from 
 
 A set of changes can affect multiple objects, and Kubernetes has no cross-object transactions. If a later write fails, objects written successfully remain in the cluster. The error message lists the changes already applied. Reload the current state, then review the next set of changes.
 
-For objects managed by Helm, Argo CD, or Flux, Zeabur only accepts restarts. It rejects other changes and directs you to update the Helm values or Git repository. This prevents the next sync from overwriting someone's changes.
+For objects managed by Helm, Argo CD, or Flux, Zeabur OSS only accepts restarts. It rejects other changes and directs you to update the Helm values or Git repository. This prevents the next sync from overwriting someone's changes.
 
 ## What keeps running after you remove the interface
 
@@ -55,24 +55,24 @@ For objects managed by Helm, Argo CD, or Flux, Zeabur only accepts restarts. It 
 | Restarts after secret or config file changes | Reloader, if installed and configured |
 | Scheduled backups | The corresponding database operator, K8up, or Velero |
 
-These components don't depend on Zeabur. When you remove Zeabur, keep the components, CRDs, and configuration that services still use.
+These components don't depend on Zeabur OSS. When you remove Zeabur OSS, keep the components, CRDs, and configuration that services still use.
 
 ## Where status and history come from
 
-Live CPU and memory usage come from metrics-server. Usage history, node disk usage, and volume usage come from a metrics store that supports the Prometheus HTTP API. Zeabur queries it through the Kubernetes Service proxy with the user's permissions. When Zeabur Proxy is enabled, the Proxy queries usage history from the default metrics store based on project permissions instead.
+Live CPU and memory usage come from metrics-server. Usage history, node disk usage, and volume usage come from a metrics store that supports the Prometheus HTTP API. Zeabur OSS queries it through the Kubernetes Service proxy with the user's permissions. When Zeabur Proxy is enabled, the Proxy queries usage history from the default metrics store based on project permissions instead.
 
-**Deployments** come from the revisions workloads retain. Timestamps and who made each change come from events, container statuses, and `managedFields`. Zeabur can't read revisions the cluster has deleted or events past their retention period.
+**Deployments** come from the revisions workloads retain. Timestamps and who made each change come from events, container statuses, and `managedFields`. Zeabur OSS can't read revisions the cluster has deleted or events past their retention period.
 
 Container logs come from kubelet by default and cover only the replica's current and previous runs. With Zeabur Proxy enabled, users can read historical logs from VictoriaLogs based on project permissions. Removing the chart also removes the Proxy, but doesn't affect logs in VictoriaLogs. The log collector's `includePodLabels: false` setting has no effect in operator v0.75.0; logs still include `kubernetes.pod_labels.*`.
 
-## What Zeabur stores
+## What Zeabur OSS stores
 
 - Secrets created or specified by the chart: the OAuth client secret, change token key, and TLS certificates when the Proxy is enabled.
-- Cluster name and metrics store settings: the `zeabur-settings` config file in Zeabur's namespace.
+- Cluster name and metrics store settings: the `zeabur-settings` config file in Zeabur OSS's namespace.
 - Member permissions: Kubernetes RoleBindings and ClusterRoleBindings.
 - Registered S3 destinations: config files and secrets in the `zeabur-s3-destinations` namespace.
-- Tools replicas for the kubectl terminal: the `zeabur-terminals` namespace. Only Zeabur's ServiceAccount can create and use replicas there.
+- Tools replicas for the kubectl terminal: the `zeabur-terminals` namespace. Only Zeabur OSS's ServiceAccount can create and use replicas there.
 - Sign-in settings: the `zeabur-identity-settings` config file in Zeabur Identity's namespace. The **Settings** page writes it, and Zeabur Identity reads it. See [Sign-in settings](./permissions.mdx#sign-in-settings).
-- Sign-in sessions: held only in the server process's memory. A session ends after an idle timeout of at most 1 hour, or 12 hours after sign-in. See [How long does a sign-in last](./permissions.mdx#how-long-sign-in-lasts). The chart uses a single replica and the `Recreate` strategy, so everyone must sign in again after Zeabur restarts.
+- Sign-in sessions: held only in the server process's memory. A session ends after an idle timeout of at most 1 hour, or 12 hours after sign-in. See [How long does a sign-in last](./permissions.mdx#how-long-sign-in-lasts). The chart uses a single replica and the `Recreate` strategy, so everyone must sign in again after Zeabur OSS restarts.
 
 Terminals use temporary replicas and in-memory kubeconfig files. For their permissions and lifetimes, see [Security](./security.mdx#terminals).

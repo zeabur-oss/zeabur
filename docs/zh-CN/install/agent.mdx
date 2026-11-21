@@ -1,6 +1,6 @@
 ---
 title: 交给 Agent 安装或迁移
-description: 把一段提示词粘贴到 Claude Code 或 Codex，它会按照这份文档帮你把 Zeabur 安装到服务器上，还能把 zeabur.com 的项目迁移过来。
+description: 把一段提示词粘贴到 Claude Code 或 Codex，它会按照这份文档帮你把 Zeabur 开源版安装到服务器上，还能把 Zeabur 的项目迁移过来。
 ---
 
 Claude Code 或 Codex 这类 Coding Agent 可以替你按安装步骤操作。它读的页面和你一样，会自己运行命令，遇到需要你决定或付费的地方就停下来。
@@ -8,7 +8,7 @@ Claude Code 或 Codex 这类 Coding Agent 可以替你按安装步骤操作。�
 ## 粘贴这段提示词
 
 ```text
-按照 https://oss.zeabur.com/zh-CN/docs/zeabur/install/one-command.md 把 Zeabur 安装到我的服务器上。
+按照 https://oss.zeabur.com/zh-CN/docs/zeabur/install/one-command.md 把 Zeabur 开源版安装到我的服务器上。
 如果服务器已经在运行 Kubernetes，改为按照 https://oss.zeabur.com/zh-CN/docs/zeabur/install/existing-cluster.md 安装。
 ```
 
@@ -18,8 +18,8 @@ Claude Code 或 Codex 这类 Coding Agent 可以替你按安装步骤操作。�
 
 1. 检查服务器，修改任何内容前先询问你。
 2. 服务器还没有 Kubernetes 时，用 Zeatend 装好。
-3. 用一条 `helm install` 安装 Zeabur。
-4. 给你 Zeabur 的网址，以及创建管理员账号的链接。
+3. 用一条 `helm install` 安装 Zeabur 开源版。
+4. 给你 Zeabur 开源版的网址，以及创建管理员账号的链接。
 
 ## 你需要自己做的事
 
@@ -27,6 +27,6 @@ Claude Code 或 Codex 这类 Coding Agent 可以替你按安装步骤操作。�
 - 想用自己的域名而不是 sslip.io 地址时，把域名的 DNS 记录指向服务器。
 - 打开链接，创建通行密钥。通行密钥只能由你在自己的设备上创建。
 
-## 从 zeabur.com 迁移过来
+## 从 Zeabur 迁移过来
 
-想把项目一起迁移过来，在提示词后面加上：“然后按照 https://oss.zeabur.com/zh-CN/docs/zeabur/get-started/from-zeabur-com.md 把我在 zeabur.com 的服务迁移过来。”这个文件是[从 zeabur.com 过来](../get-started/from-zeabur-com.mdx)的 Markdown 版。Agent 会列出你的服务、备份数据库，在 Zeabur 中重建服务，再还原数据。
+想把项目一起迁移过来，在提示词后面加上：“然后按照 https://oss.zeabur.com/zh-CN/docs/zeabur/get-started/from-zeabur-com.md 把我在 Zeabur 的服务迁移过来。”这个文件是[从 Zeabur 过来](../get-started/from-zeabur-com.mdx)的 Markdown 版。Agent 会列出你的服务、备份数据库，在 Zeabur 开源版中重建服务，再还原数据。

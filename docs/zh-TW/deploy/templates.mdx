@@ -68,9 +68,9 @@ description: 從 Zeabur Catalog 的範本挑一個應用程式，填好網域和
 
 ### 自己產生 YAML 再套用
 
-Zeabur 用內建的 Zeabur Catalog 把範本轉成 Kubernetes 的 YAML。轉換在 Zeabur 裡做，沒有對應的叢集物件，但你可以用 Catalog 的 `catalog` 指令得到同樣的 YAML，再用 kubectl 套用。
+Zeabur 開源版用內建的 Zeabur Catalog 把範本轉成 Kubernetes 的 YAML。轉換在 Zeabur 開源版裡做，沒有對應的叢集物件，但你可以用 Catalog 的 `catalog` 指令得到同樣的 YAML，再用 kubectl 套用。
 
-先查 Zeabur 用的 Catalog 版本：到**設定**的**關於**，**Zeabur Catalog** 那一列是 Catalog 的提交。在 Catalog 的原始碼切到這個提交，進入 `nix develop` 後執行：
+先查 Zeabur 開源版用的 Catalog 版本：到**設定**的**關於**，**Zeabur Catalog** 那一列是 Catalog 的提交。在 Catalog 的原始碼切到這個提交，進入 `nix develop` 後執行：
 
 ```sh
 umask 077
