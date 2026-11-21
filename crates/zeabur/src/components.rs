@@ -26,8 +26,7 @@ use zeabur_api::views::CapabilityList;
 use zeabur_catalog::InstallSource;
 use zeabur_core::problem::Problem;
 use zeabur_kube::{
-    Cluster as _, ClusterEndpoint, ObjectTarget, Preconditions, UserClient, WriteBody,
-    WriteRequest,
+    Cluster as _, ClusterEndpoint, ObjectTarget, Preconditions, UserClient, WriteBody, WriteRequest,
 };
 
 /// The service account token of this pod, which kubelet renews.
