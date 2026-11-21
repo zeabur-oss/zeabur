@@ -419,7 +419,13 @@ pub(crate) async fn apply(
             };
             let target = object.target.clone();
             let refused = right(verb, &target);
-            let result = send(cluster.as_ref(), target, body, dry_run, refused).await?;
+            let deleting = matches!(body, WriteBody::Delete(_));
+            let result = match send(cluster.as_ref(), target, body, dry_run, refused).await {
+                Ok(result) => result,
+                // The object went away after the plan read it, which is what the delete wants.
+                Err(e) if deleting && e.0.kind == Kind::NotFound => continue,
+                Err(e) => return Err(e),
+            };
             if !dry_run {
                 written.push(ObjectWritten {
                     kind: object.target.kind.clone(),
@@ -456,7 +462,8 @@ struct Placed {
     target: ObjectTarget,
     /// The object to apply.
     body: Option<DynamicObject>,
-    /// Without `body`: the uid of the object to delete, `None` when it is gone.
+    /// Without `body`: the uid of the object to delete, `None` when it is gone or already being
+    /// deleted.
     uid: Option<String>,
     /// Without `body`: the `resourceVersion` of the object to delete.
     resource_version: Option<String>,
@@ -960,9 +967,12 @@ impl World {
                 let mut write = view(&desired.object, Some(&target), None);
                 write.yaml = None;
                 writes.push(write);
-                let (uid, resource_version) = found.map_or((None, None), |o| {
-                    (o.metadata.uid, o.metadata.resource_version)
-                });
+                // An object already being deleted needs no second delete.
+                let (uid, resource_version) = found
+                    .filter(|o| o.metadata.deletion_timestamp.is_none())
+                    .map_or((None, None), |o| {
+                        (o.metadata.uid, o.metadata.resource_version)
+                    });
                 placed.push(Placed {
                     uid,
                     resource_version,
