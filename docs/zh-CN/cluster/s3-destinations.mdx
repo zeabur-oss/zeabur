@@ -11,6 +11,8 @@ description: 添加 S3 存储位置，供数据库、K8up 和 Velero 备份选�
 
 还没有存储桶时，Cloudflare R2 和 Backblaze B2 都提供兼容 S3 的存储。创建私有的存储桶，备份放在集群外面，集群出问题也还在。
 
+只有一台服务器、又不想先注册外部账号时，可以在项目里创建[对象存储](../deploy/object-storage.mdx)，把它的内部 S3 端点、存储桶和密钥登记成目的地，先试试备份。这样的备份还在同一个集群里，集群丢失时，这些备份也会一起没了。
+
 ### Cloudflare R2
 
 1. 在 Cloudflare 控制台打开 **R2 对象存储**，点击**创建存储桶**，取个名字，例如 `zeabur-backups`。
