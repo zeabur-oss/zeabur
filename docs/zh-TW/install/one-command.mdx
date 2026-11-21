@@ -42,7 +42,7 @@ zeatend apply
 
 ### 讓叢集信任登入
 
-下一步裝好的 Zeabur Identity 會發出登入權杖，Kubernetes 要在 Zeatend 的 `apiServer.authenticationConfig` 列出它，才會接受。`zeabur-identityctl kube-config` 印出這段設定，它要讀叢集，所以等叢集裝好才執行。第二次 `zeatend apply` 會帶著這段設定重新啟動 K3s：
+下一步裝好的 Zeabur Identity 會發出登入權杖，Kubernetes 要在 Zeatend 的 `apiServer.authenticationConfig` 把它設為可信任的簽發者，才會接受。`zeabur-identityctl kube-config` 印出這段設定，它要讀叢集，所以等叢集裝好才執行。第二次 `zeatend apply` 會帶著這段設定重新啟動 K3s：
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
@@ -55,7 +55,7 @@ zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s 
   zeatend apply
 ```
 
-`zeabur-identityctl` 也會印出手動安裝這段設定的做法，不用理它，Zeatend 會代你做。如果它印出的是錯誤，就不會寫入任何檔案，`zeatend apply` 也不會執行。照錯誤訊息處理後，再執行一次這段指令。
+`zeabur-identityctl` 也會印出手動安裝這段設定的做法，不用理它，Zeatend 會代你做。如果它印出的是錯誤，就不會寫入 Zeatend 的設定檔，`zeatend apply` 也不會執行。照錯誤訊息處理後，再執行一次這段指令。
 
 </Step>
 <Step>

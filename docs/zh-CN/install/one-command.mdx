@@ -42,7 +42,7 @@ zeatend apply
 
 ### 让集群信任登录
 
-下一步装好的 Zeabur Identity 会签发登录令牌，Kubernetes 要在 Zeatend 的 `apiServer.authenticationConfig` 里列出它，才会接受。`zeabur-identityctl kube-config` 输出这段配置，它要读集群，所以等集群装好再运行。第二次 `zeatend apply` 会带着这段配置重启 K3s：
+下一步装好的 Zeabur Identity 会签发登录令牌，Kubernetes 要在 Zeatend 的 `apiServer.authenticationConfig` 里把它设为可信任的签发者，才会接受。`zeabur-identityctl kube-config` 输出这段配置，它要读集群，所以等集群装好再运行。第二次 `zeatend apply` 会带着这段配置重启 K3s：
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
@@ -55,7 +55,7 @@ zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s 
   zeatend apply
 ```
 
-`zeabur-identityctl` 也会输出手动安装这段配置的做法，不用管它，Zeatend 会替你做。如果它输出的是错误，就不会写入任何文件，`zeatend apply` 也不会运行。按错误信息处理后，再运行一次这段命令。
+`zeabur-identityctl` 也会输出手动安装这段配置的做法，不用管它，Zeatend 会替你做。如果它输出的是错误，就不会写入 Zeatend 的配置文件，`zeatend apply` 也不会运行。按错误信息处理后，再运行一次这段命令。
 
 </Step>
 <Step>

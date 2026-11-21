@@ -42,7 +42,7 @@ zeatend apply
 
 ### Let the cluster trust sign-in
 
-Kubernetes accepts the sign-in tokens of the Zeabur Identity you install in the next step only when Zeatend's `apiServer.authenticationConfig` lists them. `zeabur-identityctl kube-config` prints that setting. It reads the cluster, so it runs now, after the cluster exists. The second `zeatend apply` restarts K3s with the setting:
+Kubernetes accepts the sign-in tokens of the Zeabur Identity you install in the next step only when Zeatend's `apiServer.authenticationConfig` names Zeabur Identity as a token issuer. `zeabur-identityctl kube-config` prints that setting. It reads the cluster, so it runs now, after the cluster exists. The second `zeatend apply` restarts K3s with the setting:
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
@@ -55,7 +55,7 @@ zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s 
   zeatend apply
 ```
 
-`zeabur-identityctl` also prints how to install the setting by hand. Ignore that part, because Zeatend does it. If it prints an error instead, nothing is written and `zeatend apply` doesn't run. Fix what the error says, then run the block again.
+`zeabur-identityctl` also prints how to install the setting by hand. Ignore that part, because Zeatend does it. If it prints an error instead, the Zeatend configuration isn't written and `zeatend apply` doesn't run. Fix what the error says, then run the block again.
 
 </Step>
 <Step>
