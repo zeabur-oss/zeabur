@@ -1,9 +1,9 @@
 ---
 title: 创建和管理项目
-description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目名称和图标，并控制其他项目能否连接进来。
+description: 创建项目、将已有的 Namespace 加入 Zeabur 开源版、修改项目名称和图标，并控制其他项目能否连接进来。
 ---
 
-完成这一页后，**项目**页会多出一个项目，你可以在里面部署服务。项目把一组相关的服务放在一起，用法和 zeabur.com 的项目一样。项目的名称、描述、图标和网络隔离，都在项目的**设置**中修改。
+完成这一页后，**项目**页会多出一个项目，你可以在里面部署服务。项目把一组相关的服务放在一起，用法和 Zeabur 的项目一样。项目的名称、描述、图标和网络隔离，都在项目的**设置**中修改。
 
 <Figure label="一个项目放一组服务，每个服务可以有自己的域名">
 <FigGroup label="项目 shop：放一组服务" row>
@@ -29,7 +29,7 @@ description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目�
 
 ![新建项目窗口，名称填为 hello](../images/shots/project-new.avif)
 
-项目在集群中是一个 Namespace，也就是 Kubernetes 用来分开放置一组服务的空间。项目名称就是 Namespace 的名称，所以创建后不能修改。同名的 Namespace 已经存在时，表单会提示你改用它，做法见[下一节](#将已有的-namespace-加入-zeabur)。
+项目在集群中是一个 Namespace，也就是 Kubernetes 用来分开放置一组服务的空间。项目名称就是 Namespace 的名称，所以创建后不能修改。同名的 Namespace 已经存在时，表单会提示你改用它，做法见[下一节](#将已有的-namespace-加入-zeabur-开源版)。
 
 </Step>
 <Step>
@@ -49,7 +49,7 @@ description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目�
 </Step>
 </Steps>
 
-## 将已有的 Namespace 加入 Zeabur
+## 将已有的 Namespace 加入 Zeabur 开源版
 
 集群中已经有应用时，可以把它所在的 Namespace 变成项目，不用重新部署。这需要该 Namespace 的 `zeabur-manage` 权限，通常只有管理员具备，见[项目 Namespace 的保护](../reference/permissions.mdx#项目-namespace-的保护)。
 
@@ -59,9 +59,9 @@ description: 创建项目、将已有的 Namespace 加入 Zeabur、修改项目�
 
 2. 在对应行打开菜单，选择**使用这个 Namespace**，检查后应用。
 
-Zeabur 只会为 Namespace 添加项目标签 `zeabur.com/project: "true"`。其中的服务、数据和安全配置都不会改变。
+Zeabur 开源版只会为 Namespace 添加项目标签 `zeabur.com/project: "true"`。其中的服务、数据和安全配置都不会改变。
 
-不想再在 Zeabur 中看到它时，打开项目**设置**的**危险区域**，点击**从 Zeabur 移除**。这只会移除项目标签，Namespace 及其中的所有内容都会保留。要连同内容一起删除，见[删除项目](./delete-project.mdx)。
+不想再在 Zeabur 开源版中看到它时，打开项目**设置**的**危险区域**，点击**从 Zeabur 开源版移除**。这只会移除项目标签，Namespace 及其中的所有内容都会保留。要连同内容一起删除，见[删除项目](./delete-project.mdx)。
 
 ## 修改名称、描述和图标
 
@@ -91,13 +91,13 @@ Zeabur 只会为 Namespace 添加项目标签 `zeabur.com/project: "true"`。其
 
 1. 打开项目**设置**的**网络**，查看**其他项目**这一行：
    - **集群中的任何副本都能连接到这个项目的服务。**：尚未隔离。
-   - **无法连接到这个项目的服务。项目内的服务和 Zeabur 组件不受影响。**：已经隔离。
+   - **无法连接到这个项目的服务。项目内的服务和 Zeabur 开源版组件不受影响。**：已经隔离。
 
    ![项目设置的网络，其他项目一行说明当前是否隔离](../images/shots/project-network.avif)
 
 2. 尚未隔离时，点击**隔离**，检查后应用。
 
-隔离后，项目内的服务仍能相互连接。Traefik、数据库 operator 这类 Zeabur 组件也能连接进来，因为它们所在的 Namespace 带有 `zeabur.com/platform: "true"` 标签，`kube-system` 也一样。
+隔离后，项目内的服务仍能相互连接。Traefik、数据库 operator 这类 Zeabur 开源版组件也能连接进来，因为它们所在的 Namespace 带有 `zeabur.com/platform: "true"` 标签，`kube-system` 也一样。
 
 要让另一个项目连接进来，点击**允许其他项目连入**，选择项目，点击**允许**，检查后应用。那个项目的所有服务就能连接到这个项目的所有服务。要取消，在对应行点击**移除**。
 
@@ -111,19 +111,19 @@ Zeabur 只会为 Namespace 添加项目标签 `zeabur.com/project: "true"`。其
 
 | 界面或结果 | 处理方法 |
 | --- | --- |
-| **已经有同名的 Namespace，可以改用已有的 Namespace。** | 换一个名称，或在**其他 Namespace** 中将那个 Namespace 加入 Zeabur。 |
+| **已经有同名的 Namespace，可以改用已有的 Namespace。** | 换一个名称，或在**其他 Namespace** 中将那个 Namespace 加入 Zeabur 开源版。 |
 | 加入或移除项目时，集群返回 **Only an admin can change the namespace's labels** | 只有管理员能修改 Namespace 的标签，请管理员操作。 |
 | **这是 Kubernetes 为自身组件保留的 Namespace，不能作为项目。** | 以 `kube-` 开头的 Namespace 和节点终端使用的 `zeabur-node-shell` 都不能作为项目。 |
-| 创建项目时，检查页面没有隔离这一项 | 集群中没有带 `zeabur.com/platform: "true"` 标签的 Namespace。Zeabur 无法判断 Ingress controller 在哪里，所以不隔离，以免公开域名打不开。Ingress controller 是把域名的流量转给服务的组件。请管理员为它所在的 Namespace 添加标签，再到**网络**点击**隔离**。 |
+| 创建项目时，检查页面没有隔离这一项 | 集群中没有带 `zeabur.com/platform: "true"` 标签的 Namespace。Zeabur 开源版无法判断 Ingress controller 在哪里，所以不隔离，以免公开域名打不开。Ingress controller 是把域名的流量转给服务的组件。请管理员为它所在的 Namespace 添加标签，再到**网络**点击**隔离**。 |
 | 隔离后公开域名无法打开 | Ingress controller 所在的 Namespace 没有 `zeabur.com/platform: "true"` 标签。为那个 Namespace 添加标签，或在 `zeabur-project` 中添加一条允许连入的规则。 |
 
 ## 用 kubectl 完成相同操作
 
-项目的所有配置都是 Namespace 上的标签、annotation 和普通的 NetworkPolicy。移除 Zeabur 后，Kubernetes 仍会执行这些配置。
+项目的所有配置都是 Namespace 上的标签、annotation 和普通的 NetworkPolicy。移除 Zeabur 开源版后，Kubernetes 仍会执行这些配置。
 
 ### 创建项目
 
-与 Zeabur 创建的内容相同：
+与 Zeabur 开源版创建的内容相同：
 
 ```yaml
 apiVersion: v1
@@ -170,7 +170,7 @@ kubectl annotate namespace demo --overwrite builder.zeabur.com/build-memory=2Gi 
 
 ### 调整 Pod Security 级别
 
-Zeabur 没有修改项目 Pod Security 级别的界面，需要由管理员用 kubectl 修改。改为 `restricted` 后，只有**严格**的服务能启动：
+Zeabur 开源版没有修改项目 Pod Security 级别的界面，需要由管理员用 kubectl 修改。改为 `restricted` 后，只有**严格**的服务能启动：
 
 ```sh
 kubectl label namespace demo --overwrite \

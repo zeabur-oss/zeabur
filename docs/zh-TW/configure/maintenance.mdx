@@ -108,15 +108,15 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 | Service | 帶這個標籤，連接埠 `pages` 依檔名提供頁面，連接埠 `maintenance` 對每個請求回維護頁和 503 |
 | ConfigMap | 帶這個標籤，鍵為 `502.html`、`503.html`、`504.html` 和 `maintenance.html` |
 
-一個專案只能有一個帶這個標籤的 Service。也可以自己用 `kubectl` 部署這個範本，或改用符合上表的其他伺服器，Zeabur 一樣認得。這些都是一般的 Kubernetes 物件，不用 Zeabur 也照常運作。
+一個專案只能有一個帶這個標籤的 Service。也可以自己用 `kubectl` 部署這個範本，或改用符合上表的其他伺服器，Zeabur 開源版一樣認得。這些都是一般的 Kubernetes 物件，不用 Zeabur 開源版也照常運作。
 
 ## 用 kubectl 做同樣的事
 
-維護模式和錯誤頁面只用到 Ingress、HTTPRoute、Traefik Middleware 和頁面伺服器，移除 Zeabur 之後照樣運作。以下以專案 `demo`、Ingress `web-app-example-com`、網域 `app.example.com` 為例，假設專案已經有頁面伺服器 `error-pages`。
+維護模式和錯誤頁面只用到 Ingress、HTTPRoute、Traefik Middleware 和頁面伺服器，移除 Zeabur 開源版之後照樣運作。以下以專案 `demo`、Ingress `web-app-example-com`、網域 `app.example.com` 為例，假設專案已經有頁面伺服器 `error-pages`。
 
 ### 開啟維護模式（Ingress）
 
-新增一個 Ingress，名稱是 `<服務>-<網域，點換成破折號>-maintenance`，同一個網域的所有路徑都轉到頁面伺服器的 `maintenance` 連接埠。`router.priority` 要比這個網域其他路由都高，Traefik 才會優先使用。`ownerReferences` 指向原本的 Ingress，Zeabur 靠這個欄位認出這是維護用的 Ingress，所以先查原本 Ingress 的 `uid`：
+新增一個 Ingress，名稱是 `<服務>-<網域，點換成破折號>-maintenance`，同一個網域的所有路徑都轉到頁面伺服器的 `maintenance` 連接埠。`router.priority` 要比這個網域其他路由都高，Traefik 才會優先使用。`ownerReferences` 指向原本的 Ingress，Zeabur 開源版靠這個欄位認出這是維護用的 Ingress，所以先查原本 Ingress 的 `uid`：
 
 ```sh
 kubectl -n demo get ingress web-app-example-com -o jsonpath='{.metadata.uid}'
@@ -155,7 +155,7 @@ spec:
                   name: maintenance
 ```
 
-Zeabur 寫的版本還會：
+Zeabur 開源版寫的版本還會：
 
 - 把 `router.priority` 設成這個網域現有路由的最高優先權加 1。Traefik 沒有指定優先權時，用規則的長度當優先權，所以這個數字通常不大。上面的 `1000` 只要高過原本的路由就好。
 - 複製原本 Ingress 的 `traefik.ingress.kubernetes.io/router.*` annotation（`router.middlewares` 和 `router.priority` 除外）、`ingressClassName` 和這個網域的 `tls`。
@@ -170,7 +170,7 @@ kubectl -n demo delete ingress web-app-example-com-maintenance
 
 ### 開啟維護模式（HTTPRoute）
 
-HTTPRoute 沒有另一份物件。Zeabur 把每條規則原本後端的 `weight` 改成 `0`，再加上頁面伺服器的 `maintenance` 連接埠，權重 `1`。用 `kubectl edit httproute <名稱>` 照這樣改，例如：
+HTTPRoute 沒有另一份物件。Zeabur 開源版把每條規則原本後端的 `weight` 改成 `0`，再加上頁面伺服器的 `maintenance` 連接埠，權重 `1`。用 `kubectl edit httproute <名稱>` 照這樣改，例如：
 
 ```yaml
 rules:

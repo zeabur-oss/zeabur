@@ -190,7 +190,7 @@ kubectl -n shop wait --for=condition=Ready mariadb/blogdb --timeout=10m
 kubectl -n shop wait --for=jsonpath='{.status.phase}'=Ready dragonfly/cache --timeout=10m
 ```
 
-Zeabur 建立的資料庫物件、機密變數和備份設定都帶有 `zeabur.com/database: <名稱>`，用這個標籤列出同一個資料庫的物件：
+Zeabur 開源版建立的資料庫物件、機密變數和備份設定都帶有 `zeabur.com/database: <名稱>`，用這個標籤列出同一個資料庫的物件：
 
 ```sh
 kubectl -n shop get secret,job -l zeabur.com/database=shopdb
@@ -210,7 +210,7 @@ PostgreSQL 的 Backup `PHASE` 是 `completed`，MongoDB 的備份 `STATUS` 是 `
 
 ## 用 kubectl 做同樣的事
 
-資料庫由各引擎的 operator 管理，Zeabur 只寫 operator 讀的物件。移除 Zeabur 後，operator 照樣運作。下面的 YAML 都是表單用預設值（一個執行個體、**小**規格）建立的內容，存成檔案後用 `kubectl -n shop apply -f <檔案>` 套用。`<24 個英數字>` 換成自己產生的密碼，例如 `openssl rand -base64 18 | tr -d '/+='`。
+資料庫由各引擎的 operator 管理，Zeabur 開源版只寫 operator 讀的物件。移除 Zeabur 開源版後，operator 照樣運作。下面的 YAML 都是表單用預設值（一個執行個體、**小**規格）建立的內容，存成檔案後用 `kubectl -n shop apply -f <檔案>` 套用。`<24 個英數字>` 換成自己產生的密碼，例如 `openssl rand -base64 18 | tr -d '/+='`。
 
 <Tabs items={["PostgreSQL", "MongoDB", "MySQL", "MariaDB", "Dragonfly"]}>
 <Tab value="PostgreSQL">
@@ -411,7 +411,7 @@ spec:
               drop: [ALL]
 ```
 
-MOCO 不會建立應用程式的資料庫，所以多一個 Job，用 MOCO 的 `moco-writable` 帳號建立資料庫 `app` 和使用者 `app`。annotation `zeabur.com/app-database` 和 `zeabur.com/app-secret` 告訴 Zeabur 應用程式的資料庫和密碼機密變數。不加時 MySQL 照樣運作，但介面的**接到服務**找不到應用程式帳號。服務連到 `moco-shopdb-primary`，連接埠 3306。
+MOCO 不會建立應用程式的資料庫，所以多一個 Job，用 MOCO 的 `moco-writable` 帳號建立資料庫 `app` 和使用者 `app`。annotation `zeabur.com/app-database` 和 `zeabur.com/app-secret` 告訴 Zeabur 開源版應用程式的資料庫和密碼機密變數。不加時 MySQL 照樣運作，但介面的**接到服務**找不到應用程式帳號。服務連到 `moco-shopdb-primary`，連接埠 3306。
 
 </Tab>
 <Tab value="MariaDB">

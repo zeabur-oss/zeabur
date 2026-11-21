@@ -1,6 +1,6 @@
 ---
 title: 发行文件与验证
-description: 按操作系统选择 Zeabur 发行文件，验证校验和、签名和构建来源后再运行。
+description: 按操作系统选择 Zeabur 开源版发行文件，验证校验和、签名和构建来源后再运行。
 ---
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 选好版本，下载对应的压缩包、`SHA256SUMS` 和签名。验证时，将签名者限定为 Zeabur 开源版的 release workflow，且是为本仓库该版本 tag 运行的那一次，验证通过后再解压、运行。
@@ -78,7 +78,7 @@ spctl --assess -vvv --type open --context context:primary-signature ./zeaburctl
 
 输出必须是下面两种之一，不是的话请不要打开这个文件。
 
-v0.2.0 起使用 Zeabur 的证书签名：
+v0.2.0 起使用 Zeabur 开源版的证书签名：
 
 ```text
 ./zeaburctl: accepted
@@ -96,7 +96,7 @@ origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
 
 ## 验证镜像与 chart
 
-发行说明只写这一版改了什么，不列出摘要。`digests.txt` 每行一条，列出各平台镜像、镜像索引和 chart 的完整 registry 引用，Zeabur Proxy 的几行以 `proxy` 开头。`debug` 和 `tools` 两行是 Zeabur 为调试容器和终端使用的其他项目的镜像，Zeabur 不为它们签名，所以下面的 cosign 只验证其余的镜像：
+发行说明只写这一版改了什么，不列出摘要。`digests.txt` 每行一条，列出各平台镜像、镜像索引和 chart 的完整 registry 引用，Zeabur Proxy 的几行以 `proxy` 开头。`debug` 和 `tools` 两行是 Zeabur 开源版为调试容器和终端使用的其他项目的镜像，Zeabur 开源版不为它们签名，所以下面的 cosign 只验证其余的镜像：
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
@@ -137,7 +137,7 @@ cosign verify \
 
 ## 把镜像复制到自己的 registry
 
-要把镜像复制到私有 registry，或按名称放行，就以 `digests.txt` 为清单。里面列出 Zeabur 和它的 chart 会用到的镜像，包含 `debug` 和 `tools`。打印各镜像的镜像索引：
+要把镜像复制到私有 registry，或按名称放行，就以 `digests.txt` 为清单。里面列出 Zeabur 开源版和它的 chart 会用到的镜像，包含 `debug` 和 `tools`。打印各镜像的镜像索引：
 
 ```sh
 awk '$(NF-1) == "index" { print $NF }' digests.txt
@@ -151,4 +151,4 @@ awk '$(NF-1) == "index" { print $NF }' digests.txt
 
 Workflow 最后把文件添加到 GitHub release 草稿，维护者检查后才公开。只有 Releases 页面上能看到的版本才有可下载的文件。
 
-下载和验证都不会改动集群，用完后可以直接删除下载目录。要移除已安装的 Zeabur，见[移除流程](../leave/uninstall.mdx)。
+下载和验证都不会改动集群，用完后可以直接删除下载目录。要移除已安装的 Zeabur 开源版，见[移除流程](../leave/uninstall.mdx)。

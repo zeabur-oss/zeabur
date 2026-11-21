@@ -1,21 +1,21 @@
 - group: get-started
   label: 开始使用
   pages:
-    quickstart: 安装 Zeabur
-    from-zeabur-com: 从 zeabur.com 过来
+    quickstart: 安装 Zeabur 开源版
+    from-zeabur-com: 从 Zeabur 过来
     first-project: 部署第一个服务
-    how-it-works: Zeabur 如何管理服务
+    how-it-works: Zeabur 开源版如何管理服务
 - group: install
   label: 安装方式
   pages:
     agent: 交给 Agent 安装或迁移
     one-command: 用 Zeatend 安装
-    existing-cluster: 将 Zeabur 安装到已有集群
+    existing-cluster: 将 Zeabur 开源版安装到已有集群
     desktop: Zeabur Desktop：在自己的电脑上打开集群
 - group: upgrade
   label: 升级
   pages:
-    steps: 升级 Zeabur
+    steps: 升级 Zeabur 开源版
     notes: 升级须知
 - group: deploy
   label: 部署服务
@@ -68,6 +68,6 @@
     security: 安全性
     telemetry: 体验计划
 - group: leave
-  label: 移除 Zeabur
+  label: 移除 Zeabur 开源版
   pages:
-    uninstall: 移除 Zeabur，保留服务
+    uninstall: 移除 Zeabur 开源版，保留服务

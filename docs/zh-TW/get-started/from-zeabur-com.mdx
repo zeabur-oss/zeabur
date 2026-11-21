@@ -1,24 +1,24 @@
 ---
-title: 從 zeabur.com 過來
-description: 哪些用起來和 zeabur.com 一樣，哪些不一樣，以及怎麼自己或交給 Coding Agent 把服務搬過來。
+title: 從 Zeabur 過來
+description: 哪些用起來和 Zeabur 一樣，哪些不一樣，以及怎麼自己或交給 Coding Agent 把服務搬過來。
 ---
 
-用過 zeabur.com，現在想把服務放到自己的主機上？zeabur.com 會在 2026 年 12 月 31 日停止運作。讀完這一頁，你會知道 Zeabur 開源版哪些用起來和 zeabur.com 一樣，哪些要自己負責，以及怎麼把服務搬過來。
+用過 Zeabur，現在想把服務放到自己的主機上？Zeabur 會在 2026 年 12 月 31 日停止運作。讀完這一頁，你會知道 Zeabur 開源版哪些用起來和 Zeabur 一樣，哪些要自己負責，以及怎麼把服務搬過來。
 
-<Figure label="專案、服務、網域、變數和範本用起來和 zeabur.com 一樣，不一樣的是服務跑在你自己的主機上，由你維護">
+<Figure label="專案、服務、網域、變數和範本用起來和 Zeabur 一樣，不一樣的是服務跑在你自己的主機上，由你維護">
 <FigFlow>
 <FigCard title="用起來一樣" note="專案、服務、網域、變數和範本" />
 <FigArrow />
 <FigGroup row>
-<FigCard title="zeabur.com" note="跑在 zeabur.com 的主機上，由 zeabur.com 維護" />
-<FigCard accent title="Zeabur" note="跑在你自己的主機上，由你維護" />
+<FigCard title="Zeabur" note="跑在 Zeabur 的主機上，由 Zeabur 維護" />
+<FigCard accent title="Zeabur 開源版" note="跑在你自己的主機上，由你維護" />
 </FigGroup>
 </FigFlow>
 </Figure>
 
 ## 用起來一樣的地方
 
-| 你在 zeabur.com 做的事 | 在 Zeabur 怎麼做 |
+| 你在 Zeabur 做的事 | 在 Zeabur 開源版怎麼做 |
 | --- | --- |
 | 建立專案，把相關的服務放在一起 | [建立與管理專案](../configure/projects.mdx) |
 | 從 Git 儲存庫部署 | [從 Git 建置並部署服務](../deploy/git.mdx) |
@@ -31,44 +31,44 @@ description: 哪些用起來和 zeabur.com 一樣，哪些不一樣，以及怎�
 | 設定環境變數 | [設定環境變數](../configure/variables.mdx) |
 | 看日誌、重新啟動、回到上一版 | [查看日誌、事件與用量](../configure/logs-terminal.mdx)、[重新啟動、回滾與暫停服務](../configure/restart-rollback.mdx) |
 
-zeabur.com 上常用的範本，在 Zeabur Catalog 裡有哪些對應的範本，見 [Zeabur 範本對照表](https://oss.zeabur.com/zh-TW/docs/catalog/get-started/zeabur-com-templates)。
+Zeabur 上常用的範本，在 Zeabur Catalog 裡有哪些對應的範本，見 [Zeabur 範本對照表](https://oss.zeabur.com/zh-TW/docs/catalog/get-started/zeabur-com-templates)。
 
 ## 不一樣的地方
 
-- **主機是你的**：Zeabur 裝在你自己的主機上。服務跑在哪裡、用多大的主機，都由你決定。
-- **費用付給主機的供應商**：Zeabur 是開源軟體，不向你收費，也沒有用量計費。你只付主機的費用給你選的雲端服務或機房。
-- **由你維護**：[升級 Zeabur](../upgrade/steps.mdx)、[備份叢集](../cluster/backups.mdx)和照顧主機，都由你或你的團隊負責。
+- **主機是你的**：Zeabur 開源版裝在你自己的主機上。服務跑在哪裡、用多大的主機，都由你決定。
+- **費用付給主機的供應商**：Zeabur 開源版不向你收費，也沒有用量計費。你只付主機的費用給你選的雲端服務或機房。
+- **由你維護**：[升級 Zeabur 開源版](../upgrade/steps.mdx)、[備份叢集](../cluster/backups.mdx)和照顧主機，都由你或你的團隊負責。
 - **成員由你邀請**：每個人用自己的通行密鑰登入，只能用你分給他的專案。見[邀請成員並分配專案權限](../cluster/members.mdx)。
-- **專案不會自動搬過來**：在 Zeabur 用同一個 Git 儲存庫、映像檔或範本重新部署服務。變數要重新設定，資料庫和磁碟裡的資料要自己複製過來。最後把網域指到新的位址。
+- **專案不會自動搬過來**：在 Zeabur 開源版用同一個 Git 儲存庫、映像檔或範本重新部署服務。變數要重新設定，資料庫和磁碟裡的資料要自己複製過來。最後把網域指到新的位址。
 
 ## 從哪裡開始
 
-Zeabur 裝在 Kubernetes 上。Kubernetes 是在一台或多台主機上執行容器的開源系統。有哪些安裝方式、哪一種適合你，見[在一台伺服器安裝 Zeabur](quickstart.mdx)。裝好後，再[部署第一個服務](first-project.mdx)。
+Zeabur 開源版裝在 Kubernetes 上。Kubernetes 是在一台或多台主機上執行容器的開源系統。有哪些安裝方式、哪一種適合你，見[在一台伺服器安裝 Zeabur 開源版](quickstart.mdx)。裝好後，再[部署第一個服務](first-project.mdx)。
 
-要把 zeabur.com 上的服務搬過來，可以[交給 Coding Agent](#交給-coding-agent-搬家)，也可以自己[一步一步搬](#一步一步搬)。
+要把 Zeabur 上的服務搬過來，可以[交給 Coding Agent](#交給-coding-agent-搬家)，也可以自己[一步一步搬](#一步一步搬)。
 
 ## 交給 Coding Agent 搬家
 
-Claude Code 或 Codex 這類 Coding Agent 可以準備伺服器、裝好 Zeabur，再把你的服務搬過來。要花錢或改動的地方，都會先問你。
+Claude Code 或 Codex 這類 Coding Agent 可以準備伺服器、裝好 Zeabur 開源版，再把你的服務搬過來。要花錢或改動的地方，都會先問你。
 
 ### 貼上這句話
 
 在 Claude Code 或 Codex 貼上：
 
 ```text
-讀 https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com.md，把我在 zeabur.com 的服務搬到我自己的伺服器上，用 Zeabur 管理。
+讀 https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com.md，把我在 Zeabur 的服務搬到我自己的伺服器上，用 Zeabur 開源版管理。
 ```
 
-這個網址指向[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com.md)。在你自己的電腦上執行 Agent。電腦要能用 SSH 連到新伺服器，也要能登入 zeabur.com 的 CLI。
+這個網址指向[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com.md)。在你自己的電腦上執行 Agent。電腦要能用 SSH 連到新伺服器，也要能登入 Zeabur 的 CLI。
 
 ### Agent 會做什麼
 
-1. 列出 zeabur.com 上的專案、服務、變數、資料庫和網域，並匯出資料。
+1. 列出 Zeabur 上的專案、服務、變數、資料庫和網域，並匯出資料。
 2. 建議一台伺服器，寫出方案、地區和每月價格。
-3. 用 Zeatend 在新伺服器裝好 Kubernetes，再用一個 `helm install` 裝好 Zeabur。
-4. 在 Zeabur 重新建立每個服務，還原資料庫和磁碟的資料，再用 `sslip.io` 的網址逐一測試。
-5. 你同意後切換：停掉 zeabur.com 的服務、最後同步一次資料，你再改 DNS。
-6. 交給你 Zeabur 的網址，說明之後怎麼部署和備份。
+3. 用 Zeatend 在新伺服器裝好 Kubernetes，再用一個 `helm install` 裝好 Zeabur 開源版。
+4. 在 Zeabur 開源版重新建立每個服務，還原資料庫和磁碟的資料，再用 `sslip.io` 的網址逐一測試。
+5. 你同意後切換：停掉 Zeabur 的服務、最後同步一次資料，你再改 DNS。
+6. 交給你 Zeabur 開源版的網址，說明之後怎麼部署和備份。
 
 ### 你要自己做的事
 
@@ -78,9 +78,9 @@ Agent 會在這些地方停下來等你：
 - 每次寫入新叢集之前，看過要改的內容再同意。
 - 開啟管理員連結，在自己的裝置建立通行密鑰。只有你能建立，Agent 不會開這個連結。
 - 同意切換的時間，並修改網域的 DNS 紀錄。
-- 確定不再需要後，才刪除 zeabur.com 上的服務。
+- 確定不再需要後，才刪除 Zeabur 上的服務。
 
-在你刪除舊的服務或 zeabur.com 方案到期之前，舊的服務都還在，可以切回去。
+在你刪除舊的服務或 Zeabur 方案到期之前，舊的服務都還在，可以切回去。
 
 ## 一步一步搬
 
@@ -90,16 +90,16 @@ Coding Agent 會照著下面的步驟做，你也可以自己照著做。自己�
 
 每次開始工作時重新讀一次這一頁，內容會隨版本更新。用使用者的語言跟對方說話。
 
-- 先讀 zeabur.com 的[搬家指南](https://zeabur.com/blogs/migrate-from-zeabur.md)，遵守那份指南的規則，照它的步驟盤點、匯出資料和切換。這一頁取代其中的「Choosing a destination」，以及要使用者自己準備目的地的步驟：目的地一律是一台執行 Zeabur 的伺服器，由你準備。
+- 先讀 Zeabur 的[搬家指南](https://zeabur.com/blogs/migrate-from-zeabur.md)，遵守那份指南的規則，照它的步驟盤點、匯出資料和切換。這一頁取代其中的「Choosing a destination」，以及要使用者自己準備目的地的步驟：目的地一律是一台執行 Zeabur 開源版的伺服器，由你準備。
 - 不要印出機密。變數、匯出的設定和資料庫備份都存成權限 `600` 的檔案。交接時刪掉工作用的副本，保留使用者要的備份，並告訴對方放在哪裡。
-- 下列事情要先問過使用者，等對方明確同意：購買伺服器、每次寫入新叢集、切換、刪除 zeabur.com 上的任何東西。DNS 由使用者自己修改。
+- 下列事情要先問過使用者，等對方明確同意：購買伺服器、每次寫入新叢集、切換、刪除 Zeabur 上的任何東西。DNS 由使用者自己修改。
 - 不要開啟、轉貼到別處或代為使用管理員的設定連結。只把連結交給使用者。
-- 切換之前，不要更動 zeabur.com 上的服務。
+- 切換之前，不要更動 Zeabur 上的服務。
 - 文件和你看到的情況不一致時，相信你看到的，並告訴使用者。
 
-### 1. 盤點 zeabur.com
+### 1. 盤點 Zeabur
 
-照 zeabur.com 指南的「Before you start」、「Inventory」、「Container images」、「Variables」和「Data」做。問使用者自己的到期日，以那一天為準規劃，不要以 12 月 31 日為準。
+照 Zeabur 指南的「Before you start」、「Inventory」、「Container images」、「Variables」和「Data」做。問使用者自己的到期日，以那一天為準規劃，不要以 12 月 31 日為準。
 
 整理一份清單，每個環境的每個服務寫一列：
 
@@ -117,11 +117,11 @@ Coding Agent 會照著下面的步驟做，你也可以自己照著做。自己�
 
 - Linux，有 systemd，x86-64 或 ARM64。
 - 有公開 IP，連接埠 80 和 443 對網際網路開放，Let's Encrypt 會從 80 連進來驗證。
-- 記憶體要夠服務在 zeabur.com 上用的量，另外 K3s 約需 1900 MiB，也要留一些給 Zeabur 和它的元件。磁碟至少空出 30 GiB，再加上要搬的資料大小，並留些餘裕。
+- 記憶體要夠服務在 Zeabur 上用的量，另外 K3s 約需 1900 MiB，也要留一些給 Zeabur 開源版和它的元件。磁碟至少空出 30 GiB，再加上要搬的資料大小，並留些餘裕。
 
 只透過服務商自己的 MCP 伺服器或 CLI 建立伺服器，例如 Hetzner（`hcloud`）、DigitalOcean（`doctl`）、Vultr（`vultr-cli`）、阿里雲（`aliyun`）或騰訊雲（`tccli`）。帳號和付款方式由使用者在服務商自己的網站設定。建立伺服器就會開始計費，所以先寫出方案、地區和每月價格，等使用者同意。
 
-建立伺服器時加上使用者同意的 SSH 公鑰，例如 zeabur.com 指南「Server access」裡那把搬家專用的公鑰。
+建立伺服器時加上使用者同意的 SSH 公鑰，例如 Zeabur 指南「Server access」裡那把搬家專用的公鑰。
 
 ### 3. 用 Zeatend 裝好 Kubernetes
 
@@ -141,9 +141,9 @@ sudo zeatend apply --plan plan.json
 
 `apply` 因為伺服器在計畫產生後有變動而拒絕套用時，重新產生計畫，再問一次。
 
-### 4. 用一個 helm install 裝好 Zeabur
+### 4. 用一個 helm install 裝好 Zeabur 開源版
 
-照同一頁的「安裝 Zeabur」執行 `helm install`。結束時會印出建立第一個管理員帳號的連結，只能用一次，24 小時後失效。
+照同一頁的「安裝 Zeabur 開源版」執行 `helm install`。結束時會印出建立第一個管理員帳號的連結，只能用一次，24 小時後失效。
 
 把連結交給使用者，請對方開啟並建立通行密鑰，再用通行密鑰登入 `https://zeabur.<IP>.sslip.io`。等使用者說登入成功再繼續。
 
@@ -153,7 +153,7 @@ sudo zeatend apply --plan plan.json
 
 依盤點的結果決定要裝哪些元件：
 
-| zeabur.com 上有 | 元件 |
+| Zeabur 上有 | 元件 |
 | --- | --- |
 | 從 Git 建置的服務 | `zeabur-builder`、`keel` |
 | PostgreSQL | `cloudnative-pg` |
@@ -163,7 +163,7 @@ sudo zeatend apply --plan plan.json
 | Redis | `dragonfly-operator`。先確認應用程式能搭配 Dragonfly 使用，不行的話改用映像檔執行 Redis |
 | 磁碟區或資料庫備份 | `velero`、`k8up` |
 
-使用者可以在 Zeabur 的**叢集** → **元件**頁面安裝，畫面會列出要做的變更。由你安裝時，在自己的電腦用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 產生清單，複製到伺服器。先給使用者看差異，同意後再套用：
+使用者可以在 Zeabur 開源版的**叢集** → **元件**頁面安裝，畫面會列出要做的變更。由你安裝時，在自己的電腦用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 產生清單，複製到伺服器。先給使用者看差異，同意後再套用：
 
 ```sh
 zeaburctl components export cloudnative-pg zeabur-builder keel > components.yaml
@@ -175,21 +175,21 @@ sudo k3s kubectl apply --server-side -f components.yaml
 
 ### 6. 重新建立專案和服務
 
-每個 zeabur.com 環境對應一個 Zeabur 專案。正式環境沿用專案名稱，其他環境叫做 `<專案>-<環境>`。
+每個 Zeabur 環境對應一個 Zeabur 開源版專案。正式環境沿用專案名稱，其他環境叫做 `<專案>-<環境>`。
 
 照下表把每個服務寫成 YAML。每種物件怎麼寫，見對應頁面的「用 kubectl 做同樣的事」：
 
-| zeabur.com | Zeabur |
+| Zeabur | Zeabur 開源版 |
 | --- | --- |
 | 專案 | 加上 `zeabur.com/project: "true"` 標籤的 Namespace，見[建立與管理專案](../configure/projects.mdx) |
-| 用 zbpack 從 Git 建置的服務 | 同一個儲存庫的 Build。有 Dockerfile 就用 `dockerfile`，否則用 `railpack`。照 zeabur.com 指南的「Build」沿用根目錄、指令和執行環境版本。見[從 Git 建置並部署服務](../deploy/git.mdx)。匯出的映像檔只能暫時使用 |
+| 用 zbpack 從 Git 建置的服務 | 同一個儲存庫的 Build。有 Dockerfile 就用 `dockerfile`，否則用 `railpack`。照 Zeabur 指南的「Build」沿用根目錄、指令和執行環境版本。見[從 Git 建置並部署服務](../deploy/git.mdx)。匯出的映像檔只能暫時使用 |
 | 預先建置的映像檔或範本服務 | 同一個映像檔，固定在目前執行的 digest。見[部署容器映像檔](../deploy/image.mdx) |
-| 資料庫範本 | Zeabur 的資料庫，見[建立、備份與還原資料庫](../deploy/databases.mdx) |
-| 展開後的變數、`.zeabur.internal` 位址 | zeabur.com 指南「Variables」裡展開後的值，內部位址換成 Zeabur 的服務名稱。見[設定環境變數](../configure/variables.mdx) |
+| 資料庫範本 | Zeabur 開源版的資料庫，見[建立、備份與還原資料庫](../deploy/databases.mdx) |
+| 展開後的變數、`.zeabur.internal` 位址 | Zeabur 指南「Variables」裡展開後的值，內部位址換成 Zeabur 開源版的服務名稱。見[設定環境變數](../configure/variables.mdx) |
 | 磁碟區 | 新的磁碟，見[儲存檔案與備份磁碟區](../configure/volumes.mdx) |
 | `*.zeabur.app` | `<服務>-<專案>.<IP>.sslip.io` |
 | 自訂網域 | 使用 HTTP-01 憑證的網域，見[加上公開網域與 HTTPS](../configure/domains.mdx)。切換時才加上 |
-| 每日備份 | Zeabur 的備份，見[備份叢集並從備份還原](../cluster/backups.mdx) |
+| 每日備份 | Zeabur 開源版的備份，見[備份叢集並從備份還原](../cluster/backups.mdx) |
 | 團隊成員 | Zeabur Identity 的邀請連結，見[邀請成員並分配專案權限](../cluster/members.mdx) |
 
 先建立專案的 Namespace，再處理其他物件。每次寫入前先給使用者看差異，對方同意後才套用：
@@ -203,7 +203,7 @@ sudo k3s kubectl apply --server-side -f shop/
 
 ### 7. 還原資料並測試
 
-- 資料庫：在 Zeabur 建立種類和主要版本都跟 zeabur.com 相同的資料庫。就緒後，用匯出時同一個主要版本的工具還原，例如 `pg_restore`。連線方式見資料庫頁面的「從叢集外連線」。
+- 資料庫：在 Zeabur 開源版建立種類和主要版本都跟 Zeabur 相同的資料庫。就緒後，用匯出時同一個主要版本的工具還原，例如 `pg_restore`。連線方式見資料庫頁面的「從叢集外連線」。
 - 磁碟區：先把匯出的檔案複製到伺服器。用 `busybox` 這類小映像檔啟動一個叫 `copy-data` 的暫時 Pod，把新磁碟掛在 `/data`，等它就緒後用 tar 把檔案傳進去，傳完刪掉這個 Pod。
 
   ```sh
@@ -214,25 +214,25 @@ sudo k3s kubectl apply --server-side -f shop/
 
 ### 8. 切換
 
-照 zeabur.com 指南的「Cutover and rollback」做，並在這些地方停下來：
+照 Zeabur 指南的「Cutover and rollback」做，並在這些地方停下來：
 
 1. 問使用者什麼時候切換，等對方同意。
-2. 在 zeabur.com 停掉應用程式服務，資料庫保持執行。
-3. 也停掉 Zeabur 的服務，再匯出一次資料、還原到 Zeabur，然後重新啟動服務。
-4. 在 Zeabur 為服務加上自訂網域。
+2. 在 Zeabur 停掉應用程式服務，資料庫保持執行。
+3. 也停掉 Zeabur 開源版的服務，再匯出一次資料、還原到 Zeabur 開源版，然後重新啟動服務。
+4. 在 Zeabur 開源版為服務加上自訂網域。
 5. 請使用者把網域的 DNS 紀錄指到新伺服器的 IP。
 6. 用 `sudo k3s kubectl wait --for=condition=Ready certificate --all -n <專案> --timeout=10m` 等憑證就緒，再開啟網域確認。
 
-要切回去時，請使用者把 DNS 改回原本的紀錄，再照 zeabur.com 指南重新啟動那些服務。切換後寫進新伺服器的資料不在 zeabur.com 上，切回去之前要先複製回去。
+要切回去時，請使用者把 DNS 改回原本的紀錄，再照 Zeabur 指南重新啟動那些服務。切換後寫進新伺服器的資料不在 Zeabur 上，切回去之前要先複製回去。
 
 ### 9. 交接
 
 交給使用者：
 
-- Zeabur 的網址 `https://zeabur.<IP>.sslip.io`，以及每個服務的網址。
+- Zeabur 開源版的網址 `https://zeabur.<IP>.sslip.io`，以及每個服務的網址。
 - 怎麼部署新版本：[部署第一個服務](first-project.mdx)。
 - 怎麼設定備份。建議設好 S3 備份，並試著還原一次：[備份叢集並從備份還原](../cluster/backups.mdx)。
 - 怎麼邀請團隊成員：[邀請成員並分配專案權限](../cluster/members.mdx)。
-- 怎麼升級：[升級 Zeabur](../upgrade/steps.mdx)。
+- 怎麼升級：[升級 Zeabur 開源版](../upgrade/steps.mdx)。
 
-最後刪掉你留在電腦上的機密檔案、工作用的資料庫備份副本，以及任何管理員 kubeconfig 的副本，保留使用者要的備份。搬家專用的 SSH 金鑰要問過使用者才移除。zeabur.com 上的服務要等使用者明確同意才刪除。
+最後刪掉你留在電腦上的機密檔案、工作用的資料庫備份副本，以及任何管理員 kubeconfig 的副本，保留使用者要的備份。搬家專用的 SSH 金鑰要問過使用者才移除。Zeabur 上的服務要等使用者明確同意才刪除。

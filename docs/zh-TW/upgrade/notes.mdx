@@ -9,24 +9,24 @@ description: 每一版不相容的變更，以及升級前要先做的事。一�
 
 ## v0.3.0 → v0.3.1
 
-Zeabur 改成在安裝 VictoriaMetrics 和 VictoriaLogs 時，自己寫入警示規則，以及讓 Zeabur Proxy 讀取記錄的網路規則。Catalog 的元件不再帶這些東西，自訂資源的指標也改名為 `kube_customresource_*`。如果你用 Helm、Flux 或 Argo CD 安裝 VictoriaMetrics，先從 Zeabur Catalog 升級，再用 `zeaburctl components export victoria-metrics victoria-logs` 印出 Zeabur 的物件，套用每個元件最後面的那幾個。舊的 `zeabur-notifications` VMRule 還在、通知頁面又更新不了時，先用 `kubectl -n observability delete vmrule zeabur-notifications` 刪掉，再到通知頁面按**安裝規則**。
+Zeabur 開源版改成在安裝 VictoriaMetrics 和 VictoriaLogs 時，自己寫入警示規則，以及讓 Zeabur Proxy 讀取記錄的網路規則。Catalog 的元件不再帶這些東西，自訂資源的指標也改名為 `kube_customresource_*`。如果你用 Helm、Flux 或 Argo CD 安裝 VictoriaMetrics，先從 Zeabur Catalog 升級，再用 `zeaburctl components export victoria-metrics victoria-logs` 印出 Zeabur 開源版的物件，套用每個元件最後面的那幾個。舊的 `zeabur-notifications` VMRule 還在、通知頁面又更新不了時，先用 `kubectl -n observability delete vmrule zeabur-notifications` 刪掉，再到通知頁面按**安裝規則**。
 
 ## v0.2 → v0.3
 
-zeabur-installer 已經移除。一個 `helm install` 就能把 Zeabur 裝進既有的叢集；全新的伺服器先用 [Zeatend](../install/one-command.mdx) 裝好 Kubernetes。
+zeabur-installer 已經移除。一個 `helm install` 就能把 Zeabur 開源版裝進既有的叢集；全新的伺服器先用 [Zeatend](../install/one-command.mdx) 裝好 Kubernetes。
 
 chart 現在會一起安裝 Zeabur Identity 和 cert-manager，並開啟 Ingress，用 ClusterIssuer `letsencrypt` 取得憑證。要繼續用你自己架的 Zeabur Identity，升級時加上 `--set identity.enabled=false`。要繼續用你自己建立的 TLS 機密變數，加上 `--set ingress.clusterIssuer=`。升級不會安裝 cert-manager。
 
-chart 現在自帶 `zeabur-system-hosts` 准入政策。在沒有標上 `zeabur.com/platform: "true"` 的命名空間裡，新增或修改的 Ingress 規則都要寫主機名稱，HTTPRoute 都要寫 hostnames，而且不能用 Zeabur 或 Zeabur Identity 的網域。已經存在的物件照常運作，直到改了 `spec` 為止。不想要這個政策，就設定 `systemHosts.enabled: false`。
+chart 現在自帶 `zeabur-system-hosts` 准入政策。在沒有標上 `zeabur.com/platform: "true"` 的命名空間裡，新增或修改的 Ingress 規則都要寫主機名稱，HTTPRoute 都要寫 hostnames，而且不能用 Zeabur 開源版或 Zeabur Identity 的網域。已經存在的物件照常運作，直到改了 `spec` 為止。不想要這個政策，就設定 `systemHosts.enabled: false`。
 
 ### 用 zeabur-installer 安裝的叢集
 
-zeabur-installer v0.2 用 K3s 的 `HelmChart` 安裝 Zeabur，另外用一般的 manifest 安裝 Zeabur Identity、准入政策和登入用戶端。v0.3 改用同一個 Helm release 安裝。下面的步驟會把安裝程式建立的物件交給這個 release 管理，不會刪掉重建。專案、服務、資料庫、網域、成員和通行密鑰都維持原樣，所有人都不需要建立新帳號。
+zeabur-installer v0.2 用 K3s 的 `HelmChart` 安裝 Zeabur 開源版，另外用一般的 manifest 安裝 Zeabur Identity、准入政策和登入用戶端。v0.3 改用同一個 Helm release 安裝。下面的步驟會把安裝程式建立的物件交給這個 release 管理，不會刪掉重建。專案、服務、資料庫、網域、成員和通行密鑰都維持原樣，所有人都不需要建立新帳號。
 
 維持不變的部分：
 
 - K3s、RKE2 或 KubeSolo，以及讓 Kubernetes 接受 Zeabur Identity 權杖的檔案。之後要升級 Kubernetes，用 Zeatend，見[用 zeabur-installer 裝的伺服器](steps.mdx#用-zeabur-installer-裝的伺服器)。
-- 安裝程式裝好的元件，例如 Traefik、cert-manager、Zeabur Builder 和 CloudNativePG。不是 Zeabur 安裝的元件，Zeabur 不會更動，版本也會維持原樣。
+- 安裝程式裝好的元件，例如 Traefik、cert-manager、Zeabur Builder 和 CloudNativePG。不是 Zeabur 開源版安裝的元件，Zeabur 開源版不會更動，版本也會維持原樣。
 - Zeabur Identity 的 Service 位址和簽章金鑰，帳號和通行密鑰照常可用，kube-apiserver 也繼續接受 Zeabur Identity 的權杖。
 
 升級後，不要再執行 `zeabur-installer apply`，否則會把 v0.2 的 `HelmChart` 和 Zeabur Identity v0.1 裝回來。
@@ -60,7 +60,7 @@ mkdir -p /root/zeabur-upgrade && cd /root/zeabur-upgrade
 | 指令 | 預期結果 |
 | --- | --- |
 | `kubectl -n kube-system get configmap zeabur-installer -o jsonpath='{.data.installer}'` | `0.2.0` 或其他 `0.2.x` 版本。若是 `0.1.x`，先完成 [v0.1 → v0.2](#v01--v02)。 |
-| `kubectl -n kube-system get helmchart zeabur` | 一個 `HelmChart`。找不到時，表示安裝程式用了 `zeabur: false`，沒有安裝 Zeabur；請改照[在既有叢集安裝 Zeabur](../install/existing-cluster.mdx)安裝。 |
+| `kubectl -n kube-system get helmchart zeabur` | 一個 `HelmChart`。找不到時，表示安裝程式用了 `zeabur: false`，沒有安裝 Zeabur 開源版；請改照[在既有叢集安裝 Zeabur 開源版](../install/existing-cluster.mdx)安裝。 |
 | `helm status zeabur -n zeabur` | `STATUS: deployed` |
 | `kubectl -n zeabur-identity get deployment zeabur-identity -o jsonpath='{.spec.template.spec.containers[0].args}'` | 沒有輸出，或只有 `["--invitations"]`。其他選項是有人手動加的，Zeabur Identity v0.3 不再接受許多舊選項，見[升級須知](https://oss.zeabur.com/docs/identity/operations/upgrade)。 |
 | `kubectl get crd upstreamproviders.identity.zeabur.com` | `NotFound`。若存在，表示有人手動設定過 GitHub 或 Google 登入；先照 Zeabur Identity 的升級須知處理這些登入方式。 |
@@ -76,7 +76,7 @@ cp /etc/zeabur-installer/config.yaml installer-config.yaml
 
 - **存取模式**：`installer-config.yaml` 裡的 `access.mode`。`domain` 會替實際的 DNS 名稱向 Let's Encrypt 取得憑證。`local` 會用伺服器上建立的 CA，搭配 ClusterIssuer `zeabur-local-ca`。
 - **邀請**：`access.invitations: false` 表示 Zeabur Identity 不接受邀請連結。沒有這個鍵時，邀請功能預設開啟。
-- **Zeabur 使用的 Zeabur Identity**：`old-values.yaml` 裡的 `issuer.url`。如果是 `https://` 後面接上 `access.identity`，就是安裝程式建立的 Zeabur Identity。其他位址表示有人把 Zeabur 指向外部的 Zeabur Identity。繼續前先問擁有者，並依第 2 步的外部 Zeabur Identity 說明填寫 values。
+- **Zeabur 開源版使用的 Zeabur Identity**：`old-values.yaml` 裡的 `issuer.url`。如果是 `https://` 後面接上 `access.identity`，就是安裝程式建立的 Zeabur Identity。其他位址表示有人把 Zeabur 開源版指向外部的 Zeabur Identity。繼續前先問擁有者，並依第 2 步的外部 Zeabur Identity 說明填寫 values。
 - **專案自己的網域**：執行 `kubectl get ingress,httproute,certificate -A > domains-before.txt`。再選一個專案網域，儲存 `curl -sS -o /dev/null -w '%{http_code}\n' https://<domain>/` 印出的結果。local 模式要加上 `--cacert /var/lib/rancher/zeabur-installer/local-ca.crt`，KubeSolo 則是 `/var/lib/zeabur-installer/local-ca.crt`。升級不會更動這些物件。
 - **資料庫**：執行 `kubectl get clusters.postgresql.cnpg.io,statefulsets -A > databases-before.txt`。升級不會更動這些物件。
 
@@ -152,7 +152,7 @@ kubectl -n kube-system get configmap zeabur-installer zeabur-identity-authn --ig
 
 #### 4. 讓安裝程式的 `HelmChart` 不再管理 release
 
-K3s 的 helm-controller 用 `HelmChart` `kube-system/zeabur` 管理這個 release。直接刪除 `HelmChart` 會一併解除安裝 Zeabur。先告訴 helm-controller 不要再管理這個 release，再移除 `HelmChart`：
+K3s 的 helm-controller 用 `HelmChart` `kube-system/zeabur` 管理這個 release。直接刪除 `HelmChart` 會一併解除安裝 Zeabur 開源版。先告訴 helm-controller 不要再管理這個 release，再移除 `HelmChart`：
 
 ```sh
 kubectl -n kube-system annotate helmchart zeabur helmcharts.helm.cattle.io/unmanaged=true
@@ -210,13 +210,13 @@ kubectl -n zeabur-identity get service zeabur-identity -o jsonpath='{.spec.clust
 
 #### 8. 登入
 
-**先停下來。**請擁有者開啟 Zeabur，用通行密鑰登入，打開一個專案，檢查服務和資料庫。通行密鑰只能由本人使用。方便的話，也請一位成員登入確認。
+**先停下來。**請擁有者開啟 Zeabur 開源版，用通行密鑰登入，打開一個專案，檢查服務和資料庫。通行密鑰只能由本人使用。方便的話，也請一位成員登入確認。
 
-Zeabur 的副本換新後，所有人都要重新登入一次。
+Zeabur 開源版的副本換新後，所有人都要重新登入一次。
 
 #### 9. 清理
 
-Secret `zeabur/zeabur-oidc` 是安裝程式建立的登入用戶端金鑰。使用外部 Zeabur Identity 時，`values.yaml` 還指向它，要留著。其他情況下 Zeabur 不再讀取它，擁有者同意後再刪除：
+Secret `zeabur/zeabur-oidc` 是安裝程式建立的登入用戶端金鑰。使用外部 Zeabur Identity 時，`values.yaml` 還指向它，要留著。其他情況下 Zeabur 開源版不再讀取它，擁有者同意後再刪除：
 
 ```sh
 kubectl -n zeabur delete secret zeabur-oidc
@@ -316,7 +316,7 @@ v0.2 會替系統保留記憶體，避免 Pod 用光記憶體拖垮整台伺服�
 
 ### 用 Helm、Argo CD 或 Flux 安裝
 
-Zeabur 和 Zeabur Proxy 拿掉了調整工作階段長度和 proxy 限制的參數，數值維持原樣：閒置 1 小時或總共 12 小時後要重新登入。proxy 逾時 30 秒、請求上限 16 MiB。chart 從來沒有設定這些參數。你自己在 Deployment 的 `args` 或 `env` 加過的話，先刪掉再升級：
+Zeabur 開源版和 Zeabur Proxy 拿掉了調整工作階段長度和 proxy 限制的參數，數值維持原樣：閒置 1 小時或總共 12 小時後要重新登入。proxy 逾時 30 秒、請求上限 16 MiB。chart 從來沒有設定這些參數。你自己在 Deployment 的 `args` 或 `env` 加過的話，先刪掉再升級：
 
 - `zeabur`：`--session-idle-minutes`、`--session-max-hours`，或環境變數 `ZEABUR_SESSION_IDLE_MINUTES`、`ZEABUR_SESSION_MAX_HOURS`。
 - `zeabur-proxy`：`--timeout`、`--max-bytes`、`--review-cache`、`--max-inflight`、`--max-inflight-per-person`，或環境變數 `ZEABUR_PROXY_TIMEOUT`、`ZEABUR_PROXY_MAX_BYTES`、`ZEABUR_PROXY_REVIEW_CACHE`、`ZEABUR_PROXY_MAX_INFLIGHT`、`ZEABUR_PROXY_MAX_INFLIGHT_PER_PERSON`。其他 `ZEABUR_PROXY_*` 環境變數照常使用，例如 TLS 憑證和私鑰。

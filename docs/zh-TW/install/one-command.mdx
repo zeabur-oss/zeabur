@@ -1,11 +1,11 @@
 ---
 title: 用 Zeatend 安裝
-description: 在一台全新的 Linux 伺服器上，先用 Zeatend 裝好 Kubernetes，再用一個 Helm 指令裝上 Zeabur。
+description: 在一台全新的 Linux 伺服器上，先用 Zeatend 裝好 Kubernetes，再用一個 Helm 指令裝上 Zeabur 開源版。
 ---
 
-照這一頁做完，新的 Linux 伺服器上會跑著 Kubernetes 和 Zeabur 開源版，你可以用 HTTPS 打開 Zeabur，用通行密鑰登入。
+照這一頁做完，新的 Linux 伺服器上會跑著 Kubernetes 和 Zeabur 開源版，你可以用 HTTPS 打開 Zeabur 開源版，用通行密鑰登入。
 
-已經有叢集？見[把 Zeabur 裝進既有叢集](existing-cluster.mdx)。想讓 Claude Code 或 Codex 這類 Coding Agent 代你做這些步驟，見[交給 Agent 安裝](agent.mdx)。Agent 讀的是[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/install/one-command.md)。
+已經有叢集？見[把 Zeabur 開源版裝進既有叢集](existing-cluster.mdx)。想讓 Claude Code 或 Codex 這類 Coding Agent 代你做這些步驟，見[交給 Agent 安裝](agent.mdx)。Agent 讀的是[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/install/one-command.md)。
 
 ## 開始之前
 
@@ -18,7 +18,7 @@ description: 在一台全新的 Linux 伺服器上，先用 Zeatend 裝好 Kuber
 
 ### 選好網域
 
-Zeabur 的網址是 `zeabur.<網域>`，負責登入的 Zeabur Identity 是 `identity.<網域>`。沒有自己的網域時，用 `<IP>.sslip.io`，`<IP>` 填伺服器的公開 IP 位址。sslip.io 會把這類名稱解析成名稱裡的 IP 位址，所以不用新增 DNS 紀錄：
+Zeabur 開源版的網址是 `zeabur.<網域>`，負責登入的 Zeabur Identity 是 `identity.<網域>`。沒有自己的網域時，用 `<IP>.sslip.io`，`<IP>` 填伺服器的公開 IP 位址。sslip.io 會把這類名稱解析成名稱裡的 IP 位址，所以不用新增 DNS 紀錄：
 
 ```sh
 DOMAIN=203.0.113.10.sslip.io
@@ -47,7 +47,7 @@ sudo zeatend apply
 </Step>
 <Step>
 
-### 安裝 Zeabur
+### 安裝 Zeabur 開源版
 
 把 `<version>` 換成要安裝的版本，版本列在[發布成品](../reference/releases.mdx)。
 
@@ -59,7 +59,7 @@ sudo -E helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --set global.domain="$DOMAIN"
 ```
 
-這個指令會裝好 Zeabur、負責登入的 Zeabur Identity，以及向 Let's Encrypt 取得 HTTPS 憑證的 cert-manager。Helm 會等 cert-manager 裝完，大約幾分鐘。它加上的所有東西，見[把 Zeabur 裝進既有叢集](existing-cluster.mdx#用-helm-安裝)。
+這個指令會裝好 Zeabur 開源版、負責登入的 Zeabur Identity，以及向 Let's Encrypt 取得 HTTPS 憑證的 cert-manager。Helm 會等 cert-manager 裝完，大約幾分鐘。它加上的所有東西，見[把 Zeabur 開源版裝進既有叢集](existing-cluster.mdx#用-helm-安裝)。
 
 結束時會印出建立第一個管理員帳號的連結。連結只能用一次，24 小時後失效。
 
@@ -70,7 +70,7 @@ sudo -E helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 打開連結，建立通行密鑰。安裝完後，憑證可能要等一分鐘。瀏覽器警告憑證有問題時，稍等一下再重新整理。
 
-通行密鑰存好後，頁面會連到 Zeabur。打開它，用通行密鑰登入。其他需要的元件，到**叢集** → **元件**頁面加上。
+通行密鑰存好後，頁面會連到 Zeabur 開源版。打開它，用通行密鑰登入。其他需要的元件，到**叢集** → **元件**頁面加上。
 
 </Step>
 </Steps>

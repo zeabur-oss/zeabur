@@ -100,7 +100,7 @@ Compose 的 `ports` 不會直接開放節點的主機連接埠。在需要對外
 
 ![專案頁列出匯入後的各個服務](../images/shots/project-services.avif)
 
-用 kubectl 確認時，一般服務的物件帶有 `app.kubernetes.io/name: <服務名稱>`，換成 operator 管理的資料庫，Zeabur 寫的資料庫物件和機密變數帶有 `zeabur.com/database: <名稱>`。下面的 `db` 換成了 PostgreSQL：
+用 kubectl 確認時，一般服務的物件帶有 `app.kubernetes.io/name: <服務名稱>`，換成 operator 管理的資料庫，Zeabur 開源版寫的資料庫物件和機密變數帶有 `zeabur.com/database: <名稱>`。下面的 `db` 換成了 PostgreSQL：
 
 ```sh
 kubectl -n shop get deploy,svc,pvc,secret -l app.kubernetes.io/name=web
@@ -112,12 +112,12 @@ kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.initContain
 
 ## 用 kubectl 做同樣的事
 
-把 Compose 檔案轉成服務的步驟只在介面上做，Zeabur 不保存 Compose 檔案，叢集裡也沒有對應的物件。轉換結果是一般的 Kubernetes 物件，跟手動建立的一樣：
+把 Compose 檔案轉成服務的步驟只在介面上做，Zeabur 開源版不保存 Compose 檔案，叢集裡也沒有對應的物件。轉換結果是一般的 Kubernetes 物件，跟手動建立的一樣：
 
 - 一般服務：和[部署容器映像檔](./image.mdx#用-kubectl-做同樣的事)的 YAML 相同，安全性固定是**相容**。
 - 資料庫與物件儲存：和[資料庫](./databases.mdx#用-kubectl-做同樣的事)、[物件儲存](./object-storage.mdx#用-kubectl-做同樣的事)的 YAML 相同。
 
-不用介面時，可以照上面兩頁自己寫 YAML，或用 [Kompose](https://kompose.io/) 轉換後再修改。Zeabur 的轉換規則參考 Kompose，但名稱、標籤和安全性設定不同，兩者的輸出不會一模一樣。
+不用介面時，可以照上面兩頁自己寫 YAML，或用 [Kompose](https://kompose.io/) 轉換後再修改。Zeabur 開源版的轉換規則參考 Kompose，但名稱、標籤和安全性設定不同，兩者的輸出不會一模一樣。
 
 ## 常見失敗與清除
 
@@ -125,9 +125,9 @@ kubectl -n shop get deployment web -o jsonpath='{.spec.template.spec.initContain
 - 某個服務沒有建立：檢查它是否只有 `build:`。為這個服務指定可下載的映像檔，或另外從 Git 部署。
 - 應用程式連不到新資料庫：檢查無法改寫的參照、改名後的主機與實際變數名稱。可在資料庫的**連線**使用**接到服務**，詳見[資料庫](databases.mdx)。
 - 原本共用的檔案不見了：匯入的磁碟區各自獨立。檢查原 Compose 是否靠多服務共用同一個磁碟區，重新安排儲存方式並搬移檔案。
-- 只建立了部分物件：Zeabur 依序建立物件，中途失敗時，已建立的物件會留在叢集。依畫面列出的結果補建或刪除。
+- 只建立了部分物件：Zeabur 開源版依序建立物件，中途失敗時，已建立的物件會留在叢集。依畫面列出的結果補建或刪除。
 
-要清除這次匯入，逐一使用服務的**刪除服務**、資料庫的**刪除資料庫**與物件儲存的**刪除物件儲存**，並檢查各自的刪除清單。Zeabur 沒有保存 Compose 檔案，所以沒有一次刪掉整份匯入的按鈕。
+要清除這次匯入，逐一使用服務的**刪除服務**、資料庫的**刪除資料庫**與物件儲存的**刪除物件儲存**，並檢查各自的刪除清單。Zeabur 開源版沒有保存 Compose 檔案，所以沒有一次刪掉整份匯入的按鈕。
 
 <Callout type="warn">
 刪除清單中的磁碟區、資料庫或儲存貯體可能連同資料一起刪除。先匯出或複製要留下的資料，再套用刪除。

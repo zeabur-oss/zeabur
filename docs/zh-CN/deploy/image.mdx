@@ -48,8 +48,8 @@ Zeabur 开源版会读取镜像声明的端口。确认**端口**与应用实际
 | **卷** | 开启后填写**挂载路径**，例如 `/data`，以及**卷大小**，例如 `5Gi`。创建的是新的空白卷。 |
 | **规格** | 选择**小**、**中**或**大**，字段下方会列出 CPU 预留量、内存预留量和上限。 |
 | **副本数** | 可选 1 到 20，挂载卷时固定为 1。 |
-| **私有 registry** | 开启后填写 **Registry**、**用户名**、**密码**，例如 registry 主机 `ghcr.io`。Zeabur 会创建用于下载镜像的机密变量。 |
-| **安全性** | Zeabur 读取镜像的 `User`：数字 UID 不是 0（例如 `101`、`1000:1000`）时选择**严格**；未指定用户，或指定 `root`、`0`、`nginx` 这类用户名时选择**兼容**。表单会说明原因，创建前仍可切换。 |
+| **私有 registry** | 开启后填写 **Registry**、**用户名**、**密码**，例如 registry 主机 `ghcr.io`。Zeabur 开源版会创建用于下载镜像的机密变量。 |
+| **安全性** | Zeabur 开源版读取镜像的 `User`：数字 UID 不是 0（例如 `101`、`1000:1000`）时选择**严格**；未指定用户，或指定 `root`、`0`、`nginx` 这类用户名时选择**兼容**。表单会说明原因，创建前仍可切换。 |
 
 <Callout type="warn">
 挂载卷的服务只运行一个副本。更新时会先停止旧副本，再启动新副本，期间服务会中断。
@@ -71,13 +71,13 @@ Zeabur 开源版会读取镜像声明的端口。确认**端口**与应用实际
 
 ## 确认结果
 
-在服务**概览**中确认副本就绪，再查看**日志**，确认应用是否已启动。填写端口后，Zeabur 会为服务添加 TCP 就绪检查，副本能够接受连接后才会收到流量。
+在服务**概览**中确认副本就绪，再查看**日志**，确认应用是否已启动。填写端口后，Zeabur 开源版会为服务添加 TCP 就绪检查，副本能够接受连接后才会收到流量。
 
 ![服务概览，显示副本状态和公开网址](../images/shots/service-overview.avif)
 
 如果有公开域名，到**网络**打开网址，确认应用能够响应。私有服务可以由集群内的其他服务通过**私有网络**中显示的地址访问。
 
-用 kubectl 查看时，Zeabur 创建的对象都带有 `app.kubernetes.io/name: <服务名称>`：
+用 kubectl 查看时，Zeabur 开源版创建的对象都带有 `app.kubernetes.io/name: <服务名称>`：
 
 ```sh
 kubectl -n shop get deploy,svc,ingress,secret,pvc -l app.kubernetes.io/name=web
@@ -90,7 +90,7 @@ kubectl -n shop rollout status deployment/web
 
 ## 用 kubectl 完成相同操作
 
-表单创建的是普通 Kubernetes 对象，没有 Zeabur 专属字段。将下面的 YAML 保存为 `web.yaml`，用 `kubectl -n shop apply -f web.yaml` 应用，结果与在表单中选择**严格**、**小**规格并开启公开域名相同：
+表单创建的是普通 Kubernetes 对象，没有 Zeabur 开源版专属字段。将下面的 YAML 保存为 `web.yaml`，用 `kubectl -n shop apply -f web.yaml` 应用，结果与在表单中选择**严格**、**小**规格并开启公开域名相同：
 
 ```yaml
 apiVersion: v1

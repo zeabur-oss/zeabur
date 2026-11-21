@@ -48,8 +48,8 @@ Zeabur 開源版會讀取映像檔宣告的連接埠。確認**連接埠**和應
 | **磁碟區** | 開啟後填入**掛載路徑**，例如 `/data`，以及**磁碟區大小**，例如 `5Gi`。建立的是新的空白磁碟區。 |
 | **規格** | 選擇**小**、**中**或**大**，欄位下方會列出 CPU 保留量、記憶體保留量與上限。 |
 | **副本數** | 可選 1 到 20，掛載磁碟區時固定為 1。 |
-| **私有 registry** | 開啟後填入 **Registry**、**帳號**、**密碼**，例如 registry 主機 `ghcr.io`。Zeabur 會建立下載映像檔用的機密變數。 |
-| **安全性** | Zeabur 讀取映像檔的 `User`：數字 UID 不是 0（例如 `101`、`1000:1000`）時選**嚴格**；沒有指定使用者，或指定 `root`、`0`、`nginx` 這類使用者名稱時選**相容**。表單會說明原因，建立前仍能切換。 |
+| **私有 registry** | 開啟後填入 **Registry**、**帳號**、**密碼**，例如 registry 主機 `ghcr.io`。Zeabur 開源版會建立下載映像檔用的機密變數。 |
+| **安全性** | Zeabur 開源版讀取映像檔的 `User`：數字 UID 不是 0（例如 `101`、`1000:1000`）時選**嚴格**；沒有指定使用者，或指定 `root`、`0`、`nginx` 這類使用者名稱時選**相容**。表單會說明原因，建立前仍能切換。 |
 
 <Callout type="warn">
 掛載磁碟區的服務只執行一個副本。更新時會先停止舊副本，再啟動新副本，這段時間服務會中斷。
@@ -71,13 +71,13 @@ Zeabur 開源版會讀取映像檔宣告的連接埠。確認**連接埠**和應
 
 ## 確認結果
 
-在服務**概覽**確認副本就緒，再看**日誌**是否已啟動應用程式。填了連接埠時，Zeabur 會替服務加上 TCP 就緒檢查，副本能接受連線後才開始收到流量。
+在服務**概覽**確認副本就緒，再看**日誌**是否已啟動應用程式。填了連接埠時，Zeabur 開源版會替服務加上 TCP 就緒檢查，副本能接受連線後才開始收到流量。
 
 ![服務概覽，顯示副本狀態與公開網址](../images/shots/service-overview.avif)
 
 有公開網域時，到**網路**開啟網址，確認應用程式能回應。私有服務可從叢集內其他服務連到**私有網路**顯示的位址。
 
-用 kubectl 查看時，Zeabur 建立的物件都帶有 `app.kubernetes.io/name: <服務名稱>`：
+用 kubectl 查看時，Zeabur 開源版建立的物件都帶有 `app.kubernetes.io/name: <服務名稱>`：
 
 ```sh
 kubectl -n shop get deploy,svc,ingress,secret,pvc -l app.kubernetes.io/name=web
@@ -90,7 +90,7 @@ kubectl -n shop rollout status deployment/web
 
 ## 用 kubectl 做同樣的事
 
-表單建立的是一般的 Kubernetes 物件，沒有 Zeabur 專屬的欄位。把下面的 YAML 存成 `web.yaml`，用 `kubectl -n shop apply -f web.yaml` 套用，結果和表單選**嚴格**、**小**規格、開啟公開網域相同：
+表單建立的是一般的 Kubernetes 物件，沒有 Zeabur 開源版專屬的欄位。把下面的 YAML 存成 `web.yaml`，用 `kubectl -n shop apply -f web.yaml` 套用，結果和表單選**嚴格**、**小**規格、開啟公開網域相同：
 
 ```yaml
 apiVersion: v1

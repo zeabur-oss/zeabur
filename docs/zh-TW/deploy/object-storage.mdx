@@ -116,7 +116,7 @@ kubectl -n shop get secret files-app -o jsonpath='{.data.accessKey}' | base64 -d
 
 ## 用 kubectl 做同樣的事
 
-物件儲存由 SeaweedFS Operator 管理，Zeabur 只寫 operator 讀的物件，移除 Zeabur 後照樣運作。下面的 YAML 等於表單用名稱 `files`、容量 `10Gi`、儲存貯體 `uploads` 建立，存成 `files.yaml` 後用 `kubectl -n shop apply -f files.yaml` 套用：
+物件儲存由 SeaweedFS Operator 管理，Zeabur 開源版只寫 operator 讀的物件，移除 Zeabur 開源版後照樣運作。下面的 YAML 等於表單用名稱 `files`、容量 `10Gi`、儲存貯體 `uploads` 建立，存成 `files.yaml` 後用 `kubectl -n shop apply -f files.yaml` 套用：
 
 ```yaml
 apiVersion: seaweed.seaweedfs.com/v1
@@ -308,7 +308,7 @@ kubectl -n shop delete seaweed files
 
 先中斷應用程式和物件儲存的連線，或把服務改接到要保留的目的地。接著在物件儲存右上角的**更多**選**刪除物件儲存**。
 
-刪除清單包含儲存貯體、身分與金鑰相關物件、Seaweed，以及 Zeabur 找到的資料磁碟區。逐一確認後再套用。底層磁碟是否留下，取決於磁碟的回收政策。
+刪除清單包含儲存貯體、身分與金鑰相關物件、Seaweed，以及 Zeabur 開源版找到的資料磁碟區。逐一確認後再套用。底層磁碟是否留下，取決於磁碟的回收政策。
 
 <Callout type="warn">
 刪除整個物件儲存會中斷 S3 連線，貯體與磁碟區的刪除也可能移除所有檔案。先完成資料複製並確認應用程式已改接，再執行刪除。

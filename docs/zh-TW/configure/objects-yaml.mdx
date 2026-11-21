@@ -86,7 +86,7 @@ spec:
       targetPort: 8080
 ```
 
-`namespace` 可以省略，Zeabur 會填入目前的專案。
+`namespace` 可以省略，Zeabur 開源版會填入目前的專案。
 
 </Step>
 <Step>
@@ -147,7 +147,7 @@ Kubernetes 無法一次復原多個物件。叢集拒絕其中一個時，前面
 </Step>
 </Steps>
 
-Zeabur 只寫入你改的欄位，每一處都先確認叢集裡的值和你開始編輯時相同。編輯期間有人改了同一個物件，套用會失敗，要重新開啟再改一次。
+Zeabur 開源版只寫入你改的欄位，每一處都先確認叢集裡的值和你開始編輯時相同。編輯期間有人改了同一個物件，套用會失敗，要重新開啟再改一次。
 
 `status`、`resourceVersion`、`ownerReferences` 這類由叢集維護的欄位，改了也不會寫入。Pod、ReplicaSet 這類由其他物件產生的物件不能編輯或刪除，要修改產生這些物件的上層物件。
 
@@ -167,9 +167,9 @@ kubectl -n demo edit deployment hello
 kubectl -n demo delete deployment hello
 ```
 
-`kubectl create -f` 依檔案裡的順序建立，不會像 Zeabur 重新排序，把 ConfigMap 和 Secret 寫在前面。
+`kubectl create -f` 依檔案裡的順序建立，不會像 Zeabur 開源版重新排序，把 ConfigMap 和 Secret 寫在前面。
 
-Zeabur 的寫入不加任何自己的欄位，`kubectl apply` 管理的物件可以照樣繼續用 kubectl apply。在 Zeabur 改了的欄位，要同步改進你的 YAML 檔。
+Zeabur 開源版的寫入不加任何自己的欄位，`kubectl apply` 管理的物件可以照樣繼續用 kubectl apply。在 Zeabur 開源版改了的欄位，要同步改進你的 YAML 檔。
 
 ## 確認結果
 
@@ -182,13 +182,13 @@ kubectl -n demo get deployment hello -o yaml
 kubectl -n demo get deployment hello --show-managed-fields -o jsonpath='{.metadata.managedFields[*].manager}'
 ```
 
-前兩行確認物件都在。`-o yaml` 的內容和你在 Zeabur 看到的 YAML 相同。最後一行列出寫過這個物件的程式，和檢查畫面**欄位擁有者**的資料來源相同。
+前兩行確認物件都在。`-o yaml` 的內容和你在 Zeabur 開源版看到的 YAML 相同。最後一行列出寫過這個物件的程式，和檢查畫面**欄位擁有者**的資料來源相同。
 
 ## 遇到問題
 
 | 畫面或結果 | 接著處理 |
 | --- | --- |
-| **Namespace … 屬於整個叢集，Zeabur 只在專案內建立物件。** | 用 kubectl 建立，或請管理員處理。 |
+| **Namespace … 屬於整個叢集，Zeabur 開源版只在專案內建立物件。** | 用 kubectl 建立，或請管理員處理。 |
 | **這個叢集沒有提供 Certificate（cert-manager.io/v1）。** | 先安裝提供這種物件的元件，或確認 `apiVersion` 有沒有打錯。 |
 | **已經有名為 hello 的 Deployment。建立不會修改既有的物件。** | 改用那個物件的**編輯**，或換一個名稱。 |
 | **已建立 1/3 個** | 看叢集拒絕的原因，選**刪除剛建立的 1 個**或**保留**後修正剩下的。 |

@@ -9,9 +9,9 @@ description: 了解登入、機密、變更套用、終端機與主機的權限�
 
 ## 登入與認證資訊
 
-叢集內的 Zeabur 透過 Zeabur Identity 登入，每個送到 Kubernetes 的請求都帶著使用者自己的權杖。Zeabur 的 ServiceAccount 沒有綁定任何 Role，Zeabur 的副本也不掛載這個 ServiceAccount 的 token。登入工作階段只存在伺服器程序的記憶體裡，Zeabur 重新啟動後要重新登入。
+叢集內的 Zeabur 開源版透過 Zeabur Identity 登入，每個送到 Kubernetes 的請求都帶著使用者自己的權杖。Zeabur 開源版的 ServiceAccount 沒有綁定任何 Role，Zeabur 開源版的副本也不掛載這個 ServiceAccount 的 token。登入工作階段只存在伺服器程序的記憶體裡，Zeabur 開源版重新啟動後要重新登入。
 
-Zeabur 自己持有的機密只有 OAuth client secret 和變更權杖金鑰。Chart 只接受事先建立好的 client Secret，不接受把 client secret 寫成 Helm value。能讀 Zeabur Namespace 的 Secret，或能 exec 進 Zeabur 副本的權限，只給管理員。
+Zeabur 開源版自己持有的機密只有 OAuth client secret 和變更權杖金鑰。Chart 只接受事先建立好的 client Secret，不接受把 client secret 寫成 Helm value。能讀 Zeabur 開源版 Namespace 的 Secret，或能 exec 進 Zeabur 開源版副本的權限，只給管理員。
 
 管理員帳號只能用通行密鑰登入，登入後就有整個叢集的完整權限，中間沒有再確認的步驟，所以管理員的日常工作最好改用另一個一般帳號。工作階段閒置 1 小時後結束，管理員帳號可改成 15 分鐘，開啟 AAL3 時也是 15 分鐘；最長 12 小時。在這之前權杖會自動更新。帳號類型、時間和 AAL3 見[權限](./permissions.mdx#管理員帳號和一般帳號)。
 
@@ -36,7 +36,7 @@ kubectl -n zeabur-identity delete secret zeabur-identity-internal-tls
 kubectl -n zeabur-identity wait certificate/zeabur-identity-internal-tls --for=condition=Ready --timeout=2m
 ```
 
-從刪掉 `zeabur-identity-internal-tls` 到 API server 信任新的根 CA 之前，用 Zeabur Identity 登入的 kubectl 和 Zeabur 會暫時無法使用。
+從刪掉 `zeabur-identity-internal-tls` 到 API server 信任新的根 CA 之前，用 Zeabur Identity 登入的 kubectl 和 Zeabur 開源版會暫時無法使用。
 
 ## 本機介面
 
@@ -45,7 +45,7 @@ kubectl -n zeabur-identity wait certificate/zeabur-identity-internal-tls --for=c
 - `Host` header 只能是這個連接埠的 `127.0.0.1` 或 `localhost`，擋下 DNS rebinding。
 - 啟動連結裡的隨機權杖只能換一次工作階段 cookie。
 - cookie 設為 `HttpOnly` 和 `SameSite=Strict`。
-- 會修改東西的請求，還要通過含連接埠的同源檢查，並帶有 Zeabur 網頁送出的 header。
+- 會修改東西的請求，還要通過含連接埠的同源檢查，並帶有 Zeabur 開源版網頁送出的 header。
 
 ## 把面板放到 VPN 後面
 
@@ -74,7 +74,7 @@ kubectl -n zeabur-identity wait certificate/zeabur-identity-internal-tls --for=c
 
 ## Kubernetes API
 
-Zeabur 讓 kube-apiserver 直接連得到（TCP 6443）。每個請求都由 kube-apiserver 自己驗證，接受 Zeabur Identity 權杖和 ServiceAccount 權杖，匿名存取已關閉。
+Zeabur 開源版讓 kube-apiserver 直接連得到（TCP 6443）。每個請求都由 kube-apiserver 自己驗證，接受 Zeabur Identity 權杖和 ServiceAccount 權杖，匿名存取已關閉。
 
 6443 只開給需要用到 API 的對象：
 
@@ -101,7 +101,7 @@ K3s 的工作節點也是透過 6443 加入。對網際網路關閉 6443 時，�
 
 變更權杖以 AES-256-GCM 加密和驗證，綁定使用者名稱、群組、專案、請求和物件版本，10 分鐘內有效。換掉金鑰後，還沒套用的權杖都會失效。`zeaburctl ui` 每次啟動都產生新金鑰。
 
-套用前，Zeabur 重讀物件、核對版本，並以使用者當下的權限 dry-run 每一筆寫入。正式寫入時帶著 `resourceVersion` 或刪除前置條件，這段時間有人改過物件，就不會寫入。
+套用前，Zeabur 開源版重讀物件、核對版本，並以使用者當下的權限 dry-run 每一筆寫入。正式寫入時帶著 `resourceVersion` 或刪除前置條件，這段時間有人改過物件，就不會寫入。
 
 多個物件依序寫入，後面失敗時，前面寫成功的會留在叢集。依錯誤訊息列出的已套用項目確認現況，再重新**檢查變更**。
 
@@ -109,7 +109,7 @@ K3s 的工作節點也是透過 6443 加入。對網際網路關閉 6443 時，�
 
 新專案的 Pod Security `enforce`、`audit`、`warn` 都是 `baseline`，開發者可以直接部署需要 root 的映像檔。服務設為**嚴格**時，以非 root 執行、不能提升權限、移除所有 capabilities，並使用 `RuntimeDefault` seccomp profile。
 
-新增 Docker 映像檔服務時，Zeabur 會讀取映像檔的 `User`。數字 UID 不是 0（例如 `101`、`1000:1000`）時選**嚴格**；沒有指定使用者，或指定 `root`、`0`、`nginx` 這類使用者名稱時選**相容**。表單會說明選擇原因，建立前仍能切換。從 Git 部署時，Railpack 映像檔以 UID 1000 執行，預設選**嚴格**；Dockerfile 預設選**相容**，也能自行切換。Compose 匯入的服務使用**相容**。
+新增 Docker 映像檔服務時，Zeabur 開源版會讀取映像檔的 `User`。數字 UID 不是 0（例如 `101`、`1000:1000`）時選**嚴格**；沒有指定使用者，或指定 `root`、`0`、`nginx` 這類使用者名稱時選**相容**。表單會說明選擇原因，建立前仍能切換。從 Git 部署時，Railpack 映像檔以 UID 1000 執行，預設選**嚴格**；Dockerfile 預設選**相容**，也能自行切換。Compose 匯入的服務使用**相容**。
 
 既有服務切換**嚴格**或**相容**時，變更只影響該服務，不改 Namespace 標籤，也不需要管理員權限。套用後服務副本會替換。Chart 的 `zeabur-project-namespace` 政策仍禁止開發者修改 Namespace 標籤，包括任何 Pod Security 標籤。
 
@@ -122,17 +122,17 @@ kubectl label namespace <ns> \
   pod-security.kubernetes.io/warn=baseline --overwrite
 ```
 
-叢集若把未加標籤的 Namespace 預設為 `restricted`（K3s 和 RKE2 套用 CIS 設定時就是如此），專案自己的 `baseline` 標籤會覆蓋這個預設值。`kube-system` 和 Zeabur 自己的 Namespace 維持原設定。
+叢集若把未加標籤的 Namespace 預設為 `restricted`（K3s 和 RKE2 套用 CIS 設定時就是如此），專案自己的 `baseline` 標籤會覆蓋這個預設值。`kube-system` 和 Zeabur 開源版自己的 Namespace 維持原設定。
 
 Pod Security 不管網路，專案之間的連線見下一節。
 
 ## 專案之間的網路
 
-Zeabur 的信任範圍是整個叢集：能登入的人都是可信任的使用者，Zeabur 沒有團隊的概念。要把彼此不信任的人分開，就分成不同的叢集。專案之間的網路隔離是為了減少意外：一個服務出問題或被入侵時，不會直接連到別的專案。
+Zeabur 開源版的信任範圍是整個叢集：能登入的人都是可信任的使用者，Zeabur 開源版沒有團隊的概念。要把彼此不信任的人分開，就分成不同的叢集。專案之間的網路隔離是為了減少意外：一個服務出問題或被入侵時，不會直接連到別的專案。
 
 ### 新專案裡有什麼
 
-平台元件所在的 Namespace 帶有 `zeabur.com/platform: "true"` 標籤。叢集裡有這個標籤時，Zeabur 建立專案會寫入三個物件：
+平台元件所在的 Namespace 帶有 `zeabur.com/platform: "true"` 標籤。叢集裡有這個標籤時，Zeabur 開源版建立專案會寫入三個物件：
 
 - Namespace，帶 `zeabur.com/project` 標籤和 Pod Security 標籤。
 - ServiceAccount `default`，`automountServiceAccountToken: false`。沒指定 ServiceAccount 的副本不會拿到 token；要呼叫 Kubernetes API 的工作負載要自己指定 ServiceAccount。
@@ -161,7 +161,7 @@ spec:
 
 同一台節點上的 kubelet 健康檢查不需要規則。公開網域、NodePort 和 LoadBalancer 的流量也照常進來。
 
-叢集裡沒有任何 Namespace 帶這個標籤時（例如在既有叢集上直接執行 `zeaburctl ui`），Zeabur 分不出哪些 Namespace 是平台元件，所以不寫 NetworkPolicy，以免擋掉 Ingress controller。要啟用，先替平台元件的 Namespace 加上標籤：
+叢集裡沒有任何 Namespace 帶這個標籤時（例如在既有叢集上直接執行 `zeaburctl ui`），Zeabur 開源版分不出哪些 Namespace 是平台元件，所以不寫 NetworkPolicy，以免擋掉 Ingress controller。要啟用，先替平台元件的 Namespace 加上標籤：
 
 ```sh
 kubectl label namespace traefik cert-manager zeabur.com/platform=true
@@ -212,25 +212,25 @@ kubectl -n shop delete networkpolicy zeabur-allow-from-blog
 
 容器終端機用你自己的 `pods/exec` 權限，能讀到這個容器掛載的磁碟區、Secret 和 ServiceAccount token。
 
-沒有 shell 的容器，Zeabur 會加一個除錯容器。副本或容器有指定使用者時，除錯容器用同一個使用者執行，移除所有 capabilities，用 `targetContainerName` 共享目標容器的程序空間，並在相同路徑掛上目標容器的磁碟區。Kubernetes 不會移除 ephemeral container，關閉終端機後，副本替換之前除錯容器都會留在副本裡。
+沒有 shell 的容器，Zeabur 開源版會加一個除錯容器。副本或容器有指定使用者時，除錯容器用同一個使用者執行，移除所有 capabilities，用 `targetContainerName` 共享目標容器的程序空間，並在相同路徑掛上目標容器的磁碟區。Kubernetes 不會移除 ephemeral container，關閉終端機後，副本替換之前除錯容器都會留在副本裡。
 
 ### kubectl 終端機
 
-Zeabur 在短暫的 tools 副本裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。專案的 kubectl 終端機從搜尋開啟，整個叢集的從**叢集**頁標題旁的**開啟 kubectl 終端機**開啟。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
+Zeabur 開源版在短暫的 tools 副本裡提供 `kubectl` 和 `helm`，使用登入者當下的權杖。專案的 kubectl 終端機從搜尋開啟，整個叢集的從**叢集**頁標題旁的**開啟 kubectl 終端機**開啟。kubeconfig 透過 exec 的標準輸入寫進記憶體型的 `emptyDir`，不會出現在 Pod spec、環境變數、ConfigMap 或 Secret 裡。
 
-所有 tools 副本都放在 chart 建立的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 預設在你開啟終端機的專案。Zeabur 先請 kube-apiserver 確認你能在專案的容器裡執行指令（整個叢集的則要是叢集管理員），再用 Zeabur 自己的 ServiceAccount 建立副本並開啟終端機。
+所有 tools 副本都放在 chart 建立的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 預設在你開啟終端機的專案。Zeabur 開源版先請 kube-apiserver 確認你能在專案的容器裡執行指令（整個叢集的則要是叢集管理員），再用 Zeabur 開源版自己的 ServiceAccount 建立副本並開啟終端機。
 
 <Callout type="warn">
-在權杖到期前，能讀到這份 kubeconfig 的只有 Zeabur 本身、叢集管理員，以及副本所在節點的管理員。不要把 `zeabur-terminals` 的權限給其他人。
+在權杖到期前，能讀到這份 kubeconfig 的只有 Zeabur 開源版本身、叢集管理員，以及副本所在節點的管理員。不要把 `zeabur-terminals` 的權限給其他人。
 </Callout>
 
-tools 副本預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 立刻刪掉 kubeconfig，60 秒後刪除副本。
+tools 副本預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 開源版立刻刪掉 kubeconfig，60 秒後刪除副本。
 
 ### 節點終端機
 
 **節點終端機**用 privileged 副本、host PID／network／IPC 和 `nsenter` 進入主機，取得完整的 root 權限，在裡面做的事不會經過**檢查變更**。
 
-節點終端機只給叢集管理員，終端機副本放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立副本或執行指令，Zeabur 就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 刪除終端機副本。
+節點終端機只給叢集管理員，終端機副本放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立副本或執行指令，Zeabur 開源版就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 開源版刪除終端機副本。
 
 ## 指標與歷史日誌
 
@@ -332,17 +332,17 @@ RKE2 把路徑裡的 `k3s` 換成 `rke2`。`watch` 開始時記一筆 `ResponseS
 
 兩者都在檔案到 100 MB 時換新檔，最多留 10 個舊檔，最長 30 天。沒什麼操作的單台 RKE2 server 每 5 分鐘約寫 13 到 23 KB，一天不到 7 MB。想把紀錄留在別處，用日誌收集工具收這個檔案。
 
-## Zeabur 和 Zeabur Identity 的網域
+## Zeabur 開源版和 Zeabur Identity 的網域
 
-開發者可以在專案裡建立 Ingress 和 HTTPRoute。如果沒有限制，他只要在 Zeabur 的網域寫一條路徑比較長的規則，就能搶走 Zeabur 某段網址，把請求導到自己的服務。所以 chart 會加上 `zeabur-system-hosts` 准入政策（`systemHosts.enabled`，預設開啟）。專案新增或修改 Ingress、HTTPRoute 時，政策會檢查：
+開發者可以在專案裡建立 Ingress 和 HTTPRoute。如果沒有限制，他只要在 Zeabur 開源版的網域寫一條路徑比較長的規則，就能搶走 Zeabur 開源版某段網址，把請求導到自己的服務。所以 chart 會加上 `zeabur-system-hosts` 准入政策（`systemHosts.enabled`，預設開啟）。專案新增或修改 Ingress、HTTPRoute 時，政策會檢查：
 
 - 不能用 `zeabur` 和 `zeabur-identity` Namespace 的 Ingress 正在用的網域，寫在 `spec.tls` 也不行。
-- 不能用涵蓋這些網域的萬用網域。例如 Zeabur 在 `zeabur.example.com` 時，政策會擋下 `*.example.com`。
-- Ingress 的每條規則都要寫 `host`，HTTPRoute 至少要有一個 `hostnames`。路由沒寫網域時，會接下每個網域的請求，包括 Zeabur 的。
+- 不能用涵蓋這些網域的萬用網域。例如 Zeabur 開源版在 `zeabur.example.com` 時，政策會擋下 `*.example.com`。
+- Ingress 的每條規則都要寫 `host`，HTTPRoute 至少要有一個 `hostnames`。路由沒寫網域時，會接下每個網域的請求，包括 Zeabur 開源版的。
 
-政策直接讀這兩個 Namespace 的 Ingress，Zeabur 或 Zeabur Identity 換網域時不用改政策。帶有 `zeabur.com/platform: "true"` 標籤的 Namespace 可以不寫網域，但一樣不能用 Zeabur 和 Zeabur Identity 的網域。只改標籤或 annotation、沒動 `spec` 的更新不檢查。管理員也受這條政策限制。
+政策直接讀這兩個 Namespace 的 Ingress，Zeabur 開源版或 Zeabur Identity 換網域時不用改政策。帶有 `zeabur.com/platform: "true"` 標籤的 Namespace 可以不寫網域，但一樣不能用 Zeabur 開源版和 Zeabur Identity 的網域。只改標籤或 annotation、沒動 `spec` 的更新不檢查。管理員也受這條政策限制。
 
-政策只在寫入時檢查，安裝前就有的路由會留著。用下面的指令找出用到 Zeabur 網域或沒寫網域的 Ingress，再自己處理：
+政策只在寫入時檢查，安裝前就有的路由會留著。用下面的指令找出用到 Zeabur 開源版網域或沒寫網域的 Ingress，再自己處理：
 
 ```sh
 kubectl get ingress --all-namespaces \

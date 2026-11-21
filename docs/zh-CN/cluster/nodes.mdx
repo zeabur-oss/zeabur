@@ -25,7 +25,7 @@ description: 添加新节点，停止调度，用 kubectl 迁移副本和移除�
 
 ## 添加节点
 
-Zeabur 不负责添加节点；用 Zeatend 装好的集群，由 Zeatend 添加。先开放上面的防火墙端口，再到服务器上运行：
+Zeabur 开源版不负责添加节点；用 Zeatend 装好的集群，由 Zeatend 添加。先开放上面的防火墙端口，再到服务器上运行：
 
 ```sh
 sudo zeatend node add
@@ -45,7 +45,7 @@ RKE2 的 etcd 需要过半数的服务器才能运行。要在少一台服务器
 
 在节点菜单中选择**停止调度**，节点行就会标记为已停止调度。这会阻止新的副本调度到该节点，已经运行的副本会留在原处。如果只是重启，做到这一步就够了，不需要运行 `drain`。
 
-也可以在 Zeabur **集群**页面标题旁点击**打开 kubectl 终端**，运行：
+也可以在 Zeabur 开源版**集群**页面标题旁点击**打开 kubectl 终端**，运行：
 
 ```sh
 kubectl cordon <node>
@@ -55,7 +55,7 @@ kubectl cordon <node>
 
 ### 先迁移副本再维护
 
-在 Zeabur **集群**页面标题旁点击**打开 kubectl 终端**，先列出该节点上的副本及其使用的 PVC：
+在 Zeabur 开源版**集群**页面标题旁点击**打开 kubectl 终端**，先列出该节点上的副本及其使用的 PVC：
 
 ```sh
 kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
@@ -76,7 +76,7 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 - `--delete-emptydir-data` 会清空所驱逐副本的 `emptyDir` 临时数据。
 - 使用该节点 `local-path` 卷的副本也会遭到驱逐。重新创建的副本无法在其他节点使用这些卷，原节点恢复运行之前会一直处于 `Pending` 状态。`drain` 不会导致数据丢失；对这些副本来说，结果与直接停机相同，都需要等待该节点恢复运行。
 
-如果 Zeabur 本身也运行在该节点上，`drain` 期间页面会断开连接约一分钟。刷新页面并重新登录；kubectl 终端也会断开连接，需要重新打开。
+如果 Zeabur 开源版本身也运行在该节点上，`drain` 期间页面会断开连接约一分钟。刷新页面并重新登录；kubectl 终端也会断开连接，需要重新打开。
 
 等待 `drain` 完成后，再将节点停机维护。
 
@@ -84,7 +84,7 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 
 维护完成、节点恢复运行后，在节点菜单中选择**恢复调度**。
 
-也可以在 Zeabur **集群**页面标题旁点击**打开 kubectl 终端**，运行：
+也可以在 Zeabur 开源版**集群**页面标题旁点击**打开 kubectl 终端**，运行：
 
 ```sh
 kubectl uncordon <node>
@@ -96,7 +96,7 @@ kubectl uncordon <node>
 
 **不要移除集群中唯一的节点，也不要移除最后一台控制节点。**
 
-先在 Zeabur **集群**页面标题旁点击**打开 kubectl 终端**，确认控制节点数量：
+先在 Zeabur 开源版**集群**页面标题旁点击**打开 kubectl 终端**，确认控制节点数量：
 
 ```sh
 kubectl get nodes -l node-role.kubernetes.io/control-plane
@@ -136,12 +136,12 @@ kubectl -n longhorn-system delete nodes.longhorn.io <node>
 **节点终端**会在主机上打开一个具有完整 root 权限的 shell。用管理员账号登录，在节点行点击**节点终端**，查看即将创建的终端副本和时限，再点击**打开终端**。
 
 <Callout type="warn">
-节点终端可以修改主机上的所有文件、进程和网络接口。在终端中执行的操作不经过 Zeabur 和 Kubernetes 的权限检查，也无法撤销。
+节点终端可以修改主机上的所有文件、进程和网络接口。在终端中执行的操作不经过 Zeabur 开源版和 Kubernetes 的权限检查，也无法撤销。
 </Callout>
 
 节点会记录一条事件，注明谁在什么时间打开了终端。如果界面显示**其他人也能进入这个终端**，说明有角色绑定允许集群管理员以外的人在终端所在的 Namespace 中创建副本。移除列出的角色绑定后，再重新检查。
 
-关闭终端时，Zeabur 会移除终端副本，副本最多保留 30 分钟。如果副本仍然存在，在节点下方的终端副本列表中点击**移除终端副本**，检查后确认。
+关闭终端时，Zeabur 开源版会移除终端副本，副本最多保留 30 分钟。如果副本仍然存在，在节点下方的终端副本列表中点击**移除终端副本**，检查后确认。
 
 ## 常见问题
 

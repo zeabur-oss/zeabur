@@ -105,7 +105,7 @@ description: 配置服务的副本数、CPU 和内存、健康检查、启动命
 
 ## 启动命令
 
-Zeabur 没有启动命令字段。要修改容器启动时运行的命令，到服务**设置**，将顶部的切换项从**设置**切换到 **YAML**，点击**编辑**，修改容器的 `command`（替换镜像的 `ENTRYPOINT`）和 `args`（替换 `CMD`），再检查并应用：
+Zeabur 开源版没有启动命令字段。要修改容器启动时运行的命令，到服务**设置**，将顶部的切换项从**设置**切换到 **YAML**，点击**编辑**，修改容器的 `command`（替换镜像的 `ENTRYPOINT`）和 `args`（替换 `CMD`），再检查并应用：
 
 ```yaml
 containers:
@@ -124,7 +124,7 @@ containers:
 
 ![服务设置中的安全性，当前选择兼容，下方说明允许以 root 运行但无法访问宿主机](../images/shots/service-security.avif)
 
-选择后会直接打开检查页面，确认并应用后，副本会替换为新的副本。从镜像创建服务时，Zeabur 会根据镜像配置的用户预先选择：用数字指定非 root 用户时选择严格，其他情况选择兼容。
+选择后会直接打开检查页面，确认并应用后，副本会替换为新的副本。从镜像创建服务时，Zeabur 开源版会根据镜像配置的用户预先选择：用数字指定非 root 用户时选择严格，其他情况选择兼容。
 
 服务的配置超出兼容范围（例如访问宿主机）时，这里会显示**不受限**，需要使用 YAML 修改。管理员把项目的安全级别（Pod Security）改为 `restricted` 时，只有严格的服务才能启动，见[调整 Pod Security 级别](./projects.mdx#调整-pod-security-级别)。
 
@@ -146,7 +146,7 @@ containers:
 
 ## 用 kubectl 做同样的事
 
-这些配置都是 Deployment 或 StatefulSet 的标准字段，移除 Zeabur 后仍然生效。以下以项目 `demo`、服务 `web` 为例。
+这些配置都是 Deployment 或 StatefulSet 的标准字段，移除 Zeabur 开源版后仍然生效。以下以项目 `demo`、服务 `web` 为例。
 
 副本数和资源：
 

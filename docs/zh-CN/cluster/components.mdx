@@ -37,12 +37,12 @@ description: 查看集群安装了哪些组件、状态如何、还缺什么，�
 
 ### 安装
 
-点击**安装**。Zeabur 用你的账号一次写入一个步骤，上一步就绪后才写入下一步。保持弹窗打开，等每个步骤和健康检查都显示**就绪**；如果中途关闭，在卡片上点击**管理**会从停下的地方继续。健康检查用时比预期长时，弹窗会说明要检查什么。
+点击**安装**。Zeabur 开源版用你的账号一次写入一个步骤，上一步就绪后才写入下一步。保持弹窗打开，等每个步骤和健康检查都显示**就绪**；如果中途关闭，在卡片上点击**管理**会从停下的地方继续。健康检查用时比预期长时，弹窗会说明要检查什么。
 
 </Step>
 </Steps>
 
-如果弹窗显示组件已经安装、但不是 Zeabur 安装的，Zeabur 不会改动它。升级或移除请用当初安装它的工具。
+如果弹窗显示组件已经安装、但不是 Zeabur 开源版安装的，Zeabur 开源版不会改动它。升级或移除请用当初安装它的工具。
 
 ## 用 zeaburctl 安装
 
@@ -92,7 +92,7 @@ zeaburctl components export velero --format helm
 
 ## 修改内置组件的设置
 
-K3s 和 RKE2 会自己安装一些组件，例如 Traefik。**已安装**中这些组件的来源是 K3s 或 RKE2，卡片上没有**安装**或**管理**按钮，因为 Zeabur 只管理自己安装的组件。不要修改 server 上 manifests 目录里内置组件的 manifest 文件，K3s 每次启动都会重新写入。
+K3s 和 RKE2 会自己安装一些组件，例如 Traefik。**已安装**中这些组件的来源是 K3s 或 RKE2，卡片上没有**安装**或**管理**按钮，因为 Zeabur 开源版只管理自己安装的组件。不要修改 server 上 manifests 目录里内置组件的 manifest 文件，K3s 每次启动都会重新写入。
 
 发行版用 Helm chart 安装的组件，卡片上会写出它的 `HelmChart` 名称，例如 K3s 上是 `traefik`，RKE2 上是 `rke2-traefik`。要修改 chart 的值，就在 `kube-system` 中写一个同名的 `HelmChartConfig`。helm-controller 会把它的 `valuesContent` 作为额外的 values 文件传给 Helm，再升级 chart。K3s 的 metrics-server 是普通 manifest，不是 chart，所以卡片上没有 chart 名称，`HelmChartConfig` 也改不了它。
 
@@ -125,9 +125,9 @@ kubectl delete helmchartconfig traefik -n kube-system
 
 ## 移除组件
 
-要移除 Zeabur 安装的组件，在卡片上点击**管理**。所有步骤和健康检查都就绪后，弹窗会改为移除；安装尚未完成时，例如健康检查失败，弹窗会在**安装**旁边显示**移除**。检查步骤后点击**移除**。Zeabur 会按相反的顺序删除组件的对象；删除 Chart 后，helm-controller 会卸载这个 Chart。弹窗会列出会保留的内容，例如 CRD 和密钥。如果还有其他已安装的组件依赖这个组件，或者它的自定义资源仍有对象在使用，Zeabur 会拒绝移除，并列出具体是哪些。在使用的对象包括 Zeabur 为其他组件写入的对象，以及在这个组件自身 Namespace 之外的对象。
+要移除 Zeabur 开源版安装的组件，在卡片上点击**管理**。所有步骤和健康检查都就绪后，弹窗会改为移除；安装尚未完成时，例如健康检查失败，弹窗会在**安装**旁边显示**移除**。检查步骤后点击**移除**。Zeabur 开源版会按相反的顺序删除组件的对象；删除 Chart 后，helm-controller 会卸载这个 Chart。弹窗会列出会保留的内容，例如 CRD 和密钥。如果还有其他已安装的组件依赖这个组件，或者它的自定义资源仍有对象在使用，Zeabur 开源版会拒绝移除，并列出具体是哪些。在使用的对象包括 Zeabur 开源版为其他组件写入的对象，以及在这个组件自身 Namespace 之外的对象。
 
-不是 Zeabur 安装的组件，请用当初安装它的文件或工具移除，例如 `kubectl delete -f`、`helm uninstall`、Flux 或 Argo CD。
+不是 Zeabur 开源版安装的组件，请用当初安装它的文件或工具移除，例如 `kubectl delete -f`、`helm uninstall`、Flux 或 Argo CD。
 
 移除前先确认没有东西还在使用它，例如仍有该组件的自定义资源、仍有 Longhorn 的卷，或仍有副本从 zot 拉取镜像。Longhorn 这类保存数据的组件，移除时会连数据一起删除，先备份。
 
@@ -135,9 +135,9 @@ kubectl delete helmchartconfig traefik -n kube-system
 
 ## 目录从哪里下载
 
-Zeabur 从 `https://oss-catalog.zeabur.com/v1/` 下载 Zeabur Catalog，手上的版本超过 10 分钟就重新下载。最后下载的版本保存在它所在 Namespace 的 ConfigMap `zeabur-catalog` 中，重启或目录暂时无法访问时仍可使用。组件页会显示当前使用的版本和下载时间。
+Zeabur 开源版从 `https://oss-catalog.zeabur.com/v1/` 下载 Zeabur Catalog，手上的版本超过 10 分钟就重新下载。最后下载的版本保存在它所在 Namespace 的 ConfigMap `zeabur-catalog` 中，重启或目录暂时无法访问时仍可使用。组件页会显示当前使用的版本和下载时间。
 
-如果 Zeabur 下载不到目录，也没有保存的版本，页面会说明原因，并提供**重试**。已安装的组件和所有服务照常运行，只有安装组件时才需要目录。
+如果 Zeabur 开源版下载不到目录，也没有保存的版本，页面会说明原因，并提供**重试**。已安装的组件和所有服务照常运行，只有安装组件时才需要目录。
 
 ### 使用镜像
 
@@ -145,7 +145,7 @@ Zeabur 从 `https://oss-catalog.zeabur.com/v1/` 下载 Zeabur Catalog，手上�
 
 1. 从 [Zeabur Catalog 的发布版本](https://github.com/zeabur-oss/catalog/releases)下载 `api-v1.tar.gz` 并解压，里面是 `v1` 文件夹。
 2. 用任意 Web 服务器提供包含 `v1` 的文件夹，使用 HTTPS，且集群要信任它的证书。使用私有 CA 时，参见[信任私有 CA](../install/existing-cluster.mdx#信任私有-ca)。
-3. 让 Zeabur 改从镜像下载：
+3. 让 Zeabur 开源版改从镜像下载：
 
    ```sh
    helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \

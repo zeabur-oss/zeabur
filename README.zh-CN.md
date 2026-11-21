@@ -8,13 +8,13 @@
 [English](README.md) · [繁體中文](README.zh-TW.md) · **简体中文**
 <!-- vale ZeaburZhCN.Script = YES -->
 
-# Zeabur
+# Zeabur 开源版
 
-**在自己的服务器上，用熟悉的 Zeabur 方式部署服务**。Zeabur 是开源软件。项目、服务、域名、环境变量和应用模板，都是你在 zeabur.com 上熟悉的用法。服务器向哪家租、选哪个套餐，由你自己决定。
+**在自己的服务器上，用熟悉的 Zeabur 方式部署服务**。项目、服务、域名、环境变量和应用模板，都是你在 Zeabur 上熟悉的用法。服务器向哪家租、选哪个套餐，由你自己决定。
 
-## 用过 zeabur.com？
+## 用过 Zeabur？
 
-这些和 zeabur.com 一样：
+这些和 Zeabur 一样：
 
 - **项目和服务**：一个项目放一组相关的服务，打开项目就能看到每个服务的状态。
 - **部署方式**：从 Git、Docker Compose、Docker 镜像或应用模板部署，也可以直接上传文件夹。
@@ -24,10 +24,10 @@
 不一样的地方：
 
 - **服务器是你的**：服务在你自己的服务器上运行，费用按你选的云厂商或机房计算。
-- **由你维护**：升级 Zeabur、备份数据和维护服务器，都由你或你的团队负责。
-- **运行在 Kubernetes 上**：Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur 就装在它上面。全新的服务器先用 [Zeatend](https://oss.zeabur.com/zh-CN/docs/zeabur/install/one-command/) 装好 Kubernetes。
+- **由你维护**：升级 Zeabur 开源版、备份数据和维护服务器，都由你或你的团队负责。
+- **运行在 Kubernetes 上**：Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur 开源版就装在它上面。全新的服务器先用 [Zeatend](https://oss.zeabur.com/zh-CN/docs/zeabur/install/one-command/) 装好 Kubernetes。
 
-[从 zeabur.com 过来](https://oss.zeabur.com/zh-CN/docs/zeabur/get-started/from-zeabur-com/)列出这些功能在文档的哪一页，以及从哪里开始。文档的每一步都附有截图。
+[从 Zeabur 过来](https://oss.zeabur.com/zh-CN/docs/zeabur/get-started/from-zeabur-com/)列出这些功能在文档的哪一页，以及从哪里开始。文档的每一步都附有截图。
 
 ## 能帮你做什么
 
@@ -50,17 +50,17 @@
 
 ## 开始使用
 
-目前的安装方式，是用 Helm 把 Zeabur 装进已有的 Kubernetes 集群。Helm 是 Kubernetes 的安装工具。登录由 Zeabur Identity 负责，所以要先装好它。
+目前的安装方式，是用 Helm 把 Zeabur 开源版装进已有的 Kubernetes 集群。Helm 是 Kubernetes 的安装工具。登录由 Zeabur Identity 负责，所以要先装好它。
 
-[将 Zeabur 安装到已有集群](https://oss.zeabur.com/zh-CN/docs/zeabur/install/existing-cluster/)列出了要准备的东西和每个步骤。
+[将 Zeabur 开源版安装到已有集群](https://oss.zeabur.com/zh-CN/docs/zeabur/install/existing-cluster/)列出了要准备的东西和每个步骤。
 
-只想在自己的电脑上看看集群？`zeaburctl ui` 会用你的 kubeconfig（`kubectl` 连接集群用的配置文件）在浏览器里打开 Zeabur，见 [zeaburctl](https://oss.zeabur.com/zh-CN/docs/zeabur/reference/zeaburctl/)。
+只想在自己的电脑上看看集群？`zeaburctl ui` 会用你的 kubeconfig（`kubectl` 连接集群用的配置文件）在浏览器里打开 Zeabur 开源版，见 [zeaburctl](https://oss.zeabur.com/zh-CN/docs/zeabur/reference/zeaburctl/)。
 
 [发行文件与验证](https://oss.zeabur.com/zh-CN/docs/zeabur/reference/releases/)说明每个版本包含哪些文件，以及如何验证。
 
 ## 从源码构建
 
-下面的命令会下载源码，进入备好所有构建工具的 [Nix](https://nixos.org) 开发环境，然后构建并启动 Zeabur：
+下面的命令会下载源码，进入备好所有构建工具的 [Nix](https://nixos.org) 开发环境，然后构建并启动 Zeabur 开源版：
 
 ```sh
 git clone https://github.com/zeabur-oss/zeabur && cd zeabur

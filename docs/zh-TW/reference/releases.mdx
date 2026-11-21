@@ -1,6 +1,6 @@
 ---
 title: 發行檔與驗證
-description: 依作業系統選擇 Zeabur 發行檔，驗證 checksum、簽章與建置來源後再執行。
+description: 依作業系統選擇 Zeabur 開源版發行檔，驗證 checksum、簽章與建置來源後再執行。
 ---
 
 在 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 選好版本，下載對應的 archive、`SHA256SUMS` 和簽章。驗證時把簽署者限定為 Zeabur 開源版的 release workflow，且是為本 repository 該版本 tag 執行的那一次，通過了才解壓縮、執行。
@@ -78,7 +78,7 @@ spctl --assess -vvv --type open --context context:primary-signature ./zeaburctl
 
 輸出必須是下面兩種之一，不是的話請不要開啟這個檔案。
 
-v0.2.0 起用 Zeabur 的憑證簽署：
+v0.2.0 起用 Zeabur 開源版的憑證簽署：
 
 ```text
 ./zeaburctl: accepted
@@ -96,7 +96,7 @@ origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
 
 ## 驗證映像檔與 chart
 
-發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照，Zeabur Proxy 的那幾行以 `proxy` 開頭。`debug` 和 `tools` 兩行是 Zeabur 為除錯容器和終端機使用的其他專案映像檔，Zeabur 不為它們簽章，cosign 只驗證其餘的映像檔：
+發行說明只寫這版改了什麼，不列 digest。`digests.txt` 每行一筆，列出各平台映像檔、image index 和 chart 的完整 registry 參照，Zeabur Proxy 的那幾行以 `proxy` 開頭。`debug` 和 `tools` 兩行是 Zeabur 開源版為除錯容器和終端機使用的其他專案映像檔，Zeabur 開源版不為它們簽章，cosign 只驗證其餘的映像檔：
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
@@ -137,7 +137,7 @@ cosign verify \
 
 ## 把映像檔複製到自己的 registry
 
-要把映像檔複製到私有 registry，或依名稱放行，就以 `digests.txt` 為清單。清單列出 Zeabur 與 chart 會用到的映像檔，包含 `debug` 和 `tools`。印出各映像檔的 image index：
+要把映像檔複製到私有 registry，或依名稱放行，就以 `digests.txt` 為清單。清單列出 Zeabur 開源版與 chart 會用到的映像檔，包含 `debug` 和 `tools`。印出各映像檔的 image index：
 
 ```sh
 awk '$(NF-1) == "index" { print $NF }' digests.txt
@@ -151,4 +151,4 @@ awk '$(NF-1) == "index" { print $NF }' digests.txt
 
 Workflow 最後把檔案加到 GitHub release 草稿，維護者檢查後才公開。Releases 頁面上看得到的版本，才有可下載的檔案。
 
-下載和驗證都不會動到叢集，用完的下載目錄可以直接刪掉。要移除已安裝的 Zeabur，見[移除流程](../leave/uninstall.mdx)。
+下載和驗證都不會動到叢集，用完的下載目錄可以直接刪掉。要移除已安裝的 Zeabur 開源版，見[移除流程](../leave/uninstall.mdx)。

@@ -25,7 +25,7 @@ description: 對照成員角色、管理員帳號與 Kubernetes RBAC，確認每
 | 開啟容器終端機、加入除錯容器 | 無 | 可 |
 | 用 `zeaburctl connect` 連線到資料庫或服務 | 無 | 可 |
 | 修改專案顯示名稱、描述與圖示 | 無 | 可 |
-| 建立／刪除 Namespace、把 Namespace 加入或移出 Zeabur | 無 | 無 |
+| 建立／刪除 Namespace、把 Namespace 加入或移出 Zeabur 開源版 | 無 | 無 |
 | 修改角色與成員存取權、節點、叢集元件 | 無 | 無 |
 | 建立與管理 [API 權杖](./api-tokens.mdx) | 無 | 無 |
 | 從磁碟區的備份還原（K8up） | 無 | 可 |
@@ -51,7 +51,7 @@ Chart 的 `memberRoles.enabled` 預設是 `true`，會建立：
 - `zeabur-project-viewer-rules`、`zeabur-project-developer-rules`、`zeabur-project-builds-read`、`zeabur-project-builds-write`：上面兩個角色實際的 verb 和 resource。檢視者看得到建置，開發者還能從 Git 部署和重新建置。
 - `zeabur-project-namespace` ValidatingAdmissionPolicy 和對應的 binding：限制開發者能改 Namespace 的哪些欄位，需要 Kubernetes 1.30 以上。
 
-Chart 本身不綁定任何人。管理員在 Zeabur 邀請或變更成員時，Zeabur 用管理員的權限建立：
+Chart 本身不綁定任何人。管理員在 Zeabur 開源版邀請或變更成員時，Zeabur 開源版用管理員的權限建立：
 
 | 物件 | 範圍與內容 |
 |---|---|
@@ -74,7 +74,7 @@ zeabur.com/icon
 
 其他 annotation、所有 label、finalizers、ownerReferences 和 spec，開發者都不能改。決定 Pod Security 等級和 NetworkPolicy 選取範圍的 label 也在其中。
 
-對該 Namespace 有 `zeabur-manage` 權限，或對所有 Namespace 有 `patch`／`update` 權限的人，不受這項限制。所以把既有 Namespace 加入或移出 Zeabur，都要由管理員或有這些額外權限的人來做。
+對該 Namespace 有 `zeabur-manage` 權限，或對所有 Namespace 有 `patch`／`update` 權限的人，不受這項限制。所以把既有 Namespace 加入或移出 Zeabur 開源版，都要由管理員或有這些額外權限的人來做。
 
 ## 開發者能接觸哪些機密
 
@@ -97,7 +97,7 @@ zeabur.com/icon
 
 這些 binding 和 ServiceAccount 都帶有 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。
 
-Chart 會建立 `zeabur-api-tokens` Namespace，但不在裡面給任何角色，所以只有管理員能在那裡建立 ServiceAccount 或幫它們申請權杖。Pod 只能以同一個 Namespace 的 ServiceAccount 執行，成員又不能在 `zeabur-api-tokens` 建立 Pod，所以其他人沒辦法讓 Pod 以權杖的身分執行。Zeabur 不會把 `zeabur-api-tokens` 當成專案，也不會讓任何人在裡面拿到角色。
+Chart 會建立 `zeabur-api-tokens` Namespace，但不在裡面給任何角色，所以只有管理員能在那裡建立 ServiceAccount 或幫它們申請權杖。Pod 只能以同一個 Namespace 的 ServiceAccount 執行，成員又不能在 `zeabur-api-tokens` 建立 Pod，所以其他人沒辦法讓 Pod 以權杖的身分執行。Zeabur 開源版不會把 `zeabur-api-tokens` 當成專案，也不會讓任何人在裡面拿到角色。
 
 ## 管理員帳號和一般帳號
 
@@ -133,7 +133,7 @@ zeabur-identityctl account-type alice admin     # 改回一般帳號：regular
 | 管理員帳號，預設 | 5 分鐘 | 1 小時 | 登入後 12 小時 |
 | 管理員帳號，改成 15 分鐘或開啟 AAL3 | 5 分鐘 | 15 分鐘 | 登入後 12 小時 |
 
-權杖到期時 Zeabur 會自己換新的，不用再按通行密鑰。12 小時從用通行密鑰、GitHub 或 Google 登入那一刻算起，換權杖不會延長。Zeabur 網頁的閒置上限是 1 小時，Zeabur Identity 給的時間比較短時，就照 Zeabur Identity 的時間。
+權杖到期時 Zeabur 開源版會自己換新的，不用再按通行密鑰。12 小時從用通行密鑰、GitHub 或 Google 登入那一刻算起，換權杖不會延長。Zeabur 開源版網頁的閒置上限是 1 小時，Zeabur Identity 給的時間比較短時，就照 Zeabur Identity 的時間。
 
 開著頁面不操作不算在用。超過 60 秒沒有操作，頁面自動更新狀態的請求就不算活動，閒置時間照算。
 
@@ -150,7 +150,7 @@ zeabur-identityctl account-type alice admin     # 改回一般帳號：regular
 
 安裝時不知道叢集是一個團隊在用還是多個團隊共用，所以一律從 1 小時開始。只有一個團隊的叢集，管理員通常就是唯一在用的人，閒置時間和一般帳號一樣。多個團隊共用叢集時，記得改成 15 分鐘。
 
-這兩項沒有 Helm value，因為 Zeabur Identity 不在 Zeabur 的 chart 裡。在**設定**頁改，或用 kubectl 改同一個 ConfigMap：
+這兩項沒有 Helm value，因為 Zeabur Identity 不在 Zeabur 開源版的 chart 裡。在**設定**頁改，或用 kubectl 改同一個 ConfigMap：
 
 ```sh
 kubectl -n zeabur-identity create configmap zeabur-identity-settings --from-literal=teams=multiple
@@ -163,7 +163,7 @@ kubectl -n zeabur-identity patch configmap zeabur-identity-settings --type merge
 
 開啟 AAL3 後，管理員帳號只能用不會同步到其他裝置的通行密鑰，例如安全金鑰，或只存在一台裝置上的通行密鑰。存在 iCloud 鑰匙圈、Google 密碼管理工具這類會同步的通行密鑰，登入時 Zeabur Identity 會拒絕，畫面會直接說這把通行密鑰會同步、管理員帳號要用安全金鑰或只存在一台裝置上的通行密鑰。已經用會同步的通行密鑰登入的人，下次換權杖時就會登出。
 
-開啟前，先確認每位管理員都有不會同步的通行密鑰。你自己沒有時，Zeabur 不會讓你開啟，避免把自己鎖在外面。其他沒有的管理員開啟後就登不進來，要為他們各產生一條新的 Zeabur Identity 設定連結，讓他註冊安全金鑰。檢查每把通行密鑰的方式見 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
+開啟前，先確認每位管理員都有不會同步的通行密鑰。你自己沒有時，Zeabur 開源版不會讓你開啟，避免把自己鎖在外面。其他沒有的管理員開啟後就登不進來，要為他們各產生一條新的 Zeabur Identity 設定連結，讓他註冊安全金鑰。檢查每把通行密鑰的方式見 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
 
 ## 用 kubectl 操作
 
@@ -188,4 +188,4 @@ kubectl auth can-i create pods/exec --namespace shop
 kubectl auth can-i patch deployments.apps --namespace shop
 ```
 
-Zeabur 用 `SelfSubjectRulesReview` 判斷介面上該顯示哪些操作。請求遭政策或用量上限拒絕時，要修正政策指出的條件。管理員帳號也一樣要通過 admission policy。
+Zeabur 開源版用 `SelfSubjectRulesReview` 判斷介面上該顯示哪些操作。請求遭政策或用量上限拒絕時，要修正政策指出的條件。管理員帳號也一樣要通過 admission policy。

@@ -5,12 +5,12 @@ description: 删除项目的 Namespace 和里面的所有内容，先看清楚�
 
 项目就是一个 Kubernetes Namespace。在项目**设置**的**危险区域**点击**删除项目**，Zeabur 开源版会删掉这个 Namespace 和里面的服务、数据库、卷、配置与机密变量，效果和 `kubectl delete namespace` 一样。删除后无法恢复，只能从备份重建。
 
-只想让 Namespace 不再出现在 Zeabur，改用同一处的**从 Zeabur 移除**：只去掉项目标签，什么都不删除。
+只想让 Namespace 不再出现在 Zeabur 开源版，改用同一处的**从 Zeabur 开源版移除**：只去掉项目标签，什么都不删除。
 
 ## 开始前
 
 - 你要能删除这个 Namespace（`delete namespaces/<项目>`），也要能删除里面的数据库对象。少了哪一项，检查页面会列出来，应用时集群也会拒绝。
-- Zeabur 自己的 Namespace、`kube-` 开头的系统 Namespace、平台组件（标有 `zeabur.com/platform=true` 的 Namespace）和 `zeabur-terminals` 都不能从这里删除。
+- Zeabur 开源版自己的 Namespace、`kube-` 开头的系统 Namespace、平台组件（标有 `zeabur.com/platform=true` 的 Namespace）和 `zeabur-terminals` 都不能从这里删除。
 
 ## 检查要删除的内容
 
@@ -23,8 +23,8 @@ description: 删除项目的 Namespace 和里面的所有内容，先看清楚�
 
 - 服务的名称。
 - 每个数据库和上次备份的时间。
-- 每个卷、上次备份的时间，以及数据会不会留下。卷的 PersistentVolume 配置为 `Retain` 时，数据会留在那个 PersistentVolume；配置为 `Delete` 时，数据跟着删除。读不到 PersistentVolume 时，Zeabur 改看 StorageClass 的 `reclaimPolicy`，两者都读不到就直接说不确定。
-- 你在这个项目打开过的工具 Pod。这些 Pod 在 `zeabur-terminals` 里，Zeabur 会在 Namespace 删除后一并清掉。
+- 每个卷、上次备份的时间，以及数据会不会留下。卷的 PersistentVolume 配置为 `Retain` 时，数据会留在那个 PersistentVolume；配置为 `Delete` 时，数据跟着删除。读不到 PersistentVolume 时，Zeabur 开源版改看 StorageClass 的 `reclaimPolicy`，两者都读不到就直接说不确定。
+- 你在这个项目打开过的工具 Pod。这些 Pod 在 `zeabur-terminals` 里，Zeabur 开源版会在 Namespace 删除后一并清掉。
 
 数据库或卷一天内没有成功的备份时，旁边会出现**先备份一次**。点击后会改为检查这次备份，应用后等备份完成，再回来删除项目。这个按钮用的是数据库页面和卷备份原有的**立即备份**，只有已经配置好备份的数据库和卷才会出现。
 
@@ -64,9 +64,9 @@ kubectl -n shop get secret data-redis-0-backup -o jsonpath='{.data.RESTIC_PASSWO
 
 ## 删除时发生什么
 
-Zeabur 用你的身份按顺序删除：
+Zeabur 开源版用你的身份按顺序删除：
 
-1. 先删除数据库对象，例如 CloudNativePG 的 `Cluster`，让 operator 有机会按自己的方式收尾。Zeabur 最多等一分钟，让数据库消失。operator 没有在运行时就无法收尾，项目会卡在删除中，项目页面会列出还没删掉的对象和各自的 finalizer。
+1. 先删除数据库对象，例如 CloudNativePG 的 `Cluster`，让 operator 有机会按自己的方式收尾。Zeabur 开源版最多等一分钟，让数据库消失。operator 没有在运行时就无法收尾，项目会卡在删除中，项目页面会列出还没删掉的对象和各自的 finalizer。
 2. 再删除 Namespace，Kubernetes 接着删掉里面剩下的内容。
 3. 最后删掉你在这个项目打开的工具 Pod。
 

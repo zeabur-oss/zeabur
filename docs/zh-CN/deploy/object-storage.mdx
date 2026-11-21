@@ -116,7 +116,7 @@ SeaweedFS Operator 根据 S3Credentials 创建 `files-app` 机密变量，其中
 
 ## 用 kubectl 完成相同操作
 
-对象存储由 SeaweedFS Operator 管理，Zeabur 只写入 operator 读取的对象，移除 Zeabur 后仍可正常运行。下面的 YAML 等同于在表单中使用名称 `files`、容量 `10Gi`、存储桶 `uploads` 创建对象存储，保存为 `files.yaml` 后，用 `kubectl -n shop apply -f files.yaml` 应用：
+对象存储由 SeaweedFS Operator 管理，Zeabur 开源版只写入 operator 读取的对象，移除 Zeabur 开源版后仍可正常运行。下面的 YAML 等同于在表单中使用名称 `files`、容量 `10Gi`、存储桶 `uploads` 创建对象存储，保存为 `files.yaml` 后，用 `kubectl -n shop apply -f files.yaml` 应用：
 
 ```yaml
 apiVersion: seaweed.seaweedfs.com/v1
@@ -308,7 +308,7 @@ kubectl -n shop delete seaweed files
 
 先断开应用与对象存储的连接，或将服务改为连接到要保留的目标位置。接着在对象存储右上角的**更多**中选择**删除对象存储**。
 
-删除列表包含存储桶、身份与密钥相关对象、Seaweed，以及 Zeabur 找到的数据卷。逐项确认后再应用变更。是否保留底层磁盘，取决于磁盘的回收策略。
+删除列表包含存储桶、身份与密钥相关对象、Seaweed，以及 Zeabur 开源版找到的数据卷。逐项确认后再应用变更。是否保留底层磁盘，取决于磁盘的回收策略。
 
 <Callout type="warn">
 删除整个对象存储会中断 S3 连接，删除存储桶和卷也可能移除所有文件。先完成数据复制，并确认应用已改为连接新目标，再执行删除。

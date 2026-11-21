@@ -86,7 +86,7 @@ spec:
       targetPort: 8080
 ```
 
-可以省略 `namespace`，Zeabur 会填入当前项目。
+可以省略 `namespace`，Zeabur 开源版会填入当前项目。
 
 </Step>
 <Step>
@@ -147,7 +147,7 @@ Kubernetes 无法一次撤销多个对象的创建。集群拒绝其中一个对
 </Step>
 </Steps>
 
-Zeabur 只写入你修改的字段，写入每处修改前，都会确认集群中的值与开始编辑时相同。编辑期间有人修改了同一个对象时，应用会失败，需要重新打开后再修改一次。
+Zeabur 开源版只写入你修改的字段，写入每处修改前，都会确认集群中的值与开始编辑时相同。编辑期间有人修改了同一个对象时，应用会失败，需要重新打开后再修改一次。
 
 `status`、`resourceVersion`、`ownerReferences` 这类由集群维护的字段，即使修改也不会写入。Pod、ReplicaSet 这类由其他对象生成的对象不能编辑或删除，需要修改其所属对象。
 
@@ -167,9 +167,9 @@ kubectl -n demo edit deployment hello
 kubectl -n demo delete deployment hello
 ```
 
-`kubectl create -f` 按文件中的顺序创建，不会像 Zeabur 那样重新排序，将 ConfigMap 和 Secret 放在前面。
+`kubectl create -f` 按文件中的顺序创建，不会像 Zeabur 开源版那样重新排序，将 ConfigMap 和 Secret 放在前面。
 
-Zeabur 写入时不会添加自己的字段，用 `kubectl apply` 管理的对象仍然可以继续用 kubectl apply 管理。在 Zeabur 中修改的字段，也要同步更新到你的 YAML 文件中。
+Zeabur 开源版写入时不会添加自己的字段，用 `kubectl apply` 管理的对象仍然可以继续用 kubectl apply 管理。在 Zeabur 开源版中修改的字段，也要同步更新到你的 YAML 文件中。
 
 ## 确认结果
 
@@ -182,13 +182,13 @@ kubectl -n demo get deployment hello -o yaml
 kubectl -n demo get deployment hello --show-managed-fields -o jsonpath='{.metadata.managedFields[*].manager}'
 ```
 
-前两行确认对象都已存在。`-o yaml` 的内容与你在 Zeabur 中看到的 YAML 相同。最后一行列出写入过这个对象的程序，与检查页面中**字段所有者**的数据来源相同。
+前两行确认对象都已存在。`-o yaml` 的内容与你在 Zeabur 开源版中看到的 YAML 相同。最后一行列出写入过这个对象的程序，与检查页面中**字段所有者**的数据来源相同。
 
 ## 遇到问题
 
 | 页面提示或结果 | 处理方法 |
 | --- | --- |
-| **Namespace … 属于整个集群，Zeabur 只在项目内创建对象。** | 用 kubectl 创建，或请管理员处理。 |
+| **Namespace … 属于整个集群，Zeabur 开源版只在项目内创建对象。** | 用 kubectl 创建，或请管理员处理。 |
 | **这个集群没有提供 Certificate（cert-manager.io/v1）。** | 先安装提供这类对象的组件，或确认 `apiVersion` 是否拼写有误。 |
 | **已有名为 hello 的 Deployment。创建不会修改已有对象。** | 改用该对象的**编辑**，或换一个名称。 |
 | **已创建 1/3 个** | 查看拒绝原因，选择**删除刚创建的 1 个**，或选择**保留**后修正剩余对象。 |

@@ -130,7 +130,7 @@ StatefulSet 的卷在创建时就已固定（`volumeClaimTemplates` 创建后不
 </Steps>
 
 <Callout type="warn">
-单独保存备份 Secret 中的 `RESTIC_PASSWORD`。这是 Zeabur 生成的 restic 仓库密码，没有它就无法读取 S3 中的备份。删除项目或备份 Secret 前，先将这个密码保存到其他地方。
+单独保存备份 Secret 中的 `RESTIC_PASSWORD`。这是 Zeabur 开源版生成的 restic 仓库密码，没有它就无法读取 S3 中的备份。删除项目或备份 Secret 前，先将这个密码保存到其他地方。
 </Callout>
 
 ## 从备份还原文件
@@ -141,7 +141,7 @@ StatefulSet 的卷在创建时就已固定（`volumeClaimTemplates` 创建后不
 
 - 来源 S3 端点、存储桶和文件夹，可通过 K8up Schedule 的 `spec.backend` 确认。
 - S3 访问密钥，以及备份 Secret 中的 `RESTIC_PASSWORD`。
-- 要还原哪份备份。Zeabur 的运行记录没有 restic 快照 ID，需要从备份仓库查询。
+- 要还原哪份备份。Zeabur 开源版的运行记录没有 restic 快照 ID，需要从备份仓库查询。
 - 目标 PVC，以及要重新挂载这个 PVC 的服务。
 
 有 Secret 读取权限的人可以用 `kubectl` 获取备份 Secret。以项目 `shop`、PVC `data-redis-0` 为例：
@@ -211,11 +211,11 @@ K8up 备份时，应用照常运行，K8up 直接复制卷上的文件。卷中�
 
 ## 用 kubectl 完成相同操作
 
-卷使用普通的 PVC，备份使用 K8up 的 Schedule 和 Secret。移除 Zeabur 后，挂载和定时备份仍会正常运行。以下以项目 `demo`、Deployment `web`、卷名称 `uploads` 为例。
+卷使用普通的 PVC，备份使用 K8up 的 Schedule 和 Secret。移除 Zeabur 开源版后，挂载和定时备份仍会正常运行。以下以项目 `demo`、Deployment `web`、卷名称 `uploads` 为例。
 
 ### 添加卷
 
-Zeabur 创建的 PVC 名称为 `<服务>-<卷名称>`，访问模式默认为 `ReadWriteOnce`。要指定存储类，添加 `storageClassName`：
+Zeabur 开源版创建的 PVC 名称为 `<服务>-<卷名称>`，访问模式默认为 `ReadWriteOnce`。要指定存储类，添加 `storageClassName`：
 
 ```yaml
 apiVersion: v1
@@ -230,7 +230,7 @@ spec:
       storage: 5Gi
 ```
 
-再将 PVC 挂载到容器：在 Pod template 中添加一项 `volumes`，在容器中添加一项 `volumeMounts`。这与 Zeabur 写入的 JSON Patch 相同：
+再将 PVC 挂载到容器：在 Pod template 中添加一项 `volumes`，在容器中添加一项 `volumeMounts`。这与 Zeabur 开源版写入的 JSON Patch 相同：
 
 ```sh
 kubectl -n demo patch deployment web --type=json -p='[
@@ -239,7 +239,7 @@ kubectl -n demo patch deployment web --type=json -p='[
 ]'
 ```
 
-Pod template 中还没有 `volumes`，或容器中还没有 `volumeMounts` 时，`/-` 会失败，改用 `kubectl edit deployment web` 直接添加这两段。创建服务时就添加了卷，Zeabur 会将 Deployment 设为 1 个副本和 `strategy: Recreate`，避免新旧副本争用同一个 ReadWriteOnce 磁盘。之后才添加卷时，不会修改这两项配置，检查页面会提醒多个副本共用 ReadWriteOnce 磁盘的限制。
+Pod template 中还没有 `volumes`，或容器中还没有 `volumeMounts` 时，`/-` 会失败，改用 `kubectl edit deployment web` 直接添加这两段。创建服务时就添加了卷，Zeabur 开源版会将 Deployment 设为 1 个副本和 `strategy: Recreate`，避免新旧副本争用同一个 ReadWriteOnce 磁盘。之后才添加卷时，不会修改这两项配置，检查页面会提醒多个副本共用 ReadWriteOnce 磁盘的限制。
 
 ### 扩容
 
@@ -299,7 +299,7 @@ spec:
       keepWeekly: 4
 ```
 
-`bucket` 是存储桶加上文件夹，Zeabur 的默认文件夹为 `<项目>/<PVC 名称>`。S3 需要区域时，在 Secret 中添加 `AWS_DEFAULT_REGION`，并在 `backend` 中添加 `envFrom: [{secretRef: {name: web-uploads-backup}}]`。备份不以 root 身份运行时，Zeabur 会改为写入同名的 K8up PodConfig，并将 `podSecurityContext` 替换为 `podConfigRef`。
+`bucket` 是存储桶加上文件夹，Zeabur 开源版的默认文件夹为 `<项目>/<PVC 名称>`。S3 需要区域时，在 Secret 中添加 `AWS_DEFAULT_REGION`，并在 `backend` 中添加 `envFrom: [{secretRef: {name: web-uploads-backup}}]`。备份不以 root 身份运行时，Zeabur 开源版会改为写入同名的 K8up PodConfig，并将 `podSecurityContext` 替换为 `podConfigRef`。
 
 接着为 PVC 添加 Schedule 用于选择卷的标签，以及 K8up 的 annotation：
 
@@ -364,7 +364,7 @@ PVC 的 `STATUS` 为 `Bound`，`CAPACITY` 为当前大小。扩容时，要等 `
 | 卷一直处于**等待存储**状态 | 查看副本和 PVC 的事件，确认存储类可用。卷所在行显示**固定在第一个副本运行的节点**时，需要等副本调度到节点后才会创建。 |
 | 副本更换节点后无法启动 | 查看卷是否固定在某个节点。本地磁盘的数据不会随副本迁移到新节点。 |
 | 多个副本无法同时挂载 | Deployment 的副本共用同一个 PVC。访问模式为 ReadWriteOnce 时，只有同一节点上的副本才能挂载，需要改用支持多节点的存储类和访问模式。 |
-| **这个卷名称超过 63 个字符，K8up 无法通过标签选择它。** | Zeabur 使用 PVC 名称作为标签值来选择卷。名称过长时，无法在这里配置备份，需要请管理员单独编写 K8up Schedule。 |
+| **这个卷名称超过 63 个字符，K8up 无法通过标签选择它。** | Zeabur 开源版使用 PVC 名称作为标签值来选择卷。名称过长时，无法在这里配置备份，需要请管理员单独编写 K8up Schedule。 |
 | 备份**失败**或**部分失败** | 阅读本次运行的失败信息，核对 S3 密钥，以及备份用户是否能读取文件。 |
 | 创建后没有运行记录 | 点击**立即备份**运行一次，再查看 K8up 和备份副本的状态。 |
 | 看不到备份配置或结果 | 备份区域会说明是集群未安装 K8up，还是你没有读取权限。 |

@@ -5,13 +5,13 @@ description: 给成员发一个设置链接，让他用通行密钥登录，只�
 
 照这一页做完，你的同事会出现在**成员**页，用自己的通行密钥登录 Zeabur 开源版，只能使用你分给他的项目。通行密钥保存在对方的手机或电脑里，用指纹、面容或锁屏密码解锁，不用记密码。
 
-<Figure label="成员用通行密钥通过 Zeabur Identity 登录，Zeabur 只按你给的权限显示：分给他的项目可以使用，其他项目只能看到名称">
+<Figure label="成员用通行密钥通过 Zeabur Identity 登录，Zeabur 开源版只按你给的权限显示：分给他的项目可以使用，其他项目只能看到名称">
 <FigFlow>
 <FigCard title="成员" note="通行密钥在他的手机或电脑里" />
 <FigArrow label="登录" />
 <FigCard title="Zeabur Identity" note="确认是他本人" />
 <FigArrow label="带着他的身份" />
-<FigCard title="Zeabur" note="按你给的权限显示" />
+<FigCard title="Zeabur 开源版" note="按你给的权限显示" />
 <FigArrow />
 <FigGroup label="你的集群">
 <FigCard accent title="你分给他的项目" note="shop：开发者、blog：查看者" />
@@ -22,9 +22,9 @@ description: 给成员发一个设置链接，让他用通行密钥登录，只�
 
 ## 开始之前
 
-- 你已用管理员账号登录 Zeabur。
-- 集群装了 Zeabur Identity，由它负责 Zeabur 的登录。它要以 `--invitations` 运行，设置链接才能使用。
-- 安装 Zeabur 时没有关闭 Chart 的 `memberRoles.enabled`（默认开启）。关闭后，邀请只能选择是否授予**管理员**权限。
+- 你已用管理员账号登录 Zeabur 开源版。
+- 集群装了 Zeabur Identity，由它负责 Zeabur 开源版的登录。它要以 `--invitations` 运行，设置链接才能使用。
+- 安装 Zeabur 开源版时没有关闭 Chart 的 `memberRoles.enabled`（默认开启）。关闭后，邀请只能选择是否授予**管理员**权限。
 
 ## 邀请一位成员
 
@@ -115,16 +115,16 @@ description: 给成员发一个设置链接，让他用通行密钥登录，只�
 
 先在**待使用的设置链接**中撤销尚未使用的链接。然后在成员那一行点击 **⋯**，选择**移除成员**，确认后移除。
 
-移除会删除他的通行密钥、关联的账号、会话、设置链接，以及 Zeabur 为他创建的权限。项目和服务都会保留。
+移除会删除他的通行密钥、关联的账号、会话、设置链接，以及 Zeabur 开源版为他创建的权限。项目和服务都会保留。
 
 ## 遇到问题
 
 | 看到的情况 | 怎么处理 |
 | --- | --- |
-| **没有安装 Zeabur Identity** | 请集群管理员安装 Zeabur Identity，或在启动 Zeabur 时指定 Zeabur Identity 所在的 Namespace。 |
-| 界面提示 Zeabur 不知道 Zeabur Identity 的网址 | 使用 `--issuer-url` 启动 Zeabur。 |
+| **没有安装 Zeabur Identity** | 请集群管理员安装 Zeabur Identity，或在启动 Zeabur 开源版时指定 Zeabur Identity 所在的 Namespace。 |
+| 界面提示 Zeabur 开源版不知道 Zeabur Identity 的网址 | 使用 `--issuer-url` 启动 Zeabur 开源版。 |
 | 界面提示 Zeabur Identity 目前不接受设置链接 | 使用 `--invitations` 运行 Zeabur Identity。 |
-| **安装 Zeabur 时未启用成员角色** | 使用 `memberRoles.enabled=true` 升级 Chart，或将这位成员设为管理员。完整的权限对照见[权限](../reference/permissions.mdx)。 |
+| **安装 Zeabur 开源版时未启用成员角色** | 使用 `memberRoles.enabled=true` 升级 Chart，或将这位成员设为管理员。完整的权限对照见[权限](../reference/permissions.mdx)。 |
 | 无法更改自己的权限、重置或移除自己 | 请另一位管理员处理。自己的备用通行密钥可以在账号页面添加。 |
 | 界面提示变更已过期 | 重新点击**检查变更**。 |
 | 对方登录后看不到项目 | 在**成员**确认他那一行列出了项目和角色。没有的话，用**更改权限**添加。 |
@@ -207,4 +207,4 @@ kubectl -n zeabur-identity delete zbuser erin
 - 对方登录后，在他的电脑上运行 `kubectl auth whoami`，用户名是 `zeabur:erin`。
 - 管理员可以运行 `kubectl auth can-i --as zeabur:erin -n shop create deployments` 检查。开发者会输出 `yes`，查看者会输出 `no`。
 
-移除成员时，并非由 Zeabur 创建、但指定了 `zeabur:<用户名>` 的角色绑定会保留，需要管理员另外检查。
+移除成员时，并非由 Zeabur 开源版创建、但指定了 `zeabur:<用户名>` 的角色绑定会保留，需要管理员另外检查。

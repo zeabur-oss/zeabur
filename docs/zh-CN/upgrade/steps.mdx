@@ -1,6 +1,6 @@
 ---
 title: 升级 Zeabur 开源版
-description: 查看当前的 Zeabur 版本，按安装方式用 Helm、Argo CD、Flux 或 zeaburctl 升级，用 Zeatend 升级 Kubernetes，并在升级后确认新版本。
+description: 查看当前的 Zeabur 开源版版本，按安装方式用 Helm、Argo CD、Flux 或 zeaburctl 升级，用 Zeatend 升级 Kubernetes，并在升级后确认新版本。
 ---
 
 先看你是怎么安装的，再按对应的小节升级。升级不会自动发生，Zeabur 开源版只会告诉你有新版本。
@@ -10,10 +10,10 @@ description: 查看当前的 Zeabur 版本，按安装方式用 Helm、Argo CD�
 Claude Code 或 Codex 这类 Coding Agent 可以替你按照这一页和升级须知操作。在能通过 SSH 连接服务器的电脑上运行 Agent，粘贴下面的提示词，并告诉它服务器的地址：
 
 ```text
-按照 https://oss.zeabur.com/zh-CN/docs/zeabur/upgrade/steps.md 把我服务器上的 Zeabur 升级到最新版。
+按照 https://oss.zeabur.com/zh-CN/docs/zeabur/upgrade/steps.md 把我服务器上的 Zeabur 开源版升级到最新版。
 ```
 
-这个网址指向[本页的 Markdown 版](https://oss.zeabur.com/zh-CN/docs/zeabur/upgrade/steps.md)。Agent 会查明 Zeabur 的安装方式，阅读中间每一版的升级须知，再告诉你要改哪些内容。创建快照和升级后用通行密钥登录需要你自己操作，Agent 会在这些步骤停下来等你。
+这个网址指向[本页的 Markdown 版](https://oss.zeabur.com/zh-CN/docs/zeabur/upgrade/steps.md)。Agent 会查明 Zeabur 开源版的安装方式，阅读中间每一版的升级须知，再告诉你要改哪些内容。创建快照和升级后用通行密钥登录需要你自己操作，Agent 会在这些步骤停下来等你。
 
 ## 查看版本
 
@@ -55,11 +55,11 @@ kubectl -n zeabur rollout status deployment/zeabur
 
 ## 用 zeaburctl ui 升级
 
-Zeabur 运行在你自己的电脑上，没有服务器要升级。到[发行文件与验证](../reference/releases.mdx)下载新版 `zeaburctl`，验证后替换旧文件，再运行一次 `zeaburctl ui`。
+Zeabur 开源版运行在你自己的电脑上，没有服务器要升级。到[发行文件与验证](../reference/releases.mdx)下载新版 `zeaburctl`，验证后替换旧文件，再运行一次 `zeaburctl ui`。
 
 ## 用 Zeatend 升级 Kubernetes
 
-在用 Zeatend 装好的服务器上，K3s、RKE2 或 KubeSolo 由 Zeatend 升级，和 Zeabur 分开。每个 Zeatend 版本都固定安装一个版本，所以换上新版 Zeatend，Kubernetes 也会随之更新。
+在用 Zeatend 装好的服务器上，K3s、RKE2 或 KubeSolo 由 Zeatend 升级，和 Zeabur 开源版分开。每个 Zeatend 版本都固定安装一个版本，所以换上新版 Zeatend，Kubernetes 也会随之更新。
 
 1. 在服务器上按 [Zeatend 的 README](https://github.com/zeabur-oss/zeatend#download-zeatend) 下载新版 Zeatend。
 2. 运行 `sudo zeatend plan`，查看会升到哪个版本以及主机检查的结果。这一步不会做任何改动。
@@ -71,11 +71,11 @@ Kubernetes 一次只能升一个小版本。新版本跨度更大时，`plan` �
 
 ### 用 zeabur-installer 安装的服务器
 
-Zeatend 可以直接接管这些服务器。没有 `/etc/zeatend/config.yaml` 时，Zeatend 会读取 `/etc/zeabur-installer/config.yaml`，安装程序关闭的组件也会继续保持关闭。下载 Zeatend 后，同样运行 `plan` 和 `apply`。Zeatend 不会改动 Zeabur 本身；要升级 Zeabur，先阅读[升级须知](notes.mdx)。
+Zeatend 可以直接接管这些服务器。没有 `/etc/zeatend/config.yaml` 时，Zeatend 会读取 `/etc/zeabur-installer/config.yaml`，安装程序关闭的组件也会继续保持关闭。下载 Zeatend 后，同样运行 `plan` 和 `apply`。Zeatend 不会改动 Zeabur 开源版本身；要升级 Zeabur 开源版，先阅读[升级须知](notes.mdx)。
 
 ## 升级后
 
-- Zeabur 的副本换新后，所有人都要重新登录。chart 只运行一个副本，会话保存在内存里。
+- Zeabur 开源版的副本换新后，所有人都要重新登录。chart 只运行一个副本，会话保存在内存里。
 - 运行 `zeaburctl --version`，或打开集群页面，确认版本。
 - Helm、Argo CD 和 Flux 可以运行 `kubectl -n zeabur rollout status deployment/zeabur`，等新的副本就绪。
 

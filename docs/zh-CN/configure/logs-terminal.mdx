@@ -43,7 +43,7 @@ Kubernetes 只保留大约一小时内的事件。排查更早的问题需要查
 - **当前用量**：每个副本的 CPU 和内存用量，与预留量、上限并列显示。内存用量接近上限时会标记**接近内存上限**，超过上限时容器会重启。此功能需要集群安装 metrics-server，未安装时点击**安装**，查看需要在服务器上运行的命令。
 - **历史记录**：一段时间内的用量图，会标出 OOMKilled 和重启的时间点。此功能需要兼容 Prometheus 的指标存储服务，例如 VictoriaMetrics 或 Prometheus。没有时点击**安装 VictoriaMetrics**；已有时点击**改用其他存储服务**，指定这个存储服务的 Kubernetes Service。
 
-集群管理员在 Helm chart 中开启 `proxy.enabled` 后，项目的查看者和开发者都能看到自己项目的**历史记录**。Zeabur Proxy 会先确认你是该项目的成员，查询也只能获取该项目的指标。未开启，或在配置中改用其他存储服务时，Zeabur 会直接读取存储服务，能直接读取的人可以看到所有项目的指标，因此只有管理员能查看。
+集群管理员在 Helm chart 中开启 `proxy.enabled` 后，项目的查看者和开发者都能看到自己项目的**历史记录**。Zeabur Proxy 会先确认你是该项目的成员，查询也只能获取该项目的指标。未开启，或在配置中改用其他存储服务时，Zeabur 开源版会直接读取存储服务，能直接读取的人可以看到所有项目的指标，因此只有管理员能查看。
 
 ![服务的用量选项卡，上方是每个副本当前的 CPU 和内存用量，下方是历史用量图](../images/shots/service-usage.avif)
 
@@ -108,7 +108,7 @@ Kubernetes 无法提前移除调试容器。副本替换之前（例如重启服
 
 ## 打开 kubectl 终端
 
-要在浏览器中使用 kubectl 或 helm，在页面底部的终端区域或搜索中选择**打开 kubectl 终端**。Zeabur 会在 `zeabur-terminals` Namespace 中为你启动一个临时容器，其中的 kubectl 和 helm 以你的身份运行，使用你自己的权限，默认在当前项目中操作。
+要在浏览器中使用 kubectl 或 helm，在页面底部的终端区域或搜索中选择**打开 kubectl 终端**。Zeabur 开源版会在 `zeabur-terminals` Namespace 中为你启动一个临时容器，其中的 kubectl 和 helm 以你的身份运行，使用你自己的权限，默认在当前项目中操作。
 
 在项目以外的页面（例如**集群**页面）打开时，会打开整个集群的 kubectl 终端，确认页面标题为**打开集群的 kubectl 终端**。默认在 `default` Namespace 中操作，你有权限的 Namespace 都能操作。
 
@@ -118,7 +118,7 @@ Kubernetes 无法提前移除调试容器。副本替换之前（例如重启服
 
 以下以项目 `demo`、Deployment `web` 为例。
 
-| Zeabur 中的操作 | kubectl |
+| Zeabur 开源版中的操作 | kubectl |
 | --- | --- |
 | **日志**，**实时跟踪** | `kubectl -n demo logs deployment/web -f` |
 | 指定副本和容器 | `kubectl -n demo logs web-7c9d8b6f5-x2k4p -c web` |

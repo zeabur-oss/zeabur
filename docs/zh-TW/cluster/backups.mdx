@@ -61,13 +61,13 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
 
    ![排程表單，每天 03:00（UTC）、保留 7 天、範圍是整個叢集](../images/shots/backup-schedule-form.avif)
 
-3. 按**檢查變更**，確認執行時間和範圍後套用。Zeabur 會建立或修改名為 `zeabur` 的 Velero Schedule，並開啟磁碟區檔案備份。
+3. 按**檢查變更**，確認執行時間和範圍後套用。Zeabur 開源版會建立或修改名為 `zeabur` 的 Velero Schedule，並開啟磁碟區檔案備份。
 4. 按**立即備份**，檢查後套用。這次備份照剛設定的範圍和保留天數執行，不用等排程。
 5. 在**備份紀錄**找到這筆，等狀態從**執行中**變成**成功**，再看紀錄列出的項目數和**保留到**的日期。
 
    ![備份紀錄列出每次備份的狀態、項目數和保留期限](../images/shots/backup-list.avif)
 
-在 Zeabur 以外建立的排程會標示**在 Zeabur 以外設定**，要回到原本建立的地方修改。
+在 Zeabur 開源版以外建立的排程會標示**在 Zeabur 開源版以外設定**，要回到原本建立的地方修改。
 
 ## 從備份還原
 
@@ -82,7 +82,7 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
    - **從備份建立新專案**：備份選定的專案都還在。
    - **還原已刪除的專案**：備份選定的專案都已經刪除。
    - **還原專案**：備份整個叢集，或選定的專案有些還在、有些已刪除。
-2. 在**要還原的專案**選一個專案。選項是這份備份選定的專案；備份整個叢集時，選項是目前的專案，加上備份裡已經刪除的專案，後面標 **（已刪除）**。Zeabur 要下載備份才知道有哪些已刪除的專案，表單會先顯示「正在找備份裡已刪除的專案…」。
+2. 在**要還原的專案**選一個專案。選項是這份備份選定的專案；備份整個叢集時，選項是目前的專案，加上備份裡已經刪除的專案，後面標 **（已刪除）**。Zeabur 開源版要下載備份才知道有哪些已刪除的專案，表單會先顯示「正在找備份裡已刪除的專案…」。
    - 原專案還在：**新專案名稱**會帶入一個新名稱，可以改。
    - 原專案已經刪除：畫面會說明專案會用原本的名稱還原。
 
@@ -120,7 +120,7 @@ Velero 會略過已經存在的同名物件。另存成新專案後，原專案�
 
 ### 接回網域
 
-按**接回網域**。Zeabur 從備份讀出這個專案的網域，再檢查叢集裡有沒有其他專案正在使用。
+按**接回網域**。Zeabur 開源版從備份讀出這個專案的網域，再檢查叢集裡有沒有其他專案正在使用。
 
 - 沒有其他專案在用：套用後 Velero 只還原這些路由，**還原紀錄**會多一筆「網域接回」。cert-manager 會重新申請憑證。
 
@@ -177,7 +177,7 @@ spec:
     name: blog-restored
 ```
 
-用原名稱還原時，拿掉 `namespaceMapping` 和 `resourceModifier`，也不用建立 ConfigMap。Zeabur 建立的 ConfigMap 會把 Restore 設為擁有者，刪除 Restore 時一起刪除；自己建立的要在還原完成後用 `kubectl -n velero delete configmap blog-restored` 刪掉。
+用原名稱還原時，拿掉 `namespaceMapping` 和 `resourceModifier`，也不用建立 ConfigMap。Zeabur 開源版建立的 ConfigMap 會把 Restore 設為擁有者，刪除 Restore 時一起刪除；自己建立的要在還原完成後用 `kubectl -n velero delete configmap blog-restored` 刪掉。
 
 確認專案後，用 `kubectl get ingress -A` 確認沒有其他專案在用同一個網域，再建立只還原路由的 Restore：
 
@@ -213,7 +213,7 @@ Velero 把 Kubernetes 物件照原樣放進備份，Secret 也在裡面，值只
 | `velero-repo-credentials` 的 `repository-password` | Kopia 在上傳前用這組密碼加密磁碟區裡的檔案。 |
 | `velero-backup-key` 的 `key`（32 個字元） | 存放位置設定 `customerKeyEncryptionSecret: velero-backup-key/key`，儲存服務用這把金鑰加密每個物件，包括物件清單和 Secret（SSE-C）。 |
 
-在**叢集** → **備份**新增存放位置時，Zeabur 也會設定 `customerKeyEncryptionSecret`。`velero-backup-key` 不存在就建立一把，已經有的不會換掉。既有的存放位置維持原樣，之前沒用金鑰的備份照樣讀得到。
+在**叢集** → **備份**新增存放位置時，Zeabur 開源版也會設定 `customerKeyEncryptionSecret`。`velero-backup-key` 不存在就建立一把，已經有的不會換掉。既有的存放位置維持原樣，之前沒用金鑰的備份照樣讀得到。
 
 SSE-C 每次請求都把金鑰交給儲存服務，由儲存服務加密後再存，所以端點要用 HTTPS。SeaweedFS、AWS S3、Cloudflare R2 和 Backblaze B2 支援 SSE-C，MinIO 只在 HTTPS 下接受。不支援的儲存服務會拒絕上傳，備份就會失敗。
 
@@ -239,21 +239,21 @@ Velero 不是從 Zeabur Catalog 安裝時，叢集裡可能沒有 `velero-repo-c
 
 ### 其他備份
 
-[磁碟區備份](../configure/volumes.mdx)使用 restic，上傳前用 Zeabur 產生的 `<claim>-backup` Secret 裡的 `RESTIC_PASSWORD`（24 個隨機字元）加密。CloudNativePG 的資料庫備份只壓縮、不加密，儲存貯體裡讀得到資料列（沒有 Secret 的值）。資料庫備份要放在有伺服器端加密的儲存貯體，存取金鑰只給叢集使用。
+[磁碟區備份](../configure/volumes.mdx)使用 restic，上傳前用 Zeabur 開源版產生的 `<claim>-backup` Secret 裡的 `RESTIC_PASSWORD`（24 個隨機字元）加密。CloudNativePG 的資料庫備份只壓縮、不加密，儲存貯體裡讀得到資料列（沒有 Secret 的值）。資料庫備份要放在有伺服器端加密的儲存貯體，存取金鑰只給叢集使用。
 
 ## 常見失敗
 
 - **無法連線**：核對儲存貯體、端點、區域和金鑰，並看位置下方 Velero 的訊息。
 - 連線成功但備份失敗，儲存服務拒絕上傳：確認儲存服務支援 SSE-C，端點也用 HTTPS，見[備份的加密](#備份的加密)。
-- 沒有**立即備份**：要先有 Zeabur 建立的排程，而排程要先有存放位置。
+- 沒有**立即備份**：要先有 Zeabur 開源版建立的排程，而排程要先有存放位置。
 - 還原按鈕（**從備份建立新專案**、**還原已刪除的專案**或**還原專案**）無法使用：你不能在 Velero 的 Namespace 建立 Restore。還原時 Velero 用自己的權限寫入物件，所以只有管理員能還原，見[權限](../reference/permissions.mdx)。請管理員用管理員帳號還原。
 - **部分失敗**：有些物件或磁碟區檔案沒有複製到，其餘的已存好。用 `velero backup describe <backup> --details` 查看失敗的項目，處理後再備份一次。
 - 備份失敗：看備份下方 Velero 寫的原因。如果是備份途中 Velero 重新啟動，下一次會照排程執行，也可以按**立即備份**補一次。
-- **磁碟區**顯示**只備份物件，不複製磁碟區裡的檔案**：這是在 Zeabur 以外建立的排程，要到原本的設定開啟 `defaultVolumesToFsBackup`。
+- **磁碟區**顯示**只備份物件，不複製磁碟區裡的檔案**：這是在 Zeabur 開源版以外建立的排程，要到原本的設定開啟 `defaultVolumesToFsBackup`。
 - 變更已過期：重新**檢查變更**。
 
 ## 暫停與清除
 
 在**排程**按**暫停**，檢查後套用，之後就不會再備份。按**繼續**恢復。已有的備份和存放位置都會保留，備份照各自的**保留到**日期到期。
 
-Zeabur 沒有刪除備份或排程的操作。要馬上刪掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx)只會刪掉目的地本身，已經複製到 Velero 的金鑰、排程和 S3 裡的備份都會留著。
+Zeabur 開源版沒有刪除備份或排程的操作。要馬上刪掉，用 `velero backup delete` 或 `velero schedule delete`。移除 [S3 目的地](./s3-destinations.mdx)只會刪掉目的地本身，已經複製到 Velero 的金鑰、排程和 S3 裡的備份都會留著。

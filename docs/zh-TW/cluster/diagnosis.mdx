@@ -13,7 +13,7 @@ description: 服務停擺或叢集出狀況時，去哪裡看原因，以及每�
 
 ![首頁的需要你處理，依原因分成節點、叢集外部、設定、應用程式出錯等幾組，每項附日誌或事件按鈕](../images/shots/home-problems.avif)
 
-如果原因在叢集這一側，畫面會標成**叢集**，寫出**起因**和**影響**的服務、網域和專案數。修好這個原因，這些服務就會一起恢復。Zeabur 會把下面幾種情況當成叢集的問題：
+如果原因在叢集這一側，畫面會標成**叢集**，寫出**起因**和**影響**的服務、網域和專案數。修好這個原因，這些服務就會一起恢復。Zeabur 開源版會把下面幾種情況當成叢集的問題：
 
 | 起因 | 判斷方式 | 影響範圍 |
 | --- | --- | --- |
@@ -31,7 +31,7 @@ kubectl get deploy,daemonset -A -l app.kubernetes.io/name=traefik
 kubectl get deploy -A -l k8s-app=kube-dns
 ```
 
-「哪些服務受到影響」是 Zeabur 把 Ingress、節點和服務對起來算出的，kubectl 沒有直接對應的指令。
+「哪些服務受到影響」是 Zeabur 開源版把 Ingress、節點和服務對起來算出的，kubectl 沒有直接對應的指令。
 
 ## 服務的「出了什麼問題」
 
@@ -39,7 +39,7 @@ kubectl get deploy -A -l k8s-app=kube-dns
 
 ![服務概覽的出了什麼問題，說明 worker 反覆崩潰，並附怎麼處理和開啟日誌、終端機按鈕](../images/shots/service-problem.avif)
 
-Zeabur 讀的是 kubelet 回報的容器狀態、副本的排程狀態、工作負載的狀況和事件，會判斷這些情況：
+Zeabur 開源版讀的是 kubelet 回報的容器狀態、副本的排程狀態、工作負載的狀況和事件，會判斷這些情況：
 
 - 容器一直當機、重新啟動，或記憶體用完而遭終止（結束碼 137）。
 - 健康檢查一直失敗，或排程任務的一次執行以錯誤結束。
@@ -73,7 +73,7 @@ kubectl -n shop get events --field-selector involvedObject.name=<副本名稱>
 - 專案沒有連線規則，所有服務都能互相連線。
 - 路由指向不存在的 Service，或叢集還在用已停止維護的 Ingress 控制器。
 
-這些規則是 Zeabur 自己的檢查，kubectl 沒有對應的指令。個別項目可以自己查，例如看哪些容器沒有記憶體上限：
+這些規則是 Zeabur 開源版自己的檢查，kubectl 沒有對應的指令。個別項目可以自己查，例如看哪些容器沒有記憶體上限：
 
 ```sh
 kubectl -n shop get deploy -o custom-columns=NAME:.metadata.name,MEMORY:.spec.template.spec.containers[*].resources.limits.memory
@@ -91,7 +91,7 @@ kubectl get nodes -o wide
 kubectl describe node <節點名稱>
 ```
 
-`describe node` 的 `Conditions` 有 `MemoryPressure`、`DiskPressure` 和 `Ready`。版本的支援期限和元件的新版本，是 Zeabur 對照 Zeabur Catalog 得出的，kubectl 沒有對應的指令。
+`describe node` 的 `Conditions` 有 `MemoryPressure`、`DiskPressure` 和 `Ready`。版本的支援期限和元件的新版本，是 Zeabur 開源版對照 Zeabur Catalog 得出的，kubectl 沒有對應的指令。
 
 ## 最近一小時的警告
 
@@ -123,9 +123,9 @@ kubectl get clusterpolicyreport falco-cluster-policy-report -o yaml
 
 服務**概覽**的**網路**卡片，每個網域和私有位址各一行，寫出**可連線**、**無法連線**或**無法從叢集內確認**。展開後是請求經過的每一步，每一步列出**預期**和**實際**，有問題的那一步附**修正**：
 
-| 步驟 | Zeabur 檢查什麼 | 用 kubectl 或其他指令查 |
+| 步驟 | Zeabur 開源版檢查什麼 | 用 kubectl 或其他指令查 |
 | --- | --- | --- |
-| **DNS** | 從 Zeabur 所在的地方查得到這個網域 | `dig +short shop.example.com` |
+| **DNS** | 從 Zeabur 開源版所在的地方查得到這個網域 | `dig +short shop.example.com` |
 | **入口位址** | 查到的位址之一是 Ingress `status.loadBalancer` 的位址 | `kubectl -n shop get ingress -o wide` |
 | **Ingress 控制器** | 這個 IngressClass 的控制器有就緒的副本 | `kubectl get ingressclass`，再查控制器的 Deployment |
 | **憑證** | `spec.tls` 底下的主機，cert-manager 的 `Certificate` 是 `Ready` | `kubectl -n shop get certificate` |
@@ -149,7 +149,7 @@ kubectl -n shop get networkpolicy
 kubectl -n shop describe networkpolicy <名稱>
 ```
 
-`describe` 列出每條規則選到的副本和允許的來源。把多條規則合起來、換算成「哪個服務能連到哪個服務」是 Zeabur 算的，kubectl 沒有對應的指令。
+`describe` 列出每條規則選到的副本和允許的來源。把多條規則合起來、換算成「哪個服務能連到哪個服務」是 Zeabur 開源版算的，kubectl 沒有對應的指令。
 
 ## 確認結果
 

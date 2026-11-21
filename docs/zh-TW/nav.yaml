@@ -1,21 +1,21 @@
 - group: get-started
   label: 開始使用
   pages:
-    quickstart: 安裝 Zeabur
-    from-zeabur-com: 從 zeabur.com 過來
+    quickstart: 安裝 Zeabur 開源版
+    from-zeabur-com: 從 Zeabur 過來
     first-project: 部署第一個服務
-    how-it-works: Zeabur 如何管理服務
+    how-it-works: Zeabur 開源版如何管理服務
 - group: install
   label: 安裝方式
   pages:
     agent: 交給 Agent 安裝或搬家
     one-command: 用 Zeatend 安裝
-    existing-cluster: 把 Zeabur 裝進既有叢集
+    existing-cluster: 把 Zeabur 開源版裝進既有叢集
     desktop: Zeabur Desktop：在自己的電腦開啟叢集
 - group: upgrade
   label: 升級
   pages:
-    steps: 升級 Zeabur
+    steps: 升級 Zeabur 開源版
     notes: 升級須知
 - group: deploy
   label: 部署服務
@@ -68,6 +68,6 @@
     security: 安全性
     telemetry: 體驗計畫
 - group: leave
-  label: 移除 Zeabur
+  label: 移除 Zeabur 開源版
   pages:
-    uninstall: 移除 Zeabur，保留服務
+    uninstall: 移除 Zeabur 開源版，保留服務

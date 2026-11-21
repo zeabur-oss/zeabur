@@ -75,7 +75,7 @@ description: 添加 S3 存储位置，供数据库、K8up 和 Velero 备份选�
 
 新的备份表单会在 **S3 目的地**菜单中默认选中第一个添加的目的地，也可以选择其他名称或**手动输入**。选择目的地后，表单会自动填入端点、存储桶、区域和文件夹，并隐藏密钥字段。应用前检查最终的文件夹路径，有些备份会在目的地的文件夹下再加一层。
 
-应用时，Zeabur 会将目的地的密钥复制到备份自己的 Secret 中。数据库和 K8up 的 Secret 放在项目的 Namespace 中，Velero 的放在 Velero 的 Namespace 中。之后备份只读取复制过去的密钥，所以即使移除目的地或 Zeabur，备份也会照常运行。
+应用时，Zeabur 开源版会将目的地的密钥复制到备份自己的 Secret 中。数据库和 K8up 的 Secret 放在项目的 Namespace 中，Velero 的放在 Velero 的 Namespace 中。之后备份只读取复制过去的密钥，所以即使移除目的地或 Zeabur 开源版，备份也会照常运行。
 
 ## 更换密钥
 
@@ -97,7 +97,7 @@ description: 添加 S3 存储位置，供数据库、K8up 和 Velero 备份选�
 
 ## 用 kubectl 完成相同操作
 
-一个目的地由 `zeabur-s3-destinations` Namespace 中两个同名的对象组成：ConfigMap 存放端点、存储桶、区域和文件夹，Secret 存放密钥。两个对象都要带有 label `zeabur.com/s3-destination: <名称>`，Zeabur 才会列入列表。`region` 和 `prefix` 没有值时可以省略。
+一个目的地由 `zeabur-s3-destinations` Namespace 中两个同名的对象组成：ConfigMap 存放端点、存储桶、区域和文件夹，Secret 存放密钥。两个对象都要带有 label `zeabur.com/s3-destination: <名称>`，Zeabur 开源版才会列入列表。`region` 和 `prefix` 没有值时可以省略。
 
 ```yaml
 apiVersion: v1

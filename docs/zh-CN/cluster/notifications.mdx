@@ -138,7 +138,7 @@ spec:
 | Webhook | `url`，`token` 为选填项 | `webhook_configs`，`url_secret` 指向 `url`；使用令牌时添加 `http_config.authorization`（`type: Bearer`，`credentials` 指向 `token`） |
 | ntfy | `url`，`token` 为选填项 | 同 Webhook。`url` 填写 `https://ntfy.sh/<主题>?template=alertmanager`，使用自建服务器时替换域名 |
 
-发送测试会创建一个带有 `zeabur.com/notification-test: <名称>` 标签的 Job。Zeabur 的告警规则检测到这个 Job 后，就会发送一条指定给该渠道的测试告警：
+发送测试会创建一个带有 `zeabur.com/notification-test: <名称>` 标签的 Job。Zeabur 开源版的告警规则检测到这个 Job 后，就会发送一条指定给该渠道的测试告警：
 
 ```yaml
 apiVersion: batch/v1
@@ -192,9 +192,9 @@ kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
 
 - **等待中**：Alertmanager 尚未加载该渠道，稍后再查看。
 - **被拒绝**：该行会显示原因，例如地址不完整、已保存的地址或令牌丢失、SMTP 服务器未填写端口。点击**编辑**，修正后保存。
-- 收不到测试：核对接收服务的地址和令牌。如果页面提示未安装 Zeabur 的告警规则，或规则来自其他 Zeabur 版本，点击**安装规则**或**更新规则**。
+- 收不到测试：核对接收服务的地址和令牌。如果页面提示未安装 Zeabur 开源版的告警规则，或规则来自其他 Zeabur 开源版版本，点击**安装规则**或**更新规则**。
 - 能添加渠道但无法测试：发送测试需要创建 Job 的权限，请管理员确认这项权限。
-- **不是在 Zeabur 中创建的，请到原创建位置修改**：回到原来的 Helm 或 GitOps 配置中修改。
+- **不是在 Zeabur 开源版中创建的，请到原创建位置修改**：回到原来的 Helm 或 GitOps 配置中修改。
 
 ## 移除渠道
 
