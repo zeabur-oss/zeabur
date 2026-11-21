@@ -122,8 +122,8 @@ export function Sidebar({ sources, total, only, setOnly, removeSource, addFiles 
         </div>
       </div>
       <div className="flex shrink-0 flex-col gap-2 px-5 pb-3">
-        <UpdateStatus />
         <LanguageSelect />
+        <UpdateStatus />
       </div>
     </aside>
   )
