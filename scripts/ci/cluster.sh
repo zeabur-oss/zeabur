@@ -47,6 +47,8 @@ browser_failure_context() {
   kubectl get pods,events -A -o wide || true
 }
 
+# Bun's downloads come before the cluster, whose Traefik then holds this machine's port 443.
+./scripts/build-ui.sh
 if [[ -z "${ZEABUR_CI_KEEP:-}" ]]; then
   trap './scripts/dev-cluster.sh down' EXIT
 fi
@@ -55,7 +57,7 @@ fi
 export KUBECONFIG="$PWD/target/dev-cluster/kubeconfig"
 cargo nextest run --locked --run-ignored only -E 'binary(kubernetes)'
 check_doctor
-if ! { ./scripts/build-ui.sh && ./scripts/e2e-ui.sh; }; then
+if ! ./scripts/e2e-ui.sh; then
   browser_failure_context
   exit 1
 fi
