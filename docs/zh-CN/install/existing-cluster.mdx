@@ -27,7 +27,7 @@ Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur
 - **一个 Kubernetes 集群**，版本 1.30 或更高，以及能管理它的 kubeconfig。kubeconfig 是 `kubectl` 连接集群用的配置文件。
 - **一个 Ingress controller**，并且是集群默认的 IngressClass，例如 K3s 和 RKE2 自带的 Traefik。80 和 443 端口要能从互联网访问，Let's Encrypt 才能检查网址、签发证书。
 - **电脑上的工具**：`kubectl`、Helm 4 和 `zeabur-identityctl`。
-- **要安装的版本**。下面用 `<version>` 表示版本号。chart 发布在 `oci://ghcr.io/zeabur-oss/charts/zeabur`，默认镜像固定为同一版本的 digest。版本和验证方法见[发行文件与验证](../reference/releases.mdx)。
+- **要安装的版本**。下面用 `<version>` 表示版本号。请用这份文档对应的版本，也就是 [CHANGELOG](../../../CHANGELOG.md) 最上面的标题，例如 `0.3.0` 或 `0.3.0-beta.2`，开头不加 `v`。按示例一律加上 `--version`。chart 发布在 `oci://ghcr.io/zeabur-oss/charts/zeabur`，默认镜像固定为同一版本的 digest。版本和验证方法见[发行文件与验证](../reference/releases.mdx)。
 
 Kubernetes 需要 1.30 或更高版本，是因为 chart 默认会创建项目成员角色，并用 `ValidatingAdmissionPolicy` 限制开发者可以修改的 Namespace 字段。这个 API 从 1.30 起正式可用。Namespace 是 Kubernetes 用来分组的单位，Zeabur 开源版的每个项目就是一个 Namespace。
 
