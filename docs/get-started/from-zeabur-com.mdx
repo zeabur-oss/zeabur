@@ -43,9 +43,9 @@ For the Zeabur Catalog template that matches each popular Zeabur template, see [
 
 ## Where to start
 
-Zeabur OSS runs on Kubernetes, open-source software that runs containers on one or more servers. [Install Zeabur OSS on a server](quickstart.mdx) shows the ways to install it and which one fits you. Then [deploy your first service](first-project.mdx).
+To move your Zeabur services, [hand the move to a coding agent](#hand-the-move-to-a-coding-agent), or [move step by step](#move-step-by-step) yourself. Both ways get a new server, set up Kubernetes and Zeabur OSS on it, then move the services. Kubernetes is open-source software that runs containers on one or more servers.
 
-To move your Zeabur services, [hand the move to a coding agent](#hand-the-move-to-a-coding-agent), or [move step by step](#move-step-by-step) yourself.
+To try Zeabur OSS first without moving anything, pick an install path in [Get started](../index.mdx).
 
 ## Hand the move to a coding agent
 
@@ -125,9 +125,9 @@ When you create the server, add an SSH public key that the user agrees to, such 
 
 ### 3. Set up Kubernetes with Zeatend
 
-On the server, get Zeatend, Helm 4 and `zeabur-identityctl`, as "Before you begin" in [Install with Zeatend](../install/one-command.mdx) lists. [Zeatend's README](https://github.com/zeabur-oss/zeatend#download-zeatend) shows how to download Zeatend. Then write `/etc/zeatend/config.yaml` as "Choose the domain" and "Set up Kubernetes with Zeatend" on that page show. Keep `distribution: k3s`, and use `<IP>.sslip.io` as the domain.
+On the server, get Zeatend, Helm 4 and `zeabur-identityctl`, as "Before you begin" in [Install with Zeatend](../install/one-command.mdx) lists. Then write `/etc/zeatend/config.yaml` as "Choose the domain" and "Set up Kubernetes with Zeatend" on that page show. Keep `distribution: k3s`, and use `<IP>.sslip.io` as the domain.
 
-Don't run `zeatend apply` directly. Make a plan and show it to the user first:
+In place of the `zeatend plan` and `zeatend apply` on that page, make a plan and show it to the user first:
 
 ```sh
 sudo zeatend plan --json > plan.json
@@ -143,7 +143,7 @@ If `apply` refuses the plan because the server changed after it was made, make a
 
 ### 4. Install Zeabur OSS with one helm install
 
-Run the `helm install` from "Install Zeabur OSS" on the same page. When it finishes, it prints the link that creates the first admin account. The link works once and expires in 24 hours.
+Run the `helm install` as "Install Zeabur OSS" in [Install with Zeatend](../install/one-command.mdx) shows. When it finishes, it prints the link that creates the first admin account. The link works once and expires in 24 hours.
 
 Hand the link to the user. Ask them to open it, create a passkey, and sign in with it at `https://zeabur.<IP>.sslip.io`. Wait until they say they are signed in.
 

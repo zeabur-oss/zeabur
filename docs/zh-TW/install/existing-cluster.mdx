@@ -5,7 +5,7 @@ description: 用一個 Helm 指令裝好 Zeabur 開源版和 Zeabur Identity，�
 
 照這一頁做完，你會有一個用 HTTPS 打開、用通行密鑰登入的 Zeabur 開源版。叢集裡原本的應用程式，會出現在**專案**頁。
 
-還沒有叢集？[用 Zeatend 安裝](one-command.mdx)會先在新伺服器上裝好 Kubernetes。想讓 Claude Code 或 Codex 這類 Coding Agent 代你做這些步驟，見[交給 Agent 安裝](agent.mdx)。Agent 讀的是[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/install/existing-cluster.md)。
+還沒有叢集？[用 Zeatend 安裝](one-command.mdx)會先在新伺服器上裝好 Kubernetes。想讓 Claude Code 或 Codex 代你做，見[交給 Agent 安裝或搬家](agent.mdx)。
 
 <Figure label="一個 helm install 把 Zeabur 開源版裝進 zeabur Namespace、Zeabur Identity 裝進 zeabur-identity，並加上負責 HTTPS 的 cert-manager，你原本的應用程式留在原處">
 <FigFlow>
@@ -27,7 +27,7 @@ Kubernetes 是在一台或多台主機上執行容器的開源系統，Zeabur �
 - **一個 Kubernetes 叢集**，版本 1.30 以上，以及能管理它的 kubeconfig。kubeconfig 是 `kubectl` 連到叢集用的設定檔。
 - **一個 Ingress controller**，而且是叢集預設的 IngressClass，例如 K3s 和 RKE2 內建的 Traefik。80 和 443 埠要能從網際網路連進來，Let's Encrypt 才能檢查網址、核發憑證。
 - **電腦上的工具**：`kubectl`、Helm 4 和 `zeabur-identityctl`。
-- **要安裝的版本**。下面用 `<version>` 代表版本。chart 發布在 `oci://ghcr.io/zeabur-oss/charts/zeabur`，預設映像檔固定在同一版的 digest。下載與驗證方式見[發布成品](../reference/releases.mdx)。
+- **要安裝的版本**。下面用 `<version>` 代表版本。chart 發布在 `oci://ghcr.io/zeabur-oss/charts/zeabur`，預設映像檔固定在同一版的 digest。版本和驗證方式見[發行檔與驗證](../reference/releases.mdx)。
 
 Kubernetes 要 1.30 以上，是因為 chart 預設會建立專案成員的角色，並用 `ValidatingAdmissionPolicy` 限制開發者能改的 Namespace 欄位。這個 API 從 1.30 起正式提供。Namespace 是 Kubernetes 用來分組的單位，Zeabur 開源版的每個專案就是一個 Namespace。
 
@@ -63,6 +63,8 @@ RKE2 改用 `--distro rke2`。在每個伺服器節點照印出的步驟做。�
 <Step>
 
 ### 用 Helm 安裝
+
+把 `<version>` 換成要安裝的版本：
 
 ```sh
 helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
@@ -105,7 +107,7 @@ helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 </Step>
 </Steps>
 
-接下來可以[邀請成員](../cluster/members.mdx)，或[部署第一個服務](../get-started/first-project.mdx)。管理員帳號、登入時限和**設定**頁的登入選項，見[權限](../reference/permissions.mdx#管理員帳號和一般帳號)。
+接下來可以[邀請成員](../cluster/members.mdx)，或[部署第一個服務](../get-started/first-project.mdx)。安裝時已經加上 cert-manager，其他元件的安裝方式見[檢視與安裝叢集元件](../cluster/components.mdx)。管理員帳號、登入時限和**設定**頁的登入選項，見[權限](../reference/permissions.mdx#管理員帳號和一般帳號)。
 
 ## 讓新服務有公開網址
 
@@ -194,23 +196,3 @@ printf 'sha256:%s\n' "$(printf %s "$CLIENT_SECRET" | openssl dgst -sha256 -r | c
 ```
 
 將 `planKey.existingSecret` 設為 `zeabur-plan-key`，`issuer.clientSecret.existingSecret` 設為 `zeabur-client`，`issuer.clientSecret.hash` 設為指令印出的最後一行。chart 的所有設定可用 `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>` 列出。這些工具也讀不到伺服器的 IP 位址，所以要設定 `global.domain`。
-
-## 安裝 Zeabur 開源版需要的元件
-
-安裝時會加上 cert-manager。在 K3s 和 RKE2 上，叢集管理員可以在**叢集** → **元件**安裝其他元件，見[從頁面安裝](../cluster/components.mdx#從頁面安裝)。Zeabur 開源版會從 Zeabur Catalog 下載元件清單；叢集連不上網際網路時，見[改用鏡像](../cluster/components.mdx#改用鏡像)。
-
-其他叢集，或想把元件放在 GitOps 儲存庫管理時，用 [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) 印出元件的 manifest，再用 `kubectl` 套用，或提交到儲存庫：
-
-```sh
-zeaburctl components export cert-manager --format flux > cert-manager.yaml
-```
-
-預設的 `helmchart` 格式交給 K3s 和 RKE2 內建的 helm-controller 安裝。其他叢集用 `helm`、`flux` 或 `argocd`。
-
-## 移除管理介面
-
-```sh
-helm uninstall zeabur --namespace zeabur
-```
-
-這會移除 Zeabur 開源版和 Zeabur Identity 的伺服器。Zeabur Identity 的帳號和通行密鑰留在 `zeabur-identity` Namespace，重新安裝後還在。應用程式和提供入口、憑證、儲存空間的元件都會留下。chart 建立的成員角色會隨 release 移除，成員的權限要另外接手。完整保留清單與登入移轉步驟見[移除 Zeabur 開源版](../leave/uninstall.mdx)。

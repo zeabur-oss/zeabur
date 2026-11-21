@@ -43,9 +43,9 @@ Zeabur 上常用的模板在 Zeabur Catalog 里对应哪些模板，见 [Zeabur 
 
 ## 从哪里开始
 
-Zeabur 开源版装在 Kubernetes 上。Kubernetes 是在一台或多台服务器上运行容器的开源系统。有哪些安装方式、哪一种适合你，见[在一台服务器上安装 Zeabur 开源版](quickstart.mdx)。装好后，再[部署第一个服务](first-project.mdx)。
+要把 Zeabur 上的服务迁过来，可以[交给 Coding Agent](#交给-coding-agent-迁移)，也可以自己[一步一步迁移](#一步一步迁移)。两种做法都会准备一台新服务器，在上面装好 Kubernetes 和 Zeabur 开源版，再迁移服务。Kubernetes 是在一台或多台服务器上运行容器的开源系统。
 
-要把 Zeabur 上的服务迁过来，可以[交给 Coding Agent](#交给-coding-agent-迁移)，也可以自己[一步一步迁移](#一步一步迁移)。
+只想先试试 Zeabur 开源版、不迁移服务，到[开始使用](../index.mdx)选一种安装方式。
 
 ## 交给 Coding Agent 迁移
 
@@ -125,9 +125,9 @@ Coding Agent 会按下面的步骤做，你也可以自己按着做。自己迁�
 
 ### 3. 用 Zeatend 装好 Kubernetes
 
-先按[用 Zeatend 安装](../install/one-command.mdx)的“开始之前”，在服务器上准备好 Zeatend、Helm 4 和 `zeabur-identityctl`；Zeatend 的下载方式见 [Zeatend 的 README](https://github.com/zeabur-oss/zeatend#download-zeatend)。再按同一页的“选好域名”和“用 Zeatend 装好 Kubernetes”写好 `/etc/zeatend/config.yaml`。保留 `distribution: k3s`，域名用 `<IP>.sslip.io`。
+先按[用 Zeatend 安装](../install/one-command.mdx)的“开始之前”，在服务器上准备好 Zeatend、Helm 4 和 `zeabur-identityctl`。再按同一页的“选好域名”和“用 Zeatend 装好 Kubernetes”写好 `/etc/zeatend/config.yaml`。保留 `distribution: k3s`，域名用 `<IP>.sslip.io`。
 
-不要直接运行 `zeatend apply`，先生成计划给用户看：
+那一页接下来运行的 `zeatend plan` 和 `zeatend apply`，改成下面的做法，先生成计划给用户看：
 
 ```sh
 sudo zeatend plan --json > plan.json
@@ -143,7 +143,7 @@ sudo zeatend apply --plan plan.json
 
 ### 4. 用一个 helm install 装好 Zeabur 开源版
 
-按同一页的“安装 Zeabur 开源版”运行 `helm install`。结束时会打印创建第一个管理员账号的链接，只能用一次，24 小时后失效。
+按[用 Zeatend 安装](../install/one-command.mdx)的“安装 Zeabur 开源版”运行 `helm install`。结束时会打印创建第一个管理员账号的链接，只能用一次，24 小时后失效。
 
 把链接交给用户，请对方打开并创建通行密钥，再用通行密钥登录 `https://zeabur.<IP>.sslip.io`。等用户说登录成功再继续。
 

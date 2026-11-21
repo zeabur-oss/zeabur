@@ -1,24 +1,35 @@
 ---
 title: 开始使用 Zeabur 开源版
-description: 在新服务器或已有的 Kubernetes 集群上装好 Zeabur 开源版，再用它管理服务。
+description: 根据现有环境选一条安装路线：交给 Claude Code 或 Codex、在新服务器上用 Zeatend、安装到已有集群，或从 Zeabur 迁移过来。
 ---
 
-用 Zeabur 开源版查看 Kubernetes 中的服务、日志和域名。调整配置时，先**检查变更**再应用。根据现有环境选择起点。Zeatend、Zeabur Identity、Zeabur Catalog 和 Zeabur Builder 各自负责什么，见[总览](https://oss.zeabur.com/zh-CN/docs/overview/)。
+用 Zeabur 开源版查看 Kubernetes 中的服务、日志和域名。调整配置时，先**检查变更**再应用。Zeatend、Zeabur Identity、Zeabur Catalog 和 Zeabur Builder 各自负责什么，见[总览](https://oss.zeabur.com/zh-CN/docs/overview/)。
 
-## 从一台服务器开始
+<Figure label="安装 Zeabur 开源版的三种方式：交给 Claude 或 Codex、在新服务器上用 Zeatend、安装到已有集群。三种方式装出的是同一个 Zeabur 开源版。">
+<FigFlow>
+<FigGroup label="安装 Zeabur 开源版的三种方式">
+<FigCard title="交给 Claude 或 Codex" note="粘贴一段提示词，它帮你装好" />
+<FigCard title="新服务器用 Zeatend" note="先装 Kubernetes，再用 helm install 安装" />
+<FigCard title="已有集群" note="一条 helm install" />
+</FigGroup>
+<FigArrow />
+<FigCard accent title="你的服务器上的 Zeabur 开源版" note="同样的项目、服务和域名" />
+</FigFlow>
+</Figure>
 
-在全新的 Linux 服务器上，先用 Zeatend 装好 Kubernetes，再用一条 `helm install` 装上 Zeabur 开源版。
+根据你的情况选一页开始。每条路线都会带你装好 Zeabur 开源版，并用通行密钥登录。
 
-[在一台服务器上安装 Zeabur 开源版](get-started/quickstart.mdx)
+| 你的情况 | 从这一页开始 |
+| --- | --- |
+| 想让 Claude Code 或 Codex 代劳 | [交给 Agent 安装或迁移](install/agent.mdx) |
+| 有一台全新的 Linux 服务器 | [用 Zeatend 安装](install/one-command.mdx) |
+| 已经在运行 Kubernetes 集群 | [将 Zeabur 开源版安装到已有集群](install/existing-cluster.mdx) |
+| 正在用 Zeabur，想把服务迁移过来 | [从 Zeabur 过来](get-started/from-zeabur-com.mdx) |
 
-## 使用已有的 Kubernetes 集群
+Kubernetes 是在一台或多台服务器上运行容器的开源系统，集群就是一组由它管理的服务器。Zeatend 会在新服务器上装好 Kubernetes。每条路线最后都用同一条 `helm install` 安装 Zeabur 开源版，Helm 是 Kubernetes 的安装工具。
 
-准备集群管理权限和 Helm。Chart 会一并安装 Zeabur Identity，kube-apiserver 需要信任它，做法见[将 Zeabur 开源版安装到已有集群](install/existing-cluster.mdx)。Zeabur 开源版网址必须能通过 HTTPS 打开，浏览器才会提供通行密钥。
-
-完成后，用通行密钥登录 Zeabur 开源版，在**项目**中找到已有的 Namespace，或新建项目部署服务。
-
-[将 Zeabur 开源版安装到已有集群](install/existing-cluster.mdx)
+只想在自己的电脑上查看集群，而不安装到集群中，见 [Zeabur Desktop](install/desktop.mdx)。
 
 ## 下一步
 
-能登录 Zeabur 开源版后，接着[部署第一个服务](get-started/first-project.mdx)。
+登录 Zeabur 开源版后，接着[部署第一个服务](get-started/first-project.mdx)。

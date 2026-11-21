@@ -14,13 +14,13 @@ website repository, not in the docs.
 | `FigArrow` | `label`, `accent` | The step from one child of `FigFlow` to the next. |
 
 ```mdx
-<Figure label="Members sign in with Zeabur Identity, and Zeabur shows the projects you gave them.">
+<Figure label="Members sign in with Zeabur Identity, and Zeabur OSS shows the projects you gave them.">
 <FigFlow>
 <FigCard title="Member" note="A passkey on their phone or computer" />
 <FigArrow label="Signs in" />
 <FigCard title="Zeabur Identity" note="Checks who they are" />
 <FigArrow />
-<FigCard accent title="Zeabur" note="Shows what you allowed" />
+<FigCard accent title="Zeabur OSS" note="Shows what you allowed" />
 </FigFlow>
 </Figure>
 ```

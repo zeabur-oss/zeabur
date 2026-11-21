@@ -1,30 +1,24 @@
 ---
 title: 用 Zeatend 安裝
-description: 在一台全新的 Linux 伺服器上，先用 Zeatend 裝好 Kubernetes，再用一個 Helm 指令裝上 Zeabur 開源版。
+description: 在一台全新的 Linux 伺服器上，先用 Zeatend 裝好 Kubernetes，再用一個 helm install 裝上 Zeabur 開源版。
 ---
 
 照這一頁做完，新的 Linux 伺服器上會跑著 Kubernetes 和 Zeabur 開源版，你可以用 HTTPS 打開 Zeabur 開源版，用通行密鑰登入。
 
-已經有叢集？見[把 Zeabur 開源版裝進既有叢集](existing-cluster.mdx)。想讓 Claude Code 或 Codex 這類 Coding Agent 代你做這些步驟，見[交給 Agent 安裝](agent.mdx)。Agent 讀的是[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/install/one-command.md)。
+已經有叢集？見[把 Zeabur 開源版裝進既有叢集](existing-cluster.mdx)。想讓 Claude Code 或 Codex 代你做，見[交給 Agent 安裝或搬家](agent.mdx)。
 
 ## 開始之前
 
-- **一台 Linux 伺服器**，有公開 IP 位址，80 和 443 埠能從網際網路連進來。Let's Encrypt 會透過 80 埠檢查網址。
-- **伺服器的 root 權限**，透過 SSH 登入。
-- **伺服器上的 Zeatend、Helm 4 和 `zeabur-identityctl`**。Zeatend 的取得方式見 [Zeatend 的 README](https://github.com/zeabur-oss/zeatend#readme)。
+- **一台 Linux 伺服器**，有公開 IP 位址，80 和 443 埠能從網際網路連進來。Let's Encrypt 會透過 80 埠檢查網址。記憶體和磁碟要多大，見 Zeatend 的[支援的伺服器與檔案](https://oss.zeabur.com/zh-TW/docs/zeatend/reference/hosts/)。
+- **伺服器的 root 權限**，透過 SSH 登入。下面的指令都以 root 執行，用一般帳號登入時先執行 `sudo -i`。
+- **伺服器上的 Zeatend、Helm 4 和 `zeabur-identityctl`**。Zeatend 的下載方式見[下載 Zeatend](https://oss.zeabur.com/zh-TW/docs/zeatend/get-started/install/#下載-zeatend)；`zeabur-identityctl` 見 Zeabur Identity 的[發行檔與驗證](https://oss.zeabur.com/zh-TW/docs/identity/reference/releases/)。
 
 <Steps>
 <Step>
 
 ### 選好網域
 
-Zeabur 開源版的網址是 `zeabur.<網域>`，負責登入的 Zeabur Identity 是 `identity.<網域>`。沒有自己的網域時，用 `<IP>.sslip.io`，`<IP>` 填伺服器的公開 IP 位址。sslip.io 會把這類名稱解析成名稱裡的 IP 位址，所以不用新增 DNS 紀錄：
-
-```sh
-DOMAIN=203.0.113.10.sslip.io
-```
-
-要用自己的網域，例如 `example.com`，把 `zeabur.example.com` 和 `identity.example.com`（或 `*.example.com`）指向伺服器，再設定 `DOMAIN=example.com`。
+照[選好網域](existing-cluster.mdx#選好網域)在伺服器上設定 `DOMAIN`。用自己的網域時，DNS 紀錄指向這台伺服器。
 
 </Step>
 <Step>
@@ -34,43 +28,36 @@ DOMAIN=203.0.113.10.sslip.io
 寫好 Zeatend 的設定。下一步會裝好 Zeabur Identity，`apiServer.authenticationConfig` 讓 Kubernetes 接受它發出的登入權杖。這段設定由 `zeabur-identityctl kube-config` 印出：
 
 ```sh
-sudo mkdir -p /etc/zeatend
+mkdir -p /etc/zeatend
 {
   printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
   zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public 2>/dev/null | sed 's/^/    /'
-} | sudo tee /etc/zeatend/config.yaml
-sudo zeatend apply
+} > /etc/zeatend/config.yaml
+zeatend plan
 ```
 
-`zeatend apply` 會安裝 K3s，並顯示每個步驟。SSH 斷線時安裝會繼續，再執行一次 `sudo zeatend apply` 就能接著看。
+`zeatend plan` 會檢查伺服器、列出要安裝的內容，不會改動任何東西。出現 `FAIL` 時，先照那一行的說明處理，見 Zeatend 的[檢查安裝計畫](https://oss.zeabur.com/zh-TW/docs/zeatend/get-started/install/#檢查安裝計畫)。沒有 `FAIL` 就安裝：
+
+```sh
+zeatend apply
+```
+
+`zeatend apply` 會安裝 K3s，並顯示每個步驟。SSH 斷線時安裝會繼續，再執行一次 `zeatend apply` 就能接著看。
 
 </Step>
 <Step>
 
 ### 安裝 Zeabur 開源版
 
-把 `<version>` 換成要安裝的版本，版本列在[發布成品](../reference/releases.mdx)。
+讓 Helm 使用 K3s 的 kubeconfig：
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
-sudo -E helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
-  --version <version> \
-  --namespace zeabur --create-namespace \
-  --set global.domain="$DOMAIN"
 ```
 
-這個指令會裝好 Zeabur 開源版、負責登入的 Zeabur Identity，以及向 Let's Encrypt 取得 HTTPS 憑證的 cert-manager。Helm 會等 cert-manager 裝完，大約幾分鐘。它加上的所有東西，見[把 Zeabur 開源版裝進既有叢集](existing-cluster.mdx#用-helm-安裝)。
-
-結束時會印出建立第一個管理員帳號的連結。連結只能用一次，24 小時後失效。
-
-</Step>
-<Step>
-
-### 建立管理員帳號並登入
-
-打開連結，建立通行密鑰。安裝完後，憑證可能要等一分鐘。瀏覽器警告憑證有問題時，稍等一下再重新整理。
-
-通行密鑰存好後，頁面會連到 Zeabur 開源版。打開它，用通行密鑰登入。其他需要的元件，到**叢集** → **元件**頁面加上。
+接著照[用 Helm 安裝](existing-cluster.mdx#用-helm-安裝)執行 `helm install`，再照[建立管理員帳號](existing-cluster.mdx#建立管理員帳號)用通行密鑰登入。Zeatend 已經讓叢集信任登入，不用再做「讓叢集信任登入」。
 
 </Step>
 </Steps>
+
+登入後，其他需要的元件到**叢集** → **元件**頁面安裝，見[檢視與安裝叢集元件](../cluster/components.mdx)。
