@@ -7,17 +7,17 @@ This page lists each version's breaking changes and what to do before you upgrad
 
 If you're skipping versions, start at the version you run now and read every section up to the version you're moving to. The newest version is at the top.
 
-## v0.3.0 → v0.3.1
-
-Zeabur OSS now writes its own alert rules and Zeabur Proxy's access to the logs when it installs VictoriaMetrics and VictoriaLogs. The catalog components no longer carry them, and the custom resource metrics are named `kube_customresource_*`. If you installed VictoriaMetrics with Helm, Flux or Argo CD, upgrade it from Zeabur Catalog, then print Zeabur OSS's objects with `zeaburctl components export victoria-metrics victoria-logs` and apply the ones at the end of each component. If an old `zeabur-notifications` VMRule stays and the Notifications page cannot update it, delete it with `kubectl -n observability delete vmrule zeabur-notifications`, then click **Install rules** on that page.
-
 ## v0.2 → v0.3
+
+You don't have to do the steps below by hand. Paste the prompt in [Let an agent upgrade for you](steps.mdx#let-an-agent-upgrade-for-you), and the agent follows this section for you. It stops and waits for you when you take the snapshot and when you sign in.
 
 zeabur-installer is gone. One `helm install` sets up Zeabur OSS on an existing cluster; on a new server, [Zeatend](../install/one-command.mdx) sets up Kubernetes first.
 
 The chart now installs Zeabur Identity and cert-manager, and turns on the Ingress with a certificate from the ClusterIssuer `letsencrypt`. To keep the Zeabur Identity you run, upgrade with `--set identity.enabled=false`. To keep a TLS secret you make yourself, add `--set ingress.clusterIssuer=`. Upgrades never install cert-manager.
 
 The chart now carries the `zeabur-system-hosts` admission policy. Outside namespaces labelled `zeabur.com/platform: "true"`, a new or changed Ingress rule needs a host and an HTTPRoute needs hostnames, and neither can use Zeabur OSS's or Zeabur Identity's domain. Objects that already exist keep working until their `spec` changes. To leave the policy out, set `systemHosts.enabled: false`.
+
+Zeabur OSS now writes its own alert rules and Zeabur Proxy's access to the logs when it installs VictoriaMetrics and VictoriaLogs. The catalog components no longer carry them, and the custom resource metrics are named `kube_customresource_*`. If you installed VictoriaMetrics with Helm, Flux or Argo CD, upgrade it from Zeabur Catalog, then print Zeabur OSS's objects with `zeaburctl components export victoria-metrics victoria-logs` and apply the ones at the end of each component. If an old `zeabur-notifications` VMRule stays and the Notifications page cannot update it, delete it with `kubectl -n observability delete vmrule zeabur-notifications`, then click **Install rules** on that page.
 
 ### Installed with zeabur-installer
 
