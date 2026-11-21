@@ -1,7 +1,10 @@
+{{- if .Release.IsInstall }}
 {{- with .Values.components.install }}
 {{- $name := printf "%s-components" (include "zeabur.fullname" $) | trunc 63 | trimSuffix "-" }}
-{{- /* cluster-admin, because installing a component is an admin's step (Cluster → Components
-       checks for every right). The hook objects are deleted once the Job succeeds. */}}
+{{- /* Not a Helm hook: Helm waits for hooks, and a failed install here would fail the release.
+       cluster-admin, because installing a component is an admin's step (Cluster → Components
+       checks for every right). The Job deletes the binding when it succeeds, and the next
+       upgrade deletes all three. Argo CD runs them as a hook. */}}
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -10,9 +13,8 @@ metadata:
   labels:
     {{- include "zeabur.labels" $ | nindent 4 }}
   annotations:
-    helm.sh/hook: post-install
-    helm.sh/hook-weight: "-1"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
@@ -21,9 +23,8 @@ metadata:
   labels:
     {{- include "zeabur.labels" $ | nindent 4 }}
   annotations:
-    helm.sh/hook: post-install
-    helm.sh/hook-weight: "-1"
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: ClusterRole
@@ -41,14 +42,17 @@ metadata:
   labels:
     {{- include "zeabur.labels" $ | nindent 4 }}
   annotations:
-    helm.sh/hook: post-install
-    helm.sh/hook-delete-policy: before-hook-creation,hook-succeeded
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
 spec:
-  backoffLimit: 2
+  {{- /* Each retry waits twice as long, up to 6 minutes: about 45 minutes in all. */}}
+  backoffLimit: 12
   template:
     metadata:
+      {{- /* Not the server's selector labels: the Service would send requests to this pod. */}}
       labels:
-        {{- include "zeabur.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/name: {{ $name }}
+        app.kubernetes.io/instance: {{ $.Release.Name }}
     spec:
       serviceAccountName: {{ $name }}
       restartPolicy: Never
@@ -87,7 +91,14 @@ spec:
         - name: {{ printf "install-%d" $i }}
           image: {{ include "zeabur.image" $ | quote }}
           imagePullPolicy: {{ $.Values.image.pullPolicy }}
-          args: [components, install, {{ $id | quote }}, --timeout, 4m]
+          args:
+            - components
+            - install
+            - {{ $id | quote }}
+            - --timeout=4m
+            {{- if eq $i $last }}
+            - --revoke={{ $name }}
+            {{- end }}
           env:
             - name: ZEABUR_CATALOG_URL
               value: {{ $.Values.catalog.url | quote }}
@@ -108,4 +119,5 @@ spec:
             limits:
               memory: 128Mi
       {{- end }}
+{{- end }}
 {{- end }}

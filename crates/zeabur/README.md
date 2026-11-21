@@ -10,8 +10,9 @@ kube-apiserver says the person may run commands in the project's pods (see `zeab
 `zeabur components install <id>…` does what **Cluster → Components** does, in the same process,
 as the pod's service account, which must be a cluster administrator. It waits for every step and
 health check, up to `--timeout` (default `10m`), and leaves a component that someone other than
-Zeabur OSS installed as it is. The chart runs it in a `post-install` hook Job to install cert-manager.
-It reads `--catalog-url` (`ZEABUR_CATALOG_URL`) and `--extra-ca-file` (`ZEABUR_EXTRA_CA_FILE`).
+Zeabur OSS installed as it is. The chart runs it in a Job at install time to install cert-manager, and
+`--revoke <binding>` deletes the Job's `ClusterRoleBinding` when every component is ready. It reads
+`--catalog-url` (`ZEABUR_CATALOG_URL`) and `--extra-ca-file` (`ZEABUR_EXTRA_CA_FILE`).
 
 ## Configuration
 

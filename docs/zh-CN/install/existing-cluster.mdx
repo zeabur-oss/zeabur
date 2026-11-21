@@ -77,7 +77,7 @@ helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 - 把 Zeabur 开源版装进 `zeabur` Namespace，Zeabur Identity 装进 `zeabur-identity`。
 - 在 Zeabur Identity 注册 Zeabur 开源版，并把 client secret 存入集群。实际值不会进入 Helm 的安装记录。
-- 从 Zeabur Catalog 安装 cert-manager，方式和**集群** → **组件**相同，并附带 ClusterIssuer `letsencrypt`。Helm 会等它装完，大约需要几分钟。
+- 从 Zeabur Catalog 安装 cert-manager，方式和**集群** → **组件**相同，并附带 ClusterIssuer `letsencrypt`。`helm install` 结束后由一个 Job 来装，大约需要几分钟；失败会重试约 45 分钟。
 - 添加项目成员用的 ClusterRole 和 Namespace admission policy。chart 不会把成员角色分配给任何人，登录后由管理员在**成员**中设置每个人的权限。
 
 `helm install` 结束时会输出创建第一个管理员账号的链接。请保存好：链接只能用一次，24 小时后失效。
@@ -132,7 +132,7 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 | --- | --- |
 | 浏览器打不开 Zeabur 开源版 | 先确认 `kubectl -n zeabur rollout status deployment/zeabur` 成功，再核对 DNS、Ingress class，以及 80 和 443 端口是否开放。 |
 | 浏览器提示证书有问题，几分钟后仍未消失 | 运行 `kubectl get certificate -A`。证书一直未就绪，通常是 Let's Encrypt 访问不到 80 端口，或 sslip.io 域名中的 IP 不是公网 IP。 |
-| `helm install` 提示 `zeabur-components` job 失败 | Zeabur 开源版已经装好，但 cert-manager 没有装上。`kubectl -n zeabur logs job/zeabur-components` 会显示原因。排除后，运行 `zeaburctl components export cert-manager --format helm` 输出的命令。 |
+| `kubectl -n zeabur get job zeabur-components` 显示 `Failed` | Zeabur 开源版已经装好，但 cert-manager 没有装上。`kubectl -n zeabur logs job/zeabur-components --all-containers` 会显示原因。排除后，运行 `helm uninstall zeabur -n zeabur`，再运行一次 `helm install` 命令。 |
 | 集群已经有 cert-manager | 安装不会改动它。确认它有名为 `letsencrypt` 的 ClusterIssuer，或将 `ingress.clusterIssuer`、`identity.ingress.clusterIssuer` 和 `domains.clusterIssuer` 改为你的 ClusterIssuer。 |
 | 每个页面都提示你没有登录集群 | kube-apiserver 还不接受令牌。按[让集群信任登录](#让集群信任登录)的步骤检查。 |
 | 能登录，却看不到服务 | Zeabur 开源版用登录者自己的权限读取集群。管理员在[成员](../cluster/members.mdx)中为他分配项目角色。 |

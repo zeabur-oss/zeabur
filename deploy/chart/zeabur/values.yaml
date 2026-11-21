@@ -275,7 +275,9 @@ catalog:
   url: https://oss-catalog.zeabur.com/v1/
 
 # Components installed once, right after `helm install`, as Cluster → Components installs them:
-# a hook Job runs `zeabur components install <id>` for each, as cluster-admin until it finishes.
+# a Job runs `zeabur components install <id>` for each, as cluster-admin until it finishes. It runs
+# after `helm install` returns, so its failure does not fail the release, and retries for about 45
+# minutes.
 # cert-manager signs the certificates for Zeabur and Zeabur Identity (ingress.clusterIssuer).
 # Empty: install them from Cluster → Components later. Upgrades never install them.
 components:

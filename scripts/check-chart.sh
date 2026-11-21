@@ -19,15 +19,16 @@ fail() {
 # Zeabur Identity's chart, which deploy/chart/zeabur/Chart.yaml names.
 [[ -d "$chart/charts" ]] || helm dependency build "$chart" >/dev/null
 
-# Everything the chart renders, Zeabur Identity's objects and the install hooks included.
+# Everything the chart renders, Zeabur Identity's objects and the install-time Jobs included.
 render_all() { # $@ = extra helm arguments
   helm template zeabur "$chart" --namespace zeabur "$@"
 }
 
-# Zeabur's own objects, without Zeabur Identity's or the install hooks.
+# Zeabur's own objects, without Zeabur Identity's or the install-time Jobs and their rights.
 render() { # $@ = extra helm arguments
   render_all "$@" | yq 'select((.metadata.labels."helm.sh/chart" // "zeabur-") | test("^zeabur-"))
-    | select(.metadata.annotations."helm.sh/hook" == null)'
+    | select(.metadata.annotations."helm.sh/hook" == null)
+    | select(.metadata.annotations."argocd.argoproj.io/hook" == null)'
 }
 
 # Prints the value of a yq expression over every rendered document, one per line.
@@ -365,19 +366,26 @@ expect identity "$out" '[select(.kind == "Ingress") | .metadata.annotations["cer
   "letsencrypt identity.example.test,letsencrypt zeabur.example.test"
 expect full "$(render_all -f "$chart/ci/full-values.yaml")" '[select(.kind == "OAuthClient" or .metadata.namespace == "zeabur-identity")] | length' 0
 
-# The components are installed once, after `helm install`, in order, by a Job whose cluster-admin
-# binding is gone when it succeeds.
+# The components are installed once, after `helm install`, in order, by a Job that is not a Helm
+# hook, so its failure does not fail the release. Its cluster-admin binding is gone when it
+# succeeds, and an upgrade renders none of it.
 hook='select(.metadata.annotations."helm.sh/hook")'
-expect components "$out" "[$hook | .kind + \"/\" + .metadata.name + \" \" + .metadata.annotations.\"helm.sh/hook\"] | sort | join(\",\")" \
-  "ClusterRoleBinding/zeabur-components post-install,Job/zeabur-components post-install,Job/zeabur-identity-setup post-install,Role/zeabur-identity-setup post-install,RoleBinding/zeabur-identity-setup post-install,ServiceAccount/zeabur-components post-install,ServiceAccount/zeabur-identity-setup post-install"
-expect components "$out" "[$hook | select(.metadata.name == \"zeabur-components\") | .metadata.annotations.\"helm.sh/hook-delete-policy\"] | unique | join(\",\")" \
-  before-hook-creation,hook-succeeded
+expect components "$out" "[$hook | .kind + \"/\" + .metadata.name] | sort | join(\",\")" \
+  "Job/zeabur-identity-setup,Role/zeabur-identity-setup,RoleBinding/zeabur-identity-setup,ServiceAccount/zeabur-identity-setup"
+expect components "$out" "[select(.metadata.name == \"zeabur-components\") | .metadata.annotations.\"argocd.argoproj.io/hook-delete-policy\"] | unique | join(\",\")" \
+  BeforeHookCreation,HookSucceeded
 expect components "$out" 'select(.kind == "ClusterRoleBinding" and .metadata.name == "zeabur-components") | .roleRef.name' cluster-admin
 expect components "$(render_all -f "$chart/ci/full-values.yaml")" \
   'select(.kind == "Job" and .metadata.name == "zeabur-components") | .spec.template.spec | [(.initContainers[], .containers[]) | .args | join(" ")] | join(",")' \
-  "components install cert-manager --timeout 4m,components install local-path --timeout 4m"
-expect components "$(render_all -f "$chart/ci/minimal-values.yaml" --set 'components.install=null')" \
-  '[select(.metadata.name == "zeabur-components")] | length' 0
+  "components install cert-manager --timeout=4m,components install local-path --timeout=4m --revoke=zeabur-components"
+expect components "$out" \
+  'select(.kind == "Job" and .metadata.name == "zeabur-components") | .spec.template.metadata.labels."app.kubernetes.io/name"' \
+  zeabur-components
+for args in "--set components.install=null" "--is-upgrade"; do
+  # shellcheck disable=SC2086 # $args is several helm arguments.
+  expect "components ($args)" "$(render_all -f "$chart/ci/minimal-values.yaml" $args)" \
+    '[select(.metadata.name == "zeabur-components")] | length' 0
+done
 
 # Each components container reaches the catalog as Zeabur does: the same extra CAs and proxy.
 outbound='.spec.template.spec | (.initContainers // []) + .containers | map([(.env | map(select(.name | test("^(ZEABUR_EXTRA_CA_FILE|HTTPS?_PROXY|NO_PROXY)$")) | .name + "=" + .value) | join(" ")), (.volumeMounts // [] | map(select(.name == "extra-ca") | .mountPath) | join(" "))] | join(" ")) | unique | join(",")'
