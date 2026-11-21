@@ -93,10 +93,8 @@ pub(crate) async fn has_device_bound_passkey(
     let admin = directory
         .user(username)
         .is_some_and(|u| u.spec.account_type == directory::AccountType::Admin);
-    Ok(admin
-        && directory.credentials.iter().any(|c| {
-            c.spec.user == username
-                && c.spec.kind == "Passkey"
-                && c.spec.passkey.as_ref().is_some_and(|p| !p.backup_eligible)
-        }))
+    Ok(admin && directory.credentials.iter().any(|c| {
+        c.spec.user == username
+            && matches!(&c.spec.kind, directory::CredentialKind::Passkey(p) if !p.backup_eligible)
+    }))
 }

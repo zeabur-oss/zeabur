@@ -7167,7 +7167,7 @@ export type KeptCopy = {
 }
 
 /**
- * A GitHub or Google account linked for everyday sign-in.
+ * An account at an upstream provider, such as GitHub or Google, linked for everyday sign-in.
  */
 export type LinkedAccountView = {
   /**
@@ -7184,7 +7184,7 @@ export type LinkedAccountView = {
   lastUsedAt?: string | null
   /** The `Credential`. */
   origin: Origin
-  /** `GitHub` or `Google`. */
+  /** `GitHub`, `Google`, or the upstream issuer of another provider. */
   provider: string
 }
 

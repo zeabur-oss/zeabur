@@ -79,10 +79,42 @@ pub(crate) enum AccountType {
 #[serde(rename_all = "camelCase")]
 pub(crate) struct CredentialSpec {
     pub(crate) user: String,
-    #[serde(rename = "type")]
-    pub(crate) kind: String,
-    #[serde(default)]
-    pub(crate) passkey: Option<PasskeySpec>,
+    #[serde(flatten)]
+    pub(crate) kind: CredentialKind,
+}
+
+/// What a `Credential` signs in with: the field that is set names the kind, as in Zeabur
+/// Identity's `CredentialKind`.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum CredentialKind {
+    Passkey(PasskeySpec),
+    External(ExternalSpec),
+    Password(serde::de::IgnoredAny),
+}
+
+impl CredentialKind {
+    pub(crate) const fn is_passkey(&self) -> bool {
+        matches!(self, Self::Passkey(_))
+    }
+}
+
+/// An account at an upstream provider.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct ExternalSpec {
+    pub(crate) issuer: String,
+}
+
+impl ExternalSpec {
+    /// `GitHub` or `Google` for their issuers, else the issuer.
+    fn provider(&self) -> String {
+        match self.issuer.as_str() {
+            "https://github.com" => "GitHub".to_owned(),
+            "https://accounts.google.com" => "Google".to_owned(),
+            issuer => issuer.to_owned(),
+        }
+    }
 }
 
 /// What Zeabur Identity changes after enrolment.
@@ -96,7 +128,7 @@ pub(crate) struct CredentialStatus {
     pub(crate) last_used_at: Option<i64>,
 }
 
-#[derive(Debug, Clone, Default, Deserialize)]
+#[derive(Debug, Clone, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct PasskeySpec {
     #[serde(default)]
@@ -254,7 +286,7 @@ impl Directory {
     pub(crate) fn passkeys_of(&self, username: &str) -> usize {
         self.credentials
             .iter()
-            .filter(|c| c.spec.user == username && c.spec.kind == "Passkey")
+            .filter(|c| c.spec.user == username && c.spec.kind.is_passkey())
             .count()
     }
 
@@ -285,33 +317,36 @@ impl Directory {
                 .status
                 .last_used_at
                 .and_then(|secs| Timestamp::from_second(secs).ok());
-            if credential.spec.kind == "Passkey" {
-                let passkey = credential.spec.passkey.clone().unwrap_or_default();
-                let label = credential
-                    .status
-                    .label
-                    .as_deref()
-                    .map(str::trim)
-                    .filter(|l| !l.is_empty())
-                    .map(str::to_owned)
-                    .or_else(|| passkey.label.filter(|l| !l.trim().is_empty()));
-                passkeys.push(PasskeyView {
-                    id: credential.name().to_owned(),
-                    label,
-                    created_at: credential.created(),
-                    last_used_at,
-                    synced: passkey.backup_eligible,
-                    authenticator: passkey.aaguid,
-                    origin,
-                });
-            } else {
-                linked.push(LinkedAccountView {
-                    id: credential.name().to_owned(),
-                    provider: credential.spec.kind.clone(),
-                    created_at: credential.created(),
-                    last_used_at,
-                    origin,
-                });
+            match &credential.spec.kind {
+                CredentialKind::Passkey(passkey) => {
+                    let label = credential
+                        .status
+                        .label
+                        .as_deref()
+                        .map(str::trim)
+                        .filter(|l| !l.is_empty())
+                        .map(str::to_owned)
+                        .or_else(|| passkey.label.clone().filter(|l| !l.trim().is_empty()));
+                    passkeys.push(PasskeyView {
+                        id: credential.name().to_owned(),
+                        label,
+                        created_at: credential.created(),
+                        last_used_at,
+                        synced: passkey.backup_eligible,
+                        authenticator: passkey.aaguid.clone(),
+                        origin,
+                    });
+                }
+                CredentialKind::External(external) => {
+                    linked.push(LinkedAccountView {
+                        id: credential.name().to_owned(),
+                        provider: external.provider(),
+                        created_at: credential.created(),
+                        last_used_at,
+                        origin,
+                    });
+                }
+                CredentialKind::Password(_) => {}
             }
         }
         passkeys.sort_by(|a, b| a.created_at.cmp(&b.created_at).then(a.id.cmp(&b.id)));
@@ -560,13 +595,13 @@ pub struct PasskeyView {
     pub origin: Origin,
 }
 
-/// A GitHub or Google account linked for everyday sign-in.
+/// An account at an upstream provider, such as GitHub or Google, linked for everyday sign-in.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct LinkedAccountView {
     /// The `Credential` object's name.
     pub id: String,
-    /// `GitHub` or `Google`.
+    /// `GitHub`, `Google`, or the upstream issuer of another provider.
     pub provider: String,
     /// When it was linked.
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -717,7 +752,7 @@ mod tests {
         object(json!({
             "metadata": {"name": name, "creationTimestamp": created},
             "status": status,
-            "spec": {"user": user, "type": "Passkey",
+            "spec": {"user": user,
                      "passkey": {"credentialId": "abc", "record": "{}", "label": "MacBook"}}
         }))
     }
@@ -735,7 +770,7 @@ mod tests {
                 ),
                 object(json!({
                     "metadata": {"name": "c-3", "creationTimestamp": "2026-10-03T00:00:00Z"},
-                    "spec": {"user": "bob", "type": "GitHub",
+                    "spec": {"user": "bob",
                              "external": {"issuer": "https://github.com", "subject": "1"}}
                 })),
             ],
