@@ -1,6 +1,6 @@
 ---
 title: Let an agent install for you
-description: Paste one prompt into Claude Code or Codex, and it installs Zeabur OSS on a server for you by following these docs.
+description: Paste one prompt into Claude Code or Codex, and it installs Zeabur OSS on a server for you by following these docs. It can also move your services off Zeabur.
 ---
 
 An agent such as Claude Code or Codex can follow the install steps for you. It reads the same pages you would, runs the commands, and stops where a decision or a payment is yours.
@@ -10,6 +10,7 @@ An agent such as Claude Code or Codex can follow the install steps for you. It r
 ```text
 Install Zeabur OSS on my server by following https://oss.zeabur.com/docs/zeabur/install/one-command.md.
 If the server already runs Kubernetes, follow https://oss.zeabur.com/docs/zeabur/install/existing-cluster.md instead.
+Before each change to the server, tell me what you will do and wait for my yes. Give me the link that creates the admin account, and don't open it yourself.
 ```
 
 Each address points to the Markdown copy of a docs page: [Install with Zeatend](one-command.mdx) and [Install Zeabur OSS in an existing cluster](existing-cluster.mdx). Run the agent on a computer that can reach the server over SSH, and tell it the server's address.
@@ -25,8 +26,8 @@ Each address points to the Markdown copy of a docs page: [Install with Zeatend](
 
 - Get the server and pay for it.
 - To use your own domain instead of an sslip.io address, point its DNS records at the server.
-- Open the link and create your passkey. Only you can make it, on your own device.
+- Open the link, create your passkey, and sign in to Zeabur OSS with it. Only you can make the passkey, on your own device.
 
 ## Coming from Zeabur
 
-To move a project too, add to the prompt: "Then move my Zeabur services by following https://oss.zeabur.com/docs/zeabur/get-started/from-zeabur-com.md." That file is the Markdown copy of [Coming from Zeabur](../get-started/from-zeabur-com.mdx). The agent lists your services, backs up the databases, creates the services again in Zeabur OSS, and restores the data.
+To move your services off Zeabur too, use the prompt in [Coming from Zeabur](../get-started/from-zeabur-com.mdx#hand-the-move-to-a-coding-agent) instead. The agent gets a server, installs Zeabur OSS, then moves your services and data.

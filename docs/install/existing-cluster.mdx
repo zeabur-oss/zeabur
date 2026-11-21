@@ -5,7 +5,7 @@ description: Install Zeabur OSS and Zeabur Identity with one Helm command, then 
 
 When you finish this page, you have Zeabur OSS at an HTTPS address, and you sign in to it with a passkey. The applications already in your cluster show up on the **Projects** page.
 
-No cluster yet? [Install with Zeatend](one-command.mdx) sets one up on a new server first. To have an agent do these steps, see [Let an agent install for you](agent.mdx). The agent reads [the Markdown copy of this page](https://oss.zeabur.com/docs/zeabur/install/existing-cluster.md).
+No cluster yet? [Install with Zeatend](one-command.mdx) sets one up on a new server first. To have Claude Code or Codex do it, see [Let an agent install for you](agent.mdx).
 
 <Figure label="One helm install puts Zeabur OSS in the zeabur namespace and Zeabur Identity in zeabur-identity, adds cert-manager for HTTPS, and leaves your applications where they are">
 <FigFlow>
@@ -27,7 +27,7 @@ Kubernetes is open-source software that runs containers on one or more servers, 
 - **A Kubernetes cluster**, version 1.30 or later, and a kubeconfig that can manage it. A kubeconfig is the file `kubectl` uses to reach a cluster.
 - **An Ingress controller** that is the cluster's default IngressClass, such as the Traefik that K3s and RKE2 include. Ports 80 and 443 must be open to the internet, so that Let's Encrypt can check the addresses and issue their certificates.
 - **Tools on your computer**: `kubectl`, Helm 4, and `zeabur-identityctl`.
-- **The version to install.** The examples use `<version>`. The chart is published at `oci://ghcr.io/zeabur-oss/charts/zeabur`, and its default image is pinned to the digest of the same version. See [Release artifacts](../reference/releases.mdx) to download and verify it.
+- **The version to install.** The examples use `<version>`. The chart is published at `oci://ghcr.io/zeabur-oss/charts/zeabur`, and its default image is pinned to the digest of the same version. See [Release files and verification](../reference/releases.mdx) for the versions and how to verify them.
 
 Kubernetes must be 1.30 or later because, by default, the chart creates project member roles and uses `ValidatingAdmissionPolicy` to limit which namespace fields Developers can change. That API is generally available starting in 1.30. A namespace is how Kubernetes groups things, and each Zeabur OSS project is one namespace.
 
@@ -63,6 +63,8 @@ On RKE2, use `--distro rke2`. Follow the printed steps on each server node. The 
 <Step>
 
 ### Install with Helm
+
+Replace `<version>` with the version to install:
 
 ```sh
 helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
@@ -105,7 +107,7 @@ To keep one listed as a project, select **Use this namespace**, then review and 
 </Step>
 </Steps>
 
-Next, [invite members](../cluster/members.mdx) or [deploy your first service](../get-started/first-project.mdx). For admin accounts, session limits, and the sign-in options on **Settings**, see [Permissions](../reference/permissions.mdx#admin-accounts-and-regular-accounts).
+Next, [invite members](../cluster/members.mdx) or [deploy your first service](../get-started/first-project.mdx). The install added cert-manager. For other components, see [View and install cluster components](../cluster/components.mdx). For admin accounts, session limits, and the sign-in options on **Settings**, see [Permissions](../reference/permissions.mdx#admin-accounts-and-regular-accounts).
 
 ## Give new services a public URL
 
@@ -194,23 +196,3 @@ printf 'sha256:%s\n' "$(printf %s "$CLIENT_SECRET" | openssl dgst -sha256 -r | c
 ```
 
 Set `planKey.existingSecret` to `zeabur-plan-key`, `issuer.clientSecret.existingSecret` to `zeabur-client`, and `issuer.clientSecret.hash` to the last line the commands print. These tools can't read the server's IP address either, so set `global.domain`. To view all chart settings, run `helm show values oci://ghcr.io/zeabur-oss/charts/zeabur --version <version>`.
-
-## Install the components Zeabur OSS needs
-
-The install adds cert-manager. On K3s and RKE2, a cluster administrator installs the other components from **Cluster** → **Components**. See [Install from the page](../cluster/components.mdx#install-from-the-page). Zeabur OSS downloads the list of components from Zeabur Catalog; for a cluster without internet access, see [Use a mirror](../cluster/components.mdx#use-a-mirror).
-
-On other clusters, or to keep components in a GitOps repository, use [`zeaburctl components export`](../reference/zeaburctl.mdx#components-export) to print a component's manifests, then apply them with `kubectl` or commit them:
-
-```sh
-zeaburctl components export cert-manager --format flux > cert-manager.yaml
-```
-
-The default `helmchart` format is for the built-in helm-controller of K3s and RKE2. For other clusters, use `helm`, `flux`, or `argocd`.
-
-## Remove the management interface
-
-```sh
-helm uninstall zeabur --namespace zeabur
-```
-
-This removes Zeabur OSS and Zeabur Identity's server. Zeabur Identity's accounts and passkeys stay in the `zeabur-identity` namespace, so a new install keeps them. Applications and the components that provide ingress, certificates, and storage stay in place. The member roles the chart created are removed with the release, so give members their rights another way. See [Remove Zeabur OSS](../leave/uninstall.mdx) for the full list of what stays and the steps to migrate sign-in.

@@ -1,7 +1,6 @@
 - group: get-started
   label: 開始使用
   pages:
-    quickstart: 安裝 Zeabur 開源版
     from-zeabur-com: 從 Zeabur 過來
     first-project: 部署第一個服務
     how-it-works: Zeabur 開源版如何管理服務

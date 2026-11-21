@@ -3,7 +3,7 @@
 # translations' nav.yaml refers to it, and it is part of each page's URL.
 - group: get-started
   label: Get started
-  pages: [quickstart, from-zeabur-com, first-project, how-it-works]
+  pages: [from-zeabur-com, first-project, how-it-works]
 - group: install
   label: Ways to install
   pages: [agent, one-command, existing-cluster, desktop]
@@ -23,5 +23,5 @@
   label: Reference
   pages: [zeaburctl, permissions, api-tokens, architecture, releases, security, telemetry]
 - group: leave
-  label: Leave Zeabur
+  label: Leave Zeabur OSS
   pages: [uninstall]

@@ -60,10 +60,13 @@ documentation, with a screenshot for each step, and where to start. It is also i
 
 ## Get started
 
-Today, you install Zeabur OSS into an existing Kubernetes cluster with Helm, Kubernetes' package
-installer. Zeabur Identity handles sign-in, so it is installed first.
-[Install Zeabur OSS in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/)
-lists what you need and each step.
+Pick the page that fits what you have. Each one takes you to the point where you sign in to
+Zeabur OSS with a passkey:
+
+- To let Claude Code or Codex do it: [Let an agent install for you](https://oss.zeabur.com/docs/zeabur/install/agent/)
+- On a new Linux server: [Install with Zeatend](https://oss.zeabur.com/docs/zeabur/install/one-command/)
+- On a Kubernetes cluster you already run: [Install Zeabur OSS in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/)
+- To move your services off Zeabur: [Coming from Zeabur](https://oss.zeabur.com/docs/zeabur/get-started/from-zeabur-com/)
 
 To look at a cluster from your own computer, `zeaburctl ui` opens Zeabur OSS in your browser with your
 kubeconfig, the file `kubectl` uses to reach a cluster. See [zeaburctl](https://oss.zeabur.com/docs/zeabur/reference/zeaburctl/).
