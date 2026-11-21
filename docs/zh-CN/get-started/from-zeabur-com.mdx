@@ -143,7 +143,7 @@ sudo zeatend apply --plan plan.json
 
 ### 4. 用一个 helm install 装好 Zeabur 开源版
 
-按[用 Zeatend 安装](../install/one-command.mdx)的“安装 Zeabur 开源版”运行 `helm install`。结束时会打印创建第一个管理员账号的链接，只能用一次，24 小时后失效。
+先按[用 Zeatend 安装](../install/one-command.mdx)的“让集群信任登录”做，集群才会接受登录令牌。那一步最后是第二次 `zeatend apply`，和第 3 步一样，先把计划给用户看。再按同一页的“安装 Zeabur 开源版”运行 `helm install`。结束时会打印创建第一个管理员账号的链接，只能用一次，24 小时后失效。
 
 把链接交给用户，请对方打开并创建通行密钥，再用通行密钥登录 `https://zeabur.<IP>.sslip.io`。等用户说登录成功再继续。
 
