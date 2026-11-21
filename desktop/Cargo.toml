@@ -1,7 +1,7 @@
 [package]
 name = "zeabur-desktop"
 description = "Zeabur Desktop (Tauri 2): lists kubeconfig contexts and opens Zeabur for each with its local service"
-version = "0.3.0-beta.1"
+version = "0.3.0-beta.2"
 edition = "2024"
 rust-version = "1.99"
 license = "Apache-2.0"
