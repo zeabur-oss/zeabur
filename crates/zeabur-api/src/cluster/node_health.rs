@@ -1,8 +1,9 @@
 //! What is wrong with a node, in the order it hurts.
 //!
 //! Down first, then a pressure the kubelet acts on, memory or disk nearly full, then what only
-//! limits new pods (cordoned, reservations). Fill is measured use against allocatable when
-//! metrics exist; reservations (requests) only say whether new pods fit.
+//! limits new pods (cordoned, reservations). Memory fill is measured use against the machine's
+//! capacity and disk fill against the filesystem, when metrics exist; reservations (requests) only
+//! say whether new pods fit.
 
 use serde::Serialize;
 use utoipa::ToSchema;
@@ -76,7 +77,7 @@ pub enum NodeIssueKind {
     DiskPressure,
     /// `NetworkUnavailable`.
     NetworkUnavailable,
-    /// Memory in use is near allocatable.
+    /// Memory in use is near the machine's capacity.
     MemoryFull,
     /// The kubelet's filesystem is nearly full.
     DiskFull,
@@ -169,10 +170,13 @@ pub(crate) fn disk_share(disk: Option<&DiskUsage>) -> Option<f64> {
     })
 }
 
+/// Memory in use of the whole machine. The metrics API counts every process, the system's too,
+/// so it is divided by the machine's capacity. Allocatable leaves out the system reserve, and on
+/// a small server that makes a healthy node read above 100%.
 fn memory_share(node: &NodeView) -> Option<f64> {
     share(
         node.usage.map(|u| u.memory_bytes),
-        node.allocatable.memory_bytes,
+        node.capacity.memory_bytes,
     )
 }
 
@@ -382,7 +386,11 @@ mod tests {
                 memory_bytes: 8 * GIB,
                 pods: None,
             },
-            capacity: Resources::default(),
+            capacity: Resources {
+                cpu_millicores: 4000,
+                memory_bytes: 8 * GIB,
+                pods: None,
+            },
             requests: None,
             limits: None,
             movable_pods: None,
@@ -398,6 +406,15 @@ mod tests {
     fn judged(mut node: NodeView) -> NodeView {
         node.issues = issues(&node);
         node
+    }
+
+    const MIB: u64 = 1 << 20;
+
+    fn small_server() -> NodeView {
+        let mut n = node("a");
+        n.capacity.memory_bytes = 3915 * MIB;
+        n.allocatable.memory_bytes = 1835 * MIB;
+        n
     }
 
     fn memory_used(mut node: NodeView, bytes: u64) -> NodeView {
@@ -445,6 +462,18 @@ mod tests {
             [(NodeIssueKind::MemoryFull, Health::Warn)]
         );
         assert!(found[0].share.is_some_and(|s| (s - 0.91).abs() < 0.01));
+    }
+
+    #[test]
+    fn a_small_server_is_not_full_because_the_system_reserve_is_left_out_of_allocatable() {
+        let fresh = memory_used(small_server(), 2802 * MIB);
+        assert_eq!(kinds(&fresh), []);
+    }
+
+    #[test]
+    fn a_small_server_turns_red_when_the_machine_runs_out_of_memory() {
+        let full = memory_used(small_server(), 3800 * MIB);
+        assert_eq!(kinds(&full), [(NodeIssueKind::MemoryFull, Health::Fail)]);
     }
 
     #[test]
