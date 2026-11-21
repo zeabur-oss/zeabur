@@ -25,17 +25,7 @@ Zeabur 開源版 0.2 裝的 K3s 叢集使用 Calico，UDP 連接埠是 4789，�
 
 ## 加入節點
 
-Zeabur 開源版不負責加入節點；用 Zeatend 裝好的叢集，由 Zeatend 加入。先開好上面的防火牆連接埠，再到伺服器執行：
-
-```sh
-sudo zeatend node add
-```
-
-指令會印出要在新 VM 執行的指令：先寫入 `/etc/zeatend/config.yaml`，加入權杖就在這份設定裡，再執行 `zeatend plan` 和 `zeatend apply`。RKE2 要加伺服器而不是工作節點時，加上 `--role server`。在新 VM 上先[下載 Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend)，再以 root 執行印出來的指令。`zeatend plan` 會檢查連接埠和到伺服器的網路延遲，`zeatend apply` 會讓 VM 加入叢集，並等節點變成 `Ready`。
-
-工作節點的權杖一小時內有效，可以用 `--ttl` 調整。節點 `Ready` 後，用 `node add` 印出的最後一行指令撤銷權杖。RKE2 伺服器拿到的是叢集的伺服器權杖，不會過期，不要貼到聊天室或工單裡。
-
-不是用 Zeatend 裝的叢集，照發行版自己的步驟把 VM 加進來。節點在**節點**清單顯示 `Ready` 後，新的副本就能排到它上面。
+Zeabur 開源版不負責加入節點。用 Zeatend 裝好的叢集，照 Zeatend 的[加入節點](https://oss.zeabur.com/zh-TW/docs/zeatend/operations/add-nodes/)做：要開哪些連接埠、怎麼讓新伺服器加入、最後怎麼撤銷權杖，那一頁都有寫。用其他方式裝的叢集，照發行版自己的步驟加入。節點在**節點**清單顯示 `Ready` 後，新的副本就能排到它上面。
 
 RKE2 的 etcd 需要過半數的伺服器才能運作。要在少一台時繼續運作，至少要三台伺服器。只有兩台時，任一台停機整個叢集就會停擺。K3s 叢集只有一台伺服器，這台停機時控制平面也會停止，伺服器回來後才會恢復。
 

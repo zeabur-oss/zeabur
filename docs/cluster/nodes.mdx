@@ -25,17 +25,7 @@ A K3s cluster that Zeabur OSS 0.2 set up uses Calico, with UDP 4789 in place of 
 
 ## Add a node
 
-Zeabur OSS doesn't add nodes; on a cluster set up with Zeatend, Zeatend does. Open the firewall ports above first, then run this on a server:
-
-```sh
-sudo zeatend node add
-```
-
-It prints the commands to run on the new VM: they write `/etc/zeatend/config.yaml` with the join token in it, then run `zeatend plan` and `zeatend apply`. On RKE2, add `--role server` to add a server instead of a worker. On the new VM, [download Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend), then run the printed commands as root. `zeatend plan` checks the ports and the network latency to the server, and `zeatend apply` joins the VM and waits until the node is `Ready`.
-
-A worker's token joins workers for one hour; change that with `--ttl`. Once the node is `Ready`, revoke the token with the last command `node add` printed. An RKE2 server gets the cluster's server token, which doesn't expire. Keep it out of chats and tickets.
-
-On a cluster you set up another way, join the VM with your distribution's own steps. When the node shows `Ready` under **Nodes**, new replicas can run on it.
+Zeabur OSS doesn't add nodes. On a cluster set up with Zeatend, follow Zeatend's [Add nodes](https://oss.zeabur.com/docs/zeatend/operations/add-nodes/): it covers the ports to open, joining the new server, and revoking the token afterwards. On a cluster you set up another way, join the server with your distribution's own steps. When the node shows `Ready` under **Nodes**, new replicas can run on it.
 
 On RKE2, etcd needs a majority of servers to operate. To keep running with one server down, you need at least three servers. With only two, taking either server down stops the entire cluster. A K3s cluster has one server; when it goes down, the control plane stops until it returns.
 
