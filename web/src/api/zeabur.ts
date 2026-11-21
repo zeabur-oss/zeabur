@@ -5134,6 +5134,22 @@ export type DatabaseAppUser = {
 }
 
 /**
+ * Why a database cannot archive its write-ahead log.
+ */
+export type DatabaseArchiveFailure = {
+  /**
+   * What the operator says, as the last archive attempt reported it.
+   * @nullable
+   */
+  message?: string | null
+  /**
+   * When archiving began to fail.
+   * @nullable
+   */
+  since?: string | null
+}
+
+/**
  * The times a new database can recover to.
  */
 export type DatabaseRecoveryWindow = {
@@ -5186,6 +5202,7 @@ export type DatabaseBackupStore = {
  * A database's backups.
  */
 export type DatabaseBackups = {
+  archiveFailure?: DatabaseArchiveFailure | null
   /**
    * A backup can start now: the database runs with its store. False between setting up
    * backups and the operator restarting the members with them.

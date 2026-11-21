@@ -162,6 +162,23 @@ pub struct Backups {
     /// log; absent when it does not, or archiving fails.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub recovery_window: Option<RecoveryWindow>,
+    /// The archive of the write-ahead log fails; absent when it works or has not started.
+    /// `ready` is false then, and this tells it apart from a database that is still starting.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub archive_failure: Option<ArchiveFailure>,
+}
+
+/// Why a database cannot archive its write-ahead log.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+#[schema(as = DatabaseArchiveFailure)]
+pub struct ArchiveFailure {
+    /// What the operator says, as the last archive attempt reported it.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub message: Option<String>,
+    /// When archiving began to fail.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub since: Option<Timestamp>,
 }
 
 /// The times a new database can recover to.
