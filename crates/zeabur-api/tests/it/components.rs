@@ -20,6 +20,7 @@ mod tests {
     use serde_json::{Value, json};
     use sha2::{Digest as _, Sha256};
     use zeabur_api::cluster::catalog::{Fetch, Fetched};
+    use zeabur_core::problem::KubernetesStatus;
     use zeabur_kube::k8s_openapi::api::core::v1::Node;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{ClusterFacts, DynamicObject, Identity, ServedResource, WriteBody};
@@ -579,6 +580,67 @@ mod tests {
                 .all(|p| p.uid.is_some() && p.resource_version.is_some()),
             "every deletion names the uid and resourceVersion it found: {deletions:?}"
         );
+    }
+
+    /// The HelmChart's deletes, after the writes `before` had already counted.
+    fn chart_deletes(cluster: &MemoryCluster, before: usize) -> usize {
+        cluster
+            .inspect(|s| {
+                s.writes[before..]
+                    .iter()
+                    .filter(|w| {
+                        matches!(w.body, WriteBody::Delete(_))
+                            && w.target.kind == "HelmChart"
+                            && w.target.name == "cert-manager"
+                    })
+                    .count()
+            })
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_removal_does_not_delete_again_what_is_already_being_deleted() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        call(&app, "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        call(&app, "apply", "install", "0.5.3").await;
+        // The first step of the removal deletes the issuers; the next one the HelmChart.
+        call(&app, "apply", "remove", "0.5.3").await;
+        let mut chart = dynamic(&cluster, "HelmChart", "cert-manager").unwrap();
+        chart["metadata"]["deletionTimestamp"] = json!("2030-01-01T00:00:00Z");
+        put(&cluster, chart);
+        let before = cluster.inspect(|s| s.writes.len()).unwrap();
+
+        let (status, applied) = call(&app, "apply", "remove", "0.5.3").await;
+
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(chart_deletes(&cluster, before), 0, "{applied}");
+    }
+
+    #[tokio::test]
+    async fn a_delete_that_finds_the_object_gone_counts_as_done() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        call(&app, "apply", "install", "0.5.3").await;
+        chart_installed(&cluster);
+        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "remove", "0.5.3").await;
+        // helm-controller removes its finalizer between the plan's read and the delete.
+        cluster.update(|s| {
+            s.write_refusals.insert(
+                "HelmChart/cert-manager".to_owned(),
+                KubernetesStatus::new(
+                    404,
+                    "NotFound",
+                    "helmcharts.helm.cattle.io \"cert-manager\" not found",
+                ),
+            );
+        });
+
+        let (status, applied) = call(&app, "apply", "remove", "0.5.3").await;
+
+        assert_eq!(status, StatusCode::OK, "{applied}");
     }
 
     #[tokio::test]
