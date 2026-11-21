@@ -89,11 +89,15 @@ kubectl get clusters.postgresql.cnpg.io orders -n shop -o yaml
 
 When the controller is gone for good or can't finish its cleanup, click **Force delete** at the top of the project page. The button appears as soon as an object waits for a finalizer. A controller usually finishes on its own, so waiting longer is safer. Force delete only when it can't finish.
 
+![The top of project archive while it is being deleted: the database ledger holds it with the finalizer cnpg.io/cleanup, with the Force delete button and the commands to look at it](../images/shots/project-deleting-held.avif)
+
 The review lists each object and the finalizers to remove. Force delete:
 
 - Sets `metadata.finalizers` to `[]` on the objects still waiting, and only on those already being deleted.
 - Leaves the namespace's own `spec.finalizers` alone. Kubernetes then deletes what's left, then the namespace.
 - Runs as you, so you need `patch` on those objects.
+
+![The review of Force delete for project archive, listing the finalizer it removes from the database ledger](../images/shots/project-force-delete-review.avif)
 
 Once the finalizers are gone, the controller can't clean up what it made outside the cluster, such as a backup in object storage or a cloud disk. Check for those and remove them yourself.
 
