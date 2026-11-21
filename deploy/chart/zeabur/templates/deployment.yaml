@@ -74,24 +74,7 @@ spec:
               value: /etc/zeabur/registry-ca/{{ $.Values.builds.caBundle.key }}
             {{- end }}
             {{- end }}
-            {{- if or .Values.extraTrustedCA.configMap .Values.extraTrustedCA.secret }}
-            - name: ZEABUR_EXTRA_CA_FILE
-              value: /etc/zeabur/extra-ca/{{ .Values.extraTrustedCA.key }}
-            {{- end }}
-            {{- with .Values.outboundProxy }}
-            {{- if .enabled }}
-            {{- if .httpProxy }}
-            - name: HTTP_PROXY
-              value: {{ .httpProxy | quote }}
-            {{- end }}
-            {{- if .httpsProxy }}
-            - name: HTTPS_PROXY
-              value: {{ .httpsProxy | quote }}
-            {{- end }}
-            - name: NO_PROXY
-              value: {{ concat (list "localhost" ".svc" ".cluster.local") .clusterNetwork .noProxy | join "," | quote }}
-            {{- end }}
-            {{- end }}
+            {{- with include "zeabur.outboundEnv" . }}{{ . | trim | nindent 12 }}{{- end }}
             - name: ZEABUR_ISSUER_URL
               value: {{ include "zeabur.issuerUrl" . | quote }}
             - name: ZEABUR_CLIENT_ID
@@ -210,11 +193,7 @@ spec:
               mountPath: /etc/zeabur/registry-ca
               readOnly: true
             {{- end }}
-            {{- if or .Values.extraTrustedCA.configMap .Values.extraTrustedCA.secret }}
-            - name: extra-ca
-              mountPath: /etc/zeabur/extra-ca
-              readOnly: true
-            {{- end }}
+            {{- with include "zeabur.extraCaMount" . }}{{ . | trim | nindent 12 }}{{- end }}
             {{- if .Values.proxy.enabled }}
             - name: proxy-ca
               mountPath: /etc/zeabur/proxy-ca
@@ -280,24 +259,7 @@ spec:
               - key: {{ .Values.builds.caBundle.key }}
                 path: {{ .Values.builds.caBundle.key }}
         {{- end }}
-        {{- with .Values.extraTrustedCA }}
-        {{- if .configMap }}
-        - name: extra-ca
-          configMap:
-            name: {{ .configMap }}
-            items:
-              - key: {{ .key }}
-                path: {{ .key }}
-        {{- else if .secret }}
-        - name: extra-ca
-          secret:
-            secretName: {{ .secret }}
-            defaultMode: 0440
-            items:
-              - key: {{ .key }}
-                path: {{ .key }}
-        {{- end }}
-        {{- end }}
+        {{- with include "zeabur.extraCaVolume" . }}{{ . | trim | nindent 8 }}{{- end }}
         {{- if .Values.proxy.enabled }}
         # Only the CA of Zeabur Proxy's certificate, not its key.
         - name: proxy-ca
