@@ -143,6 +143,7 @@ fn backups_of(
         schedules,
         runs,
         recovery_window: None,
+        archive_failure: None,
     }
 }
 

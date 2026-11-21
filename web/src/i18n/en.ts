@@ -3245,6 +3245,10 @@ export const en = {
   "db.backup.saidNow": (name: string, where: string) => `Back up ${name} to ${where} now.`,
   "db.backup.now": "Back up now",
   "db.backup.starting": "Ready once the database restarts with backups",
+  "db.backup.archiveFailing": "Archiving to the backup destination fails",
+  "db.backup.archiveFailed":
+    "The database cannot archive its write-ahead log to the backup destination, so backups do not work. The operator says",
+  "db.backup.archiveSince": "Failing since",
   "db.backup.planNow": (name: string) => `Back up ${name} now`,
   "db.backup.destination": "Destination",
   "db.backup.endpointFact": "Endpoint",

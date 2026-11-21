@@ -356,6 +356,11 @@ function BackUpNow({ project, database }: { project: string; database: Database 
   const planner = usePlanner(project)
   const gate = useGate(project, "backUpDatabases")
   const starting = !database.backups.ready
+  const reason = database.backups.archiveFailure
+    ? t("db.backup.archiveFailing")
+    : starting
+      ? t("db.backup.starting")
+      : undefined
   if (!canBackUpNow(database.engine)) return null
   const plan = () =>
     planner.plan({
@@ -367,7 +372,7 @@ function BackUpNow({ project, database }: { project: string; database: Database 
     <>
       {starting ? (
         <span id="db-backups-starting" className="type-meta text-muted-foreground max-sm:hidden">
-          {t("db.backup.starting")}
+          {reason}
         </span>
       ) : null}
       <GateTip gate={gate} className="max-sm:hidden">
@@ -390,7 +395,7 @@ function BackUpNow({ project, database }: { project: string; database: Database 
           className="sm:hidden"
           disabled={starting}
           aria-label={t("db.backup.now")}
-          title={starting ? t("db.backup.starting") : undefined}
+          title={reason}
           onClick={plan}
         >
           <ArchiveIcon aria-hidden="true" />
@@ -659,6 +664,7 @@ function Backups({
           reason={t("db.backup.pluginWhy")}
         />
       ) : null}
+      <ArchiveFailure failure={database.backups.archiveFailure} />
       {on && store ? (
         <Target project={project} database={database} />
       ) : pluginMissing ? null : (
@@ -669,6 +675,30 @@ function Backups({
         <Restore project={project} database={database} />
       </Section>
     </div>
+  )
+}
+
+/** Why the write-ahead log does not reach the backup destination, in the operator's words. */
+function ArchiveFailure({ failure }: { failure: Database["backups"]["archiveFailure"] }) {
+  const t = useT()
+  if (!failure) return null
+  return (
+    <Alert variant="destructive" role="alert">
+      <WarningIcon aria-hidden="true" />
+      <AlertDescription>
+        <p>{t("db.backup.archiveFailed")}</p>
+        {failure.message ? (
+          <p className="type-mono wrap-anywhere" translate="no">
+            {failure.message}
+          </p>
+        ) : null}
+        {failure.since ? (
+          <p className="type-meta">
+            {t("db.backup.archiveSince")} <Ago iso={failure.since} />
+          </p>
+        ) : null}
+      </AlertDescription>
+    </Alert>
   )
 }
 

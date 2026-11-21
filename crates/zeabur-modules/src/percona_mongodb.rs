@@ -335,6 +335,7 @@ fn backups_of(
         runs,
         ready,
         recovery_window: None,
+        archive_failure: None,
     }
 }
 
