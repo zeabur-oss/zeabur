@@ -27,7 +27,7 @@ Kubernetes is open-source software that runs containers on one or more servers, 
 - **A Kubernetes cluster**, version 1.30 or later, and a kubeconfig that can manage it. A kubeconfig is the file `kubectl` uses to reach a cluster.
 - **An Ingress controller** that is the cluster's default IngressClass, such as the Traefik that K3s and RKE2 include. Ports 80 and 443 must be open to the internet, so that Let's Encrypt can check the addresses and issue their certificates.
 - **Tools on your computer**: `kubectl`, Helm 4, and `zeabur-identityctl`.
-- **The version to install.** The examples use `<version>`. The chart is published at `oci://ghcr.io/zeabur-oss/charts/zeabur`, and its default image is pinned to the digest of the same version. See [Release files and verification](../reference/releases.mdx) for the versions and how to verify them.
+- **The version to install.** The examples use `<version>`. Use the version these docs describe, which is the newest heading in the [CHANGELOG](../../CHANGELOG.md), such as `0.3.0` or `0.3.0-beta.2`, without a leading `v`. Always give `--version`, as the examples do. The chart is published at `oci://ghcr.io/zeabur-oss/charts/zeabur`, and its default image is pinned to the digest of the same version. See [Release files and verification](../reference/releases.mdx) for the versions and how to verify them.
 
 Kubernetes must be 1.30 or later because, by default, the chart creates project member roles and uses `ValidatingAdmissionPolicy` to limit which namespace fields Developers can change. That API is generally available starting in 1.30. A namespace is how Kubernetes groups things, and each Zeabur OSS project is one namespace.
 
