@@ -59,7 +59,7 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
         )
         .to_string(),
     )?;
-    if !install.chart.join("charts").is_dir() {
+    if needs_dependency_build(install.chart) {
         dev.cmd("helm")
             .args(["dependency", "build"])
             .arg(install.chart)
@@ -86,6 +86,12 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
     }
     dev.write("profile", &format!("{}\n", install.profile.name()))?;
     summary(dev)
+}
+
+/// Whether `helm dependency build` must fetch Zeabur Identity's chart: only for an unpacked chart
+/// without `charts/`. A packaged chart carries its dependencies, and Helm refuses to update it.
+fn needs_dependency_build(chart: &Path) -> bool {
+    chart.is_dir() && !chart.join("charts").is_dir()
 }
 
 /// Zeabur's OIDC client and its secret, the plan key, the certificates and the CAs it trusts.
@@ -341,7 +347,22 @@ fn identity_setup_link(dev: &DevCluster) -> Result<(), String> {
 mod tests {
     use serde_json::json;
 
-    use super::values;
+    use super::{needs_dependency_build, values};
+
+    #[test]
+    fn only_an_unpacked_chart_without_its_dependencies_gets_them_built() {
+        let dir = tempfile::tempdir().unwrap();
+        let unpacked = dir.path().join("zeabur");
+        std::fs::create_dir(&unpacked).unwrap();
+        assert!(needs_dependency_build(&unpacked));
+
+        std::fs::create_dir(unpacked.join("charts")).unwrap();
+        assert!(!needs_dependency_build(&unpacked));
+
+        let packaged = dir.path().join("zeabur-0.3.0.tgz");
+        std::fs::write(&packaged, b"").unwrap();
+        assert!(!needs_dependency_build(&packaged));
+    }
 
     #[test]
     fn the_default_profile_sets_neither_builds_nor_the_proxy() {
