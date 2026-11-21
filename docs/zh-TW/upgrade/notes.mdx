@@ -7,17 +7,17 @@ description: 每一版不相容的變更，以及升級前要先做的事。一�
 
 一次跨好幾版升級時，從你目前的版本開始，依序看過到目標版本為止的每一節。新的版本寫在最上面。
 
-## v0.3.0 → v0.3.1
-
-Zeabur 開源版改成在安裝 VictoriaMetrics 和 VictoriaLogs 時，自己寫入警示規則，以及讓 Zeabur Proxy 讀取記錄的網路規則。Catalog 的元件不再帶這些東西，自訂資源的指標也改名為 `kube_customresource_*`。如果你用 Helm、Flux 或 Argo CD 安裝 VictoriaMetrics，先從 Zeabur Catalog 升級，再用 `zeaburctl components export victoria-metrics victoria-logs` 印出 Zeabur 開源版的物件，套用每個元件最後面的那幾個。舊的 `zeabur-notifications` VMRule 還在、通知頁面又更新不了時，先用 `kubectl -n observability delete vmrule zeabur-notifications` 刪掉，再到通知頁面按**安裝規則**。
-
 ## v0.2 → v0.3
+
+下面的步驟不用自己動手。貼上[交給 Agent 升級](steps.mdx#交給-agent-升級)裡的提示，Agent 就會照這一節替你升級。到了建立快照和登入的步驟，Agent 會停下來等你。
 
 zeabur-installer 已經移除。一個 `helm install` 就能把 Zeabur 開源版裝進既有的叢集；全新的伺服器先用 [Zeatend](../install/one-command.mdx) 裝好 Kubernetes。
 
 chart 現在會一起安裝 Zeabur Identity 和 cert-manager，並開啟 Ingress，用 ClusterIssuer `letsencrypt` 取得憑證。要繼續用你自己架的 Zeabur Identity，升級時加上 `--set identity.enabled=false`。要繼續用你自己建立的 TLS 機密變數，加上 `--set ingress.clusterIssuer=`。升級不會安裝 cert-manager。
 
 chart 現在自帶 `zeabur-system-hosts` 准入政策。在沒有標上 `zeabur.com/platform: "true"` 的命名空間裡，新增或修改的 Ingress 規則都要寫主機名稱，HTTPRoute 都要寫 hostnames，而且不能用 Zeabur 開源版或 Zeabur Identity 的網域。已經存在的物件照常運作，直到改了 `spec` 為止。不想要這個政策，就設定 `systemHosts.enabled: false`。
+
+Zeabur 開源版改成在安裝 VictoriaMetrics 和 VictoriaLogs 時，自己寫入警示規則，以及讓 Zeabur Proxy 讀取記錄的網路規則。Catalog 的元件不再帶這些東西，自訂資源的指標也改名為 `kube_customresource_*`。如果你用 Helm、Flux 或 Argo CD 安裝 VictoriaMetrics，先從 Zeabur Catalog 升級，再用 `zeaburctl components export victoria-metrics victoria-logs` 印出 Zeabur 開源版的物件，套用每個元件最後面的那幾個。舊的 `zeabur-notifications` VMRule 還在、通知頁面又更新不了時，先用 `kubectl -n observability delete vmrule zeabur-notifications` 刪掉，再到通知頁面按**安裝規則**。
 
 ### 用 zeabur-installer 安裝的叢集
 
@@ -148,7 +148,7 @@ kubectl -n kube-system get configmap zeabur-installer zeabur-identity-authn --ig
 
 這些檔案含有機密資料，例如 Zeabur Identity 的簽章金鑰，請留在伺服器上。
 
-**先停下來。**把 `values.yaml` 和第 1 步的檢查結果給擁有者看，請擁有者替每台伺服器建立快照，完成後再告訴你。需要退回時，就還原這份快照。
+**先停下來**。把 `values.yaml` 和第 1 步的檢查結果給擁有者看，請擁有者替每台伺服器建立快照，完成後再告訴你。需要退回時，就還原這份快照。
 
 #### 4. 讓安裝程式的 `HelmChart` 不再管理 release
 
@@ -210,7 +210,7 @@ kubectl -n zeabur-identity get service zeabur-identity -o jsonpath='{.spec.clust
 
 #### 8. 登入
 
-**先停下來。**請擁有者開啟 Zeabur 開源版，用通行密鑰登入，打開一個專案，檢查服務和資料庫。通行密鑰只能由本人使用。方便的話，也請一位成員登入確認。
+**先停下來**。請擁有者開啟 Zeabur 開源版，用通行密鑰登入，打開一個專案，檢查服務和資料庫。通行密鑰只能由本人使用。方便的話，也請一位成員登入確認。
 
 Zeabur 開源版的副本換新後，所有人都要重新登入一次。
 
