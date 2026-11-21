@@ -140,6 +140,8 @@ You can list multiple application domains separated by commas; the first is the 
 | A new service is ready, but its URL doesn't open | Check the application domain's DNS and certificate. Zeabur OSS and your services use different domains, set up separately. |
 | You have to sign in again after an upgrade | The chart runs one Zeabur OSS replica, and sessions live in memory. A new replica means signing in again. |
 
+The commands in this table use `kubectl` and `zeaburctl`. A new K3s server has neither. On the server, write `k3s kubectl` where the table says `kubectl`. For `zeaburctl`, see [Release files and verification](../reference/releases.mdx).
+
 Zeabur OSS's own ServiceAccount can only use kubectl terminal replicas in `zeabur-terminals`. It doesn't read the cluster on behalf of the signed-in person.
 
 ## Trust a private CA

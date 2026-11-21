@@ -11,9 +11,39 @@ description: 在一台全新的 Linux 伺服器上，先用 Zeatend 裝好 Kuber
 
 - **一台 Linux 伺服器**，有公開 IP 位址，80 和 443 埠能從網際網路連進來。Let's Encrypt 會透過 80 埠檢查網址。記憶體和磁碟要多大，見 Zeatend 的[支援的伺服器與檔案](https://oss.zeabur.com/zh-TW/docs/zeatend/reference/hosts/)。
 - **伺服器的 root 權限**，透過 SSH 登入。下面的指令都以 root 執行，用一般帳號登入時先執行 `sudo -i`。
-- **伺服器上的 Zeatend、Helm 4 和 `zeabur-identityctl`**。Zeatend 的下載方式見[下載 Zeatend](https://oss.zeabur.com/zh-TW/docs/zeatend/get-started/install/#下載-zeatend)；`zeabur-identityctl` 見 Zeabur Identity 的[發行檔與驗證](https://oss.zeabur.com/zh-TW/docs/identity/reference/releases/)。
+- **伺服器上的 Zeatend、Helm 4 和 `zeabur-identityctl`**。Zeatend 的下載方式見[下載 Zeatend](https://oss.zeabur.com/zh-TW/docs/zeatend/get-started/install/#下載-zeatend)；另外兩個在下面第一步安裝。
 
 <Steps>
+<Step>
+
+### 安裝 Helm 4 和 `zeabur-identityctl`
+
+新的伺服器上兩個都沒有，安裝時也不需要 `gh`、`cosign` 或 Docker。下面每一段會從各自專案下載發行檔，用專案提供的雜湊值檢查檔案，再裝到 `/usr/local/bin`：
+
+```sh
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+
+helm=$(curl -fsSL https://get.helm.sh/helm-latest-version)
+curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz" &&
+  curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  sha256sum -c "helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  tar -xzf "helm-$helm-linux-$arch.tar.gz" --strip-components=1 "linux-$arch/helm" &&
+  install -m 0755 helm /usr/local/bin/helm &&
+  helm version --short
+
+ctl=$(basename "$(curl -fsSLo /dev/null -w '%{url_effective}' https://github.com/zeabur-oss/identity/releases/latest)")
+base="https://github.com/zeabur-oss/identity/releases/download/$ctl"
+curl -fsSLO "$base/zeabur-identityctl-$ctl-linux-$arch.tar.gz" &&
+  curl -fsSLO "$base/SHA256SUMS" &&
+  sha256sum --ignore-missing -c SHA256SUMS &&
+  tar -xzf "zeabur-identityctl-$ctl-linux-$arch.tar.gz" zeabur-identityctl &&
+  install -m 0755 zeabur-identityctl /usr/local/bin/zeabur-identityctl &&
+  zeabur-identityctl --version
+```
+
+`helm version --short` 要顯示 `v4`。`zeabur-identityctl` 的雜湊值和檔案來自同一個發行版，只能發現下載壞掉，不能證明是誰建置的。要連簽章一起檢查，請在有 `gh` 和 `cosign` 的電腦上照 Zeabur Identity 的[發行檔與驗證](https://oss.zeabur.com/zh-TW/docs/identity/reference/releases/)做，再把檔案複製到伺服器。
+
+</Step>
 <Step>
 
 ### 選好網域
