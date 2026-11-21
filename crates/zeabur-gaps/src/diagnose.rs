@@ -9,7 +9,8 @@
 //! since is not diagnosed. The kubelet resets a container's back-off once it "has executed for
 //! 10 minutes without any problems" [k8s-restart-policy]; Zeabur uses the same window
 //! ([`RECENT`]): a failure counts while the container is not ready, waits in
-//! `CrashLoopBackOff`, or ended within the window.
+//! `CrashLoopBackOff`, or ended within the window. An event about a pod from before its `Ready`
+//! condition last turned `True` ([`before_ready`]) is its start-up and is not diagnosed.
 //!
 //! **Exit codes.** 126 and 127 are the shell's "not executable" and "command not found"
 //! [bash-exit-status]; 128 + n is death by signal n, so 137 is `SIGKILL` and 143 `SIGTERM`.
@@ -192,7 +193,15 @@ impl<'a> Namespace<'a> {
         for pod in &service.pods {
             // What a `CreateContainerConfigError` in this pod already names as missing.
             let mut missing = BTreeSet::new();
-            let pod_events = self.events_about("Pod", &pod.name);
+            // Events before the pod last became Ready are its start-up, not its state.
+            let ready_since = self.pod(&pod.name).and_then(ready_since);
+            let pod_events: Vec<&Event> = self
+                .events_about("Pod", &pod.name)
+                .iter()
+                .copied()
+                .filter(|e| !before_ready(e.last_seen, ready_since))
+                .collect();
+            let pod_events = pod_events.as_slice();
             for status in &pod.container_statuses {
                 let image = service
                     .containers
@@ -804,6 +813,29 @@ fn with_timing(why: Message, probe: &Probe) -> Message {
         .with("threshold", times.to_string())
         .with("thresholdDefault", threshold.is_none().to_string())
         .with("total", (i64::from(every) * i64::from(times)).to_string())
+}
+
+/// When `pod` last became Ready, while it is Ready: its `Ready` condition's
+/// `lastTransitionTime`.
+fn ready_since(pod: &Pod) -> Option<Timestamp> {
+    pod.status
+        .as_ref()?
+        .conditions
+        .iter()
+        .flatten()
+        .find(|c| c.type_ == "Ready" && c.status == "True")?
+        .last_transition_time
+        .as_ref()
+        .map(|t| t.0)
+}
+
+/// Whether an event about a pod, seen at `seen`, is from before the pod became Ready at `since`.
+///
+/// Such an event is the pod's start-up, not its state. `lastTransitionTime` has whole seconds,
+/// so an event within that second counts as before.
+#[must_use]
+pub fn before_ready(seen: Option<Timestamp>, since: Option<Timestamp>) -> bool {
+    since.is_some_and(|since| seen.is_none_or(|seen| seen.as_second() <= since.as_second()))
 }
 
 fn probe_failures(

@@ -1,0 +1,120 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api
+  namespace: demo
+spec:
+  selector:
+    matchLabels:
+      app: api
+  template:
+    metadata:
+      labels:
+        app: api
+    spec:
+      containers:
+        - name: api
+          image: example/api:2.0
+          readinessProbe:
+            tcpSocket:
+              port: 8080
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-started
+  namespace: demo
+  labels:
+    app: api
+spec:
+  containers:
+    - name: api
+      image: example/api:2.0
+      readinessProbe:
+        tcpSocket:
+          port: 8080
+status:
+  phase: Running
+  conditions:
+    - type: Ready
+      status: "True"
+      lastTransitionTime: "2026-10-15T11:58:10Z"
+  containerStatuses:
+    - name: api
+      image: example/api:2.0
+      imageID: ""
+      ready: true
+      restartCount: 0
+      state:
+        running:
+          startedAt: "2026-10-15T11:58:00Z"
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+metadata:
+  name: api-started.unhealthy
+  namespace: demo
+eventTime: null
+reportingController: kubelet
+reportingInstance: node-1
+action: Probing
+type: Warning
+reason: Unhealthy
+note: 'Readiness probe failed: dial tcp 10.42.0.61:8080: connect: connection refused'
+regarding:
+  kind: Pod
+  name: api-started
+  namespace: demo
+  fieldPath: spec.containers{api}
+deprecatedCount: 2
+deprecatedLastTimestamp: "2026-10-15T11:58:10Z"
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: api-failing
+  namespace: demo
+  labels:
+    app: api
+spec:
+  containers:
+    - name: api
+      image: example/api:2.0
+      readinessProbe:
+        tcpSocket:
+          port: 8080
+status:
+  phase: Running
+  conditions:
+    - type: Ready
+      status: "False"
+      lastTransitionTime: "2026-10-15T11:59:00Z"
+  containerStatuses:
+    - name: api
+      image: example/api:2.0
+      imageID: ""
+      ready: false
+      restartCount: 0
+      state:
+        running:
+          startedAt: "2026-10-15T11:58:00Z"
+---
+apiVersion: events.k8s.io/v1
+kind: Event
+metadata:
+  name: api-failing.unhealthy
+  namespace: demo
+eventTime: null
+reportingController: kubelet
+reportingInstance: node-1
+action: Probing
+type: Warning
+reason: Unhealthy
+note: 'Readiness probe failed: dial tcp 10.42.0.61:8080: connect: connection refused'
+regarding:
+  kind: Pod
+  name: api-failing
+  namespace: demo
+  fieldPath: spec.containers{api}
+deprecatedCount: 3
+deprecatedLastTimestamp: "2026-10-15T11:59:00Z"

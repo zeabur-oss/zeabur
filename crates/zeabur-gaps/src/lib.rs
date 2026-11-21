@@ -7,7 +7,7 @@ mod incident;
 mod rules;
 mod trace;
 
-pub use diagnose::{Namespace, RECENT, diagnose, missing_claim, shortage};
+pub use diagnose::{Namespace, RECENT, before_ready, diagnose, missing_claim, shortage};
 pub use durability::EphemeralData;
 pub use event::Event;
 pub use incident::{

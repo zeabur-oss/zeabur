@@ -1,0 +1,17 @@
+[
+  {
+    "kind": "probeFailure",
+    "container": "api",
+    "pods": ["api-failing"],
+    "cause": {
+      "key": "diagnosis.probeFailure.cause.readiness",
+      "params": {
+        "container": "api",
+        "count": "3",
+        "output": "dial tcp 10.42.0.61:8080: connect: connection refused"
+      }
+    },
+    "evidence": [{"kind": "Event", "name": "api-failing.unhealthy"}],
+    "lastSeenAt": "2026-10-15T11:59:00Z"
+  }
+]
