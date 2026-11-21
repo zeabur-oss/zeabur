@@ -27,6 +27,8 @@ use base64::engine::general_purpose::STANDARD;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use utoipa::ToSchema;
+use zeabur_catalog::engine::SOURCE_DIGEST;
+use zeabur_catalog::zeabur;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Secret;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -49,6 +51,9 @@ use crate::projects::namespace::Permission;
 use crate::projects::writes::token_problem;
 use crate::views::UnreadableView;
 
+/// The component Zeabur writes its alert rules with.
+const RULES_COMPONENT: &str = "victoria-metrics";
+
 /// Sealed plans of this module start with this, so no other plan's token opens as one.
 const PREFIX: &str = "n1.";
 /// What a plan's YAML shows for a secret.
@@ -70,16 +75,28 @@ pub struct Notifications {
     pub channels: Vec<AlertmanagerChannel>,
     /// Whether alerts reach anyone.
     pub verdict: ChannelsVerdict,
-    /// Whether the catalog's rule set is installed; for the cluster only, absent when it could
-    /// not be read.
+    /// Whether Zeabur's alert rules are installed as this Zeabur writes them; for the cluster
+    /// only, absent when they could not be read.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub rules_installed: Option<bool>,
+    pub rules: Option<RulesState>,
     /// Whether the person may add, change and remove channels.
     pub can_change: Permission,
     /// Whether the person may send a test.
     pub can_test: Permission,
     /// What could not be read.
     pub unreadable: Vec<UnreadableView>,
+}
+
+/// Zeabur's alert rules on the cluster, which it writes with VictoriaMetrics.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum RulesState {
+    /// As this Zeabur writes them.
+    Current,
+    /// Written by another Zeabur version, or changed since.
+    Outdated,
+    /// Not on the cluster: channels receive only alerts of other rules.
+    Missing,
 }
 
 /// What to plan.
@@ -123,6 +140,8 @@ pub enum NotificationsPlanRequest {
         /// The channel.
         name: String,
     },
+    /// Write Zeabur's alert rules as this Zeabur has them; for the cluster only.
+    Rules,
 }
 
 impl NotificationsPlanRequest {
@@ -133,6 +152,7 @@ impl NotificationsPlanRequest {
             | Self::Events { name, .. }
             | Self::Remove { name }
             | Self::Test { name } => name,
+            Self::Rules => "",
         }
     }
 }
@@ -303,7 +323,7 @@ async fn answer(
         events: scope.events().to_vec(),
         channels: Vec::new(),
         verdict: ChannelsVerdict::of(&[]),
-        rules_installed: None,
+        rules: None,
         can_change: Permission::Unknown,
         can_test: Permission::Unknown,
         unreadable: Vec::new(),
@@ -329,11 +349,11 @@ async fn answer(
     out.verdict = ChannelsVerdict::of(&channels);
     out.channels = channels;
     if scope == Scope::Cluster {
-        out.rules_installed = cluster
+        out.rules = cluster
             .find_object(&am::RULES.resource(), Some(namespace), am::RULES_NAME)
             .await
             .ok()
-            .map(|rules| rules.is_some());
+            .map(|rules| rules_state(rules.as_ref()));
     }
     let configs = permission(cluster, "create", am::CONFIGS.resource, namespace).await;
     let secrets = permission(cluster, "create", "secrets", namespace).await;
@@ -392,10 +412,93 @@ struct Computed {
     writes: Vec<Planned>,
 }
 
+/// Whether `found`, the rule set on the cluster, is the one this Zeabur writes.
+fn rules_state(found: Option<&DynamicObject>) -> RulesState {
+    let written = found.map(|rules| {
+        rules
+            .metadata
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get(SOURCE_DIGEST))
+    });
+    match written {
+        None => RulesState::Missing,
+        Some(digest) if digest == zeabur::digest(RULES_COMPONENT).as_ref() => RulesState::Current,
+        Some(_) => RulesState::Outdated,
+    }
+}
+
+/// The rule set as this Zeabur writes it.
+fn rules_object() -> Result<Value, ApiError> {
+    let objects = zeabur::objects(RULES_COMPONENT, "")
+        .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e)))?;
+    let rules = objects
+        .iter()
+        .find(|o| o.types.as_ref().is_some_and(|t| t.kind == am::RULES.kind))
+        .ok_or_else(|| {
+            ApiError::from(Problem::new(
+                Kind::Internal,
+                "This Zeabur build has no alert rules.",
+            ))
+        })?;
+    value(rules)
+}
+
+/// Writes the rule set again; refused for a project's notifications.
+async fn rules_writes(
+    cluster: &dyn Cluster,
+    namespace: &str,
+    scope: Scope,
+) -> Result<Computed, ApiError> {
+    if scope != Scope::Cluster {
+        return Err(invalid(
+            "Zeabur's alert rules are the cluster's, not a project's.".to_owned(),
+        ));
+    }
+    let before = cluster
+        .find_object(&am::RULES.resource(), Some(namespace), am::RULES_NAME)
+        .await
+        .map_err(|e| {
+            read_problem(
+                e,
+                &format!("VMRule {} in {namespace}", am::RULES_NAME),
+                get_read(
+                    am::RULES.group,
+                    am::RULES.resource,
+                    Some(namespace),
+                    am::RULES_NAME,
+                ),
+            )
+        })?
+        .map(|o| value(&o))
+        .transpose()?;
+    let after = rules_object()?;
+    let versions = BTreeMap::from([(
+        format!("{}/{}", am::RULES.kind, am::RULES_NAME),
+        version(before.as_ref()),
+    )]);
+    let write = Planned {
+        target: target(am::RULES.kind, namespace, am::RULES_NAME),
+        body: WriteBody::Apply(after.clone()),
+        action: if before.is_some() {
+            NotificationWriteAction::Patch
+        } else {
+            NotificationWriteAction::Create
+        },
+        before,
+        shown: Some(after),
+    };
+    Ok(Computed {
+        versions,
+        writes: vec![write],
+    })
+}
+
 fn target(kind: &str, namespace: &str, name: &str) -> ObjectTarget {
     let (api_version, plural) = match kind {
         "Secret" => ("v1".to_owned(), "secrets"),
         "Job" => ("batch/v1".to_owned(), "jobs"),
+        "VMRule" => (am::RULES.resource().api_version(), am::RULES.resource),
         _ => (am::CONFIGS.resource().api_version(), am::CONFIGS.resource),
     };
     ObjectTarget {
@@ -698,6 +801,9 @@ async fn compute(
     let configs = configs(cluster, namespace)
         .await?
         .ok_or_else(not_installed)?;
+    if *request == NotificationsPlanRequest::Rules {
+        return rules_writes(cluster, namespace, scope).await;
+    }
     let name = request.name();
     let object_name = am::object_name(name);
     let secret = cluster
@@ -765,6 +871,7 @@ async fn compute(
             );
             writes
         }
+        NotificationsPlanRequest::Rules => Vec::new(),
         NotificationsPlanRequest::Test { name } => {
             let before = value(managed(&configs, name)?)?;
             versions.insert(

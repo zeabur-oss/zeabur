@@ -8265,6 +8265,17 @@ export type NotificationWrite = {
 }
 
 /**
+ * Zeabur's alert rules on the cluster, which it writes with VictoriaMetrics.
+ */
+export type RulesState = (typeof RulesState)[keyof typeof RulesState]
+
+export const RulesState = {
+  current: "current",
+  outdated: "outdated",
+  missing: "missing",
+} as const
+
+/**
  * The channels of a project or of the cluster.
  */
 export type Notifications = {
@@ -8279,12 +8290,7 @@ export type Notifications = {
   events: AlertmanagerEvent[]
   /** The namespace the channels are in. */
   namespace: string
-  /**
-   * Whether the catalog's rule set is installed; for the cluster only, absent when it could
-   * not be read.
-   * @nullable
-   */
-  rulesInstalled?: boolean | null
+  rules?: RulesState | null
   /** Whether the operator's API is served and the channels could be read. */
   state: ProviderState
   /** What could not be read. */
@@ -8363,6 +8369,9 @@ export type NotificationsPlanRequest =
       /** The channel. */
       name: string
       op: "test"
+    }
+  | {
+      op: "rules"
     }
 
 /**

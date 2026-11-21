@@ -17,7 +17,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let [component, profile, inputs @ ..] = args.as_slice() else {
         return Err("usage: install <id> <profile> [<input>=<value>...]".into());
     };
-    let mut text = guide(component, profile)?
+    let mut text = guide(component, profile, "zeabur")?
         .formats
         .into_iter()
         .find(|f| f.format == InstallFormat::Helm)

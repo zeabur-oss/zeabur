@@ -1,6 +1,7 @@
 //! `zeaburctl components export`: Zeabur Catalog components' manifests or Helm commands, to
 //! install them on a cluster. The text comes from the catalogue in this binary
-//! ([`zeabur_catalog::install`]); no cluster is read.
+//! ([`zeabur_catalog::install`]), which ends with the objects Zeabur adds to the component;
+//! no cluster is read.
 
 use std::process::ExitCode;
 
@@ -21,7 +22,9 @@ enum ComponentsCommand {
     /// Print what installs one or more components, with the catalogue's pinned versions and
     /// values. Apply it with kubectl, or commit it to the repository a GitOps tool watches.
     ///
-    /// Values the component asks for show as `<name>` placeholders; replace them first.
+    /// Values the component asks for show as `<name>` placeholders; replace them first. Zeabur's
+    /// own objects for the component (its alert rules, Zeabur Proxy's access to the logs) come
+    /// last; apply them once the component is installed.
     Export(ExportArgs),
 }
 
@@ -38,6 +41,9 @@ struct ExportArgs {
     /// The sizing: `single-node` or `multi-node`.
     #[arg(long, default_value = PROFILES[0], value_parser = PROFILES)]
     profile: String,
+    /// The namespace Zeabur runs in, which Zeabur's objects admit.
+    #[arg(long, default_value = "zeabur")]
+    zeabur_namespace: String,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
@@ -83,7 +89,7 @@ fn text(args: &ExportArgs) -> Result<String, InstallError> {
     };
     let mut out = String::new();
     for component in &args.components {
-        let text = guide(component, &args.profile)?
+        let text = guide(component, &args.profile, &args.zeabur_namespace)?
             .formats
             .into_iter()
             .find(|f| f.format == format)
@@ -135,6 +141,27 @@ mod tests {
             text(&export(&["cert-manager", "nope"])).is_err(),
             "an unknown one fails the whole export"
         );
+    }
+
+    #[test]
+    fn export_adds_zeaburs_objects_in_each_format() {
+        let rules = text(&export(&["victoria-metrics"])).unwrap();
+        assert!(rules.contains("kind: VMRule"), "{rules}");
+        let policy = text(&export(&[
+            "victoria-logs",
+            "--format",
+            "helm",
+            "--zeabur-namespace",
+            "platform",
+        ]))
+        .unwrap();
+        assert!(policy.contains("kubectl apply --server-side"), "{policy}");
+        assert!(
+            policy.contains("kubernetes.io/metadata.name: platform"),
+            "{policy}"
+        );
+        let none = text(&export(&["cert-manager"])).unwrap();
+        assert!(!none.contains("Zeabur's objects"), "{none}");
     }
 
     #[test]

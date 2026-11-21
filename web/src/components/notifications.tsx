@@ -40,7 +40,7 @@ import {
   type Event,
   type Field,
 } from "@/model/notifications"
-import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { Alert, AlertAction, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
 import { Card, CardRow } from "@zeabur-oss/design-system/components/card"
 import { Checkbox } from "@zeabur-oss/design-system/components/checkbox"
@@ -144,10 +144,21 @@ function Channels({ data, project }: { data: Data; project?: string }) {
           </Button>
         </GateTip>
       </div>
-      {data.rulesInstalled === false ? (
+      {data.rules === "missing" || data.rules === "outdated" ? (
         <Alert variant="warn" role="note">
           <WarningIcon aria-hidden="true" />
-          <AlertDescription>{t("notify.noRules")}</AlertDescription>
+          <AlertDescription>{t(`notify.rules.${data.rules}`)}</AlertDescription>
+          <AlertAction>
+            <GateTip gate={change}>
+              <Button
+                size="xs"
+                variant="outline"
+                onClick={() => plan({ op: "rules" }, t("notify.plan.rules"))}
+              >
+                {t(`notify.rules.${data.rules}Apply`)}
+              </Button>
+            </GateTip>
+          </AlertAction>
         </Alert>
       ) : null}
       {data.channels.length > 0 ? (
@@ -584,7 +595,9 @@ function Planned({ request, writes }: { request: Request; writes: Schemas.Notifi
       ? t("notify.thing.secret")
       : write.kind === "Job"
         ? t("notify.thing.job")
-        : t("notify.thing.channel", request.name)
+        : request.op === "rules"
+          ? t("notify.thing.rules")
+          : t("notify.thing.channel", request.name)
   return (
     <>
       {request.op === "test" ? <p>{t("notify.plan.testHow")}</p> : null}

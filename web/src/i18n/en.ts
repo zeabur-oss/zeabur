@@ -2508,8 +2508,12 @@ export const en = {
       : `Waiting for Alertmanager to load ${n} channels.`,
   "notify.verdict.ok": (n: number) =>
     n === 1 ? "1 channel receives alerts." : `${n} channels receive alerts.`,
-  "notify.noRules":
-    "Zeabur's alert rules aren't installed, so channels receive only alerts from other rules. Reinstall the metrics component to add them.",
+  "notify.rules.missing":
+    "Zeabur's alert rules aren't installed, so channels receive only alerts from other rules.",
+  "notify.rules.outdated":
+    "Zeabur's alert rules are from another Zeabur version, so some events may not reach channels.",
+  "notify.rules.missingApply": "Install rules",
+  "notify.rules.outdatedApply": "Update rules",
   "notify.add": "Add channel",
   "notify.addTitle": "Add a notification channel",
   "notify.test": "Send test",
@@ -2588,8 +2592,10 @@ export const en = {
   "notify.action.events": "Save events",
   "notify.action.remove": "Remove channel",
   "notify.action.test": "Send test",
+  "notify.action.rules": "Write rules",
   "notify.plan.remove": (name: string) => `Remove channel ${name}`,
   "notify.plan.test": (name: string) => `Send a test to ${name}`,
+  "notify.plan.rules": "Zeabur's alert rules",
   "notify.plan.create": (what: string) => `Adds ${what}.`,
   "notify.plan.patch": (what: string) => `Changes ${what}.`,
   "notify.plan.delete": (what: string) => `Deletes ${what}.`,
@@ -2600,6 +2606,7 @@ export const en = {
   "notify.thing.channel": (name: string) => `channel ${name}`,
   "notify.thing.secret": "the channel's URL and tokens",
   "notify.thing.job": "a test Job",
+  "notify.thing.rules": "Zeabur's alert rules",
 
   // Databases
   "add.button": "New",

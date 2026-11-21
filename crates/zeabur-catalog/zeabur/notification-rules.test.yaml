@@ -1,0 +1,50 @@
+# vmalert-tool unittest of notification-rules.yaml, which the test in src/zeabur.rs writes as
+# rules.yaml next to this file. ZeaburCrashLooping gets the restart counters of three containers in
+# a project namespace and one in a namespace that is not a project. ZeaburPostgresBackupFailed reads
+# a metric of kube-state-metrics' custom resource state, under the catalog's name for it.
+evaluation_interval: 30s
+rule_files: [rules.yaml]
+tests:
+  - interval: 1m
+    input_series:
+      - series: 'kube_namespace_labels{namespace="app", label_zeabur_com_project="p1"}'
+        values: "1x20"
+      - series: 'kube_pod_container_status_restarts_total{namespace="app", pod="loop", container="c"}'
+        values: "0 0 1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10"
+      - series: 'kube_pod_container_status_restarts_total{namespace="app", pod="once", container="c"}'
+        values: "0 0 0 0 0 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+      - series: 'kube_pod_container_status_restarts_total{namespace="app", pod="steady", container="c"}'
+        values: "3x20"
+      - series: 'kube_pod_container_status_restarts_total{namespace="kube-system", pod="loop", container="c"}'
+        values: "0 0 1 1 2 2 3 3 4 4 5 5 6 6 7 7 8 8 9 9 10"
+      # vmalert-tool starts its clock at 2000-01-01T00:00:00Z (946684800). Created 5 minutes in,
+      # so at 12 minutes it is within the six hours the rule looks back.
+      - series: 'kube_customresource_cnpg_backup_created{namespace="app", cluster="db", backup="nightly", phase="failed"}'
+        values: "946685100x20"
+    alert_rule_test:
+      - eval_time: 12m
+        alertname: ZeaburCrashLooping
+        exp_alerts:
+          - exp_labels:
+              namespace: app
+              pod: loop
+              container: c
+              severity: warning
+              zeabur_event: crash-loop
+              zeabur_kind: state
+            exp_annotations:
+              summary: loop keeps crashing.
+              description: Container c of loop in app restarted at least twice in 10 minutes.
+      - eval_time: 12m
+        alertname: ZeaburPostgresBackupFailed
+        exp_alerts:
+          - exp_labels:
+              namespace: app
+              cluster: db
+              backup: nightly
+              severity: critical
+              zeabur_event: backup-failed
+              zeabur_kind: event
+            exp_annotations:
+              summary: Backup nightly of PostgreSQL db failed.
+              description: Backup nightly in app failed.

@@ -19,6 +19,16 @@ stringData:
   cloud: "<credentials>"
 ---
 # Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
+# ca.crt: The CA certificate, in PEM, that signs the S3 endpoint's certificate, such as a self-hosted MinIO's own CA. Leave it empty for a store with a public certificate.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: velero-ca
+  namespace: velero
+stringData:
+  ca.crt: "<caCert>"
+---
+# Keep these values out of Git (SOPS, Sealed Secrets or a secret manager).
 # repository-password: Kopia encrypts file-system backups with this password. Without the Secret, Velero uses its built-in password, which is public.
 apiVersion: v1
 kind: Secret
@@ -48,13 +58,16 @@ spec:
   source:
     repoURL: https://vmware-tanzu.github.io/helm-charts
     chart: velero
-    targetRevision: 12.2.3
+    targetRevision: 12.2.5
     helm:
       releaseName: velero
       valuesObject:
         configuration:
           backupStorageLocation:
           - bucket: <bucket>
+            caCertRef:
+              key: ca.crt
+              name: velero-ca
             config:
               customerKeyEncryptionSecret: velero-backup-key/key
               region: us-east-1

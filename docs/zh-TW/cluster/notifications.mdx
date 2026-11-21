@@ -138,7 +138,7 @@ spec:
 | Webhook | `url`，`token` 選填 | `webhook_configs`，`url_secret` 指向 `url`；有權杖時加 `http_config.authorization`（`type: Bearer`，`credentials` 指向 `token`） |
 | ntfy | `url`，`token` 選填 | 同 Webhook。`url` 寫 `https://ntfy.sh/<主題>?template=alertmanager`，自架伺服器就換掉網域 |
 
-傳送測試是建立一個帶 `zeabur.com/notification-test: <名稱>` 的 Job。指標元件的警示規則看到這個 Job，就送出一則指名給這個管道的測試警示：
+傳送測試是建立一個帶 `zeabur.com/notification-test: <名稱>` 的 Job。Zeabur 的警示規則看到這個 Job，就送出一則指名給這個管道的測試警示：
 
 ```yaml
 apiVersion: batch/v1
@@ -192,7 +192,7 @@ kubectl -n shop delete vmalertmanagerconfig,secret zeabur-notify-ops
 
 - **等待中**：Alertmanager 還沒載入這個管道，稍後再看。
 - **被拒絕**：該列會寫出原因，例如網址不完整、儲存的網址或權杖不見了、SMTP 伺服器沒有連接埠。按**編輯**修正後儲存。
-- 收不到測試：核對接收服務的網址和權杖。畫面說 Zeabur 的警示規則沒有安裝時，重新安裝指標元件。
+- 收不到測試：核對接收服務的網址和權杖。畫面說 Zeabur 的警示規則沒有安裝或來自其他 Zeabur 版本時，按**安裝規則**或**更新規則**。
 - 能新增管道卻不能測試：傳送測試要能建立 Job，請管理員確認這項權限。
 - **不是在 Zeabur 建立的，請到原本建立的地方修改**：回到原本的 Helm 或 GitOps 設定修改。
 

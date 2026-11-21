@@ -493,6 +493,8 @@ struct World {
     /// The components the distribution packages, with their `HelmChart` in `kube-system`.
     packaged: BTreeMap<String, String>,
     helm_releases: BTreeSet<String>,
+    /// The namespace Zeabur runs in.
+    zeabur_namespace: String,
     now: Timestamp,
 }
 
@@ -577,6 +579,11 @@ impl World {
             written,
             packaged,
             helm_releases: facts.helm_releases.clone(),
+            zeabur_namespace: state
+                .settings
+                .namespace
+                .clone()
+                .unwrap_or_else(|| "zeabur".to_owned()),
             now: (state.clock)(),
         })
     }
@@ -659,6 +666,7 @@ impl World {
             components: &self.running,
             written: &self.written,
             packaged: &self.packaged,
+            zeabur_namespace: &self.zeabur_namespace,
         }
     }
 
@@ -886,6 +894,21 @@ impl World {
         })
     }
 
+    /// The steps of `file` a removal deletes: no inputs, and no values from other components.
+    async fn removed_steps(&self, file: &ComponentFile) -> Result<Vec<engine::Step>, ApiError> {
+        let manifests = self.manifests([file]).await?;
+        engine::steps_of(
+            file,
+            &self.snapshot.index.catalog.version,
+            self.profile,
+            &manifests,
+            &[],
+            &engine::Contributions::default(),
+            &self.zeabur_namespace,
+        )
+        .map_err(|r| refusal(&r))
+    }
+
     async fn remove(&self, cluster: &dyn Cluster, id: &str) -> Result<Planned, ApiError> {
         let file = self
             .snapshot
@@ -901,10 +924,7 @@ impl World {
             )));
         }
         let version = &self.snapshot.index.catalog.version;
-        let manifests = self.manifests([file]).await?;
-        let none = engine::Contributions::default();
-        let own = engine::steps_of(file, version, self.profile, &manifests, &[], &none)
-            .map_err(|r| refusal(&r))?;
+        let own = self.removed_steps(file).await?;
         let mut zeaburs = false;
         let mut leftovers = file.declaration.leftovers.clone();
         leftovers.extend(engine::input_secrets(file));

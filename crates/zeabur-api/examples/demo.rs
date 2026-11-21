@@ -1431,11 +1431,9 @@ fn alerting() -> Vec<DynamicObject> {
             &[E::NodeNotReady, E::RuntimeSecurity, E::BackupFailed],
             operational,
         ),
-        from(json!({
-            "apiVersion": am::RULES.resource().api_version(), "kind": am::RULES.kind,
-            "metadata": {"name": am::RULES_NAME, "namespace": am::CLUSTER_NAMESPACE},
-            "spec": {"groups": []}
-        })),
+        zeabur_catalog::zeabur::objects("victoria-metrics", "zeabur")
+            .expect("Zeabur's alert rules")
+            .remove(0),
     ]
 }
 

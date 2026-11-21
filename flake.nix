@@ -108,6 +108,9 @@
               # development cluster (scripts/dev-cluster.sh: a CA and certificates for its host names)
               yq-go
               openssl
+
+              # Zeabur's alert rules (crates/zeabur-catalog/src/zeabur.rs): vmalert-tool
+              victoriametrics
             ];
 
             env = {
