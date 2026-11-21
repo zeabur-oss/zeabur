@@ -73,10 +73,10 @@ differs from the root `Cargo.toml`.
 | Windows amd64 | `zeabur-desktop-v<version>-windows-amd64-setup.exe` (NSIS, per user), `-portable.exe` | `-setup.exe` |
 | Linux amd64, arm64 | `zeabur-desktop-v<version>-linux-<arch>.deb`, `.rpm`, `.AppImage` | `.AppImage` |
 
-The app lists the releases through the GitHub REST API and reads the `latest.json` of the newest
-release newer than itself that carries one: a release build takes only releases, a pre-release
-build takes pre-releases too (`desktop/src/update.rs`). GitHub's `/releases/latest` skips
-pre-releases, so the app does not use it. The API does not list drafts, so publishing the draft is
+The app lists the newest 30 releases and the latest release through the GitHub REST API. It reads
+the `latest.json` of the newest release newer than itself that carries one: a release build takes
+only releases, a pre-release build takes pre-releases too (`desktop/src/update.rs`). The latest
+release is read on its own because many pre-releases can push it off the list. The API does not list drafts, so publishing the draft is
 what offers an update. A `.deb`, `.rpm` or portable `.exe` finds its
 platform in `latest.json` but cannot replace itself; the app offers the release page instead
 (`desktop/src/update.rs`). The signed `SHA256SUMS`, its attestation and the checksums cover every

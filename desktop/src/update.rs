@@ -19,6 +19,10 @@ const RELEASES: &str = "https://github.com/zeabur-oss/zeabur/releases/latest";
 /// The newest releases, prereleases included; `/releases/latest` skips prereleases.
 const RELEASES_API: &str = "https://api.github.com/repos/zeabur-oss/zeabur/releases?per_page=30";
 
+/// The newest release without prereleases, which many newer prereleases can push off
+/// [`RELEASES_API`]'s page.
+const LATEST_API: &str = "https://api.github.com/repos/zeabur-oss/zeabur/releases/latest";
+
 /// The update manifest each release carries (scripts/desktop-release.ts).
 const MANIFEST: &str = "latest.json";
 
@@ -170,17 +174,23 @@ fn configured(app: &AppHandle) -> bool {
 }
 
 async fn releases() -> Result<Vec<Release>, reqwest::Error> {
-    reqwest::Client::builder()
+    let client = reqwest::Client::builder()
         .user_agent(concat!("zeabur-desktop/", env!("CARGO_PKG_VERSION")))
         .timeout(std::time::Duration::from_secs(30))
-        .build()?
-        .get(RELEASES_API)
-        .header("Accept", "application/vnd.github+json")
-        .send()
-        .await?
-        .error_for_status()?
-        .json()
-        .await
+        .build()?;
+    let get = |url| {
+        client
+            .get(url)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+    };
+    let mut releases: Vec<Release> = get(RELEASES_API).await?.error_for_status()?.json().await?;
+    // A repository without a release answers 404.
+    let latest = get(LATEST_API).await?;
+    if latest.status() != reqwest::StatusCode::NOT_FOUND {
+        releases.push(latest.error_for_status()?.json().await?);
+    }
+    Ok(releases)
 }
 
 async fn find(app: &AppHandle) -> Result<Option<Update>, UpdateError> {
@@ -366,6 +376,18 @@ mod tests {
         assert_eq!(
             manifest_for(&releases, "0.2.0").as_deref(),
             Some("https://example.com/v0.3.0/latest.json"),
+        );
+    }
+
+    #[test]
+    fn a_release_build_takes_the_latest_release_behind_a_page_of_prereleases() {
+        let mut releases: Vec<Release> = (1..=30)
+            .map(|n| release(&format!("v0.4.0-beta.{n}"), true, true))
+            .collect();
+        releases.push(release("v0.3.1", false, true));
+        assert_eq!(
+            manifest_for(&releases, "0.3.0").as_deref(),
+            Some("https://example.com/v0.3.1/latest.json"),
         );
     }
 
