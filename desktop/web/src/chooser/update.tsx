@@ -27,12 +27,12 @@ const useUpdateState = () => useSyncExternalStore(subscribe, snapshot)
 /** Shown only while a newer version waits, above the foot of the sidebar or the first-run page. */
 export function UpdateButton() {
   const { t } = useI18n()
-  const { status } = useUpdateState()
-  if (status.kind !== "available") return null
+  const { update } = useUpdateState()
+  if (!update) return null
   return (
     <Button variant="secondary" size="sm" className="w-full" onClick={show}>
       <ArrowCircleUpIcon className="text-brand" aria-hidden="true" />
-      {t("desktop.update.available", status.update.version)}
+      {t("desktop.update.available", update.version)}
     </Button>
   )
 }
@@ -40,7 +40,7 @@ export function UpdateButton() {
 /** The version and the manual check, beside the language picker. */
 export function AboutMenu() {
   const { t } = useI18n()
-  const { version, status } = useUpdateState()
+  const { version, check: last } = useUpdateState()
   return (
     <Menu>
       <MenuTrigger
@@ -54,7 +54,7 @@ export function AboutMenu() {
             {t("desktop.update.version", version)}
           </p>
         ) : null}
-        <MenuItem disabled={status.kind === "checking"} onClick={() => void check()}>
+        <MenuItem disabled={last.kind === "checking"} onClick={() => void check()}>
           <ArrowClockwiseIcon aria-hidden="true" />
           {t("desktop.update.check")}
         </MenuItem>
@@ -69,10 +69,10 @@ const toastId = "update-check"
 export function UpdateToasts() {
   const { t } = useI18n()
   const theme = useTheme()
-  const { status, version } = useUpdateState()
+  const { check: last, version } = useUpdateState()
 
   useEffect(() => {
-    switch (status.kind) {
+    switch (last.kind) {
       case "checking":
         toast.loading(t("desktop.update.checking"), { id: toastId })
         break
@@ -83,7 +83,7 @@ export function UpdateToasts() {
         })
         break
       case "failed":
-        if (status.reason === "notConfigured")
+        if (last.reason === "notConfigured")
           toast.info(t("desktop.update.notConfigured"), { id: toastId })
         else
           toast.error(t("desktop.update.failedTitle"), {
@@ -92,14 +92,14 @@ export function UpdateToasts() {
             action: { label: t("desktop.update.retry"), onClick: () => void check() },
           })
         break
-      case "available":
+      case "found":
         toast.dismiss(toastId)
         break
       case "idle":
         break
     }
     // A toast is the answer to one check, so a new language does not show it again.
-  }, [status])
+  }, [last])
 
   return <Toaster theme={theme} position="bottom-right" />
 }
@@ -107,9 +107,8 @@ export function UpdateToasts() {
 /** The newer version and its install, opened from UpdateButton or by a check that found it. */
 export function UpdateDialog() {
   const { t } = useI18n()
-  const { status, open, installing, installFailed } = useUpdateState()
-  if (status.kind !== "available") return null
-  const { update } = status
+  const { update, open, installing, installFailed } = useUpdateState()
+  if (!update) return null
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>

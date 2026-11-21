@@ -12,28 +12,39 @@ export interface Available {
 /** `Failure` in desktop/src/update.rs. */
 export type Failure = "notConfigured" | "failed"
 
-export type Status =
+/** The answer of the last check the person asked for. */
+export type Check =
   | { kind: "idle" }
   | { kind: "checking" }
   | { kind: "latest" }
-  | { kind: "available"; update: Available }
+  | { kind: "found" }
   | { kind: "failed"; reason: Failure }
 
 export interface UpdateState {
   /** This build's version; null until the app answers. */
   version: string | null
-  status: Status
-  /** The dialog of the available update. */
+  /** The newer version a check found; a later failed check keeps it. */
+  update: Available | null
+  check: Check
+  /** The dialog of the update. */
   open: boolean
   installing: boolean
   installFailed: boolean
 }
 
-/** The status a check ends in; anything but `notConfigured` is the same short failure. */
-export function answer(result: { found: Available | null } | { error: unknown }): Status {
-  if ("found" in result)
-    return result.found ? { kind: "available", update: result.found } : { kind: "latest" }
-  return { kind: "failed", reason: result.error === "notConfigured" ? "notConfigured" : "failed" }
+type Settled = Pick<UpdateState, "check" | "update" | "open">
+
+/** The state a check ends in; anything but `notConfigured` is the same short failure. */
+export function settle(
+  update: Available | null,
+  result: { found: Available | null } | { error: unknown },
+): Settled {
+  if (!("found" in result)) {
+    const reason = result.error === "notConfigured" ? "notConfigured" : "failed"
+    return { check: { kind: "failed", reason }, update, open: false }
+  }
+  if (!result.found) return { check: { kind: "latest" }, update: null, open: false }
+  return { check: { kind: "found" }, update: result.found, open: true }
 }
 
 const api = {
@@ -46,7 +57,8 @@ const api = {
 
 let state: UpdateState = {
   version: null,
-  status: { kind: "idle" },
+  update: null,
+  check: { kind: "idle" },
   open: false,
   installing: false,
   installFailed: false,
@@ -61,13 +73,13 @@ function set(next: Partial<UpdateState>) {
 
 /** A check the person asked for; a newer version opens its dialog, other answers are toasts. */
 export async function check() {
-  if (state.status.kind === "checking") return
-  set({ status: { kind: "checking" } })
-  const status = await api.check().then(
-    (found) => answer({ found }),
-    (error: unknown) => answer({ error }),
+  if (state.check.kind === "checking") return
+  set({ check: { kind: "checking" } })
+  const settled = await api.check().then(
+    (found) => settle(state.update, { found }),
+    (error: unknown) => settle(state.update, { error }),
   )
-  set({ status, open: status.kind === "available", installFailed: false })
+  set({ ...settled, installFailed: false })
 }
 
 export function show() {
@@ -88,7 +100,7 @@ export const openReleases = api.openReleases
 /** Quiet on start: desktop/src/update.rs tells the chooser what it found. */
 function start() {
   const found = (update: Available) => {
-    if (state.status.kind === "idle") set({ status: { kind: "available", update } })
+    if (state.check.kind === "idle") set({ update })
   }
   void getVersion().then((version) => set({ version }))
   void api.found().then((update) => update && found(update))
