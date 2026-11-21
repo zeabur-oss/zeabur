@@ -1150,6 +1150,7 @@ export const zhCN: Messages = {
   "components.value.set": "已设置",
   "components.value.kept": "沿用上次安装的值",
   "components.value.generated": "由 Zeabur 随机生成",
+  "components.value.picked": (value) => `${value}（由 Zeabur 选定）`,
   "components.value.default": (value) => `${value}（默认）`,
   "components.value.empty": "未设置",
   "components.value.on": "开启",
