@@ -14,7 +14,7 @@ report() {
     echo "| Measure | Bytes |"
     echo "|---|---|"
     echo "| Image \`zeabur\` | $(docker image inspect --format '{{.Size}}' zeabur:dev 2>/dev/null || echo n/a) |"
-    echo "| Pod working set when idle | $(jq -r .pod_working_set_bytes "$measurements" 2>/dev/null || echo n/a) |"
+    echo "| Pod anonymous memory when idle | $(jq -r .pod_anonymous_bytes "$measurements" 2>/dev/null || echo n/a) |"
   } | tee -a "${GITHUB_STEP_SUMMARY:-/dev/null}"
 }
 

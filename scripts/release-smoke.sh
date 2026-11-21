@@ -78,19 +78,20 @@ health="$(curl --fail --silent --show-error --max-time 10 --cacert "$state/tls/c
   --resolve zeabur.localhost:443:127.0.0.1 https://zeabur.localhost/api/healthz)"
 [[ "$health" == ok ]] || { echo "/api/healthz answered '$health'" >&2; exit 1; }
 
-# A local candidate is the release build: its image's size and its idle pod's working set, in the
-# run's summary when there is one. The CI jobs build with another profile (scripts/build-image.sh).
+# A local candidate is the release build: its image's size and its idle pod's anonymous memory, in
+# the run's summary when there is one. The CI jobs build with another profile
+# (scripts/build-image.sh).
 if [[ "$image" != *@sha256:* ]]; then
   size="$(docker image inspect --format '{{.Size}}' "$image")"
   echo "image $image: $size bytes"
-  working_set="$(idle_working_set zeabur)"
+  anonymous="$(idle_memory zeabur)"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
     {
       echo "### Zeabur's release build (linux/$arch)"
       echo "| Measure | Bytes |"
       echo "|---|---|"
       echo "| Image \`$image\` | $size |"
-      echo "| Pod working set when idle | $working_set |"
+      echo "| Pod anonymous memory when idle | $anonymous |"
     } >>"$GITHUB_STEP_SUMMARY"
   fi
 fi
