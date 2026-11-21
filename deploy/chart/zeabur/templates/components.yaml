@@ -60,6 +60,8 @@ spec:
         runAsUser: 65532
         runAsGroup: 65532
         runAsNonRoot: true
+        # Secret volume files belong to root with mode 0440; the kubelet gives them this group.
+        fsGroup: 65532
         seccompProfile:
           type: RuntimeDefault
       {{- with $.Values.nodeSelector }}
@@ -69,6 +71,10 @@ spec:
       {{- with $.Values.tolerations }}
       tolerations:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with include "zeabur.extraCaVolume" $ }}
+      volumes:
+        {{- . | trim | nindent 8 }}
       {{- end }}
       {{- /* One at a time, in order: each but the last as an init container. */}}
       {{- $last := sub (len .) 1 }}
@@ -85,11 +91,16 @@ spec:
           env:
             - name: ZEABUR_CATALOG_URL
               value: {{ $.Values.catalog.url | quote }}
+            {{- with include "zeabur.outboundEnv" $ }}{{ . | trim | nindent 12 }}{{- end }}
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop: [ALL]
+          {{- with include "zeabur.extraCaMount" $ }}
+          volumeMounts:
+            {{- . | trim | nindent 12 }}
+          {{- end }}
           resources:
             requests:
               cpu: 10m

@@ -379,6 +379,21 @@ expect components "$(render_all -f "$chart/ci/full-values.yaml")" \
 expect components "$(render_all -f "$chart/ci/minimal-values.yaml" --set 'components.install=null')" \
   '[select(.metadata.name == "zeabur-components")] | length' 0
 
+# Each components container reaches the catalog as Zeabur does: the same extra CAs and proxy.
+outbound='.spec.template.spec | (.initContainers // []) + .containers | map([(.env | map(select(.name | test("^(ZEABUR_EXTRA_CA_FILE|HTTPS?_PROXY|NO_PROXY)$")) | .name + "=" + .value) | join(" ")), (.volumeMounts // [] | map(select(.name == "extra-ca") | .mountPath) | join(" "))] | join(" ")) | unique | join(",")'
+extra_ca_volume='.spec.template.spec.volumes // [] | map(select(.name == "extra-ca")) | to_json'
+for args in "-f $chart/ci/minimal-values.yaml" \
+  "-f $chart/ci/full-values.yaml --set outboundProxy.enabled=true --set outboundProxy.httpsProxy=http://proxy.example.test:3128" \
+  "-f $chart/ci/minimal-values.yaml --set extraTrustedCA.configMap=corp-ca"; do
+  # shellcheck disable=SC2086 # $args is several helm arguments.
+  rendered=$(render_all $args)
+  for expression in "$outbound" "$extra_ca_volume"; do
+    server=$(query "$rendered" "select(.kind == \"Deployment\" and .metadata.name == \"zeabur\") | $expression")
+    expect "components ($args)" "$rendered" \
+      "select(.kind == \"Job\" and .metadata.name == \"zeabur-components\") | $expression" "$server"
+  done
+done
+
 if ((failures > 0)); then
   echo "$failures chart check(s) failed" >&2
   exit 1

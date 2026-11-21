@@ -141,3 +141,55 @@ helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version }}
 {{- define "zeabur.proxyTlsSecret" -}}
 {{- .Values.proxy.tls.existingSecret | default (printf "%s-tls" (include "zeabur.proxyName" .)) -}}
 {{- end -}}
+
+{{/* How Zeabur reaches out (extraTrustedCA, outboundProxy), the same in the server and the
+     components Job: env entries, the extra-ca volume and its mount. */}}
+{{- define "zeabur.outboundEnv" -}}
+{{- if or .Values.extraTrustedCA.configMap .Values.extraTrustedCA.secret }}
+- name: ZEABUR_EXTRA_CA_FILE
+  value: /etc/zeabur/extra-ca/{{ .Values.extraTrustedCA.key }}
+{{- end }}
+{{- with .Values.outboundProxy }}
+{{- if .enabled }}
+{{- if .httpProxy }}
+- name: HTTP_PROXY
+  value: {{ .httpProxy | quote }}
+{{- end }}
+{{- if .httpsProxy }}
+- name: HTTPS_PROXY
+  value: {{ .httpsProxy | quote }}
+{{- end }}
+- name: NO_PROXY
+  value: {{ concat (list "localhost" ".svc" ".cluster.local") .clusterNetwork .noProxy | join "," | quote }}
+{{- end }}
+{{- end }}
+{{- end -}}
+
+{{- define "zeabur.extraCaMount" -}}
+{{- if or .Values.extraTrustedCA.configMap .Values.extraTrustedCA.secret }}
+- name: extra-ca
+  mountPath: /etc/zeabur/extra-ca
+  readOnly: true
+{{- end }}
+{{- end -}}
+
+{{- define "zeabur.extraCaVolume" -}}
+{{- with .Values.extraTrustedCA }}
+{{- if .configMap }}
+- name: extra-ca
+  configMap:
+    name: {{ .configMap }}
+    items:
+      - key: {{ .key }}
+        path: {{ .key }}
+{{- else if .secret }}
+- name: extra-ca
+  secret:
+    secretName: {{ .secret }}
+    defaultMode: 0440
+    items:
+      - key: {{ .key }}
+        path: {{ .key }}
+{{- end }}
+{{- end }}
+{{- end -}}
