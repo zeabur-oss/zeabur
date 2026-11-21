@@ -747,6 +747,23 @@ test("project-delete-review", async ({ page, shot }) => {
   await page.locator('[data-slot="dialog-content"] input').first().fill("blog")
   await shot({ clip: '[data-slot="dialog-content"]' })
 })
+test.describe(() => {
+  test.use({ demo: { ZEABUR_DEMO_DELETING: "1" } })
+  test("project-deleting-held", async ({ page, shot }) => {
+    await page.goto("/projects/archive", { waitUntil: "networkidle" })
+    const alert = page.locator('main [data-slot="alert"]').first()
+    await expect(alert.locator('button[data-slot="button"]')).toBeVisible()
+    await alert.locator('[data-slot="collapsible-trigger"]').click()
+    await shot({ clip: 'main [data-slot="alert"]' })
+  })
+  test("project-force-delete-review", async ({ page, shot }) => {
+    await page.goto("/projects/archive", { waitUntil: "networkidle" })
+    await page.locator('main [data-slot="alert"] button[data-slot="button"]').click()
+    await expect(page.locator('[data-slot="dialog-content"] button:text-is("YAML")')).toBeVisible()
+    await page.locator('[data-slot="dialog-content"] input').first().fill("archive")
+    await shot({ clip: '[data-slot="dialog-content"]' })
+  })
+})
 // Cluster settings and diagnosis (docs/zh-TW/cluster/settings.mdx, diagnosis.mdx).
 test("cluster-settings", async ({ page, shot }) => {
   await page.goto("/settings", { waitUntil: "networkidle" })

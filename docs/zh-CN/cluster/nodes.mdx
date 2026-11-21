@@ -25,17 +25,7 @@ description: 添加新节点，停止调度，用 kubectl 迁移副本和移除�
 
 ## 添加节点
 
-Zeabur 开源版不负责添加节点；用 Zeatend 装好的集群，由 Zeatend 添加。先开放上面的防火墙端口，再到服务器上运行：
-
-```sh
-sudo zeatend node add
-```
-
-命令会打印要在新 VM 上运行的命令：先写入 `/etc/zeatend/config.yaml`，加入令牌就在这份配置里，再运行 `zeatend plan` 和 `zeatend apply`。RKE2 要添加服务器而不是工作节点时，加上 `--role server`。在新 VM 上先[下载 Zeatend](https://github.com/zeabur-oss/zeatend#download-zeatend)，再以 root 身份运行打印出的命令。`zeatend plan` 会检查端口和到服务器的网络延迟，`zeatend apply` 会让 VM 加入集群，并等待节点变为 `Ready`。
-
-工作节点的令牌一小时内有效，可以用 `--ttl` 调整。节点 `Ready` 后，用 `node add` 打印的最后一行命令撤销令牌。RKE2 服务器拿到的是集群的服务器令牌，不会过期，不要贴到聊天或工单里。
-
-不是用 Zeatend 装的集群，按发行版自己的步骤把 VM 加进来。节点在**节点**列表中显示 `Ready` 后，新的副本就能调度到它上面。
+Zeabur 开源版不负责添加节点。用 Zeatend 装好的集群，按 Zeatend 的[添加节点](https://oss.zeabur.com/zh-CN/docs/zeatend/operations/add-nodes/)操作：要开放哪些端口、怎么让新服务器加入、最后怎么撤销令牌，那一页都有说明。用其他方式装的集群，按发行版自己的步骤添加。节点在**节点**列表显示 `Ready` 后，新的副本就能调度到它上面。
 
 RKE2 的 etcd 需要过半数的服务器才能运行。要在少一台服务器时继续运行，至少需要三台服务器。如果只有两台，任意一台停机都会导致整个集群停止运行。K3s 集群只有一台服务器，这台服务器停机时控制平面也会停止，恢复后才能继续运行。
 

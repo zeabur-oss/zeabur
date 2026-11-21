@@ -1,23 +1,34 @@
 ---
 title: Get started with Zeabur OSS
-description: Install Zeabur OSS on a new server or an existing Kubernetes cluster, then manage your services with it.
+description: Pick the install path that fits what you have, such as Claude Code or Codex, Zeatend on a new server, a cluster you already run, or a move from Zeabur.
 ---
 
-Use Zeabur OSS to see the services, logs, and domains in your Kubernetes cluster. When you change a setting, **Review changes** comes before anything is applied. Pick the starting point that matches your environment. For what Zeatend, Zeabur Identity, Zeabur Catalog and Zeabur Builder each do, see the [overview](https://oss.zeabur.com/docs/overview/).
+Use Zeabur OSS to see the services, logs, and domains in your Kubernetes cluster. When you change a setting, **Review changes** comes before anything is applied. For what Zeatend, Zeabur Identity, Zeabur Catalog and Zeabur Builder each do, see the [overview](https://oss.zeabur.com/docs/overview/).
 
-## Start with one server
+<Figure label="Three ways to install Zeabur OSS: hand it to Claude or Codex, use Zeatend on a new server, or install into a cluster you already have. Each way installs the same Zeabur OSS.">
+<FigFlow>
+<FigGroup label="Three ways to install Zeabur OSS">
+<FigCard title="Hand it to Claude or Codex" note="Paste one prompt, it installs for you" />
+<FigCard title="A new server with Zeatend" note="Kubernetes first, then one helm install" />
+<FigCard title="A cluster you already have" note="One helm install" />
+</FigGroup>
+<FigArrow />
+<FigCard accent title="Zeabur OSS on your server" note="The same projects, services and domains" />
+</FigFlow>
+</Figure>
 
-On a new Linux server, Zeatend sets up Kubernetes, then one `helm install` adds Zeabur OSS.
+Start on the page that fits what you have. Each path takes you through the install until you sign in to Zeabur OSS with a passkey.
 
-[Install Zeabur OSS on a server](get-started/quickstart.mdx)
+| What you have | Start here |
+| --- | --- |
+| You want Claude Code or Codex to do it | [Let an agent install for you](install/agent.mdx) |
+| A new Linux server | [Install with Zeatend](install/one-command.mdx) |
+| A Kubernetes cluster you already run | [Install Zeabur OSS in an existing cluster](install/existing-cluster.mdx) |
+| Services on Zeabur that you want to move | [Coming from Zeabur](get-started/from-zeabur-com.mdx) |
 
-## Use an existing Kubernetes cluster
+Kubernetes is open-source software that runs containers on one or more servers, and a cluster is a set of servers it manages. Zeatend sets up Kubernetes on a new server. Each path installs Zeabur OSS with the same `helm install`. Helm is Kubernetes' install tool.
 
-You need cluster admin access and Helm. The chart installs Zeabur Identity too, and kube-apiserver must trust it, as [Install Zeabur OSS in an existing cluster](install/existing-cluster.mdx) shows. The Zeabur OSS address must open over HTTPS so the browser offers passkeys.
-
-When the install finishes, sign in to Zeabur OSS with a passkey, then find an existing Namespace under **Projects** or add a project to deploy services.
-
-[Install Zeabur OSS in an existing cluster](install/existing-cluster.mdx)
+To look at a cluster from your own computer, without installing anything in it, see [Zeabur Desktop](install/desktop.mdx).
 
 ## Next steps
 

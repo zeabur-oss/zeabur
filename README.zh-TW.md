@@ -50,9 +50,12 @@
 
 ## 開始使用
 
-目前的安裝方式，是用 Helm 把 Zeabur 開源版裝進已有的 Kubernetes 叢集。Helm 是 Kubernetes 的安裝工具。登入由 Zeabur Identity 處理，所以要先裝好它。
+依手上的環境選一頁開始，每一頁都帶你走到用通行密鑰登入 Zeabur 開源版：
 
-[把 Zeabur 開源版裝進既有叢集](https://oss.zeabur.com/zh-TW/docs/zeabur/install/existing-cluster/)列出要準備的東西和每個步驟。
+- 想讓 Claude Code 或 Codex 代勞：[交給 Agent 安裝或搬家](https://oss.zeabur.com/zh-TW/docs/zeabur/install/agent/)
+- 有一台全新的 Linux 伺服器：[用 Zeatend 安裝](https://oss.zeabur.com/zh-TW/docs/zeabur/install/one-command/)
+- 已經在跑 Kubernetes 叢集：[把 Zeabur 開源版裝進既有叢集](https://oss.zeabur.com/zh-TW/docs/zeabur/install/existing-cluster/)
+- 正在用 Zeabur，想把服務搬過來：[從 Zeabur 過來](https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com/)
 
 只想在自己的電腦上看看叢集？`zeaburctl ui` 會用你的 kubeconfig（`kubectl` 連到叢集用的設定檔）在瀏覽器打開 Zeabur 開源版，見 [zeaburctl](https://oss.zeabur.com/zh-TW/docs/zeabur/reference/zeaburctl/)。
 
