@@ -143,7 +143,7 @@ If `apply` refuses the plan because the server changed after it was made, make a
 
 ### 4. Install Zeabur OSS with one helm install
 
-Run the `helm install` as "Install Zeabur OSS" in [Install with Zeatend](../install/one-command.mdx) shows. When it finishes, it prints the link that creates the first admin account. The link works once and expires in 24 hours.
+First run the "Let the cluster trust sign-in" step in [Install with Zeatend](../install/one-command.mdx), so the cluster accepts sign-in tokens. Its last command is a second `zeatend apply`, so show the user that plan too, as in step 3. Then run the `helm install` as "Install Zeabur OSS" in [Install with Zeatend](../install/one-command.mdx) shows. When it finishes, it prints the link that creates the first admin account. The link works once and expires in 24 hours.
 
 Hand the link to the user. Ask them to open it, create a passkey, and sign in with it at `https://zeabur.<IP>.sslip.io`. Wait until they say they are signed in.
 

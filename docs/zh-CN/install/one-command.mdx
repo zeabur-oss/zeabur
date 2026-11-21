@@ -55,14 +55,7 @@ curl -fsSLO "$base/zeabur-identityctl-$ctl-linux-$arch.tar.gz" &&
 
 ### 用 Zeatend 装好 Kubernetes
 
-写好 Zeatend 的配置。下一步会装好 Zeabur Identity，`apiServer.authenticationConfig` 让 Kubernetes 接受它签发的登录令牌。这段配置由 `zeabur-identityctl kube-config` 输出：
-
 ```sh
-mkdir -p /etc/zeatend
-{
-  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
-  zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public 2>/dev/null | sed 's/^/    /'
-} > /etc/zeatend/config.yaml
 zeatend plan
 ```
 
@@ -77,15 +70,29 @@ zeatend apply
 </Step>
 <Step>
 
-### 安装 Zeabur 开源版
+### 让集群信任登录
 
-让 Helm 使用 K3s 的 kubeconfig：
+下一步装好的 Zeabur Identity 会签发登录令牌，Kubernetes 要在 Zeatend 的 `apiServer.authenticationConfig` 里把它设为可信任的签发者，才会接受。`zeabur-identityctl kube-config` 输出这段配置，它要读集群，所以等集群装好再运行。第二次 `zeatend apply` 会带着这段配置重启 K3s：
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+mkdir -p /etc/zeatend
+authn=$(mktemp)
+zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public > "$authn" && {
+  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
+  sed 's/^/    /' "$authn"
+} > /etc/zeatend/config.yaml &&
+  zeatend apply
 ```
 
-接着按[用 Helm 安装](existing-cluster.mdx#用-helm-安装)运行 `helm install`，再按[创建管理员账号](existing-cluster.mdx#创建管理员账号)用通行密钥登录。Zeatend 已经让集群信任登录，不用再做“让集群信任登录”。
+`zeabur-identityctl` 也会输出手动安装这段配置的做法，不用管它，Zeatend 会替你做。如果它输出的是错误，就不会写入 Zeatend 的配置文件，`zeatend apply` 也不会运行。按错误信息处理后，再运行一次这段命令。
+
+</Step>
+<Step>
+
+### 安装 Zeabur 开源版
+
+Helm 使用上一步设好的 K3s kubeconfig。开了新的 SSH 连接时，先运行 `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`。按[用 Helm 安装](existing-cluster.mdx#用-helm-安装)运行 `helm install`，再按[创建管理员账号](existing-cluster.mdx#创建管理员账号)用通行密钥登录。上一步已经让集群信任登录，不用再做那里的“让集群信任登录”。
 
 </Step>
 </Steps>

@@ -55,14 +55,7 @@ Set `DOMAIN` on the server as [Choose the domain](existing-cluster.mdx#choose-th
 
 ### Set up Kubernetes with Zeatend
 
-Write Zeatend's configuration. Its `apiServer.authenticationConfig` lets Kubernetes accept the sign-in tokens of the Zeabur Identity you install in the next step, and `zeabur-identityctl kube-config` prints it:
-
 ```sh
-mkdir -p /etc/zeatend
-{
-  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
-  zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public 2>/dev/null | sed 's/^/    /'
-} > /etc/zeatend/config.yaml
 zeatend plan
 ```
 
@@ -77,15 +70,29 @@ zeatend apply
 </Step>
 <Step>
 
-### Install Zeabur OSS
+### Let the cluster trust sign-in
 
-Let Helm use the K3s kubeconfig:
+Kubernetes accepts the sign-in tokens of the Zeabur Identity you install in the next step only when Zeatend's `apiServer.authenticationConfig` names Zeabur Identity as a token issuer. `zeabur-identityctl kube-config` prints that setting. It reads the cluster, so it runs now, after the cluster exists. The second `zeatend apply` restarts K3s with the setting:
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+mkdir -p /etc/zeatend
+authn=$(mktemp)
+zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public > "$authn" && {
+  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
+  sed 's/^/    /' "$authn"
+} > /etc/zeatend/config.yaml &&
+  zeatend apply
 ```
 
-Then run `helm install` as [Install with Helm](existing-cluster.mdx#install-with-helm) shows, and sign in with a passkey as [Create the admin account](existing-cluster.mdx#create-the-admin-account) shows. Zeatend already made the cluster trust sign-in, so skip "Let the cluster trust sign-in".
+`zeabur-identityctl` also prints how to install the setting by hand. Ignore that part, because Zeatend does it. If it prints an error instead, the Zeatend configuration isn't written and `zeatend apply` doesn't run. Fix what the error says, then run the block again.
+
+</Step>
+<Step>
+
+### Install Zeabur OSS
+
+Helm uses the K3s kubeconfig that the previous step set. In a new SSH session, run `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml` first. Run `helm install` as [Install with Helm](existing-cluster.mdx#install-with-helm) shows, and sign in with a passkey as [Create the admin account](existing-cluster.mdx#create-the-admin-account) shows. The previous step already made the cluster trust sign-in, so skip "Let the cluster trust sign-in" there.
 
 </Step>
 </Steps>
