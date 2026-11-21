@@ -1,7 +1,7 @@
 ---
 title: API 權杖
 description: 讓腳本和 CI 用各專案的角色呼叫 Kubernetes API，權杖會到期。
-source: "5f7bb07ea1d9"
+source: "f6b921d4f5bf"
 ---
 
 腳本或 CI 不需要任何人登入，也能用 API 權杖操作叢集。管理員在**成員**頁建立權杖，像給成員權限一樣，替它在各專案設定角色。權杖跟 kubectl 一樣直接呼叫 kube-apiserver，能做什麼由 Kubernetes RBAC 決定。每個權杖都會到期。
