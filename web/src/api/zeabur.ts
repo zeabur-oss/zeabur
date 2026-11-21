@@ -11948,6 +11948,8 @@ export const getListClusterEventsUrl = (params?: ListClusterEventsParams) => {
  * @summary Events of every namespace, the newest `limit` of them (100 by default), optionally only
 warnings, only recent ones and only those about the cluster itself: the cluster overview asks
 for the last hour's warnings with `scope=cluster`, leaving projects' events to their pages.
+An event about a pod from before the pod last became Ready is left out: it is the pod's
+start-up, and the project's events keep it.
  */
 export const listClusterEvents = async (
   params?: ListClusterEventsParams,

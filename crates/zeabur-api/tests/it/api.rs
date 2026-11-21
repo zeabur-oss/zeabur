@@ -18,7 +18,7 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::{ConfigMap, Namespace, Node, Pod, Secret};
     use zeabur_kube::k8s_openapi::api::events::v1::Event;
-    use zeabur_kube::k8s_openapi::jiff::Timestamp;
+    use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, SecretSummary, ServedResource};
     use zeabur_telemetry::Feature;
@@ -1639,6 +1639,60 @@ mod tests {
         assert!(names(&all).contains(&"app".to_owned()), "{all}");
         let (status, ..) = call(app(&cluster), "GET", "/api/v1/cluster/events?scope=x").await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
+    }
+
+    #[tokio::test]
+    async fn warnings_from_before_a_pod_became_ready_are_left_out() {
+        let cluster = cluster();
+        let now = Timestamp::now();
+        let ago = |secs: i64| (now - SignedDuration::from_secs(secs)).to_string();
+        let pod = |name: &str, ready: &str, since: &str| {
+            serde_json::from_value(json!({
+                "metadata": {"name": name, "namespace": "shop"},
+                "spec": {"containers": [{"name": "app"}]},
+                "status": {"phase": "Running", "conditions": [
+                    {"type": "Ready", "status": ready, "lastTransitionTime": since}]}
+            }))
+            .unwrap()
+        };
+        let unhealthy = |pod: &str, seen: &str| -> Event {
+            serde_json::from_value(json!({
+                "metadata": {"name": format!("{pod}.unhealthy"), "namespace": "shop"},
+                "eventTime": seen,
+                "regarding": {"kind": "Pod", "name": pod, "namespace": "shop", "apiVersion": "v1"},
+                "type": "Warning", "reason": "Unhealthy",
+                "note": "Readiness probe failed: connect: connection refused",
+                "reportingController": "kubelet", "reportingInstance": "vps-1", "action": "x"
+            }))
+            .unwrap()
+        };
+        cluster.update(|s| {
+            if let Some(shop) = s.objects.get_mut("shop") {
+                shop.pods = vec![
+                    pod("started", "True", &ago(60)),
+                    pod("failing", "False", &ago(30)),
+                ];
+            }
+            s.events.insert(
+                "shop".to_owned(),
+                vec![
+                    unhealthy("started", &ago(90)),
+                    unhealthy("failing", &ago(20)),
+                ],
+            );
+        });
+        let warnings = get(
+            &cluster,
+            "/api/v1/cluster/events?type=warning&sinceSeconds=3600",
+        )
+        .await;
+        assert_eq!(names(&warnings), ["failing.unhealthy"]);
+        assert_eq!(warnings["totalSize"], 1);
+        let project = get(&cluster, "/api/v1/projects/shop/events").await;
+        assert!(
+            names(&project).contains(&"started.unhealthy".to_owned()),
+            "{project}"
+        );
     }
 
     #[tokio::test]

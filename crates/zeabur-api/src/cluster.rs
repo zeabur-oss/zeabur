@@ -675,6 +675,8 @@ fn about_the_cluster(event: &zeabur_kube::k8s_openapi::api::events::v1::Event) -
 /// Events of every namespace, the newest `limit` of them (100 by default), optionally only
 /// warnings, only recent ones and only those about the cluster itself: the cluster overview asks
 /// for the last hour's warnings with `scope=cluster`, leaving projects' events to their pages.
+/// An event about a pod from before the pod last became Ready is left out: it is the pod's
+/// start-up, and the project's events keep it.
 ///
 /// At most 5,000 events are read (`partial` says when there were more); `totalSize` counts every
 /// event read that matched, also those past the limit.
@@ -708,7 +710,11 @@ pub(crate) async fn events(
             ))
         })?),
     };
-    let read = cluster.cluster_events(WIDE_LIMIT).await.map_err(|e| {
+    let (read, pods) = futures_util::join!(
+        cluster.cluster_events(WIDE_LIMIT),
+        cluster.cluster_pods(WIDE_LIMIT),
+    );
+    let read = read.map_err(|e| {
         refused(
             e,
             "the cluster's events",
@@ -716,6 +722,30 @@ pub(crate) async fn events(
             list_read("events.k8s.io", "events", None),
         )
     })?;
+    // Without the pods, every event stays.
+    let ready_since: BTreeMap<(String, String), _> = pods
+        .map_or_else(|_| Vec::new(), |read| read.pods)
+        .into_iter()
+        .filter_map(|pod| Some(((pod.namespace, pod.name), pod.ready_since?)))
+        .collect();
+    let started = |e: &zeabur_kube::k8s_openapi::api::events::v1::Event| {
+        let Some(regarding) = e
+            .regarding
+            .as_ref()
+            .filter(|r| r.kind.as_deref() == Some("Pod"))
+        else {
+            return false;
+        };
+        let key = (
+            regarding
+                .namespace
+                .clone()
+                .or_else(|| e.metadata.namespace.clone())
+                .unwrap_or_default(),
+            regarding.name.clone().unwrap_or_default(),
+        );
+        zeabur_gaps::before_ready(last_seen(e), ready_since.get(&key).copied())
+    };
     let cutoff = since.map(|s| (state.clock)().as_second().saturating_sub(s));
     let mut keyed: Vec<(EventKey, crate::views::EventView)> = read
         .events
@@ -731,6 +761,7 @@ pub(crate) async fn events(
             cutoff.is_none_or(|cutoff| last_seen(e).is_some_and(|t| t.as_second() >= cutoff))
         })
         .filter(|e| !cluster_only || about_the_cluster(e))
+        .filter(|e| !started(e))
         .map(|e| {
             let namespace = e.metadata.namespace.as_deref().unwrap_or_default();
             let (time, name) = event_key(e);
