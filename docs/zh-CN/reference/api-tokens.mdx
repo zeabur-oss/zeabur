@@ -14,35 +14,99 @@ source: "5f7bb07ea1d9"
 ## 创建令牌
 
 1. 打开**成员**，在 **API 令牌**下点击**创建令牌**。
-2. 起一个能看出用途的名称，比如 `github-actions`。
-3. 在需要的项目中选择**开发者**或**查看者**，选好有效期，点击**检查**。
-4. 确认变更后应用。
-5. 复制令牌。Zeabur 开源版只会显示这一次。窗口中还有 kubeconfig 和集群的 CA 证书。
+
+   ![成员页的 API 令牌列表：每个令牌的角色、创建者和过期时间](../images/shots/api-tokens-list.avif)
+
+2. 起一个能看出用途的名称，比如 `deploy-shop`。勾选需要的项目，选择**开发者**或**查看者**，选好有效期后点击**检查变更**。
+
+   ![创建 API 令牌窗口：名称 deploy-shop、在 shop 中是开发者、有效期 30 天](../images/shots/api-token-create.avif)
+
+3. 确认变更后点击**创建令牌**。
+4. 窗口会显示令牌、kubeconfig 和集群的 CA 证书。令牌只会显示这一次，先不要关闭窗口，按下一节保存好 kubeconfig。
+
+   ![令牌窗口：令牌、server 为空的 kubeconfig，以及 CA 证书](../images/shots/api-token-shown.avif)
 
 列表会显示每个令牌的角色、创建者和过期时间。集群用 `--service-account-max-token-expiration` 限制令牌有效期时，kube-apiserver 会缩短令牌的有效期，列表显示的是实际过期时间。
 
-## 连接
+## 把令牌做成 kubeconfig
 
-每个请求需要三样东西：API 地址、CA 证书和令牌。
+窗口中的 kubeconfig 已经包含令牌和 CA 证书，只差 `server`，也就是 API 地址。Zeabur 开源版只知道 kube-apiserver 在集群内部的地址，所以需要你自己填写。
 
-**地址**：kube-apiserver 监听每个 server 节点的 TCP 6443，比如 `https://203.0.113.10:6443`。你平时用 kubectl 的 kubeconfig 中，`server` 那一行就是这个地址。要通过域名或其他地址访问 API 时，把它加到 K3s 或 RKE2 配置文件的 `tls-san`，证书才会覆盖它。
+<Steps>
+<Step>
+### 找到 API 地址
 
-**CA 证书**：创建或续期令牌后，窗口中会显示。在项目中有角色的令牌，也可以从项目的 `kube-root-ca.crt` 配置文件读取：
+kube-apiserver 监听每个 server 节点的 TCP 6443，比如 `https://203.0.113.10:6443`。在你自己的电脑上，打印管理员 kubeconfig 使用的地址：
+
+```sh
+kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'
+```
+
+输出 `https://127.0.0.1:6443` 表示这份 kubeconfig 是在服务器上用的。请改用你连接服务器的地址，例如在 Zeatend 访问方式界面填写的地址。要通过域名或其他地址访问 API 时，把它加到 K3s 或 RKE2 配置文件的 `tls-san`（Zeatend 中是 `host.tlsSan`），证书才会覆盖它。
+</Step>
+<Step>
+### 保存为文件
+
+点击窗口中 kubeconfig 的复制按钮，粘贴到一个文件中，比如 `deploy-shop.yaml`，并设为只有你能读取：
+
+```sh
+chmod 600 deploy-shop.yaml
+```
+
+拿到这个文件的人，在令牌过期前都能使用它的权限。
+</Step>
+<Step>
+### 填写地址
+
+```sh
+kubectl config set-cluster zeabur --server=https://203.0.113.10:6443 --kubeconfig deploy-shop.yaml
+```
+</Step>
+<Step>
+### 试一试
+
+```sh
+export KUBECONFIG=$PWD/deploy-shop.yaml
+kubectl auth whoami
+kubectl get deployments
+```
+
+`kubectl auth whoami` 会显示 `system:serviceaccount:zeabur-api-tokens:deploy-shop`，kube-apiserver 记录这个令牌的请求时用的就是这个名称。令牌只在一个项目中有角色时，kubeconfig 会直接从那个项目开始；否则每条命令都要加 `-n <项目>`。
+</Step>
+<Step>
+### 放进 CI
+
+把整个文件保存为 CI 的机密，不要放进代码仓库。以 GitHub Actions 为例：
+
+```sh
+gh secret set KUBECONFIG_DATA < deploy-shop.yaml
+```
+
+再在任务中写成文件：
+
+```yaml
+- name: Deploy
+  env:
+    KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+  run: |
+    export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+    (umask 077; printf '%s' "$KUBECONFIG_DATA" > "$KUBECONFIG")
+    kubectl set image deployment/web web=ghcr.io/acme/web:${{ github.sha }}
+```
+
+Runner 需要能访问 API 地址的 TCP 6443。令牌过期后，续期令牌，再保存一次新的 kubeconfig。
+</Step>
+</Steps>
+
+## 用 curl 连接
+
+curl 需要 API 地址、令牌和 CA 证书。把窗口中的 CA 证书保存为 `ca.crt`。在项目中有角色的令牌，也可以从项目的 `kube-root-ca.crt` 配置文件读取：
 
 ```sh
 kubectl -n shop get configmap kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > ca.crt
 ```
 
-**kubeconfig**：复制窗口中的 kubeconfig，填上 `server` 后保存，比如 `ci.yaml`。CA 证书已经在 `certificate-authority-data` 中。令牌只在一个项目中有角色时，kubeconfig 会直接从那个项目开始；否则每条命令都要加 `-n <项目>`。
-
-```sh
-export KUBECONFIG=$PWD/ci.yaml
-kubectl auth whoami
-```
-
-`kubectl auth whoami` 会显示 `system:serviceaccount:zeabur-api-tokens:github-actions`，kube-apiserver 记录这个令牌的请求时用的就是这个名称。
-
-用 curl 时，先设好地址和令牌：
+再设好地址和令牌：
 
 ```sh
 APISERVER=https://203.0.113.10:6443

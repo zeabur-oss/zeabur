@@ -104,6 +104,37 @@ test("members-list", async ({ page, shot }) => {
   await expect(page.locator("main section[aria-label] ul > li").first()).toBeVisible()
   await shot({ clip: "main" })
 })
+// API tokens (docs/zh-TW/reference/api-tokens.mdx).
+const tokens = 'main section[aria-labelledby="api-tokens"]'
+const dialog = '[data-slot="dialog-content"]'
+const footerButton = `${dialog} > div:last-child button:last-child`
+test("api-tokens-list", async ({ page, shot }) => {
+  await page.goto("/members", { waitUntil: "networkidle" })
+  await expect(page.locator(`${tokens} ul > li`).first()).toBeVisible()
+  await shot({ clip: tokens })
+})
+test.describe(() => {
+  test.beforeEach(async ({ page }) => {
+    await page.goto("/members", { waitUntil: "networkidle" })
+    await page.locator(`${tokens} > div button`).click()
+    await page.locator(`${dialog} input`).first().fill("deploy-shop")
+    await page.locator(`${dialog} input[type="search"]`).fill("shop")
+    await page.locator(`${dialog} ul [data-slot="checkbox"]`).first().click()
+    // Developer is the first role.
+    await page.locator(`${dialog} ul [data-slot="select-trigger"]`).click()
+    await page.locator('[role="option"]').first().click()
+  })
+  test("api-token-create", async ({ page, shot }) => {
+    await expect(page.locator(`${dialog} ul [data-slot="checkbox"][data-checked]`)).toBeVisible()
+    await shot({ clip: dialog })
+  })
+  test("api-token-shown", async ({ page, shot }) => {
+    await page.locator(footerButton).click()
+    await page.locator(footerButton).click()
+    await expect(page.locator(`${dialog} h3`).first()).toBeVisible()
+    await shot({ clip: dialog })
+  })
+})
 test("members-reset", async ({ page, shot }) => {
   await page.goto("/members", { waitUntil: "networkidle" })
   await page.locator("main section[aria-label] ul > li:nth-child(2) button[aria-label]").click()

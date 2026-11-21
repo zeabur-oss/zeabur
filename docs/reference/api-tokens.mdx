@@ -12,36 +12,100 @@ An API token lets a script or CI job work with the cluster without anyone's sign
 
 ## Create a token
 
-1. Open **Members** and, under **API tokens**, click **Create token**.
-2. Name it after what uses it, such as `github-actions`.
-3. Pick **Developer** or **Viewer** in each project it needs and how long it lasts, then click **Review**.
-4. Check the changes and apply them.
-5. Copy the token. Zeabur OSS shows it only once. The dialog also shows a kubeconfig and the cluster's CA certificate.
+1. Open **Members**. Under **API tokens**, click **Create token**.
+
+   ![The API tokens list on the Members page: each token's roles, who created it, and when it expires](../images/shots/api-tokens-list.avif)
+
+2. Name it after what uses it, such as `deploy-shop`. Tick each project it needs and choose **Developer** or **Viewer**. Choose how long it lasts, then click **Review changes**.
+
+   ![The Create API token dialog: the name deploy-shop, Developer in shop, and 30 days](../images/shots/api-token-create.avif)
+
+3. Check the changes, then click **Create token**.
+4. The dialog shows the token, a kubeconfig, and the cluster's CA certificate. Zeabur OSS shows the token only once, so keep the dialog open until you have saved the kubeconfig in the next section.
+
+   ![The token's dialog: the token, a kubeconfig whose server is empty, and the CA certificate](../images/shots/api-token-shown.avif)
 
 The list shows each token's roles, who created it, and when it expires. If the cluster limits token lifetimes with `--service-account-max-token-expiration`, kube-apiserver cuts the token short, and the list shows the real expiry.
 
-## Connect
+## Turn the token into a kubeconfig
 
-A request needs three things: the API address, the CA certificate, and the token.
+The kubeconfig in the dialog already holds the token and the CA certificate. Only `server`, the API address, is empty: Zeabur OSS knows kube-apiserver only by its address inside the cluster.
 
-**Address**: kube-apiserver listens on TCP 6443 on each server node, for example `https://203.0.113.10:6443`. The `server` line in the kubeconfig you use with kubectl has the same address. If you reach the API through a domain or another address, add it to the `tls-san` list in the K3s or RKE2 configuration file so the certificate covers it.
+<Steps>
+<Step>
+### Find the API address
 
-**CA certificate**: The dialog shows it after you create or renew a token. A token with a role in a project can also read it from the project's `kube-root-ca.crt` config file:
+kube-apiserver listens on TCP 6443 on each server node, for example `https://203.0.113.10:6443`. On your own computer, print the address your admin kubeconfig uses:
+
+```sh
+kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'
+```
+
+If it prints `https://127.0.0.1:6443`, that kubeconfig runs on the server itself. Use the address you reach the server at instead, such as the address on Zeatend's Access screen. If you reach the API through a domain or another address, add it to `tls-san` in the K3s or RKE2 configuration file (`host.tlsSan` with Zeatend), so the certificate covers it.
+</Step>
+<Step>
+### Save the kubeconfig
+
+Click the copy button on the kubeconfig in the dialog. Paste it into a file, such as `deploy-shop.yaml`, and make the file readable only by you:
+
+```sh
+chmod 600 deploy-shop.yaml
+```
+
+Whoever has this file can act as the token until it expires.
+</Step>
+<Step>
+### Fill in the address
+
+```sh
+kubectl config set-cluster zeabur --server=https://203.0.113.10:6443 --kubeconfig deploy-shop.yaml
+```
+</Step>
+<Step>
+### Try it
+
+```sh
+export KUBECONFIG=$PWD/deploy-shop.yaml
+kubectl auth whoami
+kubectl get deployments
+```
+
+`kubectl auth whoami` shows `system:serviceaccount:zeabur-api-tokens:deploy-shop`. That's the name kube-apiserver logs for the token's requests. When the token has a role in only one project, the kubeconfig starts in that project. Otherwise, add `-n <project>` to each command.
+</Step>
+<Step>
+### Use it in CI
+
+Store the whole file as a secret of the CI, not in the repository. For GitHub Actions:
+
+```sh
+gh secret set KUBECONFIG_DATA < deploy-shop.yaml
+```
+
+Then write it to a file in the job:
+
+```yaml
+- name: Deploy
+  env:
+    KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+  run: |
+    export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+    (umask 077; printf '%s' "$KUBECONFIG_DATA" > "$KUBECONFIG")
+    kubectl set image deployment/web web=ghcr.io/acme/web:${{ github.sha }}
+```
+
+The runner must reach the API address on TCP 6443. When the token expires, renew it and store the new kubeconfig again.
+</Step>
+</Steps>
+
+## Connect with curl
+
+curl needs the API address, the token, and the CA certificate. Copy the CA certificate from the dialog into `ca.crt`. A token with a role in a project can also read it from the project's `kube-root-ca.crt` config file:
 
 ```sh
 kubectl -n shop get configmap kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > ca.crt
 ```
 
-**kubeconfig**: Copy the kubeconfig from the dialog, fill in `server`, and save it, for example as `ci.yaml`. The CA certificate is already in `certificate-authority-data`. When the token has a role in only one project, the kubeconfig starts in that project. Otherwise, add `-n <project>` to each command.
-
-```sh
-export KUBECONFIG=$PWD/ci.yaml
-kubectl auth whoami
-```
-
-`kubectl auth whoami` shows `system:serviceaccount:zeabur-api-tokens:github-actions`. That's the name kube-apiserver logs for the token's requests.
-
-For curl, set the address and token once:
+Then set the address and token once:
 
 ```sh
 APISERVER=https://203.0.113.10:6443
