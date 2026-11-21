@@ -127,7 +127,17 @@ A token can't:
 - Change nodes, cluster components, or cluster backups.
 - Read or change anything in `zeabur-api-tokens`, so it can't request more tokens.
 
-There's no admin token. Admin accounts sign in only with passkeys, and a token with full rights would get around that. For work across the cluster, such as creating projects, installing components, managing nodes, or cluster backups, use your own kubeconfig as an admin. See [Admin accounts and regular accounts](./permissions.mdx#admin-accounts-and-regular-accounts).
+### Never give CI an admin kubeconfig
+
+There's no admin token. Admin accounts sign in only with passkeys, and a token with full rights would get around that. It could also create identities of its own, so deleting the token would not take its access away.
+
+<Callout type="warn">
+Never put an admin's kubeconfig in CI, in a secret of another service, or in an agent's hands. An admin kubeconfig can do anything in the cluster: if it leaks, the whole cluster and all its data leak with it. Give each token roles only in the projects it needs, and Viewer where Viewer is enough.
+</Callout>
+
+For work across the cluster, such as creating projects, installing components, managing nodes, or cluster backups, use your own kubeconfig as an admin. See [Admin accounts and regular accounts](./permissions.mdx#admin-accounts-and-regular-accounts).
+
+If something outside the cluster must do one admin task on its own, write a small program for that one task. Give it its own ServiceAccount, bind only the verbs and resources that task needs, and make it do nothing else.
 
 ## Common tasks
 
