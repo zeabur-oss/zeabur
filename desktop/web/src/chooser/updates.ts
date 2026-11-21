@@ -10,15 +10,31 @@ export interface Available {
   install: "inPlace" | "package" | "download"
 }
 
-export type View =
-  | { kind: "available"; update: Available; installing: boolean; error: string | null }
-  | { kind: "latest"; version: string }
-  | { kind: "failed"; reason: string }
+/** `Failure` in desktop/src/update.rs. */
+export type Failure = "notConfigured" | "failed"
+
+export type Status =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "latest" }
+  | { kind: "available"; update: Available }
+  | { kind: "failed"; reason: Failure }
 
 export interface UpdateState {
-  available: Available | null
-  view: View | null
-  checking: boolean
+  /** This build's version; null until the app answers. */
+  version: string | null
+  status: Status
+  /** The dialog of the available update. */
+  open: boolean
+  installing: boolean
+  installFailed: boolean
+}
+
+/** The status a check ends in; anything but `notConfigured` is the same short failure. */
+export function answer(result: { found: Available | null } | { error: unknown }): Status {
+  if ("found" in result)
+    return result.found ? { kind: "available", update: result.found } : { kind: "latest" }
+  return { kind: "failed", reason: result.error === "notConfigured" ? "notConfigured" : "failed" }
 }
 
 const api = {
@@ -29,7 +45,13 @@ const api = {
   openReleases: () => invoke<void>("open_releases"),
 }
 
-let state: UpdateState = { available: null, view: null, checking: false }
+let state: UpdateState = {
+  version: null,
+  status: { kind: "idle" },
+  open: false,
+  installing: false,
+  installFailed: false,
+}
 const subscribers = new Set<() => void>()
 let stop: (() => void) | null = null
 
@@ -38,48 +60,40 @@ function set(next: Partial<UpdateState>) {
   subscribers.forEach((notify) => notify())
 }
 
+/** A check the person asked for; a newer version opens its dialog. */
 export async function check() {
-  set({ checking: true })
-  try {
-    const found = await api.check()
-    set({
-      available: found,
-      view: found
-        ? { kind: "available", update: found, installing: false, error: null }
-        : { kind: "latest", version: await getVersion() },
-    })
-  } catch (error) {
-    set({ view: { kind: "failed", reason: String(error) } })
-  } finally {
-    set({ checking: false })
-  }
+  if (state.status.kind === "checking") return
+  set({ status: { kind: "checking" } })
+  const status = await api.check().then(
+    (found) => answer({ found }),
+    (error: unknown) => answer({ error }),
+  )
+  set({ status, open: status.kind === "available", installFailed: false })
 }
 
-export function show(update: Available) {
-  set({ view: { kind: "available", update, installing: false, error: null } })
+export function show() {
+  set({ open: true, installFailed: false })
 }
 
 export function close() {
-  set({ view: null })
+  if (!state.installing) set({ open: false })
 }
 
-export function install(update: Available) {
-  set({ view: { kind: "available", update, installing: true, error: null } })
-  api
-    .install()
-    .catch((error: unknown) =>
-      set({ view: { kind: "available", update, installing: false, error: String(error) } }),
-    )
+export function install() {
+  set({ installing: true, installFailed: false })
+  api.install().catch(() => set({ installing: false, installFailed: true }))
 }
 
 export const openReleases = api.openReleases
 
 /** Quiet on start: desktop/src/update.rs tells the chooser what it found. */
 function start() {
-  void api.found().then((found) => found && set({ available: found }))
-  const offFound = listen<Available>("update-available", (event) =>
-    set({ available: event.payload }),
-  )
+  const found = (update: Available) => {
+    if (state.status.kind === "idle") set({ status: { kind: "available", update } })
+  }
+  void getVersion().then((version) => set({ version }))
+  void api.found().then((update) => update && found(update))
+  const offFound = listen<Available>("update-available", (event) => found(event.payload))
   const checkIfAsked = async () => {
     if (await api.takeCheckRequest()) await check()
   }

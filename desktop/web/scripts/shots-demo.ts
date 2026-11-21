@@ -96,6 +96,15 @@ export type Scenario = {
   sources: boolean
   /** The reason the cluster page shows when the service does not start. */
   failure?: string
+  /** What the update check answers; nothing newer by default. */
+  update?: "available" | "failed" | "checking"
+}
+
+const update = {
+  version: "0.3.0",
+  current: "0.3.0-beta.1",
+  notes: "### Features\n\n- Check for updates from the sidebar.",
+  install: "inPlace",
 }
 
 export function install(scenario: Scenario) {
@@ -110,6 +119,12 @@ export function install(scenario: Scenario) {
           return snapshot
         case "start_cluster":
           return Promise.reject(scenario.failure ?? "")
+        case "plugin:app|version":
+          return update.current
+        case "check_update":
+          if (scenario.update === "failed") return Promise.reject("failed")
+          if (scenario.update === "checking") return new Promise(() => {})
+          return scenario.update === "available" ? update : null
         default:
           return null
       }

@@ -6221,6 +6221,7 @@ dependencies = [
  "kube",
  "nix",
  "reqwest",
+ "semver",
  "serde",
  "serde_json",
  "tauri",
