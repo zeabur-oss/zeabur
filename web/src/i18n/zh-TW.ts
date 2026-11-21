@@ -1153,6 +1153,7 @@ export const zhTW: Messages = {
   "components.value.set": "已設定",
   "components.value.kept": "沿用上次安裝的值",
   "components.value.generated": "由 Zeabur 隨機產生",
+  "components.value.picked": (value) => `${value}（由 Zeabur 選定）`,
   "components.value.default": (value) => `${value}（預設）`,
   "components.value.empty": "未設定",
   "components.value.on": "開啟",

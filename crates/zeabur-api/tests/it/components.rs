@@ -106,6 +106,8 @@ mod tests {
         down: bool,
         tampered: bool,
         contributes: Option<Contributes>,
+        /// Velero asks for a fixed ClusterIP, as Zeabur Builder's zot does.
+        cluster_ip: bool,
     }
 
     /// A contribution the catalog files do not have.
@@ -180,6 +182,16 @@ mod tests {
                             "target": {"component": "cert-manager", "release": "cert-manager"},
                             "values": "# Added by cloudnative-pg.\nadded: cnpg\n",
                         }]);
+                    }
+                    if self.cluster_ip && id == "velero" {
+                        file["declaration"]["inputs"]
+                            .as_array_mut()
+                            .unwrap()
+                            .push(json!({
+                                "name": "clusterIp",
+                                "path": "service.clusterIP",
+                                "generate": {"type": "clusterIP"},
+                            }));
                     }
                     serde_json::to_vec(&file).unwrap()
                 };
@@ -512,6 +524,52 @@ mod tests {
             key.get("value").is_none(),
             "a Secret's value stays on the server"
         );
+    }
+
+    #[tokio::test]
+    async fn an_install_takes_a_free_service_address_for_a_fixed_cluster_ip() {
+        let cluster = cluster();
+        for (kind, name, spec) in [
+            (
+                "ServiceCIDR",
+                "kubernetes",
+                json!({"cidrs": ["10.43.0.0/16"]}),
+            ),
+            ("IPAddress", "10.43.0.1", json!({})),
+            ("IPAddress", "10.43.0.2", json!({})),
+            ("IPAddress", "10.43.118.133", json!({})),
+        ] {
+            put(
+                &cluster,
+                json!({
+                    "apiVersion": "networking.k8s.io/v1", "kind": kind,
+                    "metadata": {"name": name}, "spec": spec,
+                }),
+            );
+        }
+        let app = TestApi::new(&cluster)
+            .signed_in(TOKEN)
+            .with_catalog(Arc::new(Api {
+                cluster_ip: true,
+                ..Api::default()
+            }))
+            .router();
+        let values = json!({"velero": {
+            "bucket": "backups",
+            "s3Url": "http://s3.test:9000",
+            "credentials": "[default]\naws_access_key_id=a\naws_secret_access_key=b\n",
+        }});
+
+        let (status, plan) = velero(&app, "plan", &values).await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        let input = plan["inputs"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|i| i["name"] == "clusterIp")
+            .unwrap();
+        assert_eq!(input["state"], "generated", "{input}");
+        assert_eq!(input["value"], "10.43.0.3");
     }
 
     #[tokio::test]

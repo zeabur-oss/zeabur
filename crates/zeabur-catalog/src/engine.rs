@@ -34,6 +34,7 @@
 //! [k3s-config]: https://docs.k3s.io/add-ons/helm#customizing-packaged-components-with-helmchartconfig
 
 use std::collections::{BTreeMap, BTreeSet};
+use std::net::IpAddr;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
@@ -85,6 +86,61 @@ pub struct Inputs<'a> {
     /// What an earlier install wrote: the `INPUTS` annotation and the keys of the Secrets Zeabur
     /// wrote.
     pub kept: &'a Values,
+    /// The cluster's Service addresses, for an input that `generate: {type: clusterIP}`; `None`
+    /// leaves such an input empty.
+    pub addresses: Option<&'a ServiceAddresses>,
+}
+
+/// The cluster's Service CIDRs and the addresses Services hold in them.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct ServiceAddresses {
+    /// The `spec.cidrs` of every `ServiceCIDR`, such as `10.43.0.0/16`.
+    pub cidrs: Vec<String>,
+    /// The name of every `IPAddress`: the addresses Services hold.
+    pub taken: BTreeSet<IpAddr>,
+}
+
+impl ServiceAddresses {
+    /// The lowest address of the first CIDR's static band that neither a Service nor `picked`
+    /// holds. Kubernetes assigns addresses from the band above it first, so the band is for fixed
+    /// `ClusterIP`s; it holds `min(max(16, size / 16), 256)` addresses after the first
+    /// [cluster-ip-allocation].
+    ///
+    /// [cluster-ip-allocation]: https://kubernetes.io/docs/concepts/services-networking/cluster-ip-allocation/
+    #[must_use]
+    pub fn free(&self, picked: &BTreeSet<IpAddr>) -> Option<IpAddr> {
+        let (base, host_bits) = self.cidrs.first().and_then(|c| cidr(c))?;
+        let size = 1_u128
+            .checked_shl(u32::from(host_bits))
+            .unwrap_or(u128::MAX);
+        let band = (size / 16).clamp(16, 256).min(size.saturating_sub(2));
+        (1..=band)
+            .filter_map(|offset| plus(base, offset))
+            .find(|a| !self.taken.contains(a) && !picked.contains(a))
+    }
+}
+
+/// The network address and the number of host bits of a CIDR such as `10.43.0.0/16`.
+fn cidr(text: &str) -> Option<(IpAddr, u8)> {
+    let (address, prefix) = text.split_once('/')?;
+    let base: IpAddr = address.parse().ok()?;
+    let bits = if base.is_ipv4() { 32 } else { 128 };
+    Some((
+        base,
+        bits - prefix.parse::<u8>().ok().filter(|p| *p <= bits)?,
+    ))
+}
+
+/// `base` plus `offset`.
+fn plus(base: IpAddr, offset: u128) -> Option<IpAddr> {
+    Some(match base {
+        IpAddr::V4(v4) => IpAddr::V4(
+            u32::from(v4)
+                .checked_add(u32::try_from(offset).ok()?)?
+                .into(),
+        ),
+        IpAddr::V6(v6) => IpAddr::V6(u128::from(v6).checked_add(offset)?.into()),
+    })
 }
 
 /// Where an input's value comes from.
@@ -97,7 +153,7 @@ pub enum InputState {
     Kept,
     /// The catalog's default.
     Default,
-    /// Zeabur makes it at random.
+    /// Zeabur makes it: random bytes, or a free Service address.
     Generated,
     /// None, and none is needed.
     Empty,
@@ -413,6 +469,7 @@ pub fn install(
     let mut steps = Vec::new();
     let mut warnings = Vec::new();
     let mut resolved = Vec::new();
+    let mut picked = BTreeSet::new();
     for (i, component) in order.iter().enumerate() {
         let file = snapshot
             .components
@@ -432,7 +489,7 @@ pub fn install(
                 level,
             });
         }
-        let own = resolve(file, inputs)?;
+        let own = resolve(file, inputs, &mut picked)?;
         // Only the components before it add values: a contributor's objects are not there yet.
         steps.extend(steps_of(
             file,
@@ -479,8 +536,13 @@ pub fn install(
     })
 }
 
-/// The value of each input of `file`: given, else kept, else the default, else generated.
-fn resolve(file: &ComponentFile, inputs: Inputs<'_>) -> Result<Vec<Resolved>, Refusal> {
+/// The value of each input of `file`: given, else kept, else the default, else generated. An
+/// address it generates goes into `picked`, so no other input takes it.
+fn resolve(
+    file: &ComponentFile,
+    inputs: Inputs<'_>,
+    picked: &mut BTreeSet<IpAddr>,
+) -> Result<Vec<Resolved>, Refusal> {
     let of = |values: &Values, name: &str| {
         values
             .get(&file.id)
@@ -508,11 +570,7 @@ fn resolve(file: &ComponentFile, inputs: Inputs<'_>) -> Result<Vec<Resolved>, Re
             (InputState::Kept, Some(kept))
         } else if let Some(default) = &input.default {
             (InputState::Default, Some(default.clone()))
-        } else if let Some(Generate::Random { bytes, encoding }) = &input.generate {
-            let value = random(*bytes, *encoding).map_err(|message| Refusal::Broken {
-                component: file.id.clone(),
-                message,
-            })?;
+        } else if let Some(value) = generated(file, input, inputs.addresses, picked)? {
             (InputState::Generated, Some(InputValue::Text(value)))
         } else if input.required {
             (InputState::Missing, None)
@@ -527,6 +585,32 @@ fn resolve(file: &ComponentFile, inputs: Inputs<'_>) -> Result<Vec<Resolved>, Re
         });
     }
     Ok(resolved)
+}
+
+/// The value Zeabur makes for `input`, if it makes one: random bytes, or a free Service address
+/// that goes into `picked`.
+fn generated(
+    file: &ComponentFile,
+    input: &Input,
+    addresses: Option<&ServiceAddresses>,
+    picked: &mut BTreeSet<IpAddr>,
+) -> Result<Option<String>, Refusal> {
+    match &input.generate {
+        Some(Generate::Random { bytes, encoding }) => {
+            random(*bytes, *encoding)
+                .map(Some)
+                .map_err(|message| Refusal::Broken {
+                    component: file.id.clone(),
+                    message,
+                })
+        }
+        Some(Generate::ClusterIp) => {
+            let free = addresses.and_then(|a| a.free(picked));
+            picked.extend(free);
+            Ok(free.map(|a| a.to_string()))
+        }
+        Some(Generate::Unknown) | None => Ok(None),
+    }
 }
 
 /// `bytes` random bytes in `encoding`.
@@ -706,6 +790,7 @@ pub fn without(
         let inputs = Inputs {
             given: &Values::new(),
             kept,
+            addresses: None,
         };
         steps.extend(rewrite(
             snapshot,
@@ -743,7 +828,7 @@ fn rewrite(
         else {
             return Ok(None);
         };
-        let own = resolve(file, inputs)?;
+        let own = resolve(file, inputs, &mut BTreeSet::new())?;
         let mut object =
             chart_of(file, r, target.profile, contributions, &own).map_err(broken(component))?;
         mark(&mut object.metadata, file, r, version);
@@ -1799,6 +1884,7 @@ mod tests {
         Inputs {
             given: &NO_VALUES,
             kept: &NO_VALUES,
+            addresses: None,
         }
     }
 
@@ -1852,7 +1938,11 @@ mod tests {
             id,
             &target,
             &manifests(),
-            Inputs { given, kept },
+            Inputs {
+                given,
+                kept,
+                addresses: None,
+            },
         )
     }
 
@@ -1922,6 +2012,137 @@ mod tests {
             .find(|r| r.input.name == input)
             .unwrap()
             .state
+    }
+
+    fn addresses(cidr: &str, taken: &[&str]) -> ServiceAddresses {
+        ServiceAddresses {
+            cidrs: vec![cidr.to_owned()],
+            taken: taken.iter().map(|a| a.parse().unwrap()).collect(),
+        }
+    }
+
+    #[test]
+    fn a_free_address_is_the_lowest_of_the_static_band_that_nobody_holds() {
+        let k3s = addresses("10.43.0.0/16", &["10.43.0.1", "10.43.0.2", "10.43.0.10"]);
+        assert_eq!(
+            k3s.free(&BTreeSet::new()),
+            Some("10.43.0.3".parse().unwrap())
+        );
+        let picked = BTreeSet::from(["10.43.0.3".parse().unwrap()]);
+        assert_eq!(k3s.free(&picked), Some("10.43.0.4".parse().unwrap()));
+        // A /24 keeps 16 addresses after the network address for fixed ClusterIPs.
+        let full: Vec<String> = (1..=16).map(|i| format!("10.96.0.{i}")).collect();
+        let full: Vec<&str> = full.iter().map(String::as_str).collect();
+        assert_eq!(
+            addresses("10.96.0.0/24", &full).free(&BTreeSet::new()),
+            None
+        );
+        assert_eq!(
+            addresses("fd00:10:96::/112", &["fd00:10:96::1"]).free(&BTreeSet::new()),
+            Some("fd00:10:96::2".parse().unwrap())
+        );
+        assert_eq!(ServiceAddresses::default().free(&BTreeSet::new()), None);
+    }
+
+    /// velero with two inputs that take a fixed ClusterIP, as Zeabur Builder's `clusterIp` does.
+    fn with_cluster_ips(given: &Values, kept: &Values, at: Option<&ServiceAddresses>) -> Install {
+        let mut snapshot = snapshot();
+        let velero = snapshot.components.get_mut("velero").unwrap();
+        for (name, path) in [
+            ("clusterIp", "service.clusterIP"),
+            ("otherIp", "other.clusterIP"),
+        ] {
+            velero.declaration.inputs.push(Input {
+                name: name.to_owned(),
+                description: String::new(),
+                release: None,
+                path: Some(path.to_owned()),
+                secret: None,
+                generate: Some(Generate::ClusterIp),
+                required: false,
+                default: None,
+            });
+        }
+        let empty = BTreeSet::new();
+        let cluster = Target {
+            profile: "single-node",
+            distribution: Some("k3s"),
+            platform: "linux/amd64",
+            kube_version: "v1.36.5+k3s1",
+            capabilities: &empty,
+            components: &empty,
+            written: &empty,
+            packaged: &BTreeMap::new(),
+            zeabur_namespace: "zeabur",
+        };
+        let given = velero_given().into_iter().chain(given.clone()).fold(
+            Values::new(),
+            |mut all, (component, values)| {
+                all.entry(component).or_default().extend(values);
+                all
+            },
+        );
+        let inputs = Inputs {
+            given: &given,
+            kept,
+            addresses: at,
+        };
+        install(&snapshot, "velero", &cluster, &manifests(), inputs).unwrap()
+    }
+
+    fn written_value(install: &Install, input: &str) -> Option<InputValue> {
+        install
+            .inputs
+            .iter()
+            .find(|r| r.input.name == input)
+            .and_then(|r| r.value.clone())
+    }
+
+    #[test]
+    fn a_cluster_ip_input_takes_a_free_address_that_the_next_install_keeps() {
+        let k3s = addresses("10.43.0.0/16", &["10.43.0.1", "10.43.0.10"]);
+        let install = with_cluster_ips(&Values::new(), &Values::new(), Some(&k3s));
+        assert_eq!(state(&install, "clusterIp"), InputState::Generated);
+        assert_eq!(
+            written_value(&install, "clusterIp"),
+            Some(text("10.43.0.2"))
+        );
+        // Two inputs never take the same address.
+        assert_eq!(written_value(&install, "otherIp"), Some(text("10.43.0.3")));
+        let chart = chart_of(&install);
+        let chart_values: Value =
+            serde_saphyr::from_str(chart.spec.values_content.as_deref().unwrap()).unwrap();
+        assert_eq!(chart_values["service"]["clusterIP"], "10.43.0.2");
+        let kept: Value =
+            serde_json::from_str(&chart.metadata.annotations.unwrap_or_default()[INPUTS]).unwrap();
+        assert_eq!(kept["clusterIp"], "10.43.0.2");
+
+        // Once the Service holds it, the kept address stays; a given one wins over both.
+        let held = addresses("10.43.0.0/16", &["10.43.0.1", "10.43.0.2", "10.43.0.10"]);
+        let kept = values(&[("velero", "clusterIp", text("10.43.0.2"))]);
+        let again = with_cluster_ips(&Values::new(), &kept, Some(&held));
+        assert_eq!(state(&again, "clusterIp"), InputState::Kept);
+        assert_eq!(written_value(&again, "clusterIp"), Some(text("10.43.0.2")));
+        let given = values(&[("velero", "clusterIp", text("10.43.0.50"))]);
+        let chosen = with_cluster_ips(&given, &kept, Some(&held));
+        assert_eq!(
+            written_value(&chosen, "clusterIp"),
+            Some(text("10.43.0.50"))
+        );
+    }
+
+    #[test]
+    fn a_cluster_ip_input_stays_empty_without_the_clusters_addresses() {
+        let install = with_cluster_ips(&Values::new(), &Values::new(), None);
+        assert_eq!(state(&install, "clusterIp"), InputState::Empty);
+        let full = addresses("10.96.0.0/28", &[]);
+        let taken: Vec<String> = (1..=14).map(|i| format!("10.96.0.{i}")).collect();
+        let full = ServiceAddresses {
+            taken: taken.iter().map(|a| a.parse().unwrap()).collect(),
+            ..full
+        };
+        let install = with_cluster_ips(&Values::new(), &Values::new(), Some(&full));
+        assert_eq!(state(&install, "clusterIp"), InputState::Empty);
     }
 
     #[test]
@@ -2904,6 +3125,7 @@ mod tests {
         let inputs = Inputs {
             given: &NO_VALUES,
             kept: &kept,
+            addresses: None,
         };
         let install = install(&snapshot, "keda", &cluster.target(), &manifests(), inputs).unwrap();
         let velero = install.steps.last().unwrap();

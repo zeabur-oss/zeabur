@@ -46,7 +46,7 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_catalog::InstallSource;
-use zeabur_catalog::api::{ComponentFile, InputValue, ReleaseType, Snapshot};
+use zeabur_catalog::api::{ComponentFile, Generate, InputValue, ReleaseType, Snapshot};
 use zeabur_catalog::engine::{
     self, CHART_NAMESPACE, COMPONENT, Desired, FIELD_MANAGER, HelmChart, HelmChartConfig, INPUTS,
     InputKind, InputState, Inputs, MANAGED_BY, MANAGED_BY_ZEABUR, Manifests, Progress, Refusal,
@@ -56,6 +56,7 @@ use zeabur_core::message::Message;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
 use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Node, PersistentVolume, Secret};
+use zeabur_kube::k8s_openapi::api::networking::v1::{IPAddress, ServiceCIDR};
 use zeabur_kube::k8s_openapi::apiextensions_apiserver::pkg::apis::apiextensions::v1::CustomResourceDefinition;
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
@@ -1038,7 +1039,12 @@ impl World {
         let manifests = self
             .manifests(order.iter().filter_map(|c| self.snapshot.components.get(c)))
             .await?;
-        let inputs = Inputs { given, kept: &kept };
+        let addresses = self.addresses(cluster, &order, given, &kept).await?;
+        let inputs = Inputs {
+            given,
+            kept: &kept,
+            addresses: addresses.as_ref(),
+        };
         let mut install = engine::install(&self.snapshot, id, &target, &manifests, inputs)
             .map_err(|r| refusal(&r))?;
         for step in &mut install.steps {
@@ -1048,6 +1054,53 @@ impl World {
         }
         install.steps.retain(|s| !s.objects.is_empty());
         Ok(install)
+    }
+
+    /// The cluster's Service addresses, read only when a component of `order` needs Zeabur to
+    /// pick a `ClusterIP` that is neither given nor kept.
+    async fn addresses(
+        &self,
+        cluster: &dyn Cluster,
+        order: &[String],
+        given: &Values,
+        kept: &Values,
+    ) -> Result<Option<engine::ServiceAddresses>, ApiError> {
+        let has = |values: &Values, id: &str, name: &str| {
+            values
+                .get(id)
+                .and_then(|m| m.get(name))
+                .is_some_and(|v| !matches!(v, InputValue::Text(t) if t.is_empty()))
+        };
+        let needed = order.iter().any(|id| {
+            self.snapshot.components.get(id).is_some_and(|file| {
+                file.declaration.inputs.iter().any(|i| {
+                    i.generate == Some(Generate::ClusterIp)
+                        && !has(given, id, &i.name)
+                        && !has(kept, id, &i.name)
+                })
+            })
+        });
+        if !needed {
+            return Ok(None);
+        }
+        let problem = |e: zeabur_kube::ClusterError| {
+            ApiError::from(e.into_problem("the cluster's Service addresses"))
+        };
+        let cidrs = cluster
+            .list::<ServiceCIDR>(None)
+            .await
+            .map_err(problem)?
+            .into_iter()
+            .flat_map(|c| c.spec.and_then(|s| s.cidrs).unwrap_or_default())
+            .collect();
+        let taken = cluster
+            .list::<IPAddress>(None)
+            .await
+            .map_err(problem)?
+            .into_iter()
+            .filter_map(|a| a.metadata.name?.parse().ok())
+            .collect();
+        Ok(Some(engine::ServiceAddresses { cidrs, taken }))
     }
 
     /// The files of the manifest releases of `files`.
@@ -1506,10 +1559,7 @@ fn input_view(r: &engine::Resolved) -> ComponentInput {
         kind: InputKind::of(&r.input),
         required: r.input.required,
         default: r.input.default.clone(),
-        generated: matches!(
-            r.input.generate,
-            Some(zeabur_catalog::api::Generate::Random { .. })
-        ),
+        generated: matches!(r.input.generate, Some(Generate::Random { .. })),
         state: r.state,
         value: r.input.secret.is_none().then(|| r.value.clone()).flatten(),
     }

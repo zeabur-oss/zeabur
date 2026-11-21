@@ -1240,6 +1240,7 @@ export const en = {
   "components.value.set": "Set",
   "components.value.kept": "Kept from the last install",
   "components.value.generated": "Random, made by Zeabur",
+  "components.value.picked": (value: string) => `${value} (picked by Zeabur)`,
   "components.value.default": (value: string) => `${value} (default)`,
   "components.value.empty": "Not set",
   "components.value.on": "On",
