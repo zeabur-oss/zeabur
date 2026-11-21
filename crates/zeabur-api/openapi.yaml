@@ -11682,7 +11682,9 @@ components:
           description: When the leader last renewed the lease.
     LinkedAccountView:
       type: object
-      description: A GitHub or Google account linked for everyday sign-in.
+      description: >-
+        An account at an upstream provider, such as GitHub or Google, linked for
+        everyday sign-in.
       required:
       - id
       - provider
@@ -11708,7 +11710,7 @@ components:
           description: The `Credential`.
         provider:
           type: string
-          description: "`GitHub` or `Google`."
+          description: "`GitHub`, `Google`, or the upstream issuer of another provider."
     ListenerView:
       type: object
       description: A listener of a Gateway.

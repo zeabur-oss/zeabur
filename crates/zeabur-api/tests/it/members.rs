@@ -47,12 +47,22 @@ mod tests {
         )
     }
 
+    /// A passkey as Zeabur Identity writes it: the `passkey` field names the kind.
     fn passkey(name: &str, owner: &str) -> DynamicObject {
         object(
             "Credential",
             name,
-            json!({"user": owner, "type": "Passkey",
-                   "passkey": {"credentialId": name, "record": "{}"}}),
+            json!({"user": owner,
+                   "passkey": {"credentialId": name, "record": "{}", "backupEligible": false}}),
+            json!({"identity.zeabur.com/user": owner}),
+        )
+    }
+
+    fn password(name: &str, owner: &str) -> DynamicObject {
+        object(
+            "Credential",
+            name,
+            json!({"user": owner, "password": {"hash": "$pbkdf2-sha256$i=600000$c2FsdA$aGFzaA"}}),
             json!({"identity.zeabur.com/user": owner}),
         )
     }
@@ -96,6 +106,7 @@ mod tests {
                 user("ada", true),
                 user("bob", false),
                 passkey("ada-1", "ada"),
+                password("ada-password", "ada"),
                 passkey("bob-1", "bob"),
                 passkey("bob-2", "bob"),
                 object(
@@ -231,6 +242,8 @@ mod tests {
         assert_eq!(names, [json!("ada"), json!("bob")]);
         assert_eq!(body["items"][0]["role"], "admin");
         assert_eq!(body["items"][0]["you"], true);
+        assert_eq!(body["items"][0]["passkeys"].as_array().unwrap().len(), 1);
+        assert_eq!(body["items"][0]["linked"], json!([]));
         assert_eq!(body["items"][1]["passkeys"].as_array().unwrap().len(), 2);
         assert_eq!(body["items"][1]["sessions"], 1);
         assert_eq!(body["invitations"][0]["name"], "inv-bob");
