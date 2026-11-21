@@ -5,7 +5,7 @@ description: Deploy a public Nginx image, from creating a project to opening it 
 
 Put an Nginx page online: create a project, enter an image, review the changes, apply them, and open the Nginx welcome page in a browser. You don't need a Git repository. It takes about five minutes.
 
-Before you start, you need a Zeabur installation you can sign in to and a domain that can point to the cluster, such as `web.example.com`. If an administrator has already configured an application domain, the form suggests an address, and you don't need to configure DNS yourself.
+Before you start, you need a Zeabur OSS installation you can sign in to and a domain that can point to the cluster, such as `web.example.com`. If an administrator has already configured an application domain, the form suggests an address, and you don't need to configure DNS yourself.
 
 ## Create a project
 
@@ -13,7 +13,7 @@ Open **Projects**, click **New project**, and enter `hello` in **Name**. This al
 
 ![New project dialog with hello entered as the name](../images/shots/project-new.avif)
 
-Click **Review changes**. Zeabur lists what it will do: create the `hello` Namespace, add a project label, and apply Pod Security `baseline`, which lets containers run as root but blocks access to the host. If everything looks right, click **Create**.
+Click **Review changes**. Zeabur OSS lists what it will do: create the `hello` Namespace, add a project label, and apply Pod Security `baseline`, which lets containers run as root but blocks access to the host. If everything looks right, click **Create**.
 
 ![Review screen for creating the hello project, showing the Namespace and security settings](../images/shots/project-new-review.avif)
 
@@ -30,7 +30,7 @@ In the `hello` project, click **Add**, then select **Docker image**:
 | **Port** | `8080` |
 | **Public domain** | Turn on, then use the suggested address or the domain you prepared |
 
-Zeabur detects that `nginx-unprivileged` runs as user 101 and automatically selects **Strict**. The form explains why. This image listens on `8080`. You can also use `nginx:latest`, for which Zeabur selects **Compatible**. You can still switch the setting before creating the service.
+Zeabur OSS detects that `nginx-unprivileged` runs as user 101 and automatically selects **Strict**. The form explains why. This image listens on `8080`. You can also use `nginx:latest`, for which Zeabur OSS selects **Compatible**. You can still switch the setting before creating the service.
 
 After you enter the image, the form reads its declared ports and usually fills in `8080` automatically.
 
@@ -38,7 +38,7 @@ After you enter the image, the form reads its declared ports and usually fills i
 
 ## Review changes, then apply
 
-Click **Review changes**. Zeabur lists three objects to create:
+Click **Review changes**. Zeabur OSS lists three objects to create:
 
 - A `web` Deployment that runs the image with 1 replica
 - A `web` Service that forwards `8080` to the container
@@ -46,7 +46,7 @@ Click **Review changes**. Zeabur lists three objects to create:
 
 ![Review screen for deploying web, listing the Deployment, Service, and Ingress to create](../images/shots/image-review.avif)
 
-Nothing has been added to the cluster yet. If the domain is wrong, go back to the form and fix it. Once everything looks right, click **Create**. Zeabur takes you to the service page.
+Nothing has been added to the cluster yet. If the domain is wrong, go back to the form and fix it. Once everything looks right, click **Create**. Zeabur OSS takes you to the service page.
 
 ## Open the address
 
@@ -72,7 +72,7 @@ kubectl -n hello get deploy,svc,ingress -l app.kubernetes.io/name=web
 
 The Namespace has `zeabur.com/project=true`, the Deployment's `READY` value is `1/1`, and the Ingress's `HOSTS` value is the domain you entered.
 
-These are standard Kubernetes objects. You can create the same service with `kubectl apply` without Zeabur. For the full YAML, see “Do the same with kubectl” in [Deploy a container image](../deploy/image.mdx).
+These are standard Kubernetes objects. You can create the same service with `kubectl apply` without Zeabur OSS. For the full YAML, see “Do the same with kubectl” in [Deploy a container image](../deploy/image.mdx).
 
 ## If the page doesn't load
 
@@ -85,11 +85,11 @@ These are standard Kubernetes objects. You can create the same service with `kub
 
 ## Clean up
 
-In the upper-right corner of the `web` service, open **More** and select **Delete service**. Zeabur lists the objects to delete first: the Deployment, Service, and Ingress. Review the list, then apply.
+In the upper-right corner of the `web` service, open **More** and select **Delete service**. Zeabur OSS lists the objects to delete first: the Deployment, Service, and Ingress. Review the list, then apply.
 
-To delete the project too, open the project's **Settings**, find **Danger zone**, and click **Delete project**. Review what will be deleted, then enter `hello` to confirm. See [Delete a project](../configure/delete-project.mdx). **Remove from Zeabur** in the same section only removes the project label. The Namespace and everything in it remain.
+To delete the project too, open the project's **Settings**, find **Danger zone**, and click **Delete project**. Review what will be deleted, then enter `hello` to confirm. See [Delete a project](../configure/delete-project.mdx). **Remove from Zeabur OSS** in the same section only removes the project label. The Namespace and everything in it remain.
 
 ## Next steps
 
 - Deploy your own [image](../deploy/image.mdx), or [build from Git](../deploy/git.mdx)
-- Learn how Zeabur works alongside existing tools: [How Zeabur manages services](how-it-works.mdx)
+- Learn how Zeabur OSS works alongside existing tools: [How Zeabur OSS manages services](how-it-works.mdx)

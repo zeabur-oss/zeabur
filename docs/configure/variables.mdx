@@ -80,7 +80,7 @@ After you edit a config file or secret, replicas that are already running keep r
 
 - To handle restarts manually, click **Restart** for each service that needs the new values, then check that its replicas are ready.
 - To handle restarts automatically, open the service's **Settings** → **Compute**, enable **Restart when its config files or secrets change**, then review and apply. The cluster needs Stakater Reloader, the component that restarts services when their settings change. Without it, the option alone restarts nothing.
-- Once enabled, the service restarts when the source changes, whether you edit it in Zeabur or with another tool. If every service that reads the source has this option enabled, they'll restart together.
+- Once enabled, the service restarts when the source changes, whether you edit it in Zeabur OSS or with another tool. If every service that reads the source has this option enabled, they'll restart together.
 
 **May still use the old value until restarted** means the source changed after a replica started. Expand the notice to see which replicas are affected. A completed Job doesn't run again when its source changes.
 
@@ -149,7 +149,7 @@ If the app's public URL changes, also check its [domains](./domains.mdx) and var
 
 ## Do the same with kubectl
 
-Environment variables are stored in the workload's Pod template, the settings the cluster follows to create each replica. Shared variables are standard config files or secrets. Zeabur doesn't store a separate copy of this data. The examples below use project `demo` and service `web`.
+Environment variables are stored in the workload's Pod template, the settings the cluster follows to create each replica. Shared variables are standard config files or secrets. Zeabur OSS doesn't store a separate copy of this data. The examples below use project `demo` and service `web`.
 
 Setting and removing a variable directly changes the container's `env`:
 
@@ -244,7 +244,7 @@ If you change a shared source without Reloader, restart the services that read i
 kubectl -n demo rollout restart deployment/web
 ```
 
-After you remove Zeabur, Kubernetes continues to inject these variables into containers. Reloader is an independent component and continues to restart services based on the annotation.
+After you remove Zeabur OSS, Kubernetes continues to inject these variables into containers. Reloader is an independent component and continues to restart services based on the annotation.
 
 ### Verify the settings
 

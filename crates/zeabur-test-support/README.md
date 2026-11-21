@@ -1,8 +1,8 @@
 # zeabur-test-support
 
-Helpers shared by Zeabur's tests. Only ever a dev-dependency: nothing here reaches a binary.
+Helpers shared by Zeabur OSS's tests. Only ever a dev-dependency: nothing here reaches a binary.
 
-- `fixtures`: loads Zeabur's language-neutral test cases and compares results with them. A case
+- `fixtures`: loads Zeabur OSS's language-neutral test cases and compares results with them. A case
   is a directory holding `case.yaml`, an optional `input.yaml` with Kubernetes objects and
   `expected.json`. Each crate keeps its cases in its own `fixtures/<area>/`; `load!("<area>")`
   reads them. Objects stay `serde_json::Value`s: the crate under test decides how to type them.

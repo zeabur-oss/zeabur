@@ -50,7 +50,7 @@ Click **Add to changes** in the side panel. The domain row shows **Changed**. Th
 
 ![The review changes dialog, showing that shop.example.com will display a maintenance page](../images/shots/domain-pages-review.avif)
 
-All paths under this domain route to the maintenance page. Other domains on the same Ingress aren’t affected. For an Ingress domain, Zeabur creates an additional Ingress with a name ending in `-maintenance`. Traefik gives it priority, and the original Ingress stays unchanged. For an HTTPRoute domain, Zeabur sets the original backends’ weights to 0 and adds the page server. Maintenance applies to the entire HTTPRoute. If the same HTTPRoute has other domains, Zeabur first moves this domain to its own route.
+All paths under this domain route to the maintenance page. Other domains on the same Ingress aren’t affected. For an Ingress domain, Zeabur OSS creates an additional Ingress with a name ending in `-maintenance`. Traefik gives it priority, and the original Ingress stays unchanged. For an HTTPRoute domain, Zeabur OSS sets the original backends’ weights to 0 and adds the page server. Maintenance applies to the entire HTTPRoute. If the same HTTPRoute has other domains, Zeabur OSS first moves this domain to its own route.
 
 </Step>
 <Step>
@@ -79,7 +79,7 @@ If an Ingress domain has a [redirect or password](./domains.mdx), neither applie
 3. Click **Add to changes** in the panel, then **Review changes** at the bottom of the page. Confirm that the domain will route back to the original service, then apply.
 4. Reopen the domain and subpath. Confirm that the application responds normally and the domain row no longer shows **In maintenance**.
 
-When you turn maintenance mode off, Zeabur deletes the `-maintenance` Ingress for an Ingress domain. For an HTTPRoute domain, it removes the page server and changes backends with a weight of 0 back to 1. The original rules stay on the object throughout maintenance. Routing is restored even if you edited those rules during maintenance. If you delete the original Ingress, Kubernetes also deletes its maintenance Ingress.
+When you turn maintenance mode off, Zeabur OSS deletes the `-maintenance` Ingress for an Ingress domain. For an HTTPRoute domain, it removes the page server and changes backends with a weight of 0 back to 1. The original rules stay on the object throughout maintenance. Routing is restored even if you edited those rules during maintenance. If you delete the original Ingress, Kubernetes also deletes its maintenance Ingress.
 
 ## Show custom error pages
 
@@ -101,22 +101,22 @@ The HTML is stored in a config file. The page server reads the mounted files on 
 
 ## Page server
 
-The project’s page server serves maintenance and error pages. It comes from the **Error pages** template in Zeabur Catalog: a small nginx server with HTML stored in the `error-pages` config file. Zeabur finds it by the label `zeabur.com/page-server: "true"`, not by its name:
+The project’s page server serves maintenance and error pages. It comes from the **Error pages** template in Zeabur Catalog: a small nginx server with HTML stored in the `error-pages` config file. Zeabur OSS finds it by the label `zeabur.com/page-server: "true"`, not by its name:
 
 | Object | Requirements |
 | --- | --- |
 | Service | Has this label; the `pages` port serves pages by filename, and the `maintenance` port returns the maintenance page with 503 for every request |
 | Config file | Has this label and the keys `502.html`, `503.html`, `504.html`, and `maintenance.html` |
 
-A project can have only one Service with this label. You can also deploy the template with `kubectl` or use another server that meets the requirements above; Zeabur recognizes it too. These are standard Kubernetes objects and work without Zeabur.
+A project can have only one Service with this label. You can also deploy the template with `kubectl` or use another server that meets the requirements above; Zeabur OSS recognizes it too. These are standard Kubernetes objects and work without Zeabur OSS.
 
 ## Do the same with kubectl
 
-Maintenance mode and error pages use only Ingress, HTTPRoute, Traefik Middleware, and the page server. They keep working after you remove Zeabur. The following examples use the project `demo`, Ingress `web-app-example-com`, and domain `app.example.com`. They assume the project already has a page server named `error-pages`.
+Maintenance mode and error pages use only Ingress, HTTPRoute, Traefik Middleware, and the page server. They keep working after you remove Zeabur OSS. The following examples use the project `demo`, Ingress `web-app-example-com`, and domain `app.example.com`. They assume the project already has a page server named `error-pages`.
 
 ### Turn on maintenance mode (Ingress)
 
-Create an Ingress named `<service>-<domain-with-dashes>-maintenance` that sends all paths for the domain to the page server’s `maintenance` port. Set `router.priority` higher than every other route for this domain so Traefik gives it priority. The `ownerReferences` points to the original Ingress. Zeabur uses it to recognize the maintenance Ingress, so first get the original Ingress’s `uid`:
+Create an Ingress named `<service>-<domain-with-dashes>-maintenance` that sends all paths for the domain to the page server’s `maintenance` port. Set `router.priority` higher than every other route for this domain so Traefik gives it priority. The `ownerReferences` points to the original Ingress. Zeabur OSS uses it to recognize the maintenance Ingress, so first get the original Ingress’s `uid`:
 
 ```sh
 kubectl -n demo get ingress web-app-example-com -o jsonpath='{.metadata.uid}'
@@ -155,7 +155,7 @@ spec:
                   name: maintenance
 ```
 
-The version Zeabur creates also:
+The version Zeabur OSS creates also:
 
 - Sets `router.priority` to the highest priority among the domain’s existing routes plus 1. When no priority is specified, Traefik uses the rule’s length as its priority, so this number is usually small. The `1000` above only needs to be higher than the original routes’ priorities.
 - Copies the original Ingress’s `traefik.ingress.kubernetes.io/router.*` annotations, except `router.middlewares` and `router.priority`, along with `ingressClassName` and this domain’s `tls`.
@@ -170,7 +170,7 @@ kubectl -n demo delete ingress web-app-example-com-maintenance
 
 ### Turn on maintenance mode (HTTPRoute)
 
-HTTPRoute doesn’t use a separate object. Zeabur changes each rule’s original backend `weight` to `0`, then adds the page server’s `maintenance` port with a weight of `1`. Use `kubectl edit httproute <name>` to make these changes. For example:
+HTTPRoute doesn’t use a separate object. Zeabur OSS changes each rule’s original backend `weight` to `0`, then adds the page server’s `maintenance` port with a weight of `1`. Use `kubectl edit httproute <name>` to make these changes. For example:
 
 ```yaml
 rules:

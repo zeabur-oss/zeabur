@@ -22,7 +22,7 @@ Choose a database engine from the project's **Add** menu, set the version and st
 | MariaDB | mariadb-operator | 12.3, 11.8 | 10 GiB |
 | Dragonfly (Redis-compatible) | Dragonfly Operator | 1.34 | 2 GiB |
 
-The form selects the latest version by default. On some Linux versions, MongoDB 8.0 needs a memory setting changed before it can start. Zeabur adds `GLIBC_TUNABLES=glibc.pthread.rseq=1` to every MongoDB 8 database it creates or restores, which may slightly reduce performance. For existing MongoDB 8 databases without this setting, the database page shows a notice. Select “Edit settings” to add it.
+The form selects the latest version by default. On some Linux versions, MongoDB 8.0 needs a memory setting changed before it can start. Zeabur OSS adds `GLIBC_TUNABLES=glibc.pthread.rseq=1` to every MongoDB 8 database it creates or restores, which may slightly reduce performance. For existing MongoDB 8 databases without this setting, the database page shows a notice. Select “Edit settings” to add it.
 
 Dragonfly is licensed under `Apache-2.0 AND BUSL-1.1`. Before choosing it, read the license restrictions shown in the form, especially if you plan to offer hosted database services to others.
 
@@ -190,7 +190,7 @@ kubectl -n shop wait --for=condition=Ready mariadb/blogdb --timeout=10m
 kubectl -n shop wait --for=jsonpath='{.status.phase}'=Ready dragonfly/cache --timeout=10m
 ```
 
-Database objects, secrets, and backup settings created by Zeabur all carry `zeabur.com/database: <name>`. Use it to list objects for the same database:
+Database objects, secrets, and backup settings created by Zeabur OSS all carry `zeabur.com/database: <name>`. Use it to list objects for the same database:
 
 ```sh
 kubectl -n shop get secret,job -l zeabur.com/database=shopdb
@@ -210,7 +210,7 @@ A PostgreSQL Backup succeeds when its `PHASE` is `completed`; a MongoDB backup s
 
 ## Do the same with kubectl
 
-Each engine's operator manages its databases. Zeabur only writes the objects the operator reads. If you remove Zeabur, the operators keep running. The YAML below matches what the form creates with default values: one instance and the **Small** size. Save it to a file and apply it with `kubectl -n shop apply -f <file>`. Replace `<24 alphanumeric characters>` with a password you generate, for example with `openssl rand -base64 18 | tr -d '/+='`.
+Each engine's operator manages its databases. Zeabur OSS only writes the objects the operator reads. If you remove Zeabur OSS, the operators keep running. The YAML below matches what the form creates with default values: one instance and the **Small** size. Save it to a file and apply it with `kubectl -n shop apply -f <file>`. Replace `<24 alphanumeric characters>` with a password you generate, for example with `openssl rand -base64 18 | tr -d '/+='`.
 
 <Tabs items={["PostgreSQL", "MongoDB", "MySQL", "MariaDB", "Dragonfly"]}>
 <Tab value="PostgreSQL">
@@ -411,7 +411,7 @@ spec:
               drop: [ALL]
 ```
 
-MOCO doesn't create the app's database, so an additional Job uses MOCO's `moco-writable` account to create the `app` database and `app` user. The `zeabur.com/app-database` and `zeabur.com/app-secret` annotations tell Zeabur which database and password secret the app uses. MySQL works without them, but **Connect to a service** in the interface won't find the app account. Services connect to `moco-shopdb-primary` on port 3306.
+MOCO doesn't create the app's database, so an additional Job uses MOCO's `moco-writable` account to create the `app` database and `app` user. The `zeabur.com/app-database` and `zeabur.com/app-secret` annotations tell Zeabur OSS which database and password secret the app uses. MySQL works without them, but **Connect to a service** in the interface won't find the app account. Services connect to `moco-shopdb-primary` on port 3306.
 
 </Tab>
 <Tab value="MariaDB">

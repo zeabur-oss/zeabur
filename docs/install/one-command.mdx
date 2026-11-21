@@ -1,11 +1,11 @@
 ---
 title: Install with Zeatend
-description: On a new Linux server, Zeatend sets up Kubernetes, then one Helm command installs Zeabur.
+description: On a new Linux server, Zeatend sets up Kubernetes, then one Helm command installs Zeabur OSS.
 ---
 
-When you finish this page, a new Linux server runs Kubernetes and Zeabur, and you sign in to Zeabur over HTTPS with a passkey.
+When you finish this page, a new Linux server runs Kubernetes and Zeabur OSS, and you sign in to Zeabur OSS over HTTPS with a passkey.
 
-Already have a cluster? [Install Zeabur in an existing cluster](existing-cluster.mdx). To have an agent do these steps, see [Let an agent install for you](agent.mdx). The agent reads [the Markdown copy of this page](https://oss.zeabur.com/docs/zeabur/install/one-command.md).
+Already have a cluster? [Install Zeabur OSS in an existing cluster](existing-cluster.mdx). To have an agent do these steps, see [Let an agent install for you](agent.mdx). The agent reads [the Markdown copy of this page](https://oss.zeabur.com/docs/zeabur/install/one-command.md).
 
 ## Before you begin
 
@@ -18,7 +18,7 @@ Already have a cluster? [Install Zeabur in an existing cluster](existing-cluster
 
 ### Choose the domain
 
-Zeabur opens at `zeabur.<domain>`, and Zeabur Identity, which handles sign-in, at `identity.<domain>`. With no domain of your own, use `<IP>.sslip.io`, where `<IP>` is the server's public IP address. sslip.io answers each such name with the IP address in it, so there is no DNS record to add:
+Zeabur OSS opens at `zeabur.<domain>`, and Zeabur Identity, which handles sign-in, at `identity.<domain>`. With no domain of your own, use `<IP>.sslip.io`, where `<IP>` is the server's public IP address. sslip.io answers each such name with the IP address in it, so there is no DNS record to add:
 
 ```sh
 DOMAIN=203.0.113.10.sslip.io
@@ -47,7 +47,7 @@ sudo zeatend apply
 </Step>
 <Step>
 
-### Install Zeabur
+### Install Zeabur OSS
 
 Replace `<version>` with the version to install, listed in [Release artifacts](../reference/releases.mdx).
 
@@ -59,7 +59,7 @@ sudo -E helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
   --set global.domain="$DOMAIN"
 ```
 
-The command installs Zeabur, Zeabur Identity for sign-in, and cert-manager for HTTPS certificates from Let's Encrypt. Helm waits for cert-manager, which takes a few minutes. [Install Zeabur in an existing cluster](existing-cluster.mdx#install-with-helm) lists everything it adds.
+The command installs Zeabur OSS, Zeabur Identity for sign-in, and cert-manager for HTTPS certificates from Let's Encrypt. Helm waits for cert-manager, which takes a few minutes. [Install Zeabur OSS in an existing cluster](existing-cluster.mdx#install-with-helm) lists everything it adds.
 
 When it finishes, it prints the link that creates the first admin account. The link works once and expires in 24 hours.
 
@@ -70,7 +70,7 @@ When it finishes, it prints the link that creates the first admin account. The l
 
 Open the link and create a passkey. The certificates can take a minute after the install. If the browser warns about the certificate, wait and reload.
 
-When the passkey is saved, the page links to Zeabur. Open it and sign in with the passkey. Add the other components you need on the **Cluster** → **Components** page.
+When the passkey is saved, the page links to Zeabur OSS. Open it and sign in with the passkey. Add the other components you need on the **Cluster** → **Components** page.
 
 </Step>
 </Steps>

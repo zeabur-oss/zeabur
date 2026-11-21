@@ -3,7 +3,7 @@ title: Import Docker Compose services
 description: Read Compose and environment variable files, review conversion differences, and create services in a project.
 ---
 
-In a project, select **Add** → **Docker Compose**, paste `compose.yaml`, and click **Read file**. Review each service, database replacement, and public domain, then **Review changes** and apply them. After import, you can edit each service separately. Zeabur doesn't store or continuously sync the original Compose file.
+In a project, select **Add** → **Docker Compose**, paste `compose.yaml`, and click **Read file**. Review each service, database replacement, and public domain, then **Review changes** and apply them. After import, you can edit each service separately. Zeabur OSS doesn't store or continuously sync the original Compose file.
 
 ## Before you start
 
@@ -51,7 +51,7 @@ When this option is on, the differences between the new service and the Compose 
 
 To keep using the original image, turn this option off. When two or more services can be replaced, **Replace all N with operator-managed services** at the top turns the option on or off for all of them. If the operator is missing, its installation can't be verified, or you don't have enough permissions, the service runs the original image, and the interface explains why.
 
-When you choose an operator-managed service, Zeabur rewrites recognizable connection strings, hosts, usernames, passwords, and database names in other services to use the new service's connection settings. References that can't be rewritten keep their original values, with a prompt to check them after import.
+When you choose an operator-managed service, Zeabur OSS rewrites recognizable connection strings, hosts, usernames, passwords, and database names in other services to use the new service's connection settings. References that can't be rewritten keep their original values, with a prompt to check them after import.
 
 </Step>
 <Step>
@@ -100,7 +100,7 @@ Check the application's **Variables** to see where its connections point after i
 
 ![Project page listing the imported services](../images/shots/project-services.avif)
 
-When checking with kubectl, regular service objects have the label `app.kubernetes.io/name: <service-name>`. For operator-managed databases, the database objects and secrets Zeabur creates have the label `zeabur.com/database: <name>`. In the example below, `db` was replaced with PostgreSQL:
+When checking with kubectl, regular service objects have the label `app.kubernetes.io/name: <service-name>`. For operator-managed databases, the database objects and secrets Zeabur OSS creates have the label `zeabur.com/database: <name>`. In the example below, `db` was replaced with PostgreSQL:
 
 ```sh
 kubectl -n shop get deploy,svc,pvc,secret -l app.kubernetes.io/name=web
@@ -112,12 +112,12 @@ Services with `depends_on` get additional init containers named `wait-1`, `wait-
 
 ## Do the same with kubectl
 
-Zeabur converts Compose files to services in the interface only. It doesn't store the Compose file, and nothing in the cluster corresponds to it. The conversion produces regular Kubernetes objects, just like those created manually:
+Zeabur OSS converts Compose files to services in the interface only. It doesn't store the Compose file, and nothing in the cluster corresponds to it. The conversion produces regular Kubernetes objects, just like those created manually:
 
 - Regular services: the same YAML as [Deploy a container image](./image.mdx#do-the-same-with-kubectl), with security fixed to **Compatible**.
 - Databases and object storage: the same YAML as [Databases](./databases.mdx#do-the-same-with-kubectl) and [Object storage](./object-storage.mdx#do-the-same-with-kubectl).
 
-Without the interface, you can write YAML yourself using the two pages above, or convert with [Kompose](https://kompose.io/) and then edit the result. Zeabur's conversion rules are based on Kompose, but names, labels, and security settings differ, so their output won't be identical.
+Without the interface, you can write YAML yourself using the two pages above, or convert with [Kompose](https://kompose.io/) and then edit the result. Zeabur OSS's conversion rules are based on Kompose, but names, labels, and security settings differ, so their output won't be identical.
 
 ## Common failures and cleanup
 
@@ -125,9 +125,9 @@ Without the interface, you can write YAML yourself using the two pages above, or
 - A service wasn't created: check whether it has only `build:`. Specify an image that can be pulled, or deploy it separately from Git.
 - The application can't connect to the new database: check references that couldn't be rewritten, renamed hosts, and the actual variable names. Use **Connect to a service** under the database's **Connections** section. See [Databases](databases.mdx).
 - Previously shared files are missing: imported volumes are independent. Check whether the original Compose file relied on multiple services sharing one volume, then reorganize storage and migrate the files.
-- Only some objects were created: Zeabur creates objects in sequence. If creation fails partway through, objects already created remain in the cluster. Use the results shown in the interface to create the remaining objects or delete the ones already created.
+- Only some objects were created: Zeabur OSS creates objects in sequence. If creation fails partway through, objects already created remain in the cluster. Use the results shown in the interface to create the remaining objects or delete the ones already created.
 
-To remove this import, use **Delete service**, **Delete database**, and **Delete object storage** for each service, database, and object storage service, and review each deletion list. Zeabur doesn't store the Compose file, so there's no button to delete the entire import at once.
+To remove this import, use **Delete service**, **Delete database**, and **Delete object storage** for each service, database, and object storage service, and review each deletion list. Zeabur OSS doesn't store the Compose file, so there's no button to delete the entire import at once.
 
 <Callout type="warn">
 Deleting volumes, databases, or buckets in the deletion list may also delete their data. Export or copy any data you want to keep before applying the deletion.

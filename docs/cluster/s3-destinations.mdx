@@ -31,7 +31,7 @@ If you don't have one yet, Cloudflare R2 and Backblaze B2 both offer S3-compatib
 - To register or edit a destination, you need permission to write config files and secrets in the `zeabur-s3-destinations` namespace. Admin accounts have this permission.
 - To select a destination in a backup form, you need permission to read secrets in `zeabur-s3-destinations` and create secrets in the backup's namespace.
 
-Everyone who's signed in can see destination names and locations, but the Zeabur Chart doesn't grant anyone permission to read the secrets stored there. Members without this permission can only select **Enter manually** in backup forms and enter their own keys.
+Everyone who's signed in can see destination names and locations, but the Zeabur OSS Chart doesn't grant anyone permission to read the secrets stored there. Members without this permission can only select **Enter manually** in backup forms and enter their own keys.
 
 ## Register a destination
 
@@ -75,13 +75,13 @@ After you apply the changes, **S3 destinations** lists the name, bucket, folder,
 
 New backup forms select the first registered destination in the **S3 destination** menu by default. You can select another destination or **Enter manually**. Selecting a destination fills in the endpoint, bucket, region, and folder, and hides the key fields. Some backups add a subfolder under the destination's folder, so check the final folder before you apply the changes.
 
-When you apply the changes, Zeabur copies the destination's keys into a separate secret for the backup. Database and K8up secrets go in the project's namespace; Velero secrets go in Velero's namespace. Backups then read only this copy, so they keep running even if you remove the destination or Zeabur.
+When you apply the changes, Zeabur OSS copies the destination's keys into a separate secret for the backup. Database and K8up secrets go in the project's namespace; Velero secrets go in Velero's namespace. Backups then read only this copy, so they keep running even if you remove the destination or Zeabur OSS.
 
 ## Change keys
 
 Click **Edit** in the destination's row. You can't change the name. Leave both key fields blank to keep the current keys, or fill in both to replace them, then click **Review changes**.
 
-The review lists each key copy that Zeabur also updates, for example **Update copied keys shop-db-backups-s3 in shop**. The database, K8up, and Velero copies all receive the new keys when you apply the changes.
+The review lists each key copy that Zeabur OSS also updates, for example **Update copied keys shop-db-backups-s3 in shop**. The database, K8up, and Velero copies all receive the new keys when you apply the changes.
 
 ![Review before saving a destination, listing the shop key copy that will also be updated](../images/shots/s3-destination-keys.avif)
 
@@ -89,7 +89,7 @@ The review also lists copies that can't be updated and explains why. These copie
 
 - You don't have permission to edit the copy. A member with permission can save the destination again to update it with the new keys.
 - The copy doesn't identify its key fields.
-- You don't have permission to list secrets across all namespaces, so Zeabur can't find copies elsewhere.
+- You don't have permission to list secrets across all namespaces, so Zeabur OSS can't find copies elsewhere.
 
 <Callout type="warn">
 Before revoking the old keys with the storage provider, confirm that the review lists no copies that will keep using the old keys, and wait for the next backup to succeed. Otherwise those backups start failing.
@@ -97,7 +97,7 @@ Before revoking the old keys with the storage provider, confirm that the review 
 
 ## Do the same with kubectl
 
-A destination consists of two objects with the same name in the `zeabur-s3-destinations` namespace: a ConfigMap for the endpoint, bucket, region, and folder, and a Secret for the keys. Zeabur lists the destination only when both have the label `zeabur.com/s3-destination: <name>`. Omit `region` and `prefix` if they have no values.
+A destination consists of two objects with the same name in the `zeabur-s3-destinations` namespace: a ConfigMap for the endpoint, bucket, region, and folder, and a Secret for the keys. Zeabur OSS lists the destination only when both have the label `zeabur.com/s3-destination: <name>`. Omit `region` and `prefix` if they have no values.
 
 ```yaml
 apiVersion: v1

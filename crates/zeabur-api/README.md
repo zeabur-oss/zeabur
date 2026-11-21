@@ -13,7 +13,7 @@ the in-cluster server a client per request, tests an in-memory cluster.
 
 - **Every item names its origin.** Each value in a response carries the Kubernetes object (and,
   where it is one field, the field path) it was read from, so a person can always go from
-  Zeabur's view to the object behind it. One type, `Origin`, for all of them.
+  Zeabur OSS's view to the object behind it. One type, `Origin`, for all of them.
 - **One shape for gets, one for lists.** A get returns the resource itself; a list returns
   `{items}` with every item. Event lists return the newest `limit` and count every match in
   `totalSize` (`views`, `query`).
@@ -24,7 +24,7 @@ the in-cluster server a client per request, tests an in-memory cluster.
   (`unreadable`) instead of silently showing less.
 - **Nothing is cached.** Every answer is `Cache-Control: no-store` (`cache`): answers are read as
   the person and carry values such as environment variables. Clients poll rather than watch.
-- **Images are read from their registries, never on Zeabur's own rights.** `images/inspect`
+- **Images are read from their registries, never on Zeabur OSS's own rights.** `images/inspect`
   reads an image's declared ports and user anonymously, with credentials the person typed, or
   with a pull Secret read as the person; credentials go only to the registry they name. The
   in-cluster server does not connect to loopback, link-local, multicast or unspecified
@@ -41,7 +41,7 @@ the in-cluster server a client per request, tests an in-memory cluster.
 - **Logs follow over Server-Sent Events.** One `data` line per log line, an `error` event with a
   problem when the stream breaks; no WebSocket dependency for a one-way stream [whatwg-sse].
 - **A terminal's container is a plan first.** A debug container and a tools pod are applied
-  like any plan, alone in it; `tools` is the only place the person's token leaves Zeabur, and
+  like any plan, alone in it; `tools` is the only place the person's token leaves Zeabur OSS, and
   only through exec stdin into the person's own tools pod (`docs/reference/architecture.mdx`, Terminals).
 
 ## Place in the workspace

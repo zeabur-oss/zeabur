@@ -9,7 +9,7 @@ In a project, select **Add** → **Deploy from Git**, enter the repository and t
 
 - You need a project and permission to create services, Kubernetes Services, and Builds in it. Private repositories and build variables also require permission to create secrets.
 - The cluster must have Zeabur Builder and Keel installed. Installing Zeabur Builder from the component catalog adds zot with it. If components are missing, the **Add** menu lists them under **Deploy from Git**, and clicking it shows the install commands for all of them at once. See [Manage cluster components](../cluster/components.mdx).
-- Built images are pushed to the registry set by `builds.registry` in the Zeabur chart. The default is the Zot installed with Zeabur Builder (`zot.zot.svc:5000`). To use Harbor or an external registry, an administrator must set `builds.registry` in the chart and give the Builder and nodes access to it.
+- Built images are pushed to the registry set by `builds.registry` in the Zeabur OSS chart. The default is the Zot installed with Zeabur Builder (`zot.zot.svc:5000`). To use Harbor or an external registry, an administrator must set `builds.registry` in the chart and give the Builder and nodes access to it.
 - Zot installed with Zeabur Builder only accepts connections from the Builder, build replicas, and nodes. Other replicas in projects can't connect to Zot, so a compromised app can't pull images from other projects.
 - Have the port the app actually listens on ready. To make a website public, you also need a domain that can point to the cluster's entry point.
 
@@ -30,7 +30,7 @@ Open **Add** → **Deploy from Git**. If your code is on GitHub, connect GitHub 
 
   After you apply the changes, the form switches to the GitHub repository list. These steps require permission to modify secrets and config files in `builder-system`, which is usually limited to cluster administrators. Other members see “Ask a cluster administrator to enable GitHub for this project.”
 
-If you're not using GitHub, select **Git URL** as the source and enter an HTTPS or SSH URL in **Repository**, such as `https://gitlab.com/acme/web`. If you enter the URL of a GitHub repository already available to the project, Zeabur still reads it through the GitHub App.
+If you're not using GitHub, select **Git URL** as the source and enter an HTTPS or SSH URL in **Repository**, such as `https://gitlab.com/acme/web`. If you enter the URL of a GitHub repository already available to the project, Zeabur OSS still reads it through the GitHub App.
 
 ![Deploy from GitHub with GitHub selected as the source, a searchable repository picker, and access through the cluster's GitHub App](../images/shots/git-github.avif)
 
@@ -50,7 +50,7 @@ Under **More settings**, set **Root directory** to the folder to build, such as 
 
 ### Configure how the service runs
 
-Check the **Name** and enter the **Port**. For example, if the app listens on `8080`, enter `8080`. Zeabur also adds `PORT=8080`. If you've already set `PORT`, Zeabur uses your value.
+Check the **Name** and enter the **Port**. For example, if the app listens on `8080`, enter `8080`. Zeabur OSS also adds `PORT=8080`. If you've already set `PORT`, Zeabur OSS uses your value.
 
 Leave **Port** empty for a background service that doesn't accept connections. To make a website public, turn on **Public domain** and check the domain. For DNS and HTTPS settings, see [Add a public domain](../configure/domains.mdx).
 
@@ -73,16 +73,16 @@ When using **Git URL**, choose the option under **Repository access** that match
 | Option | Action |
 | --- | --- |
 | **Public repository** | Don't add credentials. |
-| **Deploy key** | Zeabur makes the key when you apply. After the apply, copy the **Public key** from the form and use the link beside it to add the key to the repository's deploy keys. Keep read-only access. The service builds once the key is on the repository. |
-| **Access token** | Enter a **Username** and **Token** that can read the repository over HTTPS. Zeabur prefills `x-access-token` for GitHub and `oauth2` for GitLab. |
+| **Deploy key** | Zeabur OSS makes the key when you apply. After the apply, copy the **Public key** from the form and use the link beside it to add the key to the repository's deploy keys. Keep read-only access. The service builds once the key is on the repository. |
+| **Access token** | Enter a **Username** and **Token** that can read the repository over HTTPS. Zeabur OSS prefills `x-access-token` for GitHub and `oauth2` for GitLab. |
 
-Deploy keys work with any Git host that supports SSH. Zeabur includes host keys for GitHub and GitLab. For other hosts, paste in the host key first:
+Deploy keys work with any Git host that supports SSH. Zeabur OSS includes host keys for GitHub and GitLab. For other hosts, paste in the host key first:
 
 1. Run the command shown in the form on your computer, such as `ssh-keyscan -t ed25519,ecdsa -p 2222 git.example.com`. The command omits `-p` when the SSH port is 22.
 2. Paste the output into **Host keys (known_hosts)** and select **Check host keys**. Zeabur Builder only accepts Ed25519 and ECDSA keys.
 3. The form lists each host key's fingerprint, such as `SHA256:+DiY3wvvV6TuJJhbpZisF/zLDA0zPMSvHdkr4UvCOqU`. Compare it with the fingerprint published by the Git host administrator, or ask the administrator to run `ssh-keygen -lf /etc/ssh/ssh_host_ed25519_key.pub` on the host. Continue only when the fingerprints match.
 
-If you enter an HTTPS repository URL, Zeabur connects using `git@host:path.git` instead. If SSH uses a port other than 22 or a user other than `git`, enter an SSH URL directly, such as `ssh://git@git.example.com:2222/acme/site.git`.
+If you enter an HTTPS repository URL, Zeabur OSS connects using `git@host:path.git` instead. If SSH uses a port other than 22 or a user other than `git`, enter an SSH URL directly, such as `ssh://git@git.example.com:2222/acme/site.git`.
 
 </Step>
 <Step>
@@ -269,13 +269,13 @@ Actions after a build also use standard kubectl commands:
 | Turn on **Auto-deploy new builds** | `kubectl -n shop annotate deployment web keel.sh/policy=force` |
 | **Deploy newest** | `kubectl -n shop set image deployment/web web="$(kubectl -n shop get build web -o jsonpath='{.status.latestImage}')"` |
 
-Zeabur Builder and Keel keep building and deploying after you remove Zeabur. They don't depend on Zeabur.
+Zeabur Builder and Keel keep building and deploying after you remove Zeabur OSS. They don't depend on Zeabur OSS.
 
 ## When a build or deployment is stuck
 
 | What you see | What to do next |
 | --- | --- |
-| **Deploy from Git** says **Install … first** | Click it and run the commands it lists to install everything at once. To use another registry, an administrator sets `builds.registry` in the Zeabur chart and installs Zeabur Builder from its own Helm chart. See the [Zeabur Builder docs](https://oss.zeabur.com/docs/builder/). |
+| **Deploy from Git** says **Install … first** | Click it and run the commands it lists to install everything at once. To use another registry, an administrator sets `builds.registry` in the Zeabur OSS chart and installs Zeabur Builder from its own Helm chart. See the [Zeabur Builder docs](https://oss.zeabur.com/docs/builder/). |
 | Repository access is denied | If you're using a deploy key, select **Show deploy key** in **Builds** and check that you've added it to the correct repository. If you're using a token, check its read scope and expiration date. After fixing access, select **Build again**. |
 | Branch or builder not found | Use the reason shown on the build page to check the repository branch and the corresponding Railpack or Dockerfile builder in the cluster. |
 | The build succeeded, but the service still uses the old image | Check **Auto-deploy new builds** and Keel's status, or select **Deploy newest** to apply the image manually. |

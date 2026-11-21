@@ -35,7 +35,7 @@ each address into a diagnosis. See the `trace` module for each hop's rule.
 ## Gap rules
 
 A rule implements `Rule`: an id, the guidance it cites, and a check over the project and a few
-facts about the cluster (`ClusterTraits`). `BUILTIN` holds the rules Zeabur always runs; a
+facts about the cluster (`ClusterTraits`). `BUILTIN` holds the rules Zeabur OSS always runs; a
 module passes its own rules to `evaluate` next to them, so registration stays explicit and this
 crate never depends on a module.
 

@@ -3,14 +3,14 @@ title: Delete a project
 description: Delete a project's namespace and everything in it. Check which data will remain before you confirm.
 ---
 
-A project is a Kubernetes namespace. In the **Danger zone** of a project's **Settings**, click **Delete project**. Zeabur deletes that namespace and everything in it: services, databases, volumes, settings, and secrets, as `kubectl delete namespace` does. Deletion can't be undone; only a backup brings the project back.
+A project is a Kubernetes namespace. In the **Danger zone** of a project's **Settings**, click **Delete project**. Zeabur OSS deletes that namespace and everything in it: services, databases, volumes, settings, and secrets, as `kubectl delete namespace` does. Deletion can't be undone; only a backup brings the project back.
 
-To stop showing a namespace in Zeabur without deleting anything, use **Remove from Zeabur** in the same place. It removes the project label only.
+To stop showing a namespace in Zeabur OSS without deleting anything, use **Remove from Zeabur OSS** in the same place. It removes the project label only.
 
 ## Before you start
 
 - You need permission to delete the namespace (`delete namespaces/<project>`) and the database objects in it. The review lists any permissions you lack, and the cluster also rejects the changes when you apply them.
-- Zeabur's own namespace, system namespaces starting with `kube-`, platform components (namespaces labeled `zeabur.com/platform=true`), and `zeabur-terminals` can't be deleted here.
+- Zeabur OSS's own namespace, system namespaces starting with `kube-`, platform components (namespaces labeled `zeabur.com/platform=true`), and `zeabur-terminals` can't be deleted here.
 
 ## Review what will be deleted
 
@@ -23,8 +23,8 @@ After you click **Delete project**, the review has two sections. **Goes with the
 
 - The services, by name.
 - Each database, with the time of its last backup.
-- Each volume, with the time of its last backup and whether its data stays. When the volume's PersistentVolume is set to `Retain`, the data stays in that PersistentVolume; `Delete` deletes it. When Zeabur can't read the PersistentVolume, it reads the StorageClass's `reclaimPolicy`. If it can't read either, it says it can't tell.
-- The tool replicas you opened for the project. They run in `zeabur-terminals`; Zeabur deletes them after the namespace.
+- Each volume, with the time of its last backup and whether its data stays. When the volume's PersistentVolume is set to `Retain`, the data stays in that PersistentVolume; `Delete` deletes it. When Zeabur OSS can't read the PersistentVolume, it reads the StorageClass's `reclaimPolicy`. If it can't read either, it says it can't tell.
+- The tool replicas you opened for the project. They run in `zeabur-terminals`; Zeabur OSS deletes them after the namespace.
 
 A database or volume with no successful backup in the last day shows **Back up first**. Click it to review the backup instead. Apply the backup, wait for it to finish, then come back to delete the project. This button uses the same **Back up now** action as the database page and volume backups. It appears only for databases and volumes with backups already configured.
 
@@ -64,9 +64,9 @@ Enter the project name at the bottom, or click the name in the prompt to fill it
 
 ## What happens during deletion
 
-Zeabur deletes objects using your identity, in this order:
+Zeabur OSS deletes objects using your identity, in this order:
 
-1. The database objects, such as CloudNativePG's `Cluster`, so each operator has a chance to run its cleanup. Zeabur waits up to a minute for the databases to disappear. When an operator isn't running, its cleanup never happens and the project stays in deletion. The project page lists the remaining objects and their finalizers.
+1. The database objects, such as CloudNativePG's `Cluster`, so each operator has a chance to run its cleanup. Zeabur OSS waits up to a minute for the databases to disappear. When an operator isn't running, its cleanup never happens and the project stays in deletion. The project page lists the remaining objects and their finalizers.
 2. The namespace. Kubernetes then deletes what's left in it.
 3. The tool replicas you opened for the project.
 

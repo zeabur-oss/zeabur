@@ -50,7 +50,7 @@ Click **Add to changes** to add the domain to this service's draft. The cluster 
 
 ![Reviewing changes to web before saving: app.example.com will connect to web over HTTPS](../images/shots/domain-review.avif)
 
-The form has no port field. Zeabur reuses the service's existing route, If it has none, Zeabur creates one that forwards to the first port of the service's first Kubernetes Service, the service's address inside the cluster. A route is the rule the cluster uses to send a domain's requests to a service.
+The form has no port field. Zeabur OSS reuses the service's existing route, If it has none, Zeabur OSS creates one that forwards to the first port of the service's first Kubernetes Service, the service's address inside the cluster. A route is the rule the cluster uses to send a domain's requests to a service.
 
 </Step>
 <Step>
@@ -63,9 +63,9 @@ At your DNS provider, add the records shown on screen. Copy the type, name, and 
 - Use `AAAA` when the destination is an IPv6 address.
 - Use `CNAME` when the destination is another hostname.
 
-If the domain is under the cluster's application domain, such as `shop.apps.example.com`, the screen instead asks an administrator to add the wildcard record `*.apps.example.com`. If that record already exists, no additional DNS setup is needed. Zeabur doesn't update DNS for you.
+If the domain is under the cluster's application domain, such as `shop.apps.example.com`, the screen instead asks an administrator to add the wildcard record `*.apps.example.com`. If that record already exists, no additional DNS setup is needed. Zeabur OSS doesn't update DNS for you.
 
-If the screen says **Zeabur doesn't know the cluster's entry address. Ask an administrator which address to point to**, get the entry point's public address from a cluster administrator before configuring DNS.
+If the screen says **Zeabur OSS doesn't know the cluster's entry address. Ask an administrator which address to point to**, get the entry point's public address from a cluster administrator before configuring DNS.
 
 </Step>
 <Step>
@@ -101,7 +101,7 @@ If a wildcard domain says it needs DNS-01, ask a cluster administrator to create
 
 ### Create an issuer for wildcard domains
 
-Let's Encrypt only issues wildcard certificates through DNS-01 validation. A cluster administrator needs to create a DNS-01 issuer with `kubectl` so cert-manager's DNS-01 solver can validate the domain using the DNS provider's API token. The token stays in a secret, where the cluster keeps confidential data. Zeabur doesn't handle it. The **Certificates** section under **Cluster** → **Overview** only lists issuers and their status. It can't create them.
+Let's Encrypt only issues wildcard certificates through DNS-01 validation. A cluster administrator needs to create a DNS-01 issuer with `kubectl` so cert-manager's DNS-01 solver can validate the domain using the DNS provider's API token. The token stays in a secret, where the cluster keeps confidential data. Zeabur OSS doesn't handle it. The **Certificates** section under **Cluster** → **Overview** only lists issuers and their status. It can't create them.
 
 The following example uses Cloudflare. First, create an API token with DNS edit permission limited to the zone you plan to use. Then replace the placeholder below with the token:
 
@@ -141,7 +141,7 @@ After creating the issuer, check its status:
 kubectl get clusterissuer letsencrypt-dns
 ```
 
-Wait for `READY` to show `True`, then return to **Certificates** under **Cluster** → **Overview** in Zeabur. You'll see `letsencrypt-dns` and its readiness status. When configuring a wildcard domain, select `letsencrypt-dns` under **Issuer**.
+Wait for `READY` to show `True`, then return to **Certificates** under **Cluster** → **Overview** in Zeabur OSS. You'll see `letsencrypt-dns` and its readiness status. When configuring a wildcard domain, select `letsencrypt-dns` under **Issuer**.
 
 For other providers, such as Route 53, Cloud DNS, DigitalOcean, or Azure DNS, use the corresponding solver and configure credentials and permissions as described in the [cert-manager DNS-01 documentation](https://cert-manager.io/docs/configuration/acme/dns01/).
 
@@ -152,7 +152,7 @@ Select **My own certificate**, then paste the following or click **Upload file**
 - **Certificate (PEM)**: Put the site certificate first, followed by the intermediate certificates.
 - **Private key (PEM)**: Provide an unencrypted private key that matches the certificate.
 
-Click **Add to changes**, then review and apply from the bottom of the page. Zeabur checks the certificate's validity dates, domain names, and matching key, then stores the certificate and key in the cluster. Zeabur doesn't show the key again. Your own certificate doesn't renew automatically, so upload a new one before it expires.
+Click **Add to changes**, then review and apply from the bottom of the page. Zeabur OSS checks the certificate's validity dates, domain names, and matching key, then stores the certificate and key in the cluster. Zeabur OSS doesn't show the key again. Your own certificate doesn't renew automatically, so upload a new one before it expires.
 
 If other domains on the same route are still requesting certificates from cert-manager, this domain moves to its own route. The new route keeps the original rules, Ingress class, labels, annotations, and error pages. The change review lists this move. If the original route has a password, redirect, or maintenance mode configured, the domain can't move. The panel tells you which setting to turn off first.
 
@@ -208,19 +208,19 @@ In the service's **Networking** tab, under **Public domains**, each domain row s
 | **Points elsewhere** | Compare the DNS records with the destination shown on screen. A CDN or proxy in front of the cluster can also cause this status. In that case, confirm that the CDN's origin points to the cluster. |
 | DNS is correct, but the certificate stays pending or shows **Certificate failed** | Expand **cert-manager says**. Check the issuer and the DNS records or entry point settings needed for validation. |
 | No redirect or password button | An Ingress controller other than Traefik serves the domain. The Ingress controller is the cluster component that receives outside requests. Configure these settings in that component's own settings. |
-| **Not confirmed** status, or the browser can't connect | Check DNS, the entry address, service readiness, and connection rules, in that order. Zeabur checks from inside the cluster, so its results may differ from your browser's. |
+| **Not confirmed** status, or the browser can't connect | Check DNS, the entry address, service readiness, and connection rules, in that order. Zeabur OSS checks from inside the cluster, so its results may differ from your browser's. |
 
 To temporarily block visitors while keeping the domain and service, use [maintenance mode](./maintenance.mdx).
 
 ## Do the same with kubectl
 
-Domains, certificates, redirects, and passwords use standard Ingress, HTTPRoute, secret, and Traefik Middleware objects. Zeabur has no custom CRDs or controllers. After you remove Zeabur, Traefik and cert-manager continue serving the site. The examples below use project `demo`, service `web` (Service port `8080`), and domain `app.example.com`.
+Domains, certificates, redirects, and passwords use standard Ingress, HTTPRoute, secret, and Traefik Middleware objects. Zeabur OSS has no custom CRDs or controllers. After you remove Zeabur OSS, Traefik and cert-manager continue serving the site. The examples below use project `demo`, service `web` (Service port `8080`), and domain `app.example.com`.
 
 ### Add a domain
 
-If the service already has an Ingress, the new domain uses that Ingress and its existing backend. If it only has an HTTPRoute, the new domain uses that HTTPRoute. When you select a Gateway, the new domain uses the HTTPRoute on that Gateway that forwards to this service. If none exists, Zeabur creates one.
+If the service already has an Ingress, the new domain uses that Ingress and its existing backend. If it only has an HTTPRoute, the new domain uses that HTTPRoute. When you select a Gateway, the new domain uses the HTTPRoute on that Gateway that forwards to this service. If none exists, Zeabur OSS creates one.
 
-If the service has no route, Zeabur creates an Ingress named `<service>-<domain-with-dashes>`. cert-manager issues a certificate based on the annotation and stores it in `<Ingress name>-tls`:
+If the service has no route, Zeabur OSS creates an Ingress named `<service>-<domain-with-dashes>`. cert-manager issues a certificate based on the annotation and stores it in `<Ingress name>-tls`:
 
 ```yaml
 apiVersion: networking.k8s.io/v1
@@ -247,7 +247,7 @@ spec:
                   number: 8080
 ```
 
-Replace `letsencrypt` with the name of an issuer in the cluster. Find it with `kubectl get clusterissuer`. If the service already has an Ingress, Zeabur adds the new domain as another entry in that Ingress's `rules` and adds an entry to `tls`.
+Replace `letsencrypt` with the name of an issuer in the cluster. Find it with `kubectl get clusterissuer`. If the service already has an Ingress, Zeabur OSS adds the new domain as another entry in that Ingress's `rules` and adds an entry to `tls`.
 
 A domain configured to use a Gateway has an HTTPRoute whose `parentRefs` points to the Gateway and its listener:
 
@@ -271,7 +271,7 @@ spec:
 
 ### Use your own certificate
 
-Your own certificate is a `kubernetes.io/tls` secret referenced by the Ingress's `tls.secretName`. Zeabur names this secret `<Ingress name>-cert`, with `ownerReferences` pointing to the Ingress. If the Ingress only has this domain, use kubectl to create the secret, update the Ingress to read it, and remove the cert-manager annotation:
+Your own certificate is a `kubernetes.io/tls` secret referenced by the Ingress's `tls.secretName`. Zeabur OSS names this secret `<Ingress name>-cert`, with `ownerReferences` pointing to the Ingress. If the Ingress only has this domain, use kubectl to create the secret, update the Ingress to read it, and remove the cert-manager annotation:
 
 ```sh
 kubectl -n demo create secret tls web-app-example-com-cert --cert=fullchain.pem --key=privkey.pem
@@ -280,7 +280,7 @@ kubectl -n demo annotate ingress web-app-example-com cert-manager.io/cluster-iss
 kubectl -n demo delete certificate web-app-example-com-tls
 ```
 
-The last line deletes the Certificate that cert-manager previously created for this domain. Zeabur does the same when switching to your own certificate.
+The last line deletes the Certificate that cert-manager previously created for this domain. Zeabur OSS does the same when switching to your own certificate.
 
 ### Redirects and passwords
 

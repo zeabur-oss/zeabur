@@ -1,6 +1,6 @@
 # Testing
 
-A test is worth keeping when it fails because a promise Zeabur makes broke, and only then. It
+A test is worth keeping when it fails because a promise Zeabur OSS makes broke, and only then. It
 calls the code the way a caller does (the HTTP API, a crate's public functions, the rendered
 page), so a refactor that keeps the behavior keeps the test green [swe-unit].
 
@@ -15,7 +15,7 @@ that level cannot see: wiring, a real kube-apiserver, a real browser [pyramid].
 | API tests over the in-memory cluster | `crates/zeabur-api/tests/it`, one test binary (helpers shared with the cluster tests in `tests/common`) | the HTTP API end to end: routes, status codes, problems, what leaves the server |
 | Cluster tests on k3s | `crates/*/tests/kubernetes.rs`, `#[ignore]`d ([CONTRIBUTING](../../CONTRIBUTING.md#tests)); each test's namespace and person come from `zeabur-test-support`'s `sandbox` | what only kube-apiserver decides: acting as the person, RBAC refusals, `test` preconditions, field managers, concurrent writes. The in-memory cluster is a fake; what it claims about kube-apiserver is checked here, by one suite of write behaviors run against both (`crates/zeabur-kube/tests/contract`) [swe-doubles] |
 | Browser tests (Playwright) | `web/e2e` (local mode, `scripts/e2e-ui.sh`) and `web/e2e/full` (in a cluster with Zeabur Identity, `scripts/e2e.sh`; the specs that need Zeabur Builder or the database operators run in the nightly `e2e-full` job) | user journeys and what only a browser shows: the CSP, masked values on screen, keyboard use, passkey sign-in. Logic in the interface is tested with `bun test` [e2e-good] |
-| Zeabur Proxy's canary | `scripts/e2e-proxy.sh` (`cargo xtask e2e-proxy`), in a cluster with VictoriaLogs and `proxy.enabled` (and VictoriaMetrics for the metrics part) | that a person reads no other namespace's log lines or series, however the request is put. A check that fails for a known reason outside Zeabur prints `skip` with the reason and the run goes on. The proxy's attack table, property and fuzz target cover its parser in `cargo test` and the `fuzz` job (nightly). It runs in the `canary` job, nightly; a failure opens or updates the issue "Nightly canary failing" |
+| Zeabur Proxy's canary | `scripts/e2e-proxy.sh` (`cargo xtask e2e-proxy`), in a cluster with VictoriaLogs and `proxy.enabled` (and VictoriaMetrics for the metrics part) | that a person reads no other namespace's log lines or series, however the request is put. A check that fails for a known reason outside Zeabur OSS prints `skip` with the reason and the run goes on. The proxy's attack table, property and fuzz target cover its parser in `cargo test` and the `fuzz` job (nightly). It runs in the `canary` job, nightly; a failure opens or updates the issue "Nightly canary failing" |
 
 ### Browser test files
 

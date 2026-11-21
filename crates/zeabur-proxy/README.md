@@ -2,7 +2,7 @@
 
 Zeabur Proxy: lets a person read a shared backend's data for one namespace, as far as their own
 Kubernetes RBAC rights reach. The backends are VictoriaLogs (log history, `/logs/`) and
-VictoriaMetrics (usage history, `/metrics/`). Zeabur calls it with the person's token; browsers
+VictoriaMetrics (usage history, `/metrics/`). Zeabur OSS calls it with the person's token; browsers
 never reach it.
 
 ## A request
@@ -37,8 +37,8 @@ name shows the earlier one's logs and usage until the backends' retention drops 
 
 ## Deployment
 
-The Zeabur chart installs it with `proxy.enabled` (`deploy/chart/zeabur`). Its pod mounts no
-service account token: the proxy can only ask as the person. Zeabur reaches it over TLS; the
+The Zeabur OSS chart installs it with `proxy.enabled` (`deploy/chart/zeabur`). Its pod mounts no
+service account token: the proxy can only ask as the person. Zeabur OSS reaches it over TLS; the
 chart makes a CA and a certificate, or takes a Secret (for example from cert-manager), and the
 proxy reads a renewed certificate without a restart.
 

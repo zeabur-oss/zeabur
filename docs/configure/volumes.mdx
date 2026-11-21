@@ -50,7 +50,7 @@ To customize names, expand **Advanced** and edit **Name**, **PVC name**, and **A
 
 ### Review and apply
 
-Click **Review changes** at the bottom of the page. Check the volumes to create, their sizes, and their mount paths, then apply the changes. Zeabur creates the disk first, then mounts it at the path in the container.
+Click **Review changes** at the bottom of the page. Check the volumes to create, their sizes, and their mount paths, then apply the changes. Zeabur OSS creates the disk first, then mounts it at the path in the container.
 
 Adding or changing a mount updates the replica template. Continuously running services replace their replicas. A new volume starts empty; existing files at that path in the container aren't moved to it. To keep those files, copy them out first, mount the volume, then copy them back.
 
@@ -130,7 +130,7 @@ If an existing K8up schedule already backs up this volume along with other volum
 </Steps>
 
 <Callout type="warn">
-Keep a separate copy of `RESTIC_PASSWORD` from the backup secret. This is the restic repository password Zeabur generates. Without it, you can't read the backups in S3. Save it elsewhere before deleting the project or backup secret.
+Keep a separate copy of `RESTIC_PASSWORD` from the backup secret. This is the restic repository password Zeabur OSS generates. Without it, you can't read the backups in S3. Save it elsewhere before deleting the project or backup secret.
 </Callout>
 
 ## Restore files from a backup
@@ -141,7 +141,7 @@ If you don't have permission to restore and need an administrator to do it, gath
 
 - The source S3 endpoint, bucket, and folder. Check `spec.backend` in the K8up Schedule.
 - The S3 access keys and `RESTIC_PASSWORD` from the backup secret.
-- Which backup to restore. Zeabur's run history doesn't include restic snapshot IDs; look them up in the backup repository.
+- Which backup to restore. Zeabur OSS's run history doesn't include restic snapshot IDs; look them up in the backup repository.
 - The target disk and the service that will mount it.
 
 Anyone with permission to read secrets can retrieve the backup secret with `kubectl`. For example, for project `shop` and disk `data-redis-0`:
@@ -211,11 +211,11 @@ K8up copies files directly from the volume while the application keeps running. 
 
 ## Do the same with kubectl
 
-Volumes use standard disks, and backups use K8up Schedules and secrets. Mounts and backup schedules keep working after you remove Zeabur. The following examples use project `demo`, Deployment `web`, and volume name `uploads`.
+Volumes use standard disks, and backups use K8up Schedules and secrets. Mounts and backup schedules keep working after you remove Zeabur OSS. The following examples use project `demo`, Deployment `web`, and volume name `uploads`.
 
 ### Add a volume
 
-Zeabur names the disk `<service>-<volume-name>` and defaults the access mode to `ReadWriteOnce`. To specify a storage class, add `storageClassName`:
+Zeabur OSS names the disk `<service>-<volume-name>` and defaults the access mode to `ReadWriteOnce`. To specify a storage class, add `storageClassName`:
 
 ```yaml
 apiVersion: v1
@@ -230,7 +230,7 @@ spec:
       storage: 5Gi
 ```
 
-Then mount it in the container: add an entry to `volumes` in the replica template and an entry to `volumeMounts` in the container. This is the same JSON Patch Zeabur writes:
+Then mount it in the container: add an entry to `volumes` in the replica template and an entry to `volumeMounts` in the container. This is the same JSON Patch Zeabur OSS writes:
 
 ```sh
 kubectl -n demo patch deployment web --type=json -p='[
@@ -239,7 +239,7 @@ kubectl -n demo patch deployment web --type=json -p='[
 ]'
 ```
 
-If the replica template doesn't have `volumes` or the container doesn't have `volumeMounts`, `/-` fails. Use `kubectl edit deployment web` to add these two sections directly instead. When you add a volume while creating a service, Zeabur sets the Deployment to 1 replica and `strategy: Recreate` so old and new replicas don't compete for the same ReadWriteOnce disk. Adding a volume later doesn't change these two settings. The review screen warns about the restrictions on sharing a ReadWriteOnce disk across multiple replicas.
+If the replica template doesn't have `volumes` or the container doesn't have `volumeMounts`, `/-` fails. Use `kubectl edit deployment web` to add these two sections directly instead. When you add a volume while creating a service, Zeabur OSS sets the Deployment to 1 replica and `strategy: Recreate` so old and new replicas don't compete for the same ReadWriteOnce disk. Adding a volume later doesn't change these two settings. The review screen warns about the restrictions on sharing a ReadWriteOnce disk across multiple replicas.
 
 ### Expand capacity
 
@@ -299,7 +299,7 @@ spec:
       keepWeekly: 4
 ```
 
-`bucket` combines the bucket and folder. Zeabur's default folder is `<project>/<PVC name>`. If S3 requires a region, add `AWS_DEFAULT_REGION` to the secret and `envFrom: [{secretRef: {name: web-uploads-backup}}]` to `backend`. If the backup doesn't run as root, Zeabur writes a K8up PodConfig with the same name instead and replaces `podSecurityContext` with `podConfigRef`.
+`bucket` combines the bucket and folder. Zeabur OSS's default folder is `<project>/<PVC name>`. If S3 requires a region, add `AWS_DEFAULT_REGION` to the secret and `envFrom: [{secretRef: {name: web-uploads-backup}}]` to `backend`. If the backup doesn't run as root, Zeabur OSS writes a K8up PodConfig with the same name instead and replaces `podSecurityContext` with `podConfigRef`.
 
 Next, add the label the Schedule selects and the K8up annotation to the disk:
 
@@ -364,7 +364,7 @@ The disk's `STATUS` should be `Bound`, and `CAPACITY` shows its current size. Ex
 | The volume stays at **Waiting for storage** | Check the replica and disk events, and confirm that the storage class is available. If the volume's row says **Kept on the node its first replica runs on**, the volume is created only after the replica is scheduled on a node. |
 | A replica can't start after moving to another node | Check whether the volume is tied to a specific node. Data on a local disk doesn't move to the new node with the replica. |
 | Multiple replicas can't mount the volume at the same time | The Deployment's replicas share one disk. With the ReadWriteOnce access mode, only replicas on the same node can mount it. Switch to a storage class and access mode that support multiple nodes. |
-| **This volume name exceeds 63 characters. K8up can't select it with a label.** | Zeabur uses the disk's name as a label value to select the volume. If the name is too long, you can't configure backups here. Ask an administrator to write a K8up Schedule separately. |
+| **This volume name exceeds 63 characters. K8up can't select it with a label.** | Zeabur OSS uses the disk's name as a label value to select the volume. If the name is too long, you can't configure backups here. Ask an administrator to write a K8up Schedule separately. |
 | A backup shows **Failed** or **Partly failed** | Read the run's failure message. Check the S3 keys and whether the backup user can read the files. |
 | No run history after creation | Click **Back up now** to run a backup, then check the status of K8up and the backup replica. |
 | Backup settings or results aren't visible | The backup section explains whether the cluster is missing K8up or you don't have permission to read them. |

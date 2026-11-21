@@ -5,7 +5,7 @@ description: Point all generated addresses to the cluster with one wildcard reco
 
 The application domain is the domain shared by generated addresses. Set up a wildcard record once, and every new service address resolves to the cluster. For example, if the application domain is `apps.example.com`, add an A record for `*.apps.example.com` that points to the server's IPv4 address. If the server has an IPv6 address, add an AAAA record too. New addresses such as `web-shop.apps.example.com` don't need records of their own.
 
-Let's Encrypt issues a separate HTTPS certificate for each address using HTTP-01 validation, so the server's TCP port 80 must be reachable from the internet. Zeabur doesn't change DNS records for you. Add them at your DNS provider.
+Let's Encrypt issues a separate HTTPS certificate for each address using HTTP-01 validation, so the server's TCP port 80 must be reachable from the internet. Zeabur OSS doesn't change DNS records for you. Add them at your DNS provider.
 
 ## Choose an application domain
 
@@ -18,7 +18,7 @@ The application domain can be any subdomain, such as `apps.example.com`, or the 
 
 A wildcard covers only one level of names. `*.example.com` covers `web-shop.example.com`, but not `example.com` itself or `a.b.example.com`.
 
-## Find the records to add in Zeabur
+## Find the records to add in Zeabur OSS
 
 Open the **Domains** section on the **Cluster** page. Each application domain lists the records to add, including the type, name, and value, with copy buttons. It also shows whether the domain currently resolves to the cluster. After adding the records at your DNS provider, return here and click **Check again**.
 
@@ -57,14 +57,14 @@ Select the domain in Cloudflare, go to **DNS** > **Records**, and click **Add re
 
 #### Save and check
 
-Click **Save**, then return to the **Domains** section in Zeabur and click **Check again**.
+Click **Save**, then return to the **Domains** section in Zeabur OSS and click **Check again**.
 
 </Step>
 </Steps>
 
-With the gray cloud, Let's Encrypt connects directly to the server for HTTP-01 validation, and Zeabur's check also returns the server's address.
+With the gray cloud, Let's Encrypt connects directly to the server for HTTP-01 validation, and Zeabur OSS's check also returns the server's address.
 
-To turn on the orange cloud (**Proxied**) and route traffic through Cloudflare, set Cloudflare's SSL/TLS mode to **Full (strict)**. DNS will then return Cloudflare's addresses, and Zeabur will show the domain as **Points elsewhere**.
+To turn on the orange cloud (**Proxied**) and route traffic through Cloudflare, set Cloudflare's SSL/TLS mode to **Full (strict)**. DNS will then return Cloudflare's addresses, and Zeabur OSS will show the domain as **Points elsewhere**.
 
 ### Route 53
 
@@ -93,7 +93,7 @@ In the Route 53 console, select **Hosted zones**, open the domain's hosted zone,
 
 #### Save and check
 
-Click **Create records**, then return to the **Domains** section in Zeabur and click **Check again**. Route 53 changes usually take effect within a minute.
+Click **Create records**, then return to the **Domains** section in Zeabur OSS and click **Check again**. Route 53 changes usually take effect within a minute.
 
 </Step>
 </Steps>
@@ -131,17 +131,17 @@ These addresses include the server's IP address, and issued certificates also ap
 
 ## Check the application domain and ingress address with kubectl
 
-DNS records live outside the cluster. Zeabur doesn't write any objects for them; it reads two things to list the records to add.
+DNS records live outside the cluster. Zeabur OSS doesn't write any objects for them; it reads two things to list the records to add.
 
-Application domain: the value entered during installation is the Helm chart's `domains.suffixes`. If you've changed it on the **Cluster** page, the new list is stored in the `zeabur-settings` config file in the Zeabur namespace, under the `domain-suffixes` key, with one domain per line:
+Application domain: the value entered during installation is the Helm chart's `domains.suffixes`. If you've changed it on the **Cluster** page, the new list is stored in the `zeabur-settings` config file in the Zeabur OSS namespace, under the `domain-suffixes` key, with one domain per line:
 
 ```sh
 kubectl -n zeabur get configmap zeabur-settings -o jsonpath='{.data.domain-suffixes}'
 ```
 
-If there's no output, Zeabur uses the value from installation.
+If there's no output, Zeabur OSS uses the value from installation.
 
-Address the records should point to: Zeabur reads the Ingress `status.loadBalancer`, which holds the ingress's external address:
+Address the records should point to: Zeabur OSS reads the Ingress `status.loadBalancer`, which holds the ingress's external address:
 
 ```sh
 kubectl get ingress -A

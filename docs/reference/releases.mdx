@@ -1,9 +1,9 @@
 ---
 title: Release files and verification
-description: Choose Zeabur release files for your operating system, then verify checksums, signatures, and build provenance before running them.
+description: Choose Zeabur OSS release files for your operating system, then verify checksums, signatures, and build provenance before running them.
 ---
 
-Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases), then download the matching archive, `SHA256SUMS`, and signature. When verifying, accept only Zeabur's release workflow as the signer, and only when it ran for this repository at that version's tag. Extract and run the files only after verification passes.
+Choose a version on [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases), then download the matching archive, `SHA256SUMS`, and signature. When verifying, accept only Zeabur OSS's release workflow as the signer, and only when it ran for this repository at that version's tag. Extract and run the files only after verification passes.
 
 ## Files and platforms
 
@@ -78,7 +78,7 @@ spctl --assess -vvv --type open --context context:primary-signature ./zeaburctl
 
 The output must be one of these two. If it isn't, don't open the file.
 
-From v0.2.0 on, signed with Zeabur's certificate:
+From v0.2.0 on, signed with Zeabur OSS's certificate:
 
 ```text
 ./zeaburctl: accepted
@@ -96,7 +96,7 @@ origin=Developer ID Application: Yi-Jyun Pan (SG37523V73)
 
 ## Verify the image and chart
 
-The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each image's platform images and index, and the chart, one per line. Zeabur Proxy's lines start with `proxy`. The `debug` and `tools` lines are images from other projects that Zeabur runs for debug containers and terminals; Zeabur doesn't sign them, so cosign below checks only the others:
+The release notes say what changed; they don't list digests. `digests.txt` lists the full registry references for each image's platform images and index, and the chart, one per line. Zeabur Proxy's lines start with `proxy`. The `debug` and `tools` lines are images from other projects that Zeabur OSS runs for debug containers and terminals; Zeabur OSS doesn't sign them, so cosign below checks only the others:
 
 ```text
 linux/amd64  ghcr.io/zeabur-oss/zeabur@sha256:...
@@ -137,7 +137,7 @@ Replace the placeholders in angle brackets with the values from `digests.txt`. F
 
 ## Mirror the images
 
-To copy the images into a private registry, or to admit them by name, `digests.txt` is the list. It names the images Zeabur and its chart run, including `debug` and `tools`. Print the image indexes:
+To copy the images into a private registry, or to admit them by name, `digests.txt` is the list. It names the images Zeabur OSS and its chart run, including `debug` and `tools`. Print the image indexes:
 
 ```sh
 awk '$(NF-1) == "index" { print $NF }' digests.txt
@@ -151,4 +151,4 @@ When a maintainer pushes a `v<version>` tag, the release workflow (this reposito
 
 The workflow finishes by adding the files to a draft GitHub release. A maintainer checks the draft before publishing it. Downloadable files are available only for versions visible on the Releases page.
 
-Downloading and verifying files don't change the cluster. You can delete the download directory when you're done. To remove an installed copy of Zeabur, see [Uninstall](../leave/uninstall.mdx).
+Downloading and verifying files don't change the cluster. You can delete the download directory when you're done. To remove an installed copy of Zeabur OSS, see [Uninstall](../leave/uninstall.mdx).

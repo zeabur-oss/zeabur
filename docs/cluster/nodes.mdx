@@ -21,11 +21,11 @@ Open these firewall ports between nodes:
 | Between all nodes | TCP 10250, UDP 8472 (flannel VXLAN) | TCP 10250, 9099, UDP 8472 (Canal VXLAN) |
 | Between servers | None | TCP 2379–2381 |
 
-A K3s cluster that Zeabur 0.2 set up uses Calico, with UDP 4789 in place of 8472. Allow the UDP port only between cluster nodes. Don't expose it to the internet. If the port is blocked, replicas on different nodes can't reach each other.
+A K3s cluster that Zeabur OSS 0.2 set up uses Calico, with UDP 4789 in place of 8472. Allow the UDP port only between cluster nodes. Don't expose it to the internet. If the port is blocked, replicas on different nodes can't reach each other.
 
 ## Add a node
 
-Zeabur doesn't add nodes; on a cluster set up with Zeatend, Zeatend does. Open the firewall ports above first, then run this on a server:
+Zeabur OSS doesn't add nodes; on a cluster set up with Zeatend, Zeatend does. Open the firewall ports above first, then run this on a server:
 
 ```sh
 sudo zeatend node add
@@ -45,7 +45,7 @@ On RKE2, etcd needs a majority of servers to operate. To keep running with one s
 
 Select **Stop scheduling** from the node menu. The node row shows that scheduling has stopped, and no new replicas are scheduled on the node. Existing replicas stay where they are. If you're only rebooting, this is enough. You don't need to run `drain`.
 
-You can also click **Open kubectl terminal** next to the heading on Zeabur's **Cluster** page and run:
+You can also click **Open kubectl terminal** next to the heading on Zeabur OSS's **Cluster** page and run:
 
 ```sh
 kubectl cordon <node>
@@ -55,7 +55,7 @@ Replace `<node>` with the node name. Resume scheduling after the reboot.
 
 ### Move replicas before maintenance
 
-Click **Open kubectl terminal** next to the heading on Zeabur's **Cluster** page. First, list the replicas on the node and the disks they use:
+Click **Open kubectl terminal** next to the heading on Zeabur OSS's **Cluster** page. First, list the replicas on the node and the disks they use:
 
 ```sh
 kubectl get pods -A --field-selector spec.nodeName=<node> -o custom-columns=NS:.metadata.namespace,POD:.metadata.name,PVC:.spec.volumes[*].persistentVolumeClaim.claimName
@@ -76,7 +76,7 @@ kubectl drain <node> --ignore-daemonsets --delete-emptydir-data
 - `--delete-emptydir-data` clears the `emptyDir` scratch data of evicted replicas.
 - Replicas using this node's `local-path` volumes are also evicted. Recreated replicas can't use these volumes on other nodes and remain `Pending` until the original node returns. `drain` doesn't delete the data. For these replicas, the result is the same as taking the node down directly: they must wait for it to return.
 
-If Zeabur itself runs on this node, the page disconnects for about a minute during `drain`. Refresh the page and sign in again. The kubectl terminal also disconnects; reopen it.
+If Zeabur OSS itself runs on this node, the page disconnects for about a minute during `drain`. Refresh the page and sign in again. The kubectl terminal also disconnects; reopen it.
 
 Wait for `drain` to finish before taking the node down for maintenance.
 
@@ -84,7 +84,7 @@ Wait for `drain` to finish before taking the node down for maintenance.
 
 Once maintenance is complete and the node is running again, select **Resume scheduling** from the node menu.
 
-You can also click **Open kubectl terminal** next to the heading on Zeabur's **Cluster** page and run:
+You can also click **Open kubectl terminal** next to the heading on Zeabur OSS's **Cluster** page and run:
 
 ```sh
 kubectl uncordon <node>
@@ -96,7 +96,7 @@ New replicas can now be scheduled on the node.
 
 **Don't remove the cluster's only node or its last control plane node.**
 
-First, click **Open kubectl terminal** next to the heading on Zeabur's **Cluster** page and check the number of control plane nodes:
+First, click **Open kubectl terminal** next to the heading on Zeabur OSS's **Cluster** page and check the number of control plane nodes:
 
 ```sh
 kubectl get nodes -l node-role.kubernetes.io/control-plane
@@ -136,17 +136,17 @@ kubectl -n longhorn-system delete nodes.longhorn.io <node>
 A **Node terminal** opens a shell with full root access on the host. Sign in with an admin account and click **Node terminal** in the node row. Review the terminal replica that will be created and the time limit, then click **Open terminal**.
 
 <Callout type="warn">
-The node terminal can modify every file, process, and network interface on the host. Actions in this terminal bypass Zeabur and Kubernetes permission checks and can't be undone.
+The node terminal can modify every file, process, and network interface on the host. Actions in this terminal bypass Zeabur OSS and Kubernetes permission checks and can't be undone.
 </Callout>
 
 The node records an event with who opened the terminal and when. If the screen shows **Others could enter this terminal**, role bindings allow people other than cluster administrators to create replicas in the terminal's namespace. Remove the listed role bindings, then check again.
 
-When you close the terminal, Zeabur removes the terminal replica. A terminal replica lasts at most 30 minutes. If one remains, click **Remove terminal replica** in the terminal replica list below the node, review the change, and confirm.
+When you close the terminal, Zeabur OSS removes the terminal replica. A terminal replica lasts at most 30 minutes. If one remains, click **Remove terminal replica** in the terminal replica list below the node, review the change, and confirm.
 
 ## Common failures
 
 - Can't reach the server when joining: Run `sudo zeatend plan` on the new VM; it checks each port. The VM must reach the server on TCP 6443 (K3s) or TCP 9345 and 6443 (RKE2), along with the other ports in the table above.
-- The new node is ready, but services on different nodes can't reach each other: Check UDP 8472, or 4789 on a K3s cluster that Zeabur 0.2 set up, and whether network policies allow traffic from the new node.
+- The new node is ready, but services on different nodes can't reach each other: Check UDP 8472, or 4789 on a K3s cluster that Zeabur OSS 0.2 set up, and whether network policies allow traffic from the new node.
 - `drain` is stuck: It's waiting for PodDisruptionBudget to allow eviction or has stopped at a replica that isn't managed by a controller. Run `kubectl get pdb -A` to see which budget is blocking eviction, resolve it, and run the command again.
 - A replica is `Pending` on the new node: It uses a `local-path` volume on the old node and must wait for that node to return.
 - A terminal replica **Can't start**: Check its events. A failed image download is a common cause.

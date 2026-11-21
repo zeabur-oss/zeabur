@@ -1,9 +1,9 @@
 ---
 title: Create and manage projects
-description: Create projects, add existing namespaces to Zeabur, change project names and icons, and control access from other projects.
+description: Create projects, add existing namespaces to Zeabur OSS, change project names and icons, and control access from other projects.
 ---
 
-When you finish this page, the **Projects** page has a new project you can deploy services into. A project keeps a group of related services together, the same way a project does on zeabur.com. You change a project's name, description, icon, and network isolation in its **Settings**.
+When you finish this page, the **Projects** page has a new project you can deploy services into. A project keeps a group of related services together, the same way a project does on Zeabur. You change a project's name, description, icon, and network isolation in its **Settings**.
 
 <Figure label="A project holds its services, and each service can have its own domain">
 <FigGroup label="Project shop: a group of services" row>
@@ -29,18 +29,18 @@ On the **Projects** page, click **New project**. Enter `hello` in **Name**. **Di
 
 ![New project dialog with hello entered as the name](../images/shots/project-new.avif)
 
-In the cluster, a project is a namespace, the space Kubernetes uses to keep a group of services apart. The project name is the namespace name, so you can't change it later. If a namespace with the same name already exists, the form prompts you to use it instead. See the [next section](#add-an-existing-namespace-to-zeabur).
+In the cluster, a project is a namespace, the space Kubernetes uses to keep a group of services apart. The project name is the namespace name, so you can't change it later. If a namespace with the same name already exists, the form prompts you to use it instead. See the [next section](#add-an-existing-namespace-to-zeabur-oss).
 
 </Step>
 <Step>
 
 ### Review and create
 
-Click **Review changes**. The screen lists what Zeabur will do:
+Click **Review changes**. The screen lists what Zeabur OSS will do:
 
 - Create namespace `hello` with the project label. Its security level is `baseline`: services can run as root but can't access the host.
 - Services that don't ask for one get no token for the Kubernetes API.
-- If the cluster has a namespace labeled `zeabur.com/platform: "true"`, Zeabur also [isolates the project](#isolate-the-project-from-other-projects), so services in other projects can't connect to it.
+- If the cluster has a namespace labeled `zeabur.com/platform: "true"`, Zeabur OSS also [isolates the project](#isolate-the-project-from-other-projects), so services in other projects can't connect to it.
 
 ![Review screen before creating project hello, showing the namespace and security settings to create](../images/shots/project-new-review.avif)
 
@@ -49,7 +49,7 @@ Click **Create**. The new project opens.
 </Step>
 </Steps>
 
-## Add an existing namespace to Zeabur
+## Add an existing namespace to Zeabur OSS
 
 If the cluster already runs an application, you can turn its namespace into a project without deploying it again. You need `zeabur-manage` permission on that namespace. Usually, only administrators have it. See [Project namespace protection](../reference/permissions.mdx#protecting-project-namespaces).
 
@@ -59,9 +59,9 @@ If the cluster already runs an application, you can turn its namespace into a pr
 
 2. Open the menu in its row, choose **Use this namespace**, review the change, and apply it.
 
-Zeabur only adds the project label `zeabur.com/project: "true"` to the namespace. The services, data, and security settings in it stay unchanged.
+Zeabur OSS only adds the project label `zeabur.com/project: "true"` to the namespace. The services, data, and security settings in it stay unchanged.
 
-To stop showing it in Zeabur, go to **Danger zone** in the project's **Settings** and click **Remove from Zeabur**. This only removes the project label. The namespace and everything in it stay intact. To delete it along with its contents, see [Delete a project](./delete-project.mdx).
+To stop showing it in Zeabur OSS, go to **Danger zone** in the project's **Settings** and click **Remove from Zeabur OSS**. This only removes the project label. The namespace and everything in it stay intact. To delete it along with its contents, see [Delete a project](./delete-project.mdx).
 
 ## Change the name, description, and icon
 
@@ -91,13 +91,13 @@ After isolation, services in other projects can't connect to this project's serv
 
 1. Go to **Networking** in the project's **Settings** and look at the **Other projects** row:
    - **Any replica in the cluster can reach this project's services.**: The project isn't isolated yet.
-   - **Can't reach this project's services. Services within the project and Zeabur components aren't affected.**: The project is isolated.
+   - **Can't reach this project's services. Services within the project and Zeabur OSS components aren't affected.**: The project is isolated.
 
    ![Networking in project settings, where the Other projects row says whether the project is isolated](../images/shots/project-network.avif)
 
 2. If it isn't isolated, click **Isolate**, review the change, and apply it.
 
-After isolation, services within the project can still reach each other. Zeabur components such as Traefik and database operators can reach them too, because their namespaces are labeled `zeabur.com/platform: "true"`. The same goes for `kube-system`.
+After isolation, services within the project can still reach each other. Zeabur OSS components such as Traefik and database operators can reach them too, because their namespaces are labeled `zeabur.com/platform: "true"`. The same goes for `kube-system`.
 
 To let another project in, click **Let a project in**, select the project, click **Allow**, review the change, and apply it. All services in that project can then reach all services in this one. To revoke access, click **Remove** in that row.
 
@@ -111,19 +111,19 @@ The **Projects** page lists the project with the name, description, and icon you
 
 | Message or result | What to do next |
 | --- | --- |
-| **A namespace with this name already exists. You can use the existing namespace instead.** | Choose another name, or add that namespace to Zeabur from **Other namespaces**. |
+| **A namespace with this name already exists. You can use the existing namespace instead.** | Choose another name, or add that namespace to Zeabur OSS from **Other namespaces**. |
 | The cluster returns **Only an admin can change the namespace's labels** when adding or removing a project | Only administrators can change namespace labels. Ask an administrator to make the change. |
 | **Kubernetes reserves this namespace for its own components. It can't be used as a project.** | Namespaces that start with `kube-` and `zeabur-node-shell`, which the node terminal uses, can't be projects. |
-| The review screen for a new project has no isolation item | The cluster has no namespace labeled `zeabur.com/platform: "true"`. Zeabur can't tell where the Ingress controller runs, so it doesn't isolate the project, to keep public domains working. The Ingress controller is the component that passes domain traffic to services. Ask an administrator to label its namespace, then click **Isolate** in **Networking**. |
+| The review screen for a new project has no isolation item | The cluster has no namespace labeled `zeabur.com/platform: "true"`. Zeabur OSS can't tell where the Ingress controller runs, so it doesn't isolate the project, to keep public domains working. The Ingress controller is the component that passes domain traffic to services. Ask an administrator to label its namespace, then click **Isolate** in **Networking**. |
 | The public domain doesn't open after isolation | The Ingress controller's namespace doesn't have the `zeabur.com/platform: "true"` label. Add the label, or add a rule to `zeabur-project` that lets it in. |
 
 ## Do the same with kubectl
 
-All project settings are namespace labels, annotations, and standard NetworkPolicy objects. Kubernetes continues to enforce these settings after you remove Zeabur.
+All project settings are namespace labels, annotations, and standard NetworkPolicy objects. Kubernetes continues to enforce these settings after you remove Zeabur OSS.
 
 ### Create a project
 
-This matches what Zeabur creates:
+This matches what Zeabur OSS creates:
 
 ```yaml
 apiVersion: v1
@@ -170,7 +170,7 @@ kubectl annotate namespace demo --overwrite builder.zeabur.com/build-memory=2Gi 
 
 ### Change the Pod Security level
 
-Zeabur doesn't have an interface for changing a project's Pod Security level. An administrator must change it with kubectl. After changing it to `restricted`, only **Strict** services can start:
+Zeabur OSS doesn't have an interface for changing a project's Pod Security level. An administrator must change it with kubectl. After changing it to `restricted`, only **Strict** services can start:
 
 ```sh
 kubectl label namespace demo --overwrite \

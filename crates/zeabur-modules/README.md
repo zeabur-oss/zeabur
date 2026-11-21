@@ -1,18 +1,18 @@
 # zeabur-modules
 
-Integrations with components a cluster may have installed: what Zeabur reads from each and what
+Integrations with components a cluster may have installed: what Zeabur OSS reads from each and what
 it makes of it. One module per provider (metrics-server, system-upgrade-controller, …).
 
 ## Hides
 
-Each component's resources and their shapes. The rest of Zeabur sees what a module declares
+Each component's resources and their shapes. The rest of Zeabur OSS sees what a module declares
 (its id, the capability it provides, the resources it reads) and the typed views it produces.
 
 ## Place in the workspace
 
 Level 3: may depend on `zeabur-core`, `zeabur-model`, `zeabur-kube` (for the object types it
 reads) and `zeabur-model`'s `adapters` (for label selectors). Only the crates that compose Zeabur
-(`zeabur-api` and the binaries) may depend on it, never the core crates;
+OSS (`zeabur-api` and the binaries) may depend on it, never the core crates;
 `zeabur-oss-levels` checks both (`[workspace.metadata.modules]` in the root `Cargo.toml`).
 
 ## Design
@@ -22,8 +22,8 @@ reads) and `zeabur-model`'s `adapters` (for label selectors). Only the crates th
   (`Reading::NotInstalled`), not a build option. There is no registration through linker
   sections (`inventory`, `linkme`): they rely on the linker keeping otherwise unreferenced
   statics and register nothing, silently, on platforms they do not support [inventory]. There is
-  no loading at run time either: Zeabur is one static binary. Bevy composes plugins the same way,
-  by a list in code [bevy-plugins].
+  no loading at run time either: Zeabur OSS is one static binary. Bevy composes plugins the same
+  way, by a list in code [bevy-plugins].
 - **Modules do not read.** A module declares the resources it needs ([`Module::reads`]), or the
   HTTP API it reads from a Service ([`Module::http`]: the metrics store); the composer reads them
   as the person, discovery (or the API's probe) first, so "not installed" and "not allowed" are
@@ -59,7 +59,7 @@ reads) and `zeabur-model`'s `adapters` (for label selectors). Only the crates th
 | `dragonfly-operator` | redis | `dragonflydb.io/v1alpha1` dragonflies |
 | `seaweedfs-operator` | object-storage | `seaweed.seaweedfs.com/v1` seaweeds, buckets, s3credentials |
 | `zeabur-builder` | builds | `builder.zeabur.com/v1alpha1` builds, buildruns |
-| `alertmanager` | notifications | `operator.victoriametrics.com/v1beta1` vmalertmanagerconfigs (the channels), vmrules (whether Zeabur's rules are installed) |
+| `alertmanager` | notifications | `operator.victoriametrics.com/v1beta1` vmalertmanagerconfigs (the channels), vmrules (whether Zeabur OSS's rules are installed) |
 
 The databases capability (`databases`) has five providers: CloudNativePG, the Percona Operator
 for MongoDB, MOCO, mariadb-operator and the Dragonfly Operator. Like backups, they share only

@@ -11,8 +11,8 @@ The language and theme under **Preferences** are stored only in your browser and
 
 ## Before you begin
 
-- Zeabur must be installed in the cluster. When you run `zeaburctl ui` on your computer, Zeabur doesn't save settings. It uses the cluster name from kubeconfig, and you must specify the usage history source with `--metrics-service`.
-- You need permission to update the `zeabur-settings` config file in the namespace where Zeabur is installed (`zeabur` by default). You also need permission to create it when saving settings for the first time.
+- Zeabur OSS must be installed in the cluster. When you run `zeaburctl ui` on your computer, Zeabur OSS doesn't save settings. It uses the cluster name from kubeconfig, and you must specify the usage history source with `--metrics-service`.
+- You need permission to update the `zeabur-settings` config file in the namespace where Zeabur OSS is installed (`zeabur` by default). You also need permission to create it when saving settings for the first time.
 
 ## Change the cluster name
 
@@ -30,16 +30,16 @@ Go to **Settings** → **Cluster name** and enter a new **Name**. It must be a s
 
 ### Restore the default
 
-Click **Use the default name** to restore the `clusterName` set during installation. If none was set, Zeabur uses the hostname from its URL.
+Click **Use the default name** to restore the `clusterName` set during installation. If none was set, Zeabur OSS uses the hostname from its URL.
 
 </Step>
 </Steps>
 
 ## Choose a usage history source
 
-Service and node **Usage** charts and disk usage read data from a storage service that supports the Prometheus HTTP API. Zeabur reads it through the Kubernetes API with each person's own permissions. When Zeabur Proxy is enabled, the Proxy reads service usage history from the default storage service, and project members can see only their project's metrics.
+Service and node **Usage** charts and disk usage read data from a storage service that supports the Prometheus HTTP API. Zeabur OSS reads it through the Kubernetes API with each person's own permissions. When Zeabur Proxy is enabled, the Proxy reads service usage history from the default storage service, and project members can see only their project's metrics.
 
-Go to **Settings** → **Usage history** and enter the storage service's Kubernetes Service in **History source**, in the format `namespace/name:port`. The default is VictoriaMetrics, which Zeabur recommends: `observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`. After you click **Save**, **Status** shows:
+Go to **Settings** → **Usage history** and enter the storage service's Kubernetes Service in **History source**, in the format `namespace/name:port`. The default is VictoriaMetrics, which Zeabur OSS recommends: `observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`. After you click **Save**, **Status** shows:
 
 | Status | Meaning |
 | --- | --- |
@@ -52,7 +52,7 @@ Anyone who can read the storage service directly can see metrics for all project
 
 ## Set domains for new services
 
-Zeabur suggests addresses for new services in the format `<service>-<project>.<domain>`. Go to **Cluster** → **Overview** → **Domains**, click **Edit**, use **Add domain** to add domains, and click **Save**. The first domain is the default. You can add up to 20 domains. Click **Go back to the install's domains** to restore the installation settings.
+Zeabur OSS suggests addresses for new services in the format `<service>-<project>.<domain>`. Go to **Cluster** → **Overview** → **Domains**, click **Edit**, use **Add domain** to add domains, and click **Save**. The first domain is the default. You can add up to 20 domains. Click **Go back to the install's domains** to restore the installation settings.
 
 Each domain shows whether its DNS points to this cluster. For the wildcard records to add, see [Configure DNS records](../configure/dns.mdx).
 
@@ -101,6 +101,6 @@ The installation values come from the Chart's `clusterName`, `metricsStore.servi
 - New service addresses use the first domain by default.
 - `kubectl -n zeabur get configmap zeabur-settings -o yaml` shows the values you set.
 
-## After removing Zeabur
+## After removing Zeabur OSS
 
-Only Zeabur reads these settings. Deleting `zeabur-settings` doesn't affect any services.
+Only Zeabur OSS reads these settings. Deleting `zeabur-settings` doesn't affect any services.

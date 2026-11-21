@@ -16,7 +16,7 @@ An API token lets a script or CI job work with the cluster without anyone's sign
 2. Name it after what uses it, such as `github-actions`.
 3. Pick **Developer** or **Viewer** in each project it needs and how long it lasts, then click **Review**.
 4. Check the changes and apply them.
-5. Copy the token. Zeabur shows it only once. The dialog also shows a kubeconfig and the cluster's CA certificate.
+5. Copy the token. Zeabur OSS shows it only once. The dialog also shows a kubeconfig and the cluster's CA certificate.
 
 The list shows each token's roles, who created it, and when it expires. If the cluster limits token lifetimes with `--service-account-max-token-expiration`, kube-apiserver cuts the token short, and the list shows the real expiry.
 
@@ -109,7 +109,7 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" \
 
 ### Restart
 
-Like **Restart** in Zeabur, this sets the pod template annotation `kubectl.kubernetes.io/restartedAt` to the current time.
+Like **Restart** in Zeabur OSS, this sets the pod template annotation `kubectl.kubernetes.io/restartedAt` to the current time.
 
 ```sh
 kubectl rollout restart deployment/web
@@ -154,7 +154,7 @@ curl --cacert ca.crt -H "Authorization: Bearer $TOKEN" -X PATCH \
 
 ### Build again
 
-Like **Build again** in Zeabur, this sets the `builder.zeabur.com/rebuild` annotation on the Build. Zeabur Builder builds the branch's latest commit.
+Like **Build again** in Zeabur OSS, this sets the `builder.zeabur.com/rebuild` annotation on the Build. Zeabur Builder builds the branch's latest commit.
 
 ```sh
 kubectl annotate build web --overwrite builder.zeabur.com/rebuild="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
@@ -190,9 +190,9 @@ To stop a token at once, choose **More** → **Delete**. Every token issued for 
 
 A token doesn't belong to the person who created it. It keeps working after they leave, until it expires or an admin deletes it.
 
-## What Zeabur creates
+## What Zeabur OSS creates
 
-Zeabur writes these objects with the admin's own permissions:
+Zeabur OSS writes these objects with the admin's own permissions:
 
 | Object | Contents |
 |---|---|
@@ -200,6 +200,6 @@ Zeabur writes these objects with the admin's own permissions:
 | `RoleBinding zeabur-api-token-<name>` in each project | Binds `zeabur-project-developer` or `zeabur-project-viewer` to the ServiceAccount |
 | `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member`, like a member's |
 
-The token itself comes from a TokenRequest for the ServiceAccount. Zeabur doesn't store it in a secret or anywhere else. Deleting the token deletes its bindings and the ServiceAccount.
+The token itself comes from a TokenRequest for the ServiceAccount. Zeabur OSS doesn't store it in a secret or anywhere else. Deleting the token deletes its bindings and the ServiceAccount.
 
 The chart creates the `zeabur-api-tokens` namespace, and nothing else runs there. Only admins have permissions in it, so nobody else can request a token or run a pod as one. See [API tokens and RBAC](./permissions.mdx#api-tokens-and-rbac).

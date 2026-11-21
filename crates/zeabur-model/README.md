@@ -1,6 +1,6 @@
 # zeabur-model
 
-The data Zeabur shows: projects, services, the relations between them, and for every value the
+The data Zeabur OSS shows: projects, services, the relations between them, and for every value the
 Kubernetes object it came from (its *origin*). Each top-level node has an `id` in the shape of
 its API path (`projects/shop/services/deployment/api`).
 
@@ -15,7 +15,7 @@ Level 0: depends on no other workspace crate.
 
 ## Modules
 
-- `kernel`: the names Zeabur and Kubernetes must agree on (label keys under `zeabur.com/`, the
+- `kernel`: the names Zeabur OSS and Kubernetes must agree on (label keys under `zeabur.com/`, the
   field manager `zeabur`, and `Conventions`, which lets another tool use its own), Kubernetes
   quantities, the SHA-256 that derives short names, and
   the shared value types: `Message`, `Origin`, `Tool`, `DataStore`, `Denied`. The
@@ -30,7 +30,7 @@ Level 0: depends on no other workspace crate.
   `DatabaseCluster`); `zeabur-graph` maps them to the types of this crate.
 - `readiness`: whether a Deployment, StatefulSet, DaemonSet, Pod or Job has reached its spec,
   as kstatus computes it: `Current`, `InProgress` or `Failed`, with the reason. The status light
-  (`zeabur-graph`'s `phase`) and the rollout panel both start from it and add Zeabur's own
+  (`zeabur-graph`'s `phase`) and the rollout panel both start from it and add Zeabur OSS's own
   states on top.
 
 ## Features

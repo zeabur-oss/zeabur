@@ -5,13 +5,13 @@
 
 **English** · [繁體中文](README.zh-TW.md) · [简体中文](README.zh-CN.md)
 
-# Zeabur
+# Zeabur OSS
 
-**Deploy on your own server, the way you already do on zeabur.com.** Zeabur is open-source
-software. Projects, services, domains, environment variables, and app templates work the way you
-know from zeabur.com. You choose the hosting provider and the plan.
+**Deploy on your own server, the way you already do on Zeabur.** Projects, services, domains,
+environment variables, and app templates work the way you know from Zeabur. You choose the hosting
+provider and the plan.
 
-## Coming from zeabur.com?
+## Coming from Zeabur?
 
 What works the same way:
 
@@ -28,13 +28,13 @@ What is different:
 
 - **The server is yours.** Your services run on your own server, and you pay the cloud provider or data
   center you chose for it.
-- **You look after it.** You or your team upgrade Zeabur, back up data, and maintain the
+- **You look after it.** You or your team upgrade Zeabur OSS, back up data, and maintain the
   server.
 - **It runs on Kubernetes.** Kubernetes is open-source software that runs containers on one or
-  more servers, and Zeabur runs on top of it. On a new server,
+  more servers, and Zeabur OSS runs on top of it. On a new server,
   [Zeatend](https://oss.zeabur.com/docs/zeabur/install/one-command/) sets it up first.
 
-[Coming from zeabur.com](https://oss.zeabur.com/docs/zeabur/get-started/from-zeabur-com/) shows where each of these is in the
+[Coming from Zeabur](https://oss.zeabur.com/docs/zeabur/get-started/from-zeabur-com/) shows where each of these is in the
 documentation, with a screenshot for each step, and where to start. It is also in
 [繁體中文](https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com/) and
 [简体中文](https://oss.zeabur.com/zh-CN/docs/zeabur/get-started/from-zeabur-com/).
@@ -60,12 +60,12 @@ documentation, with a screenshot for each step, and where to start. It is also i
 
 ## Get started
 
-Today, you install Zeabur into an existing Kubernetes cluster with Helm, Kubernetes' package
+Today, you install Zeabur OSS into an existing Kubernetes cluster with Helm, Kubernetes' package
 installer. Zeabur Identity handles sign-in, so it is installed first.
-[Install Zeabur in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/)
+[Install Zeabur OSS in an existing cluster](https://oss.zeabur.com/docs/zeabur/install/existing-cluster/)
 lists what you need and each step.
 
-To look at a cluster from your own computer, `zeaburctl ui` opens Zeabur in your browser with your
+To look at a cluster from your own computer, `zeaburctl ui` opens Zeabur OSS in your browser with your
 kubeconfig, the file `kubectl` uses to reach a cluster. See [zeaburctl](https://oss.zeabur.com/docs/zeabur/reference/zeaburctl/).
 
 [Releases](https://oss.zeabur.com/docs/zeabur/reference/releases/) lists what a release contains
@@ -74,7 +74,7 @@ and how to verify it.
 ## Build from source
 
 These commands download the source, enter the [Nix](https://nixos.org) dev shell, which has every
-tool, and build and start Zeabur:
+tool, and build and start Zeabur OSS:
 
 ```sh
 git clone https://github.com/zeabur-oss/zeabur && cd zeabur

@@ -1,9 +1,9 @@
 ---
 title: zeaburctl
-description: Open Zeabur with the current kubeconfig, upload a folder, check a cluster, or export component installation manifests and commands.
+description: Open Zeabur OSS with the current kubeconfig, upload a folder, check a cluster, or export component installation manifests and commands.
 ---
 
-If you have a kubeconfig that can connect to the cluster, run `zeaburctl ui` to open Zeabur locally. Reads, **Review changes**, and confirmed changes all use that context's permissions. You don't need to install a Zeabur server in the cluster first.
+If you have a kubeconfig that can connect to the cluster, run `zeaburctl ui` to open Zeabur OSS locally. Reads, **Review changes**, and confirmed changes all use that context's permissions. You don't need to install a Zeabur OSS server in the cluster first.
 
 With [Homebrew](https://brew.sh) on a Mac with Apple silicon or on Linux, install it and update it later with `brew upgrade`:
 
@@ -37,7 +37,7 @@ zeaburctl components export cert-manager
 
 | Command | Result | What it changes |
 |---|---|---|
-| `ui` | Opens Zeabur in a local browser | Installs no components in the cluster. Changes applied in the interface go directly to the cluster |
+| `ui` | Opens Zeabur OSS in a local browser | Installs no components in the cluster. Changes applied in the interface go directly to the cluster |
 | `doctor` | Checks the cluster version, components, and Zeabur Identity settings | Reads only; doesn't change settings |
 | `up` | Uploads a folder to a service created from a folder and starts a build | Updates the service's Build and pushes the folder to the registry |
 | `connect` | Forwards a local port to a database or service and prints how to reach it | Changes nothing in the cluster |
@@ -61,7 +61,7 @@ zeaburctl ui --context production \
   --metrics-service monitoring/prometheus:9090
 ```
 
-By default, Zeabur reads from the VictoriaMetrics installation in Zeabur Catalog: `observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`. Zeabur reads through the Kubernetes API's Service proxy, so you also need `get services/proxy` permission for this Service. Live CPU and memory usage comes from metrics-server.
+By default, Zeabur OSS reads from the VictoriaMetrics installation in Zeabur Catalog: `observability/vmsingle-vm-victoria-metrics-k8s-stack:8428`. Zeabur OSS reads through the Kubernetes API's Service proxy, so you also need `get services/proxy` permission for this Service. Live CPU and memory usage comes from metrics-server.
 
 `zeaburctl ui` listens only on `127.0.0.1`, on a port assigned by the operating system. The link printed in the terminal includes a one-time token. Opening it for the first time exchanges the token for a browser session. The same link won't work again.
 
@@ -90,7 +90,7 @@ The JSON output has a top-level `checks` array. Each item has `name`, `status`, 
 
 When results differ, critical issues take precedence over warnings, which take precedence over checks that couldn't run. `skipped` doesn't affect the exit code. Monitoring tools need to read `checks` separately to find out which checks were skipped.
 
-On a cluster without the Zeabur dashboard, `zeaburctl doctor` skips the Zeabur Identity checks, because only the dashboard needs Zeabur Identity. A cluster you only open with `zeaburctl ui` has no dashboard. doctor looks for a Deployment labeled `app.kubernetes.io/name=zeabur` in the projects you can see. If it can't read the namespaces or a project's Deployments, it runs the checks anyway.
+On a cluster without the Zeabur OSS dashboard, `zeaburctl doctor` skips the Zeabur Identity checks, because only the dashboard needs Zeabur Identity. A cluster you only open with `zeaburctl ui` has no dashboard. doctor looks for a Deployment labeled `app.kubernetes.io/name=zeabur` in the projects you can see. If it can't read the namespaces or a project's Deployments, it runs the checks anyway.
 
 Whether kube-apiserver trusts the Zeabur Identity issuer is defined in the control plane's `AuthenticationConfiguration` file. RBAC can't read this file, so `zeaburctl doctor` marks this check as skipped. To check it, read that file on the control plane host.
 
@@ -102,7 +102,7 @@ zeaburctl up [folder] [--project <project>] [--service <service>]
 
 Uploads a folder to the cluster and starts a build. If you omit the folder, the command uses the current folder. If the service doesn't exist, the command creates it. The project must already exist; the command doesn't create projects.
 
-The command reads the Zeabur URL and Zeabur Identity address from the `zeabur-info` config file in the cluster's `kube-public` namespace. No separate configuration is needed. Anyone signed in to the cluster can read this config file; unauthenticated users can't. To use a different URL, add `--server` or set the `ZEABUR_SERVER` environment variable.
+The command reads the Zeabur OSS URL and Zeabur Identity address from the `zeabur-info` config file in the cluster's `kube-public` namespace. No separate configuration is needed. Anyone signed in to the cluster can read this config file; unauthenticated users can't. To use a different URL, add `--server` or set the `ZEABUR_SERVER` environment variable.
 
 The command uses the same API and change plans as the web interface. You don't need to know the registry address.
 
@@ -112,8 +112,8 @@ When the command starts, it prints a line showing which mode it's using.
 
 | Mode | When it's used | How it sends the folder |
 |---|---|---|
-| Server mode | kubeconfig uses a Zeabur Identity token to sign in, and the cluster has `zeabur-info` | Sends the folder to Zeabur in the cluster, which pushes it to the registry |
-| Local mode | All other cases, such as an admin kubeconfig, a cloud provider token, a ServiceAccount token, or a cluster without a Zeabur server | Runs the same steps on your computer, like `zeaburctl ui`, then pushes to the registry from that computer |
+| Server mode | kubeconfig uses a Zeabur Identity token to sign in, and the cluster has `zeabur-info` | Sends the folder to Zeabur OSS in the cluster, which pushes it to the registry |
+| Local mode | All other cases, such as an admin kubeconfig, a cloud provider token, a ServiceAccount token, or a cluster without a Zeabur OSS server | Runs the same steps on your computer, like `zeaburctl ui`, then pushes to the registry from that computer |
 
 Local mode connects directly to the Kubernetes API with the credentials in kubeconfig. It doesn't send those credentials anywhere else. With an admin kubeconfig, you can run `up` without any additional configuration.
 
@@ -121,15 +121,15 @@ Local mode also requires:
 
 - Zeabur Builder installed in the cluster. If it's missing, the command stops before uploading. If it isn't installed, deploy an image instead.
 - Access to the registry. If the registry is inside the cluster, such as `zot.zot.svc:5000`, the command automatically forwards a port through the Kubernetes API, like `kubectl port-forward`. You need `get services`, `list endpointslices`, and `create pods/portforward` permissions in the registry's namespace, plus read access to the CA config file for the registry's certificate. Administrators have these permissions; a project's Developer role doesn't.
-- `zeabur-info` in the cluster. The command reads the registry location from it. Without a Zeabur server in the cluster, the command can't create new services and doesn't automatically forward ports.
+- `zeabur-info` in the cluster. The command reads the registry location from it. Without a Zeabur OSS server in the cluster, the command can't create new services and doesn't automatically forward ports.
 
 ### Sign-in and permissions
 
 The command signs in with the current context in kubeconfig. Use `--context` to specify another context. Both modes use your permissions for uploads and changes. They can't do anything you don't have permission to do.
 
-The command sends only tokens issued by Zeabur Identity to Zeabur in the cluster. It doesn't send cloud provider tokens (such as GKE or EKS tokens), ServiceAccount tokens, static tokens, or client certificates to Zeabur; it uses local mode instead. Zeabur also accepts only tokens issued by Zeabur Identity and treats other tokens as unauthenticated.
+The command sends only tokens issued by Zeabur Identity to Zeabur OSS in the cluster. It doesn't send cloud provider tokens (such as GKE or EKS tokens), ServiceAccount tokens, static tokens, or client certificates to Zeabur OSS; it uses local mode instead. Zeabur OSS also accepts only tokens issued by Zeabur Identity and treats other tokens as unauthenticated.
 
-In server mode, the Zeabur URL must use `https://`. You can use `http://` only when testing on your own computer (`localhost`, `127.0.0.1`, or `::1`).
+In server mode, the Zeabur OSS URL must use `https://`. You can use `http://` only when testing on your own computer (`localhost`, `127.0.0.1`, or `::1`).
 
 ### Choose a project and service
 
@@ -152,7 +152,7 @@ The command sends a `tar.gz` archive. It keeps executable permissions, and symbo
 The upload has three steps, in order:
 
 1. Request an upload token from the Build. This is a change plan that the command applies directly.
-2. Push the archive to the registry. In server mode, Zeabur pushes it; in local mode, your computer does.
+2. Push the archive to the registry. In server mode, Zeabur OSS pushes it; in local mode, your computer does.
 3. Write the digest to the Build to start the build. This is also a change plan that the command applies directly.
 
 These are the same change plans the web interface uses. Running the command confirms that you want to apply them; the command doesn't ask again. When creating a new service, the service creation plan already includes the upload token request.

@@ -50,14 +50,14 @@ Level 3: may depend on `zeabur-core`, `zeabur-model` and `zeabur-kube` (for the 
   summary is checked.
 - **Exists or missing.** A capability *exists* when any of its components' detection rules
   matches something in the cluster; otherwise it is missing and its components are what could be
-  installed. Zeabur does not judge an existing installation against the catalogue's settings.
+  installed. Zeabur OSS does not judge an existing installation against the catalogue's settings.
 - **Recommended or optional.** A missing capability carries the catalogue's own default for a
   cluster of this shape: `recommended` (installed by default), `optional` (heavier or for
   specific needs) or `unsupported` (no component supports the distribution). The profile is
   `single-node` for one node, `multi-node` otherwise; the distribution comes from kube-apiserver's
   version string.
 - **Evidence, not a verdict.** Every match is reported as a line of evidence (a CRD, an
-  IngressClass controller, a K3s add-on, …), so a person can see why Zeabur thinks something is
+  IngressClass controller, a K3s add-on, …), so a person can see why Zeabur OSS thinks something is
   installed.
 - **Secrets stay closed.** Helm charts are recognised by release name or by the `helm.sh/chart`
   label on workloads; release Secrets are listed by metadata only, never decoded.

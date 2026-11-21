@@ -5,7 +5,7 @@ The web interface, embedded in the binary, and the handler that serves it.
 ## Place in the workspace
 
 Level 1: no workspace dependency. The `ui` feature of the binaries pulls it in with this crate's
-`interface` feature, which embeds Zeabur's interface; building with `--no-default-features`
+`interface` feature, which embeds Zeabur OSS's interface; building with `--no-default-features`
 leaves it out and needs no JavaScript toolchain.
 
 Without `interface`, the crate embeds nothing and needs no `ZEABUR_UI_DIST`.
@@ -56,7 +56,7 @@ time; a client without brotli gets the file decoded on request.
   loudly, not receive HTML).
 - **Content Security Policy.** The caller passes the policy to [`router_for`] and [`respond`],
   which send it with the HTML; every page also gets `X-Frame-Options`, `Referrer-Policy`,
-  `Cross-Origin-Opener-Policy` and `Permissions-Policy`. Zeabur's binaries pass [`CSP`]:
+  `Cross-Origin-Opener-Policy` and `Permissions-Policy`. Zeabur OSS's binaries pass [`CSP`]:
   everything from this origin, no inline script, no framing, Trusted Types with no policy.
   Inline styles are allowed, as Sonner and CodeMirror add `<style>` elements at run time (see
   [`CSP`]). Vite's module-preload polyfill is turned off
