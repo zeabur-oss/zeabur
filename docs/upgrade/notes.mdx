@@ -48,12 +48,27 @@ Run every command on the first server, in a root shell (`sudo -i`). First point 
 | RKE2 | `export KUBECONFIG=/etc/rancher/rke2/rke2.yaml PATH=$PATH:/var/lib/rancher/rke2/bin` |
 | KubeSolo | `export KUBECONFIG=/var/lib/kubesolo/pki/admin/admin.kubeconfig PATH=$PATH:/var/lib/zeabur-installer/bin` |
 
-The server also needs Helm 4. If `helm version` doesn't print `v4`, install it as [Installing Helm](https://helm.sh/docs/intro/install/) shows. Run the rest of the commands in `/root/zeabur-upgrade`:
+The server also needs Helm 4. Run the rest of the commands in `/root/zeabur-upgrade`:
 
 ```sh
 umask 077
 mkdir -p /root/zeabur-upgrade && cd /root/zeabur-upgrade
 ```
+
+If `helm version --short` doesn't print `v4`, run the next block to install Helm 4. It downloads Helm from get.helm.sh, checks the file against the checksum published next to it, and installs it to `/usr/local/bin`. The checksum comes from the same site as the file, so it catches a broken download but doesn't prove who built it.
+
+```sh
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+helm=$(curl -fsSL https://get.helm.sh/helm-latest-version)
+curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz" &&
+  curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  sha256sum -c "helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  tar -xzf "helm-$helm-linux-$arch.tar.gz" --strip-components=1 "linux-$arch/helm" &&
+  install -m 0755 helm /usr/local/bin/helm &&
+  helm version --short
+```
+
+`umask` holds only in the shell that ran it. Each block below that writes a file starts with `umask 077` and `cd /root/zeabur-upgrade`, so the files stay private even when each block runs in a new shell.
 
 Then check each of these. Stop and ask the owner when a result differs from what the right column expects.
 
@@ -68,6 +83,8 @@ Then check each of these. Stop and ask the owner when a result differs from what
 Save the current values and the installer's configuration:
 
 ```sh
+umask 077
+cd /root/zeabur-upgrade
 helm get values zeabur -n zeabur -o yaml > old-values.yaml
 cp /etc/zeabur-installer/config.yaml installer-config.yaml
 ```
@@ -101,7 +118,7 @@ Then add:
 - `identity.admin.setupLink: false`. The administrator already exists, so the chart makes no new setup link.
 - `identity.invitations: false`, only when `access.invitations` is `false`.
 
-A local-mode server ends up like this, with your own addresses and values:
+Use the example for your access mode as a guide, with your own addresses and names. A local-mode server ends up like this:
 
 ```yaml
 publicUrl: https://zeabur.203.0.113.10.sslip.io
@@ -132,13 +149,39 @@ builds:
     configMap: zeabur-registry-ca
 ```
 
-In domain mode, `ingress.clusterIssuer`, `identity.ingress.clusterIssuer` and `domains.clusterIssuer` are `letsencrypt`, and there is no `issuer.caBundle`.
+In domain mode, set `ingress.clusterIssuer`, `identity.ingress.clusterIssuer` and `domains.clusterIssuer` to `letsencrypt`, and leave out `issuer.caBundle`. A domain-mode server ends up like this:
+
+```yaml
+publicUrl: https://zeabur.example.com
+clusterName: vps-1
+identity:
+  issuer: https://login.example.com
+  admin:
+    setupLink: false
+  ingress:
+    className: traefik
+    clusterIssuer: letsencrypt
+planKey:
+  existingSecret: zeabur-plan-key
+ingress:
+  className: traefik
+  clusterIssuer: letsencrypt
+  tls:
+    secretName: zeabur-tls
+domains:
+  clusterIssuer: letsencrypt
+  suffixes: [apps.example.com]
+```
+
+Keys that the examples don't show, such as `builds`, `proxy`, `telemetry` and `updateCheck`, stay as they are in `old-values.yaml`, unless the table says to change them.
 
 #### 3. Back up, and take a snapshot
 
 Save what the upgrade takes over, so you can compare or put it back:
 
 ```sh
+umask 077
+cd /root/zeabur-upgrade
 kubectl get crd -o name | grep identity.zeabur.com | xargs kubectl get -o yaml > identity-crds.yaml
 kubectl -n zeabur-identity get users,credentials,grants,invitations,oauthclients,secrets,configmaps,services -o yaml > identity.yaml
 kubectl -n zeabur get secrets,configmaps -o yaml > zeabur.yaml
