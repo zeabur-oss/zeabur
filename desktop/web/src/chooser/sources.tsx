@@ -9,7 +9,7 @@ import { useI18n } from "@/i18n"
 import type { Source, SourceKind } from "./api"
 import { LanguageSelect } from "./chrome"
 import { baseName, sourceKindKeys } from "./model"
-import { UpdateStatus } from "./update"
+import { AboutMenu, UpdateButton } from "./update"
 
 const iconClass = "size-3.5 shrink-0"
 
@@ -122,8 +122,11 @@ export function Sidebar({ sources, total, only, setOnly, removeSource, addFiles 
         </div>
       </div>
       <div className="flex shrink-0 flex-col gap-2 px-5 pb-3">
-        <LanguageSelect />
-        <UpdateStatus />
+        <UpdateButton />
+        <div className="flex items-center justify-between gap-2">
+          <LanguageSelect />
+          <AboutMenu />
+        </div>
       </div>
     </aside>
   )

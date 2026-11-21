@@ -103,7 +103,6 @@ export type Scenario = {
 const update = {
   version: "0.3.0",
   current: "0.3.0-beta.1",
-  notes: "### Features\n\n- Check for updates from the sidebar.",
   install: "inPlace",
 }
 

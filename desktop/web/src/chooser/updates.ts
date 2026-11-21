@@ -6,7 +6,6 @@ import { listen } from "@tauri-apps/api/event"
 export interface Available {
   version: string
   current: string
-  notes: string | null
   install: "inPlace" | "package" | "download"
 }
 
@@ -60,7 +59,7 @@ function set(next: Partial<UpdateState>) {
   subscribers.forEach((notify) => notify())
 }
 
-/** A check the person asked for; a newer version opens its dialog. */
+/** A check the person asked for; a newer version opens its dialog, other answers are toasts. */
 export async function check() {
   if (state.status.kind === "checking") return
   set({ status: { kind: "checking" } })

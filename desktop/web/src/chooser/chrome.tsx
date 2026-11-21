@@ -13,7 +13,7 @@ import FileIcon from "~icons/ph/file-text"
 
 import { localeNames, locales, useI18n } from "@/i18n"
 
-import { UpdateStatus } from "./update"
+import { AboutMenu, UpdateButton } from "./update"
 
 export function LanguageSelect() {
   const { t, locale, setLocale } = useI18n()
@@ -35,7 +35,11 @@ export function FirstRun({ addFiles }: { addFiles: () => void }) {
     : "~/.kube/config"
   return (
     <div className="flex min-w-0 flex-1 flex-col">
-      <div className="flex justify-end p-3">
+      <div className="flex items-center justify-end gap-2 p-3">
+        <div>
+          <UpdateButton />
+        </div>
+        <AboutMenu />
         <LanguageSelect />
       </div>
       <Empty className="flex-1">
@@ -53,9 +57,6 @@ export function FirstRun({ addFiles }: { addFiles: () => void }) {
           </Button>
         </EmptyContent>
       </Empty>
-      <div className="w-64 p-3 px-5">
-        <UpdateStatus />
-      </div>
     </div>
   )
 }

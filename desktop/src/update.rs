@@ -13,7 +13,7 @@ use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::{chrome, output};
 
-/// The newest release's page, for the copies the updater cannot replace.
+/// The newest release's page, when no check has found a release.
 const RELEASES: &str = "https://github.com/zeabur-oss/zeabur/releases/latest";
 
 /// The newest releases, prereleases included; `/releases/latest` skips prereleases.
@@ -62,9 +62,24 @@ pub(crate) enum Failure {
     Failed,
 }
 
-fn failed(what: &str, err: impl std::fmt::Display) -> Failure {
-    output::warn(&format!("{what}: {err}"));
-    Failure::Failed
+/// What went wrong, for the terminal.
+#[derive(Debug, thiserror::Error)]
+enum UpdateError {
+    #[error("cannot list the releases: {0}")]
+    Releases(#[from] reqwest::Error),
+    #[error(transparent)]
+    Updater(#[from] tauri_plugin_updater::Error),
+    #[error("this copy of Zeabur cannot replace itself")]
+    CannotReplace,
+    #[error("no update to install")]
+    NothingFound,
+}
+
+impl From<UpdateError> for Failure {
+    fn from(err: UpdateError) -> Self {
+        output::warn(&format!("update: {err}"));
+        Self::Failed
+    }
 }
 
 /// How this copy of the app takes a new version.
@@ -103,8 +118,6 @@ fn install_kind() -> Install {
 pub(crate) struct Available {
     version: String,
     current: String,
-    /// The release notes, Markdown.
-    notes: Option<String>,
     install: Install,
 }
 
@@ -112,7 +125,6 @@ fn available(update: &Update) -> Available {
     Available {
         version: update.version.clone(),
         current: update.current_version.clone(),
-        notes: update.body.clone(),
         install: install_kind(),
     }
 }
@@ -171,27 +183,24 @@ async fn releases() -> Result<Vec<Release>, reqwest::Error> {
         .await
 }
 
-async fn find(app: &AppHandle) -> Result<Option<Update>, String> {
-    let releases = releases().await.map_err(|e| e.to_string())?;
+async fn find(app: &AppHandle) -> Result<Option<Update>, UpdateError> {
+    let releases = releases().await?;
     let Some(manifest) = newer_manifest(&releases, &app.package_info().version) else {
         return Ok(None);
     };
     app.updater_builder()
         .endpoints(vec![manifest])
-        .and_then(tauri_plugin_updater::UpdaterBuilder::build)
-        .map_err(|e| e.to_string())?
+        .and_then(tauri_plugin_updater::UpdaterBuilder::build)?
         .check()
         .await
-        .map_err(|e| e.to_string())
+        .map_err(UpdateError::from)
 }
 
 async fn check(app: &AppHandle) -> Result<Option<Available>, Failure> {
     if !configured(app) {
         return Err(Failure::NotConfigured);
     }
-    let update = find(app)
-        .await
-        .map_err(|err| failed("cannot check for updates", err))?;
+    let update = find(app).await?;
     let found = update.as_ref().map(available);
     *app.state::<Updates>().found() = update;
     Ok(found)
@@ -257,27 +266,39 @@ pub(crate) async fn check_update(app: AppHandle) -> Result<Option<Available>, Fa
 #[tauri::command]
 pub(crate) async fn install_update(app: AppHandle) -> Result<(), Failure> {
     if install_kind() != Install::InPlace {
-        return Err(failed(
-            "cannot update",
-            "this copy of Zeabur cannot replace itself",
-        ));
+        return Err(UpdateError::CannotReplace.into());
     }
     let update = app
         .state::<Updates>()
         .found()
         .clone()
-        .ok_or_else(|| failed("cannot update", "no update to install"))?;
+        .ok_or(UpdateError::NothingFound)?;
     update
         .download_and_install(|_, _| {}, || {})
         .await
-        .map_err(|err| failed("cannot update", err))?;
+        .map_err(UpdateError::from)?;
     app.restart()
 }
 
-/// Opens the newest release's page in the browser.
+/// The page of the release the last check found, with its notes, or the newest release's.
+fn release_page(found: Option<&Update>) -> String {
+    found
+        .and_then(|update| Version::parse(&update.version).ok())
+        .map_or_else(
+            || RELEASES.to_owned(),
+            |version| format!("https://github.com/zeabur-oss/zeabur/releases/tag/v{version}"),
+        )
+}
+
+/// Opens the found release's page in the browser.
 #[tauri::command]
-pub(crate) fn open_releases() -> Result<(), String> {
-    crate::links::open_in_browser(RELEASES).map_err(|e| e.to_string())
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
+pub(crate) fn open_releases(updates: State<'_, Updates>) -> Result<(), String> {
+    let page = release_page(updates.found().as_ref());
+    crate::links::open_in_browser(&page).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]

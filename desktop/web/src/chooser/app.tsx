@@ -10,7 +10,7 @@ import { useChanges, useSnapshot } from "./hooks"
 import { useMenuBar } from "./menu"
 import { sourceFilter, visibleContexts } from "./model"
 import { Sidebar } from "./sources"
-import { UpdateDialog } from "./update"
+import { UpdateDialog, UpdateToasts } from "./update"
 
 interface BrowserProps {
   snap: Snapshot
@@ -80,6 +80,7 @@ export function App() {
         />
       )}
       <UpdateDialog />
+      <UpdateToasts />
     </div>
   )
 }
