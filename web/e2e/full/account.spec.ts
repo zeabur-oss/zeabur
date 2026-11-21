@@ -17,14 +17,30 @@ test.beforeAll(() => {
   if (!memberLink) throw new Error("ZEABUR_E2E_MEMBER_LINK is not set")
 })
 
-const passkeys = (page: Page) => page.getByRole("region", { name: "Passkeys" })
+// Passkeys are one item of the "Sign-in methods" list, next to the password and linked accounts;
+// the passkeys themselves are the list inside that item.
+const passkeys = (page: Page) =>
+  page
+    .getByRole("region", { name: "Sign-in methods" })
+    .getByRole("listitem")
+    .filter({ has: page.getByRole("heading", { level: 3, name: "Passkeys" }) })
 const sessions = (page: Page) => page.getByRole("region", { name: "Sessions" })
 const passkey = (page: Page, label: string) =>
-  passkeys(page).getByRole("listitem").filter({ hasText: label })
+  passkeys(page).getByRole("list", { name: "Passkeys" }).getByRole("listitem").filter({
+    hasText: label,
+  })
 const confirmRemove = async (row: ReturnType<typeof passkey>) => {
   await row.getByRole("button", { name: "Remove" }).click()
-  await expect(row.getByText("Remove this passkey?")).toBeVisible()
-  await row.locator("[data-confirm]").getByRole("button", { name: "Remove" }).click()
+  const dialog = row.getByRole("dialog", { name: "Remove this passkey?" })
+  await expect(dialog).toBeVisible()
+  await dialog.getByRole("button", { name: "Remove" }).click()
+}
+// The sessions other than the page's own sit in a disclosure, closed until it is opened.
+const otherSessions = async (page: Page) => {
+  await sessions(page)
+    .getByText(/^Other sessions/)
+    .click()
+  return sessions(page).getByRole("listitem")
 }
 
 async function signInToAccount(page: Page) {
@@ -61,27 +77,30 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
     })
 
   await test.step("their one passkey is listed, cannot be removed, and takes a new name", async () => {
-    const only = passkeys(accountPage).getByRole("listitem")
+    const only = passkeys(accountPage).getByRole("list", { name: "Passkeys" }).getByRole("listitem")
     await expect(passkeys(accountPage).getByText("Add a backup passkey")).toBeVisible()
     await expect(only).toContainText("This device")
-    await expect(only).toContainText("This is your only passkey, so it can’t be removed.")
+    // With one passkey, the row has no Remove button.
     await expect(only.getByRole("button", { name: "Remove" })).toHaveCount(0)
 
     await only.getByRole("button", { name: "Rename" }).click()
-    await only.getByRole("textbox", { name: "Passkey name" }).fill("Work laptop")
-    await only.getByRole("button", { name: "Save" }).click()
+    const rename = only.getByRole("dialog", { name: "Rename" })
+    await rename.getByRole("textbox", { name: "Passkey name" }).fill("Work laptop")
+    await rename.getByRole("button", { name: "Save" }).click()
     await expect(passkey(accountPage, "Work laptop")).toBeVisible({ timeout: 30_000 })
-    await expect(
-      sessions(accountPage).getByRole("listitem").filter({ hasText: "Zeabur" }),
-    ).toContainText("Work laptop")
+    await expect((await otherSessions(accountPage)).filter({ hasText: "Zeabur" })).toContainText(
+      "Work laptop",
+    )
   })
 
   // The page excludes passkeys the member already has, so the laptop is put away meanwhile.
   const phone = await test.step("they add a second passkey on their phone", async () => {
     await laptopOnAccountPage.remove()
     const device = await authenticator(accountPage)
-    await passkeys(accountPage).getByRole("textbox", { name: "Passkey name" }).fill("Phone")
-    await passkeys(accountPage).getByRole("button", { name: "Add a passkey" }).click()
+    await passkeys(accountPage).getByRole("button", { name: "Add", exact: true }).click()
+    const add = passkeys(accountPage).getByRole("dialog", { name: "Add a passkey" })
+    await add.getByRole("textbox", { name: "Passkey name" }).fill("Phone")
+    await add.getByRole("button", { name: "Add", exact: true }).click()
     await expect(passkey(accountPage, "Phone")).toBeVisible({ timeout: 30_000 })
     await expect(passkeys(accountPage).getByText("Add a backup passkey")).toBeHidden()
     expect(await device.passkeys()).not.toEqual([])
@@ -119,13 +138,11 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
     ).toBeVisible({ timeout: 30_000 })
     await expect(passkey(onPhone, "Work laptop")).toHaveCount(0)
     await expect(row.getByText("Remove this passkey?")).toBeHidden()
-    await expect(row).toContainText("This is your only passkey, so it can’t be removed.")
+    await expect(passkeys(onPhone).getByText("Add a backup passkey")).toBeVisible()
     await expect(row.getByRole("button", { name: "Remove" })).toHaveCount(0)
     // Zeabur renews its session with a grant the removed passkey made, so that grant is revoked:
     // the access token Zeabur holds works until it expires, within minutes, then renewing fails.
-    await expect(sessions(onPhone).getByRole("listitem").filter({ hasText: "Zeabur" })).toHaveCount(
-      0,
-    )
+    await expect(sessions(onPhone).getByText("Zeabur")).toHaveCount(0)
     await other.close()
   })
 
@@ -143,7 +160,7 @@ test("a member renames, adds and removes passkeys, and cannot remove the last on
     await Promise.race([
       answered,
       signIn
-        .locator('#sign-in button[type="submit"]')
+        .getByRole("button", { name: "Sign in with a passkey" })
         .click()
         .catch(() => answered),
     ])

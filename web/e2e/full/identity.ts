@@ -54,7 +54,7 @@ export async function signInAtZeaburIdentity(page: Page, identity: string) {
   await Promise.race([
     left,
     page
-      .locator('#sign-in button[type="submit"]')
+      .getByRole("button", { name: "Sign in with a passkey" })
       .click({ timeout: 30_000 })
       .catch(() => left),
   ])
