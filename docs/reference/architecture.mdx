@@ -16,7 +16,7 @@ For a hands-on example, see [How Zeabur manages services](../get-started/how-it-
 
 `zeabur` serves both the API under `/api` and the web interface. The ServiceAccount created by the chart has no Role bindings, and replicas don't mount a ServiceAccount token. Every read and write uses the signed-in user's token.
 
-Zeabur Identity handles sign-in, passkeys, and short-lived tokens. Zeabur is its OAuth client and stores the client secret. kube-apiserver accepts these tokens only after you configure it to trust Zeabur Identity's issuer.
+Zeabur Identity handles sign-in, passkeys, and short-lived tokens. Zeabur is its OAuth client and stores the client secret. kube-apiserver accepts these tokens only after you configure it to trust Zeabur Identity's issuer. For the job of each project, see the [overview](https://oss.zeabur.com/docs/overview/).
 
 ## How projects and services are organized
 

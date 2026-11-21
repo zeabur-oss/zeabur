@@ -8,11 +8,11 @@ An agent such as Claude Code or Codex can follow the install steps for you. It r
 ## Paste this prompt
 
 ```text
-Install Zeabur on my server by following https://oss.zeabur.com/docs/zeabur/install/one-command/.
-If the server already runs Kubernetes, follow https://oss.zeabur.com/docs/zeabur/install/existing-cluster/ instead.
+Install Zeabur on my server by following https://oss.zeabur.com/docs/zeabur/install/one-command.md.
+If the server already runs Kubernetes, follow https://oss.zeabur.com/docs/zeabur/install/existing-cluster.md instead.
 ```
 
-Run the agent on a computer that can reach the server over SSH, and tell it the server's address.
+Each address points to the Markdown copy of a docs page: [Install with Zeatend](one-command.mdx) and [Install Zeabur in an existing cluster](existing-cluster.mdx). Run the agent on a computer that can reach the server over SSH, and tell it the server's address.
 
 ## What the agent does
 
@@ -29,4 +29,4 @@ Run the agent on a computer that can reach the server over SSH, and tell it the 
 
 ## Coming from zeabur.com
 
-To move a project too, add to the prompt: "Then move my zeabur.com project by following https://zeabur.com/blogs/migrate-from-zeabur". The agent lists your services, backs up the databases, creates the services again in Zeabur, and restores the data.
+To move a project too, add to the prompt: "Then move my zeabur.com services by following https://oss.zeabur.com/docs/zeabur/get-started/from-zeabur-com.md." That file is the Markdown copy of [Coming from zeabur.com](../get-started/from-zeabur-com.mdx). The agent lists your services, backs up the databases, creates the services again in Zeabur, and restores the data.

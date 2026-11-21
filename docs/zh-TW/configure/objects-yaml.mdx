@@ -8,7 +8,7 @@ description: 在專案裡貼上 YAML 建立任何 Kubernetes 物件，或直接�
 ## 開始前
 
 - 有權在專案裡建立或修改這種物件。權限不夠時，表單會先提醒，檢查變更時再向叢集確認。
-- Zeabur 只在專案的 Namespace 裡建立物件。Namespace、ClusterRole 這類屬於整個叢集的物件，要用 kubectl。
+- Zeabur 開源版只在專案的 Namespace 裡建立物件。Namespace、ClusterRole 這類屬於整個叢集的物件，要用 kubectl。
 - 由 Helm、Argo CD 或 Flux 管理的物件不能在這裡編輯或刪除，要回到那個工具修改。重新啟動例外，見[重新啟動、回滾與暫停服務](./restart-rollback.mdx)。
 
 ## 從 YAML 建立物件

@@ -19,7 +19,7 @@ description: 設定 Velero 的 S3 存放位置與排程，確認備份結果，�
 
 - 叢集裝了 Velero。畫面顯示**備份需要 Velero** 時，按**安裝 Velero**，照[安裝元件](./components.mdx)裝好。
 - 準備 S3 相容的儲存貯體、端點和金鑰，或先在同一頁上方的 **S3 目的地**登錄，見 [S3 目的地](./s3-destinations.mdx)。
-- 你能在 Velero 的 Namespace 讀取和建立備份位置、排程、備份、還原和 Secret。Zeabur Chart 的成員角色沒有 Velero 的權限，通常要用管理員帳號操作。
+- 你能在 Velero 的 Namespace 讀取和建立備份位置、排程、備份、還原和 Secret。Zeabur 開源版 Chart 的成員角色沒有 Velero 的權限，通常要用管理員帳號操作。
 
 <Callout type="warn">
 備份要存在叢集以外的儲存，例如 Cloudflare R2、Backblaze B2 或 AWS S3。存在同一個叢集時，叢集遺失，備份也會一起消失。端點看起來在叢集裡時，表單會提醒。
@@ -235,7 +235,7 @@ kubectl -n velero get secret velero-repo-credentials velero-backup-key -o yaml >
 
 ### 之前就裝了 Velero
 
-Velero 不是從 Catalog 安裝時，叢集裡可能沒有 `velero-repo-credentials`。這時 Velero 會自己用公開的預設密碼 `static-passw0rd` 建立這個 Secret，而 Kopia 儲存庫會一直沿用建立時的密碼。這種叢集要把存放位置的**資料夾**換成新的，讓 Kopia 用新密碼建立儲存庫。加入 SSE-C 之前的備份沒有加密，到期刪除後就不留明文。
+Velero 不是從 Zeabur Catalog 安裝時，叢集裡可能沒有 `velero-repo-credentials`。這時 Velero 會自己用公開的預設密碼 `static-passw0rd` 建立這個 Secret，而 Kopia 儲存庫會一直沿用建立時的密碼。這種叢集要把存放位置的**資料夾**換成新的，讓 Kopia 用新密碼建立儲存庫。加入 SSE-C 之前的備份沒有加密，到期刪除後就不留明文。
 
 ### 其他備份
 

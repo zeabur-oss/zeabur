@@ -41,7 +41,7 @@ zeaburctl components export cert-manager
 | `doctor` | Checks the cluster version, components, and Zeabur Identity settings | Reads only; doesn't change settings |
 | `up` | Uploads a folder to a service created from a folder and starts a build | Updates the service's Build and pushes the folder to the registry |
 | `connect` | Forwards a local port to a database or service and prints how to reach it | Changes nothing in the cluster |
-| `components export` | Prints manifests or Helm commands to install Catalog components | Doesn't connect to the cluster or change anything |
+| `components export` | Prints manifests or Helm commands to install Zeabur Catalog components | Doesn't connect to the cluster or change anything |
 | `telemetry status` | Shows whether `zeaburctl ui` sends events, and which setting decides it | Doesn't connect to the cluster or change anything |
 | `telemetry disable`, `telemetry enable` | Leaves or joins the experience program | Writes `telemetry: false` or `true` to `config.yaml` on this computer |
 | `telemetry reset` | Deletes the random ID that `zeaburctl ui` keeps for the experience program | Doesn't connect to the cluster or change anything |

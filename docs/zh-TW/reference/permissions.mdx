@@ -3,7 +3,7 @@ title: 權限
 description: 對照成員角色、管理員帳號與 Kubernetes RBAC，確認每項操作的存取範圍和登入能維持多久。
 ---
 
-看得到專案卻讀不到日誌時，先確認自己在這個專案的角色：**檢視者**只能看狀態和事件，**開發者**才能讀日誌、讀 Secret 和部署。Zeabur 用你自己的身分呼叫 kube-apiserver，能不能做由 Kubernetes RBAC 決定。
+看得到專案卻讀不到日誌時，先確認自己在這個專案的角色：**檢視者**只能看狀態和事件，**開發者**才能讀日誌、讀 Secret 和部署。Zeabur 開源版用你自己的身分呼叫 kube-apiserver，能不能做由 Kubernetes RBAC 決定。
 
 設定成員角色的步驟見[成員](../cluster/members.mdx)。用本機 [`zeaburctl ui`](./zeaburctl.mdx) 時，權限就是 kubeconfig 的權限。下面的成員角色由 Helm chart 提供，管理員邀請成員時綁定。
 

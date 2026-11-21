@@ -17,7 +17,7 @@ source: "5f7bb07ea1d9"
 2. 取個看得出用途的名稱，例如 `github-actions`。
 3. 在需要的專案選**開發者**或**檢視者**，選好有效期間，按**檢查**。
 4. 確認變更後套用。
-5. 複製權杖。Zeabur 只會顯示這一次。視窗裡也有 kubeconfig 和叢集的 CA 憑證。
+5. 複製權杖。Zeabur 開源版只會顯示這一次。視窗裡也有 kubeconfig 和叢集的 CA 憑證。
 
 清單會列出每個權杖的角色、誰建立的、什麼時候到期。叢集用 `--service-account-max-token-expiration` 限制權杖效期時，kube-apiserver 會把權杖的效期縮短，清單顯示的是實際到期時間。
 

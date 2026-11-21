@@ -31,7 +31,7 @@ description: 添加 S3 存储位置，供数据库、K8up 和 Velero 备份选�
 - 添加和编辑需要在 `zeabur-s3-destinations` Namespace 中写入 ConfigMap 和 Secret 的权限，管理员账号具备这些权限。
 - 在备份表单中选择目的地，需要能读取 `zeabur-s3-destinations` 的 Secret，并在备份所在的 Namespace 中创建 Secret。
 
-所有登录用户都能看到目的地的名称和位置，但 Zeabur Chart 没有授予任何人读取其中 Secret 的权限。没有这项权限的成员在备份表单中只能选择**手动输入**，自行填写密钥。
+所有登录用户都能看到目的地的名称和位置，但 Zeabur 开源版 Chart 没有授予任何人读取其中 Secret 的权限。没有这项权限的成员在备份表单中只能选择**手动输入**，自行填写密钥。
 
 ## 添加目的地
 

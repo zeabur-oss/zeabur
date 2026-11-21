@@ -101,7 +101,7 @@ HTML 存在 ConfigMap 裡，頁面伺服器每次請求都從掛載的檔案讀�
 
 ## 頁面伺服器
 
-維護頁和錯誤頁面由專案裡的頁面伺服器提供，頁面伺服器來自 Zeabur Catalog 的 **Error pages** 範本：一個小型 nginx，HTML 放在 ConfigMap `error-pages`。Zeabur 依標籤 `zeabur.com/page-server: "true"` 找到頁面伺服器，不看名稱：
+維護頁和錯誤頁面由專案裡的頁面伺服器提供，頁面伺服器來自 Zeabur Catalog 的 **Error pages** 範本：一個小型 nginx，HTML 放在 ConfigMap `error-pages`。Zeabur 開源版依標籤 `zeabur.com/page-server: "true"` 找到頁面伺服器，不看名稱：
 
 | 物件 | 需要的內容 |
 | --- | --- |

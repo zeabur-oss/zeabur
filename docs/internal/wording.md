@@ -101,9 +101,12 @@ Source text, not a CSS transform. Product, API and code names keep their exact c
 
 ## Names
 
-- **Zeabur** is the product, always capitalized. Its parts are **Zeabur Identity** (sign-in) and
-  **Zeabur Catalog** (tested component versions and how to install them). In Chinese the names
-  stay in Latin letters.
+- **Zeabur** is the product, always capitalized. The [overview](https://oss.zeabur.com/docs/overview/)
+  gives each project's name and job: **Zeabur Identity** (sign-in), **Zeabur Catalog** (tested
+  components and templates), **Zeabur Builder** (builds from Git), **Zeatend** (sets up Kubernetes
+  on a server), **Zeabur Desktop** and the agent. In Chinese the names stay in Latin letters;
+  Zeabur is 「Zeabur 開源版」／「Zeabur 开源版」 in a docs title and at its first mention on a page,
+  and the agent is 「Agent」. Docs never name the 0.2 installer outside the upgrade pages.
 - A *service* is what the reader deploys (服務／服务); `Service` is the Kubernetes kind. A
   *project* is a namespace Zeabur shows as one (專案／项目). A *replica* is a pod of a service
   (副本), and so is every other Pod, the cluster's own counts included.

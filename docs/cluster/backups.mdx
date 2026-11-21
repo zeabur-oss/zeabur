@@ -235,7 +235,7 @@ After the first backup finishes, try downloading `backups/<backup-name>/velero-b
 
 ### If Velero is already installed
 
-If Velero wasn't installed from the Catalog, the cluster may not have `velero-repo-credentials`. In that case, Velero creates it using the public default password `static-passw0rd`. Kopia repositories keep using the password they were created with. For these clusters, change the backup location's **Folder** to a new one so Kopia creates a repository with the new password. Backups made before SSE-C was enabled remain unencrypted. Once they expire and are deleted, those plaintext copies are gone.
+If Velero wasn't installed from the Zeabur Catalog, the cluster may not have `velero-repo-credentials`. In that case, Velero creates it using the public default password `static-passw0rd`. Kopia repositories keep using the password they were created with. For these clusters, change the backup location's **Folder** to a new one so Kopia creates a repository with the new password. Backups made before SSE-C was enabled remain unencrypted. Once they expire and are deleted, those plaintext copies are gone.
 
 ### Other backups
 

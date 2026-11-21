@@ -21,7 +21,7 @@ description: 查看集群安装了哪些组件、状态如何、还缺什么，�
 
 ## 在页面上安装
 
-只有能在集群中执行任何操作的人（`cluster-admin`）可以在这里安装：Zeabur 会把每个 Chart 交给集群的 helm-controller，由它以完整权限安装。集群需要有 helm-controller，K3s 和 RKE2 都已内置。
+只有能在集群中执行任何操作的人（`cluster-admin`）可以在这里安装：Zeabur 开源版会把每个 Chart 交给集群的 helm-controller，由它以完整权限安装。集群需要有 helm-controller，K3s 和 RKE2 都已内置。
 
 如果集群用 Flux 或 Argo CD 管理，组件也交给它安装。安装对话框会列出输出 Flux 或 Argo CD manifest 的 `zeaburctl components export` 命令。运行其中一个，再按照下面**用 zeaburctl 安装**的步骤，把输出提交到集群读取的仓库。
 

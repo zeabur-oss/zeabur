@@ -3,16 +3,16 @@ title: 交給 Agent 安裝或搬家
 description: 把一段提示貼進 Claude Code 或 Codex，它會照這份文件幫你把 Zeabur 裝到伺服器上，也能把 zeabur.com 的專案搬過來。
 ---
 
-Claude Code 或 Codex 這類 Agent 可以替你照著安裝步驟做。它讀的頁面和你一樣，會自己執行指令，遇到要你決定或付錢的地方就停下來。
+Claude Code 或 Codex 這類 Coding Agent 可以替你照著安裝步驟做。它讀的頁面和你一樣，會自己執行指令，遇到要你決定或付錢的地方就停下來。
 
 ## 貼上這段提示
 
 ```text
-照著 https://oss.zeabur.com/zh-TW/docs/zeabur/install/one-command/ 把 Zeabur 裝到我的伺服器上。
-如果伺服器已經在跑 Kubernetes，改照 https://oss.zeabur.com/zh-TW/docs/zeabur/install/existing-cluster/ 安裝。
+照著 https://oss.zeabur.com/zh-TW/docs/zeabur/install/one-command.md 把 Zeabur 裝到我的伺服器上。
+如果伺服器已經在跑 Kubernetes，改照 https://oss.zeabur.com/zh-TW/docs/zeabur/install/existing-cluster.md 安裝。
 ```
 
-在能用 SSH 連到伺服器的電腦上執行 Agent，並告訴它伺服器的位址。
+這兩個網址分別指向[用 Zeatend 安裝](one-command.mdx)和[把 Zeabur 開源版裝進既有叢集](existing-cluster.mdx)的 Markdown 版。在能用 SSH 連到伺服器的電腦上執行 Agent，並告訴它伺服器的位址。
 
 ## Agent 會做的事
 
@@ -29,4 +29,4 @@ Claude Code 或 Codex 這類 Agent 可以替你照著安裝步驟做。它讀的
 
 ## 從 zeabur.com 搬過來
 
-想把專案一起搬過來，在提示後面加上：「接著照 https://zeabur.com/zh-TW/blogs/migrate-from-zeabur 把我在 zeabur.com 的專案搬過來」。Agent 會列出你的服務、備份資料庫，在 Zeabur 重建服務，再還原資料。
+想把專案一起搬過來，在提示後面加上：「接著照 https://oss.zeabur.com/zh-TW/docs/zeabur/get-started/from-zeabur-com.md 把我在 zeabur.com 的服務搬過來。」這個檔案是[從 zeabur.com 過來](../get-started/from-zeabur-com.mdx)的 Markdown 版。Agent 會列出你的服務、備份資料庫，在 Zeabur 重建服務，再還原資料。
