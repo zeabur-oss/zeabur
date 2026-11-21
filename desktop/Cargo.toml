@@ -64,7 +64,7 @@ windows = { version = "0.62", features = ["Win32_UI_Input_KeyboardAndMouse", "Wi
 
 # The login shell from the passwd entry.
 [target.'cfg(unix)'.dependencies]
-nix = { version = "0.31", default-features = false, features = ["user"] }
+nix = { version = "0.32", default-features = false, features = ["user"] }
 
 # A copy of the root [workspace.lints]; only unsafe_code differs.
 [lints.rust]
