@@ -9,7 +9,7 @@ Already have a cluster? [Install Zeabur OSS in an existing cluster](existing-clu
 
 ## Before you begin
 
-- **A Linux server** with a public IP address, and ports 80 and 443 open to the internet. Let's Encrypt checks the addresses over port 80. For memory and disk, see Zeatend's [Supported servers and files](https://oss.zeabur.com/docs/zeatend/reference/hosts/).
+- **A Linux server** with a public IP address, and ports 80 and 443 open to the internet. Let's Encrypt checks the addresses over port 80. For the memory and disk K3s needs, see Zeatend's [Supported servers and files](https://oss.zeabur.com/docs/zeatend/reference/hosts/). Zeabur OSS runs on top of that. In a test on a server with 1 vCPU and 2 GiB of memory, about 850 MiB of memory was left after Zeabur OSS, Zeabur Identity and cert-manager were installed, and one small app from a prebuilt image ran there. Zeabur Builder wasn't tried on a server that small.
 - **Root on the server**, over SSH. Run the commands below as root. If you sign in as a regular user, run `sudo -i` first.
 - **Zeatend, Helm 4 and `zeabur-identityctl` on the server.** To get Zeatend, see [Download Zeatend](https://oss.zeabur.com/docs/zeatend/get-started/install/#download-zeatend) in Zeatend's docs. For `zeabur-identityctl`, see Zeabur Identity's [Release files and verification](https://oss.zeabur.com/docs/identity/reference/releases/).
 

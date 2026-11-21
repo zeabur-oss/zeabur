@@ -9,7 +9,7 @@ description: 在一台全新的 Linux 伺服器上，先用 Zeatend 裝好 Kuber
 
 ## 開始之前
 
-- **一台 Linux 伺服器**，有公開 IP 位址，80 和 443 埠能從網際網路連進來。Let's Encrypt 會透過 80 埠檢查網址。記憶體和磁碟要多大，見 Zeatend 的[支援的伺服器與檔案](https://oss.zeabur.com/zh-TW/docs/zeatend/reference/hosts/)。
+- **一台 Linux 伺服器**，有公開 IP 位址，80 和 443 埠能從網際網路連進來。Let's Encrypt 會透過 80 埠檢查網址。K3s 需要多少記憶體和磁碟，見 Zeatend 的[支援的伺服器與檔案](https://oss.zeabur.com/zh-TW/docs/zeatend/reference/hosts/)。Zeabur 開源版跑在 K3s 之上。實測 1 個 vCPU、2 GiB 記憶體的伺服器，裝好 Zeabur 開源版、Zeabur Identity 和 cert-manager 後，還剩約 850 MiB 記憶體，能再跑一個用現成映像檔部署的小型應用。Zeabur Builder 沒有在這麼小的伺服器上試過。
 - **伺服器的 root 權限**，透過 SSH 登入。下面的指令都以 root 執行，用一般帳號登入時先執行 `sudo -i`。
 - **伺服器上的 Zeatend、Helm 4 和 `zeabur-identityctl`**。Zeatend 的下載方式見[下載 Zeatend](https://oss.zeabur.com/zh-TW/docs/zeatend/get-started/install/#下載-zeatend)；`zeabur-identityctl` 見 Zeabur Identity 的[發行檔與驗證](https://oss.zeabur.com/zh-TW/docs/identity/reference/releases/)。
 

@@ -10,6 +10,7 @@ description: 连接 Git 仓库、完成首次构建，并选择新镜像何时�
 - 已有项目，并具备在项目中创建服务、Kubernetes Service 和 Build 的权限。使用私有仓库或构建变量时，还需要创建机密变量的权限。
 - 集群已安装 Zeabur Builder 和 Keel。从组件目录安装 Zeabur Builder 时，zot 会一并安装。缺少组件时，**新建**菜单会在**从 Git 部署**下方写出缺少哪些，点击后会一次列出全部安装命令，见[查看与安装集群组件](../cluster/components.mdx)。
 - 构建完成的镜像会推送到 Zeabur 开源版 chart 的 `builds.registry`，默认是和 Zeabur Builder 一起安装的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 时，管理员需要在 chart 中配置 `builds.registry`，并确保 Builder 和节点能访问这个 registry。
+- 构建要有空闲内存。Zeabur Builder 默认让一次构建用到 1 GiB 内存，见[构建节点](https://oss.zeabur.com/zh-CN/docs/builder/builds/build-nodes/)。实测 2 GiB 内存的服务器装好 Zeabur 开源版后，还剩约 850 MiB，这种服务器请改用[现成镜像](./image.mdx)部署，不要构建。4 GiB 的服务器上跑过 Next.js 构建。
 - 随 Zeabur Builder 安装的 Zot 只允许 Builder、构建用的副本和节点连接。项目中的其他副本无法连接 Zot，因此遭入侵的应用无法拉取其他项目的镜像。
 - 准备好应用实际监听的端口。要公开网站，还需准备能指向集群入口的域名。
 
