@@ -14,35 +14,99 @@ source: "5f7bb07ea1d9"
 ## 建立權杖
 
 1. 打開**成員**，在 **API 權杖**下按**建立權杖**。
-2. 取個看得出用途的名稱，例如 `github-actions`。
-3. 在需要的專案選**開發者**或**檢視者**，選好有效期間，按**檢查**。
-4. 確認變更後套用。
-5. 複製權杖。Zeabur 開源版只會顯示這一次。視窗裡也有 kubeconfig 和叢集的 CA 憑證。
+
+   ![成員頁的 API 權杖清單：每個權杖的角色、建立者和到期時間](../images/shots/api-tokens-list.avif)
+
+2. 取個看得出用途的名稱，例如 `deploy-shop`。勾選需要的專案，選**開發者**或**檢視者**，選好有效期間後按**檢查變更**。
+
+   ![建立 API 權杖視窗：名稱 deploy-shop、在 shop 是開發者、有效 30 天](../images/shots/api-token-create.avif)
+
+3. 確認變更後按**建立權杖**。
+4. 視窗會顯示權杖、kubeconfig 和叢集的 CA 憑證。權杖只會顯示這一次，先別關掉視窗，照下一節存好 kubeconfig。
+
+   ![權杖視窗：權杖、server 還空著的 kubeconfig，以及 CA 憑證](../images/shots/api-token-shown.avif)
 
 清單會列出每個權杖的角色、誰建立的、什麼時候到期。叢集用 `--service-account-max-token-expiration` 限制權杖效期時，kube-apiserver 會把權杖的效期縮短，清單顯示的是實際到期時間。
 
-## 連線
+## 把權杖做成 kubeconfig
 
-每個請求要三樣東西：API 位址、CA 憑證和權杖。
+視窗裡的 kubeconfig 已經有權杖和 CA 憑證，只差 `server`，也就是 API 位址。Zeabur 開源版只知道 kube-apiserver 在叢集內部的位址，所以要你自己填。
 
-**位址**：kube-apiserver 在每個 server 節點的 TCP 6443 上，例如 `https://203.0.113.10:6443`。你平常用 kubectl 的 kubeconfig 裡，`server` 那一行就是這個位址。要用網域或其他位址連 API 時，把它加到 K3s 或 RKE2 設定檔的 `tls-san`，憑證才會涵蓋它。
+<Steps>
+<Step>
+### 找出 API 位址
 
-**CA 憑證**：建立或更新權杖後，視窗裡會顯示。在專案有角色的權杖，也可以從專案的 `kube-root-ca.crt` 設定檔讀出來：
+kube-apiserver 在每個 server 節點的 TCP 6443 上，例如 `https://203.0.113.10:6443`。在你自己的電腦上，印出管理員 kubeconfig 用的位址：
+
+```sh
+kubectl config view --minify -o jsonpath='{.clusters[0].cluster.server}'
+```
+
+印出 `https://127.0.0.1:6443` 表示那份 kubeconfig 是在伺服器上用的。請改用你連到伺服器的位址，例如在 Zeatend 連線方式畫面填的位址。要用網域或其他位址連 API 時，把它加到 K3s 或 RKE2 設定檔的 `tls-san`（Zeatend 是 `host.tlsSan`），憑證才會涵蓋它。
+</Step>
+<Step>
+### 存成檔案
+
+按視窗裡 kubeconfig 的複製鈕，貼進一個檔案，例如 `deploy-shop.yaml`，並設成只有你能讀：
+
+```sh
+chmod 600 deploy-shop.yaml
+```
+
+拿到這個檔案的人，在權杖到期前都能用它的權限。
+</Step>
+<Step>
+### 填上位址
+
+```sh
+kubectl config set-cluster zeabur --server=https://203.0.113.10:6443 --kubeconfig deploy-shop.yaml
+```
+</Step>
+<Step>
+### 試試看
+
+```sh
+export KUBECONFIG=$PWD/deploy-shop.yaml
+kubectl auth whoami
+kubectl get deployments
+```
+
+`kubectl auth whoami` 會顯示 `system:serviceaccount:zeabur-api-tokens:deploy-shop`，kube-apiserver 記錄這個權杖的請求時用的就是這個名稱。權杖只在一個專案有角色時，kubeconfig 會直接從那個專案開始；否則每個指令都要加 `-n <專案>`。
+</Step>
+<Step>
+### 放進 CI
+
+把整個檔案存成 CI 的機密，不要放進 repository。以 GitHub Actions 為例：
+
+```sh
+gh secret set KUBECONFIG_DATA < deploy-shop.yaml
+```
+
+再在工作裡寫成檔案：
+
+```yaml
+- name: Deploy
+  env:
+    KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+  run: |
+    export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+    (umask 077; printf '%s' "$KUBECONFIG_DATA" > "$KUBECONFIG")
+    kubectl set image deployment/web web=ghcr.io/acme/web:${{ github.sha }}
+```
+
+Runner 要連得到 API 位址的 TCP 6443。權杖到期後，更新權杖，再存一次新的 kubeconfig。
+</Step>
+</Steps>
+
+## 用 curl 連線
+
+curl 需要 API 位址、權杖和 CA 憑證。把視窗裡的 CA 憑證存成 `ca.crt`。在專案有角色的權杖，也可以從專案的 `kube-root-ca.crt` 設定檔讀出來：
 
 ```sh
 kubectl -n shop get configmap kube-root-ca.crt -o jsonpath='{.data.ca\.crt}' > ca.crt
 ```
 
-**kubeconfig**：複製視窗裡的 kubeconfig，填上 `server` 後存檔，例如 `ci.yaml`。CA 憑證已經在 `certificate-authority-data` 裡。權杖只在一個專案有角色時，kubeconfig 會直接從那個專案開始；否則每個指令都要加 `-n <專案>`。
-
-```sh
-export KUBECONFIG=$PWD/ci.yaml
-kubectl auth whoami
-```
-
-`kubectl auth whoami` 會顯示 `system:serviceaccount:zeabur-api-tokens:github-actions`，kube-apiserver 記錄這個權杖的請求時用的就是這個名稱。
-
-用 curl 時，先設好位址和權杖：
+再設好位址和權杖：
 
 ```sh
 APISERVER=https://203.0.113.10:6443
@@ -64,7 +128,17 @@ TOKEN='<權杖>'
 - 變更節點、叢集元件或叢集備份。
 - 讀取或變更 `zeabur-api-tokens` 裡的任何東西，所以沒辦法再申請權杖。
 
-沒有管理員權杖。管理員帳號只能用通行密鑰登入，有完整權限的權杖會繞過這道關卡。需要在整個叢集操作時，例如建立專案、安裝元件、管理節點或叢集備份，請以管理員身分用你自己的 kubeconfig。詳見[管理員帳號和一般帳號](./permissions.mdx#管理員帳號和一般帳號)。
+### 不要把管理員的 kubeconfig 交給 CI
+
+沒有管理員權杖。管理員帳號只能用通行密鑰登入，有完整權限的權杖會繞過這道關卡。它還能自己建立新的身分，所以刪掉權杖也收不回它的權限。
+
+<Callout type="warn">
+絕對不要把管理員的 kubeconfig 放進 CI、其他服務的機密，或交給 Agent 保管。管理員的 kubeconfig 能做叢集裡所有的事，一旦外洩，整個叢集和裡面所有資料都會跟著外洩。每個權杖只在需要的專案給角色，能用檢視者就不要用開發者。
+</Callout>
+
+需要在整個叢集操作時，例如建立專案、安裝元件、管理節點或叢集備份，請以管理員身分用你自己的 kubeconfig。詳見[管理員帳號和一般帳號](./permissions.mdx#管理員帳號和一般帳號)。
+
+真的要讓叢集外的系統自動做某個管理員操作時，為這一個操作寫個小程式：給它自己的 ServiceAccount，只綁定這個操作需要的 verb 和資源，除此之外什麼都不做。
 
 ## 常見操作
 
