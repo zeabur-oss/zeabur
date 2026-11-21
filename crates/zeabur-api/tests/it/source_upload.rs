@@ -311,6 +311,49 @@ mod tests {
         assert_eq!(heard(&other), Vec::<String>::new());
     }
 
+    /// A registry with a CA of its own takes the push once the upload Secret holds that CA in
+    /// `ca.crt`; without it, or with another CA, Zeabur names the certificate it cannot trust.
+    #[tokio::test]
+    async fn the_upload_secrets_ca_is_trusted_for_the_push() {
+        let address = zeabur_test_support::tls::serve_answering(|target| {
+            let done = target.contains("/manifests/") || target.contains("digest=");
+            let (status, location) = if done {
+                ("201 Created", String::new())
+            } else {
+                (
+                    "202 Accepted",
+                    "location: /v2/shop/site/source/blobs/uploads/s1\r\n".to_owned(),
+                )
+            };
+            format!("HTTP/1.1 {status}\r\n{location}content-length: 0\r\nconnection: close\r\n\r\n")
+        })
+        .await;
+        let cluster = cluster(&format!("https://{address}"), "u1");
+        let app = app(&cluster);
+        let with_ca = |ca: &str| {
+            cluster.update(|s| {
+                s.secret_values
+                    .get_mut("shop/site-upload")
+                    .unwrap()
+                    .insert("ca.crt".to_owned(), ca.as_bytes().to_vec());
+            });
+        };
+
+        let (status, answer) = post(&app, UPLOAD, vec![1; 10]).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{answer}");
+        assert!(
+            answer["detail"].as_str().unwrap().contains("UnknownIssuer"),
+            "{answer}"
+        );
+        with_ca(zeabur_test_support::tls::ca_b());
+        let (status, answer) = post(&app, UPLOAD, vec![1; 10]).await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{answer}");
+
+        with_ca(zeabur_test_support::tls::ca_a());
+        let (status, answer) = post(&app, UPLOAD, vec![1; 10]).await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+    }
+
     /// `upload_address` (the port-forward of `zeaburctl up` in local mode) takes the push in place
     /// of the host the Secret names.
     #[tokio::test]

@@ -601,6 +601,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
             cluster::template_fetch::Templates::fixed(zeabur_catalog::Catalog::embedded())
         }
     };
+    let trusted_ca = settings.trusted_ca.clone();
     let state = AppState {
         access,
         catalogue,
@@ -615,7 +616,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         tools: Arc::new(tools::Sessions::default()),
         sign_in,
         zeabur_proxy,
-        pusher: Arc::new(projects::oci_push::Pusher::new(reach, &tls)),
+        pusher: Arc::new(projects::oci_push::Pusher::new(reach, &tls, trusted_ca)),
         store: Arc::new(cluster::object_store::Fetcher::new(images.reach(), &tls)),
         images,
         github,

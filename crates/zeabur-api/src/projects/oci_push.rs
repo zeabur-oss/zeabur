@@ -54,6 +54,8 @@ pub(crate) struct Target {
     pub(crate) repository: String,
     /// The bearer token of the upload Secret.
     pub(crate) token: SecretString,
+    /// The PEM CA of the upload Secret's `ca.crt`, trusted for this push only.
+    pub(crate) ca: Option<Vec<u8>>,
 }
 
 /// What was pushed.
@@ -83,6 +85,8 @@ pub(crate) enum PushError {
 pub struct Pusher {
     client: Result<Client<Connector, Body>, String>,
     reach: Reach,
+    /// The server's own extra CAs, which a push with its own CA trusts too.
+    trusted_ca: Option<Vec<u8>>,
 }
 
 impl std::fmt::Debug for Pusher {
@@ -129,17 +133,24 @@ struct Answer {
 }
 
 impl Pusher {
-    /// A client that connects where `reach` allows and trusts what `tls` trusts.
-    pub(crate) fn new(reach: Reach, tls: &Tls) -> Self {
-        let client = tls
-            .as_ref()
-            .map(|tls| {
-                Client::builder(TokioExecutor::new())
-                    .pool_max_idle_per_host(0)
-                    .build(connector(reach, tls))
-            })
-            .map_err(Clone::clone);
-        Self { client, reach }
+    /// A client that connects where `reach` allows and trusts what `tls` trusts, which is the
+    /// platform's roots and `trusted_ca`.
+    pub(crate) fn new(reach: Reach, tls: &Tls, trusted_ca: Option<Vec<u8>>) -> Self {
+        Self {
+            client: client(reach, tls),
+            reach,
+            trusted_ca,
+        }
+    }
+
+    /// This pusher, trusting the PEM `ca` as well.
+    fn trusting(&self, ca: &[u8]) -> Self {
+        let bundle = [self.trusted_ca.as_deref().unwrap_or_default(), b"\n", ca].concat();
+        Self {
+            client: client(self.reach, &zeabur_http::tls(Some(&bundle))),
+            reach: self.reach,
+            trusted_ca: None,
+        }
     }
 
     fn base(&self, address: &str) -> String {
@@ -251,6 +262,22 @@ impl Pusher {
         body: Body,
         length: u64,
     ) -> Result<Pushed, PushError> {
+        if let Some(ca) = &target.ca {
+            return self
+                .trusting(ca)
+                .push_trusted(target, tag, body, length)
+                .await;
+        }
+        self.push_trusted(target, tag, body, length).await
+    }
+
+    async fn push_trusted(
+        &self,
+        target: &Target,
+        tag: &str,
+        body: Body,
+        length: u64,
+    ) -> Result<Pushed, PushError> {
         let base = self.base(&target.address);
         let empty = self.start(&base, target).await?;
         let sep = if empty.contains('?') { '&' } else { '?' };
@@ -349,6 +376,16 @@ impl Pusher {
             tag: tag.to_owned(),
         })
     }
+}
+
+fn client(reach: Reach, tls: &Tls) -> Result<Client<Connector, Body>, String> {
+    tls.as_ref()
+        .map(|tls| {
+            Client::builder(TokioExecutor::new())
+                .pool_max_idle_per_host(0)
+                .build(connector(reach, tls))
+        })
+        .map_err(Clone::clone)
 }
 
 fn expect(answer: &Answer, accepted: &[StatusCode]) -> Result<(), PushError> {
