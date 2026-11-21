@@ -6,19 +6,45 @@ import { listen } from "@tauri-apps/api/event"
 export interface Available {
   version: string
   current: string
-  notes: string | null
   install: "inPlace" | "package" | "download"
 }
 
-export type View =
-  | { kind: "available"; update: Available; installing: boolean; error: string | null }
-  | { kind: "latest"; version: string }
-  | { kind: "failed"; reason: string }
+/** `Failure` in desktop/src/update.rs. */
+export type Failure = "notConfigured" | "failed"
+
+/** The answer of the last check the person asked for. */
+export type Check =
+  | { kind: "idle" }
+  | { kind: "checking" }
+  | { kind: "latest" }
+  | { kind: "found" }
+  | { kind: "failed"; reason: Failure }
 
 export interface UpdateState {
-  available: Available | null
-  view: View | null
-  checking: boolean
+  /** This build's version; null until the app answers. */
+  version: string | null
+  /** The newer version a check found; a later failed check keeps it. */
+  update: Available | null
+  check: Check
+  /** The dialog of the update. */
+  open: boolean
+  installing: boolean
+  installFailed: boolean
+}
+
+type Settled = Pick<UpdateState, "check" | "update" | "open">
+
+/** The state a check ends in; anything but `notConfigured` is the same short failure. */
+export function settle(
+  update: Available | null,
+  result: { found: Available | null } | { error: unknown },
+): Settled {
+  if (!("found" in result)) {
+    const reason = result.error === "notConfigured" ? "notConfigured" : "failed"
+    return { check: { kind: "failed", reason }, update, open: false }
+  }
+  if (!result.found) return { check: { kind: "latest" }, update: null, open: false }
+  return { check: { kind: "found" }, update: result.found, open: true }
 }
 
 const api = {
@@ -29,7 +55,14 @@ const api = {
   openReleases: () => invoke<void>("open_releases"),
 }
 
-let state: UpdateState = { available: null, view: null, checking: false }
+let state: UpdateState = {
+  version: null,
+  update: null,
+  check: { kind: "idle" },
+  open: false,
+  installing: false,
+  installFailed: false,
+}
 const subscribers = new Set<() => void>()
 let stop: (() => void) | null = null
 
@@ -38,48 +71,40 @@ function set(next: Partial<UpdateState>) {
   subscribers.forEach((notify) => notify())
 }
 
+/** A check the person asked for; a newer version opens its dialog, other answers are toasts. */
 export async function check() {
-  set({ checking: true })
-  try {
-    const found = await api.check()
-    set({
-      available: found,
-      view: found
-        ? { kind: "available", update: found, installing: false, error: null }
-        : { kind: "latest", version: await getVersion() },
-    })
-  } catch (error) {
-    set({ view: { kind: "failed", reason: String(error) } })
-  } finally {
-    set({ checking: false })
-  }
+  if (state.check.kind === "checking") return
+  set({ check: { kind: "checking" } })
+  const settled = await api.check().then(
+    (found) => settle(state.update, { found }),
+    (error: unknown) => settle(state.update, { error }),
+  )
+  set({ ...settled, installFailed: false })
 }
 
-export function show(update: Available) {
-  set({ view: { kind: "available", update, installing: false, error: null } })
+export function show() {
+  set({ open: true, installFailed: false })
 }
 
 export function close() {
-  set({ view: null })
+  if (!state.installing) set({ open: false })
 }
 
-export function install(update: Available) {
-  set({ view: { kind: "available", update, installing: true, error: null } })
-  api
-    .install()
-    .catch((error: unknown) =>
-      set({ view: { kind: "available", update, installing: false, error: String(error) } }),
-    )
+export function install() {
+  set({ installing: true, installFailed: false })
+  api.install().catch(() => set({ installing: false, installFailed: true }))
 }
 
 export const openReleases = api.openReleases
 
 /** Quiet on start: desktop/src/update.rs tells the chooser what it found. */
 function start() {
-  void api.found().then((found) => found && set({ available: found }))
-  const offFound = listen<Available>("update-available", (event) =>
-    set({ available: event.payload }),
-  )
+  const found = (update: Available) => {
+    if (state.check.kind === "idle") set({ update })
+  }
+  void getVersion().then((version) => set({ version }))
+  void api.found().then((update) => update && found(update))
+  const offFound = listen<Available>("update-available", (event) => found(event.payload))
   const checkIfAsked = async () => {
     if (await api.takeCheckRequest()) await check()
   }

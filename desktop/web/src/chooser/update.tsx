@@ -1,130 +1,163 @@
 import { Button } from "@zeabur-oss/design-system/components/button"
 import {
   Dialog,
-  DialogClose,
+  DialogBody,
   DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
   DialogTitle,
 } from "@zeabur-oss/design-system/components/dialog"
-import { useSyncExternalStore, type ReactElement } from "react"
-import XIcon from "~icons/ph/x"
+import { Menu, MenuContent, MenuItem, MenuTrigger } from "@zeabur-oss/design-system/components/menu"
+import { Toaster } from "@zeabur-oss/design-system/components/sonner"
+import { useEffect, useSyncExternalStore } from "react"
+import { toast } from "sonner"
+import ArrowClockwiseIcon from "~icons/ph/arrow-clockwise"
+import ArrowCircleUpIcon from "~icons/ph/arrow-circle-up"
+import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
+import InfoIcon from "~icons/ph/info"
 
 import { useI18n } from "@/i18n"
+import { useTheme } from "@/theme"
 
 import { check, close, install, openReleases, show, snapshot, subscribe } from "./updates"
 
-/**
- * The update check, kept in ./updates: an answer when the person asks, from the button or the
- * macOS menu. Installing waits for the person.
- */
-export function useUpdates(): { button: ReactElement; dialog: ReactElement } {
-  const { t } = useI18n()
-  const { available, view, checking } = useSyncExternalStore(subscribe, snapshot)
+const useUpdateState = () => useSyncExternalStore(subscribe, snapshot)
 
-  const button = available ? (
-    <Button size="sm" className="w-full" onClick={() => show(available)}>
-      {t("desktop.update.available", available.version)}
-    </Button>
-  ) : (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="w-full"
-      disabled={checking}
-      onClick={() => void check()}
-    >
-      {checking ? t("desktop.update.checking") : t("desktop.update.check")}
+/** Shown only while a newer version waits, above the foot of the sidebar or the first-run page. */
+export function UpdateButton() {
+  const { t } = useI18n()
+  const { update } = useUpdateState()
+  if (!update) return null
+  return (
+    <Button variant="secondary" size="sm" className="w-full" onClick={show}>
+      <ArrowCircleUpIcon className="text-brand" aria-hidden="true" />
+      {t("desktop.update.available", update.version)}
     </Button>
   )
+}
 
-  let title = ""
-  let body: ReactElement | null = null
-  let actions: ReactElement | null = null
-  if (view?.kind === "available") {
-    const { update } = view
-    title = t("desktop.update.title", update.version)
-    body = (
-      <>
-        <p className="type-body text-secondary">{t("desktop.update.current", update.current)}</p>
-        {update.notes ? (
-          <div className="flex flex-col gap-1.5">
-            <p className="type-label text-tertiary">{t("desktop.update.notes")}</p>
-            <div className="max-h-64 overflow-y-auto rounded-md border border-v2-border px-3 py-2 type-meta whitespace-pre-wrap text-main select-text">
-              {update.notes}
-            </div>
-          </div>
+/** The version and the manual check, beside the language picker. */
+export function AboutMenu() {
+  const { t } = useI18n()
+  const { version, check: last } = useUpdateState()
+  return (
+    <Menu>
+      <MenuTrigger
+        render={<Button variant="muted" size="icon-sm" aria-label={t("desktop.update.about")} />}
+      >
+        <InfoIcon aria-hidden="true" />
+      </MenuTrigger>
+      <MenuContent align="start">
+        {version ? (
+          <p className="px-2.5 pt-1.5 pb-1 type-meta text-tertiary">
+            {t("desktop.update.version", version)}
+          </p>
         ) : null}
-        {update.install === "package" ? (
-          <p className="type-body text-main">{t("desktop.update.package")}</p>
-        ) : null}
-        {update.install === "download" ? (
-          <p className="type-body text-main">{t("desktop.update.download")}</p>
-        ) : null}
-        {view.error ? (
-          <div className="flex flex-col gap-1">
-            <p className="type-body text-fail-strong">{t("desktop.update.installFailed")}</p>
-            <p className="type-meta break-words text-tertiary select-text">{view.error}</p>
-          </div>
-        ) : null}
-      </>
-    )
-    actions =
-      update.install === "inPlace" ? (
-        <>
-          <Button variant="secondary" disabled={view.installing} onClick={close}>
-            {t("desktop.update.later")}
-          </Button>
-          <Button disabled={view.installing} onClick={() => install(update)}>
-            {view.installing ? t("desktop.update.installing") : t("desktop.update.install")}
-          </Button>
-        </>
-      ) : (
-        <>
-          <Button variant="secondary" onClick={close}>
-            {t("desktop.update.close")}
-          </Button>
-          <Button onClick={() => void openReleases()}>{t("desktop.update.openReleases")}</Button>
-        </>
-      )
-  } else if (view?.kind === "latest") {
-    title = t("desktop.update.latestTitle")
-    body = <p className="type-body text-secondary">{t("desktop.update.latest", view.version)}</p>
-  } else if (view?.kind === "failed") {
-    title = t("desktop.update.failedTitle")
-    body =
-      view.reason === "not-configured" ? (
-        <p className="type-body text-secondary">{t("desktop.update.notConfigured")}</p>
-      ) : (
-        <p className="type-meta break-words text-tertiary select-text">{view.reason}</p>
-      )
-  }
-  actions ??= <Button onClick={close}>{t("desktop.update.close")}</Button>
+        <MenuItem disabled={last.kind === "checking"} onClick={() => void check()}>
+          <ArrowClockwiseIcon aria-hidden="true" />
+          {t("desktop.update.check")}
+        </MenuItem>
+      </MenuContent>
+    </Menu>
+  )
+}
 
-  const installing = view?.kind === "available" && view.installing
-  const dialog = (
-    <Dialog
-      open={view !== null}
-      onOpenChange={(next) => (next || installing ? undefined : close())}
-    >
+const toastId = "update-check"
+
+/** The answers of a check as toasts; a newer version opens UpdateDialog instead. */
+export function UpdateToasts() {
+  const { t } = useI18n()
+  const theme = useTheme()
+  const { check: last, version } = useUpdateState()
+
+  useEffect(() => {
+    switch (last.kind) {
+      case "checking":
+        toast.loading(t("desktop.update.checking"), { id: toastId })
+        break
+      case "latest":
+        toast.success(t("desktop.update.latestTitle"), {
+          id: toastId,
+          description: version ? t("desktop.update.latest", version) : undefined,
+        })
+        break
+      case "failed":
+        if (last.reason === "notConfigured")
+          toast.info(t("desktop.update.notConfigured"), { id: toastId })
+        else
+          toast.error(t("desktop.update.failedTitle"), {
+            id: toastId,
+            description: t("desktop.update.failed"),
+            action: { label: t("desktop.update.retry"), onClick: () => void check() },
+          })
+        break
+      case "found":
+        toast.dismiss(toastId)
+        break
+      case "idle":
+        break
+    }
+    // A toast is the answer to one check, so a new language does not show it again.
+  }, [last])
+
+  return <Toaster theme={theme} position="bottom-right" />
+}
+
+/** The newer version and its install, opened from UpdateButton or by a check that found it. */
+export function UpdateDialog() {
+  const { t } = useI18n()
+  const { update, open, installing, installFailed } = useUpdateState()
+  if (!update) return null
+
+  return (
+    <Dialog open={open} onOpenChange={(next) => (next ? undefined : close())}>
       <DialogContent>
-        <div className="flex items-center gap-2 border-b px-5 py-3">
-          <div className="min-w-0 flex-1 truncate">
-            <DialogTitle>{title}</DialogTitle>
+        <DialogHeader close={!installing} closeLabel={t("desktop.update.close")}>
+          <DialogTitle>{t("desktop.update.title", update.version)}</DialogTitle>
+          <DialogDescription>{t("desktop.update.current", update.current)}</DialogDescription>
+        </DialogHeader>
+        <DialogBody>
+          <div className="flex flex-col gap-3 type-body">
+            {update.install === "package" ? (
+              <p className="text-pretty">{t("desktop.update.package")}</p>
+            ) : null}
+            {update.install === "download" ? (
+              <p className="text-pretty">{t("desktop.update.download")}</p>
+            ) : null}
+            <Button variant="link" className="w-fit" onClick={() => void openReleases()}>
+              {t("desktop.update.whatsNew", update.version)}
+              <ArrowSquareOutIcon className="size-3" aria-hidden="true" />
+            </Button>
+            {installFailed ? (
+              <p className="text-fail-strong" role="alert">
+                {t("desktop.update.installFailed")}
+              </p>
+            ) : null}
           </div>
-          <DialogClose
-            disabled={installing}
-            render={
-              <Button variant="ghost" size="icon-sm" aria-label={t("desktop.update.close")} />
-            }
-          >
-            <XIcon aria-hidden="true" />
-          </DialogClose>
-        </div>
-        <div className="flex flex-col gap-4 px-5 py-4">
-          {body}
-          <div className="flex justify-end gap-2">{actions}</div>
-        </div>
+        </DialogBody>
+        <DialogFooter>
+          {update.install === "inPlace" ? (
+            <>
+              <Button variant="ghost" size="sm" disabled={installing} onClick={close}>
+                {t("desktop.update.later")}
+              </Button>
+              <Button size="sm" loading={installing} disabled={installing} onClick={install}>
+                {installFailed ? t("desktop.update.retry") : t("desktop.update.install")}
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button variant="ghost" size="sm" onClick={close}>
+                {t("desktop.update.close")}
+              </Button>
+              <Button size="sm" onClick={() => void openReleases()}>
+                {t("desktop.update.openReleases")}
+              </Button>
+            </>
+          )}
+        </DialogFooter>
       </DialogContent>
     </Dialog>
   )
-  return { button, dialog }
 }

@@ -1,19 +1,90 @@
-//! Updates from the `latest.json` of the newest Zeabur release (`plugins.updater` in
-//! `tauri.conf.json`). The app checks once on start and again from the menu; it installs only when
-//! the person asks.
+//! Updates from the `latest.json` of the newest Zeabur release that this build's channel takes: a
+//! release build takes releases, a prerelease build takes prereleases too. The app checks once on
+//! start and again when the person asks; it installs only when the person asks.
 
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Mutex, PoisonError};
 
-use serde::{Deserialize as _, Serialize};
+use semver::Version;
+use serde::{Deserialize, Serialize};
 use tauri::utils::config::BundleType;
-use tauri::{AppHandle, Emitter, Manager, State};
+use tauri::{AppHandle, Emitter, Manager, State, Url};
 use tauri_plugin_updater::{Update, UpdaterExt};
 
 use crate::{chrome, output};
 
-/// The newest release's page, for the copies the updater cannot replace.
+/// The newest release's page, when no check has found a release.
 const RELEASES: &str = "https://github.com/zeabur-oss/zeabur/releases/latest";
+
+/// The newest releases, prereleases included; `/releases/latest` skips prereleases.
+const RELEASES_API: &str = "https://api.github.com/repos/zeabur-oss/zeabur/releases?per_page=30";
+
+/// The newest release without prereleases, which many newer prereleases can push off
+/// [`RELEASES_API`]'s page.
+const LATEST_API: &str = "https://api.github.com/repos/zeabur-oss/zeabur/releases/latest";
+
+/// The update manifest each release carries (scripts/desktop-release.ts).
+const MANIFEST: &str = "latest.json";
+
+/// A release as the GitHub REST API lists it.
+#[derive(Debug, Deserialize)]
+struct Release {
+    tag_name: String,
+    prerelease: bool,
+    assets: Vec<Asset>,
+}
+
+#[derive(Debug, Deserialize)]
+struct Asset {
+    name: String,
+    browser_download_url: Url,
+}
+
+/// The manifest of the newest release newer than `current` that `current`'s channel takes, or
+/// `None` when there is no such release.
+fn newer_manifest(releases: &[Release], current: &Version) -> Option<Url> {
+    let prerelease_channel = !current.pre.is_empty();
+    releases
+        .iter()
+        .filter(|release| prerelease_channel || !release.prerelease)
+        .filter_map(|release| {
+            let version = Version::parse(release.tag_name.strip_prefix('v')?).ok()?;
+            let manifest = release.assets.iter().find(|asset| asset.name == MANIFEST)?;
+            (version > *current).then_some((version, &manifest.browser_download_url))
+        })
+        .max_by(|(a, _), (b, _)| a.cmp(b))
+        .map(|(_, url)| url.clone())
+}
+
+/// Why a check or an install did not finish. The details go to the terminal.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) enum Failure {
+    /// A build without the updater's public key.
+    NotConfigured,
+    /// GitHub, the network or the release did not answer as expected.
+    Failed,
+}
+
+/// What went wrong, for the terminal.
+#[derive(Debug, thiserror::Error)]
+enum UpdateError {
+    #[error("cannot list the releases: {0}")]
+    Releases(#[from] reqwest::Error),
+    #[error(transparent)]
+    Updater(#[from] tauri_plugin_updater::Error),
+    #[error("this copy of Zeabur cannot replace itself")]
+    CannotReplace,
+    #[error("no update to install")]
+    NothingFound,
+}
+
+impl From<UpdateError> for Failure {
+    fn from(err: UpdateError) -> Self {
+        output::warn(&format!("update: {err}"));
+        Self::Failed
+    }
+}
 
 /// How this copy of the app takes a new version.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
@@ -51,8 +122,6 @@ fn install_kind() -> Install {
 pub(crate) struct Available {
     version: String,
     current: String,
-    /// The release notes, Markdown.
-    notes: Option<String>,
     install: Install,
 }
 
@@ -60,7 +129,6 @@ fn available(update: &Update) -> Available {
     Available {
         version: update.version.clone(),
         current: update.current_version.clone(),
-        notes: update.body.clone(),
         install: install_kind(),
     }
 }
@@ -105,16 +173,44 @@ fn configured(app: &AppHandle) -> bool {
         .is_some_and(|config| !config.pubkey.is_empty())
 }
 
-async fn check(app: &AppHandle) -> Result<Option<Available>, String> {
-    if !configured(app) {
-        return Err("not-configured".into());
+async fn releases() -> Result<Vec<Release>, reqwest::Error> {
+    let client = reqwest::Client::builder()
+        .user_agent(concat!("zeabur-desktop/", env!("CARGO_PKG_VERSION")))
+        .timeout(std::time::Duration::from_secs(30))
+        .build()?;
+    let get = |url| {
+        client
+            .get(url)
+            .header("Accept", "application/vnd.github+json")
+            .send()
+    };
+    let mut releases: Vec<Release> = get(RELEASES_API).await?.error_for_status()?.json().await?;
+    // A repository without a release answers 404.
+    let latest = get(LATEST_API).await?;
+    if latest.status() != reqwest::StatusCode::NOT_FOUND {
+        releases.push(latest.error_for_status()?.json().await?);
     }
-    let update = app
-        .updater()
-        .map_err(|e| e.to_string())?
+    Ok(releases)
+}
+
+async fn find(app: &AppHandle) -> Result<Option<Update>, UpdateError> {
+    let releases = releases().await?;
+    let Some(manifest) = newer_manifest(&releases, &app.package_info().version) else {
+        return Ok(None);
+    };
+    app.updater_builder()
+        .endpoints(vec![manifest])
+        .and_then(tauri_plugin_updater::UpdaterBuilder::build)?
         .check()
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(UpdateError::from)
+}
+
+async fn check(app: &AppHandle) -> Result<Option<Available>, Failure> {
+    if !configured(app) {
+        return Err(Failure::NotConfigured);
+    }
+    let update = find(app).await?;
     let found = update.as_ref().map(available);
     *app.state::<Updates>().found() = update;
     Ok(found)
@@ -128,14 +224,10 @@ pub(crate) fn check_on_start(app: &AppHandle) {
     }
     let app = app.clone();
     tauri::async_runtime::spawn(async move {
-        match check(&app).await {
-            Ok(Some(found)) => {
-                if let Err(err) = app.emit_to(chrome::CHOOSER, "update-available", found) {
-                    output::warn(&format!("cannot tell the chooser about the update: {err}"));
-                }
-            }
-            Ok(None) => {}
-            Err(err) => output::warn(&format!("cannot check for updates: {err}")),
+        if let Ok(Some(found)) = check(&app).await
+            && let Err(err) = app.emit_to(chrome::CHOOSER, "update-available", found)
+        {
+            output::warn(&format!("cannot tell the chooser about the update: {err}"));
         }
     });
 }
@@ -174,7 +266,7 @@ pub(crate) fn take_check_request(updates: State<'_, Updates>) -> bool {
 
 /// Checks now; `Ok(None)` when this is the newest release.
 #[tauri::command]
-pub(crate) async fn check_update(app: AppHandle) -> Result<Option<Available>, String> {
+pub(crate) async fn check_update(app: AppHandle) -> Result<Option<Available>, Failure> {
     check(&app).await
 }
 
@@ -182,31 +274,139 @@ pub(crate) async fn check_update(app: AppHandle) -> Result<Option<Available>, St
 /// new version. On Windows the installer closes the app and starts it again. A failed install keeps
 /// the release, so the button can try again.
 #[tauri::command]
-pub(crate) async fn install_update(app: AppHandle) -> Result<(), String> {
+pub(crate) async fn install_update(app: AppHandle) -> Result<(), Failure> {
     if install_kind() != Install::InPlace {
-        return Err("this copy of Zeabur cannot replace itself".into());
+        return Err(UpdateError::CannotReplace.into());
     }
     let update = app
         .state::<Updates>()
         .found()
         .clone()
-        .ok_or("no update to install")?;
+        .ok_or(UpdateError::NothingFound)?;
     update
         .download_and_install(|_, _| {}, || {})
         .await
-        .map_err(|e| e.to_string())?;
+        .map_err(UpdateError::from)?;
     app.restart()
 }
 
-/// Opens the newest release's page in the browser.
+/// The page of the release the last check found, with its notes, or the newest release's.
+fn release_page(found: Option<&Update>) -> String {
+    found
+        .and_then(|update| Version::parse(&update.version).ok())
+        .map_or_else(
+            || RELEASES.to_owned(),
+            |version| format!("https://github.com/zeabur-oss/zeabur/releases/tag/v{version}"),
+        )
+}
+
+/// Opens the found release's page in the browser.
 #[tauri::command]
-pub(crate) fn open_releases() -> Result<(), String> {
-    crate::links::open_in_browser(RELEASES).map_err(|e| e.to_string())
+#[expect(
+    clippy::needless_pass_by_value,
+    reason = "Tauri passes a command's arguments by value"
+)]
+pub(crate) fn open_releases(updates: State<'_, Updates>) -> Result<(), String> {
+    let page = release_page(updates.found().as_ref());
+    crate::links::open_in_browser(&page).map_err(|e| e.to_string())
 }
 
 #[cfg(test)]
 mod tests {
-    use super::Updates;
+    use semver::Version;
+
+    use super::{Asset, MANIFEST, Release, Updates, newer_manifest};
+
+    fn release(tag: &str, prerelease: bool, manifest: bool) -> Release {
+        let asset = |name: &str| Asset {
+            name: name.to_owned(),
+            browser_download_url: format!("https://example.com/{tag}/{name}")
+                .parse()
+                .unwrap_or_else(|err| unreachable!("{err}")),
+        };
+        let mut assets = vec![asset("SHA256SUMS.sigstore.json")];
+        if manifest {
+            assets.push(asset(MANIFEST));
+        }
+        Release {
+            tag_name: tag.to_owned(),
+            prerelease,
+            assets,
+        }
+    }
+
+    /// GitHub's list today, newest first: v0.2.0 is the newest release, without a manifest.
+    fn listed() -> Vec<Release> {
+        vec![
+            release("v0.3.0-beta.2", true, true),
+            release("v0.3.0-beta.1", true, true),
+            release("v0.2.0", false, false),
+            release("v0.2.0-beta.3", true, true),
+        ]
+    }
+
+    fn manifest_for(releases: &[Release], current: &str) -> Option<String> {
+        let current = Version::parse(current).unwrap_or_else(|err| unreachable!("{err}"));
+        newer_manifest(releases, &current).map(|url| url.to_string())
+    }
+
+    #[test]
+    fn a_prerelease_build_takes_the_newest_prerelease() {
+        assert_eq!(
+            manifest_for(&listed(), "0.3.0-beta.1").as_deref(),
+            Some("https://example.com/v0.3.0-beta.2/latest.json"),
+        );
+    }
+
+    #[test]
+    fn a_prerelease_build_takes_the_release_it_leads_to() {
+        let mut releases = listed();
+        releases.insert(0, release("v0.3.0", false, true));
+        assert_eq!(
+            manifest_for(&releases, "0.3.0-beta.2").as_deref(),
+            Some("https://example.com/v0.3.0/latest.json"),
+        );
+    }
+
+    #[test]
+    fn a_release_build_skips_prereleases() {
+        assert_eq!(manifest_for(&listed(), "0.2.0"), None);
+        let mut releases = listed();
+        releases.insert(0, release("v0.3.0", false, true));
+        assert_eq!(
+            manifest_for(&releases, "0.2.0").as_deref(),
+            Some("https://example.com/v0.3.0/latest.json"),
+        );
+    }
+
+    #[test]
+    fn a_release_build_takes_the_latest_release_behind_a_page_of_prereleases() {
+        let mut releases: Vec<Release> = (1..=30)
+            .map(|n| release(&format!("v0.4.0-beta.{n}"), true, true))
+            .collect();
+        releases.push(release("v0.3.1", false, true));
+        assert_eq!(
+            manifest_for(&releases, "0.3.0").as_deref(),
+            Some("https://example.com/v0.3.1/latest.json"),
+        );
+    }
+
+    #[test]
+    fn the_newest_build_has_nothing_to_take() {
+        assert_eq!(manifest_for(&listed(), "0.3.0-beta.2"), None);
+    }
+
+    #[test]
+    fn a_release_without_a_manifest_is_skipped() {
+        let releases = vec![
+            release("v0.4.0-beta.1", true, false),
+            release("v0.3.0", false, true),
+        ];
+        assert_eq!(
+            manifest_for(&releases, "0.3.0-beta.1").as_deref(),
+            Some("https://example.com/v0.3.0/latest.json"),
+        );
+    }
 
     #[test]
     fn a_menu_request_waits_until_the_chooser_takes_it() {

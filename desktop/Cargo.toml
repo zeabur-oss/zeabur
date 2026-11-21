@@ -32,9 +32,13 @@ tauri-plugin-dialog = "2"
 zeabur-local = { path = "../crates/zeabur-local", features = ["ui"] }
 # Updates from the release's latest.json (src/update.rs). Its `rustls-tls` feature brings ring, so
 # it gets TLS from reqwest's `rustls` feature below instead, with aws-lc-rs. `zip` unpacks the macOS
-# app's .tar.gz.
+# app's .tar.gz. reqwest also lists the releases to find the newest latest.json.
 tauri-plugin-updater = { version = "2", default-features = false, features = ["zip"] }
-reqwest = { version = "0.13", default-features = false, features = ["rustls"] }
+reqwest = { version = "0.13", default-features = false, features = ["rustls", "json"] }
+# Compares the release tags with this build's version (src/update.rs); the updater's own.
+semver = "1"
+# The update check's errors (src/update.rs).
+thiserror = "2"
 
 # Set for a build that embeds desktop/web/dist instead of loading the dev server
 # (`--features custom-protocol`; `cargo tauri build` sets it).

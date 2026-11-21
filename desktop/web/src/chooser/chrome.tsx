@@ -10,9 +10,10 @@ import {
 import { Illustration } from "@zeabur-oss/design-system/components/illustration"
 import { Select } from "@zeabur-oss/design-system/components/select"
 import FileIcon from "~icons/ph/file-text"
-import type { ReactElement } from "react"
 
 import { localeNames, locales, useI18n } from "@/i18n"
+
+import { AboutMenu, UpdateButton } from "./update"
 
 export function LanguageSelect() {
   const { t, locale, setLocale } = useI18n()
@@ -27,7 +28,7 @@ export function LanguageSelect() {
   )
 }
 
-export function FirstRun({ addFiles, update }: { addFiles: () => void; update: ReactElement }) {
+export function FirstRun({ addFiles }: { addFiles: () => void }) {
   const { t } = useI18n()
   const path = navigator.userAgent.includes("Windows")
     ? "%USERPROFILE%\\.kube\\config"
@@ -35,7 +36,10 @@ export function FirstRun({ addFiles, update }: { addFiles: () => void; update: R
   return (
     <div className="flex min-w-0 flex-1 flex-col">
       <div className="flex items-center justify-end gap-2 p-3">
-        <div>{update}</div>
+        <div>
+          <UpdateButton />
+        </div>
+        <AboutMenu />
         <LanguageSelect />
       </div>
       <Empty className="flex-1">
