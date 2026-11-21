@@ -1,7 +1,7 @@
 ---
 title: API 令牌
 description: 让脚本和 CI 以各项目的角色调用 Kubernetes API，令牌会到期。
-source: "5f7bb07ea1d9"
+source: "f6b921d4f5bf"
 ---
 
 脚本或 CI 无需任何人登录，也能用 API 令牌操作集群。管理员在**成员**页创建令牌，像给成员授权一样，为它在各项目设置角色。令牌和 kubectl 一样直接调用 kube-apiserver，能做什么由 Kubernetes RBAC 决定。每个令牌都会到期。
