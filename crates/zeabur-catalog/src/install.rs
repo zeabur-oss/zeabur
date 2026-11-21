@@ -14,8 +14,10 @@
 //! - **K3s/RKE2** writes a `HelmChart` for the Helm controller both run, which installs it; the
 //!   file can go in the server's auto-deploying manifests directory [k3s-helm] [rke2-helm]. Values
 //!   are merged into `valuesContent`.
-//! - **Flux** writes the chart's source (`OCIRepository` for an OCI chart, `HelmRepository` for an
-//!   HTTP repository) and a `HelmRelease` [flux-helmrelease] [flux-ocirepository].
+//! - **Flux** writes the chart's source (`OCIRepository` for an OCI chart, pinned to the catalog's
+//!   digest, or `HelmRepository` for an HTTP repository) and a `HelmRelease` that waits for the
+//!   component's chart release before it [flux-helmrelease] [flux-ocirepository]. Namespaces and
+//!   Secrets are kept when Flux prunes, as Zeabur keeps them on removal.
 //! - **Argo CD** writes an `Application` with the values in `helm.valuesObject`; an OCI chart also
 //!   needs a repository Secret with `enableOCI` [argocd-helm].
 //!
@@ -56,6 +58,12 @@ use crate::api::{Generate, Input, InputValue};
 use crate::engine::{self, ChartRelease};
 use crate::templates::Encoding;
 use crate::{bundle, zeabur};
+
+/// Keeps an object when Flux prunes: a Namespace holds the volumes a component leaves, and a
+/// Secret the inputs a later install reads back [flux-prune].
+///
+/// [flux-prune]: https://fluxcd.io/flux/components/kustomize/kustomizations/#prune
+const FLUX_PRUNE: &str = "kustomize.toolkit.fluxcd.io/prune";
 
 /// The profiles the catalogue sizes components for.
 pub const PROFILES: [&str; 2] = ["single-node", "multi-node"];
@@ -240,6 +248,9 @@ struct Release {
     urls: Vec<String>,
     #[serde(default)]
     version: Option<String>,
+    /// For an OCI chart, its manifest digest.
+    #[serde(default)]
+    chart_digest: Option<String>,
     #[serde(default)]
     manifests: Option<String>,
     #[serde(default)]
@@ -418,6 +429,8 @@ struct Rendered<'a> {
     merged: Vec<String>,
     /// The Namespace of each release, as Zeabur's installer writes it, as YAML documents.
     namespaces: String,
+    /// The same, kept when Flux prunes.
+    flux_namespaces: String,
     /// Per release: its `HelmChart` as Zeabur's installer writes it, as YAML; `None` for
     /// manifests.
     charts: Vec<Option<String>>,
@@ -428,6 +441,7 @@ impl<'a> Rendered<'a> {
         let level = PodSecurityLevel::parse(&file.security.pod_security)
             .ok_or_else(|| format!("Pod Security level {}", file.security.pod_security))?;
         let mut namespaces = String::new();
+        let mut flux_namespaces = String::new();
         let mut seen = Vec::new();
         for release in &file.releases {
             if !seen.contains(&release.namespace.as_str())
@@ -435,10 +449,14 @@ impl<'a> Rendered<'a> {
             {
                 seen.push(release.namespace.as_str());
                 namespaces.push_str(&yaml(&namespace)?);
-                namespaces.push_str(
-                    "---
-",
-                );
+                namespaces.push_str("---\n");
+                let mut kept = namespace;
+                kept.metadata
+                    .annotations
+                    .get_or_insert_default()
+                    .insert(FLUX_PRUNE.to_owned(), "disabled".to_owned());
+                flux_namespaces.push_str(&yaml(&kept)?);
+                flux_namespaces.push_str("---\n");
             }
         }
         let first_chart = file
@@ -473,6 +491,7 @@ impl<'a> Rendered<'a> {
             profile,
             merged,
             namespaces,
+            flux_namespaces,
             charts,
         })
     }
@@ -815,7 +834,7 @@ impl<'a> Rendered<'a> {
         namespaces
     }
 
-    fn secret_objects(&self) -> String {
+    fn secret_objects(&self, format: InstallFormat) -> String {
         let mut out = String::new();
         for ((ns, name), inputs) in self.secrets() {
             out.push_str(
@@ -829,9 +848,16 @@ impl<'a> Rendered<'a> {
             push(
                 &mut out,
                 format!(
-                    "apiVersion: v1\nkind: Secret\nmetadata:\n  name: {name}\n  namespace: {ns}\nstringData:\n"
+                    "apiVersion: v1\nkind: Secret\nmetadata:\n  name: {name}\n  namespace: {ns}\n"
                 ),
             );
+            if format == InstallFormat::Flux {
+                push(
+                    &mut out,
+                    format!("  annotations:\n    {FLUX_PRUNE}: disabled\n"),
+                );
+            }
+            out.push_str("stringData:\n");
             out.extend(inputs.iter().map(|(input, key)| {
                 let value = input.random().map_or_else(
                     || format!("<{}>", input.name),
@@ -883,8 +909,13 @@ impl<'a> Rendered<'a> {
 
     /// Secrets, then each release: a manifest release as listed, a chart as its objects.
     fn append_releases(&self, out: &mut String, format: InstallFormat) {
-        out.push_str(&self.namespaces);
-        out.push_str(&self.secret_objects());
+        out.push_str(if format == InstallFormat::Flux {
+            &self.flux_namespaces
+        } else {
+            &self.namespaces
+        });
+        out.push_str(&self.secret_objects(format));
+        let mut after = None;
         for ((release, merged), chart) in self
             .file
             .releases
@@ -896,10 +927,11 @@ impl<'a> Rendered<'a> {
                 out.push_str(&text);
                 continue;
             }
-            for object in Self::release_objects(format, release, merged, chart.as_deref()) {
+            for object in Self::release_objects(format, release, merged, chart.as_deref(), after) {
                 out.push_str(&object);
                 out.push_str("---\n");
             }
+            after = Some(release.release_name());
         }
     }
 
@@ -909,11 +941,12 @@ impl<'a> Rendered<'a> {
         release: &Release,
         merged: &str,
         chart: Option<&str>,
+        after: Option<&str>,
     ) -> Vec<String> {
         match format {
             InstallFormat::Helm => Vec::new(),
             InstallFormat::K3s => chart.map(str::to_owned).into_iter().collect(),
-            InstallFormat::Flux => Self::flux_objects(release, merged),
+            InstallFormat::Flux => Self::flux_objects(release, merged, after),
             InstallFormat::ArgoCd => Self::argo_cd_objects(release, merged),
         }
     }
@@ -942,13 +975,18 @@ impl<'a> Rendered<'a> {
         trim_separator(out)
     }
 
-    /// A chart release's Flux source and `HelmRelease` in `flux-system`.
-    fn flux_objects(release: &Release, merged: &str) -> Vec<String> {
+    /// A chart release's Flux source and `HelmRelease` in `flux-system`, after the chart release
+    /// `after` of the same component.
+    fn flux_objects(release: &Release, merged: &str, after: Option<&str>) -> Vec<String> {
         let name = release.release_name();
         let (source, chart_ref) = match release.source() {
             Some(Source::Oci { url, version }) => (
                 format!(
-                    "apiVersion: source.toolkit.fluxcd.io/v1\nkind: OCIRepository\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  url: {url}\n  ref:\n    tag: {version}\n  layerSelector:\n    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip\n    operation: copy\n"
+                    "apiVersion: source.toolkit.fluxcd.io/v1\nkind: OCIRepository\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  url: {url}\n  ref:\n    tag: {version}\n{}  layerSelector:\n    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip\n    operation: copy\n",
+                    release
+                        .chart_digest
+                        .as_deref()
+                        .map_or_else(String::new, |digest| format!("    digest: {digest}\n"))
                 ),
                 format!("  chartRef:\n    kind: OCIRepository\n    name: {name}\n"),
             ),
@@ -970,6 +1008,12 @@ impl<'a> Rendered<'a> {
             "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  releaseName: {name}\n  targetNamespace: {}\n  install:\n    createNamespace: true\n{chart_ref}",
             release.namespace
         );
+        if let Some(after) = after {
+            push(
+                &mut helm_release,
+                format!("  dependsOn:\n    - name: {after}\n"),
+            );
+        }
         if !merged.is_empty() {
             helm_release.push_str("  values:\n");
             helm_release.push_str(&indent_block(merged, 4));
@@ -1307,6 +1351,87 @@ mod tests {
                 assert_eq!(exported, written, "{id} {profile}");
             }
         }
+    }
+
+    /// The Flux form's objects of `component`, parsed.
+    fn flux_documents(component: &str) -> Vec<Value> {
+        let guide = guide(component, "single-node").unwrap();
+        let text = guide
+            .formats
+            .iter()
+            .find(|t| t.format == InstallFormat::Flux)
+            .unwrap();
+        text.text
+            .split("\n---\n")
+            .map(|document| serde_saphyr::from_str(document).unwrap())
+            .filter(|document: &Value| document.get("kind").is_some())
+            .collect()
+    }
+
+    #[test]
+    fn a_flux_helm_release_waits_for_the_chart_release_before_it() {
+        let releases: Vec<(String, Option<Value>)> = flux_documents("cloudnative-pg")
+            .into_iter()
+            .filter(|d| d["kind"] == "HelmRelease")
+            .map(|d| {
+                (
+                    d["metadata"]["name"].as_str().unwrap().to_owned(),
+                    d["spec"].get("dependsOn").cloned(),
+                )
+            })
+            .collect();
+        assert_eq!(
+            releases,
+            [
+                ("cnpg".to_owned(), None),
+                (
+                    "plugin-barman-cloud".to_owned(),
+                    Some(json!([{"name": "cnpg"}]))
+                ),
+            ]
+        );
+    }
+
+    #[test]
+    fn flux_keeps_the_namespaces_and_input_secrets_when_it_prunes() {
+        let kept: Vec<(String, bool)> = flux_documents("crowdsec")
+            .into_iter()
+            .filter(|d| d["kind"] == "Namespace" || d["kind"] == "Secret")
+            .map(|d| {
+                let annotation = &d["metadata"]["annotations"][FLUX_PRUNE];
+                (
+                    d["kind"].as_str().unwrap().to_owned(),
+                    annotation == "disabled",
+                )
+            })
+            .collect();
+        assert_eq!(
+            kept,
+            [
+                ("Namespace".to_owned(), true),
+                ("Secret".to_owned(), true),
+                ("Secret".to_owned(), true),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_flux_oci_source_pins_the_catalogs_chart_digest() {
+        let source = flux_documents("crowdsec")
+            .into_iter()
+            .find(|d| d["kind"] == "OCIRepository")
+            .unwrap();
+        let (_, text) = bundle::FILES
+            .iter()
+            .find(|(id, _)| *id == "crowdsec")
+            .unwrap();
+        let file: File = serde_saphyr::from_str(text).unwrap();
+        let chart = file.releases.iter().find(|r| r.name == "crowdsec").unwrap();
+        assert_eq!(
+            source["spec"]["ref"]["digest"].as_str(),
+            chart.chart_digest.as_deref()
+        );
+        assert!(chart.chart_digest.is_some());
     }
 
     #[test]
