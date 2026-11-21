@@ -25,14 +25,7 @@ description: 在一台全新的 Linux 伺服器上，先用 Zeatend 裝好 Kuber
 
 ### 用 Zeatend 裝好 Kubernetes
 
-寫好 Zeatend 的設定。下一步會裝好 Zeabur Identity，`apiServer.authenticationConfig` 讓 Kubernetes 接受它發出的登入權杖。這段設定由 `zeabur-identityctl kube-config` 印出：
-
 ```sh
-mkdir -p /etc/zeatend
-{
-  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
-  zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public 2>/dev/null | sed 's/^/    /'
-} > /etc/zeatend/config.yaml
 zeatend plan
 ```
 
@@ -47,15 +40,29 @@ zeatend apply
 </Step>
 <Step>
 
-### 安裝 Zeabur 開源版
+### 讓叢集信任登入
 
-讓 Helm 使用 K3s 的 kubeconfig：
+下一步裝好的 Zeabur Identity 會發出登入權杖，Kubernetes 要在 Zeatend 的 `apiServer.authenticationConfig` 列出它，才會接受。`zeabur-identityctl kube-config` 印出這段設定，它要讀叢集，所以等叢集裝好才執行。第二次 `zeatend apply` 會帶著這段設定重新啟動 K3s：
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+mkdir -p /etc/zeatend
+authn=$(mktemp)
+zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public > "$authn" && {
+  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
+  sed 's/^/    /' "$authn"
+} > /etc/zeatend/config.yaml &&
+  zeatend apply
 ```
 
-接著照[用 Helm 安裝](existing-cluster.mdx#用-helm-安裝)執行 `helm install`，再照[建立管理員帳號](existing-cluster.mdx#建立管理員帳號)用通行密鑰登入。Zeatend 已經讓叢集信任登入，不用再做「讓叢集信任登入」。
+`zeabur-identityctl` 也會印出手動安裝這段設定的做法，不用理它，Zeatend 會代你做。如果它印出的是錯誤，就不會寫入任何檔案，`zeatend apply` 也不會執行。照錯誤訊息處理後，再執行一次這段指令。
+
+</Step>
+<Step>
+
+### 安裝 Zeabur 開源版
+
+Helm 使用上一步設好的 K3s kubeconfig。開了新的 SSH 連線時，先執行 `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`。照[用 Helm 安裝](existing-cluster.mdx#用-helm-安裝)執行 `helm install`，再照[建立管理員帳號](existing-cluster.mdx#建立管理員帳號)用通行密鑰登入。上一步已經讓叢集信任登入，不用再做那裡的「讓叢集信任登入」。
 
 </Step>
 </Steps>
