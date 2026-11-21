@@ -3,6 +3,13 @@
 Zeabur is starting at {{ $publicUrl }}. Wait for it with:
 
   kubectl -n {{ .Release.Namespace }} rollout status deployment/{{ include "zeabur.fullname" . }}
+{{- if and .Release.IsInstall .Values.components.install }}
+
+The Job {{ printf "%s-components" (include "zeabur.fullname" .) | trunc 63 | trimSuffix "-" }} installs {{ join ", " .Values.components.install }} from Zeabur Catalog
+and retries for about 45 minutes. Follow it with:
+
+  kubectl -n {{ .Release.Namespace }} logs -f job/{{ printf "%s-components" (include "zeabur.fullname" .) | trunc 63 | trimSuffix "-" }} --all-containers
+{{- end }}
 {{- if and .Values.identity.enabled .Release.IsInstall .Values.identity.admin.setupLink }}
 
 Create the first administrator ({{ .Values.identity.admin.user }}) in a browser. The link works

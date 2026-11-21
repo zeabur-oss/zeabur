@@ -1,5 +1,5 @@
 //! `zeabur components install`: what **Cluster → Components** does, from the command line, as
-//! the pod's service account. The chart's `post-install` hook runs it to install cert-manager
+//! the pod's service account. The chart's install-time Job runs it to install cert-manager
 //! before anyone signs in.
 //!
 //! The API runs in this process (a service call on `zeabur_api::router`, no listener). The
@@ -25,7 +25,10 @@ use zeabur_api::cluster::components::{
 use zeabur_api::views::CapabilityList;
 use zeabur_catalog::InstallSource;
 use zeabur_core::problem::Problem;
-use zeabur_kube::{ClusterEndpoint, UserClient};
+use zeabur_kube::{
+    Cluster as _, ClusterEndpoint, ObjectTarget, Preconditions, UserClient, WriteBody,
+    WriteRequest,
+};
 
 /// The service account token of this pod, which kubelet renews.
 const TOKEN_FILE: &str = "/var/run/secrets/kubernetes.io/serviceaccount/token";
@@ -65,6 +68,10 @@ struct InstallArgs {
     /// reading the catalog.
     #[arg(long, env = "ZEABUR_EXTRA_CA_FILE")]
     extra_ca_file: Option<PathBuf>,
+    /// The `ClusterRoleBinding` that gives this pod its rights, deleted once every component is
+    /// ready.
+    #[arg(long, value_name = "NAME")]
+    revoke: Option<String>,
 }
 
 fn duration(text: &str) -> Result<Duration, String> {
@@ -92,14 +99,39 @@ pub(crate) async fn run(args: &ComponentsArgs) -> Result<(), String> {
     let endpoint = ClusterEndpoint::in_cluster().map_err(|e| e.to_string())?;
     let cluster =
         UserClient::with_token_file(&endpoint, Path::new(TOKEN_FILE)).map_err(|e| e.to_string())?;
-    let api = Api::new(cluster, settings);
+    let api = Api::new(cluster.clone(), settings);
     let deadline = Instant::now() + args.timeout;
     for id in &args.components {
         tokio::time::timeout_at(deadline, install(&api, id))
             .await
             .map_err(|_elapsed| format!("{id} is not ready after {}s", args.timeout.as_secs()))??;
     }
+    if let Some(binding) = &args.revoke {
+        revoke(&cluster, binding).await;
+    }
     Ok(())
+}
+
+/// Deletes `binding`. The components are ready, so a failure only leaves the binding to the next
+/// `helm upgrade`, which removes it.
+async fn revoke(cluster: &UserClient, binding: &str) {
+    let request = WriteRequest {
+        target: ObjectTarget {
+            api_version: "rbac.authorization.k8s.io/v1".to_owned(),
+            kind: "ClusterRoleBinding".to_owned(),
+            plural: "clusterrolebindings".to_owned(),
+            namespace: String::new(),
+            name: binding.to_owned(),
+        },
+        body: WriteBody::Delete(Preconditions::default()),
+        dry_run: false,
+    };
+    match cluster.write(&request).await {
+        Ok(_written) => tracing::info!(event = "components.revoke", binding, "deleted"),
+        Err(error) => {
+            tracing::warn!(event = "components.revoke", binding, %error, "not deleted");
+        }
+    }
 }
 
 async fn install(api: &Api, id: &str) -> Result<(), String> {
