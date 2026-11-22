@@ -30,6 +30,8 @@ export interface ImageService {
   /** Empty: a worker, which takes no connections. */
   port: string
   publicUrl: boolean
+  /** The person chose `publicUrl`; until then it follows the cluster's suffix. */
+  publicChosen: boolean
   host: string
   variables: ServiceVariable[]
   /** Plain values go in the Secret `<name>-env` rather than in the Deployment. */
@@ -58,6 +60,7 @@ export const newImageService = (): ImageService => ({
   name: "",
   port: "",
   publicUrl: false,
+  publicChosen: false,
   host: "",
   variables: [],
   secretVariables: true,
@@ -206,4 +209,14 @@ export function imageOptions(rights: Rights) {
     secrets: may("", "secrets"),
     volume: may("", "persistentvolumeclaims"),
   }
+}
+
+/** Whether the service gets a public address. On by default when the cluster has a suffix to
+ * fill the host from, as for Git and uploads, until the person chooses. */
+export function publishChoice(
+  chosen: boolean,
+  on: boolean,
+  suffixes?: readonly string[] | null,
+): boolean {
+  return chosen ? on : Boolean(suffixes?.[0])
 }

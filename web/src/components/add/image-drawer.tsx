@@ -35,6 +35,7 @@ import {
   serviceNameProblem,
   suggestedHost,
   type ImageService,
+  publishChoice,
 } from "@/model/image-service"
 import { imageProfile, type Profile } from "@/model/pod-security"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -85,7 +86,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const [extras, setExtras] = useState<Extras>(newExtras)
   const [named, setNamed] = useState(false)
   const [hosted, setHosted] = useState(false)
-  const [published, setPublished] = useState(false)
   const [tried, setTried] = useState(false)
   const [moreShown, setMoreShown] = useState(false)
   const set = (patch: Partial<ImageService>) => setForm((f) => ({ ...f, ...patch }))
@@ -102,8 +102,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const portValue = shownPort(typedPort, inspection)
   const note = portNote(portValue, inspection)
   const port = options.port ? portValue.trim() : ""
-  // On by default when the cluster has a suffix to fill the host from, as for Git and uploads.
-  const publish = published ? form.publicUrl : Boolean(domains.suffixes?.[0])
+  const publish = publishChoice(form.publicChosen, form.publicUrl, domains.suffixes)
   const publicUrl = options.publicUrl && port !== "" && publish
   const host = hosted ? form.host : suggestedHost(name, project, domains.suffixes?.[0])
   const env = parseEnv(extras.env)
@@ -251,10 +250,7 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
           port={port}
           canPublish={options.publicUrl}
           on={publish}
-          onToggle={(publicUrl) => {
-            setPublished(true)
-            set({ publicUrl })
-          }}
+          onToggle={(publicUrl) => set({ publicUrl, publicChosen: true })}
           host={host}
           onHost={(typed) => {
             setHosted(true)
