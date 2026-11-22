@@ -4,8 +4,8 @@
 //!   `app.kubernetes.io/name: <service>` that "Deploy an image" and "Deploy from Git" write on
 //!   everything they create, or where its name is how Zeabur or Kubernetes made it for the service:
 //!   a route `<service>-<host>` that "Add domain" created, the `<route>-tls` certificate Secret of
-//!   a route that goes, a claim a StatefulSet's template made (`<template>-<service>-<n>`).
-//!   An install of a template labels everything it creates `templates.zeabur.com/template`; such an
+//!   a route that goes, a claim a StatefulSet's template made (`<template>-<service>-<n>`). An
+//!   install of a template labels everything it creates `templates.zeabur.com/template`; such an
 //!   object the service uses is the service's too.
 //! - **Used by nothing else.** A ConfigMap, Secret or claim another workload reads or mounts, a
 //!   Kubernetes Service that also selects another workload's pods, and a route that also leads to
