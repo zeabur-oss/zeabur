@@ -4,7 +4,9 @@
 //!   `app.kubernetes.io/name: <service>` that "Deploy an image" and "Deploy from Git" write on
 //!   everything they create, or where its name is how Zeabur or Kubernetes made it for the service:
 //!   a route `<service>-<host>` that "Add domain" created, the `<route>-tls` certificate Secret of
-//!   a route that goes, a claim a StatefulSet's template made (`<template>-<service>-<n>`).
+//!   a route that goes, a claim a StatefulSet's template made (`<template>-<service>-<n>`). An
+//!   install of a template labels everything it creates `templates.zeabur.com/template`; such an
+//!   object the service uses is the service's too.
 //! - **Used by nothing else.** A ConfigMap, Secret or claim another workload reads or mounts, a
 //!   Kubernetes Service that also selects another workload's pods, and a route that also leads to
 //!   one, stay. So does a route to a Service that stays.
@@ -30,6 +32,14 @@ use crate::rules::route_name;
 
 /// The label "Deploy an image" and "Deploy from Git" put on every object they create.
 pub const SERVICE_LABEL: &str = "app.kubernetes.io/name";
+
+/// The label a template's install puts on every object it creates.
+const TEMPLATE_LABEL: &str = "templates.zeabur.com/template";
+
+/// Whether a template's install created the object.
+fn from_template(meta: &ObjectMeta) -> bool {
+    label(meta.labels.as_ref(), TEMPLATE_LABEL).is_some()
+}
 
 /// The ConfigMap kube-apiserver publishes into every namespace.
 const ROOT_CA_CONFIG_MAP: &str = "kube-root-ca.crt";
@@ -97,6 +107,7 @@ pub fn owned(snapshot: &Snapshot, http_routes: &[Value], workload: &WorkloadRef)
         let mut using = users(kind, object);
         let used = using.remove(workload);
         let labelled = label(meta.labels.as_ref(), SERVICE_LABEL) == Some(name);
+        let made = made || (used && from_template(meta));
         if !(used || labelled || made) {
             return None;
         }
@@ -163,7 +174,12 @@ pub fn owned(snapshot: &Snapshot, http_routes: &[Value], workload: &WorkloadRef)
             .flat_map(|s| s.tls.iter().flatten())
             .filter_map(|t| t.secret_name.clone())
             .collect();
-        let gone = match decide(&mut out, "Ingress", &ingress.metadata, made && leads_here) {
+        let gone = match decide(
+            &mut out,
+            "Ingress",
+            &ingress.metadata,
+            (made || from_template(&ingress.metadata)) && leads_here,
+        ) {
             Some(true) if backends.iter().all(|b| services.contains(b)) => true,
             Some(true) => {
                 out.stays
@@ -214,6 +230,7 @@ pub fn owned(snapshot: &Snapshot, http_routes: &[Value], workload: &WorkloadRef)
             .map(|r| r.workload.clone())
             .collect();
         let labelled = label(meta.labels.as_ref(), SERVICE_LABEL) == Some(name);
+        let made = made || from_template(&meta);
         if !(leads_here || labelled) {
             continue;
         }
