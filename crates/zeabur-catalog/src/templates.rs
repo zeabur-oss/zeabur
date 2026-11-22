@@ -14,10 +14,12 @@ use base64::Engine as _;
 use base64::engine::general_purpose::STANDARD;
 use regex::Regex;
 use serde::{Deserialize, Serialize};
-use serde_json::value::RawValue;
 use serde_json::{Value, json};
 use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
+use zeabur_catalog_format::api::{Entry, TemplateFile};
+use zeabur_catalog_format::common::{self as format, Generate};
+use zeabur_catalog_format::template;
 use zeabur_model::kernel::dns::{is_dns_label, is_hostname};
 
 use crate::bundle;
@@ -268,90 +270,6 @@ pub enum Reference {
     Component(String),
 }
 
-/// The parts of `template.yaml` Zeabur reads.
-#[derive(Deserialize)]
-struct File {
-    metadata: FileMetadata,
-    #[serde(default)]
-    requires: Vec<Reference>,
-    #[serde(default)]
-    services: Vec<FileService>,
-    #[serde(default)]
-    inputs: Vec<FileInput>,
-    #[serde(default)]
-    security: FileSecurity,
-}
-
-#[derive(Deserialize, Default)]
-struct FileSecurity {
-    #[serde(default)]
-    summary: String,
-    #[serde(default)]
-    locales: BTreeMap<String, FileSummary>,
-    #[serde(default)]
-    risks: Vec<TemplateRisk>,
-}
-
-#[derive(Deserialize)]
-struct FileSummary {
-    summary: String,
-}
-
-#[derive(Deserialize)]
-struct FileMetadata {
-    name: String,
-    version: String,
-    #[serde(default)]
-    summary: String,
-    #[serde(default)]
-    locales: BTreeMap<String, FileSummary>,
-    license: String,
-    homepage: String,
-}
-
-#[derive(Deserialize)]
-struct FileService {
-    name: String,
-    #[serde(default)]
-    domains: Vec<String>,
-    #[serde(default)]
-    resources: BTreeMap<String, BTreeMap<String, String>>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct FileInput {
-    name: String,
-    description: String,
-    #[serde(default)]
-    label: Option<String>,
-    #[serde(default)]
-    locales: BTreeMap<String, InputLocale>,
-    #[serde(default)]
-    required: bool,
-    #[serde(default)]
-    default: Option<String>,
-    #[serde(default)]
-    generate: Option<FileGenerate>,
-    #[serde(default)]
-    secret: Option<SecretKey>,
-    validation: FileValidation,
-}
-
-#[derive(Deserialize)]
-#[serde(tag = "type")]
-enum FileGenerate {
-    #[serde(rename = "random")]
-    Random { bytes: u8, encoding: Encoding },
-    #[serde(other)]
-    Unknown,
-}
-
-#[derive(Deserialize)]
-struct FileValidation {
-    pattern: String,
-}
-
 /// The templates Zeabur offers: the ones this build carries ([`Catalog::embedded`]), or those
 /// Zeabur Catalog's API lists now ([`Catalog::updated`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -359,36 +277,13 @@ pub struct Catalog {
     sources: BTreeMap<String, Source>,
 }
 
-/// A template's `template.yaml` (as written, or as JSON), its `manifests.yaml` and its revision.
+/// A template's `template.yaml` (or why it does not read), its `manifests.yaml` and its
+/// revision.
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Source {
-    file: Cow<'static, str>,
+    file: Result<template::Template, String>,
     manifests: Cow<'static, str>,
     revision: String,
-}
-
-/// `catalog.json` of Zeabur Catalog's API: the part Zeabur reads.
-#[derive(Debug, Deserialize)]
-pub struct Index {
-    templates: Vec<IndexEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct IndexEntry {
-    id: String,
-    source_digest: String,
-}
-
-/// `templates/<id>.json` of Zeabur Catalog's API.
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct TemplateFile {
-    id: String,
-    source_digest: String,
-    /// `template.yaml` as JSON, which reads as YAML.
-    template: Box<RawValue>,
-    manifests: String,
 }
 
 /// A template the API lists that Zeabur does not offer as listed, and why.
@@ -408,7 +303,7 @@ impl Catalog {
             .iter()
             .map(|(id, file, manifests)| {
                 let source = Source {
-                    file: Cow::Borrowed(file),
+                    file: serde_saphyr::from_str(file).map_err(|e| e.to_string()),
                     manifests: Cow::Borrowed(manifests),
                     revision: source_digest(file, manifests),
                 };
@@ -418,12 +313,11 @@ impl Catalog {
         Self { sources }
     }
 
-    /// The ids `index` lists whose `sourceDigest` is not the revision offered here: the
-    /// `templates/<id>.json` to fetch for [`Self::updated`]. An id that is not a DNS label is
-    /// left out.
-    pub fn stale<'a>(&self, index: &'a Index) -> impl Iterator<Item = &'a str> {
-        index
-            .templates
+    /// The ids `listed` (the templates of `catalog.json`) names whose `sourceDigest` is not the
+    /// revision offered here: the `templates/<id>.json` to fetch for [`Self::updated`]. An id
+    /// that is not a DNS label is left out.
+    pub fn stale<'a>(&self, listed: &'a [Entry]) -> impl Iterator<Item = &'a str> {
+        listed
             .iter()
             .filter(|entry| is_dns_label(&entry.id))
             .filter(|entry| {
@@ -434,19 +328,19 @@ impl Catalog {
             .map(|entry| entry.id.as_str())
     }
 
-    /// The templates `index` lists, each from its `templates/<id>.json` in `files` when it is
+    /// The templates `listed` names, each from its `templates/<id>.json` in `files` when it is
     /// there and as offered here otherwise. A file is dropped when it does not read, is not the
-    /// revision `index` lists, or requires a component this build does not carry, and the
+    /// revision `listed` names, or requires a component this build does not carry, and the
     /// template offered here stays in its place.
     #[must_use]
     pub fn updated(
         &self,
-        index: &Index,
+        listed: &[Entry],
         files: &BTreeMap<String, Vec<u8>>,
     ) -> (Self, Vec<Dropped>) {
         let mut sources = BTreeMap::new();
         let mut dropped = Vec::new();
-        for IndexEntry { id, source_digest } in &index.templates {
+        for Entry { id, source_digest } in listed {
             let fetched = files.get(id).map(|file| {
                 read_fetched(id, file)
                     .and_then(|source| listed_revision(source, source_digest))
@@ -539,7 +433,7 @@ fn read_fetched(id: &str, file: &[u8]) -> Result<Source, String> {
         return Err(format!("its file names the template {}", file.id));
     }
     Ok(Source {
-        file: Cow::Owned(file.template.get().to_owned()),
+        file: Ok(file.template),
         manifests: Cow::Owned(file.manifests),
         revision: file.source_digest,
     })
@@ -593,12 +487,17 @@ pub fn template_id(id: &str) -> Option<&'static str> {
 }
 
 #[expect(clippy::too_many_lines, reason = "one pass over the file's parts")]
-fn read(id: &str, file: &str, manifests: &str, revision: &str) -> Result<Template, RenderError> {
+fn read(
+    id: &str,
+    file: &Result<template::Template, String>,
+    manifests: &str,
+    revision: &str,
+) -> Result<Template, RenderError> {
     let broken = |detail: String| RenderError::Broken {
         template: id.to_owned(),
         detail,
     };
-    let file: File = serde_saphyr::from_str(file).map_err(|e| broken(e.to_string()))?;
+    let file = file.as_ref().map_err(|e| broken(e.clone()))?.clone();
     parse(manifests).map_err(broken)?;
     let inputs = file
         .inputs
@@ -606,10 +505,14 @@ fn read(id: &str, file: &str, manifests: &str, revision: &str) -> Result<Templat
         .map(|input| {
             let generate = match input.generate {
                 None => None,
-                Some(FileGenerate::Random { bytes, encoding }) => {
-                    Some(Generated { bytes, encoding })
-                }
-                Some(FileGenerate::Unknown) => {
+                Some(Generate::Random { bytes, encoding }) => Some(Generated {
+                    bytes,
+                    encoding: match encoding {
+                        format::Encoding::Base64url => Encoding::Base64url,
+                        format::Encoding::Hex => Encoding::Hex,
+                    },
+                }),
+                Some(Generate::ClusterIp | Generate::Unknown) => {
                     return Err(RenderError::UnknownTemplate(id.to_owned()));
                 }
             };
@@ -621,15 +524,21 @@ fn read(id: &str, file: &str, manifests: &str, revision: &str) -> Result<Templat
                     .locales
                     .into_iter()
                     .map(|(lang, l)| {
-                        let description = l.description.trim().to_owned();
-                        (lang, InputLocale { description, ..l })
+                        let locale = InputLocale {
+                            label: l.label,
+                            description: l.description.trim().to_owned(),
+                        };
+                        (lang, locale)
                     })
                     .collect(),
                 required: input.required,
                 default: input.default,
                 pattern: input.validation.pattern,
                 generate,
-                secret: input.secret,
+                secret: input.secret.map(|s| SecretKey {
+                    name: s.name,
+                    key: s.key,
+                }),
             })
         })
         .collect::<Result<Vec<_>, _>>()?;
@@ -672,13 +581,23 @@ fn read(id: &str, file: &str, manifests: &str, revision: &str) -> Result<Templat
             .collect(),
         license: file.metadata.license,
         homepage: file.metadata.homepage,
-        requires: file.requires,
+        requires: file
+            .requires
+            .into_iter()
+            .map(|r| match r {
+                format::Reference::Capability(name) => Reference::Capability(name),
+                format::Reference::Component(name) => Reference::Component(name),
+            })
+            .collect(),
         services: file
             .services
             .into_iter()
             .map(|s| TemplateService {
                 name: s.name,
-                requests: s.resources.get("requests").cloned().unwrap_or_default(),
+                requests: BTreeMap::from([
+                    ("cpu".to_owned(), s.resources.requests.cpu),
+                    ("memory".to_owned(), s.resources.requests.memory),
+                ]),
             })
             .collect(),
         inputs,
@@ -988,24 +907,84 @@ mod tests {
         }
     }
 
+    /// `file`, a template with only the fields a test reads, with the others a template file
+    /// must have.
+    fn complete(mut file: Value) -> template::Template {
+        fill(
+            &mut file,
+            &json!({
+                "apiVersion": "catalog.zeabur.com/v1",
+                "kind": "Template",
+                "metadata": {
+                    "name": "A",
+                    "version": "1",
+                    "summary": "s",
+                    "locales": {},
+                    "license": "MIT",
+                    "homepage": "https://example.com",
+                    "docs": "https://example.com",
+                },
+                "services": [],
+                "security": {"summary": "s", "risks": []},
+                "smoke": [],
+            }),
+        );
+        let quantities = json!({"cpu": "10m", "memory": "16Mi"});
+        let service = json!({
+            "podSecurity": "restricted",
+            "resources": {"requests": quantities, "limits": quantities},
+        });
+        for service_file in file["services"].as_array_mut().into_iter().flatten() {
+            fill(service_file, &service);
+        }
+        // `get_mut`, not `file["inputs"]`, which would add `inputs: null` to a case without it.
+        for input in file
+            .get_mut("inputs")
+            .and_then(Value::as_array_mut)
+            .into_iter()
+            .flatten()
+        {
+            fill(input, &json!({"description": "d"}));
+        }
+        serde_json::from_value(file).unwrap()
+    }
+
+    /// Adds each key of `defaults` that `value` lacks, in nested objects too.
+    fn fill(value: &mut Value, defaults: &Value) {
+        let (Some(value), Some(defaults)) = (value.as_object_mut(), defaults.as_object()) else {
+            return;
+        };
+        for (key, default) in defaults {
+            match value.get_mut(key) {
+                Some(existing) => fill(existing, default),
+                None => {
+                    value.insert(key.clone(), default.clone());
+                }
+            }
+        }
+    }
+
     #[test]
     fn refuses_duplicate_input_names_and_secret_keys() {
-        let file = |inputs: &str| {
-            format!(
-                "metadata: {{name: A, version: '1', description: d, license: MIT, homepage: h}}\ninputs:\n{inputs}"
-            )
+        let file = |inputs: [(&str, &str, &str); 2]| {
+            let inputs: Vec<Value> = inputs
+                .iter()
+                .map(|(name, secret, key)| {
+                    json!({
+                        "name": name,
+                        "generate": {"type": "random", "bytes": 32, "encoding": "base64url"},
+                        "secret": {"name": secret, "key": key},
+                        "validation": {"pattern": "x"},
+                    })
+                })
+                .collect();
+            Ok(complete(json!({ "inputs": inputs })))
         };
-        let input = |name: &str, secret: &str| {
-            format!(
-                "  - {{name: {name}, description: d, generate: {{type: random, bytes: 32, encoding: base64url}}, secret: {secret}, validation: {{pattern: x}}}}\n"
-            )
-        };
-        let secret = |name: &str, key: &str| format!("{{name: {name}, key: {key}}}");
-        let ok = file(&(input("a", &secret("s", "k")) + &input("b", &secret("s", "l"))));
+        let ok = file([("a", "s", "k"), ("b", "s", "l")]);
         assert!(read("t", &ok, "", "").is_ok());
-        let same_name = file(&(input("a", &secret("s", "k")) + &input("a", &secret("s", "l"))));
+        let same_name = file([("a", "s", "k"), ("a", "s", "l")]);
         assert!(read("t", &same_name, "", "").is_err());
-        let same_key = file(&(input("a", &secret("s", "k")) + &input("b", &secret("s", "k"))));
+        let same_key = file([("a", "s", "k"), ("b", "s", "k")]);
         assert!(read("t", &same_key, "", "").is_err());
     }
 
@@ -1200,30 +1179,12 @@ mod tests {
             };
             ran = true;
             let id = case["id"].as_str().unwrap();
-            // The case has only the fields rendering reads; `read` needs the others too.
-            let mut file = case["template"].clone();
-            for (key, value) in [
-                ("name", id),
-                ("description", "d"),
-                ("license", "MIT"),
-                ("homepage", "https://example.com"),
-            ] {
-                file["metadata"][key] = json!(value);
-            }
-            // `get_mut`, not `file["inputs"]`, which would add `inputs: null` to a case without it.
-            for input in file
-                .get_mut("inputs")
-                .and_then(Value::as_array_mut)
-                .into_iter()
-                .flatten()
-            {
-                input["description"] = json!("d");
-            }
+            let file = complete(case["template"].clone());
             let options = &case["options"];
             let inputs: BTreeMap<String, String> =
                 serde_json::from_value(options["inputs"].clone()).unwrap_or_default();
             let source = Source {
-                file: Cow::Owned(file.to_string()),
+                file: Ok(file),
                 manifests: Cow::Owned(manifests.to_owned()),
                 revision: String::new(),
             };
@@ -1299,9 +1260,9 @@ mod tests {
         assert!(objects.iter().any(|o| o["kind"] == "Deployment"));
     }
 
-    /// Zeabur Catalog's API from its v0.5.3 release (`api-v1.tar.gz`): `catalog.json`, two
+    /// Zeabur Catalog's API from its v0.6.1 release (`api-v1.tar.gz`): `catalog.json`, two
     /// template files, and the two files of Miniflux they were made from, at the same commit.
-    const INDEX: &str = include_str!("../tests/catalog-api/v1/catalog.json");
+    const INDEX: &str = include_str!("../tests/api/catalog.json");
     const MINIFLUX: &str = include_str!("../tests/catalog-api/v1/templates/miniflux.json");
     const OLLAMA: &str = include_str!("../tests/catalog-api/v1/templates/ollama.json");
 
@@ -1310,13 +1271,13 @@ mod tests {
         let file = include_str!("../tests/catalog-api/miniflux/template.yaml");
         let manifests = include_str!("../tests/catalog-api/miniflux/manifests.yaml");
         let written = Source {
-            file: Cow::Borrowed(file),
+            file: serde_saphyr::from_str(file).map_err(|e| e.to_string()),
             manifests: Cow::Borrowed(manifests),
             revision: source_digest(file, manifests),
         };
         let fetched = read_fetched("miniflux", MINIFLUX.as_bytes()).unwrap();
         assert_eq!(fetched.read("miniflux"), written.read("miniflux"));
-        let index: Index = serde_json::from_str(INDEX).unwrap();
+        let index = crate::api::index(INDEX.as_bytes()).unwrap();
         let listed = index.templates.iter().find(|t| t.id == "miniflux").unwrap();
         assert_eq!(written.revision, listed.source_digest);
 
@@ -1340,15 +1301,14 @@ mod tests {
             .source_digest
     }
 
-    fn listed(entries: &[(&str, &str)]) -> Index {
-        let templates = entries
+    fn listed(entries: &[(&str, &str)]) -> Vec<Entry> {
+        entries
             .iter()
-            .map(|(id, digest)| IndexEntry {
+            .map(|(id, digest)| Entry {
                 id: (*id).to_owned(),
                 source_digest: (*digest).to_owned(),
             })
-            .collect();
-        Index { templates }
+            .collect()
     }
 
     #[test]

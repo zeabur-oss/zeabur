@@ -15,7 +15,7 @@ use std::time::{Duration, Instant};
 
 use axum::http::{self, Request};
 use tokio::sync::Mutex;
-use zeabur_catalog::{Catalog, Index};
+use zeabur_catalog::{Catalog, api};
 use zeabur_http::Https;
 
 /// How long after a fetch the next one is due.
@@ -142,14 +142,13 @@ impl Fetch {
             .get(http::header::ETAG)
             .and_then(|v| v.to_str().ok())
             .map(str::to_owned);
-        let index: Index =
-            serde_json::from_slice(&index).map_err(|e| format!("catalog.json: {e}"))?;
+        let index = api::index(&index).map_err(|e| format!("catalog.json: {e}"))?;
         let mut files = BTreeMap::new();
-        for id in current.stale(&index) {
+        for id in current.stale(&index.templates) {
             let (_, _, file) = self.get(&format!("templates/{id}.json"), None).await?;
             files.insert(id.to_owned(), file);
         }
-        let (catalog, dropped) = current.updated(&index, &files);
+        let (catalog, dropped) = current.updated(&index.templates, &files);
         for dropped in &dropped {
             tracing::warn!(template = %dropped.id, reason = %dropped.reason, "a fetched template is not offered");
         }
@@ -199,7 +198,8 @@ mod tests {
     /// The files asked for, with the `If-None-Match` each request named.
     type Asked = Arc<std::sync::Mutex<Vec<(String, Option<String>)>>>;
 
-    /// `catalog.json` with every embedded template at its revision, and Ollama at `ollama`.
+    /// Zeabur Catalog v0.6.1's `catalog.json` with every embedded template at its revision, and
+    /// Ollama at `ollama`.
     fn index(ollama: &str) -> String {
         let embedded = Catalog::embedded().templates().unwrap();
         let templates: Vec<serde_json::Value> = embedded
@@ -213,7 +213,12 @@ mod tests {
                 serde_json::json!({"id": t.id, "sourceDigest": digest})
             })
             .collect();
-        serde_json::json!({"catalog": {"version": "9.9.9"}, "templates": templates}).to_string()
+        let mut index: serde_json::Value = serde_json::from_str(include_str!(
+            "../../../zeabur-catalog/tests/api/catalog.json"
+        ))
+        .unwrap();
+        index["templates"] = templates.into();
+        index.to_string()
     }
 
     /// Serves an API under `/v1/` as GitHub Pages does: each file with an `ETag`, and `304` to a

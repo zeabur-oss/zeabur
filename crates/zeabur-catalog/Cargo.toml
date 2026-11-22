@@ -14,6 +14,7 @@ workspace = true
 # Random values of generated component inputs.
 aws-lc-rs.workspace = true
 flate2.workspace = true
+zeabur-catalog-format.workspace = true
 zeabur-kube.workspace = true
 zeabur-model.workspace = true
 # A template's revision, Zeabur Catalog's `sourceDigest` (`templates::source_digest`).

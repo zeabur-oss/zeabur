@@ -57,7 +57,7 @@ mod tests {
     ];
 
     const SUC: &str =
-        "https://github.com/rancher/system-upgrade-controller/releases/download/v0.20.2";
+        "https://github.com/rancher/system-upgrade-controller/releases/download/v0.21.1";
     const POLICY_REPORTS: &str = "https://raw.githubusercontent.com/kubernetes-retired/\
         wg-policy-prototypes/ed0ca5a1c7788055074c7500915b76fc4518ed33/policy-report/crd/\
         wgpolicyk8s.io/v1alpha2/wgpolicyk8s.io_";
@@ -98,7 +98,7 @@ mod tests {
         ]
     }
 
-    /// Zeabur Catalog v0.5.3 with the components of `FIXTURES`, or no answer at all; `tampered`
+    /// Zeabur Catalog v0.6.1 with the components of `FIXTURES`, or no answer at all; `tampered`
     /// answers each manifest file with other bytes than the catalog's digest. With
     /// `contributes` adds values to another component.
     #[derive(Default)]
@@ -189,6 +189,7 @@ mod tests {
                             .unwrap()
                             .push(json!({
                                 "name": "clusterIp",
+                                "description": "The Service's fixed address.",
                                 "path": "service.clusterIP",
                                 "generate": {"type": "clusterIP"},
                             }));
@@ -271,7 +272,7 @@ mod tests {
             app,
             "POST",
             &format!("/api/v1/cluster/components/velero/{verb}"),
-            Some(&json!({"action": "install", "catalogVersion": "0.5.3", "values": values})),
+            Some(&json!({"action": "install", "catalogVersion": "0.6.1", "values": values})),
         )
         .await
     }
@@ -377,7 +378,7 @@ mod tests {
 
         let (status, plan) = call(&app, "plan", "install", "").await;
         assert_eq!(status, StatusCode::OK, "{plan}");
-        assert_eq!(plan["catalogVersion"], "0.5.3");
+        assert_eq!(plan["catalogVersion"], "0.6.1");
         assert_eq!(plan["components"], json!(["cert-manager"]));
         assert_eq!(states(&plan), ["cert-manager pending", "issuers pending"]);
         let chart = &plan["steps"][0]["writes"][1];
@@ -399,7 +400,7 @@ mod tests {
 
         // The first step: the namespace and the chart, dry run first; the answer names what
         // each write left.
-        let (status, applied) = call(&app, "apply", "install", "0.5.3").await;
+        let (status, applied) = call(&app, "apply", "install", "0.6.1").await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert_eq!(
             states(&applied["plan"]),
@@ -422,15 +423,15 @@ mod tests {
         assert_eq!(applied["written"].as_array().unwrap().len(), writes.len());
 
         // Nothing new is written while helm-controller works.
-        call(&app, "apply", "install", "0.5.3").await;
-        let (_, applied) = call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
+        let (_, applied) = call(&app, "apply", "install", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"]),
             ["cert-manager waiting", "issuers pending"]
         );
 
         chart_installed(&cluster);
-        let (_, applied) = call(&app, "apply", "install", "0.5.3").await;
+        let (_, applied) = call(&app, "apply", "install", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"]),
             ["cert-manager ready", "issuers ready"]
@@ -464,12 +465,12 @@ mod tests {
                 .to_string()
                 .contains("letsencrypt-account-key")
         );
-        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let (_, applied) = call(&app, "apply", "remove", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"]),
             ["issuers ready", "cert-manager pending"]
         );
-        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let (_, applied) = call(&app, "apply", "remove", "0.6.1").await;
         assert_eq!(applied["plan"]["done"], true, "{applied}");
         assert!(dynamic(&cluster, "HelmChart", "cert-manager").is_none());
         let namespaces = cluster.inspect(|s| s.namespaces.len()).unwrap();
@@ -613,11 +614,11 @@ mod tests {
     async fn a_removal_deletes_only_the_objects_it_found_unchanged() {
         let cluster = cluster();
         let app = app(&cluster, false);
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
-        call(&app, "apply", "install", "0.5.3").await;
-        call(&app, "apply", "remove", "0.5.3").await;
-        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
+        call(&app, "apply", "remove", "0.6.1").await;
+        let (_, applied) = call(&app, "apply", "remove", "0.6.1").await;
         assert_eq!(applied["plan"]["done"], true, "{applied}");
         let deletions: Vec<_> = cluster
             .inspect(|s| s.writes.clone())
@@ -660,17 +661,17 @@ mod tests {
     async fn a_removal_does_not_delete_again_what_is_already_being_deleted() {
         let cluster = cluster();
         let app = app(&cluster, false);
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         // The first step of the removal deletes the issuers; the next one the HelmChart.
-        call(&app, "apply", "remove", "0.5.3").await;
+        call(&app, "apply", "remove", "0.6.1").await;
         let mut chart = dynamic(&cluster, "HelmChart", "cert-manager").unwrap();
         chart["metadata"]["deletionTimestamp"] = json!("2030-01-01T00:00:00Z");
         put(&cluster, chart);
         let before = cluster.inspect(|s| s.writes.len()).unwrap();
 
-        let (status, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let (status, applied) = call(&app, "apply", "remove", "0.6.1").await;
 
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert_eq!(chart_deletes(&cluster, before), 0, "{applied}");
@@ -680,10 +681,10 @@ mod tests {
     async fn a_delete_that_finds_the_object_gone_counts_as_done() {
         let cluster = cluster();
         let app = app(&cluster, false);
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
-        call(&app, "apply", "install", "0.5.3").await;
-        call(&app, "apply", "remove", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
+        call(&app, "apply", "remove", "0.6.1").await;
         // helm-controller removes its finalizer between the plan's read and the delete.
         cluster.update(|s| {
             s.write_refusals.insert(
@@ -696,7 +697,7 @@ mod tests {
             );
         });
 
-        let (status, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let (status, applied) = call(&app, "apply", "remove", "0.6.1").await;
 
         assert_eq!(status, StatusCode::OK, "{applied}");
     }
@@ -835,7 +836,7 @@ mod tests {
                              "labels": {"pod-security.kubernetes.io/enforce": "privileged"}},
             }),
         );
-        call(&app(&cluster, false), "apply", "install", "0.5.3").await;
+        call(&app(&cluster, false), "apply", "install", "0.6.1").await;
         let namespace = dynamic(&cluster, "Namespace", "cert-manager").unwrap();
         assert_eq!(
             namespace["metadata"]["labels"]["pod-security.kubernetes.io/enforce"],
@@ -847,7 +848,7 @@ mod tests {
     async fn a_certificate_outside_cert_managers_namespace_keeps_it() {
         let cluster = cluster();
         let app = app(&cluster, false);
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
         put(
             &cluster,
@@ -871,7 +872,7 @@ mod tests {
     async fn an_object_zeabur_wrote_for_another_component_keeps_it_in_any_namespace() {
         let cluster = cluster();
         let app = app(&cluster, false);
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
         put(
             &cluster,
@@ -899,7 +900,7 @@ mod tests {
     async fn a_component_needing_it_keeps_it_but_its_leftover_crds_do_not() {
         let cluster = cluster();
         let app = app(&cluster, false);
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
         cluster.update(|s| {
             s.facts
@@ -1022,7 +1023,7 @@ mod tests {
             "the controller file's Namespace is written once, by the first step"
         );
 
-        let (_, applied) = call_for(&app, suc, "apply", "install", "0.5.3").await;
+        let (_, applied) = call_for(&app, suc, "apply", "install", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"]),
             ["crds waiting", "controller pending"]
@@ -1038,7 +1039,7 @@ mod tests {
             suc
         );
         established(&cluster, "plans.upgrade.cattle.io");
-        let (_, applied) = call_for(&app, suc, "apply", "install", "0.5.3").await;
+        let (_, applied) = call_for(&app, suc, "apply", "install", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"]),
             ["crds ready", "controller waiting"]
@@ -1056,7 +1057,7 @@ mod tests {
             plan["leftovers"],
             json!(["customresourcedefinitions/plans.upgrade.cattle.io"])
         );
-        let (_, applied) = call_for(&app, suc, "apply", "remove", "0.5.3").await;
+        let (_, applied) = call_for(&app, suc, "apply", "remove", "0.6.1").await;
         assert_eq!(applied["plan"]["done"], true, "{applied}");
         assert!(
             dynamic(
@@ -1073,7 +1074,7 @@ mod tests {
         let cluster = cluster_with_crds();
         let app = app(&cluster, false);
         let suc = "system-upgrade-controller";
-        call_for(&app, suc, "apply", "install", "0.5.3").await;
+        call_for(&app, suc, "apply", "install", "0.6.1").await;
         // The controller updates its embedded CRD on start: Zeabur's labels go, its fields stay.
         let mut crd = dynamic(
             &cluster,
@@ -1129,7 +1130,7 @@ mod tests {
         // Once Zeabur wrote them, the release stays in the plan.
         let cluster = cluster_with_crds();
         let app = app(&cluster, false);
-        let (_, applied) = call_for(&app, "falco", "apply", "install", "0.5.3").await;
+        let (_, applied) = call_for(&app, "falco", "apply", "install", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"])[0],
             "policy-report-crds waiting",
@@ -1238,7 +1239,7 @@ mod tests {
                 "cert-manager pending"
             ]
         );
-        call_for(&app, "cloudnative-pg", "apply", "install", "0.5.3").await;
+        call_for(&app, "cloudnative-pg", "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
         // The last step writes the chart again with cloudnative-pg's value, and
         // helm-controller installs it.
@@ -1272,10 +1273,10 @@ mod tests {
         );
         assert_eq!(plan["steps"][2]["writes"][0]["kind"], "HelmChartConfig");
 
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
-        call(&app, "apply", "install", "0.5.3").await;
-        let (_, applied) = call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
+        let (_, applied) = call(&app, "apply", "install", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"]),
             ["cert-manager ready", "issuers ready", "traefik waiting"]
@@ -1302,7 +1303,7 @@ mod tests {
         );
         // The config stays, empty, and cert-manager waits until Traefik is installed without
         // the values: its middleware is still in Traefik until then.
-        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let (_, applied) = call(&app, "apply", "remove", "0.6.1").await;
         let config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
         assert_eq!(config["spec"]["valuesContent"], "");
         assert_eq!(
@@ -1327,7 +1328,7 @@ mod tests {
                 "traefik pending"
             ]
         );
-        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let (_, applied) = call(&app, "apply", "remove", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"]),
             [
@@ -1338,7 +1339,7 @@ mod tests {
             ]
         );
         assert!(dynamic(&cluster, "HelmChartConfig", "traefik").is_some());
-        let (_, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let (_, applied) = call(&app, "apply", "remove", "0.6.1").await;
         assert_eq!(
             states(&applied["plan"]),
             [
@@ -1348,7 +1349,7 @@ mod tests {
                 "traefik pending"
             ]
         );
-        let (status, applied) = call(&app, "apply", "remove", "0.5.3").await;
+        let (status, applied) = call(&app, "apply", "remove", "0.6.1").await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert_eq!(applied["plan"]["done"], true, "{applied}");
         assert!(dynamic(&cluster, "HelmChartConfig", "traefik").is_none());
@@ -1357,10 +1358,10 @@ mod tests {
     #[tokio::test]
     async fn an_installed_config_with_other_values_is_written_again() {
         let (cluster, app) = packaged();
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
-        call(&app, "apply", "install", "0.5.3").await;
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
+        call(&app, "apply", "install", "0.6.1").await;
         // helm-controller installs Traefik with the config.
         traefik_installed(&cluster);
         let (_, plan) = call(&app, "plan", "install", "").await;
@@ -1378,7 +1379,7 @@ mod tests {
             states(&plan),
             ["cert-manager ready", "issuers ready", "traefik pending"]
         );
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         let config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
         assert_eq!(config["spec"]["valuesContent"], BOUNCER);
     }
@@ -1402,9 +1403,9 @@ mod tests {
             "values": BOUNCER,
         })));
 
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         chart_installed(&cluster);
-        call(&app, "apply", "install", "0.5.3").await;
+        call(&app, "apply", "install", "0.6.1").await;
         let config = dynamic(&cluster, "HelmChartConfig", "traefik").unwrap();
         assert_eq!(config["spec"], theirs["spec"]);
         let (_, plan) = call(&app, "plan", "remove", "").await;

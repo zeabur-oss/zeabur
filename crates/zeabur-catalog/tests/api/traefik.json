@@ -1,6 +1,6 @@
 {
   "id": "traefik",
-  "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+  "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
   "declaration": {
     "apiVersion": "catalog.zeabur.com/v1",
     "defaults": {
@@ -124,7 +124,7 @@
           "single-node": "deployment:\n  # A second copy gains nothing on one node.\n  replicas: 1\nresources:\n  # Idles near 40Mi; the limit contains leaks.\n  requests: {cpu: 50m, memory: 64Mi}\n  limits: {memory: 256Mi}\n"
         },
         "type": "helm",
-        "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: traefik\n  tag: v3.7.16@sha256:c8a121e4bb1347e8fd52657fab12f2cb70b68f8a018895e2068f92c9e519b9c2\nproviders:\n  kubernetesGateway:\n    # Route web services with HTTPRoute.\n    enabled: true\n  kubernetesIngress:\n    # Many charts still ship Ingress objects.\n    enabled: true\n  kubernetesCRD:\n    # Middleware objects, such as the CrowdSec bouncer.\n    enabled: true\n    # No references to other namespaces.\n    allowCrossNamespace: false\n    # Only the traefik namespace can set the default TLS store.\n    defaultTLSResourcesNamespace: traefik\ngatewayClass:\n  # Gateways reference GatewayClass \"traefik\".\n  enabled: true\n  name: traefik\ngateway:\n  # Gateways and listeners are created per domain, not by the chart.\n  enabled: false\napi:\n  # Unauthenticated surface; not needed.\n  dashboard: false\nservice:\n  spec:\n    # Skip source NAT so Traefik sees client addresses (CrowdSec, rate\n    # limits, logs); only nodes running Traefik serve traffic.\n    externalTrafficPolicy: Local\naccessLog:\n  # JSON access logs for metrics, log search and CrowdSec.\n  enabled: true\n  format: json\n  fields:\n    # Keep only the fields below; secrets live in headers and queries.\n    defaultMode: drop\n    names:\n      ClientHost: keep\n      RequestHost: keep\n      RequestMethod: keep\n      RequestPath: keep\n      RequestProtocol: keep\n      DownstreamStatus: keep\n      DownstreamContentSize: keep\n      RequestContentSize: keep\n      Duration: keep\n      RouterName: keep\n      StartUTC: keep\n    headers:\n      # Headers carry cookies and bearer tokens.\n      defaultMode: drop\n    queryParameters:\n      # Query strings carry OAuth codes and signed-URL secrets.\n      defaultMode: drop\n",
+        "values": "# Pinned by digest; a tag alone can move.\nimage:\n  repository: traefik\n  tag: v3.7.18@sha256:9c437ac4f09ce6f4980a8544902d3475fdf70a1a7c578729581d2535dfa7d635\nproviders:\n  kubernetesGateway:\n    # Route web services with HTTPRoute.\n    enabled: true\n  kubernetesIngress:\n    # Many charts still ship Ingress objects.\n    enabled: true\n  kubernetesCRD:\n    # Middleware objects, such as the CrowdSec bouncer.\n    enabled: true\n    # No references to other namespaces.\n    allowCrossNamespace: false\n    # Only the traefik namespace can set the default TLS store.\n    defaultTLSResourcesNamespace: traefik\ngatewayClass:\n  # Gateways reference GatewayClass \"traefik\".\n  enabled: true\n  name: traefik\ngateway:\n  # Gateways and listeners are created per domain, not by the chart.\n  enabled: false\napi:\n  # Unauthenticated surface; not needed.\n  dashboard: false\nservice:\n  spec:\n    # Skip source NAT so Traefik sees client addresses (CrowdSec, rate\n    # limits, logs); only nodes running Traefik serve traffic.\n    externalTrafficPolicy: Local\naccessLog:\n  # JSON access logs for metrics, log search and CrowdSec.\n  enabled: true\n  format: json\n  fields:\n    # Keep only the fields below; secrets live in headers and queries.\n    defaultMode: drop\n    names:\n      ClientHost: keep\n      RequestHost: keep\n      RequestMethod: keep\n      RequestPath: keep\n      RequestProtocol: keep\n      DownstreamStatus: keep\n      DownstreamContentSize: keep\n      RequestContentSize: keep\n      Duration: keep\n      RouterName: keep\n      StartUTC: keep\n    headers:\n      # Headers carry cookies and bearer tokens.\n      defaultMode: drop\n    queryParameters:\n      # Query strings carry OAuth codes and signed-URL secrets.\n      defaultMode: drop\n",
         "version": "42.1.3"
       }
     ],
@@ -198,7 +198,7 @@
       "result": "passed",
       "pods": [
         {
-          "workload": "svclb-traefik-ec66927e",
+          "workload": "svclb-traefik-c63f4932",
           "kind": "DaemonSet",
           "memory": "1Mi",
           "cpu": "0"
@@ -206,7 +206,7 @@
         {
           "workload": "traefik",
           "kind": "Deployment",
-          "memory": "23Mi",
+          "memory": "26Mi",
           "cpu": "0"
         }
       ],
@@ -220,8 +220,8 @@
           "version": "42.1.3"
         }
       ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "k3s",
@@ -235,7 +235,7 @@
       "result": "passed",
       "pods": [
         {
-          "workload": "svclb-traefik-73a7a7d5",
+          "workload": "svclb-traefik-28aceb6a",
           "kind": "DaemonSet",
           "memory": "1Mi",
           "cpu": "0"
@@ -243,7 +243,7 @@
         {
           "workload": "traefik",
           "kind": "Deployment",
-          "memory": "23Mi",
+          "memory": "25Mi",
           "cpu": "0"
         }
       ],
@@ -257,8 +257,8 @@
           "version": "42.1.3"
         }
       ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kind",
@@ -273,7 +273,7 @@
         {
           "workload": "traefik",
           "kind": "DaemonSet",
-          "memory": "23Mi",
+          "memory": "25Mi",
           "cpu": "0"
         }
       ],
@@ -287,8 +287,8 @@
           "version": "42.1.3"
         }
       ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kind",
@@ -303,7 +303,7 @@
         {
           "workload": "traefik",
           "kind": "DaemonSet",
-          "memory": "22Mi",
+          "memory": "24Mi",
           "cpu": "0"
         }
       ],
@@ -317,8 +317,8 @@
           "version": "42.1.3"
         }
       ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kind",
@@ -333,7 +333,7 @@
         {
           "workload": "traefik",
           "kind": "Deployment",
-          "memory": "22Mi",
+          "memory": "24Mi",
           "cpu": "0"
         }
       ],
@@ -347,8 +347,8 @@
           "version": "42.1.3"
         }
       ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kind",
@@ -363,7 +363,7 @@
         {
           "workload": "traefik",
           "kind": "Deployment",
-          "memory": "22Mi",
+          "memory": "23Mi",
           "cpu": "0"
         }
       ],
@@ -377,8 +377,8 @@
           "version": "42.1.3"
         }
       ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kubesolo",
@@ -394,7 +394,7 @@
         {
           "workload": "traefik",
           "kind": "Deployment",
-          "memory": "24Mi",
+          "memory": "22Mi",
           "cpu": "0"
         }
       ],
@@ -408,11 +408,11 @@
           "version": "42.1.3"
         }
       ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
       "addOns": {
         "helm-controller": "v0.17.9"
       },
-      "measuredAt": "2026-11-12"
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kubesolo",
@@ -423,74 +423,6 @@
       },
       "kubernetesVersion": "v1.36.6",
       "distributionVersion": "v1.3.0",
-      "result": "passed",
-      "pods": [
-        {
-          "workload": "traefik",
-          "kind": "Deployment",
-          "memory": "24Mi",
-          "cpu": "0"
-        }
-      ],
-      "versions": [
-        {
-          "release": "gateway-api-crds",
-          "version": "v1.6.3"
-        },
-        {
-          "release": "traefik",
-          "version": "42.1.3"
-        }
-      ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
-      "addOns": {
-        "helm-controller": "v0.17.9"
-      },
-      "measuredAt": "2026-11-12"
-    },
-    {
-      "distribution": "rke2",
-      "profile": "single-node",
-      "platform": {
-        "os": "linux",
-        "architecture": "amd64"
-      },
-      "kubernetesVersion": "v1.37.2",
-      "distributionVersion": "v1.37.2+rke2r1",
-      "result": "passed",
-      "pods": [
-        {
-          "workload": "traefik",
-          "kind": "Deployment",
-          "memory": "24Mi",
-          "cpu": "0"
-        }
-      ],
-      "versions": [
-        {
-          "release": "gateway-api-crds",
-          "version": "v1.6.3"
-        },
-        {
-          "release": "traefik",
-          "version": "42.1.3"
-        }
-      ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
-      "addOns": {
-        "local-path-provisioner": "v0.0.37"
-      },
-      "measuredAt": "2026-11-12"
-    },
-    {
-      "distribution": "rke2",
-      "profile": "single-node",
-      "platform": {
-        "os": "linux",
-        "architecture": "arm64"
-      },
-      "kubernetesVersion": "v1.37.2",
-      "distributionVersion": "v1.37.2+rke2r1",
       "result": "passed",
       "pods": [
         {
@@ -510,11 +442,79 @@
           "version": "42.1.3"
         }
       ],
-      "sourceDigest": "h1:+8iwlP8LmLeCUMGNTldXjp+XugWenxgqsasxzYs0fxk=",
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
+      "addOns": {
+        "helm-controller": "v0.17.9"
+      },
+      "measuredAt": "2026-11-20"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "amd64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "26Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
       "addOns": {
         "local-path-provisioner": "v0.0.37"
       },
-      "measuredAt": "2026-11-12"
+      "measuredAt": "2026-11-20"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "traefik",
+          "kind": "Deployment",
+          "memory": "26Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "gateway-api-crds",
+          "version": "v1.6.3"
+        },
+        {
+          "release": "traefik",
+          "version": "42.1.3"
+        }
+      ],
+      "sourceDigest": "h1:pW/IOZjWHt3Rdag6Xn/6Uv1tK7hJ/qc0lxQtmiZq8YU=",
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-20"
     }
   ]
 }

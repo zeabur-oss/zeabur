@@ -78,6 +78,8 @@ zeabur-auth = { path = "crates/zeabur-auth" }
 zeabur-test-support = { path = "crates/zeabur-test-support" }
 zeabur-embed = { path = "crates/zeabur-embed" }
 zeabur-telemetry = { path = "crates/zeabur-telemetry" }
+# The types of Zeabur Catalog's files, from the catalog release tag that flake.nix's `catalog` input names.
+zeabur-catalog-format = { git = "https://github.com/zeabur-oss/catalog", tag = "v0.6.1" }
 
 # Third-party crates.
 aws-lc-rs = { version = "1.18", default-features = false, features = ["aws-lc-sys", "alloc", "ring-io"] }

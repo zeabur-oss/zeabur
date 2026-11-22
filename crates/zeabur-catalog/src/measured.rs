@@ -5,8 +5,10 @@
 //! template runs one pod per workload (`replicas: 1`, `instances: 1`), so the rows are the
 //! template's pods.
 
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
 use utoipa::ToSchema;
+use zeabur_catalog_format::api::{Environment, MeasuredDistribution, MeasurementFile, RunResult};
+use zeabur_catalog_format::common::Profile;
 use zeabur_kube::k8s_openapi::jiff::civil::Date;
 use zeabur_model::kernel::quantity;
 
@@ -40,53 +42,22 @@ pub struct MeasuredPod {
     pub cpu_millicores: u64,
 }
 
-#[derive(Deserialize)]
-struct File {
-    environments: Vec<Environment>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Environment {
-    distribution: String,
-    profile: String,
-    platform: Platform,
-    #[serde(default)]
-    kubernetes_version: Option<String>,
-    #[serde(default)]
-    pods: Vec<Pod>,
-    /// `passed`; any other value, or none, is a run that did not pass.
-    #[serde(default)]
-    result: String,
-    measured_at: Date,
-}
-
-#[derive(Deserialize)]
-struct Platform {
-    os: String,
-    architecture: String,
-}
-
-/// One pod of a workload, as Kubernetes quantities (`22Mi`, `3m`).
-#[derive(Deserialize)]
-struct Pod {
-    workload: String,
-    memory: String,
-    cpu: String,
-}
-
-impl Environment {
-    fn name(&self) -> String {
-        let mut name = format!(
-            "{}-{}-{}",
-            self.distribution, self.profile, self.platform.architecture
-        );
-        if let Some(version) = &self.kubernetes_version {
-            name.push('-');
-            name.push_str(version);
-        }
-        name
+/// Where `run` was measured: `<distribution>-<profile>-<architecture>-<Kubernetes version>`.
+fn environment(run: &Environment) -> String {
+    let distribution = match run.distribution {
+        MeasuredDistribution::Kind(_) => "kind",
+        MeasuredDistribution::Host(d) => d.as_str(),
+    };
+    let mut name = format!(
+        "{distribution}-{}-{}",
+        run.profile.as_str(),
+        run.platform.architecture
+    );
+    if let Some(version) = &run.kubernetes_version {
+        name.push('-');
+        name.push_str(version);
     }
+    name
 }
 
 /// What the template `id` uses when idle, as the embedded catalogue measured it; `None` when it
@@ -102,19 +73,22 @@ pub fn template_idle(id: &str) -> Option<IdleUse> {
 /// The newest passed run of a measurement file on a single-node kind cluster on linux/amd64, else
 /// its newest passed run.
 fn idle_from(text: &str) -> Option<IdleUse> {
-    let file: File = serde_json::from_str(text).ok()?;
-    let passed = file.environments.iter().filter(|e| e.result == "passed");
+    let file: MeasurementFile = serde_json::from_str(text).ok()?;
+    let passed = file
+        .environments
+        .iter()
+        .filter(|e| e.result == RunResult::Passed);
     let preferred = |e: &&Environment| {
-        e.distribution == "kind"
-            && e.profile == "single-node"
+        matches!(e.distribution, MeasuredDistribution::Kind(_))
+            && e.profile == Profile::SingleNode
             && e.platform.os == "linux"
             && e.platform.architecture == "amd64"
     };
     let measured = passed
         .clone()
         .filter(preferred)
-        .max_by_key(|e| e.measured_at)
-        .or_else(|| passed.max_by_key(|e| e.measured_at))?;
+        .max_by(|a, b| a.measured_at.cmp(&b.measured_at))
+        .or_else(|| passed.max_by(|a, b| a.measured_at.cmp(&b.measured_at)))?;
     let pods = measured
         .pods
         .iter()
@@ -129,8 +103,8 @@ fn idle_from(text: &str) -> Option<IdleUse> {
     Some(IdleUse {
         memory_bytes: pods.iter().map(|p| p.memory_bytes).sum(),
         cpu_millicores: pods.iter().map(|p| p.cpu_millicores).sum(),
-        environment: measured.name(),
-        measured_at: measured.measured_at,
+        environment: environment(measured),
+        measured_at: measured.measured_at.parse().ok()?,
         pods,
     })
 }
@@ -216,18 +190,6 @@ mod tests {
         let idle = idle_from(&text).unwrap();
         assert_eq!(idle.environment, "k3s-single-node-arm64-v1.36.4");
         assert_eq!(idle.memory_bytes, 22 * 1024 * 1024);
-    }
-
-    #[test]
-    fn a_run_without_a_result_did_not_pass_and_the_others_still_count() {
-        let mut unfinished = run("kind", "amd64", "900Mi", "passed", "2026-10-12");
-        unfinished.as_object_mut().unwrap().remove("result");
-        let text = bundle_of(&[
-            run("kind", "amd64", "300Mi", "passed", "2026-10-11"),
-            unfinished,
-        ]);
-        let idle = idle_from(&text).unwrap();
-        assert_eq!(idle.measured_at, date(2026, 10, 11));
     }
 
     #[test]

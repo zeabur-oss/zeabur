@@ -1115,6 +1115,7 @@ export type Unsupported = (typeof Unsupported)[keyof typeof Unsupported]
 export const Unsupported = {
   contributesWithoutChart: "contributesWithoutChart",
   newerRelease: "newerRelease",
+  unreadable: "unreadable",
 } as const
 
 /**
@@ -1308,7 +1309,7 @@ export type CatalogView = {
   /** Where Zeabur reads it. */
   url: string
   /**
-   * The release, `0.5.3`; absent when Zeabur has never read one.
+   * The release, `0.6.1`; absent when Zeabur has never read one.
    * @nullable
    */
   version?: string | null

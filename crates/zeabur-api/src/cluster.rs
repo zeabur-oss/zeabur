@@ -229,10 +229,8 @@ pub(crate) async fn capabilities(
     capabilities.sort_by(|a, b| a.name.cmp(&b.name));
     if let Some(snapshot) = catalog::current(&state).await.snapshot {
         for component in capabilities.iter_mut().flat_map(|c| &mut c.components) {
-            component.unsupported = snapshot
-                .components
-                .get(&component.id)
-                .and_then(zeabur_catalog::engine::unsupported);
+            component.unsupported =
+                zeabur_catalog::engine::unsupported_in(&snapshot, &component.id);
         }
     }
     let installed = capabilities.iter().filter(|c| c.existing).count();

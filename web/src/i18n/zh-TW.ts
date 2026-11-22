@@ -1161,6 +1161,8 @@ export const zhTW: Messages = {
   "components.unsupported.contributesWithoutChart":
     "這個元件會修改其他元件的設定，本身卻沒有 Helm chart，所以 Zeabur 無法安裝。",
   "components.unsupported.newerRelease": "這個版本的 Zeabur 無法安裝這個元件，請先更新 Zeabur。",
+  "components.unsupported.unreadable":
+    "這個版本的 Zeabur 看不懂 Zeabur Catalog 裡的這個元件，請先更新 Zeabur。",
   "components.howToInstall": "安裝方式",
   "settings.homepage": "首頁",
   "settings.opensInNewTab": "（在新分頁開啟）",

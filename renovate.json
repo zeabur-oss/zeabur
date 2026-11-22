@@ -1,6 +1,6 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "description": "Cargo crates, the Bun workspace's packages and its catalog (bun.lock), action digests, the pins of zeabur-oss/.github (one pull request, no wait) and the Zeabur Identity release tag; the schedule, sign-off, no publish delay for zeabur-oss's own releases, and the github actions, cargo (non-major) and kubernetes crates groups come from the shared preset github>zeabur-oss/.github, and the k3s test version and documented release, which follow K3s's stable channel, from github>zeabur-oss/.github:k3s. Lock file maintenance updates flake.lock, including the Zeabur Catalog commit that zeabur-catalog embeds; the Rust nightly date in rust-toolchain.toml moves with the rust-toolchain manager, after the preset's seven-day wait.",
+  "description": "Cargo crates, the Bun workspace's packages and its catalog (bun.lock), action digests, the pins of zeabur-oss/.github (one pull request, no wait) and the Zeabur Identity release tag; the schedule, sign-off, no publish delay for zeabur-oss's own releases, and the github actions, cargo (non-major) and kubernetes crates groups come from the shared preset github>zeabur-oss/.github, and the k3s test version and documented release, which follow K3s's stable channel, from github>zeabur-oss/.github:k3s. Zeabur Catalog's release tag moves in flake.nix and in Cargo.toml (zeabur-catalog-format) in one pull request; lock file maintenance updates flake.lock; the Rust nightly date in rust-toolchain.toml moves with the rust-toolchain manager, after the preset's seven-day wait.",
   "extends": [
     "github>zeabur-oss/.github",
     "github>zeabur-oss/.github:k3s"
@@ -37,6 +37,14 @@
         "patch"
       ],
       "groupName": "web (non-major)"
+    },
+    {
+      "description": "Zeabur Catalog's release tag: the format crate in Cargo.toml and the flake input that zeabur-catalog embeds move together.",
+      "matchPackageNames": [
+        "zeabur-oss/catalog",
+        "zeabur-catalog-format"
+      ],
+      "groupName": "Zeabur Catalog"
     }
   ],
   "customManagers": [
@@ -62,6 +70,18 @@
         "(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+(?:-[0-9A-Za-z.-]+)?)"
       ],
       "depNameTemplate": "zeabur-oss/builder",
+      "datasourceTemplate": "github-tags"
+    },
+    {
+      "customType": "regex",
+      "description": "Zeabur Catalog release tag of the flake input that zeabur-catalog embeds.",
+      "managerFilePatterns": [
+        "/^flake\\.nix$/"
+      ],
+      "matchStrings": [
+        "\"github:zeabur-oss/catalog/(?<currentValue>v[0-9]+\\.[0-9]+\\.[0-9]+)\""
+      ],
+      "depNameTemplate": "zeabur-oss/catalog",
       "datasourceTemplate": "github-tags"
     }
   ]

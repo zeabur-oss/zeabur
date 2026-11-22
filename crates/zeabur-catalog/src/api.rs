@@ -1,5 +1,5 @@
-//! Zeabur Catalog's API [catalog-api]: the typed files Zeabur reads, and a [`Snapshot`] of one
-//! release made of them.
+//! Zeabur Catalog's API [catalog-api]: a [`Snapshot`] of one release, made of the files that
+//! `zeabur-catalog-format` types.
 //!
 //! The API is static JSON at [`DEFAULT_URL`]: `catalog.json` lists each component's `id` and
 //! `sourceDigest`, and `components/<id>.json` holds one component. A snapshot is `catalog.json`
@@ -7,7 +7,9 @@
 //! Nothing here does I/O: `zeabur-api` fetches the files and keeps the snapshot.
 //!
 //! The path names the API's major version (`v1`). Every catalog release on `v1` only adds to it
-//! [catalog-api], so Zeabur reads any of them and leaves out the fields it does not know.
+//! [catalog-api], so Zeabur reads any of them and leaves out the fields it does not know. A
+//! component file that does not decode is kept as a problem with its id ([`Snapshot::problems`]),
+//! not left out.
 //!
 //! [catalog-api]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/releases.mdx
 
@@ -15,470 +17,17 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::io::{Read as _, Write as _};
 
 use serde::{Deserialize, Serialize};
-use utoipa::ToSchema;
+use zeabur_catalog_format::api::Entry;
+pub use zeabur_catalog_format::api::{ComponentFile, Index};
+use zeabur_catalog_format::common::{Mode, Profile, Reference};
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
-use zeabur_model::PodSecurityLevel;
 use zeabur_model::kernel::dns::is_dns_label;
-
-use crate::templates::Encoding;
 
 /// Where the API is when no mirror is set.
 pub const DEFAULT_URL: &str = "https://oss-catalog.zeabur.com/v1/";
 
 /// The largest file Zeabur reads from the API.
 pub const MAX_FILE: usize = 1 << 20;
-
-/// `catalog.json`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Index {
-    /// The release.
-    pub catalog: ReleaseInfo,
-    /// The distributions the catalog tests on, each with its pinned release.
-    #[serde(default)]
-    pub distributions: Vec<Distribution>,
-    /// Each component's id and digest.
-    pub components: Vec<Entry>,
-}
-
-/// The release a file belongs to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ReleaseInfo {
-    /// `0.5.3`.
-    pub version: String,
-    /// The commit it was built from.
-    pub commit: String,
-}
-
-/// A distribution and its pinned release.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Distribution {
-    /// `k3s`, `rke2` or `kubesolo`.
-    pub name: String,
-    /// `v1.37.2+k3s1`.
-    pub version: String,
-}
-
-/// One component in `catalog.json`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Entry {
-    /// Its id.
-    pub id: String,
-    /// The digest of its file.
-    pub source_digest: String,
-}
-
-/// `components/<id>.json`, with the fields Zeabur reads.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct ComponentFile {
-    /// Its id.
-    pub id: String,
-    /// The digest of the component file.
-    pub source_digest: String,
-    /// The component file as written.
-    pub declaration: Declaration,
-    /// Each environment e2e ran it in.
-    #[serde(default)]
-    pub measurements: Vec<Measurement>,
-}
-
-/// A component file [component-format].
-///
-/// [component-format]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/component-format.mdx
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Declaration {
-    /// Its name and summary.
-    pub metadata: Metadata,
-    /// `recommended`, `optional` or `unsupported`, by profile.
-    #[serde(default)]
-    pub defaults: BTreeMap<String, String>,
-    /// The distributions it may be installed on.
-    #[serde(default)]
-    pub distributions: Vec<String>,
-    /// The Kubernetes versions it supports, as a Helm chart's `kubeVersion` range.
-    #[serde(rename = "kubeVersion")]
-    pub kube_version: String,
-    /// What it needs installed first.
-    #[serde(default)]
-    pub requires: Vec<Reference>,
-    /// What it offers.
-    #[serde(default)]
-    pub provides: Provides,
-    /// What it installs, in order.
-    pub releases: Vec<Release>,
-    /// How privileged it is.
-    pub security: Security,
-    /// Read-only checks of an installed component.
-    #[serde(default)]
-    pub health: Vec<Health>,
-    /// What stays after it is removed.
-    #[serde(default)]
-    pub leftovers: Vec<String>,
-    /// What finds it on a cluster.
-    #[serde(default)]
-    pub detection: Detection,
-    /// CRDs of `detection.crds` whose objects it writes itself.
-    #[serde(default, rename = "internalCRDs")]
-    pub internal_crds: Vec<String>,
-    /// Values asked for or generated.
-    #[serde(default)]
-    pub inputs: Vec<Input>,
-    /// Values it adds to other components' releases.
-    #[serde(default)]
-    pub contributes: Vec<Contribution>,
-}
-
-/// The name and the one-sentence summary.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Metadata {
-    /// `cert-manager`.
-    pub name: String,
-    /// One sentence, in English.
-    #[serde(default)]
-    pub summary: String,
-}
-
-/// A capability (any of its components) or a component.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Reference {
-    /// A capability, such as `ingress`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub capability: Option<String>,
-    /// A component id.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub component: Option<String>,
-}
-
-/// What a component offers.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Provides {
-    /// The capability, such as `certificates`.
-    #[serde(default)]
-    pub capability: String,
-}
-
-/// The kind of a release.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ReleaseType {
-    /// A Helm chart.
-    Helm,
-    /// Manifests written in the file.
-    Inline,
-    /// Manifests at URLs.
-    Manifest,
-    /// A type this build does not know: the component is not offered.
-    #[serde(other)]
-    Unknown,
-}
-
-/// One release of a component.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Release {
-    /// Its name in the file.
-    pub name: String,
-    /// The namespace it installs into.
-    pub namespace: String,
-    /// What it is.
-    #[serde(rename = "type")]
-    pub kind: ReleaseType,
-    /// The Helm release name, when it is not `name`.
-    #[serde(
-        default,
-        rename = "releaseName",
-        skip_serializing_if = "Option::is_none"
-    )]
-    pub helm: Option<String>,
-    /// The chart: `oci://…`, or a name in `repo`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub chart: Option<String>,
-    /// The HTTP chart repository.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub repo: Option<String>,
-    /// The chart version.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub version: Option<String>,
-    /// The values, as YAML.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub values: Option<String>,
-    /// Values merged over `values`, as YAML, by profile.
-    #[serde(default)]
-    pub profiles: BTreeMap<String, String>,
-    /// The manifests of an inline release, as YAML.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub manifests: Option<String>,
-    /// The manifests of a manifest release: URLs, with `{version}` for `version`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub urls: Vec<String>,
-    /// The `sha256:<hex>` digest of each URL's file, in the order of `urls`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub url_digests: Vec<String>,
-    /// CRDs, as `plural.group`: when every one exists, the release is not installed.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub skip_if_present: Vec<String>,
-}
-
-impl Release {
-    /// The Helm release name.
-    #[must_use]
-    pub fn helm_name(&self) -> &str {
-        self.helm.as_deref().unwrap_or(&self.name)
-    }
-
-    /// The URLs of a manifest release, with `{version}` replaced.
-    #[expect(
-        clippy::literal_string_with_formatting_args,
-        reason = "`{version}` is the catalog's URL placeholder, not a format argument"
-    )]
-    #[must_use]
-    pub fn manifest_urls(&self) -> Vec<String> {
-        let version = self.version.as_deref().unwrap_or_default();
-        self.urls
-            .iter()
-            .map(|u| u.replace("{version}", version))
-            .collect()
-    }
-}
-
-/// How privileged a component is.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Security {
-    /// The Pod Security level of its namespaces.
-    pub pod_security: PodSecurityLevel,
-    /// What it may do, in one sentence.
-    #[serde(default)]
-    pub summary: String,
-}
-
-/// One health check.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Health {
-    /// Its name.
-    pub name: String,
-    /// The objects it reads.
-    pub resource: HealthResource,
-    /// The condition they reach. A workload kind names none: kstatus decides when it is ready.
-    #[serde(default)]
-    pub condition: String,
-    /// How long to wait, such as `60s`.
-    #[serde(default)]
-    pub timeout: String,
-    /// What to tell the person when it fails.
-    #[serde(default)]
-    pub advice: String,
-}
-
-/// The objects a health check reads: one `name`, a `selector`, or `all`.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct HealthResource {
-    /// `Deployment`, `APIService`, `Node.longhorn.io`, ….
-    pub kind: String,
-    /// The namespace, for a namespaced kind.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
-    /// One object.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub name: Option<String>,
-    /// The objects with these labels.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub selector: Option<BTreeMap<String, String>>,
-    /// Every object of the kind.
-    #[serde(default)]
-    pub all: bool,
-}
-
-/// What finds a component on a cluster, as far as removing it reads.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Detection {
-    /// Its CRDs.
-    #[serde(default)]
-    pub crds: Vec<String>,
-    /// The CSI drivers of the volumes it provides.
-    #[serde(default)]
-    pub csi_drivers: Vec<String>,
-}
-
-/// A value an installer asks for or generates [component-format].
-///
-/// [component-format]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/component-format.mdx
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Input {
-    /// Its name, camelCase.
-    pub name: String,
-    /// What it is, in English.
-    #[serde(default)]
-    pub description: String,
-    /// The release whose values take a `path` input; the first chart release when absent.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub release: Option<String>,
-    /// Where it goes in the release's values: a dotted path, where a number indexes a list.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub path: Option<String>,
-    /// The Secret key it is stored in, created before the install.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub secret: Option<SecretRef>,
-    /// How an installer makes it when it is not given.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub generate: Option<Generate>,
-    /// An install needs a value.
-    #[serde(default)]
-    pub required: bool,
-    /// The value when none is given.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub default: Option<InputValue>,
-}
-
-/// A key of a Secret.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SecretRef {
-    /// The Secret's name.
-    pub name: String,
-    /// The key.
-    pub key: String,
-    /// The Secret's namespace.
-    pub namespace: String,
-}
-
-/// How an installer makes an input's value.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "type")]
-pub enum Generate {
-    /// `bytes` random bytes in `encoding`.
-    #[serde(rename = "random")]
-    Random {
-        /// How many, 12 to 64.
-        bytes: u8,
-        /// How they are written.
-        encoding: Encoding,
-    },
-    /// A free address in the cluster's Service CIDR.
-    #[serde(rename = "clusterIP")]
-    ClusterIp,
-    /// A way this build does not know: the input is not filled in.
-    #[serde(other)]
-    Unknown,
-}
-
-/// An input's value: the catalog's `default`, or what a person gives.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
-#[serde(untagged)]
-pub enum InputValue {
-    /// `true` or `false`.
-    Flag(bool),
-    /// A whole number.
-    Integer(i64),
-    /// Text.
-    Text(String),
-}
-
-impl InputValue {
-    /// The value in a chart's values.
-    #[must_use]
-    pub fn to_json(&self) -> serde_json::Value {
-        match self {
-            Self::Flag(b) => (*b).into(),
-            Self::Integer(i) => (*i).into(),
-            Self::Text(s) => s.clone().into(),
-        }
-    }
-
-    /// The value as a Secret stores it.
-    #[must_use]
-    pub fn text(&self) -> String {
-        match self {
-            Self::Flag(b) => b.to_string(),
-            Self::Integer(i) => i.to_string(),
-            Self::Text(s) => s.clone(),
-        }
-    }
-}
-
-/// Values a component adds to another's release.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Contribution {
-    /// The other component's release.
-    pub target: ContributionTarget,
-    /// The values, as YAML.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub values: Option<String>,
-}
-
-/// The release values are added to.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ContributionTarget {
-    /// The component's id.
-    pub component: String,
-    /// The release's name in its file.
-    pub release: String,
-}
-
-/// One e2e run of a component.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Measurement {
-    /// `kind`, `k3s`, `rke2` or `kubesolo`.
-    pub distribution: String,
-    /// The distribution's release on the host.
-    #[serde(default)]
-    pub distribution_version: Option<String>,
-    /// The platform.
-    pub platform: Platform,
-    /// `passed`, or anything else for a run that did not pass.
-    pub result: String,
-    /// The digest of the component file the run installed.
-    pub source_digest: String,
-    /// The day, `YYYY-MM-DD`.
-    pub measured_at: String,
-}
-
-/// An OS and an architecture.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Platform {
-    /// `linux`.
-    pub os: String,
-    /// `amd64`.
-    pub architecture: String,
-}
-
-impl ComponentFile {
-    /// Whether `testedOn` lists `distribution` with `platform` (`linux/amd64`) [installers]: the
-    /// newest passing run there, on the distribution's pinned release, has this file's digest
-    /// and is no older than the newest failed run (a pass on the same day wins).
-    ///
-    /// [installers]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/installers.mdx#tested-on
-    #[must_use]
-    pub fn tested_on(&self, index: &Index, distribution: &str, platform: &str) -> bool {
-        let Some(pinned) = index.distributions.iter().find(|d| d.name == distribution) else {
-            return false;
-        };
-        let runs = self.measurements.iter().filter(|m| {
-            m.distribution == distribution
-                && m.distribution_version.as_deref() == Some(pinned.version.as_str())
-                && format!("{}/{}", m.platform.os, m.platform.architecture) == platform
-        });
-        let (mut pass, mut fail): (Option<&Measurement>, Option<&str>) = (None, None);
-        for run in runs {
-            if run.result == "passed" {
-                if pass.is_none_or(|p| run.measured_at > p.measured_at) {
-                    pass = Some(run);
-                }
-            } else if fail.is_none_or(|f| run.measured_at.as_str() > f) {
-                fail = Some(&run.measured_at);
-            }
-        }
-        pass.is_some_and(|p| {
-            p.source_digest == self.source_digest
-                && fail.is_none_or(|f| p.measured_at.as_str() >= f)
-        })
-    }
-}
 
 /// Why a file or a snapshot cannot be used.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
@@ -518,25 +67,35 @@ pub fn index(bytes: &[u8]) -> Result<Index, ApiError> {
     Ok(index)
 }
 
-/// Reads `components/<id>.json` and checks it is the file `index` lists.
+/// A component file as listed: decoded, or why it does not decode.
+pub type Decoded = Result<ComponentFile, String>;
+
+/// Reads `components/<id>.json` and checks it is the file `index` lists. A file that is the one
+/// listed but does not decode with the catalog's types is `Ok(Err(why))`.
 ///
 /// # Errors
 ///
-/// It does not parse, or its id or digest is not the one listed.
-pub fn component(index: &Index, id: &str, bytes: &[u8]) -> Result<ComponentFile, ApiError> {
-    let file: ComponentFile = serde_json::from_slice(bytes).map_err(|e| ApiError::Parse {
+/// It is no JSON object with an `id` and a `sourceDigest`, or its id or digest is not the one
+/// listed.
+pub fn component(index: &Index, id: &str, bytes: &[u8]) -> Result<Decoded, ApiError> {
+    let entry: Entry = serde_json::from_slice(bytes).map_err(|e| ApiError::Parse {
         file: format!("components/{id}.json"),
         message: e.to_string(),
     })?;
     let listed = index
         .components
         .iter()
-        .any(|c| c.id == id && c.id == file.id && c.source_digest == file.source_digest);
-    if listed {
-        Ok(file)
-    } else {
-        Err(ApiError::Mismatch(id.to_owned()))
+        .any(|c| c.id == id && c.id == entry.id && c.source_digest == entry.source_digest);
+    if !listed {
+        return Err(ApiError::Mismatch(id.to_owned()));
     }
+    Ok(serde_json::from_slice(bytes).map_err(|e| e.to_string()))
+}
+
+/// The profile named `name` (`single-node`).
+#[must_use]
+pub fn profile(name: &str) -> Option<Profile> {
+    Profile::ALL.into_iter().find(|p| p.as_str() == name)
 }
 
 /// One catalog release as Zeabur read it: `catalog.json` and every component file it lists.
@@ -545,14 +104,18 @@ pub fn component(index: &Index, id: &str, bytes: &[u8]) -> Result<ComponentFile,
 pub struct Snapshot {
     /// `catalog.json`.
     pub index: Index,
-    /// The component files, by id.
+    /// The component files that decode, by id.
     pub components: BTreeMap<String, ComponentFile>,
+    /// Why each listed component file that does not decode does not, by id.
+    #[serde(default)]
+    pub problems: BTreeMap<String, String>,
     /// When it was fetched.
     pub fetched_at: Timestamp,
 }
 
 impl Snapshot {
-    /// The ids `index` lists whose digest differs from this snapshot's, which a refresh fetches.
+    /// The ids `index` lists whose digest differs from this snapshot's, or whose file did not
+    /// decode, which a refresh fetches.
     #[must_use]
     pub fn stale(&self, index: &Index) -> Vec<String> {
         index
@@ -575,24 +138,33 @@ impl Snapshot {
     /// A component listed is in neither.
     pub fn assemble(
         index: Index,
-        mut fetched: BTreeMap<String, ComponentFile>,
+        mut fetched: BTreeMap<String, Decoded>,
         previous: Option<&Self>,
         fetched_at: Timestamp,
     ) -> Result<Self, ApiError> {
         let mut components = BTreeMap::new();
+        let mut problems = BTreeMap::new();
         for entry in &index.components {
             let file = fetched.remove(&entry.id).or_else(|| {
                 previous
                     .and_then(|p| p.components.get(&entry.id))
                     .filter(|f| f.source_digest == entry.source_digest)
                     .cloned()
+                    .map(Ok)
             });
-            let file = file.ok_or_else(|| ApiError::Mismatch(entry.id.clone()))?;
-            components.insert(entry.id.clone(), file);
+            match file.ok_or_else(|| ApiError::Mismatch(entry.id.clone()))? {
+                Ok(file) => {
+                    components.insert(entry.id.clone(), file);
+                }
+                Err(why) => {
+                    problems.insert(entry.id.clone(), why);
+                }
+            }
         }
         Ok(Self {
             index,
             components,
+            problems,
             fetched_at,
         })
     }
@@ -602,14 +174,14 @@ impl Snapshot {
     ///
     /// [installers]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/installers.mdx#install-order
     #[must_use]
-    pub fn provider(&self, capability: &str, profile: &str) -> Option<&ComponentFile> {
-        let offering = |level: &str| {
+    pub fn provider(&self, capability: &str, profile: Profile) -> Option<&ComponentFile> {
+        let offering = |mode: Mode| {
             self.components.values().find(|c| {
-                c.declaration.provides.capability == capability
-                    && c.declaration.defaults.get(profile).map(String::as_str) == Some(level)
+                c.declaration.capability() == Some(capability)
+                    && c.declaration.mode(profile) == mode
             })
         };
-        offering("recommended").or_else(|| offering("optional"))
+        offering(Mode::Recommended).or_else(|| offering(Mode::Optional))
     }
 
     /// The ids of the components whose `requires` names `id` or its capability.
@@ -618,13 +190,13 @@ impl Snapshot {
         let capability = self
             .components
             .get(id)
-            .map(|c| c.declaration.provides.capability.as_str());
+            .and_then(|c| c.declaration.capability());
         self.components
             .values()
             .filter(|c| {
-                c.declaration.requires.iter().any(|r| {
-                    r.component.as_deref() == Some(id)
-                        || (r.capability.is_some() && r.capability.as_deref() == capability)
+                c.declaration.requires.iter().any(|r| match r {
+                    Reference::Component(component) => component == id,
+                    Reference::Capability(name) => Some(name.as_str()) == capability,
                 })
             })
             .map(|c| c.id.as_str())
@@ -676,24 +248,13 @@ mod tests {
         index
     }
 
-    /// Catalog 0.5.6 names no condition for a Deployment, StatefulSet or DaemonSet.
-    #[test]
-    fn a_health_check_of_a_workload_reads_without_a_condition() {
-        let check: Health = serde_json::from_value(serde_json::json!({
-            "name": "controller",
-            "resource": {"kind": "Deployment", "name": "cert-manager", "namespace": "cert-manager"},
-            "timeout": "60s",
-            "advice": "Check its pods with kubectl -n cert-manager get pods."
-        }))
-        .unwrap();
-        assert_eq!(check.resource.kind, "Deployment");
-        assert_eq!(check.condition, "");
-    }
-
     #[test]
     fn a_component_file_of_another_release_is_a_mismatch() {
         let mut listed = only_cert_manager();
-        assert!(component(&listed, "cert-manager", CERT_MANAGER).is_ok());
+        assert!(matches!(
+            component(&listed, "cert-manager", CERT_MANAGER),
+            Ok(Ok(_))
+        ));
         listed.components[0].source_digest = "sha256:0".to_owned();
         assert_eq!(
             component(&listed, "cert-manager", CERT_MANAGER),
@@ -735,6 +296,21 @@ mod tests {
             Snapshot::decode(b"not gzip"),
             Err(ApiError::Cache(_))
         ));
+    }
+
+    #[test]
+    fn a_listed_file_that_does_not_decode_is_a_problem_with_its_id() {
+        let listed = only_cert_manager();
+        let mut file: serde_json::Value = serde_json::from_slice(CERT_MANAGER).unwrap();
+        file["declaration"]["releases"] = "not a list".into();
+        let bytes = serde_json::to_vec(&file).unwrap();
+        let read = component(&listed, "cert-manager", &bytes).unwrap();
+        let fetched = BTreeMap::from([("cert-manager".to_owned(), read)]);
+        let snapshot = Snapshot::assemble(listed.clone(), fetched, None, second(0)).unwrap();
+        assert!(snapshot.components.is_empty());
+        assert!(snapshot.problems["cert-manager"].contains("expected a sequence"));
+        // A refresh of the same release asks for it again.
+        assert_eq!(snapshot.stale(&listed), ["cert-manager"]);
     }
 
     #[test]

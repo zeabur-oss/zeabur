@@ -15,11 +15,12 @@
       url = "github:sysprog21/zhtw-mcp/5b385b3d66b1554f6f9ae036017ef06dd8ec0da6";
       inputs.nixpkgs.follows = "nixpkgs";
     };
-    # Zeabur Catalog. flake.lock pins its commit: zeabur-catalog embeds the bundle that the
-    # catalog's `release` output builds there, and a release build checks that bundle against the
-    # signed release at that commit (scripts/release-pins.sh).
+    # Zeabur Catalog at a release tag, the same tag as zeabur-catalog-format in Cargo.toml (a test
+    # in zeabur-catalog checks it). zeabur-catalog embeds the bundle that the catalog's `release`
+    # output builds there, and a release build checks that bundle against the signed release at
+    # that commit (scripts/release-pins.sh).
     catalog = {
-      url = "github:zeabur-oss/catalog";
+      url = "github:zeabur-oss/catalog/v0.6.1";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.oss.follows = "oss";
     };

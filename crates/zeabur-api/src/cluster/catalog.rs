@@ -26,7 +26,7 @@ use axum::extract::State;
 use futures_util::future::BoxFuture;
 use serde::Serialize;
 use utoipa::ToSchema;
-use zeabur_catalog::api::{self, ApiError as CatalogError, ComponentFile, MAX_FILE, Snapshot};
+use zeabur_catalog::api::{self, ApiError as CatalogError, MAX_FILE, Snapshot};
 use zeabur_catalog::engine::{self, Download, Manifests};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
@@ -315,7 +315,7 @@ impl Catalog {
             || index.components.iter().map(|c| c.id.clone()).collect(),
             |p| p.stale(&index),
         );
-        let mut fetched: BTreeMap<String, ComponentFile> = BTreeMap::new();
+        let mut fetched: BTreeMap<String, api::Decoded> = BTreeMap::new();
         for id in stale {
             let url = format!("{}components/{id}.json", self.url);
             let Fetched::Body { bytes, .. } = fetch.get(url, None).await.map_err(Refusal::Fetch)?
@@ -326,6 +326,9 @@ impl Catalog {
             fetched.insert(id, file);
         }
         let snapshot = Snapshot::assemble(index, fetched, previous, fetched_at)?;
+        for (id, problem) in &snapshot.problems {
+            tracing::warn!(component = %id, error = %problem, "a Zeabur Catalog file does not read");
+        }
         Ok(Some((snapshot, etag)))
     }
 }
@@ -397,7 +400,7 @@ async fn write_cache(
 pub struct CatalogView {
     /// Where Zeabur reads it.
     pub url: String,
-    /// The release, `0.5.3`; absent when Zeabur has never read one.
+    /// The release, `0.6.1`; absent when Zeabur has never read one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub version: Option<String>,
     /// The release's commit.
@@ -517,7 +520,7 @@ mod tests {
         let catalog = catalog(&fake, None);
         let start = Instant::now();
         let first = catalog.current(start, second(0)).await;
-        assert_eq!(first.snapshot.unwrap().index.catalog.version, "0.5.3");
+        assert_eq!(first.snapshot.unwrap().index.catalog.version, "0.6.1");
         assert_eq!(fake.reads.lock().unwrap().len(), 2);
 
         catalog

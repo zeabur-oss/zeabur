@@ -1,6 +1,6 @@
 //! Embeds Zeabur Catalog's `bundle.tar.gz` from `ZEABUR_CATALOG_RELEASE`, which the Nix dev shell
 //! sets to the catalog's `release` output at the commit in flake.lock. The components
-//! (`components/<id>.yaml`), the templates (`templates/<id>/template.yaml` and
+//! (`components/<id>/component.yaml`), the templates (`templates/<id>/template.yaml` and
 //! `manifests.yaml`) and the template measurements (`measurements/templates/<id>.json`) become
 //! sorted tables of `include_str!` entries, so the binary carries the catalogue it was built with.
 //! `crosscheck.json`, the catalogue's own render of each template, is unpacked for the tests only.
@@ -78,18 +78,21 @@ fn unpack(archive: &Path, dir: &Path) -> io::Result<(Components, Templates, Meas
     let (mut components, mut templates, mut measurements) = (Vec::new(), Vec::new(), Vec::new());
     for entry in tar.entries()? {
         let mut entry = entry?;
+        if entry.header().entry_type().is_dir() {
+            continue;
+        }
         let path = entry.path()?.into_owned();
         let parts: Vec<&str> = path.iter().filter_map(|part| part.to_str()).collect();
         let dest = dir.join(parts.join("/"));
         match parts.as_slice() {
-            ["components", file] => match file.strip_suffix(".yaml") {
-                Some(id) => components.push((id.to_owned(), dest.clone())),
-                None => continue,
-            },
+            ["components", id, "component.yaml"] => {
+                components.push(((*id).to_owned(), dest.clone()));
+            }
+            ["components", _, file] if file.starts_with("README") => continue,
             // A layout this build does not know would leave the catalogue silently empty.
-            ["components", _, _, ..] => {
+            ["components", ..] => {
                 return Err(io::Error::other(format!(
-                    "{} is not components/<id>.yaml",
+                    "{} is not components/<id>/component.yaml",
                     path.display()
                 )));
             }

@@ -13,6 +13,7 @@ metadata:
   license: Apache-2.0 AND PostgreSQL
   # Also: https://cloudnative-pg.io/
   homepage: https://miniflux.app/
+  docs: https://miniflux.app/docs/configuration.html
 
 requires:
   - {component: traefik}
@@ -83,12 +84,10 @@ smoke:
     timeout: 900s
   - name: miniflux-ready
     resource: deployment/miniflux
-    condition: condition=Available
     timeout: 600s
     http: {service: miniflux, port: 8080, path: /healthcheck, status: 200, contains: OK}
   - name: authentication-required
     resource: deployment/miniflux
-    condition: condition=Available
     timeout: 120s
     http: {service: miniflux, port: 8080, path: /v1/me, status: 401}
   - name: administrator-created

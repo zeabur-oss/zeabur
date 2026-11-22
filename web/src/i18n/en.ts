@@ -1249,6 +1249,8 @@ export const en = {
     "Zeabur can't install this because it changes other components' settings but has no Helm chart of its own.",
   "components.unsupported.newerRelease":
     "This version of Zeabur can't install it. Update Zeabur first.",
+  "components.unsupported.unreadable":
+    "This version of Zeabur can't read this component in Zeabur Catalog. Update Zeabur first.",
   "components.howToInstall": "How to install",
   "settings.homepage": "Home page",
   "settings.opensInNewTab": "(opens in a new tab)",

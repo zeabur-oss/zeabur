@@ -46,12 +46,14 @@ use axum::extract::State;
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_catalog::InstallSource;
-use zeabur_catalog::api::{ComponentFile, Generate, InputValue, ReleaseType, Snapshot};
+use zeabur_catalog::api::{ComponentFile, Snapshot};
 use zeabur_catalog::engine::{
     self, CHART_NAMESPACE, COMPONENT, Desired, FIELD_MANAGER, HelmChart, HelmChartConfig, INPUTS,
     InputKind, InputState, Inputs, MANAGED_BY, MANAGED_BY_ZEABUR, Manifests, Progress, Refusal,
     Target, Values,
 };
+use zeabur_catalog::format::common::Generate;
+use zeabur_catalog::format::component::{Health, InputValue, Release};
 use zeabur_core::message::Message;
 use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
@@ -100,8 +102,22 @@ pub struct ComponentRequest {
     /// to `plan` and to every `apply`; an input left out keeps the value an earlier install
     /// wrote, and an empty text is no value.
     #[serde(default)]
-    #[schema(value_type = BTreeMap<String, BTreeMap<String, InputValue>>)]
+    #[schema(value_type = BTreeMap<String, BTreeMap<String, InputValueSchema>>)]
     pub values: Values,
+}
+
+/// An input's value: the catalog's `default`, or what a person gives.
+#[derive(ToSchema)]
+#[schema(as = InputValue)]
+#[serde(untagged)]
+#[expect(dead_code, reason = "only the schema of the catalog's InputValue")]
+enum InputValueSchema {
+    /// `true` or `false`.
+    Flag(bool),
+    /// A whole number.
+    Integer(i64),
+    /// Text.
+    Text(String),
 }
 
 /// How far a step or check has come.
@@ -261,6 +277,7 @@ pub struct ComponentInput {
     pub required: bool,
     /// The catalog's value when none is given.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<InputValueSchema>)]
     pub default: Option<InputValue>,
     /// Zeabur makes a random value when none is given or kept.
     pub generated: bool,
@@ -268,6 +285,7 @@ pub struct ComponentInput {
     pub state: InputState,
     /// The value the plan writes; never for a Secret.
     #[serde(skip_serializing_if = "Option::is_none")]
+    #[schema(value_type = Option<InputValueSchema>)]
     pub value: Option<InputValue>,
 }
 
@@ -617,7 +635,6 @@ impl World {
                 continue;
             };
             let d = &file.declaration;
-            let first_chart = d.releases.iter().find(|r| r.kind == ReleaseType::Helm);
             let mut charts = BTreeMap::new();
             let mut secrets = BTreeMap::new();
             for input in &d.inputs {
@@ -634,10 +651,9 @@ impl World {
                         .and_then(|b| String::from_utf8(b.clone()).ok())
                         .map(InputValue::Text)
                 } else {
-                    let release = input.release.as_ref().map_or(first_chart, |name| {
-                        d.releases.iter().find(|r| &r.name == name)
-                    });
-                    let Some(release) = release else { continue };
+                    let Some(release) = d.input_release(input).and_then(Release::helm) else {
+                        continue;
+                    };
                     let name = release.helm_name().to_owned();
                     if !charts.contains_key(&name) {
                         let found = find::<HelmChart>(cluster, Some(CHART_NAMESPACE), &name, id)
@@ -782,14 +798,19 @@ impl World {
             };
             config_values(step).is_none()
                 && !managed.contains(&step.component)
-                && file.declaration.releases.iter().any(|r| {
-                    r.name == step.release
-                        && self.helm_releases.contains(&format!(
-                            "{}/{}",
-                            r.namespace,
-                            r.helm_name()
-                        ))
-                })
+                && file
+                    .declaration
+                    .releases
+                    .iter()
+                    .filter_map(Release::helm)
+                    .any(|r| {
+                        r.name == step.release
+                            && self.helm_releases.contains(&format!(
+                                "{}/{}",
+                                r.namespace,
+                                r.helm_name()
+                            ))
+                    })
         });
         if let Some(step) = elsewhere {
             return Err(ApiError::from(Problem::new(
@@ -1178,7 +1199,7 @@ impl World {
         file: &ComponentFile,
     ) -> Result<(), ApiError> {
         let d = &file.declaration;
-        let own: BTreeSet<&str> = d.releases.iter().map(|r| r.namespace.as_str()).collect();
+        let own: BTreeSet<&str> = d.releases.iter().filter_map(Release::namespace).collect();
         let mut users = Vec::new();
         for crd in &d.detection.crds {
             if d.internal_crds.contains(crd) {
@@ -1361,7 +1382,7 @@ impl World {
         let now = self.now;
         let mut checks = Vec::new();
         for check in &file.declaration.health {
-            let resource = engine::health_resource(&check.resource.kind, &self.served);
+            let resource = engine::health_resource(check.resource.kind, &self.served);
             let progress = match resource {
                 Some(resource) if ready => {
                     let objects = self.check_objects(cluster, file, check, resource).await?;
@@ -1392,7 +1413,7 @@ impl World {
         &self,
         cluster: &dyn Cluster,
         file: &ComponentFile,
-        check: &zeabur_catalog::api::Health,
+        check: &Health,
         served: &ServedResource,
     ) -> Result<Vec<DynamicObject>, ApiError> {
         let r = &check.resource;
@@ -1406,7 +1427,7 @@ impl World {
             file.declaration
                 .releases
                 .first()
-                .map(|x| x.namespace.clone())
+                .and_then(|x| x.namespace().map(str::to_owned))
         });
         let namespace = served.namespaced.then_some(namespace).flatten();
         let what = format!("{} objects of {}", served.kind, file.id);
