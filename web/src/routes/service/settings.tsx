@@ -16,7 +16,7 @@ import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { AmountInput } from "@/components/amount-input"
 import { FormField } from "@/components/form-field"
-import { isAmount, type Dimension } from "@/lib/amount"
+import { aboveLimit, isAmount, type Dimension } from "@/lib/amount"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 import { useHold } from "@/components/plan/draft"
 
@@ -233,36 +233,57 @@ function Compute({
             ] as const
           ).map((row) => (
             <div key={row[0][0]} className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
-              {row.map(([key, label, hint]) => (
-                <form.Field
-                  key={key}
-                  name={`containers[${index}].${key}`}
-                  validators={{ onChange: amount(key.startsWith("cpu") ? "cpu" : "bytes") }}
-                >
-                  {(f) => (
-                    <FormField
-                      label={label}
-                      hint={f.state.value.trim() === "" ? hint : undefined}
-                      errors={[
-                        ...f.state.meta.errors,
-                        refusedField(
-                          refused,
-                          `spec.template.spec.containers[${index}].resources.${paths[key]}`,
-                        ),
-                      ]}
-                    >
-                      <AmountInput
-                        dimension={key.startsWith("cpu") ? "cpu" : "bytes"}
-                        value={f.state.value}
-                        placeholder={t("form.notSet")}
-                        onChange={f.handleChange}
-                        onBlur={f.handleBlur}
-                        disabled={disabled}
-                      />
-                    </FormField>
-                  )}
-                </form.Field>
-              ))}
+              {row.map(([key, label, hint]) => {
+                const limitKey =
+                  key === "cpuRequest"
+                    ? "cpuLimit"
+                    : key === "memoryRequest"
+                      ? "memoryLimit"
+                      : undefined
+                return (
+                  <form.Field
+                    key={key}
+                    name={`containers[${index}].${key}`}
+                    validators={{
+                      onChangeListenTo: limitKey ? [`containers[${index}].${limitKey}`] : [],
+                      onChange: ({ value, fieldApi }) => {
+                        const dimension = key.startsWith("cpu") ? "cpu" : "bytes"
+                        const bad = amount(dimension)({ value })
+                        if (bad || !limitKey) return bad
+                        const limit = fieldApi.form.getFieldValue(
+                          `containers[${index}].${limitKey}`,
+                        )
+                        return aboveLimit(value, limit, dimension)
+                          ? t("form.requestAboveLimit")
+                          : undefined
+                      },
+                    }}
+                  >
+                    {(f) => (
+                      <FormField
+                        label={label}
+                        hint={f.state.value.trim() === "" ? hint : undefined}
+                        errors={[
+                          ...f.state.meta.errors,
+                          refusedField(
+                            refused,
+                            `spec.template.spec.containers[${index}].resources.${paths[key]}`,
+                          ),
+                        ]}
+                      >
+                        <AmountInput
+                          dimension={key.startsWith("cpu") ? "cpu" : "bytes"}
+                          value={f.state.value}
+                          placeholder={t("form.notSet")}
+                          onChange={f.handleChange}
+                          onBlur={f.handleBlur}
+                          disabled={disabled}
+                        />
+                      </FormField>
+                    )}
+                  </form.Field>
+                )
+              })}
             </div>
           ))}
         </fieldset>
