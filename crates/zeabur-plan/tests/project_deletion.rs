@@ -11,9 +11,9 @@ mod tests {
     use zeabur_graph::Snapshot;
     use zeabur_model::{Tool, WorkloadKind, WorkloadRef};
     use zeabur_plan::{
-        BackupDeletion, BackupKind, Change, DeletionInput, HeldBy, ObjectName, Plan, PlanError,
-        PlanRequest, ProjectBackup, ProjectDeletion, ProjectObject, ResourceRef, VolumeDeletion,
-        Warning, Write, plan,
+        BackupDeletion, BackupFate, BackupKind, BackupStore, Change, DeletionInput, HeldBy,
+        ObjectName, Plan, PlanError, PlanRequest, ProjectBackup, ProjectDeletion, ProjectObject,
+        ResourceRef, VolumeDeletion, Warning, Write, plan,
     };
 
     fn namespace(name: &str, labels: &Value) -> Value {
@@ -215,25 +215,29 @@ mod tests {
         }
     }
 
-    fn backed_up(backups: &[(BackupKind, &str, Option<&str>)]) -> DeletionInput {
+    fn backed_up(backups: &[(BackupKind, &str, BackupStore)]) -> DeletionInput {
         DeletionInput {
             backups: backups
                 .iter()
-                .map(|(kind, name, endpoint)| ProjectBackup {
+                .map(|(kind, name, store)| ProjectBackup {
                     kind: *kind,
                     name: (*name).to_owned(),
-                    endpoint: endpoint.map(str::to_owned),
+                    store: store.clone(),
                 })
                 .collect(),
             ..deletion()
         }
     }
 
-    fn kept_in(plan: &Plan) -> Vec<(&str, Option<&str>)> {
+    fn at(endpoint: &str) -> BackupStore {
+        BackupStore::Endpoint(endpoint.to_owned())
+    }
+
+    fn fates(plan: &Plan) -> Vec<(&str, BackupFate, Option<&str>)> {
         gone(plan)
             .backups
             .iter()
-            .map(|b| (b.name.as_str(), b.kept_in.as_deref()))
+            .map(|b| (b.name.as_str(), b.fate, b.kept_in.as_deref()))
             .collect()
     }
 
@@ -243,30 +247,27 @@ mod tests {
             (
                 BackupKind::Database,
                 "db",
-                Some("http://files-s3.shop.svc:8333"),
+                at("http://files-s3.shop.svc:8333"),
             ),
-            (BackupKind::Database, "short", Some("http://files-s3:8333")),
+            (BackupKind::Database, "short", at("http://files-s3:8333")),
             (
                 BackupKind::Database,
                 "fqdn",
-                Some("http://files-s3.shop.svc.cluster.local:8333/"),
+                at("http://files-s3.shop.svc.cluster.local:8333/"),
             ),
-            (BackupKind::Volume, "by-ip", Some("http://10.43.0.12:8333")),
-            (
-                BackupKind::Volume,
-                "unread",
-                Some("http://other-s3.shop.svc"),
-            ),
+            (BackupKind::Volume, "by-ip", at("http://10.43.0.12:8333")),
+            (BackupKind::Volume, "unread", at("http://other-s3.shop.svc")),
         ]);
         let plan = planned(&shop(), &with_object_storage(), &input).unwrap();
+        let goes = BackupFate::Goes;
         assert_eq!(
-            kept_in(&plan),
+            fates(&plan),
             [
-                ("db", Some("files")),
-                ("short", Some("files")),
-                ("fqdn", Some("files")),
-                ("by-ip", Some("files")),
-                ("unread", Some("other-s3")),
+                ("db", goes, Some("files")),
+                ("short", goes, Some("files")),
+                ("fqdn", goes, Some("files")),
+                ("by-ip", goes, Some("files")),
+                ("unread", goes, Some("other-s3")),
             ]
         );
         assert_eq!(
@@ -274,6 +275,7 @@ mod tests {
             BackupDeletion {
                 kind: BackupKind::Database,
                 name: "db".to_owned(),
+                fate: goes,
                 kept_in: Some("files".to_owned()),
             }
         );
@@ -282,34 +284,43 @@ mod tests {
     #[test]
     fn backups_kept_outside_the_project_stay() {
         let input = backed_up(&[
-            (BackupKind::Database, "aws", None),
-            (
-                BackupKind::Database,
-                "hosted",
-                Some("https://s3.example.com"),
-            ),
+            (BackupKind::Database, "aws", BackupStore::Aws),
+            (BackupKind::Database, "hosted", at("https://s3.example.com")),
             (
                 BackupKind::Volume,
                 "other",
-                Some("http://files-s3.other.svc:8333"),
+                at("http://files-s3.other.svc:8333"),
             ),
             (
                 BackupKind::Volume,
                 "short-other",
-                Some("http://files-s3.other:8333"),
+                at("http://files-s3.other:8333"),
             ),
-            (
-                BackupKind::Volume,
-                "unknown-short",
-                Some("http://minio:9000"),
-            ),
-            (BackupKind::Project, "shop", None),
+            (BackupKind::Volume, "unknown-short", at("http://minio:9000")),
         ]);
         let plan = planned(&shop(), &with_object_storage(), &input).unwrap();
         assert!(
-            kept_in(&plan).iter().all(|(_, kept)| kept.is_none()),
+            fates(&plan)
+                .iter()
+                .all(|(_, fate, kept)| *fate == BackupFate::Stays && kept.is_none()),
             "{:?}",
-            kept_in(&plan)
+            fates(&plan)
+        );
+    }
+
+    #[test]
+    fn backups_whose_store_was_not_read_are_told_as_unknown() {
+        let input = backed_up(&[
+            (BackupKind::Database, "pg", BackupStore::Unknown),
+            (BackupKind::Project, "shop", BackupStore::Unknown),
+        ]);
+        let plan = planned(&shop(), &with_object_storage(), &input).unwrap();
+        assert_eq!(
+            fates(&plan),
+            [
+                ("pg", BackupFate::Unknown, None),
+                ("shop", BackupFate::Unknown, None),
+            ]
         );
     }
 

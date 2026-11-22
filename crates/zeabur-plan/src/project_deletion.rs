@@ -22,8 +22,9 @@
 //!   databases, the volumes and what their reclaim policy does with the data [k8s-reclaim], and the
 //!   person's tools pods for the project. It also tells where the project's backups are kept: a
 //!   backup whose S3 endpoint is a Service of the project (`<service>`, `<service>.<project>`,
-//!   `<service>.<project>.svc…` or its cluster IP) is kept in the project and goes with it; any
-//!   other backup and everything outside the namespace stay.
+//!   `<service>.<project>.svc…` or its cluster IP) is kept in the project and goes with it; a
+//!   backup whose store could not be read is told as unknown, never as staying; any other backup
+//!   and everything outside the namespace stay.
 //! - **Tools that put objects back.** Objects Helm, Argo CD or Flux manages are deleted with the
 //!   namespace, and the tool can create them again ([`Warning::Recreated`]).
 //! - **Refused**: a namespace Kubernetes keeps for itself (`kube-` prefix), Zeabur's own namespaces
@@ -120,8 +121,19 @@ pub struct ProjectBackup {
     pub kind: BackupKind,
     /// The database, the claim or the project.
     pub name: String,
-    /// The S3 endpoint it writes to; absent for AWS S3 or when the provider does not say.
-    pub endpoint: Option<String>,
+    /// Where it writes.
+    pub store: BackupStore,
+}
+
+/// Where a backup writes, as read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BackupStore {
+    /// AWS S3: no endpoint is set.
+    Aws,
+    /// The S3 endpoint.
+    Endpoint(String),
+    /// The provider's store could not be read, or does not name an endpoint.
+    Unknown,
 }
 
 /// An object whose finalizers a force deletion removes ([`Warning::RemovesFinalizers`]).
@@ -185,10 +197,25 @@ pub struct BackupDeletion {
     pub kind: BackupKind,
     /// The database, the claim or the project.
     pub name: String,
-    /// What in the project keeps the backup: the owner of the Service its endpoint names, else
-    /// the Service. The backup goes with the project. Absent when it is kept outside and stays.
+    /// Whether it goes with the project.
+    pub fate: BackupFate,
+    /// When it goes: what in the project keeps it, the owner of the Service its endpoint names,
+    /// else the Service.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kept_in: Option<String>,
+}
+
+/// Whether a backup goes with the project.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum BackupFate {
+    /// It is kept outside the project.
+    Stays,
+    /// It is kept in the project's object storage.
+    Goes,
+    /// Where it is kept could not be read.
+    Unknown,
 }
 
 /// A database that goes with the project.
@@ -297,13 +324,19 @@ impl<'a> Planner<'a> {
         let backups = deletion
             .backups
             .iter()
-            .map(|b| BackupDeletion {
-                kind: b.kind,
-                name: b.name.clone(),
-                kept_in: b
-                    .endpoint
-                    .as_deref()
-                    .and_then(|e| kept_in(e, &name, snapshot)),
+            .map(|b| {
+                let (fate, kept_in) = match &b.store {
+                    BackupStore::Aws => (BackupFate::Stays, None),
+                    BackupStore::Unknown => (BackupFate::Unknown, None),
+                    BackupStore::Endpoint(e) => kept_in(e, &name, snapshot)
+                        .map_or((BackupFate::Stays, None), |k| (BackupFate::Goes, Some(k))),
+                };
+                BackupDeletion {
+                    kind: b.kind,
+                    name: b.name.clone(),
+                    fate,
+                    kept_in,
+                }
             })
             .collect();
         self.warnings.push(Warning::DeletesProject(ProjectDeletion {

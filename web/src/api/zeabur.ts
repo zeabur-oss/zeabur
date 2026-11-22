@@ -577,6 +577,17 @@ export type BackupCoverage = {
 }
 
 /**
+ * Whether a backup goes with the project.
+ */
+export type BackupFate = (typeof BackupFate)[keyof typeof BackupFate]
+
+export const BackupFate = {
+  stays: "stays",
+  goes: "goes",
+  unknown: "unknown",
+} as const
+
+/**
  * What a backup covers.
  */
 export type BackupKind = (typeof BackupKind)[keyof typeof BackupKind]
@@ -591,9 +602,11 @@ export const BackupKind = {
  * A backup of the project, and whether it goes with it.
  */
 export type BackupDeletion = {
+  /** Whether it goes with the project. */
+  fate: BackupFate
   /**
-   * What in the project keeps the backup: the owner of the Service its endpoint names, else
-   * the Service. The backup goes with the project. Absent when it is kept outside and stays.
+   * When it goes: what in the project keeps it, the owner of the Service its endpoint names,
+   * else the Service.
    * @nullable
    */
   keptIn?: string | null

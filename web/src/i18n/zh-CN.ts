@@ -515,6 +515,8 @@ export const zhCN: Messages = {
   "deletion.toolsPods": "你在这个项目中打开的 kubectl 终端也会删除",
   "deletion.backupsGo": (names, place) =>
     `${names} 的备份存在 ${place}，删除项目时 ${place} 也会一起删除。先把备份复制到别处，或改用其他 S3 目的地。`,
+  "deletion.backupsUnknown": (names) =>
+    `看不出 ${names} 的备份存在哪里，可能会跟项目一起删除。先确认备份的 S3 目的地。`,
   "deletion.stays": "会保留",
   "deletion.staysBackups": (names) => `${names} 存在 S3 的备份`,
   "deletion.thisProject": "这个项目",

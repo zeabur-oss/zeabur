@@ -551,6 +551,8 @@ export const en = {
   "deletion.toolsPods": "The kubectl terminal you opened in this project is deleted too",
   "deletion.backupsGo": (names: string, place: string) =>
     `Backups of ${names} are kept in ${place}, which is deleted with the project. Copy them elsewhere or move the backups to another S3 destination first.`,
+  "deletion.backupsUnknown": (names: string) =>
+    `Can't tell where the backups of ${names} are kept, so they may be deleted with the project. Check their S3 destination first.`,
   "deletion.stays": "Stays",
   "deletion.staysBackups": (names: string) => `Backups of ${names} in S3`,
   "deletion.thisProject": "the project",

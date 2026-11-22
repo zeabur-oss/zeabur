@@ -65,7 +65,7 @@ function Deletion({
   const backups = useBackups(project).data
   const databases = useQuery(databasesQuery(project)).data?.items ?? []
   const now = new Date()
-  const { going, staying } = backupFates(deletion.backups)
+  const { going, unknown, staying } = backupFates(deletion.backups)
   const names = (list: Schemas.BackupDeletion[]) =>
     bounded(
       t,
@@ -145,6 +145,12 @@ function Deletion({
             <span>{t("deletion.backupsGo", names(g.backups), g.keptIn)}</span>
           </p>
         ))}
+        {unknown.length > 0 ? (
+          <p className="type-meta flex gap-1.5 text-destructive" role="alert">
+            <WarningIcon aria-hidden="true" className="mt-0.5 shrink-0" />
+            <span>{t("deletion.backupsUnknown", names(unknown))}</span>
+          </p>
+        ) : null}
       </section>
       <section className="flex flex-col gap-1" aria-labelledby="deletion-stays">
         <h3 id="deletion-stays" className="type-label">

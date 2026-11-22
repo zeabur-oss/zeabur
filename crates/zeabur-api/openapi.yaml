@@ -4850,20 +4850,31 @@ components:
       required:
       - kind
       - name
+      - fate
       properties:
+        fate:
+          $ref: "#/components/schemas/BackupFate"
+          description: Whether it goes with the project.
         keptIn:
           type:
           - string
           - "null"
           description: |-
-            What in the project keeps the backup: the owner of the Service its endpoint names, else
-            the Service. The backup goes with the project. Absent when it is kept outside and stays.
+            When it goes: what in the project keeps it, the owner of the Service its endpoint names,
+            else the Service.
         kind:
           $ref: "#/components/schemas/BackupKind"
           description: What it covers.
         name:
           type: string
           description: The database, the claim or the project.
+    BackupFate:
+      type: string
+      description: Whether a backup goes with the project.
+      enum:
+      - stays
+      - goes
+      - unknown
     BackupKind:
       type: string
       description: What a backup covers.

@@ -31,19 +31,25 @@ export function recentBackup(run: Run | null | undefined, now = Date.now()): boo
 
 type Backup = Schemas.BackupDeletion
 
-/** The project's backups that go with it, by what keeps them, and those that stay. */
+/** The project's backups that go with it, by what keeps them, those kept where the server
+ * could not tell, and those that stay. */
 export function backupFates(backups: Backup[]): {
   going: { keptIn: string; backups: Backup[] }[]
+  unknown: Backup[]
   staying: Backup[]
 } {
   const going: { keptIn: string; backups: Backup[] }[] = []
   for (const backup of backups) {
-    if (!backup.keptIn) continue
+    if (backup.fate !== "goes" || !backup.keptIn) continue
     const group = going.find((g) => g.keptIn === backup.keptIn)
     if (group) group.backups.push(backup)
     else going.push({ keptIn: backup.keptIn, backups: [backup] })
   }
-  return { going, staying: backups.filter((b) => !b.keptIn) }
+  return {
+    going,
+    unknown: backups.filter((b) => b.fate === "unknown"),
+    staying: backups.filter((b) => b.fate === "stays"),
+  }
 }
 
 /** The deletion warning of a plan, when it deletes the project. */

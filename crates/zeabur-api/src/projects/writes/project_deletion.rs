@@ -33,8 +33,8 @@ use zeabur_modules::{
 };
 use zeabur_plan::terminal::{self as plans, ToolsScope};
 use zeabur_plan::{
-    BackupKind, DeletionInput, Input, Plan, PlanRequest, ProjectBackup, ProjectObject, Warning,
-    Write,
+    BackupKind, BackupStore, DeletionInput, Input, Plan, PlanRequest, ProjectBackup, ProjectObject,
+    Warning, Write,
 };
 
 use super::terminal::{self, Planner};
@@ -299,17 +299,21 @@ async fn backups(
             if !database.backups.runs.iter().any(stored) {
                 continue;
             }
-            out.extend(
+            let stores: Vec<BackupStore> = if database.backups.endpoints.is_empty() {
+                vec![BackupStore::Unknown]
+            } else {
                 database
                     .backups
                     .endpoints
                     .into_iter()
-                    .map(|endpoint| ProjectBackup {
-                        kind: BackupKind::Database,
-                        name: database.name.clone(),
-                        endpoint,
-                    }),
-            );
+                    .map(|e| e.map_or(BackupStore::Aws, BackupStore::Endpoint))
+                    .collect()
+            };
+            out.extend(stores.into_iter().map(|store| ProjectBackup {
+                kind: BackupKind::Database,
+                name: database.name.clone(),
+                store,
+            }));
         }
     }
     let Some(found) = allowed(
@@ -339,7 +343,10 @@ async fn backups(
             let backup = ProjectBackup {
                 kind: BackupKind::Volume,
                 name: target.name.clone(),
-                endpoint: schedule.endpoint.clone(),
+                store: schedule
+                    .endpoint
+                    .clone()
+                    .map_or(BackupStore::Unknown, BackupStore::Endpoint),
             };
             if target.kind == backups::TargetKind::Volume
                 && run_of(k8up::MODULE.id, target)
@@ -357,7 +364,7 @@ async fn backups(
         out.push(ProjectBackup {
             kind: BackupKind::Project,
             name: project.to_owned(),
-            endpoint: None,
+            store: BackupStore::Unknown,
         });
     }
     Ok(out)
