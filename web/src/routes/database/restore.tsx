@@ -1,7 +1,7 @@
 // Restoring a backup into a new database, and moving services between it and the original.
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 
 import { databasesQuery, revealSecret } from "@/api/queries"
@@ -455,12 +455,7 @@ function Kin({
       changes,
       notes: [t("db.restored.keep", otherName)],
     })
-  const status =
-    here.state !== "ready"
-      ? t("db.restored.waiting", here.name)
-      : changes.length === 0
-        ? t("db.restored.noReaders", otherName)
-        : t("db.restored.readers", otherName, t("common.list", services))
+  const status = readerStatus(t, here, otherName, changes.length, services)
   const point =
     here.state === "ready" && changes.length > 0 ? (
       <GateTip gate={gate}>
@@ -480,24 +475,65 @@ function Kin({
             {point}
           </>
         ) : (
-          <ol className="flex list-decimal flex-col gap-1.5 pl-5">
-            <li>
-              {status}
-              {point ? <div className="mt-1.5">{point}</div> : null}
-            </li>
-            <li>{t("db.restored.check", here.name)}</li>
-            {other ? (
-              <li>
-                {t("db.restored.remove", otherName)}{" "}
-                <Link {...databaseLink(project, other)} className="underline">
-                  {t("db.restored.open", otherName)}
-                </Link>
-              </li>
-            ) : null}
-          </ol>
+          <NextSteps
+            project={project}
+            here={here.name}
+            other={other}
+            otherName={otherName}
+            status={status}
+            point={point}
+          />
         )}
       </AlertDescription>
       {planner.dialog}
     </Alert>
+  )
+}
+
+function readerStatus(
+  t: ReturnType<typeof useT>,
+  here: Database,
+  otherName: string,
+  readers: number,
+  services: string[],
+) {
+  if (here.state !== "ready") return t("db.restored.waiting", here.name)
+  if (readers === 0) return t("db.restored.noReaders", otherName)
+  return t("db.restored.readers", otherName, t("common.list", services))
+}
+
+/** What to do after a restore, in order: point the services, check them, delete the original. */
+function NextSteps({
+  project,
+  here,
+  other,
+  otherName,
+  status,
+  point,
+}: {
+  project: string
+  here: string
+  other?: Database
+  otherName: string
+  status: string
+  point: ReactNode
+}) {
+  const t = useT()
+  return (
+    <ol className="flex list-decimal flex-col gap-1.5 pl-5">
+      <li>
+        {status}
+        {point ? <div className="mt-1.5">{point}</div> : null}
+      </li>
+      <li>{t("db.restored.check", here)}</li>
+      {other ? (
+        <li>
+          {t("db.restored.remove", otherName)}{" "}
+          <Link {...databaseLink(project, other)} className="underline">
+            {t("db.restored.open", otherName)}
+          </Link>
+        </li>
+      ) : null}
+    </ol>
   )
 }
