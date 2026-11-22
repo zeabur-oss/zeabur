@@ -3385,6 +3385,7 @@ export const zhTW: Messages = {
   "sentence.problem.badRequest.fix.planToken": () =>
     "重新檢查變更。只有做這次檢查的那台伺服器能套用，而且權杖不能改動。",
   "sentence.problem.conflict.fix.review": () => "重新檢查，以物件目前的狀態為準。",
+  "sentence.problem.conflict.fix.inUse": () => "先把這些刪掉，再移除一次。",
   "sentence.problem.conflict.fix.alreadyExists": () => "先刪掉這些物件，或部署到別的專案。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等容器開始執行。如果一直沒有執行，容器的日誌和事件會說明原因。",
@@ -3435,6 +3436,8 @@ export const zhTW: Messages = {
   "sentence.problem.summary.log-unavailable": () => "無法讀取這份日誌。",
   "sentence.problem.summary.conflict": (p) =>
     p.name ? `${p.name} 在你檢查之後又有變更。` : "這個物件在你檢查之後又有變更。",
+  "sentence.problem.summary.inUse": (p) =>
+    p.more === "0" ? `${p.users} 還在用它。` : `${p.users} 等 ${p.more} 個還在用它。`,
   "sentence.problem.summary.already-exists": (p) => `專案 ${p.namespace} 裡已經有 ${p.objects}。`,
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "這由其他工具管理。",

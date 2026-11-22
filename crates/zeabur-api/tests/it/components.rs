@@ -859,12 +859,13 @@ mod tests {
         );
         let (status, problem) = call(&app, "plan", "remove", "").await;
         assert_eq!(status, StatusCode::CONFLICT, "{problem}");
-        assert!(
-            problem["detail"]
-                .as_str()
-                .unwrap()
-                .contains("Certificate shop/shop-tls")
+        // Not a change after the review: the summary names what uses it.
+        assert_eq!(problem["summary"]["key"], "problem.summary.inUse");
+        assert_eq!(
+            problem["summary"]["params"]["users"],
+            "Certificate shop/shop-tls"
         );
+        assert_eq!(problem["fixKey"]["key"], "problem.conflict.fix.inUse");
     }
 
     #[tokio::test]

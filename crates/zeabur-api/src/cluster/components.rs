@@ -1254,13 +1254,18 @@ impl World {
         } else {
             users.join(", ")
         };
-        Err(ApiError::from(Problem::new(
+        let mut problem = Problem::new(
             Kind::Conflict,
-            format!(
-                "{} still uses {}: {list}. Delete them first.",
-                file.id, file.id
-            ),
-        )))
+            format!("{list} still use {}. Delete them first.", file.id),
+        );
+        problem.summary = Message::new("problem.summary.inUse")
+            .with("users", users.join(", "))
+            .with("more", more.to_string());
+        problem.fix_for_occasion(
+            "Delete them first, then remove it again.",
+            Message::new("problem.conflict.fix.inUse"),
+        );
+        Err(ApiError::from(problem))
     }
 
     /// Where an object goes: its resource from discovery and its namespace; `None` while the
