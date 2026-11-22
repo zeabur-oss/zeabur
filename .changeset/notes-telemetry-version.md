@@ -1,0 +1,7 @@
+---
+default: patch
+---
+
+# The telemetry command after install keeps the installed version
+
+The `helm upgrade` command that the chart prints to join the experience program now names the release namespace and the installed chart version. Before, it failed outside that namespace, and it upgraded to the latest stable release, so on a pre-release it went back to an older version.
