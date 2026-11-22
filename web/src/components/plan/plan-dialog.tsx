@@ -727,7 +727,12 @@ function staysSentence(
   const object = `${kindName(t, warning.object.kind)} ${warning.object.name}`
   switch (warning.reason) {
     case "shared":
-      return t("warn.staysShared", object, names(t, warning.workloads ?? []))
+      return t(
+        "warn.staysShared",
+        object,
+        names(t, warning.workloads ?? []),
+        warning.workloads?.length ?? 0,
+      )
     case "routesElsewhere":
       return t("warn.staysRoute", object)
     case "controlled":

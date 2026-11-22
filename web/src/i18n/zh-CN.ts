@@ -1541,7 +1541,8 @@ export const zhCN: Messages = {
     `也会删除 ${owner} 拥有的对象：${names}`,
   "warn.deletesOwned": (owner: string, names: string) =>
     `也会删除 ${owner} 创建、且没有其他服务使用的对象：${names}`,
-  "warn.staysShared": (object: string, names: string) => `保留 ${object}：${names} 也在使用`,
+  "warn.staysShared": (object: string, names: string, _count: number) =>
+    `保留 ${object}：${names} 也在使用`,
   "warn.staysRoute": (object: string) => `保留 ${object}：也指向一个会保留的 Service`,
   "warn.staysControlled": (object: string, owner: string) => `保留 ${object}：属于 ${owner}`,
   "warn.staysManaged": (object: string, tool: string) => `保留 ${object}：由 ${tool} 管理`,

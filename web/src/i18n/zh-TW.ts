@@ -1544,7 +1544,8 @@ export const zhTW: Messages = {
     `也會刪除 ${owner} 擁有的物件：${names}`,
   "warn.deletesOwned": (owner: string, names: string) =>
     `也會刪除 ${owner} 建立、且沒有其他服務使用的物件：${names}`,
-  "warn.staysShared": (object: string, names: string) => `保留 ${object}：${names} 也在使用`,
+  "warn.staysShared": (object: string, names: string, _count: number) =>
+    `保留 ${object}：${names} 也在使用`,
   "warn.staysRoute": (object: string) => `保留 ${object}：也導向一個會保留的 Service`,
   "warn.staysControlled": (object: string, owner: string) => `保留 ${object}：屬於 ${owner}`,
   "warn.staysManaged": (object: string, tool: string) => `保留 ${object}：由 ${tool} 管理`,
