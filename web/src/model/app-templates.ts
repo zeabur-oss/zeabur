@@ -158,3 +158,29 @@ export function templateChanges(
     },
   ]
 }
+
+/** The licence names of an SPDX expression: `Apache-2.0` is `Apache 2.0`, and a `LicenseRef-` id
+ * is its name in words. `or` is true when the expression offers a choice. */
+export function licenseNames(expression: string): { names: string[]; or: boolean } {
+  const parts = expression
+    .replace(/[()]/g, " ")
+    .split(/\s+(AND|OR)\s+/)
+    .map((p) => p.trim())
+  const names = parts.filter((p) => p && p !== "AND" && p !== "OR").map(licenseName)
+  return { names, or: parts.includes("OR") }
+}
+
+function licenseName(id: string): string {
+  const [base = id, ...exception] = id.split(/\s+WITH\s+/)
+  const name = base.startsWith("LicenseRef-")
+    ? base
+        .slice("LicenseRef-".length)
+        .split("-")
+        .map((w) => (/\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+        .join(" ")
+    : base
+        .replace(/-only$/, "")
+        .replace(/-or-later$/, " or later")
+        .replace(/-(?=\d)/g, " ")
+  return [name, ...exception].join(" with ")
+}
