@@ -413,7 +413,7 @@ impl Planner<'_> {
     }
 
     /// Whether the plan deletes object `kind` `name`.
-    fn deletes(&self, kind: &str, name: &str) -> bool {
+    pub(crate) fn deletes(&self, kind: &str, name: &str) -> bool {
         self.objects
             .iter()
             .any(|w| w.deleted && w.target.kind == kind && w.target.name == name)
