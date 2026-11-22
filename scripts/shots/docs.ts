@@ -406,7 +406,6 @@ test("image-form", async ({ page, shot }) => {
     .first()
     .fill("docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim")
   await page.locator('[data-slot="dialog-content"] input').nth(1).fill("web")
-  await page.locator('[data-slot="dialog-content"] [data-slot="switch"]').first().click()
   await expect(
     page.locator('[data-slot="dialog-content"] input[value$="apps.example.com"]'),
   ).toBeVisible()
@@ -422,7 +421,6 @@ test("image-review", async ({ page, shot }) => {
     .first()
     .fill("docker.io/nginxinc/nginx-unprivileged:1.30.5-alpine-slim")
   await page.locator('[data-slot="dialog-content"] input').nth(1).fill("web")
-  await page.locator('[data-slot="dialog-content"] [data-slot="switch"]').first().click()
   await expect(
     page.locator('[data-slot="dialog-content"] input[value$="apps.example.com"]'),
   ).toBeVisible()
