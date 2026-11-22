@@ -12,6 +12,7 @@ import {
 import { PlanDiffs, PlanFrame } from "@/components/cluster-plan"
 import { FormField } from "@/components/form-field"
 import { GateTip, useHintGate } from "@/components/gate"
+import { FormDrawer, ReviewFooter, ReviewForm } from "@/components/plan/plan-drawer"
 import { useT } from "@/i18n"
 import type { Gate } from "@/model/rights"
 import {
@@ -22,7 +23,7 @@ import {
   destinationProblems,
   saveRequest,
 } from "@/model/s3-destinations"
-import { FormButtons, Section } from "@/routes/cluster/section"
+import { Section } from "@/routes/cluster/section"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Input } from "@zeabur-oss/design-system/components/input"
@@ -85,7 +86,6 @@ export function S3DestinationsSection() {
         <DestinationEditor
           editing={editing === "new" ? undefined : editing}
           taken={data.items.map((d) => d.name)}
-          gate={gate}
           onCancel={() => setEditing(undefined)}
           onReview={(request) => review({ request, title: t("s3d.plan.save", request.name) })}
         />
@@ -168,13 +168,11 @@ const problemText = (p: DestinationProblem) =>
 function DestinationEditor({
   editing,
   taken,
-  gate,
   onCancel,
   onReview,
 }: {
   editing?: Destination
   taken: string[]
-  gate: Gate
   onCancel: () => void
   onReview: (request: Extract<Request, { op: "save" }>) => void
 }) {
@@ -190,6 +188,7 @@ function DestinationEditor({
     <Input
       size="sm"
       mono
+      autoFocus={key === (editing ? "endpoint" : "name")}
       value={form[key]}
       placeholder={placeholder}
       autoComplete="off"
@@ -198,19 +197,20 @@ function DestinationEditor({
       onChange={(event) => setForm((f) => ({ ...f, [key]: event.target.value }))}
     />
   )
+  const review = () => {
+    setTried(true)
+    if (problems.length === 0) onReview(saveRequest(form))
+  }
   return (
-    <form
-      className="flex flex-col gap-4 rounded-xl border border-main bg-card p-5"
-      onSubmit={(event) => {
-        event.preventDefault()
-        setTried(true)
-        if (problems.length === 0) onReview(saveRequest(form))
-      }}
+    <FormDrawer
+      onClose={onCancel}
+      title={editing ? t("s3d.edit", editing.name) : t("s3d.add")}
+      footer={<ReviewFooter onCancel={onCancel} onReview={review} />}
     >
-      <FormField label={t("vars.name")} errors={errors("name", "taken")}>
-        {input("name", "r2-backups")}
-      </FormField>
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <ReviewForm onReview={review}>
+        <FormField label={t("vars.name")} errors={errors("name", "taken")}>
+          {input("name", "r2-backups")}
+        </FormField>
         {fields.map((f) => (
           <FormField key={f.key} label={t(f.label)} errors={errors(f.problem)}>
             {input(f.key, f.placeholder)}
@@ -229,9 +229,10 @@ function DestinationEditor({
             onChange={(event) => setForm((f) => ({ ...f, secretAccessKey: event.target.value }))}
           />
         </FormField>
-      </div>
-      <FormButtons gate={gate} onCancel={onCancel} />
-    </form>
+        {/* The footer's button is outside the form, so Enter needs one in it. */}
+        <button type="submit" hidden />
+      </ReviewForm>
+    </FormDrawer>
   )
 }
 
