@@ -145,8 +145,6 @@ domains:
   suffixes: [203-0-113-10.sslip.io]
 builds:
   registry: zot.zot.svc:5000
-  caBundle:
-    configMap: zeabur-registry-ca
 ```
 
 domain 模式要把 `ingress.clusterIssuer`、`identity.ingress.clusterIssuer` 和 `domains.clusterIssuer` 都设为 `letsencrypt`，也不要添加 `issuer.caBundle`。domain 模式的服务器最后会类似下面这样：

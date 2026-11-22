@@ -72,22 +72,16 @@ domains:
 
 # Services deployed from Git. registry: where Zeabur Builder pushes and nodes pull, the same as the
 # Builder's default registry; a new service runs <registry>/<project>/<service>. The default is the
-# catalog's Zot. Empty: "Deploy from Git" is turned off.
-# caBundle: a ConfigMap in this namespace with the CA (PEM) that signed the registry's certificate,
-# which Zeabur trusts when it reads an image from the registry. Zot serves HTTPS, so without it
-# the image form cannot read the registry. Empty: the image's Mozilla CA bundle only. A folder
-# upload needs none: it trusts the CA that Zeabur Builder puts in the Build's upload Secret.
+# catalog's Zot. Empty: "Deploy from Git" is turned off. For this registry, Zeabur also trusts the
+# CA that Zeabur Builder puts in a Build's upload Secret, read as the person.
 builds:
   registry: zot.zot.svc:5000
-  caBundle:
-    configMap: ""
-    key: ca.crt
 
 # Extra CA certificates (PEM) Zeabur trusts, on top of the image's Mozilla CA bundle, for every
 # HTTPS connection it makes: signing in with the issuer, reading images from registries, reading
 # backups from object stores, and GitHub. Use it when one of them, or a proxy that inspects TLS, presents a certificate a
 # private CA signed. Name a ConfigMap or a Secret in this namespace, not both; Zeabur reads it when
-# it starts. issuer.caBundle and builds.caBundle are trusted on top. Empty: the Mozilla CA bundle only.
+# it starts. issuer.caBundle is trusted on top. Empty: the Mozilla CA bundle only.
 extraTrustedCA:
   configMap: ""
   secret: ""

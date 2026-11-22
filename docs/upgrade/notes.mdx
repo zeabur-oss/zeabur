@@ -145,8 +145,6 @@ domains:
   suffixes: [203-0-113-10.sslip.io]
 builds:
   registry: zot.zot.svc:5000
-  caBundle:
-    configMap: zeabur-registry-ca
 ```
 
 In domain mode, set `ingress.clusterIssuer`, `identity.ingress.clusterIssuer` and `domains.clusterIssuer` to `letsencrypt`, and leave out `issuer.caBundle`. A domain-mode server ends up like this:
