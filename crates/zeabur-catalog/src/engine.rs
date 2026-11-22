@@ -1416,7 +1416,8 @@ pub fn written(facts: &ClusterFacts) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// The installed components that need `id`, which keep it from being removed.
+/// The installed components that need `id`, which keep it from being removed. An installed
+/// component whose file does not read may need it too, so it also keeps `id`.
 #[must_use]
 pub fn needed_by<'a>(
     snapshot: &'a Snapshot,
@@ -1426,6 +1427,7 @@ pub fn needed_by<'a>(
     snapshot
         .needed_by(id)
         .into_iter()
+        .chain(snapshot.problems.keys().map(String::as_str))
         .filter(|c| *c != id && installed.contains(*c))
         .collect()
 }
@@ -2770,6 +2772,14 @@ mod tests {
         assert_eq!(
             needed_by(&snapshot, "cert-manager", &installed),
             ["cloudnative-pg"]
+        );
+        // An installed component whose file does not read may need it.
+        let mut unread = snapshot;
+        let file = unread.components.remove("keda-http-add-on").unwrap();
+        unread.problems.insert(file.id, "too new".to_owned());
+        assert_eq!(
+            needed_by(&unread, "keda", &set(&["keda", "keda-http-add-on"])),
+            ["keda-http-add-on"]
         );
     }
 
