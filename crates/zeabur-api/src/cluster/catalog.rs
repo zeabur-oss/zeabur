@@ -308,7 +308,8 @@ impl Catalog {
         };
         let index = api::index(&bytes)?;
         let previous = kept.snapshot.as_deref();
-        if previous.is_some_and(|p| p.index == index) {
+        // A file an older build could not read is asked for again; this build may read it.
+        if previous.is_some_and(|p| p.index == index && p.problems.is_empty()) {
             return Ok(None);
         }
         let stale = previous.map_or_else(
@@ -602,6 +603,25 @@ mod tests {
             .await;
         assert_eq!(now.snapshot.unwrap().fetched_at, second(0));
         assert!(now.error.is_some());
+    }
+
+    #[tokio::test]
+    async fn a_cached_file_that_did_not_read_is_read_again_after_a_restart() {
+        let cluster: Arc<dyn Cluster> = Arc::new(zeabur_kube::memory::MemoryCluster::new(
+            zeabur_kube::memory::State::default(),
+        ));
+        let fake = Fake::new();
+        let listed = api::index(&fake.index.lock().unwrap()).unwrap();
+        let unread = BTreeMap::from([("cert-manager".to_owned(), Err("too new".to_owned()))]);
+        let old = Snapshot::assemble(listed, unread, None, second(0)).unwrap();
+        write_cache(cluster.as_ref(), "zeabur", &old).await.unwrap();
+
+        let now = catalog(&fake, Some(cluster))
+            .current(Instant::now(), second(1))
+            .await;
+        let snapshot = now.snapshot.unwrap();
+        assert!(snapshot.problems.is_empty());
+        assert!(snapshot.components.contains_key("cert-manager"));
     }
 
     #[tokio::test]
