@@ -9,6 +9,7 @@ import {
   generateAll,
   inputProblem,
   inputWords,
+  licenseNames,
   listed,
   riskWords,
   startValues,
@@ -276,5 +277,29 @@ describe("app templates", () => {
     ]
     expect(listed(items).map((t) => t.id)).toEqual(["ghost", "umami"])
     expect(filterTemplates(listed(items), "ANALYTICS", "en").map((t) => t.id)).toEqual(["umami"])
+  })
+})
+
+describe("licenseNames", () => {
+  test("names the SPDX ids and the LicenseRef- ids in words", () => {
+    expect(
+      licenseNames("LicenseRef-n8n-sustainable-use AND PostgreSQL AND Apache-2.0"),
+    ).toMatchObject({ names: ["n8n Sustainable Use", "PostgreSQL", "Apache 2.0"], joined: "and" })
+  })
+
+  test("keeps a choice and an exception", () => {
+    expect(licenseNames("(MIT OR GPL-3.0-or-later)")).toMatchObject({
+      names: ["MIT", "GPL 3.0 or later"],
+      joined: "or",
+    })
+    expect(licenseNames("GPL-2.0-only WITH Classpath-exception-2.0").names).toStrictEqual([
+      "GPL 2.0 with Classpath-exception-2.0",
+    ])
+  })
+
+  test("a mix of AND and OR keeps the expression", () => {
+    const mixed = licenseNames("MIT AND (Apache-2.0 OR GPL-3.0-only)")
+    expect(mixed.joined).toBe("mixed")
+    expect(mixed.text).toBe("MIT AND (Apache 2.0 OR GPL 3.0)")
   })
 })

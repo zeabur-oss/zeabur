@@ -158,3 +158,53 @@ export function templateChanges(
     },
   ]
 }
+
+/** The licence names of an SPDX expression: `Apache-2.0` is `Apache 2.0`, and a `LicenseRef-` id
+ * is its name in words. `joined` says how the names combine. A mix of `AND` and `OR` only the
+ * expression can say, so `text` holds it with the names in words. */
+export function licenseNames(expression: string): {
+  names: string[]
+  joined: "and" | "or" | "mixed"
+  text: string
+} {
+  const tokens = expression
+    .replace(/([()])/g, " $1 ")
+    .split(/\s+/)
+    .filter(Boolean)
+  const names: string[] = []
+  const written: string[] = []
+  let id: string[] = []
+  const flush = () => {
+    if (id.length === 0) return
+    const name = licenseName(id.join(" "))
+    names.push(name)
+    written.push(name)
+    id = []
+  }
+  for (const token of tokens) {
+    if (token === "AND" || token === "OR" || token === "(" || token === ")") {
+      flush()
+      written.push(token)
+    } else id.push(token)
+  }
+  flush()
+  const operators = new Set(tokens.filter((t) => t === "AND" || t === "OR"))
+  const joined = operators.size > 1 ? "mixed" : operators.has("OR") ? "or" : "and"
+  const text = written.join(" ").replace(/\( /g, "(").replace(/ \)/g, ")")
+  return { names, joined, text }
+}
+
+function licenseName(id: string): string {
+  const [base = id, ...exception] = id.split(/\s+WITH\s+/)
+  const name = base.startsWith("LicenseRef-")
+    ? base
+        .slice("LicenseRef-".length)
+        .split("-")
+        .map((w) => (/\d/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1)))
+        .join(" ")
+    : base
+        .replace(/-only$/, "")
+        .replace(/-or-later$/, " or later")
+        .replace(/-(?=\d)/g, " ")
+  return [name, ...exception].join(" with ")
+}
