@@ -2937,6 +2937,7 @@ export const zhTW: Messages = {
   "s3d.plan.keptUnknown": (copies) => `${copies} 沒有標明金鑰欄位，所以會沿用舊金鑰。`,
   "s3d.plan.unsearched": "你無權列出所有 Namespace 的機密變數，其他地方的金鑰複本會沿用舊金鑰。",
   "s3d.add": "新增目的地",
+  "s3d.edit": (name) => `編輯 S3 目的地 ${name}`,
   "s3d.plan.save": (name) => `儲存 S3 目的地 ${name}`,
   "s3d.plan.remove": (name) => `移除 S3 目的地 ${name}`,
   "s3d.problem.taken": "這個名稱已經有人用了。",

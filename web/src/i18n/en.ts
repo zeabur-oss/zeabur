@@ -3211,6 +3211,7 @@ export const en = {
   "s3d.plan.unsearched":
     "You cannot list secrets in every namespace, so copies of these keys elsewhere keep the old keys.",
   "s3d.add": "Add destination",
+  "s3d.edit": (name: string) => `Edit S3 destination ${name}`,
   "s3d.plan.save": (name: string) => `Save S3 destination ${name}`,
   "s3d.plan.remove": (name: string) => `Remove S3 destination ${name}`,
   "s3d.problem.taken": "This name is taken.",

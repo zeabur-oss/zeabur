@@ -2930,6 +2930,7 @@ export const zhCN: Messages = {
   "s3d.plan.keptUnknown": (copies) => `${copies} 没有标明密钥字段，所以会沿用旧密钥。`,
   "s3d.plan.unsearched": "你无权列出所有 Namespace 的机密变量，其他地方复制的密钥会沿用旧密钥。",
   "s3d.add": "添加目的地",
+  "s3d.edit": (name) => `编辑 S3 目的地 ${name}`,
   "s3d.plan.save": (name) => `保存 S3 目的地 ${name}`,
   "s3d.plan.remove": (name) => `移除 S3 目的地 ${name}`,
   "s3d.problem.taken": "已有同名的目的地。",
