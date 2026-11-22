@@ -11604,6 +11604,35 @@ export type GetServiceLogHistoryParams = {
   limit?: number
 }
 
+const getHeaders = (
+  ...sources: (RequestInit["headers"] | Record<string, string | undefined>)[]
+) => {
+  const seen = new Set<string>()
+  const layers: [string, string | readonly string[]][][] = []
+  for (const source of sources.reverse()) {
+    if (!source) continue
+    const entries =
+      source instanceof Headers
+        ? source.entries()
+        : Symbol.iterator in source
+          ? Array.from(
+              source as Iterable<Iterable<string>>,
+              (entry) => Array.from(entry) as [string, string],
+            )
+          : Object.entries<string | readonly string[] | undefined>(source)
+    const layer: [string, string | readonly string[]][] = []
+    for (const [name, value] of entries) {
+      if (value !== undefined && !seen.has(name.toLowerCase())) layer.push([name, value])
+    }
+    for (const [name] of layer) seen.add(name.toLowerCase())
+    layers.push(layer)
+  }
+  return Object.fromEntries(layers.reverse().flat()) as Extract<
+    RequestInit["headers"],
+    Record<string, unknown>
+  >
+}
+
 export const getGetAccountUrl = () => {
   return `/api/v1/account`
 }
@@ -11682,29 +11711,10 @@ export const applyClusterBackups = async (
   backupsApply: BackupsApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<BackupsApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<BackupsApplied>(getApplyClusterBackupsUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(backupsApply),
   })
 }
@@ -11722,29 +11732,10 @@ export const planClusterBackups = async (
   backupsPlanRequest: BackupsPlanRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<BackupsPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<BackupsPlan>(getPlanClusterBackupsUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(backupsPlanRequest),
   })
 }
@@ -11838,29 +11829,10 @@ export const applyComponent = async (
   componentRequest: ComponentRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ComponentApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<ComponentApplied>(getApplyComponentUrl(id), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(componentRequest),
   })
 }
@@ -11881,29 +11853,10 @@ export const planComponent = async (
   componentRequest: ComponentRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ComponentPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<ComponentPlan>(getPlanComponentUrl(id), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(componentRequest),
   })
 }
@@ -12005,29 +11958,10 @@ export const applyGitHubApp = async (
   gitHubAppApply: GitHubAppApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<GitHubAppApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<GitHubAppApplied>(getApplyGitHubAppUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(gitHubAppApply),
   })
 }
@@ -12044,29 +11978,10 @@ export const convertGitHubApp = async (
   gitHubConversionRequest: GitHubConversionRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<GitHubAppPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<GitHubAppPlan>(getConvertGitHubAppUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(gitHubConversionRequest),
   })
 }
@@ -12114,29 +12029,10 @@ export const startGitHubAppManifest = async (
   gitHubManifestRequest: GitHubManifestRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<GitHubManifest> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<GitHubManifest>(getStartGitHubAppManifestUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(gitHubManifestRequest),
   })
 }
@@ -12153,29 +12049,10 @@ export const planGitHubApp = async (
   gitHubGrantRequest: GitHubGrantRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<GitHubAppPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<GitHubAppPlan>(getPlanGitHubAppUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(gitHubGrantRequest),
   })
 }
@@ -12260,29 +12137,10 @@ export const applyNodeShell = async (
   nodeShellApply: NodeShellApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<NodeShellApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<NodeShellApplied>(getApplyNodeShellUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(nodeShellApply),
   })
 }
@@ -12301,29 +12159,10 @@ export const planNodeShell = async (
   nodeShellPlanRequest: NodeShellPlanRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<NodeShellPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<NodeShellPlan>(getPlanNodeShellUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(nodeShellPlanRequest),
   })
 }
@@ -12385,29 +12224,10 @@ export const applyNodeMaintenance = async (
   maintenanceApply: MaintenanceApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<MaintenanceApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<MaintenanceApplied>(getApplyNodeMaintenanceUrl(node), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(maintenanceApply),
   })
 }
@@ -12425,29 +12245,10 @@ export const planNodeMaintenance = async (
   maintenanceRequest: MaintenanceRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<MaintenancePlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<MaintenancePlan>(getPlanNodeMaintenanceUrl(node), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(maintenanceRequest),
   })
 }
@@ -12479,29 +12280,10 @@ export const applyClusterNotifications = async (
   notificationsApply: NotificationsApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<NotificationsApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<NotificationsApplied>(getApplyClusterNotificationsUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(notificationsApply),
   })
 }
@@ -12518,29 +12300,10 @@ export const planClusterNotifications = async (
   notificationsPlanRequest: NotificationsPlanRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<NotificationsPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<NotificationsPlan>(getPlanClusterNotificationsUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(notificationsPlanRequest),
   })
 }
@@ -12573,29 +12336,10 @@ export const applyS3Destinations = async (
   s3DestinationsApply: S3DestinationsApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<S3DestinationsApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<S3DestinationsApplied>(getApplyS3DestinationsUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(s3DestinationsApply),
   })
 }
@@ -12612,29 +12356,10 @@ export const planS3Destinations = async (
   s3DestinationsPlanRequest: S3DestinationsPlanRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<S3DestinationsPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<S3DestinationsPlan>(getPlanS3DestinationsUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(s3DestinationsPlanRequest),
   })
 }
@@ -12720,29 +12445,10 @@ export const applyClusterTools = async (
   clusterToolsApply: ClusterToolsApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ClusterToolsApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<ClusterToolsApplied>(getApplyClusterToolsUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(clusterToolsApply),
   })
 }
@@ -12908,29 +12614,10 @@ export const applyMemberChange = async (
   memberApplyRequest: MemberApplyRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<MemberApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<MemberApplied>(getApplyMemberChangeUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(memberApplyRequest),
   })
 }
@@ -12963,29 +12650,10 @@ export const planMemberChange = async (
   memberChange: MemberChange,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<MemberPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<MemberPlan>(getPlanMemberChangeUrl(), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(memberChange),
   })
 }
@@ -13021,29 +12689,10 @@ export const createSetupLink = async (
   setupLinkRequest: SetupLinkRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<SetupLinkView> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<SetupLinkView>(getCreateSetupLinkUrl(username), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(setupLinkRequest),
   })
 }
@@ -13110,29 +12759,10 @@ export const applyProject = async (
   applyRequest: ApplyRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ApplyResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<ApplyResponse>(getApplyProjectUrl(project), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(applyRequest),
   })
 }
@@ -13227,29 +12857,10 @@ export const uploadBuildSource = async (
   params: UploadBuildSourceParams,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<UploadedSource> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<UploadedSource>(getUploadBuildSourceUrl(project, build, params), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/gzip", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/gzip" }, options?.headers),
     body: JSON.stringify(uploadBuildSourceBody),
   })
 }
@@ -13281,29 +12892,10 @@ export const convertCompose = async (
   composeRequest: ComposeRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<Conversion> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<Conversion>(getConvertComposeUrl(project), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(composeRequest),
   })
 }
@@ -13394,29 +12986,10 @@ export const inspectDeployKeyHost = async (
   deployKeyRequest: DeployKeyRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<DeployKeyHost> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<DeployKeyHost>(getInspectDeployKeyHostUrl(project), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(deployKeyRequest),
   })
 }
@@ -13514,29 +13087,10 @@ export const previewImageService = async (
   imageServiceChange: ImageServiceChange,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ServiceYaml> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<ServiceYaml>(getPreviewImageServiceUrl(project), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(imageServiceChange),
   })
 }
@@ -13554,29 +13108,10 @@ export const inspectImage = async (
   inspectRequest: InspectRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ImageInspection> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<ImageInspection>(getInspectImageUrl(project), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(inspectRequest),
   })
 }
@@ -13684,29 +13219,10 @@ export const applyProjectNotifications = async (
   notificationsApply: NotificationsApply,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<NotificationsApplied> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<NotificationsApplied>(getApplyProjectNotificationsUrl(project), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(notificationsApply),
   })
 }
@@ -13724,29 +13240,10 @@ export const planProjectNotifications = async (
   notificationsPlanRequest: NotificationsPlanRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<NotificationsPlan> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<NotificationsPlan>(getPlanProjectNotificationsUrl(project), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(notificationsPlanRequest),
   })
 }
@@ -13842,29 +13339,10 @@ export const planProject = async (
   planRequest: PlanRequest,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<PlanResponse> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<PlanResponse>(getPlanProjectUrl(project), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(planRequest),
   })
 }
@@ -14057,29 +13535,10 @@ export const uploadFile = async (
   params?: UploadFileParams,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<void> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<void>(getUploadFileUrl(project, pod, params), {
     ...options,
     method: "PUT",
-    headers: { "Content-Type": "application/octet-stream", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/octet-stream" }, options?.headers),
     body: uploadFileBody,
   })
 }
@@ -14162,29 +13621,10 @@ export const makeFolder = async (
   fileNewFolder: FileNewFolder,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<void> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<void>(getMakeFolderUrl(project, pod), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(fileNewFolder),
   })
 }
@@ -14202,29 +13642,10 @@ export const renameFile = async (
   fileRename: FileRename,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<void> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<void>(getRenameFileUrl(project, pod), {
     ...options,
     method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(fileRename),
   })
 }
@@ -14799,29 +14220,10 @@ export const setClusterName = async (
   clusterNameChange: ClusterNameChange,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<ClusterNameSetting> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<ClusterNameSetting>(getSetClusterNameUrl(), {
     ...options,
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(clusterNameChange),
   })
 }
@@ -14858,29 +14260,10 @@ export const setDomains = async (
   domainsChange: DomainsChange,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<DomainsSetting> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<DomainsSetting>(getSetDomainsUrl(), {
     ...options,
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(domainsChange),
   })
 }
@@ -14917,29 +14300,10 @@ export const setMetricsStore = async (
   metricsStoreChange: MetricsStoreChange,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<MetricsStoreSetting> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<MetricsStoreSetting>(getSetMetricsStoreUrl(), {
     ...options,
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(metricsStoreChange),
   })
 }
@@ -14974,29 +14338,10 @@ export const setSignInSetting = async (
   signInChange: SignInChange,
   options?: Parameters<typeof zeaburFetch>[1],
 ): Promise<SignInSetting> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
-    if (!h) return {}
-    if (h instanceof Headers) return Object.fromEntries(h.entries())
-    if (Symbol.iterator in h) {
-      return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
-      )
-    }
-    const headers: Record<string, string | readonly string[]> = {}
-    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
-      if (value !== undefined) headers[name] = value
-    }
-    return headers
-  }
   return zeaburFetch<SignInSetting>(getSetSignInSettingUrl(), {
     ...options,
     method: "PUT",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
     body: JSON.stringify(signInChange),
   })
 }
