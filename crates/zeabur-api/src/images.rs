@@ -6,6 +6,10 @@
 //! only to the registry they name. The architectures of the cluster's nodes, where the person
 //! may list nodes, choose among an index's platforms; else `amd64`, then `arm64`.
 //!
+//! An image in the build registry is read trusting, on top, the CA Zeabur Builder puts in the
+//! upload Secret of the project's latest upload, read as the person. Only connections to that
+//! registry's host trust it.
+//!
 //! A registry that cannot be read is an answer, not an error: deploying never waits on it.
 //! Answers are kept for a few minutes, per credential.
 
@@ -24,10 +28,12 @@ use registry::{Credential, Inspected, Transport, Unreadable};
 use secrecy::zeroize::Zeroizing;
 use secrecy::{ExposeSecret as _, SecretString};
 use serde::{Deserialize, Serialize};
+use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::ClusterExt as _;
 use zeabur_kube::k8s_openapi::api::core::v1::Node;
+use zeabur_kube::k8s_openapi::jiff::Timestamp;
+use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
 
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
@@ -50,6 +56,16 @@ pub struct Inspector {
     kept: Mutex<HashMap<String, (Instant, Inspected)>>,
     /// Which addresses the server may connect to.
     reach: zeabur_http::Reach,
+    /// How a read that brings its own CA connects.
+    extra: Extra,
+}
+
+/// How a read that brings the build registry's CA connects.
+enum Extra {
+    /// Through the given transport, as any other read.
+    Given,
+    /// Over HTTPS to the registry's host, trusting the platform's roots, `trusted_ca` and the CA.
+    Https { trusted_ca: Option<Vec<u8>> },
 }
 
 impl std::fmt::Debug for Inspector {
@@ -69,6 +85,7 @@ impl Inspector {
             insecure,
             kept: Mutex::new(HashMap::new()),
             reach: zeabur_http::Reach::Any,
+            extra: Extra::Given,
         }
     }
 
@@ -79,11 +96,12 @@ impl Inspector {
     }
 
     /// Through [`zeabur_http::Https`] reaching `reach`, trusting what `tls` trusts (see
-    /// [`zeabur_http::tls`]); the registry of Zeabur Builder is read over HTTPS like any other.
+    /// [`zeabur_http::tls`]), which is the platform's roots and `trusted_ca`.
     #[must_use]
     pub fn connected(
         reach: zeabur_http::Reach,
         tls: &Result<Arc<rustls::ClientConfig>, String>,
+        trusted_ca: Option<Vec<u8>>,
     ) -> Self {
         let transport: Arc<dyn Transport> = match tls {
             Ok(tls) => Arc::new(zeabur_http::Https::new(reach, tls)),
@@ -95,17 +113,38 @@ impl Inspector {
         }
         Self {
             reach,
+            extra: Extra::Https { trusted_ca },
             ..Self::new(transport, insecure)
         }
     }
 
-    fn base(&self, reference: &Reference) -> String {
+    /// The registry's API; a registry with a CA of its own speaks HTTPS.
+    fn base(&self, reference: &Reference, has_ca: bool) -> String {
         let host = reference.api_host();
         let bare = host.rsplit_once(':').map_or(host, |(h, _)| h);
-        if self.insecure.iter().any(|i| i == host || i == bare) {
+        if !has_ca && self.insecure.iter().any(|i| i == host || i == bare) {
             format!("http://{host}")
         } else {
             format!("https://{host}")
+        }
+    }
+
+    /// The transport for a read of `reference` that also trusts the PEM `ca`, at its host only.
+    fn trusting(&self, reference: &Reference, ca: &[u8]) -> Option<Pinned> {
+        let Extra::Https { trusted_ca } = &self.extra else {
+            return None;
+        };
+        let bundle = [trusted_ca.as_deref().unwrap_or_default(), b"\n", ca].concat();
+        match zeabur_http::tls(Some(&bundle)) {
+            Ok(tls) => Some(Pinned {
+                host: reference.api_host().to_ascii_lowercase(),
+                trusting: zeabur_http::Https::new(self.reach, &tls),
+                other: Arc::clone(&self.transport),
+            }),
+            Err(error) => {
+                tracing::debug!(%error, "the build registry's CA is not usable");
+                None
+            }
         }
     }
 
@@ -114,14 +153,16 @@ impl Inspector {
         reference: &Reference,
         credential: Option<&Credential>,
         architectures: &[String],
+        ca: Option<&[u8]>,
     ) -> Result<Inspected, Unreadable> {
         let key = format!(
-            "{}/{}@{}|{}|{}",
+            "{}/{}@{}|{}|{}|{}",
             reference.registry,
             reference.repository,
             reference.tag,
             architectures.join(","),
-            credential.map_or_default(Credential::fingerprint)
+            credential.map_or_default(Credential::fingerprint),
+            ca.map_or_default(|ca| hex::encode(Sha256::digest(ca)))
         );
         if let Some(found) = self.kept.lock().ok().and_then(|kept| {
             kept.get(&key)
@@ -130,12 +171,17 @@ impl Inspector {
         }) {
             return Ok(found);
         }
+        let pinned = ca.and_then(|ca| self.trusting(reference, ca));
+        let transport: &dyn Transport = match &pinned {
+            Some(pinned) => pinned,
+            None => self.transport.as_ref(),
+        };
         let read = tokio::time::timeout(
             DEADLINE,
             registry::inspect(
-                self.transport.as_ref(),
+                transport,
                 reference,
-                self.base(reference),
+                self.base(reference, ca.is_some()),
                 credential,
                 architectures,
             ),
@@ -152,6 +198,35 @@ impl Inspector {
             kept.insert(key, (Instant::now(), found.clone()));
         }
         read
+    }
+}
+
+/// Sends a request to `host` through `trusting`, and any other through `other`.
+struct Pinned {
+    host: String,
+    trusting: zeabur_http::Https,
+    other: Arc<dyn Transport>,
+}
+
+impl Transport for Pinned {
+    fn get<'a>(
+        &'a self,
+        get: registry::Get,
+    ) -> std::pin::Pin<Box<dyn Future<Output = Result<registry::Answer, String>> + Send + 'a>> {
+        let to_host = get
+            .url
+            .parse::<axum::http::Uri>()
+            .ok()
+            .and_then(|uri| {
+                uri.authority()
+                    .map(|a| a.as_str().eq_ignore_ascii_case(&self.host))
+            })
+            .unwrap_or_default();
+        if to_host {
+            Transport::get(&self.trusting, get)
+        } else {
+            self.other.get(get)
+        }
     }
 }
 
@@ -317,9 +392,15 @@ pub(crate) async fn inspect(
     } else {
         architectures
     };
+    let ca = published_ca(cluster.as_ref(), &state, &project, &reference).await;
     let answer = match state
         .images
-        .inspect(&reference, credential.as_ref(), &architectures)
+        .inspect(
+            &reference,
+            credential.as_ref(),
+            &architectures,
+            ca.as_deref(),
+        )
         .await
     {
         Ok(read) => {
@@ -352,6 +433,75 @@ pub(crate) async fn inspect(
         }
     };
     Ok(Json(answer))
+}
+
+/// The CA Zeabur Builder publishes for the build registry, when `reference` is in it: the
+/// `ca.crt` of the upload Secret that the project's Build with the latest upload token names,
+/// read as the person, when that Secret names the image's registry. `None` keeps the server's own
+/// trust.
+async fn published_ca(
+    cluster: &dyn Cluster,
+    state: &AppState,
+    project: &str,
+    reference: &Reference,
+) -> Option<Vec<u8>> {
+    #[derive(Deserialize)]
+    struct Build {
+        status: Option<BuildStatus>,
+    }
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct BuildStatus {
+        upload_token: Option<UploadToken>,
+    }
+    #[derive(Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct UploadToken {
+        secret_name: String,
+        expires_at: Timestamp,
+    }
+    #[derive(Deserialize)]
+    struct DockerConfig {
+        auths: serde_json::Map<String, serde_json::Value>,
+    }
+
+    let registry = state.settings.builds.registry.as_deref()?;
+    if registry_name(registry) != reference.registry {
+        return None;
+    }
+    let builds = ResourceRef::new("builder.zeabur.com", "v1alpha1", "builds", "Build");
+    let listed = match cluster.list_objects(&builds, Some(project)).await {
+        Ok(listed) => listed?,
+        Err(error) => {
+            tracing::debug!(%error, "the project's Builds are unreadable");
+            return None;
+        }
+    };
+    let latest = listed
+        .into_iter()
+        .filter_map(|build| {
+            serde_json::from_value::<Build>(build.data)
+                .ok()?
+                .status?
+                .upload_token
+        })
+        .max_by_key(|token| token.expires_at)?;
+    let values = match cluster.reveal_secret(project, &latest.secret_name).await {
+        Ok(values) => values,
+        Err(error) => {
+            tracing::debug!(%error, secret = %latest.secret_name, "the upload Secret is unreadable");
+            return None;
+        }
+    };
+    let config: DockerConfig = serde_json::from_slice(values.get(".dockerconfigjson")?).ok()?;
+    if !config
+        .auths
+        .keys()
+        .any(|server| registry_name(server) == reference.registry)
+    {
+        return None;
+    }
+    values.get("ca.crt").cloned()
 }
 
 /// The nodes' architectures, the most common first.
@@ -474,9 +624,19 @@ mod tests {
         // The fake answers at registry.test.
         let reference = Reference::parse("registry.test/library/nginx").unwrap();
         let amd64 = vec!["amd64".to_owned()];
-        assert!(inspector.inspect(&reference, None, &amd64).await.is_ok());
+        assert!(
+            inspector
+                .inspect(&reference, None, &amd64, None)
+                .await
+                .is_ok()
+        );
         let sent = fake.sent().len();
-        assert!(inspector.inspect(&reference, None, &amd64).await.is_ok());
+        assert!(
+            inspector
+                .inspect(&reference, None, &amd64, None)
+                .await
+                .is_ok()
+        );
         assert_eq!(fake.sent().len(), sent, "read again instead of kept");
         let credential = Credential {
             username: "me".to_owned(),
@@ -484,7 +644,7 @@ mod tests {
         };
         assert!(
             inspector
-                .inspect(&reference, Some(&credential), &amd64)
+                .inspect(&reference, Some(&credential), &amd64, None)
                 .await
                 .is_ok()
         );
@@ -494,13 +654,38 @@ mod tests {
         );
     }
 
+    /// A token service or redirect on another host is reached with the server's own trust.
+    #[tokio::test]
+    async fn only_the_build_registrys_host_trusts_its_ca() {
+        let fake = Arc::new(nginx());
+        let other: Arc<dyn Transport> = Arc::<registry::fake::Registry>::clone(&fake);
+        let pinned = Pinned {
+            host: "127.0.0.1:1".to_owned(),
+            trusting: zeabur_http::Https::new(
+                zeabur_http::Reach::Any,
+                &zeabur_http::tls(None).unwrap(),
+            ),
+            other,
+        };
+        let get = |url: &str| registry::Get {
+            url: url.to_owned(),
+            accept: None,
+            authorization: None,
+            limit: 1024,
+        };
+        assert!(pinned.get(get("https://127.0.0.1:1/v2/")).await.is_err());
+        assert!(fake.sent().is_empty(), "the registry's host went elsewhere");
+        let _answer = pinned.get(get("https://registry.test/token")).await;
+        assert_eq!(fake.sent().len(), 1, "another host trusted the CA");
+    }
+
     #[test]
     fn plain_http_only_for_the_registries_named() {
         let inspector = Inspector::new(
             Arc::new(Broken(String::new())),
             vec!["zot.zot.svc".to_owned()],
         );
-        let base = |image: &str| inspector.base(&Reference::parse(image).unwrap());
+        let base = |image: &str| inspector.base(&Reference::parse(image).unwrap(), false);
         assert_eq!(base("zot.zot.svc:5000/shop/web"), "http://zot.zot.svc:5000");
         assert_eq!(base("nginx"), "https://registry-1.docker.io");
         assert_eq!(base("ghcr.io/acme/web"), "https://ghcr.io");

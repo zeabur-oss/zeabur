@@ -22,7 +22,6 @@ use serde::{Deserialize, Serialize};
 use zeabur_api::projects::backups::ProviderState;
 use zeabur_api::projects::writes::ApplyRequest;
 use zeabur_core::problem::Problem;
-use zeabur_kube::k8s_openapi::api::core::v1::ConfigMap;
 use zeabur_kube::{Cluster, UserClient, UserToken, ZeaburInfo};
 use zeabur_plan::{BuildMethod, Change, PlanRequest, UploadServiceChange};
 
@@ -214,9 +213,6 @@ async fn local(client: UserClient, info: &ZeaburInfo) -> Result<Zeabur, String> 
     let mut settings = zeabur_api::Settings::default();
     settings.builds.registry.clone_from(&info.registry);
     if let Some(service) = info.registry.as_deref().and_then(ServiceAddress::parse) {
-        if let Some(reference) = info.registry_ca.as_deref() {
-            settings.trusted_ca = Some(registry_ca(client.kube(), reference).await?);
-        }
         let port = forward::start(client.kube().clone(), &service, 0)
             .await
             .map_err(|e| format!("{e} Uploading a folder from this computer needs it. A cluster administrator has it; otherwise upload from Zeabur's web interface."))?;
@@ -238,24 +234,6 @@ async fn builder_installed(cluster: &dyn Cluster) -> Result<(), String> {
     } else {
         Err(NO_BUILDER.to_owned())
     }
-}
-
-/// The PEM at `reference`, `<namespace>/<ConfigMap>/<key>`.
-async fn registry_ca(client: &kube::Client, reference: &str) -> Result<Vec<u8>, String> {
-    let cannot = |why: &str| format!("Cannot read the registry's CA ({reference}): {why}.");
-    let mut parts = reference.splitn(3, '/');
-    let (Some(namespace), Some(name), Some(key)) = (parts.next(), parts.next(), parts.next())
-    else {
-        return Err(cannot("not namespace/name/key"));
-    };
-    let map = kube::Api::<ConfigMap>::namespaced(client.clone(), namespace)
-        .get(name)
-        .await
-        .map_err(|e| cannot(&e.to_string()))?;
-    map.data
-        .and_then(|mut data| data.remove(key))
-        .map(String::into_bytes)
-        .ok_or_else(|| cannot("the key is missing"))
 }
 
 /// Zeabur's API, on the server or in this process.

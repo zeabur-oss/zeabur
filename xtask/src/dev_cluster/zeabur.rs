@@ -47,17 +47,12 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
 
     dev.apply_created("zeabur", &["namespace", "zeabur"])?;
     dev.platform("zeabur")?;
-    secrets(dev, install.profile)?;
+    secrets(dev)?;
     dev.apply_object(&identity_ingress())?;
 
     let values = dev.write(
         "values.json",
-        &values(
-            install.zeabur_image,
-            install.profile == Profile::Full,
-            install.proxy_image,
-        )
-        .to_string(),
+        &values(install.zeabur_image, install.proxy_image).to_string(),
     )?;
     if needs_dependency_build(install.chart) {
         dev.cmd("helm")
@@ -95,7 +90,7 @@ fn needs_dependency_build(chart: &Path) -> bool {
 }
 
 /// Zeabur's OIDC client and its secret, the plan key, the certificates and the CAs it trusts.
-fn secrets(dev: &DevCluster, profile: Profile) -> Result<(), String> {
+fn secrets(dev: &DevCluster) -> Result<(), String> {
     let has = |args: &[&str]| dev.kubectl().args(args).attempt();
     let client = has(&[
         "-n",
@@ -151,20 +146,6 @@ fn secrets(dev: &DevCluster, profile: Profile) -> Result<(), String> {
             &format!("--from-file=ca.crt={}", tls.join("ca.crt").display()),
         ],
     )?;
-    // Zeabur reads zot over HTTPS against its CA.
-    if profile == Profile::Full {
-        dev.apply_created(
-            "zeabur",
-            &[
-                "configmap",
-                "zeabur-registry-ca",
-                &format!(
-                    "--from-file=ca.crt={}",
-                    dev.state.join("zot-ca.crt").display()
-                ),
-            ],
-        )?;
-    }
     Ok(())
 }
 
@@ -227,10 +208,9 @@ fn identity_ingress() -> Ingress {
     }
 }
 
-/// The chart's values for this cluster, with the registry's CA in the full profile, and Zeabur
-/// Proxy when its image is built here. Zeabur Identity is at xtask/pins/zeabur-identity, and the
-/// cluster's components are installed already.
-fn values(image: &str, full: bool, proxy_image: Option<&str>) -> Value {
+/// The chart's values for this cluster, with Zeabur Proxy when its image is built here. Zeabur
+/// Identity is at xtask/pins/zeabur-identity, and the cluster's components are installed already.
+fn values(image: &str, proxy_image: Option<&str>) -> Value {
     let (repository, tag) = split_tag(image);
     // The templates prefer a digest: an empty one clears the one a released chart pins.
     let digest = image.split_once('@').map_or("", |(_, digest)| digest);
@@ -256,7 +236,6 @@ fn values(image: &str, full: bool, proxy_image: Option<&str>) -> Value {
             "tls": {"secretName": "zeabur-tls"},
         },
     });
-    let builds = full.then(|| json!({"caBundle": {"configMap": "zeabur-registry-ca"}}));
     let proxy = proxy_image.map(|image| {
         let (repository, tag) = split_tag(image);
         json!({
@@ -264,12 +243,8 @@ fn values(image: &str, full: bool, proxy_image: Option<&str>) -> Value {
             "image": {"repository": repository, "tag": tag.unwrap_or("latest")},
         })
     });
-    if let Some(map) = values.as_object_mut() {
-        map.extend(
-            [("builds", builds), ("proxy", proxy)]
-                .into_iter()
-                .filter_map(|(key, value)| Some((key.to_owned(), value?))),
-        );
+    if let (Some(map), Some(proxy)) = (values.as_object_mut(), proxy) {
+        map.insert("proxy".to_owned(), proxy);
     }
     values
 }
@@ -366,7 +341,7 @@ mod tests {
 
     #[test]
     fn the_default_profile_sets_neither_builds_nor_the_proxy() {
-        let values = values("zeabur:dev-0123456789ab", false, None);
+        let values = values("zeabur:dev-0123456789ab", None);
         assert_eq!(
             values["image"],
             json!({"repository": "zeabur", "tag": "dev-0123456789ab", "digest": "",
@@ -379,7 +354,7 @@ mod tests {
 
     #[test]
     fn a_digest_reference_keeps_its_digest() {
-        let values = values("ghcr.io/zeabur-oss/zeabur@sha256:0123", false, None);
+        let values = values("ghcr.io/zeabur-oss/zeabur@sha256:0123", None);
         assert_eq!(values["image"]["repository"], "ghcr.io/zeabur-oss/zeabur");
         assert_eq!(values["image"]["digest"], "sha256:0123");
     }
@@ -388,7 +363,6 @@ mod tests {
     fn a_proxy_built_here_is_enabled_with_its_image() {
         let values = values(
             "zeabur:dev-1",
-            true,
             Some("docker.io/library/zeabur-proxy:dev-0123456789ab"),
         );
         assert_eq!(
@@ -397,10 +371,6 @@ mod tests {
                 "enabled": true,
                 "image": {"repository": "docker.io/library/zeabur-proxy", "tag": "dev-0123456789ab"},
             })
-        );
-        assert_eq!(
-            values["builds"]["caBundle"]["configMap"],
-            "zeabur-registry-ca"
         );
     }
 }

@@ -1,5 +1,6 @@
 //! An image's ports from its registry: a private image is read with the project's pull Secret,
-//! read as the person, and the credentials go only to the image's registry.
+//! read as the person, and the credentials go only to the image's registry. An image in the build
+//! registry is read trusting the CA of the project's upload Secret, read as the person.
 
 #[cfg(test)]
 mod tests {
@@ -12,8 +13,10 @@ mod tests {
     use secrecy::ExposeSecret as _;
     use serde_json::json;
     use sha2::{Digest as _, Sha256};
+    use zeabur_api::Settings;
     use zeabur_api::images::Inspector;
     use zeabur_api::images::registry::{Answer, Get, Transport};
+    use zeabur_kube::ServedResource;
     use zeabur_kube::memory::{MemoryCluster, State};
 
     use crate::common::send;
@@ -212,5 +215,112 @@ mod tests {
         let (status, body) =
             send(&app, "POST", PATH, Some(&json!({"image": "Not An Image"}))).await;
         assert_eq!(status, StatusCode::BAD_REQUEST, "{body}");
+    }
+
+    /// An HTTPS registry whose certificate CA A signed, holding `<address>/shop/web:1`.
+    async fn tls_registry() -> String {
+        let config = json!({"architecture": "amd64", "os": "linux",
+            "config": {"ExposedPorts": {"8080/tcp": {}}, "User": "node"}})
+        .to_string();
+        let manifest = json!({
+            "schemaVersion": 2,
+            "mediaType": "application/vnd.oci.image.manifest.v1+json",
+            "config": {"mediaType": "application/vnd.oci.image.config.v1+json",
+                "digest": digest(config.as_bytes()), "size": config.len()},
+            "layers": [],
+        })
+        .to_string();
+        let config_path = format!("/v2/shop/web/blobs/{}", digest(config.as_bytes()));
+        let address = zeabur_test_support::tls::serve_answering(move |target| {
+            let (content_type, body) = if target == "/v2/shop/web/manifests/1" {
+                ("application/vnd.oci.image.manifest.v1+json", manifest.as_str())
+            } else if target == config_path {
+                ("application/octet-stream", config.as_str())
+            } else {
+                return "HTTP/1.1 404 Not Found\r\ncontent-length: 0\r\nconnection: close\r\n\r\n"
+                    .to_owned();
+            };
+            format!(
+                "HTTP/1.1 200 OK\r\ncontent-type: {content_type}\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{body}",
+                body.len()
+            )
+        })
+        .await;
+        address.to_string()
+    }
+
+    /// A project with a Build whose upload Secret, written by Zeabur Builder, names `registry`
+    /// and holds `ca`.
+    fn built(registry: &str, ca: Option<&str>, forbidden: bool) -> MemoryCluster {
+        let config = json!({"auths": {registry: {"registrytoken": "t"}}}).to_string();
+        let mut values = BTreeMap::from([(".dockerconfigjson".to_owned(), config.into_bytes())]);
+        if let Some(ca) = ca {
+            values.insert("ca.crt".to_owned(), ca.as_bytes().to_vec());
+        }
+        MemoryCluster::new(State {
+            served: vec![ServedResource::readable(
+                "builder.zeabur.com",
+                "v1alpha1",
+                "builds",
+                "Build",
+                true,
+            )],
+            dynamic: vec![
+                serde_json::from_value(json!({
+                    "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
+                    "metadata": {"name": "web", "namespace": "shop"},
+                    "spec": {"builderRef": "railpack", "source": {"archive": {}}},
+                    "status": {"uploadToken": {"request": "u1", "secretName": "web-upload",
+                        "expiresAt": "2099-01-01T00:00:00Z"}},
+                }))
+                .unwrap(),
+            ],
+            secret_values: BTreeMap::from([("shop/web-upload".to_owned(), values)]),
+            forbidden_namespaces: if forbidden {
+                ["shop".to_owned()].into()
+            } else {
+                std::collections::BTreeSet::new()
+            },
+            ..State::default()
+        })
+    }
+
+    /// The read trusts the build registry's CA only when the person's upload Secret holds the CA
+    /// that signed the registry's certificate.
+    #[tokio::test]
+    async fn the_build_registry_is_read_with_the_ca_builder_published() {
+        use zeabur_test_support::tls::{ca_a, ca_b};
+
+        let registry = tls_registry().await;
+        let image = format!("{registry}/shop/web:1");
+        for (case, ca, forbidden, read) in [
+            ("the CA that signed it", Some(ca_a()), false, true),
+            ("another CA", Some(ca_b()), false, false),
+            ("no CA", None, false, false),
+            (
+                "a project the person may not read",
+                Some(ca_a()),
+                true,
+                false,
+            ),
+        ] {
+            let mut settings = Settings::default();
+            settings.builds.registry = Some(registry.clone());
+            let app = TestApi::new(&built(&registry, ca, forbidden))
+                .with_settings(settings)
+                .router();
+            let (status, body) = send(&app, "POST", PATH, Some(&json!({"image": image}))).await;
+            assert_eq!(status, StatusCode::OK, "{case}: {body}");
+            if read {
+                assert_eq!(
+                    body["exposedPorts"],
+                    json!([{"port": 8080, "protocol": "TCP"}]),
+                    "{case}: {body}"
+                );
+                assert_eq!(body["user"], "node", "{case}: {body}");
+            } else {
+                assert_eq!(body["unreadable"], "unreachable", "{case}: {body}");
+            }
+        }
     }
 }

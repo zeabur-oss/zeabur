@@ -79,10 +79,6 @@ pub(crate) struct Args {
     /// deployed from Git.
     #[arg(long, env = "ZEABUR_BUILD_REGISTRY", default_value = "")]
     pub(crate) build_registry: String,
-    /// A PEM file of the certificate authorities that sign the build registry's certificate, on
-    /// top of the platform's roots. Needs `--build-registry`.
-    #[arg(long, env = "ZEABUR_BUILD_REGISTRY_CA_FILE")]
-    pub(crate) build_registry_ca_file: Option<PathBuf>,
     /// A PEM file of certificate authorities Zeabur trusts, on top of the platform's roots, for
     /// every HTTPS connection it makes: the issuer, registries, object stores and GitHub.
     #[arg(long, env = "ZEABUR_EXTRA_CA_FILE")]
@@ -221,7 +217,7 @@ impl Args {
             );
         }
         (settings.domains, settings.builds) = (domains(self)?, builds(self)?);
-        settings.trusted_ca = self.trusted_ca(&settings.builds)?;
+        settings.trusted_ca = bundle(&[(&self.extra_ca_file, "--extra-ca-file")])?;
         settings.public_host = Some(host(public_url.authority()).to_owned());
         settings.identity.issuer = Some(issuer.to_string());
         settings.identity.project_roles = self.member_roles;
@@ -258,20 +254,6 @@ impl Args {
             settings,
             proxy,
         })
-    }
-
-    /// One PEM bundle of the extra CAs and the build registry's CA.
-    fn trusted_ca(
-        &self,
-        builds: &zeabur_api::settings::BuildSettings,
-    ) -> Result<Option<Vec<u8>>, String> {
-        if self.build_registry_ca_file.is_some() && builds.registry.is_none() {
-            return Err("--build-registry-ca-file needs --build-registry".to_owned());
-        }
-        bundle(&[
-            (&self.extra_ca_file, "--extra-ca-file"),
-            (&self.build_registry_ca_file, "--build-registry-ca-file"),
-        ])
     }
 }
 
@@ -736,63 +718,12 @@ qkDcEXA7cf4S+NsEneg=
     }
 
     #[test]
-    fn a_build_registry_ca_file_is_checked_and_needs_a_registry() {
-        let files = Files::new("registry-ca");
+    fn an_extra_ca_file_is_checked_and_trusted() {
+        let files = Files::new("extra-ca");
         assert_eq!(args(&files, &[]).unwrap().settings.trusted_ca, None);
         let ca = files.write("ca.crt", CA.as_bytes());
-        let config = args(
-            &files,
-            &[
-                "--build-registry",
-                "zot.zot.svc:5000",
-                "--build-registry-ca-file",
-                &ca,
-            ],
-        )
-        .unwrap();
+        let config = args(&files, &["--extra-ca-file", &ca]).unwrap();
         assert_eq!(config.settings.trusted_ca.as_deref(), Some(CA.as_bytes()));
-        let error = args(&files, &["--build-registry-ca-file", &ca]).unwrap_err();
-        assert!(
-            error.starts_with("--build-registry-ca-file needs"),
-            "{error}"
-        );
-        let none = files.write("none.crt", b"not a certificate\n");
-        let error = args(
-            &files,
-            &[
-                "--build-registry",
-                "zot.zot.svc:5000",
-                "--build-registry-ca-file",
-                &none,
-            ],
-        )
-        .unwrap_err();
-        assert!(error.starts_with("--build-registry-ca-file:"), "{error}");
-    }
-
-    #[test]
-    fn an_extra_ca_file_is_trusted_with_the_build_registry_ca() {
-        let files = Files::new("extra-ca");
-        let ca = files.write("ca.crt", CA.as_bytes());
-        let alone = args(&files, &["--extra-ca-file", &ca]).unwrap();
-        assert_eq!(alone.settings.trusted_ca.as_deref(), Some(CA.as_bytes()));
-        let both = args(
-            &files,
-            &[
-                "--extra-ca-file",
-                &ca,
-                "--build-registry",
-                "zot.zot.svc:5000",
-                "--build-registry-ca-file",
-                &ca,
-            ],
-        )
-        .unwrap();
-        let bundle = String::from_utf8(both.settings.trusted_ca.unwrap()).unwrap();
-        assert_eq!(
-            bundle.trim_end(),
-            format!("{}\n{}", CA.trim_end(), CA.trim_end())
-        );
         let none = files.write("none.crt", b"not a certificate\n");
         let error = args(&files, &["--extra-ca-file", &none]).unwrap_err();
         assert!(error.starts_with("--extra-ca-file:"), "{error}");

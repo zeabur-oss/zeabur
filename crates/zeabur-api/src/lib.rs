@@ -568,7 +568,13 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
     } = options;
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let tls = zeabur_http::tls(settings.trusted_ca.as_deref());
-    let images = images.unwrap_or_else(|| Arc::new(images::Inspector::connected(reach, &tls)));
+    let images = images.unwrap_or_else(|| {
+        Arc::new(images::Inspector::connected(
+            reach,
+            &tls,
+            settings.trusted_ca.clone(),
+        ))
+    });
     let github = tls
         .as_ref()
         .ok()

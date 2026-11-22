@@ -372,8 +372,6 @@ pub struct ZeaburInfo {
     pub issuer: Option<String>,
     /// The registry Zeabur Builder pushes to, such as `zot.zot.svc:5000`.
     pub registry: Option<String>,
-    /// The CA of the registry's certificate, as `<namespace>/<ConfigMap>/<key>`.
-    pub registry_ca: Option<String>,
 }
 
 fn info_of(map: k8s_openapi::api::core::v1::ConfigMap) -> ZeaburInfo {
@@ -387,7 +385,6 @@ fn info_of(map: k8s_openapi::api::core::v1::ConfigMap) -> ZeaburInfo {
         url: take("url"),
         issuer: take("issuer"),
         registry: take("registry"),
-        registry_ca: take("registryCa"),
     }
 }
 
@@ -591,13 +588,11 @@ mod tests {
                 "url": " https://zeabur.example.com\n",
                 "issuer": "https://identity.example.com",
                 "registry": "zot.zot.svc:5000",
-                "registryCa": "zeabur/zeabur-registry-ca/ca.crt",
             }))),
             ZeaburInfo {
                 url: Some("https://zeabur.example.com".to_owned()),
                 issuer: Some("https://identity.example.com".to_owned()),
                 registry: Some("zot.zot.svc:5000".to_owned()),
-                registry_ca: Some("zeabur/zeabur-registry-ca/ca.crt".to_owned()),
             }
         );
         assert_eq!(
