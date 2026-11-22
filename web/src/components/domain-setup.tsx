@@ -131,7 +131,7 @@ export function DomainSetup({
             </p>
           ) : null}
           {certTrouble.message ? (
-            <Collapsible>
+            <Collapsible defaultOpen={certTrouble.state === "failed"}>
               <CollapsibleTrigger variant="disclosure">
                 <CaretRightIcon aria-hidden="true" />
                 {t("domain.cert.says")}
