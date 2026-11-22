@@ -168,7 +168,34 @@ If you installed Zeabur OSS with `identity.enabled=false`, remove your own Ident
 kubectl delete namespace zeabur-identity
 ```
 
+The six Zeabur Identity CRDs stay in the cluster after that. Delete them once the namespace is gone. Identity's objects use no finalizers, so the deletion finishes right away.
+
+```sh
+kubectl delete crd \
+  users.identity.zeabur.com credentials.identity.zeabur.com \
+  oauthclients.identity.zeabur.com grants.identity.zeabur.com \
+  invitations.identity.zeabur.com upstreamproviders.identity.zeabur.com
+```
+
 kube-apiserver still trusts Identity's issuer. On a server set up with Zeatend, remove Identity's issuer from `apiServer.authenticationConfig` in `/etc/zeatend/config.yaml`, then run `sudo zeatend apply`. On a cluster you set up yourself, remove the issuer from kube-apiserver's authentication configuration.
+
+On a K3s server set up with Zeatend, `/etc/rancher/k3s/authentication/config.yaml` can still name the old issuer after `sudo zeatend apply`. Open it, and if it lists only Identity's issuer, delete it:
+
+```sh
+sudo rm /etc/rancher/k3s/authentication/config.yaml
+```
+
+Delete it only after `apply` has run, because K3s reads this file at start. Your applications keep running through the K3s restart.
+
+`helm uninstall` also leaves the `zeabur` namespace, which the chart's release lived in. Check that it is empty, then delete it:
+
+```sh
+kubectl get --show-kind --ignore-not-found --namespace zeabur \
+  "$(kubectl api-resources --verbs=list --namespaced -o name | paste -sd, -)"
+kubectl delete namespace zeabur
+```
+
+Skip this if you want to reinstall Zeabur OSS in the same namespace, or if the list still shows objects you need.
 
 ## When you no longer need the cluster
 
