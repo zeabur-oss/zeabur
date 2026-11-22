@@ -1375,7 +1375,7 @@ export function backUpNow(database: Database, now: Date): Change[] {
 }
 
 /** A PostgreSQL backup still running after this long is shown as stalled. */
-export const STALLED_AFTER_MS = 60 * 60 * 1000
+const STALLED_AFTER_MS = 60 * 60 * 1000
 
 /** A PostgreSQL backup that has run past `STALLED_AFTER_MS`; CloudNativePG starts no other
  * backup of the cluster until it ends. */
