@@ -101,18 +101,18 @@ Coding Agent 會照著下面的步驟做，你也可以自己照著做。自己�
 
 盤點之前，先用一則訊息問使用者這幾件事：
 
-- **SSH 存取。**Zeabur 代管的伺服器可能沒有存 SSH 憑證，這時 `server exec` 會失敗。每一台這樣的伺服器，都問使用者位址、使用者名稱，以及金鑰或密碼。
-- **要搬哪些服務。**已暫停和已停止的服務也要列出來，逐一問使用者搬不搬。已停止的服務在 Zeabur 開源版建成 0 個副本，這樣它存在但不會執行。
-- **讀不到的用量。**服務的記憶體用量讀不到時，例如它已經停止，先用 Medium 大小。第一次執行後，用 `kubectl top pod` 讀實際用量，再依它調整大小。
+- **SSH 存取**。Zeabur 代管的伺服器可能沒有存 SSH 憑證，這時 `server exec` 會失敗。每一台這樣的伺服器，都問使用者位址、使用者名稱，以及金鑰或密碼。
+- **要搬哪些服務**。已暫停和已停止的服務也要列出來，逐一問使用者搬不搬。已停止的服務在 Zeabur 開源版建成 0 個副本，這樣它存在但不會執行。
+- **讀不到的用量**。服務的記憶體用量讀不到時，例如它已經停止，先用 Medium 大小。第一次執行後，用 `kubectl top pod` 讀實際用量，再依它調整大小。
 
 ### 已知限制
 
-- **執行中的 digest。**Zeabur CLI 不會顯示正在執行的映像檔 digest。用 `docker buildx imagetools inspect <image>:<tag>` 把 tag 解析成 digest，固定這個 digest，並告訴使用者它是 tag 目前指向的 digest。
-- **建置需要 Keel。**從 Git 部署和上傳資料夾都需要 Zeabur Builder 和 Keel。建立這兩種服務之前，先裝好這兩個元件。
-- **記憶體。**用映像檔建立的服務預設是 Small 大小，記憶體上限是 256 MiB。在 Zeabur 用得比這多的服務，會被以 `OOMKilled` 停掉。依你記下的用量，留一些餘裕，寫進每個服務 YAML 的 `resources.limits.memory`。之後要調高，照[服務設定](../configure/service-settings.mdx)到**設定** → **運算資源**。
-- **提示。**`variable list` 和 `domain list` 會問要用哪個專案。加上 `-i=false`，並用參數指定專案和服務，它們就不會停下來等回答。
-- **輸出大小。**`service exec` 最多回傳 3 MB。把傾印檔寫在服務裡的檔案，再分成小於 3 MB 的片段讀出來，或從外部連到資料庫。
-- **SQLite。**不要複製應用程式正開著的 SQLite 檔案。用 `sqlite3 app.db .dump > app.sql` 做邏輯複製，再用 `sqlite3 new.db < app.sql` 還原。
+- **執行中的 digest**。Zeabur CLI 不會顯示正在執行的映像檔 digest。用 `docker buildx imagetools inspect <image>:<tag>` 把 tag 解析成 digest，固定這個 digest，並告訴使用者它是 tag 目前指向的 digest。
+- **建置需要 Keel**。從 Git 部署和上傳資料夾都需要 Zeabur Builder 和 Keel。建立這兩種服務之前，先裝好這兩個元件。
+- **記憶體**。用映像檔建立的服務預設是 Small 大小，記憶體上限是 256 MiB。在 Zeabur 用得比這多的服務，會被以 `OOMKilled` 停掉。依你記下的用量，留一些餘裕，寫進每個服務 YAML 的 `resources.limits.memory`。之後要調高，照[服務設定](../configure/service-settings.mdx)到**設定** → **運算資源**。
+- **提示**。`variable list` 和 `domain list` 會問要用哪個專案。加上 `-i=false`，並用參數指定專案和服務，它們就不會停下來等回答。
+- **輸出大小**。`service exec` 最多回傳 3 MB。把傾印檔寫在服務裡的檔案，再分成小於 3 MB 的片段讀出來，或從外部連到資料庫。
+- **SQLite**。不要複製應用程式正開著的 SQLite 檔案。用 `sqlite3 app.db .dump > app.sql` 做邏輯複製，再用 `sqlite3 new.db < app.sql` 還原。
 
 ### 1. 盤點 Zeabur
 
