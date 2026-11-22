@@ -553,6 +553,7 @@ export const en = {
     `Backups of ${names} are kept in ${place}, which is deleted with the project. Copy them elsewhere or move the backups to another S3 destination first.`,
   "deletion.stays": "Stays",
   "deletion.staysBackups": (names: string) => `Backups of ${names} in S3`,
+  "deletion.thisProject": "the project",
   "deletion.resticPassword":
     "Volume backups in S3 stay, but the restic password that restores them is in a secret in this project and goes with it. Keep a copy first.",
   "deletion.staysOutside":

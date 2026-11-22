@@ -29,17 +29,19 @@ export function recentBackup(run: Run | null | undefined, now = Date.now()): boo
   return !Number.isNaN(finished) && now - finished < RECENT_MS
 }
 
-/** The project's backups that go with it, by what keeps them, and the names of those that stay. */
-export function backupFates(backups: Schemas.BackupDeletion[]): {
-  going: { keptIn: string; names: string[] }[]
-  staying: Schemas.BackupDeletion[]
+type Backup = Schemas.BackupDeletion
+
+/** The project's backups that go with it, by what keeps them, and those that stay. */
+export function backupFates(backups: Backup[]): {
+  going: { keptIn: string; backups: Backup[] }[]
+  staying: Backup[]
 } {
-  const going: { keptIn: string; names: string[] }[] = []
+  const going: { keptIn: string; backups: Backup[] }[] = []
   for (const backup of backups) {
     if (!backup.keptIn) continue
     const group = going.find((g) => g.keptIn === backup.keptIn)
-    if (group) group.names.push(backup.name)
-    else going.push({ keptIn: backup.keptIn, names: [backup.name] })
+    if (group) group.backups.push(backup)
+    else going.push({ keptIn: backup.keptIn, backups: [backup] })
   }
   return { going, staying: backups.filter((b) => !b.keptIn) }
 }

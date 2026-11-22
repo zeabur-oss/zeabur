@@ -517,6 +517,7 @@ export const zhCN: Messages = {
     `${names} 的备份存在 ${place}，删除项目时 ${place} 也会一起删除。先把备份复制到别处，或改用其他 S3 目的地。`,
   "deletion.stays": "会保留",
   "deletion.staysBackups": (names) => `${names} 存在 S3 的备份`,
+  "deletion.thisProject": "这个项目",
   "deletion.resticPassword":
     "S3 中的卷备份会保留。还原备份要用 restic 密码，密码存放在这个项目的机密变量中，删除项目时会一起删除，所以先另存一份。",
   "deletion.staysOutside": "项目以外的内容，例如其他项目和集群设置",

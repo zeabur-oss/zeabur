@@ -516,6 +516,7 @@ export const zhTW: Messages = {
     `${names} 的備份存在 ${place}，刪除專案時 ${place} 也會一起刪除。先把備份複製到別處，或改用其他 S3 目的地。`,
   "deletion.stays": "會留下",
   "deletion.staysBackups": (names) => `${names} 存在 S3 的備份`,
+  "deletion.thisProject": "這個專案",
   "deletion.resticPassword":
     "S3 裡的磁碟區備份會留下。還原備份要用 restic 密碼，密碼存在這個專案的機密變數，刪除專案時會一起刪除，所以先另存一份。",
   "deletion.staysOutside": "專案以外的東西，例如其他專案和叢集設定",

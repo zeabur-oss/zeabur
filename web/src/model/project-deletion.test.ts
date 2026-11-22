@@ -23,7 +23,9 @@ describe("project deletion", () => {
       { kind: "volume", name: "uploads", keptIn: "files" },
       { kind: "database", name: "orders" },
     ])
-    expect(fates.going).toEqual([{ keptIn: "files", names: ["pg", "uploads"] }])
+    expect(fates.going.map((g) => [g.keptIn, g.backups.map((b) => b.name)])).toEqual([
+      ["files", ["pg", "uploads"]],
+    ])
     expect(fates.staying.map((b) => b.name)).toEqual(["orders"])
     expect(backupFates([])).toEqual({ going: [], staying: [] })
   })

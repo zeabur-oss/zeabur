@@ -66,7 +66,11 @@ function Deletion({
   const databases = useQuery(databasesQuery(project)).data?.items ?? []
   const now = new Date()
   const { going, staying } = backupFates(deletion.backups)
-  const names = (list: string[]) => bounded(t, list).text
+  const names = (list: Schemas.BackupDeletion[]) =>
+    bounded(
+      t,
+      list.map((b) => (b.kind === "project" ? t("deletion.thisProject") : b.name)),
+    ).text
   const backUp = (ask: PlanAsk) => (
     <Button variant="outline" size="xs" onClick={() => reopen(ask)}>
       <ArchiveIcon aria-hidden="true" data-icon="inline-start" />
@@ -138,7 +142,7 @@ function Deletion({
         {going.map((g) => (
           <p key={g.keptIn} className="type-meta flex gap-1.5 text-destructive" role="alert">
             <WarningIcon aria-hidden="true" className="mt-0.5 shrink-0" />
-            <span>{t("deletion.backupsGo", names(g.names), g.keptIn)}</span>
+            <span>{t("deletion.backupsGo", names(g.backups), g.keptIn)}</span>
           </p>
         ))}
       </section>
@@ -148,7 +152,7 @@ function Deletion({
         </h3>
         {staying.length > 0 ? (
           <p className="type-meta text-muted-foreground">
-            {t("deletion.staysBackups", names(staying.map((b) => b.name)))}
+            {t("deletion.staysBackups", names(staying))}
           </p>
         ) : null}
         {staying.some((b) => b.kind === "volume") ? (
