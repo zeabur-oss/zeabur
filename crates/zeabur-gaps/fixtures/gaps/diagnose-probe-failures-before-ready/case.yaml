@@ -1,0 +1,4 @@
+description: A pod that failed its readiness probe twice while it started and then became Ready has no probe failure; a pod that became not ready after its probe failed keeps one.
+operation: gaps.diagnose
+params:
+  now: "2026-10-15T12:00:00Z"

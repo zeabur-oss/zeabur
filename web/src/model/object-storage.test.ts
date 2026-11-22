@@ -31,6 +31,20 @@ describe("object storage", () => {
     expect(objects[5]!.spec).toMatchObject({ name: "uploads", clusterRef: { name: "files" } })
   })
 
+  test.each([
+    ["3Gi", 3 * 1024],
+    ["10Gi", 10 * 1024],
+    ["10Ti", 10 * 1024 * 1024],
+  ])("a %s store has volumes for many buckets within its disk", (storage, mib) => {
+    const [seaweed] = made(createObjectStorage({ ...newObjectStorage(), storage }))
+    const size: number = seaweed!.spec.master.volumeSizeLimitMB
+    const count: number = seaweed!.spec.volume.maxVolumeCounts
+    expect(count).toBeGreaterThanOrEqual(7 * 10)
+    expect(size).toBeLessThanOrEqual(30_000)
+    expect(size * count).toBeLessThanOrEqual(mib)
+    expect(size * (count + 1)).toBeGreaterThan(mib)
+  })
+
   test("deleting goes through the buckets and IAM objects before the Seaweed", () => {
     const store = {
       name: "files",
@@ -54,6 +68,8 @@ describe("object storage", () => {
     expect(grow).toMatchObject({ op: "edit", name: "files", specOnly: true })
     const yaml = grow?.op === "edit" ? JSON.parse(grow.yaml) : undefined
     expect(yaml.spec.volume.requests).toEqual({ cpu: "1", storage: "20Gi" })
+    const { volumeSizeLimitMB: size } = yaml.spec.master
+    expect(size * yaml.spec.volume.maxVolumeCounts).toBeGreaterThan(10 * 1024)
   })
 
   test("bucket names follow the server's bucket rule", () => {

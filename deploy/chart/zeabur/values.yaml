@@ -75,7 +75,8 @@ domains:
 # catalog's Zot. Empty: "Deploy from Git" is turned off.
 # caBundle: a ConfigMap in this namespace with the CA (PEM) that signed the registry's certificate,
 # which Zeabur trusts when it reads an image from the registry. Zot serves HTTPS, so without it
-# the image form cannot read the registry. Empty: the image's Mozilla CA bundle only.
+# the image form cannot read the registry. Empty: the image's Mozilla CA bundle only. A folder
+# upload needs none: it trusts the CA that Zeabur Builder puts in the Build's upload Secret.
 builds:
   registry: zot.zot.svc:5000
   caBundle:
@@ -275,7 +276,9 @@ catalog:
   url: https://oss-catalog.zeabur.com/v1/
 
 # Components installed once, right after `helm install`, as Cluster → Components installs them:
-# a hook Job runs `zeabur components install <id>` for each, as cluster-admin until it finishes.
+# a Job runs `zeabur components install <id>` for each, as cluster-admin until it finishes. It runs
+# after `helm install` returns, so its failure does not fail the release, and retries for about 45
+# minutes.
 # cert-manager signs the certificates for Zeabur and Zeabur Identity (ingress.clusterIssuer).
 # Empty: install them from Cluster → Components later. Upgrades never install them.
 components:

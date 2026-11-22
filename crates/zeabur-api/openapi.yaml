@@ -418,6 +418,8 @@ paths:
         Events of every namespace, the newest `limit` of them (100 by default), optionally only
         warnings, only recent ones and only those about the cluster itself: the cluster overview asks
         for the last hour's warnings with `scope=cluster`, leaving projects' events to their pages.
+        An event about a pod from before the pod last became Ready is left out: it is the pod's
+        start-up, and the project's events keep it.
       description: |-
         At most 5,000 events are read (`partial` says when there were more); `totalSize` counts every
         event read that matched, also those past the limit.
@@ -8551,6 +8553,21 @@ components:
         username:
           type: string
           description: The user name.
+    DatabaseArchiveFailure:
+      type: object
+      description: Why a database cannot archive its write-ahead log.
+      properties:
+        message:
+          type:
+          - string
+          - "null"
+          description: What the operator says, as the last archive attempt reported it.
+        since:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: When archiving began to fail.
     DatabaseBackupStore:
       type: object
       description: "Where backups go: an S3-compatible bucket."
@@ -8597,6 +8614,13 @@ components:
       - runs
       - ready
       properties:
+        archiveFailure:
+          oneOf:
+          - $ref: "#/components/schemas/DatabaseArchiveFailure"
+            description: |-
+              The archive of the write-ahead log fails; absent when it works or has not started.
+              `ready` is false then, and this tells it apart from a database that is still starting.
+          - type: "null"
         ready:
           type: boolean
           description: |-
@@ -11682,7 +11706,9 @@ components:
           description: When the leader last renewed the lease.
     LinkedAccountView:
       type: object
-      description: A GitHub or Google account linked for everyday sign-in.
+      description: >-
+        An account at an upstream provider, such as GitHub or Google, linked for
+        everyday sign-in.
       required:
       - id
       - provider
@@ -11708,7 +11734,7 @@ components:
           description: The `Credential`.
         provider:
           type: string
-          description: "`GitHub` or `Google`."
+          description: "`GitHub`, `Google`, or the upstream issuer of another provider."
     ListenerView:
       type: object
       description: A listener of a Gateway.

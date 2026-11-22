@@ -6,9 +6,8 @@
 //! and each component file with the digest `catalog.json` lists, so it never mixes two releases.
 //! Nothing here does I/O: `zeabur-api` fetches the files and keeps the snapshot.
 //!
-//! The path names the API's major version (`v1`). Before 1.0 a catalog minor release can change
-//! the format [catalog-api], so a Zeabur release also names the series it reads ([`SERIES`]) and
-//! does not use a snapshot of another.
+//! The path names the API's major version (`v1`). Every catalog release on `v1` only adds to it
+//! [catalog-api], so Zeabur reads any of them and leaves out the fields it does not know.
 //!
 //! [catalog-api]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/releases.mdx
 
@@ -25,9 +24,6 @@ use crate::templates::Encoding;
 
 /// Where the API is when no mirror is set.
 pub const DEFAULT_URL: &str = "https://oss-catalog.zeabur.com/v1/";
-
-/// The catalog series this build reads: `0.5.x`.
-pub const SERIES: (u64, u64) = (0, 5);
 
 /// The largest file Zeabur reads from the API.
 pub const MAX_FILE: usize = 1 << 20;
@@ -495,12 +491,6 @@ pub enum ApiError {
         /// Why.
         message: String,
     },
-    /// The release is of a series this build does not read.
-    #[error("Zeabur Catalog {version} needs a newer Zeabur; this one reads {}.{}.x", SERIES.0, SERIES.1)]
-    Series {
-        /// The release's version.
-        version: String,
-    },
     /// A component file is not the one `catalog.json` lists: the fetch spanned two releases.
     #[error("Zeabur Catalog, components/{0}.json is not the file catalog.json lists")]
     Mismatch(String),
@@ -512,21 +502,16 @@ pub enum ApiError {
     Cache(String),
 }
 
-/// Reads `catalog.json`, refusing a release of another series.
+/// Reads `catalog.json`.
 ///
 /// # Errors
 ///
-/// It does not parse, names another series, or lists an id that is not a DNS label.
+/// It does not parse, or lists an id that is not a DNS label.
 pub fn index(bytes: &[u8]) -> Result<Index, ApiError> {
     let index: Index = serde_json::from_slice(bytes).map_err(|e| ApiError::Parse {
         file: "catalog.json".to_owned(),
         message: e.to_string(),
     })?;
-    if series(&index.catalog.version) != Some(SERIES) {
-        return Err(ApiError::Series {
-            version: index.catalog.version,
-        });
-    }
     if let Some(bad) = index.components.iter().find(|c| !is_dns_label(&c.id)) {
         return Err(ApiError::BadId(bad.id.clone()));
     }
@@ -552,12 +537,6 @@ pub fn component(index: &Index, id: &str, bytes: &[u8]) -> Result<ComponentFile,
     } else {
         Err(ApiError::Mismatch(id.to_owned()))
     }
-}
-
-/// `major.minor` of a version such as `0.5.3`.
-fn series(version: &str) -> Option<(u64, u64)> {
-    let mut parts = version.trim_start_matches('v').split('.');
-    Some((parts.next()?.parse().ok()?, parts.next()?.parse().ok()?))
 }
 
 /// One catalog release as Zeabur read it: `catalog.json` and every component file it lists.
@@ -665,25 +644,18 @@ impl Snapshot {
             .map_err(|e| ApiError::Cache(e.to_string()))
     }
 
-    /// Reads [`Self::encode`]'s bytes, refusing a snapshot of another series.
+    /// Reads [`Self::encode`]'s bytes.
     ///
     /// # Errors
     ///
-    /// They do not decode, or the snapshot is of another series.
+    /// They do not decode.
     pub fn decode(bytes: &[u8]) -> Result<Self, ApiError> {
         let mut json = Vec::new();
         flate2::read::GzDecoder::new(bytes)
             .take(16 * MAX_FILE as u64)
             .read_to_end(&mut json)
             .map_err(|e| ApiError::Cache(e.to_string()))?;
-        let snapshot: Self =
-            serde_json::from_slice(&json).map_err(|e| ApiError::Cache(e.to_string()))?;
-        if series(&snapshot.index.catalog.version) != Some(SERIES) {
-            return Err(ApiError::Series {
-                version: snapshot.index.catalog.version,
-            });
-        }
-        Ok(snapshot)
+        serde_json::from_slice(&json).map_err(|e| ApiError::Cache(e.to_string()))
     }
 }
 
@@ -716,16 +688,6 @@ mod tests {
         .unwrap();
         assert_eq!(check.resource.kind, "Deployment");
         assert_eq!(check.condition, "");
-    }
-
-    #[test]
-    fn a_release_of_another_series_is_refused() {
-        let text = String::from_utf8(INDEX.to_vec())
-            .unwrap()
-            .replacen("\"0.5.3\"", "\"0.6.0\"", 1);
-        assert!(
-            matches!(index(text.as_bytes()), Err(ApiError::Series { version }) if version == "0.6.0")
-        );
     }
 
     #[test]

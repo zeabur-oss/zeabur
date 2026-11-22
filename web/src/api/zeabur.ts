@@ -5134,6 +5134,22 @@ export type DatabaseAppUser = {
 }
 
 /**
+ * Why a database cannot archive its write-ahead log.
+ */
+export type DatabaseArchiveFailure = {
+  /**
+   * What the operator says, as the last archive attempt reported it.
+   * @nullable
+   */
+  message?: string | null
+  /**
+   * When archiving began to fail.
+   * @nullable
+   */
+  since?: string | null
+}
+
+/**
  * The times a new database can recover to.
  */
 export type DatabaseRecoveryWindow = {
@@ -5186,6 +5202,7 @@ export type DatabaseBackupStore = {
  * A database's backups.
  */
 export type DatabaseBackups = {
+  archiveFailure?: DatabaseArchiveFailure | null
   /**
    * A backup can start now: the database runs with its store. False between setting up
    * backups and the operator restarting the members with them.
@@ -7167,7 +7184,7 @@ export type KeptCopy = {
 }
 
 /**
- * A GitHub or Google account linked for everyday sign-in.
+ * An account at an upstream provider, such as GitHub or Google, linked for everyday sign-in.
  */
 export type LinkedAccountView = {
   /**
@@ -7184,7 +7201,7 @@ export type LinkedAccountView = {
   lastUsedAt?: string | null
   /** The `Credential`. */
   origin: Origin
-  /** `GitHub` or `Google`. */
+  /** `GitHub`, `Google`, or the upstream issuer of another provider. */
   provider: string
 }
 
@@ -11948,6 +11965,8 @@ export const getListClusterEventsUrl = (params?: ListClusterEventsParams) => {
  * @summary Events of every namespace, the newest `limit` of them (100 by default), optionally only
 warnings, only recent ones and only those about the cluster itself: the cluster overview asks
 for the last hour's warnings with `scope=cluster`, leaving projects' events to their pages.
+An event about a pod from before the pod last became Ready is left out: it is the pod's
+start-up, and the project's events keep it.
  */
 export const listClusterEvents = async (
   params?: ListClusterEventsParams,

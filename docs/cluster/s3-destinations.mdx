@@ -11,6 +11,8 @@ You don't need Velero installed to register a destination. A destination is only
 
 If you don't have one yet, Cloudflare R2 and Backblaze B2 both offer S3-compatible storage. Create a private bucket. Backups then live outside the cluster and survive losing it.
 
+To try backups on one server without an outside account, create [object storage](../deploy/object-storage.mdx) in a project and register its private S3 endpoint, a bucket and its keys here. Those backups stay in the same cluster, so they don't survive losing it.
+
 ### Cloudflare R2
 
 1. In the Cloudflare dashboard, open **R2 object storage**, click **Create bucket**, and give it a name, for example `zeabur-backups`.

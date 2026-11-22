@@ -1153,6 +1153,7 @@ export const zhTW: Messages = {
   "components.value.set": "已設定",
   "components.value.kept": "沿用上次安裝的值",
   "components.value.generated": "由 Zeabur 隨機產生",
+  "components.value.picked": (value) => `${value}（由 Zeabur 選定）`,
   "components.value.default": (value) => `${value}（預設）`,
   "components.value.empty": "未設定",
   "components.value.on": "開啟",
@@ -2971,6 +2972,10 @@ export const zhTW: Messages = {
   "db.backup.saidNow": (name, where) => `立即把 ${name} 備份到 ${where}。`,
   "db.backup.now": "立即備份",
   "db.backup.starting": "資料庫套用備份設定並重新啟動後就能使用",
+  "db.backup.archiveFailing": "備份目的地寫入失敗",
+  "db.backup.archiveFailed":
+    "資料庫無法把交易日誌（WAL）封存到備份目的地，所以備份沒有作用。operator 回報如下。",
+  "db.backup.archiveSince": "失敗開始於",
   "db.backup.planNow": (name) => `立即備份 ${name}`,
   "db.backup.destination": "目的地",
   "db.backup.endpointFact": "端點",

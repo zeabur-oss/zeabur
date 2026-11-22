@@ -518,6 +518,8 @@ pub struct ClusterPod {
     pub node_name: Option<String>,
     /// `status.phase`.
     pub phase: Option<String>,
+    /// When its `Ready` condition last turned `True`, while it is Ready.
+    pub ready_since: Option<k8s_openapi::jiff::Timestamp>,
     /// Its regular containers.
     pub containers: Vec<ContainerResources>,
     /// Its init containers, in order; sidecars are marked.

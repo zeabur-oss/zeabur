@@ -27,7 +27,7 @@ Kubernetes 是在一台或多台服务器上运行容器的开源系统，Zeabur
 - **一个 Kubernetes 集群**，版本 1.30 或更高，以及能管理它的 kubeconfig。kubeconfig 是 `kubectl` 连接集群用的配置文件。
 - **一个 Ingress controller**，并且是集群默认的 IngressClass，例如 K3s 和 RKE2 自带的 Traefik。80 和 443 端口要能从互联网访问，Let's Encrypt 才能检查网址、签发证书。
 - **电脑上的工具**：`kubectl`、Helm 4 和 `zeabur-identityctl`。
-- **要安装的版本**。下面用 `<version>` 表示版本号。chart 发布在 `oci://ghcr.io/zeabur-oss/charts/zeabur`，默认镜像固定为同一版本的 digest。版本和验证方法见[发行文件与验证](../reference/releases.mdx)。
+- **要安装的版本**。下面用 `<version>` 表示版本号。请用这份文档对应的版本，也就是 [CHANGELOG](../../../CHANGELOG.md) 最上面的标题，例如 `0.3.0` 或 `0.3.0-beta.2`，开头不加 `v`。按示例一律加上 `--version`。chart 发布在 `oci://ghcr.io/zeabur-oss/charts/zeabur`，默认镜像固定为同一版本的 digest。版本和验证方法见[发行文件与验证](../reference/releases.mdx)。
 
 Kubernetes 需要 1.30 或更高版本，是因为 chart 默认会创建项目成员角色，并用 `ValidatingAdmissionPolicy` 限制开发者可以修改的 Namespace 字段。这个 API 从 1.30 起正式可用。Namespace 是 Kubernetes 用来分组的单位，Zeabur 开源版的每个项目就是一个 Namespace。
 
@@ -77,7 +77,7 @@ helm install zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 
 - 把 Zeabur 开源版装进 `zeabur` Namespace，Zeabur Identity 装进 `zeabur-identity`。
 - 在 Zeabur Identity 注册 Zeabur 开源版，并把 client secret 存入集群。实际值不会进入 Helm 的安装记录。
-- 从 Zeabur Catalog 安装 cert-manager，方式和**集群** → **组件**相同，并附带 ClusterIssuer `letsencrypt`。Helm 会等它装完，大约需要几分钟。
+- 从 Zeabur Catalog 安装 cert-manager，方式和**集群** → **组件**相同，并附带 ClusterIssuer `letsencrypt`。`helm install` 结束后由一个 Job 来装，大约需要几分钟；失败会重试约 45 分钟。
 - 添加项目成员用的 ClusterRole 和 Namespace admission policy。chart 不会把成员角色分配给任何人，登录后由管理员在**成员**中设置每个人的权限。
 
 `helm install` 结束时会输出创建第一个管理员账号的链接。请保存好：链接只能用一次，24 小时后失效。
@@ -132,13 +132,15 @@ helm upgrade zeabur oci://ghcr.io/zeabur-oss/charts/zeabur \
 | --- | --- |
 | 浏览器打不开 Zeabur 开源版 | 先确认 `kubectl -n zeabur rollout status deployment/zeabur` 成功，再核对 DNS、Ingress class，以及 80 和 443 端口是否开放。 |
 | 浏览器提示证书有问题，几分钟后仍未消失 | 运行 `kubectl get certificate -A`。证书一直未就绪，通常是 Let's Encrypt 访问不到 80 端口，或 sslip.io 域名中的 IP 不是公网 IP。 |
-| `helm install` 提示 `zeabur-components` job 失败 | Zeabur 开源版已经装好，但 cert-manager 没有装上。`kubectl -n zeabur logs job/zeabur-components` 会显示原因。排除后，运行 `zeaburctl components export cert-manager --format helm` 输出的命令。 |
+| `kubectl -n zeabur get job zeabur-components` 显示 `Failed` | Zeabur 开源版已经装好，但 cert-manager 没有装上。`kubectl -n zeabur logs job/zeabur-components --all-containers` 会显示原因。排除后，运行 `helm uninstall zeabur -n zeabur`，再运行一次 `helm install` 命令。 |
 | 集群已经有 cert-manager | 安装不会改动它。确认它有名为 `letsencrypt` 的 ClusterIssuer，或将 `ingress.clusterIssuer`、`identity.ingress.clusterIssuer` 和 `domains.clusterIssuer` 改为你的 ClusterIssuer。 |
 | 每个页面都提示你没有登录集群 | kube-apiserver 还不接受令牌。按[让集群信任登录](#让集群信任登录)的步骤检查。 |
 | 能登录，却看不到服务 | Zeabur 开源版用登录者自己的权限读取集群。管理员在[成员](../cluster/members.mdx)中为他分配项目角色。 |
 | 登录后读取被拒绝 | 在 Zeabur Identity 确认成员的身份和群组，再核对该 Namespace 的 RoleBinding。见[权限](../reference/permissions.mdx)。 |
 | 新服务已就绪，但网址打不开 | 核对应用域名的 DNS 和证书。Zeabur 开源版和服务用的是不同域名，需要分别配置。 |
 | 升级后需要重新登录 | chart 只运行一个 Zeabur 开源版副本，登录状态保存在内存中。换成新副本后需要重新登录。 |
+
+表格里的命令用到 `kubectl` 和 `zeaburctl`，新的 K3s 服务器上两个都没有。在服务器上，把表格里的 `kubectl` 写成 `k3s kubectl`。`zeaburctl` 见[发行文件与验证](../reference/releases.mdx)。
 
 Zeabur 开源版自己的 ServiceAccount 只能在 `zeabur-terminals` 中使用 kubectl 终端的副本，不会代替登录者读取集群。
 

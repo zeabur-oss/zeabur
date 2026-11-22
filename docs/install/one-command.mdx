@@ -9,11 +9,41 @@ Already have a cluster? [Install Zeabur OSS in an existing cluster](existing-clu
 
 ## Before you begin
 
-- **A Linux server** with a public IP address, and ports 80 and 443 open to the internet. Let's Encrypt checks the addresses over port 80. For memory and disk, see Zeatend's [Supported servers and files](https://oss.zeabur.com/docs/zeatend/reference/hosts/).
+- **A Linux server** with a public IP address, and ports 80 and 443 open to the internet. Let's Encrypt checks the addresses over port 80. For the memory and disk K3s needs, see Zeatend's [Supported servers and files](https://oss.zeabur.com/docs/zeatend/reference/hosts/). Zeabur OSS runs on top of that. In a test on a server with 1 vCPU and 2 GiB of memory, about 850 MiB of memory was left after Zeabur OSS, Zeabur Identity and cert-manager were installed, and one small app from a prebuilt image ran there. Zeabur Builder wasn't tried on a server that small.
 - **Root on the server**, over SSH. Run the commands below as root. If you sign in as a regular user, run `sudo -i` first.
-- **Zeatend, Helm 4 and `zeabur-identityctl` on the server.** To get Zeatend, see [Download Zeatend](https://oss.zeabur.com/docs/zeatend/get-started/install/#download-zeatend) in Zeatend's docs. For `zeabur-identityctl`, see Zeabur Identity's [Release files and verification](https://oss.zeabur.com/docs/identity/reference/releases/).
+- **Zeatend, Helm 4 and `zeabur-identityctl` on the server.** To get Zeatend, see [Download Zeatend](https://oss.zeabur.com/docs/zeatend/get-started/install/#download-zeatend) in Zeatend's docs. The first step below gets the other two.
 
 <Steps>
+<Step>
+
+### Get Helm 4 and `zeabur-identityctl`
+
+A new server has neither tool, and neither needs `gh`, `cosign` or Docker to install. Each block downloads a release from its project, checks the file against the project's checksum, and installs it to `/usr/local/bin`:
+
+```sh
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+
+helm=$(curl -fsSL https://get.helm.sh/helm-latest-version)
+curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz" &&
+  curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  sha256sum -c "helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  tar -xzf "helm-$helm-linux-$arch.tar.gz" --strip-components=1 "linux-$arch/helm" &&
+  install -m 0755 helm /usr/local/bin/helm &&
+  helm version --short
+
+ctl=$(basename "$(curl -fsSLo /dev/null -w '%{url_effective}' https://github.com/zeabur-oss/identity/releases/latest)")
+base="https://github.com/zeabur-oss/identity/releases/download/$ctl"
+curl -fsSLO "$base/zeabur-identityctl-$ctl-linux-$arch.tar.gz" &&
+  curl -fsSLO "$base/SHA256SUMS" &&
+  sha256sum --ignore-missing -c SHA256SUMS &&
+  tar -xzf "zeabur-identityctl-$ctl-linux-$arch.tar.gz" zeabur-identityctl &&
+  install -m 0755 zeabur-identityctl /usr/local/bin/zeabur-identityctl &&
+  zeabur-identityctl --version
+```
+
+`helm version --short` must show `v4`. The checksum of `zeabur-identityctl` comes from the same release as the file, so it catches a broken download but doesn't prove who built it. To check the signature too, follow Zeabur Identity's [Release files and verification](https://oss.zeabur.com/docs/identity/reference/releases/) on a computer that has `gh` and `cosign`, then copy the file to the server.
+
+</Step>
 <Step>
 
 ### Choose the domain
@@ -25,14 +55,7 @@ Set `DOMAIN` on the server as [Choose the domain](existing-cluster.mdx#choose-th
 
 ### Set up Kubernetes with Zeatend
 
-Write Zeatend's configuration. Its `apiServer.authenticationConfig` lets Kubernetes accept the sign-in tokens of the Zeabur Identity you install in the next step, and `zeabur-identityctl kube-config` prints it:
-
 ```sh
-mkdir -p /etc/zeatend
-{
-  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
-  zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public 2>/dev/null | sed 's/^/    /'
-} > /etc/zeatend/config.yaml
 zeatend plan
 ```
 
@@ -47,15 +70,29 @@ zeatend apply
 </Step>
 <Step>
 
-### Install Zeabur OSS
+### Let the cluster trust sign-in
 
-Let Helm use the K3s kubeconfig:
+Kubernetes accepts the sign-in tokens of the Zeabur Identity you install in the next step only when Zeatend's `apiServer.authenticationConfig` names Zeabur Identity as a token issuer. `zeabur-identityctl kube-config` prints that setting. It reads the cluster, so it runs now, after the cluster exists. The second `zeatend apply` restarts K3s with the setting:
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+mkdir -p /etc/zeatend
+authn=$(mktemp)
+zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public > "$authn" && {
+  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
+  sed 's/^/    /' "$authn"
+} > /etc/zeatend/config.yaml &&
+  zeatend apply
 ```
 
-Then run `helm install` as [Install with Helm](existing-cluster.mdx#install-with-helm) shows, and sign in with a passkey as [Create the admin account](existing-cluster.mdx#create-the-admin-account) shows. Zeatend already made the cluster trust sign-in, so skip "Let the cluster trust sign-in".
+`zeabur-identityctl` also prints how to install the setting by hand. Ignore that part, because Zeatend does it. If it prints an error instead, the Zeatend configuration isn't written and `zeatend apply` doesn't run. Fix what the error says, then run the block again.
+
+</Step>
+<Step>
+
+### Install Zeabur OSS
+
+Helm uses the K3s kubeconfig that the previous step set. In a new SSH session, run `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml` first. Run `helm install` as [Install with Helm](existing-cluster.mdx#install-with-helm) shows, and sign in with a passkey as [Create the admin account](existing-cluster.mdx#create-the-admin-account) shows. The previous step already made the cluster trust sign-in, so skip "Let the cluster trust sign-in" there.
 
 </Step>
 </Steps>

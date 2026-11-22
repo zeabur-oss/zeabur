@@ -69,6 +69,7 @@ import {
   type Service,
 } from "@/model/service"
 import type { ServicePlace } from "@/routes/search"
+import { UploadProgress } from "@/components/upload-folder"
 import { UploadAction, useServiceBuilds } from "@/routes/service/builds"
 import { TaskRunsCard } from "@/routes/service/task-runs"
 import { UsageGlance } from "@/routes/service/usage"
@@ -385,16 +386,21 @@ function BuildLine({
   const failed = statusOf(service).reason === "BuildFailed"
   const waiting = !failed && statusOf(service).word === "waitingUpload"
   const why = buildWhy(t, { service, build, run, failed, waiting })
+  const upload = uploadOf(build)
   return (
-    <p className="mt-1 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
-      {why ? <span className="min-w-0 break-words">{why}</span> : null}
-      {waiting && build?.archive ? (
-        <UploadAction project={project} build={build.name} primary />
-      ) : null}
-      <More onClick={() => onTab("builds")}>{t("overview.seeBuild")}</More>
-    </p>
+    <>
+      <p className="mt-1 flex max-w-prose flex-wrap items-baseline gap-x-2 gap-y-1 text-sm text-secondary">
+        {why ? <span className="min-w-0 break-words">{why}</span> : null}
+        {waiting && upload ? <UploadAction project={project} build={upload} primary /> : null}
+        <More onClick={() => onTab("builds")}>{t("overview.seeBuild")}</More>
+      </p>
+      {upload ? <UploadProgress project={project} build={upload} /> : null}
+    </>
   )
 }
+
+/** The name of a Build of an uploaded folder. */
+const uploadOf = (build: Build | undefined) => (build?.archive ? build.name : undefined)
 
 function buildWhy(
   t: Translate,

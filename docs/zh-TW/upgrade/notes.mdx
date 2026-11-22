@@ -48,12 +48,27 @@ zeabur-installer v0.2 用 K3s 的 `HelmChart` 安裝 Zeabur 開源版，另外�
 | RKE2 | `export KUBECONFIG=/etc/rancher/rke2/rke2.yaml PATH=$PATH:/var/lib/rancher/rke2/bin` |
 | KubeSolo | `export KUBECONFIG=/var/lib/kubesolo/pki/admin/admin.kubeconfig PATH=$PATH:/var/lib/zeabur-installer/bin` |
 
-伺服器也需要 Helm 4。如果 `helm version` 沒有印出 `v4`，照[安裝 Helm](https://helm.sh/docs/intro/install/)安裝。下面的指令都在 `/root/zeabur-upgrade` 執行：
+伺服器也需要 Helm 4。下面的指令都在 `/root/zeabur-upgrade` 執行：
 
 ```sh
 umask 077
 mkdir -p /root/zeabur-upgrade && cd /root/zeabur-upgrade
 ```
+
+如果 `helm version --short` 沒有印出 `v4`，就用下面這段安裝 Helm 4。它從 get.helm.sh 下載，用同一個網站公布的雜湊值檢查檔案，再裝到 `/usr/local/bin`。雜湊值和檔案來自同一個網站，只能發現下載損壞，不能證明是誰建置的。
+
+```sh
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+helm=$(curl -fsSL https://get.helm.sh/helm-latest-version)
+curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz" &&
+  curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  sha256sum -c "helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  tar -xzf "helm-$helm-linux-$arch.tar.gz" --strip-components=1 "linux-$arch/helm" &&
+  install -m 0755 helm /usr/local/bin/helm &&
+  helm version --short
+```
+
+`umask` 只在執行它的 shell 裡有效。下面每段會寫出檔案的指令，開頭都有 `umask 077` 和 `cd /root/zeabur-upgrade`，所以每段在新的 shell 裡執行時，新建的檔案也只有 root 能讀寫。
 
 接著逐項檢查。結果和右欄不符時，先停下來問擁有者。
 
@@ -68,6 +83,8 @@ mkdir -p /root/zeabur-upgrade && cd /root/zeabur-upgrade
 儲存目前的 values 和安裝程式的設定：
 
 ```sh
+umask 077
+cd /root/zeabur-upgrade
 helm get values zeabur -n zeabur -o yaml > old-values.yaml
 cp /etc/zeabur-installer/config.yaml installer-config.yaml
 ```
@@ -101,7 +118,7 @@ cp /etc/zeabur-installer/config.yaml installer-config.yaml
 - `identity.admin.setupLink: false`。管理員已經存在，chart 不需要建立新的設定連結。
 - 只有 `access.invitations` 是 `false` 時，才加上 `identity.invitations: false`。
 
-local 模式的伺服器最後會像這樣，請換成你自己的位址和值：
+參考你所用模式的範例，換成自己的位址和名稱。local 模式的伺服器最後會像這樣：
 
 ```yaml
 publicUrl: https://zeabur.203.0.113.10.sslip.io
@@ -132,13 +149,39 @@ builds:
     configMap: zeabur-registry-ca
 ```
 
-domain 模式的 `ingress.clusterIssuer`、`identity.ingress.clusterIssuer` 和 `domains.clusterIssuer` 都是 `letsencrypt`，也沒有 `issuer.caBundle`。
+domain 模式要把 `ingress.clusterIssuer`、`identity.ingress.clusterIssuer` 和 `domains.clusterIssuer` 都設為 `letsencrypt`，也不要加入 `issuer.caBundle`。domain 模式的伺服器最後會像這樣：
+
+```yaml
+publicUrl: https://zeabur.example.com
+clusterName: vps-1
+identity:
+  issuer: https://login.example.com
+  admin:
+    setupLink: false
+  ingress:
+    className: traefik
+    clusterIssuer: letsencrypt
+planKey:
+  existingSecret: zeabur-plan-key
+ingress:
+  className: traefik
+  clusterIssuer: letsencrypt
+  tls:
+    secretName: zeabur-tls
+domains:
+  clusterIssuer: letsencrypt
+  suffixes: [apps.example.com]
+```
+
+範例沒列出的 key，例如 `builds`、`proxy`、`telemetry` 和 `updateCheck`，除非上面的表格要你改，否則照 `old-values.yaml` 原樣保留。
 
 #### 3. 備份並建立快照
 
 儲存這次升級會接手的物件，方便比對或還原：
 
 ```sh
+umask 077
+cd /root/zeabur-upgrade
 kubectl get crd -o name | grep identity.zeabur.com | xargs kubectl get -o yaml > identity-crds.yaml
 kubectl -n zeabur-identity get users,credentials,grants,invitations,oauthclients,secrets,configmaps,services -o yaml > identity.yaml
 kubectl -n zeabur get secrets,configmaps -o yaml > zeabur.yaml
@@ -149,6 +192,8 @@ kubectl -n kube-system get configmap zeabur-installer zeabur-identity-authn --ig
 這些檔案含有機密資料，例如 Zeabur Identity 的簽章金鑰，請留在伺服器上。
 
 **先停下來**。把 `values.yaml` 和第 1 步的檢查結果給擁有者看，請擁有者替每台伺服器建立快照，完成後再告訴你。需要退回時，就還原這份快照。
+
+伺服器自己無法建立快照時，擁有者通常可以到服務商的管理頁面建立，等它完成。沒有快照就不支援退回。存下來的檔案不足以還原成 v0.2，因為第 4 步會刪掉安裝程式的 `HelmChart`，第 5 步會改動 Zeabur Identity 的 CRD。真的沒辦法建立快照時，告訴擁有者，升級後就無法退回 v0.2。擁有者確認每台伺服器的快照都已完成，或明確同意不做快照就繼續後，才開始第 4 步。
 
 #### 4. 讓安裝程式的 `HelmChart` 不再管理 release
 
@@ -169,7 +214,7 @@ kubectl -n zeabur get pods
 
 #### 5. 更新 Zeabur Identity 的 CRD
 
-Helm 只會在第一次安裝時安裝 chart 的 CRD，不會更新。請下載 chart，自己套用新的 CRD。把 `<version>` 換成要升級的版本；除非擁有者指定別的版本，就用 [GitHub Releases](https://github.com/zeabur-oss/zeabur/releases) 上最新的那一版：
+Helm 只會在第一次安裝時安裝 chart 的 CRD，不會更新。請下載 chart，自己套用新的 CRD。把 `<version>` 換成要升級的版本，照[選哪一版](steps.mdx#選哪一版)決定，不要加 `v`：
 
 ```sh
 helm pull oci://ghcr.io/zeabur-oss/charts/zeabur --version <version> --untar

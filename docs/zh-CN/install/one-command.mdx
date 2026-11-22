@@ -9,11 +9,41 @@ description: 在一台全新的 Linux 服务器上，先用 Zeatend 装好 Kuber
 
 ## 开始之前
 
-- **一台 Linux 服务器**，有公网 IP 地址，80 和 443 端口可以从互联网访问。Let's Encrypt 会通过 80 端口检查网址。内存和磁盘需要多大，见 Zeatend 的[支持的服务器与文件](https://oss.zeabur.com/zh-CN/docs/zeatend/reference/hosts/)。
+- **一台 Linux 服务器**，有公网 IP 地址，80 和 443 端口可以从互联网访问。Let's Encrypt 会通过 80 端口检查网址。K3s 需要多少内存和磁盘，见 Zeatend 的[支持的服务器与文件](https://oss.zeabur.com/zh-CN/docs/zeatend/reference/hosts/)。Zeabur 开源版跑在 K3s 之上。实测 1 个 vCPU、2 GiB 内存的服务器，装好 Zeabur 开源版、Zeabur Identity 和 cert-manager 后，还剩约 850 MiB 内存，能再跑一个用现成镜像部署的小型应用。Zeabur Builder 没有在这么小的服务器上试过。
 - **服务器的 root 权限**，通过 SSH 登录。下面的命令都以 root 运行，用普通账号登录时先运行 `sudo -i`。
-- **服务器上的 Zeatend、Helm 4 和 `zeabur-identityctl`**。Zeatend 的下载方法见[下载 Zeatend](https://oss.zeabur.com/zh-CN/docs/zeatend/get-started/install/#下载-zeatend)；`zeabur-identityctl` 见 Zeabur Identity 的[发行文件与验证](https://oss.zeabur.com/zh-CN/docs/identity/reference/releases/)。
+- **服务器上的 Zeatend、Helm 4 和 `zeabur-identityctl`**。Zeatend 的下载方法见[下载 Zeatend](https://oss.zeabur.com/zh-CN/docs/zeatend/get-started/install/#下载-zeatend)；另外两个在下面第一步安装。
 
 <Steps>
+<Step>
+
+### 安装 Helm 4 和 `zeabur-identityctl`
+
+新的服务器上两个都没有，安装时也不需要 `gh`、`cosign` 或 Docker。下面每一段会从各自项目下载发行文件，用项目提供的校验值检查文件，再装到 `/usr/local/bin`：
+
+```sh
+arch=$(uname -m | sed 's/x86_64/amd64/; s/aarch64/arm64/')
+
+helm=$(curl -fsSL https://get.helm.sh/helm-latest-version)
+curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz" &&
+  curl -fsSLO "https://get.helm.sh/helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  sha256sum -c "helm-$helm-linux-$arch.tar.gz.sha256sum" &&
+  tar -xzf "helm-$helm-linux-$arch.tar.gz" --strip-components=1 "linux-$arch/helm" &&
+  install -m 0755 helm /usr/local/bin/helm &&
+  helm version --short
+
+ctl=$(basename "$(curl -fsSLo /dev/null -w '%{url_effective}' https://github.com/zeabur-oss/identity/releases/latest)")
+base="https://github.com/zeabur-oss/identity/releases/download/$ctl"
+curl -fsSLO "$base/zeabur-identityctl-$ctl-linux-$arch.tar.gz" &&
+  curl -fsSLO "$base/SHA256SUMS" &&
+  sha256sum --ignore-missing -c SHA256SUMS &&
+  tar -xzf "zeabur-identityctl-$ctl-linux-$arch.tar.gz" zeabur-identityctl &&
+  install -m 0755 zeabur-identityctl /usr/local/bin/zeabur-identityctl &&
+  zeabur-identityctl --version
+```
+
+`helm version --short` 要显示 `v4`。`zeabur-identityctl` 的校验值和文件来自同一个发行版，只能发现下载损坏，不能证明是谁构建的。要连签名一起检查，请在有 `gh` 和 `cosign` 的电脑上按 Zeabur Identity 的[发行文件与验证](https://oss.zeabur.com/zh-CN/docs/identity/reference/releases/)操作，再把文件复制到服务器。
+
+</Step>
 <Step>
 
 ### 选好域名
@@ -25,14 +55,7 @@ description: 在一台全新的 Linux 服务器上，先用 Zeatend 装好 Kuber
 
 ### 用 Zeatend 装好 Kubernetes
 
-写好 Zeatend 的配置。下一步会装好 Zeabur Identity，`apiServer.authenticationConfig` 让 Kubernetes 接受它签发的登录令牌。这段配置由 `zeabur-identityctl kube-config` 输出：
-
 ```sh
-mkdir -p /etc/zeatend
-{
-  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
-  zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public 2>/dev/null | sed 's/^/    /'
-} > /etc/zeatend/config.yaml
 zeatend plan
 ```
 
@@ -47,15 +70,29 @@ zeatend apply
 </Step>
 <Step>
 
-### 安装 Zeabur 开源版
+### 让集群信任登录
 
-让 Helm 使用 K3s 的 kubeconfig：
+下一步装好的 Zeabur Identity 会签发登录令牌，Kubernetes 要在 Zeatend 的 `apiServer.authenticationConfig` 里把它设为可信任的签发者，才会接受。`zeabur-identityctl kube-config` 输出这段配置，它要读集群，所以等集群装好再运行。第二次 `zeatend apply` 会带着这段配置重启 K3s：
 
 ```sh
 export KUBECONFIG=/etc/rancher/k3s/k3s.yaml
+mkdir -p /etc/zeatend
+authn=$(mktemp)
+zeabur-identityctl kube-config --issuer "https://identity.$DOMAIN" --distro k3s --discovery public > "$authn" && {
+  printf 'distribution: k3s\napiServer:\n  authenticationConfig:\n'
+  sed 's/^/    /' "$authn"
+} > /etc/zeatend/config.yaml &&
+  zeatend apply
 ```
 
-接着按[用 Helm 安装](existing-cluster.mdx#用-helm-安装)运行 `helm install`，再按[创建管理员账号](existing-cluster.mdx#创建管理员账号)用通行密钥登录。Zeatend 已经让集群信任登录，不用再做“让集群信任登录”。
+`zeabur-identityctl` 也会输出手动安装这段配置的做法，不用管它，Zeatend 会替你做。如果它输出的是错误，就不会写入 Zeatend 的配置文件，`zeatend apply` 也不会运行。按错误信息处理后，再运行一次这段命令。
+
+</Step>
+<Step>
+
+### 安装 Zeabur 开源版
+
+Helm 使用上一步设好的 K3s kubeconfig。开了新的 SSH 连接时，先运行 `export KUBECONFIG=/etc/rancher/k3s/k3s.yaml`。按[用 Helm 安装](existing-cluster.mdx#用-helm-安装)运行 `helm install`，再按[创建管理员账号](existing-cluster.mdx#创建管理员账号)用通行密钥登录。上一步已经让集群信任登录，不用再做那里的“让集群信任登录”。
 
 </Step>
 </Steps>

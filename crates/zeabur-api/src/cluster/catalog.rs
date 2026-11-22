@@ -567,15 +567,19 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_newer_series_is_not_used() {
+    async fn a_newer_release_with_fields_it_does_not_know_is_used() {
         let fake = Fake::new();
-        let text = String::from_utf8(fake.index.lock().unwrap().clone()).unwrap();
-        *fake.index.lock().unwrap() = text.replacen("\"0.5.3\"", "\"0.6.0\"", 1).into_bytes();
+        let mut index: serde_json::Value =
+            serde_json::from_slice(&fake.index.lock().unwrap()).unwrap();
+        index["catalog"]["version"] = "0.6.0".into();
+        index["catalog"]["added"] = true.into();
+        index["added"] = serde_json::json!({"a": 1});
+        *fake.index.lock().unwrap() = serde_json::to_vec(&index).unwrap();
         let now = catalog(&fake, None)
             .current(Instant::now(), second(0))
             .await;
-        assert!(now.snapshot.is_none());
-        assert!(now.error.unwrap().contains("0.6.0 needs a newer Zeabur"));
+        assert!(now.error.is_none());
+        assert_eq!(now.snapshot.unwrap().index.catalog.version, "0.6.0");
     }
 
     #[tokio::test]

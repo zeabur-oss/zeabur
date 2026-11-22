@@ -161,7 +161,7 @@ function TextField({
       type={integer ? "number" : "text"}
       inputMode={integer ? "numeric" : undefined}
       value={text}
-      placeholder={textOf(input.default) || undefined}
+      placeholder={textOf(input.default ?? pickedOf(input)) || undefined}
       autoComplete="off"
       spellCheck={false}
       translate="no"
@@ -169,6 +169,10 @@ function TextField({
     />
   )
 }
+
+/** The value Zeabur picked when the field is left empty; never a secret's. */
+const pickedOf = (input: Schemas.ComponentInput) =>
+  input.state === "generated" && input.kind !== "secret" ? input.value : undefined
 
 const textOf = (value: Schemas.InputValue | null | undefined) =>
   value === undefined || value === null ? "" : String(value)
@@ -220,6 +224,8 @@ const fixedReview: Partial<Record<Schemas.InputState, (t: Translate) => string>>
 }
 
 function reviewOf(t: Translate, input: Schemas.ComponentInput) {
+  const picked = pickedOf(input)
+  if (picked != null) return t("components.value.picked", textOf(picked))
   const fixed = fixedReview[input.state]
   if (fixed) return fixed(t)
   if (input.kind === "secret")

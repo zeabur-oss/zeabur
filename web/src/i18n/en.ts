@@ -1240,6 +1240,7 @@ export const en = {
   "components.value.set": "Set",
   "components.value.kept": "Kept from the last install",
   "components.value.generated": "Random, made by Zeabur",
+  "components.value.picked": (value: string) => `${value} (picked by Zeabur)`,
   "components.value.default": (value: string) => `${value} (default)`,
   "components.value.empty": "Not set",
   "components.value.on": "On",
@@ -3245,6 +3246,10 @@ export const en = {
   "db.backup.saidNow": (name: string, where: string) => `Back up ${name} to ${where} now.`,
   "db.backup.now": "Back up now",
   "db.backup.starting": "Ready once the database restarts with backups",
+  "db.backup.archiveFailing": "Archiving to the backup destination fails",
+  "db.backup.archiveFailed":
+    "The database cannot archive its write-ahead log to the backup destination, so backups do not work. The operator says",
+  "db.backup.archiveSince": "Failing since",
   "db.backup.planNow": (name: string) => `Back up ${name} now`,
   "db.backup.destination": "Destination",
   "db.backup.endpointFact": "Endpoint",

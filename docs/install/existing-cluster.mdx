@@ -27,7 +27,7 @@ Kubernetes is open-source software that runs containers on one or more servers, 
 - **A Kubernetes cluster**, version 1.30 or later, and a kubeconfig that can manage it. A kubeconfig is the file `kubectl` uses to reach a cluster.
 - **An Ingress controller** that is the cluster's default IngressClass, such as the Traefik that K3s and RKE2 include. Ports 80 and 443 must be open to the internet, so that Let's Encrypt can check the addresses and issue their certificates.
 - **Tools on your computer**: `kubectl`, Helm 4, and `zeabur-identityctl`.
-- **The version to install.** The examples use `<version>`. The chart is published at `oci://ghcr.io/zeabur-oss/charts/zeabur`, and its default image is pinned to the digest of the same version. See [Release files and verification](../reference/releases.mdx) for the versions and how to verify them.
+- **The version to install.** The examples use `<version>`. Use the version these docs describe, which is the newest heading in the [CHANGELOG](../../CHANGELOG.md), such as `0.3.0` or `0.3.0-beta.2`, without a leading `v`. Always give `--version`, as the examples do. The chart is published at `oci://ghcr.io/zeabur-oss/charts/zeabur`, and its default image is pinned to the digest of the same version. See [Release files and verification](../reference/releases.mdx) for the versions and how to verify them.
 
 Kubernetes must be 1.30 or later because, by default, the chart creates project member roles and uses `ValidatingAdmissionPolicy` to limit which namespace fields Developers can change. That API is generally available starting in 1.30. A namespace is how Kubernetes groups things, and each Zeabur OSS project is one namespace.
 
@@ -77,7 +77,7 @@ This one command does all of the following:
 
 - Installs Zeabur OSS in the `zeabur` namespace, and Zeabur Identity in `zeabur-identity`.
 - Registers Zeabur OSS in Zeabur Identity and stores the client secret in the cluster. The value stays out of Helm's release records.
-- Installs cert-manager from Zeabur Catalog, the same way **Cluster** → **Components** does, with the ClusterIssuer `letsencrypt`. Helm waits for this, which takes a few minutes.
+- Installs cert-manager from Zeabur Catalog, the same way **Cluster** → **Components** does, with the ClusterIssuer `letsencrypt`. A Job does this after `helm install` returns, which takes a few minutes. It retries for about 45 minutes.
 - Adds the ClusterRoles and namespace admission policy for project members. The chart doesn't give the member roles to anyone. After signing in, an admin sets each person's access on **Members**.
 
 When `helm install` finishes, it prints the link that creates the first admin account. Keep it: the link works once and expires in 24 hours.
@@ -132,13 +132,15 @@ You can list multiple application domains separated by commas; the first is the 
 | --- | --- |
 | The browser can't open Zeabur OSS | Check that `kubectl -n zeabur rollout status deployment/zeabur` succeeds, then check DNS, the Ingress class, and that ports 80 and 443 are open. |
 | The browser warns about the certificate for minutes | Run `kubectl get certificate -A`. A certificate that stays not ready usually means Let's Encrypt can't reach port 80, or the IP address in an sslip.io domain isn't the public one. |
-| `helm install` says the `zeabur-components` job failed | Zeabur OSS is installed, but cert-manager isn't. `kubectl -n zeabur logs job/zeabur-components` shows why. Fix that, then run the commands that `zeaburctl components export cert-manager --format helm` prints. |
+| `kubectl -n zeabur get job zeabur-components` shows `Failed` | Zeabur OSS is installed, but cert-manager isn't. `kubectl -n zeabur logs job/zeabur-components --all-containers` shows why. Fix that, then run `helm uninstall zeabur -n zeabur` and the `helm install` command again. |
 | The cluster already has cert-manager | The install leaves it as it is. Make sure it has a ClusterIssuer named `letsencrypt`, or set `ingress.clusterIssuer`, `identity.ingress.clusterIssuer` and `domains.clusterIssuer` to yours. |
 | Every page says you are not signed in to the cluster | kube-apiserver doesn't accept the tokens yet. Check the steps of [Let the cluster trust sign-in](#let-the-cluster-trust-sign-in). |
 | You can sign in but see no services | Zeabur OSS reads the cluster with the signed-in person's own rights. An admin gives them project roles on [Members](../cluster/members.mdx). |
 | Reads are denied after sign-in | Check the member's identity and groups in Zeabur Identity, then the namespace's RoleBinding. See [Permissions](../reference/permissions.mdx). |
 | A new service is ready, but its URL doesn't open | Check the application domain's DNS and certificate. Zeabur OSS and your services use different domains, set up separately. |
 | You have to sign in again after an upgrade | The chart runs one Zeabur OSS replica, and sessions live in memory. A new replica means signing in again. |
+
+The commands in this table use `kubectl` and `zeaburctl`. A new K3s server has neither. On the server, write `k3s kubectl` where the table says `kubectl`. For `zeaburctl`, see [Release files and verification](../reference/releases.mdx).
 
 Zeabur OSS's own ServiceAccount can only use kubectl terminal replicas in `zeabur-terminals`. It doesn't read the cluster on behalf of the signed-in person.
 
