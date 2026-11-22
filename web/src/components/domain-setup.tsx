@@ -12,7 +12,14 @@ import {
 import { useI18n, useT } from "@/i18n"
 import { formatDate } from "@/lib/format"
 import { cn } from "@/lib/utils"
-import { dnsSetup, isSslip, recordsFor, wildcardFor, type DnsRecord } from "@/model/domains"
+import {
+  dnsSetup,
+  isSslip,
+  recordsFor,
+  wildcardFor,
+  type DnsRecord,
+  type DnsSetup,
+} from "@/model/domains"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { severity } from "@/model/severity"
 
@@ -80,42 +87,10 @@ export function DomainSetup({
       ? certificate
       : undefined
   if (dns.as === "valid" && !certTrouble) return null
-  if (dns.as === "name")
-    return (
-      <p className="text-sm text-secondary">
-        {t("domain.sslipName", t("common.list", dns.resolved))}
-      </p>
-    )
-  const wildcard = wildcardFor(host, suffixes)
   const limited = certTrouble?.rateLimited ?? false
   return (
     <div className="flex flex-col gap-3 text-sm">
-      {dns.as === "valid" ? null : (
-        <div className="flex flex-col gap-2">
-          <p className="text-secondary">
-            {dns.as === "missing"
-              ? t("domain.dns.missing", host)
-              : dns.as === "elsewhere"
-                ? t("domain.dns.elsewhere", t("common.list", dns.resolved))
-                : t("domain.dns.unknown")}
-          </p>
-          {dns.records.length === 0 ? (
-            <p className="text-secondary">{t("domain.askAdmin")}</p>
-          ) : (
-            <>
-              <p className="font-medium">
-                {wildcard
-                  ? t("domain.wildcardMissing", wildcard)
-                  : dns.as === "missing"
-                    ? t("domain.addRecord")
-                    : t("domain.theRecord")}
-              </p>
-              <Records records={dns.records} />
-            </>
-          )}
-          {onCheck ? <CheckAgain checking={checking} onCheck={onCheck} /> : null}
-        </div>
-      )}
+      <DnsPart host={host} dns={dns} suffixes={suffixes} checking={checking} onCheck={onCheck} />
       {certTrouble ? (
         <div className="flex flex-col gap-1">
           <p className="flex items-center gap-1.5 font-medium">
@@ -151,6 +126,52 @@ export function DomainSetup({
           ) : null}
         </div>
       ) : null}
+    </div>
+  )
+}
+
+function DnsPart({
+  host,
+  dns,
+  suffixes,
+  checking,
+  onCheck,
+}: {
+  host: string
+  dns: DnsSetup
+  suffixes?: readonly string[]
+  checking?: boolean
+  onCheck?: () => void
+}) {
+  const t = useT()
+  if (dns.as === "valid") return null
+  if (dns.as === "name")
+    return <p className="text-secondary">{t("domain.sslipName", t("common.list", dns.resolved))}</p>
+  const wildcard = wildcardFor(host, suffixes)
+  return (
+    <div className="flex flex-col gap-2">
+      <p className="text-secondary">
+        {dns.as === "missing"
+          ? t("domain.dns.missing", host)
+          : dns.as === "elsewhere"
+            ? t("domain.dns.elsewhere", t("common.list", dns.resolved))
+            : t("domain.dns.unknown")}
+      </p>
+      {dns.records.length === 0 ? (
+        <p className="text-secondary">{t("domain.askAdmin")}</p>
+      ) : (
+        <>
+          <p className="font-medium">
+            {wildcard
+              ? t("domain.wildcardMissing", wildcard)
+              : dns.as === "missing"
+                ? t("domain.addRecord")
+                : t("domain.theRecord")}
+          </p>
+          <Records records={dns.records} />
+        </>
+      )}
+      {onCheck ? <CheckAgain checking={checking} onCheck={onCheck} /> : null}
     </div>
   )
 }
