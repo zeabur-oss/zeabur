@@ -114,25 +114,31 @@ pub(super) async fn refuse_existing(
         return Ok(());
     };
     let objects: Vec<&str> = existing.iter().map(|(_, o)| o.as_str()).collect();
-    let mut problem = Problem {
+    let problem = Problem {
         at: Some(ProblemAt {
             change: *index,
             line: None,
             field: Some("metadata.name".to_owned()),
         }),
-        ..Problem::new(
-            Kind::Conflict,
-            format!("{} already exist in project {project}.", objects.join(", ")),
-        )
+        ..already_exist(&objects.join(", "), project)
     };
+    Err(ApiError::from(problem))
+}
+
+/// The `409` for `objects` that already exist in project `project`: a create never updates.
+pub(super) fn already_exist(objects: &str, project: &str) -> Problem {
+    let mut problem = Problem::new(
+        Kind::Conflict,
+        format!("{objects} already exist in project {project}."),
+    );
     problem.summary = Message::new("problem.summary.already-exists")
-        .with("objects", objects.join(", "))
+        .with("objects", objects)
         .with("namespace", project);
     problem.fix_for_occasion(
         "Delete them first, or deploy into another project.",
         Message::new("problem.conflict.fix.alreadyExists"),
     );
-    Err(ApiError::from(problem))
+    problem
 }
 
 /// Sends every write of a plan that creates objects as a dry run, as the person: what their
