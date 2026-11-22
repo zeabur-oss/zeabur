@@ -61,6 +61,18 @@ export interface Overview {
 const stopsAtReady = (route: Route) =>
   route.status === "failed" && route.hops.find((h) => h.status === "failed")?.step === "ready"
 
+/** No ready replica answers nothing, whatever a check from outside says. */
+function markNoReplica(
+  waiting: Map<string, Waiting>,
+  routes: Route[],
+  replicas?: { desired: number; ready: number } | null,
+) {
+  if ((replicas?.desired ?? 0) === 0 || replicas?.ready !== 0) return
+  for (const route of routes)
+    if (route.status !== "failed" && !waiting.has(route.address))
+      waiting.set(route.address, "noReplica")
+}
+
 export function overviewOf(
   service: {
     diagnoses?: Diagnosis[] | null
@@ -80,12 +92,7 @@ export function overviewOf(
     causes.length > 0 ? "cause" : service.stopped ? "stopped" : undefined
   const waiting = new Map<string, Waiting>()
   if (known) for (const route of routes) if (stopsAtReady(route)) waiting.set(route.address, known)
-  // No ready replica answers nothing, whatever a check from outside says.
-  const none = (service.replicas?.desired ?? 0) > 0 && service.replicas?.ready === 0
-  if (none)
-    for (const route of routes)
-      if (route.status !== "failed" && !waiting.has(route.address))
-        waiting.set(route.address, "noReplica")
+  markNoReplica(waiting, routes, service.replicas)
   const down = routes.filter((r) => waiting.get(r.address) === "cause")
   const alsoDown =
     down.length > 0
