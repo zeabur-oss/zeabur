@@ -1666,8 +1666,8 @@ export const en = {
     `Also deletes what ${owner} owns: ${names}`,
   "warn.deletesOwned": (owner: string, names: string) =>
     `Also deletes what ${owner} made and nothing else uses: ${names}`,
-  "warn.staysShared": (object: string, names: string, count: number) =>
-    `${object} stays: ${names} ${count === 1 ? "also uses" : "also use"} it`,
+  "warn.staysShared": (object: string, names: string) =>
+    `${object} stays: it is also used by ${names}`,
   "warn.staysRoute": (object: string) => `${object} stays: it also leads to a Service that stays`,
   "warn.staysControlled": (object: string, owner: string) =>
     `${object} stays: it belongs to ${owner}`,
