@@ -1,5 +1,6 @@
 // Restoring a backup into a new database, and moving services between it and the original.
 import { useQuery } from "@tanstack/react-query"
+import { Link } from "@tanstack/react-router"
 import { useState } from "react"
 import ArrowCounterClockwiseIcon from "~icons/ph/arrow-counter-clockwise"
 
@@ -12,6 +13,7 @@ import { usePlanner, usePlanStep, type PlanStepState } from "@/components/plan/p
 import { Problem } from "@/components/problem"
 import { useI18n, useT, type Locale, type Translate } from "@/i18n"
 import { formatTime } from "@/lib/format"
+import { databaseLink } from "@/lib/place"
 import {
   keptSecret,
   localInput,
@@ -217,6 +219,9 @@ function PointForm({
           value={name}
           onChange={onName}
         />
+        <p className="type-meta text-muted-foreground">
+          {t("db.restore.after", database.name, name)}
+        </p>
         <p className="type-meta text-muted-foreground">{t(AS_OF[mode])}</p>
         {failure ? <Problem error={failure} /> : null}
       </ReviewForm>
@@ -450,25 +455,47 @@ function Kin({
       changes,
       notes: [t("db.restored.keep", otherName)],
     })
+  const status =
+    here.state !== "ready"
+      ? t("db.restored.waiting", here.name)
+      : changes.length === 0
+        ? t("db.restored.noReaders", otherName)
+        : t("db.restored.readers", otherName, t("common.list", services))
+  const point =
+    here.state === "ready" && changes.length > 0 ? (
+      <GateTip gate={gate}>
+        <Button variant="secondary" size="sm" onClick={plan}>
+          {t("db.restored.point")}
+        </Button>
+      </GateTip>
+    ) : null
   return (
     <Alert variant="info" role="note">
       <ArrowCounterClockwiseIcon aria-hidden="true" />
       <AlertTitle>{title}</AlertTitle>
       <AlertDescription>
-        <p>
-          {here.state !== "ready"
-            ? t("db.restored.waiting", here.name)
-            : changes.length === 0
-              ? t("db.restored.noReaders", otherName)
-              : t("db.restored.readers", otherName, t("common.list", services))}
-        </p>
-        {here.state === "ready" && changes.length > 0 ? (
-          <GateTip gate={gate}>
-            <Button variant="secondary" size="sm" onClick={plan}>
-              {t("db.restored.point")}
-            </Button>
-          </GateTip>
-        ) : null}
+        {copy ? (
+          <>
+            <p>{status}</p>
+            {point}
+          </>
+        ) : (
+          <ol className="flex list-decimal flex-col gap-1.5 pl-5">
+            <li>
+              {status}
+              {point ? <div className="mt-1.5">{point}</div> : null}
+            </li>
+            <li>{t("db.restored.check", here.name)}</li>
+            {other ? (
+              <li>
+                {t("db.restored.remove", otherName)}{" "}
+                <Link {...databaseLink(project, other)} className="underline">
+                  {t("db.restored.open", otherName)}
+                </Link>
+              </li>
+            ) : null}
+          </ol>
+        )}
       </AlertDescription>
       {planner.dialog}
     </Alert>

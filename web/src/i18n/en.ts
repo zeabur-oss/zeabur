@@ -3323,6 +3323,11 @@ export const en = {
     "The new database holds the data as of the backup, not what was written after it.",
   "db.restore.copiedSecret": (from: string, into: string) =>
     `The backup holds the passwords in ${from}, so the new database gets its own secret ${into} with the same values. It keeps working after the original is deleted.`,
+  "db.restore.after": (from: string, into: string) =>
+    `You will have two databases. ${into} is the new one, and ${from} keeps running. Services keep using ${from} until you point them to ${into}.`,
+  "db.restored.check": (name: string) => `Check that your app works with ${name}.`,
+  "db.restored.remove": (name: string) => `When you no longer need ${name}, delete it.`,
+  "db.restored.open": (name: string) => `Open ${name}`,
   "db.restored.from": (name: string, time: string) => `Restored from ${name}'s backup of ${time}`,
   "db.restored.copy": (name: string, time: string) =>
     `${name} was restored from this database's backup of ${time}`,
