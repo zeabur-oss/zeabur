@@ -3559,6 +3559,9 @@ export const en = {
   "link.done": "Done",
   "link.expires": (when: string) => `Works once, until ${when}.`,
   "link.once": "It isn't shown again.",
+  "link.notCopied": "You haven't copied the link yet. It isn't shown again after you close this.",
+  "link.back": "Back to the link",
+  "link.closeAnyway": "Close anyway",
   "link.send": (user: string) =>
     `Send this link to ${user}. Whoever opens it first adds a passkey to ${user}'s account.`,
   "members.title": "Members",

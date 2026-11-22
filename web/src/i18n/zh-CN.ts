@@ -3245,6 +3245,9 @@ export const zhCN: Messages = {
   "link.done": "完成",
   "link.expires": (when) => `只能使用一次，${when} 前有效。`,
   "link.once": "之后不会再显示。",
+  "link.notCopied": "你还没有复制链接，关闭后就不会再显示。",
+  "link.back": "回到链接",
+  "link.closeAnyway": "仍要关闭",
   "link.send": (user) =>
     `把这个链接发给 ${user}。谁先打开，谁就能在 ${user} 的账号添加一把通行密钥。`,
   "members.title": "成员",

@@ -3254,6 +3254,9 @@ export const zhTW: Messages = {
   "link.done": "完成",
   "link.expires": (when) => `只能使用一次，${when} 前有效。`,
   "link.once": "之後不會再顯示。",
+  "link.notCopied": "你還沒有複製連結，關閉後就不會再顯示。",
+  "link.back": "回到連結",
+  "link.closeAnyway": "仍要關閉",
   "link.send": (user) =>
     `把這個連結傳給 ${user}。誰先開啟，誰就能在 ${user} 的帳號新增一把通行密鑰。`,
   "members.title": "成員",

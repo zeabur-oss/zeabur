@@ -84,14 +84,14 @@ export function ConfirmDialog({
   )
 }
 
-/** A link just made: shown once, since only its hash is kept. */
-function LinkShown({ link, lead }: { link: SetupLink; lead: string }) {
+/** A link just made, shown once since only its hash is kept. */
+function LinkShown({ link, lead, onCopy }: { link: SetupLink; lead: string; onCopy?: () => void }) {
   const t = useT()
   const { locale } = useI18n()
   return (
     <>
       <p>{lead}</p>
-      <CopyInput value={link.url} copyLabel={t("link.copy")} />
+      <CopyInput value={link.url} copyLabel={t("link.copy")} onCopy={onCopy} />
       <p className="text-muted-foreground">
         {t("common.sentences", [
           t("link.expires", formatTime(link.expiresAt, locale)),
@@ -102,12 +102,51 @@ function LinkShown({ link, lead }: { link: SetupLink; lead: string }) {
   )
 }
 
-function DoneButton({ onClose }: { onClose: () => void }) {
+/** A new link in its dialog. Closing before the link is copied asks first. */
+function LinkDialog({
+  title,
+  link,
+  onClose,
+}: {
+  title: string
+  link: SetupLink
+  onClose: () => void
+}) {
   const t = useT()
+  const [copied, setCopied] = useState(false)
+  const [asking, setAsking] = useState(false)
+  const close = () => (copied ? onClose() : setAsking(true))
+  if (asking)
+    return (
+      <Frame
+        title={title}
+        onClose={() => setAsking(false)}
+        footer={
+          <>
+            <Button variant="ghost" size="sm" onClick={onClose}>
+              {t("link.closeAnyway")}
+            </Button>
+            <Button size="sm" onClick={() => setAsking(false)}>
+              {t("link.back")}
+            </Button>
+          </>
+        }
+      >
+        <p>{t("link.notCopied")}</p>
+      </Frame>
+    )
   return (
-    <Button size="sm" onClick={onClose}>
-      {t("link.done")}
-    </Button>
+    <Frame
+      title={title}
+      onClose={close}
+      footer={
+        <Button size="sm" onClick={close}>
+          {t("link.done")}
+        </Button>
+      }
+    >
+      <LinkShown link={link} lead={t("link.send", link.username)} onCopy={() => setCopied(true)} />
+    </Frame>
   )
 }
 
@@ -137,12 +176,7 @@ export function InviteDialog({
   const roleLine = useRoleLine()
   const target = inviteTarget(members, username)
   const name = username.trim()
-  if (link)
-    return (
-      <Frame title={t("invite.title")} onClose={onClose} footer={<DoneButton onClose={onClose} />}>
-        <LinkShown link={link} lead={t("link.send", link.username)} />
-      </Frame>
-    )
+  if (link) return <LinkDialog title={t("invite.title")} link={link} onClose={onClose} />
   if (reviewing) {
     const existing = target === "existing"
     const projects = admin || !projectRoles ? [] : grantsOf(chosen)
@@ -269,12 +303,7 @@ export function SetupLinkDialog({
     onSuccess: refreshMembers,
   })
   const title = t("reset.title", name)
-  if (create.data)
-    return (
-      <Frame title={title} onClose={onClose} footer={<DoneButton onClose={onClose} />}>
-        <LinkShown link={create.data} lead={t("link.send", member.username)} />
-      </Frame>
-    )
+  if (create.data) return <LinkDialog title={title} link={create.data} onClose={onClose} />
   return (
     <Frame
       title={title}
