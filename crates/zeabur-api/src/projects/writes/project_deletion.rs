@@ -101,7 +101,7 @@ pub(super) async fn compute(
         .filter_map(|p| p.pointer("/metadata/name").and_then(Value::as_str))
         .map(str::to_owned)
         .collect();
-    let backups = backups(cluster, project, read_at).await?;
+    let backups = backups(cluster, project, read_at, &mut unreadable).await?;
     let deletion = DeletionInput {
         zeabur_namespaces,
         databases,
@@ -274,25 +274,39 @@ async fn databases(
 }
 
 /// The project's backups that exist: a database's with a backup run, the store's endpoint; a
-/// volume's with a K8up run, its schedule's endpoint; the project's own with a Velero run. What
-/// the person may not read is left out.
+/// volume's with a K8up run, the endpoint of each K8up schedule that covers it (a run does not
+/// name its schedule); the project's own with a Velero run. A refused read leaves its backups
+/// out, and its right is named in `unreadable`.
 async fn backups(
     cluster: &dyn Cluster,
     project: &str,
     now: Timestamp,
+    unreadable: &mut Vec<Denied>,
 ) -> Result<Vec<ProjectBackup>, ApiError> {
-    let databases = crate::projects::databases::read(cluster, &[], project, now).await?;
-    let mut out: Vec<ProjectBackup> = databases
-        .items
-        .into_iter()
-        .filter(|d| !d.backups.runs.is_empty())
-        .map(|d| ProjectBackup {
-            kind: BackupKind::Database,
-            endpoint: d.backups.store.and_then(|s| s.endpoint),
-            name: d.name,
-        })
-        .collect();
-    let found = crate::projects::backups::read(cluster, &[], project).await?;
+    let mut out = Vec::new();
+    if let Some(databases) = allowed(
+        crate::projects::databases::read(cluster, &[], project, now).await,
+        unreadable,
+    )? {
+        out.extend(
+            databases
+                .items
+                .into_iter()
+                .filter(|d| !d.backups.runs.is_empty())
+                .map(|d| ProjectBackup {
+                    kind: BackupKind::Database,
+                    endpoint: d.backups.store.and_then(|s| s.endpoint),
+                    name: d.name,
+                }),
+        );
+    }
+    let Some(found) = allowed(
+        crate::projects::backups::read(cluster, &[], project).await,
+        unreadable,
+    )?
+    else {
+        return Ok(out);
+    };
     let run_of = |provider: &str, target: &backups::Target| {
         found
             .runs
@@ -306,16 +320,16 @@ async fn backups(
         .filter(|s| s.provider == k8up::MODULE.id)
     {
         for target in &schedule.targets {
-            let new = !out
-                .iter()
-                .any(|b| b.kind == BackupKind::Volume && b.name == target.name);
-            if target.kind == backups::TargetKind::Volume && new && run_of(k8up::MODULE.id, target)
+            let backup = ProjectBackup {
+                kind: BackupKind::Volume,
+                name: target.name.clone(),
+                endpoint: schedule.endpoint.clone(),
+            };
+            if target.kind == backups::TargetKind::Volume
+                && run_of(k8up::MODULE.id, target)
+                && !out.contains(&backup)
             {
-                out.push(ProjectBackup {
-                    kind: BackupKind::Volume,
-                    name: target.name.clone(),
-                    endpoint: schedule.endpoint.clone(),
-                });
+                out.push(backup);
             }
         }
     }
@@ -331,6 +345,21 @@ async fn backups(
         });
     }
     Ok(out)
+}
+
+/// What a read found, or nothing when it was refused, its right named in `unreadable`.
+fn allowed<T>(
+    result: Result<T, ApiError>,
+    unreadable: &mut Vec<Denied>,
+) -> Result<Option<T>, ApiError> {
+    match result {
+        Ok(found) => Ok(Some(found)),
+        Err(ApiError(problem)) if problem.kind == Kind::Forbidden => {
+            unreadable.extend(problem.denied);
+            Ok(None)
+        }
+        Err(other) => Err(other),
+    }
 }
 
 /// The `reclaimPolicy` of each `StorageClass` (`Delete` when it sets none, as kube-apiserver
