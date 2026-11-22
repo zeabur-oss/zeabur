@@ -327,8 +327,9 @@ function DomainField({
 
 function About({ template }: { template: AppTemplate }) {
   const t = useT()
-  const { names, or } = licenseNames(template.license)
-  const licenses = or ? names.join(" / ") : t("common.list", names)
+  const { names, joined, text } = licenseNames(template.license)
+  const licenses =
+    joined === "mixed" ? text : joined === "or" ? names.join(" / ") : t("common.list", names)
   return (
     <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
       <span className="type-meta text-muted-foreground" translate="no">
