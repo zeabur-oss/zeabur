@@ -229,6 +229,8 @@ function DestinationEditor({
             onChange={(event) => setForm((f) => ({ ...f, secretAccessKey: event.target.value }))}
           />
         </FormField>
+        {/* The footer's button is outside the form, so Enter needs one in it. */}
+        <button type="submit" hidden />
       </ReviewForm>
     </FormDrawer>
   )
