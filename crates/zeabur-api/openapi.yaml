@@ -5501,7 +5501,7 @@ components:
           type:
           - string
           - "null"
-          description: The release, `0.5.3`; absent when Zeabur has never read one.
+          description: The release, `0.6.1`; absent when Zeabur has never read one.
     CertificateChange:
       type: object
       description: A [`Change::Certificate`].
@@ -19455,6 +19455,7 @@ components:
       enum:
       - contributesWithoutChart
       - newerRelease
+      - unreadable
     UpgradeExtensions:
       type: object
       description: What integrations add to the cluster's upgrades, one member per module.

@@ -1,6 +1,6 @@
 {
   "id": "falco",
-  "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
+  "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
   "declaration": {
     "apiVersion": "catalog.zeabur.com/v1",
     "defaults": {
@@ -209,7 +209,7 @@
         {
           "workload": "falco-falcosidekick",
           "kind": "Deployment",
-          "memory": "13Mi",
+          "memory": "12Mi",
           "cpu": "0"
         }
       ],
@@ -223,8 +223,8 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "k3s",
@@ -240,7 +240,7 @@
         {
           "workload": "falco",
           "kind": "DaemonSet",
-          "memory": "58Mi",
+          "memory": "57Mi",
           "cpu": "3m"
         },
         {
@@ -260,8 +260,8 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kind",
@@ -276,13 +276,13 @@
         {
           "workload": "falco",
           "kind": "DaemonSet",
-          "memory": "66Mi",
-          "cpu": "9m"
+          "memory": "52Mi",
+          "cpu": "12m"
         },
         {
           "workload": "falco-falcosidekick",
           "kind": "Deployment",
-          "memory": "12Mi",
+          "memory": "11Mi",
           "cpu": "0"
         }
       ],
@@ -296,8 +296,8 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kind",
@@ -312,13 +312,13 @@
         {
           "workload": "falco",
           "kind": "DaemonSet",
-          "memory": "65Mi",
-          "cpu": "7m"
+          "memory": "54Mi",
+          "cpu": "8m"
         },
         {
           "workload": "falco-falcosidekick",
           "kind": "Deployment",
-          "memory": "12Mi",
+          "memory": "11Mi",
           "cpu": "0"
         }
       ],
@@ -332,8 +332,8 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kind",
@@ -349,7 +349,7 @@
           "workload": "falco",
           "kind": "DaemonSet",
           "memory": "55Mi",
-          "cpu": "5m"
+          "cpu": "4m"
         },
         {
           "workload": "falco-falcosidekick",
@@ -368,8 +368,8 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kind",
@@ -390,7 +390,7 @@
         {
           "workload": "falco-falcosidekick",
           "kind": "Deployment",
-          "memory": "11Mi",
+          "memory": "12Mi",
           "cpu": "0"
         }
       ],
@@ -404,8 +404,8 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
-      "measuredAt": "2026-11-12"
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kubesolo",
@@ -421,8 +421,8 @@
         {
           "workload": "falco",
           "kind": "DaemonSet",
-          "memory": "53Mi",
-          "cpu": "66m"
+          "memory": "51Mi",
+          "cpu": "75m"
         },
         {
           "workload": "falco-falcosidekick",
@@ -441,11 +441,11 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
       "addOns": {
         "helm-controller": "v0.17.9"
       },
-      "measuredAt": "2026-11-12"
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "kubesolo",
@@ -462,7 +462,7 @@
           "workload": "falco",
           "kind": "DaemonSet",
           "memory": "53Mi",
-          "cpu": "89m"
+          "cpu": "93m"
         },
         {
           "workload": "falco-falcosidekick",
@@ -481,11 +481,11 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
       "addOns": {
         "helm-controller": "v0.17.9"
       },
-      "measuredAt": "2026-11-12"
+      "measuredAt": "2026-11-20"
     },
     {
       "distribution": "rke2",
@@ -501,48 +501,8 @@
         {
           "workload": "falco",
           "kind": "DaemonSet",
-          "memory": "60Mi",
-          "cpu": "10m"
-        },
-        {
-          "workload": "falco-falcosidekick",
-          "kind": "Deployment",
-          "memory": "12Mi",
-          "cpu": "0"
-        }
-      ],
-      "versions": [
-        {
-          "release": "policy-report-crds",
-          "version": "ed0ca5a1c7788055074c7500915b76fc4518ed33"
-        },
-        {
-          "release": "falco",
-          "version": "9.2.1"
-        }
-      ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
-      "addOns": {
-        "local-path-provisioner": "v0.0.37"
-      },
-      "measuredAt": "2026-11-12"
-    },
-    {
-      "distribution": "rke2",
-      "profile": "single-node",
-      "platform": {
-        "os": "linux",
-        "architecture": "arm64"
-      },
-      "kubernetesVersion": "v1.37.2",
-      "distributionVersion": "v1.37.2+rke2r1",
-      "result": "passed",
-      "pods": [
-        {
-          "workload": "falco",
-          "kind": "DaemonSet",
-          "memory": "64Mi",
-          "cpu": "6m"
+          "memory": "62Mi",
+          "cpu": "8m"
         },
         {
           "workload": "falco-falcosidekick",
@@ -561,11 +521,51 @@
           "version": "9.2.1"
         }
       ],
-      "sourceDigest": "h1:iPC8/+lNBcPT2W1WCKzULuctwAD0cojiIE+F9Ypwa3g=",
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
       "addOns": {
         "local-path-provisioner": "v0.0.37"
       },
-      "measuredAt": "2026-11-12"
+      "measuredAt": "2026-11-20"
+    },
+    {
+      "distribution": "rke2",
+      "profile": "single-node",
+      "platform": {
+        "os": "linux",
+        "architecture": "arm64"
+      },
+      "kubernetesVersion": "v1.37.2",
+      "distributionVersion": "v1.37.2+rke2r1",
+      "result": "passed",
+      "pods": [
+        {
+          "workload": "falco",
+          "kind": "DaemonSet",
+          "memory": "62Mi",
+          "cpu": "7m"
+        },
+        {
+          "workload": "falco-falcosidekick",
+          "kind": "Deployment",
+          "memory": "12Mi",
+          "cpu": "0"
+        }
+      ],
+      "versions": [
+        {
+          "release": "policy-report-crds",
+          "version": "ed0ca5a1c7788055074c7500915b76fc4518ed33"
+        },
+        {
+          "release": "falco",
+          "version": "9.2.1"
+        }
+      ],
+      "sourceDigest": "h1:cqf+4FIapxElzB3bhhDpS8qDa1EP18YILl07QgEHGCI=",
+      "addOns": {
+        "local-path-provisioner": "v0.0.37"
+      },
+      "measuredAt": "2026-11-20"
     }
   ]
 }

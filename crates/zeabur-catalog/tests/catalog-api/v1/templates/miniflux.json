@@ -1,6 +1,6 @@
 {
   "id": "miniflux",
-  "sourceDigest": "h1:q3v6Nm7KFobn+blakE/PBfDyhV7zdcDOH6f3yLjL27Q=",
+  "sourceDigest": "h1:1tBafOhPlr9SLsqWgsDgCZHKZ10slcroIDoYKTqEoZM=",
   "template": {
     "apiVersion": "catalog.zeabur.com/v1",
     "inputs": [
@@ -23,6 +23,7 @@
     ],
     "kind": "Template",
     "metadata": {
+      "docs": "https://miniflux.app/docs/configuration.html",
       "homepage": "https://miniflux.app/",
       "license": "Apache-2.0 AND PostgreSQL",
       "locales": {
@@ -142,7 +143,6 @@
         "timeout": "900s"
       },
       {
-        "condition": "condition=Available",
         "http": {
           "contains": "OK",
           "path": "/healthcheck",
@@ -155,7 +155,6 @@
         "timeout": "600s"
       },
       {
-        "condition": "condition=Available",
         "http": {
           "path": "/v1/me",
           "port": 8080,

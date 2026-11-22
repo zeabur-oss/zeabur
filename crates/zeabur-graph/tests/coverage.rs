@@ -118,7 +118,8 @@ mod tests {
             .filter(|p| p.extension().is_some_and(|e| e == "yaml"))
             .collect();
         files.sort();
-        // One chart per component of the pinned catalogue (`components/<id>.yaml`), named `<id>`.
+        // One chart per component of the pinned catalogue (`components/<id>/component.yaml`), named
+        // `<id>`.
         let mut charts: Vec<String> = files
             .iter()
             .map(|f| f.file_stem().unwrap().to_string_lossy().into_owned())
@@ -128,8 +129,8 @@ mod tests {
                 .unwrap()
                 .filter_map(Result::ok)
                 .map(|e| e.path())
-                .filter(|p| p.extension().is_some_and(|e| e == "yaml"))
-                .map(|p| p.file_stem().unwrap().to_string_lossy().into_owned())
+                .filter(|p| p.join("component.yaml").is_file())
+                .map(|p| p.file_name().unwrap().to_string_lossy().into_owned())
                 .collect();
         charts.sort();
         components.sort();

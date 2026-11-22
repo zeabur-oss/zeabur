@@ -3963,6 +3963,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde_ignored"
+version = "0.1.14"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "115dffd5f3853e06e746965a20dcbae6ee747ae30b543d91b0e089668bb07798"
+dependencies = [
+ "serde",
+ "serde_core",
+]
+
+[[package]]
 name = "serde_json"
 version = "1.0.154"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -6205,8 +6215,21 @@ dependencies = [
  "tar",
  "thiserror 2.0.21",
  "utoipa",
+ "zeabur-catalog-format",
  "zeabur-kube",
  "zeabur-model",
+]
+
+[[package]]
+name = "zeabur-catalog-format"
+version = "0.5.6"
+source = "git+https://github.com/zeabur-oss/catalog?tag=v0.6.1#bcc7d3c21ffde0f4c13257bc28e1f5de4f3b7872"
+dependencies = [
+ "serde",
+ "serde-saphyr",
+ "serde_ignored",
+ "serde_json",
+ "thiserror 2.0.21",
 ]
 
 [[package]]

@@ -39,6 +39,10 @@ use std::net::IpAddr;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use sha2::{Digest as _, Sha256};
+use zeabur_catalog_format::common::{Encoding, Generate, Mode, PodSecurity, Reference};
+use zeabur_catalog_format::component::{
+    Component, Health, HealthKind, HelmRelease, Input, InputValue, Release,
+};
 use zeabur_kube::k8s_openapi::api::batch::v1::Job;
 use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Secret};
 use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -49,11 +53,8 @@ use zeabur_model::PodSecurityLevel;
 use zeabur_model::kernel::names::is_system_namespace;
 use zeabur_model::readiness::{self, Explained, GenericStatus, Reason, Status};
 
-use crate::api::{
-    ComponentFile, Generate, Health, Input, InputValue, Release, ReleaseType, Snapshot,
-};
+use crate::api::{ComponentFile, Snapshot};
 use crate::install::{merge, parse_values, set_path};
-use crate::templates::Encoding;
 
 /// The label that marks what Zeabur installed, with [`MANAGED_BY_ZEABUR`].
 pub const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
@@ -331,8 +332,11 @@ pub enum Unsupported {
     /// components it installed by their `HelmChart`s, so its values would leave their targets
     /// when they are written again.
     ContributesWithoutChart,
-    /// It has a release of a type this build does not know.
+    /// It has a release type, a Pod Security level or a way to generate an input that this
+    /// build does not know.
     NewerRelease,
+    /// Its file in the catalog release Zeabur read does not decode.
+    Unreadable,
 }
 
 impl std::fmt::Display for Unsupported {
@@ -341,22 +345,56 @@ impl std::fmt::Display for Unsupported {
             Self::ContributesWithoutChart => {
                 "adds values to other components but has no Helm chart"
             }
-            Self::NewerRelease => "has a release of a type this version does not know",
+            Self::NewerRelease => "needs something this version does not know",
+            Self::Unreadable => "has a catalog file this version cannot read",
         })
     }
+}
+
+/// What the component `id` of `snapshot` uses that Zeabur cannot install yet, wherever it is
+/// installed; `None` for a component `snapshot` does not list.
+#[must_use]
+pub fn unsupported_in(snapshot: &Snapshot, id: &str) -> Option<Unsupported> {
+    if snapshot.problems.contains_key(id) {
+        return Some(Unsupported::Unreadable);
+    }
+    snapshot.components.get(id).and_then(unsupported)
+}
+
+/// The file of the component `id`, or why there is none to install.
+fn file_of<'a>(snapshot: &'a Snapshot, id: &str) -> Result<&'a ComponentFile, Refusal> {
+    snapshot.components.get(id).ok_or_else(|| {
+        if snapshot.problems.contains_key(id) {
+            Refusal::Unsupported {
+                component: id.to_owned(),
+                why: Unsupported::Unreadable,
+            }
+        } else {
+            Refusal::Unknown(id.to_owned())
+        }
+    })
 }
 
 /// What `file` uses that Zeabur cannot install yet, wherever it is installed.
 #[must_use]
 pub fn unsupported(file: &ComponentFile) -> Option<Unsupported> {
     let d = &file.declaration;
-    if !d.contributes.is_empty() && !d.releases.iter().any(|r| r.kind == ReleaseType::Helm) {
+    if !d.contributes.is_empty() && !d.releases.iter().any(|r| r.helm().is_some()) {
         return Some(Unsupported::ContributesWithoutChart);
     }
-    d.releases.iter().find_map(|r| match r.kind {
-        ReleaseType::Helm | ReleaseType::Inline | ReleaseType::Manifest => None,
-        ReleaseType::Unknown => Some(Unsupported::NewerRelease),
-    })
+    (!d.known()).then_some(Unsupported::NewerRelease)
+}
+
+/// The Pod Security level of `component`'s namespaces; `None` for a level this build does not know,
+/// which [`unsupported`] refuses.
+#[must_use]
+pub const fn pod_security(component: &Component) -> Option<PodSecurityLevel> {
+    match component.security.pod_security {
+        PodSecurity::Restricted => Some(PodSecurityLevel::Restricted),
+        PodSecurity::Baseline => Some(PodSecurityLevel::Baseline),
+        PodSecurity::Privileged => Some(PodSecurityLevel::Privileged),
+        PodSecurity::Unknown => None,
+    }
 }
 
 /// Why a component cannot be installed.
@@ -427,10 +465,7 @@ pub fn components(
     let mut order = Vec::new();
     install_order(snapshot, id, target, &mut order, &mut BTreeSet::new())?;
     for component in &order {
-        let file = snapshot
-            .components
-            .get(component)
-            .ok_or_else(|| Refusal::Unknown(component.clone()))?;
+        let file = file_of(snapshot, component)?;
         check(file, target)?;
     }
     Ok(order)
@@ -471,18 +506,21 @@ pub fn install(
     let mut resolved = Vec::new();
     let mut picked = fixed_addresses(snapshot, &order, inputs);
     for (i, component) in order.iter().enumerate() {
-        let file = snapshot
-            .components
-            .get(component)
-            .ok_or_else(|| Refusal::Unknown(component.clone()))?;
+        let file = file_of(snapshot, component)?;
         if let Some(distribution) = target.distribution
-            && !file.tested_on(&snapshot.index, distribution, target.platform)
+            && !file.tested_on(&snapshot.index).iter().any(|t| {
+                t.distribution.as_str() == distribution
+                    && t.platforms.iter().any(|p| p == target.platform)
+            })
         {
             warnings.push(Warning::Untested {
                 component: component.clone(),
             });
         }
-        let level = file.declaration.security.pod_security;
+        let level = pod_security(&file.declaration).ok_or_else(|| Refusal::Unsupported {
+            component: component.clone(),
+            why: Unsupported::NewerRelease,
+        })?;
         if level != PodSecurityLevel::Restricted {
             warnings.push(Warning::Privileged {
                 component: component.clone(),
@@ -660,27 +698,25 @@ fn install_order(
     if order.iter().any(|c| c == id) || !visiting.insert(id.to_owned()) {
         return Ok(());
     }
-    let file = snapshot
-        .components
-        .get(id)
-        .ok_or_else(|| Refusal::Unknown(id.to_owned()))?;
+    let file = file_of(snapshot, id)?;
     for reference in &file.declaration.requires {
-        let needed = match (&reference.component, &reference.capability) {
-            (Some(component), _)
+        let needed = match reference {
+            Reference::Component(component)
                 if target.components.contains(component) && !target.written.contains(component) =>
             {
                 continue;
             }
-            (Some(component), _) => component.clone(),
-            (None, Some(capability)) => match written_provider(snapshot, target, capability) {
-                Some(id) => id,
-                None if target.capabilities.contains(capability) => continue,
-                None => snapshot
-                    .provider(capability, target.profile)
-                    .map(|c| c.id.clone())
-                    .ok_or_else(|| Refusal::NoProvider(capability.clone()))?,
-            },
-            (None, None) => continue,
+            Reference::Component(component) => component.clone(),
+            Reference::Capability(capability) => {
+                match written_provider(snapshot, target, capability) {
+                    Some(id) => id,
+                    None if target.capabilities.contains(capability) => continue,
+                    None => crate::api::profile(target.profile)
+                        .and_then(|profile| snapshot.provider(capability, profile))
+                        .map(|c| c.id.clone())
+                        .ok_or_else(|| Refusal::NoProvider(capability.clone()))?,
+                }
+            }
         };
         install_order(snapshot, &needed, target, order, visiting)?;
     }
@@ -697,7 +733,7 @@ fn written_provider(snapshot: &Snapshot, target: &Target<'_>, capability: &str) 
             snapshot
                 .components
                 .get(*id)
-                .is_some_and(|f| f.declaration.provides.capability == capability)
+                .is_some_and(|f| f.declaration.capability() == Some(capability))
         })
         .cloned()
 }
@@ -705,8 +741,8 @@ fn written_provider(snapshot: &Snapshot, target: &Target<'_>, capability: &str) 
 /// Refuses what the catalog does not offer here and what Zeabur cannot install yet.
 fn check(file: &ComponentFile, target: &Target<'_>) -> Result<(), Refusal> {
     let d = &file.declaration;
-    match d.defaults.get(target.profile).map(String::as_str) {
-        Some("recommended" | "optional") => {}
+    match crate::api::profile(target.profile).map(|p| d.mode(p)) {
+        Some(Mode::Recommended | Mode::Optional) => {}
         _ => {
             return Err(Refusal::NotHere {
                 component: file.id.clone(),
@@ -715,7 +751,7 @@ fn check(file: &ComponentFile, target: &Target<'_>) -> Result<(), Refusal> {
         }
     }
     if let Some(distribution) = target.distribution
-        && !d.distributions.iter().any(|x| x == distribution)
+        && !d.distributions.iter().any(|x| x.as_str() == distribution)
     {
         return Err(Refusal::NotHere {
             component: file.id.clone(),
@@ -754,7 +790,7 @@ impl Contributions {
                 continue;
             };
             for c in &file.declaration.contributes {
-                let values = parse_values(c.values.as_deref()).map_err(broken(id))?;
+                let values = parse_values(Some(&c.values)).map_err(broken(id))?;
                 let key = (c.target.component.clone(), c.target.release.clone());
                 merge(
                     added
@@ -843,18 +879,13 @@ fn rewrite(
         return Ok(None);
     };
     if target.written.contains(component) {
-        let Some(r) = file
-            .declaration
-            .releases
-            .iter()
-            .find(|r| r.name == release && r.kind == ReleaseType::Helm)
-        else {
+        let Some(r) = file.declaration.release(release).and_then(Release::helm) else {
             return Ok(None);
         };
         let own = resolve(file, inputs, &mut BTreeSet::new())?;
         let mut object =
             chart_of(file, r, target.profile, contributions, &own).map_err(broken(component))?;
-        mark(&mut object.metadata, file, r, version);
+        mark(&mut object.metadata, file, &r.name, version);
         return Ok(Some(Step {
             component: component.to_owned(),
             release: release.to_owned(),
@@ -915,10 +946,10 @@ fn broken(component: &str) -> impl Fn(String) -> Refusal + Copy {
 pub fn downloads(file: &ComponentFile) -> Result<Vec<Download>, Refusal> {
     let mut downloads = Vec::new();
     for release in &file.declaration.releases {
-        if release.kind != ReleaseType::Manifest {
+        let Release::Manifest(release) = release else {
             continue;
-        }
-        for (index, url) in release.manifest_urls().into_iter().enumerate() {
+        };
+        for (index, url) in release.resolved_urls().into_iter().enumerate() {
             let Some(sha256) = release
                 .url_digests
                 .get(index)
@@ -978,15 +1009,22 @@ pub fn steps_of(
     zeabur_namespace: &str,
 ) -> Result<Vec<Step>, Refusal> {
     let broken = broken(&file.id);
+    let level = pod_security(&file.declaration)
+        .ok_or_else(|| broken("its Pod Security level is unknown".to_owned()))?;
     let releases = &file.declaration.releases;
+    let release_namespaces: Vec<&str> = releases.iter().filter_map(Release::namespace).collect();
     let mut secrets = secrets(inputs);
     let mut namespaces = BTreeSet::new();
     let mut steps = Vec::new();
     for (index, release) in releases.iter().enumerate() {
+        let (Some(name), Some(release_namespace)) = (release.name(), release.namespace()) else {
+            return Err(broken(
+                "it has a release of a type this version does not know".to_owned(),
+            ));
+        };
         let mut objects = Vec::new();
-        let level = file.declaration.security.pod_security;
-        if namespaces.insert(release.namespace.clone())
-            && let Some(namespace) = namespace(&release.namespace, level)
+        if namespaces.insert(release_namespace.to_owned())
+            && let Some(namespace) = namespace(release_namespace, level)
         {
             objects.push(Desired {
                 object: dynamic(&namespace).map_err(broken)?,
@@ -995,19 +1033,19 @@ pub fn steps_of(
         }
         let here: Vec<Secret> = if index == 0 {
             let homeless = |s: &Secret| {
-                !releases
+                !release_namespaces
                     .iter()
-                    .any(|r| Some(&r.namespace) == s.metadata.namespace.as_ref())
+                    .any(|r| Some(*r) == s.metadata.namespace.as_deref())
             };
             let (here, rest) = secrets.into_iter().partition(|s| {
-                s.metadata.namespace.as_ref() == Some(&release.namespace) || homeless(s)
+                s.metadata.namespace.as_deref() == Some(release_namespace) || homeless(s)
             });
             secrets = rest;
             here
         } else {
             let (here, rest) = secrets
                 .into_iter()
-                .partition(|s| s.metadata.namespace.as_ref() == Some(&release.namespace));
+                .partition(|s| s.metadata.namespace.as_deref() == Some(release_namespace));
             secrets = rest;
             here
         };
@@ -1016,28 +1054,29 @@ pub fn steps_of(
             .map(dynamic)
             .collect::<Result<Vec<_>, _>>()
             .map_err(broken)?;
-        made.extend(match release.kind {
-            ReleaseType::Helm => {
-                vec![chart_of(file, release, profile, contributions, inputs).map_err(broken)?]
+        made.extend(match release {
+            Release::Helm(chart) => {
+                vec![chart_of(file, chart, profile, contributions, inputs).map_err(broken)?]
             }
-            ReleaseType::Inline => {
-                objects_of(release.manifests.as_deref().unwrap_or_default()).map_err(broken)?
+            Release::Inline(inline) => objects_of(&inline.manifests).map_err(broken)?,
+            Release::Manifest(manifest) => {
+                manifest_objects(&release_namespaces, &manifest.resolved_urls(), manifests)
+                    .map_err(broken)?
             }
-            ReleaseType::Manifest => manifest_objects(file, release, manifests).map_err(broken)?,
-            ReleaseType::Unknown => Vec::new(),
+            Release::Unknown => Vec::new(),
         });
         objects.extend(made.into_iter().map(|mut object| {
-            mark(&mut object.metadata, file, release, catalog_version);
+            mark(&mut object.metadata, file, name, catalog_version);
             Desired {
                 object,
-                namespace: release.namespace.clone(),
+                namespace: release_namespace.to_owned(),
             }
         }));
         steps.push(Step {
             component: file.id.clone(),
-            release: release.name.clone(),
+            release: name.to_owned(),
             objects,
-            skip_if_present: release.skip_if_present.clone(),
+            skip_if_present: release.skip_if_present().to_vec(),
         });
     }
     steps.extend(zeabur_step(file, zeabur_namespace).map_err(broken)?);
@@ -1061,27 +1100,25 @@ fn zeabur_step(file: &ComponentFile, zeabur_namespace: &str) -> Result<Option<St
     }))
 }
 
-/// The objects of a manifest release's files, without the component's namespaces: each is written
-/// once, with its Pod Security level.
+/// The objects of a manifest release's files at `urls`, without the component's namespaces
+/// (`namespaces`): each is written once, with its Pod Security level.
 fn manifest_objects(
-    file: &ComponentFile,
-    release: &Release,
+    namespaces: &[&str],
+    urls: &[String],
     manifests: &Manifests,
 ) -> Result<Vec<DynamicObject>, String> {
     let mut objects = Vec::new();
-    for url in release.manifest_urls() {
+    for url in urls {
         let text = manifests
-            .get(&url)
+            .get(url)
             .ok_or_else(|| format!("{url} was not downloaded"))?;
         objects.extend(objects_of(text)?);
     }
     objects.retain(|o| {
         o.types.as_ref().is_none_or(|t| t.kind != Namespace::KIND)
-            || !file
-                .declaration
-                .releases
+            || !namespaces
                 .iter()
-                .any(|r| o.metadata.name.as_ref() == Some(&r.namespace))
+                .any(|n| o.metadata.name.as_deref() == Some(*n))
     });
     Ok(objects)
 }
@@ -1177,7 +1214,7 @@ fn covers(found: &Value, desired: &Value) -> bool {
 /// `INPUTS` annotation, so a later install keeps them.
 fn chart_of(
     file: &ComponentFile,
-    release: &Release,
+    release: &HelmRelease,
     profile: &str,
     contributions: &Contributions,
     inputs: &[Resolved],
@@ -1186,7 +1223,7 @@ fn chart_of(
         .declaration
         .releases
         .iter()
-        .find(|r| r.kind == ReleaseType::Helm)
+        .find_map(Release::helm)
         .map(|r| r.name.as_str());
     let mut values = profile_values(release, profile)?;
     merge(&mut values, contributions.to(&file.id, &release.name));
@@ -1261,9 +1298,9 @@ pub(crate) fn namespace(name: &str, level: PodSecurityLevel) -> Option<Namespace
 }
 
 /// A release's values with the profile's merged over them.
-fn profile_values(release: &Release, profile: &str) -> Result<Value, String> {
+fn profile_values(release: &HelmRelease, profile: &str) -> Result<Value, String> {
     let mut values = parse_values(release.values.as_deref())?;
-    if let Some(over) = release.profiles.get(profile) {
+    if let Some(over) = crate::api::profile(profile).and_then(|p| release.profiles.get(p)) {
         merge(&mut values, parse_values(Some(over))?);
     }
     Ok(values)
@@ -1318,21 +1355,13 @@ fn yaml_values(values: &Value) -> Result<String, String> {
     serde_saphyr::to_string(values).map_err(|e| e.to_string())
 }
 
-fn helm_chart(release: &Release, values: &Value) -> Result<HelmChart, String> {
-    let chart = release
-        .chart
-        .as_deref()
-        .ok_or("a chart release names no chart")?;
-    let version = release
-        .version
-        .as_deref()
-        .ok_or("a chart release names no version")?;
+fn helm_chart(release: &HelmRelease, values: &Value) -> Result<HelmChart, String> {
     chart_object(
         &ChartRelease {
             name: release.helm_name(),
-            chart,
+            chart: &release.chart,
             repo: release.repo.as_deref(),
-            version,
+            version: &release.version,
             namespace: &release.namespace,
         },
         values,
@@ -1363,8 +1392,8 @@ pub(crate) fn label_release(metadata: &mut ObjectMeta, component: &str, release:
 }
 
 /// Labels an object as the release's and annotates it with the catalog file it came from.
-fn mark(metadata: &mut ObjectMeta, file: &ComponentFile, release: &Release, catalog_version: &str) {
-    label_release(metadata, &file.id, &release.name);
+fn mark(metadata: &mut ObjectMeta, file: &ComponentFile, release: &str, catalog_version: &str) {
+    label_release(metadata, &file.id, release);
     metadata.annotations.get_or_insert_default().extend([
         (SOURCE_DIGEST.to_owned(), file.source_digest.clone()),
         (CATALOG_VERSION.to_owned(), catalog_version.to_owned()),
@@ -1387,7 +1416,8 @@ pub fn written(facts: &ClusterFacts) -> BTreeMap<String, String> {
         .collect()
 }
 
-/// The installed components that need `id`, which keep it from being removed.
+/// The installed components that need `id`, which keep it from being removed. An installed
+/// component whose file does not read may need it too, so it also keeps `id`.
 #[must_use]
 pub fn needed_by<'a>(
     snapshot: &'a Snapshot,
@@ -1397,6 +1427,7 @@ pub fn needed_by<'a>(
     snapshot
         .needed_by(id)
         .into_iter()
+        .chain(snapshot.problems.keys().map(String::as_str))
         .filter(|c| *c != id && installed.contains(*c))
         .collect()
 }
@@ -1700,21 +1731,14 @@ fn status_of(object: &DynamicObject) -> Option<GenericStatus> {
         .map(|body| body.status)
 }
 
-/// The served resource of a health check's kind, `Kind` or `Kind.group` [installers].
-///
-/// A kind without a group is looked up in the groups of Kubernetes itself first: the core group,
-/// a group without a dot, or one under `k8s.io`.
-///
-/// [installers]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/installers.mdx#install-and-check
+/// The served resource of a health check's kind: the one named by its `plural.group`.
 #[must_use]
-pub fn health_resource<'a>(kind: &str, served: &'a [ServedResource]) -> Option<&'a ServedResource> {
-    let (kind, group) = kind
-        .split_once('.')
-        .map_or((kind, None), |(kind, group)| (kind, Some(group)));
+pub fn health_resource(kind: HealthKind, served: &[ServedResource]) -> Option<&ServedResource> {
+    let resource = kind.resource();
+    let (plural, group) = resource.split_once('.').unwrap_or((resource, ""));
     served
         .iter()
-        .filter(|r| r.kind == kind && group.is_none_or(|group| r.group == group))
-        .min_by_key(|r| r.group.contains('.') && !r.group.ends_with(".k8s.io"))
+        .find(|r| r.resource == plural && r.group == group)
 }
 
 /// Whether a health check passes on `objects` of `resource`, the objects it names.
@@ -1740,7 +1764,7 @@ pub fn check_progress(
         let progress = if own_rule {
             kstatus(group, kind, object, now).unwrap_or(Progress::Waiting)
         } else {
-            condition_progress(kind, object, &check.condition)
+            condition_progress(kind, object, check.condition.as_deref().unwrap_or_default())
         };
         match progress {
             Progress::Ready => {}
@@ -1814,6 +1838,7 @@ mod tests {
     use std::collections::BTreeMap;
 
     use serde_json::json;
+    use zeabur_catalog_format::component::{Contribution, HealthResource, ReleaseRef};
 
     use super::*;
     use crate::api;
@@ -1855,7 +1880,7 @@ mod tests {
     ];
 
     const SUC: &str =
-        "https://github.com/rancher/system-upgrade-controller/releases/download/v0.20.2";
+        "https://github.com/rancher/system-upgrade-controller/releases/download/v0.21.1";
 
     /// Short stand-ins for the files of the manifest releases of `FILES`.
     fn manifests() -> Manifests {
@@ -1883,13 +1908,13 @@ mod tests {
         .collect()
     }
 
-    /// Zeabur Catalog v0.5.3 with the components of `FILES` only.
+    /// Zeabur Catalog v0.6.1 with the components of `FILES` only.
     fn snapshot() -> Snapshot {
         let mut index = api::index(include_bytes!("../tests/api/catalog.json")).unwrap();
         index
             .components
             .retain(|c| FILES.iter().any(|(id, _)| *id == c.id));
-        let fetched: BTreeMap<String, ComponentFile> = FILES
+        let fetched: BTreeMap<String, api::Decoded> = FILES
             .iter()
             .map(|(id, text)| {
                 (
@@ -2084,6 +2109,7 @@ mod tests {
                 generate: Some(Generate::ClusterIp),
                 required: false,
                 default: None,
+                test_value: None,
             });
         }
         let empty = BTreeSet::new();
@@ -2185,6 +2211,7 @@ mod tests {
             [
                 "Namespace/velero",
                 "Secret/velero-credentials",
+                "Secret/velero-ca",
                 "Secret/velero-repo-credentials",
                 "Secret/velero-backup-key",
                 "HelmChart/velero",
@@ -2336,7 +2363,7 @@ mod tests {
         let velero = &snapshot().components["velero"];
         let steps = steps_of(
             velero,
-            "0.5.3",
+            "0.6.1",
             "single-node",
             &Manifests::new(),
             &[],
@@ -2354,6 +2381,7 @@ mod tests {
             input_secrets(velero),
             [
                 "velero/velero-credentials",
+                "velero/velero-ca",
                 "velero/velero-repo-credentials",
                 "velero/velero-backup-key",
             ]
@@ -2474,7 +2502,7 @@ mod tests {
         assert_eq!(label(&chart[1].object, MANAGED_BY), Some(MANAGED_BY_ZEABUR));
         assert_eq!(
             helm.metadata.annotations.unwrap_or_default()[CATALOG_VERSION],
-            "0.5.3"
+            "0.6.1"
         );
 
         // The single-node values merge over the release's: both are in the chart's values.
@@ -2592,7 +2620,7 @@ mod tests {
         let traefik = &snapshot().components["traefik"];
         let namespaces: Vec<String> = steps_of(
             traefik,
-            "0.5.3",
+            "0.6.1",
             "single-node",
             &manifests(),
             &[],
@@ -2674,19 +2702,21 @@ mod tests {
             [
                 Download {
                     url: format!("{SUC}/crd.yaml"),
-                    sha256: "1fb061e0d8bf9534da0145e614a9e03ca376cd5d1adcca17d13cfa12e211c48c"
+                    sha256: "1393ba034e7691273fc519b721a7f72a0cdbef8c7b051c9e408be96090b8478d"
                         .to_owned(),
                 },
                 Download {
                     url: format!("{SUC}/system-upgrade-controller.yaml"),
-                    sha256: "fd474b662d1f2b74ab150d95b6482869e1fd1f27ceee54b13e94b92292097969"
+                    sha256: "5b46172058b198f8297c9966aacdcd9da2604f740254f0beae74e61b1ad84eac"
                         .to_owned(),
                 },
             ]
         );
 
         let mut unlisted = file.clone();
-        unlisted.declaration.releases[1].url_digests.clear();
+        if let Release::Manifest(release) = &mut unlisted.declaration.releases[1] {
+            release.url_digests.clear();
+        }
         let refusal = downloads(&unlisted).unwrap_err();
         assert!(refusal.to_string().contains(&format!(
             "no sha256 digest for {SUC}/system-upgrade-controller.yaml"
@@ -2742,6 +2772,14 @@ mod tests {
         assert_eq!(
             needed_by(&snapshot, "cert-manager", &installed),
             ["cloudnative-pg"]
+        );
+        // An installed component whose file does not read may need it.
+        let mut unread = snapshot;
+        let file = unread.components.remove("keda-http-add-on").unwrap();
+        unread.problems.insert(file.id, "too new".to_owned());
+        assert_eq!(
+            needed_by(&unread, "keda", &set(&["keda", "keda-http-add-on"])),
+            ["keda-http-add-on"]
         );
     }
 
@@ -2930,10 +2968,15 @@ mod tests {
     }
 
     fn served(group: &str, kind: &str) -> ServedResource {
+        let lower = kind.to_ascii_lowercase();
         ServedResource {
             group: group.to_owned(),
             version: "v1".to_owned(),
-            resource: format!("{}s", kind.to_ascii_lowercase()),
+            resource: if lower.ends_with('s') {
+                format!("{lower}es")
+            } else {
+                format!("{lower}s")
+            },
             kind: kind.to_owned(),
             namespaced: true,
             verbs: Vec::new(),
@@ -2944,16 +2987,20 @@ mod tests {
     fn a_health_check_kind_is_found_in_discovery() {
         let all = [
             served("", "Node"),
+            served("", "Pod"),
             served("apps", "Deployment"),
             served("longhorn.io", "Node"),
             served("gateway.networking.k8s.io", "GatewayClass"),
         ];
         let found = |kind| health_resource(kind, &all).map(|r| r.group.as_str());
-        assert_eq!(found("Deployment"), Some("apps"));
-        assert_eq!(found("Node"), Some(""));
-        assert_eq!(found("Node.longhorn.io"), Some("longhorn.io"));
-        assert_eq!(found("GatewayClass"), Some("gateway.networking.k8s.io"));
-        assert_eq!(found("APIService"), None);
+        assert_eq!(found(HealthKind::Deployment), Some("apps"));
+        assert_eq!(found(HealthKind::Pod), Some(""));
+        assert_eq!(found(HealthKind::LonghornNode), Some("longhorn.io"));
+        assert_eq!(
+            found(HealthKind::GatewayClass),
+            Some("gateway.networking.k8s.io")
+        );
+        assert_eq!(found(HealthKind::ApiService), None);
     }
 
     #[test]
@@ -2997,14 +3044,14 @@ mod tests {
     fn a_health_check_condition_counts_once_the_generation_is_observed() {
         let check = Health {
             name: "nodes-ready".to_owned(),
-            resource: api::HealthResource {
-                kind: "Node.longhorn.io".to_owned(),
+            resource: HealthResource {
+                kind: HealthKind::LonghornNode,
                 namespace: Some("longhorn-system".to_owned()),
                 name: None,
                 selector: None,
                 all: true,
             },
-            condition: "Ready".to_owned(),
+            condition: Some("Ready".to_owned()),
             timeout: "60s".to_owned(),
             advice: String::new(),
         };
@@ -3035,12 +3082,12 @@ mod tests {
     /// The test snapshot where `from` adds `values` to keda's release.
     fn contributing(snapshot: &mut Snapshot, from: &str, values: &str) {
         let file = snapshot.components.get_mut(from).unwrap();
-        file.declaration.contributes.push(api::Contribution {
-            target: api::ContributionTarget {
+        file.declaration.contributes.push(Contribution {
+            target: ReleaseRef {
                 component: "keda".to_owned(),
                 release: "keda".to_owned(),
             },
-            values: Some(values.to_owned()),
+            values: values.to_owned(),
         });
     }
 
@@ -3118,7 +3165,7 @@ mod tests {
         let own = values_of(
             &steps_of(
                 &snapshot.components["keda"],
-                "0.5.3",
+                "0.6.1",
                 "single-node",
                 &manifests(),
                 &[],
@@ -3141,12 +3188,12 @@ mod tests {
             .unwrap()
             .declaration
             .contributes
-            .push(api::Contribution {
-                target: api::ContributionTarget {
+            .push(Contribution {
+                target: ReleaseRef {
                     component: "velero".to_owned(),
                     release: "velero".to_owned(),
                 },
-                values: Some("added: keda".to_owned()),
+                values: "added: keda".to_owned(),
             });
         let cluster = Cluster::new(&["velero"], &["velero"]);
         let kept = values(&[

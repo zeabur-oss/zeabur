@@ -36,6 +36,7 @@ use std::cmp::Ordering;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use zeabur_catalog_format::common::Distribution;
 use zeabur_kube::ClusterFacts;
 
 use crate::Component;
@@ -182,7 +183,7 @@ pub fn installation(
             .map(|(installed, tested)| compare(installed, tested));
         return found;
     }
-    for name in component.detection.addons_on("rke2") {
+    for name in component.detection.addons_on(Distribution::Rke2) {
         if let Some(url) = facts
             .rke2_packaged_charts
             .get(&format!("kube-system/{name}"))
@@ -194,7 +195,7 @@ pub fn installation(
             return found;
         }
     }
-    for addon in component.detection.addons_on("k3s") {
+    for addon in component.detection.addons_on(Distribution::K3s) {
         let key = format!("kube-system/{addon}");
         let Some(chart) = facts.k3s_helm_charts.get(&key) else {
             continue;

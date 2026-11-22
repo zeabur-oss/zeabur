@@ -317,7 +317,7 @@ mod tests {
             })
             .collect();
         serde_json::from_value(json!({
-            "action": "install", "catalogVersion": "0.5.3", "components": ["cert-manager"],
+            "action": "install", "catalogVersion": "0.6.1", "components": ["cert-manager"],
             "steps": steps, "checks": checks, "warnings": [], "inputs": [], "leftovers": [], "done": done,
         }))
         .unwrap()

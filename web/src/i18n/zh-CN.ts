@@ -1160,6 +1160,8 @@ export const zhCN: Messages = {
   "components.unsupported.contributesWithoutChart":
     "这个组件会修改其他组件的设置，本身却没有 Helm chart，所以 Zeabur 无法安装。",
   "components.unsupported.newerRelease": "这个版本的 Zeabur 无法安装这个组件，请先更新 Zeabur。",
+  "components.unsupported.unreadable":
+    "Zeabur Catalog 里有这个组件，但当前的 Zeabur 还读不了，请先更新 Zeabur。",
   "components.howToInstall": "安装方式",
   "settings.homepage": "主页",
   "settings.opensInNewTab": "（在新标签页打开）",

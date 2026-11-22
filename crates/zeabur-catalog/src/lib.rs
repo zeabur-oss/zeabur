@@ -4,6 +4,9 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
+use zeabur_catalog_format::common::{Distribution, Mode, Profile, WorkloadKind};
+use zeabur_catalog_format::component::Release;
+pub use zeabur_catalog_format::component::{Addon, DetectedWorkload, Detection};
 use zeabur_kube::ClusterFacts;
 
 mod bundle {
@@ -21,7 +24,9 @@ pub mod zeabur;
 
 pub use installed::{ComponentUpgrade, InstallSource, Installation};
 pub use measured::{IdleUse, MeasuredPod, template_idle};
-pub use templates::{Catalog, Dropped, Index, RenderError, RenderOptions, Template, template_id};
+pub use templates::{Catalog, Dropped, RenderError, RenderOptions, Template, template_id};
+/// The types of Zeabur Catalog's files.
+pub use zeabur_catalog_format as format;
 
 /// The commit of Zeabur Catalog this build carries.
 pub const CATALOGUE_COMMIT: &str = env!("ZEABUR_CATALOG_COMMIT");
@@ -67,118 +72,39 @@ pub struct Component {
     pub unsupported: Option<engine::Unsupported>,
 }
 
-/// A release of a catalogue file: only its chart and version are read.
-#[derive(Debug, Deserialize)]
-struct Release {
-    #[serde(default)]
-    chart: Option<String>,
-    #[serde(default)]
-    version: Option<String>,
-}
-
-/// The version of the first release whose chart (its last path segment) is one the component is
-/// detected by.
+/// The version of the first chart release whose chart (its last path segment) is one the
+/// component is detected by.
 fn tested_version(releases: &[Release], detection: &Detection) -> Option<String> {
-    releases.iter().find_map(|release| {
-        let chart = release.chart.as_deref()?;
-        let name = chart.rsplit('/').next().unwrap_or(chart);
-        detection
-            .helm_charts
-            .iter()
-            .any(|c| c == name)
-            .then(|| release.version.clone())
-            .flatten()
-    })
+    releases
+        .iter()
+        .filter_map(Release::helm)
+        .find_map(|release| {
+            let name = release.chart.rsplit('/').next().unwrap_or(&release.chart);
+            detection
+                .helm_charts
+                .iter()
+                .any(|c| c == name)
+                .then(|| release.version.clone())
+        })
 }
 
-/// The catalogue's `detection` block: any one match means the capability exists.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub struct Detection {
-    /// CustomResourceDefinition names.
-    #[serde(default)]
-    pub crds: Vec<String>,
-    /// APIService names.
-    #[serde(default)]
-    pub api_services: Vec<String>,
-    /// GatewayClass controller names.
-    #[serde(default)]
-    pub gateway_controllers: Vec<String>,
-    /// IngressClass controller names.
-    #[serde(default)]
-    pub ingress_controllers: Vec<String>,
-    /// Helm chart names.
-    #[serde(default)]
-    pub helm_charts: Vec<String>,
-    /// Add-ons a distribution packages.
-    #[serde(default)]
-    pub addons: Vec<Addon>,
-    /// Workloads carrying all of these labels.
-    #[serde(default)]
-    pub workloads: Vec<WorkloadMatch>,
-}
-
-impl Detection {
-    /// The names of the add-ons `distribution` packages: `HelmChart` objects in `kube-system`.
-    pub fn addons_on<'a>(&'a self, distribution: &'a str) -> impl Iterator<Item = &'a str> {
-        self.addons
-            .iter()
-            .filter(move |a| a.distribution == distribution)
-            .map(|a| a.name.as_str())
+/// The name the catalogue gives `mode`; a mode Zeabur does not know counts as unsupported.
+const fn mode_name(mode: Mode) -> &'static str {
+    match mode {
+        Mode::Recommended => "recommended",
+        Mode::Optional => "optional",
+        Mode::Unsupported | Mode::Unknown => "unsupported",
     }
 }
 
-/// An add-on a distribution packages.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
-pub struct Addon {
-    /// The distribution (`k3s`, `rke2`). An entry of a distribution Zeabur does not know is
-    /// ignored.
-    pub distribution: String,
-    /// The name of its `HelmChart` in `kube-system`.
-    pub name: String,
-}
-
-/// A workload kind and the labels that identify it.
-#[derive(Debug, Clone, PartialEq, Eq, Default, Deserialize)]
-pub struct WorkloadMatch {
-    /// `Deployment`, `StatefulSet` or `DaemonSet`.
-    pub kind: String,
-    /// Labels that must all be present with these values.
-    pub labels: BTreeMap<String, String>,
-}
-
-/// The parts of a catalogue file Zeabur reads; the rest is ignored.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct File {
-    metadata: Metadata,
-    provides: Provides,
-    defaults: BTreeMap<String, String>,
-    distributions: Vec<String>,
-    kube_version: String,
-    detection: Detection,
-    #[serde(default)]
-    releases: Vec<Release>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Provides {
-    capability: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Metadata {
-    name: String,
-    summary: String,
-    #[serde(default)]
-    locales: BTreeMap<String, Summary>,
-    license: String,
-    homepage: String,
-}
-
-#[derive(Debug, Deserialize)]
-struct Summary {
-    summary: String,
+/// The Kubernetes kind of a workload the catalogue detects a component by.
+const fn workload_kind(kind: WorkloadKind) -> Option<&'static str> {
+    match kind {
+        WorkloadKind::DaemonSet => Some("DaemonSet"),
+        WorkloadKind::Deployment => Some("Deployment"),
+        WorkloadKind::StatefulSet => Some("StatefulSet"),
+        WorkloadKind::Unknown => None,
+    }
 }
 
 /// Why the catalogue could not be read.
@@ -199,13 +125,18 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
     let mut components = bundle::FILES
         .iter()
         .map(|(id, text)| {
-            let file: File = serde_saphyr::from_str(text).map_err(|e| CatalogueError {
+            let error = |message: String| CatalogueError {
                 id: (*id).to_owned(),
-                message: e.to_string(),
-            })?;
+                message,
+            };
+            let file: format::component::Component =
+                serde_saphyr::from_str(text).map_err(|e| error(e.to_string()))?;
             Ok(Component {
                 id: (*id).to_owned(),
-                capability: file.provides.capability,
+                capability: file
+                    .capability()
+                    .ok_or_else(|| error("it provides no capability".to_owned()))?
+                    .to_owned(),
                 display_name: file.metadata.name,
                 homepage: file.metadata.homepage,
                 license: file.metadata.license,
@@ -219,8 +150,21 @@ pub fn catalogue() -> Result<Vec<Component>, CatalogueError> {
                     summary.insert("en".to_owned(), file.metadata.summary.trim().to_owned());
                     summary
                 },
-                defaults: file.defaults,
-                distributions: file.distributions,
+                defaults: Profile::ALL
+                    .into_iter()
+                    .map(|p| {
+                        (
+                            p.as_str().to_owned(),
+                            mode_name(file.defaults.mode(p)).to_owned(),
+                        )
+                    })
+                    .collect(),
+                distributions: file
+                    .distributions
+                    .iter()
+                    .filter(|d| **d != Distribution::Unknown)
+                    .map(|d| d.as_str().to_owned())
+                    .collect(),
                 kube_version: file.kube_version,
                 tested_version: tested_version(&file.releases, &file.detection),
                 detection: file.detection,
@@ -472,7 +416,7 @@ fn running(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
     }
     found.extend(
         detection
-            .addons_on("k3s")
+            .addons_on(Distribution::K3s)
             .filter(|addon| {
                 facts
                     .k3s_helm_charts
@@ -482,7 +426,7 @@ fn running(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
     );
     found.extend(
         detection
-            .addons_on("rke2")
+            .addons_on(Distribution::Rke2)
             .filter(|addon| {
                 facts
                     .rke2_packaged_charts
@@ -491,8 +435,11 @@ fn running(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
             .map(|addon| format!("RKE2 add-on {addon}")),
     );
     for wanted in &detection.workloads {
+        let Some(wanted_kind) = workload_kind(wanted.kind) else {
+            continue;
+        };
         if facts.workload_labels.iter().any(|(kind, labels)| {
-            *kind == wanted.kind
+            kind == wanted_kind
                 && wanted
                     .labels
                     .iter()
@@ -503,7 +450,7 @@ fn running(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
                 .iter()
                 .map(|(k, v)| format!("{k}={v}"))
                 .collect();
-            found.push(format!("{} with {}", wanted.kind, selector.join(",")));
+            found.push(format!("{wanted_kind} with {}", selector.join(",")));
         }
     }
     found
@@ -512,6 +459,22 @@ fn running(detection: &Detection, facts: &ClusterFacts) -> Vec<String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The types that read the catalog come from the release whose bundle this build embeds:
+    /// Cargo.lock pins zeabur-catalog-format to the commit of the flake's `catalog` input.
+    #[test]
+    fn the_format_crate_is_from_the_embedded_catalog_commit() {
+        let lock = include_str!("../../../Cargo.lock");
+        let source = lock
+            .split("[[package]]")
+            .find(|p| p.contains("\nname = \"zeabur-catalog-format\"\n"))
+            .and_then(|p| p.lines().find_map(|l| l.strip_prefix("source = ")))
+            .unwrap();
+        assert!(
+            source.ends_with(&format!("#{CATALOGUE_COMMIT}\"")),
+            "{source} is not commit {CATALOGUE_COMMIT}"
+        );
+    }
 
     #[test]
     fn every_catalogue_file_parses_and_has_a_detection_rule() {

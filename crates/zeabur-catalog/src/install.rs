@@ -49,12 +49,12 @@
 use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value};
 use utoipa::ToSchema;
+use zeabur_catalog_format::common::{Distribution, Encoding, Generate, Profile, Reference};
+use zeabur_catalog_format::component::{self, Component, Input, InputValue, ProfileValues};
 use zeabur_kube::k8s_openapi::Resource;
 use zeabur_model::PodSecurityLevel;
 
-use crate::api::{Generate, Input, InputValue};
 use crate::engine::{self, ChartRelease};
-use crate::templates::Encoding;
 use crate::{bundle, zeabur};
 
 /// The profiles the catalogue sizes components for.
@@ -152,100 +152,28 @@ pub enum InstallError {
     Catalogue(String, String),
 }
 
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct File {
-    #[serde(default)]
-    requires: Vec<Reference>,
-    #[serde(default)]
-    inputs: Vec<Input>,
-    releases: Vec<Release>,
-    #[serde(default)]
-    contributes: Vec<Contribution>,
-    security: Security,
-    #[serde(default)]
-    detection: Detection,
+/// The shell command that makes a random value like the one Zeabur generates.
+fn random(input: &Input) -> Option<String> {
+    let Some(Generate::Random { bytes, encoding }) = &input.generate else {
+        return None;
+    };
+    Some(if *encoding == Encoding::Base64url {
+        format!("openssl rand -base64 {bytes} | tr '+/' '-_' | tr -d '='")
+    } else {
+        format!("openssl rand -hex {bytes}")
+    })
 }
 
-/// A capability (any provider) or a component.
-#[derive(Debug, Deserialize)]
-struct Reference {
-    #[serde(default)]
-    capability: Option<String>,
-    #[serde(default)]
-    component: Option<String>,
-}
-
-#[derive(Debug, Default, Deserialize)]
-struct Detection {
-    #[serde(default)]
-    addons: Vec<Addon>,
-}
-
-#[derive(Debug, Deserialize)]
-struct Addon {
-    distribution: String,
-    name: String,
-}
-
-impl Detection {
-    fn addons_on(&self, distribution: &str) -> impl Iterator<Item = &str> {
-        self.addons
-            .iter()
-            .filter(move |a| a.distribution == distribution)
-            .map(|a| a.name.as_str())
-    }
-}
-
-#[derive(Debug, Deserialize)]
-struct Contribution {
-    target: Target,
-}
-
-#[derive(Debug, Deserialize)]
-struct Target {
-    component: String,
-}
-
-impl Input {
-    /// The shell command that makes a random value like the one Zeabur generates.
-    fn random(&self) -> Option<String> {
-        let Some(Generate::Random { bytes, encoding }) = &self.generate else {
-            return None;
-        };
-        Some(if *encoding == Encoding::Base64url {
-            format!("openssl rand -base64 {bytes} | tr '+/' '-_' | tr -d '='")
-        } else {
-            format!("openssl rand -hex {bytes}")
-        })
-    }
-}
-
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Release {
-    name: String,
-    namespace: String,
-    #[serde(rename = "type")]
-    kind: String,
-    #[serde(default, rename = "releaseName")]
-    helm_name: Option<String>,
-    #[serde(default)]
-    skip_if_present: Vec<String>,
-    #[serde(default)]
-    chart: Option<String>,
-    #[serde(default)]
-    repo: Option<String>,
-    #[serde(default)]
-    urls: Vec<String>,
-    #[serde(default)]
-    version: Option<String>,
-    #[serde(default)]
-    manifests: Option<String>,
-    #[serde(default)]
-    values: Option<String>,
-    #[serde(default)]
-    profiles: Map<String, Value>,
+/// A release of the file, as the forms render it.
+struct Release<'a> {
+    name: &'a str,
+    namespace: &'a str,
+    /// The Helm release name; `name` for manifests.
+    helm_name: &'a str,
+    skip_if_present: &'a [String],
+    source: Source<'a>,
+    values: Option<&'a str>,
+    profiles: Option<&'a ProfileValues>,
 }
 
 /// What one release installs.
@@ -264,63 +192,73 @@ enum Source<'a> {
     Manifests(&'a str),
 }
 
-impl Release {
-    #[expect(
-        clippy::literal_string_with_formatting_args,
-        reason = "`{version}` is the catalogue's URL placeholder, not a format argument"
-    )]
-    fn source(&self) -> Option<Source<'_>> {
-        let version = self.version.as_deref();
-        match (&self.chart, &self.repo, &self.manifests) {
-            (Some(chart), None, _) if chart.starts_with("oci://") => Some(Source::Oci {
-                url: chart,
-                version: version?,
-            }),
-            (Some(chart), Some(repo), _) => Some(Source::Repo {
-                repo,
-                chart,
-                version: version?,
-            }),
-            (None, _, Some(manifests)) => Some(Source::Manifests(manifests)),
-            (None, _, None) if !self.urls.is_empty() => Some(Source::Urls(
-                self.urls
-                    .iter()
-                    .map(|u| u.replace("{version}", version.unwrap_or_default()))
-                    .collect(),
-            )),
-            _ => None,
-        }
+impl<'a> Release<'a> {
+    fn new(release: &'a component::Release) -> Result<Self, String> {
+        Ok(match release {
+            component::Release::Helm(r) => Self {
+                name: &r.name,
+                namespace: &r.namespace,
+                helm_name: r.helm_name(),
+                skip_if_present: &r.skip_if_present,
+                source: match &r.repo {
+                    None if r.chart.starts_with("oci://") => Source::Oci {
+                        url: &r.chart,
+                        version: &r.version,
+                    },
+                    Some(repo) => Source::Repo {
+                        repo,
+                        chart: &r.chart,
+                        version: &r.version,
+                    },
+                    None => return Err(format!("release {}: chart has no repository", r.name)),
+                },
+                values: r.values.as_deref(),
+                profiles: Some(&r.profiles),
+            },
+            component::Release::Manifest(r) => Self {
+                name: &r.name,
+                namespace: &r.namespace,
+                helm_name: &r.name,
+                skip_if_present: &r.skip_if_present,
+                source: Source::Urls(r.resolved_urls()),
+                values: None,
+                profiles: None,
+            },
+            component::Release::Inline(r) => Self {
+                name: &r.name,
+                namespace: &r.namespace,
+                helm_name: &r.name,
+                skip_if_present: &r.skip_if_present,
+                source: Source::Manifests(&r.manifests),
+                values: None,
+                profiles: None,
+            },
+            component::Release::Unknown => return Err("a release type it does not know".to_owned()),
+        })
     }
 
-    fn release_name(&self) -> &str {
-        self.helm_name.as_deref().unwrap_or(&self.name)
-    }
-
-    fn is_chart(&self) -> bool {
-        self.kind == "helm"
+    const fn is_chart(&self) -> bool {
+        matches!(self.source, Source::Oci { .. } | Source::Repo { .. })
     }
 }
 
-impl File {
-    /// The first value of a release type, Pod Security level or input generator that this build
-    /// does not know.
-    fn unknown(&self) -> Option<String> {
-        if let Some(r) = self
-            .releases
-            .iter()
-            .find(|r| !["helm", "manifest", "inline"].contains(&r.kind.as_str()))
-        {
-            return Some(format!("release type {}", r.kind));
-        }
-        if !["restricted", "baseline", "privileged"].contains(&self.security.pod_security.as_str())
-        {
-            return Some(format!("Pod Security level {}", self.security.pod_security));
-        }
-        self.inputs
-            .iter()
-            .find(|i| matches!(i.generate, Some(Generate::Unknown)))
-            .map(|i| format!("how to generate {}", i.name))
+/// The first thing `file` names that this build does not know: a release type, a Pod Security
+/// level or a way to generate an input.
+fn unknown(file: &Component) -> Option<String> {
+    if file
+        .releases
+        .iter()
+        .any(|r| matches!(r, component::Release::Unknown))
+    {
+        return Some("a release type".to_owned());
     }
+    if engine::pod_security(file).is_none() {
+        return Some("a Pod Security level".to_owned());
+    }
+    file.inputs
+        .iter()
+        .find(|i| matches!(i.generate, Some(Generate::Unknown)))
+        .map(|i| format!("how to generate {}", i.name))
 }
 
 /// How to install the component `id` for `profile`.
@@ -336,31 +274,36 @@ pub fn guide(
     profile: &str,
     zeabur_namespace: &str,
 ) -> Result<InstallGuide, InstallError> {
-    if !PROFILES.contains(&profile) {
+    let Some(profile) = crate::api::profile(profile) else {
         return Err(InstallError::UnknownProfile(profile.to_owned()));
-    }
+    };
     let text = bundle::FILES
         .iter()
         .find(|(id, _)| *id == component)
         .map(|(_, text)| *text)
         .ok_or_else(|| InstallError::UnknownComponent(component.to_owned()))?;
     let catalogue = |message: String| InstallError::Catalogue(component.to_owned(), message);
-    let file: File = serde_saphyr::from_str(text).map_err(|e| catalogue(e.to_string()))?;
-    if let Some(unknown) = file.unknown() {
+    let file: Component = serde_saphyr::from_str(text).map_err(|e| catalogue(e.to_string()))?;
+    if let Some(unknown) = unknown(&file) {
         return Err(InstallError::Unknown(component.to_owned(), unknown));
     }
     let rendered = Rendered::new(component, &file, profile).map_err(catalogue)?;
     let zeaburs = zeabur::yaml(component, zeabur_namespace).map_err(catalogue)?;
     Ok(InstallGuide {
         component: component.to_owned(),
-        profile: profile.to_owned(),
-        profiles: PROFILES.iter().map(|p| (*p).to_owned()).collect(),
+        profile: profile.as_str().to_owned(),
+        profiles: Profile::ALL.iter().map(|p| p.as_str().to_owned()).collect(),
         requires: file
             .requires
             .iter()
-            .filter_map(|r| r.capability.clone().or_else(|| r.component.clone()))
+            .map(|r| match r {
+                Reference::Capability(name) | Reference::Component(name) => name.clone(),
+            })
             .collect(),
-        security: file.security.clone(),
+        security: Security {
+            pod_security: engine::pod_security(&file)
+                .map_or_else(String::new, |level| level.as_str().to_owned()),
+        },
         inputs: file
             .inputs
             .iter()
@@ -368,7 +311,7 @@ pub fn guide(
                 name: i.name.clone(),
                 description: i.description.trim().to_owned(),
                 required: i.required,
-                generated: i.random().is_some(),
+                generated: random(i).is_some(),
             })
             .collect(),
         contributes_to: file
@@ -376,7 +319,11 @@ pub fn guide(
             .iter()
             .map(|c| c.target.component.clone())
             .collect(),
-        replaces_k3s_packaged: file.detection.addons_on("k3s").map(str::to_owned).collect(),
+        replaces_k3s_packaged: file
+            .detection
+            .addons_on(Distribution::K3s)
+            .map(str::to_owned)
+            .collect(),
         formats: [
             InstallFormat::Helm,
             InstallFormat::K3s,
@@ -412,8 +359,9 @@ type SecretInputs<'a> = ((&'a str, &'a str), Vec<(&'a Input, &'a str)>);
 
 /// The releases of a file, with their values worked out for one profile.
 struct Rendered<'a> {
-    file: &'a File,
-    profile: &'a str,
+    file: &'a Component,
+    releases: Vec<Release<'a>>,
+    profile: Profile,
     /// Per release: the merged values (inputs set at their paths), as YAML; empty when none.
     merged: Vec<String>,
     /// The Namespace of each release, as Zeabur's installer writes it, as YAML documents.
@@ -424,16 +372,20 @@ struct Rendered<'a> {
 }
 
 impl<'a> Rendered<'a> {
-    fn new(id: &str, file: &'a File, profile: &'a str) -> Result<Self, String> {
-        let level = PodSecurityLevel::parse(&file.security.pod_security)
-            .ok_or_else(|| format!("Pod Security level {}", file.security.pod_security))?;
+    fn new(id: &str, file: &'a Component, profile: Profile) -> Result<Self, String> {
+        let level = engine::pod_security(file).ok_or_else(|| "a Pod Security level".to_owned())?;
+        let releases = file
+            .releases
+            .iter()
+            .map(Release::new)
+            .collect::<Result<Vec<_>, _>>()?;
         let mut namespaces = String::new();
         let mut seen = Vec::new();
-        for release in &file.releases {
-            if !seen.contains(&release.namespace.as_str())
-                && let Some(namespace) = engine::namespace(&release.namespace, level)
+        for release in &releases {
+            if !seen.contains(&release.namespace)
+                && let Some(namespace) = engine::namespace(release.namespace, level)
             {
-                seen.push(release.namespace.as_str());
+                seen.push(release.namespace);
                 namespaces.push_str(&yaml(&namespace)?);
                 namespaces.push_str(
                     "---
@@ -441,16 +393,12 @@ impl<'a> Rendered<'a> {
                 );
             }
         }
-        let first_chart = file
-            .releases
-            .iter()
-            .find(|r| r.is_chart())
-            .map(|r| r.name.as_str());
+        let first_chart = releases.iter().find(|r| r.is_chart()).map(|r| r.name);
         let mut merged = Vec::new();
         let mut charts = Vec::new();
-        for release in &file.releases {
-            let mut values = parse_values(release.values.as_deref())?;
-            if let Some(profile_values) = release.profiles.get(profile).and_then(Value::as_str) {
+        for release in &releases {
+            let mut values = parse_values(release.values)?;
+            if let Some(profile_values) = release.profiles.and_then(|p| p.get(profile)) {
                 merge(&mut values, parse_values(Some(profile_values))?);
             }
             for input in &file.inputs {
@@ -470,6 +418,7 @@ impl<'a> Rendered<'a> {
         }
         Ok(Self {
             file,
+            releases,
             profile,
             merged,
             namespaces,
@@ -478,27 +427,27 @@ impl<'a> Rendered<'a> {
     }
 
     /// A chart release's `HelmChart`, as YAML; `None` for manifests.
-    fn chart(id: &str, release: &Release, values: &Value) -> Result<Option<String>, String> {
-        let (chart, repo, version) = match release.source() {
-            Some(Source::Oci { url, version }) => (url, None, version),
-            Some(Source::Repo {
+    fn chart(id: &str, release: &Release<'_>, values: &Value) -> Result<Option<String>, String> {
+        let (chart, repo, version) = match release.source {
+            Source::Oci { url, version } => (url, None, version),
+            Source::Repo {
                 repo,
                 chart,
                 version,
-            }) => (chart, Some(repo), version),
-            Some(Source::Urls(_) | Source::Manifests(_)) | None => return Ok(None),
+            } => (chart, Some(repo), version),
+            Source::Urls(_) | Source::Manifests(_) => return Ok(None),
         };
         let mut object = engine::chart_object(
             &ChartRelease {
-                name: release.release_name(),
+                name: release.helm_name,
                 chart,
                 repo,
                 version,
-                namespace: &release.namespace,
+                namespace: release.namespace,
             },
             values,
         )?;
-        engine::label_release(&mut object.metadata, id, &release.name);
+        engine::label_release(&mut object.metadata, id, release.name);
         yaml(&object).map(Some)
     }
 
@@ -557,7 +506,7 @@ impl<'a> Rendered<'a> {
     /// Shell commands for `kubectl` and Helm.
     fn helm(&self) -> String {
         let mut out = self.k3s_packaged();
-        push(&mut out, format!("# Profile: {}\n", self.profile));
+        push(&mut out, format!("# Profile: {}\n", self.profile.as_str()));
         let secrets = self.secrets();
         out.push_str(&self.namespace_commands(&secrets));
         for ((ns, name), inputs) in &secrets {
@@ -567,7 +516,7 @@ impl<'a> Rendered<'a> {
             let literals: Vec<String> = inputs
                 .iter()
                 .map(|(input, key)| {
-                    let value = input.random().map_or_else(
+                    let value = random(input).map_or_else(
                         || format!("'<{}>'", input.name),
                         |random| format!("\"$({random})\""),
                     );
@@ -582,7 +531,7 @@ impl<'a> Rendered<'a> {
                 ),
             );
         }
-        for release in &self.file.releases {
+        for release in &self.releases {
             out.push('\n');
             push(&mut out, format!("# {}\n", release.name));
             let indent = if release.skip_if_present.is_empty() {
@@ -596,8 +545,8 @@ impl<'a> Rendered<'a> {
                 push(&mut out, format!("if ! {}; then\n", checks.join(" && ")));
                 "  "
             };
-            match release.source() {
-                Some(Source::Urls(urls)) => {
+            match &release.source {
+                Source::Urls(urls) => {
                     for url in urls {
                         push(
                             &mut out,
@@ -605,7 +554,7 @@ impl<'a> Rendered<'a> {
                         );
                     }
                 }
-                Some(Source::Manifests(manifests)) => {
+                Source::Manifests(manifests) => {
                     push(
                         &mut out,
                         format!(
@@ -616,17 +565,16 @@ impl<'a> Rendered<'a> {
                         ),
                     );
                 }
-                Some(Source::Oci { url, version }) => {
+                Source::Oci { url, version } => {
                     self.helm_chart(&mut out, indent, release, url, None, version);
                 }
-                Some(Source::Repo {
+                Source::Repo {
                     repo,
                     chart,
                     version,
-                }) => {
+                } => {
                     self.helm_chart(&mut out, indent, release, chart, Some(repo), version);
                 }
-                None => {}
             }
             if !release.skip_if_present.is_empty() {
                 out.push_str("fi\n");
@@ -640,21 +588,18 @@ impl<'a> Rendered<'a> {
         &self,
         out: &mut String,
         indent: &str,
-        release: &Release,
+        release: &Release<'_>,
         chart: &str,
         repo: Option<&str>,
         version: &str,
     ) {
-        let profile_values = release.profiles.get(self.profile).and_then(Value::as_str);
+        let profile_values = release.profiles.and_then(|p| p.get(self.profile));
         let mut files = Vec::new();
         for (values, file) in [
-            (
-                release.values.as_deref(),
-                format!("{}-values.yaml", release.name),
-            ),
+            (release.values, format!("{}-values.yaml", release.name)),
             (
                 profile_values,
-                format!("{}-{}.yaml", release.name, self.profile),
+                format!("{}-{}.yaml", release.name, self.profile.as_str()),
             ),
         ] {
             if let Some(values) = values.filter(|v| !v.trim().is_empty()) {
@@ -682,7 +627,7 @@ impl<'a> Rendered<'a> {
         }
         let mut args = vec![format!(
             "{indent}helm upgrade --install {} {chart}",
-            release.release_name()
+            release.helm_name
         )];
         if let Some(repo) = repo {
             args.push(format!("--repo {repo}"));
@@ -703,7 +648,7 @@ impl<'a> Rendered<'a> {
             {
                 continue;
             }
-            let value = input.random().map_or_else(
+            let value = random(input).map_or_else(
                 || format!("'<{}>'", input.name),
                 |random| format!("\"$({random})\""),
             );
@@ -716,10 +661,9 @@ impl<'a> Rendered<'a> {
     /// The lists of `release`'s merged values that hold an input, as YAML: `helm --set` with an
     /// index replaces the whole list item, so these inputs go in a values file. `None` when no
     /// input of the release is in a list.
-    fn input_lists(&self, release: &Release) -> Option<String> {
+    fn input_lists(&self, release: &Release<'_>) -> Option<String> {
         let first_chart = self.first_chart();
         let index = self
-            .file
             .releases
             .iter()
             .position(|r| std::ptr::eq(r, release))?;
@@ -744,11 +688,10 @@ impl<'a> Rendered<'a> {
     }
 
     fn first_chart(&self) -> &str {
-        self.file
-            .releases
+        self.releases
             .iter()
             .find(|r| r.is_chart())
-            .map_or("", |r| r.name.as_str())
+            .map_or("", |r| r.name)
     }
 
     /// For each k3s packaged component this one replaces, a comment on disabling it first and
@@ -756,7 +699,7 @@ impl<'a> Rendered<'a> {
     fn k3s_packaged(&self) -> String {
         let detection = &self.file.detection;
         let mut out = String::new();
-        for addon in detection.addons_on("k3s") {
+        for addon in detection.addons_on(Distribution::K3s) {
             push(
                 &mut out,
                 format!(
@@ -764,7 +707,7 @@ impl<'a> Rendered<'a> {
                 ),
             );
         }
-        for addon in detection.addons_on("rke2") {
+        for addon in detection.addons_on(Distribution::Rke2) {
             if addon == "rke2-traefik" {
                 out.push_str("# On RKE2, set `ingress-controller: none` in /etc/rancher/rke2/config.yaml on\n# every server, then restart rke2-server.\n");
             } else {
@@ -801,15 +744,16 @@ impl<'a> Rendered<'a> {
     /// The namespaces of its releases with the Pod Security level they need when it is not
     /// `restricted`; in release order.
     fn exempt_namespaces(&self) -> Vec<(&str, &'static str)> {
-        let level = match self.file.security.pod_security.as_str() {
-            "privileged" => "privileged",
-            "baseline" => "baseline",
-            _ => return Vec::new(),
+        let level = match engine::pod_security(self.file) {
+            Some(level @ (PodSecurityLevel::Privileged | PodSecurityLevel::Baseline)) => {
+                level.as_str()
+            }
+            Some(PodSecurityLevel::Restricted) | None => return Vec::new(),
         };
         let mut namespaces: Vec<(&str, &'static str)> = Vec::new();
-        for release in &self.file.releases {
+        for release in &self.releases {
             if !namespaces.iter().any(|(ns, _)| *ns == release.namespace) {
-                namespaces.push((release.namespace.as_str(), level));
+                namespaces.push((release.namespace, level));
             }
         }
         namespaces
@@ -833,7 +777,7 @@ impl<'a> Rendered<'a> {
                 ),
             );
             out.extend(inputs.iter().map(|(input, key)| {
-                let value = input.random().map_or_else(
+                let value = random(input).map_or_else(
                     || format!("<{}>", input.name),
                     |random| format!("<random: {random}>"),
                 );
@@ -845,8 +789,8 @@ impl<'a> Rendered<'a> {
     }
 
     /// Manifest releases, for the YAML forms: listed as they would be applied.
-    fn manifest_release(release: &Release) -> Option<String> {
-        match release.source()? {
+    fn manifest_release(release: &Release<'_>) -> Option<String> {
+        match &release.source {
             Source::Urls(urls) => Some(format!(
                 "# {}: apply with `kubectl apply --server-side -f`, or vendor into your repository:\n{}",
                 release.name,
@@ -874,7 +818,7 @@ impl<'a> Rendered<'a> {
             &mut out,
             format!(
                 "# Profile: {}. Apply with kubectl, or save in /var/lib/rancher/k3s/server/manifests/\n# (K3s) or /var/lib/rancher/rke2/server/manifests/ (RKE2).\n",
-                self.profile
+                self.profile.as_str()
             ),
         );
         self.append_releases(&mut out, InstallFormat::K3s);
@@ -885,13 +829,7 @@ impl<'a> Rendered<'a> {
     fn append_releases(&self, out: &mut String, format: InstallFormat) {
         out.push_str(&self.namespaces);
         out.push_str(&self.secret_objects());
-        for ((release, merged), chart) in self
-            .file
-            .releases
-            .iter()
-            .zip(&self.merged)
-            .zip(&self.charts)
-        {
+        for ((release, merged), chart) in self.releases.iter().zip(&self.merged).zip(&self.charts) {
             if let Some(text) = Self::manifest_release(release) {
                 out.push_str(&text);
                 continue;
@@ -906,7 +844,7 @@ impl<'a> Rendered<'a> {
     /// A chart release's objects in one form; empty for manifests and for Helm.
     fn release_objects(
         format: InstallFormat,
-        release: &Release,
+        release: &Release<'_>,
         merged: &str,
         chart: Option<&str>,
     ) -> Vec<String> {
@@ -935,7 +873,7 @@ impl<'a> Rendered<'a> {
             &mut out,
             format!(
                 "# Profile: {}. Commit to the repository Flux reconciles.\n",
-                self.profile
+                self.profile.as_str()
             ),
         );
         self.append_releases(&mut out, InstallFormat::Flux);
@@ -943,20 +881,20 @@ impl<'a> Rendered<'a> {
     }
 
     /// A chart release's Flux source and `HelmRelease` in `flux-system`.
-    fn flux_objects(release: &Release, merged: &str) -> Vec<String> {
-        let name = release.release_name();
-        let (source, chart_ref) = match release.source() {
-            Some(Source::Oci { url, version }) => (
+    fn flux_objects(release: &Release<'_>, merged: &str) -> Vec<String> {
+        let name = release.helm_name;
+        let (source, chart_ref) = match release.source {
+            Source::Oci { url, version } => (
                 format!(
                     "apiVersion: source.toolkit.fluxcd.io/v1\nkind: OCIRepository\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  url: {url}\n  ref:\n    tag: {version}\n  layerSelector:\n    mediaType: application/vnd.cncf.helm.chart.content.v1.tar+gzip\n    operation: copy\n"
                 ),
                 format!("  chartRef:\n    kind: OCIRepository\n    name: {name}\n"),
             ),
-            Some(Source::Repo {
+            Source::Repo {
                 repo,
                 chart,
                 version,
-            }) => (
+            } => (
                 format!(
                     "apiVersion: source.toolkit.fluxcd.io/v1\nkind: HelmRepository\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  url: {repo}\n"
                 ),
@@ -964,7 +902,7 @@ impl<'a> Rendered<'a> {
                     "  chart:\n    spec:\n      chart: {chart}\n      version: {version}\n      sourceRef:\n        kind: HelmRepository\n        name: {name}\n"
                 ),
             ),
-            _ => return Vec::new(),
+            Source::Urls(_) | Source::Manifests(_) => return Vec::new(),
         };
         let mut helm_release = format!(
             "apiVersion: helm.toolkit.fluxcd.io/v2\nkind: HelmRelease\nmetadata:\n  name: {name}\n  namespace: flux-system\nspec:\n  interval: 1h\n  releaseName: {name}\n  targetNamespace: {}\n  install:\n    createNamespace: true\n{chart_ref}",
@@ -984,7 +922,7 @@ impl<'a> Rendered<'a> {
             &mut out,
             format!(
                 "# Profile: {}. Apply in the namespace Argo CD runs in (argocd).\n",
-                self.profile
+                self.profile.as_str()
             ),
         );
         self.append_releases(&mut out, InstallFormat::ArgoCd);
@@ -993,11 +931,11 @@ impl<'a> Rendered<'a> {
 
     /// A chart release's Argo CD `Application` in `argocd`, after the repository Secret an OCI
     /// chart needs.
-    fn argo_cd_objects(release: &Release, merged: &str) -> Vec<String> {
-        let name = release.release_name();
+    fn argo_cd_objects(release: &Release<'_>, merged: &str) -> Vec<String> {
+        let name = release.helm_name;
         let mut objects = Vec::new();
-        let (repo_url, chart, version) = match release.source() {
-            Some(Source::Oci { url, version }) => {
+        let (repo_url, chart, version) = match release.source {
+            Source::Oci { url, version } => {
                 let path = url.trim_start_matches("oci://");
                 let (registry_path, chart) = path.rsplit_once('/').unwrap_or((path, path));
                 objects.push(format!(
@@ -1005,12 +943,12 @@ impl<'a> Rendered<'a> {
                 ));
                 (registry_path.to_owned(), chart.to_owned(), version)
             }
-            Some(Source::Repo {
+            Source::Repo {
                 repo,
                 chart,
                 version,
-            }) => (repo.to_owned(), chart.to_owned(), version),
-            _ => return Vec::new(),
+            } => (repo.to_owned(), chart.to_owned(), version),
+            Source::Urls(_) | Source::Manifests(_) => return Vec::new(),
         };
         let mut application = format!(
             "apiVersion: argoproj.io/v1alpha1\nkind: Application\nmetadata:\n  name: {name}\n  namespace: argocd\nspec:\n  project: default\n  source:\n    repoURL: {repo_url}\n    chart: {chart}\n    targetRevision: {version}\n    helm:\n      releaseName: {name}\n"
@@ -1032,7 +970,7 @@ impl<'a> Rendered<'a> {
 }
 
 fn placeholder(input: &Input) -> Value {
-    input.random().map_or_else(
+    random(input).map_or_else(
         || {
             input.default.as_ref().map_or_else(
                 || Value::String(format!("<{}>", input.name)),
@@ -1254,14 +1192,18 @@ mod tests {
     fn the_k3s_form_holds_the_objects_the_installer_writes() {
         let key = |o: &Value| format!("{}/{}", o["kind"], o["metadata"]["name"]);
         for (id, text) in bundle::FILES {
-            let file: File = serde_saphyr::from_str(text).unwrap();
-            if !file.inputs.is_empty() {
+            let declaration: Component = serde_saphyr::from_str(text).unwrap();
+            if !declaration.inputs.is_empty() {
                 continue;
             }
             let component = crate::api::ComponentFile {
                 id: (*id).to_owned(),
                 source_digest: String::new(),
-                declaration: serde_saphyr::from_str(text).unwrap(),
+                declaration,
+                render: zeabur_catalog_format::api::Render {
+                    kubernetes_version: String::new(),
+                    profiles: std::collections::BTreeMap::new(),
+                },
                 measurements: Vec::new(),
             };
             // The files of manifest releases hold neither kind.
@@ -1315,9 +1257,9 @@ mod tests {
             .iter()
             .find(|(id, _)| *id == "cloudnative-pg")
             .unwrap();
-        let mut file: File = serde_saphyr::from_str(text).unwrap();
-        file.security.pod_security = "privileged".to_owned();
-        let rendered = Rendered::new("x", &file, "single-node").unwrap();
+        let mut file: Component = serde_saphyr::from_str(text).unwrap();
+        file.security.pod_security = zeabur_catalog_format::common::PodSecurity::Privileged;
+        let rendered = Rendered::new("x", &file, Profile::SingleNode).unwrap();
         let k3s = rendered.k3s();
         let namespace = k3s.find("kind: Namespace").unwrap();
         assert!(namespace < k3s.find("kind: HelmChart").unwrap());
@@ -1357,19 +1299,19 @@ mod tests {
         // (`cnpg`) hides the Secret k3s or Flux leaves: the chart label is what every form leaves.
         let components = crate::catalogue().unwrap();
         for (id, text) in bundle::FILES {
-            let file: File = serde_saphyr::from_str(text).unwrap();
-            if !file.releases.iter().all(Release::is_chart) {
+            let file: Component = serde_saphyr::from_str(text).unwrap();
+            let Some(charts) = file
+                .releases
+                .iter()
+                .map(component::Release::helm)
+                .collect::<Option<Vec<_>>>()
+            else {
                 continue;
-            }
+            };
             let mut facts = zeabur_kube::ClusterFacts::default();
-            for release in &file.releases {
-                let (chart, version) = match release.source() {
-                    Some(Source::Oci { url, version }) => {
-                        (url.rsplit('/').next().unwrap_or(url), version)
-                    }
-                    Some(Source::Repo { chart, version, .. }) => (chart, version),
-                    _ => continue,
-                };
+            for release in charts {
+                let chart = release.chart.rsplit('/').next().unwrap_or(&release.chart);
+                let version = &release.version;
                 facts.workload_labels.push((
                     "Deployment".to_owned(),
                     std::collections::BTreeMap::from([(

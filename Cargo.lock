@@ -2881,8 +2881,21 @@ dependencies = [
  "tar",
  "thiserror",
  "utoipa",
+ "zeabur-catalog-format",
  "zeabur-kube",
  "zeabur-model",
+]
+
+[[package]]
+name = "zeabur-catalog-format"
+version = "0.5.6"
+source = "git+https://github.com/zeabur-oss/catalog?tag=v0.6.1#bcc7d3c21ffde0f4c13257bc28e1f5de4f3b7872"
+dependencies = [
+ "serde",
+ "serde-saphyr",
+ "serde_ignored",
+ "serde_json",
+ "thiserror",
 ]
 
 [[package]]
