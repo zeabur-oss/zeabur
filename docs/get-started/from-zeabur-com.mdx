@@ -97,6 +97,23 @@ Read this page again at the start of each session; it changes with new versions.
 - Don't change the services on Zeabur before the cutover.
 - When these docs don't match what you see, trust what you see and tell the user.
 
+### Before you start
+
+Ask the user these before the inventory, in one message:
+
+- **SSH access.** A server that Zeabur manages for the user can have no stored SSH credential, and then `server exec` fails. Ask for the address, the user name and a key or password for each such server.
+- **Which services to move.** Include the suspended and stopped services, and ask for each one whether to move it. Create a stopped service in Zeabur OSS with 0 replicas, so it exists and doesn't run.
+- **Sizes you can't read.** If you can't read a service's memory use, for example because it is stopped, start with the Medium size. After the first run, read the real use with `kubectl top pod` and set the size from it.
+
+### Known limits
+
+- **The running digest.** The Zeabur CLI doesn't show the digest of the image that runs. Resolve the tag to a digest with `docker buildx imagetools inspect <image>:<tag>`, pin that digest, and tell the user it is the digest the tag has now.
+- **Builds need Keel.** Deploy from Git and Upload a folder both need Zeabur Builder and Keel. Install both before you create either kind of service.
+- **Memory.** A service made from an image gets the Small size by default, so its memory maximum is 256 MiB. A service that used more on Zeabur is stopped with `OOMKilled`. Set each service's memory maximum from the use you recorded, with some room, in `resources.limits.memory` of its YAML. To raise it later, use **Settings** → **Compute**, as [Service settings](../configure/service-settings.mdx) shows.
+- **Prompts.** `variable list` and `domain list` ask which project to use. Pass `-i=false` and name the project and service with flags, so they don't wait for an answer.
+- **Output size.** `service exec` returns at most 3 MB. Write a dump to a file inside the service and read it in pieces smaller than 3 MB, or connect to the database from outside.
+- **SQLite.** Don't copy a SQLite file that an application has open. Make a logical copy with `sqlite3 app.db .dump > app.sql`, and restore it with `sqlite3 new.db < app.sql`.
+
 ### 1. Take stock of Zeabur
 
 Follow "Before you start", "Inventory", "Container images", "Variables" and "Data" in the Zeabur guide. Ask the user for their own expiry date and plan around it, not around December 31.
@@ -155,7 +172,7 @@ Choose the components from the inventory:
 
 | On Zeabur | Component |
 | --- | --- |
-| Services built from Git | `zeabur-builder`, `keel` |
+| Services built from Git, or from an uploaded folder | `zeabur-builder`, `keel` |
 | PostgreSQL | `cloudnative-pg` |
 | MySQL | `moco` |
 | MariaDB | `mariadb-operator` |
@@ -183,7 +200,7 @@ Write each service as YAML, using the table below. The section "Do the same with
 | --- | --- |
 | Project | A namespace with the `zeabur.com/project: "true"` label. See [Create and manage projects](../configure/projects.mdx) |
 | Service built from Git by zbpack | A Build of the same repository: `dockerfile` when it has a Dockerfile, otherwise `railpack`. Carry over the root directory, commands and runtime versions from "Build" in the Zeabur guide. See [Build and deploy a service from Git](../deploy/git.mdx). An exported image is only a stopgap |
-| Prebuilt image or template service | The same image, pinned to the running digest. See [Deploy a container image](../deploy/image.mdx) |
+| Prebuilt image or template service | The same image, pinned by digest as in [Known limits](#known-limits). See [Deploy a container image](../deploy/image.mdx) |
 | Database template | A Zeabur OSS database. See [Create, back up, and restore databases](../deploy/databases.mdx) |
 | Expanded variables, `.zeabur.internal` addresses | The expanded values from "Variables" in the Zeabur guide, with internal addresses changed to Zeabur OSS service names. See [Configure environment variables](../configure/variables.mdx) |
 | Volume | A new disk. See [Store files and back up volumes](../configure/volumes.mdx) |
