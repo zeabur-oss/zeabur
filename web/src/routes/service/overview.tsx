@@ -101,7 +101,11 @@ export function OverviewTab({
   })
   const trace = useQuery(traceQuery(project, service.kind, service.name))
   const said = overviewOf(
-    { diagnoses: service.diagnoses, stopped: service.replicas?.desired === 0 },
+    {
+      diagnoses: service.diagnoses,
+      stopped: service.replicas?.desired === 0,
+      replicas: service.replicas,
+    },
     task ? undefined : rollout.data,
     trace.data?.routes ?? [],
     events,
@@ -689,7 +693,9 @@ function Reachability({
                 ? t("trace.waiting", service.name)
                 : waits === "stopped"
                   ? t("trace.stopped", service.name)
-                  : undefined
+                  : waits === "noReplica"
+                    ? t("trace.noReplica")
+                    : undefined
             }
             fix={
               waits

@@ -37,7 +37,7 @@ export function explainedBy(event: Event, diagnoses: Diagnosis[]): boolean {
 }
 
 /** Why an address can't be reached when the hop that fails is only the replicas' readiness. */
-type Waiting = "cause" | "stopped"
+type Waiting = "cause" | "stopped" | "noReplica"
 
 type RolloutShown =
   | { as: "none" }
@@ -66,6 +66,8 @@ export function overviewOf(
     diagnoses?: Diagnosis[] | null
     /** Scaled to zero: no replica is meant to run. */
     stopped: boolean
+    /** Replicas wanted and ready, when the service has them. */
+    replicas?: { desired: number; ready: number } | null
   },
   rollout: Rollout | undefined,
   routes: Route[],
@@ -78,6 +80,12 @@ export function overviewOf(
     causes.length > 0 ? "cause" : service.stopped ? "stopped" : undefined
   const waiting = new Map<string, Waiting>()
   if (known) for (const route of routes) if (stopsAtReady(route)) waiting.set(route.address, known)
+  // No ready replica answers nothing, whatever a check from outside says.
+  const none = (service.replicas?.desired ?? 0) > 0 && service.replicas?.ready === 0
+  if (none)
+    for (const route of routes)
+      if (route.status !== "failed" && !waiting.has(route.address))
+        waiting.set(route.address, "noReplica")
   const down = routes.filter((r) => waiting.get(r.address) === "cause")
   const alsoDown =
     down.length > 0

@@ -3865,6 +3865,7 @@ export const en = {
   "overview.privateAddress": "the private address",
   "trace.waiting": (name: string) => `Waiting for ${name} to be ready`,
   "trace.stopped": (name: string) => `${name} is scaled to 0`,
+  "trace.noReplica": "No replica is ready",
   "event.word.retrying": "Retrying",
   "event.word.checkFailed": "Check failed",
   "event.word.stopping": "Stopping",
