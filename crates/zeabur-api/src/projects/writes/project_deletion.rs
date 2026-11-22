@@ -273,11 +273,11 @@ async fn databases(
     Ok(out)
 }
 
-/// The project's backups that exist: a database's with a backup run, once per store it may be
-/// in (none when no store could be read, so an unread store never counts as kept outside); a
-/// volume's with a K8up run, the endpoint of each K8up schedule that covers it (a run does not
-/// name its schedule); the project's own with a Velero run. A refused read leaves its backups
-/// out, and its right is named in `unreadable`.
+/// The project's backups that exist (a run that stored one, [`stored`]): a database's, once per
+/// store it may be in (none when no store could be read, so an unread store never counts as kept
+/// outside); a volume's K8up backups, once per endpoint of each K8up schedule that covers it (a
+/// run does not name its schedule); the project's own Velero backups. A refused read leaves its
+/// backups out, and its right is named in `unreadable`.
 async fn backups(
     cluster: &dyn Cluster,
     project: &str,
@@ -293,10 +293,10 @@ async fn backups(
             databases
                 .unreadable
                 .iter()
-                .map(|u| refused_list(u, project)),
+                .map(|u| refused_list(u, Some(project))),
         );
         for database in databases.items {
-            if database.backups.runs.is_empty() {
+            if !database.backups.runs.iter().any(stored) {
                 continue;
             }
             out.extend(
@@ -319,12 +319,16 @@ async fn backups(
     else {
         return Ok(out);
     };
+    unreadable.extend(found.unreadable.iter().map(|u| {
+        let velero = u.resource.ends_with(".velero.io");
+        refused_list(u, (!velero).then_some(project))
+    }));
     let run_of = |provider: &str, target: &backups::Target| {
         found
             .runs
             .iter()
             .chain(found.coverage.iter().filter_map(|c| c.last_run.as_ref()))
-            .any(|r| r.provider == provider && r.targets.contains(target))
+            .any(|r| r.provider == provider && r.targets.contains(target) && stored(r))
     };
     for schedule in found
         .schedules
@@ -359,9 +363,17 @@ async fn backups(
     Ok(out)
 }
 
+/// Whether a run left a backup in its store: it succeeded, or some items failed.
+const fn stored(run: &backups::Run) -> bool {
+    matches!(
+        run.outcome,
+        backups::Outcome::Succeeded | backups::Outcome::PartiallyFailed
+    )
+}
+
 /// The `list` right a partial read was refused, from its resource
-/// (`objectstores.barmancloud.cnpg.io`).
-fn refused_list(unread: &crate::views::UnreadableView, project: &str) -> Denied {
+/// (`objectstores.barmancloud.cnpg.io`), in `namespace` or cluster-wide.
+fn refused_list(unread: &crate::views::UnreadableView, namespace: Option<&str>) -> Denied {
     let (resource, group) = unread
         .resource
         .split_once('.')
@@ -371,7 +383,7 @@ fn refused_list(unread: &crate::views::UnreadableView, project: &str) -> Denied 
         group: group.to_owned(),
         resource: resource.to_owned(),
         name: None,
-        namespace: Some(project.to_owned()),
+        namespace: namespace.map(str::to_owned),
     }
 }
 
