@@ -660,6 +660,15 @@ group("deploying from Git or an image", () => {
     expect(actionOf(t, { changes: git })).toBe("action.create")
     expect(actionOf(t, { changes: image })).toBe("action.create")
   })
+
+  test("the review of an image service says whether it is public", () => {
+    const sentence = (more: Partial<Schemas.ImageServiceChange>) =>
+      describe(t, { changes: [{ ...image[0], ...more } as Schemas.Change] }, plan(), pods({})).lines
+    expect(sentence({ port: 8080, host: "web.example.com" })).toContain(
+      "confirm.createImageServicePublic(web, web.example.com)",
+    )
+    expect(sentence({ port: 8080 })).toContain("confirm.createImageServiceInside(web)")
+  })
 })
 
 group("deploying an uploaded folder", () => {

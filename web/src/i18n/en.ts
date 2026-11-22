@@ -1862,6 +1862,10 @@ export const en = {
   "confirm.createGitService": (name: string) =>
     `Create service ${name} and the build that runs your repository.`,
   "confirm.createImageService": (name: string) => `Create service ${name} from its image.`,
+  "confirm.createImageServicePublic": (name: string, host: string) =>
+    `Create service ${name} from its image, open to anyone on the internet at ${host}.`,
+  "confirm.createImageServiceInside": (name: string) =>
+    `Create service ${name} from its image, reachable only from inside the cluster.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
   "confirm.delete": (name: string) => `Delete ${name}. This can't be undone.`,
