@@ -8,7 +8,7 @@ Choose a database engine from the project's **Add** menu, set the version and st
 ## Before you begin
 
 - You have a project and permission to create databases and the required secrets. To connect a service, you also need permission to modify that service.
-- An administrator has installed the operator for the engine you choose. If it's missing, the **Add** menu says under the engine which operator to install first, and clicking it lists the install commands. See [View and install cluster components](../cluster/components.mdx).
+- An administrator has installed the operator for the engine you choose. If it's missing, the **Add** menu says under the engine which operator to install first, and clicking it opens its install dialog in **Cluster** → **Components**. See [View and install cluster components](../cluster/components.mdx).
 - The cluster has an available storage class and enough space. When you create multiple instances, the capacity and resources in the form apply to each instance.
 - To set up backups, have an S3-compatible endpoint reachable from the cluster, an existing bucket, and access keys, or a [shared S3 destination](../cluster/s3-destinations.mdx) you can read. PostgreSQL backups also require the Barman Cloud plugin.
 

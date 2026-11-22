@@ -9,7 +9,7 @@ You don't need a Git repository. The browser packages the folder and sends it di
 
 ## Before you begin
 
-- The requirements are the same as for [deploying from Git](./git.mdx): Zeabur Builder and Keel are installed, the chart has `builds.registry` configured, and you have permission to create services and Builds in the project. If components are missing, **Upload a folder** lists them, and clicking it shows the install commands.
+- The requirements are the same as for [deploying from Git](./git.mdx): Zeabur Builder and Keel are installed, the chart has `builds.registry` configured, and you have permission to create services and Builds in the project. If components are missing, **Upload a folder** lists them, and clicking it opens the install dialog of the first one in **Cluster** → **Components**.
 - Zeabur Builder must have `registry.tokenKey` configured to issue a temporary upload token. Without it, the upload stops at **Zeabur Builder doesn't allow uploads**.
 - You need permission to read secrets in the project. Zeabur Builder writes the upload token to the `<service-name>-upload` secret. Zeabur OSS reads it with your permissions, not its own.
 

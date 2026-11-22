@@ -9,7 +9,7 @@ description: 将电脑上的文件夹或 .zip 文件交给 Zeabur Builder 构建
 
 ## 开始前
 
-- 条件与[从 Git 部署](./git.mdx)相同：已安装 Zeabur Builder 和 Keel，chart 已配置 `builds.registry`，你有在项目中创建服务和 Build 的权限。缺少组件时，**上传文件夹**下方会写出缺少哪些，点击后会列出安装命令。
+- 条件与[从 Git 部署](./git.mdx)相同：已安装 Zeabur Builder 和 Keel，chart 已配置 `builds.registry`，你有在项目中创建服务和 Build 的权限。缺少组件时，**上传文件夹**下方会写出缺少哪些，点击后会在**集群** → **组件**打开第一个组件的安装对话框。
 - Zeabur Builder 必须配置 `registry.tokenKey`，上传时才能获取有时效的令牌。未配置时，上传会停在 **Zeabur Builder 不允许上传**。
 - 你需要有读取项目中机密变量的权限。Zeabur Builder 将上传令牌写入 `<服务名称>-upload` 机密变量，Zeabur 开源版使用你的权限读取，不使用自身的权限。
 

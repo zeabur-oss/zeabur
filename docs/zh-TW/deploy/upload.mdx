@@ -9,7 +9,7 @@ description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置。
 
 ## 開始前
 
-- 條件和[從 Git 部署](./git.mdx)相同：已安裝 Zeabur Builder 和 Keel，chart 已設定 `builds.registry`，你有在專案建立服務和 Build 的權限。缺少元件時，**上傳資料夾**下方會寫出缺哪些，點下去會列出安裝指令。
+- 條件和[從 Git 部署](./git.mdx)相同：已安裝 Zeabur Builder 和 Keel，chart 已設定 `builds.registry`，你有在專案建立服務和 Build 的權限。缺少元件時，**上傳資料夾**下方會寫出缺哪些，點下去會在**叢集** → **元件**打開第一個元件的安裝對話框。
 - Zeabur Builder 要設定 `registry.tokenKey`，上傳才會拿到有時效的權杖。沒有設定時，上傳會停在 **Zeabur Builder 不允許上傳**。
 - 你要能讀取專案裡的機密變數。上傳用的權杖由 Zeabur Builder 寫在 `<服務名稱>-upload` 機密變數裡，Zeabur 開源版用你的權限讀取，不用自己的權限。
 
