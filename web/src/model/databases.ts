@@ -1397,15 +1397,16 @@ const SCHEMES: Record<Engine, string> = {
   dragonfly: "redis",
 }
 
-/** The connection string, with a placeholder where the password goes. */
-export function connectionUri(database: Database, password = "PASSWORD") {
+/** The connection string. While the password is hidden, `<password>` stands where it goes: not a
+ * value anyone could paste as it is. */
+export function connectionUri(database: Database, password?: string) {
   const c = database.connection
   const scheme = SCHEMES[database.engine]
-  if (database.engine === "dragonfly")
-    return `${scheme}://:${encodeURIComponent(password)}@${c.host}:${c.port}`
-  const user = c.username ? encodeURIComponent(c.username) : "USER"
+  const secret = password === undefined ? "<password>" : encodeURIComponent(password)
+  if (database.engine === "dragonfly") return `${scheme}://:${secret}@${c.host}:${c.port}`
+  const user = c.username ? encodeURIComponent(c.username) : "<username>"
   const options = c.options ? `?${c.options}` : ""
-  return `${scheme}://${user}:${encodeURIComponent(password)}@${c.host}:${c.port}/${c.database ?? ""}${options}`
+  return `${scheme}://${user}:${secret}@${c.host}:${c.port}/${c.database ?? ""}${options}`
 }
 
 /** The command that forwards a port on the person's computer to the database. */

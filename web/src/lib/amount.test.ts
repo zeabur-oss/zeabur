@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { exactBytes, isAmount, kubeAmount, parseAmount, toKube } from "@/lib/amount"
+import { aboveLimit, exactBytes, isAmount, kubeAmount, parseAmount, toKube } from "@/lib/amount"
 
 describe("CPU", () => {
   test("reads Kubernetes millicores and plain cores alike", () => {
@@ -45,5 +45,21 @@ describe("memory and storage", () => {
     expect(exactBytes(1500 * 2 ** 20)).toEqual(["1500", "MiB"])
     expect(exactBytes(5 * 2 ** 30)).toEqual(["5", "GiB"])
     expect(exactBytes(100)).toEqual(["100", "B"])
+  })
+})
+
+describe("a reservation above its limit", () => {
+  test("is told apart in either unit", () => {
+    expect(aboveLimit("512Mi", "256Mi", "bytes")).toBe(true)
+    expect(aboveLimit("1 GiB", "512Mi", "bytes")).toBe(true)
+    expect(aboveLimit("500m", "0.25 cores", "cpu")).toBe(true)
+    expect(aboveLimit("128Mi", "256Mi", "bytes")).toBe(false)
+    expect(aboveLimit("256Mi", "256Mi", "bytes")).toBe(false)
+  })
+
+  test("needs both sides to be amounts", () => {
+    expect(aboveLimit("512Mi", "", "bytes")).toBe(false)
+    expect(aboveLimit("", "256Mi", "bytes")).toBe(false)
+    expect(aboveLimit("lots", "256Mi", "bytes")).toBe(false)
   })
 })

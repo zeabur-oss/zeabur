@@ -142,6 +142,15 @@ group("editGroups", () => {
     ])
   })
 
+  test("an object of another kind, made whole, is named by its kind and not by `other fields`", () => {
+    const bucket = object({ kind: "ObjectBucketClaim", name: "media" }, [], {
+      beforeYaml: undefined,
+    })
+    const [group] = editGroups(t, plan({ objects: [bucket] }))
+    expect(group?.part).toBe("other")
+    expect(group?.kind).toBeTruthy()
+  })
+
   test("a restart's annotation is no row", () => {
     const restarted = object(api, [
       {

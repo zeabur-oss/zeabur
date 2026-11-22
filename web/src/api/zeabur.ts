@@ -9157,7 +9157,7 @@ export type ServiceVerdict = {
  */
 export type Service = WorkloadSummary & {
   configReload?: ConfigReload | null
-  /** Its init and regular containers, in that order. */
+  /** Its regular containers, then its init containers. */
   containers: Container[]
   dataStore?: DataStore | null
   /**

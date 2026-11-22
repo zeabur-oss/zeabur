@@ -1699,6 +1699,9 @@ export const zhCN: Messages = {
   "confirm.createUploadService": (name) => `创建服务 ${name}，并用你上传的文件夹构建。`,
   "confirm.createGitService": (name) => `创建服务 ${name}，并用你的仓库构建。`,
   "confirm.createImageService": (name) => `用镜像创建服务 ${name}。`,
+  "confirm.createImageServicePublic": (name, host) =>
+    `用镜像创建服务 ${name}，并公开到 ${host}，网上的人都能访问。`,
+  "confirm.createImageServiceInside": (name) => `用镜像创建服务 ${name}，只有集群内的服务能访问。`,
   "confirm.isolates": (name) =>
     `之后 ${name} 只收发这条和其他连接规则允许的流量，集群会拦截其余流量。`,
   "confirm.delete": (name: string) => `删除 ${name}。删除后无法恢复。`,
@@ -1833,6 +1836,7 @@ export const zhCN: Messages = {
   "form.probePeriod": "间隔（秒）",
   "form.probeFailures": "失败次数",
   "form.probePreset": (port: string) => `HTTP，端口 ${port}`,
+  "form.requestAboveLimit": "保留量不能高于上限。",
   "form.computeBlocked": "修正计算资源后才能保存。",
   "form.probeBlocked": (probe: string) => `修正${probe}后才能保存。`,
   "form.size": "大小",
@@ -2428,7 +2432,7 @@ export const zhCN: Messages = {
   "add.httpOnly": "这个网址只有 HTTP。管理员指定 cert-manager 的签发者后会使用 HTTPS。",
   "add.noPublicUrl": "你的角色不能在这个项目新建公开域名。",
   "add.more": "更多设置",
-  "add.moreSummary": "环境变量、卷、规格、副本数、私有 registry 和安全性。",
+  "add.moreSummary": "环境变量、卷、私有 registry 和安全性。",
   "add.variables": "环境变量",
   "add.variablesHint": "每行一个 KEY=value，和 .env 文件相同。",
   "add.variablesBad": (lines) => `第 ${lines} 行不是 KEY=value。`,
@@ -2676,7 +2680,7 @@ export const zhCN: Messages = {
   "upload.problem.directory": "上传内容里的文件夹，像 apps/web。",
   "upload.problem.dockerfile": "上传内容里的文件，像 docker/Dockerfile.prod。",
   "upload.after":
-    "应用后文件夹会马上上传，上传完成后开始第一次构建。要构建新版本，从服务页面再上传一次。",
+    "应用后文件夹会马上上传，上传完成后开始第一次构建。上传完成前请保持这个页面打开。要构建新版本，或上传中断时，从服务页面再上传一次。",
   "upload.keepOpen": "上传完成前请保持这个页面打开。",
   "upload.stage.token": "正在向 Zeabur Builder 获取上传许可…",
   "upload.stage.sending": (sent, total) => `正在上传… ${sent}/${total}`,
@@ -3515,6 +3519,7 @@ export const zhCN: Messages = {
   "overview.privateAddress": "私有地址",
   "trace.waiting": (name) => `等待 ${name} 就绪`,
   "trace.stopped": (name) => `${name} 目前是 0 个副本`,
+  "trace.noReplica": "没有任何副本就绪",
   "event.word.retrying": "重试等待中",
   "event.word.checkFailed": "检查未通过",
   "event.word.stopping": "正在停止",

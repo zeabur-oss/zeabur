@@ -97,6 +97,23 @@ Coding Agent 会按下面的步骤做，你也可以自己按着做。自己迁�
 - 切换之前，不要改动 Zeabur 上的服务。
 - 文档和你看到的情况不一致时，以你看到的为准，并告诉用户。
 
+### 开始之前
+
+盘点之前，先用一条消息问用户这几件事：
+
+- **SSH 访问**。Zeabur 托管的服务器可能没有保存 SSH 凭据，这时 `server exec` 会失败。每台这样的服务器，都问用户地址、用户名，以及密钥或密码。
+- **要迁哪些服务**。已暂停和已停止的服务也要列出来，逐个问用户迁不迁。已停止的服务在 Zeabur 开源版建成 0 个副本，这样它存在但不会运行。
+- **读不到的用量**。服务的内存用量读不到时，例如它已经停止，先用 Medium 大小。第一次运行后，用 `kubectl top pod` 读实际用量，再据此调整大小。
+
+### 已知限制
+
+- **运行中的 digest**。Zeabur CLI 不会显示正在运行的镜像 digest。用 `docker buildx imagetools inspect <image>:<tag>` 把 tag 解析成 digest，固定这个 digest，并告诉用户它是 tag 当前指向的 digest。
+- **构建需要 Keel**。从 Git 部署和上传文件夹都需要 Zeabur Builder 和 Keel。创建这两种服务之前，先装好这两个组件。
+- **内存**。用镜像创建的服务默认是 Small 大小，内存上限是 256 MiB。在 Zeabur 用得比这多的服务，会被以 `OOMKilled` 停掉。按你记下的用量，留一些余量，写进每个服务 YAML 的 `resources.limits.memory`。之后要调高，按[服务设置](../configure/service-settings.mdx)到**设置** → **计算资源**。
+- **提示**。`variable list` 和 `domain list` 会问要用哪个项目。加上 `-i=false`，并用参数指定项目和服务，它们就不会停下来等回答。
+- **输出大小**。`service exec` 最多返回 3 MB。把转储文件写在服务里的文件中，再分成小于 3 MB 的片段读出来，或从外部连到数据库。
+- **SQLite**。不要复制应用正开着的 SQLite 文件。用 `sqlite3 app.db .dump > app.sql` 做逻辑复制，再用 `sqlite3 new.db < app.sql` 恢复。
+
 ### 1. 盘点 Zeabur
 
 按 Zeabur 指南的“Before you start”“Inventory”“Container images”“Variables”和“Data”操作。问用户自己的到期日，以那一天为准规划，不要以 12 月 31 日为准。
@@ -155,7 +172,7 @@ sudo zeatend apply --plan plan.json
 
 | Zeabur 上有 | 组件 |
 | --- | --- |
-| 从 Git 构建的服务 | `zeabur-builder`、`keel` |
+| 从 Git 构建或上传文件夹的服务 | `zeabur-builder`、`keel` |
 | PostgreSQL | `cloudnative-pg` |
 | MySQL | `moco` |
 | MariaDB | `mariadb-operator` |
@@ -183,7 +200,7 @@ sudo k3s kubectl apply --server-side -f components.yaml
 | --- | --- |
 | 项目 | 带 `zeabur.com/project: "true"` 标签的 Namespace，见[创建和管理项目](../configure/projects.mdx) |
 | 用 zbpack 从 Git 构建的服务 | 同一个仓库的 Build。有 Dockerfile 就用 `dockerfile`，否则用 `railpack`。按 Zeabur 指南的“Build”沿用根目录、命令和运行时版本。见[从 Git 构建并部署服务](../deploy/git.mdx)。导出的镜像只能临时使用 |
-| 预先构建的镜像或模板服务 | 同一个镜像，固定在当前运行的 digest。见[部署容器镜像](../deploy/image.mdx) |
+| 预先构建的镜像或模板服务 | 同一个镜像，按[已知限制](#已知限制)用 digest 固定。见[部署容器镜像](../deploy/image.mdx) |
 | 数据库模板 | Zeabur 开源版的数据库，见[创建、备份与还原数据库](../deploy/databases.mdx) |
 | 展开后的变量、`.zeabur.internal` 地址 | Zeabur 指南“Variables”里展开后的值，内部地址换成 Zeabur 开源版的服务名称。见[配置环境变量](../configure/variables.mdx) |
 | 卷 | 新的磁盘，见[存储文件与备份卷](../configure/volumes.mdx) |

@@ -1,0 +1,11 @@
+description: "Removing a workload's only domain and adding another in one plan deletes the old Ingress and creates a new one, instead of adding the rule to the Ingress that is going away."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: removeDomain
+        route: {kind: Ingress, name: shop}
+        hostname: shop.example.test
+      - op: addDomain
+        workload: {kind: Deployment, name: web}
+        hostname: www.example.test

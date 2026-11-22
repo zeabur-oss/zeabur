@@ -36,7 +36,7 @@ The release tag has a `v`, such as `v0.3.0-beta.2`. Give `--version` the version
 
 ## Upgrade with Helm
 
-If `kubectl -n kube-system get configmap zeabur-installer` finds a ConfigMap, zeabur-installer set up this server. To move from v0.2 to v0.3, follow [Installed with zeabur-installer](notes.mdx#installed-with-zeabur-installer) in the upgrade notes instead of this section.
+If `kubectl -n kube-system get helmchart zeabur` finds a `HelmChart`, a K3s `HelmChart` still runs Zeabur OSS, as zeabur-installer v0.2 set it up. To move from v0.2 to v0.3, follow [Installed with zeabur-installer](notes.mdx#installed-with-zeabur-installer) in the upgrade notes instead of this section. If there is no `HelmChart`, a Helm release runs Zeabur OSS, even when the `zeabur-installer` ConfigMap is still there. Follow this section.
 
 Replace `<version>` with the version from [Which version](#which-version):
 

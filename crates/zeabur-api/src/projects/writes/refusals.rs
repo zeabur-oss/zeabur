@@ -122,9 +122,11 @@ pub(super) fn moved_on(target: &zeabur_plan::Target) -> Problem {
 
 /// The problem for a refused write of `target`.
 ///
-/// A plan's preconditions failing means the object moved on since the plan: `409 Conflict`, `409
-/// AlreadyExists`, or a `422` that names no invalid field, which is how a JSON Patch that does not
-/// apply is answered [k8s-patch]. All are `409` here, with the fix to plan again. A `422` that
+/// A create whose name is taken is answered `409 AlreadyExists`: the object is named as existing,
+/// whoever made it, since a plan made again would create it again. A plan's other preconditions
+/// failing means the object moved on since the plan: `409 Conflict`, or a `422` that names no
+/// invalid field, which is how a JSON Patch that does not apply is answered [k8s-patch]. Both are
+/// `409` here, with the fix to plan again. A `422` that
 /// names a field stays as kube-apiserver gave it, as do `429` (with its `Retry-After`) and other
 /// refusals. A `403` also names the request that was refused ([`denied`]).
 ///
@@ -134,6 +136,15 @@ pub(super) fn write_problem(
     target: &zeabur_plan::Target,
     write: &WriteRequest,
 ) -> Problem {
+    if let ClusterError::Status(status) = &error
+        && status.code == 409
+        && status.reason == "AlreadyExists"
+    {
+        return super::creations::already_exist(
+            &format!("{} {}", target.kind, target.name),
+            &write.target.namespace,
+        );
+    }
     let changed = match &error {
         ClusterError::Status(status) => {
             status.code == 409 || (status.code == 422 && !status.names_invalid_field)
@@ -238,12 +249,31 @@ mod tests {
                 "the server rejected our request due to an error in our request",
             ),
             answer(409, "Conflict", "the object has been modified"),
-            answer(409, "AlreadyExists", "ingresses \"web\" already exists"),
         ] {
             let problem = write_problem(error, &target());
             assert_eq!(problem.kind, Kind::Conflict, "{problem:?}");
             assert!(problem.fix.contains("plan again"), "{problem:?}");
         }
+    }
+
+    /// A name taken by an object nobody planned around, such as one left by kubectl, is named as
+    /// existing: planning again would not help.
+    #[test]
+    fn a_taken_name_says_the_object_exists() {
+        let create = WriteRequest {
+            body: WriteBody::Create(json!({})),
+            ..patch()
+        };
+        let problem = super::write_problem(
+            answer(409, "AlreadyExists", "deployments \"web\" already exists"),
+            &target(),
+            &create,
+        );
+        assert_eq!(problem.kind, Kind::Conflict);
+        assert_eq!(problem.summary.key, "problem.summary.already-exists");
+        assert_eq!(problem.summary.params["objects"], "Deployment web");
+        assert_eq!(problem.summary.params["namespace"], "shop");
+        assert!(!problem.detail.contains("changed"), "{problem:?}");
     }
 
     #[test]

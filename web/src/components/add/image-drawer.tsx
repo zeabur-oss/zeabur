@@ -35,6 +35,7 @@ import {
   serviceNameProblem,
   suggestedHost,
   type ImageService,
+  publishChoice,
 } from "@/model/image-service"
 import { imageProfile, type Profile } from "@/model/pod-security"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -101,7 +102,8 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
   const portValue = shownPort(typedPort, inspection)
   const note = portNote(portValue, inspection)
   const port = options.port ? portValue.trim() : ""
-  const publicUrl = options.publicUrl && port !== "" && form.publicUrl
+  const publish = publishChoice(form.publicChosen, form.publicUrl, domains.suffixes)
+  const publicUrl = options.publicUrl && port !== "" && publish
   const host = hosted ? form.host : suggestedHost(name, project, domains.suffixes?.[0])
   const env = parseEnv(extras.env)
   const secrets = options.secrets
@@ -247,8 +249,8 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
           project={project}
           port={port}
           canPublish={options.publicUrl}
-          on={form.publicUrl}
-          onToggle={(publicUrl) => set({ publicUrl })}
+          on={publish}
+          onToggle={(publicUrl) => set({ publicUrl, publicChosen: true })}
           host={host}
           onHost={(typed) => {
             setHosted(true)
@@ -257,6 +259,21 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
           domains={domains}
           error={shown(problems.host, () => t(`add.problem.host.${problems.host ?? "empty"}`))}
         />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <ImageSizeField size={form.size} onSize={(size) => set({ size })} />
+          <FormField label={t("add.replicas")} hint={volume ? t("add.replicasFixed") : undefined}>
+            <Select
+              size="sm"
+              value={String(volume ? 1 : form.replicas)}
+              disabled={volume}
+              onValueChange={(replicas) => set({ replicas: Number(replicas) })}
+              items={Array.from({ length: MAX_REPLICAS }, (_, i) => ({
+                value: String(i + 1),
+                label: String(i + 1),
+              }))}
+            />
+          </FormField>
+        </div>
         <Collapsible open={moreShown || moreOpen} onOpenChange={setMoreShown}>
           <CollapsibleTrigger variant="disclosure">
             <CaretRightIcon aria-hidden="true" />
@@ -332,24 +349,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
               ) : (
                 <Note>{t("add.noVolume")}</Note>
               )}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <ImageSizeField size={form.size} onSize={(size) => set({ size })} />
-                <FormField
-                  label={t("add.replicas")}
-                  hint={volume ? t("add.replicasFixed") : undefined}
-                >
-                  <Select
-                    size="sm"
-                    value={String(volume ? 1 : form.replicas)}
-                    disabled={volume}
-                    onValueChange={(replicas) => set({ replicas: Number(replicas) })}
-                    items={Array.from({ length: MAX_REPLICAS }, (_, i) => ({
-                      value: String(i + 1),
-                      label: String(i + 1),
-                    }))}
-                  />
-                </FormField>
-              </div>
               {secrets ? (
                 <div className="flex flex-col gap-3">
                   <Toggle

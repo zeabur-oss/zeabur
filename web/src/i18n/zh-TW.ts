@@ -1702,6 +1702,10 @@ export const zhTW: Messages = {
   "confirm.createUploadService": (name) => `建立服務 ${name}，並用你上傳的資料夾建置。`,
   "confirm.createGitService": (name) => `建立服務 ${name}，並用你的儲存庫建置。`,
   "confirm.createImageService": (name) => `用映像檔建立服務 ${name}。`,
+  "confirm.createImageServicePublic": (name, host) =>
+    `用映像檔建立服務 ${name}，並公開到 ${host}，網路上的人都連得到。`,
+  "confirm.createImageServiceInside": (name) =>
+    `用映像檔建立服務 ${name}，只有叢集內的服務連得到。`,
   "confirm.isolates": (name) =>
     `之後 ${name} 只收發這條和其他連線規則允許的流量，叢集會擋下其餘流量。`,
   "confirm.delete": (name: string) => `刪除 ${name}。刪除後無法復原。`,
@@ -1836,6 +1840,7 @@ export const zhTW: Messages = {
   "form.probePeriod": "間隔（秒）",
   "form.probeFailures": "失敗次數",
   "form.probePreset": (port: string) => `HTTP，連接埠 ${port}`,
+  "form.requestAboveLimit": "保留量不能高過上限。",
   "form.computeBlocked": "修正運算資源後才能儲存。",
   "form.probeBlocked": (probe: string) => `修正${probe}後才能儲存。`,
   "form.size": "大小",
@@ -2432,7 +2437,7 @@ export const zhTW: Messages = {
   "add.httpOnly": "這個網址只有 HTTP。管理員指定 cert-manager 的簽發者後會使用 HTTPS。",
   "add.noPublicUrl": "你的角色不能在這個專案新增公開網域。",
   "add.more": "更多設定",
-  "add.moreSummary": "環境變數、磁碟區、規格、副本數、私有 registry 和安全性。",
+  "add.moreSummary": "環境變數、磁碟區、私有 registry 和安全性。",
   "add.variables": "環境變數",
   "add.variablesHint": "一行一個 KEY=value，和 .env 檔案相同。",
   "add.variablesBad": (lines) => `第 ${lines} 行不是 KEY=value。`,
@@ -2682,7 +2687,7 @@ export const zhTW: Messages = {
   "upload.problem.directory": "上傳內容裡的資料夾，像 apps/web。",
   "upload.problem.dockerfile": "上傳內容裡的檔案，像 docker/Dockerfile.prod。",
   "upload.after":
-    "套用後資料夾會馬上上傳，上傳完成後開始第一次建置。要建置新版本，從服務頁面再上傳一次。",
+    "套用後資料夾會馬上上傳，上傳完成後開始第一次建置。上傳完成前請保持這個頁面開啟。要建置新版本，或上傳中斷時，從服務頁面再上傳一次。",
   "upload.keepOpen": "上傳完成前請保持這個頁面開啟。",
   "upload.stage.token": "正在向 Zeabur Builder 取得上傳許可…",
   "upload.stage.sending": (sent, total) => `正在上傳… ${sent}／${total}`,
@@ -3524,6 +3529,7 @@ export const zhTW: Messages = {
   "overview.privateAddress": "私有位址",
   "trace.waiting": (name) => `等待 ${name} 就緒`,
   "trace.stopped": (name) => `${name} 目前是 0 個副本`,
+  "trace.noReplica": "沒有任何副本就緒",
   "event.word.retrying": "重試等待中",
   "event.word.checkFailed": "檢查未通過",
   "event.word.stopping": "正在停止",

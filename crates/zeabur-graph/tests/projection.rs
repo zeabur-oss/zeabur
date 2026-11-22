@@ -135,6 +135,20 @@ mod tests {
     }
 
     #[test]
+    fn a_service_lists_its_own_containers_before_its_init_containers() {
+        let mut web = deployment(&json!([]));
+        web["spec"]["template"]["spec"]["initContainers"] = json!([{"name": "wait-1"}]);
+        let snapshot = snapshot(web, &json!({}));
+        let service = &project(&snapshot).services[0];
+        let names: Vec<(&str, bool)> = service
+            .containers
+            .iter()
+            .map(|c| (c.name.as_str(), c.init))
+            .collect();
+        assert_eq!(names, [("app", false), ("wait-1", true)]);
+    }
+
+    #[test]
     fn an_import_list_another_manager_owns_is_read_only() {
         let snapshot = snapshot(deployment(&owner_of_env_from("helm")), &json!({}));
         let imports = env_from(&snapshot, workloads(&snapshot)[0], "app").unwrap();

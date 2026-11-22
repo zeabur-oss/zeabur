@@ -115,6 +115,24 @@ describe("a service's overview", () => {
     expect(o.alsoDown).toBeUndefined()
   })
 
+  test("an address the cluster could not check waits while no replica is ready", () => {
+    const unverified = route("domain", "blog.example.com", [hop("dns", "unknown")], "unknown")
+    const o = overviewOf(
+      { diagnoses: [], stopped: false, replicas: { desired: 1, ready: 0 } },
+      undefined,
+      [unverified],
+      [],
+    )
+    expect(o.waiting.get("blog.example.com")).toBe("noReplica")
+    const some = overviewOf(
+      { diagnoses: [], stopped: false, replicas: { desired: 2, ready: 1 } },
+      undefined,
+      [unverified],
+      [],
+    )
+    expect(some.waiting.size).toBe(0)
+  })
+
   test("without a diagnosis or a known reason, an address stays not reachable", () => {
     const o = overviewOf({ diagnoses: [], stopped: false }, undefined, [privateAddress], [])
     expect(o.waiting.size).toBe(0)

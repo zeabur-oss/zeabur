@@ -370,10 +370,13 @@ describe("backups", () => {
 })
 
 describe("connecting", () => {
-  test("a connection string with the password left out unless given", () => {
-    expect(connectionUri(postgres)).toBe("postgresql://app:PASSWORD@pg-rw.shop.svc:5432/app")
+  test("a hidden password is a marked placeholder, a given one is in the string", () => {
+    expect(connectionUri(postgres)).toBe("postgresql://app:<password>@pg-rw.shop.svc:5432/app")
+    expect(connectionUri(postgres, "s3cret")).toBe(
+      "postgresql://app:s3cret@pg-rw.shop.svc:5432/app",
+    )
     expect(connectionUri(mongo, "p@ss")).toBe(
-      "mongodb://USER:p%40ss@mongo-rs0.shop.svc:27017/admin?replicaSet=rs0",
+      "mongodb://<username>:p%40ss@mongo-rs0.shop.svc:27017/admin?replicaSet=rs0",
     )
   })
 

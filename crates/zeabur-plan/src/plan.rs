@@ -1206,6 +1206,7 @@ impl<'a> Planner<'a> {
             .ingresses
             .iter()
             .filter(|i| joins(i) && maintenance_of(i).is_none())
+            .filter(|i| !self.deletes("Ingress", i.metadata.name.as_deref().unwrap_or_default()))
             .find_map(|i| {
                 let backend = i
                     .spec
@@ -1304,7 +1305,15 @@ impl<'a> Planner<'a> {
         let namespace = self.input.snapshot.namespace.as_str();
         let server = self.page_server().ok();
         self.http_routes()
-            .filter(|(_, route)| route.routes_to(|name| names.contains(name)))
+            .filter(|(object, route)| {
+                !self.deletes(
+                    "HTTPRoute",
+                    object
+                        .pointer("/metadata/name")
+                        .and_then(Value::as_str)
+                        .unwrap_or_default(),
+                ) && route.routes_to(|name| names.contains(name))
+            })
             .filter(|(object, _)| {
                 redirect_rule(object).is_none() && !shows_maintenance(object, server.as_ref())
             })

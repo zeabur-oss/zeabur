@@ -1235,7 +1235,7 @@ export const en = {
   "components.needsValue": "Fill this in.",
   "components.keptSecret": "Set at the last install. Paste a new value to replace it.",
   "components.generatedSecret": "Leave it empty and Zeabur makes a random value.",
-  "components.check": "Check changes",
+  "components.check": "Review changes",
   "components.changeValues": "Change values",
   "components.value.set": "Set",
   "components.value.kept": "Kept from the last install",
@@ -1668,7 +1668,8 @@ export const en = {
     `Also deletes what ${owner} owns: ${names}`,
   "warn.deletesOwned": (owner: string, names: string) =>
     `Also deletes what ${owner} made and nothing else uses: ${names}`,
-  "warn.staysShared": (object: string, names: string) => `${object} stays: ${names} also use it`,
+  "warn.staysShared": (object: string, names: string) =>
+    `${object} stays: it is also used by ${names}`,
   "warn.staysRoute": (object: string) => `${object} stays: it also leads to a Service that stays`,
   "warn.staysControlled": (object: string, owner: string) =>
     `${object} stays: it belongs to ${owner}`,
@@ -1864,6 +1865,10 @@ export const en = {
   "confirm.createGitService": (name: string) =>
     `Create service ${name} and the build that runs your repository.`,
   "confirm.createImageService": (name: string) => `Create service ${name} from its image.`,
+  "confirm.createImageServicePublic": (name: string, host: string) =>
+    `Create service ${name} from its image, open to anyone on the internet at ${host}.`,
+  "confirm.createImageServiceInside": (name: string) =>
+    `Create service ${name} from its image, reachable only from inside the cluster.`,
   "confirm.isolates": (name: string) =>
     `${name} then accepts and sends only what this and other policies allow; the cluster blocks the rest.`,
   "confirm.delete": (name: string) => `Delete ${name}. This can't be undone.`,
@@ -1997,6 +2002,7 @@ export const en = {
   "form.probePeriod": "Every (s)",
   "form.probeFailures": "Failures",
   "form.probePreset": (port: string) => `HTTP on ${port}`,
+  "form.requestAboveLimit": "The reservation can't be more than the limit.",
   "form.computeBlocked": "Fix compute to save.",
   "form.probeBlocked": (probe: string) => `Fix the ${probe.toLowerCase()} to save.`,
   "form.size": "Size",
@@ -2653,7 +2659,7 @@ export const en = {
     "This URL is HTTP only. An administrator can name a cert-manager issuer to make it HTTPS.",
   "add.noPublicUrl": "Your role can't add a public domain in this project.",
   "add.more": "More settings",
-  "add.moreSummary": "Variables, volume, size, replicas, a private registry and security.",
+  "add.moreSummary": "Variables, volume, a private registry and security.",
   "add.variables": "Variables",
   "add.variablesHint": "KEY=value lines, as in a .env file.",
   "add.variablesBad": (lines: string) => `Not KEY=value: line ${lines}.`,
@@ -2931,7 +2937,7 @@ export const en = {
   "upload.problem.directory": "A folder in the upload, like apps/web.",
   "upload.problem.dockerfile": "A file in the upload, like docker/Dockerfile.prod.",
   "upload.after":
-    "The folder goes up as soon as you apply, and the first build starts once it is there. To build a new version, upload the folder again from the service.",
+    "The folder goes up as soon as you apply, and the first build starts once it is there. Keep this page open until the upload finishes. To build a new version, or if the upload stops, upload the folder again from the service.",
   "upload.keepOpen": "Keep this page open until the upload finishes.",
   "upload.stage.token": "Asking Zeabur Builder for permission to upload…",
   "upload.stage.sending": (sent: string, total: string) => `Uploading… ${sent} of ${total}`,
@@ -3867,6 +3873,7 @@ export const en = {
   "overview.privateAddress": "the private address",
   "trace.waiting": (name: string) => `Waiting for ${name} to be ready`,
   "trace.stopped": (name: string) => `${name} is scaled to 0`,
+  "trace.noReplica": "No replica is ready",
   "event.word.retrying": "Retrying",
   "event.word.checkFailed": "Check failed",
   "event.word.stopping": "Stopping",
