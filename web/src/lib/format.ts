@@ -1,9 +1,19 @@
 import type { Translate } from "@/i18n"
 
-export function formatTime(iso: string, locale: string): string {
+/** The date and time in the browser's time zone, or `timeZone`, with the zone's name, so it can be
+ * read beside a schedule written in UTC. */
+export function formatTime(iso: string, locale: string, timeZone?: string): string {
   const date = new Date(iso)
   if (Number.isNaN(date.getTime())) return iso
-  return new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" }).format(date)
+  return new Intl.DateTimeFormat(locale, {
+    year: "numeric",
+    month: "short",
+    day: "numeric",
+    hour: "numeric",
+    minute: "2-digit",
+    timeZoneName: "short",
+    timeZone,
+  }).format(date)
 }
 
 export function formatAgo(iso: string, locale: string, now = Date.now()): string {
