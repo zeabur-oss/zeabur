@@ -762,6 +762,8 @@ export const zhCN: Messages = {
   "domain.dns.elsewhere": (list) =>
     `DNS 指向 ${list}，不是这个集群。如果前面有 CDN 或代理，这是正常的，否则请修改记录。`,
   "domain.dns.unknown": "Zeabur 无法从集群查询这个域名。",
+  "domain.sslipName": (list) =>
+    `这个名称解析到 ${list}，不是这个集群。名称结尾是数字时，sslip.io 会读成地址。请让名称以英文字母结尾，或把地址里的点换成 -，例如 203-0-113-7.sslip.io。`,
   "domain.addRecord": "到你的 DNS 服务商添加这条记录：",
   "domain.theRecord": "指向这里的记录：",
   "domain.askAdmin": "Zeabur 不知道集群的入口地址，请询问管理员要指向哪个地址。",

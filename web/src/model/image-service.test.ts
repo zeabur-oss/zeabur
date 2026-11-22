@@ -55,6 +55,9 @@ describe("names", () => {
     expect(hostProblem("https://web.example.com")).toBe("invalid")
     expect(suggestedHost("web", "shop", "apps.example.com")).toBe("web-shop.apps.example.com")
     expect(suggestedHost("web", "shop", undefined)).toBe("")
+    expect(suggestedHost("web", "untitled-5", "172.238.20.4.sslip.io")).toBe(
+      "web-untitled-5.172-238-20-4.sslip.io",
+    )
   })
 
   test("a built service is named after its source, else web, so the host shows from the start", () => {

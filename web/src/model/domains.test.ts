@@ -7,6 +7,7 @@ import {
   isSslip,
   plainFirst,
   recordsFor,
+  dashedSuffix,
   sslipSuffix,
   wildcardFor,
 } from "@/model/domains"
@@ -121,6 +122,26 @@ describe("sslip.io", () => {
     expect(sslipSuffix("2001:db8::1")).toBe("2001-db8--1.sslip.io")
     expect(isSslip("web-shop.203-0-113-7.sslip.io")).toBe(true)
     expect(isSslip("web.example.com")).toBe(false)
+  })
+
+  test("a dotted suffix is written with dashes, so a name that ends in a digit stays apart", () => {
+    expect(dashedSuffix("172.238.20.4.sslip.io")).toBe("172-238-20-4.sslip.io")
+    expect(dashedSuffix("10.0.0.1.nip.io")).toBe("10-0-0-1.nip.io")
+    expect(dashedSuffix("203-0-113-7.sslip.io")).toBe("203-0-113-7.sslip.io")
+    expect(dashedSuffix("apps.example.com")).toBe("apps.example.com")
+  })
+
+  test("a wrong sslip.io name is a problem with the name, not a record to add", () => {
+    const wrong = check({ dns: "elsewhere", resolved: ["5.172.238.20"] })
+    expect(dnsSetup("web-5.172.238.20.4.sslip.io", wrong)).toEqual({
+      as: "name",
+      resolved: ["5.172.238.20"],
+    })
+  })
+
+  test("a dashed sslip.io name that moved is a record to add, as any other domain", () => {
+    const moved = check({ dns: "elsewhere", resolved: ["203.0.113.7"] })
+    expect(dnsSetup("web-shop.203-0-113-7.sslip.io", moved).as).toBe("elsewhere")
   })
 })
 

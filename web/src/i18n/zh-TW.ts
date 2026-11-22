@@ -763,6 +763,8 @@ export const zhTW: Messages = {
   "domain.dns.elsewhere": (list) =>
     `DNS 指向 ${list}，不是這個叢集。如果前面有 CDN 或代理，這是正常的，否則請修改紀錄。`,
   "domain.dns.unknown": "Zeabur 無法從叢集查詢這個網域。",
+  "domain.sslipName": (list) =>
+    `這個名稱解析到 ${list}，不是這個叢集。名稱結尾是數字時，sslip.io 會讀成位址。請讓名稱以英文字母結尾，或把位址裡的點換成 -，例如 203-0-113-7.sslip.io。`,
   "domain.addRecord": "到你的 DNS 服務商新增這筆紀錄：",
   "domain.theRecord": "指向這裡的紀錄：",
   "domain.askAdmin": "Zeabur 不知道叢集的入口位址，請問管理員要指向哪個位址。",
