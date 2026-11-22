@@ -164,6 +164,7 @@ export function ProjectPicker({
   const id = useId()
   const projects = useQuery(projectsQuery)
   const roles = useRoles()
+  const defaultRole = useQuery(membersQuery).data?.defaultRole
   const [query, setQuery] = useState("")
   const [first] = useState(() => new Set(chosen.keys()))
   const [others, setOthers] = useState(false)
@@ -212,7 +213,7 @@ export function ProjectPicker({
                     <Checkbox
                       id={`${id}-${name}`}
                       checked={role !== undefined}
-                      onCheckedChange={(checked) => pick(name, checked ? "viewer" : undefined)}
+                      onCheckedChange={(checked) => pick(name, checked ? defaultRole : undefined)}
                     />
                     <Label htmlFor={`${id}-${name}`} className="min-w-0 flex-1">
                       <ProjectLabel name={name} title={title(name)} />
