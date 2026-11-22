@@ -67,6 +67,10 @@ export const dashedSuffix = (suffix: string) =>
     "$1-$2-$3-$4.$5.io",
   )
 
+/** A name that ends in a digit right before a dotted address, which reads as part of it. */
+const digitBeforeAddress = (host: string) =>
+  /\d\.\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\.(sslip|nip)\.io$/.test(host)
+
 /** What a domain's DNS needs, Vercel-style: fine, or the records to add and why. */
 export type DnsSetup =
   | { as: "valid" }
@@ -77,7 +81,7 @@ export type DnsSetup =
 
 export function dnsSetup(host: string, check: DomainCheck, suffixes?: readonly string[]): DnsSetup {
   if (check.dns === "pointsHere") return { as: "valid" }
-  if (isSslip(host) && check.dns === "elsewhere")
+  if (digitBeforeAddress(host) && check.dns === "elsewhere")
     return { as: "name", resolved: check.resolved ?? [] }
   const records = recordsFor(wildcardFor(host, suffixes) ?? host, check.target)
   if (check.dns === "missing") return { as: "missing", records }

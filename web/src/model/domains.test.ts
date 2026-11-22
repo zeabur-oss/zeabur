@@ -138,6 +138,11 @@ describe("sslip.io", () => {
       resolved: ["5.172.238.20"],
     })
   })
+
+  test("a dashed sslip.io name that moved is a record to add, as any other domain", () => {
+    const moved = check({ dns: "elsewhere", resolved: ["203.0.113.7"] })
+    expect(dnsSetup("web-shop.203-0-113-7.sslip.io", moved).as).toBe("elsewhere")
+  })
 })
 
 describe("dnsSetup", () => {
