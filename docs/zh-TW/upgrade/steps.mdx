@@ -36,7 +36,7 @@ Claude Code 或 Codex 這類 Coding Agent 可以替你照著這一頁和升級�
 
 ## 用 Helm 升級
 
-如果 `kubectl -n kube-system get configmap zeabur-installer` 找到 ConfigMap，表示這台伺服器是用 zeabur-installer 裝好的。從 v0.2 升到 v0.3 時，請改照升級須知裡的[用 zeabur-installer 安裝的叢集](notes.mdx#用-zeabur-installer-安裝的叢集)，不要照這一節操作。
+如果 `kubectl -n kube-system get helmchart zeabur` 找得到 `HelmChart`，表示 Zeabur 開源版還是由 zeabur-installer v0.2 設定的 K3s `HelmChart` 在跑。從 v0.2 升到 v0.3 時，請改照升級須知裡的[用 zeabur-installer 安裝的叢集](notes.mdx#用-zeabur-installer-安裝的叢集)，不要照這一節操作。找不到 `HelmChart` 的話，Zeabur 開源版就是由 Helm release 在跑，就算 `zeabur-installer` ConfigMap 還在，也照這一節操作。
 
 把 `<版本>` 換成[選哪一版](#選哪一版)決定的版本：
 
