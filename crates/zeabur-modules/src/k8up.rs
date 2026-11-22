@@ -262,6 +262,10 @@ pub fn findings(
             targets: covered(schedule, "/spec/backup", volumes),
             note: None,
             destination: destination(schedule),
+            endpoint: backend(schedule)
+                .and_then(|b| b.pointer("/s3/endpoint"))
+                .and_then(Value::as_str)
+                .map(str::to_owned),
             retention: retention(schedule),
             run_now: run_now(schedule).ok(),
         });

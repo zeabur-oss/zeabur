@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import ArchiveIcon from "~icons/ph/archive"
+import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
 import { databasesQuery } from "@/api/queries"
@@ -13,7 +14,7 @@ import type { PlanAsk } from "@/components/plan/planner"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { useT, type Translate } from "@/i18n"
 import { backUpNow, backUpNowSummary, canBackUpNow } from "@/model/databases"
-import { dataFate, projectDeletionOf, recentBackup } from "@/model/project-deletion"
+import { backupFates, dataFate, projectDeletionOf, recentBackup } from "@/model/project-deletion"
 import { backUpVolumeNow, scheduleOf } from "@/model/volume-backups"
 
 type DeletesProject = Extract<Schemas.PlanWarning, { code: "deletesProject" }>
@@ -64,6 +65,8 @@ function Deletion({
   const backups = useBackups(project).data
   const databases = useQuery(databasesQuery(project)).data?.items ?? []
   const now = new Date()
+  const { going, staying } = backupFates(deletion.backups)
+  const names = (list: string[]) => bounded(t, list).text
   const backUp = (ask: PlanAsk) => (
     <Button variant="outline" size="xs" onClick={() => reopen(ask)}>
       <ArchiveIcon aria-hidden="true" data-icon="inline-start" />
@@ -132,23 +135,35 @@ function Deletion({
         {deletion.toolsPods.length > 0 ? (
           <p className="type-meta text-muted-foreground">{t("deletion.toolsPods")}</p>
         ) : null}
+        {going.map((g) => (
+          <p key={g.keptIn} className="type-meta flex gap-1.5 text-destructive" role="alert">
+            <WarningIcon aria-hidden="true" className="mt-0.5 shrink-0" />
+            <span>{t("deletion.backupsGo", names(g.names), g.keptIn)}</span>
+          </p>
+        ))}
       </section>
       <section className="flex flex-col gap-1" aria-labelledby="deletion-stays">
         <h3 id="deletion-stays" className="type-label">
           {t("deletion.stays")}
         </h3>
-        <p className="type-meta text-muted-foreground">{t("deletion.staysBackups")}</p>
-        {backups?.schedules.some((schedule) => schedule.provider === "k8up") ? (
+        {staying.length > 0 ? (
+          <p className="type-meta text-muted-foreground">
+            {t("deletion.staysBackups", names(staying.map((b) => b.name)))}
+          </p>
+        ) : null}
+        {staying.some((b) => b.kind === "volume") ? (
           <p className="type-meta text-muted-foreground">{t("deletion.resticPassword")}</p>
         ) : null}
         <p className="type-meta text-muted-foreground">{t("deletion.staysOutside")}</p>
-        <p className="type-meta text-muted-foreground">
-          {t("deletion.restore", t("clusterBackups.restoreGoneAction"))}
-          {t("common.gap")}
-          <Link to="/cluster/backups" className="text-foreground hover:underline">
-            {t("deletion.openBackups")}
-          </Link>
-        </p>
+        {staying.length > 0 ? (
+          <p className="type-meta text-muted-foreground">
+            {t("deletion.restore", t("clusterBackups.restoreGoneAction"))}
+            {t("common.gap")}
+            <Link to="/cluster/backups" className="text-foreground hover:underline">
+              {t("deletion.openBackups")}
+            </Link>
+          </p>
+        ) : null}
       </section>
     </div>
   )

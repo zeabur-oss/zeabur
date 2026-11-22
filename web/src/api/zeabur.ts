@@ -577,6 +577,33 @@ export type BackupCoverage = {
 }
 
 /**
+ * What a backup covers.
+ */
+export type BackupKind = (typeof BackupKind)[keyof typeof BackupKind]
+
+export const BackupKind = {
+  database: "database",
+  volume: "volume",
+  project: "project",
+} as const
+
+/**
+ * A backup of the project, and whether it goes with it.
+ */
+export type BackupDeletion = {
+  /**
+   * What in the project keeps the backup: the owner of the Service its endpoint names, else
+   * the Service. The backup goes with the project. Absent when it is kept outside and stays.
+   * @nullable
+   */
+  keptIn?: string | null
+  /** What it covers. */
+  kind: BackupKind
+  /** The database, the claim or the project. */
+  name: string
+}
+
+/**
  * A catalogue component, as an install link names it.
  */
 export type ComponentRef = {
@@ -635,6 +662,11 @@ export type BackupSchedule = {
    * @nullable
    */
   destination?: string | null
+  /**
+   * The S3 endpoint it writes to, when the provider names one.
+   * @nullable
+   */
+  endpoint?: string | null
   /** The provider's object, `<namespace>/<name>`. */
   name: string
   /**
@@ -3513,6 +3545,8 @@ export type VolumeDeletion = {
  * What deleting the project takes with it ([`Warning::DeletesProject`]).
  */
 export type ProjectDeletion = {
+  /** The project's backups, and where each is kept. */
+  backups: BackupDeletion[]
   /** Its databases, deleted before the Namespace. */
   databases: DatabaseDeletion[]
   /** The project's Namespace. */

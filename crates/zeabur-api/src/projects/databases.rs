@@ -103,7 +103,7 @@ fn operator(
     }
 }
 
-async fn read(
+pub(crate) async fn read(
     cluster: &dyn Cluster,
     catalogue: &[zeabur_catalog::Component],
     project: &str,

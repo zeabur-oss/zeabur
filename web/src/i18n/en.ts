@@ -549,8 +549,10 @@ export const en = {
   "deletion.backUpFirst": "Back up first",
   "deletion.backUpVolume": (claim: string) => `Back up ${claim} now`,
   "deletion.toolsPods": "The kubectl terminal you opened in this project is deleted too",
+  "deletion.backupsGo": (names: string, place: string) =>
+    `Backups of ${names} are kept in ${place}, which is deleted with the project. Copy them elsewhere or move the backups to another S3 destination first.`,
   "deletion.stays": "Stays",
-  "deletion.staysBackups": "Backups in S3",
+  "deletion.staysBackups": (names: string) => `Backups of ${names} in S3`,
   "deletion.resticPassword":
     "Volume backups in S3 stay, but the restic password that restores them is in a secret in this project and goes with it. Keep a copy first.",
   "deletion.staysOutside":

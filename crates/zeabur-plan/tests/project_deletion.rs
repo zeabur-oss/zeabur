@@ -11,8 +11,9 @@ mod tests {
     use zeabur_graph::Snapshot;
     use zeabur_model::{Tool, WorkloadKind, WorkloadRef};
     use zeabur_plan::{
-        Change, DeletionInput, HeldBy, ObjectName, Plan, PlanError, PlanRequest, ProjectObject,
-        ResourceRef, VolumeDeletion, Warning, Write, plan,
+        BackupDeletion, BackupKind, Change, DeletionInput, HeldBy, ObjectName, Plan, PlanError,
+        PlanRequest, ProjectBackup, ProjectDeletion, ProjectObject, ResourceRef, VolumeDeletion,
+        Warning, Write, plan,
     };
 
     fn namespace(name: &str, labels: &Value) -> Value {
@@ -184,6 +185,138 @@ mod tests {
         };
         let uploads = gone.volumes.iter().find(|v| v.claim == "uploads").unwrap();
         assert_eq!(uploads.reclaim_policy, None);
+    }
+
+    fn gone(plan: &Plan) -> &ProjectDeletion {
+        plan.warnings
+            .iter()
+            .find_map(|w| {
+                if let Warning::DeletesProject(gone) = w {
+                    Some(gone)
+                } else {
+                    None
+                }
+            })
+            .unwrap()
+    }
+
+    /// `snapshot()` with the object storage `files`: its S3 gateway is the Service `files-s3`,
+    /// which the `Seaweed` controls.
+    fn with_object_storage() -> Snapshot {
+        Snapshot {
+            services: vec![
+                serde_json::from_value(json!({"metadata": {"name": "files-s3", "namespace": "shop",
+                    "ownerReferences": [{"apiVersion": "seaweed.seaweedfs.com/v1", "kind": "Seaweed",
+                        "name": "files", "uid": "files-uid", "controller": true}]},
+                    "spec": {"clusterIP": "10.43.0.12", "clusterIPs": ["10.43.0.12"]}}))
+                .unwrap(),
+            ],
+            ..snapshot()
+        }
+    }
+
+    fn backed_up(backups: &[(BackupKind, &str, Option<&str>)]) -> DeletionInput {
+        DeletionInput {
+            backups: backups
+                .iter()
+                .map(|(kind, name, endpoint)| ProjectBackup {
+                    kind: *kind,
+                    name: (*name).to_owned(),
+                    endpoint: endpoint.map(str::to_owned),
+                })
+                .collect(),
+            ..deletion()
+        }
+    }
+
+    fn kept_in(plan: &Plan) -> Vec<(&str, Option<&str>)> {
+        gone(plan)
+            .backups
+            .iter()
+            .map(|b| (b.name.as_str(), b.kept_in.as_deref()))
+            .collect()
+    }
+
+    #[test]
+    fn backups_kept_in_the_projects_object_storage_go_with_it() {
+        let input = backed_up(&[
+            (
+                BackupKind::Database,
+                "db",
+                Some("http://files-s3.shop.svc:8333"),
+            ),
+            (BackupKind::Database, "short", Some("http://files-s3:8333")),
+            (
+                BackupKind::Database,
+                "fqdn",
+                Some("http://files-s3.shop.svc.cluster.local:8333/"),
+            ),
+            (BackupKind::Volume, "by-ip", Some("http://10.43.0.12:8333")),
+            (
+                BackupKind::Volume,
+                "unread",
+                Some("http://other-s3.shop.svc"),
+            ),
+        ]);
+        let plan = planned(&shop(), &with_object_storage(), &input).unwrap();
+        assert_eq!(
+            kept_in(&plan),
+            [
+                ("db", Some("files")),
+                ("short", Some("files")),
+                ("fqdn", Some("files")),
+                ("by-ip", Some("files")),
+                ("unread", Some("other-s3")),
+            ]
+        );
+        assert_eq!(
+            gone(&plan).backups[0],
+            BackupDeletion {
+                kind: BackupKind::Database,
+                name: "db".to_owned(),
+                kept_in: Some("files".to_owned()),
+            }
+        );
+    }
+
+    #[test]
+    fn backups_kept_outside_the_project_stay() {
+        let input = backed_up(&[
+            (BackupKind::Database, "aws", None),
+            (
+                BackupKind::Database,
+                "hosted",
+                Some("https://s3.example.com"),
+            ),
+            (
+                BackupKind::Volume,
+                "other",
+                Some("http://files-s3.other.svc:8333"),
+            ),
+            (
+                BackupKind::Volume,
+                "short-other",
+                Some("http://files-s3.other:8333"),
+            ),
+            (
+                BackupKind::Volume,
+                "unknown-short",
+                Some("http://minio:9000"),
+            ),
+            (BackupKind::Project, "shop", None),
+        ]);
+        let plan = planned(&shop(), &with_object_storage(), &input).unwrap();
+        assert!(
+            kept_in(&plan).iter().all(|(_, kept)| kept.is_none()),
+            "{:?}",
+            kept_in(&plan)
+        );
+    }
+
+    #[test]
+    fn a_project_without_backups_tells_none() {
+        let plan = planned(&shop(), &with_object_storage(), &deletion()).unwrap();
+        assert_eq!(gone(&plan).backups, []);
     }
 
     #[test]

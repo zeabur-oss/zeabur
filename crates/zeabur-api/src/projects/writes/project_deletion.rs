@@ -3,7 +3,8 @@
 //!
 //! The plan reads as the person: the Namespace, the objects in it, the database objects of each
 //! operator this build knows, and the `StorageClass`es and the bound PersistentVolumes (for what
-//! happens to the data).
+//! happens to the data), and the project's backups with the S3 endpoint each writes to (the
+//! `databases` and `backups` routes' reads).
 //! A read the person may not make leaves its part out; a refused read of database objects is told
 //! as a right the person lacks.
 //!
@@ -26,9 +27,15 @@ use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef, WriteRequest};
-use zeabur_modules::{Reading, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb};
+use zeabur_modules::{
+    Reading, backups, cloudnative_pg, dragonfly, k8up, mariadb_operator, moco, percona_mongodb,
+    velero,
+};
 use zeabur_plan::terminal::{self as plans, ToolsScope};
-use zeabur_plan::{DeletionInput, Input, Plan, PlanRequest, ProjectObject, Warning, Write};
+use zeabur_plan::{
+    BackupKind, DeletionInput, Input, Plan, PlanRequest, ProjectBackup, ProjectObject, Warning,
+    Write,
+};
 
 use super::terminal::{self, Planner};
 use super::{Applied, plan_problem, refusal, refused, write_request};
@@ -94,6 +101,7 @@ pub(super) async fn compute(
         .filter_map(|p| p.pointer("/metadata/name").and_then(Value::as_str))
         .map(str::to_owned)
         .collect();
+    let backups = backups(cluster, project, read_at).await?;
     let deletion = DeletionInput {
         zeabur_namespaces,
         databases,
@@ -101,6 +109,7 @@ pub(super) async fn compute(
         default_class,
         tools_namespace,
         tools_pods,
+        backups,
         ..DeletionInput::default()
     };
     let mut plan = zeabur_plan::plan(
@@ -260,6 +269,66 @@ async fn databases(
                 object,
             });
         }
+    }
+    Ok(out)
+}
+
+/// The project's backups that exist: a database's with a backup run, the store's endpoint; a
+/// volume's with a K8up run, its schedule's endpoint; the project's own with a Velero run. What
+/// the person may not read is left out.
+async fn backups(
+    cluster: &dyn Cluster,
+    project: &str,
+    now: Timestamp,
+) -> Result<Vec<ProjectBackup>, ApiError> {
+    let databases = crate::projects::databases::read(cluster, &[], project, now).await?;
+    let mut out: Vec<ProjectBackup> = databases
+        .items
+        .into_iter()
+        .filter(|d| !d.backups.runs.is_empty())
+        .map(|d| ProjectBackup {
+            kind: BackupKind::Database,
+            endpoint: d.backups.store.and_then(|s| s.endpoint),
+            name: d.name,
+        })
+        .collect();
+    let found = crate::projects::backups::read(cluster, &[], project).await?;
+    let run_of = |provider: &str, target: &backups::Target| {
+        found
+            .runs
+            .iter()
+            .chain(found.coverage.iter().filter_map(|c| c.last_run.as_ref()))
+            .any(|r| r.provider == provider && r.targets.contains(target))
+    };
+    for schedule in found
+        .schedules
+        .iter()
+        .filter(|s| s.provider == k8up::MODULE.id)
+    {
+        for target in &schedule.targets {
+            let new = !out
+                .iter()
+                .any(|b| b.kind == BackupKind::Volume && b.name == target.name);
+            if target.kind == backups::TargetKind::Volume && new && run_of(k8up::MODULE.id, target)
+            {
+                out.push(ProjectBackup {
+                    kind: BackupKind::Volume,
+                    name: target.name.clone(),
+                    endpoint: schedule.endpoint.clone(),
+                });
+            }
+        }
+    }
+    let namespace = backups::Target {
+        kind: backups::TargetKind::Namespace,
+        name: project.to_owned(),
+    };
+    if run_of(velero::MODULE.id, &namespace) {
+        out.push(ProjectBackup {
+            kind: BackupKind::Project,
+            name: project.to_owned(),
+            endpoint: None,
+        });
     }
     Ok(out)
 }

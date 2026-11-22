@@ -20,8 +20,10 @@
 //!   pods, the Namespace goes within seconds.
 //! - **What goes and what stays** is told in one [`Warning::DeletesProject`]: the services, the
 //!   databases, the volumes and what their reclaim policy does with the data [k8s-reclaim], and the
-//!   person's tools pods for the project. Backups in object storage and everything outside the
-//!   namespace stay.
+//!   person's tools pods for the project. It also tells where the project's backups are kept: a
+//!   backup whose S3 endpoint is a Service of the project (`<service>`, `<service>.<project>`,
+//!   `<service>.<project>.svc…` or its cluster IP) is kept in the project and goes with it; any
+//!   other backup and everything outside the namespace stay.
 //! - **Tools that put objects back.** Objects Helm, Argo CD or Flux manages are deleted with the
 //!   namespace, and the tool can create them again ([`Warning::Recreated`]).
 //! - **Refused**: a namespace Kubernetes keeps for itself (`kube-` prefix), Zeabur's own namespaces
@@ -94,6 +96,32 @@ pub struct DeletionInput {
     /// For a force deletion: the objects with finalizers among the content the namespace
     /// controller says is left.
     pub held: Vec<ProjectObject>,
+    /// The project's backups.
+    pub backups: Vec<ProjectBackup>,
+}
+
+/// What a backup covers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum BackupKind {
+    /// A database.
+    Database,
+    /// A volume's files.
+    Volume,
+    /// The project's Kubernetes objects.
+    Project,
+}
+
+/// A backup of the project, as read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectBackup {
+    /// What it covers.
+    pub kind: BackupKind,
+    /// The database, the claim or the project.
+    pub name: String,
+    /// The S3 endpoint it writes to; absent for AWS S3 or when the provider does not say.
+    pub endpoint: Option<String>,
 }
 
 /// An object whose finalizers a force deletion removes ([`Warning::RemovesFinalizers`]).
@@ -144,6 +172,23 @@ pub struct ProjectDeletion {
     pub tools_namespace: String,
     /// The person's tools pods for the project, deleted after the Namespace.
     pub tools_pods: Vec<String>,
+    /// The project's backups, and where each is kept.
+    pub backups: Vec<BackupDeletion>,
+}
+
+/// A backup of the project, and whether it goes with it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct BackupDeletion {
+    /// What it covers.
+    pub kind: BackupKind,
+    /// The database, the claim or the project.
+    pub name: String,
+    /// What in the project keeps the backup: the owner of the Service its endpoint names, else
+    /// the Service. The backup goes with the project. Absent when it is kept outside and stays.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kept_in: Option<String>,
 }
 
 /// A database that goes with the project.
@@ -249,6 +294,18 @@ impl<'a> Planner<'a> {
                 name: text(&d.object, "/metadata/name"),
             })
             .collect();
+        let backups = deletion
+            .backups
+            .iter()
+            .map(|b| BackupDeletion {
+                kind: b.kind,
+                name: b.name.clone(),
+                kept_in: b
+                    .endpoint
+                    .as_deref()
+                    .and_then(|e| kept_in(e, &name, snapshot)),
+            })
+            .collect();
         self.warnings.push(Warning::DeletesProject(ProjectDeletion {
             namespace: name,
             services,
@@ -256,6 +313,7 @@ impl<'a> Planner<'a> {
             volumes,
             tools_namespace: deletion.tools_namespace.clone(),
             tools_pods: deletion.tools_pods.clone(),
+            backups,
         }));
         self.warnings.extend(recreated(&meta, snapshot, deletion));
         Ok(())
@@ -354,6 +412,61 @@ fn text(object: &Value, pointer: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned()
+}
+
+/// What in the project serves `endpoint`: the owner of the project's Service it names, else the
+/// Service. A short name (`files-s3`, `files-s3.shop`) or a cluster IP counts only when the
+/// Service was read; `files-s3.shop.svc` and longer names the project by its DNS form
+/// [k8s-dns].
+///
+/// [k8s-dns]: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#services
+fn kept_in(endpoint: &str, project: &str, snapshot: &zeabur_graph::Snapshot) -> Option<String> {
+    let rest = endpoint.split_once("://").map_or(endpoint, |(_, r)| r);
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let authority = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    let host = authority.strip_prefix('[').map_or_else(
+        || authority.split(':').next().unwrap_or_default(),
+        |v6| v6.split(']').next().unwrap_or_default(),
+    );
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    let named = |name: &str| {
+        snapshot
+            .services
+            .iter()
+            .find(|s| s.metadata.name.as_deref() == Some(name))
+    };
+    if host.parse::<std::net::IpAddr>().is_ok() {
+        return snapshot
+            .services
+            .iter()
+            .find(|s| {
+                s.spec.as_ref().is_some_and(|spec| {
+                    spec.cluster_ips
+                        .iter()
+                        .flatten()
+                        .chain(&spec.cluster_ip)
+                        .any(|ip| *ip == host)
+                })
+            })
+            .map(owner_or_name);
+    }
+    let labels: Vec<&str> = host.split('.').collect();
+    let found = match labels.as_slice() {
+        [service] => named(service),
+        [service, namespace] if *namespace == project => named(service),
+        [service, namespace, "svc", ..] if *namespace == project => {
+            return Some(named(service).map_or_else(|| (*service).to_owned(), owner_or_name));
+        }
+        _ => None,
+    };
+    found.map(owner_or_name)
+}
+
+fn owner_or_name(service: &k8s_openapi::api::core::v1::Service) -> String {
+    zeabur_model::adapters::controller_of(&service.metadata).map_or_else(
+        || service.metadata.name.clone().unwrap_or_default(),
+        |owner| owner.name.clone(),
+    )
 }
 
 /// Refuses a namespace that is not a project of the person's to delete.

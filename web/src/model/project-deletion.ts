@@ -29,6 +29,21 @@ export function recentBackup(run: Run | null | undefined, now = Date.now()): boo
   return !Number.isNaN(finished) && now - finished < RECENT_MS
 }
 
+/** The project's backups that go with it, by what keeps them, and the names of those that stay. */
+export function backupFates(backups: Schemas.BackupDeletion[]): {
+  going: { keptIn: string; names: string[] }[]
+  staying: Schemas.BackupDeletion[]
+} {
+  const going: { keptIn: string; names: string[] }[] = []
+  for (const backup of backups) {
+    if (!backup.keptIn) continue
+    const group = going.find((g) => g.keptIn === backup.keptIn)
+    if (group) group.names.push(backup.name)
+    else going.push({ keptIn: backup.keptIn, names: [backup.name] })
+  }
+  return { going, staying: backups.filter((b) => !b.keptIn) }
+}
+
 /** The deletion warning of a plan, when it deletes the project. */
 export function projectDeletionOf(
   warnings: Schemas.PlanWarning[],

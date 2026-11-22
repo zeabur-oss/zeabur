@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  backupFates,
   dataFate,
   deletingCommands,
   projectDeletionOf,
@@ -14,6 +15,17 @@ describe("project deletion", () => {
     expect(dataFate({ claim: "data", reclaimPolicy: "Delete" })).toBe("deleted")
     expect(dataFate({ claim: "data", reclaimPolicy: "Retain", volume: "pv-1" })).toBe("kept")
     expect(dataFate({ claim: "data" })).toBe("unknown")
+  })
+
+  test("backups kept in the project go with it, grouped by what keeps them", () => {
+    const fates = backupFates([
+      { kind: "database", name: "pg", keptIn: "files" },
+      { kind: "volume", name: "uploads", keptIn: "files" },
+      { kind: "database", name: "orders" },
+    ])
+    expect(fates.going).toEqual([{ keptIn: "files", names: ["pg", "uploads"] }])
+    expect(fates.staying.map((b) => b.name)).toEqual(["orders"])
+    expect(backupFates([])).toEqual({ going: [], staying: [] })
   })
 
   test("only a backup that succeeded within a day is recent", () => {
