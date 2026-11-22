@@ -2,6 +2,442 @@
 
 All notable changes to Zeabur. Versions follow [Semantic Versioning](https://semver.org/); before 1.0.0, a minor or patch release may break the API. Each section comes from the change files in `.changeset/` (CONTRIBUTING.md, "Releases").
 
+## 0.3.0-beta.4 (2026-11-22)
+
+### Breaking Changes
+
+#### Apply answers with its writes, and the deploy key is made at apply
+
+`POST /components/{id}/apply` now answers with the plan and the result of each write, so a client sees which writes landed. A Git service's deploy key is now made when the service is applied: the Git drawer shows its public key after the service is created, and `createDeployKey` is replaced by `inspectDeployKeyHost`, which only checks the Git host. Removing a component now sends the objects it reviewed as preconditions, so a change made in the meantime stops the removal. Clients of the old answers must read the new shapes.
+
+#### Catalog components are named by id
+
+Zeabur OSS now uses Zeabur Catalog v0.5, which names each component by its id alone, such as `traefik` or `cloudnative-pg`, instead of `<capability>/<id>`. `zeaburctl components export` takes these ids, and the Components page links use them. Scripts that pass `ingress/traefik` must pass `traefik` instead. Velero moves to chart 12.2.3.
+
+#### The server judges the cluster's health
+
+The API now says what the cluster page shows, so every client reads the same verdicts. `GET /cluster/nodes` gives each node its issues, groups them for the attention list, sorts the nodes worst first and names the worst one, with the thresholds the bars use. `GET /cluster/upgrades` replaces `severity` with `badge` and `attention`, and a newer Zeabur OSS release carries its `health`. `GET /cluster/backups` gives a `verdict`, a project's backups say whether cluster backups cover it, namespace usage says whether memory is near its maximum, and volumes carry their `health`. Clients that read `severity` from the upgrades must read `badge` instead.
+
+#### Plans say their risk and fixes carry their values
+
+A plan now says how much its changes can hurt. `POST /projects/{project}/plan` returns `risk`, with a `level` (`low`, `normal` or `high`) and the `reasons` for it, each with the workloads it is about. A restart reads the ready pods when the plan is made, so every client confirms the same changes the same way.
+
+A gap's fix names the `workload` it changes and, where Zeabur OSS can choose them, the `values` the plan sets: the requests and limits, the port of a readiness check, or the path and size of a new disk. The `service`, `container` and `mountPath` parameters of these fixes are gone; clients must read `workload` and `values` instead. A volume's backup fix names the workload that mounts the volume.
+
+A diagnosis carries a `group`. Services whose diagnoses have the same group key fail the same way, and `sharedCause` says whether their cause can be said once for all of them.
+
+#### The step that sends the GitHub App to GitHub uses the web interface
+
+The page between Zeabur OSS's form and GitHub's confirmation is now part of the web interface, at `/cluster/github-app/continue`, with the same look as the rest of Zeabur OSS in light and dark and in Zeabur Desktop. It shows the App's name and the account it goes to. Only this page may send forms to GitHub. `GET /api/v1/cluster/github-app/form` now answers JSON with the form's address and the manifest instead of an HTML page.
+
+#### The image form reads zot with the CA Zeabur Builder publishes
+
+Zeabur now reads an image in the build registry, such as `zot.zot.svc:5000`, with the CA in the project's latest upload Secret, read as the person. It trusts that CA only for the registry's host. So the image form gets the ports and the user of an image in zot without a CA set at install, and a new CA after Zeabur Builder is installed again needs no restart.
+
+The chart value `builds.caBundle`, the server flag `--build-registry-ca-file` (`ZEABUR_BUILD_REGISTRY_CA_FILE`) and `registryCa` in `zeabur-info` are removed. If you set `builds.caBundle`, remove it from your values. For a registry whose CA Zeabur Builder does not publish, set `extraTrustedCA`.
+
+#### The server says which component installs a missing tool
+
+`BackupProvider`, `Notifications`, `DatabaseOperator`, `ProjectObjectStorage` and `ProjectBuilds` add `component`: the catalogue component that installs the tool, with its id and name. `GET /cluster/backups` adds `providers` with K8up and Velero, each with its state and component. A missing capability on `GET /cluster/capabilities` adds `install`: a recommended component that runs on the cluster, else the first that does. A component incident names the component as Zeabur Catalog does, so a down ingress controller is now `ingress` instead of `ingress-controller`. The web no longer keeps its own component ids or picks a component for a capability.
+
+#### The plan review no longer predicts whether new pods fit
+
+The plan preview used to add up requests against quotas and the nodes' free room, and could warn "Not enough room" before you applied. That guess missed what the host uses, affinity, taints and LimitRange defaults, so it could be wrong either way. The preview now says only what is certain: which services restart or stop, the data that goes and the fields that are removed. If a pod can't start after you apply, the service shows the real reason from the cluster.
+
+API: `Preview` loses `fit` and `unreadable`, and the `Fit`, `FitStatus`, `Blocker` and `BlockerKind` schemas are removed.
+
+#### Rights come from Kubernetes reviews, not from matching rules
+
+A project is read-only when its rules review grants no write. Each action, the Admin and Viewer roles and the cluster actions now come from access reviews, and cluster actions are checked cluster-wide. A `cluster-admin` bound only by a RoleBinding can no longer change nodes or cluster backups in the interface. `GET /projects/{p}/namespace` drops `can` and `workloadPatch` and adds `readOnly`, `canReadLogs` and `canReadSecrets`. On `GET /projects/{p}/creatable`, a kind's `access` is now `unknown` unless the project is read-only. `GET /projects/{p}/objects` answers 403 only when the person can list no kind in the project. Clients of the old fields must read the new ones.
+
+#### The server names the role and rule behind each right
+
+`GET /api/v1/rights` lists the rights the interface gates actions by, the least role and the Kubernetes rule behind each, and the right that covers each resource. `GET /api/v1/whoami` adds `member` and `admin`. Members carry `canRemove` and `canChangeAccess`, and an API token's `createdBy` is the Zeabur Identity user name without the `zeabur:` prefix. The web no longer keeps its own copy of these.
+
+#### The server makes the objects of a new image or Git service
+
+The "Docker image" form and a Compose import send one `createImageService` change per service, and "Deploy from Git" sends one `createGitService` change. The server makes the Secrets, claims, Deployment, Service, Ingress and Build from them, with the pod settings of the security profile, and checks the service name, the image, the replicas, the branch and the host. `POST /projects/{project}/image-service/yaml` gives the objects of an image service as YAML for the YAML editor. The `deployKey` change is gone: a Git service with `access.type` `deployKey` gets its key at apply. The public key is now read by `POST /projects/{project}/builds/{build}/deploy-key`, which replaces `…/deploy-keys/{name}/public`. The `ServiceReplicas` schema is gone; the limit is on `ImageServiceChange.replicas`. `UploadMethod` is renamed `BuildMethod`. The web interface builds every API address with the generated client.
+
+#### The server judges each service
+
+The API now says what the service pages show, so every client reads the same conclusions. A service carries its `role` and a `verdict` with its headline and tone, its status says the `cause` in plain words, and a project's `health` names the `worst` one. A pod summary says its `cause`, a diagnosis says the `refusedPort` and a concrete fix, a Warning event says which `warning` it is, and a domain check says its `setup` and whether Let's Encrypt refused for its rate limit. `GET /projects/{project}/builds` says whether a build is under way, gives each run its `health`, and says when a build ran out of memory or the Git host refused its credentials. A service's reachability gives the ranges of its outgoing IP limit.
+
+#### Times in the API are typed and end in `At`
+
+Every time the API returns is an RFC 3339 instant in UTC, stated as `date-time` in `openapi.yaml`. Calendar days, such as release dates and idle measurements, are `date`. A time that another tool wrote and that is not RFC 3339 is left out. Time fields are renamed to end in `At`: for example, `created` becomes `createdAt`, `since` becomes `startedAt`, and a usage `timestamp` becomes `sampledAt`. The commit that renames them lists every field. Clients must read the new names.
+
+#### Forms check names and limits by the server's rules
+
+The OpenAPI description now carries the length limits, patterns and defaults the server checks: project, task, volume, token, notification, S3 destination and uploaded service names, build paths, bucket names, kept task runs and the backup schedule. New schemas `ProjectName`, `DatabaseName` and `ServiceReplicas` name rules no request field carries. The web reads all of them from the generated rules instead of its own copies, so a bucket name may now have dots everywhere. A backup schedule may leave out `cron` and `keepDays` for daily at 03:00 UTC, kept 7 days. A plan that creates objects is now checked by a dry run, so what Kubernetes refuses in a built object, such as a bad name, is refused at review, and a plan refuses an object whose `zeabur.com/database` label is not a database name. The YAML editor no longer checks documents itself: the review shows what the server refuses, at its line.
+
+### Features
+
+#### API tokens on the Members page
+
+Admins can now create API tokens on the Members page, so scripts and CI can call the Kubernetes API. Each token is a ServiceAccount in the `zeabur-api-tokens` namespace, which the chart creates, and gets roles the same way a member does: Developer or Viewer in chosen projects. A token is never an admin; cluster-wide work uses an admin's own kubeconfig. A token expires and is shown once with a kubeconfig template and the cluster's CA certificate. Renew issues a new token for the same ServiceAccount, and Delete revokes every token issued for it. Tokens work without Zeabur Identity, so the Members page lists them even when Identity isn't installed.
+
+#### The experience program reports changes of a Deployment and their rollout
+
+When it is on, Zeabur OSS sends `app_change_submitted` when the cluster answers a new image, a new replica count or new environment variables for one Deployment, and `rollout_finished` when an accepted change becomes available or passes its progress deadline. Zeabur OSS reads the Deployment with the person's own credential to see it.
+
+#### `zeaburctl ui` joins the experience program
+
+`zeaburctl ui` joins the experience program by default and says so each time it starts. It sends `cluster_connected`: whether it could connect to the cluster of your kubeconfig. It keeps a random ID in its configuration directory, made only when the first event is about to be sent; `zeaburctl telemetry reset` deletes it. `zeaburctl telemetry status` shows whether it sends and which setting decides it; `zeaburctl telemetry disable` (or `DO_NOT_TRACK=1`) turns it off and `zeaburctl telemetry enable` turns it back on. Sending never delays the link or the browser.
+
+#### Install components that add values to other components
+
+Components that add values to another component's release, such as CrowdSec's bouncer in Traefik and VictoriaMetrics' Alertmanager in Falco, now install from **Cluster** → **Components**. The plan shows the other component as a step: Zeabur OSS writes its chart again, or a `HelmChartConfig` for Traefik that K3s or RKE2 packages. Removing the component takes its values out again. When another tool installed the other component, or you wrote its `HelmChartConfig`, Zeabur OSS leaves it as it is and the plan shows the values to add yourself.
+
+#### Install components that ask for values
+
+Components that ask for values, such as Velero's bucket and credentials, now install from **Cluster** → **Components**. The dialog shows a field for each value; secret values go into a Secret before the chart and never show again. Zeabur OSS makes a random value for a key the catalog lets it generate, keeps every value for the next install, and **Change values** on an installed component writes new ones. A component Zeabur OSS cannot install yet says why on its card, and **How to install** shows the commands that print it for Flux or Argo CD.
+
+#### Install and remove components from the Components page
+
+On K3s and RKE2, a cluster administrator installs a component from **Cluster** → **Components**: Zeabur OSS shows each step and the objects it writes, then writes one step at a time and waits for it to be ready, starting with cert-manager. **Manage** continues an unfinished install, or removes a finished one: Zeabur OSS deletes what it installed in reverse order and keeps CRDs and keys. Template updates read the same `catalog.url`. Zeabur OSS downloads Zeabur Catalog from `https://oss-catalog.zeabur.com/v1/` and keeps the last release in the ConfigMap `zeabur-catalog`; set `catalog.url` to serve a mirror to a cluster without internet access.
+
+#### Install components from the command line
+
+`zeabur components install <id>...` installs catalog components the same way **Cluster** → **Components** does, as the pod's service account. It waits until every step and health check is ready, or until `--timeout` passes. A component that something other than Zeabur OSS installed stays as it is.
+
+#### Connect to any service from outside the cluster
+
+`zeaburctl connect <project>/<name>` also reaches a service that is not a database: it forwards a local port to the service's Kubernetes Service and prints `127.0.0.1:<port>`. When the service has several ports, pick one with `<project>/<name>:<port>`.
+
+#### Connect to a database from outside the cluster
+
+`zeaburctl connect <project>/<database>` forwards a local port to any database and prints a connection string on 127.0.0.1. The database page shows the command, and says when your role can't use it.
+
+#### Zeabur Desktop on the release page, with updates
+
+Each release now carries Zeabur Desktop for macOS on Apple silicon (`.dmg`), Windows on x64 (an installer and a portable `.exe`) and Linux on amd64 and arm64 (`.deb`, `.rpm` and `.AppImage`), covered by the release's signed `SHA256SUMS` and attestation. The app checks for a new version when it starts and from **Check for updates**, shows what changed, and installs only when you confirm. The macOS app, the Windows installer and the AppImage update themselves; the others open the release page.
+
+Releases are now signed by this repository's own release workflow, `zeabur-oss/zeabur/.github/workflows/release.yml`. To verify a release, accept that signer as well as the shared workflow that signed earlier releases; [Releases](docs/reference/releases.mdx) shows the command.
+
+#### Dragonfly has no backups
+
+A Dragonfly database no longer has a **Backups** tab. Dragonfly keeps its data in snapshots on its volume and loads the newest one when it starts. A snapshot folder in a bucket is where the store keeps its data, not a separate copy, so Zeabur OSS no longer sets one up or restores a new database from it.
+
+#### Remove zeabur-installer; the chart guards system hosts
+
+`zeabur-installer` and its release archives are gone. To run Zeabur OSS, install the chart on an existing Kubernetes cluster. Setting up a server from nothing moves to Zeatend ([#430](https://github.com/zeabur-oss/zeabur/issues/430)). The cluster page no longer shows installer steps for upgrades, and "How to install" on a missing component prints the `zeaburctl components export` command.
+
+The chart now has the `zeabur-system-hosts` ValidatingAdmissionPolicy that the installer used to apply. Outside namespaces labelled `zeabur.com/platform: "true"`, a new or changed Ingress rule needs a host and an HTTPRoute needs hostnames, and neither can claim the host of Zeabur OSS or Zeabur Identity. It reads those hosts from the release's namespace and from each namespace in `systemHosts.namespaces` (default `zeabur-identity`). Set `systemHosts.enabled: false` to leave it out.
+
+#### Edit or turn off a database's backups
+
+A database's **Backups** tab now has **Edit** and **Turn off backups**. Edit changes the destination, schedule, retention or access keys. The form never shows the saved keys, and leaving them empty keeps them. Turning off stops the schedule and keeps the keys secret and the backups already in the bucket.
+
+#### Force delete a project held by finalizers
+
+When a project stays in Deleting because an object's controller is gone, the banner offers **Force delete**. After you type the project name, Zeabur OSS removes the finalizers from the objects Kubernetes is still waiting on, running as you, and never from the namespace itself. The plan lists each object and finalizer and warns that their controllers won't clean up what they made outside the cluster. For a Kubernetes finalizer such as `kubernetes.io/pvc-protection`, it adds a separate warning to deal with the Pod or node that holds it first.
+
+#### Install with Homebrew
+
+On macOS and Linux, `brew tap zeabur-oss/tap` and then `brew install zeabur-oss/tap/zeaburctl` installs `zeaburctl`, and `brew upgrade` updates it. On a Mac, `brew install --cask zeabur-oss/tap/zeabur-desktop` installs Zeabur Desktop, which keeps updating itself. Both install the signed files of the release and check them against its `SHA256SUMS`, and each new release updates them.
+
+#### Install pre-releases with Homebrew
+
+Pre-releases go to the Homebrew tap's beta channel. `brew install zeabur-oss/tap/zeaburctl-beta` installs the newest pre-release of `zeaburctl`, and on a Mac `brew install --cask zeabur-oss/tap/zeabur-desktop@beta` installs the newest pre-release of Zeabur Desktop. Each conflicts with its normal-release version, so uninstall one before you install the other.
+
+#### Install Falco, System Upgrade Controller and Traefik's Gateway API CRDs
+
+Zeabur OSS now installs components whose releases are manifest files at URLs. It downloads each file and uses it only when its SHA-256 matches the one in Zeabur Catalog. A release is left out when the cluster already has the CRDs it lists in `skipIfPresent`, such as the policy report CRDs that Kyverno installs. Removing a component keeps the CRDs Zeabur OSS wrote, and the removal dialog lists them under **Stays on the cluster**. The cluster where Zeabur OSS runs needs to reach these URLs.
+
+#### One `helm install` for Zeabur OSS and Zeabur Identity
+
+The chart now installs Zeabur Identity with Zeabur OSS, registers Zeabur OSS as its client and makes the client secret, so no `zeabur-identityctl` step comes first. With no `global.domain`, Zeabur OSS is at `zeabur.<ip>.sslip.io` and Identity at `identity.<ip>.sslip.io`, where `<ip>` is the first node's address. Right after the install, a hook Job installs cert-manager from Zeabur Catalog, and both addresses get Let's Encrypt certificates. The install notes print the link that creates the first administrator. Set `identity.enabled=false` to keep an issuer of your own.
+
+#### Change settings of K3s and RKE2 built-in components
+
+The card of a component that K3s or RKE2 installed as a Helm chart, such as Traefik, names the `HelmChartConfig` that changes its settings and links to an example in the docs.
+
+#### A plan dry-runs the pods it starts
+
+A plan that starts or scales up a Deployment or StatefulSet sends one of its Pods as a dry run. A quota, a LimitRange maximum or a Pod Security level that would refuse the pods now refuses the plan at its change. The pods the plan adds, with the LimitRange's default requests, are held against the project's quotas.
+
+#### Zeabur OSS offers Zeabur Catalog's newest templates without an upgrade
+
+When someone opens the template list, at most once every 6 hours, the Zeabur OSS server reads `catalog.json` from Zeabur Catalog's API at `https://oss-catalog.zeabur.com/v1/`, fetches `templates/<id>.json` for each template that changed, and offers those templates in place of the ones it was built with. Zeabur OSS trusts the HTTPS address it fetches from; the files carry no signature. A template that does not read or needs a component this Zeabur OSS does not know is not offered, and the one offered before stays. Components stay as built, and deployed services do not change. Turn it off with the chart's `templateFetch.enabled=false` or `ZEABUR_TEMPLATE_FETCH=false`; `DO_NOT_TRACK` does not turn it off. It reads the same address as component installs, the chart's `catalog.url` or `ZEABUR_CATALOG_URL`, so one setting points both at a mirror. See [Template updates](docs/reference/telemetry.mdx#template-updates).
+
+#### Template room is counted node by node
+
+Whether the cluster has room for a template now comes from Zeabur OSS (`GET /api/v1/cluster/template-rooms`). Each pod must fit on one ready, schedulable node that keeps a tenth of its room free, so room spread over several nodes no longer counts.
+
+#### Zeabur OSS applies its own alert rules and log access
+
+Zeabur OSS now applies the `zeabur-notifications` VMRule when it installs VictoriaMetrics, and the NetworkPolicy that lets Zeabur Proxy read VictoriaLogs when it installs VictoriaLogs. They come from the Zeabur OSS binary, so the rules match the Zeabur OSS version that reads them. `zeaburctl components export` prints them after each component for Helm, Flux and Argo CD installs. When the rules are missing or come from another Zeabur OSS version, **Cluster** → **Notifications** says so and offers **Install rules** or **Update rules**. The rules read the custom resource metrics as `kube_customresource_*`.
+
+### Fixes
+
+- A long list of services no longer makes the page scrollable
+
+#### The Add menu opens a missing component's install dialog
+
+An entry in **New** that needs a component first, such as a database operator or Zeabur Builder, now looks like the other entries and opens that component's install dialog on the Components page. Before, it looked disabled and showed only a `zeaburctl` command.
+
+#### The Backups tab says when WAL archiving fails
+
+A PostgreSQL database whose CloudNativePG `ContinuousArchiving` condition is false used to look like one that was still starting. The Backups tab now shows the operator's message and when archiving began to fail, and the disabled Back up now button says why.
+
+#### Uploading a folder and deploying from Git work with Zeabur Builder v0.2.4 and later
+
+"Review changes" for **Upload a folder** and **Deploy from Git** no longer fails with `spec.source.type: Required value`. Zeabur now writes and reads the Build source in the shape Zeabur Builder v0.2.4 introduced: `spec.source.type` is `git` or `archive`, the repository's credentials are under `spec.source.git`, and the directory and Dockerfile are on `spec.source`. Builds in the old shape are not read; Zeabur Builder v0.2.4 does not take them either.
+
+#### Zeabur Catalog 0.5.5
+
+Zeabur OSS embeds Zeabur Catalog 0.5.5. Its `builder` component installs Zeabur Builder 0.2.3: builds can be capped per cluster, run on build nodes set aside by a taint, and record their steps. Build Jobs get a memory limit.
+
+#### Zeabur Catalog 0.5.6
+
+Zeabur OSS embeds Zeabur Catalog 0.5.6. Velero takes the CA certificate of an S3 store that has its own certificate, such as a self-hosted MinIO. OpenClaw reaches its Browser Sandbox, and the Longhorn node check no longer names zeabur-installer. VictoriaMetrics and VictoriaLogs leave Zeabur OSS's alert rules and log access to Zeabur OSS.
+
+#### Zeabur Catalog 0.6.1
+
+Zeabur OSS embeds Zeabur Catalog 0.6.1 and reads every catalog file with the catalog's own types. A component whose file this version cannot read shows as one that needs a newer Zeabur, and the other components still load.
+
+#### Zeabur reads every Zeabur Catalog release on `/v1/`
+
+Zeabur no longer refuses a Zeabur Catalog release of a newer minor version, such as 0.6.0, with "needs a newer Zeabur". Every release on `/v1/` only adds to the API, so Zeabur reads any of them and leaves out the fields it does not know.
+
+#### Certificate failure shown without a click
+
+The cert-manager message under a domain is open when the certificate failed to issue.
+
+#### Components pick a fixed ClusterIP
+
+Installing a component with an input that takes a fixed ClusterIP, such as `clusterIp` of Zeabur Builder, fills it with the lowest free address in the Service CIDR's static band when it is left empty. The install review shows the address, and a later install keeps it. Before, the input stayed empty, zot got a random address, and nodes could not pull built images.
+
+If you installed Zeabur Builder before this release, its zot Service already has an assigned address that cannot change, so installing it again fails. Run `kubectl -n zot delete service zot` first: the install then creates the Service at the picked address. zot's pod and its images stay.
+
+#### Removing a component that is still in use names what uses it
+
+Removing a component while other objects use it, such as Zeabur Builder with a Build, no longer says the object changed after you reviewed it. The dialog lists what still uses the component and asks you to delete it first, in your language.
+
+#### Removing a component no longer fails when an object is already gone
+
+Removing a catalog component could fail with `404` when helm-controller finished deleting a HelmChart while Zeabur was deleting it again. A removal now leaves alone an object that is already being deleted, and a delete that finds the object gone counts as done.
+
+#### A failed component install no longer fails `helm install`
+
+The Job that installs `components.install` is no longer a Helm hook. `helm install` returns as soon as Zeabur OSS is deployed and prints the admin link, and the Job installs cert-manager after it. The Job retries for about 45 minutes, so a short outage of Zeabur Catalog heals by itself. When it succeeds, it deletes its `cluster-admin` binding. Its pods no longer carry the labels of the Zeabur OSS Service, so the Service never sends requests to them. Before, a catalog that Zeabur OSS could not read failed the release, and Helm printed no admin link.
+
+#### The components Job trusts extraTrustedCA and uses outboundProxy
+
+The `post-install` Job that installs `components.install` now mounts `extraTrustedCA` and sets the `outboundProxy` variables, as the server does. Before, a `catalog.url` behind a private CA or a proxy made the Job fail with `invalid peer certificate: UnknownIssuer`.
+
+#### A Compose variable such as `discovery.type` imports again
+
+Creating an image or built service no longer refuses a runtime variable name that is not a C identifier. Kubernetes judges the name in the plan's dry run, so names such as `discovery.type` from a Compose file plan as before. Build variables keep the stricter rule.
+
+#### Connection string placeholders
+
+A database connection string shows `<password>` while the password is hidden, instead of the text `PASSWORD`.
+
+#### Every create checks the kinds the cluster serves
+
+A plan that creates an object from a form, such as a database, a bucket or a backup, now reads the cluster's API discovery, as a create from YAML already did. A kind the cluster does not serve, for example a database whose operator is not installed, is refused when the plan is made instead of when it is applied. Zeabur OSS no longer keeps its own list of kinds to fall back on. When discovery cannot be read, the plan is refused.
+
+#### A database operator's volumes no longer get volume-backup advice
+
+Missing setup suggested a K8up or Velero volume backup for each volume of a database that an operator runs, such as a CloudNativePG `Cluster` or a `MariaDB`. Copying the files of a running database does not give a consistent backup, and the database has its own backups. These volumes now have no row of their own under Backups and no volume-backup advice. Other volumes keep their advice, and a CloudNativePG database without a `ScheduledBackup` still shows its warning.
+
+#### The Desktop screenshots are taken with Playwright
+
+The Desktop images in the docs come from the pages of the app in Chromium with the app's commands mocked, in English, zh-TW and zh-CN, light and dark. `scripts/docs-shots.sh desktop` takes them.
+
+#### Zeabur Desktop checks for updates again
+
+Check for updates failed with "Could not fetch a valid release JSON from the remote", because the app asked for the newest release and GitHub's newest release skips pre-releases. Zeabur Desktop now looks for the newest release that has an update: a release build takes newer releases, and a pre-release build takes newer pre-releases too. **Check for updates** moves into a small menu beside the language picker, with the version. The answer comes as a notification: up to date, or a short message with **Try again**. A newer version shows an **Update to** button in the sidebar, and its dialog links to the release notes on GitHub.
+
+#### The desktop app uses url 2.5.9
+
+The desktop app now builds with `url` 2.5.9, which fixes RUSTSEC-2026-0592. In 2.5.8, `Url::origin()` on a URL with many nested `blob:` prefixes overflowed the stack.
+
+#### digests.txt lists the images Zeabur OSS runs by default
+
+A release's `digests.txt` now also names the busybox image used for debug containers (`debug index`) and the `alpine/k8s` image used by terminals (`tools index`). Zeabur OSS runs both without publishing them, so a registry mirror built from `digests.txt` alone left terminals stuck in `ImagePullBackOff`. The release checks that each is still served for `linux/amd64` and `linux/arm64`, and `verify` checks that `digests.txt` names the images the code pins. Zeabur OSS does not sign these two.
+
+#### The env editor opens on the main container
+
+A service that has init containers lists its regular containers first, so the environment editor opens on the container that runs the app.
+
+#### Experience program also counts log, terminal and invitation use
+
+With the experience program on, Zeabur OSS's server also sends `feature_used` with `logs_viewed` when a log stream opens, `terminal_opened` when a terminal session is ready and `member_invited` when an invitation succeeds, at most once a day for each.
+
+#### Experience program counts how services, databases and domains are created
+
+With the experience program on, Zeabur OSS's server sends `feature_used` after a successful apply that creates a service (`git`, `upload`, `image` or a catalog `template`), a database or object storage (its kind), or a domain (`generated` or `custom`), at most once a day for each feature and set of values. See the Experience program page for what is sent.
+
+#### Flux and Argo CD commands in the component install dialog
+
+The install dialog on **Cluster** → **Components** shows the `zeaburctl components export` commands that print the component for Flux or Argo CD, for a cluster managed with either. On a cluster without helm-controller, the refusal names the same command.
+
+#### Growing a volume names only the StatefulSet it belongs to
+
+Before you grow a volume, the confirmation says which services the change also affects. It also named a StatefulSet whose name only ended the volume's name, such as `replica` for `data-db-replica-0`. Now it names the StatefulSet that created the volume from its claim template or controls it, and the services that mount it.
+
+#### Components read from Zeabur Catalog 0.5.6
+
+Zeabur OSS reads the components of Zeabur Catalog 0.5.6 again. Their health checks of a Deployment, StatefulSet or DaemonSet name no condition, because kstatus decides when a workload is ready, and Zeabur OSS no longer requires one.
+
+#### The chart installs Zeabur Identity v0.3.3
+
+With Zeabur Identity v0.3.3, a later `helm upgrade` of the chart no longer fails with a conflict on `app.kubernetes.io/managed-by` of the Secret `zeabur-identity-signing-keys`. Zeabur Identity now changes only the keys of that Secret and keeps the labels and annotations Helm set.
+
+#### Public domain choice in the image form
+
+The image form asks whether the new service gets a public domain, and the review says which.
+
+#### Size and Replicas shown in the image form
+
+The image form shows Size and Replicas above "More settings", so the memory limit is no longer hidden.
+
+#### Start a new project member as Developer on the Members page
+
+The invite dialog on the Members page now starts a ticked project at the role the server sends, which is the same role the project's own Members route starts with. It was Viewer before, and a Viewer cannot read logs.
+
+#### Kinds outside their group's preferred version count as served
+
+A kind that its API group serves only at a version other than the preferred one, such as VictoriaMetrics' `VMRule` at `v1beta1` while the group prefers `v1`, no longer shows as not served. Templates and installs that need such a kind now go ahead. Zeabur OSS uses the version kubectl uses: the preferred version when it serves the kind, otherwise the highest-priority version that does.
+
+#### The status light shows a StatefulSet or DaemonSet update until it finishes
+
+After an image change on a StatefulSet or a DaemonSet, the status light said Running while the old pods still served, and the rollout panel said the update was still under way. Both now use the same kstatus rules, so both show the update until every pod runs the new template. A Deployment whose old ReplicaSet still has pods also shows as rolling out. An `OnDelete` StatefulSet still waits for its pods to be deleted, and the rollout panel now shows it as done once every pod was recreated.
+
+#### Template licences as names
+
+The template drawer shows licence names in words instead of the SPDX expression.
+
+#### Members show their passkeys again
+
+The Members page showed `沒有通行密鑰` for every member, also for those who signed in with a passkey. Zeabur read the kind of a `Credential` from `spec.type`, which Zeabur Identity v0.3 no longer writes: the field that is set (`passkey`, `external` or `password`) names the kind. Zeabur now reads that shape. The passkey count, linked accounts, removing a credential or a member, an account reset and the device-bound passkey check for admin AAL3 work again.
+
+#### Memory alert no longer fires on a healthy small server
+
+The Overview divided the memory in use by the whole machine, including the system's, by allocatable memory, which leaves out the system reserve. A new install on a 4 GB server showed "memory used 153%". It now divides by the machine's memory.
+
+#### A MongoDB database shows the user and password the operator wrote
+
+A new MongoDB database names its users Secret `<name>-secrets`, and the database page and `zeaburctl connect` read the Secret the cluster names. A cluster that names none is read at the operator's own default, `percona-server-mongodb-users`, which is where its users really are.
+
+#### A domain with no ready replica is not reachable
+
+The route trace no longer calls a domain reachable while the service has no ready replica.
+
+#### Object storage fits its volumes to its disk
+
+A new object storage sets the size and number of its SeaweedFS volumes from the disk size you choose, and growing the disk adjusts them. Before, SeaweedFS made volumes of up to 30 GB, so a store on a small disk had one volume. Every bucket needs volumes of its own, so each upload to a bucket failed with `InternalError`, and PostgreSQL backups to it failed.
+
+#### Zeabur OSS's outbound requests can go through an HTTP proxy
+
+Set `outboundProxy` in the chart to send the requests Zeabur OSS makes itself (images, backups, GitHub) through an `http://` proxy with a `CONNECT` tunnel. Local addresses, `.svc`, `.cluster.local` and the cluster network are never sent to the proxy, and the same addresses are refused as without one.
+
+#### The project overview decodes each object once
+
+Reading a project overview allocates about 22% fewer bytes and 41% fewer times, and runs faster, because each list is decoded straight into its type. Secrets read through the generic path are decoded without their values.
+
+#### Open a replica's YAML from the service page
+
+The replica list under a service's squares links each pod to its YAML, so a person can read why one pod is not ready without leaving the page.
+
+#### Problems describe the pod as it is now
+
+A service that failed its health checks while it started kept a red `健康檢查沒通過` banner and a `需要調整設定` tag on the canvas for up to 10 minutes after its pods were Ready. The Overview counted the same start-up warnings, so a fresh install showed warnings. Zeabur now leaves out an event about a pod from before the pod last became Ready. The service's and the project's event lists still show it. A probe that fails after the pod was Ready still shows the problem.
+
+#### Project deletion with a running database
+
+Deleting a project with a running CloudNativePG database no longer leaves the project `Terminating` for up to 5 minutes. The database is deleted together with its pods before the project's namespace.
+
+#### Registry credentials go only to the token service the registry names, over HTTPS
+
+When Zeabur OSS reads an image's ports and user, it sends the registry's username and password only to the token service in the registry's `WWW-Authenticate` challenge, and only over HTTPS. A token service on a loopback, link-local or private address is refused unless it is on the registry's own host. Redirects of registry requests carry no credentials or token, and a challenge after a redirect is not answered.
+
+#### Remove and add a domain in one review
+
+Removing a domain and adding the same host again in one review now makes one plan. Before, the review failed.
+
+#### Resources form error in your language
+
+The Resources form shows the error for a request above its limit in the interface language.
+
+#### The restore form says what will exist afterwards
+
+Restoring a database makes a second one, and the form now says so: the new database is created, the original keeps running, and services keep using it until you point them to the new one. The new database's page lists the next steps in order, with a link to delete the original.
+
+#### A restore copy fits only when each pod fits on one node
+
+A restored copy used to fit when the nodes' free room added up to what its pods request. Each pod is now placed on one ready node that has its CPU, memory and a free pod slot, the largest pods first. Three nodes with 1 GiB free each no longer report room for a pod that requests 2 GiB.
+
+#### Review step named alike
+
+The component install flow calls its review step "Review changes", and a review row for a whole object is titled by its kind.
+
+#### Add destination opens a drawer
+
+On the Cluster Backups page, Add destination and Edit open the S3 destination form in a drawer with the first field focused, in place of a form below the page where it could not be seen.
+
+#### A secret key change checks who owns each key it writes
+
+Setting one key of a secret no longer fails because Helm, Argo CD or Flux owns another key. Removing a key and setting it again is refused when one of those tools owns it. A key removed in a later change of the same plan is removed.
+
+#### A secret's YAML shows its values, and its keys are edited one at a time
+
+The YAML of a secret is the object as the cluster stores it, with `data` in base64, for a person who may read the secret. In the key editor each value is masked until you press its eye, a copy button copies the decoded value, and a binary value shows its size with a download. Saving sends only the keys you changed. A secret's YAML is planned like any other object's: removing a key from `data` removes it from the secret.
+
+#### Diagnoses and build times follow the server's clock
+
+Project, database, object storage and build reads, and the cluster events' `sinceSeconds`, count time from the server's clock instead of the machine's. On a real cluster nothing changes; a fixed clock (tests, the demo's screenshots) now sees recent events as recent.
+
+#### Ask before closing a setup link that was not copied
+
+Closing the setup link dialog before the link is copied now asks first, with a way back to the link. Copying from the link box counts as a copy. The link is still shown only once.
+
+#### Default domain after a name ending in a digit
+
+The suggested sslip.io domain uses a dashed address when the service name ends in a digit, so the host reads as the right address.
+
+#### A PostgreSQL backup that never ends shows as stalled
+
+A PostgreSQL backup that has run for more than an hour shows as Stalled on the database's Backups tab. The row says that the next backup waits for it, and a Remove button opens a review that deletes it.
+
+#### A name that is already taken says the object exists
+
+Creating a service over an object left behind, such as a `<name>-env` Secret that kubectl did not delete, no longer fails with "changed after the plan was made". The review says the object already exists in the project, so you can delete it or pick another name.
+
+#### Deleting a template service takes what its template made
+
+Deleting a service that a template made also deletes the domain, certificate and volume the template made for it, unless another service still uses them.
+
+#### Times name their time zone
+
+A time shown in your browser's time zone, such as a backup or a restore point, now names the zone, so it can be read beside a schedule written in UTC.
+
+#### Upload a folder says to keep the page open
+
+The **Upload a folder** form now says to keep the page open until the upload finishes, and that an upload that stopped can be sent again from the service.
+
+#### Folder uploads trust the registry's own CA
+
+A folder upload now trusts the CA that Zeabur Builder puts in the Build's upload Secret, so it reaches zot without a CA set in the chart. A failed upload also shows its error and a Retry button on the service overview, not only on the Builds tab.
+
+#### Focus, hidden tabs, small targets and form fields on the web
+
+Links and buttons show the design system's focus outline. Pages behind the object list, the create menu, settings and the project switcher load ahead, and switching projects uses a plain link, so it opens in a new tab too. Log follow and clocks stop while the tab is hidden. Small controls have a 24 by 24 px hit area, and the design system 0.1.5 gives checkboxes, radios and the dock and sidebar buttons the same. A cleared number field no longer writes 0, and trimmed text fields keep the cursor where it was.
+
+#### A built app that doesn't listen on its port says so
+
+When a built service's health check is refused on its port a minute after the container started, Overview says the app isn't listening there and how to fix it: read `PORT`, or listen on `0.0.0.0` instead of `127.0.0.1`. When the image declares another port with `EXPOSE`, that message also offers **Use port …**, which moves the container port, health checks, `PORT` and the port the service's private addresses send traffic to.
+
+#### zeaburctl reads a newer server's answers
+
+`zeaburctl up` against a newer Zeabur OSS server no longer fails on a field or value this version does not know. It reads only the fields it uses, and a problem kind or backup provider state it does not know reads as unknown.
+
+#### zeaburctl reads the API with the server's own types
+
+`zeaburctl doctor`, `up` and `connect` send and read the API's requests and answers as the types the server writes, not as copies of their own. A field the server renames or retypes now stops the build of zeaburctl instead of failing when a command runs. A refusal reads as the server's problem, so a missing permission is named as before.
+
 ## 0.3.0-beta.3 (2026-11-22)
 
 ### Breaking Changes
