@@ -2638,7 +2638,6 @@ export const zhTW: Messages = {
   "add.planGit": (name) => `從 Git 部署 ${name}`,
   "add.card.git": "建置並執行 Git 儲存庫。",
   "add.palette.git": (project) => `在 ${project} 從 Git 部署`,
-  "add.gitNeedsWhy": "從 Git 部署和上傳資料夾都要用到這些元件。",
   "add.gitMissing.keel": "需要 Keel 元件，但這個叢集沒有，它的 Kubernetes 版本也裝不了。",
   "add.gitMissing.registrySetting":
     "Zeabur 沒有設定建置用的 registry，請在 chart 設定 builds.registry。",

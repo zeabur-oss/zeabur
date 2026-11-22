@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
-import { cloneElement, Fragment, useState } from "react"
+import { cloneElement, Fragment } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 import PlusIcon from "~icons/ph/plus"
 
@@ -14,7 +14,6 @@ import {
   objectStorageQuery,
 } from "@/api/queries"
 import { GatedMenuItem, GateTip, useGates } from "@/components/gate"
-import { LazyInstallerSheet } from "@/components/lazy-installer-sheet"
 import { useT, type Translate } from "@/i18n"
 import { openAdd, type AddWhat } from "@/lib/adding"
 import { engineName, engines, type Engine } from "@/model/databases"
@@ -129,13 +128,6 @@ export function useAddChoices(project: string | undefined): AddChoices | undefin
   }
 }
 
-/** The install steps a closed item opens. */
-export interface Steps {
-  components: Component[]
-  reason?: string
-  note?: string
-}
-
 /** One thing "New" offers, shared by the menu and the empty project's tiles. */
 export interface AddEntry {
   what: AddWhat
@@ -145,8 +137,8 @@ export interface AddEntry {
   gate: Gate
   /** Set when the cluster lacks something: what, said under the label. */
   why?: string
-  /** The install steps that open it, when Zeabur knows them. */
-  steps?: Steps
+  /** The component to install first, whose install dialog the entry opens, when Zeabur knows it. */
+  install?: Component
 }
 
 export const entryTestid = (what: AddWhat) =>
@@ -165,7 +157,7 @@ function gitEntry(git: AddChoices["git"], what: "git" | "upload", t: Translate):
   return {
     ...entry,
     why: t("add.installFirst", names),
-    steps: { components: git.install, reason: t("add.gitNeedsWhy"), note },
+    install: git.install[0],
   }
 }
 
@@ -178,7 +170,7 @@ function operatorEntry(
 ): AddEntry {
   const entry: AddEntry = { what, group, label, gate: { open: true } }
   if (installed || !operator) return entry
-  return { ...entry, why: t("add.installFirst", operator.name), steps: { components: [operator] } }
+  return { ...entry, why: t("add.installFirst", operator.name), install: operator }
 }
 
 /** Everything "New" offers, in the menu's order. */
@@ -202,7 +194,6 @@ export function addEntries(choices: AddChoices, t: Translate): AddEntry[] {
 export function AddMenu({ project, compact = false }: { project: string; compact?: boolean }) {
   const t = useT()
   const choices = useAddChoices(project)
-  const [steps, setSteps] = useState<Steps>()
   if (!choices) return null
   const trigger = compact ? (
     <Button variant="ghost" size="icon-xs" aria-label={t("add.inProject", project)} />
@@ -225,53 +216,38 @@ export function AddMenu({ project, compact = false }: { project: string; compact
     return <GateTip gate={choices.gates.image}>{cloneElement(trigger, {}, face)}</GateTip>
   const entries = addEntries(choices, t)
   return (
-    <>
-      <Menu>
-        <MenuTrigger render={trigger}>{face}</MenuTrigger>
-        <MenuContent align={compact ? "start" : "end"} className="w-60">
-          {entries.map((entry, i) => (
-            <Fragment key={entry.what}>
-              {i > 0 && entries[i - 1]?.group !== entry.group ? <MenuSeparator /> : null}
-              <EntryItem
-                entry={entry}
-                onOpen={() => openAdd(project, entry.what)}
-                onSteps={setSteps}
-              />
-            </Fragment>
-          ))}
-          {!choices.gates.database.open ? (
-            <>
-              <MenuSeparator />
-              <GatedMenuItem gate={choices.gates.database}>{t("add.database")}</GatedMenuItem>
-            </>
-          ) : null}
-          {choices.yaml ? (
-            <>
-              <MenuSeparator />
-              <MenuLabel>{t("add.advanced")}</MenuLabel>
-              <MenuItem render={<Link to="/projects/$project/create" params={{ project }} />}>
-                {t("add.yaml")}
-              </MenuItem>
-            </>
-          ) : null}
-        </MenuContent>
-      </Menu>
-      {steps ? <LazyInstallerSheet {...steps} onClose={() => setSteps(undefined)} /> : null}
-    </>
+    <Menu>
+      <MenuTrigger render={trigger}>{face}</MenuTrigger>
+      <MenuContent align={compact ? "start" : "end"} className="w-60">
+        {entries.map((entry, i) => (
+          <Fragment key={entry.what}>
+            {i > 0 && entries[i - 1]?.group !== entry.group ? <MenuSeparator /> : null}
+            <EntryItem entry={entry} onOpen={() => openAdd(project, entry.what)} />
+          </Fragment>
+        ))}
+        {!choices.gates.database.open ? (
+          <>
+            <MenuSeparator />
+            <GatedMenuItem gate={choices.gates.database}>{t("add.database")}</GatedMenuItem>
+          </>
+        ) : null}
+        {choices.yaml ? (
+          <>
+            <MenuSeparator />
+            <MenuLabel>{t("add.advanced")}</MenuLabel>
+            <MenuItem render={<Link to="/projects/$project/create" params={{ project }} />}>
+              {t("add.yaml")}
+            </MenuItem>
+          </>
+        ) : null}
+      </MenuContent>
+    </Menu>
   )
 }
 
-/** An entry: open, closed by the role, or what the cluster lacks with its install steps. */
-function EntryItem({
-  entry,
-  onOpen,
-  onSteps,
-}: {
-  entry: AddEntry
-  onOpen: () => void
-  onSteps: (steps: Steps) => void
-}) {
-  const { steps } = entry
+/** An entry: open, closed by the role, or what the cluster lacks with a link to install it. */
+function EntryItem({ entry, onOpen }: { entry: AddEntry; onOpen: () => void }) {
+  const { install } = entry
   if (entry.why === undefined)
     return (
       <GatedMenuItem gate={entry.gate} testid={entryTestid(entry.what)} onClick={onOpen}>
@@ -281,11 +257,13 @@ function EntryItem({
   return (
     <MenuItem
       data-testid={entryTestid(entry.what)}
-      disabled={!steps}
-      onClick={steps ? () => onSteps(steps) : undefined}
+      disabled={!install}
+      render={
+        install ? <Link to="/cluster/components" search={{ component: install.id }} /> : undefined
+      }
     >
       <span className="flex min-w-0 flex-col gap-0.5">
-        <span className="text-muted-foreground">{entry.label}</span>
+        <span className={install ? undefined : "text-muted-foreground"}>{entry.label}</span>
         <span className="type-meta text-muted-foreground">{entry.why}</span>
       </span>
     </MenuItem>
