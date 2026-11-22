@@ -52,7 +52,7 @@ are: no names, domains or emails, and PostHog doesn't keep IP addresses.
 
 Join with one command:
 
-  helm upgrade {{ .Release.Name }} oci://ghcr.io/zeabur-oss/charts/zeabur --reset-then-reuse-values \
+  helm upgrade {{ .Release.Name }} oci://ghcr.io/zeabur-oss/charts/zeabur --version {{ .Chart.Version }} --reset-then-reuse-values \
     --set telemetry.enabled=true \
     --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
 
