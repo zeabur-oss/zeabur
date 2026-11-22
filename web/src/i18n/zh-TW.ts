@@ -3046,6 +3046,11 @@ export const zhTW: Messages = {
   "db.restore.asOf": "新資料庫的資料停在備份當時，之後寫入的不會包含。",
   "db.restore.copiedSecret": (from, into) =>
     `備份裡的密碼和 ${from} 相同，所以新資料庫會有自己的機密變數 ${into}，內容和原本的一樣。之後刪掉原本的資料庫也不受影響。`,
+  "db.restore.after": (from, into) =>
+    `做完會有兩個資料庫。${into} 是新的，${from} 繼續運作。在你把服務指向 ${into} 之前，服務仍然使用 ${from}。`,
+  "db.restored.check": (name) => `確認你的應用程式用 ${name} 運作正常。`,
+  "db.restored.remove": (name) => `不再需要 ${name} 時，把它刪除。`,
+  "db.restored.open": (name) => `開啟 ${name}`,
   "db.restored.from": (name, time) => `從 ${name} ${time}的備份還原`,
   "db.restored.copy": (name, time) => `${name} 由這個資料庫 ${time}的備份還原而來`,
   "db.restored.point": "把服務指向這裡",

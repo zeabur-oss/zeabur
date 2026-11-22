@@ -3037,6 +3037,11 @@ export const zhCN: Messages = {
   "db.restore.asOf": "新数据库的数据停在备份当时，之后写入的不会包含。",
   "db.restore.copiedSecret": (from, into) =>
     `备份里的密码和 ${from} 相同，所以新数据库会有自己的机密变量 ${into}，内容和原来的一样。之后删掉原来的数据库也不受影响。`,
+  "db.restore.after": (from, into) =>
+    `完成后会有两个数据库。${into} 是新的，${from} 继续运行。在你把服务指向 ${into} 之前，服务仍然使用 ${from}。`,
+  "db.restored.check": (name) => `确认你的应用用 ${name} 运行正常。`,
+  "db.restored.remove": (name) => `不再需要 ${name} 时，把它删除。`,
+  "db.restored.open": (name) => `打开 ${name}`,
   "db.restored.from": (name, time) => `从 ${name} ${time}的备份还原`,
   "db.restored.copy": (name, time) => `${name} 由这个数据库 ${time}的备份还原而来`,
   "db.restored.point": "把服务指向这里",
