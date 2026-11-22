@@ -2426,7 +2426,7 @@ export const zhCN: Messages = {
   "add.httpOnly": "这个网址只有 HTTP。管理员指定 cert-manager 的签发者后会使用 HTTPS。",
   "add.noPublicUrl": "你的角色不能在这个项目新建公开域名。",
   "add.more": "更多设置",
-  "add.moreSummary": "环境变量、卷、规格、副本数、私有 registry 和安全性。",
+  "add.moreSummary": "环境变量、卷、私有 registry 和安全性。",
   "add.variables": "环境变量",
   "add.variablesHint": "每行一个 KEY=value，和 .env 文件相同。",
   "add.variablesBad": (lines) => `第 ${lines} 行不是 KEY=value。`,

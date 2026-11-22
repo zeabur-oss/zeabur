@@ -2430,7 +2430,7 @@ export const zhTW: Messages = {
   "add.httpOnly": "這個網址只有 HTTP。管理員指定 cert-manager 的簽發者後會使用 HTTPS。",
   "add.noPublicUrl": "你的角色不能在這個專案新增公開網域。",
   "add.more": "更多設定",
-  "add.moreSummary": "環境變數、磁碟區、規格、副本數、私有 registry 和安全性。",
+  "add.moreSummary": "環境變數、磁碟區、私有 registry 和安全性。",
   "add.variables": "環境變數",
   "add.variablesHint": "一行一個 KEY=value，和 .env 檔案相同。",
   "add.variablesBad": (lines) => `第 ${lines} 行不是 KEY=value。`,
