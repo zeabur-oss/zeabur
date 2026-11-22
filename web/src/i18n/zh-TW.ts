@@ -2681,7 +2681,7 @@ export const zhTW: Messages = {
   "upload.problem.directory": "上傳內容裡的資料夾，像 apps/web。",
   "upload.problem.dockerfile": "上傳內容裡的檔案，像 docker/Dockerfile.prod。",
   "upload.after":
-    "套用後資料夾會馬上上傳，上傳完成後開始第一次建置。要建置新版本，從服務頁面再上傳一次。",
+    "套用後資料夾會馬上上傳，上傳完成後開始第一次建置。上傳完成前請保持這個頁面開啟。要建置新版本，或上傳中斷時，從服務頁面再上傳一次。",
   "upload.keepOpen": "上傳完成前請保持這個頁面開啟。",
   "upload.stage.token": "正在向 Zeabur Builder 取得上傳許可…",
   "upload.stage.sending": (sent, total) => `正在上傳… ${sent}／${total}`,

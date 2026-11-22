@@ -2675,7 +2675,7 @@ export const zhCN: Messages = {
   "upload.problem.directory": "上传内容里的文件夹，像 apps/web。",
   "upload.problem.dockerfile": "上传内容里的文件，像 docker/Dockerfile.prod。",
   "upload.after":
-    "应用后文件夹会马上上传，上传完成后开始第一次构建。要构建新版本，从服务页面再上传一次。",
+    "应用后文件夹会马上上传，上传完成后开始第一次构建。上传完成前请保持这个页面打开。要构建新版本，或上传中断时，从服务页面再上传一次。",
   "upload.keepOpen": "上传完成前请保持这个页面打开。",
   "upload.stage.token": "正在向 Zeabur Builder 获取上传许可…",
   "upload.stage.sending": (sent, total) => `正在上传… ${sent}/${total}`,
