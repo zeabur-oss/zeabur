@@ -2982,6 +2982,12 @@ export const zhCN: Messages = {
   "db.backup.schedule": "定时",
   "db.backup.unscheduled": "没有定时备份",
   "db.backup.runs": "备份记录",
+  "db.backup.stalled": "卡住",
+  "db.backup.stalledNote": "已经跑了超过一小时，可能卡住了。它不结束，下一次备份就不会开始。",
+  "db.backup.remove": "移除",
+  "db.backup.removeTitle": (name: string) => `移除备份 ${name}`,
+  "db.backup.saidRemove": (name: string) =>
+    `移除备份 ${name} 的记录，下一次备份就能开始。已存在备份存储空间的文件不会被删掉。`,
   "db.backup.storeIdle": (store) => `${store} 已经存在，但这个数据库还没有把备份发送到那里。`,
   "db.backup.pluginMissing": "备份 PostgreSQL 需要 CloudNativePG 的 Barman Cloud 插件。",
   "db.backup.pluginWhy": "CloudNativePG 组件附带备份要用的 Barman Cloud 插件。",
