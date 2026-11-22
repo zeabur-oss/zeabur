@@ -385,8 +385,8 @@ fn docs_build() -> [DynamicObject; 2] {
         "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
         "metadata": {"name": "docs", "namespace": "blog"},
         "spec": {"builderRef": "railpack",
-            "source": {"git": {"url": "https://github.com/example/docs.git", "ref": "main",
-                "contextDir": "site"}},
+            "source": {"type": "git", "git": {"url": "https://github.com/example/docs.git", "ref": "main"},
+                "contextDir": "site"},
             "output": {"image": "zot.zot.svc:5000/blog/docs"},
             "env": [{"name": "NPM_TOKEN", "valueFrom": {"secretKeyRef":
                 {"name": "docs-build-env", "key": "NPM_TOKEN"}}}],
@@ -430,7 +430,7 @@ fn storefront_build() -> DynamicObject {
         "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
         "metadata": {"name": "storefront", "namespace": "lab"},
         "spec": {"builderRef": "dockerfile",
-            "source": {"git": {"url": "https://github.com/example/storefront.git", "ref": "main"}},
+            "source": {"type": "git", "git": {"url": "https://github.com/example/storefront.git", "ref": "main"}},
             "output": {"image": "zot.zot.svc:5000/lab/storefront"}},
         "status": {"latestImage": "zot.zot.svc:5000/lab/storefront:main-12-c81e4a0",
             "exposedPorts": ["3000/tcp"],
@@ -461,7 +461,7 @@ fn checkout_build() -> Vec<DynamicObject> {
             "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
             "metadata": {"name": "checkout", "namespace": "lab"},
             "spec": {"builderRef": "dockerfile",
-                "source": {"git": {"url": "https://github.com/example/checkout.git", "ref": "main"}},
+                "source": {"type": "git", "git": {"url": "https://github.com/example/checkout.git", "ref": "main"}},
                 "output": {"image": "zot.zot.svc:5000/lab/checkout"}},
             "status": {"latestImage": "zot.zot.svc:5000/lab/checkout:main-1-5d41402",
                 "exposedPorts": ports,
@@ -2876,7 +2876,12 @@ fn answer_uploads(s: &mut State, registry: &str) {
         .iter_mut()
         .filter(|o| o.types.as_ref().is_some_and(|t| t.kind == "Build"))
     {
-        if build.data.pointer("/spec/source/archive").is_none() {
+        if build
+            .data
+            .pointer("/spec/source/type")
+            .and_then(Value::as_str)
+            != Some("archive")
+        {
             continue;
         }
         let name = build.metadata.name.clone().unwrap_or_default();

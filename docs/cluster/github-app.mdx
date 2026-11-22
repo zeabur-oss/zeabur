@@ -107,7 +107,7 @@ data:
 
 Zeabur OSS also writes a config file `zeabur-github-app` (label `zeabur.com/github-app: "true"`) in each granted project. It records the repositories the App could read at that time, so members without permission to read `builder-system` can still pick a repository. Zeabur Builder doesn't read it. You can omit it when you set this up with kubectl. The list on screen is then empty, and you enter the repository URL yourself.
 
-A service's Build sets the installation with `spec.source.githubApp.installationId`:
+A service's Build sets the installation with `spec.source.git.githubApp.installationId`:
 
 ```yaml
 apiVersion: builder.zeabur.com/v1alpha1
@@ -120,11 +120,12 @@ metadata:
 spec:
   builderRef: railpack
   source:
+    type: git
     git:
       url: https://github.com/example/web.git
       ref: HEAD
-    githubApp:
-      installationId: 87654321
+      githubApp:
+        installationId: 87654321
   output:
     image: registry.example.com/shop/web
   notify:

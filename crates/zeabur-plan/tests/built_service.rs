@@ -1,17 +1,215 @@
 //! A service from an uploaded folder or a Git repository is one change that makes the `Build` and
 //! the objects of the service that runs what it builds, the same for the web interface and
 //! `zeaburctl up`.
+//!
+//! Every `Build` Zeabur writes fits the CRD of the Zeabur Builder release in
+//! `xtask/pins/zeabur-builder`. `scripts/builder-crds.sh` copies that CRD next to this file; a pin
+//! without its copy fails here, so a Builder release that changes the `Build` fails the pull
+//! request that moves the pin.
 
 #[cfg(test)]
 mod tests {
+    use std::path::Path;
+
     use serde_json::{Value, json};
     use zeabur_graph::Snapshot;
     use zeabur_graph::pod_security::level;
     use zeabur_model::PodSecurityLevel;
+    use zeabur_plan::builds::builds;
     use zeabur_plan::{
-        BuildMethod, Change, DeployKeySecret, GitAccess, GitServiceChange, Input, NameValue, Plan,
-        PlanError, PlanRequest, ServedKind, ServiceSize, UploadServiceChange, Write, plan,
+        BuildMethod, BuildOptionsChange, Change, DeployKeySecret, Fetched, GitAccess,
+        GitServiceChange, Input, NameValue, Plan, PlanError, PlanRequest, ServedKind, ServiceSize,
+        UploadServiceChange, Write, plan,
     };
+
+    /// The CRDs of the pinned Zeabur Builder, with the release they come from on the first line.
+    const CRDS: &str = include_str!("zeabur-builder-crds.yaml");
+    const PIN: &str = include_str!("../../../xtask/pins/zeabur-builder");
+
+    /// The schema of a `Build`'s `spec` in the pinned CRDs.
+    fn spec_schema() -> Value {
+        let crds: Vec<Value> = serde_saphyr::from_multiple(CRDS).unwrap();
+        let build = crds
+            .into_iter()
+            .find(|crd| crd["spec"]["names"]["kind"] == "Build")
+            .unwrap();
+        let version = build["spec"]["versions"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["name"] == "v1alpha1")
+            .unwrap();
+        version["schema"]["openAPIV3Schema"]["properties"]["spec"].clone()
+    }
+
+    /// Where `value` breaks `schema`, a structural `openAPIV3Schema` node: its type, required and
+    /// unknown fields (which the API server would drop), enums, lengths, patterns, minimums and
+    /// items. CEL rules (`x-kubernetes-validations`) are not checked.
+    fn breaks(value: &Value, schema: &Value, at: &str, out: &mut Vec<String>) {
+        if value.is_null() && schema["nullable"] == true {
+            return;
+        }
+        let kind = schema["type"].as_str().unwrap_or_default();
+        let fits = match kind {
+            "object" => value.is_object(),
+            "array" => value.is_array(),
+            "string" => value.is_string(),
+            "integer" => value.is_i64() || value.is_u64(),
+            "number" => value.is_number(),
+            "boolean" => value.is_boolean(),
+            _ => true,
+        };
+        if !fits {
+            out.push(format!("{at}: not a {kind}"));
+            return;
+        }
+        if let Some(allowed) = schema["enum"].as_array()
+            && !allowed.contains(value)
+        {
+            out.push(format!("{at}: {value} is not one of {allowed:?}"));
+        }
+        if let Some(text) = value.as_str() {
+            let length = text.chars().count();
+            if schema["maxLength"]
+                .as_u64()
+                .is_some_and(|max| length as u64 > max)
+                || schema["minLength"]
+                    .as_u64()
+                    .is_some_and(|min| (length as u64) < min)
+            {
+                out.push(format!("{at}: length {length} is out of range"));
+            }
+            if let Some(pattern) = schema["pattern"].as_str()
+                && !regex::Regex::new(pattern).unwrap().is_match(text)
+            {
+                out.push(format!("{at}: {text:?} does not match {pattern}"));
+            }
+        }
+        if let (Some(number), Some(min)) = (value.as_f64(), schema["minimum"].as_f64())
+            && number < min
+        {
+            out.push(format!("{at}: {number} is below {min}"));
+        }
+        if let Some(items) = value.as_array() {
+            if schema["maxItems"]
+                .as_u64()
+                .is_some_and(|max| items.len() as u64 > max)
+            {
+                out.push(format!("{at}: more than {} items", schema["maxItems"]));
+            }
+            for (index, item) in items.iter().enumerate() {
+                breaks(item, &schema["items"], &format!("{at}[{index}]"), out);
+            }
+        }
+        if let Some(fields) = value.as_object() {
+            for required in schema["required"].as_array().into_iter().flatten() {
+                let name = required.as_str().unwrap();
+                if !fields.contains_key(name) {
+                    out.push(format!("{at}.{name}: Required value"));
+                }
+            }
+            for (name, field) in fields {
+                let at = format!("{at}.{name}");
+                if let Some(property) = schema["properties"].get(name) {
+                    breaks(field, property, &at, out);
+                } else if schema["additionalProperties"].is_object() {
+                    breaks(field, &schema["additionalProperties"], &at, out);
+                } else if schema["x-kubernetes-preserve-unknown-fields"] != true {
+                    out.push(format!("{at}: unknown field"));
+                }
+            }
+        }
+    }
+
+    /// `build` fits the pinned Builder's CRD.
+    fn fits_the_crd(build: &Value) {
+        let mut out = Vec::new();
+        breaks(&build["spec"], &spec_schema(), "spec", &mut out);
+        assert!(out.is_empty(), "{out:#?}\n{build:#}");
+    }
+
+    /// Build options on `build` as a Build Zeabur Builder serves, applied to it.
+    fn with_options(build: &Value, change: BuildOptionsChange) -> Value {
+        let snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            ..Snapshot::default()
+        };
+        let mut served = build.clone();
+        served["metadata"]["generation"] = json!(1);
+        let objects = [Fetched {
+            resource: builds(),
+            name: served["metadata"]["name"].as_str().unwrap().to_owned(),
+            object: served.clone(),
+        }];
+        let kinds = [kind("builder.zeabur.com", "Build", "builds")];
+        let planned = plan(
+            Input {
+                kinds: &kinds,
+                objects: &objects,
+                ..Input::new(&snapshot, "2026-10-23T00:00:00Z")
+            },
+            &PlanRequest {
+                changes: vec![Change::BuildOptions(change)],
+            },
+        )
+        .unwrap();
+        let Write::Patch { operations } = &planned.objects[0].write else {
+            panic!("build options patch the Build");
+        };
+        let patch: json_patch::Patch = serde_json::from_value(json!(operations)).unwrap();
+        json_patch::patch(&mut served, &patch).unwrap();
+        served
+    }
+
+    /// The copied CRDs are the pinned release's.
+    #[test]
+    fn the_crds_are_the_pinned_builders() {
+        let first = CRDS.lines().next().unwrap();
+        assert!(
+            first.starts_with(&format!("# zeabur-oss/builder {} ", PIN.trim())),
+            "{first:?} is not the CRD of the pinned Zeabur Builder {}: run scripts/builder-crds.sh",
+            PIN.trim()
+        );
+    }
+
+    /// The check finds the shape Zeabur Builder v0.2.4 stopped taking: a source without `type`,
+    /// credentials beside `git`, and the context inside `git`.
+    #[test]
+    fn the_check_refuses_a_source_the_builder_does_not_take() {
+        let old = json!({"builderRef": "railpack",
+            "source": {"git": {"url": "https://github.com/acme/site.git", "contextDir": "web"},
+                       "credentialsRef": {"name": "site-git"}}});
+        let mut out = Vec::new();
+        breaks(&old, &spec_schema(), "spec", &mut out);
+        out.sort();
+        assert_eq!(
+            out,
+            [
+                "spec.source.credentialsRef: unknown field",
+                "spec.source.git.contextDir: unknown field",
+                "spec.source.type: Required value",
+            ]
+        );
+    }
+
+    /// Every Build in the fixtures, which stand for what Zeabur Builder serves, fits its CRD.
+    #[test]
+    fn every_build_in_the_fixtures_fits_the_crd() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR")).join("fixtures/mutation");
+        let mut seen = 0;
+        for case in std::fs::read_dir(root).unwrap() {
+            let input = case.unwrap().path().join("input.yaml");
+            let Ok(text) = std::fs::read_to_string(&input) else {
+                continue;
+            };
+            let objects: Vec<Value> = serde_saphyr::from_multiple(&text).unwrap();
+            for build in objects.iter().filter(|o| o["kind"] == "Build") {
+                fits_the_crd(build);
+                seen += 1;
+            }
+        }
+        assert!(seen > 0);
+    }
 
     fn kind(group: &str, kind: &str, plural: &str) -> ServedKind {
         ServedKind {
@@ -106,7 +304,11 @@ mod tests {
             "up-1"
         );
         assert_eq!(build["metadata"]["namespace"], "shop");
-        assert_eq!(build["spec"]["source"], json!({"archive": {}}));
+        assert_eq!(
+            build["spec"]["source"],
+            json!({"type": "archive", "archive": {}})
+        );
+        fits_the_crd(&build);
         assert_eq!(
             build["spec"]["output"]["image"],
             "zot.zot.svc:5000/shop/site"
@@ -182,6 +384,7 @@ mod tests {
             build["spec"]["env"][0]["valueFrom"]["secretKeyRef"],
             json!({"name": "site-build-env", "key": "NPM_TOKEN"})
         );
+        fits_the_crd(&build);
     }
 
     /// Railpack images run as a regular user, so the pod is restricted; a Dockerfile's often run
@@ -204,10 +407,12 @@ mod tests {
         assert_eq!(level_of(docker.clone()), PodSecurityLevel::Restricted);
         let build = created(&planned(docker, Some("zot:5000"), None).unwrap(), "Build").unwrap();
         assert_eq!(
-            build["spec"]["source"]["archive"],
-            json!({"contextDir": "apps/web", "dockerfile": "docker/Dockerfile.prod"})
+            build["spec"]["source"],
+            json!({"type": "archive", "archive": {},
+                   "contextDir": "apps/web", "dockerfile": "docker/Dockerfile.prod"})
         );
         assert_eq!(build["spec"]["builderRef"], "dockerfile");
+        fits_the_crd(&build);
     }
 
     /// Nothing is planned for a cluster without a registry, or for input the Build would refuse.
@@ -327,8 +532,9 @@ mod tests {
         let build = created(&plan, "Build").unwrap();
         assert_eq!(
             build["spec"]["source"],
-            json!({"git": {"url": "https://github.com/acme/site.git", "ref": "HEAD"}})
+            json!({"type": "git", "git": {"url": "https://github.com/acme/site.git", "ref": "HEAD"}})
         );
+        fits_the_crd(&build);
         assert_eq!(build["spec"]["notify"][0]["type"], "keel");
         let deployment = created(&plan, "Deployment").unwrap();
         assert_eq!(
@@ -339,6 +545,7 @@ mod tests {
         branch.branch = Some(" release/1.4 ".to_owned());
         let build = created(&git_plan(branch).unwrap(), "Build").unwrap();
         assert_eq!(build["spec"]["source"]["git"]["ref"], "release/1.4");
+        fits_the_crd(&build);
     }
 
     /// A token goes in a basic-auth Secret `<name>-git` that Zeabur Builder reads by its label,
@@ -367,9 +574,10 @@ mod tests {
         assert_eq!(body["stringData"]["password"], "ghp_1");
         let build = created(&plan, "Build").unwrap();
         assert_eq!(
-            build["spec"]["source"]["credentialsRef"]["name"],
+            build["spec"]["source"]["git"]["credentialsRef"]["name"],
             "site-git"
         );
+        fits_the_crd(&build);
     }
 
     /// A deploy key reads the repository over SSH, from the Secret the API made.
@@ -392,9 +600,10 @@ mod tests {
             "git@github.com:acme/site.git"
         );
         assert_eq!(
-            build["spec"]["source"]["credentialsRef"]["name"],
+            build["spec"]["source"]["git"]["credentialsRef"]["name"],
             "site-git"
         );
+        fits_the_crd(&build);
         let secret = created(&plan, "Secret").unwrap();
         assert_eq!(secret["type"], "kubernetes.io/ssh-auth");
     }
@@ -409,10 +618,49 @@ mod tests {
         let plan = git_plan(change).unwrap();
         let build = created(&plan, "Build").unwrap();
         assert_eq!(
-            build["spec"]["source"]["githubApp"],
+            build["spec"]["source"]["git"]["githubApp"],
             json!({"installationId": 42})
         );
+        fits_the_crd(&build);
         assert!(created(&plan, "Secret").is_none_or(|s| s["metadata"]["name"] != "site-git"));
+    }
+
+    /// Build options set the directory and Dockerfile on `spec.source` for both sources, and
+    /// remove them again, and the Build still fits the CRD.
+    #[test]
+    fn build_options_keep_the_build_in_the_crd() {
+        let mut docker = git();
+        docker.method = BuildMethod::Dockerfile;
+        let mut upload = service();
+        upload.method = BuildMethod::Dockerfile;
+        for build in [
+            created(&git_plan(docker).unwrap(), "Build").unwrap(),
+            created(&planned(upload, Some("zot:5000"), None).unwrap(), "Build").unwrap(),
+        ] {
+            let set = with_options(
+                &build,
+                BuildOptionsChange {
+                    build: "site".to_owned(),
+                    context_dir: Some("apps/web".to_owned()),
+                    dockerfile: Some("Dockerfile.prod".to_owned()),
+                    env: Vec::new(),
+                },
+            );
+            assert_eq!(set["spec"]["source"]["contextDir"], "apps/web");
+            assert_eq!(set["spec"]["source"]["dockerfile"], "Dockerfile.prod");
+            fits_the_crd(&set);
+            let cleared = with_options(
+                &set,
+                BuildOptionsChange {
+                    build: "site".to_owned(),
+                    context_dir: Some(String::new()),
+                    dockerfile: Some(String::new()),
+                    env: Vec::new(),
+                },
+            );
+            assert_eq!(cleared["spec"]["source"], build["spec"]["source"]);
+            fits_the_crd(&cleared);
+        }
     }
 
     /// The form's rules for a repository and a branch are the server's.

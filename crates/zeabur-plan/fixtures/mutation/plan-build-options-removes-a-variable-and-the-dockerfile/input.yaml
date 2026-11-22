@@ -7,7 +7,10 @@ metadata:
   generation: 2
 spec:
   source:
-    git: {url: https://example.com/acme/web, ref: main, contextDir: apps/web, dockerfile: Dockerfile.prod}
+    type: git
+    git: {url: https://example.com/acme/web, ref: main}
+    contextDir: apps/web
+    dockerfile: Dockerfile.prod
   builderRef: dockerfile
   env:
     - name: NPM_TOKEN

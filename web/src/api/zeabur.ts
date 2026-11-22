@@ -1072,15 +1072,15 @@ export type BuildOptionsChange = {
   /** The `Build`. */
   build: string
   /**
-   * The build context inside the repository, `spec.source.git.contextDir`. Empty: the
-   * repository's root.
+   * The build context inside the repository or folder, `spec.source.contextDir`. Empty: its
+   * root.
    * @maxLength 1024
    * @nullable
    * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
    */
   contextDir?: string | null
   /**
-   * The Dockerfile, relative to the context, `spec.source.git.dockerfile`. Empty: `Dockerfile`.
+   * The Dockerfile, relative to the context, `spec.source.dockerfile`. Empty: `Dockerfile`.
    * @maxLength 1024
    * @nullable
    * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
@@ -9298,7 +9298,7 @@ export type ZeaburBuilderProblem = {
  * A `Build`.
  */
 export type ZeaburBuilderBuild = {
-  /** Built from an uploaded folder (`spec.source.archive`) instead of a Git ref. */
+  /** Built from an uploaded folder (`spec.source.type: archive`) instead of a Git ref. */
   archive: boolean
   /**
    * The uploaded folder's manifest digest, once it is named.

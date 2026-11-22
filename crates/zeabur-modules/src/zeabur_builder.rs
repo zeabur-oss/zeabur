@@ -56,7 +56,7 @@ pub struct ZeaburBuilderBuild {
     pub repository: Option<String>,
     /// The Git repository; none for an uploaded folder.
     pub git_url: Option<String>,
-    /// Built from an uploaded folder (`spec.source.archive`) instead of a Git ref.
+    /// Built from an uploaded folder (`spec.source.type: archive`) instead of a Git ref.
     pub archive: bool,
     /// The uploaded folder's manifest digest, once it is named.
     pub archive_digest: Option<String>,
@@ -161,12 +161,8 @@ pub const TRANSIENT: SignedDuration = SignedDuration::from_mins(5);
 const WAITING_FOR_UPLOAD: &str = "WaitingForUpload";
 
 fn awaiting_upload(build: &BuildView) -> bool {
-    build
-        .spec
-        .source
-        .archive
-        .as_ref()
-        .is_some_and(|a| a.digest.is_none())
+    let source = &build.spec.source;
+    source.type_ == "archive" && source.archive.as_ref().is_none_or(|a| a.digest.is_none())
 }
 
 fn problem(build: &BuildView, now: Option<Timestamp>) -> Option<ZeaburBuilderProblem> {
@@ -266,12 +262,16 @@ struct Output {
     image: Option<String>,
 }
 
+/// `spec.source`: `type` is `git` or `archive`, and the build context is the same for both.
 #[derive(Default, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 struct Source {
+    #[serde(rename = "type")]
+    type_: String,
     git: Option<GitSource>,
     archive: Option<ArchiveSource>,
-    credentials_ref: Option<NameRef>,
+    context_dir: Option<String>,
+    dockerfile: Option<String>,
 }
 
 #[derive(Default, Deserialize)]
@@ -280,16 +280,13 @@ struct GitSource {
     url: Option<String>,
     #[serde(rename = "ref")]
     ref_: Option<String>,
-    context_dir: Option<String>,
-    dockerfile: Option<String>,
+    credentials_ref: Option<NameRef>,
 }
 
 #[derive(Default, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
+#[serde(default)]
 struct ArchiveSource {
     digest: Option<String>,
-    context_dir: Option<String>,
-    dockerfile: Option<String>,
 }
 
 #[derive(Default, Deserialize)]
@@ -395,9 +392,7 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
             let ready = build.condition("Ready");
             let name = b.metadata.name.clone().unwrap_or_default();
             let credentials = filled(
-                spec.source
-                    .credentials_ref
-                    .as_ref()
+                git.and_then(|g| g.credentials_ref.as_ref())
                     .and_then(|c| c.name.as_ref()),
             )
             .map(|secret| BuildCredentials {
@@ -412,7 +407,7 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                 git_url: filled(git.and_then(|g| g.url.as_ref())),
                 git_ref: filled(git.and_then(|g| g.ref_.as_ref())),
                 resolved_ref: filled(status.resolved_ref.as_ref()),
-                archive: archive.is_some(),
+                archive: spec.source.type_ == "archive",
                 archive_digest: filled(archive.and_then(|a| a.digest.as_ref())),
                 awaiting_upload: awaiting_upload(&build),
                 upload_request: filled(
@@ -427,10 +422,8 @@ pub fn builds(objects: &[DynamicObject], now: Option<Timestamp>) -> Vec<ZeaburBu
                         .as_ref()
                         .and_then(|t| t.expires_at.as_ref()),
                 ),
-                context_dir: filled(git.and_then(|g| g.context_dir.as_ref()))
-                    .or_else(|| filled(archive.and_then(|a| a.context_dir.as_ref()))),
-                dockerfile: filled(git.and_then(|g| g.dockerfile.as_ref()))
-                    .or_else(|| filled(archive.and_then(|a| a.dockerfile.as_ref()))),
+                context_dir: filled(spec.source.context_dir.as_ref()),
+                dockerfile: filled(spec.source.dockerfile.as_ref()),
                 env: env(spec),
                 builder: filled(spec.builder_ref.as_ref()),
                 suspended: spec.suspend,
@@ -591,8 +584,8 @@ mod tests {
             "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
             "metadata": {"name": "web", "namespace": "demo"},
             "spec": {"builderRef": "dockerfile",
-                "source": {"git": {"url": "https://example.com/acme/web",
-                    "contextDir": "apps/web", "dockerfile": "Dockerfile.prod"}},
+                "source": {"type": "git", "git": {"url": "https://example.com/acme/web"},
+                    "contextDir": "apps/web", "dockerfile": "Dockerfile.prod"},
                 "env": [{"name": "NODE_ENV", "value": "production"},
                         {"name": "NPM_TOKEN", "valueFrom": {"secretKeyRef":
                             {"name": "web-build-env", "key": "NPM_TOKEN"}}}]}
@@ -628,8 +621,8 @@ mod tests {
             object(serde_json::json!({
                 "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
                 "metadata": {"name": name, "namespace": "demo"},
-                "spec": {"source": {"git": {"url": "ssh://git@example.com/acme/web"},
-                    "credentialsRef": {"name": secret}}}
+                "spec": {"source": {"type": "git", "git": {"url": "ssh://git@example.com/acme/web",
+                    "credentialsRef": {"name": secret}}}}
             }))
         };
         let found = builds(&[build("api", "shared-git"), build("web", "web-git")], None);
@@ -643,7 +636,7 @@ mod tests {
         let build = object(serde_json::json!({
             "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
             "metadata": {"name": "site", "namespace": "demo"},
-            "spec": {"builderRef": "railpack", "source": {"archive": {}},
+            "spec": {"builderRef": "railpack", "source": {"type": "archive", "archive": {}},
                 "output": {"image": "zot:5000/demo/site"}},
             "status": {"uploadToken": {"request": "u1", "secretName": "site-upload",
                     "expiresAt": "2026-10-23T08:15:00Z"},
@@ -664,7 +657,7 @@ mod tests {
             "metadata": {"name": "web", "namespace": "demo",
                 "annotations": {"builder.zeabur.com/rebuild": "2026-10-23T08:00:00Z"}},
             "spec": {"builderRef": "railpack",
-                "source": {"git": {"url": "https://example.com/acme/web", "ref": "main"}},
+                "source": {"type": "git", "git": {"url": "https://example.com/acme/web", "ref": "main"}},
                 "notify": [{"type": "keel", "url": "http://keel:9300/v1/webhooks/native"},
                            {"type": "generic", "url": "https://example.com/hook"}]},
             "status": {"latestImage": "zot:5000/demo/web:main-1-abc@sha256:00",
@@ -695,7 +688,7 @@ mod tests {
             "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
             "metadata": {"name": "api"},
             "spec": {"builderRef": "dockerfile", "output": {"image": "ghcr.io/acme/api"},
-                "source": {"git": {"url": "https://example.com/acme/api", "ref": "main"}}}
+                "source": {"type": "git", "git": {"url": "https://example.com/acme/api", "ref": "main"}}}
         }));
         assert_eq!(
             builds(&[build], None)[0].repository.as_deref(),
@@ -724,7 +717,7 @@ mod tests {
                 "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
                 "metadata": {"name": "web"},
                 "spec": {"builderRef": "railpack",
-                    "source": {"git": {"url": "https://example.com/acme/web", "ref": "HEAD"}}},
+                    "source": {"type": "git", "git": {"url": "https://example.com/acme/web", "ref": "HEAD"}}},
                 "status": {"resolvedRef": "refs/heads/master", "conditions": [
                     {"type": "BuilderReady", "status": "True", "reason": "Found"},
                     {"type": "SourceReady", "status": "False", "reason": reason,
@@ -749,7 +742,7 @@ mod tests {
         let missing = object(serde_json::json!({
             "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
             "metadata": {"name": "web"},
-            "spec": {"builderRef": "nope", "source": {"git": {"url": "https://example.com/a/b"}}},
+            "spec": {"builderRef": "nope", "source": {"type": "git", "git": {"url": "https://example.com/a/b"}}},
             "status": {"conditions": [{"type": "BuilderReady", "status": "False",
                 "reason": "BuilderNotFound", "message": "no ClusterBuilder `nope`"}]}
         }));

@@ -857,7 +857,7 @@ mod tests {
     async fn the_folder_goes_up_in_the_order_the_server_expects() {
         let address = registry().await;
         let cluster = cluster(&address);
-        with_build(&cluster, &json!({"archive": {}}));
+        with_build(&cluster, &json!({"type": "archive", "archive": {}}));
         let server = server(&cluster).await;
         let service = deploy(
             &server,
@@ -885,7 +885,7 @@ mod tests {
         let cluster = cluster(&address);
         with_build(
             &cluster,
-            &json!({"git": {"url": "https://example.com/a/b"}}),
+            &json!({"type": "git", "git": {"url": "https://example.com/a/b"}}),
         );
         let server = server(&cluster).await;
         let error = deploy(

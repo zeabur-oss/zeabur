@@ -83,7 +83,7 @@ Build 的 `SOURCE` 是 `Archive`，`REVISION` 是上傳內容的 digest。BuildR
 
 ## 用 kubectl 做同樣的事
 
-上傳建立的物件和[從 Git 部署](./git.mdx#用-kubectl-做同樣的事)相同，只有 Build 的來源不一樣：`spec.source` 是 `archive`，不是 `git`，也沒有 `credentialsRef`。Deployment、Service、`<服務名稱>-env` 照 Git 頁面的 YAML 建立，把 `web` 換成 `site`，再建立這個 Build：
+上傳建立的物件和[從 Git 部署](./git.mdx#用-kubectl-做同樣的事)相同，只有 Build 的來源不一樣：`spec.source.type` 是 `archive`，不是 `git`，也沒有 `credentialsRef`。Deployment、Service、`<服務名稱>-env` 照 Git 頁面的 YAML 建立，把 `web` 換成 `site`，再建立這個 Build：
 
 ```yaml
 apiVersion: builder.zeabur.com/v1alpha1
@@ -97,6 +97,7 @@ metadata:
 spec:
   builderRef: railpack
   source:
+    type: archive
     archive: {}
   output:
     image: zot.zot.svc:5000/shop/site

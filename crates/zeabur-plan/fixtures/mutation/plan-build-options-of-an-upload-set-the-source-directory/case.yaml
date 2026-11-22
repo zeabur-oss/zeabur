@@ -1,4 +1,4 @@
-description: "An uploaded folder keeps its directory and Dockerfile under source.archive, not source.git."
+description: "An uploaded folder takes its directory and Dockerfile on spec.source, as a Git repository does."
 operation: mutation.plan
 params:
   request:

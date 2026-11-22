@@ -366,29 +366,20 @@ struct Build {
 #[serde(rename_all = "camelCase")]
 struct BuildSpec {
     builder_ref: &'static str,
-    source: BuildSource,
+    source: SourceSpec,
     output: BuildOutput,
     notify: [BuildNotify; 1],
     #[serde(skip_serializing_if = "Vec::is_empty")]
     env: Vec<EnvVar>,
 }
 
-#[derive(Default, Serialize)]
-#[serde(rename_all = "camelCase")]
-struct BuildSource {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    archive: Option<Paths>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    git: Option<GitSource>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    credentials_ref: Option<NameRef>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    github_app: Option<GitHubApp>,
-}
-
+/// `spec.source`, as Zeabur Builder's `SourceSpec` (`crates/zeabur-builder-api/src/build.rs` at
+/// the tag in `xtask/pins/zeabur-builder`).
 #[derive(Serialize)]
 #[serde(rename_all = "camelCase")]
-struct Paths {
+struct SourceSpec {
+    #[serde(flatten)]
+    kind: SourceKind,
     #[serde(skip_serializing_if = "Option::is_none")]
     context_dir: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -396,12 +387,29 @@ struct Paths {
 }
 
 #[derive(Serialize)]
+#[serde(tag = "type", rename_all = "camelCase")]
+enum SourceKind {
+    Git { git: GitSource },
+    Archive { archive: ArchiveSource },
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
 struct GitSource {
     url: String,
     #[serde(rename = "ref")]
     reference: String,
-    #[serde(flatten)]
-    paths: Paths,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    credentials_ref: Option<NameRef>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    github_app: Option<GitHubApp>,
+}
+
+/// An uploaded archive. The client uploads it after the plan and names its digest then.
+#[derive(Serialize)]
+struct ArchiveSource {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    digest: Option<String>,
 }
 
 #[derive(Serialize)]
@@ -472,15 +480,6 @@ impl<'a> Built<'a> {
         }
     }
 
-    fn paths(&self) -> Paths {
-        Paths {
-            context_dir: self.directory.clone(),
-            dockerfile: (self.method == BuildMethod::Dockerfile)
-                .then(|| self.dockerfile.clone())
-                .flatten(),
-        }
-    }
-
     /// The objects in project `project`, in the order they are created: `before`, the build
     /// variables' Secret, the image service, and the `Build` from `source`.
     fn objects(
@@ -489,7 +488,7 @@ impl<'a> Built<'a> {
         registry: &str,
         cluster_issuer: Option<&str>,
         before: Vec<Value>,
-        source: BuildSource,
+        source: SourceKind,
         annotations: Option<BTreeMap<String, String>>,
     ) -> Result<Vec<Value>, PlanError> {
         let name = self.name;
@@ -565,7 +564,13 @@ impl<'a> Built<'a> {
                     BuildMethod::Railpack => "railpack",
                     BuildMethod::Dockerfile => "dockerfile",
                 },
-                source,
+                source: SourceSpec {
+                    kind: source,
+                    context_dir: self.directory.clone(),
+                    dockerfile: (self.method == BuildMethod::Dockerfile)
+                        .then(|| self.dockerfile.clone())
+                        .flatten(),
+                },
                 output: BuildOutput { image: repository },
                 notify: [BuildNotify {
                     kind: "keel",
@@ -578,11 +583,11 @@ impl<'a> Built<'a> {
     }
 }
 
-/// The credentials Secret of `change`, if its access has one, and the source's fields for it.
+/// The credentials Secret of `change`, if its access has one, and the Git source that reads it.
 fn credentials(
     change: &GitServiceChange,
     repository: &Repository,
-) -> Result<(Option<Secret>, BuildSource), PlanError> {
+) -> Result<(Option<Secret>, GitSource), PlanError> {
     let name = change.name.as_str();
     let secret_name = format!("{name}-git");
     let mut labels = labels_of(name);
@@ -650,22 +655,17 @@ fn credentials(
             )
         }
     };
-    let built = Built::of_git(change);
-    let source = BuildSource {
-        git: Some(GitSource {
-            url,
-            reference: change
-                .branch
-                .as_deref()
-                .map(str::trim)
-                .filter(|b| !b.is_empty())
-                .unwrap_or(DEFAULT_BRANCH_REF)
-                .to_owned(),
-            paths: built.paths(),
-        }),
+    let source = GitSource {
+        url,
+        reference: change
+            .branch
+            .as_deref()
+            .map(str::trim)
+            .filter(|b| !b.is_empty())
+            .unwrap_or(DEFAULT_BRANCH_REF)
+            .to_owned(),
         credentials_ref: secret.as_ref().map(|_| NameRef { name: secret_name }),
         github_app,
-        ..BuildSource::default()
     };
     Ok((secret, source))
 }
@@ -694,9 +694,8 @@ impl Planner<'_> {
         check_built(&built)?;
         check_upload(change)?;
         let registry = self.registry()?;
-        let source = BuildSource {
-            archive: Some(built.paths()),
-            ..BuildSource::default()
+        let source = SourceKind::Archive {
+            archive: ArchiveSource { digest: None },
         };
         let annotations =
             BTreeMap::from([(UPLOAD_TOKEN_REQUEST.to_owned(), change.request.clone())]);
@@ -724,7 +723,7 @@ impl Planner<'_> {
         check_built(&built)?;
         let repository = check_git(change)?;
         let registry = self.registry()?;
-        let (secret, source) = credentials(change, &repository)?;
+        let (secret, git) = credentials(change, &repository)?;
         let before = secret
             .as_ref()
             .map(to_json)
@@ -737,7 +736,7 @@ impl Planner<'_> {
             registry,
             self.input.cluster_issuer,
             before,
-            source,
+            SourceKind::Git { git },
             None,
         )?;
         for object in objects {

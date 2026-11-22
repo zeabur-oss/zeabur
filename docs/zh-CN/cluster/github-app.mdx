@@ -107,7 +107,7 @@ data:
 
 Zeabur 开源版还会在每个已开放的项目中写入一个 ConfigMap `zeabur-github-app`（label 为 `zeabur.com/github-app: "true"`），记录当时有权读取的仓库，让没有权限读取 `builder-system` 的成员也能选择仓库。Zeabur Builder 不读取这个 ConfigMap，用 kubectl 配置时可以不写，但页面上的列表会是空的，需要自行填写仓库地址。
 
-服务的 Build 通过 `spec.source.githubApp.installationId` 指定安装实例：
+服务的 Build 通过 `spec.source.git.githubApp.installationId` 指定安装实例：
 
 ```yaml
 apiVersion: builder.zeabur.com/v1alpha1
@@ -120,11 +120,12 @@ metadata:
 spec:
   builderRef: railpack
   source:
+    type: git
     git:
       url: https://github.com/example/web.git
       ref: HEAD
-    githubApp:
-      installationId: 87654321
+      githubApp:
+        installationId: 87654321
   output:
     image: registry.example.com/shop/web
   notify:

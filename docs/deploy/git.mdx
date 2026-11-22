@@ -228,11 +228,12 @@ metadata:
 spec:
   builderRef: railpack
   source:
+    type: git
     git:
       url: https://github.com/acme/web.git
       ref: main
-    credentialsRef:
-      name: web-git
+      credentialsRef:
+        name: web-git
   output:
     image: zot.zot.svc:5000/shop/web
   env:
@@ -246,10 +247,10 @@ spec:
       url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native
 ```
 
-- `web-git` is only needed when using an access token for a private repository. The Build references it through `spec.source.credentialsRef`, and the `builder.zeabur.com/git-credentials: "true"` label lets Zeabur Builder read it. For a public repository, remove this secret and `credentialsRef`.
+- `web-git` is only needed when using an access token for a private repository. The Build references it through `spec.source.git.credentialsRef`, and the `builder.zeabur.com/git-credentials: "true"` label lets Zeabur Builder read it. For a public repository, remove this secret and `credentialsRef`.
 - `web-build-env` and the Build's `spec.env` are only needed when using build variables.
 - The Deployment starts with the nonexistent `:pending` tag, which Keel replaces after the first build finishes. `keel.sh/policy: force` corresponds to **Auto-deploy new builds**.
-- To build with a Dockerfile, change `builderRef` to `dockerfile` and add `contextDir` and `dockerfile` under `spec.source.git` as needed. When `ref` is empty, the form writes `HEAD` to track the default branch.
+- To build with a Dockerfile, change `builderRef` to `dockerfile` and add `contextDir` and `dockerfile` under `spec.source` as needed. When `ref` is empty, the form writes `HEAD` to track the default branch.
 
 To use a deploy key instead, generate a key pair, add the public key to the repository, and put the private key and `known_hosts` in a `kubernetes.io/ssh-auth` secret. Change the Build's `url` to an SSH URL, such as `git@github.com:acme/web.git`:
 

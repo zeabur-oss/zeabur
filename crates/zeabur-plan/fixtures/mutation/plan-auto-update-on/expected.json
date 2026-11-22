@@ -123,7 +123,7 @@
           }
         }
       },
-      "afterYaml": "apiVersion: builder.zeabur.com/v1alpha1\nkind: Build\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  builderRef: dockerfile\n  notify:\n  - type: keel\n    url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native\n  source:\n    git:\n      ref: main\n      url: https://example.com/acme/web\n",
+      "afterYaml": "apiVersion: builder.zeabur.com/v1alpha1\nkind: Build\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  builderRef: dockerfile\n  notify:\n  - type: keel\n    url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native\n  source:\n    git:\n      ref: main\n      url: https://example.com/acme/web\n    type: git\n",
       "before": {
         "apiVersion": "builder.zeabur.com/v1alpha1",
         "kind": "Build",
@@ -141,7 +141,7 @@
           }
         }
       },
-      "beforeYaml": "apiVersion: builder.zeabur.com/v1alpha1\nkind: Build\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  builderRef: dockerfile\n  source:\n    git:\n      ref: main\n      url: https://example.com/acme/web\n",
+      "beforeYaml": "apiVersion: builder.zeabur.com/v1alpha1\nkind: Build\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  builderRef: dockerfile\n  source:\n    git:\n      ref: main\n      url: https://example.com/acme/web\n    type: git\n",
       "changes": [
         {
           "after": "keel",

@@ -93,7 +93,7 @@ fn created(object: &Value, found: &mut Found, workloads: &mut usize, builds: &mu
         (zeabur_plan::builds::BUILDER_GROUP, "Build") => {
             *builds += 1;
             found.feature(Feature::ServiceCreated(
-                if object.pointer("/spec/source/archive").is_some() {
+                if object.pointer("/spec/source/type").and_then(Value::as_str) == Some("archive") {
                     Source::Upload
                 } else {
                     Source::Git
@@ -201,7 +201,7 @@ mod tests {
     fn build() -> Value {
         json!({"op": "create", "object": {"apiVersion": "builder.zeabur.com/v1alpha1",
             "kind": "Build", "metadata": {"name": "site"},
-            "spec": {"source": {"git": {"url": "https://github.com/acme/site.git"}}}}})
+            "spec": {"source": {"type": "git", "git": {"url": "https://github.com/acme/site.git"}}}}})
     }
 
     fn strings(values: &[&str]) -> Vec<String> {

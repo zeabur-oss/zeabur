@@ -25,7 +25,7 @@ metadata:
   resourceVersion: "7"
   generation: 2
 spec:
-  source: {git: {url: https://example.com/acme/web, ref: main}}
+  source: {type: git, git: {url: https://example.com/acme/web, ref: main}}
   builderRef: dockerfile
 status:
   latestImage: zot.zot.svc.cluster.local:5000/demo/web:main-1761059900-9f00aa1@sha256:1111111111111111111111111111111111111111111111111111111111111111
