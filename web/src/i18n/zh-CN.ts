@@ -3381,6 +3381,7 @@ export const zhCN: Messages = {
   "sentence.problem.badRequest.fix.planToken": () =>
     "重新检查变更。只有做这次检查的那台服务器能应用，而且令牌不能改动。",
   "sentence.problem.conflict.fix.review": () => "重新检查，以对象当前的状态为准。",
+  "sentence.problem.conflict.fix.inUse": () => "先把这些删掉，再移除一次。",
   "sentence.problem.conflict.fix.alreadyExists": () => "先删掉这些对象，或部署到其他项目。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等容器开始运行。如果一直没有运行，容器的日志和事件会说明原因。",
@@ -3430,6 +3431,8 @@ export const zhCN: Messages = {
   "sentence.problem.summary.log-unavailable": () => "无法读取这份日志。",
   "sentence.problem.summary.conflict": (p) =>
     p.name ? `${p.name} 在你检查之后又有了改动。` : "这个对象在你检查之后又有了改动。",
+  "sentence.problem.summary.inUse": (p) =>
+    p.more === "0" ? `${p.users} 还在用它。` : `${p.users} 等 ${p.more} 个还在用它。`,
   "sentence.problem.summary.already-exists": (p) => `项目 ${p.namespace} 里已经有 ${p.objects}。`,
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "这由其他工具管理。",

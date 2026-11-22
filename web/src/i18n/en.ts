@@ -3709,6 +3709,7 @@ export const en = {
   "sentence.problem.badRequest.fix.planToken": () =>
     "Review the changes again. They apply only on the server that checked them, with their token unchanged.",
   "sentence.problem.conflict.fix.review": () => "Review again to start from its current state.",
+  "sentence.problem.conflict.fix.inUse": () => "Delete them first, then remove it again.",
   "sentence.problem.conflict.fix.alreadyExists": () =>
     "Delete them first, or deploy into another project.",
   "sentence.problem.conflict.fix.waitForContainer": () =>
@@ -3771,6 +3772,8 @@ export const en = {
   "sentence.problem.summary.log-unavailable": () => "This log can't be read.",
   "sentence.problem.summary.conflict": (p: P) =>
     p.name ? `${p.name} changed after you reviewed it.` : "It changed after you reviewed it.",
+  "sentence.problem.summary.inUse": (p: P) =>
+    p.more === "0" ? `${p.users} still use it.` : `${p.users} and ${p.more} more still use it.`,
   "sentence.problem.summary.already-exists": (p: P) =>
     `${p.objects} already exist in project ${p.namespace}.`,
   "sentence.problem.summary.managed": (p: P) =>
