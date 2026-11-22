@@ -216,7 +216,7 @@ function editView(t: Translate, groups: readonly EditGroup[]): Group[] {
       .filter((kind) => counts[kind] > 0)
       .map((kind) => t(`plan.fact.${kind}`, counts[kind]))
       .join(t("common.sep"))
-    const part = group.part === "other" ? t("plan.other") : t(`part.${group.part}`)
+    const part = group.part === "other" ? (group.kind ?? t("plan.other")) : t(`part.${group.part}`)
     return {
       key: group.key,
       object: group.object,

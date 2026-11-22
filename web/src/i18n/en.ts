@@ -1235,7 +1235,7 @@ export const en = {
   "components.needsValue": "Fill this in.",
   "components.keptSecret": "Set at the last install. Paste a new value to replace it.",
   "components.generatedSecret": "Leave it empty and Zeabur makes a random value.",
-  "components.check": "Check changes",
+  "components.check": "Review changes",
   "components.changeValues": "Change values",
   "components.value.set": "Set",
   "components.value.kept": "Kept from the last install",
