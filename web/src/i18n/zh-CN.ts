@@ -1697,6 +1697,9 @@ export const zhCN: Messages = {
   "confirm.createUploadService": (name) => `创建服务 ${name}，并用你上传的文件夹构建。`,
   "confirm.createGitService": (name) => `创建服务 ${name}，并用你的仓库构建。`,
   "confirm.createImageService": (name) => `用镜像创建服务 ${name}。`,
+  "confirm.createImageServicePublic": (name, host) =>
+    `用镜像创建服务 ${name}，并公开到 ${host}，网上的人都能访问。`,
+  "confirm.createImageServiceInside": (name) => `用镜像创建服务 ${name}，只有集群内的服务能访问。`,
   "confirm.isolates": (name) =>
     `之后 ${name} 只收发这条和其他连接规则允许的流量，集群会拦截其余流量。`,
   "confirm.delete": (name: string) => `删除 ${name}。删除后无法恢复。`,

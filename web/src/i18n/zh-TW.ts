@@ -1700,6 +1700,10 @@ export const zhTW: Messages = {
   "confirm.createUploadService": (name) => `建立服務 ${name}，並用你上傳的資料夾建置。`,
   "confirm.createGitService": (name) => `建立服務 ${name}，並用你的儲存庫建置。`,
   "confirm.createImageService": (name) => `用映像檔建立服務 ${name}。`,
+  "confirm.createImageServicePublic": (name, host) =>
+    `用映像檔建立服務 ${name}，並公開到 ${host}，網路上的人都連得到。`,
+  "confirm.createImageServiceInside": (name) =>
+    `用映像檔建立服務 ${name}，只有叢集內的服務連得到。`,
   "confirm.isolates": (name) =>
     `之後 ${name} 只收發這條和其他連線規則允許的流量，叢集會擋下其餘流量。`,
   "confirm.delete": (name: string) => `刪除 ${name}。刪除後無法復原。`,

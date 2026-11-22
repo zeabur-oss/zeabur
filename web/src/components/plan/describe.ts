@@ -370,7 +370,11 @@ function uploadSentence(t: Translate, change: UploadChange | LimitChange | Pages
     case "createGitService":
       return t("confirm.createGitService", change.name)
     case "createImageService":
-      return t("confirm.createImageService", change.name)
+      return change.host
+        ? t("confirm.createImageServicePublic", change.name, change.host)
+        : change.port
+          ? t("confirm.createImageServiceInside", change.name)
+          : t("confirm.createImageService", change.name)
     case "uploadToken":
       return t("confirm.uploadToken", change.build)
     case "archiveDigest":
