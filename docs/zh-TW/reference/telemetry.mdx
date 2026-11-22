@@ -64,7 +64,7 @@ description: 加入體驗計畫後，Zeabur 開源版和 `zeaburctl ui` 會傳�
 用 Helm 加入時，帶入一組新的安裝代碼：
 
 ```sh
-helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
+helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reset-then-reuse-values \
   --set telemetry.enabled=true \
   --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
 ```

@@ -64,7 +64,7 @@ To delete the ID of `zeaburctl ui`, run `zeaburctl telemetry reset`. It makes a 
 To join with Helm, pass in a new ID:
 
 ```sh
-helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
+helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reset-then-reuse-values \
   --set telemetry.enabled=true \
   --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
 ```

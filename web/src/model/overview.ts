@@ -37,7 +37,7 @@ export function explainedBy(event: Event, diagnoses: Diagnosis[]): boolean {
 }
 
 /** Why an address can't be reached when the hop that fails is only the replicas' readiness. */
-type Waiting = "cause" | "stopped"
+type Waiting = "cause" | "stopped" | "noReplica"
 
 type RolloutShown =
   | { as: "none" }
@@ -61,11 +61,25 @@ export interface Overview {
 const stopsAtReady = (route: Route) =>
   route.status === "failed" && route.hops.find((h) => h.status === "failed")?.step === "ready"
 
+/** No ready replica answers nothing, whatever a check from outside says. */
+function markNoReplica(
+  waiting: Map<string, Waiting>,
+  routes: Route[],
+  replicas?: { desired: number; ready: number } | null,
+) {
+  if ((replicas?.desired ?? 0) === 0 || replicas?.ready !== 0) return
+  for (const route of routes)
+    if (route.status !== "failed" && !waiting.has(route.address))
+      waiting.set(route.address, "noReplica")
+}
+
 export function overviewOf(
   service: {
     diagnoses?: Diagnosis[] | null
     /** Scaled to zero: no replica is meant to run. */
     stopped: boolean
+    /** Replicas wanted and ready, when the service has them. */
+    replicas?: { desired: number; ready: number } | null
   },
   rollout: Rollout | undefined,
   routes: Route[],
@@ -78,6 +92,7 @@ export function overviewOf(
     causes.length > 0 ? "cause" : service.stopped ? "stopped" : undefined
   const waiting = new Map<string, Waiting>()
   if (known) for (const route of routes) if (stopsAtReady(route)) waiting.set(route.address, known)
+  markNoReplica(waiting, routes, service.replicas)
   const down = routes.filter((r) => waiting.get(r.address) === "cause")
   const alsoDown =
     down.length > 0

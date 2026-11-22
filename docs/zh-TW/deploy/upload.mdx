@@ -115,7 +115,7 @@ printf '{"auths":{"localhost:5000":{"registrytoken":"%s"}}}' \
 kubectl -n zot get secret zot-tls -o jsonpath='{.data.ca\.crt}' | base64 -d > ca.crt
 kubectl -n zot port-forward svc/zot 5000:5000 &
 tar -czf source.tar.gz -C ./site .
-oras push --registry-config auth.json --ca-file ca.crt \
+oras push --registry-config auth.json --ca-file ca.crt --plain-http=false \
   localhost:5000/shop/site/source:upload-1 \
   --artifact-type application/vnd.zeabur.source.v1+tar \
   source.tar.gz:application/vnd.oci.image.layer.v1.tar+gzip

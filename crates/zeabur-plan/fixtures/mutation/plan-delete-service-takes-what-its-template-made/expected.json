@@ -1,0 +1,14 @@
+{
+  "impact": [{"kind": "Deployment", "name": "webui"}],
+  "objects": [
+    {"target": {"kind": "Deployment", "name": "webui"}, "write": {"type": "delete", "uid": "d-webui", "resourceVersion": "7"}},
+    {"target": {"kind": "Ingress", "name": "webui"}, "write": {"type": "delete", "uid": "i-webui", "resourceVersion": "10"}},
+    {"target": {"kind": "Service", "name": "webui"}, "write": {"type": "delete", "uid": "s-webui", "resourceVersion": "9"}},
+    {"target": {"kind": "PersistentVolumeClaim", "name": "webui-data"}, "write": {"type": "delete", "uid": "pvc-webui", "resourceVersion": "12"}}
+  ],
+  "warnings": [
+    {"code": "deletesOwned", "target": {"kind": "Deployment", "name": "webui"}, "objects": [{"kind": "Ingress", "name": "webui"}, {"kind": "Service", "name": "webui"}, {"kind": "PersistentVolumeClaim", "name": "webui-data"}]},
+    {"code": "claimDataMayBeLost", "claim": "webui-data"},
+    {"code": "stays", "object": {"kind": "Secret", "name": "app-secrets"}, "reason": "shared", "workloads": [{"kind": "Deployment", "name": "pipeline"}]}
+  ]
+}

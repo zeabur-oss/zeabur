@@ -523,6 +523,9 @@ fn service(
             })
         })
         .collect();
+    // The first container is the service's own; a screen that takes `containers[0]` must not get
+    // an init container.
+    projected.sort_by_key(|c| c.init);
     crate::restart::mark(snapshot, &index.objects, workload, &mut projected);
     let me = workload.reference();
     let summary = summarise_with(snapshot, workload, conventions);

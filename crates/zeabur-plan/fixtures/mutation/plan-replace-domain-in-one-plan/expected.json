@@ -1,0 +1,13 @@
+{
+  "objects": [
+    {"target": {"kind": "Ingress", "name": "shop"}, "write": {"type": "delete", "resourceVersion": "9"}},
+    {
+      "target": {"kind": "Ingress", "name": "web-www-example-test"},
+      "write": {"type": "create"}
+    }
+  ],
+  "warnings": [
+    {"code": "routeDeleted", "hostname": "shop.example.test", "route": {"kind": "Ingress", "name": "shop"}},
+    {"code": "httpOnly", "hostname": "www.example.test", "reason": "noIssuer"}
+  ]
+}

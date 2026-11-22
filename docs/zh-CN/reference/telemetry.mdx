@@ -64,7 +64,7 @@ description: 加入体验计划后，Zeabur 开源版和 `zeaburctl ui` 会发�
 用 Helm 加入时，传入一个新的安装代码：
 
 ```sh
-helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reuse-values \
+helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reset-then-reuse-values \
   --set telemetry.enabled=true \
   --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
 ```

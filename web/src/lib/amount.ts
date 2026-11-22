@@ -78,3 +78,10 @@ export function exactBytes(bytes: number): [string, string] {
   }
   return [String(Math.round(bytes)), "B"]
 }
+
+/** Whether a reservation is more than its limit; an empty or invalid side never is. */
+export function aboveLimit(request: string, limit: string, dimension: Dimension): boolean {
+  const reserved = parseAmount(request, dimension)
+  const most = parseAmount(limit, dimension)
+  return reserved !== undefined && most !== undefined && reserved > most
+}

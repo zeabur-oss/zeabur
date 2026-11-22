@@ -121,6 +121,26 @@ mod tests {
             .expect("the Secret is created")
     }
 
+    /// Objects of the same name left from an earlier service, as kubectl leaves a Secret, are
+    /// named as existing when the plan is made, not as a change after it.
+    #[tokio::test]
+    async fn a_service_over_left_over_objects_is_refused_naming_them() {
+        let cluster = cluster();
+        let app = git_app(&cluster);
+        let changes = json!([git_service("git@github.com:acme/site.git", None)]);
+        plan_and_apply(&app, changes.clone()).await;
+        let request = json!({ "changes": changes });
+        let (status, problem) =
+            send(&app, "POST", "/api/v1/projects/shop/plan", Some(&request)).await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        assert_eq!(problem["summary"]["key"], "problem.summary.already-exists");
+        assert_eq!(problem["summary"]["params"]["namespace"], "shop");
+        assert!(
+            !problem["detail"].as_str().unwrap().contains("changed"),
+            "{problem}"
+        );
+    }
+
     /// The plan lists the Secret with its values hidden and makes no key; the apply makes the key
     /// and creates an `ssh-auth` Secret Zeabur Builder reads, with GitHub's host key; the person
     /// then reads its public half through the `Build`.
