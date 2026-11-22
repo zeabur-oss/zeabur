@@ -17954,7 +17954,7 @@ components:
             type: array
             items:
               $ref: "#/components/schemas/Container"
-            description: Its init and regular containers, in that order.
+            description: Its regular containers, then its init containers.
           dataStore:
             oneOf:
             - $ref: "#/components/schemas/DataStore"

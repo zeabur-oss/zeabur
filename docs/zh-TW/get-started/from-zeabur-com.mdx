@@ -97,6 +97,23 @@ Coding Agent 會照著下面的步驟做，你也可以自己照著做。自己�
 - 切換之前，不要更動 Zeabur 上的服務。
 - 文件和你看到的情況不一致時，相信你看到的，並告訴使用者。
 
+### 開始之前
+
+盤點之前，先用一則訊息問使用者這幾件事：
+
+- **SSH 存取**。Zeabur 代管的伺服器可能沒有存 SSH 憑證，這時 `server exec` 會失敗。每一台這樣的伺服器，都問使用者位址、使用者名稱，以及金鑰或密碼。
+- **要搬哪些服務**。已暫停和已停止的服務也要列出來，逐一問使用者搬不搬。已停止的服務在 Zeabur 開源版建成 0 個副本，這樣它存在但不會執行。
+- **讀不到的用量**。服務的記憶體用量讀不到時，例如它已經停止，先用 Medium 大小。第一次執行後，用 `kubectl top pod` 讀實際用量，再依它調整大小。
+
+### 已知限制
+
+- **執行中的 digest**。Zeabur CLI 不會顯示正在執行的映像檔 digest。用 `docker buildx imagetools inspect <image>:<tag>` 把 tag 解析成 digest，固定這個 digest，並告訴使用者它是 tag 目前指向的 digest。
+- **建置需要 Keel**。從 Git 部署和上傳資料夾都需要 Zeabur Builder 和 Keel。建立這兩種服務之前，先裝好這兩個元件。
+- **記憶體**。用映像檔建立的服務預設是 Small 大小，記憶體上限是 256 MiB。在 Zeabur 用得比這多的服務，會被以 `OOMKilled` 停掉。依你記下的用量，留一些餘裕，寫進每個服務 YAML 的 `resources.limits.memory`。之後要調高，照[服務設定](../configure/service-settings.mdx)到**設定** → **運算資源**。
+- **提示**。`variable list` 和 `domain list` 會問要用哪個專案。加上 `-i=false`，並用參數指定專案和服務，它們就不會停下來等回答。
+- **輸出大小**。`service exec` 最多回傳 3 MB。把傾印檔寫在服務裡的檔案，再分成小於 3 MB 的片段讀出來，或從外部連到資料庫。
+- **SQLite**。不要複製應用程式正開著的 SQLite 檔案。用 `sqlite3 app.db .dump > app.sql` 做邏輯複製，再用 `sqlite3 new.db < app.sql` 還原。
+
 ### 1. 盤點 Zeabur
 
 照 Zeabur 指南的「Before you start」、「Inventory」、「Container images」、「Variables」和「Data」做。問使用者自己的到期日，以那一天為準規劃，不要以 12 月 31 日為準。
@@ -155,7 +172,7 @@ sudo zeatend apply --plan plan.json
 
 | Zeabur 上有 | 元件 |
 | --- | --- |
-| 從 Git 建置的服務 | `zeabur-builder`、`keel` |
+| 從 Git 建置或上傳資料夾的服務 | `zeabur-builder`、`keel` |
 | PostgreSQL | `cloudnative-pg` |
 | MySQL | `moco` |
 | MariaDB | `mariadb-operator` |
@@ -183,7 +200,7 @@ sudo k3s kubectl apply --server-side -f components.yaml
 | --- | --- |
 | 專案 | 加上 `zeabur.com/project: "true"` 標籤的 Namespace，見[建立與管理專案](../configure/projects.mdx) |
 | 用 zbpack 從 Git 建置的服務 | 同一個儲存庫的 Build。有 Dockerfile 就用 `dockerfile`，否則用 `railpack`。照 Zeabur 指南的「Build」沿用根目錄、指令和執行環境版本。見[從 Git 建置並部署服務](../deploy/git.mdx)。匯出的映像檔只能暫時使用 |
-| 預先建置的映像檔或範本服務 | 同一個映像檔，固定在目前執行的 digest。見[部署容器映像檔](../deploy/image.mdx) |
+| 預先建置的映像檔或範本服務 | 同一個映像檔，依[已知限制](#已知限制)用 digest 固定。見[部署容器映像檔](../deploy/image.mdx) |
 | 資料庫範本 | Zeabur 開源版的資料庫，見[建立、備份與還原資料庫](../deploy/databases.mdx) |
 | 展開後的變數、`.zeabur.internal` 位址 | Zeabur 指南「Variables」裡展開後的值，內部位址換成 Zeabur 開源版的服務名稱。見[設定環境變數](../configure/variables.mdx) |
 | 磁碟區 | 新的磁碟，見[儲存檔案與備份磁碟區](../configure/volumes.mdx) |

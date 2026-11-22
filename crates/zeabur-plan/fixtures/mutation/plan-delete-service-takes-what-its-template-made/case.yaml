@@ -1,0 +1,10 @@
+description: "Deleting a service that a template installed with `owned` deletes, after its Deployment, the Service, route and claim the template made for it, whose data goes. A Secret the template's other Deployment reads stays, shared."
+operation: mutation.plan
+params:
+  reclaimPolicies: {pv-webui: Delete}
+  request:
+    changes:
+      - op: delete
+        resource: {group: apps, version: v1, resource: deployments}
+        name: webui
+        owned: true
