@@ -52,6 +52,7 @@ describe("project deletion", () => {
       volumes: [],
       toolsNamespace: "zeabur-terminals",
       toolsPods: [],
+      backups: [],
     }
     expect(
       projectDeletionOf([
