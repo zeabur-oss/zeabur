@@ -2890,7 +2890,6 @@ export const en = {
   "add.planGit": (name: string) => `Deploy ${name} from Git`,
   "add.card.git": "Build a Git repository and run it.",
   "add.palette.git": (project: string) => `Deploy from Git in ${project}`,
-  "add.gitNeedsWhy": "Deploy from Git and Upload a folder need these components.",
   "add.gitMissing.keel":
     "Needs the Keel component, which this cluster doesn't have and can't install on its Kubernetes version.",
   "add.gitMissing.registrySetting":

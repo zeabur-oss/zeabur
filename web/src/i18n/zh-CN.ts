@@ -2637,7 +2637,6 @@ export const zhCN: Messages = {
   "add.planGit": (name) => `从 Git 部署 ${name}`,
   "add.card.git": "构建并运行 Git 仓库。",
   "add.palette.git": (project) => `在 ${project} 从 Git 部署`,
-  "add.gitNeedsWhy": "从 Git 部署和上传文件夹都要用到这些组件。",
   "add.gitMissing.keel": "需要 Keel 组件，但这个集群没有，它的 Kubernetes 版本也装不了。",
   "add.gitMissing.registrySetting":
     "Zeabur 没有设置构建用的 registry，请在 chart 设置 builds.registry。",

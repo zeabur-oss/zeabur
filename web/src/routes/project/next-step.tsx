@@ -1,6 +1,6 @@
 import { useQuery } from "@tanstack/react-query"
-import { Link } from "@tanstack/react-router"
-import { Fragment, useState, type ComponentType, type SVGProps } from "react"
+import { Link, useNavigate } from "@tanstack/react-router"
+import { Fragment, type ComponentType, type SVGProps } from "react"
 import ArchiveIcon from "~icons/ph/archive"
 import CaretRightIcon from "~icons/ph/caret-right"
 import DatabaseIcon from "~icons/ph/database"
@@ -11,16 +11,9 @@ import StackIcon from "~icons/ph/stack"
 import UploadSimpleIcon from "~icons/ph/upload-simple"
 
 import { objectStorageQuery } from "@/api/queries"
-import {
-  addEntries,
-  entryTestid,
-  useAddChoices,
-  type AddEntry,
-  type Steps,
-} from "@/components/add/menu"
+import { addEntries, entryTestid, useAddChoices, type AddEntry } from "@/components/add/menu"
 import { CopyText } from "@/components/copy-text"
 import { useDatabases } from "@/components/databases"
-import { LazyInstallerSheet } from "@/components/lazy-installer-sheet"
 import { useT } from "@/i18n"
 import { openAdd, type AddWhat } from "@/lib/adding"
 import { cn } from "@/lib/utils"
@@ -56,7 +49,9 @@ const icons: Partial<Record<AddWhat, ComponentType<SVGProps<SVGSVGElement>>>> = 
 export function NextStep({ project }: { project: string }) {
   const t = useT()
   const choices = useAddChoices(project)
-  const [steps, setSteps] = useState<Steps>()
+  const navigate = useNavigate()
+  const onInstall = (id: string) =>
+    void navigate({ to: "/cluster/components", search: { component: id } })
   const databases = useDatabases(project).data?.items.length ?? 0
   const stores = useQuery(objectStorageQuery(project)).data?.items.length ?? 0
   const entries = choices && !choices.none ? addEntries(choices, t).filter((e) => e.gate.open) : []
@@ -81,7 +76,7 @@ export function NextStep({ project }: { project: string }) {
                 title={t("add.group.services")}
                 entries={services}
                 project={project}
-                onSteps={setSteps}
+                onInstall={onInstall}
               />
             ) : null}
             {data.length ? (
@@ -90,7 +85,7 @@ export function NextStep({ project }: { project: string }) {
                 hint={t("add.group.dataHint")}
                 entries={data}
                 project={project}
-                onSteps={setSteps}
+                onInstall={onInstall}
               />
             ) : null}
             <OtherWays project={project} yaml={!!choices?.yaml} />
@@ -99,7 +94,6 @@ export function NextStep({ project }: { project: string }) {
       </Empty>
       {databases ? <Databases project={project} /> : null}
       {stores ? <ObjectStorageSection project={project} /> : null}
-      {steps ? <LazyInstallerSheet {...steps} onClose={() => setSteps(undefined)} /> : null}
     </PageColumn>
   )
 }
@@ -109,13 +103,13 @@ function TileGroup({
   hint,
   entries,
   project,
-  onSteps,
+  onInstall,
 }: {
   title: string
   hint?: string
   entries: AddEntry[]
   project: string
-  onSteps: (steps: Steps) => void
+  onInstall: (id: string) => void
 }) {
   return (
     <section className="flex flex-col gap-3">
@@ -125,17 +119,21 @@ function TileGroup({
       </div>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         {entries.map((entry) => (
-          <EntryTile key={entry.what} entry={entry} onClick={tileAction(entry, project, onSteps)} />
+          <EntryTile
+            key={entry.what}
+            entry={entry}
+            onClick={tileAction(entry, project, onInstall)}
+          />
         ))}
       </div>
     </section>
   )
 }
 
-function tileAction(entry: AddEntry, project: string, onSteps: (steps: Steps) => void) {
-  const { steps } = entry
+function tileAction(entry: AddEntry, project: string, onInstall: (id: string) => void) {
+  const { install } = entry
   if (entry.why === undefined) return () => openAdd(project, entry.what)
-  return steps ? () => onSteps(steps) : undefined
+  return install ? () => onInstall(install.id) : undefined
 }
 
 function EntryTile({ entry, onClick }: { entry: AddEntry; onClick?: () => void }) {
