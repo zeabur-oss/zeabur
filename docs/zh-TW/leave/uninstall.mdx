@@ -168,7 +168,33 @@ kubectl delete namespace zeabur-s3-destinations
 kubectl delete namespace zeabur-identity
 ```
 
+之後叢集裡還留著六個 Zeabur Identity 的 CRD，等 Namespace 刪完再刪。Identity 的物件沒有用 finalizer，刪除很快就會完成。
+
+```sh
+kubectl delete crd \
+  users.identity.zeabur.com credentials.identity.zeabur.com \
+  oauthclients.identity.zeabur.com grants.identity.zeabur.com \
+  invitations.identity.zeabur.com upstreamproviders.identity.zeabur.com
+```
+
 kube-apiserver 仍信任 Identity 的 issuer。用 Zeatend 設定的伺服器，從 `/etc/zeatend/config.yaml` 的 `apiServer.authenticationConfig` 移除 Identity 的 issuer，再執行 `sudo zeatend apply`。叢集是你自己裝的，就從 kube-apiserver 的認證設定移除這個 issuer。
+
+用 Zeatend 設定的 K3s 伺服器，執行 `sudo zeatend apply` 之後，`/etc/rancher/k3s/authentication/config.yaml` 可能還留著舊的 issuer。打開檢查，裡面只有 Identity 的 issuer 就刪掉：
+
+```sh
+sudo rm /etc/rancher/k3s/authentication/config.yaml
+```
+
+要等 `apply` 跑完才能刪，因為 K3s 啟動時會讀這個檔案。K3s 重啟時，你的應用程式會繼續運行。
+
+`helm uninstall` 也會留下 `zeabur` Namespace，也就是 chart 當初安裝的地方。確認裡面是空的，再刪除：
+
+```sh
+kubectl get all,configmaps,secrets --namespace zeabur
+kubectl delete namespace zeabur
+```
+
+打算在同一個 Namespace 重新安裝 Zeabur 開源版，或清單裡還有你需要的物件，就先不要刪。
 
 ## 整個叢集都不用時
 
