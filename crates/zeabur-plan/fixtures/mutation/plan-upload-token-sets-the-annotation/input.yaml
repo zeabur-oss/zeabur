@@ -6,5 +6,5 @@ metadata:
   resourceVersion: "7"
   generation: 1
 spec:
-  source: {archive: {}}
+  source: {type: archive, archive: {}}
   builderRef: railpack

@@ -639,8 +639,8 @@ pub struct EnvImportChange {
 pub struct BuildOptionsChange {
     /// The `Build`.
     pub build: String,
-    /// The build context inside the repository, `spec.source.git.contextDir`. Empty: the
-    /// repository's root.
+    /// The build context inside the repository or folder, `spec.source.contextDir`. Empty: its
+    /// root.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "openapi",
@@ -650,7 +650,7 @@ pub struct BuildOptionsChange {
         )
     )]
     pub context_dir: Option<String>,
-    /// The Dockerfile, relative to the context, `spec.source.git.dockerfile`. Empty: `Dockerfile`.
+    /// The Dockerfile, relative to the context, `spec.source.dockerfile`. Empty: `Dockerfile`.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "openapi",

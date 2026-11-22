@@ -83,7 +83,7 @@ The Build's `SOURCE` is `Archive`, and its `REVISION` is the digest of the uploa
 
 ## Do the same with kubectl
 
-Uploading creates the same objects as [deploying from Git](./git.mdx#do-the-same-with-kubectl). Only the Build source differs: `spec.source` is `archive` instead of `git`, and there's no `credentialsRef`. Create the Deployment, Service, and `<service-name>-env` using the YAML on the Git page, replacing `web` with `site`. Then create this Build:
+Uploading creates the same objects as [deploying from Git](./git.mdx#do-the-same-with-kubectl). Only the Build source differs: `spec.source.type` is `archive` instead of `git`, and there's no `credentialsRef`. Create the Deployment, Service, and `<service-name>-env` using the YAML on the Git page, replacing `web` with `site`. Then create this Build:
 
 ```yaml
 apiVersion: builder.zeabur.com/v1alpha1
@@ -97,6 +97,7 @@ metadata:
 spec:
   builderRef: railpack
   source:
+    type: archive
     archive: {}
   output:
     image: zot.zot.svc:5000/shop/site

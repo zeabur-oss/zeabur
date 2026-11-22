@@ -7,6 +7,5 @@ metadata:
   generation: 1
 spec:
   source:
-    archive:
-      digest: "sha256:1111111111111111111111111111111111111111111111111111111111111111"
+    type: archive
   builderRef: railpack

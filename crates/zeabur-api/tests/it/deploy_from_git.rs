@@ -63,8 +63,8 @@ mod tests {
         json!({"apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
                "metadata": {"name": "site"},
                "spec": {"builderRef": "dockerfile",
-                        "source": {"git": {"url": "git@github.com:acme/site.git", "ref": "main"},
-                                   "credentialsRef": {"name": "site-git"}},
+                        "source": {"type": "git", "git": {"url": "git@github.com:acme/site.git", "ref": "main",
+                                                          "credentialsRef": {"name": "site-git"}}},
                         "output": {"image": "zot.zot.svc:5000/shop/site"}}})
     }
 
@@ -368,7 +368,7 @@ mod tests {
         );
         cluster.update(|s| {
             let build = s.dynamic.last_mut().unwrap();
-            build.data["spec"]["source"] = json!({"archive": {}});
+            build.data["spec"]["source"] = json!({"type": "archive", "archive": {}});
         });
         let service = site(&cluster).await;
         assert_eq!(service["status"]["word"], "waitingUpload", "{service}");
@@ -506,11 +506,11 @@ mod tests {
                     "kind": "Build",
                     "metadata": {"name": name, "namespace": "shop"},
                     "spec": {"builderRef": "dockerfile",
-                             "source": {"git": {"url": "https://github.com/acme/site.git",
+                             "source": {"type": "git", "git": {"url": "https://github.com/acme/site.git",
                                                 "ref": "main"}},
                              "output": {"image": "zot.zot.svc:5000/shop/site"}}});
                 if !credentials.is_empty() {
-                    build["spec"]["source"]["credentialsRef"] = json!({"name": credentials});
+                    build["spec"]["source"]["git"]["credentialsRef"] = json!({"name": credentials});
                 }
                 s.dynamic.push(serde_json::from_value(build).unwrap());
             }

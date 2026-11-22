@@ -269,7 +269,7 @@ mod tests {
                 serde_json::from_value(json!({
                     "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
                     "metadata": {"name": "web", "namespace": "shop"},
-                    "spec": {"builderRef": "railpack", "source": {"archive": {}}},
+                    "spec": {"builderRef": "railpack", "source": {"type": "archive", "archive": {}}},
                     "status": {"uploadToken": {"request": "u1", "secretName": "web-upload",
                         "expiresAt": "2099-01-01T00:00:00Z"}},
                 }))

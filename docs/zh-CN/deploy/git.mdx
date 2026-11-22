@@ -228,11 +228,12 @@ metadata:
 spec:
   builderRef: railpack
   source:
+    type: git
     git:
       url: https://github.com/acme/web.git
       ref: main
-    credentialsRef:
-      name: web-git
+      credentialsRef:
+        name: web-git
   output:
     image: zot.zot.svc:5000/shop/web
   env:
@@ -246,10 +247,10 @@ spec:
       url: http://keel.keel.svc.cluster.local:9300/v1/webhooks/native
 ```
 
-- `web-git` 仅在使用访问令牌读取私有仓库时需要，Build 通过 `spec.source.credentialsRef` 引用它，标签 `builder.zeabur.com/git-credentials: "true"` 让 Zeabur Builder 能够读取。公开仓库需移除此机密变量和 `credentialsRef`。
+- `web-git` 仅在使用访问令牌读取私有仓库时需要，Build 通过 `spec.source.git.credentialsRef` 引用它，标签 `builder.zeabur.com/git-credentials: "true"` 让 Zeabur Builder 能够读取。公开仓库需移除此机密变量和 `credentialsRef`。
 - `web-build-env` 和 Build 的 `spec.env` 仅在有构建变量时需要。
 - Deployment 先使用不存在的 `:pending` tag，首次构建完成后由 Keel 替换。`keel.sh/policy: force` 对应**新构建完成后自动部署**。
-- 使用 Dockerfile 构建时，将 `builderRef` 改为 `dockerfile`，按需在 `spec.source.git` 中添加 `contextDir` 和 `dockerfile`。`ref` 留空时，表单会写入 `HEAD`，跟踪默认分支。
+- 使用 Dockerfile 构建时，将 `builderRef` 改为 `dockerfile`，按需在 `spec.source` 中添加 `contextDir` 和 `dockerfile`。`ref` 留空时，表单会写入 `HEAD`，跟踪默认分支。
 
 改用部署密钥时，自行生成密钥，将公钥添加到仓库，再将私钥和 `known_hosts` 放入 `kubernetes.io/ssh-auth` 机密变量。将 Build 的 `url` 改为 SSH 地址，例如 `git@github.com:acme/web.git`：
 

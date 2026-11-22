@@ -6,8 +6,8 @@
         "type": "patch",
         "operations": [
           {"op": "test", "path": "/metadata/generation", "value": 2},
-          {"op": "test", "path": "/spec/source/git/contextDir", "value": "apps/web"},
-          {"op": "replace", "path": "/spec/source/git/contextDir", "value": "apps/site"},
+          {"op": "test", "path": "/spec/source/contextDir", "value": "apps/web"},
+          {"op": "replace", "path": "/spec/source/contextDir", "value": "apps/site"},
           {
             "op": "add",
             "path": "/spec/env/-",

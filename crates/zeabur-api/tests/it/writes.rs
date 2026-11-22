@@ -140,7 +140,7 @@ mod tests {
                     "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
                     "metadata": {"name": "web", "namespace": "shop", "resourceVersion": "7"},
                     "spec": {"builderRef": "dockerfile",
-                        "source": {"git": {"url": "https://example.com/acme/web", "ref": "main"}}}
+                        "source": {"type": "git", "git": {"url": "https://example.com/acme/web", "ref": "main"}}}
                 }))
                 .unwrap(),
             );

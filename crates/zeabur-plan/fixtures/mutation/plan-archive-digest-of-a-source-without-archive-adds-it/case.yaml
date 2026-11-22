@@ -1,0 +1,6 @@
+description: "A Build of type archive without an archive object gets one with the digest, since the CRD leaves it optional."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: archiveDigest, build: site, digest: "sha256:2222222222222222222222222222222222222222222222222222222222222222"}

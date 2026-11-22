@@ -188,8 +188,9 @@ impl Planner<'_> {
         let index = self.build(name)?;
         if self
             .current(index)
-            .pointer("/spec/source/archive")
-            .is_none()
+            .pointer("/spec/source/type")
+            .and_then(Value::as_str)
+            != Some("archive")
         {
             return Err(error(
                 ErrorKind::BadRequest,
@@ -264,10 +265,18 @@ impl Planner<'_> {
             ],
             "spec.source.archive.digest",
         )?;
-        let operations = before.map_or_else(
-            || vec![add(&path, json!(digest))],
-            |before| vec![test(&path, before), replace(&path, json!(digest))],
-        );
+        // `archive` is optional in the CRD: `{type: archive}` alone waits for an upload.
+        let operations = match before {
+            Some(before) => vec![test(&path, before), replace(&path, json!(digest))],
+            None if self
+                .current(index)
+                .pointer("/spec/source/archive")
+                .is_some() =>
+            {
+                vec![add(&path, json!(digest))]
+            }
+            None => vec![add("/spec/source/archive", json!({ "digest": digest }))],
+        };
         self.patch(index, operations)
     }
 
@@ -445,24 +454,14 @@ impl Planner<'_> {
         Ok(())
     }
 
-    /// Sets `spec.source.git.<field>` (`archive` for an uploaded folder) to `value`, or removes it
-    /// when `value` is empty.
+    /// Sets `spec.source.<field>` to `value`, or removes it when `value` is empty.
     fn build_path_field(
         &mut self,
         index: usize,
         field: &str,
         value: &str,
     ) -> Result<(), PlanError> {
-        let source = if self
-            .current(index)
-            .pointer("/spec/source/archive")
-            .is_some()
-        {
-            "archive"
-        } else {
-            "git"
-        };
-        let path = pointer(&["spec", "source", source, field]);
+        let path = pointer(&["spec", "source", field]);
         let before = self.current(index).pointer(&path).cloned();
         let operations = match before {
             Some(before) if before.as_str() == Some(value) => return Ok(()),
@@ -476,10 +475,9 @@ impl Planner<'_> {
             &[
                 Step::field("spec"),
                 Step::field("source"),
-                Step::field(source),
                 Step::field(field),
             ],
-            &format!("spec.source.{source}.{field}"),
+            &format!("spec.source.{field}"),
         )?;
         self.patch(index, operations)
     }

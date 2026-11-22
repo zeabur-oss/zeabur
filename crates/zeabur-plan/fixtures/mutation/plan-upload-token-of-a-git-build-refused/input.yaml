@@ -6,5 +6,5 @@ metadata:
   resourceVersion: "7"
   generation: 1
 spec:
-  source: {git: {url: https://example.com/acme/web, ref: main}}
+  source: {type: git, git: {url: https://example.com/acme/web, ref: main}}
   builderRef: dockerfile

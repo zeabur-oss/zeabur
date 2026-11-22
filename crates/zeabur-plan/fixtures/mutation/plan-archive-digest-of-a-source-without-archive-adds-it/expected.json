@@ -1,0 +1,14 @@
+{
+  "objects": [
+    {
+      "target": {"kind": "Build", "name": "site"},
+      "write": {
+        "type": "patch",
+        "operations": [
+          {"op": "test", "path": "/metadata/generation", "value": 1},
+          {"op": "add", "path": "/spec/source/archive", "value": {"digest": "sha256:2222222222222222222222222222222222222222222222222222222222222222"}}
+        ]
+      }
+    }
+  ]
+}

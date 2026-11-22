@@ -856,7 +856,7 @@ mod tests {
                     "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
                     "metadata": {"name": "web", "namespace": "shop"},
                     "spec": {"builderRef": "dockerfile",
-                        "source": {"git": {"url": "https://example.com/acme/web", "ref": "main"}}},
+                        "source": {"type": "git", "git": {"url": "https://example.com/acme/web", "ref": "main"}}},
                     "status": {"latestImage": "zot:5000/shop/web:main-1-abc@sha256:00"}
                 }))
                 .unwrap(),

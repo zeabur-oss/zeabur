@@ -130,7 +130,7 @@ async fn issued_target(
             ))
         })?;
     let data = &object.data;
-    if data.pointer("/spec/source/archive").is_none() {
+    if data.pointer("/spec/source/type").and_then(Value::as_str) != Some("archive") {
         return Err(bad(&format!(
             "Build {build} does not build an uploaded folder."
         )));
