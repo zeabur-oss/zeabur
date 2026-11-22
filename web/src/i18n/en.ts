@@ -2652,7 +2652,7 @@ export const en = {
     "This URL is HTTP only. An administrator can name a cert-manager issuer to make it HTTPS.",
   "add.noPublicUrl": "Your role can't add a public domain in this project.",
   "add.more": "More settings",
-  "add.moreSummary": "Variables, volume, size, replicas, a private registry and security.",
+  "add.moreSummary": "Variables, volume, a private registry and security.",
   "add.variables": "Variables",
   "add.variablesHint": "KEY=value lines, as in a .env file.",
   "add.variablesBad": (lines: string) => `Not KEY=value: line ${lines}.`,

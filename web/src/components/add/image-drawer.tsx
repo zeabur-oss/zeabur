@@ -257,6 +257,21 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
           domains={domains}
           error={shown(problems.host, () => t(`add.problem.host.${problems.host ?? "empty"}`))}
         />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <ImageSizeField size={form.size} onSize={(size) => set({ size })} />
+          <FormField label={t("add.replicas")} hint={volume ? t("add.replicasFixed") : undefined}>
+            <Select
+              size="sm"
+              value={String(volume ? 1 : form.replicas)}
+              disabled={volume}
+              onValueChange={(replicas) => set({ replicas: Number(replicas) })}
+              items={Array.from({ length: MAX_REPLICAS }, (_, i) => ({
+                value: String(i + 1),
+                label: String(i + 1),
+              }))}
+            />
+          </FormField>
+        </div>
         <Collapsible open={moreShown || moreOpen} onOpenChange={setMoreShown}>
           <CollapsibleTrigger variant="disclosure">
             <CaretRightIcon aria-hidden="true" />
@@ -332,24 +347,6 @@ export function ImageDrawer({ project, onClose }: { project: string; onClose: ()
               ) : (
                 <Note>{t("add.noVolume")}</Note>
               )}
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <ImageSizeField size={form.size} onSize={(size) => set({ size })} />
-                <FormField
-                  label={t("add.replicas")}
-                  hint={volume ? t("add.replicasFixed") : undefined}
-                >
-                  <Select
-                    size="sm"
-                    value={String(volume ? 1 : form.replicas)}
-                    disabled={volume}
-                    onValueChange={(replicas) => set({ replicas: Number(replicas) })}
-                    items={Array.from({ length: MAX_REPLICAS }, (_, i) => ({
-                      value: String(i + 1),
-                      label: String(i + 1),
-                    }))}
-                  />
-                </FormField>
-              </div>
               {secrets ? (
                 <div className="flex flex-col gap-3">
                   <Toggle
