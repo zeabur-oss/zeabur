@@ -151,6 +151,10 @@ pub struct Backups {
     /// Where they go, when set up.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub store: Option<Store>,
+    /// The endpoint of every store the database's backups may be in, `None` for AWS S3; empty
+    /// when no store could be read. Not sent: deleting a project reads it.
+    #[serde(skip)]
+    pub endpoints: Vec<Option<String>>,
     /// The schedules that back it up.
     pub schedules: Vec<Schedule>,
     /// Its backups, newest first.

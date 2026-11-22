@@ -116,6 +116,9 @@ pub struct Schedule {
     /// Where it writes, such as `s3:https://s3.example.com/backups/shop`, when the provider says.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub destination: Option<String>,
+    /// The S3 endpoint it writes to, when the provider names one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub endpoint: Option<String>,
     /// How many backups it keeps, by period (`last`, `hourly`, `daily`, `weekly`, `monthly`,
     /// `yearly`), when the provider counts them.
     #[serde(default, skip_serializing_if = "BTreeMap::is_empty")]

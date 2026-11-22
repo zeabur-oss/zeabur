@@ -20,8 +20,11 @@
 //!   pods, the Namespace goes within seconds.
 //! - **What goes and what stays** is told in one [`Warning::DeletesProject`]: the services, the
 //!   databases, the volumes and what their reclaim policy does with the data [k8s-reclaim], and the
-//!   person's tools pods for the project. Backups in object storage and everything outside the
-//!   namespace stay.
+//!   person's tools pods for the project. It also tells where the project's backups are kept: a
+//!   backup whose S3 endpoint is a Service of the project (`<service>`, `<service>.<project>`,
+//!   `<service>.<project>.svc…` or its cluster IP) is kept in the project and goes with it; a
+//!   backup whose store or Service could not be read is told as unknown, never as staying; any
+//!   other backup and everything outside the namespace stay.
 //! - **Tools that put objects back.** Objects Helm, Argo CD or Flux manages are deleted with the
 //!   namespace, and the tool can create them again ([`Warning::Recreated`]).
 //! - **Refused**: a namespace Kubernetes keeps for itself (`kube-` prefix), Zeabur's own namespaces
@@ -94,6 +97,46 @@ pub struct DeletionInput {
     /// For a force deletion: the objects with finalizers among the content the namespace
     /// controller says is left.
     pub held: Vec<ProjectObject>,
+    /// The project's backups.
+    pub backups: Vec<ProjectBackup>,
+    /// Whether listing the project's Services was refused: an endpoint that names no Service
+    /// read is then unknown, not outside.
+    pub services_unread: bool,
+}
+
+/// What a backup covers.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum BackupKind {
+    /// A database.
+    Database,
+    /// A volume's files.
+    Volume,
+    /// The project's Kubernetes objects.
+    Project,
+}
+
+/// A backup of the project, as read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ProjectBackup {
+    /// What it covers.
+    pub kind: BackupKind,
+    /// The database, the claim or the project.
+    pub name: String,
+    /// Where it writes.
+    pub store: BackupStore,
+}
+
+/// Where a backup writes, as read.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum BackupStore {
+    /// AWS S3: no endpoint is set.
+    Aws,
+    /// The S3 endpoint.
+    Endpoint(String),
+    /// The provider's store could not be read, or does not name an endpoint.
+    Unknown,
 }
 
 /// An object whose finalizers a force deletion removes ([`Warning::RemovesFinalizers`]).
@@ -144,6 +187,38 @@ pub struct ProjectDeletion {
     pub tools_namespace: String,
     /// The person's tools pods for the project, deleted after the Namespace.
     pub tools_pods: Vec<String>,
+    /// The project's backups, and where each is kept.
+    pub backups: Vec<BackupDeletion>,
+}
+
+/// A backup of the project, and whether it goes with it.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct BackupDeletion {
+    /// What it covers.
+    pub kind: BackupKind,
+    /// The database, the claim or the project.
+    pub name: String,
+    /// Whether it goes with the project.
+    pub fate: BackupFate,
+    /// When it goes: what in the project keeps it, the owner of the Service its endpoint names,
+    /// else the Service.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub kept_in: Option<String>,
+}
+
+/// Whether a backup goes with the project.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum BackupFate {
+    /// It is kept outside the project.
+    Stays,
+    /// It is kept in the project's object storage.
+    Goes,
+    /// Where it is kept could not be read.
+    Unknown,
 }
 
 /// A database that goes with the project.
@@ -249,6 +324,25 @@ impl<'a> Planner<'a> {
                 name: text(&d.object, "/metadata/name"),
             })
             .collect();
+        let backups = deletion
+            .backups
+            .iter()
+            .map(|b| {
+                let (fate, kept_in) = match &b.store {
+                    BackupStore::Aws => (BackupFate::Stays, None),
+                    BackupStore::Unknown => (BackupFate::Unknown, None),
+                    BackupStore::Endpoint(e) => {
+                        fate_of(e, &name, snapshot, deletion.services_unread)
+                    }
+                };
+                BackupDeletion {
+                    kind: b.kind,
+                    name: b.name.clone(),
+                    fate,
+                    kept_in,
+                }
+            })
+            .collect();
         self.warnings.push(Warning::DeletesProject(ProjectDeletion {
             namespace: name,
             services,
@@ -256,6 +350,7 @@ impl<'a> Planner<'a> {
             volumes,
             tools_namespace: deletion.tools_namespace.clone(),
             tools_pods: deletion.tools_pods.clone(),
+            backups,
         }));
         self.warnings.extend(recreated(&meta, snapshot, deletion));
         Ok(())
@@ -354,6 +449,69 @@ fn text(object: &Value, pointer: &str) -> String {
         .and_then(Value::as_str)
         .unwrap_or_default()
         .to_owned()
+}
+
+/// Whether a backup at `endpoint` goes with the project, and what in the project serves it: the
+/// owner of the project's Service it names, else the Service. A short name (`files-s3`,
+/// `files-s3.shop`) or a cluster IP goes only when that Service was read; when the Services were
+/// not read it is unknown. `files-s3.shop.svc` and longer names the project by its DNS form
+/// [k8s-dns].
+///
+/// [k8s-dns]: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#services
+fn fate_of(
+    endpoint: &str,
+    project: &str,
+    snapshot: &zeabur_graph::Snapshot,
+    services_unread: bool,
+) -> (BackupFate, Option<String>) {
+    let rest = endpoint.split_once("://").map_or(endpoint, |(_, r)| r);
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    let authority = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
+    let host = authority.strip_prefix('[').map_or_else(
+        || authority.split(':').next().unwrap_or_default(),
+        |v6| v6.split(']').next().unwrap_or_default(),
+    );
+    let host = host.trim_end_matches('.').to_ascii_lowercase();
+    let named = |name: &str| {
+        snapshot
+            .services
+            .iter()
+            .find(|s| s.metadata.name.as_deref() == Some(name))
+    };
+    let looked_up = |found: Option<&k8s_openapi::api::core::v1::Service>| match found {
+        Some(service) => (BackupFate::Goes, Some(owner_or_name(service))),
+        None if services_unread => (BackupFate::Unknown, None),
+        None => (BackupFate::Stays, None),
+    };
+    if host.parse::<std::net::IpAddr>().is_ok() {
+        let found = snapshot.services.iter().find(|s| {
+            s.spec.as_ref().is_some_and(|spec| {
+                spec.cluster_ips
+                    .iter()
+                    .flatten()
+                    .chain(&spec.cluster_ip)
+                    .any(|ip| *ip == host)
+            })
+        });
+        return looked_up(found);
+    }
+    let labels: Vec<&str> = host.split('.').collect();
+    match labels.as_slice() {
+        [service] => looked_up(named(service)),
+        [service, namespace] if *namespace == project => looked_up(named(service)),
+        [service, namespace, "svc", ..] if *namespace == project => (
+            BackupFate::Goes,
+            Some(named(service).map_or_else(|| (*service).to_owned(), owner_or_name)),
+        ),
+        _ => (BackupFate::Stays, None),
+    }
+}
+
+fn owner_or_name(service: &k8s_openapi::api::core::v1::Service) -> String {
+    zeabur_model::adapters::controller_of(&service.metadata).map_or_else(
+        || service.metadata.name.clone().unwrap_or_default(),
+        |owner| owner.name.clone(),
+    )
 }
 
 /// Refuses a namespace that is not a project of the person's to delete.

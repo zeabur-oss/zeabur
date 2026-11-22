@@ -330,6 +330,11 @@ fn backups_of(
         .any(|c| c.type_ == "PBMReady" && c.status == "True");
     let ready = enabled && seen && pbm && view.status.state.as_deref() == Some("ready");
     Backups {
+        endpoints: backup
+            .storages
+            .values()
+            .map(|s| filled(s.s3.endpoint_url.as_ref()))
+            .collect(),
         store,
         schedules,
         runs,
@@ -522,6 +527,17 @@ mod tests {
         assert!(!db.backups.schedules[0].paused);
         assert_eq!(db.backups.runs[0].outcome, Outcome::Failed);
         assert_eq!(db.backups.runs[0].message.as_deref(), Some("access denied"));
+
+        assert_eq!(db.backups.endpoints, [Some("http://s3:8333".to_owned())]);
+
+        // Every storage is a place its backups may be, AWS S3's without an endpoint.
+        let mut two = cluster.clone();
+        two.data["spec"]["backup"]["storages"]["aws"] =
+            serde_json::json!({"type": "s3", "s3": {"bucket": "a"}});
+        assert_eq!(
+            database("shop", &two, &[]).backups.endpoints,
+            [None, Some("http://s3:8333".to_owned())]
+        );
 
         // Backups just set up: the operator has not seen the spec yet.
         let mut changed = cluster;

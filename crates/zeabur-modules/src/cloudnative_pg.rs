@@ -412,6 +412,11 @@ pub fn database(
             ready: state == State::Ready
                 && store.as_ref().is_some_and(|s| s.in_use)
                 && backups_ready(cluster, store_created, &found.runs),
+            endpoints: store
+                .iter()
+                .filter(|s| s.destination.is_some())
+                .map(|s| s.endpoint.clone())
+                .collect(),
             store,
             schedules: found.schedules,
             runs: found.runs,
@@ -616,6 +621,11 @@ mod tests {
         assert_eq!(db.backups.runs.len(), 1);
         assert_eq!(db.backups.runs[0].outcome, Outcome::Running);
         assert!(db.backups.ready);
+        assert_eq!(db.backups.endpoints, [Some("http://s3:8333".to_owned())]);
+
+        // An ObjectStore that could not be read: where the backups are is not known.
+        let unread = database("shop", &pg, &[], &[], &[]);
+        assert_eq!(unread.backups.endpoints, []);
 
         // Before the operator restarts the instances, archiving reads true without an archiver.
         let mut before = pg;

@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import {
+  backupFates,
   dataFate,
   deletingCommands,
   projectDeletionOf,
@@ -14,6 +15,21 @@ describe("project deletion", () => {
     expect(dataFate({ claim: "data", reclaimPolicy: "Delete" })).toBe("deleted")
     expect(dataFate({ claim: "data", reclaimPolicy: "Retain", volume: "pv-1" })).toBe("kept")
     expect(dataFate({ claim: "data" })).toBe("unknown")
+  })
+
+  test("backups kept in the project go with it, grouped by what keeps them", () => {
+    const fates = backupFates([
+      { kind: "database", name: "pg", fate: "goes", keptIn: "files" },
+      { kind: "volume", name: "uploads", fate: "goes", keptIn: "files" },
+      { kind: "database", name: "orders", fate: "stays" },
+      { kind: "project", name: "shop", fate: "unknown" },
+    ])
+    expect(fates.going.map((g) => [g.keptIn, g.backups.map((b) => b.name)])).toEqual([
+      ["files", ["pg", "uploads"]],
+    ])
+    expect(fates.staying.map((b) => b.name)).toEqual(["orders"])
+    expect(fates.unknown.map((b) => b.name)).toEqual(["shop"])
+    expect(backupFates([])).toEqual({ going: [], unknown: [], staying: [] })
   })
 
   test("only a backup that succeeded within a day is recent", () => {
@@ -40,6 +56,7 @@ describe("project deletion", () => {
       volumes: [],
       toolsNamespace: "zeabur-terminals",
       toolsPods: [],
+      backups: [],
     }
     expect(
       projectDeletionOf([

@@ -3,7 +3,8 @@
 //!
 //! The plan reads as the person: the Namespace, the objects in it, the database objects of each
 //! operator this build knows, and the `StorageClass`es and the bound PersistentVolumes (for what
-//! happens to the data).
+//! happens to the data), and the project's backups with the S3 endpoint each writes to (the
+//! `databases` and `backups` routes' reads).
 //! A read the person may not make leaves its part out; a refused read of database objects is told
 //! as a right the person lacks.
 //!
@@ -26,9 +27,15 @@ use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef, WriteRequest};
-use zeabur_modules::{Reading, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb};
+use zeabur_modules::{
+    Reading, backups, cloudnative_pg, dragonfly, k8up, mariadb_operator, moco, percona_mongodb,
+    velero,
+};
 use zeabur_plan::terminal::{self as plans, ToolsScope};
-use zeabur_plan::{DeletionInput, Input, Plan, PlanRequest, ProjectObject, Warning, Write};
+use zeabur_plan::{
+    BackupKind, BackupStore, DeletionInput, Input, Plan, PlanRequest, ProjectBackup, ProjectObject,
+    Warning, Write,
+};
 
 use super::terminal::{self, Planner};
 use super::{Applied, plan_problem, refusal, refused, write_request};
@@ -82,8 +89,15 @@ pub(super) async fn compute(
         .namespace_objects(project)
         .await
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(project)))?;
-    let (snapshot, _) = snapshot(objects, read_at);
+    let (snapshot, unread_objects) = snapshot(objects, read_at);
     let mut unreadable = Vec::new();
+    let services_unread = unread_objects.iter().any(|u| u.resource == "services");
+    unreadable.extend(
+        unread_objects
+            .iter()
+            .filter(|u| u.resource == "services")
+            .map(|u| refused_list(u, Some(project))),
+    );
     let databases = databases(cluster, project, &mut unreadable).await?;
     let (class_reclaim, default_class) = classes(cluster).await?;
     let reclaim_policies = volume_reclaim(cluster, &snapshot).await?;
@@ -94,6 +108,7 @@ pub(super) async fn compute(
         .filter_map(|p| p.pointer("/metadata/name").and_then(Value::as_str))
         .map(str::to_owned)
         .collect();
+    let backups = backups(cluster, project, read_at, &mut unreadable).await?;
     let deletion = DeletionInput {
         zeabur_namespaces,
         databases,
@@ -101,6 +116,8 @@ pub(super) async fn compute(
         default_class,
         tools_namespace,
         tools_pods,
+        backups,
+        services_unread,
         ..DeletionInput::default()
     };
     let mut plan = zeabur_plan::plan(
@@ -262,6 +279,142 @@ async fn databases(
         }
     }
     Ok(out)
+}
+
+/// The project's backups that exist (a run that stored one, [`stored`]): a database's, once per
+/// store it may be in (none when no store could be read, so an unread store never counts as kept
+/// outside); a volume's K8up backups, once per endpoint of each K8up schedule that covers it (a
+/// run does not name its schedule); the project's own Velero backups. A refused read leaves its
+/// backups out, and its right is named in `unreadable`.
+async fn backups(
+    cluster: &dyn Cluster,
+    project: &str,
+    now: Timestamp,
+    unreadable: &mut Vec<Denied>,
+) -> Result<Vec<ProjectBackup>, ApiError> {
+    let mut out = Vec::new();
+    if let Some(databases) = allowed(
+        crate::projects::databases::read(cluster, &[], project, now).await,
+        unreadable,
+    )? {
+        unreadable.extend(
+            databases
+                .unreadable
+                .iter()
+                .map(|u| refused_list(u, Some(project))),
+        );
+        for database in databases.items {
+            if !database.backups.runs.iter().any(stored) {
+                continue;
+            }
+            let stores: Vec<BackupStore> = if database.backups.endpoints.is_empty() {
+                vec![BackupStore::Unknown]
+            } else {
+                database
+                    .backups
+                    .endpoints
+                    .into_iter()
+                    .map(|e| e.map_or(BackupStore::Aws, BackupStore::Endpoint))
+                    .collect()
+            };
+            out.extend(stores.into_iter().map(|store| ProjectBackup {
+                kind: BackupKind::Database,
+                name: database.name.clone(),
+                store,
+            }));
+        }
+    }
+    let Some(found) = allowed(
+        crate::projects::backups::read(cluster, &[], project).await,
+        unreadable,
+    )?
+    else {
+        return Ok(out);
+    };
+    unreadable.extend(found.unreadable.iter().map(|u| {
+        let velero = u.resource.ends_with(".velero.io");
+        refused_list(u, (!velero).then_some(project))
+    }));
+    let run_of = |provider: &str, target: &backups::Target| {
+        found
+            .runs
+            .iter()
+            .chain(found.coverage.iter().filter_map(|c| c.last_run.as_ref()))
+            .any(|r| r.provider == provider && r.targets.contains(target) && stored(r))
+    };
+    for schedule in found
+        .schedules
+        .iter()
+        .filter(|s| s.provider == k8up::MODULE.id)
+    {
+        for target in &schedule.targets {
+            let backup = ProjectBackup {
+                kind: BackupKind::Volume,
+                name: target.name.clone(),
+                store: schedule
+                    .endpoint
+                    .clone()
+                    .map_or(BackupStore::Unknown, BackupStore::Endpoint),
+            };
+            if target.kind == backups::TargetKind::Volume
+                && run_of(k8up::MODULE.id, target)
+                && !out.contains(&backup)
+            {
+                out.push(backup);
+            }
+        }
+    }
+    let namespace = backups::Target {
+        kind: backups::TargetKind::Namespace,
+        name: project.to_owned(),
+    };
+    if run_of(velero::MODULE.id, &namespace) {
+        out.push(ProjectBackup {
+            kind: BackupKind::Project,
+            name: project.to_owned(),
+            store: BackupStore::Unknown,
+        });
+    }
+    Ok(out)
+}
+
+/// Whether a run left a backup in its store: it succeeded, or some items failed.
+const fn stored(run: &backups::Run) -> bool {
+    matches!(
+        run.outcome,
+        backups::Outcome::Succeeded | backups::Outcome::PartiallyFailed
+    )
+}
+
+/// The `list` right a partial read was refused, from its resource
+/// (`objectstores.barmancloud.cnpg.io`), in `namespace` or cluster-wide.
+fn refused_list(unread: &crate::views::UnreadableView, namespace: Option<&str>) -> Denied {
+    let (resource, group) = unread
+        .resource
+        .split_once('.')
+        .unwrap_or((unread.resource.as_str(), ""));
+    Denied {
+        verb: "list".to_owned(),
+        group: group.to_owned(),
+        resource: resource.to_owned(),
+        name: None,
+        namespace: namespace.map(str::to_owned),
+    }
+}
+
+/// What a read found, or nothing when it was refused, its right named in `unreadable`.
+fn allowed<T>(
+    result: Result<T, ApiError>,
+    unreadable: &mut Vec<Denied>,
+) -> Result<Option<T>, ApiError> {
+    match result {
+        Ok(found) => Ok(Some(found)),
+        Err(ApiError(problem)) if problem.kind == Kind::Forbidden => {
+            unreadable.extend(problem.denied);
+            Ok(None)
+        }
+        Err(other) => Err(other),
+    }
 }
 
 /// The `reclaimPolicy` of each `StorageClass` (`Delete` when it sets none, as kube-apiserver

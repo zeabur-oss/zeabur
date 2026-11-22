@@ -513,8 +513,13 @@ export const zhCN: Messages = {
   "deletion.backUpFirst": "先备份一次",
   "deletion.backUpVolume": (claim) => `现在备份 ${claim}`,
   "deletion.toolsPods": "你在这个项目中打开的 kubectl 终端也会删除",
+  "deletion.backupsGo": (names, place) =>
+    `${names} 的备份存在 ${place}，删除项目时 ${place} 也会一起删除。先把备份复制到别处，或改用其他 S3 目的地。`,
+  "deletion.backupsUnknown": (names) =>
+    `看不出 ${names} 的备份存在哪里，可能会跟项目一起删除。先确认备份的 S3 目的地。`,
   "deletion.stays": "会保留",
-  "deletion.staysBackups": "S3 中的备份",
+  "deletion.staysBackups": (names) => `${names} 存在 S3 的备份`,
+  "deletion.thisProject": "这个项目",
   "deletion.resticPassword":
     "S3 中的卷备份会保留。还原备份要用 restic 密码，密码存放在这个项目的机密变量中，删除项目时会一起删除，所以先另存一份。",
   "deletion.staysOutside": "项目以外的内容，例如其他项目和集群设置",

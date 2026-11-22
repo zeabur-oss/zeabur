@@ -4,6 +4,7 @@ import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 import ArchiveIcon from "~icons/ph/archive"
+import WarningIcon from "~icons/ph/warning"
 
 import type { Schemas } from "@/api/client"
 import { databasesQuery } from "@/api/queries"
@@ -13,7 +14,7 @@ import type { PlanAsk } from "@/components/plan/planner"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { useT, type Translate } from "@/i18n"
 import { backUpNow, backUpNowSummary, canBackUpNow } from "@/model/databases"
-import { dataFate, projectDeletionOf, recentBackup } from "@/model/project-deletion"
+import { backupFates, dataFate, projectDeletionOf, recentBackup } from "@/model/project-deletion"
 import { backUpVolumeNow, scheduleOf } from "@/model/volume-backups"
 
 type DeletesProject = Extract<Schemas.PlanWarning, { code: "deletesProject" }>
@@ -35,6 +36,52 @@ function fateText(t: Translate, volume: Schemas.VolumeDeletion): string {
     case "unknown":
       return t("deletion.dataUnknown")
   }
+}
+
+function backupNames(t: Translate, list: Schemas.BackupDeletion[]): string {
+  return bounded(
+    t,
+    list.map((b) => (b.kind === "project" ? t("deletion.thisProject") : b.name)),
+  ).text
+}
+
+function Alert({ children }: { children: ReactNode }) {
+  return (
+    <p className="type-meta flex gap-1.5 text-destructive" role="alert">
+      <WarningIcon aria-hidden="true" className="mt-0.5 shrink-0" />
+      <span>{children}</span>
+    </p>
+  )
+}
+
+function BackupAlerts({ backups }: { backups: Schemas.BackupDeletion[] }) {
+  const t = useT()
+  const { going, unknown } = backupFates(backups)
+  return (
+    <>
+      {going.map((g) => (
+        <Alert key={g.keptIn}>{t("deletion.backupsGo", backupNames(t, g.backups), g.keptIn)}</Alert>
+      ))}
+      {unknown.length > 0 ? (
+        <Alert>{t("deletion.backupsUnknown", backupNames(t, unknown))}</Alert>
+      ) : null}
+    </>
+  )
+}
+
+function StayingBackups({ staying }: { staying: Schemas.BackupDeletion[] }) {
+  const t = useT()
+  if (staying.length === 0) return null
+  return (
+    <>
+      <p className="type-meta text-muted-foreground">
+        {t("deletion.staysBackups", backupNames(t, staying))}
+      </p>
+      {staying.some((b) => b.kind === "volume") ? (
+        <p className="type-meta text-muted-foreground">{t("deletion.resticPassword")}</p>
+      ) : null}
+    </>
+  )
 }
 
 /** The plan's deletion of the project, when it has one. */
@@ -64,6 +111,7 @@ function Deletion({
   const backups = useBackups(project).data
   const databases = useQuery(databasesQuery(project)).data?.items ?? []
   const now = new Date()
+  const { staying } = backupFates(deletion.backups)
   const backUp = (ask: PlanAsk) => (
     <Button variant="outline" size="xs" onClick={() => reopen(ask)}>
       <ArchiveIcon aria-hidden="true" data-icon="inline-start" />
@@ -132,23 +180,23 @@ function Deletion({
         {deletion.toolsPods.length > 0 ? (
           <p className="type-meta text-muted-foreground">{t("deletion.toolsPods")}</p>
         ) : null}
+        <BackupAlerts backups={deletion.backups} />
       </section>
       <section className="flex flex-col gap-1" aria-labelledby="deletion-stays">
         <h3 id="deletion-stays" className="type-label">
           {t("deletion.stays")}
         </h3>
-        <p className="type-meta text-muted-foreground">{t("deletion.staysBackups")}</p>
-        {backups?.schedules.some((schedule) => schedule.provider === "k8up") ? (
-          <p className="type-meta text-muted-foreground">{t("deletion.resticPassword")}</p>
-        ) : null}
+        <StayingBackups staying={staying} />
         <p className="type-meta text-muted-foreground">{t("deletion.staysOutside")}</p>
-        <p className="type-meta text-muted-foreground">
-          {t("deletion.restore", t("clusterBackups.restoreGoneAction"))}
-          {t("common.gap")}
-          <Link to="/cluster/backups" className="text-foreground hover:underline">
-            {t("deletion.openBackups")}
-          </Link>
-        </p>
+        {staying.length > 0 ? (
+          <p className="type-meta text-muted-foreground">
+            {t("deletion.restore", t("clusterBackups.restoreGoneAction"))}
+            {t("common.gap")}
+            <Link to="/cluster/backups" className="text-foreground hover:underline">
+              {t("deletion.openBackups")}
+            </Link>
+          </p>
+        ) : null}
       </section>
     </div>
   )

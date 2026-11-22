@@ -200,6 +200,38 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_refused_backup_read_leaves_the_backups_out_and_names_the_right() {
+        let cluster = cluster(namespace("shop", &json!({})));
+        cluster.update(|s| {
+            s.forbidden_in_namespaces = BTreeSet::from(["persistentvolumeclaims".to_owned()]);
+        });
+        let app = app(&cluster);
+        let (status, plan) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({"changes": [{"op": "deleteProject"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(deletes_project(&plan)["backups"], json!([]));
+        let rights = plan["warnings"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|w| w["code"] == "rightsMissing")
+            .unwrap_or_else(|| panic!("{plan}"));
+        assert!(
+            rights["rights"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|r| r["verb"] == "list" && r["resource"] == "persistentvolumeclaims"),
+            "{rights}"
+        );
+    }
+
+    #[tokio::test]
     async fn a_project_being_deleted_says_what_holds_it_and_is_not_deleted_twice() {
         let terminating = namespace(
             "shop",

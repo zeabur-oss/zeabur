@@ -63,7 +63,8 @@ pub use plan::{
 };
 pub use project::{DEFAULT_ACCOUNT, project_namespace};
 pub use project_deletion::{
-    DatabaseDeletion, DeletionInput, HeldBy, ProjectDeletion, ProjectObject, VolumeDeletion,
+    BackupDeletion, BackupFate, BackupKind, BackupStore, DatabaseDeletion, DeletionInput, HeldBy,
+    ProjectBackup, ProjectDeletion, ProjectObject, VolumeDeletion,
 };
 pub use public_port::public_service_name;
 pub use releases::{Release, ReleasePods};

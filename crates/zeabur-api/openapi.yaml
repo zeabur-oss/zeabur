@@ -4844,6 +4844,44 @@ components:
         target:
           $ref: "#/components/schemas/BackupTarget"
           description: The target.
+    BackupDeletion:
+      type: object
+      description: A backup of the project, and whether it goes with it.
+      required:
+      - kind
+      - name
+      - fate
+      properties:
+        fate:
+          $ref: "#/components/schemas/BackupFate"
+          description: Whether it goes with the project.
+        keptIn:
+          type:
+          - string
+          - "null"
+          description: |-
+            When it goes: what in the project keeps it, the owner of the Service its endpoint names,
+            else the Service.
+        kind:
+          $ref: "#/components/schemas/BackupKind"
+          description: What it covers.
+        name:
+          type: string
+          description: The database, the claim or the project.
+    BackupFate:
+      type: string
+      description: Whether a backup goes with the project.
+      enum:
+      - stays
+      - goes
+      - unknown
+    BackupKind:
+      type: string
+      description: What a backup covers.
+      enum:
+      - database
+      - volume
+      - project
     BackupOutcome:
       type: string
       description: How a backup run went.
@@ -4942,6 +4980,11 @@ components:
           description: >-
             Where it writes, such as `s3:https://s3.example.com/backups/shop`, when the
             provider says.
+        endpoint:
+          type:
+          - string
+          - "null"
+          description: The S3 endpoint it writes to, when the provider names one.
         name:
           type: string
           description: The provider's object, `<namespace>/<name>`.
@@ -15760,7 +15803,13 @@ components:
       - volumes
       - toolsNamespace
       - toolsPods
+      - backups
       properties:
+        backups:
+          type: array
+          items:
+            $ref: "#/components/schemas/BackupDeletion"
+          description: The project's backups, and where each is kept.
         databases:
           type: array
           items:

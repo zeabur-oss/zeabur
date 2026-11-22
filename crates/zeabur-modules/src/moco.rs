@@ -231,6 +231,12 @@ fn backups_of(
     }
     Backups {
         ready: store.in_use && state == State::Ready,
+        endpoints: store
+            .destination
+            .is_some()
+            .then(|| store.endpoint.clone())
+            .into_iter()
+            .collect(),
         store: Some(store),
         schedules,
         runs,
