@@ -151,7 +151,7 @@ pub struct Service {
     pub status: crate::ServiceStatus,
     /// Its pods, sorted by name.
     pub pods: Vec<crate::PodSummary>,
-    /// Its init and regular containers, in that order.
+    /// Its regular containers, then its init containers.
     pub containers: Vec<Container>,
     /// The names of the Kubernetes Services selecting its pods, sorted by name; each is in
     /// the document's `endpoints`.
