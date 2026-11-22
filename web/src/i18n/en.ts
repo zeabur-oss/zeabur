@@ -3261,6 +3261,13 @@ export const en = {
   "db.backup.schedule": "Schedule",
   "db.backup.unscheduled": "No schedule",
   "db.backup.runs": "Backups",
+  "db.backup.stalled": "Stalled",
+  "db.backup.stalledNote":
+    "Running for over an hour, so it may be stuck. The next backup does not start until it ends or is removed.",
+  "db.backup.remove": "Remove",
+  "db.backup.removeTitle": (name: string) => `Remove backup ${name}`,
+  "db.backup.saidRemove": (name: string) =>
+    `Removes the record of backup ${name}, and the next backup can start. Files already in the backup storage stay.`,
   "db.backup.storeIdle": (store: string) =>
     `${store} exists, but this database does not send its backups there yet.`,
   "db.backup.pluginMissing":

@@ -1374,6 +1374,36 @@ export function backUpNow(database: Database, now: Date): Change[] {
   ])
 }
 
+/** A PostgreSQL backup still running after this long is shown as stalled. */
+export const STALLED_AFTER_MS = 60 * 60 * 1000
+
+/** A PostgreSQL backup that has run past `STALLED_AFTER_MS`; CloudNativePG starts no other
+ * backup of the cluster until it ends. */
+export const isStalled = (database: Database, run: Schemas.BackupRun, now: number) =>
+  database.engine === "postgresql" &&
+  run.outcome === "running" &&
+  !!run.startedAt &&
+  now - Date.parse(run.startedAt) > STALLED_AFTER_MS
+
+/** Remove one backup record, which frees the cluster for the next backup. */
+export function removeBackup(run: Schemas.BackupRun): Change[] {
+  return [
+    {
+      op: "delete",
+      resource: { group: "postgresql.cnpg.io", version: "v1", resource: "backups" },
+      name: run.name,
+    },
+  ]
+}
+
+/** What `removeBackup` does, in the form's words. */
+export function removeBackupSummary(t: Translate, run: Schemas.BackupRun) {
+  return {
+    lines: [t("db.backup.saidRemove", run.name)],
+    action: t("db.backup.remove"),
+  }
+}
+
 export const stateHealth: Record<Schemas.DatabaseState, Health> = {
   ready: "ok",
   progressing: "progress",

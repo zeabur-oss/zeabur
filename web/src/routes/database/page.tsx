@@ -34,6 +34,8 @@ import { Diagnoses } from "@/components/diagnoses"
 import { FormField, NumberInput } from "@/components/form-field"
 import { GatedMenuItem, GateTip, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
+import { cn } from "@/lib/utils"
+import { useNow } from "@/lib/page-visible"
 import { Problem } from "@/components/problem"
 import { FrequencyField, S3Fields } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
@@ -71,7 +73,10 @@ import {
   fixedFolder,
   keepsEverything,
   rseqNote,
+  isStalled,
   lastRun,
+  removeBackup,
+  removeBackupSummary,
   MADE_KINDS,
   madeObjects,
   newBackupTarget,
@@ -409,16 +414,18 @@ function BackUpNow({ project, database }: { project: string; database: Database 
 function LastBackup({ database }: { database: Database }) {
   const t = useT()
   const run = lastRun(database)
+  const now = useNow(60_000)
   if (!run)
     return (
       <span className="text-muted-foreground">
         {backupsOn(database) ? t("db.backup.noRun") : t("db.backup.none")}
       </span>
     )
+  const stalled = isStalled(database, run, now)
   return (
     <>
-      <StatusPill health={outcomeHealth[run.outcome]} size="sm">
-        {t(`backups.${run.outcome}`)}
+      <StatusPill health={stalled ? "warn" : outcomeHealth[run.outcome]} size="sm">
+        {stalled ? t("db.backup.stalled") : t(`backups.${run.outcome}`)}
       </StatusPill>
       <Ago iso={run.finishedAt ?? run.startedAt} />
     </>
@@ -670,7 +677,7 @@ function Backups({
       ) : pluginMissing ? null : (
         <SetUp project={project} database={database} />
       )}
-      <Runs database={database} />
+      <Runs project={project} database={database} />
       <Section id="db-restore" title={t("db.restore.action")}>
         <Restore project={project} database={database} />
       </Section>
@@ -816,8 +823,11 @@ function KeysFrom({ project, secret }: { project: string; secret: string }) {
   ) : null
 }
 
-function Runs({ database }: { database: Database }) {
+function Runs({ project, database }: { project: string; database: Database }) {
   const t = useT()
+  const planner = usePlanner(project)
+  const gate = useGate(project, "backUpDatabases")
+  const now = useNow(60_000)
   const runs = database.backups.runs
   return (
     <Section id="db-runs" title={t("db.backup.runs")}>
@@ -825,29 +835,57 @@ function Runs({ database }: { database: Database }) {
         <p className="type-meta text-muted-foreground">{t("db.backup.noRun")}</p>
       ) : (
         <ul className="flex flex-col">
-          {runs.map((r) => (
-            <li key={r.name} className="flex items-center gap-2.5 border-t border-rule py-2.5">
-              <div className="flex min-w-0 flex-1 flex-col">
-                <span className="truncate type-mono" translate="no">
-                  {r.name}
-                </span>
-                {r.message ? (
-                  <span className="truncate type-meta text-muted-foreground" title={r.message}>
-                    {r.message}
+          {runs.map((r) => {
+            const stalled = isStalled(database, r, now)
+            const note = stalled ? t("db.backup.stalledNote") : r.message
+            return (
+              <li
+                key={r.name}
+                className="flex flex-wrap items-center gap-x-2.5 gap-y-1.5 border-t border-rule py-2.5"
+              >
+                <div className="flex min-w-48 flex-1 flex-col">
+                  <span className="truncate type-mono" translate="no">
+                    {r.name}
                   </span>
+                  {note ? (
+                    <span
+                      className={cn("type-meta text-muted-foreground", !stalled && "truncate")}
+                      title={note}
+                    >
+                      {note}
+                    </span>
+                  ) : null}
+                </div>
+                <StatusPill health={stalled ? "warn" : outcomeHealth[r.outcome]} size="sm">
+                  {stalled ? t("db.backup.stalled") : t(`backups.${r.outcome}`)}
+                </StatusPill>
+                {stalled ? (
+                  <GateTip gate={gate}>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() =>
+                        planner.plan({
+                          title: t("db.backup.removeTitle", r.name),
+                          changes: removeBackup(r),
+                          summary: removeBackupSummary(t, r),
+                        })
+                      }
+                    >
+                      {t("db.backup.remove")}
+                    </Button>
+                  </GateTip>
                 ) : null}
-              </div>
-              <StatusPill health={outcomeHealth[r.outcome]} size="sm">
-                {t(`backups.${r.outcome}`)}
-              </StatusPill>
-              <Ago
-                iso={r.finishedAt ?? r.startedAt}
-                className="w-20 shrink-0 text-right type-meta text-muted-foreground"
-              />
-            </li>
-          ))}
+                <Ago
+                  iso={r.finishedAt ?? r.startedAt}
+                  className="w-20 shrink-0 text-right type-meta text-muted-foreground max-sm:w-auto max-sm:text-left"
+                />
+              </li>
+            )
+          })}
         </ul>
       )}
+      {planner.dialog}
     </Section>
   )
 }

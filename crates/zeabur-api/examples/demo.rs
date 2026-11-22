@@ -1039,6 +1039,22 @@ fn state() -> State {
                 "status": {"phase": "Cluster in healthy state", "readyInstances": 1,
                     "currentPrimary": "orders-1", "writeService": "orders-rw"}
             })),
+            // Orders' backups: one done, and one the plugin never wrote back, stuck in `started`.
+            from(json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Backup",
+                "metadata": {"name": "orders-20261025-020000", "namespace": "shop",
+                    "creationTimestamp": minutes_ago(60 * 31)},
+                "spec": {"cluster": {"name": "orders"}, "method": "plugin"},
+                "status": {"phase": "completed", "startedAt": minutes_ago(60 * 31),
+                    "stoppedAt": minutes_ago(60 * 31 - 4), "backupId": "20261025T020000"}
+            })),
+            from(json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Backup",
+                "metadata": {"name": "orders-20261026-020000", "namespace": "shop",
+                    "creationTimestamp": minutes_ago(60 * 7)},
+                "spec": {"cluster": {"name": "orders"}, "method": "plugin"},
+                "status": {"phase": "started", "startedAt": minutes_ago(60 * 7)}
+            })),
             from(json!({
                 "apiVersion": "psmdb.percona.com/v1", "kind": "PerconaServerMongoDB",
                 "metadata": {"name": "sessions", "namespace": "shop",

@@ -2986,6 +2986,12 @@ export const zhTW: Messages = {
   "db.backup.schedule": "排程",
   "db.backup.unscheduled": "沒有排程",
   "db.backup.runs": "備份紀錄",
+  "db.backup.stalled": "卡住",
+  "db.backup.stalledNote": "已經跑了超過一小時，可能卡住了。它不結束，下一次備份就不會開始。",
+  "db.backup.remove": "移除",
+  "db.backup.removeTitle": (name: string) => `移除備份 ${name}`,
+  "db.backup.saidRemove": (name: string) =>
+    `移除備份 ${name} 的紀錄，下一次備份就能開始。已存在備份儲存空間的檔案不會被刪掉。`,
   "db.backup.storeIdle": (store) => `${store} 已經存在，但這個資料庫還沒有把備份送到那裡。`,
   "db.backup.pluginMissing": "備份 PostgreSQL 需要 CloudNativePG 的 Barman Cloud 外掛。",
   "db.backup.pluginWhy": "CloudNativePG 元件附帶備份要用的 Barman Cloud 外掛。",

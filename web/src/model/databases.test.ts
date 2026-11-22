@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import type { Schemas } from "@/api/client"
 import { actionOf, describe as describePlan } from "@/components/plan/describe"
 import type { Translate } from "@/i18n"
 
@@ -11,6 +12,8 @@ import {
   backupsNotes,
   backupsSummary,
   currentTarget,
+  isStalled,
+  removeBackup,
   turnOffBackups,
   turnOffSummary,
   canBackUpNow,
@@ -809,6 +812,32 @@ describe("the review of a backup form", () => {
       lines: ["db.backup.saidNow(pg, s3://backups/pg)"],
       action: "db.backup.now",
     })
+  })
+})
+
+describe("a stalled backup", () => {
+  const started = "2026-11-22T02:00:00Z"
+  const run = { name: "pg-1", outcome: "running", startedAt: started } as Schemas.BackupRun
+  const at = (minutes: number) => Date.parse(started) + minutes * 60_000
+
+  test("a PostgreSQL backup is stalled after an hour and one that just started is not", () => {
+    expect(isStalled(postgres, run, at(59))).toBe(false)
+    expect(isStalled(postgres, run, at(61))).toBe(true)
+  })
+
+  test("a finished backup and another engine's are never stalled", () => {
+    expect(isStalled(postgres, { ...run, outcome: "succeeded" }, at(600))).toBe(false)
+    expect(isStalled({ ...postgres, engine: "mongodb" }, run, at(600))).toBe(false)
+  })
+
+  test("removing it deletes its Backup object and nothing else", () => {
+    expect(removeBackup(run)).toEqual([
+      {
+        op: "delete",
+        resource: { group: "postgresql.cnpg.io", version: "v1", resource: "backups" },
+        name: "pg-1",
+      },
+    ])
   })
 })
 
