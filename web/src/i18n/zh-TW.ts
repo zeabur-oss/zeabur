@@ -1834,6 +1834,7 @@ export const zhTW: Messages = {
   "form.probePeriod": "間隔（秒）",
   "form.probeFailures": "失敗次數",
   "form.probePreset": (port: string) => `HTTP，連接埠 ${port}`,
+  "form.requestAboveLimit": "保留量不能高過上限。",
   "form.computeBlocked": "修正運算資源後才能儲存。",
   "form.probeBlocked": (probe: string) => `修正${probe}後才能儲存。`,
   "form.size": "大小",

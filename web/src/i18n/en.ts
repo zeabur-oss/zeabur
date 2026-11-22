@@ -1995,6 +1995,7 @@ export const en = {
   "form.probePeriod": "Every (s)",
   "form.probeFailures": "Failures",
   "form.probePreset": (port: string) => `HTTP on ${port}`,
+  "form.requestAboveLimit": "The reservation can't be more than the limit.",
   "form.computeBlocked": "Fix compute to save.",
   "form.probeBlocked": (probe: string) => `Fix the ${probe.toLowerCase()} to save.`,
   "form.size": "Size",

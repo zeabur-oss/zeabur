@@ -1831,6 +1831,7 @@ export const zhCN: Messages = {
   "form.probePeriod": "间隔（秒）",
   "form.probeFailures": "失败次数",
   "form.probePreset": (port: string) => `HTTP，端口 ${port}`,
+  "form.requestAboveLimit": "保留量不能高于上限。",
   "form.computeBlocked": "修正计算资源后才能保存。",
   "form.probeBlocked": (probe: string) => `修正${probe}后才能保存。`,
   "form.size": "大小",
