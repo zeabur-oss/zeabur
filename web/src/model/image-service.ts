@@ -2,6 +2,7 @@
 // change. The server makes its objects.
 import type { Schemas } from "@/api/client"
 import { rules } from "@/api/rules"
+import { dashedSuffix } from "@/model/domains"
 import { type Profile } from "@/model/pod-security"
 import { textProblem } from "@/model/rules"
 
@@ -128,7 +129,7 @@ export function hostProblem(host: string): "empty" | "invalid" | undefined {
 
 /** `<service>-<project>.<suffix>`, or nothing to suggest without a suffix. */
 export const suggestedHost = (service: string, project: string, suffix?: string | null) =>
-  suffix && service ? `${service}-${project}.${suffix}` : ""
+  suffix && service ? `${service}-${project}.${dashedSuffix(suffix)}` : ""
 
 /** The name a built service gets before the person types one: from the repository or folder,
  * else `web`. */
@@ -137,7 +138,7 @@ export const builtName = (source: string, taken: readonly string[]) =>
 
 /** What the host field shows while it is empty: the shape `suggestedHost` gives. */
 export const hostPlaceholder = (project: string, suffix?: string | null) =>
-  suffix ? `<name>-${project}.${suffix}` : "web.example.com"
+  suffix ? `<name>-${project}.${dashedSuffix(suffix)}` : "web.example.com"
 
 /** `KEY=value` lines as pasted from a `.env` file; the lines that are not, from 1. */
 export function parseEnv(text: string): { variables: Schemas.NameValue[]; bad: number[] } {

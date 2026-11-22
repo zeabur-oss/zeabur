@@ -58,15 +58,27 @@ export const isSslip = (host: string) => /\.(sslip|nip)\.io$/.test(host)
 /** The sslip.io suffix for `address`: dashes, so URLs under it stay one label deep. */
 export const sslipSuffix = (address: string) => `${address.replaceAll(/[.:]/g, "-")}.sslip.io`
 
+/** A dotted address suffix (`203.0.113.7.sslip.io`) written with dashes. A name that ends in a
+ * digit before a dotted address is read as part of it (`web-5.203.0.113.7.sslip.io` is
+ * `5.203.0.113`); dashes keep the address apart. */
+export const dashedSuffix = (suffix: string) =>
+  suffix.replace(
+    /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(sslip|nip)\.io$/,
+    "$1-$2-$3-$4.$5.io",
+  )
+
 /** What a domain's DNS needs, Vercel-style: fine, or the records to add and why. */
 export type DnsSetup =
   | { as: "valid" }
   | { as: "missing"; records: DnsRecord[] }
   | { as: "elsewhere"; records: DnsRecord[]; resolved: string[] }
+  | { as: "name"; resolved: string[] }
   | { as: "unknown"; records: DnsRecord[] }
 
 export function dnsSetup(host: string, check: DomainCheck, suffixes?: readonly string[]): DnsSetup {
   if (check.dns === "pointsHere") return { as: "valid" }
+  if (isSslip(host) && check.dns === "elsewhere")
+    return { as: "name", resolved: check.resolved ?? [] }
   const records = recordsFor(wildcardFor(host, suffixes) ?? host, check.target)
   if (check.dns === "missing") return { as: "missing", records }
   if (check.dns === "elsewhere") return { as: "elsewhere", records, resolved: check.resolved ?? [] }

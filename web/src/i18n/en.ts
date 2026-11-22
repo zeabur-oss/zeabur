@@ -816,6 +816,8 @@ export const en = {
   "domain.dns.elsewhere": (list: string) =>
     `DNS points to ${list}, not to the cluster. That's expected behind a CDN or proxy. Otherwise, change the record.`,
   "domain.dns.unknown": "Zeabur couldn't look this domain up from the cluster.",
+  "domain.sslipName": (list: string) =>
+    `This name resolves to ${list}, not to the cluster, because sslip.io reads the number before the address as part of it. Change the name so it ends in a letter, or write the address with dashes, such as 203-0-113-7.sslip.io.`,
   "domain.addRecord": "Add this record at your DNS provider:",
   "domain.theRecord": "The record that points it here:",
   "domain.askAdmin":

@@ -80,6 +80,12 @@ export function DomainSetup({
       ? certificate
       : undefined
   if (dns.as === "valid" && !certTrouble) return null
+  if (dns.as === "name")
+    return (
+      <p className="text-sm text-secondary">
+        {t("domain.sslipName", t("common.list", dns.resolved))}
+      </p>
+    )
   const wildcard = wildcardFor(host, suffixes)
   const limited = certTrouble?.rateLimited ?? false
   return (
