@@ -89,8 +89,15 @@ pub(super) async fn compute(
         .namespace_objects(project)
         .await
         .map_err(|e| read_problem(e, &format!("project {project}"), project_read(project)))?;
-    let (snapshot, _) = snapshot(objects, read_at);
+    let (snapshot, unread_objects) = snapshot(objects, read_at);
     let mut unreadable = Vec::new();
+    let services_unread = unread_objects.iter().any(|u| u.resource == "services");
+    unreadable.extend(
+        unread_objects
+            .iter()
+            .filter(|u| u.resource == "services")
+            .map(|u| refused_list(u, Some(project))),
+    );
     let databases = databases(cluster, project, &mut unreadable).await?;
     let (class_reclaim, default_class) = classes(cluster).await?;
     let reclaim_policies = volume_reclaim(cluster, &snapshot).await?;
@@ -110,6 +117,7 @@ pub(super) async fn compute(
         tools_namespace,
         tools_pods,
         backups,
+        services_unread,
         ..DeletionInput::default()
     };
     let mut plan = zeabur_plan::plan(

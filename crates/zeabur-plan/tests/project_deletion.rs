@@ -325,6 +325,33 @@ mod tests {
     }
 
     #[test]
+    fn a_short_endpoint_is_unknown_when_the_services_were_not_read() {
+        let input = DeletionInput {
+            services_unread: true,
+            ..backed_up(&[
+                (BackupKind::Database, "short", at("http://files-s3:8333")),
+                (BackupKind::Volume, "by-ip", at("http://10.43.0.12:8333")),
+                (
+                    BackupKind::Volume,
+                    "svc",
+                    at("http://files-s3.shop.svc:8333"),
+                ),
+                (BackupKind::Database, "hosted", at("https://s3.example.com")),
+            ])
+        };
+        let plan = planned(&shop(), &snapshot(), &input).unwrap();
+        assert_eq!(
+            fates(&plan),
+            [
+                ("short", BackupFate::Unknown, None),
+                ("by-ip", BackupFate::Unknown, None),
+                ("svc", BackupFate::Goes, Some("files-s3")),
+                ("hosted", BackupFate::Stays, None),
+            ]
+        );
+    }
+
+    #[test]
     fn a_project_without_backups_tells_none() {
         let plan = planned(&shop(), &with_object_storage(), &deletion()).unwrap();
         assert_eq!(gone(&plan).backups, []);

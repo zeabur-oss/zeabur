@@ -23,8 +23,8 @@
 //!   person's tools pods for the project. It also tells where the project's backups are kept: a
 //!   backup whose S3 endpoint is a Service of the project (`<service>`, `<service>.<project>`,
 //!   `<service>.<project>.svc…` or its cluster IP) is kept in the project and goes with it; a
-//!   backup whose store could not be read is told as unknown, never as staying; any other backup
-//!   and everything outside the namespace stay.
+//!   backup whose store or Service could not be read is told as unknown, never as staying; any
+//!   other backup and everything outside the namespace stay.
 //! - **Tools that put objects back.** Objects Helm, Argo CD or Flux manages are deleted with the
 //!   namespace, and the tool can create them again ([`Warning::Recreated`]).
 //! - **Refused**: a namespace Kubernetes keeps for itself (`kube-` prefix), Zeabur's own namespaces
@@ -99,6 +99,9 @@ pub struct DeletionInput {
     pub held: Vec<ProjectObject>,
     /// The project's backups.
     pub backups: Vec<ProjectBackup>,
+    /// Whether listing the project's Services was refused: an endpoint that names no Service
+    /// read is then unknown, not outside.
+    pub services_unread: bool,
 }
 
 /// What a backup covers.
@@ -328,8 +331,9 @@ impl<'a> Planner<'a> {
                 let (fate, kept_in) = match &b.store {
                     BackupStore::Aws => (BackupFate::Stays, None),
                     BackupStore::Unknown => (BackupFate::Unknown, None),
-                    BackupStore::Endpoint(e) => kept_in(e, &name, snapshot)
-                        .map_or((BackupFate::Stays, None), |k| (BackupFate::Goes, Some(k))),
+                    BackupStore::Endpoint(e) => {
+                        fate_of(e, &name, snapshot, deletion.services_unread)
+                    }
                 };
                 BackupDeletion {
                     kind: b.kind,
@@ -447,13 +451,19 @@ fn text(object: &Value, pointer: &str) -> String {
         .to_owned()
 }
 
-/// What in the project serves `endpoint`: the owner of the project's Service it names, else the
-/// Service. A short name (`files-s3`, `files-s3.shop`) or a cluster IP counts only when the
-/// Service was read; `files-s3.shop.svc` and longer names the project by its DNS form
+/// Whether a backup at `endpoint` goes with the project, and what in the project serves it: the
+/// owner of the project's Service it names, else the Service. A short name (`files-s3`,
+/// `files-s3.shop`) or a cluster IP goes only when that Service was read; when the Services were
+/// not read it is unknown. `files-s3.shop.svc` and longer names the project by its DNS form
 /// [k8s-dns].
 ///
 /// [k8s-dns]: https://kubernetes.io/docs/concepts/services-networking/dns-pod-service/#services
-fn kept_in(endpoint: &str, project: &str, snapshot: &zeabur_graph::Snapshot) -> Option<String> {
+fn fate_of(
+    endpoint: &str,
+    project: &str,
+    snapshot: &zeabur_graph::Snapshot,
+    services_unread: bool,
+) -> (BackupFate, Option<String>) {
     let rest = endpoint.split_once("://").map_or(endpoint, |(_, r)| r);
     let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
     let authority = authority.rsplit_once('@').map_or(authority, |(_, h)| h);
@@ -468,31 +478,33 @@ fn kept_in(endpoint: &str, project: &str, snapshot: &zeabur_graph::Snapshot) -> 
             .iter()
             .find(|s| s.metadata.name.as_deref() == Some(name))
     };
+    let looked_up = |found: Option<&k8s_openapi::api::core::v1::Service>| match found {
+        Some(service) => (BackupFate::Goes, Some(owner_or_name(service))),
+        None if services_unread => (BackupFate::Unknown, None),
+        None => (BackupFate::Stays, None),
+    };
     if host.parse::<std::net::IpAddr>().is_ok() {
-        return snapshot
-            .services
-            .iter()
-            .find(|s| {
-                s.spec.as_ref().is_some_and(|spec| {
-                    spec.cluster_ips
-                        .iter()
-                        .flatten()
-                        .chain(&spec.cluster_ip)
-                        .any(|ip| *ip == host)
-                })
+        let found = snapshot.services.iter().find(|s| {
+            s.spec.as_ref().is_some_and(|spec| {
+                spec.cluster_ips
+                    .iter()
+                    .flatten()
+                    .chain(&spec.cluster_ip)
+                    .any(|ip| *ip == host)
             })
-            .map(owner_or_name);
+        });
+        return looked_up(found);
     }
     let labels: Vec<&str> = host.split('.').collect();
-    let found = match labels.as_slice() {
-        [service] => named(service),
-        [service, namespace] if *namespace == project => named(service),
-        [service, namespace, "svc", ..] if *namespace == project => {
-            return Some(named(service).map_or_else(|| (*service).to_owned(), owner_or_name));
-        }
-        _ => None,
-    };
-    found.map(owner_or_name)
+    match labels.as_slice() {
+        [service] => looked_up(named(service)),
+        [service, namespace] if *namespace == project => looked_up(named(service)),
+        [service, namespace, "svc", ..] if *namespace == project => (
+            BackupFate::Goes,
+            Some(named(service).map_or_else(|| (*service).to_owned(), owner_or_name)),
+        ),
+        _ => (BackupFate::Stays, None),
+    }
 }
 
 fn owner_or_name(service: &k8s_openapi::api::core::v1::Service) -> String {
