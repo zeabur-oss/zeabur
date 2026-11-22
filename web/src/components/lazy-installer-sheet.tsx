@@ -10,7 +10,7 @@ const Sheet = lazy(() =>
 )
 
 /** The installer sheet, loaded when first opened. */
-export function LazyInstallerSheet(props: ComponentProps<typeof Sheet>) {
+function LazyInstallerSheet(props: ComponentProps<typeof Sheet>) {
   return (
     <Suspense fallback={null}>
       <Sheet {...props} />
