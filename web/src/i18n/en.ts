@@ -2930,7 +2930,7 @@ export const en = {
   "upload.problem.directory": "A folder in the upload, like apps/web.",
   "upload.problem.dockerfile": "A file in the upload, like docker/Dockerfile.prod.",
   "upload.after":
-    "The folder goes up as soon as you apply, and the first build starts once it is there. To build a new version, upload the folder again from the service.",
+    "The folder goes up as soon as you apply, and the first build starts once it is there. Keep this page open until the upload finishes. To build a new version, or if the upload stops, upload the folder again from the service.",
   "upload.keepOpen": "Keep this page open until the upload finishes.",
   "upload.stage.token": "Asking Zeabur Builder for permission to upload…",
   "upload.stage.sending": (sent: string, total: string) => `Uploading… ${sent} of ${total}`,
