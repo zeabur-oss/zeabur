@@ -38,6 +38,52 @@ function fateText(t: Translate, volume: Schemas.VolumeDeletion): string {
   }
 }
 
+function backupNames(t: Translate, list: Schemas.BackupDeletion[]): string {
+  return bounded(
+    t,
+    list.map((b) => (b.kind === "project" ? t("deletion.thisProject") : b.name)),
+  ).text
+}
+
+function Alert({ children }: { children: ReactNode }) {
+  return (
+    <p className="type-meta flex gap-1.5 text-destructive" role="alert">
+      <WarningIcon aria-hidden="true" className="mt-0.5 shrink-0" />
+      <span>{children}</span>
+    </p>
+  )
+}
+
+function BackupAlerts({ backups }: { backups: Schemas.BackupDeletion[] }) {
+  const t = useT()
+  const { going, unknown } = backupFates(backups)
+  return (
+    <>
+      {going.map((g) => (
+        <Alert key={g.keptIn}>{t("deletion.backupsGo", backupNames(t, g.backups), g.keptIn)}</Alert>
+      ))}
+      {unknown.length > 0 ? (
+        <Alert>{t("deletion.backupsUnknown", backupNames(t, unknown))}</Alert>
+      ) : null}
+    </>
+  )
+}
+
+function StayingBackups({ staying }: { staying: Schemas.BackupDeletion[] }) {
+  const t = useT()
+  if (staying.length === 0) return null
+  return (
+    <>
+      <p className="type-meta text-muted-foreground">
+        {t("deletion.staysBackups", backupNames(t, staying))}
+      </p>
+      {staying.some((b) => b.kind === "volume") ? (
+        <p className="type-meta text-muted-foreground">{t("deletion.resticPassword")}</p>
+      ) : null}
+    </>
+  )
+}
+
 /** The plan's deletion of the project, when it has one. */
 export function ProjectDeletion({
   project,
@@ -65,12 +111,7 @@ function Deletion({
   const backups = useBackups(project).data
   const databases = useQuery(databasesQuery(project)).data?.items ?? []
   const now = new Date()
-  const { going, unknown, staying } = backupFates(deletion.backups)
-  const names = (list: Schemas.BackupDeletion[]) =>
-    bounded(
-      t,
-      list.map((b) => (b.kind === "project" ? t("deletion.thisProject") : b.name)),
-    ).text
+  const { staying } = backupFates(deletion.backups)
   const backUp = (ask: PlanAsk) => (
     <Button variant="outline" size="xs" onClick={() => reopen(ask)}>
       <ArchiveIcon aria-hidden="true" data-icon="inline-start" />
@@ -139,31 +180,13 @@ function Deletion({
         {deletion.toolsPods.length > 0 ? (
           <p className="type-meta text-muted-foreground">{t("deletion.toolsPods")}</p>
         ) : null}
-        {going.map((g) => (
-          <p key={g.keptIn} className="type-meta flex gap-1.5 text-destructive" role="alert">
-            <WarningIcon aria-hidden="true" className="mt-0.5 shrink-0" />
-            <span>{t("deletion.backupsGo", names(g.backups), g.keptIn)}</span>
-          </p>
-        ))}
-        {unknown.length > 0 ? (
-          <p className="type-meta flex gap-1.5 text-destructive" role="alert">
-            <WarningIcon aria-hidden="true" className="mt-0.5 shrink-0" />
-            <span>{t("deletion.backupsUnknown", names(unknown))}</span>
-          </p>
-        ) : null}
+        <BackupAlerts backups={deletion.backups} />
       </section>
       <section className="flex flex-col gap-1" aria-labelledby="deletion-stays">
         <h3 id="deletion-stays" className="type-label">
           {t("deletion.stays")}
         </h3>
-        {staying.length > 0 ? (
-          <p className="type-meta text-muted-foreground">
-            {t("deletion.staysBackups", names(staying))}
-          </p>
-        ) : null}
-        {staying.some((b) => b.kind === "volume") ? (
-          <p className="type-meta text-muted-foreground">{t("deletion.resticPassword")}</p>
-        ) : null}
+        <StayingBackups staying={staying} />
         <p className="type-meta text-muted-foreground">{t("deletion.staysOutside")}</p>
         {staying.length > 0 ? (
           <p className="type-meta text-muted-foreground">
