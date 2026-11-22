@@ -190,7 +190,8 @@ Delete it only after `apply` has run, because K3s reads this file at start. Your
 `helm uninstall` also leaves the `zeabur` namespace, which the chart's release lived in. Check that it is empty, then delete it:
 
 ```sh
-kubectl get all,configmaps,secrets --namespace zeabur
+kubectl get --show-kind --ignore-not-found --namespace zeabur \
+  "$(kubectl api-resources --verbs=list --namespaced -o name | paste -sd, -)"
 kubectl delete namespace zeabur
 ```
 

@@ -190,7 +190,8 @@ sudo rm /etc/rancher/k3s/authentication/config.yaml
 `helm uninstall` 也會留下 `zeabur` Namespace，也就是 chart 當初安裝的地方。確認裡面是空的，再刪除：
 
 ```sh
-kubectl get all,configmaps,secrets --namespace zeabur
+kubectl get --show-kind --ignore-not-found --namespace zeabur \
+  "$(kubectl api-resources --verbs=list --namespaced -o name | paste -sd, -)"
 kubectl delete namespace zeabur
 ```
 
