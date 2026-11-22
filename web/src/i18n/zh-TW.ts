@@ -3523,6 +3523,7 @@ export const zhTW: Messages = {
   "overview.privateAddress": "私有位址",
   "trace.waiting": (name) => `等待 ${name} 就緒`,
   "trace.stopped": (name) => `${name} 目前是 0 個副本`,
+  "trace.noReplica": "沒有任何副本就緒",
   "event.word.retrying": "重試等待中",
   "event.word.checkFailed": "檢查未通過",
   "event.word.stopping": "正在停止",

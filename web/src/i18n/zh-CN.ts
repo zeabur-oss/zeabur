@@ -3514,6 +3514,7 @@ export const zhCN: Messages = {
   "overview.privateAddress": "私有地址",
   "trace.waiting": (name) => `等待 ${name} 就绪`,
   "trace.stopped": (name) => `${name} 目前是 0 个副本`,
+  "trace.noReplica": "没有任何副本就绪",
   "event.word.retrying": "重试等待中",
   "event.word.checkFailed": "检查未通过",
   "event.word.stopping": "正在停止",
