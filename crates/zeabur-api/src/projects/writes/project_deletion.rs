@@ -273,7 +273,8 @@ async fn databases(
     Ok(out)
 }
 
-/// The project's backups that exist: a database's with a backup run, the store's endpoint; a
+/// The project's backups that exist: a database's with a backup run, once per store it may be
+/// in (none when no store could be read, so an unread store never counts as kept outside); a
 /// volume's with a K8up run, the endpoint of each K8up schedule that covers it (a run does not
 /// name its schedule); the project's own with a Velero run. A refused read leaves its backups
 /// out, and its right is named in `unreadable`.
@@ -288,17 +289,28 @@ async fn backups(
         crate::projects::databases::read(cluster, &[], project, now).await,
         unreadable,
     )? {
-        out.extend(
+        unreadable.extend(
             databases
-                .items
-                .into_iter()
-                .filter(|d| !d.backups.runs.is_empty())
-                .map(|d| ProjectBackup {
-                    kind: BackupKind::Database,
-                    endpoint: d.backups.store.and_then(|s| s.endpoint),
-                    name: d.name,
-                }),
+                .unreadable
+                .iter()
+                .map(|u| refused_list(u, project)),
         );
+        for database in databases.items {
+            if database.backups.runs.is_empty() {
+                continue;
+            }
+            out.extend(
+                database
+                    .backups
+                    .endpoints
+                    .into_iter()
+                    .map(|endpoint| ProjectBackup {
+                        kind: BackupKind::Database,
+                        name: database.name.clone(),
+                        endpoint,
+                    }),
+            );
+        }
     }
     let Some(found) = allowed(
         crate::projects::backups::read(cluster, &[], project).await,
@@ -345,6 +357,22 @@ async fn backups(
         });
     }
     Ok(out)
+}
+
+/// The `list` right a partial read was refused, from its resource
+/// (`objectstores.barmancloud.cnpg.io`).
+fn refused_list(unread: &crate::views::UnreadableView, project: &str) -> Denied {
+    let (resource, group) = unread
+        .resource
+        .split_once('.')
+        .unwrap_or((unread.resource.as_str(), ""));
+    Denied {
+        verb: "list".to_owned(),
+        group: group.to_owned(),
+        resource: resource.to_owned(),
+        name: None,
+        namespace: Some(project.to_owned()),
+    }
 }
 
 /// What a read found, or nothing when it was refused, its right named in `unreadable`.

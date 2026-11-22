@@ -105,32 +105,39 @@ fn backups_of(
         })
         .collect();
     schedules.sort_by(|a, b| a.name.cmp(&b.name));
+    let store_of = |b: &DynamicObject| {
+        let s3 = |key: &str| text(b, &format!("/spec/storage/s3/{key}"));
+        Store {
+            name: b.metadata.name.clone().unwrap_or_default(),
+            destination: s3("bucket").map(|bucket| {
+                s3("prefix").map_or_else(
+                    || format!("s3://{bucket}"),
+                    |prefix| format!("s3://{bucket}/{prefix}"),
+                )
+            }),
+            endpoint: s3("endpoint").map(|host| {
+                let tls =
+                    b.data.pointer("/spec/storage/s3/tls/enabled") == Some(&Value::Bool(true));
+                format!("{}://{host}", if tls { "https" } else { "http" })
+            }),
+            secret: s3("secretAccessKeySecretKeyRef/name"),
+            region: s3("region"),
+            retention: text(b, "/spec/maxRetention"),
+            in_use: b.data.pointer("/spec/schedule/suspend") != Some(&Value::Bool(true)),
+        }
+    };
+    let with_s3 = |b: &DynamicObject| b.data.pointer("/spec/storage/s3").is_some();
     let store = mine
         .iter()
         .find(|b| b.data.pointer("/spec/schedule").is_some())
         .or_else(|| mine.first())
-        .filter(|b| b.data.pointer("/spec/storage/s3").is_some())
-        .map(|b| {
-            let s3 = |key: &str| text(b, &format!("/spec/storage/s3/{key}"));
-            Store {
-                name: b.metadata.name.clone().unwrap_or_default(),
-                destination: s3("bucket").map(|bucket| {
-                    s3("prefix").map_or_else(
-                        || format!("s3://{bucket}"),
-                        |prefix| format!("s3://{bucket}/{prefix}"),
-                    )
-                }),
-                endpoint: s3("endpoint").map(|host| {
-                    let tls =
-                        b.data.pointer("/spec/storage/s3/tls/enabled") == Some(&Value::Bool(true));
-                    format!("{}://{host}", if tls { "https" } else { "http" })
-                }),
-                secret: s3("secretAccessKeySecretKeyRef/name"),
-                region: s3("region"),
-                retention: text(b, "/spec/maxRetention"),
-                in_use: b.data.pointer("/spec/schedule/suspend") != Some(&Value::Bool(true)),
-            }
-        });
+        .filter(|b| with_s3(b))
+        .map(|b| store_of(b));
+    let endpoints = mine
+        .iter()
+        .filter(|b| with_s3(b))
+        .map(|b| store_of(b).endpoint)
+        .collect();
     let owners: Vec<String> = mine
         .iter()
         .filter_map(|b| b.metadata.name.clone())
@@ -139,6 +146,7 @@ fn backups_of(
     newest(&mut runs, 20);
     Backups {
         ready: store.as_ref().is_some_and(|s| s.in_use) && state == State::Ready,
+        endpoints,
         store,
         schedules,
         runs,
