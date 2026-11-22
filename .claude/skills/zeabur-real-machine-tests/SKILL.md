@@ -8,7 +8,7 @@ description: Run Zeabur OSS's user-story tests on real, disposable servers, star
 The cluster tests (`zeabur-cluster-tests`) prove the code on a throwaway cluster. These tests prove
 the docs and the product together: an agent and a user, on a real server, with nothing but
 oss.zeabur.com. The stories are in [`stories.md`](stories.md). Issues, commits and public text follow
-`zeabur-oss-workflow` and `zeabur-writing`.
+`zeabur-workflow` and `zeabur-wording`.
 
 ## Machines
 
@@ -66,7 +66,7 @@ A story is done when its "Done when" holds and the section has every item above.
 1. **Rank** each UX problem. Blocker: the user cannot finish. Major: the user likely gets lost or
    needs help. Minor: friction. Give each a one-line fix.
 2. **File one issue per fixable problem**, in the repository that owns the code
-   (`zeabur-oss-workflow`, Issues), after searching for an open one. Issue text is public: no
+   (`zeabur-workflow`, Issues), after searching for an open one. Issue text is public: no
    addresses, keys or secrets. Link the story.
 3. **Write the report** for the maintainer: a result per story, the ranked problems with their
    issues, the waits, what you guessed, the state of each server and what only the maintainer can
