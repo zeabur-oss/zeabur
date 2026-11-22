@@ -37,6 +37,8 @@ export interface EditGroup {
   /** The object, when the plan changes more than one. */
   object?: string
   part: GroupPart
+  /** What names the group when its part is "other": the kind of an object made or removed whole. */
+  kind?: string
   /** The container, when the object's edits touch more than one. */
   container?: string
   rows: FieldRow[]
@@ -186,6 +188,7 @@ export function editGroups(t: Translate, plan: Pick<Plan, "objects">): EditGroup
         key: `${kind}/${name}`,
         object: label,
         part: partOfKind(kind),
+        kind: partOfKind(kind) === "other" ? kindName(t, kind) : undefined,
         rows: [
           {
             kind: created ? "added" : "removed",
