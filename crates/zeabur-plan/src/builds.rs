@@ -265,10 +265,18 @@ impl Planner<'_> {
             ],
             "spec.source.archive.digest",
         )?;
-        let operations = before.map_or_else(
-            || vec![add(&path, json!(digest))],
-            |before| vec![test(&path, before), replace(&path, json!(digest))],
-        );
+        // `archive` is optional in the CRD: `{type: archive}` alone waits for an upload.
+        let operations = match before {
+            Some(before) => vec![test(&path, before), replace(&path, json!(digest))],
+            None if self
+                .current(index)
+                .pointer("/spec/source/archive")
+                .is_some() =>
+            {
+                vec![add(&path, json!(digest))]
+            }
+            None => vec![add("/spec/source/archive", json!({ "digest": digest }))],
+        };
         self.patch(index, operations)
     }
 
