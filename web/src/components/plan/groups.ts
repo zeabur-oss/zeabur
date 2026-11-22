@@ -148,6 +148,11 @@ function partOfKind(kind: string): GroupPart {
   return networkKinds.has(kind) ? "networking" : "other"
 }
 
+/** What titles the group of an object made or removed whole, when no part names it. */
+function wholeKind(t: Translate, kind: string): string | undefined {
+  return partOfKind(kind) === "other" ? kindName(t, kind) : undefined
+}
+
 function entrySlot(part: GroupPart, segment: string, below: string[]): Slot {
   return { part, entry: keyOf(segment) ?? segment, leaf: below.join(".") }
 }
@@ -188,7 +193,7 @@ export function editGroups(t: Translate, plan: Pick<Plan, "objects">): EditGroup
         key: `${kind}/${name}`,
         object: label,
         part: partOfKind(kind),
-        kind: partOfKind(kind) === "other" ? kindName(t, kind) : undefined,
+        kind: wholeKind(t, kind),
         rows: [
           {
             kind: created ? "added" : "removed",
