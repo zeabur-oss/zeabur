@@ -7,10 +7,10 @@ description: 查看目前的 Zeabur 開源版版本，依安裝方式用 Helm、
 
 ## 交給 Agent 升級
 
-Claude Code 或 Codex 這類 Coding Agent 可以替你照著這一頁和升級須知執行。貼上這段提示，在能用 SSH 連到伺服器的電腦上執行 Agent，並告訴它伺服器的位址和版本，版本照[選哪一版](#選哪一版)決定：
+Claude Code 或 Codex 這類 Coding Agent 可以替你照著這一頁和升級須知執行。貼上這段提示，在能用 SSH 連到伺服器的電腦上執行 Agent，並告訴它伺服器的位址：
 
 ```text
-照著 https://oss.zeabur.com/zh-TW/docs/zeabur/upgrade/steps.md 把我伺服器上的 Zeabur 開源版升級到 <版本> 版。我沒說版本時，先問我，不要用 GitHub 的 Latest 標籤決定版本。
+照著 https://oss.zeabur.com/zh-TW/docs/zeabur/upgrade/steps.md 把我伺服器上的 Zeabur 開源版升級到最新版。
 ```
 
 這個網址指向[本頁的 Markdown 版](https://oss.zeabur.com/zh-TW/docs/zeabur/upgrade/steps.md)。Agent 會查出 Zeabur 開源版的安裝方式，讀過中間每一版的升級須知，並列出要改動的內容。快照由你建立，升級後也要由你用通行密鑰登入；到了這些步驟，Agent 會停下來等你。
