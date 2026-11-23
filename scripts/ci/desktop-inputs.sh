@@ -9,7 +9,7 @@ cd "$(dirname "$0")/../.."
 
 app=$(cargo metadata --manifest-path desktop/Cargo.toml --locked --no-deps --format-version 1 |
   jq -r '.packages[] | select(.name == "zeabur-desktop") | .version')
-toolchain=$(readlink -f "$(command -v rustc)" | grep -o 'nightly-[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}')
+toolchain=$(readlink -f "$(command -v rustc)" | rg -o 'nightly-[0-9]{4}-[0-9]{2}-[0-9]{2}')
 tauri_cli=$(cargo tauri --version)
 
 ./scripts/build-ui.sh >&2

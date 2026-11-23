@@ -15,7 +15,7 @@
 #   its label, join with the locale's separator (`t("common.sep")`) or set them apart by space;
 # - a bordered pill in small type for a fact ("Deployment", "HTTPS configured"): status is a
 #   StatusPill, anything else plain text. Exceptions go in `chip_allow` as `path:line text`.
-# Run from anywhere; needs only grep.
+# Run from anywhere; needs only rg.
 set -euo pipefail
 
 root="$(cd "$(dirname "$0")/.." && pwd)"
@@ -53,18 +53,24 @@ while IFS= read -r hit; do
       echo "error: $file:$line uses \`$token\`, a banned style (see scripts/check-ui-styles.sh)" >&2
       status=1
     fi
-  done < <(grep -oE '[[:alnum:]_:/.!-]+' <<<"$text")
-done < <(grep -rnE --include='*.ts' --include='*.tsx' --include='*.css' "$pattern" web/src || true)
+  done < <(rg -o '[[:alnum:]_:/.!-]+' <<<"$text")
+done < <(rg -n --no-heading -g '*.{ts,tsx,css}' -e "$pattern" web/src || true)
 
 # App code and catalogues: everything under web/src but the generated API types. The components
 # and styles are in @zeabur-oss/design-system.
+# The line number of a `path:line:text` hit.
+line_of() {
+  local rest=${1#*:}
+  echo "${rest%%:*}"
+}
+
 sources() {
-  grep -rnE --include='*.ts' --include='*.tsx' "$1" web/src --exclude=zeabur.ts || true
+  rg -n --no-heading -g '*.{ts,tsx}' -g '!zeabur.ts' -e "$1" web/src || true
 }
 
 while IFS= read -r hit; do
   [[ -n "$hit" ]] || continue
-  echo "error: ${hit%%:*}:$(cut -d: -f2 <<<"$hit") puts a Kubernetes kind after a heading (\`kube=\`); headings are plain words, the kind goes in the rows, a tooltip or the YAML tab" >&2
+  echo "error: ${hit%%:*}:$(line_of "$hit") puts a Kubernetes kind after a heading (\`kube=\`); headings are plain words, the kind goes in the rows, a tooltip or the YAML tab" >&2
   status=1
 done < <(sources '(^|[[:space:]])kube=')
 
@@ -73,7 +79,7 @@ while IFS= read -r hit; do
   text=${hit#*:*:}
   # Comments may use the dot; what a person reads may not.
   [[ "$text" =~ ^[[:space:]]*(//|\*|/\*) ]] && continue
-  echo "error: ${hit%%:*}:$(cut -d: -f2 <<<"$hit") joins facts with a middle dot (\"A · B\"); label each value, use t(\"common.sep\") or set them apart by space" >&2
+  echo "error: ${hit%%:*}:$(line_of "$hit") joins facts with a middle dot (\"A · B\"); label each value, use t(\"common.sep\") or set them apart by space" >&2
   status=1
 done < <(sources '·')
 
@@ -91,7 +97,7 @@ while IFS= read -r hit; do
     if [[ "$file" == "${entry%%:*}" && "$text" == *"${entry#*:}"* ]]; then allowed=1; fi
   done
   [[ $allowed -eq 1 ]] && continue
-  echo "error: $file:$(cut -d: -f2 <<<"$hit") draws a bordered pill for a fact; status is a StatusPill, anything else plain text" >&2
+  echo "error: $file:$(line_of "$hit") draws a bordered pill for a fact; status is a StatusPill, anything else plain text" >&2
   status=1
 done < <(sources "$chip")
 

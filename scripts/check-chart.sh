@@ -140,7 +140,7 @@ for values in "$chart"/ci/*-values.yaml; do
   # proxy variables, which crates/zeabur-http reads (Proxies::from_env).
   for env in $(query "$out" "$container | .env[].name"); do
     case "$env" in HTTP_PROXY | HTTPS_PROXY | NO_PROXY) continue ;; esac
-    grep -q "env = \"$env\"" "$root/crates/zeabur/src/config.rs" ||
+    rg -qF "env = \"$env\"" "$root/crates/zeabur/src/config.rs" ||
       fail "$name: Zeabur does not read $env"
   done
   # ZEABUR_MEMBER_ROLES is parsed as a bool: exactly true or false.
@@ -272,7 +272,7 @@ proxy_check() { # $1 = values name, $2 = rendered YAML
   expect "$1" "$2" "$container | .resources.limits.memory" 64Mi
   expect "$1" "$2" "$container | [.livenessProbe.httpGet.scheme, .readinessProbe.httpGet.scheme] | join(\",\")" HTTPS,HTTPS
   for env in $(query "$2" "$container | .env[].name"); do
-    grep -q "env = \"$env\"" "$root/crates/zeabur-proxy/src/main.rs" ||
+    rg -qF "env = \"$env\"" "$root/crates/zeabur-proxy/src/main.rs" ||
       fail "$1: Zeabur Proxy does not read $env"
   done
   expect "$1" "$2" "$zeabur | .volumes[] | select(.name == \"proxy-ca\") | .secret.items | map(.key) | join(\",\")" ca.crt
@@ -358,7 +358,8 @@ client='select(.kind == "OAuthClient")'
 expect identity "$out" "$client | [.metadata.namespace, .metadata.name, .spec.type, .spec.redirectUris[0], .spec.homeUrl, (.spec.audiences | join(\",\"))] | join(\" \")" \
   "zeabur-identity zeabur Confidential https://zeabur.example.test/auth/callback https://zeabur.example.test/ kubernetes"
 secret=$(query "$out" 'select(.kind == "Secret" and .metadata.name == "zeabur-client") | .data["client-secret"]' | base64 -d)
-[[ "$(query "$out" "$client | .spec.secretHash")" == "sha256:$(printf %s "$secret" | sha256sum | cut -d' ' -f1)" ]] ||
+sum=$(printf %s "$secret" | sha256sum)
+[[ "$(query "$out" "$client | .spec.secretHash")" == "sha256:${sum%% *}" ]] ||
   fail "identity: the OAuthClient's secretHash is not the hash of the client secret Zeabur reads"
 expect identity "$out" '[select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[] | select(.name == "ZEABUR_PUBLIC_URL" or .name == "ZEABUR_ISSUER_URL") | .value] | join(",")' \
   "https://zeabur.example.test,https://identity.example.test"

@@ -10,9 +10,9 @@ index="$dist/index.html"
 
 # The files the first page load needs: index.html, its entry script, every chunk it asks the
 # browser to preload (<link rel="modulepreload">: fetched before the page runs), and its CSS.
-entry_js=$(grep -o '<script[^>]*src="/assets/[^"]*\.js"' "$index" | grep -o '/assets/[^"]*' | sed 's/^\///')
-preload_js=$(grep -o '<link rel="modulepreload"[^>]*href="/assets/[^"]*\.js"' "$index" | grep -o '/assets/[^"]*' | sed 's/^\///' || true)
-entry_css=$(grep -o 'href="/assets/[^"]*\.css"' "$index" | sed 's/^href="\///; s/"$//')
+entry_js=$(rg -o -r '$1' '<script[^>]*src="/(assets/[^"]*\.js)"' "$index" || true)
+preload_js=$(rg -o -r '$1' '<link rel="modulepreload"[^>]*href="/(assets/[^"]*\.js)"' "$index" || true)
+entry_css=$(rg -o -r '$1' 'href="/(assets/[^"]*\.css)"' "$index")
 
 if [[ -z "$entry_js" ]]; then
   echo "error: no entry script in $index" >&2

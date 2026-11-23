@@ -105,9 +105,8 @@
               k3d
               kubectl
 
-              # The Helm chart (deploy/chart/zeabur, scripts/check-chart.sh) and the in-cluster
-              # development cluster (scripts/dev-cluster.sh: a CA and certificates for its host names)
-              yq-go
+              # The in-cluster development cluster (scripts/dev-cluster.sh: a CA and certificates for
+              # its host names)
               openssl
 
               # Zeabur's alert rules (crates/zeabur-catalog/src/zeabur.rs): vmalert-tool

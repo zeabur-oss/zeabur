@@ -67,7 +67,7 @@ for account in zeabur zeabur-proxy; do
   for scope in "$namespace" default "$project" kube-system; do
     # deploy/chart/zeabur/templates/catalog.yaml
     if ! diff <(kubectl auth can-i --list -n "$scope" "${as_account[@]}" |
-      grep -vE '^configmaps +\[\] +\[zeabur-catalog\] +\[get patch\]') \
+      rg -v '^configmaps +\[\] +\[zeabur-catalog\] +\[get patch\]') \
       <(kubectl auth can-i --list -n "$scope" "${as_fresh[@]}"); then
       echo "error: service account $account has rights a fresh one lacks (namespace $scope)" >&2
       exit 1
