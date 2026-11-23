@@ -22,7 +22,7 @@ mod tests {
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource};
 
     use crate::common::{app, plan_and_apply};
-    use crate::support::TestApi;
+    use crate::support::{RegistryCatalog, TestApi};
 
     const TOKEN: &str = "registry-token-1";
 
@@ -311,10 +311,11 @@ mod tests {
         assert_eq!(heard(&other), Vec::<String>::new());
     }
 
-    /// A registry with a CA of its own takes the push once the upload Secret holds that CA in
-    /// `ca.crt`; without it, or with another CA, Zeabur names the certificate it cannot trust.
+    /// A registry with a CA of its own takes the push once the Secret that the catalog's
+    /// `provides.registry.ca` names holds that CA; without it, or with another CA, Zeabur names
+    /// the certificate it cannot trust.
     #[tokio::test]
-    async fn the_upload_secrets_ca_is_trusted_for_the_push() {
+    async fn the_published_ca_is_trusted_for_the_push() {
         let address = zeabur_test_support::tls::serve_answering(|target| {
             let done = target.contains("/manifests/") || target.contains("digest=");
             let (status, location) = if done {
@@ -328,14 +329,20 @@ mod tests {
             format!("HTTP/1.1 {status}\r\n{location}content-length: 0\r\nconnection: close\r\n\r\n")
         })
         .await;
-        let cluster = cluster(&format!("https://{address}"), "u1");
-        let app = app(&cluster);
+        let registry = format!("https://{address}");
+        let cluster = cluster(&registry, "u1");
+        let mut settings = zeabur_api::Settings::default();
+        settings.builds.registry = Some(registry.clone());
+        let app = TestApi::new(&cluster)
+            .with_settings(settings)
+            .with_catalog(Arc::new(RegistryCatalog { host: registry }))
+            .router();
         let with_ca = |ca: &str| {
             cluster.update(|s| {
-                s.secret_values
-                    .get_mut("shop/site-upload")
-                    .unwrap()
-                    .insert("ca.crt".to_owned(), ca.as_bytes().to_vec());
+                s.secret_values.insert(
+                    "zot/zot-tls".to_owned(),
+                    BTreeMap::from([("ca.crt".to_owned(), ca.as_bytes().to_vec())]),
+                );
             });
         };
 

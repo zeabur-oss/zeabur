@@ -54,7 +54,7 @@ pub(crate) struct Target {
     pub(crate) repository: String,
     /// The bearer token of the upload Secret.
     pub(crate) token: SecretString,
-    /// The PEM CA of the upload Secret's `ca.crt`, trusted for this push only.
+    /// The PEM CA the build registry's catalog component publishes, trusted for this push only.
     pub(crate) ca: Option<Vec<u8>>,
 }
 

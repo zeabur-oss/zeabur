@@ -6,9 +6,9 @@
 //! only to the registry they name. The architectures of the cluster's nodes, where the person
 //! may list nodes, choose among an index's platforms; else `amd64`, then `arm64`.
 //!
-//! An image in the build registry is read trusting, on top, the CA Zeabur Builder puts in the
-//! upload Secret of the project's latest upload, read as the person. Only connections to that
-//! registry's host trust it.
+//! An image in the build registry, such as Zeabur Builder's zot, is read trusting, on top, the CA
+//! that the catalog component providing it names in `provides.registry.ca`, read as the person.
+//! Only connections to that registry's host trust it.
 //!
 //! A registry that cannot be read is an answer, not an error: deploying never waits on it.
 //! Answers are kept for a few minutes, per credential.
@@ -32,8 +32,7 @@ use sha2::{Digest as _, Sha256};
 use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Node;
-use zeabur_kube::k8s_openapi::jiff::Timestamp;
-use zeabur_kube::{Cluster, ClusterExt as _, ResourceRef};
+use zeabur_kube::{Cluster, ClusterExt as _};
 
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
@@ -392,7 +391,7 @@ pub(crate) async fn inspect(
     } else {
         architectures
     };
-    let ca = published_ca(cluster.as_ref(), &state, &project, &reference).await;
+    let ca = published_ca(cluster.as_ref(), &state, &reference.registry).await;
     let answer = match state
         .images
         .inspect(
@@ -435,73 +434,34 @@ pub(crate) async fn inspect(
     Ok(Json(answer))
 }
 
-/// The CA Zeabur Builder publishes for the build registry, when `reference` is in it: the
-/// `ca.crt` of the upload Secret that the project's Build with the latest upload token names,
-/// read as the person, when that Secret names the image's registry. `None` keeps the server's own
-/// trust.
-async fn published_ca(
+/// The CA of the build registry (`builds.registry`), when `server` is it: the Secret key that the
+/// catalog component providing that registry names in `provides.registry.ca`, read as the person.
+/// The declaration comes from the catalog Zeabur reads. `None` keeps the server's own trust: no
+/// component provides that registry, or the person may not read the Secret, or it is not there.
+pub(crate) async fn published_ca(
     cluster: &dyn Cluster,
     state: &AppState,
-    project: &str,
-    reference: &Reference,
+    server: &str,
 ) -> Option<Vec<u8>> {
-    #[derive(Deserialize)]
-    struct Build {
-        status: Option<BuildStatus>,
-    }
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct BuildStatus {
-        upload_token: Option<UploadToken>,
-    }
-    #[derive(Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct UploadToken {
-        secret_name: String,
-        expires_at: Timestamp,
-    }
-    #[derive(Deserialize)]
-    struct DockerConfig {
-        auths: serde_json::Map<String, serde_json::Value>,
-    }
-
-    let registry = state.settings.builds.registry.as_deref()?;
-    if registry_name(registry) != reference.registry {
+    let registry = registry_name(server);
+    if registry_name(state.settings.builds.registry.as_deref()?) != registry {
         return None;
     }
-    let builds = ResourceRef::new("builder.zeabur.com", "v1alpha1", "builds", "Build");
-    let listed = match cluster.list_objects(&builds, Some(project)).await {
-        Ok(listed) => listed?,
+    let snapshot = crate::cluster::catalog::current(state).await.snapshot?;
+    let ca = snapshot
+        .components
+        .values()
+        .filter_map(|file| file.declaration.provides.as_ref()?.registry.as_ref())
+        .find(|provided| registry_name(&provided.host) == registry)?
+        .ca
+        .clone();
+    match cluster.reveal_secret(&ca.namespace, &ca.name).await {
+        Ok(mut values) => values.remove(&ca.key),
         Err(error) => {
-            tracing::debug!(%error, "the project's Builds are unreadable");
-            return None;
+            tracing::debug!(%error, namespace = %ca.namespace, secret = %ca.name, "the registry CA is unreadable");
+            None
         }
-    };
-    let latest = listed
-        .into_iter()
-        .filter_map(|build| {
-            serde_json::from_value::<Build>(build.data)
-                .ok()?
-                .status?
-                .upload_token
-        })
-        .max_by_key(|token| token.expires_at)?;
-    let values = match cluster.reveal_secret(project, &latest.secret_name).await {
-        Ok(values) => values,
-        Err(error) => {
-            tracing::debug!(%error, secret = %latest.secret_name, "the upload Secret is unreadable");
-            return None;
-        }
-    };
-    let config: DockerConfig = serde_json::from_slice(values.get(".dockerconfigjson")?).ok()?;
-    if !config
-        .auths
-        .keys()
-        .any(|server| registry_name(server) == reference.registry)
-    {
-        return None;
     }
-    values.get("ca.crt").cloned()
 }
 
 /// The nodes' architectures, the most common first.

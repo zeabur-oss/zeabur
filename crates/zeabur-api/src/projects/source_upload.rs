@@ -3,10 +3,10 @@
 //!
 //! Zeabur acts as the person at every step: it reads the `Build` and the upload Secret the
 //! controller wrote with the person's own rights, so whoever may not read that Secret cannot
-//! upload. The push trusts the CA in the Secret's `ca.crt`, which Zeabur Builder writes for a
-//! registry with a CA of its own. The body goes to the registry as it arrives; Zeabur keeps none of
-//! it, and the token goes into no answer and no log. Naming the digest in the `Build` is a plan
-//! like any other write (`archiveDigest`).
+//! upload. The push trusts the CA that the catalog component providing the registry names in
+//! `provides.registry.ca` (`crate::images::published_ca`), also read as the person. The body goes
+//! to the registry as it arrives; Zeabur keeps none of it, and the token goes into no answer and no
+//! log. Naming the digest in the `Build` is a plan like any other write (`archiveDigest`).
 
 use axum::body::Body;
 use axum::extract::{RawQuery, State};
@@ -172,6 +172,10 @@ async fn issued_target(
         .get(".dockerconfigjson")
         .and_then(|c| serde_json::from_slice::<Value>(c).ok())
         .and_then(|c| c.get("auths")?.as_object()?.keys().next().cloned());
+    let ca = match &host {
+        Some(host) => crate::images::published_ca(cluster, state, host).await,
+        None => None,
+    };
     let address = state
         .settings
         .upload_address
@@ -183,7 +187,7 @@ async fn issued_target(
         address,
         repository: format!("{project}/{build}/source"),
         token,
-        ca: values.get("ca.crt").cloned(),
+        ca,
     })
 }
 
