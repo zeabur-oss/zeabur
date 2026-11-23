@@ -21,9 +21,6 @@ ignore = [
   { id = "RUSTSEC-2026-0370", reason = "zvariant under zbus 5, through tauri-plugin-single-instance (desktop/)" },
   { id = "RUSTSEC-2026-0371", reason = "zbus_names under zbus 5, through tauri-plugin-single-instance (desktop/)" },
   { id = "RUSTSEC-2026-0372", reason = "zvariant_derive under zbus 5, through tauri-plugin-single-instance (desktop/)" },
-  # desktop/: Tauri builds cookie with its default features. The advisory is in PrivateJar, which
-  # only the `private` feature compiles. Remove this entry once cookie 0.18.3 is in the lock file.
-  { id = "RUSTSEC-2026-0594", reason = "cookie's PrivateJar, not compiled: Tauri does not enable the private feature (desktop/)" },
 ]
 
 [licenses]
