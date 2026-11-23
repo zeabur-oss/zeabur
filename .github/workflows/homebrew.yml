@@ -83,7 +83,8 @@ jobs:
           git -C "$RUNNER_TEMP/tap" add -A
           git -C "$RUNNER_TEMP/tap" -c user.name=ci -c user.email=ci@invalid commit --quiet --allow-empty -m check
           brew tap zeabur-oss/tap "$RUNNER_TEMP/tap"
-      # Installing by the full name trusts it, as it does for people, so audit comes after.
+          # audit loads the formula each one conflicts with, so trust the whole tap copy.
+          brew trust zeabur-oss/tap
       - name: Install and test the formula
         run: |
           for file in "$RUNNER_TEMP"/tap-files/Formula/*.rb; do
