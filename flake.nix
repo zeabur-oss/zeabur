@@ -92,6 +92,8 @@
               cargo-nextest
               cargo-auditable
               cargo-cyclonedx
+              # Pattern rules (scripts/ci/patterns.sh)
+              ripgrep
               # Zeabur Proxy's parser fuzz target (crates/zeabur-proxy/fuzz)
               cargo-fuzz
               # Breaking changes to crates/zeabur-api/openapi.yaml (scripts/api-break.ts)
