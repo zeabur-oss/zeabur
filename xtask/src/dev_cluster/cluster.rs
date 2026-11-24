@@ -14,8 +14,8 @@ pub(crate) const NAME: &str = "zeabur-dev";
 pub(crate) const NODE: &str = "k3d-zeabur-dev-server-0";
 /// The registry k3d starts with the cluster: images are pushed to it from the host
 /// (`localhost:<port>`) and the node pulls them as `REGISTRY_HOST/<path>`.
-pub(crate) const REGISTRY_CONTAINER: &str = "k3d-zeabur-dev-registry";
-pub(crate) const REGISTRY_HOST: &str = "k3d-zeabur-dev-registry:5000";
+pub(crate) const REGISTRY_CONTAINER: &str = "zeabur-dev-registry";
+pub(crate) const REGISTRY_HOST: &str = "zeabur-dev-registry:5000";
 pub(crate) const AUTHN_VOLUME: &str = "zeabur-dev-authn";
 /// Where the node reads Zeabur Identity's `AuthenticationConfiguration`.
 pub(crate) const AUTHN_DIR: &str = "/etc/rancher/k3s/zeabur-identity";
@@ -60,7 +60,7 @@ pub(crate) fn create(dev: &DevCluster) -> Result<(), String> {
                 "--kubeconfig-update-default=false",
                 "--kubeconfig-switch-context=false",
             ])
-            .args(["--registry-create", "zeabur-dev-registry"])
+            .args(["--registry-create", REGISTRY_CONTAINER])
             .arg("--registry-config")
             .arg(registries)
             .arg("--volume")

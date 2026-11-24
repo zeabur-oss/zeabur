@@ -20,7 +20,7 @@ uses an empty registry configuration on purpose, so a login cannot hide a privat
 
 `k3d image import` can print "Successfully imported" before `ctr` has read the tarball, and
 `release-smoke.sh` never uses it. The dev cluster has a k3d registry: `xtask dev-cluster up` pushes
-each local image to `localhost:<port>` and the node pulls it as `k3d-zeabur-dev-registry:5000/<name>`.
+each local image to `localhost:<port>` and the node pulls it as `zeabur-dev-registry:5000/<name>`.
 When a smoke test fails here, read `docker push`'s output and the pod's events (`ErrImagePull`,
 `ImagePullBackOff`), not only the exit code. This is a transport problem: fix the script, never
 rebuild the release for it.

@@ -98,7 +98,7 @@ mod tests {
         assert_eq!(
             yaml["mirrors"]["docker.io"]["endpoint"],
             json!([
-                "http://k3d-zeabur-dev-registry:5000",
+                "http://zeabur-dev-registry:5000",
                 "http://10.211.55.122:5001"
             ])
         );
@@ -113,7 +113,7 @@ mod tests {
     fn docker_hub_comes_from_the_cluster_registry_when_there_is_no_mirror() {
         assert_eq!(
             parsed("")["mirrors"]["docker.io"]["endpoint"],
-            json!(["http://k3d-zeabur-dev-registry:5000"])
+            json!(["http://zeabur-dev-registry:5000"])
         );
     }
 
