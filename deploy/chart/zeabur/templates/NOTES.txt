@@ -41,20 +41,16 @@ Zeabur gives members their rights with RoleBindings and ClusterRoleBindings it m
     -l app.kubernetes.io/managed-by=zeabur,zeabur.com/member
 {{- end }}
 
-{{- if not .Values.telemetry.enabled }}
+{{- if .Values.telemetry.enabled }}
 
-Help us improve Zeabur: join the experience program
+Zeabur is in the experience program. It sends the version, how many people use
+it each day, which features they use and whether changes rolled out, with a
+random installation ID. It never sends names, domains, emails or your cluster's
+contents, and PostHog doesn't keep IP addresses. What is sent:
+https://oss.zeabur.com/docs/zeabur/reference/telemetry/
 
-Out of the box, Zeabur sends nothing, so we can't tell whether anyone runs it
-or which fixes matter most. Joining sends one event a day for each person who
-uses this install, with the version and a random ID. It never says who they
-are: no names, domains or emails, and PostHog doesn't keep IP addresses.
-
-Join with one command:
+To leave:
 
   helm upgrade {{ .Release.Name }} oci://ghcr.io/zeabur-oss/charts/zeabur --namespace {{ .Release.Namespace }} --version {{ .Chart.Version }} --reset-then-reuse-values \
-    --set telemetry.enabled=true \
-    --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
-
-What is sent: https://oss.zeabur.com/docs/zeabur/reference/telemetry/
+    --set telemetry.enabled=false
 {{- end }}

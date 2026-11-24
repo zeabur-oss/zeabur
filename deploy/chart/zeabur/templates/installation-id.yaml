@@ -1,0 +1,21 @@
+{{- if and .Values.telemetry.enabled (not .Values.telemetry.installationId) }}
+{{- $name := include "zeabur.installationIdConfigMap" . }}
+{{- $existing := lookup "v1" "ConfigMap" .Release.Namespace $name }}
+{{- $id := "" }}
+{{- if and $existing (index ($existing.data | default dict) "id") }}
+{{- $id = index $existing.data "id" }}
+{{- else }}
+{{- /* Made once and kept by upgrades. `lookup` sees nothing under `helm template` or a
+       client-side dry run, so those print a new ID each time. */}}
+{{- $id = uuidv4 }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+data:
+  id: {{ $id | quote }}
+{{- end }}

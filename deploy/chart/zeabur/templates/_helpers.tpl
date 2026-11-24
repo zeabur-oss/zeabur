@@ -107,6 +107,10 @@ https://identity.{{ include "zeabur.domain" . }}
 {{- end -}}
 {{- end -}}
 
+{{- define "zeabur.installationIdConfigMap" -}}
+{{- printf "%s-installation-id" (include "zeabur.fullname" .) | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
 {{- define "zeabur.planKeySecret" -}}
 {{- .Values.planKey.existingSecret | default (printf "%s-plan-key" (include "zeabur.fullname" .)) -}}
 {{- end -}}
