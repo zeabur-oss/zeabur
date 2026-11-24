@@ -400,25 +400,32 @@ impl Event {
 
     /// [`Event::body`] with `distinct_id` as given.
     pub(crate) fn body_as(&self, key: &str, distinct_id: &str) -> String {
-        let mut properties = match self.properties() {
-            Value::Object(map) => map,
-            Value::Null
-            | Value::Bool(_)
-            | Value::Number(_)
-            | Value::String(_)
-            | Value::Array(_) => Map::new(),
-        };
-        properties.insert("$process_person_profile".to_owned(), json!(false));
-        properties.insert("$geoip_disable".to_owned(), json!(true));
-        json!({
-            "api_key": key,
-            "batch": [{
-                "event": self.name(),
-                "distinct_id": distinct_id,
-                "properties": properties,
-            }],
-        })
-        .to_string()
+        Self::batch(key, distinct_id, std::slice::from_ref(self))
+    }
+
+    /// The body of one request that carries `events`, all under `distinct_id`.
+    pub(crate) fn batch(key: &str, distinct_id: &str, events: &[Self]) -> String {
+        let batch: Vec<Value> = events
+            .iter()
+            .map(|event| {
+                let mut properties = match event.properties() {
+                    Value::Object(map) => map,
+                    Value::Null
+                    | Value::Bool(_)
+                    | Value::Number(_)
+                    | Value::String(_)
+                    | Value::Array(_) => Map::new(),
+                };
+                properties.insert("$process_person_profile".to_owned(), json!(false));
+                properties.insert("$geoip_disable".to_owned(), json!(true));
+                json!({
+                    "event": event.name(),
+                    "distinct_id": distinct_id,
+                    "properties": properties,
+                })
+            })
+            .collect();
+        json!({ "api_key": key, "batch": batch }).to_string()
     }
 }
 

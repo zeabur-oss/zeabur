@@ -250,7 +250,7 @@ These are repository and organization settings, not files; a maintainer sets the
   the private key, so every release has a `latest.json`. A build without a public key, a fork's
   for one, has no `latest.json` and the app does not check for updates.
 - **Telemetry key.** A repository variable `POSTHOG_KEY`, the PostHog project key of the
-  experience program (docs/reference/telemetry.mdx). Tag builds compile it in as
+  experience program (docs/reference/telemetry.mdx). Tag builds of `build` and `desktop-build` compile it in as
   `ZEABUR_TELEMETRY_KEY`; every other build, local ones included, has none and sends nothing.
 - **Workflow permissions** can stay read-only by default: each job of `release.yml` asks for
   what it needs. `desktop-build` has `id-token: write` for `azure/login`. `publish` has `packages: write` and

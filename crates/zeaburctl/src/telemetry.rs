@@ -1,16 +1,12 @@
-//! The experience program for a local run (docs/reference/telemetry.mdx): `zeaburctl ui` sends
-//! `cluster_connected` unless the person left. `zeaburctl telemetry` shows the setting, leaves or
-//! joins the program, and deletes the random ID the run keeps.
+//! `zeaburctl telemetry`: shows the setting of the experience program for a local run
+//! (`zeabur_local::telemetry`), leaves or joins it, and deletes the random ID the run keeps.
 
 use std::path::Path;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 use clap::Subcommand;
-use zeabur_kube::ClusterError;
-use zeabur_telemetry::{
-    ClusterConnected, Connection, Event, LocalId, Mode, PROJECT_KEY, Sender, Show, Switch,
-    standard_dir,
-};
+use zeabur_local::telemetry::{CONFIG, Local, Show, parse, random, read_config};
+use zeabur_telemetry::{LocalId, PROJECT_KEY, Switch, standard_dir};
 
 use crate::output;
 
@@ -168,149 +164,29 @@ fn reset(directory: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn random() -> Option<[u8; 16]> {
-    zeabur_core::crypto::random().ok()
-}
-
-/// The file in which the person can leave the program with `telemetry: false`.
-const CONFIG: &str = "config.yaml";
-
-#[derive(serde::Deserialize)]
-struct Config {
-    #[serde(default)]
-    telemetry: Option<bool>,
-}
-
-/// What `config.yaml` in `directory` says: `None` when it is missing, empty or has no
-/// `telemetry`, which means the program is joined.
-fn read_config(directory: &Path) -> Result<Option<bool>, String> {
-    let path = directory.join(CONFIG);
-    let unusable =
-        |error: &dyn std::fmt::Display| format!("cannot read {}: {error}", path.display());
-    let text = match std::fs::read_to_string(&path) {
-        Ok(text) => text,
-        Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(error) => return Err(unusable(&error)),
-    };
-    parse(&text).map_err(|error| unusable(&error))
-}
-
-/// The `telemetry` value of the text of a `config.yaml`.
-fn parse(text: &str) -> Result<Option<bool>, String> {
-    if text.trim().is_empty() {
-        return Ok(None);
-    }
-    serde_saphyr::from_str::<Config>(text)
-        .map(|config| config.telemetry)
-        .map_err(|error| error.to_string())
-}
-
-/// Whether `config.yaml` in `directory` leaves the program in. A file that can't be read or
-/// parsed leaves it, so an opt-out is never lost.
-fn joined_in(directory: &Path) -> bool {
-    match read_config(directory) {
-        Ok(joined) => joined.unwrap_or(true),
-        Err(error) => {
-            output::error(&format!(
-                "{error}. zeaburctl ui sends nothing until it is fixed."
-            ));
-            false
-        }
-    }
-}
-
-/// What `zeaburctl ui` sends. It is on by default; `DO_NOT_TRACK`, `ZEABUR_TELEMETRY=off` or
-/// `telemetry: false` in `config.yaml` turns it off.
-pub(crate) struct Local {
-    on: Option<Arc<(Sender, LocalId)>>,
-    /// The event on its way, which [`finish`](Self::finish) waits for.
-    sending: Mutex<Option<tokio::task::JoinHandle<()>>>,
-}
-
-impl Local {
-    /// The program as this environment and `config.yaml` set it. When it is on, says so and
-    /// how to turn it off.
-    pub(crate) fn from_env() -> Self {
-        let off = || Self {
-            on: None,
-            sending: Mutex::new(None),
-        };
-        let Some(directory) = standard_dir() else {
-            return off();
-        };
-        let switch = Switch::from_env(joined_in(&directory));
-        if switch == Switch::Off {
-            return off();
-        }
+/// The program for `zeaburctl ui`. When it is on, says so and how to turn it off.
+pub(crate) fn local() -> Local {
+    let show: Show = Arc::new(|body| output::info(&format!("telemetry: {body}")));
+    let local = Local::from_env(show).unwrap_or_else(|error| {
+        output::error(&format!(
+            "{error}. zeaburctl ui sends nothing until it is fixed."
+        ));
+        Local::default()
+    });
+    if local.is_on() {
         output::info(
             "zeaburctl ui sends its version and whether it could connect to the cluster, to help \
              improve Zeabur. `zeaburctl telemetry status` shows the setting; `zeaburctl telemetry \
              disable` or DO_NOT_TRACK=1 turns it off.\n\
              What is sent: https://oss.zeabur.com/docs/zeabur/reference/telemetry/",
         );
-        let show: Show = Arc::new(|body| output::info(&format!("telemetry: {body}")));
-        Self {
-            on: Some(Arc::new((
-                Sender::new(switch, show),
-                LocalId::new(&directory, random),
-            ))),
-            sending: Mutex::new(None),
-        }
     }
-
-    /// Starts sending how connecting to the cluster ended, one try with a short timeout, and
-    /// returns at once. Call it inside the Tokio runtime.
-    pub(crate) fn connected(&self, result: Connection) {
-        let Some(on) = self.on.clone() else {
-            return;
-        };
-        let event = Event::ClusterConnected(ClusterConnected {
-            zeabur_version: env!("CARGO_PKG_VERSION"),
-            mode: Mode::Local,
-            result,
-        });
-        let task = tokio::spawn(async move {
-            let (sender, id) = &*on;
-            sender.send_local(id, &event).await;
-        });
-        if let Ok(mut sending) = self.sending.lock() {
-            *sending = Some(task);
-        }
-    }
-
-    /// Waits for the event that [`connected`](Self::connected) started, before the program
-    /// exits.
-    pub(crate) async fn finish(&self) {
-        let task = self
-            .sending
-            .lock()
-            .ok()
-            .and_then(|mut sending| sending.take());
-        if let Some(task) = task {
-            // The sender logs its own failures; a task that did not finish is not sent.
-            task.await.unwrap_or_default();
-        }
-    }
-}
-
-/// How the cluster's answer to the first request ended the connection.
-pub(crate) const fn outcome(error: &ClusterError) -> Connection {
-    match (error, error.code()) {
-        (ClusterError::Transport(_), _) => Connection::Unreachable,
-        (_, Some(401)) => Connection::CredentialRefused,
-        (_, Some(403)) => Connection::NoReadRight,
-        _ => Connection::Other,
-    }
+    local
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    fn status(code: u16) -> ClusterError {
-        let status = serde_json::json!({"code": code, "reason": "", "message": ""});
-        ClusterError::Status(serde_json::from_value(status).unwrap())
-    }
 
     #[test]
     fn enable_and_disable_change_only_the_telemetry_line() {
@@ -334,40 +210,6 @@ mod tests {
         assert_eq!(
             std::fs::read_to_string(directory.path().join(CONFIG)).unwrap(),
             "{telemetry: true}\n"
-        );
-    }
-
-    #[test]
-    fn config_yaml_leaves_the_program_only_when_it_says_so() {
-        let directory = tempfile::tempdir().unwrap();
-        let with = |text: Option<&str>| {
-            if let Some(text) = text {
-                std::fs::write(directory.path().join(CONFIG), text).unwrap();
-            }
-            joined_in(directory.path())
-        };
-        assert!(with(None));
-        assert!(with(Some("")));
-        assert!(with(Some("telemetry: true\n")));
-        assert!(with(Some("other: 1\n")));
-        assert!(!with(Some("telemetry: false\n")));
-        assert!(!with(Some("telemetry: [")));
-        std::fs::write(directory.path().join(CONFIG), [0xFF, 0xFE]).unwrap();
-        assert!(!joined_in(directory.path()));
-    }
-
-    #[test]
-    fn a_connection_ends_by_what_the_cluster_said() {
-        assert_eq!(
-            outcome(&ClusterError::Transport("refused".to_owned())),
-            Connection::Unreachable
-        );
-        assert_eq!(outcome(&status(401)), Connection::CredentialRefused);
-        assert_eq!(outcome(&status(403)), Connection::NoReadRight);
-        assert_eq!(outcome(&status(500)), Connection::Other);
-        assert_eq!(
-            outcome(&ClusterError::Decode("x".to_owned())),
-            Connection::Other
         );
     }
 }

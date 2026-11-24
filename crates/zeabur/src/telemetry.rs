@@ -4,11 +4,12 @@
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
 
 use zeabur_api::measure::{Fact, Report};
 use zeabur_core::crypto;
 use zeabur_telemetry::{
-    AppChangeSubmitted, Change, Day, Event, Feature, FeatureUsed, InstallationId, Mode,
+    AppChangeSubmitted, Change, Day, Event, Feature, FeatureUsed, Id, InstallationId, Mode,
     RolloutFinished, Sender, Switch, ZeaburActive,
 };
 
@@ -61,6 +62,18 @@ impl Daily {
         let day = state.today(now);
         state.features.insert(feature).then_some(day)
     }
+
+    /// Forgets that the person of `hash` was seen, so the next use sends again.
+    fn unsee(&self, hash: &[u8; 16]) {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        state.seen.remove(hash);
+    }
+
+    /// Forgets that `feature` was used, so the next use sends again.
+    fn unuse(&self, feature: &Feature) {
+        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
+        state.features.remove(feature);
+    }
 }
 
 fn hash(key: &[u8; 32], day: Day, person: &str) -> [u8; 16] {
@@ -86,7 +99,7 @@ impl State {
 
 /// The program as the server runs it.
 pub(crate) struct Telemetry {
-    on: Option<(Daily, Arc<Sender>, InstallationId)>,
+    on: Option<(Daily, Sender)>,
 }
 
 impl Telemetry {
@@ -106,10 +119,10 @@ impl Telemetry {
         };
         let show: zeabur_telemetry::Show =
             Arc::new(|body| tracing::info!(event = "telemetry.debug", %body, "would send"));
-        let sender = Sender::new(switch, show);
         let on = id
-            .filter(|_| sender.active())
-            .map(|id| (Daily::new(key), Arc::new(sender), id));
+            .map(|id| Sender::new(switch, Id::Installation(id), show))
+            .filter(Sender::active)
+            .map(|sender| (Daily::new(key), sender));
         Self { on }
     }
 
@@ -123,10 +136,17 @@ impl Telemetry {
         Self { on: None }
     }
 
+    /// Waits up to `wait` for the queued events to be sent.
+    pub(crate) async fn close(&self, wait: Duration) {
+        if let Some((_, sender)) = &self.on {
+            sender.close(wait).await;
+        }
+    }
+
     /// Notes that `person` used Zeabur at `now` (Unix seconds), and sends an event in the
     /// background the first time in a day.
     pub(crate) fn saw(&self, person: &str, now: i64) {
-        let Some((daily, sender, id)) = &self.on else {
+        let Some((daily, sender)) = &self.on else {
             return;
         };
         let Some((day, hash)) = daily.first(person, now) else {
@@ -138,16 +158,15 @@ impl Telemetry {
             person: crypto::hex(&hash),
             mode: Mode::InCluster,
         });
-        let (sender, id) = (Arc::clone(sender), id.clone());
-        drop(tokio::spawn(async move {
-            sender.send(&id, &event).await;
-        }));
+        if !sender.send(event) {
+            daily.unsee(&hash);
+        }
     }
 
     /// Sends `feature` in the background the first time in a UTC day that it is used, with
     /// these values. Called after the API call that used it succeeded.
     pub(crate) fn used(&self, feature: Feature, now: i64) {
-        let Some((daily, sender, id)) = &self.on else {
+        let Some((daily, sender)) = &self.on else {
             return;
         };
         let Some(day) = daily.first_use(feature, now) else {
@@ -158,16 +177,15 @@ impl Telemetry {
             day,
             feature,
         });
-        let (sender, id) = (Arc::clone(sender), id.clone());
-        drop(tokio::spawn(async move {
-            sender.send(&id, &event).await;
-        }));
+        if !sender.send(event) {
+            daily.unuse(&feature);
+        }
     }
 
     /// Sends what happened to a change in the background. `person` is of the day the change
     /// was submitted.
     pub(crate) fn changed(&self, report: Report) {
-        let Some((daily, sender, id)) = &self.on else {
+        let Some((daily, sender)) = &self.on else {
             return;
         };
         let change = Change {
@@ -183,10 +201,7 @@ impl Telemetry {
             }
             Fact::Finished(result) => Event::RolloutFinished(RolloutFinished { change, result }),
         };
-        let (sender, id) = (Arc::clone(sender), id.clone());
-        drop(tokio::spawn(async move {
-            sender.send(&id, &event).await;
-        }));
+        sender.send(event);
     }
 }
 
@@ -252,6 +267,21 @@ mod tests {
             daily.first_use(wordpress, tomorrow),
             Some(Day::from_unix(tomorrow))
         );
+    }
+
+    #[test]
+    fn a_use_whose_event_was_not_queued_counts_again() {
+        let id = InstallationId::parse("8f14e45f-ceea-467a-9575-0123456789ab").unwrap();
+        let show: zeabur_telemetry::Show = Arc::new(|_| {});
+        // Without a key or a runtime, nothing is queued.
+        let telemetry = Telemetry {
+            on: Some((daily(), Sender::new(Switch::On, Id::Installation(id), show))),
+        };
+        telemetry.saw("alice", NOW);
+        telemetry.used(Feature::LogsViewed, NOW);
+        let (daily, _) = telemetry.on.as_ref().unwrap();
+        assert!(daily.first("alice", NOW + 1).is_some());
+        assert!(daily.first_use(Feature::LogsViewed, NOW + 1).is_some());
     }
 
     #[test]

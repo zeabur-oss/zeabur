@@ -41,6 +41,10 @@ const SWEEP: Duration = Duration::from_secs(60);
 /// the 30 s a pod gets by default before it is killed.
 const DRAIN: Duration = Duration::from_secs(10);
 
+/// How long queued usage events may take to be sent after the server stopped; with [`DRAIN`],
+/// still inside the 30 s.
+const TELEMETRY_WAIT: Duration = Duration::from_secs(3);
+
 /// Info and above, and nothing from kube-rs (targets `kube_client`, `kube_core` …). kube-rs logs
 /// response bodies, such as an admission message that quotes a Secret value or an object it
 /// cannot parse, at `WARN`, `DEBUG` and `TRACE`. Zeabur gets the same errors as values.
@@ -207,7 +211,7 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
             std::future::pending::<()>().await;
         }
     };
-    tokio::select! {
+    let result = tokio::select! {
         result = server.into_future() => {
             result.map_err(|e| format!("cannot serve on {address}: {e}"))
         }
@@ -215,7 +219,9 @@ async fn serve(args: &Args, config: Config) -> Result<(), String> {
             tracing::warn!(event = "server.stopped", "stopped with answers still open");
             Ok(())
         }
-    }
+    };
+    auth.telemetry.close(TELEMETRY_WAIT).await;
+    result
 }
 
 /// Listens on `address`, and where that is the default `[::]` and the node has no IPv6, on
