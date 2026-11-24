@@ -17,7 +17,7 @@
   "dependencies": {
     "@base-ui/react": "catalog:",
     "@tanstack/react-query": "catalog:",
-    "@tauri-apps/api": "2.12.4",
+    "@tauri-apps/api": "2.12.5",
     "@tauri-apps/plugin-dialog": "2.8.4",
     "@zeabur-oss/design-system": "catalog:",
     "class-variance-authority": "catalog:",
