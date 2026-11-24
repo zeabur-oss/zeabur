@@ -27,7 +27,7 @@
 //! the chart and has completed [helm-controller].
 //!
 //! [installers]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/installers.mdx
-//! [k3s-helm]: https://docs.k3s.io/helm
+//! [k3s-helm]: https://docs.k3s.io/add-ons/helm
 //! [kstatus]: https://github.com/kubernetes-sigs/cli-utils/blob/v0.37.2/pkg/kstatus/README.md
 //! [helm-controller]: https://github.com/k3s-io/helm-controller/blob/v0.16.27/pkg/controllers/chart/chart.go
 //! [releases]: https://github.com/zeabur-oss/catalog/blob/main/docs/reference/releases.mdx
