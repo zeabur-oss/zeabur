@@ -1,9 +1,9 @@
 ---
 title: 体验计划
-description: 加入体验计划后，Zeabur 开源版和 `zeaburctl ui` 会发送什么、绝不发送什么；Zeabur 开源版和 zeaburctl 如何检查新版本；Zeabur 开源版如何获取更新的模板；以及如何分别关闭。
+description: 加入体验计划后，Zeabur 开源版、`zeaburctl ui` 和 Zeabur Desktop 会发送什么、绝不发送什么；Zeabur 开源版和 zeaburctl 如何检查新版本；Zeabur 开源版如何获取更新的模板；以及如何分别关闭。
 ---
 
-体验计划会发送版本、每天的使用人数、用过哪些功能、`zeaburctl ui` 有没有连上集群，以及 Deployment 的变更有没有部署完成，让我们知道有多少人在用、该先修哪里。用 Helm 安装的 Zeabur 开源版和 `zeaburctl ui` 都默认加入，也都会提示并说明如何关闭：`helm install` 和 `helm upgrade` 在完成时提示，`zeaburctl ui` 在每次启动时提示。
+体验计划会发送版本、每天的使用人数、用过哪些功能、`zeaburctl ui` 有没有连上集群，以及 Deployment 的变更有没有部署完成，让我们知道有多少人在用、该先修哪里。用 Helm 安装的 Zeabur 开源版和 `zeaburctl ui` 都默认加入，也都会提示并说明如何关闭：`helm install` 和 `helm upgrade` 在完成时提示，`zeaburctl ui` 在每次启动时提示。Zeabur Desktop 跟随 `zeaburctl ui` 的设置。
 
 ## 会发送什么
 
@@ -13,7 +13,7 @@ description: 加入体验计划后，Zeabur 开源版和 `zeaburctl ui` 会发�
 |---|---|---|
 | `zeabur_active` | Zeabur 开源版 | 每个人每天（UTC）第一次使用 Zeabur 开源版网页界面时 |
 | `feature_used` | Zeabur 开源版 | 成功创建服务、数据库或域名，打开日志流或终端，邀请成员，或应用 Docker Compose 导入之后；同一项功能、同一组值每天（UTC）只发送一次 |
-| `cluster_connected` | `zeaburctl ui` | 用你的 kubeconfig 连上集群，或连不上时 |
+| `cluster_connected` | `zeaburctl ui`、Zeabur Desktop | 用你的 kubeconfig 连上集群，或连不上时 |
 | `app_change_submitted` | Zeabur 开源版 | 集群回应了一个 Deployment 的变更：换镜像、改副本数或改环境变量 |
 | `rollout_finished` | Zeabur 开源版 | 被接受的变更部署结束时，结果和 `kubectl rollout status` 一致 |
 
@@ -22,9 +22,9 @@ description: 加入体验计划后，Zeabur 开源版和 `zeaburctl ui` 会发�
 | `zeabur_version` | `zeabur_active`、`feature_used` | Zeabur 开源版的版本，例如 `0.1.1` |
 | `day` | `zeabur_active`、`feature_used` | UTC 日期，例如 `2026-10-30` |
 | `person` | `zeabur_active`、`app_change_submitted`、`rollout_finished` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
-| `zeabur_version` | `cluster_connected` | `zeaburctl` 的版本，例如 `0.1.1` |
+| `zeabur_version` | `cluster_connected` | `zeaburctl` 或 Zeabur Desktop 的版本，例如 `0.1.1` |
 | `zeabur_version` | `app_change_submitted`、`rollout_finished` | Zeabur 开源版的版本 |
-| `mode` | `zeabur_active`、`cluster_connected`、`app_change_submitted`、`rollout_finished` | 集群里的 Zeabur 开源版是 `in-cluster`，`zeaburctl ui` 是 `local` |
+| `mode` | `zeabur_active`、`cluster_connected`、`app_change_submitted`、`rollout_finished` | 集群里的 Zeabur 开源版是 `in-cluster`，`zeaburctl ui` 和 Zeabur Desktop 是 `local` |
 | `result` | `cluster_connected` | `connected`、`unreachable`、`credential_refused`、`no_read_right` 或 `other` |
 | `change_id` | `app_change_submitted`、`rollout_finished` | 随机 UUID，用来把同一个变更的两条事件连起来 |
 | `operation` | `app_change_submitted`、`rollout_finished` | `deploy_image`、`scale_replicas` 或 `change_env` |
@@ -43,9 +43,9 @@ description: 加入体验计划后，Zeabur 开源版和 `zeaburctl ui` 会发�
 
 `feature_used` 没有 `person`，只表示今天用过某项功能，不说是谁、用了几次。浏览器不会发送任何东西，是 Zeabur 开源版的服务器在操作成功之后发送的。
 
-`zeaburctl ui` 没有安装代码，所以在第一次要发送事件时才生成一个随机代码，关闭时不会生成。这个代码保存在配置目录里 `zeabur` 文件夹中名为 `local-id` 的文件：Linux 是 `$XDG_CONFIG_HOME` 或 `~/.config`，macOS 是 `~/Library/Application Support`，Windows 是 `%APPDATA%`。只有你能读取它，里面不含机器、kubeconfig、令牌或用户名的任何信息。
+`zeaburctl ui` 和 Zeabur Desktop 没有安装代码，所以共用一个随机代码，在第一次要发送事件时才生成，关闭时不会生成。这个代码保存在配置目录里 `zeabur` 文件夹中名为 `local-id` 的文件：Linux 是 `$XDG_CONFIG_HOME` 或 `~/.config`，macOS 是 `~/Library/Application Support`，Windows 是 `%APPDATA%`。只有你能读取它，里面不含机器、kubeconfig、令牌或用户名的任何信息。
 
-事件通过 HTTPS 发送到 PostHog（经由 `oss-nori.zeabur.com`），只尝试一次，超时很短。发送失败时不会重试，也不影响 Zeabur 开源版。PostHog 不保存 IP 地址。`zeaburctl ui` 在后台发送，不会延迟打印链接或打开浏览器。
+事件通过 HTTPS 发送到 PostHog（经由 `oss-nori.zeabur.com`）。事件先放在内存里排队，在后台分批发送，所以不会拖慢 Zeabur 开源版、`zeaburctl ui` 的链接或 Zeabur Desktop 的窗口。请求没有响应、被限流或遇到服务器错误时，最多再试三次；被 PostHog 拒绝的不会重试。Zeabur 开源版、`zeaburctl ui` 或 Zeabur Desktop 退出时会等几秒让排队的事件发出，之后还没发出的就不发了，因为不会保存到磁盘。PostHog 不保存 IP 地址。
 
 ## 绝不发送
 
@@ -55,9 +55,9 @@ description: 加入体验计划后，Zeabur 开源版和 `zeaburctl ui` 会发�
 
 以下任何一种都有效，其中 `DO_NOT_TRACK` 优先于其他设置。
 
-- 在 Zeabur 开源版或 `zeaburctl ui` 的环境变量中设置 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
+- 在 Zeabur 开源版、`zeaburctl ui` 或 Zeabur Desktop 的环境变量中设置 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
 - 用 Helm 安装时，设置 `telemetry.enabled=false`，做法见下方命令。
-- `zeaburctl ui` 运行 `zeaburctl telemetry disable`，它会在 `local-id` 所在的 `zeabur` 文件夹里的 `config.yaml` 写上 `telemetry: false`；或设置 `ZEABUR_TELEMETRY=off`。`config.yaml` 无法解析时，`zeaburctl ui` 什么都不发送。`zeaburctl telemetry status` 会显示当前生效的设置。
+- `zeaburctl ui` 运行 `zeaburctl telemetry disable`，它会在 `local-id` 所在的 `zeabur` 文件夹里的 `config.yaml` 写上 `telemetry: false`；或设置 `ZEABUR_TELEMETRY=off`。`config.yaml` 无法解析时，`zeaburctl ui` 什么都不发送。`zeaburctl telemetry status` 会显示当前生效的设置。Zeabur Desktop 启动时也读取同一个 `config.yaml` 和 `ZEABUR_TELEMETRY`。
 
 要删掉 `zeaburctl ui` 的代码，运行 `zeaburctl telemetry reset`。下次要发送事件时，它会生成新的代码。
 
