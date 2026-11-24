@@ -15,7 +15,7 @@
       "dependencies": {
         "@base-ui/react": "catalog:",
         "@tanstack/react-query": "catalog:",
-        "@tauri-apps/api": "2.12.4",
+        "@tauri-apps/api": "2.12.5",
         "@tauri-apps/plugin-dialog": "2.8.4",
         "@zeabur-oss/design-system": "catalog:",
         "class-variance-authority": "catalog:",
@@ -60,7 +60,7 @@
     },
     "web": {
       "name": "zeabur-web",
-      "version": "0.3.0-beta.2",
+      "version": "0.3.0",
       "dependencies": {
         "@base-ui/react": "catalog:",
         "@codemirror/commands": "6.11.1",
@@ -607,7 +607,7 @@
 
     "@tanstack/virtual-core": ["@tanstack/virtual-core@3.19.11", "", {}, "sha512-/5iHb0RHBvj8Di59FDs4ESNm45jls33aZAi4zccVXZjc/6ZvwQP6nzEYeT6weXjTf9E6/vrp2JhYWRyO+ZP13A=="],
 
-    "@tauri-apps/api": ["@tauri-apps/api@2.12.4", "", {}, "sha512-pVmfis+4zT8H0Qhp3xPZx9Ju7kpzvA6rr/PSJPyuwfvucTQ8sVt61NYU9KMkK703UFlYadFmjKA4HhybOtN0gg=="],
+    "@tauri-apps/api": ["@tauri-apps/api@2.12.5", "", {}, "sha512-G9QIMt5fzED+aS4QhVK3w1HWLKpLIwH/MnpCr9z1ugGEHnS2ORmqrLkc0uALOjRK4qXJy+4Yiw8LDl/KicC1Hg=="],
 
     "@tauri-apps/plugin-dialog": ["@tauri-apps/plugin-dialog@2.8.4", "", { "dependencies": { "@tauri-apps/api": "^2.12.0" } }, "sha512-+6ZOiXenOaxXwb8qCbBPdT2jX2cFPaVVHGIskrpmJLpmWj+qKRTD6X/z9x7hTdSQn7NedcoXCkWGej4a7dC4lw=="],
 
