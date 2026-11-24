@@ -16,7 +16,7 @@ fail() {
 
 # image_of <constant>: the image that settings.rs pins in a constant.
 image_of() {
-  sed -nE "s/^pub const $1: &str = \"([^\"]+)\";$/\1/p" "$settings"
+  rg -o -r '$1' "^pub const $1: &str = \"([^\"]+)\";$" "$settings" || true
 }
 
 # check_platforms <image>: the registry still serves the image for both platforms.
@@ -24,7 +24,7 @@ check_platforms() {
   local platforms
   platforms=$(crane manifest "$1" | jq -r '.manifests[]?.platform | "\(.os)/\(.architecture)"')
   for platform in linux/amd64 linux/arm64; do
-    if ! grep -qx "$platform" <<<"$platforms"; then
+    if ! rg -qxF -- "$platform" <<<"$platforms"; then
       fail "$1 has no $platform image"
     fi
   done

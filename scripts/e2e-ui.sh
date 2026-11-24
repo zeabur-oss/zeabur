@@ -57,7 +57,7 @@ server=$!
 trap 'kill "$server" 2>/dev/null || true' EXIT
 url=""
 for _ in $(seq 1 100); do
-  url=$(grep -o 'http://127.0.0.1:[0-9]*/?zeabur-launch=[0-9a-f]*' "$out/zeaburctl.log" || true)
+  url=$(rg -o 'http://127\.0\.0\.1:[0-9]+/\?zeabur-launch=[0-9a-f]+' "$out/zeaburctl.log" || true)
   [[ -n "$url" ]] && break
   sleep 0.2
 done

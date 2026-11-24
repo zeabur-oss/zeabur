@@ -63,7 +63,7 @@ if [[ "$stage" == compile ]]; then
   cargo tauri build --ci --no-bundle
   # Linked outside Nix: the binary names nothing in /nix/store.
   binary="$CARGO_TARGET_DIR/release/zeabur-desktop"
-  if case "$os" in darwin) otool -L "$binary" ;; linux) readelf -d "$binary" ;; esac | grep /nix/store >&2; then
+  if case "$os" in darwin) otool -L "$binary" ;; linux) readelf -d "$binary" ;; esac | rg -F /nix/store >&2; then
     echo "error: the binary links from /nix/store" >&2
     exit 1
   fi
@@ -104,7 +104,7 @@ case "$os" in
       security import "$work/certificate.p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
       security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$secret" "$keychain" >/dev/null
       identity=$(security find-identity -v -p codesigning "$keychain" |
-        sed -n 's/.*) \([0-9A-F]\{40\}\) "Developer ID Application: .*/\1/p' | head -n 1)
+        rg -m 1 -o -r '$1' '\) ([0-9A-F]{40}) "Developer ID Application: ' || true)
       if [[ -z "$identity" ]]; then
         echo "error: the certificate is not a Developer ID Application one" >&2
         exit 1

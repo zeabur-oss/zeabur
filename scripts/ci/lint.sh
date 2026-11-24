@@ -11,6 +11,7 @@ static() {
   cargo fmt --all --check
   nixfmt --check flake.nix
   shellcheck scripts/*.sh scripts/ci/*.sh
+  ./scripts/ci/patterns.sh
   jactionlint
   (cd web; bun run fmt:check)
   (cd scripts/shots; bun run fmt:check)

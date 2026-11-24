@@ -29,9 +29,12 @@ unset DEVELOPER_DIR SDKROOT
 
 work=$(mktemp -d)
 keychain=$work/signing.keychain-db
-mapfile -t old_keychains < <(
-  /usr/bin/security list-keychains -d user | sed -E 's/^ *"?//; s/"? *$//'
-)
+# One quoted path per line.
+old_keychains=()
+while read -r path; do
+  path=${path#\"}
+  old_keychains+=("${path%\"}")
+done < <(/usr/bin/security list-keychains -d user)
 
 cleanup() {
   /usr/bin/security list-keychains -d user -s "${old_keychains[@]}" || true
@@ -58,7 +61,7 @@ import_certificate() {
 
 developer_id() {
   /usr/bin/security find-identity -v -p codesigning "$keychain" |
-    awk '/"Developer ID Application: / { print $2; exit }'
+    rg -m 1 -o -r '$1' '\) ([0-9A-F]{40}) "Developer ID Application: ' || true
 }
 
 # A bare executable cannot hold the notarization ticket; Gatekeeper looks it up online.

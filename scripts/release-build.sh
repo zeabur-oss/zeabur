@@ -64,8 +64,8 @@ for binary in "${binaries[@]}"; do
     # Rust's standard library links libiconv, which the Nix shell resolves to its own build of
     # Apple's libiconv; the binary is pointed at the system's copy of that same library. The first
     # line of `otool -L` names the file itself.
-    libraries="$(otool -L "$file" | tail -n +2 | awk '{ print $1 }')"
-    while IFS= read -r library; do
+    libraries="$(otool -L "$file" | tail -n +2)"
+    while read -r library _; do
       case "$library" in
         /usr/lib/* | /System/Library/*) ;;
         /nix/store/*-libiconv-*/lib/libiconv.2.dylib)

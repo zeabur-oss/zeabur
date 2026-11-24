@@ -31,7 +31,7 @@ if ! diff -u <(toml ".profile.release" Cargo.toml) <(toml ".profile.release" des
   failed=1
 fi
 
-found=$(grep -rl --include='*.rs' unsafe_code desktop/src desktop/build.rs | sort || true)
+found=$(rg -l -g '*.rs' unsafe_code desktop/src desktop/build.rs | sort || true)
 allowed=$(printf '%s\n' "${unsafe_modules[@]}" | sort)
 if [[ "$found" != "$allowed" ]]; then
   diff -u <(echo "$allowed") <(echo "$found") >&2 || true
@@ -49,14 +49,14 @@ for name in $paths; do
 done
 
 # Every command the app registers has a permission in build.rs and one in a capability.
-commands=$(sed -n '/generate_handler!\[/,/\]/p' desktop/src/main.rs |
-  grep -oE '[a-z_]+,?$' | tr -d ',' | grep -v '^$' || true)
+commands=$(rg -U -o 'generate_handler!\[[^\]]*\]' desktop/src/main.rs |
+  rg -o -r '$1' '([a-z_]+),?$' || true)
 for command in $commands; do
-  if ! grep -q "\"$command\"" desktop/build.rs; then
+  if ! rg -qF "\"$command\"" desktop/build.rs; then
     echo "error: the command $command is not in desktop/build.rs" >&2
     failed=1
   fi
-  if ! grep -q "\"allow-${command//_/-}\"" desktop/capabilities/*.json; then
+  if ! rg -qF "\"allow-${command//_/-}\"" desktop/capabilities/*.json; then
     echo "error: no capability allows allow-${command//_/-}" >&2
     failed=1
   fi

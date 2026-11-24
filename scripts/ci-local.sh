@@ -18,7 +18,7 @@
 # earlier run left (clusters, images, tools installed by hand) can make a job pass here and fail
 # there: on a VM, snapshot its clean state and restore it after every run.
 #
-# A full disk fails jobs with no error of their own (a log cut off mid-line, a k3s node that
+# A full disk fails jobs with no error of their own (a log that stops mid-line, a k3s node that
 # stops scheduling pods), so the run refuses to start with less than CI_LOCAL_MIN_FREE_GB
 # (default 25) free; each running job's build directory takes several GB. The cluster jobs install
 # the Zeabur Identity release that xtask/pins/zeabur-identity names (scripts/dev-cluster.sh), or build
@@ -103,6 +103,6 @@ wait
 
 status=0
 for name in "${targets[@]}"; do
-  grep -q ' PASS ' "$out/$name.result" || status=1
+  rg -qF ' PASS ' "$out/$name.result" || status=1
 done
 exit $status

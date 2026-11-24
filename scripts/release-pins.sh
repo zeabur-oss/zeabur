@@ -47,9 +47,11 @@ download_sums() {
 
 # listed <repository> <file>: the digest that the repository's SHA256SUMS has for the file.
 listed() {
-  local digest
-  # Each line is "<64 hex digits>  <file>", so the name starts at column 67.
-  digest=$(awk -v file="$2" 'substr($0, 67) == file { print $1 }' "$work/$1/SHA256SUMS")
+  local digest="" sum name
+  # Each line is "<64 hex digits>  <file>".
+  while read -r sum name; do
+    if [[ $name == "$2" ]]; then digest=$sum; fi
+  done <"$work/$1/SHA256SUMS"
   if [[ ! "$digest" =~ ^[0-9a-f]{64}$ ]]; then
     fail "SHA256SUMS of zeabur-oss/$1 does not list $2"
   fi
@@ -60,7 +62,8 @@ listed() {
 check_listed() {
   local expected actual
   expected=$(listed "$1" "$3")
-  actual=$(sha256sum "$2" | cut -d' ' -f1)
+  actual=$(sha256sum "$2")
+  actual=${actual%% *}
   if [[ "$actual" != "$expected" ]]; then
     fail "$2 is not the $3 that zeabur-oss/$1 released"
   fi

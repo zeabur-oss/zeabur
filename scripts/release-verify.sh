@@ -43,8 +43,8 @@ chart=$downloaded/zeabur-${version#v}.tgz
 
 check_asset_list() {
   local expected actual
-  expected=$("$root/scripts/release-assets.sh" "$version" | cut -d' ' -f1 | sort)
-  actual=$(cd "$downloaded" && printf '%s\n' * | grep -v '^SHA256SUMS' | sort)
+  expected=$("$root/scripts/release-assets.sh" "$version" | while read -r name _; do echo "$name"; done | sort)
+  actual=$(cd "$downloaded" && printf '%s\n' * | rg -v '^SHA256SUMS' | sort)
   if [[ "$actual" != "$expected" ]]; then
     fail "the draft has these files:"$'\n'"$actual"$'\n'"and not these:"$'\n'"$expected"
   fi
@@ -56,7 +56,7 @@ check_default_images() {
   lines=$("$root/scripts/release-default-images.sh")
   while read -r line; do
     label=${line%% *}
-    if [[ "$(grep -c "^$label index " "$digests")" != 1 ]] || ! grep -qxF "$line" "$digests"; then
+    if [[ "$(rg -c "^$label index " "$digests")" != 1 ]] || ! rg -qxF -- "$line" "$digests"; then
       fail "digests.txt does not list ${line##* } as its one $label image"
     fi
   done <<<"$lines"
@@ -64,7 +64,7 @@ check_default_images() {
 
 # has_developer_id <file>
 has_developer_id() {
-  /usr/bin/codesign -dvv "$1" 2>&1 | grep -q '^Authority=Developer ID Application: '
+  /usr/bin/codesign -dvv "$1" 2>&1 | rg -q '^Authority=Developer ID Application: '
 }
 
 # check_notarized <file> <name>: a file with a Developer ID signature must also be notarized.
@@ -78,7 +78,7 @@ check_notarized() {
     --context context:primary-signature "$1" 2>&1); then
     fail "$2 is not notarized: $assessment"
   fi
-  if ! grep -q 'source=Notarized Developer ID' <<<"$assessment"; then
+  if ! rg -q 'source=Notarized Developer ID' <<<"$assessment"; then
     fail "$2 is not notarized: $assessment"
   fi
 }

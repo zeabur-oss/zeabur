@@ -11,7 +11,9 @@ set -euo pipefail
 tag="${1:?usage: build-image.sh <tag> [zeabur|zeabur-proxy]}"
 binary="${2:-zeabur}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
-target="$(uname -m | sed -e 's/^arm64$/aarch64/')-unknown-linux-musl"
+machine=$(uname -m)
+[[ $machine != arm64 ]] || machine=aarch64
+target="$machine-unknown-linux-musl"
 context="$root/target/image"
 rm -rf "$context"
 mkdir -p "$context"

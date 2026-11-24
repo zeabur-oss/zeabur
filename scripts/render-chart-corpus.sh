@@ -48,21 +48,25 @@ fi
 # Removes CustomResourceDefinition documents and documents with nothing but blank lines and
 # comments; prints every other document verbatim after a `---` line.
 filter() {
-  awk '
-    function flush() {
-      if (doc != "" && !crd && content) printf "---\n%s", doc
-      doc = ""; crd = 0; content = 0
-    }
-    # A new input file starts a new document, even if the previous file did not end with `---`.
-    FNR == 1 && NR > 1 { flush() }
-    /^---([ \t].*)?$/ { flush(); next }
-    {
-      doc = doc $0 "\n"
-      if ($0 ~ /^kind:[ \t]*"?CustomResourceDefinition"?[ \t]*$/) crd = 1
-      if ($0 !~ /^[ \t]*(#.*)?$/) content = 1
-    }
-    END { flush() }
-  ' "$@"
+  local file line doc="" crd=0 content=0
+  local separator='^---([[:blank:]].*)?$' kind='^kind:[[:blank:]]*"?CustomResourceDefinition"?[[:blank:]]*$' blank='^[[:blank:]]*(#.*)?$'
+  flush() {
+    if [[ -n $doc && $crd == 0 && $content == 1 ]]; then printf -- '---\n%s' "$doc"; fi
+    doc="" crd=0 content=0
+  }
+  # A new input file starts a new document, even if the previous file did not end with `---`.
+  for file in "$@"; do
+    while IFS= read -r line || [[ -n $line ]]; do
+      if [[ $line =~ $separator ]]; then
+        flush
+        continue
+      fi
+      doc+=$line$'\n'
+      if [[ $line =~ $kind ]]; then crd=1; fi
+      if [[ ! $line =~ $blank ]]; then content=1; fi
+    done <"$file"
+    flush
+  done
 }
 
 # The licence of each component's sources, as read in its chart's or manifests' repository (the
@@ -157,7 +161,7 @@ for path in "$src"/components/*/component.yaml; do
   fi
   filter "${rendered[@]}" >"$out_dir/$file"
   versions=$(yq -r '[.releases[] | .name + "@" + (.version // "inline")] | join(", ")' "$rel")
-  docs=$(grep -c '^---$' "$out_dir/$file" || true)
+  docs=$(rg -c '^---$' "$out_dir/$file" || echo 0)
   bytes=$(wc -c <"$out_dir/$file")
   printf '| %s | %s | %s | %s | %s | %s |\n' "$component" "\`$file\`" \
     "$versions" "$licence_cell" "$docs" "$bytes" >>"$rows"
