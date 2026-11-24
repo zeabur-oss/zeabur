@@ -3023,11 +3023,16 @@ version = "0.3.0"
 dependencies = [
  "axum",
  "kube",
+ "serde",
+ "serde-saphyr",
+ "serde_json",
+ "tempfile",
  "thiserror",
  "tokio",
  "zeabur-api",
  "zeabur-core",
  "zeabur-kube",
+ "zeabur-telemetry",
  "zeabur-ui",
 ]
 

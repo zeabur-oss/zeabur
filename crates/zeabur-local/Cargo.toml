@@ -18,11 +18,16 @@ ui = ["dep:zeabur-ui", "zeabur-ui/interface"]
 zeabur-api.workspace = true
 zeabur-core.workspace = true
 zeabur-kube.workspace = true
+zeabur-telemetry.workspace = true
 zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
 kube.workspace = true
+serde.workspace = true
+serde-saphyr.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
 zeabur-kube = { workspace = true, features = ["memory"] }
+serde_json.workspace = true
+tempfile.workspace = true

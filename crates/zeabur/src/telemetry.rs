@@ -4,11 +4,10 @@
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
+use std::time::Duration;
 
 use zeabur_api::measure::{Fact, Report};
 use zeabur_core::crypto;
-use std::time::Duration;
-
 use zeabur_telemetry::{
     AppChangeSubmitted, Change, Day, Event, Feature, FeatureUsed, Id, InstallationId, Mode,
     RolloutFinished, Sender, Switch, ZeaburActive,

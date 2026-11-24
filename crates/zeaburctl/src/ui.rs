@@ -1,14 +1,11 @@
 //! `zeaburctl ui`: the web interface on this machine, acting with the person's kubeconfig.
 
 use std::process::ExitCode;
-use std::sync::Arc;
 
-use zeabur_kube::UserClient;
-use zeabur_local::{ServiceError, Settings};
-use zeabur_telemetry::Connection;
+use zeabur_local::Settings;
+use zeabur_local::telemetry::{Connection, Local};
 
 use crate::output;
-use crate::telemetry::{Local, outcome};
 
 /// Options of `zeaburctl ui`.
 #[derive(Debug, clap::Args)]
@@ -34,14 +31,12 @@ pub(crate) async fn run(args: &UiArgs) -> ExitCode {
             return ExitCode::FAILURE;
         }
     };
-    let telemetry = Local::from_env();
+    let telemetry = crate::telemetry::local();
     let served = serve(args, settings, &telemetry).await;
     if let Err(message) = &served {
         output::error(message);
     }
-    // The event goes out while the interface runs; only a start that failed waits for it here,
-    // after the error is shown.
-    telemetry.finish().await;
+    telemetry.close().await;
     if served.is_ok() {
         ExitCode::SUCCESS
     } else {
@@ -50,18 +45,14 @@ pub(crate) async fn run(args: &UiArgs) -> ExitCode {
 }
 
 async fn serve(args: &UiArgs, settings: Settings, telemetry: &Local) -> Result<(), String> {
-    let cluster = match UserClient::from_kubeconfig(args.context.as_deref()).await {
-        Ok(cluster) => cluster,
-        Err(error) => {
-            telemetry.connected(Connection::Other);
-            return Err(error.to_string());
-        }
-    };
-    let started = zeabur_local::start_with(Arc::new(cluster), settings).await;
-    telemetry.connected(match &started {
-        Err(ServiceError::Identity(error)) => outcome(error),
-        Ok(_) | Err(_) => Connection::Connected,
-    });
+    let started = zeabur_local::start(args.context.as_deref(), settings).await;
+    telemetry.connected(
+        started
+            .as_ref()
+            .map_or_else(zeabur_local::ServiceError::connection, |_| {
+                Connection::Connected
+            }),
+    );
     let running = started.map_err(|e| e.to_string())?;
     let url = running.url();
     output::info(&format!(

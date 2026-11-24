@@ -1,5 +1,7 @@
 #![doc = include_str!("../README.md")]
 
+pub mod telemetry;
+
 use std::io;
 use std::net::{Ipv4Addr, SocketAddr};
 use std::sync::Arc;
