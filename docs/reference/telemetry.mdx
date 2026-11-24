@@ -3,11 +3,11 @@ title: Experience program
 description: What Zeabur OSS and `zeaburctl ui` send when you join the experience program, what they never send, how Zeabur OSS and zeaburctl check for a newer version, how Zeabur OSS fetches newer templates, and how to turn each off.
 ---
 
-The experience program sends the version, how many people use Zeabur OSS each day, which features they use, whether `zeaburctl ui` could connect to a cluster, and whether changes of a Deployment rolled out, so we know how many installations are in use and what to fix first. With Helm, Zeabur OSS stays out until you turn it on. `zeaburctl ui` joins by default and says so, with how to turn it off, each time it starts.
+The experience program sends the version, how many people use Zeabur OSS each day, which features they use, whether `zeaburctl ui` could connect to a cluster, and whether changes of a Deployment rolled out, so we know how many installations are in use and what to fix first. Zeabur OSS installed with Helm and `zeaburctl ui` join by default. Each says so, with how to turn it off: `helm install` and `helm upgrade` when they finish, `zeaburctl ui` each time it starts.
 
 ## What is sent
 
-Zeabur OSS sends one event the first time each person uses it in a UTC day, and one the first time each feature below is used with the same values in a UTC day. Each event carries a random installation ID, the properties below and nothing else. You make the ID with `uuidgen`; nothing about your machine goes into it. The data is kept for 13 months.
+Zeabur OSS sends one event the first time each person uses it in a UTC day, and one the first time each feature below is used with the same values in a UTC day. Each event carries a random installation ID, the properties below and nothing else. With Helm, the chart makes the ID once with `uuidv4` and keeps it in the ConfigMap `zeabur-installation-id`, so upgrades keep it; you can set your own with `telemetry.installationId`. Nothing about your machine goes into it. The data is kept for 13 months.
 
 | Event | Sent by | When |
 |---|---|---|
@@ -56,18 +56,19 @@ Domains, host names, IP addresses, Git URLs, image or service names, project nam
 Any one of these is enough, and `DO_NOT_TRACK` wins over all the others.
 
 - Set `DO_NOT_TRACK=1` in the environment of Zeabur OSS or of `zeaburctl ui`. Any value but empty or `0` counts.
-- With Helm, keep `telemetry.enabled=false`, the default. The chart refuses `telemetry.enabled=true` without an ID.
+- With Helm, set `telemetry.enabled=false`, as the command below does.
 - For `zeaburctl ui`, run `zeaburctl telemetry disable`, which writes `telemetry: false` to `config.yaml` in the same `zeabur` folder as `local-id`, or set `ZEABUR_TELEMETRY=off`. If `config.yaml` can't be read, `zeaburctl ui` sends nothing. `zeaburctl telemetry status` shows which setting is in effect.
 
 To delete the ID of `zeaburctl ui`, run `zeaburctl telemetry reset`. It makes a new one the next time it is about to send an event.
 
-To join with Helm, pass in a new ID:
+To leave with Helm:
 
 ```sh
 helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reset-then-reuse-values \
-  --set telemetry.enabled=true \
-  --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
+  --set telemetry.enabled=false
 ```
+
+If a tool such as Argo CD renders the chart with `helm template`, the chart can't read the ConfigMap it made before and makes a new ID on each render. Set `telemetry.installationId` to a UUID of your own, such as the output of `uuidgen | tr 'A-Z' 'a-z'`.
 
 ## See what would be sent
 

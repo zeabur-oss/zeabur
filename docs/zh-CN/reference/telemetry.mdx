@@ -3,11 +3,11 @@ title: 体验计划
 description: 加入体验计划后，Zeabur 开源版和 `zeaburctl ui` 会发送什么、绝不发送什么；Zeabur 开源版和 zeaburctl 如何检查新版本；Zeabur 开源版如何获取更新的模板；以及如何分别关闭。
 ---
 
-体验计划会发送版本、每天的使用人数、用过哪些功能、`zeaburctl ui` 有没有连上集群，以及 Deployment 的变更有没有部署完成，让我们知道有多少人在用、该先修哪里。用 Helm 安装时默认不加入，需要自己开启；`zeaburctl ui` 默认加入，每次启动都会提示，并说明如何关闭。
+体验计划会发送版本、每天的使用人数、用过哪些功能、`zeaburctl ui` 有没有连上集群，以及 Deployment 的变更有没有部署完成，让我们知道有多少人在用、该先修哪里。用 Helm 安装的 Zeabur 开源版和 `zeaburctl ui` 都默认加入，也都会提示并说明如何关闭：`helm install` 和 `helm upgrade` 在完成时提示，`zeaburctl ui` 在每次启动时提示。
 
 ## 会发送什么
 
-每个人每天（UTC）第一次使用 Zeabur 开源版时，Zeabur 开源版会发送一条事件；同一项功能、同一组值每天（UTC）第一次出现时，Zeabur 开源版也会发送一条。每条事件只带随机的安装代码和下表的属性，没有别的。安装代码由你用 `uuidgen` 生成，不含任何机器的信息。数据保留 13 个月。
+每个人每天（UTC）第一次使用 Zeabur 开源版时，Zeabur 开源版会发送一条事件；同一项功能、同一组值每天（UTC）第一次出现时，Zeabur 开源版也会发送一条。每条事件只带随机的安装代码和下表的属性，没有别的。用 Helm 安装时，chart 用 `uuidv4` 生成一次安装代码，保存在 ConfigMap `zeabur-installation-id`，升级时沿用；也可以用 `telemetry.installationId` 指定自己的代码。安装代码不含任何机器的信息。数据保留 13 个月。
 
 | 事件 | 由谁发送 | 时机 |
 |---|---|---|
@@ -56,18 +56,19 @@ description: 加入体验计划后，Zeabur 开源版和 `zeaburctl ui` 会发�
 以下任何一种都有效，其中 `DO_NOT_TRACK` 优先于其他设置。
 
 - 在 Zeabur 开源版或 `zeaburctl ui` 的环境变量中设置 `DO_NOT_TRACK=1`。空值和 `0` 以外的值都算。
-- 用 Helm 安装时，保持默认的 `telemetry.enabled=false`。没有安装代码时，chart 不接受 `telemetry.enabled=true`。
+- 用 Helm 安装时，设置 `telemetry.enabled=false`，做法见下方命令。
 - `zeaburctl ui` 运行 `zeaburctl telemetry disable`，它会在 `local-id` 所在的 `zeabur` 文件夹里的 `config.yaml` 写上 `telemetry: false`；或设置 `ZEABUR_TELEMETRY=off`。`config.yaml` 无法解析时，`zeaburctl ui` 什么都不发送。`zeaburctl telemetry status` 会显示当前生效的设置。
 
 要删掉 `zeaburctl ui` 的代码，运行 `zeaburctl telemetry reset`。下次要发送事件时，它会生成新的代码。
 
-用 Helm 加入时，传入一个新的安装代码：
+用 Helm 退出：
 
 ```sh
 helm upgrade <release> oci://ghcr.io/zeabur-oss/charts/zeabur --reset-then-reuse-values \
-  --set telemetry.enabled=true \
-  --set telemetry.installationId=$(uuidgen | tr 'A-Z' 'a-z')
+  --set telemetry.enabled=false
 ```
+
+如果 Argo CD 这类工具用 `helm template` 生成 chart 内容，chart 读不到之前创建的 ConfigMap，每次都会生成新的代码。请把 `telemetry.installationId` 设为自己的 UUID，例如 `uuidgen | tr 'A-Z' 'a-z'` 的结果。
 
 ## 查看会发送的内容
 

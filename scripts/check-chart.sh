@@ -338,18 +338,28 @@ refuse "a tools resource Zeabur does not set" --set terminal.toolsResources.limi
 refuse "an image digest without its algorithm" --set image.digest="$(printf '%064d' 0)"
 refuse "a logs URL with https or a path" --set proxy.logs.url=https://vl.example.test:9428/select
 refuse "metrics through the proxy from a named port" --set proxy.enabled=true --set metricsStore.service=monitoring/prometheus:web
-refuse "the experience program without an installation ID" --set telemetry.enabled=true
 refuse "an installation ID that is not a UUID" --set telemetry.enabled=true --set telemetry.installationId=machine-1
 refuse "an installation ID that is not a UUID" --set telemetry.installationId=machine-1
 refuse "an apiServer address that is not a CIDR" --set 'proxy.apiServer[0]=kubernetes.default'
 if render >/dev/null 2>&1; then fail "accepted no values at all"; fi
 
-# The experience program is off unless it is turned on with an installation ID.
+# The experience program is on by default, with an installation ID the chart makes and keeps in a
+# ConfigMap; a set ID replaces it, and telemetry.enabled=false sends nothing.
 env='select(.kind == "Deployment" and .metadata.name == "zeabur") | .spec.template.spec.containers[0].env[]'
+telemetry_env="[$env | select(.name == \"ZEABUR_TELEMETRY_ENABLED\" or .name == \"ZEABUR_INSTALLATION_ID\")]"
+id_map='select(.kind == "ConfigMap" and .metadata.name == "zeabur-installation-id")'
 id=0a1b2c3d-0000-4000-8000-000000000000
-expect telemetry "$(render -f "$chart/ci/minimal-values.yaml")" "[$env | select(.name == \"ZEABUR_TELEMETRY_ENABLED\" or .name == \"ZEABUR_INSTALLATION_ID\")] | length" 0
-expect telemetry "$(render -f "$chart/ci/minimal-values.yaml" --set telemetry.enabled=true --set telemetry.installationId=$id)" \
-  "[$env | select(.name == \"ZEABUR_TELEMETRY_ENABLED\" or .name == \"ZEABUR_INSTALLATION_ID\") | .value] | join(\",\")" "true,$id"
+out=$(render -f "$chart/ci/minimal-values.yaml")
+expect telemetry "$out" "$telemetry_env | map(.value // .valueFrom.configMapKeyRef.name + \"/\" + .valueFrom.configMapKeyRef.key) | join(\",\")" \
+  "true,zeabur-installation-id/id"
+[[ "$(query "$out" "$id_map | .data.id")" =~ ^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$ ]] ||
+  fail "telemetry: the chart's installation ID is not a random UUID"
+out=$(render -f "$chart/ci/minimal-values.yaml" --set telemetry.installationId=$id)
+expect telemetry "$out" "$telemetry_env | map(.value) | join(\",\")" "true,$id"
+expect telemetry "$out" "[$id_map] | length" 0
+out=$(render -f "$chart/ci/minimal-values.yaml" --set telemetry.enabled=false)
+expect telemetry "$out" "$telemetry_env | length" 0
+expect telemetry "$out" "[$id_map] | length" 0
 
 # With Zeabur Identity, the chart registers Zeabur as its client: the redirect URI at the public
 # URL, the hash of the client secret Zeabur reads, and the addresses under global.domain.

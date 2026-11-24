@@ -253,10 +253,11 @@ resources:
   limits:
     memory: 128Mi
 
-# The experience program (docs/reference/telemetry.mdx). Off by default. installationId: a random
-# UUID you make, such as `uuidgen | tr A-Z a-z`; required when enabled. DO_NOT_TRACK=1 turns it off.
+# The experience program (docs/reference/telemetry.mdx). On by default; false or DO_NOT_TRACK=1
+# turns it off. installationId: a random UUID. Empty: the chart makes one and keeps it in the
+# ConfigMap <fullname>-installation-id. Set it when a tool renders the chart with `helm template`.
 telemetry:
-  enabled: false
+  enabled: true
   installationId: ""
 
 # The update check (docs/reference/telemetry.mdx): at most once an hour, Zeabur asks GitHub whether
