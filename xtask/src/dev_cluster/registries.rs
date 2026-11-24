@@ -1,6 +1,7 @@
-//! The node's `registries.yaml`: zot through its fixed ClusterIP, and the mirrors of
-//! `ZEABUR_REGISTRY_MIRRORS`.
+//! The node's `registries.yaml`: zot through its fixed ClusterIP, the cluster's registry before the
+//! mirrors of Docker Hub, and the mirrors of `ZEABUR_REGISTRY_MIRRORS`.
 
+use super::cluster::REGISTRY_HOST;
 use super::{ZOT_CA, ZOT_HOST, ZOT_IP};
 
 /// A registry the node pulls through another endpoint.
@@ -29,6 +30,8 @@ pub(crate) fn parse_mirrors(value: &str) -> Result<Vec<Mirror>, String> {
         .collect()
 }
 
+/// Docker Hub's images that were pushed to the cluster's registry (`busybox:1.37`) come from it;
+/// the registry answers 404 for the rest, and the node tries the next endpoint.
 pub(crate) fn render(mirrors: &[Mirror]) -> String {
     let quote = |s: &str| serde_json::Value::from(s).to_string();
     let yaml = format!(
@@ -36,17 +39,30 @@ pub(crate) fn render(mirrors: &[Mirror]) -> String {
         quote(&format!("{ZOT_IP}:5000")),
         quote(ZOT_CA)
     );
-    let zot = Mirror {
-        registry: ZOT_HOST.to_owned(),
-        endpoint: format!("https://{ZOT_IP}:5000"),
-    };
-    let entries: Vec<String> = std::iter::once(&zot)
-        .chain(mirrors)
-        .map(|mirror| {
+    let zot = format!("https://{ZOT_IP}:5000");
+    let local = format!("http://{REGISTRY_HOST}");
+    let mut grouped: Vec<(&str, Vec<&str>)> = Vec::new();
+    let entries = [(ZOT_HOST, zot.as_str()), ("docker.io", local.as_str())]
+        .into_iter()
+        .chain(
+            mirrors
+                .iter()
+                .map(|mirror| (mirror.registry.as_str(), mirror.endpoint.as_str())),
+        );
+    for (registry, endpoint) in entries {
+        match grouped.iter_mut().find(|(name, _)| *name == registry) {
+            Some((_, endpoints)) => endpoints.push(endpoint),
+            None => grouped.push((registry, vec![endpoint])),
+        }
+    }
+    let entries: Vec<String> = grouped
+        .iter()
+        .map(|(registry, endpoints)| {
+            let endpoints: Vec<String> = endpoints.iter().map(|e| quote(e)).collect();
             format!(
                 "  {}:\n    endpoint: [{}]\n",
-                quote(&mirror.registry),
-                quote(&mirror.endpoint)
+                quote(registry),
+                endpoints.join(", ")
             )
         })
         .collect();
@@ -81,13 +97,24 @@ mod tests {
         let yaml = parsed("docker.io=http://10.211.55.122:5001,ghcr.io=http://m:5002/a=b,");
         assert_eq!(
             yaml["mirrors"]["docker.io"]["endpoint"],
-            json!(["http://10.211.55.122:5001"])
+            json!([
+                "http://zeabur-dev-registry:5000",
+                "http://10.211.55.122:5001"
+            ])
         );
         assert_eq!(
             yaml["mirrors"]["ghcr.io"]["endpoint"],
             json!(["http://m:5002/a=b"])
         );
         assert!(yaml["mirrors"]["zot.zot.svc:5000"].is_object());
+    }
+
+    #[test]
+    fn docker_hub_comes_from_the_cluster_registry_when_there_is_no_mirror() {
+        assert_eq!(
+            parsed("")["mirrors"]["docker.io"]["endpoint"],
+            json!(["http://zeabur-dev-registry:5000"])
+        );
     }
 
     #[test]

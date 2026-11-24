@@ -1,4 +1,4 @@
-//! The images the cluster runs: built here, tagged by content, imported into the node.
+//! The images the cluster runs: built here, tagged by content, pushed to the cluster's registry.
 
 use std::fs;
 use std::os::unix::fs::symlink;
@@ -6,7 +6,8 @@ use std::path::Path;
 
 use sha2::{Digest as _, Sha256};
 
-use super::{DevCluster, cluster, identity_release};
+use super::cluster::{REGISTRY_CONTAINER, REGISTRY_HOST};
+use super::{DevCluster, identity_release};
 use crate::checkout::{self, Pin};
 use crate::output;
 
@@ -31,8 +32,8 @@ pub(crate) struct Built {
     pub(crate) zeabur: String,
     /// Zeabur Proxy's image, when Zeabur's was built here.
     pub(crate) proxy: Option<String>,
-    /// The local images to import into the node.
-    pub(crate) import: Vec<String>,
+    /// The local images to push to the registry.
+    pub(crate) push: Vec<String>,
 }
 
 /// Zeabur Identity and its `zeabur-identityctl`, and, unless `zeabur_image` is given, Zeabur and
@@ -43,14 +44,14 @@ pub(crate) fn build(
     identity_src: Option<&Path>,
     zeabur_image: Option<&str>,
 ) -> Result<Built, String> {
-    let mut import = Vec::new();
+    let mut push = Vec::new();
     let identity = if let Some(src) = identity_src {
         output::say(&format!(
             "Zeabur Identity: building ZEABUR_IDENTITY_SRC {}",
             src.display()
         ));
         let identity = build_identity(dev, src)?;
-        import.push(identity.clone());
+        push.push(identity.clone());
         identity
     } else {
         let tag = match read_pin(dev, "xtask/pins/zeabur-identity")? {
@@ -73,7 +74,7 @@ pub(crate) fn build(
             dev.cmd(&script).args([PROXY_DEV, "zeabur-proxy"]).run()?;
             let zeabur = content_tag(dev, ZEABUR_DEV)?;
             let proxy = content_tag(dev, PROXY_DEV)?;
-            import.extend([zeabur.clone(), proxy.clone()]);
+            push.extend([zeabur.clone(), proxy.clone()]);
             (zeabur, Some(proxy))
         }
         Some(image)
@@ -83,7 +84,7 @@ pub(crate) fn build(
                 .attempt() =>
         {
             let zeabur = content_tag(dev, image)?;
-            import.push(zeabur.clone());
+            push.push(zeabur.clone());
             (zeabur, None)
         }
         Some(image) => (image.to_owned(), None),
@@ -92,7 +93,7 @@ pub(crate) fn build(
         identity,
         zeabur,
         proxy,
-        import,
+        push,
     })
 }
 
@@ -155,13 +156,13 @@ pub(crate) fn pinned_checkout(
     checkout::checkout(dir, &read_pin(dev, pin_file)?, &pin_url(url_env, url))
 }
 
-/// Tags `image` by its content, so that a changed image gets a new tag and the cluster a new
-/// value.
+/// Tags `image` by its content, under the registry's name in the cluster, so that a changed image
+/// gets a new tag and the cluster a new value.
 pub(crate) fn content_tag(dev: &DevCluster, image: &str) -> Result<String, String> {
     let id = image_id(dev, image)?;
     let (repository, _) = split_tag(image);
     let digits: String = id.trim_start_matches("sha256:").chars().take(12).collect();
-    let tagged = format!("{repository}:dev-{digits}");
+    let tagged = format!("{REGISTRY_HOST}/{}:dev-{digits}", short_name(repository));
     tag(dev, image, &tagged)?;
     Ok(tagged)
 }
@@ -197,24 +198,65 @@ pub(crate) fn joint_tag(ids: &[String]) -> String {
     format!("dev-{digits}")
 }
 
-/// Imports local images into the node and fails unless the node has them: k3d's import of a
-/// multi-manifest index can fail on the node while reporting success.
-pub(crate) fn import(dev: &DevCluster, images: &[String]) -> Result<(), String> {
-    dev.cmd("k3d")
-        .args(["image", "import"])
-        .args(images)
-        .args(["--cluster", cluster::NAME])
-        .quiet()?;
-    let listing = dev
+/// Pushes each local image to the cluster's registry, from the host's side of it. An image named
+/// `REGISTRY_HOST/<path>` is pulled by the node under that name; `busybox:1.37` and other
+/// Docker Hub images are pulled from the registry first, as `docker.io/library/busybox:1.37`.
+pub(crate) fn push(dev: &DevCluster, images: &[String]) -> Result<(), String> {
+    let port = host_port(dev)?;
+    for image in images {
+        let (repository, version) = split_tag(image);
+        let pushed = format!(
+            "localhost:{port}/{}:{}",
+            registry_path(repository),
+            version.unwrap_or("latest")
+        );
+        tag(dev, image, &pushed)?;
+        dev.cmd("docker")
+            .args(["push", "--quiet", &pushed])
+            .quiet()?;
+    }
+    Ok(())
+}
+
+/// The registry's port on the host's loopback.
+fn host_port(dev: &DevCluster) -> Result<String, String> {
+    let ports = dev
         .cmd("docker")
-        .args(["exec", cluster::NODE, "crictl", "images"])
-        .read()?;
-    images
-        .iter()
-        .find(|image| !node_has(&listing, image))
-        .map_or(Ok(()), |image| {
-            Err(format!("the node does not have {image} after the import"))
+        .args(["port", REGISTRY_CONTAINER, "5000/tcp"])
+        .read()
+        .map_err(|e| format!("the cluster has no registry (run `down`, then `up`): {e}"))?;
+    ports
+        .lines()
+        .find_map(|line| {
+            line.rsplit_once(':')
+                .map(|(_, port)| port.trim().to_owned())
         })
+        .ok_or_else(|| format!("{REGISTRY_CONTAINER} publishes no port: {ports}"))
+}
+
+/// The path in the registry of the image the node pulls as `repository`: a name under
+/// `REGISTRY_HOST` as it is, a Docker Hub name as the node's containerd asks for it.
+fn registry_path(repository: &str) -> String {
+    if let Some(path) = repository.strip_prefix(&format!("{REGISTRY_HOST}/")) {
+        return path.to_owned();
+    }
+    let path = repository.strip_prefix("docker.io/").unwrap_or(repository);
+    if path.contains('/') {
+        path.to_owned()
+    } else {
+        format!("library/{path}")
+    }
+}
+
+/// `repository` without its registry and without Docker Hub's `library/`. As in Docker's
+/// reference grammar, the first component names a registry when it holds a `.` or a `:`, or is
+/// `localhost`.
+fn short_name(repository: &str) -> &str {
+    let repository = match repository.split_once('/') {
+        Some((host, path)) if host.contains(['.', ':']) || host == "localhost" => path,
+        _ => repository,
+    };
+    repository.strip_prefix("library/").unwrap_or(repository)
 }
 
 /// The repository and tag of a reference such as `ghcr.io:443/a/b:tag`, without its `@sha256:…`.
@@ -226,67 +268,46 @@ pub(crate) fn split_tag(image: &str) -> (&str, Option<&str>) {
     }
 }
 
-/// The name containerd lists for an image: `busybox` is `docker.io/library/busybox`.
-fn full_name(repository: &str) -> String {
-    let first = repository.split('/').next().unwrap_or_default();
-    let registry = repository.contains('/')
-        && (first.contains('.') || first.contains(':') || first == "localhost");
-    if registry {
-        repository.to_owned()
-    } else if repository.contains('/') {
-        format!("docker.io/{repository}")
-    } else {
-        format!("docker.io/library/{repository}")
-    }
-}
-
-/// Whether `crictl images`' `listing` has `image`.
-fn node_has(listing: &str, image: &str) -> bool {
-    let (repository, tag) = split_tag(image);
-    let name = full_name(repository);
-    let tag = tag.unwrap_or("latest");
-    listing.lines().any(|line| {
-        let mut columns = line.split_whitespace();
-        columns.next() == Some(name.as_str()) && columns.next() == Some(tag)
-    })
-}
-
 #[cfg(test)]
 mod tests {
-    use super::{joint_tag, node_has, split_tag};
-
-    const LISTING: &str = "\
-IMAGE                                   TAG                 IMAGE ID            SIZE
-docker.io/library/busybox               1.37                0a1b2c3d4e5f6       2.2MB
-docker.io/library/zeabur                dev-0123456789ab    1a2b3c4d5e6f7       30MB
-docker.io/zeabur-builder/builder        dev-aaaaaaaaaaaa    2a2b3c4d5e6f7       40MB
-ghcr.io/zeabur-oss/zeabur               0.1.1               3a2b3c4d5e6f7       30MB
-localhost:5000/tool                     v1                  4a2b3c4d5e6f7       1MB
-";
+    use super::{REGISTRY_HOST, joint_tag, registry_path, short_name, split_tag};
 
     #[test]
-    fn short_names_match_what_containerd_lists() {
-        for image in [
-            "busybox:1.37",
-            "docker.io/library/zeabur:dev-0123456789ab",
-            "zeabur-builder/builder:dev-aaaaaaaaaaaa",
-            "ghcr.io/zeabur-oss/zeabur:0.1.1",
-            "localhost:5000/tool:v1",
-        ] {
-            assert!(node_has(LISTING, image), "{image}");
-        }
+    fn a_name_under_the_registry_is_pushed_as_it_is() {
+        assert_eq!(
+            registry_path(&format!("{REGISTRY_HOST}/zeabur-builder/builder")),
+            "zeabur-builder/builder"
+        );
     }
 
     #[test]
-    fn another_tag_or_a_missing_image_is_not_there() {
-        for image in [
-            "busybox:1.36",
-            "zeabur:dev-ffffffffffff",
-            "builder:dev-aaaaaaaaaaaa",
-            "docker.io/library/zeabur-proxy:dev-0123456789ab",
-        ] {
-            assert!(!node_has(LISTING, image), "{image}");
-        }
+    fn a_docker_hub_name_is_pushed_where_containerd_asks_for_it() {
+        assert_eq!(registry_path("busybox"), "library/busybox");
+        assert_eq!(
+            registry_path("docker.io/library/busybox"),
+            "library/busybox"
+        );
+        assert_eq!(registry_path("docker.io/rancher/k3s"), "rancher/k3s");
+    }
+
+    #[test]
+    fn a_content_tag_keeps_the_short_name() {
+        assert_eq!(short_name("docker.io/library/zeabur"), "zeabur");
+        assert_eq!(
+            short_name("zeabur-builder/builder"),
+            "zeabur-builder/builder"
+        );
+        assert_eq!(short_name("ghcr.io/zeabur-oss/zeabur"), "zeabur-oss/zeabur");
+    }
+
+    #[test]
+    fn a_content_tag_drops_a_registry_with_a_port() {
+        assert_eq!(short_name("localhost:5000/zeabur"), "zeabur");
+        assert_eq!(short_name("localhost/zeabur"), "zeabur");
+        assert_eq!(
+            short_name(&format!("{REGISTRY_HOST}/zeabur-builder/builder")),
+            "zeabur-builder/builder"
+        );
     }
 
     #[test]

@@ -26,6 +26,12 @@ rule text-scraping 'scripts/**' '\b(grep|sed|awk|cut)\b' \
   "version=\$(helm show chart deploy/chart/zeabur | sed -n 's/^version: //p')" \
   'read structured output with jq, yq or kubectl -o jsonpath, search text with rg, and move a long script with branches to a Rust test or Bun'
 
+registry="k3d 5.9.0 can report success for an import that never ran; push the image to the dev cluster's registry (xtask/src/dev_cluster/images.rs)"
+rule image-import-script 'scripts/** .github/**' '^[^#]*(k3d image import|ctr[^|]*images? import)' \
+  'k3d image import zeabur:dev -c zeabur-dev' "$registry"
+rule image-import-xtask 'xtask/**/*.rs' '"images?",\s*"import"|"ctr"' \
+  '.args(["image", "import"])' "$registry"
+
 if ((failures > 0)); then
   exit 1
 fi
