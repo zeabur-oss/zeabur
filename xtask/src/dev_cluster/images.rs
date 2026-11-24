@@ -248,9 +248,14 @@ fn registry_path(repository: &str) -> String {
     }
 }
 
-/// `repository` without the Docker Hub's name.
+/// `repository` without its registry and without Docker Hub's `library/`. As in Docker's
+/// reference grammar, the first component names a registry when it holds a `.` or a `:`, or is
+/// `localhost`.
 fn short_name(repository: &str) -> &str {
-    let repository = repository.strip_prefix("docker.io/").unwrap_or(repository);
+    let repository = match repository.split_once('/') {
+        Some((host, path)) if host.contains(['.', ':']) || host == "localhost" => path,
+        _ => repository,
+    };
     repository.strip_prefix("library/").unwrap_or(repository)
 }
 
@@ -292,9 +297,16 @@ mod tests {
             short_name("zeabur-builder/builder"),
             "zeabur-builder/builder"
         );
+        assert_eq!(short_name("ghcr.io/zeabur-oss/zeabur"), "zeabur-oss/zeabur");
+    }
+
+    #[test]
+    fn a_content_tag_drops_a_registry_with_a_port() {
+        assert_eq!(short_name("localhost:5000/zeabur"), "zeabur");
+        assert_eq!(short_name("localhost/zeabur"), "zeabur");
         assert_eq!(
-            short_name("ghcr.io/zeabur-oss/zeabur"),
-            "ghcr.io/zeabur-oss/zeabur"
+            short_name(&format!("{REGISTRY_HOST}/zeabur-builder/builder")),
+            "zeabur-builder/builder"
         );
     }
 
