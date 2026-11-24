@@ -35,12 +35,12 @@
         "rust-analyzer-src": "rust-analyzer-src"
       },
       "locked": {
-        "lastModified": 1790858958,
-        "narHash": "sha256-am3DS8g9vyeQLKk9QQvmJoZLHGBUB1rtd6zVaGeq2Mc=",
-        "rev": "025bf5b6b0293c5ee3a3506a7e43ba64bc8bb1b7",
-        "revCount": 2805,
+        "lastModified": 1782900513,
+        "narHash": "sha256-GHrsl1+ysDFgmDQtQSqWS7TiYD2Q58VlwLvnf1+crJM=",
+        "rev": "16810aa8f4ad89ca480b1513774e8b6f485fe368",
+        "revCount": 2708,
         "type": "tarball",
-        "url": "https://api.flakehub.com/f/pinned/nix-community/fenix/0.1.2805%2Brev-025bf5b6b0293c5ee3a3506a7e43ba64bc8bb1b7/01a0f7fd-201c-7141-9966-113030740054/source.tar.gz"
+        "url": "https://api.flakehub.com/f/pinned/nix-community/fenix/0.1.2708%2Brev-16810aa8f4ad89ca480b1513774e8b6f485fe368/019f1d68-8b55-7783-bed1-d5926f21ae52/source.tar.gz"
       },
       "original": {
         "type": "tarball",
@@ -136,11 +136,11 @@
     "rust-analyzer-src": {
       "flake": false,
       "locked": {
-        "lastModified": 1790532271,
-        "narHash": "sha256-j8y/AO3AMDF9p+11aIDhnA21JnNj5PjvcejTI43vI8Q=",
+        "lastModified": 1782864348,
+        "narHash": "sha256-NVYhLbaefeIUftPlo3kS6qr0xd8eFJRodEiaHrvFKR4=",
         "owner": "rust-lang",
         "repo": "rust-analyzer",
-        "rev": "03fcb77246f2568adb0e9b2fa60d19c6cc1686f4",
+        "rev": "0d381ca097a8e0375a19387874d952c0a230ac4f",
         "type": "github"
       },
       "original": {
@@ -214,17 +214,17 @@
         ]
       },
       "locked": {
-        "lastModified": 1791166685,
-        "narHash": "sha256-ncvYESRSMGUNSs+gviiSKxJiyFd+CpBNlAAddgPGLjI=",
+        "lastModified": 1795474589,
+        "narHash": "sha256-Sj4K18Qtb+ibshlYWuI2XqnkNAQvFrsQAVwbKe5GWzU=",
         "owner": "sysprog21",
         "repo": "zhtw-mcp",
-        "rev": "5b385b3d66b1554f6f9ae036017ef06dd8ec0da6",
+        "rev": "37995816d042b58b3670a63fdd673cd556a2ce20",
         "type": "github"
       },
       "original": {
         "owner": "sysprog21",
         "repo": "zhtw-mcp",
-        "rev": "5b385b3d66b1554f6f9ae036017ef06dd8ec0da6",
+        "rev": "37995816d042b58b3670a63fdd673cd556a2ce20",
         "type": "github"
       }
     }

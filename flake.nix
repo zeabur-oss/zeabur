@@ -12,7 +12,7 @@
     # release tags, so it is pinned to a commit; bump it here, to a commit at least seven days old
     # (the same delay as crates and web packages), then `nix flake lock`.
     zhtw-mcp = {
-      url = "github:sysprog21/zhtw-mcp/5b385b3d66b1554f6f9ae036017ef06dd8ec0da6";
+      url = "github:sysprog21/zhtw-mcp/37995816d042b58b3670a63fdd673cd556a2ce20";
       inputs.nixpkgs.follows = "nixpkgs";
     };
     # Zeabur Catalog at a release tag, the same tag as zeabur-catalog-format in Cargo.toml (a test
