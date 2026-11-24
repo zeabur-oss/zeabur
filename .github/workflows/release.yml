@@ -206,6 +206,9 @@ jobs:
           rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal
           cargo install tauri-cli --version "=$TAURI_CLI" --locked
       - name: Build
+        env:
+          # The experience program's PostHog key, in tag builds only (docs/internal/releasing.md).
+          ZEABUR_TELEMETRY_KEY: ${{ startsWith(github.ref, 'refs/tags/v') && vars.POSTHOG_KEY || '' }}
         run: scripts/package-desktop.sh compile "$VERSION" "$OS" "$ARCH" dist
       # Signing logs in right before packaging, so the short-lived token is still valid.
       - if: matrix.os == 'windows' && vars.AZURE_CLIENT_ID != ''
