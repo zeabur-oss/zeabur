@@ -7,6 +7,7 @@ use std::time::Duration;
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::Serialize;
 
+use super::cluster::REGISTRY_HOST;
 use super::{DevCluster, ZOT_CA, ZOT_HOST, ZOT_IP, catalog, cluster, images};
 use crate::process::wait_for;
 
@@ -158,11 +159,11 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
     let tag = images::joint_tag(&ids);
     let mut tagged = Vec::new();
     for (image, name) in built.iter().zip(BUILDER_IMAGES) {
-        let image_tag = format!("zeabur-builder/{name}:{tag}");
+        let image_tag = format!("{REGISTRY_HOST}/zeabur-builder/{name}:{tag}");
         images::tag(dev, image, &image_tag)?;
         tagged.push(image_tag);
     }
-    images::import(dev, &tagged)?;
+    images::push(dev, &tagged)?;
 
     let chart = src.join("deploy/chart");
     // Helm installs the CRDs only on the first install.
@@ -190,7 +191,9 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
     ] {
         helm = helm
             .arg("--set")
-            .arg(format!("{value}.repository=zeabur-builder/{image}"))
+            .arg(format!(
+                "{value}.repository={REGISTRY_HOST}/zeabur-builder/{image}"
+            ))
             .arg("--set")
             .arg(format!("{value}.tag={tag}"));
     }

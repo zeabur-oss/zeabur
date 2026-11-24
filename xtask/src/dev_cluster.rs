@@ -68,8 +68,8 @@ pub(crate) struct Up {
     /// `xtask/pins/zeabur-builder` fetched from `ZEABUR_BUILDER_GIT`.
     #[arg(long, value_name = "DIR", env = "ZEABUR_BUILDER_SRC")]
     pub(crate) builder_src: Option<PathBuf>,
-    /// Run this Zeabur image (a local image is imported, any other is pulled) instead of one
-    /// built from this checkout; Zeabur Proxy stays off.
+    /// Run this Zeabur image (a local image is pushed to the cluster's registry, any other is
+    /// pulled) instead of one built from this checkout; Zeabur Proxy stays off.
     #[arg(long, value_name = "IMAGE", value_parser = clap::builder::NonEmptyStringValueParser::new())]
     pub(crate) zeabur_image: Option<String>,
     /// Install this chart (directory, `.tgz` or `oci://`) instead of `deploy/chart/zeabur`.
@@ -105,8 +105,8 @@ impl DevCluster {
         self.state.join("identityctl")
     }
 
-    /// A tool pointed at this cluster's kubeconfig. No attestation manifests in built images:
-    /// k3d's import of a multi-manifest index can fail on the node.
+    /// A tool pointed at this cluster's kubeconfig. No attestation manifests in built images: one
+    /// plain image per tag.
     fn cmd(&self, program: impl AsRef<std::ffi::OsStr>) -> Cmd {
         Cmd::new(program)
             .env("KUBECONFIG", self.kubeconfig())
@@ -250,11 +250,11 @@ pub(crate) fn up(options: &Up) -> Result<(), String> {
     let chart = resolve_chart(&dev, options.zeabur_chart.as_deref())?;
 
     cluster::create(&dev)?;
-    let mut import = vec![images::BUSYBOX.to_owned()];
+    let mut push = vec![images::BUSYBOX.to_owned()];
     if let Some(built) = &built {
-        import.extend(built.import.iter().cloned());
+        push.extend(built.push.iter().cloned());
     }
-    images::import(&dev, &import)?;
+    images::push(&dev, &push)?;
     cluster::traefik(&dev)?;
     let Some(built) = built else {
         dev.write("profile", "bare\n")?;
