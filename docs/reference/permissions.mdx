@@ -121,7 +121,7 @@ zeabur-identityctl invite --username alice --admin
 zeabur-identityctl account-type alice admin     # back to a regular account: regular
 ```
 
-Only the account type can grant the `admins` group. For details, see [Admin accounts](https://oss.zeabur.com/docs/identity/managing-users#admin-accounts) in the Zeabur Identity docs.
+Only the account type can grant the `admins` group. For details, see [Admin accounts](https://oss.zeabur.com/docs/identity/users/admin-sessions#create-and-switch-admins) in the Zeabur Identity docs.
 
 ## How long sign-in lasts
 
@@ -163,7 +163,7 @@ If the config file or a key is missing, Zeabur Identity uses the default.
 
 With AAL3 enabled, admin accounts can only use passkeys that don't sync to other devices, such as security keys or passkeys stored on a single device. Zeabur Identity rejects synced passkeys stored in services such as iCloud Keychain or Google Password Manager at sign-in. The interface explains that the passkey syncs and that admin accounts require a security key or a passkey stored on a single device. Anyone already signed in with a synced passkey is signed out at the next token refresh.
 
-Before enabling AAL3, make sure every admin has a device-bound passkey. Zeabur OSS won't let you enable it until you have one yourself, so you can't lock yourself out. Other admins without one won't be able to sign in after you enable it. Generate a new Zeabur Identity setup link for each of them so they can register a security key. For steps to check each passkey, see [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins) in the Zeabur Identity docs.
+Before enabling AAL3, make sure every admin has a device-bound passkey. Zeabur OSS won't let you enable it until you have one yourself, so you can't lock yourself out. Other admins without one won't be able to sign in after you enable it. Generate a new Zeabur Identity setup link for each of them so they can register a security key. For steps to check each passkey, see [AAL3 for admins](https://oss.zeabur.com/docs/identity/users/admin-sessions#require-device-bound-passkeys-for-admins-aal3) in the Zeabur Identity docs.
 
 ## Using kubectl
 
@@ -174,7 +174,7 @@ By default, kubelogin stores refresh tokens in `~/.kube/cache/oidc-login`. To av
 - `--token-cache-storage=keyring`: Store tokens in the operating system's keyring.
 - `--token-cache-storage=none`: Store nothing and open the sign-in page for every kubectl command.
 
-For steps to configure kubeconfig, see [Get started](https://oss.zeabur.com/docs/identity/get-started#7-set-up-kubectl-on-your-computer) in the Zeabur Identity docs.
+For steps to configure kubeconfig, see [Get started](https://oss.zeabur.com/docs/identity/get-started/quickstart#configure-kubectl-on-your-computer) in the Zeabur Identity docs.
 
 ## Checking permissions with kubectl
 

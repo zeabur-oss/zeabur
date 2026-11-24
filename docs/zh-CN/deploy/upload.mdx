@@ -123,7 +123,7 @@ kubectl -n shop patch build site --type=merge \
   -p '{"spec":{"source":{"archive":{"digest":"sha256:<oras 输出的 digest>"}}}}'
 ```
 
-上传新版本时，更换 annotation 的值、推送新内容，再修改 `digest`。网页和 `zeaburctl up` 会应用 `.gitignore`、`.dockerignore` 和大小限制，自行打包时需要自行排除不需要的文件。推送格式和限制见 [Zeabur Builder 的说明](https://oss.zeabur.com/docs/builder/archive-source)。
+上传新版本时，更换 annotation 的值、推送新内容，再修改 `digest`。网页和 `zeaburctl up` 会应用 `.gitignore`、`.dockerignore` 和大小限制，自行打包时需要自行排除不需要的文件。推送格式和限制见 [Zeabur Builder 的说明](https://oss.zeabur.com/docs/builder/builds/archive-source)。
 
 ## 上传卡住时
 

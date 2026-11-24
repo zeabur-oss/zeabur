@@ -121,7 +121,7 @@ zeabur-identityctl invite --username alice --admin
 zeabur-identityctl account-type alice admin     # 改回普通账号：regular
 ```
 
-`admins` 组只能通过账号类型获得。详情见 Zeabur Identity 的[管理员账号](https://oss.zeabur.com/docs/identity/managing-users#admin-accounts)。
+`admins` 组只能通过账号类型获得。详情见 Zeabur Identity 的[管理员账号](https://oss.zeabur.com/zh-CN/docs/identity/users/admin-sessions#创建和切换管理员)。
 
 ## 登录有效期
 
@@ -163,7 +163,7 @@ kubectl -n zeabur-identity patch configmap zeabur-identity-settings --type merge
 
 启用 AAL3 后，管理员账号只能使用不会同步到其他设备的通行密钥，例如安全密钥，或仅保存在一台设备上的通行密钥。登录时，Zeabur Identity 会拒绝保存在 iCloud 钥匙串、Google 密码管理工具等服务中、会同步的通行密钥。界面会明确提示该通行密钥会同步，管理员账号需要使用安全密钥或仅保存在一台设备上的通行密钥。已经通过会同步的通行密钥登录的人，会在下次刷新令牌时退出登录。
 
-启用前，先确认每位管理员都有不会同步的通行密钥。如果你自己没有，Zeabur 开源版不会允许你启用，以免将自己锁在账号外。启用后，其他没有此类通行密钥的管理员将无法登录，需要为他们各生成一条新的 Zeabur Identity 设置链接，让他注册安全密钥。检查每把通行密钥的方法见 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/docs/identity/managing-users#aal3-for-admins)。
+启用前，先确认每位管理员都有不会同步的通行密钥。如果你自己没有，Zeabur 开源版不会允许你启用，以免将自己锁在账号外。启用后，其他没有此类通行密钥的管理员将无法登录，需要为他们各生成一条新的 Zeabur Identity 设置链接，让他注册安全密钥。检查每把通行密钥的方法见 Zeabur Identity 的 [AAL3 for admins](https://oss.zeabur.com/zh-CN/docs/identity/users/admin-sessions#限制管理员使用设备绑定的通行密钥aal3)。
 
 ## 使用 kubectl 操作
 
@@ -174,7 +174,7 @@ kubelogin 默认将 refresh token 保存在 `~/.kube/cache/oidc-login`。如果�
 - `--token-cache-storage=keyring`：保存到操作系统的钥匙串中。
 - `--token-cache-storage=none`：不保存任何内容，每次运行 kubectl 命令都会打开登录页。
 
-配置 kubeconfig 的步骤见 Zeabur Identity 的[入门](https://oss.zeabur.com/docs/identity/get-started#7-set-up-kubectl-on-your-computer)。
+配置 kubeconfig 的步骤见 Zeabur Identity 的[入门](https://oss.zeabur.com/zh-CN/docs/identity/get-started/quickstart#配置你电脑上的-kubectl)。
 
 ## 使用 kubectl 确认权限
 

@@ -37,7 +37,7 @@
 //!
 //! [helm-values]: https://helm.sh/docs/chart_template_guide/values_files/
 //! [helm-upgrade]: https://helm.sh/docs/helm/helm_upgrade/
-//! [k3s-helm]: https://docs.k3s.io/helm
+//! [k3s-helm]: https://docs.k3s.io/add-ons/helm
 //! [flux-helmrelease]: https://fluxcd.io/flux/components/helm/helmreleases/
 //! [flux-ocirepository]: https://fluxcd.io/flux/components/source/ocirepositories/
 //! [argocd-helm]: https://argo-cd.readthedocs.io/en/stable/user-guide/helm/
