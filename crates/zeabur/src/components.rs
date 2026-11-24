@@ -25,6 +25,7 @@ use zeabur_api::cluster::components::{
 use zeabur_api::views::CapabilityList;
 use zeabur_catalog::InstallSource;
 use zeabur_core::problem::Problem;
+use zeabur_kube::k8s_openapi::jiff::SignedDuration;
 use zeabur_kube::{
     Cluster as _, ClusterEndpoint, ObjectTarget, Preconditions, UserClient, WriteBody, WriteRequest,
 };
@@ -73,18 +74,12 @@ struct InstallArgs {
     revoke: Option<String>,
 }
 
+/// A time limit such as `90s`, `10m` or `1h30m`, in jiff's friendly format.
 fn duration(text: &str) -> Result<Duration, String> {
-    let (number, unit) = text.split_at(text.len().saturating_sub(1));
-    let seconds = match unit {
-        "s" => 1,
-        "m" => 60,
-        "h" => 3600,
-        _ => return Err("end it with s, m or h, such as 10m".to_owned()),
-    };
-    let number: u64 = number
-        .parse()
-        .map_err(|_number| "start it with a number".to_owned())?;
-    Ok(Duration::from_secs(number.saturating_mul(seconds)))
+    text.parse::<SignedDuration>()
+        .ok()
+        .and_then(|limit| Duration::try_from(limit).ok())
+        .ok_or_else(|| format!("`{text}` is not a time limit, such as 90s, 10m or 1h"))
 }
 
 pub(crate) async fn run(args: &ComponentsArgs) -> Result<(), String> {
@@ -404,11 +399,25 @@ mod tests {
     }
 
     #[test]
-    fn a_time_limit_ends_in_seconds_minutes_or_hours() {
-        assert_eq!(duration("90s"), Ok(Duration::from_secs(90)));
-        assert_eq!(duration("10m"), Ok(Duration::from_secs(600)));
-        assert_eq!(duration("1h"), Ok(Duration::from_secs(3600)));
-        for bad in ["", "10", "m", "ten m", "-5m"] {
+    fn a_time_limit_is_a_duration() {
+        for (text, want) in [
+            ("90s", Duration::from_secs(90)),
+            ("10m", Duration::from_secs(600)),
+            ("1h", Duration::from_secs(3600)),
+            ("0s", Duration::ZERO),
+        ] {
+            assert_eq!(duration(text), Ok(want), "{text}");
+        }
+        for bad in [
+            "",
+            "10",
+            "m",
+            "ten m",
+            "-5m",
+            "1d",
+            "1x",
+            "99999999999999999999h",
+        ] {
             assert!(duration(bad).is_err(), "{bad}");
         }
     }
