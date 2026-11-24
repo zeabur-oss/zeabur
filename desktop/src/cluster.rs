@@ -7,7 +7,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Mutex, PoisonError};
 
-use zeabur_local::{Kubeconfig, Running, Settings};
+use zeabur_local::telemetry::{Connection, Local};
+use zeabur_local::{Kubeconfig, Running, ServiceError, Settings};
 
 use crate::env::ChildEnv;
 use crate::output;
@@ -25,9 +26,23 @@ pub(crate) struct Clusters {
     targets: Mutex<HashMap<String, (u64, Target)>>,
     next: AtomicU64,
     running: Mutex<HashMap<String, Running>>,
+    /// The experience program: how each start connected.
+    telemetry: Local,
 }
 
 impl Clusters {
+    pub(crate) fn new(telemetry: Local) -> Self {
+        Self {
+            telemetry,
+            ..Self::default()
+        }
+    }
+
+    /// Waits a moment for the queued usage events to be sent. Call it before the app exits.
+    pub(crate) async fn close(&self) {
+        self.telemetry.close().await;
+    }
+
     pub(crate) fn set_target(&self, label: &str, target: Target) {
         self.targets
             .lock()
@@ -46,10 +61,17 @@ impl Clusters {
             .ok_or_else(|| "This window has no cluster to open.".to_owned())?;
         self.stop(label);
         let own: Vec<(OsString, OsString)> = std::env::vars_os().collect();
-        let kubeconfig = read(&target, &env.changed_from(&own))?;
-        let running = zeabur_local::start_from(kubeconfig, &target.context, Settings::default())
-            .await
-            .map_err(|e| e.to_string())?;
+        let kubeconfig = read(&target, &env.changed_from(&own)).inspect_err(|_| {
+            self.telemetry.connected(Connection::Other);
+        })?;
+        let started =
+            zeabur_local::start_from(kubeconfig, &target.context, Settings::default()).await;
+        self.telemetry.connected(
+            started
+                .as_ref()
+                .map_or_else(ServiceError::connection, |_| Connection::Connected),
+        );
+        let running = started.map_err(|e| e.to_string())?;
         let url = running.url().to_owned();
         let targets = self.targets.lock().unwrap_or_else(PoisonError::into_inner);
         if lookup(&targets, label).is_none_or(|(now, _)| now != id) {
@@ -139,6 +161,10 @@ fn read(target: &Target, vars: &[(String, String)]) -> Result<Kubeconfig, String
 
 #[cfg(test)]
 mod tests {
+    use std::sync::Arc;
+
+    use zeabur_local::telemetry::{Show, Switch};
+
     use super::*;
 
     #[test]
@@ -156,6 +182,29 @@ mod tests {
         clusters.set_target("cluster-a", target);
         assert!(id(&clusters).is_some());
         assert_ne!(id(&clusters), first);
+    }
+
+    #[test]
+    fn a_start_reports_how_it_connected() {
+        let shown = Arc::new(Mutex::new(Vec::new()));
+        let log = Arc::clone(&shown);
+        let show: Show = Arc::new(move |body| log.lock().unwrap().push(body.to_owned()));
+        let telemetry = Local::with(Switch::Debug, &PathBuf::from("/nonexistent"), show);
+        let clusters = Clusters::new(telemetry);
+        clusters.set_target(
+            "cluster-a",
+            Target {
+                file: PathBuf::from("/nonexistent"),
+                context: "c".to_owned(),
+            },
+        );
+        drop(tauri::async_runtime::block_on(
+            clusters.start("cluster-a", &ChildEnv::default()),
+        ));
+        let body = shown.lock().unwrap().remove(0);
+        let body: serde_json::Value = serde_json::from_str(&body).unwrap();
+        assert_eq!(body["batch"][0]["event"], "cluster_connected");
+        assert_eq!(body["batch"][0]["properties"]["result"], "other");
     }
 
     #[test]

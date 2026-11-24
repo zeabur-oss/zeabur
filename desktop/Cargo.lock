@@ -6516,11 +6516,14 @@ version = "0.3.0"
 dependencies = [
  "axum",
  "kube",
+ "serde",
+ "serde-saphyr",
  "thiserror 2.0.21",
  "tokio",
  "zeabur-api",
  "zeabur-core",
  "zeabur-kube",
+ "zeabur-telemetry",
  "zeabur-ui",
 ]
 

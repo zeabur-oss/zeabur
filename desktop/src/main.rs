@@ -281,7 +281,7 @@ fn setup(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
         saved: Mutex::new(saved),
         env: RwLock::new(ChildEnv::from_process()),
         shell: Mutex::new(ShellRead::Pending),
-        clusters: cluster::Clusters::default(),
+        clusters: cluster::Clusters::new(telemetry()),
     });
 
     // A login shell can take seconds; the window opens without waiting and reloads on the
@@ -302,6 +302,17 @@ fn setup(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
     chrome::show_chooser(tauri_app.handle())?;
     update::check_on_start(tauri_app.handle());
     Ok(())
+}
+
+/// The experience program as `config.yaml` and the environment set it, the same as for
+/// `zeaburctl ui`.
+fn telemetry() -> zeabur_local::telemetry::Local {
+    let show: zeabur_local::telemetry::Show =
+        std::sync::Arc::new(|body| output::warn(&format!("telemetry: {body}")));
+    zeabur_local::telemetry::Local::from_env(show).unwrap_or_else(|error| {
+        output::warn(&format!("{error}; no usage data is sent until it is fixed"));
+        zeabur_local::telemetry::Local::default()
+    })
 }
 
 fn main() -> ExitCode {
@@ -349,6 +360,9 @@ fn main() -> ExitCode {
                 } = &event
                 {
                     handle.state::<App>().clusters.closed(label);
+                }
+                if let (tauri::RunEvent::Exit, Some(app)) = (&event, handle.try_state::<App>()) {
+                    tauri::async_runtime::block_on(app.clusters.close());
                 }
                 chrome::on_run_event(handle, event);
             });
