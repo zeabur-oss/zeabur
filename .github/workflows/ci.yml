@@ -241,7 +241,7 @@ jobs:
     runs-on: instabox-small
     timeout-minutes: 10
     steps:
-      - uses: zeabur-oss/website/.github/actions/docs-check@2f5a9b47e8c236f28052b4789c607634d95e45af # main
+      - uses: zeabur-oss/website/.github/actions/docs-check@8026171082841ce8a375977cc803625bf646871c # main
 
   # The check rulesets require.
   ok:
