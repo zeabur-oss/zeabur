@@ -123,7 +123,7 @@ kubectl -n shop patch build site --type=merge \
   -p '{"spec":{"source":{"archive":{"digest":"sha256:<oras digest printed by oras>"}}}}'
 ```
 
-To upload a new version, change the annotation value, push the new content, then update `digest`. The web interface and `zeaburctl up` apply `.gitignore`, `.dockerignore`, and size limits for you. When packaging the folder yourself, exclude files you don't need. See the [Zeabur Builder documentation](https://oss.zeabur.com/docs/builder/archive-source) for the upload format and limits.
+To upload a new version, change the annotation value, push the new content, then update `digest`. The web interface and `zeaburctl up` apply `.gitignore`, `.dockerignore`, and size limits for you. When packaging the folder yourself, exclude files you don't need. See the [Zeabur Builder documentation](https://oss.zeabur.com/docs/builder/builds/archive-source) for the upload format and limits.
 
 ## When an upload gets stuck
 
