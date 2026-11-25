@@ -155,7 +155,7 @@ export function GateNote({ gate: g }: { gate: Gate }) {
   )
 }
 
-/** Whether any of `pages` is open, and whether that is still being asked. Unknown counts as no. */
+/** Whether any of `pages` is open, and whether that is still being asked. An answer not yet known, or that the server could not give, counts as no. */
 export function usePages(pages: Page[]): { open: boolean; pending: boolean } {
   const queries = useQueries({ queries: pages.map(pageQuery) })
   const answers: Answers = {}
