@@ -318,6 +318,7 @@ fn backups_of(
             }
         })
         .collect();
+    let stored = runs.iter().any(Run::stored);
     newest(&mut runs, 20);
     // The operator has seen this spec, restarted the members with the backup agents and given
     // them the storage: `PBMReady` is "PBMConfigurationIsUpToDate".
@@ -338,6 +339,7 @@ fn backups_of(
         store,
         schedules,
         runs,
+        stored,
         ready,
         recovery_window: None,
         archive_failure: None,

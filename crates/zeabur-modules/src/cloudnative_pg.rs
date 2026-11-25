@@ -207,15 +207,7 @@ fn recovery_window(
     store: Option<&DynamicObject>,
 ) -> Option<RecoveryWindow> {
     true_since(cluster, "ContinuousArchiving")?;
-    let server = plugin(cluster)
-        .and_then(|p| p.pointer("/parameters/serverName"))
-        .and_then(serde_json::Value::as_str)
-        .map(str::to_owned)
-        .or_else(|| cluster.metadata.name.clone())?;
-    let first = store?
-        .data
-        .pointer("/status/serverRecoveryWindow")?
-        .get(&server)?
+    let first = server_window(cluster, store?)?
         .get("firstRecoverabilityPoint")?
         .as_str()?
         .parse()
@@ -226,6 +218,32 @@ fn recovery_window(
     Some(RecoveryWindow {
         earliest_at: first,
         lag_seconds,
+    })
+}
+
+/// The `ObjectStore`'s recovery window of the `Cluster`'s server: the plugin's `serverName`, else
+/// the `Cluster`'s name.
+fn server_window<'a>(
+    cluster: &DynamicObject,
+    store: &'a DynamicObject,
+) -> Option<&'a serde_json::Value> {
+    let server = plugin(cluster)
+        .and_then(|p| p.pointer("/parameters/serverName"))
+        .and_then(serde_json::Value::as_str)
+        .or(cluster.metadata.name.as_deref())?;
+    store
+        .data
+        .pointer("/status/serverRecoveryWindow")?
+        .get(server)
+}
+
+/// The store holds a backup of the `Cluster`: its recovery window has a first point or a last
+/// successful backup [barman-cloud-api].
+fn store_holds_backup(cluster: &DynamicObject, store: &DynamicObject) -> bool {
+    server_window(cluster, store).is_some_and(|w| {
+        ["firstRecoverabilityPoint", "lastSuccessfulBackupTime"]
+            .iter()
+            .any(|key| w.get(key).is_some_and(|t| !t.is_null()))
     })
 }
 
@@ -367,9 +385,12 @@ pub fn database(
     let mine = |o: &&DynamicObject| text(o, "/spec/cluster/name").as_deref() == Some(&name);
     let scheduled: Vec<DynamicObject> = scheduled.iter().filter(mine).cloned().collect();
     let backups: Vec<DynamicObject> = backups.iter().filter(mine).cloned().collect();
-    let found = findings_limited(namespace, &scheduled, &backups, 20);
-    let state = state(cluster, members, ready);
+    let mut found = all_findings(namespace, &scheduled, &backups);
     let in_use = plugin_store(cluster).and_then(|wanted| named(&wanted));
+    let has_backup = found.runs.iter().any(Run::stored)
+        || in_use.is_some_and(|s| store_holds_backup(cluster, s));
+    newest(&mut found.runs, 20);
+    let state = state(cluster, members, ready);
     let store_created = in_use
         .and_then(|s| s.metadata.creation_timestamp.as_ref())
         .map(|t| t.0);
@@ -424,6 +445,7 @@ pub fn database(
             store,
             schedules: found.schedules,
             runs: found.runs,
+            stored: has_backup,
             recovery_window,
             archive_failure,
         },
@@ -443,14 +465,16 @@ pub fn findings(
     scheduled: &[DynamicObject],
     backups: &[DynamicObject],
 ) -> Findings {
-    findings_limited(namespace, scheduled, backups, 10)
+    let mut out = all_findings(namespace, scheduled, backups);
+    newest(&mut out.runs, 10);
+    out
 }
 
-fn findings_limited(
+/// Every schedule and run; the runs unsorted.
+fn all_findings(
     namespace: &str,
     scheduled: &[DynamicObject],
     backups: &[DynamicObject],
-    limit: usize,
 ) -> Findings {
     let mut out = Findings::default();
     for schedule in scheduled {
@@ -499,7 +523,6 @@ fn findings_limited(
                 .flatten(),
         });
     }
-    newest(&mut out.runs, limit);
     out
 }
 
@@ -840,5 +863,55 @@ mod tests {
         let store = db.backups.store.unwrap();
         assert_eq!(store.name, "pg-backups");
         assert!(!store.in_use);
+    }
+
+    #[test]
+    fn a_backup_older_than_the_runs_shown_or_only_in_the_store_is_still_stored() {
+        let pg = object(serde_json::json!({
+            "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+            "metadata": {"name": "pg", "namespace": "shop"},
+            "spec": {"plugins": [{"name": "barman-cloud.cloudnative-pg.io", "isWALArchiver": true,
+                                  "parameters": {"barmanObjectName": "pg-backups"}}]}
+        }));
+        let run = |n: u32, phase: &str| {
+            object(serde_json::json!({
+                "apiVersion": "postgresql.cnpg.io/v1", "kind": "Backup",
+                "metadata": {"name": format!("pg-{n}"), "namespace": "shop"},
+                "spec": {"cluster": {"name": "pg"}},
+                "status": {"phase": phase,
+                           "stoppedAt": format!("2026-10-{:02}T03:00:00Z", n)}
+            }))
+        };
+        let mut runs: Vec<DynamicObject> = (2..=25).map(|n| run(n, "failed")).collect();
+        runs.push(run(1, "completed"));
+        let store = |status: serde_json::Value| {
+            object(serde_json::json!({
+                "apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore",
+                "metadata": {"name": "pg-backups", "namespace": "shop"},
+                "status": status
+            }))
+        };
+        let empty = store(serde_json::json!({}));
+        let db = database("shop", &pg, std::slice::from_ref(&empty), &[], &runs);
+        assert_eq!(db.backups.runs.len(), 20);
+        assert!(db.backups.runs.iter().all(|r| r.outcome == Outcome::Failed));
+        assert!(db.backups.stored);
+
+        let failed: Vec<DynamicObject> = (2..=25).map(|n| run(n, "failed")).collect();
+        assert!(
+            !database("shop", &pg, std::slice::from_ref(&empty), &[], &failed)
+                .backups
+                .stored
+        );
+        let holding = store(serde_json::json!({"serverRecoveryWindow": {
+            "pg": {"lastSuccessfulBackupTime": "2026-09-01T03:00:00Z"}}}));
+        assert!(database("shop", &pg, &[holding], &[], &[]).backups.stored);
+        let other_server = store(serde_json::json!({"serverRecoveryWindow": {
+            "pg-old": {"firstRecoverabilityPoint": "2026-09-01T03:00:00Z"}}}));
+        assert!(
+            !database("shop", &pg, &[other_server], &[], &[])
+                .backups
+                .stored
+        );
     }
 }

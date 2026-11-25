@@ -38,7 +38,7 @@ use zeabur_kube::DynamicObject;
 use zeabur_model::kernel::names::LABEL_DATABASE as DATABASE_LABEL;
 use zeabur_model::readiness::{self, Status};
 
-use crate::backups::{Outcome, Schedule, Target, TargetKind, newest};
+use crate::backups::{Outcome, Run, Schedule, Target, TargetKind, newest};
 use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
 use crate::{Module, Read, text};
 
@@ -190,7 +190,11 @@ fn backups_of(
         .clone()
         .or_else(|| policy.and_then(|p| p.metadata.name.clone()))
     else {
-        return Backups::default();
+        // A backup taken before the policy went is still in its bucket.
+        return Backups {
+            stored: text(cluster, "/status/backup/time").is_some(),
+            ..Backups::default()
+        };
     };
     let config = |pointer: &str| policy.and_then(|p| text(p, &format!("/spec/jobConfig{pointer}")));
     let store = Store {
@@ -220,6 +224,7 @@ fn backups_of(
         .into_iter()
         .collect();
     let mut runs = databases::job_runs(MODULE.id, name, jobs, &[format!("moco-backup-{name}")]);
+    let stored = runs.iter().any(Run::stored) || text(cluster, "/status/backup/time").is_some();
     newest(&mut runs, 20);
     // The newest backup's binary logs are not in the bucket yet, so it restores to the time of
     // its dump, not the time the Job finished.
@@ -240,6 +245,7 @@ fn backups_of(
         store: Some(store),
         schedules,
         runs,
+        stored,
         recovery_window: None,
         archive_failure: None,
     }
@@ -542,5 +548,13 @@ mod tests {
         assert_eq!(store.secret.as_deref(), Some("mysql-backups-s3"));
         assert!(!store.in_use);
         assert!(backups.schedules[0].paused);
+    }
+
+    #[test]
+    fn the_last_backup_time_says_the_bucket_holds_a_backup_after_its_jobs_are_gone() {
+        let backed_up = cluster(&serde_json::json!({"backup": {"time": "2026-09-01T03:00:00Z"}}));
+        assert!(database("shop", &backed_up, &[], &[]).backups.stored);
+        let never = cluster(&serde_json::json!({"backup": {"time": null}}));
+        assert!(!database("shop", &never, &[], &[]).backups.stored);
     }
 }

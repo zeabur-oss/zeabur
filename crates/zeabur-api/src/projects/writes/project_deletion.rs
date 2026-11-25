@@ -3,8 +3,8 @@
 //!
 //! The plan reads as the person: the Namespace, the objects in it, the database objects of each
 //! operator this build knows, and the `StorageClass`es and the bound PersistentVolumes (for what
-//! happens to the data), and the project's backups with the S3 endpoint each writes to (the
-//! `databases` and `backups` routes' reads).
+//! happens to the data), and the backups a store holds of the project, with the S3 endpoint of
+//! each store: the `databases` route's read, K8up's `Snapshot`s and Velero's `Backup`s.
 //! A read the person may not make leaves its part out; a refused read of database objects is told
 //! as a right the person lacks.
 //!
@@ -28,8 +28,7 @@ use zeabur_kube::k8s_openapi::api::storage::v1::StorageClass;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _, ResourceRef, WriteRequest};
 use zeabur_modules::{
-    Reading, backups, cloudnative_pg, dragonfly, k8up, mariadb_operator, moco, percona_mongodb,
-    velero,
+    Reading, cloudnative_pg, dragonfly, k8up, mariadb_operator, moco, percona_mongodb, velero,
 };
 use zeabur_plan::terminal::{self as plans, ToolsScope};
 use zeabur_plan::{
@@ -281,11 +280,14 @@ async fn databases(
     Ok(out)
 }
 
-/// The project's backups that exist (a run that stored one, [`stored`]): a database's, once per
-/// store it may be in (none when no store could be read, so an unread store never counts as kept
-/// outside); a volume's K8up backups, once per endpoint of each K8up schedule that covers it (a
-/// run does not name its schedule); the project's own Velero backups. A refused read leaves its
-/// backups out, and its right is named in `unreadable`.
+/// The project's backups that a store holds: a database's ([`Backups::stored`]), once per store
+/// it may be in (none when no store could be read, so an unread store never counts as kept
+/// outside); a volume's, from K8up's `Snapshot`s, once per claim and endpoint, also when its
+/// schedule is gone ([`k8up::stored`]); the project's own, from every Velero `Backup` that covers
+/// it ([`velero::stored`]). A refused read leaves its backups out, and its right is named in
+/// `unreadable`.
+///
+/// [`Backups::stored`]: zeabur_modules::databases::Backups::stored
 async fn backups(
     cluster: &dyn Cluster,
     project: &str,
@@ -303,10 +305,7 @@ async fn backups(
                 .iter()
                 .map(|u| refused_list(u, Some(project))),
         );
-        for database in databases.items {
-            if !database.backups.runs.iter().any(stored) {
-                continue;
-            }
+        for database in databases.items.into_iter().filter(|d| d.backups.stored) {
             let stores: Vec<BackupStore> = if database.backups.endpoints.is_empty() {
                 vec![BackupStore::Unknown]
             } else {
@@ -324,66 +323,39 @@ async fn backups(
             }));
         }
     }
-    let Some(found) = allowed(
-        crate::projects::backups::read(cluster, &[], project).await,
-        unreadable,
-    )?
-    else {
-        return Ok(out);
-    };
-    unreadable.extend(found.unreadable.iter().map(|u| {
-        let velero = u.resource.ends_with(".velero.io");
-        refused_list(u, (!velero).then_some(project))
-    }));
-    let run_of = |provider: &str, target: &backups::Target| {
-        found
-            .runs
-            .iter()
-            .chain(found.coverage.iter().filter_map(|c| c.last_run.as_ref()))
-            .any(|r| r.provider == provider && r.targets.contains(target) && stored(r))
-    };
-    for schedule in found
-        .schedules
-        .iter()
-        .filter(|s| s.provider == k8up::MODULE.id)
-    {
-        for target in &schedule.targets {
-            let backup = ProjectBackup {
-                kind: BackupKind::Volume,
-                name: target.name.clone(),
-                store: schedule
-                    .endpoint
-                    .clone()
-                    .map_or(BackupStore::Unknown, BackupStore::Endpoint),
-            };
-            if target.kind == backups::TargetKind::Volume
-                && run_of(k8up::MODULE.id, target)
-                && !out.contains(&backup)
-            {
-                out.push(backup);
-            }
+    let snapshots = crate::cluster::modules::read_in(cluster, &k8up::SNAPSHOTS, Some(project))
+        .await
+        .map_err(|e| ApiError::from(e.into_problem(&format!("K8up snapshots of {project}"))))?;
+    match snapshots {
+        Reading::Objects(snapshots) => {
+            out.extend(k8up::stored(&snapshots).into_iter().map(|s| {
+                ProjectBackup {
+                    kind: BackupKind::Volume,
+                    name: s.claim,
+                    store: s
+                        .endpoint
+                        .map_or(BackupStore::Unknown, BackupStore::Endpoint),
+                }
+            }));
         }
+        Reading::NotInstalled => {}
+        Reading::Refused(refusal) => unreadable.push(refused_list(&refusal, Some(project))),
     }
-    let namespace = backups::Target {
-        kind: backups::TargetKind::Namespace,
-        name: project.to_owned(),
-    };
-    if run_of(velero::MODULE.id, &namespace) {
-        out.push(ProjectBackup {
-            kind: BackupKind::Project,
-            name: project.to_owned(),
-            store: BackupStore::Unknown,
-        });
+    let velero = crate::cluster::modules::read_in(cluster, &velero::BACKUPS, None)
+        .await
+        .map_err(|e| ApiError::from(e.into_problem("Velero backups")))?;
+    match velero {
+        Reading::Objects(backups) if velero::stored(project, &backups) => {
+            out.push(ProjectBackup {
+                kind: BackupKind::Project,
+                name: project.to_owned(),
+                store: BackupStore::Unknown,
+            });
+        }
+        Reading::Objects(_) | Reading::NotInstalled => {}
+        Reading::Refused(refusal) => unreadable.push(refused_list(&refusal, None)),
     }
     Ok(out)
-}
-
-/// Whether a run left a backup in its store: it succeeded, or some items failed.
-const fn stored(run: &backups::Run) -> bool {
-    matches!(
-        run.outcome,
-        backups::Outcome::Succeeded | backups::Outcome::PartiallyFailed
-    )
 }
 
 /// The `list` right a partial read was refused, from its resource

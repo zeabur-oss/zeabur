@@ -93,6 +93,12 @@ impl Run {
     pub fn time(&self) -> Option<Timestamp> {
         self.finished_at.or(self.started_at)
     }
+
+    /// It left a backup in its store: it succeeded, or some items failed.
+    #[must_use]
+    pub const fn stored(&self) -> bool {
+        matches!(self.outcome, Outcome::Succeeded | Outcome::PartiallyFailed)
+    }
 }
 
 /// One backup schedule.

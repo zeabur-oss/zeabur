@@ -159,6 +159,10 @@ pub struct Backups {
     pub schedules: Vec<Schedule>,
     /// Its backups, newest first.
     pub runs: Vec<Run>,
+    /// A store holds a backup of it: one of all its runs, not only those in `runs`, stored one,
+    /// or the store says it holds one. Not sent: deleting a project reads it.
+    #[serde(skip)]
+    pub stored: bool,
     /// A backup can start now: the database runs with its store. False between setting up
     /// backups and the operator restarting the members with them.
     pub ready: bool,

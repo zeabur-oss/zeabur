@@ -29,7 +29,16 @@
 //! status here, so a restore that failed can still report `Completed` [k8up-folder-restore]; the
 //! files must be checked.
 //!
+//! # Stored backups
+//!
+//! A backup run syncs the `Snapshot` objects of its repository with the repository's snapshots:
+//! it adds new ones and deletes those no longer there. The objects have no owner, so they stay
+//! when the `Schedule` or the `Backup` goes [k8up-snapshots]. The repository is
+//! `s3:<endpoint>/<bucket>` for an S3 backend [k8up-backend]. They are the claims' backups that a
+//! store holds, whether or not a schedule still runs.
+//!
 //! [k8up-api]: https://docs.k8up.io/k8up/2.13/references/api-reference.html
+//! [k8up-backend]: https://github.com/k8up-io/k8up/blob/v2.16.1/api/v1/backend.go
 //! [k8up-snapshots]: https://github.com/k8up-io/k8up/blob/v2.16.1/restic/kubernetes/snapshots.go
 //! [k8up-restore]: https://docs.k8up.io/k8up/2.16/how-tos/restore.html
 //! [restic-restore]: https://restic.readthedocs.io/en/stable/050_restore.html
@@ -398,6 +407,49 @@ pub fn snapshots(
     out
 }
 
+/// A claim's backups in one repository, from its `Snapshot`s (see "Stored backups").
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct StoredBackup {
+    /// The claim.
+    pub claim: String,
+    /// The repository's S3 endpoint; absent for another backend.
+    pub endpoint: Option<String>,
+}
+
+/// The claims' backups that `Snapshot` objects list, once per claim and repository.
+#[must_use]
+pub fn stored(snapshots: &[DynamicObject]) -> Vec<StoredBackup> {
+    let mut out: Vec<StoredBackup> = Vec::new();
+    for snapshot in snapshots {
+        let repository = text(snapshot, "/spec/repository");
+        let endpoint = repository
+            .as_deref()
+            .and_then(|r| r.strip_prefix("s3:"))
+            .and_then(|r| r.rsplit_once('/'))
+            .map(|(endpoint, _bucket)| endpoint)
+            .filter(|e| !e.is_empty())
+            .map(str::to_owned);
+        let claims = snapshot
+            .data
+            .pointer("/spec/paths")
+            .and_then(Value::as_array)
+            .into_iter()
+            .flatten()
+            .filter_map(|p| p.as_str()?.strip_prefix("/data/"))
+            .filter(|claim| !claim.is_empty() && !claim.contains('/'));
+        for claim in claims {
+            let backup = StoredBackup {
+                claim: claim.to_owned(),
+                endpoint: endpoint.clone(),
+            };
+            if !out.contains(&backup) {
+                out.push(backup);
+            }
+        }
+    }
+    out
+}
+
 /// The `Restore`s of `claim`'s backups, by [`VOLUME_LABEL`], newest first.
 #[must_use]
 pub fn restores(objects: &[DynamicObject], claim: &str) -> Vec<RestoreView> {
@@ -542,6 +594,54 @@ mod tests {
         assert_eq!(
             found.runs[0].finished_at.map(|t| t.to_string()).as_deref(),
             Some("2026-10-14T02:01:00Z")
+        );
+    }
+
+    #[test]
+    fn snapshots_list_the_stored_backups_of_each_claim_without_a_schedule() {
+        let snapshot = |id: &str, repository: &str, paths: Value| -> DynamicObject {
+            serde_json::from_value(serde_json::json!({
+                "apiVersion": "k8up.io/v1", "kind": "Snapshot",
+                "metadata": {"name": id, "namespace": "shop"},
+                "spec": {"id": id, "date": "2026-10-01T03:00:00Z",
+                         "repository": repository, "paths": paths}
+            }))
+            .unwrap()
+        };
+        let stored = stored(&[
+            snapshot(
+                "aaaaaaaa",
+                "s3:http://files-s3.shop.svc:9000/backups",
+                serde_json::json!(["/data/uploads"]),
+            ),
+            snapshot(
+                "bbbbbbbb",
+                "s3:http://files-s3.shop.svc:9000/backups",
+                serde_json::json!(["/data/uploads"]),
+            ),
+            snapshot(
+                "cccccccc",
+                "s3:https://s3.example.com/shop",
+                serde_json::json!(["/data/uploads"]),
+            ),
+            snapshot("dddddddd", "b2:shop:/", serde_json::json!(["/data/cache"])),
+            snapshot(
+                "eeeeeeee",
+                "s3:http://files-s3:9000/backups",
+                serde_json::json!(["/shop-db-0-mysql"]),
+            ),
+        ]);
+        let backup = |claim: &str, endpoint: Option<&str>| StoredBackup {
+            claim: claim.to_owned(),
+            endpoint: endpoint.map(str::to_owned),
+        };
+        assert_eq!(
+            stored,
+            [
+                backup("uploads", Some("http://files-s3.shop.svc:9000")),
+                backup("uploads", Some("https://s3.example.com")),
+                backup("cache", None),
+            ]
         );
     }
 }
