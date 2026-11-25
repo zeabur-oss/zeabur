@@ -462,9 +462,17 @@ describe("a terminal in the database", () => {
 
   test("opens mongosh in the first member of a MongoDBCommunity, which holds no password", () => {
     expect(shellPod(community)).toBe("mongo-0")
-    expect(shellCommand(community)).toEqual(["mongosh"])
+    expect(shellCommand(community)).toEqual(["mongosh", "--port", "27017"])
     expect(connectionUri(community)).toBe(
       "mongodb://app:<password>@mongo-svc.shop.svc:27017/admin?replicaSet=mongo",
+    )
+  })
+
+  test("opens mongosh on the port a MongoDBCommunity's members listen on", () => {
+    const moved = { ...community, connection: { ...community.connection, port: 27018 } }
+    expect(shellCommand(moved)).toEqual(["mongosh", "--port", "27018"])
+    expect(commands("shop", moved).shell).toBe(
+      "kubectl exec -it -n shop mongo-0 -c mongod -- mongosh --port 27018",
     )
   })
 })

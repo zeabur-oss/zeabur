@@ -1519,7 +1519,9 @@ export function shellCommand(database: Database): string[] {
       return ["psql", database.connection.database ?? "app"]
     case "mongodb":
       // MCK mounts no user's password in its members: `mongosh` signs in with `db.auth()`.
-      return database.provider === MCK ? ["mongosh"] : ["bash", "-c", mongoLogin]
+      return database.provider === MCK
+        ? ["mongosh", "--port", String(database.connection.port)]
+        : ["bash", "-c", mongoLogin]
     case "mysql":
       return ["mysql", "-h", "127.0.0.1", "-u", "moco-writable", "-p"]
     case "mariadb":
