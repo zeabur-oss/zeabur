@@ -5380,6 +5380,8 @@ export type PodSummary = {
   reason?: string | null
   /** Restarts, summed over its containers. */
   restarts: number
+  /** It is being deleted (`metadata.deletionTimestamp` is set): a replica a release replaces. */
+  terminating?: boolean
 }
 
 /**

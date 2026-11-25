@@ -104,6 +104,7 @@ export function OverviewTab({
     {
       diagnoses: service.diagnoses,
       stopped: service.replicas?.desired === 0,
+      pods: service.pods,
       replicas: service.replicas,
     },
     task ? undefined : rollout.data,

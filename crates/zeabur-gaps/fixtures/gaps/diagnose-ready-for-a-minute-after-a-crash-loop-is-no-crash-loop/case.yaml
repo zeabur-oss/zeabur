@@ -1,0 +1,4 @@
+description: A container that crashed in a loop and has run ready for two minutes since is no crash loop, although the kubelet still backs off for ten.
+operation: gaps.diagnose
+params:
+  now: "2026-10-29T03:05:00Z"

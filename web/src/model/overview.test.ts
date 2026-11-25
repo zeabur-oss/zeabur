@@ -3,7 +3,7 @@ import { describe, expect, test } from "bun:test"
 import type { Schemas } from "@/api/client"
 import { en } from "@/i18n/en"
 import { eventWord, explainedBy, overviewOf, suggestionsOf } from "@/model/overview"
-import type { Event } from "@/model/service"
+import type { Event, Pod } from "@/model/service"
 
 type Diagnosis = Schemas.Diagnosis
 type Rollout = Schemas.RolloutProgress
@@ -63,6 +63,18 @@ const event = (name: string, reason: string, pod: string, type = "Warning"): Eve
   type,
 })
 
+const pod = (name: string, more: Partial<Pod> = {}): Pod => ({
+  id: `projects/blog/pods/${name}`,
+  name,
+  phase: "Running",
+  ready: false,
+  restarts: 0,
+  health: "warn",
+  containers: ["web"],
+  origin: { kind: "Pod", name },
+  ...more,
+})
+
 const rollout = (more: Partial<Rollout>): Rollout => ({
   id: "r",
   workload: { kind: "Deployment", name: "web" },
@@ -82,7 +94,7 @@ const rollout = (more: Partial<Rollout>): Rollout => ({
 describe("a service's overview", () => {
   test("says a cause once and folds what follows from it", () => {
     const o = overviewOf(
-      { diagnoses: [imagePull, noReady], stopped: false },
+      { diagnoses: [imagePull, noReady], stopped: false, pods: [] },
       undefined,
       [blogDomain, privateAddress],
       [],
@@ -94,7 +106,12 @@ describe("a service's overview", () => {
   })
 
   test("keeps no ready replica as the cause when nothing else explains it", () => {
-    const o = overviewOf({ diagnoses: [noReady], stopped: false }, undefined, [privateAddress], [])
+    const o = overviewOf(
+      { diagnoses: [noReady], stopped: false, pods: [] },
+      undefined,
+      [privateAddress],
+      [],
+    )
     expect(o.causes).toStrictEqual([noReady])
     expect(o.alsoDown).toStrictEqual({ domains: [], private: true })
   })
@@ -104,13 +121,23 @@ describe("a service's overview", () => {
       hop("targetPort", "failed"),
       hop("ready", "failed"),
     ])
-    const o = overviewOf({ diagnoses: [imagePull], stopped: false }, undefined, [wrongPort], [])
+    const o = overviewOf(
+      { diagnoses: [imagePull], stopped: false, pods: [] },
+      undefined,
+      [wrongPort],
+      [],
+    )
     expect(o.waiting.size).toBe(0)
     expect(o.alsoDown).toBeUndefined()
   })
 
   test("says an address of a service scaled to zero waits for it, without a cause", () => {
-    const o = overviewOf({ diagnoses: [], stopped: true }, undefined, [privateAddress], [])
+    const o = overviewOf(
+      { diagnoses: [], stopped: true, pods: [] },
+      undefined,
+      [privateAddress],
+      [],
+    )
     expect(o.waiting.get("web.blog.svc.cluster.local")).toBe("stopped")
     expect(o.alsoDown).toBeUndefined()
   })
@@ -118,14 +145,14 @@ describe("a service's overview", () => {
   test("an address the cluster could not check waits while no replica is ready", () => {
     const unverified = route("domain", "blog.example.com", [hop("dns", "unknown")], "unknown")
     const o = overviewOf(
-      { diagnoses: [], stopped: false, replicas: { desired: 1, ready: 0 } },
+      { diagnoses: [], stopped: false, pods: [], replicas: { desired: 1, ready: 0 } },
       undefined,
       [unverified],
       [],
     )
     expect(o.waiting.get("blog.example.com")).toBe("noReplica")
     const some = overviewOf(
-      { diagnoses: [], stopped: false, replicas: { desired: 2, ready: 1 } },
+      { diagnoses: [], stopped: false, pods: [], replicas: { desired: 2, ready: 1 } },
       undefined,
       [unverified],
       [],
@@ -134,14 +161,19 @@ describe("a service's overview", () => {
   })
 
   test("without a diagnosis or a known reason, an address stays not reachable", () => {
-    const o = overviewOf({ diagnoses: [], stopped: false }, undefined, [privateAddress], [])
+    const o = overviewOf(
+      { diagnoses: [], stopped: false, pods: [] },
+      undefined,
+      [privateAddress],
+      [],
+    )
     expect(o.waiting.size).toBe(0)
   })
 })
 
 describe("a rollout on the overview", () => {
   const shown = (r: Rollout | undefined, diagnoses: Diagnosis[] = []) =>
-    overviewOf({ diagnoses, stopped: false }, r, [], []).rollout
+    overviewOf({ diagnoses, stopped: false, pods: [] }, r, [], []).rollout
 
   test("gets a card only while it moves by itself", () => {
     expect(shown(rollout({}))).toStrictEqual({ as: "card" })
@@ -172,12 +204,42 @@ describe("warnings on the overview", () => {
     const other = event("x", "BackOff", "web-2")
     const normal = event("n", "Pulled", "web-1", "Normal")
     const o = overviewOf(
-      { diagnoses: [imagePull], stopped: false },
+      { diagnoses: [imagePull], stopped: false, pods: [pod("web-1"), pod("web-2")] },
       undefined,
       [],
       [backOff, failed, other, normal],
     )
     expect(o.warnings).toStrictEqual([other])
+  })
+
+  test("leave out what is past: a pod that is gone, being replaced or ready, a finished init container", () => {
+    const old = event("a", "Unhealthy", "web-old")
+    const replaced = event("b", "Unhealthy", "web-1")
+    const ready = event("c", "Unhealthy", "web-2")
+    const retried: Event = {
+      ...event("d", "BackOff", "web-3"),
+      regarding: { kind: "Pod", name: "web-3", fieldPath: "spec.initContainers{setup}" },
+    }
+    const starting = event("e", "Unhealthy", "web-4")
+    const status = (exitCode: number) => ({
+      name: "setup",
+      init: true,
+      ready: false,
+      restarts: 2,
+      terminated: { exitCode },
+    })
+    const pods = [
+      pod("web-1", { terminating: true }),
+      pod("web-2", { ready: true, health: "ok" }),
+      pod("web-3", { containerStatuses: [status(0)] }),
+      pod("web-4"),
+    ]
+    const warnings = (events: Event[], pods_ = pods) =>
+      overviewOf({ diagnoses: [], stopped: false, pods: pods_ }, undefined, [], events).warnings
+    expect(warnings([old, replaced, ready, retried, starting])).toStrictEqual([starting])
+    expect(warnings([retried], [pod("web-3", { containerStatuses: [status(2)] })])).toStrictEqual([
+      retried,
+    ])
   })
 
   test("leave out what a failed run explains on its Job", () => {

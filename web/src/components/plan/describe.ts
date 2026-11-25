@@ -77,9 +77,19 @@ export function restartRuleApplies(plan: Plan): boolean {
 
 const same = (a: WorkloadRef, b: WorkloadRef) => a.kind === b.kind && a.name === b.name
 
-function rolling(t: Translate, workload: WorkloadRef, podsOf: PodsOf, restart: boolean): string {
+/** The replicas the review itself sets for `workload`, when it scales it. */
+const scaledTo = (changes: readonly Change[], workload: WorkloadRef): number | undefined =>
+  changes.find((c) => c.op === "scale" && same(c.workload, workload))?.replicas
+
+function rolling(
+  t: Translate,
+  workload: WorkloadRef,
+  podsOf: PodsOf,
+  restart: boolean,
+  scaled?: number,
+): string {
   const pods = podsOf(workload)
-  const ready = pods?.ready ?? 0
+  const ready = Math.max(pods?.ready ?? 0, scaled ?? 0)
   if (ready >= 2) return t("confirm.rolling", workload.name, ready)
   if (ready === 1 || pods?.desired === 1)
     return restart
@@ -567,7 +577,7 @@ export function describe(
     lines.push(t("confirm.notRolledBack"))
   for (const workload of replaced(plan))
     if (!said.some((w) => same(w, workload))) {
-      lines.push(rolling(t, workload, podsOf, false))
+      lines.push(rolling(t, workload, podsOf, false, scaledTo(ask.changes, workload)))
       said.push(workload)
     }
   for (const change of ask.changes) if (change.op === "scale") said.push(change.workload)

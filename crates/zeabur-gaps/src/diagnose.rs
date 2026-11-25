@@ -10,7 +10,9 @@
 //! 10 minutes without any problems" [k8s-restart-policy]; Zeabur uses the same window
 //! ([`RECENT`]): a failure counts while the container is not ready, waits in
 //! `CrashLoopBackOff`, or ended within the window. An event about a pod from before its `Ready`
-//! condition last turned `True` ([`before_ready`]) is its start-up and is not diagnosed.
+//! condition last turned `True` ([`before_ready`]) is its start-up and is not diagnosed. A
+//! container that has run ready for a minute is no crash loop any more, and a pod that is being
+//! deleted is a replica a release replaces: neither is diagnosed.
 //!
 //! **Exit codes.** 126 and 127 are the shell's "not executable" and "command not found"
 //! [bash-exit-status]; 128 + n is death by signal n, so 137 is `SIGKILL` and 143 `SIGTERM`.
@@ -190,7 +192,7 @@ impl<'a> Namespace<'a> {
             .get(&service.workload.kind)
             .and_then(|by_name| by_name.get(service.workload.name.as_str()))
             .copied();
-        for pod in &service.pods {
+        for pod in service.pods.iter().filter(|pod| !pod.terminating) {
             // What a `CreateContainerConfigError` in this pod already names as missing.
             let mut missing = BTreeSet::new();
             // Events before the pod last became Ready are its start-up, not its state.

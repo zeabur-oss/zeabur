@@ -1,0 +1,4 @@
+description: A crash-looping pod that is being deleted is a replica a release replaces and is not diagnosed.
+operation: gaps.diagnose
+params:
+  now: "2026-10-29T03:05:00Z"

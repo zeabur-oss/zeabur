@@ -15182,6 +15182,9 @@ components:
           type: integer
           format: int32
           description: Restarts, summed over its containers.
+        terminating:
+          type: boolean
+          description: "It is being deleted (`metadata.deletionTimestamp` is set): a replica a release replaces."
     PodUsage:
       type: object
       description: What one pod uses, the sum of its containers.

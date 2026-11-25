@@ -181,6 +181,16 @@ group("describe", () => {
     expect(d.action).toBe("action.saveVariables")
   })
 
+  test("a review that scales up does not warn of the one replica it replaces", () => {
+    const d = describe(
+      t,
+      { changes: [{ op: "scale", workload: api, replicas: 3 }] },
+      plan({ objects: [templated("api")] }),
+      pods({ api: { desired: 1, ready: 1 } }),
+    )
+    expect(d.lines).toStrictEqual(["confirm.scale(api, 1, 3)", "confirm.rolling(api, 3)"])
+  })
+
   test("a rollback says what is not rolled back, and its button names the revision", () => {
     const d = describe(
       t,
