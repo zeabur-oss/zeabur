@@ -180,6 +180,13 @@ mod tests {
     }
 
     fn planned(snapshot: &Snapshot, changes: Vec<Change>) -> Plan {
+        try_planned(snapshot, changes).unwrap()
+    }
+
+    fn try_planned(
+        snapshot: &Snapshot,
+        changes: Vec<Change>,
+    ) -> Result<Plan, zeabur_plan::PlanError> {
         let secrets = BTreeMap::new();
         let objects: Vec<zeabur_plan::Fetched> = snapshot
             .deployments
@@ -198,7 +205,6 @@ mod tests {
             },
             &PlanRequest { changes },
         )
-        .unwrap()
     }
 
     /// The snapshot with every planned object put in place of the one it was computed from.
@@ -420,6 +426,34 @@ mod tests {
             prop_assert_eq!(web.metadata.labels.as_ref().and_then(|l| l.get("team")), Some(&label));
             prop_assert_eq!(web.metadata.resource_version.as_deref(), Some("1"), "server fields stay");
         }
+    }
+
+    #[test]
+    fn a_scale_past_the_limit_is_refused_naming_the_field() {
+        let snapshot = snapshot(&[]);
+        let limit = i32::try_from(zeabur_plan::compose::MAX_REPLICAS).unwrap();
+        for replicas in [limit + 1, -1] {
+            let refused = try_planned(
+                &snapshot,
+                vec![Change::Scale {
+                    workload: web(),
+                    replicas,
+                }],
+            )
+            .unwrap_err();
+            assert_eq!(refused.code, "invalid_replicas");
+            assert_eq!(refused.field.as_deref(), Some("replicas"));
+        }
+        assert!(
+            try_planned(
+                &snapshot,
+                vec![Change::Scale {
+                    workload: web(),
+                    replicas: limit
+                }]
+            )
+            .is_ok()
+        );
     }
 
     #[test]

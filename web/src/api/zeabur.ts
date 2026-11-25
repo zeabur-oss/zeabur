@@ -2341,7 +2341,11 @@ export type Change =
     }
   | {
       op: "scale"
-      /** The replicas. */
+      /**
+       * The replicas.
+       * @minimum 0
+       * @maximum 20
+       */
       replicas: number
       /** The workload. */
       workload: WorkloadRef

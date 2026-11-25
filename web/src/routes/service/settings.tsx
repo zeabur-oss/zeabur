@@ -2,6 +2,7 @@ import { useForm, useSelector } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 
 import type { Schemas } from "@/api/client"
+import { rules } from "@/api/rules"
 import { nodesQuery, releasesQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
 import { GateNote, useGate } from "@/components/gate"
@@ -13,6 +14,7 @@ import { useT } from "@/i18n"
 import { useQuantityFormat } from "@/lib/quantity"
 import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
+import { isWholeNumber } from "@/model/rules"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { AmountInput } from "@/components/amount-input"
 import { FormField } from "@/components/form-field"
@@ -189,7 +191,9 @@ function Compute({
           name="replicas"
           validators={{
             onChange: ({ value }) =>
-              /^\d+$/.test(value) && Number(value) <= 1000 ? undefined : t("form.badReplicas"),
+              isWholeNumber(value, rules["Change.scale.replicas"])
+                ? undefined
+                : t("form.badReplicas", rules["Change.scale.replicas"].maximum),
           }}
         >
           {(f) => (

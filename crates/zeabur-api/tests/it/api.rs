@@ -2237,6 +2237,9 @@ mod tests {
         let replicas = field("ImageServiceChange", "replicas");
         assert_eq!(replicas["minimum"], 1);
         assert_eq!(replicas["maximum"], zeabur_plan::compose::MAX_REPLICAS);
+        let scale = &variant("Change", "scale")["replicas"];
+        assert_eq!(scale["minimum"], 0);
+        assert_eq!(scale["maximum"], zeabur_plan::compose::MAX_REPLICAS);
         let schedule = variant("BackupsPlanRequest", "schedule");
         assert_eq!(
             schedule["cron"]["default"],

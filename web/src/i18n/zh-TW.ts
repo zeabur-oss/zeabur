@@ -1829,7 +1829,7 @@ export const zhTW: Messages = {
     "節點會依保留量替每個副本留出資源。副本用的記憶體超過上限時，容器會重新啟動。CPU 超過上限時會降速。",
   "form.largestNode": (cores: string, memory: string) => `最大的節點：${cores} 核心、${memory}`,
   "form.badQuantity": "輸入數量，例如 0.25 核心或 512 MiB。",
-  "form.badReplicas": "輸入 0 到 1000 的整數。",
+  "form.badReplicas": (max) => `輸入 0 到 ${max} 的整數。`,
   "form.badNumber": "輸入大於 0 的整數。",
   "form.probe.readiness": "就緒檢查",
   "form.probe.liveness": "存活檢查",

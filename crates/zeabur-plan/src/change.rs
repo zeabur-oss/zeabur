@@ -278,6 +278,7 @@ pub enum Change {
         /// The workload.
         workload: WorkloadRef,
         /// The replicas.
+        #[cfg_attr(feature = "openapi", schema(minimum = 0, maximum = 20))]
         replicas: i32,
     },
     /// Set a container's CPU, memory and ephemeral storage requests and limits; those left out

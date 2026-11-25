@@ -50,8 +50,10 @@ use crate::checks::{
     reconcile_identity, resource_allowed, validate_mount_path, validate_resources,
     validate_storage,
 };
+use crate::compose::MAX_REPLICAS;
 use crate::edit::{edit_operations, editable};
 use crate::fields::Step;
+use crate::image_service::refused;
 use crate::json::{add, pointer, remove, replace, test};
 use crate::plan::{
     ErrorKind, PlanError, Planner, Working, error, pod_spec_steps, to_json, workload_json,
@@ -842,11 +844,11 @@ impl<'a> Planner<'a> {
                 ),
             ));
         }
-        if replicas < 0 {
-            return Err(error(
-                ErrorKind::BadRequest,
+        if !u64::try_from(replicas).is_ok_and(|n| n <= MAX_REPLICAS) {
+            return Err(refused(
                 "invalid_replicas",
-                "Replicas cannot be negative.",
+                "A workload runs 0 to 20 replicas.",
+                "replicas",
             ));
         }
         Self::refuse_managed(found.meta(), reference.kind.as_str(), &reference.name)?;

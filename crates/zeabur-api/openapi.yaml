@@ -6323,6 +6323,8 @@ components:
             type: integer
             format: int32
             description: The replicas.
+            maximum: 20
+            minimum: 0
           workload:
             $ref: "#/components/schemas/WorkloadRef"
             description: The workload.

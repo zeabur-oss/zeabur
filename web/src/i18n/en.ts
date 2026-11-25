@@ -1991,7 +1991,7 @@ export const en = {
     "The node sets the reserved amount aside for each replica. When a replica uses more memory than its maximum, its container restarts; CPU above the maximum is slowed down.",
   "form.largestNode": (cores: string, memory: string) => `Largest node: ${cores} cores, ${memory}`,
   "form.badQuantity": "Enter an amount such as 0.25 cores or 512 MiB.",
-  "form.badReplicas": "Enter a whole number from 0 to 1000.",
+  "form.badReplicas": (max: number) => `Enter a whole number from 0 to ${max}.`,
   "form.badNumber": "Enter a whole number above 0.",
   "form.probe.readiness": "Traffic check",
   "form.probe.liveness": "Restart check",

@@ -39,6 +39,9 @@ export const rules = {
   "Change.editTask.keepSucceeded": {
     maximum: 100,
   },
+  "Change.scale.replicas": {
+    maximum: 20,
+  },
   "Change.scheduleTask.keepFailed": {
     maximum: 100,
   },
