@@ -28,7 +28,7 @@ describe("object storage", () => {
     for (const part of ["master", "volume", "filer", "s3"])
       expect(seaweed[part].podSecurityContext.runAsNonRoot).toBe(true)
     expect(seaweed.master.persistence.enabled).toBe(true)
-    expect(objects[5]!.spec).toMatchObject({ name: "uploads", clusterRef: { name: "files" } })
+    expect(objects[5]!.spec).toMatchObject({ name: "uploads", seaweedRef: { name: "files" } })
   })
 
   test.each([
