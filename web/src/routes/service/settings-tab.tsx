@@ -97,7 +97,7 @@ export function SettingsTab({
         <Suspense fallback={<LoadingRows label={t("common.loading")} rows={4} />}>
           {parts.includes("build") ? (
             <Part id="build">
-              <BuildSection project={project} service={service} builds={builds} data={data} />
+              <BuildSection project={project} service={service} builds={builds} />
             </Part>
           ) : null}
           {parts.includes("schedule") ? (

@@ -1,4 +1,4 @@
-// A service from a Git repository: the form, sent as one `createGitService` change. The server
+// A service from a Git repository: the form, sent as one `createBuiltService` change. The server
 // makes Zeabur Builder's Build and the objects of the service that runs what it builds.
 import type { Schemas } from "@/api/client"
 import { rules } from "@/api/rules"
@@ -98,7 +98,7 @@ export const buildProfile = (method: BuildMethod): Profile =>
   method === "railpack" ? "restricted" : "baseline"
 
 const SEGMENT = /^[A-Za-z0-9._-]+$/
-const BRANCH = new RegExp(rules["GitServiceChange.branch"].pattern)
+const BRANCH = new RegExp(rules["BuildSource.git.branch"].pattern)
 const HOST = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?(:\d{1,5})?$/
 
 /** The host and path of `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
@@ -270,38 +270,54 @@ function accessOf(form: GitSource): Schemas.GitAccess {
   }
 }
 
-/** The repository fields of a change. */
-function sourceFields(form: GitSource) {
-  const branch = form.branch.trim()
+/** The paths of a Build as the form gives them: the Dockerfile only for `dockerfile`. */
+export function buildPaths(form: Pick<BuiltService, "method" | "directory" | "dockerfile">) {
   const directory = cleanPath(form.directory)
   const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
   return {
-    url: form.url.trim(),
-    ...(branch ? { branch } : {}),
     method: form.method,
     ...(directory ? { directory } : {}),
     ...(dockerfile ? { dockerfile } : {}),
-    access: accessOf(form),
+  }
+}
+
+/** The Build the form asks for, reading the repository. */
+export function gitBuild(form: GitSource): Schemas.BuildInput {
+  const branch = form.branch.trim()
+  return {
+    source: {
+      type: "git",
+      url: form.url.trim(),
+      ...(branch ? { branch } : {}),
+      access: accessOf(form),
+    },
+    ...buildPaths(form),
+  }
+}
+
+/** The service fields of a new built service, with its `build`. */
+export function builtServiceChange(
+  form: BuiltService,
+  build: Schemas.BuildInput,
+): Schemas.BuiltServiceChange {
+  const port = form.port.trim()
+  return {
+    name: form.name,
+    ...(port ? { port: Number(port) } : {}),
+    ...(port && form.publicUrl ? { host: form.host.trim() } : {}),
+    variables: form.variables,
+    size: form.size,
+    security: form.security,
+    build: { ...build, buildVariables: form.buildVariables },
   }
 }
 
 /** The change the form sends. */
-export function gitChange(form: GitService): Schemas.GitServiceChange {
-  const port = form.port.trim()
-  return {
-    name: form.name,
-    ...sourceFields(form),
-    ...(port ? { port: Number(port) } : {}),
-    ...(port && form.publicUrl ? { host: form.host.trim() } : {}),
-    variables: form.variables,
-    buildVariables: form.buildVariables,
-    size: form.size,
-    security: form.security,
-  }
-}
+export const gitChange = (form: GitService): Schemas.BuiltServiceChange =>
+  builtServiceChange(form, gitBuild(form))
 
 export const createGitService = (form: GitService): Change[] => [
-  { op: "createGitService", ...gitChange(form) },
+  { op: "createBuiltService", ...gitChange(form) },
 ]
 
 export const newGitSource = (method: BuildMethod = "railpack"): GitSource => ({
@@ -317,16 +333,16 @@ export const newGitSource = (method: BuildMethod = "railpack"): GitSource => ({
 })
 
 /** The change that builds `container` of `workload` from the repository: a new Build named after
- * the workload, or the uploaded folder's Build reading the repository instead. */
+ * the workload, or its Build reading the repository instead. */
 export const gitSourceChange = (
   form: GitSource,
   workload: Schemas.WorkloadRef,
   container?: string,
 ): Change => ({
-  op: "gitSource",
+  op: "setBuild",
   workload,
   ...(container ? { container } : {}),
-  ...sourceFields(form),
+  build: gitBuild(form),
 })
 
 /** A Build's options as the service's settings edit them. */

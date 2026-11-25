@@ -8,7 +8,7 @@ import { GateNote, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
-import { stopBuilding, type Build, type Builds } from "@/model/builds"
+import type { Build } from "@/model/builds"
 import {
   buildEnvSecret,
   buildOptionsChanges,
@@ -24,17 +24,15 @@ import { SectionHeader } from "@zeabur-oss/design-system/components/section-head
 import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 /** The directory, Dockerfile and build variables of each `Build` that makes the service's
- * images; a Git source for a service that builds from none; stopping a Build. */
+ * images; a Git source for a service that builds from none; stopping the service's own Build. */
 export function BuildSection({
   project,
   service,
   builds,
-  data,
 }: {
   project: string
   service: Service
   builds: Build[]
-  data?: Builds
 }) {
   const t = useT()
   const gate = useGate(project, "build")
@@ -60,14 +58,8 @@ export function BuildSection({
           named={builds.length > 1}
           disabled={!gate.open}
           stop={
-            data ? (
-              <StopBuilding
-                project={project}
-                service={service}
-                build={build}
-                data={data}
-                gate={gate}
-              />
+            build.name === service.name ? (
+              <StopBuilding project={project} service={service} gate={gate} />
             ) : null
           }
         />
@@ -86,18 +78,14 @@ export function BuildSection({
   )
 }
 
-/** "Stop building from source": the Build goes, the service keeps the image it runs. */
+/** "Stop building from source": the service's Build goes, the service keeps the image it runs. */
 function StopBuilding({
   project,
   service,
-  build,
-  data,
   gate,
 }: {
   project: string
   service: Service
-  build: Build
-  data: Builds
   gate: Gate
 }) {
   const t = useT()
@@ -111,8 +99,8 @@ function StopBuilding({
         disabled={!gate.open}
         onClick={() =>
           planner.plan({
-            title: t("title.stopBuilding", build.name),
-            changes: stopBuilding(service, build, data),
+            title: t("title.stopBuilding", service.name),
+            changes: [{ op: "removeBuild", workload: { kind: service.kind, name: service.name } }],
             notes: [t("stopBuilding.note", service.name)],
           })
         }

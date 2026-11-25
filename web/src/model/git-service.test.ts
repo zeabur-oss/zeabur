@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import type { Schemas } from "@/api/client"
 import { branchOf, buildProblem, builtContainers, type Build, type BuildRun } from "@/model/builds"
 import {
   branchProblem,
@@ -25,6 +26,10 @@ import {
   urlProblem,
   type GitService,
 } from "@/model/git-service"
+
+/** The repository a change's Build reads. */
+const source = (change: Schemas.BuiltServiceChange) =>
+  change.build.source as Extract<Schemas.BuildSource, { type: "git" }>
 
 const form = (patch: Partial<GitService>): GitService => ({
   ...newGitService(),
@@ -108,13 +113,18 @@ describe("a Git source for a running service", () => {
       { kind: "Deployment", name: "site" },
     )
     expect(change).toEqual({
-      op: "gitSource",
+      op: "setBuild",
       workload: { kind: "Deployment", name: "site" },
-      url: "git@github.com:acme/site.git",
-      branch: "main",
-      method: "dockerfile",
-      directory: "web",
-      access: { type: "deployKey" },
+      build: {
+        source: {
+          type: "git",
+          url: "git@github.com:acme/site.git",
+          branch: "main",
+          access: { type: "deployKey" },
+        },
+        method: "dockerfile",
+        directory: "web",
+      },
     })
   })
 })
@@ -123,16 +133,17 @@ describe("the change", () => {
   test("a public repository builds from its default branch, with the port and no host", () => {
     expect(gitChange(form({ branch: "  " }))).toEqual({
       name: "site",
-      url: "https://github.com/acme/site",
-      method: "railpack",
       port: 3000,
       variables: [],
-      buildVariables: [],
       size: "small",
       security: "restricted",
-      access: { type: "public" },
+      build: {
+        source: { type: "git", url: "https://github.com/acme/site", access: { type: "public" } },
+        method: "railpack",
+        buildVariables: [],
+      },
     })
-    expect(gitChange(form({ branch: " release/1.2 " })).branch).toBe("release/1.2")
+    expect(source(gitChange(form({ branch: " release/1.2 " }))).branch).toBe("release/1.2")
   })
 
   test("the Builds tab finds the service's Build by repository, as for any built image", () => {
@@ -157,16 +168,20 @@ describe("the change", () => {
         port: "",
       }),
     )
-    expect(change.access).toEqual({ type: "token", username: "x-access-token", token: "ghp_1" })
-    expect(change.directory).toBe("apps/web")
-    expect(change.dockerfile).toBe("docker/Dockerfile.prod")
+    expect(source(change).access).toEqual({
+      type: "token",
+      username: "x-access-token",
+      token: "ghp_1",
+    })
+    expect(change.build.directory).toBe("apps/web")
+    expect(change.build.dockerfile).toBe("docker/Dockerfile.prod")
     expect(change.port).toBeUndefined()
-    expect(gitChange(form({ dockerfile: "x" })).dockerfile).toBeUndefined()
+    expect(gitChange(form({ dockerfile: "x" })).build.dockerfile).toBeUndefined()
   })
 
   test("a deploy key sends the host's lines only for a host Zeabur does not pin", () => {
     const lines = "[git.example.com]:2222 ssh-ed25519 AAAA"
-    expect(gitChange(form({ access: "deployKey", knownHosts: lines })).access).toEqual({
+    expect(source(gitChange(form({ access: "deployKey", knownHosts: lines }))).access).toEqual({
       type: "deployKey",
     })
     const other = form({
@@ -174,11 +189,11 @@ describe("the change", () => {
       access: "deployKey",
       knownHosts: lines,
     })
-    expect(gitChange(other).access).toEqual({ type: "deployKey", knownHosts: lines })
+    expect(source(gitChange(other)).access).toEqual({ type: "deployKey", knownHosts: lines })
   })
 
   test("a repository picked from the GitHub App names its installation", () => {
-    expect(gitChange(form({ access: "githubApp", installationId: 4242 })).access).toEqual({
+    expect(source(gitChange(form({ access: "githubApp", installationId: 4242 }))).access).toEqual({
       type: "githubApp",
       installationId: 4242,
     })
@@ -200,8 +215,10 @@ describe("the change", () => {
     expect(background.host).toBeUndefined()
   })
 
-  test("the form is one createGitService change", () => {
-    expect(createGitService(form({}))).toEqual([{ op: "createGitService", ...gitChange(form({})) }])
+  test("the form is one createBuiltService change", () => {
+    expect(createGitService(form({}))).toEqual([
+      { op: "createBuiltService", ...gitChange(form({})) },
+    ])
   })
 })
 

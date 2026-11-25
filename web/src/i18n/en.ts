@@ -1785,8 +1785,12 @@ export const en = {
   "confirm.port": (service: string, from: number, to: number) =>
     `${service} moves from port ${from} to ${to}: its container port, health checks and PORT change, and its private addresses send traffic to ${to}.`,
   "confirm.image": (service: string, tag: string) => `${service} will run ${tag}.`,
-  "confirm.gitSource": (service: string) =>
+  "confirm.setBuild": (service: string) =>
     `Zeabur Builder builds ${service} from your repository, and each new build goes live.`,
+  "confirm.setBuildUpload": (service: string) =>
+    `Zeabur Builder builds ${service} from the folder you upload, and each new build goes live.`,
+  "confirm.removeBuild": (service: string) =>
+    `Zeabur Builder stops building ${service}, and its Build is deleted.`,
   "confirm.rebuild": (build: string) =>
     `Zeabur Builder builds ${build} again from the newest commit of its branch.`,
   "confirm.buildOptions": (build: string) =>
@@ -1883,9 +1887,9 @@ export const en = {
   "confirm.maintenanceOff": (host: string) => `Send visitors of ${host} to the service again.`,
   "confirm.copyS3Keys": (name: string, destination: string) =>
     `Copy the keys of ${destination} into secret ${name}.`,
-  "confirm.createUploadService": (name: string) =>
+  "confirm.createBuiltServiceUpload": (name: string) =>
     `Create service ${name} and the build that runs the folder you uploaded.`,
-  "confirm.createGitService": (name: string) =>
+  "confirm.createBuiltServiceGit": (name: string) =>
     `Create service ${name} and the build that runs your repository.`,
   "confirm.createImageService": (name: string) => `Create service ${name} from its image.`,
   "confirm.createImageServicePublic": (name: string, host: string) =>
@@ -1902,6 +1906,7 @@ export const en = {
   "action.rebuild": "Build again",
   "action.upload": "Upload",
   "action.connectGit": "Connect",
+  "action.stopBuilding": "Stop building",
   "action.saveBuildOptions": "Save build options",
   "action.autoUpdateOn": "Turn on",
   "action.autoUpdateOff": "Turn off",

@@ -135,48 +135,6 @@ const buildDeletion = (build: Build, kept: readonly Build[]): Schemas.Change[] =
     : []),
 ]
 
-/** The image a container keeps once nothing builds it: the Build's newest with its digest when
- * the container runs that one, else what it runs now. */
-function pinnedImage(image: string, build: Build): string {
-  if (digestOf(image)) return image
-  return runsLatest(image, build) && build.latestImage ? build.latestImage : image
-}
-
-/**
- * "Stop building from source": delete `build` and the Secret only it reads, pin each container
- * that runs its images to the image it runs, and stop Keel's updates when no other Build makes the
- * service's images. Images already in the registry stay.
- */
-export function stopBuilding(service: Service, build: Build, data: Builds): Schemas.Change[] {
-  const workload = { kind: service.kind, name: service.name }
-  const built = builtContainers(service, data.builds)
-  // The image op changes regular containers; an init container keeps the tag it names.
-  const init = new Set(service.containers.filter((c) => c.init).map((c) => c.name))
-  const pins: Schemas.Change[] = built
-    .filter(
-      (b) =>
-        b.build.name === build.name &&
-        !init.has(b.container) &&
-        pinnedImage(b.image, build) !== b.image,
-    )
-    .map((b) => ({
-      op: "image",
-      workload,
-      container: b.container,
-      image: pinnedImage(b.image, build),
-    }))
-  const others = built.some((b) => b.build.name !== build.name)
-  const keel = keelPolicy(data, service) !== undefined
-  return [
-    ...buildDeletion(
-      build,
-      data.builds.filter((b) => b.name !== build.name),
-    ),
-    ...pins,
-    ...(keel && !others ? [{ op: "autoUpdate" as const, workload, enabled: false }] : []),
-  ]
-}
-
 /** The first words that say why a build failed: its own message, then the run's, then the
  * resource's. */
 export function failureText(build: Build | undefined, run: BuildRun | undefined) {

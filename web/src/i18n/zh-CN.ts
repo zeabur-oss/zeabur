@@ -1639,8 +1639,11 @@ export const zhCN: Messages = {
   "confirm.port": (service, from, to) =>
     `${service} 从端口 ${from} 改用 ${to}：容器端口、健康检查和 PORT 都会跟着调整，私有地址也会把流量转发到 ${to}。`,
   "confirm.image": (service, tag) => `${service} 会改为运行 ${tag}。`,
-  "confirm.gitSource": (service) =>
+  "confirm.setBuild": (service) =>
     `Zeabur Builder 会用你的仓库构建 ${service}，每次构建完成就会上线。`,
+  "confirm.setBuildUpload": (service) =>
+    `Zeabur Builder 会用你上传的文件夹构建 ${service}，每次构建完成就会上线。`,
+  "confirm.removeBuild": (service) => `Zeabur Builder 会停止构建 ${service}，并删除它的 Build。`,
   "confirm.rebuild": (build) => `Zeabur Builder 会用分支最新的提交重新构建 ${build}。`,
   "confirm.buildOptions": (build) => `从下一次构建起，Zeabur Builder 用这些选项构建 ${build}。`,
   "confirm.uploadToken": (build) => `Zeabur Builder 会让你在 15 分钟内上传文件夹到 ${build}。`,
@@ -1719,8 +1722,8 @@ export const zhCN: Messages = {
   "confirm.maintenanceOff": (host) => `${host} 的访客重新连到服务。`,
   "confirm.copyS3Keys": (name, destination) =>
     `创建机密变量 ${name}，复制 S3 目的地 ${destination} 的密钥。`,
-  "confirm.createUploadService": (name) => `创建服务 ${name}，并用你上传的文件夹构建。`,
-  "confirm.createGitService": (name) => `创建服务 ${name}，并用你的仓库构建。`,
+  "confirm.createBuiltServiceUpload": (name) => `创建服务 ${name}，并用你上传的文件夹构建。`,
+  "confirm.createBuiltServiceGit": (name) => `创建服务 ${name}，并用你的仓库构建。`,
   "confirm.createImageService": (name) => `用镜像创建服务 ${name}。`,
   "confirm.createImageServicePublic": (name, host) =>
     `用镜像创建服务 ${name}，并公开到 ${host}，网上的人都能访问。`,
@@ -1735,6 +1738,7 @@ export const zhCN: Messages = {
   "action.rebuild": "重新构建",
   "action.upload": "上传",
   "action.connectGit": "连接",
+  "action.stopBuilding": "停止构建",
   "action.saveBuildOptions": "保存构建选项",
   "action.autoUpdateOn": "开启",
   "action.autoUpdateOff": "关闭",

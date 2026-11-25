@@ -29,7 +29,7 @@ import { Input } from "@zeabur-oss/design-system/components/input"
 import { Select } from "@zeabur-oss/design-system/components/select"
 
 /** Settings → Build of a service that builds from no repository: the repository form of "Deploy
- * from Git", sent as one `gitSource` change. An uploaded folder's Build reads it instead. */
+ * from Git", sent as one `setBuild` change. An uploaded folder's Build reads it instead. */
 export function GitSourceForm({
   project,
   service,

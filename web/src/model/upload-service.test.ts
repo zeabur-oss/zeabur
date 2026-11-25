@@ -17,22 +17,20 @@ const form = (patch: Partial<UploadService> = {}): UploadService => ({
 describe("a service from an uploaded folder", () => {
   test("one change names the service, its token request and how to build the folder", () => {
     expect(createUploadService(form(), "u1")).toMatchObject({
-      op: "createUploadService",
+      op: "createBuiltService",
       name: "site",
-      request: "u1",
-      method: "railpack",
       port: 3000,
+      build: { source: { type: "upload", request: "u1" }, method: "railpack" },
     })
   })
 
   test("the folder inside the upload and the Dockerfile are sent clean, the Dockerfile only for that method", () => {
     const options = { directory: "./apps/web/", dockerfile: "docker/Dockerfile.prod" }
     const railpack = createUploadService(form(options), "u1")
-    expect(railpack).toMatchObject({ directory: "apps/web" })
-    expect(railpack).not.toHaveProperty("dockerfile")
+    expect(railpack).toMatchObject({ build: { directory: "apps/web" } })
+    expect(railpack).not.toHaveProperty("build.dockerfile")
     expect(createUploadService(form({ ...options, method: "dockerfile" }), "u1")).toMatchObject({
-      directory: "apps/web",
-      dockerfile: "docker/Dockerfile.prod",
+      build: { directory: "apps/web", dockerfile: "docker/Dockerfile.prod" },
     })
   })
 

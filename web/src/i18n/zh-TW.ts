@@ -1642,8 +1642,11 @@ export const zhTW: Messages = {
   "confirm.port": (service, from, to) =>
     `${service} 從連接埠 ${from} 改用 ${to}：容器連接埠、健康檢查和 PORT 都會跟著調整，私有位址也會把流量轉送到 ${to}。`,
   "confirm.image": (service, tag) => `${service} 會改為執行 ${tag}。`,
-  "confirm.gitSource": (service) =>
+  "confirm.setBuild": (service) =>
     `Zeabur Builder 會用你的儲存庫建置 ${service}，每次建置完成就會上線。`,
+  "confirm.setBuildUpload": (service) =>
+    `Zeabur Builder 會用你上傳的資料夾建置 ${service}，每次建置完成就會上線。`,
+  "confirm.removeBuild": (service) => `Zeabur Builder 會停止建置 ${service}，並刪除它的 Build。`,
   "confirm.rebuild": (build) => `Zeabur Builder 會用分支最新的提交重新建置 ${build}。`,
   "confirm.buildOptions": (build) => `從下一次建置起，Zeabur Builder 用這些選項建置 ${build}。`,
   "confirm.uploadToken": (build) => `Zeabur Builder 會讓你在 15 分鐘內上傳資料夾到 ${build}。`,
@@ -1722,8 +1725,8 @@ export const zhTW: Messages = {
   "confirm.maintenanceOff": (host) => `${host} 的訪客重新連到服務。`,
   "confirm.copyS3Keys": (name, destination) =>
     `建立機密變數 ${name}，金鑰從 S3 目的地 ${destination} 複製過來。`,
-  "confirm.createUploadService": (name) => `建立服務 ${name}，並用你上傳的資料夾建置。`,
-  "confirm.createGitService": (name) => `建立服務 ${name}，並用你的儲存庫建置。`,
+  "confirm.createBuiltServiceUpload": (name) => `建立服務 ${name}，並用你上傳的資料夾建置。`,
+  "confirm.createBuiltServiceGit": (name) => `建立服務 ${name}，並用你的儲存庫建置。`,
   "confirm.createImageService": (name) => `用映像檔建立服務 ${name}。`,
   "confirm.createImageServicePublic": (name, host) =>
     `用映像檔建立服務 ${name}，並公開到 ${host}，網路上的人都連得到。`,
@@ -1739,6 +1742,7 @@ export const zhTW: Messages = {
   "action.rebuild": "重新建置",
   "action.upload": "上傳",
   "action.connectGit": "連結",
+  "action.stopBuilding": "停止建置",
   "action.saveBuildOptions": "儲存建置選項",
   "action.autoUpdateOn": "開啟",
   "action.autoUpdateOff": "關閉",
