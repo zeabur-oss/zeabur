@@ -436,8 +436,10 @@ pub(crate) async fn inspect(
 
 /// The CA of the build registry (`builds.registry`), when `server` is it: the Secret key that the
 /// catalog component providing that registry names in `provides.registry.ca`, read as the person.
-/// The declaration comes from the catalog Zeabur reads. `None` keeps the server's own trust: no
-/// component provides that registry, or the person may not read the Secret, or it is not there.
+/// The declaration comes from the catalog Zeabur reads. Zeabur Builder lets every signed-in user
+/// read its CA-only Secret `registry-ca`, so a Developer of one project reads it too. `None` keeps
+/// the server's own trust: no component provides that registry, or the person may not read the
+/// Secret, or it is not there.
 pub(crate) async fn published_ca(
     cluster: &dyn Cluster,
     state: &AppState,
