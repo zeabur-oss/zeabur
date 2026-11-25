@@ -383,7 +383,7 @@ fn docs_build() -> [DynamicObject; 2] {
     let failed = oom || std::env::var_os("ZEABUR_DEMO_BUILD_FAILED").is_some();
     let build = json!({
         "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
-        "metadata": {"name": "docs", "namespace": "blog"},
+        "metadata": {"name": "docs", "namespace": "blog", "resourceVersion": "12"},
         "spec": {"builderRef": "railpack",
             "source": {"type": "git", "git": {"url": "https://github.com/example/docs.git", "ref": "main"},
                 "contextDir": "site"},
