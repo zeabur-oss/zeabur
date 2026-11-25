@@ -60,6 +60,7 @@ const apiChanges: Schemas.FieldChange[] = [
 const preview = (over: Partial<Schemas.Preview> = {}): Schemas.Preview => ({
   rollouts: [],
   databases: [],
+  deletedDatabases: [],
   domains: [],
   dataLoss: [],
   removals: [],

@@ -54,6 +54,75 @@ pub enum Engine {
     Dragonfly,
 }
 
+/// The object an operator runs a database as, and where that object asks for its members.
+#[derive(Debug, Clone, Copy)]
+pub struct Operator {
+    /// The engine it runs.
+    pub engine: Engine,
+    /// The object.
+    pub read: Read,
+    /// The JSON pointer of the member count in the object.
+    pub members: &'static str,
+    /// The member count when the object leaves it out.
+    pub default_members: i64,
+}
+
+/// The operators Zeabur adds databases through, one per engine.
+pub const OPERATORS: [Operator; 5] = [
+    Operator {
+        engine: Engine::Postgresql,
+        read: crate::cloudnative_pg::CLUSTERS,
+        members: "/spec/instances",
+        default_members: 1,
+    },
+    Operator {
+        engine: Engine::Mongodb,
+        read: crate::percona_mongodb::CLUSTERS,
+        members: "/spec/replsets/0/size",
+        default_members: 3,
+    },
+    Operator {
+        engine: Engine::Mysql,
+        read: crate::moco::CLUSTERS,
+        members: "/spec/replicas",
+        default_members: 1,
+    },
+    Operator {
+        engine: Engine::Mariadb,
+        read: crate::mariadb_operator::SERVERS,
+        members: "/spec/replicas",
+        default_members: 1,
+    },
+    Operator {
+        engine: Engine::Dragonfly,
+        read: crate::dragonfly::STORES,
+        members: "/spec/replicas",
+        default_members: 1,
+    },
+];
+
+impl Operator {
+    /// The operator whose database object `api_version` and `kind` name.
+    #[must_use]
+    pub fn of(api_version: &str, kind: &str) -> Option<&'static Self> {
+        OPERATORS.iter().find(|o| {
+            o.read.kind == kind
+                && api_version
+                    .strip_prefix(o.read.group)
+                    .is_some_and(|rest| rest.starts_with('/'))
+        })
+    }
+
+    /// How many members `object` asks for.
+    #[must_use]
+    pub fn members(&self, object: &serde_json::Value) -> i64 {
+        object
+            .pointer(self.members)
+            .and_then(serde_json::Value::as_i64)
+            .unwrap_or(self.default_members)
+    }
+}
+
 /// How a database is, from its operator's status.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

@@ -125,11 +125,6 @@ function sorted<E extends { op: string }>(
   return [removed, set.filter(added), set.filter((n) => !added(n))]
 }
 
-const databases = new Set([
-  "clusters.postgresql.cnpg.io",
-  "perconaservermongodbs.psmdb.percona.com",
-])
-
 type PlainKey = { [K in keyof Messages]: Messages[K] extends string ? K : never }[keyof Messages]
 
 /** The sentence of a change that does not depend on its fields. */
@@ -193,7 +188,7 @@ function sentenceOf(
   t: Translate,
   change: Change,
   podsOf: PodsOf,
-  plan?: Pick<Plan, "objects">,
+  plan?: Pick<Plan, "objects" | "preview">,
 ): string {
   const list = (items: string[]) => (items.length > 0 ? t("common.list", items) : "")
   const plain = plainSentence[change.op]
@@ -269,7 +264,7 @@ function sentenceOf(
       return t("confirm.create", kind, name)
     }
     case "delete":
-      return databases.has(`${change.resource.resource}.${change.resource.group}`)
+      return plan?.preview?.deletedDatabases.includes(change.name)
         ? t("confirm.deleteDatabase", change.name)
         : t("confirm.delete", change.name)
     case "debugContainer":
