@@ -7,6 +7,15 @@ description: 每一版不相容的變更，以及升級前要先做的事。一�
 
 一次跨好幾版升級時，從你目前的版本開始，依序看過到目標版本為止的每一節。新的版本寫在最上面。
 
+## v0.3.0 → v0.3.1
+
+只有裝了 Zeabur Builder 的叢集要做。升級 Zeabur 開源版之後，馬上把 Zeabur Builder 升到 0.3.0。升級之前，上傳資料夾會失敗，畫面顯示「Zeabur cannot reach the registry: invalid peer certificate: UnknownIssuer」，映像檔表單也讀不到建置好的映像檔。從 Git 部署不受影響。
+
+v0.3.1 從 `builder-system/registry-ca` 這個 Secret 讀建置用 registry 的 CA，只有 Zeabur Builder 0.3.0 會建立它。
+
+- **Zeabur Builder 是 Zeabur 開源版裝的：**打開**叢集** → **元件**，在 Zeabur Builder 的卡片上按**管理**，再按**安裝**。Zeabur 開源版會把它升到 0.3.0，並沿用上次安裝時填的值。
+- **Zeabur Builder 是其他工具裝的**，例如 Helm、Flux 或 zeabur-installer：用那個工具升級，照 `zeaburctl components export zeabur-builder --format helm` 印出的版本和值。Zeabur Builder 0.3.0 改了兩個值的名稱：`registry.tokenKey` 改成 `registry.tokenSecretRef`，`registry.caFrom` 改成 `registry.caSecretRef`，兩個都填 `namespace` 和 `name`。
+
 ## v0.2 → v0.3
 
 下面的步驟不用自己動手。貼上[交給 Agent 升級](steps.mdx#交給-agent-升級)裡的提示，Agent 就會照這一節替你升級。到了建立快照和登入的步驟，Agent 會停下來等你。
