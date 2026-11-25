@@ -7,11 +7,11 @@ description: 每一版不兼容的变更，以及升级前要先做的事。一�
 
 一次跨好几版升级时，从你当前的版本开始，依次看过到目标版本为止的每一节。新的版本写在最上面。
 
-## v0.3.0 → v0.3.1
+## v0.3.0 → v0.3.2
 
 只有装了 Zeabur Builder 的集群要做。升级 Zeabur 开源版之后，马上把 Zeabur Builder 升到 0.3.0。升级之前，上传文件夹会失败，页面显示“Zeabur cannot reach the registry: invalid peer certificate: UnknownIssuer”，镜像表单也读不到构建好的镜像。从 Git 部署不受影响。
 
-v0.3.1 从 `builder-system/registry-ca` 这个 Secret 读取构建用 registry 的 CA，只有 Zeabur Builder 0.3.0 会创建它。
+v0.3.2 从 `builder-system/registry-ca` 这个 Secret 读取构建用 registry 的 CA，只有 Zeabur Builder 0.3.0 会创建它。
 
 - **Zeabur Builder 是 Zeabur 开源版安装的：**打开**集群** → **组件**，在 Zeabur Builder 的卡片上点**管理**，再点**安装**。Zeabur 开源版会把它升到 0.3.0，并沿用上次安装时填写的值。
 - **Zeabur Builder 是其他工具安装的**，例如 Helm、Flux 或 zeabur-installer：用那个工具升级，按 `zeaburctl components export zeabur-builder --format helm` 输出的版本和值。Zeabur Builder 0.3.0 改了两个值的名称：`registry.tokenKey` 改为 `registry.tokenSecretRef`，`registry.caFrom` 改为 `registry.caSecretRef`，两个都填写 `namespace` 和 `name`。

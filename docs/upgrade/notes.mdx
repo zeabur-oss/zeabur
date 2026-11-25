@@ -7,11 +7,11 @@ This page lists each version's breaking changes and what to do before you upgrad
 
 If you're skipping versions, start at the version you run now and read every section up to the version you're moving to. The newest version is at the top.
 
-## v0.3.0 → v0.3.1
+## v0.3.0 → v0.3.2
 
 Only for a cluster with Zeabur Builder. Upgrade Zeabur Builder to 0.3.0 right after you upgrade Zeabur OSS. Until then, folder uploads fail with "Zeabur cannot reach the registry: invalid peer certificate: UnknownIssuer", and the image form cannot read built images. Deploys from Git keep working.
 
-v0.3.1 reads the build registry's CA from the Secret `builder-system/registry-ca`, which only Zeabur Builder 0.3.0 makes.
+v0.3.2 reads the build registry's CA from the Secret `builder-system/registry-ca`, which only Zeabur Builder 0.3.0 makes.
 
 - **Zeabur OSS installed Zeabur Builder:** open **Cluster** → **Components**, click **Manage** on the Zeabur Builder card, then **Install**. Zeabur OSS upgrades it to 0.3.0 and keeps the values from the last install.
 - **Another tool installed it**, such as Helm, Flux or zeabur-installer: upgrade it with that tool to what `zeaburctl components export zeabur-builder --format helm` prints. Zeabur Builder 0.3.0 renames two values: `registry.tokenKey` is now `registry.tokenSecretRef`, and `registry.caFrom` is now `registry.caSecretRef`, each with `namespace` and `name`.
