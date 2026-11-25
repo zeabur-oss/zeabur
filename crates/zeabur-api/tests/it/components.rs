@@ -1306,7 +1306,7 @@ mod tests {
             .unwrap();
         assert_eq!(webhook["state"], "waiting", "{plan}");
         assert_eq!(applied["written"], json!([]));
-        assert!(dynamic(&cluster, "HelmChart", "cloudnative-pg").is_none());
+        assert!(dynamic(&cluster, "HelmChart", "cnpg").is_none());
 
         // Once the webhook serves, the chart is written.
         cluster.update(|s| {
@@ -1322,7 +1322,7 @@ mod tests {
             }
         });
         call_for(&app, "cloudnative-pg", "apply", "install", "0.6.1").await;
-        assert!(dynamic(&cluster, "HelmChart", "cloudnative-pg").is_some());
+        assert!(dynamic(&cluster, "HelmChart", "cnpg").is_some());
     }
 
     #[tokio::test]
