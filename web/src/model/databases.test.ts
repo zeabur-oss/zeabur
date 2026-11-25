@@ -475,6 +475,18 @@ describe("a terminal in the database", () => {
       "kubectl exec -it -n shop mongo-0 -c mongod -- mongosh --port 27018",
     )
   })
+
+  test("opens mongosh over TLS with MCK's CA when a MongoDBCommunity's members need TLS", () => {
+    const tls = {
+      ...community,
+      connection: { ...community.connection, options: "replicaSet=mongo&tls=true" },
+    }
+    expect(shellCommand(tls)).toEqual([
+      "bash",
+      "-c",
+      "exec mongosh --port 27017 --tls --tlsCAFile /var/lib/tls/ca/*.pem --tlsAllowInvalidHostnames",
+    ])
+  })
 })
 
 describe("operator names", () => {

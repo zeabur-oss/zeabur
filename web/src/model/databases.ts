@@ -1511,6 +1511,21 @@ export function shellPod(database: Database): string {
 const mongoLogin =
   'mongosh -u "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_USER)" -p "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_PASSWORD)" --authenticationDatabase admin'
 
+/** `mongosh` in an MCK member. MCK mounts no user's password there, so it signs in with
+ * `db.auth()`. With TLS, MCK mounts its CA as the only file in /var/lib/tls/ca/; the member's
+ * certificate does not name localhost. */
+function mckShell(database: Database): string[] {
+  const port = String(database.connection.port)
+  const tls = new URLSearchParams(database.connection.options ?? "").get("tls") === "true"
+  return tls
+    ? [
+        "bash",
+        "-c",
+        `exec mongosh --port ${port} --tls --tlsCAFile /var/lib/tls/ca/*.pem --tlsAllowInvalidHostnames`,
+      ]
+    : ["mongosh", "--port", port]
+}
+
 /** What a terminal runs in the server's container: the engine's own shell, signed in where the
  * container holds a password. MOCO's does not, so `mysql` asks for `moco-writable`'s. */
 export function shellCommand(database: Database): string[] {
@@ -1518,10 +1533,7 @@ export function shellCommand(database: Database): string[] {
     case "postgresql":
       return ["psql", database.connection.database ?? "app"]
     case "mongodb":
-      // MCK mounts no user's password in its members: `mongosh` signs in with `db.auth()`.
-      return database.provider === MCK
-        ? ["mongosh", "--port", String(database.connection.port)]
-        : ["bash", "-c", mongoLogin]
+      return database.provider === MCK ? mckShell(database) : ["bash", "-c", mongoLogin]
     case "mysql":
       return ["mysql", "-h", "127.0.0.1", "-u", "moco-writable", "-p"]
     case "mariadb":
