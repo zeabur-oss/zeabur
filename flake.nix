@@ -20,7 +20,7 @@
     # output builds there, and a release build checks that bundle against the signed release at
     # that commit (scripts/release-pins.sh).
     catalog = {
-      url = "github:zeabur-oss/catalog/v0.6.1";
+      url = "github:zeabur-oss/catalog/v0.6.3";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.oss.follows = "oss";
     };
@@ -92,6 +92,8 @@
               cargo-nextest
               cargo-auditable
               cargo-cyclonedx
+              # Pattern rules (scripts/ci/patterns.sh)
+              ripgrep
               # Zeabur Proxy's parser fuzz target (crates/zeabur-proxy/fuzz)
               cargo-fuzz
               # Breaking changes to crates/zeabur-api/openapi.yaml (scripts/api-break.ts)

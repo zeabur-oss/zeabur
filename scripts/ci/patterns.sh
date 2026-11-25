@@ -25,6 +25,9 @@ rule() {
 rule text-scraping 'scripts/**' '\b(grep|sed|awk|cut)\b' \
   "version=\$(helm show chart deploy/chart/zeabur | sed -n 's/^version: //p')" \
   'read structured output with jq, yq or kubectl -o jsonpath, search text with rg, and move a long script with branches to a Rust test or Bun'
+rule upload-secret-ca 'crates/zeabur-api/src/**' '\.get\("ca\.crt"\)' \
+  '    values.get("ca.crt").cloned()' \
+  "an upload Secret holds credentials only; read the build registry's CA that the catalog component names in provides.registry.ca (images.rs)"
 
 registry="k3d 5.9.0 can report success for an import that never ran; push the image to the dev cluster's registry (xtask/src/dev_cluster/images.rs)"
 rule image-import-script 'scripts/** .github/**' '^[^#]*(k3d image import|ctr[^|]*images? import)' \

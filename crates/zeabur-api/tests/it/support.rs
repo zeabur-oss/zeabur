@@ -163,3 +163,43 @@ impl ClusterAccess for Signed {
         })
     }
 }
+
+/// Zeabur Catalog v0.6.1 with one component, Velero's file, that provides the registry `host`
+/// with its CA in the `ca.crt` of the Secret `zot/zot-tls`.
+pub(crate) struct RegistryCatalog {
+    pub(crate) host: String,
+}
+
+impl zeabur_api::cluster::catalog::Fetch for RegistryCatalog {
+    fn get(
+        &self,
+        url: String,
+        _etag: Option<String>,
+    ) -> futures_util::future::BoxFuture<'_, Result<zeabur_api::cluster::catalog::Fetched, String>>
+    {
+        Box::pin(async move {
+            let bytes = if url.ends_with("/catalog.json") {
+                let mut index: serde_json::Value = serde_json::from_slice(include_bytes!(
+                    "../../../zeabur-catalog/tests/api/catalog.json"
+                ))
+                .unwrap();
+                index["components"]
+                    .as_array_mut()
+                    .unwrap()
+                    .retain(|c| c["id"] == "velero");
+                serde_json::to_vec(&index).unwrap()
+            } else {
+                let mut file: serde_json::Value = serde_json::from_slice(include_bytes!(
+                    "../../../zeabur-catalog/tests/api/velero.json"
+                ))
+                .unwrap();
+                file["declaration"]["provides"]["registry"] = serde_json::json!({
+                    "host": self.host,
+                    "ca": {"name": "zot-tls", "key": "ca.crt", "namespace": "zot"},
+                });
+                serde_json::to_vec(&file).unwrap()
+            };
+            Ok(zeabur_api::cluster::catalog::Fetched::Body { bytes, etag: None })
+        })
+    }
+}

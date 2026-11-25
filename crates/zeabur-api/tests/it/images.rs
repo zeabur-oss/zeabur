@@ -1,6 +1,7 @@
 //! An image's ports from its registry: a private image is read with the project's pull Secret,
 //! read as the person, and the credentials go only to the image's registry. An image in the build
-//! registry is read trusting the CA of the project's upload Secret, read as the person.
+//! registry is read trusting the CA that the catalog's `provides.registry.ca` names, read as the
+//! person.
 
 #[cfg(test)]
 mod tests {
@@ -16,11 +17,10 @@ mod tests {
     use zeabur_api::Settings;
     use zeabur_api::images::Inspector;
     use zeabur_api::images::registry::{Answer, Get, Transport};
-    use zeabur_kube::ServedResource;
     use zeabur_kube::memory::{MemoryCluster, State};
 
     use crate::common::send;
-    use crate::support::TestApi;
+    use crate::support::{RegistryCatalog, TestApi};
 
     /// `me:pw`, as Basic credentials.
     const BASIC: &str = "Basic bWU6cHc=";
@@ -249,35 +249,21 @@ mod tests {
         address.to_string()
     }
 
-    /// A project with a Build whose upload Secret, written by Zeabur Builder, names `registry`
-    /// and holds `ca`.
-    fn built(registry: &str, ca: Option<&str>, forbidden: bool) -> MemoryCluster {
-        let config = json!({"auths": {registry: {"registrytoken": "t"}}}).to_string();
-        let mut values = BTreeMap::from([(".dockerconfigjson".to_owned(), config.into_bytes())]);
-        if let Some(ca) = ca {
-            values.insert("ca.crt".to_owned(), ca.as_bytes().to_vec());
-        }
+    /// A project that never built: the only object is the Secret `zot/zot-tls` that the catalog
+    /// names in `provides.registry.ca`, holding `ca` when there is one.
+    fn published(ca: Option<&str>, forbidden: bool) -> MemoryCluster {
         MemoryCluster::new(State {
-            served: vec![ServedResource::readable(
-                "builder.zeabur.com",
-                "v1alpha1",
-                "builds",
-                "Build",
-                true,
-            )],
-            dynamic: vec![
-                serde_json::from_value(json!({
-                    "apiVersion": "builder.zeabur.com/v1alpha1", "kind": "Build",
-                    "metadata": {"name": "web", "namespace": "shop"},
-                    "spec": {"builderRef": "railpack", "source": {"type": "archive", "archive": {}}},
-                    "status": {"uploadToken": {"request": "u1", "secretName": "web-upload",
-                        "expiresAt": "2099-01-01T00:00:00Z"}},
-                }))
-                .unwrap(),
-            ],
-            secret_values: BTreeMap::from([("shop/web-upload".to_owned(), values)]),
+            secret_values: ca
+                .map(|ca| {
+                    (
+                        "zot/zot-tls".to_owned(),
+                        BTreeMap::from([("ca.crt".to_owned(), ca.as_bytes().to_vec())]),
+                    )
+                })
+                .into_iter()
+                .collect(),
             forbidden_namespaces: if forbidden {
-                ["shop".to_owned()].into()
+                ["zot".to_owned()].into()
             } else {
                 std::collections::BTreeSet::new()
             },
@@ -285,10 +271,11 @@ mod tests {
         })
     }
 
-    /// The read trusts the build registry's CA only when the person's upload Secret holds the CA
-    /// that signed the registry's certificate.
+    /// The build registry is read trusting the CA that the catalog's `provides.registry.ca`
+    /// names, in a project with no Build: only when that Secret holds the CA that signed the
+    /// registry's certificate and the person may read it.
     #[tokio::test]
-    async fn the_build_registry_is_read_with_the_ca_builder_published() {
+    async fn the_build_registry_is_read_with_the_published_ca() {
         use zeabur_test_support::tls::{ca_a, ca_b};
 
         let registry = tls_registry().await;
@@ -296,9 +283,9 @@ mod tests {
         for (case, ca, forbidden, read) in [
             ("the CA that signed it", Some(ca_a()), false, true),
             ("another CA", Some(ca_b()), false, false),
-            ("no CA", None, false, false),
+            ("no Secret", None, false, false),
             (
-                "a project the person may not read",
+                "a Secret the person may not read",
                 Some(ca_a()),
                 true,
                 false,
@@ -306,8 +293,11 @@ mod tests {
         ] {
             let mut settings = Settings::default();
             settings.builds.registry = Some(registry.clone());
-            let app = TestApi::new(&built(&registry, ca, forbidden))
+            let app = TestApi::new(&published(ca, forbidden))
                 .with_settings(settings)
+                .with_catalog(Arc::new(RegistryCatalog {
+                    host: registry.clone(),
+                }))
                 .router();
             let (status, body) = send(&app, "POST", PATH, Some(&json!({"image": image}))).await;
             assert_eq!(status, StatusCode::OK, "{case}: {body}");
@@ -322,5 +312,24 @@ mod tests {
                 assert_eq!(body["unreadable"], "unreachable", "{case}: {body}");
             }
         }
+    }
+
+    /// The published CA is trusted only for the build registry: another registry the catalog
+    /// provides is read with the server's own trust.
+    #[tokio::test]
+    async fn only_the_build_registry_trusts_the_published_ca() {
+        let registry = tls_registry().await;
+        let mut settings = Settings::default();
+        settings.builds.registry = Some("zot.zot.svc:5000".to_owned());
+        let app = TestApi::new(&published(Some(zeabur_test_support::tls::ca_a()), false))
+            .with_settings(settings)
+            .with_catalog(Arc::new(RegistryCatalog {
+                host: registry.clone(),
+            }))
+            .router();
+        let image = format!("{registry}/shop/web:1");
+        let (status, body) = send(&app, "POST", PATH, Some(&json!({"image": image}))).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["unreadable"], "unreachable", "{body}");
     }
 }

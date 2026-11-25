@@ -178,7 +178,7 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
             .quiet()?;
     }
     // zot takes pushes only with a token that Builder signs with the key of zot-token-signer.
-    // buildkitd trusts zot's CA, copied from zot-tls at install time.
+    // Builder follows zot-tls and gives its CA to buildkitd.
     let mut helm = dev
         .cmd("helm")
         .args(["upgrade", "--install", "builder"])
@@ -199,10 +199,10 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
     }
     for value in [
         format!("registry.host={ZOT_HOST}"),
-        "registry.tokenKey.namespace=zot".to_owned(),
-        "registry.tokenKey.secret=zot-token-signer".to_owned(),
-        "registry.caFrom.namespace=zot".to_owned(),
-        "registry.caFrom.secret=zot-tls".to_owned(),
+        "registry.tokenSecretRef.namespace=zot".to_owned(),
+        "registry.tokenSecretRef.name=zot-token-signer".to_owned(),
+        "registry.caSecretRef.namespace=zot".to_owned(),
+        "registry.caSecretRef.name=zot-tls".to_owned(),
         "registry.inCluster.namespace=zot".to_owned(),
         r"registry.inCluster.podLabels.app\.kubernetes\.io/name=zot".to_owned(),
     ] {
