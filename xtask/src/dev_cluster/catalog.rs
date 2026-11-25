@@ -46,7 +46,7 @@ pub(crate) fn prepare(
         if let Some(repo) = chart.repo {
             args.extend(["--repo", repo]);
         }
-        let archive = super::pull_chart(dev, chart.chart, &args, &dir)?;
+        let archive = super::pull_chart(dev, chart.reference, &args, &dir)?;
         archive
             .strip_prefix(work.path())
             .map(|path| path.display().to_string())
@@ -91,7 +91,7 @@ pub(crate) fn install(dev: &DevCluster, script: &Script) -> Result<(), String> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct Chart<'a> {
     release: &'a str,
-    chart: &'a str,
+    reference: &'a str,
     repo: Option<&'a str>,
     version: &'a str,
 }
@@ -128,7 +128,7 @@ fn local_charts<'a>(
         };
         let chart = Chart {
             release,
-            chart,
+            reference: chart,
             repo: option("--repo "),
             version: option("--version ")
                 .ok_or_else(|| format!("no --version for release {release}"))?,
@@ -233,13 +233,13 @@ fi
             [
                 Chart {
                     release: "zot",
-                    chart: "zot",
+                    reference: "zot",
                     repo: Some("https://zotregistry.dev/helm-charts"),
                     version: "0.1.134",
                 },
                 Chart {
                     release: "builder",
-                    chart: "oci://ghcr.io/zeabur-oss/charts/zeabur-builder",
+                    reference: "oci://ghcr.io/zeabur-oss/charts/zeabur-builder",
                     repo: None,
                     version: "0.3.0",
                 },
