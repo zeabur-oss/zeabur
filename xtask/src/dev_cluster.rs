@@ -237,26 +237,23 @@ pub(crate) fn up(options: &Up) -> Result<(), String> {
         return Err(format!("{tool} is not on PATH"));
     }
     fs::create_dir_all(&dev.state).map_err(|e| format!("creating {}: {e}", dev.state.display()))?;
+    // Every download comes before the cluster: its Traefik then holds this machine's port 443, and
+    // a host connection that reaches it gets a certificate for another name.
     images::busybox(&dev)?;
-    let built = if options.profile == Profile::Bare {
+    let prepared = if options.profile == Profile::Bare {
         None
     } else {
-        Some(images::build(
-            &dev,
-            options.identity_src.as_deref(),
-            options.zeabur_image.as_deref(),
-        )?)
+        Some(prepare(&dev, options)?)
     };
-    let chart = resolve_chart(&dev, options.zeabur_chart.as_deref())?;
 
     cluster::create(&dev)?;
     let mut push = vec![images::BUSYBOX.to_owned()];
-    if let Some(built) = &built {
-        push.extend(built.push.iter().cloned());
+    if let Some(prepared) = &prepared {
+        push.extend(prepared.built.push.iter().cloned());
     }
     images::push(&dev, &push)?;
     cluster::traefik(&dev)?;
-    let Some(built) = built else {
+    let Some(prepared) = prepared else {
         dev.write("profile", "bare\n")?;
         output::say(&format!(
             "kubectl: export KUBECONFIG={}",
@@ -269,27 +266,58 @@ pub(crate) fn up(options: &Up) -> Result<(), String> {
 
     // cert-manager issues the certificate kube-apiserver checks on Zeabur Identity's internal
     // address, and the full profile's certificates.
-    catalog::install(
+    catalog::install(&dev, &prepared.cert_manager)?;
+    // Before Zeabur, so that e2e's removal check counts them as the cluster's own.
+    if let Some(full) = &prepared.full {
+        full::install(&dev, full)?;
+    }
+    identity::install(&dev, &prepared.built.identity)?;
+    zeabur::install(
         &dev,
+        &zeabur::Install {
+            profile: options.profile,
+            zeabur_image: &prepared.built.zeabur,
+            proxy_image: prepared.built.proxy.as_deref(),
+            chart: &prepared.chart,
+        },
+    )
+}
+
+/// What `up` installs past the bare cluster, downloaded and built.
+#[derive(Debug)]
+struct Prepared {
+    built: images::Built,
+    chart: PathBuf,
+    cert_manager: catalog::Script,
+    full: Option<full::Prepared>,
+}
+
+fn prepare(dev: &DevCluster, options: &Up) -> Result<Prepared, String> {
+    let built = images::build(
+        dev,
+        options.identity_src.as_deref(),
+        options.zeabur_image.as_deref(),
+    )?;
+    let chart = resolve_chart(dev, options.zeabur_chart.as_deref())?;
+    zeabur::dependencies(dev, &chart)?;
+    let cert_manager = catalog::prepare(
+        dev,
         "cert-manager",
         "cert-manager",
         &[],
         catalog::stop_at_from_env().as_deref(),
     )?;
-    // Before Zeabur, so that e2e's removal check counts them as the cluster's own.
-    if options.profile == Profile::Full {
-        full::install(&dev, options.builder_src.as_deref())?;
-    }
-    identity::install(&dev, &built.identity)?;
-    zeabur::install(
-        &dev,
-        &zeabur::Install {
-            profile: options.profile,
-            zeabur_image: &built.zeabur,
-            proxy_image: built.proxy.as_deref(),
-            chart: &chart,
-        },
-    )
+    let full = if options.profile == Profile::Full {
+        Some(full::prepare(dev, options.builder_src.as_deref())?)
+    } else {
+        None
+    };
+    Ok(Prepared {
+        built,
+        chart,
+        cert_manager,
+        full,
+    })
 }
 
 /// The chart as a local path; an `oci://` chart is pulled into `target/dev-cluster/chart`.
@@ -297,25 +325,31 @@ fn resolve_chart(dev: &DevCluster, chart: Option<&str>) -> Result<PathBuf, Strin
     let chart = match chart {
         None => dev.root.join("deploy/chart/zeabur"),
         Some(oci) if oci.starts_with("oci://") => {
-            let dir = dev.state.join("chart");
-            if dir.exists() {
-                fs::remove_dir_all(&dir).map_err(|e| format!("removing {}: {e}", dir.display()))?;
-            }
-            fs::create_dir_all(&dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
-            dev.cmd("helm")
-                .args(["pull", oci, "--destination"])
-                .arg(&dir)
-                .run()?;
-            fs::read_dir(&dir)
-                .map_err(|e| format!("reading {}: {e}", dir.display()))?
-                .filter_map(Result::ok)
-                .map(|entry| entry.path())
-                .find(|path| path.extension().is_some_and(|ext| ext == "tgz"))
-                .ok_or_else(|| format!("helm pull {oci} left no .tgz"))?
+            pull_chart(dev, oci, &[], &dev.state.join("chart"))?
         }
         Some(path) => PathBuf::from(path),
     };
     fs::canonicalize(&chart).map_err(|e| format!("no chart at {}: {e}", chart.display()))
+}
+
+/// `helm pull <chart> <args>` into `dir`, emptied first; returns the archive.
+fn pull_chart(dev: &DevCluster, chart: &str, args: &[&str], dir: &Path) -> Result<PathBuf, String> {
+    if dir.exists() {
+        fs::remove_dir_all(dir).map_err(|e| format!("removing {}: {e}", dir.display()))?;
+    }
+    fs::create_dir_all(dir).map_err(|e| format!("creating {}: {e}", dir.display()))?;
+    dev.cmd("helm")
+        .args(["pull", chart])
+        .args(args)
+        .arg("--destination")
+        .arg(dir)
+        .run()?;
+    fs::read_dir(dir)
+        .map_err(|e| format!("reading {}: {e}", dir.display()))?
+        .filter_map(Result::ok)
+        .map(|entry| entry.path())
+        .find(|path| path.extension().is_some_and(|ext| ext == "tgz"))
+        .ok_or_else(|| format!("helm pull {chart} left no .tgz"))
 }
 
 /// Deletes the cluster, its volume, the images it tagged and its state, but not the checkouts.
