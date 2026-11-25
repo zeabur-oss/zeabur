@@ -562,6 +562,24 @@ fn empty(
     }
 }
 
+/// The reads of `GET /cluster/backups` that decide whether the page opens: Velero's schedules,
+/// backups and locations, cluster-wide, and the S3 destinations its manager lists.
+pub(crate) fn reads() -> Vec<Denied> {
+    vec![
+        list_read(velero::SCHEDULES.group, velero::SCHEDULES.resource, None),
+        list_read(velero::BACKUPS.group, velero::BACKUPS.resource, None),
+        list_read(v::LOCATIONS.group, v::LOCATIONS.resource, None),
+        list_read("", "configmaps", Some(s3_destinations::NAMESPACE)),
+    ]
+}
+
+/// Whether the person may open Backups: see [`crate::head`].
+#[utoipa::path(head, path = "/api/v1/cluster/backups", tag = "cluster",
+    operation_id = "headClusterBackups", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+pub(crate) async fn head(Person(cluster): Person) -> axum::http::StatusCode {
+    crate::head::status(cluster.as_ref(), &reads()).await
+}
+
 /// The cluster's backups through Velero: its locations with whether Velero reaches them, its
 /// schedules, and the newest hundred backups with how each went. Read as the person; Velero not
 /// installed is `state: not-installed`, and a refused read is named in `unreadable`.
@@ -573,6 +591,7 @@ pub(crate) async fn get(
     Person(cluster): Person,
 ) -> Result<Json<ClusterBackups>, ApiError> {
     let cluster = cluster.as_ref();
+    crate::head::require(cluster, &reads(), "the cluster's backups").await?;
     let mut unreadable = Vec::new();
     let k8up = k8up_state(cluster, &mut unreadable).await?;
     let providers = |velero_state| {

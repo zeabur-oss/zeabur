@@ -133,6 +133,7 @@ pub mod extract;
 pub mod gaps;
 mod github;
 mod handlers;
+mod head;
 pub mod identity;
 pub mod images;
 pub mod incidents;
@@ -242,10 +243,12 @@ macro_rules! handlers {
             cluster::zeabur::get,
             cluster::update::get,
             cluster::capabilities,
+            cluster::capabilities_head,
             cluster::catalog::get,
             cluster::components::plan,
             cluster::components::apply,
             cluster::backups::get,
+            cluster::backups::head,
             cluster::backups::plan,
             cluster::backups::apply,
             cluster::backup_download::download,
@@ -255,12 +258,14 @@ macro_rules! handlers {
             cluster::s3_destinations::plan,
             cluster::s3_destinations::apply,
             cluster::github_app::get,
+            cluster::github_app::head,
             cluster::github_app::manifest,
             cluster::github_app::form,
             cluster::github_app::conversion,
             cluster::github_app::plan,
             cluster::github_app::apply,
             notifications::cluster_get,
+            notifications::cluster_head,
             notifications::cluster_plan,
             notifications::cluster_apply,
             cluster::config_reload::get,
@@ -279,6 +284,7 @@ macro_rules! handlers {
             cluster::maintenance::plan,
             cluster::maintenance::apply,
             cluster::nodes,
+            cluster::nodes_head,
             cluster::usage::get,
             cluster::health,
             cluster::upgrades,
@@ -357,6 +363,7 @@ macro_rules! handlers {
             settings::sign_in::set,
             account::get,
             members::handlers::list,
+            members::handlers::head,
             members::plan::plan,
             members::plan::apply,
             members::handlers::revoke_invitation,

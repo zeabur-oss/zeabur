@@ -48,6 +48,8 @@ export const zhCN: Messages = {
   "shell.menu": "菜单",
   "shell.findProject": "查找项目",
   "shell.manage": "管理",
+  "shell.adminOnly": "只有集群管理员能打开这个页面",
+  "shell.adminOnlyHint": "需要调整的话，请联系集群管理员。",
   "shell.whoamiUnknown": "未知用户",
   "shell.signOut": "退出登录",
   "shell.theme": "主题",

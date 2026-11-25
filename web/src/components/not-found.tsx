@@ -17,12 +17,12 @@ export function NotFound() {
     <Empty>
       <EmptyHeader>
         <EmptyMedia>
-          <Illustration kind="not-found" className="w-48" />
+          <Illustration kind="not-found" />
         </EmptyMedia>
         <EmptyTitle>{t("common.notFound")}</EmptyTitle>
       </EmptyHeader>
       <EmptyContent>
-        <Link to="/cluster" className={cn(buttonVariants({ variant: "outline" }))}>
+        <Link to="/projects" className={cn(buttonVariants({ variant: "outline" }))}>
           {t("common.backToProjects")}
         </Link>
       </EmptyContent>

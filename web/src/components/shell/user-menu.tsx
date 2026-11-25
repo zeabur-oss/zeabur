@@ -12,6 +12,8 @@ import UserCircleIcon from "~icons/ph/user-circle"
 
 import { clusterNameQuery, clusterQuery, sessionQuery, whoamiQuery } from "@/api/queries"
 import { signOut } from "@/auth/session"
+import { usePages } from "@/components/gate"
+import { clusterPages } from "@/model/pages"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
 import { lastKnown } from "@/lib/last-known"
 import { nameSourceOf } from "@/lib/cluster-name"
@@ -92,15 +94,7 @@ export function ContextMenu() {
           <UserCircleIcon aria-hidden="true" />
           {t("shell.account")}
         </MenuItem>
-        <MenuItem render={<Link to="/cluster" />}>
-          <HardDrivesIcon aria-hidden="true" />
-          <span className="flex min-w-0 flex-1 flex-col">
-            <span className="truncate" translate="no">
-              {place}
-            </span>
-            {source ? <span className="truncate text-xs text-tertiary">{source}</span> : null}
-          </span>
-        </MenuItem>
+        <ClusterItem place={place} source={source} />
         <RenameCluster />
         <MenuSeparator />
         <MenuLabel>{t("settings.language")}</MenuLabel>
@@ -130,6 +124,22 @@ export function ContextMenu() {
         ) : null}
       </MenuContent>
     </Menu>
+  )
+}
+
+/** The cluster's name, which opens its page for an administrator. */
+function ClusterItem({ place, source }: { place: string; source?: string }) {
+  const mayOpen = usePages(clusterPages).open
+  return (
+    <MenuItem render={mayOpen ? <Link to="/cluster" /> : undefined}>
+      <HardDrivesIcon aria-hidden="true" />
+      <span className="flex min-w-0 flex-1 flex-col">
+        <span className="truncate" translate="no">
+          {place}
+        </span>
+        {source ? <span className="truncate text-xs text-tertiary">{source}</span> : null}
+      </span>
+    </MenuItem>
   )
 }
 

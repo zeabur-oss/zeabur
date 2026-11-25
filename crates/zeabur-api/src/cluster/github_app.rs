@@ -479,6 +479,22 @@ fn client(state: &AppState) -> Result<&zeabur_http::Https, ApiError> {
     })
 }
 
+/// The reads of `GET /cluster/github-app` that decide whether the page opens: the App's Secret
+/// and its installations' ConfigMap.
+pub(crate) fn reads() -> Vec<Denied> {
+    vec![
+        get_read("", "secrets", Some(NAMESPACE), SECRET),
+        get_read("", "configmaps", Some(NAMESPACE), GRANTS),
+    ]
+}
+
+/// Whether the person may open GitHub App: see [`crate::head`].
+#[utoipa::path(head, path = "/api/v1/cluster/github-app", tag = "cluster",
+    operation_id = "headGitHubApp", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+pub(crate) async fn head(Person(cluster): Person) -> axum::http::StatusCode {
+    crate::head::status(cluster.as_ref(), &reads()).await
+}
+
 /// The App, its installations and their projects. The installations are read from GitHub with
 /// the App's private key, read as the person; a person who may not read it sees the App without
 /// them.
@@ -491,6 +507,7 @@ pub(crate) async fn get(
     Person(cluster): Person,
 ) -> Result<Json<GitHubApp>, ApiError> {
     let cluster = cluster.as_ref();
+    crate::head::require(cluster, &reads(), "the GitHub App").await?;
     let mut unreadable = Vec::new();
     let mut read = async |resource: ResourceRef, name: &str| match cluster
         .find_object(&resource, Some(NAMESPACE), name)

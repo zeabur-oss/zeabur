@@ -11811,6 +11811,22 @@ export const getClusterBackups = async (
   })
 }
 
+export const getHeadClusterBackupsUrl = () => {
+  return `/api/v1/cluster/backups`
+}
+
+/**
+ * @summary Whether the person may open Backups: see [`crate::head`].
+ */
+export const headClusterBackups = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getHeadClusterBackupsUrl(), {
+    ...options,
+    method: "HEAD",
+  })
+}
+
 export const getApplyClusterBackupsUrl = () => {
   return `/api/v1/cluster/backups/apply`
 }
@@ -11907,6 +11923,22 @@ export const listCapabilities = async (
   return zeaburFetch<CapabilityList>(getListCapabilitiesUrl(), {
     ...options,
     method: "GET",
+  })
+}
+
+export const getHeadCapabilitiesUrl = () => {
+  return `/api/v1/cluster/capabilities`
+}
+
+/**
+ * @summary Whether the person may open Components: see [`crate::head`].
+ */
+export const headCapabilities = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getHeadCapabilitiesUrl(), {
+    ...options,
+    method: "HEAD",
   })
 }
 
@@ -12057,6 +12089,20 @@ export const getGitHubApp = async (
   return zeaburFetch<GitHubApp>(getGetGitHubAppUrl(), {
     ...options,
     method: "GET",
+  })
+}
+
+export const getHeadGitHubAppUrl = () => {
+  return `/api/v1/cluster/github-app`
+}
+
+/**
+ * @summary Whether the person may open GitHub App: see [`crate::head`].
+ */
+export const headGitHubApp = async (options?: Parameters<typeof zeaburFetch>[1]): Promise<void> => {
+  return zeaburFetch<void>(getHeadGitHubAppUrl(), {
+    ...options,
+    method: "HEAD",
   })
 }
 
@@ -12325,6 +12371,22 @@ export const listNodes = async (options?: Parameters<typeof zeaburFetch>[1]): Pr
   })
 }
 
+export const getHeadClusterNodesUrl = () => {
+  return `/api/v1/cluster/nodes`
+}
+
+/**
+ * @summary Whether the person may open the Cluster overview: see [`crate::head`].
+ */
+export const headClusterNodes = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getHeadClusterNodesUrl(), {
+    ...options,
+    method: "HEAD",
+  })
+}
+
 export const getApplyNodeMaintenanceUrl = (node: string) => {
   return `/api/v1/cluster/nodes/${encodeURIComponent(String(node))}/maintenance/apply`
 }
@@ -12379,6 +12441,22 @@ export const getClusterNotifications = async (
   return zeaburFetch<Notifications>(getGetClusterNotificationsUrl(), {
     ...options,
     method: "GET",
+  })
+}
+
+export const getHeadClusterNotificationsUrl = () => {
+  return `/api/v1/cluster/notifications`
+}
+
+/**
+ * @summary Whether the person may open Notifications: see [`crate::head`].
+ */
+export const headClusterNotifications = async (
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getHeadClusterNotificationsUrl(), {
+    ...options,
+    method: "HEAD",
   })
 }
 
@@ -12712,6 +12790,20 @@ export const listMembers = async (
   return zeaburFetch<MembersView>(getListMembersUrl(), {
     ...options,
     method: "GET",
+  })
+}
+
+export const getHeadMembersUrl = () => {
+  return `/api/v1/members`
+}
+
+/**
+ * @summary Whether the person may open Members: see [`crate::head`].
+ */
+export const headMembers = async (options?: Parameters<typeof zeaburFetch>[1]): Promise<void> => {
+  return zeaburFetch<void>(getHeadMembersUrl(), {
+    ...options,
+    method: "HEAD",
   })
 }
 

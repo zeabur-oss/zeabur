@@ -48,6 +48,8 @@ export const zhTW: Messages = {
   "shell.menu": "選單",
   "shell.findProject": "尋找專案",
   "shell.manage": "管理",
+  "shell.adminOnly": "只有叢集管理員能開啟這個頁面",
+  "shell.adminOnlyHint": "需要調整的話，請洽叢集管理員。",
   "shell.whoamiUnknown": "不明使用者",
   "shell.signOut": "登出",
   "shell.theme": "主題",
