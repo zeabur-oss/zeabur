@@ -64,9 +64,10 @@ if [[ "$stage" == compile ]]; then
   cargo tauri build --ci --no-bundle
   # Linked outside Nix: the binary names nothing in /nix/store.
   binary="$CARGO_TARGET_DIR/release/zeabur-desktop"
+  links=
   if [[ "$os" == darwin ]]; then
     links=$(otool -L "$binary")
-  else
+  elif [[ "$os" == linux ]]; then
     links=$(readelf -d "$binary")
   fi
   if [[ "$links" == */nix/store* ]]; then
