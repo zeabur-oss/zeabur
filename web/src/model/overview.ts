@@ -44,6 +44,10 @@ function isCurrent(event: Event, pods: readonly Pod[]): boolean {
   return status?.terminated?.exitCode !== 0
 }
 
+/** The events that still say something, given the pods now: see [`isCurrent`]. */
+export const currentEvents = (events: Event[], pods: readonly Pod[]) =>
+  events.filter((event) => isCurrent(event, pods))
+
 export function explainedBy(event: Event, diagnoses: Diagnosis[]): boolean {
   return diagnoses.some((d) => {
     if (d.evidence.some((o) => o.kind === "Event" && o.name === event.origin.name)) return true
@@ -96,8 +100,6 @@ export function overviewOf(
     diagnoses?: Diagnosis[] | null
     /** Scaled to zero: no replica is meant to run. */
     stopped: boolean
-    /** Its pods now, which say which warnings still hold. */
-    pods: readonly Pod[]
     /** Replicas wanted and ready, when the service has them. */
     replicas?: { desired: number; ready: number } | null
   },
@@ -126,9 +128,7 @@ export function overviewOf(
     waiting,
     alsoDown,
     rollout: rolloutShown(rollout, causes),
-    warnings: events.filter(
-      (e) => isWarning(e) && isCurrent(e, service.pods) && !explainedBy(e, diagnoses),
-    ),
+    warnings: events.filter((e) => isWarning(e) && !explainedBy(e, diagnoses)),
   }
 }
 
