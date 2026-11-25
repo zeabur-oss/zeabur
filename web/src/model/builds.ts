@@ -137,7 +137,7 @@ const buildDeletion = (build: Build, kept: readonly Build[]): Schemas.Change[] =
 
 /** The image a container keeps once nothing builds it: the Build's newest with its digest when
  * the container runs that one, else what it runs now. */
-export function pinnedImage(image: string, build: Build): string {
+function pinnedImage(image: string, build: Build): string {
   if (digestOf(image)) return image
   return runsLatest(image, build) && build.latestImage ? build.latestImage : image
 }
