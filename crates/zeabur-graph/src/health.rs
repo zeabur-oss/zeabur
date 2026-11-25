@@ -149,7 +149,10 @@ pub fn status(
     let serving = workload.kind == WorkloadKind::Deployment
         && matches!(workload.phase, Phase::Progressing | Phase::Failed)
         && workload.replicas.is_some_and(|r| r.ready > 0);
-    if let Some(pod) = pods.iter().find(|pod| !pod.terminating && failing(pod, now)) {
+    if let Some(pod) = pods
+        .iter()
+        .find(|pod| !pod.terminating && failing(pod, now))
+    {
         let word = if serving {
             StatusWord::RolloutStuck
         } else {
