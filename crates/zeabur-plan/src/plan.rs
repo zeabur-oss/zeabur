@@ -418,6 +418,7 @@ impl<'a> Planner<'a> {
             Change::Create { .. } => self.create(change, index),
             Change::CreateUploadService(service) => self.create_upload_service(service, index),
             Change::CreateGitService(service) => self.create_git_service(service, index),
+            Change::GitSource(change) => self.git_source(change, index),
             Change::CreateImageService(service) => self.create_image_service(service, index),
             Change::Restart { workload } => self.restart_workload(workload),
             Change::Rollback { workload, revision } => self.rollback(workload, *revision),

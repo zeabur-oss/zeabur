@@ -218,6 +218,7 @@ fn weigh_one(change: &Change, ready: &ReadyPods) -> Weight {
         | Change::CreateUploadService(_)
         | Change::CreateImageService(_)
         | Change::CreateGitService(_)
+        | Change::GitSource(_)
         | Change::CopyS3Keys(_)
         | Change::Unadopt
         | Change::ScheduleTask { .. }

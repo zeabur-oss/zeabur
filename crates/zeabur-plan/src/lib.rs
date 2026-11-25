@@ -36,8 +36,8 @@ pub mod terminal;
 pub mod token;
 
 pub use built_service::{
-    BRANCH_PATTERN, DeployKeySecret, GitAccess, GitServiceChange, Repository, deploy_key_host,
-    parse_repository,
+    BRANCH_PATTERN, DeployKeySecret, GitAccess, GitServiceChange, GitSourceChange, Repository,
+    deploy_key_host, parse_repository,
 };
 pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{

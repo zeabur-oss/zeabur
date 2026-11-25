@@ -75,6 +75,17 @@ export const rules = {
     maxLength: 40,
     pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$",
   },
+  "GitSourceChange.branch": {
+    pattern: "^(\\.?[A-Za-z0-9_-])+\\.?(/(\\.?[A-Za-z0-9_-])+\\.?)*$",
+  },
+  "GitSourceChange.directory": {
+    maxLength: 1024,
+    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
+  },
+  "GitSourceChange.dockerfile": {
+    maxLength: 1024,
+    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
+  },
   "ImageServiceChange.image": {
     pattern: "^[a-z0-9][A-Za-z0-9._/:@-]*$",
   },

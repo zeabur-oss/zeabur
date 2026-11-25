@@ -6473,6 +6473,24 @@ components:
           credentials, and the objects of the service that runs the image it builds (see the
           `built_service` module).
       - allOf:
+        - $ref: "#/components/schemas/GitSourceChange"
+          description: |-
+            Build a running service from a Git repository (see the `built_service` module): a
+            service with no `Build` of its name gets one, and its container runs what the `Build`
+            pushes, updated by Keel; an uploaded folder's `Build` builds the repository instead.
+        - type: object
+          required:
+          - op
+          properties:
+            op:
+              type: string
+              enum:
+              - gitSource
+        description: |-
+          Build a running service from a Git repository (see the `built_service` module): a
+          service with no `Build` of its name gets one, and its container runs what the `Build`
+          pushes, updated by Keel; an uploaded folder's `Build` builds the repository instead.
+      - allOf:
         - $ref: "#/components/schemas/ImageServiceChange"
           description: |-
             Create a service that runs a container image: its Deployment, and the Secrets, claims,
@@ -10795,6 +10813,54 @@ components:
           description: >-
             Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from
             `port`.
+    GitSourceChange:
+      type: object
+      description: A [`crate::Change::GitSource`]. The `Build` is named after the workload.
+      required:
+      - workload
+      - url
+      - method
+      - access
+      properties:
+        access:
+          $ref: "#/components/schemas/GitAccess"
+          description: How Zeabur Builder reads the repository.
+        branch:
+          type:
+          - string
+          - "null"
+          description: "The branch. Left out: the repository's default branch."
+          pattern: ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
+        container:
+          type:
+          - string
+          - "null"
+          description: |-
+            The container that runs what the `Build` makes; may be left out when the workload has
+            only one.
+        directory:
+          type:
+          - string
+          - "null"
+          description: "The folder inside the repository to build. Left out: its root."
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+        dockerfile:
+          type:
+          - string
+          - "null"
+          description: The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+        method:
+          $ref: "#/components/schemas/BuildMethod"
+          description: How the folder is built.
+        url:
+          type: string
+          description: The repository, as for [`GitServiceChange::url`].
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: "The service: a Deployment, StatefulSet or DaemonSet."
     Headline:
       oneOf:
       - type: object

@@ -1,5 +1,6 @@
 //! What a plan reads before it edits an object as YAML, or deletes it: the object itself. The
-//! same for the Zeabur Builder `Build` it builds again, changes the options of, or tells of Keel.
+//! same for the Zeabur Builder `Build` it builds again, changes the options of, tells of Keel, or
+//! gives a Git source (the `Build` named after the service, when there is one).
 
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _};
 use zeabur_plan::{Change, Fetched, PlanRequest};
@@ -32,6 +33,8 @@ pub(super) async fn edited_objects(
             } = change
             {
                 (&builds, build)
+            } else if let Change::GitSource(source) = change {
+                (&builds, &source.workload.name)
             } else if let Change::Edit { resource, name, .. } = change
                 && zeabur_plan::checks::resource_allowed(resource).allowed
             {

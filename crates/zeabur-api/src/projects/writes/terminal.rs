@@ -117,6 +117,7 @@ pub(crate) async fn compute(
         | Change::Create { .. }
         | Change::CreateUploadService(_)
         | Change::CreateGitService(_)
+        | Change::GitSource(_)
         | Change::CreateImageService(_)
         | Change::CopyS3Keys(_)
         | Change::Delete { .. }

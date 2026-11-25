@@ -14,13 +14,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use zeabur_model::{PodSecurityLevel, ProjectIcon, TaskConcurrency, WorkloadRef};
 
-use crate::built_service::GitServiceChange;
+use crate::built_service::{GitServiceChange, GitSourceChange};
 use crate::checks::{ProbeRequest, ResourceRef, VolumeRequest};
 use crate::image_service::ImageServiceChange;
 use crate::rules::{EnvEdit, FieldChange};
 
 // `zeabur-api` resolves `PageServer`, `Template` and `CopyS3Keys` into other changes, and makes
-// the deploy key of a `CreateGitService`, before the planner sees them. The planner rejects them.
+// the deploy key of a `CreateGitService` or `GitSource`, before the planner sees them. The
+// planner rejects them.
 /// One change a person asks for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -348,6 +349,10 @@ pub enum Change {
     /// credentials, and the objects of the service that runs the image it builds (see the
     /// `built_service` module).
     CreateGitService(GitServiceChange),
+    /// Build a running service from a Git repository (see the `built_service` module): a
+    /// service with no `Build` of its name gets one, and its container runs what the `Build`
+    /// pushes, updated by Keel; an uploaded folder's `Build` builds the repository instead.
+    GitSource(GitSourceChange),
     /// Create a service that runs a container image: its Deployment, and the Secrets, claims,
     /// Service and Ingress the change asks for (see the `image_service` module).
     CreateImageService(ImageServiceChange),

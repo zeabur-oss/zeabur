@@ -21,6 +21,7 @@ pub(super) fn creates(request: &PlanRequest) -> bool {
             Change::Create { .. }
                 | Change::CreateUploadService(_)
                 | Change::CreateGitService(_)
+                | Change::GitSource(_)
                 | Change::CreateImageService(_)
         )
     })

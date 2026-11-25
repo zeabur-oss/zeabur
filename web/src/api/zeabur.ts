@@ -1913,6 +1913,46 @@ export type GitServiceChange = {
 }
 
 /**
+ * A [`crate::Change::GitSource`]. The `Build` is named after the workload.
+ */
+export type GitSourceChange = {
+  /** How Zeabur Builder reads the repository. */
+  access: GitAccess
+  /**
+   * The branch. Left out: the repository's default branch.
+   * @nullable
+   * @pattern ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
+   */
+  branch?: string | null
+  /**
+   * The container that runs what the `Build` makes; may be left out when the workload has
+   * only one.
+   * @nullable
+   */
+  container?: string | null
+  /**
+   * The folder inside the repository to build. Left out: its root.
+   * @maxLength 1024
+   * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+   */
+  directory?: string | null
+  /**
+   * The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
+   * @maxLength 1024
+   * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+   */
+  dockerfile?: string | null
+  /** How the folder is built. */
+  method: BuildMethod
+  /** The repository, as for [`GitServiceChange::url`]. */
+  url: string
+  /** The service: a Deployment, StatefulSet or DaemonSet. */
+  workload: WorkloadRef
+}
+
+/**
  * A login to a private registry.
  */
 export type RegistryLogin = {
@@ -2406,6 +2446,9 @@ export type Change =
     })
   | (GitServiceChange & {
       op: "createGitService"
+    })
+  | (GitSourceChange & {
+      op: "gitSource"
     })
   | (ImageServiceChange & {
       op: "createImageService"

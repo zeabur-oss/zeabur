@@ -14,12 +14,12 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_graph::Snapshot;
     use zeabur_graph::pod_security::level;
-    use zeabur_model::PodSecurityLevel;
+    use zeabur_model::{PodSecurityLevel, WorkloadKind, WorkloadRef};
     use zeabur_plan::builds::builds;
     use zeabur_plan::{
         BuildMethod, BuildOptionsChange, Change, DeployKeySecret, Fetched, GitAccess,
-        GitServiceChange, Input, NameValue, Plan, PlanError, PlanRequest, ServedKind, ServiceSize,
-        UploadServiceChange, Write, plan,
+        GitServiceChange, GitSourceChange, Input, NameValue, Plan, PlanError, PlanRequest,
+        ServedKind, ServiceSize, UploadServiceChange, Write, plan,
     };
 
     /// The CRDs of the pinned Zeabur Builder, with the release they come from on the first line.
@@ -661,6 +661,157 @@ mod tests {
             assert_eq!(cleared["spec"]["source"], build["spec"]["source"]);
             fits_the_crd(&cleared);
         }
+    }
+
+    fn running(image: &str, keel: bool) -> Value {
+        let annotations = if keel {
+            json!({"keel.sh/policy": "force"})
+        } else {
+            json!({})
+        };
+        json!({
+            "apiVersion": "apps/v1", "kind": "Deployment",
+            "metadata": {"name": "site", "namespace": "shop", "resourceVersion": "3",
+                "generation": 1, "annotations": annotations},
+            "spec": {"selector": {"matchLabels": {"app": "site"}}, "template": {
+                "metadata": {"labels": {"app": "site"}},
+                "spec": {"containers": [{"name": "site", "image": image}]}}}
+        })
+    }
+
+    fn source() -> GitSourceChange {
+        GitSourceChange {
+            workload: WorkloadRef {
+                kind: WorkloadKind::Deployment,
+                name: "site".to_owned(),
+            },
+            container: None,
+            url: "https://github.com/acme/site".to_owned(),
+            branch: None,
+            method: BuildMethod::Railpack,
+            directory: Some("web".to_owned()),
+            dockerfile: None,
+            access: GitAccess::Public,
+            deploy_key: None,
+        }
+    }
+
+    /// A `gitSource` on `deployment`, with `build` as the `Build` of its name if it has one.
+    fn source_plan(
+        change: GitSourceChange,
+        deployment: Value,
+        build: Option<Value>,
+    ) -> Result<Plan, PlanError> {
+        #[expect(clippy::unwrap_in_result, reason = "a test fixture")]
+        let snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            deployments: vec![serde_json::from_value(deployment).unwrap()],
+            ..Snapshot::default()
+        };
+        let objects: Vec<Fetched> = build
+            .into_iter()
+            .map(|object| Fetched {
+                resource: builds(),
+                name: "site".to_owned(),
+                object,
+            })
+            .collect();
+        let kinds = [
+            kind("", "Secret", "secrets"),
+            kind("apps", "Deployment", "deployments"),
+            kind("builder.zeabur.com", "Build", "builds"),
+        ];
+        plan(
+            Input {
+                kinds: &kinds,
+                objects: &objects,
+                build_registry: Some("zot:5000"),
+                ..Input::new(&snapshot, "2026-11-26T00:00:00Z")
+            },
+            &PlanRequest {
+                changes: vec![Change::GitSource(change)],
+            },
+        )
+    }
+
+    fn after<'a>(plan: &'a Plan, kind: &str) -> Option<&'a Value> {
+        plan.objects
+            .iter()
+            .find(|o| o.target.kind == kind)
+            .map(|o| &o.raw_after)
+    }
+
+    /// An image service gets a `Build` of the repository, and its container moves to what the
+    /// `Build` pushes, which Keel updates, as for a new Git service.
+    #[test]
+    fn an_image_service_gets_a_build_and_runs_what_it_pushes() {
+        let plan = source_plan(source(), running("nginx:1.27", false), None).unwrap();
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["spec"]["source"],
+            json!({"type": "git", "git": {"url": "https://github.com/acme/site.git", "ref": "HEAD"},
+                   "contextDir": "web"})
+        );
+        assert_eq!(build["spec"]["output"]["image"], "zot:5000/shop/site");
+        assert_eq!(build["spec"]["notify"][0]["type"], "keel");
+        fits_the_crd(&build);
+        let deployment = after(&plan, "Deployment").unwrap();
+        assert_eq!(
+            deployment["spec"]["template"]["spec"]["containers"][0]["image"],
+            "zot:5000/shop/site:pending"
+        );
+        assert_eq!(
+            deployment["metadata"]["annotations"]["keel.sh/policy"],
+            "force"
+        );
+    }
+
+    /// An uploaded folder's `Build` builds the repository instead, with the credentials it is
+    /// given; the service already runs what that `Build` pushes, so it is left as it is.
+    #[test]
+    fn an_upload_service_builds_the_repository_instead() {
+        let mut upload = service();
+        upload.directory = Some("old".to_owned());
+        let mut build =
+            created(&planned(upload, Some("zot:5000"), None).unwrap(), "Build").unwrap();
+        build["metadata"]["generation"] = json!(1);
+        let mut change = source();
+        change.method = BuildMethod::Dockerfile;
+        change.dockerfile = Some("Dockerfile.prod".to_owned());
+        change.access = GitAccess::Token {
+            username: "x-access-token".to_owned(),
+            token: "ghp_1".to_owned(),
+        };
+        let image = "zot:5000/shop/site:main-1@sha256:".to_owned() + &"a".repeat(64);
+        let plan = source_plan(change, running(&image, true), Some(build)).unwrap();
+        let written = plan.objects.iter().find(|o| o.target.kind == "Build");
+        assert!(written.is_some_and(|o| matches!(o.write, Write::Patch { .. })));
+        let build = after(&plan, "Build").unwrap();
+        assert_eq!(
+            build["spec"]["source"],
+            json!({"type": "git",
+                   "git": {"url": "https://github.com/acme/site.git", "ref": "HEAD",
+                           "credentialsRef": {"name": "site-git"}},
+                   "contextDir": "web", "dockerfile": "Dockerfile.prod"})
+        );
+        assert_eq!(build["spec"]["builderRef"], "dockerfile");
+        fits_the_crd(build);
+        let secret = created(&plan, "Secret").unwrap();
+        assert_eq!(secret["metadata"]["name"], "site-git");
+        assert!(after(&plan, "Deployment").is_none());
+    }
+
+    /// A `Build` that already reads a repository is changed in its own settings.
+    #[test]
+    fn a_build_from_git_is_not_given_another_source() {
+        let build = created(&git_plan(git()).unwrap(), "Build").unwrap();
+        let refused = source_plan(
+            source(),
+            running("zot:5000/shop/site:pending", true),
+            Some(build),
+        )
+        .unwrap_err();
+        assert_eq!(refused.code, "not_an_upload");
     }
 
     /// The form's rules for a repository and a branch are the server's.

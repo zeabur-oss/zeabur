@@ -1,10 +1,10 @@
 //! Deploy keys for Zeabur Builder.
 //!
-//! A plan's [`Change::CreateGitService`] with a deploy key names the Git host. The plan shows the
-//! `create` of a `kubernetes.io/ssh-auth` Secret with its values hidden, like every Secret it
-//! writes; the apply makes the SSH key pair and writes the private key and the host's
-//! `known_hosts`, which Zeabur Builder requires, into that Secret. The private key never leaves the
-//! server. The person then reads the public key from the Secret (`POST
+//! A plan's [`Change::CreateGitService`] or [`Change::GitSource`] with a deploy key names the Git
+//! host. The plan shows the `create` of a `kubernetes.io/ssh-auth` Secret with its values hidden,
+//! like every Secret it writes; the apply makes the SSH key pair and writes the private key and the
+//! host's `known_hosts`, which Zeabur Builder requires, into that Secret. The private key never
+//! leaves the server. The person then reads the public key from the Secret (`POST
 //! /projects/{p}/builds/{build}/deploy-key`) and adds it to the repository on its Git host.
 //!
 //! GitHub's and GitLab's host keys are pinned here. For any other host the person gives its
@@ -264,13 +264,18 @@ pub(crate) fn open(
         .changes
         .iter()
         .map(|change| {
-            let Change::CreateGitService(service) = change else {
-                return Ok(change.clone());
+            let mut change = change.clone();
+            let (url, access, slot) = if let Change::CreateGitService(service) = &mut change {
+                (&service.url, &service.access, &mut service.deploy_key)
+            } else if let Change::GitSource(source) = &mut change {
+                (&source.url, &source.access, &mut source.deploy_key)
+            } else {
+                return Ok(change);
             };
-            let GitAccess::DeployKey { known_hosts } = &service.access else {
-                return Ok(change.clone());
+            let GitAccess::DeployKey { known_hosts } = access else {
+                return Ok(change);
             };
-            let host = zeabur_plan::deploy_key_host(&service.url)
+            let host = zeabur_plan::deploy_key_host(url)
                 .ok_or_else(|| refused("Use a repository URL like git@github.com:acme/web.git."))?;
             let (lines, _) = trusted(&host, known_hosts.as_deref())?;
             let private_key = match pair {
@@ -281,12 +286,11 @@ pub(crate) fn open(
                         .private
                 }
             };
-            let mut service = service.clone();
-            service.deploy_key = Some(DeployKeySecret {
+            *slot = Some(DeployKeySecret {
                 private_key,
                 known_hosts: lines,
             });
-            Ok(Change::CreateGitService(service))
+            Ok(change)
         })
         .collect::<Result<Vec<_>, ApiError>>()?;
     Ok(PlanRequest { changes })

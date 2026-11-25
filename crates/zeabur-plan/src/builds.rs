@@ -140,7 +140,7 @@ impl Planner<'_> {
     }
 
     /// The working copy of `Build` `name`, read for the plan.
-    fn build(&mut self, name: &str) -> Result<usize, PlanError> {
+    pub(crate) fn build(&mut self, name: &str) -> Result<usize, PlanError> {
         let resource = builds();
         let Some(object) = self
             .input
