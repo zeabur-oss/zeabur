@@ -34,7 +34,7 @@ const initContainerOf = (fieldPath?: string | null) =>
  * hour, so the pod's state decides: a pod that is gone or being replaced, a pod that is ready,
  * and an init container that has since completed are all past what the event says.
  */
-export function isCurrent(event: Event, pods: readonly Pod[]): boolean {
+function isCurrent(event: Event, pods: readonly Pod[]): boolean {
   const about = event.regarding
   if (about?.kind !== "Pod") return true
   const pod = pods.find((p) => p.name === about.name)
