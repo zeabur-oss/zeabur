@@ -16,7 +16,9 @@ import {
   pinnedHost,
   gitChange,
   gitNeeds,
+  gitSourceChange,
   newGitService,
+  newGitSource,
   parseRepository,
   pathProblem,
   tokenUser,
@@ -90,6 +92,30 @@ describe("repository addresses", () => {
     expect(pathProblem("docker/Dockerfile.prod")).toBeUndefined()
     expect(pathProblem("../etc")).toBe("invalid")
     expect(pathProblem("apps/.cache")).toBe("invalid")
+  })
+})
+
+describe("a Git source for a running service", () => {
+  test("names the workload and reads the repository as a new Git service does", () => {
+    const change = gitSourceChange(
+      {
+        ...newGitSource("dockerfile"),
+        url: " git@github.com:acme/site.git ",
+        branch: "main",
+        directory: "./web/",
+        access: "deployKey",
+      },
+      { kind: "Deployment", name: "site" },
+    )
+    expect(change).toEqual({
+      op: "gitSource",
+      workload: { kind: "Deployment", name: "site" },
+      url: "git@github.com:acme/site.git",
+      branch: "main",
+      method: "dockerfile",
+      directory: "web",
+      access: { type: "deployKey" },
+    })
   })
 })
 

@@ -9,7 +9,9 @@ import {
   repositoryOf,
   runsLatest,
   shortSha,
+  stopBuilding,
   type Build,
+  type Builds,
   type BuildRun,
 } from "@/model/builds"
 import type { Service } from "@/model/service"
@@ -160,5 +162,47 @@ describe("reasonKey", () => {
   test("a reason Zeabur does not know shares one sentence", () => {
     expect(reasonKey("SomethingNew")).toBe("builds.reason.other")
     expect(reasonKey(undefined)).toBe("builds.reason.other")
+  })
+})
+
+describe("stopBuilding", () => {
+  const latest = build().latestImage ?? ""
+  const data = (builds: Build[], policy?: string): Builds =>
+    ({
+      builds,
+      keel: policy ? [{ kind: "Deployment", name: "web", policy }] : [],
+    }) as unknown as Builds
+
+  test("deletes the Build, pins the newest image by digest and stops Keel", () => {
+    const changes = stopBuilding(
+      service(["zot.zot.svc:5000/shop/web:main-2-bbbbbbb"]),
+      build({ credentials: { name: "web-git", own: true } }),
+      data([build({ credentials: { name: "web-git", own: true } })], "force"),
+    )
+    expect(changes).toEqual([
+      {
+        op: "delete",
+        resource: { group: "builder.zeabur.com", version: "v1alpha1", resource: "builds" },
+        name: "web",
+      },
+      { op: "delete", resource: { version: "v1", resource: "secrets" }, name: "web-git" },
+      {
+        op: "image",
+        workload: { kind: "Deployment", name: "web" },
+        container: "c0",
+        image: latest,
+      },
+      { op: "autoUpdate", workload: { kind: "Deployment", name: "web" }, enabled: false },
+    ])
+  })
+
+  test("an image with a digest stays; Keel stays while another Build makes an image", () => {
+    const sidecar = build({ name: "proxy", repository: "zot.zot.svc:5000/shop/proxy" })
+    const changes = stopBuilding(
+      service([latest, "zot.zot.svc:5000/shop/proxy:1"]),
+      build(),
+      data([build(), sidecar], "force"),
+    )
+    expect(changes.map((c) => c.op)).toEqual(["delete"])
   })
 })

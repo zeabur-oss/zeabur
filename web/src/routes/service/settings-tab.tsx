@@ -70,7 +70,8 @@ export function SettingsTab({
   const t = useT()
   const draft = useDraft()
   const hash = useLocation({ select: (l) => l.hash })
-  const builds = buildsOf(service, useQuery(buildsQuery(project)).data?.builds)
+  const data = useQuery(buildsQuery(project)).data
+  const builds = buildsOf(service, data?.builds)
   const parts = partsOf(service, builds.length > 0)
 
   useEffect(() => {
@@ -96,7 +97,7 @@ export function SettingsTab({
         <Suspense fallback={<LoadingRows label={t("common.loading")} rows={4} />}>
           {parts.includes("build") ? (
             <Part id="build">
-              <BuildSection project={project} builds={builds} />
+              <BuildSection project={project} service={service} builds={builds} data={data} />
             </Part>
           ) : null}
           {parts.includes("schedule") ? (
@@ -135,8 +136,9 @@ export function SettingsTab({
 }
 
 function partsOf(service: Service, built: boolean): SettingsPart[] {
+  // A long-running service without a Build may connect a repository there.
   return [
-    ...(built ? (["build"] as const) : []),
+    ...(built || !isTask(service.kind) ? (["build"] as const) : []),
     ...(service.schedule ? (["schedule"] as const) : []),
     "compute",
     ...(isTask(service.kind) ? [] : (["health-checks"] as const)),

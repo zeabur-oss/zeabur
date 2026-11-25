@@ -1,34 +1,52 @@
-import { useState } from "react"
+import { useQuery } from "@tanstack/react-query"
+import { useState, type ReactNode } from "react"
 
+import { creatableQuery } from "@/api/queries"
+import { GitSourceForm } from "@/routes/service/git-source"
 import { FormField } from "@/components/form-field"
-import { GateNote, useGate } from "@/components/gate"
+import { GateNote, useGate, type Gate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
-import type { Build } from "@/model/builds"
+import { stopBuilding, type Build, type Builds } from "@/model/builds"
 import {
   buildEnvSecret,
   buildOptionsChanges,
   buildOptionsOf,
   pathProblem,
 } from "@/model/git-service"
-import { parseEnv } from "@/model/image-service"
+import { imageOptions, parseEnv, rightsOf } from "@/model/image-service"
+import type { Service } from "@/model/service"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Input } from "@zeabur-oss/design-system/components/input"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 /** The directory, Dockerfile and build variables of each `Build` that makes the service's
- * images. */
-export function BuildSection({ project, builds }: { project: string; builds: Build[] }) {
+ * images; a Git source for a service that builds from none; stopping a Build. */
+export function BuildSection({
+  project,
+  service,
+  builds,
+  data,
+}: {
+  project: string
+  service: Service
+  builds: Build[]
+  data?: Builds
+}) {
   const t = useT()
   const gate = useGate(project, "build")
+  const secrets = imageOptions(rightsOf(useQuery(creatableQuery(project)).data)).secrets
+  // An uploaded folder's Build can read a repository instead; a Build from Git already does.
+  const fromGit = builds.some((b) => !b.archive)
+  const upload = builds.find((b) => b.archive)
   return (
     <section aria-labelledby="build-title" className="flex flex-col gap-3">
       <SectionHeader
         id="build-title"
         title={t("part.build")}
-        description={t("buildOptions.hint")}
+        description={t(builds.length > 0 ? "buildOptions.hint" : "gitSource.hint")}
       />
       <GateNote gate={gate} />
       {builds.map((build) => (
@@ -38,9 +56,61 @@ export function BuildSection({ project, builds }: { project: string; builds: Bui
           build={build}
           named={builds.length > 1}
           disabled={!gate.open}
+          stop={
+            data ? (
+              <StopBuilding
+                project={project}
+                service={service}
+                build={build}
+                data={data}
+                gate={gate}
+              />
+            ) : null
+          }
         />
       ))}
+      {fromGit || builds.length > 1 ? null : (
+        <GitSourceForm project={project} service={service} upload={upload} secrets={secrets} />
+      )}
     </section>
+  )
+}
+
+/** "Stop building from source": the Build goes, the service keeps the image it runs. */
+function StopBuilding({
+  project,
+  service,
+  build,
+  data,
+  gate,
+}: {
+  project: string
+  service: Service
+  build: Build
+  data: Builds
+  gate: Gate
+}) {
+  const t = useT()
+  const planner = usePlanner(project, undefined, true)
+  return (
+    <>
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={!gate.open}
+        onClick={() =>
+          planner.plan({
+            title: t("title.stopBuilding", build.name),
+            changes: stopBuilding(service, build, data),
+            notes: [t("stopBuilding.note", service.name)],
+          })
+        }
+      >
+        {t("stopBuilding.action")}
+      </Button>
+      {planner.dialog}
+    </>
   )
 }
 
@@ -49,11 +119,13 @@ function BuildOptionsForm({
   build,
   named,
   disabled,
+  stop,
 }: {
   project: string
   build: Build
   named: boolean
   disabled: boolean
+  stop: ReactNode
 }) {
   const t = useT()
   const [options, setOptions] = useState(() => buildOptionsOf(build))
@@ -204,7 +276,8 @@ function BuildOptionsForm({
           />
         </FormField>
       </div>
-      <div className="flex justify-end">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        {stop}
         <Button type="submit" size="sm" disabled={disabled || changes.length === 0}>
           {t("edit.review")}
         </Button>

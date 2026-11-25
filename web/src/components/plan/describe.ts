@@ -238,6 +238,8 @@ function sentenceOf(
       return t("confirm.image", change.workload.name, imageTag(change.image))
     case "rebuild":
       return t("confirm.rebuild", change.build)
+    case "gitSource":
+      return t("confirm.gitSource", change.workload.name)
     case "autoUpdate":
       return t(
         change.enabled ? "confirm.autoUpdateOn" : "confirm.autoUpdateOff",
@@ -278,7 +280,7 @@ type ServiceChange =
   | Extract<
       Change,
       {
-        op: "envImport" | "publicPort" | "buildOptions" | "labelVolume"
+        op: "envImport" | "publicPort" | "buildOptions" | "gitSource" | "labelVolume"
       }
     >
   | UploadChange
@@ -987,6 +989,8 @@ function serviceAction(t: Translate, change: ServiceChange): string {
       return change.remove ? t("action.closePort") : t("action.openPort")
     case "buildOptions":
       return t("action.saveBuildOptions")
+    case "gitSource":
+      return t("action.connectGit")
     case "labelVolume":
       return t("action.save")
     default:

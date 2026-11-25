@@ -1642,6 +1642,8 @@ export const zhTW: Messages = {
   "confirm.port": (service, from, to) =>
     `${service} 從連接埠 ${from} 改用 ${to}：容器連接埠、健康檢查和 PORT 都會跟著調整，私有位址也會把流量轉送到 ${to}。`,
   "confirm.image": (service, tag) => `${service} 會改為執行 ${tag}。`,
+  "confirm.gitSource": (service) =>
+    `Zeabur Builder 會用你的儲存庫建置 ${service}，每次建置完成就會上線。`,
   "confirm.rebuild": (build) => `Zeabur Builder 會用分支最新的提交重新建置 ${build}。`,
   "confirm.buildOptions": (build) => `從下一次建置起，Zeabur Builder 用這些選項建置 ${build}。`,
   "confirm.uploadToken": (build) => `Zeabur Builder 會讓你在 15 分鐘內上傳資料夾到 ${build}。`,
@@ -1736,6 +1738,7 @@ export const zhTW: Messages = {
   "action.deploy": "部署",
   "action.rebuild": "重新建置",
   "action.upload": "上傳",
+  "action.connectGit": "連結",
   "action.saveBuildOptions": "儲存建置選項",
   "action.autoUpdateOn": "開啟",
   "action.autoUpdateOff": "關閉",
@@ -1804,6 +1807,8 @@ export const zhTW: Messages = {
   "title.configReload": (service: string) => `設定檔或機密變數變更時重新啟動 ${service}`,
   "title.deployBuild": (service) => `把最新的建置部署到 ${service}`,
   "title.rebuild": (build) => `重新建置 ${build}`,
+  "title.gitSource": (service) => `從 Git 建置 ${service}`,
+  "title.stopBuilding": (build) => `停止從原始程式碼建置 ${build}`,
   "title.buildOptions": (build) => `變更 ${build} 的建置方式`,
   "title.autoUpdateOn": (service) => `自動部署 ${service}`,
   "title.autoUpdateOff": (service) => `停止自動部署 ${service}`,
@@ -3609,6 +3614,17 @@ export const zhTW: Messages = {
   "part.networking": "網路",
   "part.storage": "儲存空間",
   "part.compute": "運算資源",
+  "gitSource.hint": "連結 Git 儲存庫後，Zeabur Builder 會用它建置這個服務。",
+  "gitSource.title": "從 Git 儲存庫建置",
+  "gitSource.imageHint":
+    "連結後，服務會改跑 Zeabur Builder 用儲存庫建置的映像檔，每次建置完成就會上線。",
+  "gitSource.uploadHint":
+    "連結後，Zeabur Builder 會改用儲存庫建置，不再用上傳的資料夾，每次建置完成就會上線。",
+  "gitSource.open": "連結 Git",
+  "gitSource.container": "容器",
+  "stopBuilding.action": "停止從原始程式碼建置",
+  "stopBuilding.note": (service) =>
+    `${service} 會繼續跑目前的映像檔，推送後不再自動更新。映像檔倉庫裡已有的映像檔會留著。`,
   "buildOptions.hint": "Zeabur Builder 從儲存庫的哪個位置建置，以及只在建置時讀得到的變數。",
   "buildOptions.none": "還沒有建置變數，可在下方加入 KEY=value。",
   "buildOptions.fromSecret": (secret) => `值在機密變數 ${secret}`,
