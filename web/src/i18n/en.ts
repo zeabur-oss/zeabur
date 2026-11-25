@@ -3265,6 +3265,8 @@ export const en = {
   "db.backup.archiveFailed":
     "The database cannot archive its write-ahead log to the backup destination, so backups do not work. The operator says",
   "db.backup.archiveSince": "Failing since",
+  "db.backup.archiveHint":
+    "The S3 error is only in the backup plugin's log. Check the bucket name and the keys first.",
   "db.backup.planNow": (name: string) => `Back up ${name} now`,
   "db.backup.destination": "Destination",
   "db.backup.endpointFact": "Endpoint",

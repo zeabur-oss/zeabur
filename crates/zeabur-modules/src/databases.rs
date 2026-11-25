@@ -180,6 +180,10 @@ pub struct ArchiveFailure {
     /// What the operator says, as the last archive attempt reported it.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
+    /// The bucket and path the database archives to (`s3://bucket/path`), so a wrong bucket name
+    /// shows. The S3 error itself is not in any Kubernetes object.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub destination: Option<String>,
     /// When archiving began to fail.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub since: Option<Timestamp>,
