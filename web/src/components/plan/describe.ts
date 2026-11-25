@@ -238,8 +238,6 @@ function sentenceOf(
       return t("confirm.image", change.workload.name, imageTag(change.image))
     case "rebuild":
       return t("confirm.rebuild", change.build)
-    case "gitSource":
-      return t("confirm.gitSource", change.workload.name)
     case "autoUpdate":
       return t(
         change.enabled ? "confirm.autoUpdateOn" : "confirm.autoUpdateOff",
@@ -367,6 +365,8 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
         : t("confirm.publicPort", change.port, change.workload.name)
     case "buildOptions":
       return t("confirm.buildOptions", change.build)
+    case "gitSource":
+      return t("confirm.gitSource", change.workload.name)
     case "labelVolume":
       return t("confirm.labelVolume", change.claim)
     default:

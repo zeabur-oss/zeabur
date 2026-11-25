@@ -3617,14 +3617,14 @@ export const zhTW: Messages = {
   "gitSource.hint": "連結 Git 儲存庫後，Zeabur Builder 會用它建置這個服務。",
   "gitSource.title": "從 Git 儲存庫建置",
   "gitSource.imageHint":
-    "連結後，服務會改跑 Zeabur Builder 用儲存庫建置的映像檔，每次建置完成就會上線。",
+    "連結後，服務會改為執行 Zeabur Builder 用儲存庫建置的映像檔，每次建置完成就會上線。",
   "gitSource.uploadHint":
     "連結後，Zeabur Builder 會改用儲存庫建置，不再用上傳的資料夾，每次建置完成就會上線。",
   "gitSource.open": "連結 Git",
   "gitSource.container": "容器",
   "stopBuilding.action": "停止從原始程式碼建置",
   "stopBuilding.note": (service) =>
-    `${service} 會繼續跑目前的映像檔，推送後不再自動更新。映像檔倉庫裡已有的映像檔會留著。`,
+    `${service} 會繼續執行目前的映像檔，推送後不再自動更新。映像檔倉庫裡已有的映像檔會留著。`,
   "buildOptions.hint": "Zeabur Builder 從儲存庫的哪個位置建置，以及只在建置時讀得到的變數。",
   "buildOptions.none": "還沒有建置變數，可在下方加入 KEY=value。",
   "buildOptions.fromSecret": (secret) => `值在機密變數 ${secret}`,
