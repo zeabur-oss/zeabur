@@ -2094,6 +2094,17 @@ mod tests {
         serde_json::to_value(zeabur_api::openapi()).unwrap()["components"]["schemas"].clone()
     }
 
+    /// The fields of the Git variant of `BuildSource`.
+    fn git_source(schemas: &Value) -> Value {
+        schemas["BuildSource"]["oneOf"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|v| v["properties"]["type"]["enum"][0] == "git")
+            .unwrap()["properties"]
+            .clone()
+    }
+
     /// The fields of the `op` variant of `schema`.
     fn variant_of(schemas: &Value, schema: &str, op: &str) -> Value {
         schemas[schema]["oneOf"]
@@ -2164,11 +2175,7 @@ mod tests {
             zeabur_modules::alertmanager::NAME_MAX,
             RFC1035_LABEL_PATTERN,
         );
-        for schema in [
-            "UploadServiceChange",
-            "GitServiceChange",
-            "ImageServiceChange",
-        ] {
+        for schema in ["BuiltServiceChange", "ImageServiceChange"] {
             rule(
                 &field(schema, "name"),
                 zeabur_plan::compose::SERVICE_NAME_MAX,
@@ -2180,14 +2187,12 @@ mod tests {
             zeabur_plan::IMAGE_PATTERN
         );
         assert_eq!(
-            field("GitServiceChange", "branch")["pattern"],
+            git_source(&schemas)["branch"]["pattern"],
             zeabur_plan::BRANCH_PATTERN
         );
         for (schema, name) in [
-            ("UploadServiceChange", "directory"),
-            ("UploadServiceChange", "dockerfile"),
-            ("GitServiceChange", "directory"),
-            ("GitServiceChange", "dockerfile"),
+            ("BuildInput", "directory"),
+            ("BuildInput", "dockerfile"),
             ("BuildOptionsChange", "contextDir"),
             ("BuildOptionsChange", "dockerfile"),
         ] {

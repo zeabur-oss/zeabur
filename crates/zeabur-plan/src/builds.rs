@@ -482,7 +482,12 @@ impl Planner<'_> {
         self.patch(index, operations)
     }
 
-    fn build_env(&mut self, index: usize, build: &str, edit: &EnvEdit) -> Result<(), PlanError> {
+    pub(crate) fn build_env(
+        &mut self,
+        index: usize,
+        build: &str,
+        edit: &EnvEdit,
+    ) -> Result<(), PlanError> {
         let env = self
             .current(index)
             .pointer("/spec/env")

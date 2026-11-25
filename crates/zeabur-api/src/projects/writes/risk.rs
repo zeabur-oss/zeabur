@@ -184,9 +184,10 @@ fn weigh_one(change: &Change, ready: &ReadyPods) -> Weight {
             spec_only: false, ..
         } => high(RiskReason::YamlEdit),
         Change::RemoveDomain { .. } => high(RiskReason::RemovesDomain),
-        Change::Delete { .. } | Change::DeleteProject | Change::ForceDeleteProject => {
-            high(RiskReason::Deletes)
-        }
+        Change::Delete { .. }
+        | Change::RemoveBuild { .. }
+        | Change::DeleteProject
+        | Change::ForceDeleteProject => high(RiskReason::Deletes),
         Change::Env { .. }
         | Change::Data { .. }
         | Change::AddDomain(_)
@@ -215,10 +216,9 @@ fn weigh_one(change: &Change, ready: &ReadyPods) -> Weight {
         | Change::SecurityProfile { .. }
         | Change::Edit { .. }
         | Change::Create { .. }
-        | Change::CreateUploadService(_)
+        | Change::CreateBuiltService(_)
         | Change::CreateImageService(_)
-        | Change::CreateGitService(_)
-        | Change::GitSource(_)
+        | Change::SetBuild(_)
         | Change::CopyS3Keys(_)
         | Change::Unadopt
         | Change::ScheduleTask { .. }

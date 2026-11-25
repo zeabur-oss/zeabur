@@ -14,14 +14,14 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use zeabur_model::{PodSecurityLevel, ProjectIcon, TaskConcurrency, WorkloadRef};
 
-use crate::built_service::{GitServiceChange, GitSourceChange};
+use crate::built_service::{BuiltServiceChange, SetBuildChange};
 use crate::checks::{ProbeRequest, ResourceRef, VolumeRequest};
 use crate::image_service::ImageServiceChange;
 use crate::rules::{EnvEdit, FieldChange};
 
 // `zeabur-api` resolves `PageServer`, `Template` and `CopyS3Keys` into other changes, and makes
-// the deploy key of a `CreateGitService` or `GitSource`, before the planner sees them. The
-// planner rejects them.
+// the deploy key of a `CreateBuiltService` or `SetBuild` from Git, before the planner sees them.
+// The planner rejects them.
 /// One change a person asks for.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
@@ -341,18 +341,23 @@ pub enum Change {
         #[serde(default, skip_serializing_if = "Option::is_none")]
         yaml: Option<String>,
     },
-    /// Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
-    /// uploaded-folder source that asks for its upload token, and the objects of the service that
-    /// runs the image it builds (see the `built_service` module).
-    CreateUploadService(UploadServiceChange),
-    /// Create a service from a Git repository: a Zeabur Builder `Build` of the repository, its
-    /// credentials, and the objects of the service that runs the image it builds (see the
-    /// `built_service` module).
-    CreateGitService(GitServiceChange),
-    /// Build a running service from a Git repository (see the `built_service` module): a
-    /// service with no `Build` of its name gets one, and its container runs what the `Build`
-    /// pushes, updated by Keel; an uploaded folder's `Build` builds the repository instead.
-    GitSource(GitSourceChange),
+    /// Create a service whose image Zeabur Builder builds from a Git repository or an uploaded
+    /// folder: its `Build`, the credentials and variables it reads, and the objects of the service
+    /// that runs the image it builds (see the `built_service` module).
+    CreateBuiltService(BuiltServiceChange),
+    /// Give a running service its `Build`, or change what the one it has builds (see the
+    /// `built_service` module): a service with no `Build` of its name gets one, and its container
+    /// runs what the `Build` pushes, updated by Keel; a `Build` that exists takes the new source,
+    /// method and paths.
+    SetBuild(SetBuildChange),
+    /// Stop building a service (see the `built_service` module): delete the `Build` of its name
+    /// and the credentials Secret only it reads, pin each container that runs what it built to
+    /// that image's digest, and stop Keel when no other `Build` makes the service's images.
+    #[serde(rename_all = "camelCase")]
+    RemoveBuild {
+        /// The service.
+        workload: WorkloadRef,
+    },
     /// Create a service that runs a container image: its Deployment, and the Secrets, claims,
     /// Service and Ingress the change asks for (see the `image_service` module).
     CreateImageService(ImageServiceChange),
@@ -704,63 +709,6 @@ pub struct NameValue {
     pub name: String,
     /// Its value.
     pub value: String,
-}
-
-/// A [`Change::CreateUploadService`].
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
-#[serde(rename_all = "camelCase")]
-pub struct UploadServiceChange {
-    /// The service's name, which its `Build`, workload and Service share.
-    #[cfg_attr(
-        feature = "openapi",
-        schema(max_length = 40, pattern = "^[a-z]([-a-z0-9]*[a-z0-9])?$")
-    )]
-    pub name: String,
-    /// A value the `Build` has not been asked with before, for its upload token (see
-    /// [`Change::UploadToken`]).
-    pub request: String,
-    /// How the folder is built.
-    pub method: BuildMethod,
-    /// The folder inside the upload to build. Left out: the whole upload.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        feature = "openapi",
-        schema(
-            max_length = 1024,
-            pattern = "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$"
-        )
-    )]
-    pub directory: Option<String>,
-    /// The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        feature = "openapi",
-        schema(
-            max_length = 1024,
-            pattern = "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$"
-        )
-    )]
-    pub dockerfile: Option<String>,
-    /// The port the app listens on. Left out: a worker, which takes no connections.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub port: Option<u16>,
-    /// A public hostname for the port, with HTTPS where the cluster has an issuer.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub host: Option<String>,
-    /// Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub variables: Vec<NameValue>,
-    /// Variables of the build, kept in the Secret `<name>-build-env`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub build_variables: Vec<NameValue>,
-    /// What the app asks for. Left out: small.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub size: Option<ServiceSize>,
-    /// `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
-    /// regular user, and `baseline` for a Dockerfile, which often runs as root.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub security: Option<PodSecurityLevel>,
 }
 
 /// A [`Change::PublicPort`].

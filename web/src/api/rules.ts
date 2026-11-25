@@ -16,6 +16,14 @@ export const rules = {
     maximum: 365,
     default: 7,
   },
+  "BuildInput.directory": {
+    maxLength: 1024,
+    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
+  },
+  "BuildInput.dockerfile": {
+    maxLength: 1024,
+    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
+  },
   "BuildOptionsChange.contextDir": {
     maxLength: 1024,
     pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
@@ -23,6 +31,13 @@ export const rules = {
   "BuildOptionsChange.dockerfile": {
     maxLength: 1024,
     pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
+  },
+  "BuildSource.git.branch": {
+    pattern: "^(\\.?[A-Za-z0-9_-])+\\.?(/(\\.?[A-Za-z0-9_-])+\\.?)*$",
+  },
+  "BuiltServiceChange.name": {
+    maxLength: 40,
+    pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$",
   },
   "Change.createProject.displayName": {
     maxLength: 64,
@@ -59,32 +74,6 @@ export const rules = {
   "GitHubManifestRequest.name": {
     maxLength: 34,
     minLength: 1,
-  },
-  "GitServiceChange.branch": {
-    pattern: "^(\\.?[A-Za-z0-9_-])+\\.?(/(\\.?[A-Za-z0-9_-])+\\.?)*$",
-  },
-  "GitServiceChange.directory": {
-    maxLength: 1024,
-    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
-  },
-  "GitServiceChange.dockerfile": {
-    maxLength: 1024,
-    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
-  },
-  "GitServiceChange.name": {
-    maxLength: 40,
-    pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$",
-  },
-  "GitSourceChange.branch": {
-    pattern: "^(\\.?[A-Za-z0-9_-])+\\.?(/(\\.?[A-Za-z0-9_-])+\\.?)*$",
-  },
-  "GitSourceChange.directory": {
-    maxLength: 1024,
-    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
-  },
-  "GitSourceChange.dockerfile": {
-    maxLength: 1024,
-    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
   },
   "ImageServiceChange.image": {
     pattern: "^[a-z0-9][A-Za-z0-9._/:@-]*$",
@@ -126,18 +115,6 @@ export const rules = {
   "ServiceVolume.name": {
     maxLength: 63,
     pattern: "^[a-z0-9]([-a-z0-9]*[a-z0-9])?$",
-  },
-  "UploadServiceChange.directory": {
-    maxLength: 1024,
-    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
-  },
-  "UploadServiceChange.dockerfile": {
-    maxLength: 1024,
-    pattern: "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$",
-  },
-  "UploadServiceChange.name": {
-    maxLength: 40,
-    pattern: "^[a-z]([-a-z0-9]*[a-z0-9])?$",
   },
   "VolumeRequest.claimName": {
     maxLength: 253,

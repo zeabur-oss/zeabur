@@ -1059,6 +1059,16 @@ export type BuildCredentials = {
 }
 
 /**
+ * A variable and its value.
+ */
+export type NameValue = {
+  /** The variable's name. */
+  name: string
+  /** Its value. */
+  value: string
+}
+
+/**
  * How Zeabur Builder builds a folder.
  */
 export type BuildMethod = (typeof BuildMethod)[keyof typeof BuildMethod]
@@ -1067,6 +1077,96 @@ export const BuildMethod = {
   railpack: "railpack",
   dockerfile: "dockerfile",
 } as const
+
+/**
+ * How Zeabur Builder reads a repository. Credentials go in the Secret `<name>-git`.
+ */
+export type GitAccess =
+  | {
+      type: "public"
+    }
+  | {
+      /** The token. */
+      token: string
+      type: "token"
+      /** The user name the host takes with a token. */
+      username: string
+    }
+  | {
+      /**
+       * The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
+       * `github.com` and `gitlab.com`, whose keys Zeabur pins.
+       * @nullable
+       */
+      knownHosts?: string | null
+      type: "deployKey"
+    }
+  | {
+      /**
+       * The installation.
+       * @minimum 0
+       */
+      installationId: number
+      type: "githubApp"
+    }
+
+/**
+ * What a `Build` builds.
+ */
+export type BuildSource =
+  | {
+      /** How Zeabur Builder reads the repository. */
+      access: GitAccess
+      /**
+       * The branch. Left out: the repository's default branch.
+       * @nullable
+       * @pattern ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
+       */
+      branch?: string | null
+      type: "git"
+      /**
+       * The repository: `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
+       * `ssh://git@host/owner/repo.git`.
+       */
+      url: string
+    }
+  | {
+      /**
+       * A value the `Build` has not been asked with before, for its upload token (see
+       * [`crate::Change::UploadToken`]).
+       */
+      request: string
+      type: "upload"
+    }
+
+/**
+ * One `Build`'s settings, whatever its source.
+ */
+export type BuildInput = {
+  /**
+   * Variables of the build, kept in the Secret `<name>-build-env`. A `Build` that exists keeps
+   * the variables it has; these are set beside them.
+   */
+  buildVariables?: NameValue[]
+  /**
+   * The folder inside the repository or upload to build. Left out: its root.
+   * @maxLength 1024
+   * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+   */
+  directory?: string | null
+  /**
+   * The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
+   * @maxLength 1024
+   * @nullable
+   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+   */
+  dockerfile?: string | null
+  /** How the folder is built. */
+  method: BuildMethod
+  /** What it builds. */
+  source: BuildSource
+}
 
 /**
  * A value read from a Secret or ConfigMap key, or a pod field.
@@ -1150,6 +1250,57 @@ export type BuildSettings = {
    * @nullable
    */
   registry?: string | null
+}
+
+/**
+ * A Pod Security Standards level, from the least to the most restrictive.
+ */
+export type PodSecurityLevel = (typeof PodSecurityLevel)[keyof typeof PodSecurityLevel]
+
+export const PodSecurityLevel = {
+  privileged: "privileged",
+  baseline: "baseline",
+  restricted: "restricted",
+} as const
+
+/**
+ * How much a new service asks for.
+ */
+export type ServiceSize = (typeof ServiceSize)[keyof typeof ServiceSize]
+
+export const ServiceSize = {
+  small: "small",
+  medium: "medium",
+  large: "large",
+} as const
+
+/**
+ * A [`crate::Change::CreateBuiltService`].
+ */
+export type BuiltServiceChange = {
+  /** Its `Build`. */
+  build: BuildInput
+  /**
+   * A public hostname for the port, with HTTPS where the cluster has an issuer.
+   * @nullable
+   */
+  host?: string | null
+  /**
+   * The service's name, which its `Build`, workload and Service share.
+   * @maxLength 40
+   * @pattern ^[a-z]([-a-z0-9]*[a-z0-9])?$
+   */
+  name: string
+  /**
+   * The port the app listens on. Left out: a worker, which takes no connections.
+   * @minimum 0
+   * @nullable
+   */
+  port?: number | null
+  security?: PodSecurityLevel | null
+  size?: ServiceSize | null
+  /** Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`. */
+  variables?: NameValue[]
 }
 
 /**
@@ -1729,17 +1880,6 @@ export type ProbeRequest = {
 }
 
 /**
- * A Pod Security Standards level, from the least to the most restrictive.
- */
-export type PodSecurityLevel = (typeof PodSecurityLevel)[keyof typeof PodSecurityLevel]
-
-export const PodSecurityLevel = {
-  privileged: "privileged",
-  baseline: "baseline",
-  restricted: "restricted",
-} as const
-
-/**
  * A namespaced resource, as a request path names it.
  */
 export type ResourceRef = {
@@ -1752,202 +1892,17 @@ export type ResourceRef = {
 }
 
 /**
- * A variable and its value.
+ * A [`crate::Change::SetBuild`]. The `Build` is named after the workload.
  */
-export type NameValue = {
-  /** The variable's name. */
-  name: string
-  /** Its value. */
-  value: string
-}
-
-/**
- * How much a new service asks for.
- */
-export type ServiceSize = (typeof ServiceSize)[keyof typeof ServiceSize]
-
-export const ServiceSize = {
-  small: "small",
-  medium: "medium",
-  large: "large",
-} as const
-
-/**
- * A [`Change::CreateUploadService`].
- */
-export type UploadServiceChange = {
-  /** Variables of the build, kept in the Secret `<name>-build-env`. */
-  buildVariables?: NameValue[]
-  /**
-   * The folder inside the upload to build. Left out: the whole upload.
-   * @maxLength 1024
-   * @nullable
-   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-   */
-  directory?: string | null
-  /**
-   * The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
-   * @maxLength 1024
-   * @nullable
-   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-   */
-  dockerfile?: string | null
-  /**
-   * A public hostname for the port, with HTTPS where the cluster has an issuer.
-   * @nullable
-   */
-  host?: string | null
-  /** How the folder is built. */
-  method: BuildMethod
-  /**
-   * The service's name, which its `Build`, workload and Service share.
-   * @maxLength 40
-   * @pattern ^[a-z]([-a-z0-9]*[a-z0-9])?$
-   */
-  name: string
-  /**
-   * The port the app listens on. Left out: a worker, which takes no connections.
-   * @minimum 0
-   * @nullable
-   */
-  port?: number | null
-  /**
-   * A value the `Build` has not been asked with before, for its upload token (see
-   * [`Change::UploadToken`]).
-   */
-  request: string
-  security?: PodSecurityLevel | null
-  size?: ServiceSize | null
-  /** Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`. */
-  variables?: NameValue[]
-}
-
-/**
- * How Zeabur Builder reads a repository. Credentials go in the Secret `<name>-git`.
- */
-export type GitAccess =
-  | {
-      type: "public"
-    }
-  | {
-      /** The token. */
-      token: string
-      type: "token"
-      /** The user name the host takes with a token. */
-      username: string
-    }
-  | {
-      /**
-       * The host's `known_hosts` lines, as `ssh-keyscan` prints them; needed for any host but
-       * `github.com` and `gitlab.com`, whose keys Zeabur pins.
-       * @nullable
-       */
-      knownHosts?: string | null
-      type: "deployKey"
-    }
-  | {
-      /**
-       * The installation.
-       * @minimum 0
-       */
-      installationId: number
-      type: "githubApp"
-    }
-
-/**
- * A [`crate::Change::CreateGitService`].
- */
-export type GitServiceChange = {
-  /** How Zeabur Builder reads the repository. */
-  access: GitAccess
-  /**
-   * The branch. Left out: the repository's default branch.
-   * @nullable
-   * @pattern ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
-   */
-  branch?: string | null
-  /** Variables of the build, kept in the Secret `<name>-build-env`. */
-  buildVariables?: NameValue[]
-  /**
-   * The folder inside the repository to build. Left out: its root.
-   * @maxLength 1024
-   * @nullable
-   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-   */
-  directory?: string | null
-  /**
-   * The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
-   * @maxLength 1024
-   * @nullable
-   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-   */
-  dockerfile?: string | null
-  /**
-   * A public hostname for the port, with HTTPS where the cluster has an issuer.
-   * @nullable
-   */
-  host?: string | null
-  /** How the folder is built. */
-  method: BuildMethod
-  /**
-   * The service's name, which its `Build`, workload and Service share.
-   * @maxLength 40
-   * @pattern ^[a-z]([-a-z0-9]*[a-z0-9])?$
-   */
-  name: string
-  /**
-   * The port the app listens on. Left out: a worker, which takes no connections.
-   * @minimum 0
-   * @nullable
-   */
-  port?: number | null
-  security?: PodSecurityLevel | null
-  size?: ServiceSize | null
-  /**
-   * The repository: `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
-   * `ssh://git@host/owner/repo.git`.
-   */
-  url: string
-  /** Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`. */
-  variables?: NameValue[]
-}
-
-/**
- * A [`crate::Change::GitSource`]. The `Build` is named after the workload.
- */
-export type GitSourceChange = {
-  /** How Zeabur Builder reads the repository. */
-  access: GitAccess
-  /**
-   * The branch. Left out: the repository's default branch.
-   * @nullable
-   * @pattern ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
-   */
-  branch?: string | null
+export type SetBuildChange = {
+  /** The `Build`. */
+  build: BuildInput
   /**
    * The container that runs what the `Build` makes; may be left out when the workload has
    * only one.
    * @nullable
    */
   container?: string | null
-  /**
-   * The folder inside the repository to build. Left out: its root.
-   * @maxLength 1024
-   * @nullable
-   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-   */
-  directory?: string | null
-  /**
-   * The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
-   * @maxLength 1024
-   * @nullable
-   * @pattern ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-   */
-  dockerfile?: string | null
-  /** How the folder is built. */
-  method: BuildMethod
-  /** The repository, as for [`GitServiceChange::url`]. */
-  url: string
   /** The service: a Deployment, StatefulSet or DaemonSet. */
   workload: WorkloadRef
 }
@@ -2441,15 +2396,17 @@ export type Change =
        */
       yaml?: string | null
     }
-  | (UploadServiceChange & {
-      op: "createUploadService"
+  | (BuiltServiceChange & {
+      op: "createBuiltService"
     })
-  | (GitServiceChange & {
-      op: "createGitService"
+  | (SetBuildChange & {
+      op: "setBuild"
     })
-  | (GitSourceChange & {
-      op: "gitSource"
-    })
+  | {
+      op: "removeBuild"
+      /** The service. */
+      workload: WorkloadRef
+    }
   | (ImageServiceChange & {
       op: "createImageService"
     })

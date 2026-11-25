@@ -1,10 +1,10 @@
 //! Deploy keys for Zeabur Builder.
 //!
-//! A plan's [`Change::CreateGitService`] or [`Change::GitSource`] with a deploy key names the Git
-//! host. The plan shows the `create` of a `kubernetes.io/ssh-auth` Secret with its values hidden,
-//! like every Secret it writes; the apply makes the SSH key pair and writes the private key and the
-//! host's `known_hosts`, which Zeabur Builder requires, into that Secret. The private key never
-//! leaves the server. The person then reads the public key from the Secret (`POST
+//! A plan's [`Change::CreateBuiltService`] or [`Change::SetBuild`] from Git with a deploy key
+//! names the Git host. The plan shows the `create` of a `kubernetes.io/ssh-auth` Secret with its
+//! values hidden, like every Secret it writes; the apply makes the SSH key pair and writes the
+//! private key and the host's `known_hosts`, which Zeabur Builder requires, into that Secret. The
+//! private key never leaves the server. The person then reads the public key from the Secret (`POST
 //! /projects/{p}/builds/{build}/deploy-key`) and adds it to the repository on its Git host.
 //!
 //! GitHub's and GitLab's host keys are pinned here. For any other host the person gives its
@@ -18,7 +18,10 @@ use utoipa::ToSchema;
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_modules::zeabur_builder;
 use zeabur_plan::builds::{BUILDER_GROUP, BUILDER_VERSION};
-use zeabur_plan::{Change, DeployKeySecret, GitAccess, PlanRequest};
+use zeabur_plan::{
+    BuildSource, BuiltServiceChange, Change, DeployKeySecret, GitAccess, PlanRequest,
+    SetBuildChange,
+};
 
 use crate::error::{ApiError, get_read, read_problem};
 use crate::extract::{Json, Path};
@@ -265,14 +268,18 @@ pub(crate) fn open(
         .iter()
         .map(|change| {
             let mut change = change.clone();
-            let (url, access, slot) = if let Change::CreateGitService(service) = &mut change {
-                (&service.url, &service.access, &mut service.deploy_key)
-            } else if let Change::GitSource(source) = &mut change {
-                (&source.url, &source.access, &mut source.deploy_key)
-            } else {
+            let (Change::CreateBuiltService(BuiltServiceChange { build, .. })
+            | Change::SetBuild(SetBuildChange { build, .. })) = &mut change
+            else {
                 return Ok(change);
             };
-            let GitAccess::DeployKey { known_hosts } = access else {
+            let BuildSource::Git {
+                url,
+                access: GitAccess::DeployKey { known_hosts },
+                deploy_key: slot,
+                ..
+            } = &mut build.source
+            else {
                 return Ok(change);
             };
             let host = zeabur_plan::deploy_key_host(url)
@@ -298,7 +305,7 @@ pub(crate) fn open(
 
 #[cfg(test)]
 mod tests {
-    use zeabur_plan::GitServiceChange;
+    use zeabur_plan::{BuildInput, BuiltServiceChange};
 
     use super::*;
 
@@ -328,28 +335,35 @@ mod tests {
     #[test]
     fn a_planned_secret_holds_a_key_kubernetes_accepts() {
         let request = PlanRequest {
-            changes: vec![Change::CreateGitService(GitServiceChange {
+            changes: vec![Change::CreateBuiltService(BuiltServiceChange {
                 name: "web".to_owned(),
-                url: "git@github.com:acme/web.git".to_owned(),
-                branch: None,
-                method: zeabur_plan::BuildMethod::Railpack,
-                directory: None,
-                dockerfile: None,
                 port: None,
                 host: None,
                 variables: Vec::new(),
-                build_variables: Vec::new(),
                 size: None,
                 security: None,
-                access: GitAccess::DeployKey { known_hosts: None },
-                deploy_key: None,
+                build: BuildInput {
+                    source: BuildSource::Git {
+                        url: "git@github.com:acme/web.git".to_owned(),
+                        branch: None,
+                        access: GitAccess::DeployKey { known_hosts: None },
+                        deploy_key: None,
+                    },
+                    method: zeabur_plan::BuildMethod::Railpack,
+                    directory: None,
+                    dockerfile: None,
+                    build_variables: Vec::new(),
+                },
             })],
         };
         let planned = open("shop", &request, KeyPair::Hidden).unwrap();
-        let [Change::CreateGitService(service)] = planned.changes.as_slice() else {
+        let [Change::CreateBuiltService(service)] = planned.changes.as_slice() else {
             panic!("{:?}", planned.changes);
         };
-        let key = service.deploy_key.as_ref().unwrap();
+        let BuildSource::Git { deploy_key, .. } = &service.build.source else {
+            panic!("{service:?}");
+        };
+        let key = deploy_key.as_ref().unwrap();
         assert_eq!(key.private_key, PLANNED_KEY);
         assert!(key.known_hosts.starts_with("github.com ssh-ed25519 "));
     }

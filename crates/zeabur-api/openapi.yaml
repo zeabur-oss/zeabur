@@ -5382,6 +5382,40 @@ components:
           description: >-
             Whether it is the one Zeabur made for this `Build` (`<name>-git`), which goes
             with it.
+    BuildInput:
+      type: object
+      description: One `Build`'s settings, whatever its source.
+      required:
+      - source
+      - method
+      properties:
+        buildVariables:
+          type: array
+          items:
+            $ref: "#/components/schemas/NameValue"
+          description: |-
+            Variables of the build, kept in the Secret `<name>-build-env`. A `Build` that exists keeps
+            the variables it has; these are set beside them.
+        directory:
+          type:
+          - string
+          - "null"
+          description: "The folder inside the repository or upload to build. Left out: its root."
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+        dockerfile:
+          type:
+          - string
+          - "null"
+          description: The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
+          maxLength: 1024
+          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
+        method:
+          $ref: "#/components/schemas/BuildMethod"
+          description: How the folder is built.
+        source:
+          $ref: "#/components/schemas/BuildSource"
+          description: What it builds.
     BuildMethod:
       type: string
       description: How Zeabur Builder builds a folder.
@@ -5434,6 +5468,95 @@ components:
             The registry Zeabur Builder pushes to and nodes pull from, such as `zot.zot.svc:5000`; a
             new service's images are `<registry>/<project>/<service>`. `None`: services are not
             deployed from Git.
+    BuildSource:
+      oneOf:
+      - type: object
+        description: A Git repository.
+        required:
+        - url
+        - access
+        - type
+        properties:
+          access:
+            $ref: "#/components/schemas/GitAccess"
+            description: How Zeabur Builder reads the repository.
+          branch:
+            type:
+            - string
+            - "null"
+            description: "The branch. Left out: the repository's default branch."
+            pattern: ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
+          type:
+            type: string
+            enum:
+            - git
+          url:
+            type: string
+            description: |-
+              The repository: `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
+              `ssh://git@host/owner/repo.git`.
+      - type: object
+        description: A folder the client uploads after the plan.
+        required:
+        - request
+        - type
+        properties:
+          request:
+            type: string
+            description: |-
+              A value the `Build` has not been asked with before, for its upload token (see
+              [`crate::Change::UploadToken`]).
+          type:
+            type: string
+            enum:
+            - upload
+      description: What a `Build` builds.
+    BuiltServiceChange:
+      type: object
+      description: A [`crate::Change::CreateBuiltService`].
+      required:
+      - name
+      - build
+      properties:
+        build:
+          $ref: "#/components/schemas/BuildInput"
+          description: Its `Build`.
+        host:
+          type:
+          - string
+          - "null"
+          description: A public hostname for the port, with HTTPS where the cluster has an issuer.
+        name:
+          type: string
+          description: The service's name, which its `Build`, workload and Service share.
+          maxLength: 40
+          pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
+        port:
+          type:
+          - integer
+          - "null"
+          format: int32
+          description: "The port the app listens on. Left out: a worker, which takes no connections."
+          minimum: 0
+        security:
+          oneOf:
+          - $ref: "#/components/schemas/PodSecurityLevel"
+            description: |-
+              `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
+              regular user, and `baseline` for a Dockerfile, which often runs as root.
+          - type: "null"
+        size:
+          oneOf:
+          - $ref: "#/components/schemas/ServiceSize"
+            description: "What the app asks for. Left out: small."
+          - type: "null"
+        variables:
+          type: array
+          items:
+            $ref: "#/components/schemas/NameValue"
+          description: >-
+            Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from
+            `port`.
     Capability:
       type: object
       description: Whether a capability is present on the cluster, and on what evidence.
@@ -6437,11 +6560,11 @@ components:
               The object as one YAML document, as a person wrote it; a problem with it names the
               line.
       - allOf:
-        - $ref: "#/components/schemas/UploadServiceChange"
+        - $ref: "#/components/schemas/BuiltServiceChange"
           description: |-
-            Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
-            uploaded-folder source that asks for its upload token, and the objects of the service that
-            runs the image it builds (see the `built_service` module).
+            Create a service whose image Zeabur Builder builds from a Git repository or an uploaded
+            folder: its `Build`, the credentials and variables it reads, and the objects of the service
+            that runs the image it builds (see the `built_service` module).
         - type: object
           required:
           - op
@@ -6449,17 +6572,18 @@ components:
             op:
               type: string
               enum:
-              - createUploadService
+              - createBuiltService
         description: |-
-          Create a service that runs a folder the person uploads: a Zeabur Builder `Build` with an
-          uploaded-folder source that asks for its upload token, and the objects of the service that
-          runs the image it builds (see the `built_service` module).
+          Create a service whose image Zeabur Builder builds from a Git repository or an uploaded
+          folder: its `Build`, the credentials and variables it reads, and the objects of the service
+          that runs the image it builds (see the `built_service` module).
       - allOf:
-        - $ref: "#/components/schemas/GitServiceChange"
+        - $ref: "#/components/schemas/SetBuildChange"
           description: |-
-            Create a service from a Git repository: a Zeabur Builder `Build` of the repository, its
-            credentials, and the objects of the service that runs the image it builds (see the
-            `built_service` module).
+            Give a running service its `Build`, or change what the one it has builds (see the
+            `built_service` module): a service with no `Build` of its name gets one, and its container
+            runs what the `Build` pushes, updated by Keel; a `Build` that exists takes the new source,
+            method and paths.
         - type: object
           required:
           - op
@@ -6467,29 +6591,28 @@ components:
             op:
               type: string
               enum:
-              - createGitService
+              - setBuild
         description: |-
-          Create a service from a Git repository: a Zeabur Builder `Build` of the repository, its
-          credentials, and the objects of the service that runs the image it builds (see the
-          `built_service` module).
-      - allOf:
-        - $ref: "#/components/schemas/GitSourceChange"
-          description: |-
-            Build a running service from a Git repository (see the `built_service` module): a
-            service with no `Build` of its name gets one, and its container runs what the `Build`
-            pushes, updated by Keel; an uploaded folder's `Build` builds the repository instead.
-        - type: object
-          required:
-          - op
-          properties:
-            op:
-              type: string
-              enum:
-              - gitSource
+          Give a running service its `Build`, or change what the one it has builds (see the
+          `built_service` module): a service with no `Build` of its name gets one, and its container
+          runs what the `Build` pushes, updated by Keel; a `Build` that exists takes the new source,
+          method and paths.
+      - type: object
         description: |-
-          Build a running service from a Git repository (see the `built_service` module): a
-          service with no `Build` of its name gets one, and its container runs what the `Build`
-          pushes, updated by Keel; an uploaded folder's `Build` builds the repository instead.
+          Stop building a service (see the `built_service` module): delete the `Build` of its name
+          and the credentials Secret only it reads, pin each container that runs what it built to
+          that image's digest, and stop Keel when no other `Build` makes the service's images.
+        required:
+        - workload
+        - op
+        properties:
+          op:
+            type: string
+            enum:
+            - removeBuild
+          workload:
+            $ref: "#/components/schemas/WorkloadRef"
+            description: The service.
       - allOf:
         - $ref: "#/components/schemas/ImageServiceChange"
           description: |-
@@ -10732,135 +10855,6 @@ components:
           description: >-
             Builder's webhook URL, `https://<host>/hooks/github-app`; empty when its
             receiver is off.
-    GitServiceChange:
-      type: object
-      description: A [`crate::Change::CreateGitService`].
-      required:
-      - name
-      - url
-      - method
-      - access
-      properties:
-        access:
-          $ref: "#/components/schemas/GitAccess"
-          description: How Zeabur Builder reads the repository.
-        branch:
-          type:
-          - string
-          - "null"
-          description: "The branch. Left out: the repository's default branch."
-          pattern: ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
-        buildVariables:
-          type: array
-          items:
-            $ref: "#/components/schemas/NameValue"
-          description: Variables of the build, kept in the Secret `<name>-build-env`.
-        directory:
-          type:
-          - string
-          - "null"
-          description: "The folder inside the repository to build. Left out: its root."
-          maxLength: 1024
-          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-        dockerfile:
-          type:
-          - string
-          - "null"
-          description: The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
-          maxLength: 1024
-          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-        host:
-          type:
-          - string
-          - "null"
-          description: A public hostname for the port, with HTTPS where the cluster has an issuer.
-        method:
-          $ref: "#/components/schemas/BuildMethod"
-          description: How the folder is built.
-        name:
-          type: string
-          description: The service's name, which its `Build`, workload and Service share.
-          maxLength: 40
-          pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
-        port:
-          type:
-          - integer
-          - "null"
-          format: int32
-          description: "The port the app listens on. Left out: a worker, which takes no connections."
-          minimum: 0
-        security:
-          oneOf:
-          - $ref: "#/components/schemas/PodSecurityLevel"
-            description: |-
-              `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
-              regular user, and `baseline` for a Dockerfile, which often runs as root.
-          - type: "null"
-        size:
-          oneOf:
-          - $ref: "#/components/schemas/ServiceSize"
-            description: "What the app asks for. Left out: small."
-          - type: "null"
-        url:
-          type: string
-          description: |-
-            The repository: `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
-            `ssh://git@host/owner/repo.git`.
-        variables:
-          type: array
-          items:
-            $ref: "#/components/schemas/NameValue"
-          description: >-
-            Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from
-            `port`.
-    GitSourceChange:
-      type: object
-      description: A [`crate::Change::GitSource`]. The `Build` is named after the workload.
-      required:
-      - workload
-      - url
-      - method
-      - access
-      properties:
-        access:
-          $ref: "#/components/schemas/GitAccess"
-          description: How Zeabur Builder reads the repository.
-        branch:
-          type:
-          - string
-          - "null"
-          description: "The branch. Left out: the repository's default branch."
-          pattern: ^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$
-        container:
-          type:
-          - string
-          - "null"
-          description: |-
-            The container that runs what the `Build` makes; may be left out when the workload has
-            only one.
-        directory:
-          type:
-          - string
-          - "null"
-          description: "The folder inside the repository to build. Left out: its root."
-          maxLength: 1024
-          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-        dockerfile:
-          type:
-          - string
-          - "null"
-          description: The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
-          maxLength: 1024
-          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-        method:
-          $ref: "#/components/schemas/BuildMethod"
-          description: How the folder is built.
-        url:
-          type: string
-          description: The repository, as for [`GitServiceChange::url`].
-        workload:
-          $ref: "#/components/schemas/WorkloadRef"
-          description: "The service: a Deployment, StatefulSet or DaemonSet."
     Headline:
       oneOf:
       - type: object
@@ -18487,6 +18481,26 @@ components:
           description: |-
             Whether people sign in to this server, and so can sign out. `false` on this machine
             (`zeaburctl ui`), which acts with the kubeconfig of whoever started it.
+    SetBuildChange:
+      type: object
+      description: A [`crate::Change::SetBuild`]. The `Build` is named after the workload.
+      required:
+      - workload
+      - build
+      properties:
+        build:
+          $ref: "#/components/schemas/BuildInput"
+          description: The `Build`.
+        container:
+          type:
+          - string
+          - "null"
+          description: |-
+            The container that runs what the `Build` makes; may be left out when the workload has
+            only one.
+        workload:
+          $ref: "#/components/schemas/WorkloadRef"
+          description: "The service: a Deployment, StatefulSet or DaemonSet."
     SettingSource:
       type: string
       description: Where the metrics store in use comes from.
@@ -19686,77 +19700,6 @@ components:
           items:
             type: string
           description: Nodes system-upgrade-controller is upgrading now.
-    UploadServiceChange:
-      type: object
-      description: A [`Change::CreateUploadService`].
-      required:
-      - name
-      - request
-      - method
-      properties:
-        buildVariables:
-          type: array
-          items:
-            $ref: "#/components/schemas/NameValue"
-          description: Variables of the build, kept in the Secret `<name>-build-env`.
-        directory:
-          type:
-          - string
-          - "null"
-          description: "The folder inside the upload to build. Left out: the whole upload."
-          maxLength: 1024
-          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-        dockerfile:
-          type:
-          - string
-          - "null"
-          description: The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
-          maxLength: 1024
-          pattern: ^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$
-        host:
-          type:
-          - string
-          - "null"
-          description: A public hostname for the port, with HTTPS where the cluster has an issuer.
-        method:
-          $ref: "#/components/schemas/BuildMethod"
-          description: How the folder is built.
-        name:
-          type: string
-          description: The service's name, which its `Build`, workload and Service share.
-          maxLength: 40
-          pattern: ^[a-z]([-a-z0-9]*[a-z0-9])?$
-        port:
-          type:
-          - integer
-          - "null"
-          format: int32
-          description: "The port the app listens on. Left out: a worker, which takes no connections."
-          minimum: 0
-        request:
-          type: string
-          description: |-
-            A value the `Build` has not been asked with before, for its upload token (see
-            [`Change::UploadToken`]).
-        security:
-          oneOf:
-          - $ref: "#/components/schemas/PodSecurityLevel"
-            description: |-
-              `restricted` or `baseline`. Left out: `restricted` for Railpack, whose images run as a
-              regular user, and `baseline` for a Dockerfile, which often runs as root.
-          - type: "null"
-        size:
-          oneOf:
-          - $ref: "#/components/schemas/ServiceSize"
-            description: "What the app asks for. Left out: small."
-          - type: "null"
-        variables:
-          type: array
-          items:
-            $ref: "#/components/schemas/NameValue"
-          description: >-
-            Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from
-            `port`.
     UploadedSource:
       type: object
       description: The folder as pushed.

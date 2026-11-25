@@ -19,9 +19,8 @@ pub(super) fn creates(request: &PlanRequest) -> bool {
         matches!(
             c,
             Change::Create { .. }
-                | Change::CreateUploadService(_)
-                | Change::CreateGitService(_)
-                | Change::GitSource(_)
+                | Change::CreateBuiltService(_)
+                | Change::SetBuild(_)
                 | Change::CreateImageService(_)
         )
     })

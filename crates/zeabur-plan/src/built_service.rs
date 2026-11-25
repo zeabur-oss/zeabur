@@ -1,31 +1,39 @@
 //! A service whose image Zeabur Builder builds: its `Build`, from an uploaded folder or a Git
-//! repository, and the objects of the image service that runs what it builds, as one change.
+//! repository, and the objects of the image service that runs what it builds.
 //!
-//! The web interface and `zeaburctl up` both send [`crate::Change::CreateUploadService`], and the
-//! web interface sends [`crate::Change::CreateGitService`]. The objects are created as a `create`
-//! of each is: the credentials and build variables first, the `Build` last. The Deployment names
-//! the `Build`'s repository with a tag no build makes, and Keel moves it to each image the
-//! `Build` pushes. An uploaded folder's `Build` carries the annotation that asks Zeabur Builder
-//! for an upload token.
+//! Every change that writes a `Build` takes one [`BuildInput`], whatever its source, and goes
+//! through one check and one `Build` object.
 //!
-//! [`crate::Change::GitSource`] gives a running service a Git source. A service without a `Build`
-//! of its name gets one, and its container moves to the `Build`'s repository with Keel's policy,
-//! as a new Git service has. A service from an uploaded folder keeps its `Build`, whose
-//! `spec.source` becomes the repository.
+//! - [`crate::Change::CreateBuiltService`] makes a new service, sent by the web interface and
+//!   `zeaburctl up`. The objects are created as a `create` of each is: the credentials and build
+//!   variables first, the `Build` last. The Deployment names the `Build`'s repository with a tag no
+//!   build makes, and Keel moves it to each image the `Build` pushes.
+//! - [`crate::Change::SetBuild`] gives a running service its `Build`, named after the workload. A
+//!   service without one gets one, and its container moves to the `Build`'s repository with Keel's
+//!   policy, as a new service has. A service with one keeps it, and its source, method and paths
+//!   become the new ones: an uploaded folder becomes a repository, a repository another one or an
+//!   uploaded folder, and an uploaded folder is uploaded again.
+//! - [`crate::Change::RemoveBuild`] stops building a service: its `Build` goes, with the
+//!   credentials Secret only it reads, each container that runs what it built keeps the image it
+//!   runs, pinned to its digest, and Keel stops when no other `Build` makes the service's images.
+//!
+//! An uploaded folder's `Build` carries the annotation that asks Zeabur Builder for an upload
+//! token; the client uploads the folder after the plan.
 
 use std::collections::BTreeMap;
 
 use k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, Secret, SecretKeySelector};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::json;
 use zeabur_model::{PodSecurityLevel, WorkloadKind, WorkloadRef};
 
 use crate::builds::{
     BUILDER_GROUP, BUILDER_VERSION, GIT_CREDENTIALS_LABEL, KEEL_FORCE, KEEL_POLICY,
     UPLOAD_TOKEN_REQUEST, build_path, builds,
 };
-use crate::change::{BuildMethod, NameValue, ServiceSize, UploadServiceChange};
+use crate::change::{BuildMethod, DataEdit, DataKind, NameValue, ServiceSize};
+use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::image_service::{
     ImageServiceChange, check_host, check_name, check_variable_names, image_objects, labels_of,
@@ -33,6 +41,7 @@ use crate::image_service::{
 };
 use crate::json::{add, replace, test};
 use crate::plan::{ErrorKind, PlanError, Planner, error, to_json};
+use crate::rules::{EnvEdit, EnvValueFrom};
 
 /// The tag the Deployment names until the first build.
 const PENDING_TAG: &str = "pending";
@@ -42,34 +51,22 @@ const KEEL_WEBHOOK: &str = "http://keel.keel.svc.cluster.local:9300/v1/webhooks/
 const REQUEST_MAX: usize = 63;
 /// The ref Zeabur Builder takes for the repository's default branch.
 const DEFAULT_BRANCH_REF: &str = "HEAD";
+/// The Keel policy that leaves a workload alone.
+const KEEL_NEVER: &str = "never";
 /// A branch as the form takes it, for the API's description. Kubernetes' regular expressions
 /// have no lookahead, so a branch ending in `.lock` is refused by the server only.
 pub const BRANCH_PATTERN: &str = r"^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$";
 
-/// A [`crate::Change::CreateGitService`].
+/// One `Build`'s settings, whatever its source.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
-pub struct GitServiceChange {
-    /// The service's name, which its `Build`, workload and Service share.
-    #[cfg_attr(
-        feature = "openapi",
-        schema(max_length = 40, pattern = "^[a-z]([-a-z0-9]*[a-z0-9])?$")
-    )]
-    pub name: String,
-    /// The repository: `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
-    /// `ssh://git@host/owner/repo.git`.
-    pub url: String,
-    /// The branch. Left out: the repository's default branch.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        feature = "openapi",
-        schema(pattern = r"^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$")
-    )]
-    pub branch: Option<String>,
+pub struct BuildInput {
+    /// What it builds.
+    pub source: BuildSource,
     /// How the folder is built.
     pub method: BuildMethod,
-    /// The folder inside the repository to build. Left out: its root.
+    /// The folder inside the repository or upload to build. Left out: its root.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     #[cfg_attr(
         feature = "openapi",
@@ -89,6 +86,58 @@ pub struct GitServiceChange {
         )
     )]
     pub dockerfile: Option<String>,
+    /// Variables of the build, kept in the Secret `<name>-build-env`. A `Build` that exists keeps
+    /// the variables it has; these are set beside them.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub build_variables: Vec<NameValue>,
+}
+
+/// What a `Build` builds.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(tag = "type", rename_all = "camelCase")]
+pub enum BuildSource {
+    /// A Git repository.
+    #[serde(rename_all = "camelCase")]
+    Git {
+        /// The repository: `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
+        /// `ssh://git@host/owner/repo.git`.
+        url: String,
+        /// The branch. Left out: the repository's default branch.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        #[cfg_attr(
+            feature = "openapi",
+            schema(pattern = r"^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$")
+        )]
+        branch: Option<String>,
+        /// How Zeabur Builder reads the repository.
+        access: GitAccess,
+        /// The deploy key the API makes for [`GitAccess::DeployKey`], before the planner sees
+        /// the change.
+        #[serde(skip)]
+        #[cfg_attr(feature = "openapi", schema(ignore))]
+        deploy_key: Option<DeployKeySecret>,
+    },
+    /// A folder the client uploads after the plan.
+    #[serde(rename_all = "camelCase")]
+    Upload {
+        /// A value the `Build` has not been asked with before, for its upload token (see
+        /// [`crate::Change::UploadToken`]).
+        request: String,
+    },
+}
+
+/// A [`crate::Change::CreateBuiltService`].
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct BuiltServiceChange {
+    /// The service's name, which its `Build`, workload and Service share.
+    #[cfg_attr(
+        feature = "openapi",
+        schema(max_length = 40, pattern = "^[a-z]([-a-z0-9]*[a-z0-9])?$")
+    )]
+    pub name: String,
     /// The port the app listens on. Left out: a worker, which takes no connections.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub port: Option<u16>,
@@ -98,9 +147,6 @@ pub struct GitServiceChange {
     /// Variables of the app, kept in the Secret `<name>-env`. `PORT` is added from `port`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub variables: Vec<NameValue>,
-    /// Variables of the build, kept in the Secret `<name>-build-env`.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub build_variables: Vec<NameValue>,
     /// What the app asks for. Left out: small.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub size: Option<ServiceSize>,
@@ -108,64 +154,23 @@ pub struct GitServiceChange {
     /// regular user, and `baseline` for a Dockerfile, which often runs as root.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub security: Option<PodSecurityLevel>,
-    /// How Zeabur Builder reads the repository.
-    pub access: GitAccess,
-    /// The deploy key the API makes for [`GitAccess::DeployKey`], before the planner sees the
-    /// change.
-    #[serde(skip)]
-    #[cfg_attr(feature = "openapi", schema(ignore))]
-    pub deploy_key: Option<DeployKeySecret>,
+    /// Its `Build`.
+    pub build: BuildInput,
 }
 
-/// A [`crate::Change::GitSource`]. The `Build` is named after the workload.
+/// A [`crate::Change::SetBuild`]. The `Build` is named after the workload.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
 #[serde(rename_all = "camelCase")]
-pub struct GitSourceChange {
+pub struct SetBuildChange {
     /// The service: a Deployment, StatefulSet or DaemonSet.
     pub workload: WorkloadRef,
     /// The container that runs what the `Build` makes; may be left out when the workload has
     /// only one.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub container: Option<String>,
-    /// The repository, as for [`GitServiceChange::url`].
-    pub url: String,
-    /// The branch. Left out: the repository's default branch.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        feature = "openapi",
-        schema(pattern = r"^(\.?[A-Za-z0-9_-])+\.?(/(\.?[A-Za-z0-9_-])+\.?)*$")
-    )]
-    pub branch: Option<String>,
-    /// How the folder is built.
-    pub method: BuildMethod,
-    /// The folder inside the repository to build. Left out: its root.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        feature = "openapi",
-        schema(
-            max_length = 1024,
-            pattern = "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$"
-        )
-    )]
-    pub directory: Option<String>,
-    /// The Dockerfile, relative to the directory, for [`BuildMethod::Dockerfile`].
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    #[cfg_attr(
-        feature = "openapi",
-        schema(
-            max_length = 1024,
-            pattern = "^([A-Za-z0-9_@+-][A-Za-z0-9._@+-]*(/[A-Za-z0-9_@+-][A-Za-z0-9._@+-]*)*)?$"
-        )
-    )]
-    pub dockerfile: Option<String>,
-    /// How Zeabur Builder reads the repository.
-    pub access: GitAccess,
-    /// The deploy key the API makes for [`GitAccess::DeployKey`], before the planner sees the
-    /// change.
-    #[serde(skip)]
-    #[cfg_attr(feature = "openapi", schema(ignore))]
-    pub deploy_key: Option<DeployKeySecret>,
+    /// The `Build`.
+    pub build: BuildInput,
 }
 
 /// How Zeabur Builder reads a repository. Credentials go in the Secret `<name>-git`.
@@ -340,72 +345,47 @@ fn trimmed(path: Option<&str>) -> Option<String> {
     (!path.is_empty()).then(|| path.to_owned())
 }
 
-/// What every built service checks, whatever its source.
-fn check_built(built: &Built<'_>) -> Result<(), PlanError> {
-    check_name(built.name)?;
-    for (field, path) in [
-        ("directory", built.directory.as_deref()),
-        ("dockerfile", built.dockerfile.as_deref()),
-    ] {
-        if let Some(path) = path
-            && !build_path(path)
-        {
-            return Err(refused(
-                "invalid_path",
-                "A path in the build has no segment that starts with a dot.",
-                field,
-            ));
-        }
-    }
-    check_host(built.host, built.port)?;
-    check_variable_names(
-        built.build_variables.iter().map(|v| v.name.as_str()),
-        "buildVariables",
-    )
-}
-
-fn check_upload(change: &UploadServiceChange) -> Result<(), PlanError> {
-    if change.request.is_empty()
-        || change.request.len() > REQUEST_MAX
-        || !change
-            .request
+fn check_request(request: &str) -> Result<(), PlanError> {
+    if request.is_empty()
+        || request.len() > REQUEST_MAX
+        || !request
             .bytes()
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
     {
         return Err(refused(
             "invalid_request",
             "The upload request must be 1 to 63 letters, digits, dots, dashes or underscores.",
-            "request",
+            "build.source.request",
         ));
     }
     Ok(())
 }
 
-fn check_git(git: &GitRead<'_>) -> Result<Repository, PlanError> {
-    let repository = parse_repository(git.url).ok_or_else(|| {
+fn check_git(url: &str, branch: Option<&str>, access: &GitAccess) -> Result<Repository, PlanError> {
+    let repository = parse_repository(url).ok_or_else(|| {
         refused(
             "invalid_repository",
             "Use a repository URL like https://github.com/acme/web.",
-            "url",
+            "build.source.url",
         )
     })?;
-    if let Some(branch) = git.branch.map(str::trim)
+    if let Some(branch) = branch.map(str::trim)
         && !branch.is_empty()
         && !is_branch(branch)
     {
         return Err(refused(
             "invalid_branch",
             "A branch is letters, digits, dots, dashes, underscores and slashes.",
-            "branch",
+            "build.source.branch",
         ));
     }
-    if let GitAccess::Token { username, token } = git.access
+    if let GitAccess::Token { username, token } = access
         && (username.trim().is_empty() || token.trim().is_empty())
     {
         return Err(refused(
             "invalid_token",
             "A token needs the user name the host takes with it.",
-            "access",
+            "build.source.access",
         ));
     }
     Ok(repository)
@@ -493,226 +473,121 @@ struct BuildNotify {
     url: &'static str,
 }
 
-/// What a built service takes from its change, whatever the source.
-struct Built<'a> {
-    name: &'a str,
-    method: BuildMethod,
-    directory: Option<String>,
-    dockerfile: Option<String>,
-    port: Option<u16>,
-    host: Option<&'a str>,
-    variables: &'a [NameValue],
-    build_variables: &'a [NameValue],
-    size: Option<ServiceSize>,
-    security: Option<PodSecurityLevel>,
+/// The fields of a `Build` the plan reads.
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct BuildRead {
+    spec: SpecRead,
+    status: StatusRead,
 }
 
-impl<'a> Built<'a> {
-    fn of_upload(change: &'a UploadServiceChange) -> Self {
-        Self {
-            name: &change.name,
-            method: change.method,
-            directory: trimmed(change.directory.as_deref()),
-            dockerfile: trimmed(change.dockerfile.as_deref()),
-            port: change.port,
-            host: change.host.as_deref(),
-            variables: &change.variables,
-            build_variables: &change.build_variables,
-            size: change.size,
-            security: change.security,
-        }
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct SpecRead {
+    source: SourceRead,
+    output: OutputRead,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct SourceRead {
+    #[serde(rename = "type")]
+    kind: String,
+    git: Option<GitRead>,
+    archive: Option<ArchiveRead>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct GitRead {
+    credentials_ref: Option<NameRead>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct NameRead {
+    name: String,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct ArchiveRead {
+    digest: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default)]
+struct OutputRead {
+    image: Option<String>,
+}
+
+#[derive(Default, Deserialize)]
+#[serde(default, rename_all = "camelCase")]
+struct StatusRead {
+    latest_image: Option<String>,
+}
+
+impl BuildRead {
+    /// The repository it pushes to: `spec.output.image`, else its newest image's.
+    fn repository(&self) -> Option<&str> {
+        self.spec
+            .output
+            .image
+            .as_deref()
+            .filter(|i| !i.is_empty())
+            .or_else(|| self.status.latest_image.as_deref().map(repository_of))
     }
 
-    fn of_git(change: &'a GitServiceChange) -> Self {
-        Self {
-            name: &change.name,
-            method: change.method,
-            directory: trimmed(change.directory.as_deref()),
-            dockerfile: trimmed(change.dockerfile.as_deref()),
-            port: change.port,
-            host: change.host.as_deref(),
-            variables: &change.variables,
-            build_variables: &change.build_variables,
-            size: change.size,
-            security: change.security,
-        }
+    /// The Secret it reads the repository's credentials from.
+    fn credentials(&self) -> Option<&str> {
+        self.spec
+            .source
+            .git
+            .as_ref()
+            .and_then(|g| g.credentials_ref.as_ref())
+            .map(|r| r.name.as_str())
     }
 
-    fn of_source(change: &'a GitSourceChange) -> Self {
-        Self {
-            name: &change.workload.name,
-            method: change.method,
-            directory: trimmed(change.directory.as_deref()),
-            dockerfile: trimmed(change.dockerfile.as_deref()),
-            port: None,
-            host: None,
-            variables: &[],
-            build_variables: &[],
-            size: None,
-            security: None,
-        }
-    }
-
-    const fn builder_ref(&self) -> &'static str {
-        match self.method {
-            BuildMethod::Railpack => "railpack",
-            BuildMethod::Dockerfile => "dockerfile",
-        }
-    }
-
-    fn source(&self, kind: SourceKind) -> SourceSpec {
-        SourceSpec {
-            kind,
-            context_dir: self.directory.clone(),
-            dockerfile: (self.method == BuildMethod::Dockerfile)
-                .then(|| self.dockerfile.clone())
-                .flatten(),
-        }
-    }
-
-    /// The `Build` that pushes to `repository`, its variables read from `<name>-build-env`.
-    fn build(
-        &self,
-        repository: String,
-        source: SourceKind,
-        annotations: Option<BTreeMap<String, String>>,
-    ) -> Build {
-        let build_secret = format!("{}-build-env", self.name);
-        let env = self
-            .build_variables
-            .iter()
-            .map(|v| EnvVar {
-                name: v.name.clone(),
-                value: None,
-                value_from: Some(EnvVarSource {
-                    secret_key_ref: Some(SecretKeySelector {
-                        name: build_secret.clone(),
-                        key: v.name.clone(),
-                        optional: None,
-                    }),
-                    ..EnvVarSource::default()
-                }),
-            })
-            .collect();
-        Build {
-            api_version: format!("{BUILDER_GROUP}/{BUILDER_VERSION}"),
-            kind: "Build",
-            metadata: ObjectMeta {
-                name: Some(self.name.to_owned()),
-                labels: Some(labels_of(self.name)),
-                annotations,
-                ..ObjectMeta::default()
-            },
-            spec: BuildSpec {
-                builder_ref: self.builder_ref(),
-                source: self.source(source),
-                output: BuildOutput { image: repository },
-                notify: [BuildNotify {
-                    kind: "keel",
-                    url: KEEL_WEBHOOK,
-                }],
-                env,
-            },
-        }
-    }
-
-    /// The objects in project `project`, in the order they are created: `before`, the build
-    /// variables' Secret, the image service, and the `Build` from `source`.
-    fn objects(
-        &self,
-        project: &str,
-        registry: &str,
-        cluster_issuer: Option<&str>,
-        before: Vec<Value>,
-        source: SourceKind,
-        annotations: Option<BTreeMap<String, String>>,
-    ) -> Result<Vec<Value>, PlanError> {
-        let name = self.name;
-        let labels = labels_of(name);
-        let repository = format!("{}/{project}/{name}", registry.trim_end_matches('/'));
-        let mut variables = self.variables.to_vec();
-        if let Some(port) = self.port
-            && !variables.iter().any(|v| v.name == "PORT")
-        {
-            variables.push(NameValue {
-                name: "PORT".to_owned(),
-                value: port.to_string(),
-            });
-        }
-        let service = ImageServiceChange {
-            name: name.to_owned(),
-            image: format!("{repository}:{PENDING_TAG}"),
-            port: self.port,
-            more_ports: Vec::new(),
-            host: self.host.map(str::to_owned),
-            variables: plain_variables(&variables),
-            secret_variables: true,
-            volumes: Vec::new(),
-            size: self.size.unwrap_or(ServiceSize::Small),
-            replicas: 1,
-            registry: None,
-            security: self.security.unwrap_or(match self.method {
-                BuildMethod::Railpack => PodSecurityLevel::Restricted,
-                BuildMethod::Dockerfile => PodSecurityLevel::Baseline,
-            }),
-            command: Vec::new(),
-            args: Vec::new(),
-            wait_for: None,
+    /// Whether a container of `spec`, init containers too, runs what it pushes.
+    fn feeds(&self, spec: Option<&k8s_openapi::api::core::v1::PodSpec>) -> bool {
+        let Some(repository) = self.repository() else {
+            return false;
         };
-        let build_secret = format!("{name}-build-env");
-        let mut out = before;
-        if !self.build_variables.is_empty() {
-            let values = self
-                .build_variables
-                .iter()
-                .map(|v| (v.name.as_str(), v.value.as_str()));
-            out.push(to_json(&opaque_secret(&build_secret, &labels, values))?);
-        }
-        let keel = BTreeMap::from([(KEEL_POLICY.to_owned(), KEEL_FORCE.to_owned())]);
-        out.extend(image_objects(&service, cluster_issuer, Some(keel))?);
-        out.push(to_json(&self.build(repository, source, annotations))?);
-        Ok(out)
+        spec.into_iter()
+            .flat_map(|s| s.init_containers.iter().flatten().chain(&s.containers))
+            .any(|c| c.image.as_deref().is_some_and(|i| runs_from(i, repository)))
     }
 }
 
-/// What reading a repository takes, from a new Git service or a Git source.
-struct GitRead<'a> {
-    name: &'a str,
-    url: &'a str,
-    branch: Option<&'a str>,
-    access: &'a GitAccess,
-    deploy_key: Option<&'a DeployKeySecret>,
+/// The Secret Zeabur makes for a `Build`'s repository credentials.
+fn credentials_name(build: &str) -> String {
+    format!("{build}-git")
 }
 
-impl<'a> GitRead<'a> {
-    fn of_service(change: &'a GitServiceChange) -> Self {
-        Self {
-            name: &change.name,
-            url: &change.url,
-            branch: change.branch.as_deref(),
-            access: &change.access,
-            deploy_key: change.deploy_key.as_ref(),
-        }
-    }
+/// The Secret that holds a `Build`'s variables.
+fn variables_name(build: &str) -> String {
+    format!("{build}-build-env")
+}
 
-    fn of_source(change: &'a GitSourceChange) -> Self {
-        Self {
-            name: &change.workload.name,
-            url: &change.url,
-            branch: change.branch.as_deref(),
-            access: &change.access,
-            deploy_key: change.deploy_key.as_ref(),
-        }
+fn secrets() -> ResourceRef {
+    ResourceRef {
+        group: String::new(),
+        version: "v1".to_owned(),
+        resource: "secrets".to_owned(),
     }
 }
 
-/// The credentials Secret of `git`, if its access has one, and the Git source that reads it.
+/// The credentials Secret `<name>-git` for `access`, if it needs one, and the Git source that
+/// reads `repository` with them.
 fn credentials(
-    git: &GitRead<'_>,
+    name: &str,
+    url: &str,
+    branch: Option<&str>,
+    access: &GitAccess,
+    deploy_key: Option<&DeployKeySecret>,
     repository: &Repository,
 ) -> Result<(Option<Secret>, GitSource), PlanError> {
-    let name = git.name;
-    let secret_name = format!("{name}-git");
+    let secret_name = credentials_name(name);
     let mut labels = labels_of(name);
     labels.insert(GIT_CREDENTIALS_LABEL.to_owned(), "true".to_owned());
     let secret = |kind: &str, values: [(&str, &str); 2]| Secret {
@@ -731,7 +606,7 @@ fn credentials(
         ..Secret::default()
     };
     let https = format!("https://{}/{}.git", repository.host, repository.path);
-    let (secret, url, github_app) = match git.access {
+    let (secret, url, github_app) = match access {
         GitAccess::Public => (None, https, None),
         GitAccess::GithubApp { installation_id } => (
             None,
@@ -742,34 +617,34 @@ fn credentials(
         ),
         GitAccess::Token { username, token } => (
             Some(secret(
-                "kubernetes.io/basic-auth",
+                BASIC_AUTH,
                 [("username", username.trim()), ("password", token.trim())],
             )),
             https,
             None,
         ),
         GitAccess::DeployKey { .. } => {
-            let Some(key) = git.deploy_key else {
+            let Some(key) = deploy_key else {
                 return Err(error(
                     ErrorKind::BadRequest,
                     "unresolved_deploy_key",
                     "The API makes a deploy key before planning; this change has none.",
                 ));
             };
-            let ssh = if over_https(git.url) {
+            let ssh = if over_https(url) {
                 format!(
                     "git@{}:{}.git",
                     without_port(&repository.host),
                     repository.path
                 )
             } else {
-                git.url.trim().to_owned()
+                url.trim().to_owned()
             };
             (
                 Some(secret(
-                    "kubernetes.io/ssh-auth",
+                    SSH_AUTH,
                     [
-                        ("ssh-privatekey", key.private_key.as_str()),
+                        (SSH_PRIVATE_KEY, key.private_key.as_str()),
                         ("known_hosts", key.known_hosts.as_str()),
                     ],
                 )),
@@ -780,8 +655,7 @@ fn credentials(
     };
     let source = GitSource {
         url,
-        reference: git
-            .branch
+        reference: branch
             .map(str::trim)
             .filter(|b| !b.is_empty())
             .unwrap_or(DEFAULT_BRANCH_REF)
@@ -792,101 +666,225 @@ fn credentials(
     Ok((secret, source))
 }
 
+const BASIC_AUTH: &str = "kubernetes.io/basic-auth";
+const SSH_AUTH: &str = "kubernetes.io/ssh-auth";
+const SSH_PRIVATE_KEY: &str = "ssh-privatekey";
+
+impl BuildInput {
+    /// Refuses what the `Build` would refuse.
+    fn check(&self) -> Result<(), PlanError> {
+        for (field, path) in [
+            ("build.directory", self.directory.as_deref()),
+            ("build.dockerfile", self.dockerfile.as_deref()),
+        ] {
+            if let Some(path) = trimmed(path)
+                && !build_path(&path)
+            {
+                return Err(refused(
+                    "invalid_path",
+                    "A path in the build has no segment that starts with a dot.",
+                    field,
+                ));
+            }
+        }
+        check_variable_names(
+            self.build_variables.iter().map(|v| v.name.as_str()),
+            "build.buildVariables",
+        )?;
+        match &self.source {
+            BuildSource::Upload { request } => check_request(request),
+            BuildSource::Git {
+                url,
+                branch,
+                access,
+                ..
+            } => check_git(url, branch.as_deref(), access).map(|_| ()),
+        }
+    }
+
+    const fn builder_ref(&self) -> &'static str {
+        match self.method {
+            BuildMethod::Railpack => "railpack",
+            BuildMethod::Dockerfile => "dockerfile",
+        }
+    }
+
+    /// `spec.source` of the `Build` `name`, and the credentials Secret it reads, if any.
+    fn source(&self, name: &str) -> Result<(SourceSpec, Option<Secret>), PlanError> {
+        let (kind, secret) = match &self.source {
+            BuildSource::Upload { .. } => (
+                SourceKind::Archive {
+                    archive: ArchiveSource { digest: None },
+                },
+                None,
+            ),
+            BuildSource::Git {
+                url,
+                branch,
+                access,
+                deploy_key,
+            } => {
+                let repository = check_git(url, branch.as_deref(), access)?;
+                let (secret, git) = credentials(
+                    name,
+                    url,
+                    branch.as_deref(),
+                    access,
+                    deploy_key.as_ref(),
+                    &repository,
+                )?;
+                (SourceKind::Git { git }, secret)
+            }
+        };
+        let spec = SourceSpec {
+            kind,
+            context_dir: trimmed(self.directory.as_deref()),
+            dockerfile: (self.method == BuildMethod::Dockerfile)
+                .then(|| trimmed(self.dockerfile.as_deref()))
+                .flatten(),
+        };
+        Ok((spec, secret))
+    }
+
+    /// The new `Build` `name` that builds `source` and pushes to `repository`, its variables read
+    /// from `<name>-build-env`.
+    fn build(&self, name: &str, repository: String, source: SourceSpec) -> Build {
+        let secret = variables_name(name);
+        let env = self
+            .build_variables
+            .iter()
+            .map(|v| EnvVar {
+                name: v.name.clone(),
+                value: None,
+                value_from: Some(EnvVarSource {
+                    secret_key_ref: Some(SecretKeySelector {
+                        name: secret.clone(),
+                        key: v.name.clone(),
+                        optional: None,
+                    }),
+                    ..EnvVarSource::default()
+                }),
+            })
+            .collect();
+        let annotations = match &self.source {
+            BuildSource::Upload { request } => Some(BTreeMap::from([(
+                UPLOAD_TOKEN_REQUEST.to_owned(),
+                request.clone(),
+            )])),
+            BuildSource::Git { .. } => None,
+        };
+        Build {
+            api_version: format!("{BUILDER_GROUP}/{BUILDER_VERSION}"),
+            kind: "Build",
+            metadata: ObjectMeta {
+                name: Some(name.to_owned()),
+                labels: Some(labels_of(name)),
+                annotations,
+                ..ObjectMeta::default()
+            },
+            spec: BuildSpec {
+                builder_ref: self.builder_ref(),
+                source,
+                output: BuildOutput { image: repository },
+                notify: [BuildNotify {
+                    kind: "keel",
+                    url: KEEL_WEBHOOK,
+                }],
+                env,
+            },
+        }
+    }
+}
+
 #[expect(
     clippy::multiple_inherent_impl,
     reason = "the planner's change kinds are split across modules by area"
 )]
 impl Planner<'_> {
-    fn registry(&self) -> Result<&str, PlanError> {
-        self.input.build_registry.filter(|r| !r.is_empty()).ok_or_else(|| {
+    /// The repository Zeabur Builder pushes the `Build` `name` to.
+    fn repository(&self, name: &str) -> Result<String, PlanError> {
+        let registry = self.input.build_registry.filter(|r| !r.is_empty()).ok_or_else(|| {
             error(
                 ErrorKind::Invalid,
                 "no_registry",
                 "Zeabur has no registry for Zeabur Builder to push to. Ask an administrator to set builds.registry.",
             )
-        })
+        })?;
+        let project = &self.input.snapshot.namespace;
+        Ok(format!(
+            "{}/{project}/{name}",
+            registry.trim_end_matches('/')
+        ))
     }
 
-    pub(crate) fn create_upload_service(
+    pub(crate) fn create_built_service(
         &mut self,
-        change: &UploadServiceChange,
+        change: &BuiltServiceChange,
         index: usize,
     ) -> Result<(), PlanError> {
-        let built = Built::of_upload(change);
-        check_built(&built)?;
-        check_upload(change)?;
-        let registry = self.registry()?;
-        let source = SourceKind::Archive {
-            archive: ArchiveSource { digest: None },
+        let name = change.name.as_str();
+        check_name(name)?;
+        check_host(change.host.as_deref(), change.port)?;
+        change.build.check()?;
+        let repository = self.repository(name)?;
+        let (source, credentials) = change.build.source(name)?;
+        if let Some(secret) = credentials {
+            self.create_object(&to_json(&secret)?, index)?;
+        }
+        self.build_variables(name, &change.build.build_variables, index)?;
+        let mut variables = change.variables.clone();
+        if let Some(port) = change.port
+            && !variables.iter().any(|v| v.name == "PORT")
+        {
+            variables.push(NameValue {
+                name: "PORT".to_owned(),
+                value: port.to_string(),
+            });
+        }
+        let service = ImageServiceChange {
+            name: name.to_owned(),
+            image: format!("{repository}:{PENDING_TAG}"),
+            port: change.port,
+            more_ports: Vec::new(),
+            host: change.host.clone(),
+            variables: plain_variables(&variables),
+            secret_variables: true,
+            volumes: Vec::new(),
+            size: change.size.unwrap_or(ServiceSize::Small),
+            replicas: 1,
+            registry: None,
+            security: change.security.unwrap_or(match change.build.method {
+                BuildMethod::Railpack => PodSecurityLevel::Restricted,
+                BuildMethod::Dockerfile => PodSecurityLevel::Baseline,
+            }),
+            command: Vec::new(),
+            args: Vec::new(),
+            wait_for: None,
         };
-        let annotations =
-            BTreeMap::from([(UPLOAD_TOKEN_REQUEST.to_owned(), change.request.clone())]);
-        let project = self.input.snapshot.namespace.clone();
-        let objects = built.objects(
-            &project,
-            registry,
-            self.input.cluster_issuer,
-            Vec::new(),
-            source,
-            Some(annotations),
-        )?;
-        for object in objects {
+        let keel = BTreeMap::from([(KEEL_POLICY.to_owned(), KEEL_FORCE.to_owned())]);
+        for object in image_objects(&service, self.input.cluster_issuer, Some(keel))? {
             self.create_object(&object, index)?;
         }
-        Ok(())
+        let build = change.build.build(name, repository, source);
+        self.create_object(&to_json(&build)?, index)
     }
 
-    pub(crate) fn create_git_service(
+    pub(crate) fn set_build(
         &mut self,
-        change: &GitServiceChange,
-        index: usize,
-    ) -> Result<(), PlanError> {
-        let built = Built::of_git(change);
-        check_built(&built)?;
-        let read = GitRead::of_service(change);
-        let repository = check_git(&read)?;
-        let registry = self.registry()?;
-        let (secret, git) = credentials(&read, &repository)?;
-        let before = secret
-            .as_ref()
-            .map(to_json)
-            .transpose()?
-            .into_iter()
-            .collect();
-        let project = self.input.snapshot.namespace.clone();
-        let objects = built.objects(
-            &project,
-            registry,
-            self.input.cluster_issuer,
-            before,
-            SourceKind::Git { git },
-            None,
-        )?;
-        for object in objects {
-            self.create_object(&object, index)?;
-        }
-        Ok(())
-    }
-
-    pub(crate) fn git_source(
-        &mut self,
-        change: &GitSourceChange,
+        change: &SetBuildChange,
         index: usize,
     ) -> Result<(), PlanError> {
         let reference = &change.workload;
-        let built = Built::of_source(change);
-        check_built(&built)?;
-        let read = GitRead::of_source(change);
-        let repository = check_git(&read)?;
+        let name = reference.name.as_str();
+        change.build.check()?;
         let found = self.editable_workload(reference)?;
         if matches!(found.kind(), WorkloadKind::Job | WorkloadKind::CronJob) {
             return Err(error(
                 ErrorKind::Invalid,
                 "not_updatable",
                 format!(
-                    "{} {} runs to completion; only a long-running service builds from Git.",
+                    "{} {name} runs to completion; only a long-running service is built.",
                     reference.kind.as_str(),
-                    reference.name
                 ),
             ));
         }
@@ -897,97 +895,296 @@ impl Planner<'_> {
             .as_ref()
             .and_then(|a| a.get(KEEL_POLICY))
             .is_some_and(|p| p == KEEL_FORCE);
-        let (secret, git) = credentials(&read, &repository)?;
-        if let Some(secret) = &secret {
-            self.create_object(&to_json(secret)?, index)?;
-        }
-        let source = built.source(SourceKind::Git { git });
-        let pushes_to = if self.fetched_build(built.name) {
-            self.build_from_git(&built, &source)?
+        let (source, credentials) = change.build.source(name)?;
+        let existing = self.builds_read()?.into_iter().any(|(n, _)| n == name);
+        let pushes_to = if existing {
+            self.update_build(name, &change.build, source, credentials, index)?
         } else {
-            let project = &self.input.snapshot.namespace;
-            let pushes_to = format!(
-                "{}/{project}/{}",
-                self.registry()?.trim_end_matches('/'),
-                built.name
-            );
-            let object = built.build(pushes_to.clone(), source.kind, None);
-            self.create_object(&to_json(&object)?, index)?;
+            let pushes_to = self.repository(name)?;
+            if let Some(secret) = credentials {
+                self.create_object(&to_json(&secret)?, index)?;
+            }
+            self.build_variables(name, &change.build.build_variables, index)?;
+            let build = change.build.build(name, pushes_to.clone(), source);
+            self.create_object(&to_json(&build)?, index)?;
             pushes_to
         };
-        if container.spec.image.as_deref().map(repository_of) != Some(pushes_to.as_str()) {
+        if !container
+            .spec
+            .image
+            .as_deref()
+            .is_some_and(|i| runs_from(i, &pushes_to))
+        {
             let image = format!("{pushes_to}:{PENDING_TAG}");
             self.image(reference, Some(&container.name), &image)?;
         }
-        if !keel {
-            self.auto_update(reference, true, None, None)?;
+        match (keel, existing) {
+            (true, _) => Ok(()),
+            (false, true) => self.auto_update(reference, true, Some(name), Some(KEEL_WEBHOOK)),
+            (false, false) => self.auto_update(reference, true, None, None),
         }
-        Ok(())
     }
 
-    /// Whether the plan read a `Build` named `name`.
-    fn fetched_build(&self, name: &str) -> bool {
+    /// Gives the `Build` `name` that exists `build`'s source, method and paths, writing the
+    /// credentials it reads; returns the repository it pushes to.
+    fn update_build(
+        &mut self,
+        name: &str,
+        build: &BuildInput,
+        mut source: SourceSpec,
+        credentials: Option<Secret>,
+        index: usize,
+    ) -> Result<String, PlanError> {
+        let wrote_credentials = self.write_credentials(name, credentials, index)?;
+        let at = self.build(name)?;
+        let before = self.current(at);
+        let read: BuildRead = serde_json::from_value(before.clone())
+            .map_err(|e| error(ErrorKind::Invalid, "unreadable_object", e.to_string()))?;
+        let Some(pushes_to) = read.spec.output.image.clone().filter(|i| !i.is_empty()) else {
+            return Err(error(
+                ErrorKind::Invalid,
+                "no_output",
+                format!("Build {name} names no image to push."),
+            ));
+        };
+        // A folder uploaded again keeps building the one it has until the new one is named.
+        if let SourceKind::Archive { archive } = &mut source.kind
+            && read.spec.source.kind == "archive"
+        {
+            archive.digest = read.spec.source.archive.and_then(|a| a.digest);
+        }
+        let mut operations = Vec::new();
+        for (field, value) in [
+            ("source", to_json(&source)?),
+            ("builderRef", json!(build.builder_ref())),
+        ] {
+            let path = format!("/spec/{field}");
+            let was = before.pointer(&path).cloned();
+            if was.as_ref() == Some(&value) {
+                continue;
+            }
+            self.claim(
+                at,
+                &[Step::field("spec"), Step::field(field)],
+                &format!("spec.{field}"),
+            )?;
+            match was {
+                Some(was) => operations.extend([test(&path, was), replace(&path, value)]),
+                None => operations.push(add(&path, value)),
+            }
+        }
+        self.patch(at, operations)?;
+        if let BuildSource::Upload { request } = &build.source {
+            self.upload_token(name, request)?;
+        }
+        if !build.build_variables.is_empty() {
+            self.build_variables(name, &build.build_variables, index)?;
+            let secret = variables_name(name);
+            for variable in &build.build_variables {
+                let edit = EnvEdit {
+                    op: "set".to_owned(),
+                    name: variable.name.clone(),
+                    value: None,
+                    value_from: Some(EnvValueFrom {
+                        secret_name: Some(secret.clone()),
+                        config_map_name: None,
+                        key: Some(variable.name.clone()),
+                        field_path: None,
+                    }),
+                };
+                self.build_env(at, name, &edit)?;
+            }
+        }
+        if !wrote_credentials && self.current(at) == before {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "unchanged",
+                format!("Build {name} already builds this way."),
+            ));
+        }
+        Ok(pushes_to)
+    }
+
+    /// Writes the credentials Secret `<name>-git` the `Build` reads from now on, or deletes it when
+    /// it reads none and no other `Build` reads it. A deploy key stays, so the key the person added
+    /// to the Git host keeps working. Returns whether it writes the Secret.
+    fn write_credentials(
+        &mut self,
+        name: &str,
+        wanted: Option<Secret>,
+        index: usize,
+    ) -> Result<bool, PlanError> {
+        let secret_name = credentials_name(name);
+        let existing = self
+            .input
+            .snapshot
+            .secret(&secret_name)
+            .map(|s| s.type_.clone().unwrap_or_default());
+        match (wanted, existing) {
+            (Some(secret), None) => {
+                self.create_object(&to_json(&secret)?, index)?;
+                Ok(true)
+            }
+            (Some(secret), Some(kind)) if secret.type_.as_deref() == Some(kind.as_str()) => {
+                let edits: Vec<DataEdit> = secret
+                    .string_data
+                    .into_iter()
+                    .flatten()
+                    .filter(|(key, _)| key != SSH_PRIVATE_KEY)
+                    .map(|(key, value)| DataEdit {
+                        op: "set".to_owned(),
+                        key,
+                        value: Some(value),
+                    })
+                    .collect();
+                self.data(DataKind::Secret, &secret_name, &edits)?;
+                Ok(true)
+            }
+            (Some(_), Some(kind)) => Err(refused(
+                "credentials_kind_changed",
+                &format!(
+                    "Secret {secret_name} holds {kind} credentials. Stop building from source, then connect the repository again."
+                ),
+                "build.source.access",
+            )),
+            (None, Some(_)) => {
+                let others = self.builds_read()?;
+                if others
+                    .iter()
+                    .any(|(other, b)| other != name && b.credentials() == Some(&secret_name))
+                {
+                    return Ok(false);
+                }
+                self.delete(&secrets(), &secret_name, None)?;
+                Ok(true)
+            }
+            (None, None) => Ok(false),
+        }
+    }
+
+    /// Sets `variables` in the Secret `<name>-build-env`, made when it is not there.
+    fn build_variables(
+        &mut self,
+        name: &str,
+        variables: &[NameValue],
+        index: usize,
+    ) -> Result<(), PlanError> {
+        if variables.is_empty() {
+            return Ok(());
+        }
+        let secret = variables_name(name);
+        if self.input.snapshot.secret(&secret).is_some() {
+            let edits: Vec<DataEdit> = variables
+                .iter()
+                .map(|v| DataEdit {
+                    op: "set".to_owned(),
+                    key: v.name.clone(),
+                    value: Some(v.value.clone()),
+                })
+                .collect();
+            return self.data(DataKind::Secret, &secret, &edits);
+        }
+        let values = variables
+            .iter()
+            .map(|v| (v.name.as_str(), v.value.as_str()));
+        let object = opaque_secret(&secret, &labels_of(name), values);
+        self.create_object(&to_json(&object)?, index)
+    }
+
+    /// The `Build`s the plan read, by name.
+    fn builds_read(&self) -> Result<Vec<(String, BuildRead)>, PlanError> {
         let resource = builds();
         self.input
             .objects
             .iter()
-            .any(|f| f.resource == resource && f.name == name)
+            .filter(|f| f.resource == resource)
+            .map(|f| {
+                serde_json::from_value(f.object.clone())
+                    .map(|read| (f.name.clone(), read))
+                    .map_err(|e| error(ErrorKind::Invalid, "unreadable_object", e.to_string()))
+            })
+            .collect()
     }
 
-    /// Points the `Build` of an uploaded folder at `source`; returns the repository it pushes to.
-    fn build_from_git(
-        &mut self,
-        built: &Built<'_>,
-        source: &SourceSpec,
-    ) -> Result<String, PlanError> {
-        let index = self.build(built.name)?;
-        let current = self.current(index);
-        match current.pointer("/spec/source/type").and_then(Value::as_str) {
-            Some("archive") => {}
-            _ => {
-                return Err(error(
-                    ErrorKind::BadRequest,
-                    "not_an_upload",
-                    format!(
-                        "Build {} already builds from a repository; change it in Build settings.",
-                        built.name
-                    ),
-                ));
-            }
-        }
-        let Some(pushes_to) = current
-            .pointer("/spec/output/image")
-            .and_then(Value::as_str)
-            .map(str::to_owned)
-        else {
+    pub(crate) fn remove_build(&mut self, reference: &WorkloadRef) -> Result<(), PlanError> {
+        let name = reference.name.as_str();
+        let found = self.editable_workload(reference)?;
+        let mut others = self.builds_read()?;
+        let Some(at) = others.iter().position(|(n, _)| n == name) else {
+            return Err(error(
+                ErrorKind::NotFound,
+                "unknown_build",
+                format!("There is no Build named {name}."),
+            ));
+        };
+        let (_, build) = others.swap_remove(at);
+        let Some(repository) = build.repository().map(str::to_owned) else {
             return Err(error(
                 ErrorKind::Invalid,
                 "no_output",
-                format!("Build {} names no image to push.", built.name),
+                format!("Build {name} names no image to push."),
             ));
         };
-        let mut operations = Vec::new();
-        for (field, value) in [
-            ("source", to_json(source)?),
-            ("builderRef", json!(built.builder_ref())),
-        ] {
-            let path = format!("/spec/{field}");
-            let before = current.pointer(&path).cloned();
-            if before.as_ref() == Some(&value) {
+        self.delete(&builds(), name, None)?;
+        let secret = credentials_name(name);
+        if build.credentials() == Some(secret.as_str())
+            && self.input.snapshot.secret(&secret).is_some()
+            && !others
+                .iter()
+                .any(|(_, other)| other.credentials() == Some(secret.as_str()))
+        {
+            self.delete(&secrets(), &secret, None)?;
+        }
+        let spec = found.pod_spec();
+        let latest = build.status.latest_image.as_deref();
+        for container in spec.into_iter().flat_map(|s| &s.containers) {
+            let Some(image) = container.image.as_deref() else {
+                continue;
+            };
+            if !runs_from(image, &repository) {
                 continue;
             }
-            self.claim(
-                index,
-                &[Step::field("spec"), Step::field(field)],
-                &format!("spec.{field}"),
-            )?;
-            match before {
-                Some(before) => operations.extend([test(&path, before), replace(&path, value)]),
-                None => operations.push(add(&path, value)),
+            let pinned = pinned(image, latest);
+            if pinned != image {
+                self.image(reference, Some(&container.name), pinned)?;
             }
         }
-        self.patch(index, operations)?;
-        Ok(pushes_to)
+        let keel = found
+            .meta()
+            .annotations
+            .as_ref()
+            .and_then(|a| a.get(KEEL_POLICY))
+            .is_some_and(|p| p != KEEL_NEVER);
+        if keel && !others.iter().any(|(_, other)| other.feeds(spec)) {
+            self.auto_update(reference, false, None, None)?;
+        }
+        Ok(())
+    }
+}
+
+/// Whether `image` is in `repository`, whatever its tag or digest.
+fn runs_from(image: &str, repository: &str) -> bool {
+    repository_of(image).eq_ignore_ascii_case(repository)
+}
+
+/// An image's tag, if it names one.
+fn tag_of(image: &str) -> Option<&str> {
+    let name = image.split_once('@').map_or(image, |(name, _)| name);
+    name.rsplit_once(':')
+        .map(|(_, tag)| tag)
+        .filter(|tag| !tag.contains('/'))
+}
+
+/// The image a container keeps once nothing builds it: the `Build`'s newest, `latest`, with its
+/// digest when the container runs that tag; else what it runs.
+fn pinned<'a>(image: &'a str, latest: Option<&'a str>) -> &'a str {
+    match latest {
+        Some(latest)
+            if !image.contains('@') && tag_of(image).is_some_and(|t| tag_of(latest) == Some(t)) =>
+        {
+            latest
+        }
+        _ => image,
     }
 }
 
