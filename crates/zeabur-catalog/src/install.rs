@@ -55,6 +55,8 @@ use zeabur_catalog_format::common::{Distribution, Encoding, Generate, Profile, R
 use zeabur_catalog_format::component::{self, Component, Input, InputValue, ProfileValues};
 use zeabur_kube::k8s_openapi::Resource;
 use zeabur_model::PodSecurityLevel;
+use zeabur_model::kernel::isolation::PLATFORM_LABEL;
+use zeabur_model::kernel::names::is_system_namespace;
 
 use crate::engine::{self, ChartRelease};
 use crate::{bundle, zeabur};
@@ -491,13 +493,22 @@ impl<'a> Rendered<'a> {
         secrets
     }
 
-    /// `kubectl` commands that make the namespaces the secrets and a privileged component need.
+    /// `kubectl` commands that make the namespaces of the releases and the secrets, label the
+    /// releases' namespaces as the platform's, and give a privileged component its Pod Security
+    /// level.
     fn namespace_commands(&self, secrets: &[SecretInputs<'_>]) -> String {
         let mut out = String::new();
         let exempt = self.exempt_namespaces();
-        let mut namespaces: Vec<&str> = exempt.iter().map(|(ns, _)| *ns).collect();
-        for ((ns, _), _) in secrets {
-            if !namespaces.contains(ns) {
+        let releases: Vec<&str> = self
+            .releases
+            .iter()
+            .map(|r| r.namespace)
+            .filter(|ns| !is_system_namespace(ns))
+            .collect();
+        let mut namespaces: Vec<&str> = Vec::new();
+        let wanted = exempt.iter().map(|(ns, _)| *ns).chain(releases.iter().copied());
+        for ns in wanted.chain(secrets.iter().map(|((ns, _), _)| *ns)) {
+            if !namespaces.contains(&ns) {
                 namespaces.push(ns);
             }
         }
@@ -508,11 +519,18 @@ impl<'a> Rendered<'a> {
                     "\nkubectl create namespace {ns} --dry-run=client -o yaml | kubectl apply -f -\n"
                 ),
             );
+            let mut labels = Vec::new();
+            if releases.contains(&ns) {
+                labels.push(format!("{PLATFORM_LABEL}=true"));
+            }
             if let Some((_, level)) = exempt.iter().find(|(name, _)| *name == ns) {
-                let labels: Vec<String> = engine::POD_SECURITY_MODES
-                    .iter()
-                    .map(|mode| format!("{mode}={level}"))
-                    .collect();
+                labels.extend(
+                    engine::POD_SECURITY_MODES
+                        .iter()
+                        .map(|mode| format!("{mode}={level}")),
+                );
+            }
+            if !labels.is_empty() {
                 push(
                     &mut out,
                     format!(

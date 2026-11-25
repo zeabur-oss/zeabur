@@ -8,6 +8,10 @@
 # https://docs.rke2.io/advanced
 # Profile: multi-node
 
+kubectl create namespace traefik --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace traefik --overwrite \
+  zeabur.com/platform=true
+
 # gateway-api-crds
 if ! kubectl get crd httproutes.gateway.networking.k8s.io >/dev/null 2>&1; then
   kubectl apply --server-side -f https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.3/standard-install.yaml

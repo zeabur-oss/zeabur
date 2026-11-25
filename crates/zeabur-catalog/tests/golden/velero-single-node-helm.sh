@@ -1,6 +1,8 @@
 # Profile: single-node
 
 kubectl create namespace velero --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace velero --overwrite \
+  zeabur.com/platform=true
 # Velero reads the bucket's credentials from this AWS-style credentials file.
 kubectl -n velero create secret generic velero-credentials \
   --from-literal=cloud='<credentials>' \
