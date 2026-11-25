@@ -25,6 +25,7 @@ import {
   EmptyTitle,
 } from "@zeabur-oss/design-system/components/empty"
 import { Select } from "@zeabur-oss/design-system/components/select"
+import { databaseKind } from "@/lib/place"
 
 type ShellTabProps = { tab: Extract<DockTab, { kind: "shell" }>; shown: boolean; focus: number }
 
@@ -59,7 +60,7 @@ function DatabaseShell({ tab, shown, focus }: ShellTabProps) {
   const t = useT()
   const query = useQuery(databasesQuery(tab.project))
   const database = query.data?.items.find(
-    (d) => d.engine === tab.database?.engine && d.name === tab.database.name,
+    (d) => databaseKind(d) === tab.database?.engine && d.name === tab.database.name,
   )
   if (query.isPending) return <LoadingRows label={t("common.loading")} rows={2} />
   if (query.isError) return <Problem error={query.error} />

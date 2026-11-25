@@ -67,6 +67,7 @@ import {
   daysOf,
   engineName,
   eventsOf,
+  asksForBackups,
   backupNames,
   exportTool,
   exportUrl,
@@ -87,6 +88,7 @@ import {
   type BackupTarget,
   type Database,
 } from "@/model/databases"
+import type { Gate } from "@/model/rights"
 import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
 import { FormButtons } from "@/routes/cluster/section"
@@ -109,6 +111,7 @@ import {
   SummaryCardWord,
 } from "@zeabur-oss/design-system/components/summary-card"
 import { TabsContent } from "@zeabur-oss/design-system/components/tabs"
+import { databaseKind } from "@/lib/place"
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
 
@@ -151,7 +154,7 @@ export function DatabasePage() {
       </Column>
     )
   if (!query.data) return null
-  const database = query.data.items.find((d) => d.engine === engine && d.name === name)
+  const database = query.data.items.find((d) => databaseKind(d) === engine && d.name === name)
   if (!database)
     return (
       <Column>
@@ -161,7 +164,7 @@ export function DatabasePage() {
         </Link>
       </Column>
     )
-  const operator = query.data.operators.find((o) => o.engine === database.engine)
+  const operator = query.data.operators.find((o) => o.module === database.provider)
   return (
     <Body
       project={project}
@@ -270,14 +273,12 @@ function Body({
               <TerminalWindowIcon aria-hidden="true" />
             </Button>
           </GateTip>
-          <StoreMenu
-            copy={`${database.resource}/${database.name}`}
+          <DatabaseMenu
+            project={project}
+            database={database}
             deleteGate={gates("changeDatabases")}
-            deleteLabel={t("db.delete")}
             onDelete={() => void planDelete()}
-          >
-            <ExportItem project={project} database={database} />
-          </StoreMenu>
+          />
         </>
       }
     >
@@ -503,6 +504,29 @@ function Overview({
   )
 }
 
+/** The page's menu. A database Zeabur did not create can be copied, but not deleted or
+ * exported. */
+function DatabaseMenu({
+  project,
+  database,
+  deleteGate,
+  onDelete,
+}: {
+  project: string
+  database: Database
+  deleteGate: Gate
+  onDelete: () => void
+}) {
+  const t = useT()
+  const copy = `${database.resource}/${database.name}`
+  if (database.unmanaged) return <StoreMenu copy={copy} />
+  return (
+    <StoreMenu copy={copy} deleteGate={deleteGate} deleteLabel={t("db.delete")} onDelete={onDelete}>
+      <ExportItem project={project} database={database} />
+    </StoreMenu>
+  )
+}
+
 /** Warnings about this database and the services under it. */
 function Cautions({ project, database }: { project: string; database: Database }) {
   const t = useT()
@@ -513,12 +537,7 @@ function Cautions({ project, database }: { project: string; database: Database }
       {database.members === 1 ? (
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
-          <AlertDescription>
-            {t(
-              "db.noRedundancy",
-              !backsUp(database.engine) || Boolean(database.backups.store?.inUse),
-            )}
-          </AlertDescription>
+          <AlertDescription>{t("db.noRedundancy", !asksForBackups(database))}</AlertDescription>
         </Alert>
       ) : null}
       {troubled ? (
@@ -660,6 +679,13 @@ function Backups({
   const store = database.backups.store
   const on = backupsOn(database)
   const pluginMissing = database.engine === "postgresql" && !readable && operator
+  if (database.unmanaged)
+    return (
+      <Alert>
+        <InfoIcon aria-hidden="true" />
+        <AlertDescription>{t("db.backup.unmanaged")}</AlertDescription>
+      </Alert>
+    )
   return (
     <div className="flex flex-col gap-7">
       {pluginMissing ? (

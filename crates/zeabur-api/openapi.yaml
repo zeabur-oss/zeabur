@@ -2110,8 +2110,8 @@ paths:
       - projects
       summary: |-
         The databases of a project, read as the person, from every database operator this build
-        knows (CloudNativePG, the Percona Operator for MongoDB, MOCO, mariadb-operator, the Dragonfly
-        Operator).
+        knows (CloudNativePG, the Percona Operator for MongoDB, MongoDB Controllers for Kubernetes,
+        MOCO, mariadb-operator, the Dragonfly Operator).
       operationId: getProjectDatabases
       parameters:
       - name: project
@@ -8628,6 +8628,11 @@ components:
           description: |-
             The `StorageClass` of each member's volume, as asked for; absent for the cluster's
             default.
+        unmanaged:
+          type: boolean
+          description: |-
+            Zeabur shows it and edits its YAML, but does not create, delete, back up, restore or
+            export it.
         version:
           type:
           - string
@@ -8857,6 +8862,11 @@ components:
         state:
           $ref: "#/components/schemas/ProviderState"
           description: Whether its objects could be read.
+        unmanaged:
+          type: boolean
+          description: |-
+            Zeabur shows its databases and edits their YAML, but does not create, delete, back up,
+            restore or export them.
     DatabaseRecoveryWindow:
       type: object
       description: The times a new database can recover to.
@@ -15873,7 +15883,7 @@ components:
           type: array
           items:
             $ref: "#/components/schemas/DatabaseOperator"
-          description: One per engine this build knows.
+          description: One per operator this build knows.
         unreadable:
           type: array
           items:

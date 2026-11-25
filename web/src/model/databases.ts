@@ -47,6 +47,13 @@ const ENGINE_NAMES: Record<Engine, string> = {
 
 export const engineName = (engine: Engine) => ENGINE_NAMES[engine]
 
+/** The provider of MongoDB Controllers for Kubernetes, whose databases Zeabur does not create. */
+const MCK = "mongodb-kubernetes"
+
+/** The operator's name where the engine's alone would be ambiguous. */
+export const operatorName = (operator: Schemas.DatabaseOperator) =>
+  operator.module === MCK ? "MongoDB Controllers for Kubernetes" : engineName(operator.engine)
+
 /** The server's licence, when it is not an open-source one. */
 export const engineLicence: Partial<Record<Engine, string>> = {
   dragonfly: "Apache-2.0 AND BUSL-1.1",
@@ -216,7 +223,8 @@ export function perThreadCaches(spec: Manifest, version?: string | null) {
 
 /** The note a MongoDB 8 gets: the setting is there, or missing. */
 export function rseqNote(database: Database): "set" | "missing" | undefined {
-  if (database.engine !== "mongodb" || !mongo8OrLater(database.version ?? database.image)) return
+  if (database.engine !== "mongodb" || database.unmanaged) return
+  if (!mongo8OrLater(database.version ?? database.image)) return
   const spec = (database.object as Manifest & { spec?: Manifest }).spec ?? {}
   const replsets = (spec.replsets as Manifest[] | undefined) ?? []
   return replsets.every(hasPerThreadCaches) ? "set" : "missing"
@@ -693,6 +701,16 @@ function mariaBackupPods(database: Database) {
 export type BackupEngine = Exclude<Engine, "dragonfly">
 
 export const backsUp = (engine: Engine): engine is BackupEngine => engine !== "dragonfly"
+
+/** Whether the page asks to set up backups: Zeabur backs up the engine, the database is not one
+ * Zeabur did not create, and no backup store is in use yet. */
+export const asksForBackups = (database: Database) =>
+  backsUp(database.engine) && !database.unmanaged && !database.backups.store?.inUse
+
+/** The operators Zeabur creates databases with: not those whose databases it
+ * does not create. */
+export const creatable = (operators: Schemas.DatabaseOperator[]) =>
+  operators.filter((o) => !o.unmanaged)
 
 /** The database's engine, for a database that `backsUp`. */
 export const backupEngine = (database: Database) => database.engine as BackupEngine
@@ -1480,7 +1498,7 @@ export function shellPod(database: Database): string {
     case "postgresql":
       return database.primary ?? `${database.name}-1`
     case "mongodb":
-      return `${database.name}-rs0-0`
+      return database.provider === MCK ? `${database.name}-0` : `${database.name}-rs0-0`
     case "mysql":
       return database.primary ?? `moco-${database.name}-0`
     case "mariadb":
@@ -1493,6 +1511,21 @@ export function shellPod(database: Database): string {
 const mongoLogin =
   'mongosh -u "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_USER)" -p "$(cat /etc/users-secret/MONGODB_DATABASE_ADMIN_PASSWORD)" --authenticationDatabase admin'
 
+/** `mongosh` in an MCK member. MCK mounts no user's password there, so it signs in with
+ * `db.auth()`. With TLS, MCK mounts its CA as the only file in /var/lib/tls/ca/; the member's
+ * certificate does not name localhost. */
+function mckShell(database: Database): string[] {
+  const port = String(database.connection.port)
+  const tls = new URLSearchParams(database.connection.options ?? "").get("tls") === "true"
+  return tls
+    ? [
+        "bash",
+        "-c",
+        `exec mongosh --port ${port} --tls --tlsCAFile /var/lib/tls/ca/*.pem --tlsAllowInvalidHostnames`,
+      ]
+    : ["mongosh", "--port", port]
+}
+
 /** What a terminal runs in the server's container: the engine's own shell, signed in where the
  * container holds a password. MOCO's does not, so `mysql` asks for `moco-writable`'s. */
 export function shellCommand(database: Database): string[] {
@@ -1500,7 +1533,7 @@ export function shellCommand(database: Database): string[] {
     case "postgresql":
       return ["psql", database.connection.database ?? "app"]
     case "mongodb":
-      return ["bash", "-c", mongoLogin]
+      return database.provider === MCK ? mckShell(database) : ["bash", "-c", mongoLogin]
     case "mysql":
       return ["mysql", "-h", "127.0.0.1", "-u", "moco-writable", "-p"]
     case "mariadb":

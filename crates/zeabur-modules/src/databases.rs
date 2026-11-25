@@ -1,9 +1,10 @@
 //! The databases capability: the database clusters an operator runs in a project, how they are,
 //! how to connect, and their backups, whichever operator runs them.
 //!
-//! Each provider ([`crate::cloudnative_pg`] for PostgreSQL, [`crate::percona_mongodb`] for
-//! MongoDB, [`crate::moco`] for MySQL, [`crate::mariadb_operator`] for MariaDB and
-//! [`crate::dragonfly`] for Dragonfly) turns its own objects into the shared view below. What is
+//! Each provider ([`crate::cloudnative_pg`] for PostgreSQL, [`crate::percona_mongodb`] and
+//! [`crate::mongodb_kubernetes`] for MongoDB, [`crate::moco`] for MySQL,
+//! [`crate::mariadb_operator`] for MariaDB and [`crate::dragonfly`] for Dragonfly) turns its own
+//! objects into the shared view below. What is
 //! shared is what a person asks of any database: is it up, how many members are ready, which one
 //! takes writes, which version, where to connect and as whom, and whether it is backed up. The rest
 //! (replication settings, extensions, sharding) stays with each provider's objects.
@@ -366,13 +367,18 @@ pub struct Database {
     /// The backup it was restored from, when Zeabur made it from one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub restored: Option<Restored>,
+    /// Zeabur shows it and edits its YAML, but does not create, delete, back up, restore or
+    /// export it.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub unmanaged: bool,
 }
 
 impl Database {
     /// Whether a pod with `labels` is one of its members. CloudNativePG labels an instance with
     /// `cnpg.io/cluster` and `cnpg.io/instanceName` (its jobs have no instance name); the Percona
     /// Operator labels a replica set member with `app.kubernetes.io/instance` and
-    /// `app.kubernetes.io/component: mongod`. MOCO, mariadb-operator and the Dragonfly Operator
+    /// `app.kubernetes.io/component: mongod`, and MongoDB Controllers for Kubernetes with `app`,
+    /// the name of its Service. MOCO, mariadb-operator and the Dragonfly Operator
     /// label each member with `app.kubernetes.io/name` and `app.kubernetes.io/instance`.
     /// <https://cloudnative-pg.io/documentation/current/labels_annotations/>
     #[must_use]
@@ -382,6 +388,10 @@ impl Database {
             Engine::Postgresql => {
                 label("cnpg.io/cluster") == Some(&self.name)
                     && label("cnpg.io/instanceName").is_some()
+            }
+            Engine::Mongodb if self.provider == crate::mongodb_kubernetes::MODULE.id => {
+                label("app")
+                    .is_some_and(|app| crate::mongodb_kubernetes::member_label(self) == Some(app))
             }
             Engine::Mongodb => {
                 label("app.kubernetes.io/instance") == Some(&self.name)

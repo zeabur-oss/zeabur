@@ -216,7 +216,7 @@ pub struct Rights {
 
 const WORKLOADS: [&str; 3] = ["deployments", "statefulsets", "daemonsets"];
 
-const COVERED: [(&str, Right); 13] = [
+const COVERED: [(&str, Right); 14] = [
     ("secrets", Right::ChangeSecrets),
     ("configmaps", Right::ChangeConfig),
     ("ingresses", Right::ChangeDomains),
@@ -225,6 +225,7 @@ const COVERED: [(&str, Right); 13] = [
     ("networkpolicies", Right::ChangeNetworkPolicies),
     ("clusters", Right::ChangeDatabases),
     ("perconaservermongodbs", Right::ChangeDatabases),
+    ("mongodbcommunity", Right::ChangeDatabases),
     ("mysqlclusters", Right::ChangeDatabases),
     ("mariadbs", Right::ChangeDatabases),
     ("dragonflies", Right::ChangeDatabases),
@@ -288,5 +289,22 @@ mod tests {
             .find(|r| r.right == Right::ChangeNodes)
             .unwrap();
         assert_eq!((nodes.role, nodes.rule), (NeededRole::Admin, "patch nodes"));
+    }
+
+    #[test]
+    fn a_mongodb_community_yaml_edit_needs_a_developer() {
+        let listed = rights();
+        let community = listed
+            .resources
+            .iter()
+            .find(|r| r.resource == "mongodbcommunity")
+            .unwrap();
+        assert_eq!(community.edit, Right::ChangeDatabases);
+        let databases = listed
+            .rights
+            .iter()
+            .find(|r| r.right == Right::ChangeDatabases)
+            .unwrap();
+        assert_eq!(databases.role, NeededRole::Developer);
     }
 }

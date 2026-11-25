@@ -671,7 +671,8 @@ pub(crate) mod tests {
             "s3policybindings.seaweed.seaweedfs.com",
         ];
         let restores = "restores.k8s.mariadb.com";
-        for resource in changed.iter().chain([&restores]) {
+        let shown = "mongodbcommunity.mongodbcommunity.mongodb.com";
+        for resource in changed.iter().chain([&restores, &shown]) {
             for verb in ["get", "list", "watch"] {
                 assert!(allows(viewer, verb, resource), "viewer {verb} {resource}");
                 assert!(
@@ -693,6 +694,13 @@ pub(crate) mod tests {
             for role in [developer, viewer] {
                 assert!(!allows(role, verb, restores), "{verb} {restores}");
             }
+            let edits = matches!(verb, "update" | "patch");
+            assert_eq!(
+                allows(developer, verb, shown),
+                edits,
+                "developer {verb} {shown}"
+            );
+            assert!(!allows(viewer, verb, shown), "viewer {verb} {shown}");
         }
     }
 

@@ -8,7 +8,10 @@ const kubeconfig = askerOf({ member: false })
 
 const rights: Schemas.Rights = {
   rights: [{ right: "openTerminal", role: "developer", rule: "create pods/exec" }],
-  resources: [{ resource: "statefulsets", edit: "changeServices", delete: "deleteServices" }],
+  resources: [
+    { resource: "statefulsets", edit: "changeServices", delete: "deleteServices" },
+    { resource: "mongodbcommunity", edit: "changeDatabases", delete: "changeDatabases" },
+  ],
 }
 
 describe("closing an action by the person's rights", () => {
@@ -40,5 +43,13 @@ describe("closing an action by the person's rights", () => {
     expect(rightOfResource(rights, "statefulsets", "delete")).toBe("deleteServices")
     expect(rightOfResource(rights, "widgets", "edit")).toBeUndefined()
     expect(rightOfResource(undefined, "statefulsets", "edit")).toBeUndefined()
+  })
+
+  test("a MongoDBCommunity's YAML opens to a developer and stays closed to a viewer", () => {
+    const right = rightOfResource(rights, "mongodbcommunity", "edit")
+    expect(right).toBe("changeDatabases")
+    // The project's answer for a developer allows changeDatabases; a viewer's denies it.
+    expect(gate(right!, "allowed", member).open).toBe(true)
+    expect(gate(right!, "denied", member).open).toBe(false)
   })
 })

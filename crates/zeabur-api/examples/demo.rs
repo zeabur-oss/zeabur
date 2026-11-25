@@ -447,6 +447,20 @@ fn wrong_port() -> Option<String> {
     std::env::var("ZEABUR_DEMO_WRONG_PORT").ok()
 }
 
+/// Lab's MongoDB made with MongoDB Controllers for Kubernetes, which Zeabur does not create.
+fn mongodb_community() -> DynamicObject {
+    from(json!({
+        "apiVersion": "mongodbcommunity.mongodb.com/v1", "kind": "MongoDBCommunity",
+        "metadata": {"name": "events", "namespace": "lab", "creationTimestamp": created("events")},
+        "spec": {"members": 3, "type": "ReplicaSet", "version": "8.0.12",
+            "users": [{"name": "app", "db": "admin",
+                "passwordSecretRef": {"name": "events-app-password"},
+                "roles": [{"name": "readWrite", "db": "events"}],
+                "scramCredentialsSecretName": "events-app"}]},
+        "status": {"phase": "Running", "version": "8.0.12", "currentMongoDBMembers": 3}
+    }))
+}
+
 fn checkout_build() -> Vec<DynamicObject> {
     let Some(variant) = wrong_port() else {
         return Vec::new();
@@ -839,6 +853,13 @@ fn state() -> State {
                 "v1",
                 "objectstores",
                 "ObjectStore",
+                true,
+            ),
+            ServedResource::readable(
+                "mongodbcommunity.mongodb.com",
+                "v1",
+                "mongodbcommunity",
+                "MongoDBCommunity",
                 true,
             ),
             ServedResource::readable(
@@ -1240,6 +1261,7 @@ fn state() -> State {
         .chain(live)
         .chain(docs_build())
         .chain([storefront_build()])
+        .chain([mongodb_community()])
         .chain(checkout_build())
         .chain(people())
         .chain(member_roles())

@@ -7,6 +7,7 @@ import { connected } from "@/model/connect"
 import { engineName, stateHealth, type Database } from "@/model/databases"
 import { serviceId, type Claim, type Health, type Project, type Service } from "@/model/service"
 import { bytesOf } from "@/model/volume-edit"
+import { databaseKind } from "@/lib/place"
 
 /** Whether a database's operator runs this workload for the database. */
 const isDatabasePart = (service: Pick<Service, "managedBy">) => Boolean(service.managedBy?.engine)
@@ -26,33 +27,22 @@ export function foldDatabases(project: Project): Project {
   }
 }
 
-/** Engine words as the server sends them in `managedBy` (`MongoDB`), by the API's engine id. */
-const ENGINE_OF: Record<string, Database["engine"]> = {
-  PostgreSQL: "postgresql",
-  MongoDB: "mongodb",
-  MySQL: "mysql",
-  MariaDB: "mariadb",
-  Dragonfly: "dragonfly",
-}
+/** Whether the database's operator runs this workload for it: `managedBy` names the database's
+ * kind and name. */
+const isPartOf = (service: Pick<Service, "managedBy">, database: Database) =>
+  service.managedBy?.kind === database.kind && service.managedBy.name === database.name
 
 /** The database a part belongs to, among `databases`. */
 const databaseOfPart = (service: Service, databases: Database[]) =>
-  databases.find(
-    (d) =>
-      d.name === service.managedBy?.name && d.engine === ENGINE_OF[service.managedBy.engine ?? ""],
-  )
+  databases.find((d) => isPartOf(service, d))
 
 /** The workloads the database's operator runs for it. */
 export const partsOf = (database: Database, services: Service[]) =>
-  services.filter(
-    (s) =>
-      s.managedBy?.name === database.name &&
-      ENGINE_OF[s.managedBy.engine ?? ""] === database.engine,
-  )
+  services.filter((s) => isPartOf(s, database))
 
 /** A database on the project map. */
 export interface DatabaseNode {
-  /** `database:<engine>/<name>`. */
+  /** `database:<kind>/<name>`, `databaseKind`. */
   id: string
   database: Database
   health: Health
@@ -60,8 +50,8 @@ export interface DatabaseNode {
   volumes: { name: string; size?: string | null }[]
 }
 
-const databaseNodeId = (database: Pick<Database, "engine" | "name">) =>
-  `database:${database.engine}/${database.name}`
+const databaseNodeId = (database: Pick<Database, "engine" | "name" | "provider" | "unmanaged">) =>
+  `database:${databaseKind(database)}/${database.name}`
 
 /** `claims` from the whole project give a volume its size when the database has none. */
 export function databaseNodes(databases: Database[], claims: Claim[] = []): DatabaseNode[] {

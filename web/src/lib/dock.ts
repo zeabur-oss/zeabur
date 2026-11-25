@@ -1,6 +1,7 @@
 // The terminals docked under every page: which are open and which is shown. Kept here, outside the
 // pages, so a terminal lives on while the person moves between pages and services.
 import { load, save, store } from "@/lib/stores"
+import { databaseKind } from "@/lib/place"
 
 export interface ServiceRef {
   kind: string
@@ -8,6 +9,7 @@ export interface ServiceRef {
 }
 
 export interface DatabaseRef {
+  /** `databaseKind`: the engine, or the provider of a database Zeabur did not create. */
   engine: string
   name: string
 }
@@ -104,11 +106,11 @@ export function openShell(
 /** Opens a terminal in the database's server, or shows the one already open. */
 export const openDatabaseShell = (
   project: string,
-  database: DatabaseRef & { kind: string },
+  database: DatabaseRef & { kind: string; provider?: string; unmanaged?: boolean },
   pod?: string,
 ) =>
   openShell(project, { kind: database.kind, name: database.name }, pod, {
-    engine: database.engine,
+    engine: databaseKind(database),
     name: database.name,
   })
 

@@ -5481,6 +5481,11 @@ export type Database = {
    */
   storageClass?: string | null
   /**
+   * Zeabur shows it and edits its YAML, but does not create, delete, back up, restore or
+   * export it.
+   */
+  unmanaged?: boolean
+  /**
    * The server version, as reported, else from the image tag.
    * @nullable
    */
@@ -5510,6 +5515,11 @@ export type DatabaseOperator = {
   module: string
   /** Whether its objects could be read. */
   state: ProviderState
+  /**
+   * Zeabur shows its databases and edits their YAML, but does not create, delete, back up,
+   * restore or export them.
+   */
+  unmanaged?: boolean
 }
 
 /**
@@ -9598,7 +9608,7 @@ export type ProjectBuilds = {
 export type ProjectDatabases = {
   /** The databases, by engine, then name. */
   items: Database[]
-  /** One per engine this build knows. */
+  /** One per operator this build knows. */
   operators: DatabaseOperator[]
   /** What could not be read. */
   unreadable: UnreadableView[]
@@ -13104,8 +13114,8 @@ export const getGetProjectDatabasesUrl = (project: ProjectName) => {
 
 /**
  * @summary The databases of a project, read as the person, from every database operator this build
-knows (CloudNativePG, the Percona Operator for MongoDB, MOCO, mariadb-operator, the Dragonfly
-Operator).
+knows (CloudNativePG, the Percona Operator for MongoDB, MongoDB Controllers for Kubernetes,
+MOCO, mariadb-operator, the Dragonfly Operator).
  */
 export const getProjectDatabases = async (
   project: ProjectName,

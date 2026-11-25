@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import { actionOf, describe as describePlan } from "@/components/plan/describe"
+import { databaseLink } from "@/lib/place"
+import { databaseNodes } from "@/model/database-parts"
 import type { Translate } from "@/i18n"
 
 import {
@@ -38,8 +40,12 @@ import {
   presetResources,
   reshapeDatabase,
   sizePresets,
+  operatorName,
+  creatable,
+  asksForBackups,
   rseqNote,
   shellCommand,
+  shellPod,
   storageProblem,
   targetProblems,
   type Database,
@@ -115,6 +121,34 @@ const mongo: Database = {
     kind: "PerconaServerMongoDB",
     metadata: { name: "mongo" },
     spec: { replsets: [{ name: "rs0", size: 1 }], backup: { enabled: false, image: "pbm:1" } },
+  } as unknown as Database["object"],
+}
+
+/** A `MongoDBCommunity` of MongoDB Controllers for Kubernetes, which Zeabur does not create. */
+const community: Database = {
+  ...mongo,
+  apiVersion: "mongodbcommunity.mongodb.com/v1",
+  apiGroup: "mongodbcommunity.mongodb.com",
+  kind: "MongoDBCommunity",
+  resource: "mongodbcommunity",
+  provider: "mongodb-kubernetes",
+  version: "8.0.4",
+  unmanaged: true,
+  connection: {
+    host: "mongo-svc.shop.svc",
+    port: 27017,
+    database: "admin",
+    username: "app",
+    secret: "mongo-admin-app",
+    usernameKey: "username",
+    passwordKey: "password",
+    options: "replicaSet=mongo",
+  },
+  object: {
+    apiVersion: "mongodbcommunity.mongodb.com/v1",
+    kind: "MongoDBCommunity",
+    metadata: { name: "mongo" },
+    spec: { members: 3, type: "ReplicaSet", version: "8.0.4" },
   } as unknown as Database["object"],
 }
 
@@ -239,6 +273,10 @@ describe("MongoDB 8 memory setting", () => {
     const spec = merged((eight.object as { spec: unknown }).spec, patch)
     const fixed = { ...eight, object: { spec } as unknown as Database["object"] }
     expect(rseqNote(fixed)).toBe("set")
+  })
+
+  test("a MongoDB 8 that Zeabur did not create gets no note", () => {
+    expect(rseqNote(community)).toBeUndefined()
   })
 
   test("the fix keeps other glibc tunables", () => {
@@ -420,6 +458,67 @@ describe("a terminal in the database", () => {
     expect(shellCommand(postgres)).toEqual(["psql", "app"])
     expect(shellCommand(mongo).slice(0, 2)).toEqual(["bash", "-c"])
     expect(shellCommand(mongo)[2]).toStartWith("mongosh -u")
+  })
+
+  test("opens mongosh in the first member of a MongoDBCommunity, which holds no password", () => {
+    expect(shellPod(community)).toBe("mongo-0")
+    expect(shellCommand(community)).toEqual(["mongosh", "--port", "27017"])
+    expect(connectionUri(community)).toBe(
+      "mongodb://app:<password>@mongo-svc.shop.svc:27017/admin?replicaSet=mongo",
+    )
+  })
+
+  test("opens mongosh on the port a MongoDBCommunity's members listen on", () => {
+    const moved = { ...community, connection: { ...community.connection, port: 27018 } }
+    expect(shellCommand(moved)).toEqual(["mongosh", "--port", "27018"])
+    expect(commands("shop", moved).shell).toBe(
+      "kubectl exec -it -n shop mongo-0 -c mongod -- mongosh --port 27018",
+    )
+  })
+
+  test("opens mongosh over TLS with MCK's CA when a MongoDBCommunity's members need TLS", () => {
+    const tls = {
+      ...community,
+      connection: { ...community.connection, options: "replicaSet=mongo&tls=true" },
+    }
+    expect(shellCommand(tls)).toEqual([
+      "bash",
+      "-c",
+      "exec mongosh --port 27017 --tls --tlsCAFile /var/lib/tls/ca/*.pem --tlsAllowInvalidHostnames",
+    ])
+  })
+})
+
+describe("operator names", () => {
+  test("name MongoDB Controllers for Kubernetes apart from the Percona Operator", () => {
+    const operator = (module: string) =>
+      ({ engine: "mongodb", module, state: "refused" }) as Schemas.DatabaseOperator
+    expect(operatorName(operator("percona-server-mongodb"))).toBe("MongoDB")
+    expect(operatorName(operator("mongodb-kubernetes"))).toBe("MongoDB Controllers for Kubernetes")
+  })
+
+  test("leave an operator whose databases Zeabur does not create out of creating", () => {
+    const operators = [
+      { engine: "mongodb", module: "mongodb-kubernetes", state: "installed", unmanaged: true },
+      { engine: "mongodb", module: "percona-server-mongodb", state: "not-installed" },
+    ] as Schemas.DatabaseOperator[]
+    expect(creatable(operators).map((o) => o.module)).toEqual(["percona-server-mongodb"])
+  })
+})
+
+describe("a database Zeabur did not create beside one of the same engine and name", () => {
+  test("has its own address and graph node", () => {
+    expect(databaseLink("shop", mongo).params.engine).toBe("mongodb")
+    expect(databaseLink("shop", community).params.engine).toBe("mongodb-kubernetes")
+    const ids = databaseNodes([mongo, community]).map((n) => n.id)
+    expect(new Set(ids).size).toBe(2)
+  })
+})
+
+describe("asking for backups", () => {
+  test("happens only for a database Zeabur can back up", () => {
+    expect(asksForBackups(mongo)).toBe(true)
+    expect(asksForBackups(community)).toBe(false)
   })
 })
 

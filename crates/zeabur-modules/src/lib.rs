@@ -15,6 +15,7 @@ pub mod k8up;
 pub mod mariadb_operator;
 pub mod metrics_server;
 pub mod moco;
+pub mod mongodb_kubernetes;
 pub mod network_policy;
 pub mod percona_mongodb;
 pub mod prometheus_api;
@@ -126,6 +127,7 @@ pub fn modules() -> Vec<&'static Module> {
         &reloader::MODULE,
         &cloudnative_pg::BARMAN_CLOUD,
         &percona_mongodb::MODULE,
+        &mongodb_kubernetes::MODULE,
         &moco::MODULE,
         &mariadb_operator::MODULE,
         &dragonfly::MODULE,

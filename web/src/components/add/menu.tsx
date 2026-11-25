@@ -16,7 +16,7 @@ import {
 import { GatedMenuItem, GateTip, useGates } from "@/components/gate"
 import { useT, type Translate } from "@/i18n"
 import { openAdd, type AddWhat } from "@/lib/adding"
-import { engineName, engines, type Engine } from "@/model/databases"
+import { creatable, engineName, engines, type Engine } from "@/model/databases"
 import { gitNeeds } from "@/model/git-service"
 import type { Gate } from "@/model/rights"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -57,7 +57,7 @@ type Component = Schemas.ComponentRef
  * read is left out. */
 function knownEngines(operators: Schemas.DatabaseOperator[] = []) {
   return engines.flatMap((engine) => {
-    const operator = operators.find((o) => o.engine === engine)
+    const operator = creatable(operators).find((o) => o.engine === engine)
     return operator?.state === "installed" || operator?.state === "not-installed"
       ? [
           {

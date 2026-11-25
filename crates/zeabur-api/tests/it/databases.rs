@@ -1,6 +1,7 @@
 //! A project's databases of MOCO, mariadb-operator and the Dragonfly Operator: their backup Jobs,
 //! Dragonfly's master, and exporting a dump: refused without `pods/exec`, a failed dump as a
-//! problem, and MOCO's password kept out of the command.
+//! problem, and MOCO's password kept out of the command. A `MongoDBCommunity` of MongoDB
+//! Controllers for Kubernetes is unmanaged, and a refused read of it is named.
 
 #[cfg(test)]
 mod tests {
@@ -32,8 +33,25 @@ mod tests {
         .unwrap()
     }
 
-    fn cluster() -> MemoryCluster {
-        let served = [
+    /// A `MongoDBCommunity` made outside Zeabur, running, with one user.
+    fn mongodb_community() -> DynamicObject {
+        object(json!({
+            "apiVersion": "mongodbcommunity.mongodb.com/v1", "kind": "MongoDBCommunity",
+            "metadata": {"name": "events", "namespace": "shop"},
+            "spec": {"members": 1, "type": "ReplicaSet", "version": "8.0.4",
+                     "security": {"authentication": {"modes": ["SCRAM"]}},
+                     "users": [{"name": "app", "db": "admin",
+                                "passwordSecretRef": {"name": "app-password"},
+                                "roles": [{"name": "readWrite", "db": "events"}],
+                                "scramCredentialsSecretName": "app"}]},
+            "status": {"phase": "Running", "version": "8.0.4", "mongoUri": "mongodb://x",
+                       "currentMongoDBMembers": 1, "currentStatefulSetReplicas": 1}
+        }))
+    }
+
+    /// The operators' resources this cluster serves.
+    fn served() -> Vec<ServedResource> {
+        [
             (
                 "moco.cybozu.com",
                 "v1beta2",
@@ -50,12 +68,22 @@ mod tests {
             ("k8s.mariadb.com", "v1alpha1", "backups", "Backup"),
             ("dragonflydb.io", "v1alpha1", "dragonflies", "Dragonfly"),
             ("batch", "v1", "jobs", "Job"),
+            (
+                "mongodbcommunity.mongodb.com",
+                "v1",
+                "mongodbcommunity",
+                "MongoDBCommunity",
+            ),
         ]
         .into_iter()
         .map(|(group, version, resource, kind)| {
             ServedResource::readable(group, version, resource, kind, true)
         })
-        .collect();
+        .collect()
+    }
+
+    fn cluster() -> MemoryCluster {
+        let served = served();
         let dynamic = vec![
             object(json!({
                 "apiVersion": "moco.cybozu.com/v1beta2", "kind": "MySQLCluster",
@@ -92,6 +120,7 @@ mod tests {
                 "spec": {"replicas": 2},
                 "status": {"phase": "Ready"}
             })),
+            mongodb_community(),
         ];
         let pods = vec![
             pod(
@@ -109,6 +138,7 @@ mod tests {
                 &json!({"app.kubernetes.io/name": "dragonfly",
                 "app": "cache", "app.kubernetes.io/part-of": "cache", "role": "replica"}),
             ),
+            pod("events-0", &json!({"app": "events-svc"})),
             pod(
                 "cache-1",
                 &json!({"app.kubernetes.io/name": "dragonfly",
@@ -148,26 +178,35 @@ mod tests {
         let app = app(&cluster());
         let (status, answer) = send(&app, "GET", "/api/v1/projects/shop/databases", None).await;
         assert_eq!(status, StatusCode::OK, "{answer}");
-        let engines: Vec<(&str, &str, &str)> = answer["operators"]
+        let engines: Vec<(&str, &str, Option<&str>)> = answer["operators"]
             .as_array()
             .unwrap()
             .iter()
             .map(|o| {
                 (
-                    o["engine"].as_str().unwrap(),
+                    o["module"].as_str().unwrap(),
                     o["state"].as_str().unwrap(),
-                    o["component"]["id"].as_str().unwrap(),
+                    o["component"]["id"].as_str(),
                 )
             })
             .collect();
         assert_eq!(
             engines,
             [
-                ("postgresql", "not-installed", "cloudnative-pg"),
-                ("mongodb", "not-installed", "percona-mongodb"),
-                ("mysql", "installed", "moco"),
-                ("mariadb", "installed", "mariadb-operator"),
-                ("dragonfly", "installed", "dragonfly-operator")
+                ("cloudnative-pg", "not-installed", Some("cloudnative-pg")),
+                (
+                    "percona-server-mongodb",
+                    "not-installed",
+                    Some("percona-mongodb")
+                ),
+                ("mongodb-kubernetes", "installed", None),
+                ("moco", "installed", Some("moco")),
+                ("mariadb-operator", "installed", Some("mariadb-operator")),
+                (
+                    "dragonfly-operator",
+                    "installed",
+                    Some("dragonfly-operator")
+                )
             ]
         );
         let mysql = named(&answer, "mysql");
@@ -189,6 +228,66 @@ mod tests {
         assert_eq!(mysql["apiGroup"], "moco.cybozu.com");
         assert_eq!(mysql["apiGroupVersion"], "v1beta2");
         assert!(!answer.to_string().contains(PASSWORD));
+    }
+
+    #[tokio::test]
+    async fn a_mongodb_community_is_unmanaged_with_its_members_and_first_user() {
+        let app = app(&cluster());
+        let (_, answer) = send(&app, "GET", "/api/v1/projects/shop/databases", None).await;
+        let operator = answer["operators"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|o| o["module"] == "mongodb-kubernetes")
+            .unwrap();
+        assert_eq!(operator["unmanaged"], true);
+        let events = named(&answer, "events");
+        assert_eq!(events["engine"], "mongodb");
+        assert_eq!(events["unmanaged"], true);
+        assert_eq!(events["state"], "ready");
+        assert_eq!(events["pods"][0]["name"], "events-0");
+        assert_eq!(events["connection"]["host"], "events-svc.shop.svc");
+        assert_eq!(events["connection"]["secret"], "events-admin-app");
+        assert!(named(&answer, "mysql").get("unmanaged").is_none());
+    }
+
+    #[tokio::test]
+    async fn a_refused_read_of_mongodb_community_is_named_not_left_out() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.forbidden_in_namespaces
+                .insert("mongodbcommunity.mongodbcommunity.mongodb.com".to_owned());
+        });
+        let (status, answer) = send(
+            &app(&cluster),
+            "GET",
+            "/api/v1/projects/shop/databases",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{answer}");
+        let operator = answer["operators"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|o| o["module"] == "mongodb-kubernetes")
+            .unwrap();
+        assert_eq!(operator["state"], "refused");
+        assert!(
+            answer["unreadable"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .any(|u| u["resource"] == "mongodbcommunity.mongodbcommunity.mongodb.com"),
+            "{answer}"
+        );
+        assert!(
+            answer["items"]
+                .as_array()
+                .unwrap()
+                .iter()
+                .all(|d| d["name"] != "events")
+        );
     }
 
     async fn export(

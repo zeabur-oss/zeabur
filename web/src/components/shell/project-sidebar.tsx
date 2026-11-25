@@ -25,6 +25,7 @@ import { kindName } from "@/i18n/kind-name"
 import type { Icon } from "@/lib/icon"
 import { addressOf, objectKey } from "@/lib/objects"
 import {
+  databaseKind,
   databaseLink,
   objectStorageLink,
   serviceLink,
@@ -334,7 +335,7 @@ function DatabaseSection({ project }: { project: string }) {
           key={`${database.engine}/${database.name}`}
           link={databaseLink(project, database)}
           icon={DatabaseIcon}
-          current={place.database === `${database.engine}/${database.name}`}
+          current={place.database === `${databaseKind(database)}/${database.name}`}
           state={database.state}
           name={database.name}
         />
