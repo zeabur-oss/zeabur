@@ -7,7 +7,8 @@
 # with the signing variables set.
 #
 # Runs outside the Nix shell, with the system's C compiler and linker: a binary linked in the
-# shell loads libraries from /nix/store, which a user's machine does not have. It needs on PATH
+# shell loads libraries from /nix/store, which a user's machine does not have. So it uses bash and
+# the runner's own tools, not the shell's rg or yq. It needs on PATH
 # cargo and rustc of the nightly flake.lock pins and cargo-tauri; in the environment
 # ZEABUR_CATALOG_RELEASE, ZEABUR_CATALOG_COMMIT and ZEABUR_UI_DIST, as the dev shell sets them; and
 # desktop/web/dist built. The desktop-prepare job of .github/workflows/release.yml prepares all of
@@ -63,7 +64,9 @@ if [[ "$stage" == compile ]]; then
   cargo tauri build --ci --no-bundle
   # Linked outside Nix: the binary names nothing in /nix/store.
   binary="$CARGO_TARGET_DIR/release/zeabur-desktop"
-  if case "$os" in darwin) otool -L "$binary" ;; linux) readelf -d "$binary" ;; esac | rg -F /nix/store >&2; then
+  links=$(case "$os" in darwin) otool -L "$binary" ;; linux) readelf -d "$binary" ;; esac)
+  if [[ "$links" == */nix/store* ]]; then
+    printf '%s\n' "$links" >&2
     echo "error: the binary links from /nix/store" >&2
     exit 1
   fi
@@ -103,8 +106,12 @@ case "$os" in
       base64 --decode <<<"$APPLE_CERTIFICATE_P12" >"$work/certificate.p12"
       security import "$work/certificate.p12" -k "$keychain" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
       security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$secret" "$keychain" >/dev/null
-      identity=$(security find-identity -v -p codesigning "$keychain" |
-        rg -m 1 -o -r '$1' '\) ([0-9A-F]{40}) "Developer ID Application: ' || true)
+      identities=$(security find-identity -v -p codesigning "$keychain")
+      developer_id='\) ([0-9A-F]{40}) "Developer ID Application: '
+      identity=
+      if [[ "$identities" =~ $developer_id ]]; then
+        identity=${BASH_REMATCH[1]}
+      fi
       if [[ -z "$identity" ]]; then
         echo "error: the certificate is not a Developer ID Application one" >&2
         exit 1
