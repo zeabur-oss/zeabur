@@ -129,7 +129,7 @@ A **Node terminal** opens a shell with full root access on the host. Sign in wit
 The node terminal can modify every file, process, and network interface on the host. Actions in this terminal bypass Zeabur OSS and Kubernetes permission checks and can't be undone.
 </Callout>
 
-The node records an event with who opened the terminal and when. If the screen shows **Others could enter this terminal**, role bindings allow people other than cluster administrators to create replicas in the terminal's namespace. Remove the listed role bindings, then check again.
+The node records an event with who opened the terminal and when.
 
 When you close the terminal, Zeabur OSS removes the terminal replica. A terminal replica lasts at most 30 minutes. If one remains, click **Remove terminal replica** in the terminal replica list below the node, review the change, and confirm.
 

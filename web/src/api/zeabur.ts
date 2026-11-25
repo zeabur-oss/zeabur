@@ -3391,41 +3391,6 @@ export type ClusterToolsApply = {
 }
 
 /**
- * Someone a binding lets into node shells.
- */
-export type ShellSubject = {
-  /** `User`, `Group` or `ServiceAccount`. */
-  kind: string
-  /** Its name. */
-  name: string
-  /**
-   * A service account's namespace.
-   * @nullable
-   */
-  namespace?: string | null
-}
-
-/**
- * A binding that lets someone other than cluster administrators create pods in the node shell
- * namespace or run commands in them.
- */
-export type ShellExposure = {
-  /** `RoleBinding` or `ClusterRoleBinding`. */
-  kind: string
-  /** Its name. */
-  name: string
-  /**
-   * What the role grants: `create pods` (bound in the namespace), `create` or `get` on
-   * `pods/exec` and `pods/attach`.
-   */
-  rights: string[]
-  /** The role it binds, `Role/name` or `ClusterRole/name`. */
-  role: string
-  /** Who it lets in. */
-  subjects: ShellSubject[]
-}
-
-/**
  * Why a new hostname gets no HTTPS.
  */
 export type HttpOnlyReason = (typeof HttpOnlyReason)[keyof typeof HttpOnlyReason]
@@ -3909,21 +3874,12 @@ export type ShellWrite = {
 export type ClusterToolsPlan = {
   /** When the token stops working. */
   expiresAt: string
-  /**
-   * Bindings that let others into the pod, and so to the credential in it; the plan cannot be
-   * applied while there is one.
-   */
-  exposed: ShellExposure[]
   /** The namespace of the pod. */
   namespace: string
   /** The pod it starts, or the one it uses. */
   pod: string
-  /**
-   * Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
-   * bindings.
-   * @nullable
-   */
-  token?: string | null
+  /** Send this to `apply` to carry out exactly this plan. */
+  token: string
   /** Who `kubectl` acts as and until when, or that a running pod is used. */
   warnings: PlanWarning[]
   /** The writes, in order; none when it uses a running pod. */
@@ -8222,8 +8178,6 @@ export type NodeShellPlan = {
   deadlineSeconds: number
   /** When the token stops working. */
   expiresAt: string
-  /** Bindings that let others into node shells; the plan cannot be applied while there is one. */
-  exposed: ShellExposure[]
   /**
    * How long it waits for its first session, in seconds.
    * @minimum 0
@@ -8249,12 +8203,8 @@ export type NodeShellPlan = {
   person?: string | null
   /** The pod. */
   pod: string
-  /**
-   * Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
-   * bindings.
-   * @nullable
-   */
-  token?: string | null
+  /** Send this to `apply` to carry out exactly this plan. */
+  token: string
   /** The writes, in order. */
   writes: ShellWrite[]
 }
@@ -12271,8 +12221,7 @@ export const getPlanNodeShellUrl = () => {
 /**
  * @summary Works out what opening a shell on a node, or removing a shell pod, writes, and a token to
 apply it; writes nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do
-everything everywhere; without a token while `exposed` lists bindings that let others into
-node shells.
+everything everywhere.
  */
 export const planNodeShell = async (
   nodeShellPlanRequest: NodeShellPlanRequest,
@@ -12579,8 +12528,7 @@ export const getPlanClusterToolsUrl = () => {
 /**
  * @summary Works out what starting the person's cluster tools pod writes, and a token to apply it; writes
 nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do everything
-everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over;
-without a token while `exposed` lists bindings that let others into the pod.
+everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over.
  */
 export const planClusterTools = async (
   options?: Parameters<typeof zeaburFetch>[1],

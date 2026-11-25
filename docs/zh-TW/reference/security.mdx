@@ -221,7 +221,7 @@ Zeabur 開源版在短暫的 tools 副本裡提供 `kubectl` 和 `helm`，使用
 所有 tools 副本都放在 chart 建立的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 預設在你開啟終端機的專案。Zeabur 開源版先請 kube-apiserver 確認你能在專案的容器裡執行指令（整個叢集的則要是叢集管理員），再用 Zeabur 開源版自己的 ServiceAccount 建立副本並開啟終端機。
 
 <Callout type="warn">
-在權杖到期前，能讀到這份 kubeconfig 的只有 Zeabur 開源版本身、叢集管理員，以及副本所在節點的管理員。不要把 `zeabur-terminals` 的權限給其他人。
+在權杖到期前，能讀到這份 kubeconfig 的有 Zeabur 開源版本身、叢集管理員、副本所在節點的管理員，以及角色綁定允許在所有 Namespace 的副本裡執行指令的帳號（例如部分 operator 的 ServiceAccount）。不要把 `zeabur-terminals` 的權限給其他人。
 </Callout>
 
 tools 副本預設最多執行 30 分鐘。最後一個終端機關閉時，Zeabur 開源版立刻刪掉 kubeconfig，60 秒後刪除副本。
@@ -230,7 +230,7 @@ tools 副本預設最多執行 30 分鐘。最後一個終端機關閉時，Zeab
 
 **節點終端機**用 privileged 副本、host PID／network／IPC 和 `nsenter` 進入主機，取得完整的 root 權限，在裡面做的事不會經過**檢查變更**。
 
-節點終端機只給叢集管理員，終端機副本放在專用的 privileged Namespace。只要有 RBAC binding 讓管理員和 Kubernetes 元件以外的人能在那裡建立副本或執行指令，Zeabur 開源版就拒絕開啟。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 開源版刪除終端機副本。
+節點終端機只給叢集管理員，終端機副本放在專用的 privileged Namespace。角色綁定允許在所有 Namespace 的副本裡執行指令的帳號（例如 CloudNativePG 的 operator）也進得去。Zeabur 開源版照樣開啟：這類帳號本來就能在叢集裡每個副本執行指令，擋下終端機也保護不了什麼。每次開啟都會在節點上記一筆 Event，`kubectl describe node` 看得到誰在什麼時候開過。終端機關閉時 Zeabur 開源版刪除終端機副本。
 
 ## 指標與歷史日誌
 

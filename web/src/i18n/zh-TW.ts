@@ -933,9 +933,6 @@ export const zhTW: Messages = {
   "nodeShell.lasts": (minutes) => `關閉終端機時會移除終端機副本，最多保留 ${minutes} 分鐘。`,
   "nodeShell.firstSession": (minutes) => `${minutes} 分鐘內沒有終端機連上，副本會自己結束。`,
   "nodeShell.recorded": "節點會記下一筆事件，寫明是誰在什麼時候開啟的。",
-  "nodeShell.exposedTitle": "其他人也能進入這個終端機",
-  "nodeShell.exposed": (namespace) =>
-    `下列角色綁定讓叢集管理員以外的人也能在 ${namespace} 建立副本或開啟終端機。移除之後再重新檢查。`,
   "nodeShell.kubectl": "用 kubectl 做同樣的事",
   "nodeShell.write.create": "新增",
   "nodeShell.write.patch": "修改",

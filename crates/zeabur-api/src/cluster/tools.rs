@@ -13,11 +13,8 @@
 //!
 //! Every route is refused unless kube-apiserver says the person may do everything everywhere. The
 //! pod goes in the terminal namespace with the projects' tools pods, and Zeabur's own service
-//! account creates it (see the `tools` module). `kubectl` starts in namespace `default`. As for
-//! node shells, a plan has no token while a binding lets anyone but cluster administrators and
-//! Zeabur's service account create pods in that namespace or run commands in its pods
-//! (`exposed`), and its apply is refused when one has appeared since. Everything else (the
-//! credential, the pod's lifetime) is the project tools pod's.
+//! account creates it (see the `tools` module). `kubectl` starts in namespace `default`. Everything
+//! else (the credential, the pod's lifetime) is the project tools pod's.
 
 use axum::extract::State;
 use axum::http::StatusCode;
@@ -32,8 +29,7 @@ use zeabur_plan::terminal::ToolsScope;
 use zeabur_plan::{Plan, Warning, Write};
 
 use super::node_shells::{
-    ShellExposure, ShellWrite, ShellWriteAction, exposed_except, exposure_views, moved, plan_key,
-    require_admin, seal, send, yaml,
+    ShellWrite, ShellWriteAction, moved, plan_key, require_admin, seal, send, yaml,
 };
 use crate::access::Handoff;
 use crate::error::ApiError;
@@ -53,10 +49,8 @@ const WHAT: &str = "a kubectl terminal for the cluster";
 #[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ClusterToolsPlan {
-    /// Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
-    /// bindings.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
+    /// Send this to `apply` to carry out exactly this plan.
+    pub token: String,
     /// When the token stops working.
     pub expires_at: Timestamp,
     /// The namespace of the pod.
@@ -67,9 +61,6 @@ pub struct ClusterToolsPlan {
     pub writes: Vec<ShellWrite>,
     /// Who `kubectl` acts as and until when, or that a running pod is used.
     pub warnings: Vec<Warning>,
-    /// Bindings that let others into the pod, and so to the credential in it; the plan cannot be
-    /// applied while there is one.
-    pub exposed: Vec<ShellExposure>,
 }
 
 /// The token of a plan to apply.
@@ -103,7 +94,6 @@ struct Computed {
     namespace: String,
     plan: Plan,
     pod: String,
-    exposed: Vec<zeabur_plan::node_shell::Exposure>,
 }
 
 impl Computed {
@@ -140,11 +130,9 @@ fn right(namespace: &str) -> Denied {
     }
 }
 
-/// `cluster` is the administrator's, which reads the bindings; `zeabur` is Zeabur's own service
-/// account, which reads the pods.
+/// `zeabur` is Zeabur's own service account, which reads the pods.
 async fn compute(
     state: &AppState,
-    cluster: &dyn Cluster,
     zeabur: &dyn Cluster,
     handoff: &Handoff,
     person: &str,
@@ -152,11 +140,6 @@ async fn compute(
 ) -> Result<Computed, ApiError> {
     let settings = &state.settings.terminal;
     let namespace = settings.namespace.clone();
-    let trusted = zeabur
-        .whoami()
-        .await
-        .map_err(|e| ApiError::from(e.into_problem("Zeabur's own identity")))?;
-    let exposed = exposed_except(cluster, &namespace, Some(&trusted.username)).await?;
     let pods = list_pods(zeabur, &namespace).await?;
     let planner = Planner {
         settings,
@@ -190,7 +173,6 @@ async fn compute(
         namespace,
         plan,
         pod,
-        exposed,
     })
 }
 
@@ -212,8 +194,7 @@ pub(crate) async fn status(
 
 /// Works out what starting the person's cluster tools pod writes, and a token to apply it; writes
 /// nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do everything
-/// everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over;
-/// without a token while `exposed` lists bindings that let others into the pod.
+/// everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over.
 #[utoipa::path(post, path = "/api/v1/cluster/tools/plan", tag = "cluster",
     operation_id = "planClusterTools",
     responses((status = 200, body = ClusterToolsPlan),
@@ -236,7 +217,6 @@ pub(crate) async fn plan(
     let made_at = token::whole_second(now)?.to_string();
     let computed = compute(
         &state,
-        cluster.as_ref(),
         zeabur.as_ref(),
         &handoff,
         &identity.username,
@@ -262,19 +242,13 @@ pub(crate) async fn plan(
             yaml: yaml(&body),
         })
         .collect();
-    let token = if computed.exposed.is_empty() {
-        Some(seal(&sealing, PREFIX, &claims)?)
-    } else {
-        None
-    };
     Ok(Json(ClusterToolsPlan {
-        token,
+        token: seal(&sealing, PREFIX, &claims)?,
         expires_at,
         namespace: computed.namespace,
         pod: computed.pod,
         writes,
         warnings: computed.plan.warnings,
-        exposed: exposure_views(computed.exposed),
     }))
 }
 
@@ -315,7 +289,6 @@ pub(crate) async fn apply(
     let zeabur = crate::tools::zeabur(&state)?;
     let computed = compute(
         &state,
-        cluster.as_ref(),
         zeabur.as_ref(),
         &handoff,
         &claims.person,
@@ -324,20 +297,6 @@ pub(crate) async fn apply(
     .await?;
     if computed.pod != claims.pod {
         return Err(moved("Your cluster tools pod"));
-    }
-    if !computed.exposed.is_empty() {
-        let names: Vec<String> = computed
-            .exposed
-            .iter()
-            .map(|e| format!("{} {}", e.kind, e.name))
-            .collect();
-        return Err(ApiError::from(Problem::new(
-            Kind::Conflict,
-            format!(
-                "Since the plan was made, {} let others into cluster kubectl terminals.",
-                names.join(", ")
-            ),
-        )));
     }
     for (target, body, refused) in computed.writes() {
         for dry_run in [true, false] {

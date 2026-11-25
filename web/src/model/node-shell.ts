@@ -34,7 +34,3 @@ export function shellsOn(shells: readonly NodeShell[], node: string): NodeShell[
 /** Only its opener may enter, and only while it runs. */
 export const enters = (shell: Pick<NodeShell, "mine" | "phase">) =>
   shell.mine && shell.phase === "running"
-
-export function subjectName(subject: Schemas.ShellSubject): string {
-  return subject.namespace ? `${subject.namespace}/${subject.name}` : subject.name
-}

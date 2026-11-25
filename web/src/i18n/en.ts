@@ -998,9 +998,6 @@ export const en = {
   "nodeShell.firstSession": (minutes: number) =>
     `If no terminal connects within ${minutes} minutes, the replica ends on its own.`,
   "nodeShell.recorded": "The node records an event with who opened it and when.",
-  "nodeShell.exposedTitle": "Others could enter this terminal",
-  "nodeShell.exposed": (namespace: string) =>
-    `These role bindings let someone other than a cluster administrator create replicas or open terminals in ${namespace}. Remove them, then check again.`,
   "nodeShell.kubectl": "The same with kubectl",
   "nodeShell.write.create": "add",
   "nodeShell.write.patch": "change",

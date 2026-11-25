@@ -221,7 +221,7 @@ Zeabur OSS provides `kubectl` and `helm` in a temporary tools replica. Both use 
 All tools replicas run in the chart-created `zeabur-terminals` namespace (`terminal.namespace`). kubectl defaults to the project where you opened the terminal. Zeabur OSS first asks kube-apiserver to confirm that you can run commands in the project's containers. A cluster-wide terminal requires a cluster administrator. Zeabur OSS then uses its own ServiceAccount to create the replica and open the terminal.
 
 <Callout type="warn">
-Until the token expires, only Zeabur OSS itself, cluster administrators, and administrators of the node running the replica can read this kubeconfig. Don't grant anyone else permissions in `zeabur-terminals`.
+Until the token expires, Zeabur OSS itself, cluster administrators, administrators of the node running the replica, and accounts that a role binding lets run commands in replicas of every namespace (such as some operators' ServiceAccounts) can read this kubeconfig. Don't grant anyone else permissions in `zeabur-terminals`.
 </Callout>
 
 Tools replicas run for at most 30 minutes by default. When the last terminal closes, Zeabur OSS deletes the kubeconfig immediately and deletes the replica 60 seconds later.
@@ -230,7 +230,7 @@ Tools replicas run for at most 30 minutes by default. When the last terminal clo
 
 The **Node terminal** uses a privileged replica, the host's PID, network, and IPC namespaces, and `nsenter` to enter the host with full root access. Actions in this terminal bypass **Review changes**.
 
-Only cluster administrators can use the node terminal. Its replica runs in a dedicated privileged namespace. If any RBAC binding lets anyone other than administrators and Kubernetes components create replicas or run commands there, Zeabur OSS refuses to open the terminal. Each time it opens, Zeabur OSS records an Event on the node. `kubectl describe node` shows who opened it and when. Zeabur OSS deletes the replica when the terminal closes.
+Only cluster administrators can use the node terminal. Its replica runs in a dedicated privileged namespace. Accounts that a role binding lets run commands in replicas of every namespace, such as CloudNativePG's operator, can enter it too. Zeabur OSS still opens the terminal: those accounts can already run commands in every replica in the cluster, so refusing it would protect little. Each time it opens, Zeabur OSS records an Event on the node. `kubectl describe node` shows who opened it and when. Zeabur OSS deletes the replica when the terminal closes.
 
 ## Metrics and historical logs
 

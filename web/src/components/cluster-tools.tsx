@@ -8,7 +8,7 @@ import {
   refreshClusterTools,
   type ClusterToolsPlan,
 } from "@/api/cluster-tools"
-import { Exposed, PlanFrame, PlanWrites } from "@/components/cluster-plan"
+import { PlanFrame, PlanWrites } from "@/components/cluster-plan"
 import { terminalLines } from "@/components/plan/describe"
 import { useT } from "@/i18n"
 
@@ -49,9 +49,6 @@ function Planned({ plan }: { plan: ClusterToolsPlan }) {
   const t = useT()
   return (
     <>
-      {plan.exposed.length > 0 ? (
-        <Exposed namespace={plan.namespace} exposed={plan.exposed} />
-      ) : null}
       {plan.writes.length > 0 ? <p>{t("clusterTools.starts", plan.namespace)}</p> : null}
       <ul className="flex list-disc flex-col gap-1 pl-5">
         {terminalLines(t, plan).map((line) => (
