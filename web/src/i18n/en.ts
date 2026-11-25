@@ -84,7 +84,10 @@ export const en = {
   "problem.title.policy-denied": "A policy in the cluster refused this",
   "problem.title.not-found": "This object doesn't exist",
   "problem.title.log-unavailable": "The log is not available",
-  "problem.title.conflict": "It changed in the meantime",
+  "problem.title.conflict": "It conflicts with how things are now",
+  "problem.title.already-exists": "It already exists",
+  "problem.title.expired": "What was asked for has expired",
+  "problem.title.changed": "It changed after you reviewed it",
   "problem.title.managed": "Another tool manages it",
   "problem.title.plan-expired": "These changes expired",
   "problem.title.system-namespace": "Kubernetes keeps this name for itself",
@@ -102,7 +105,10 @@ export const en = {
     "Change what the policy names, or ask a cluster administrator about the policy.",
   "problem.fix.not-found": "Reload the page to see what the cluster has now.",
   "problem.fix.log-unavailable": "Read the current run's log, or wait a moment and refresh.",
-  "problem.fix.conflict": "Reload to see the latest version, then make the change again.",
+  "problem.fix.conflict": "Read the details, change what they name, then try again.",
+  "problem.fix.already-exists": "Choose another name, or delete the one that exists.",
+  "problem.fix.expired": "Reload the page to ask again.",
+  "problem.fix.changed": "Review again to start from its current state.",
   "problem.fix.managed":
     "Change it where the managing tool reads it, such as Helm values or a Git repository. Restarting still works here.",
   "problem.fix.plan-expired": "Review the changes again.",
@@ -136,6 +142,12 @@ export const en = {
   "problemPage.rule.log-unavailable":
     "The cluster keeps a container's log for its current run and the run before, and only while its replica exists. A log never written, or one whose replica is gone, cannot be read.",
   "problemPage.rule.conflict":
+    "The cluster, or Zeabur, refuses a request that conflicts with how things are now, for example removing something others still use. The details say what it conflicts with.",
+  "problemPage.rule.already-exists":
+    "A create never replaces what is there. When an object with the same name already exists, the cluster refuses the create, and nothing is written.",
+  "problemPage.rule.expired":
+    "The cluster keeps the changes a watch or a long list reads from only for a while. When what was asked for is older than that, it has expired; asking again starts from now.",
+  "problemPage.rule.changed":
     "Zeabur writes a change only onto the version you reviewed. When someone or something (a deploy tool, an autoscaler) changed the object after that, nothing is written, so no one's change is lost.",
   "problemPage.rule.managed":
     "Another tool (Helm, Argo CD, Flux) owns this object and puts its own version back at its next sync or upgrade. A change made here would be undone, so Zeabur refuses it.",
@@ -3736,8 +3748,8 @@ export const en = {
     `Reviewed changes hold for ${p.minutes} minutes. Review them again.`,
   "sentence.problem.badRequest.fix.planToken": () =>
     "Review the changes again. They apply only on the server that checked them, with their token unchanged.",
-  "sentence.problem.conflict.fix.review": () => "Review again to start from its current state.",
   "sentence.problem.conflict.fix.inUse": () => "Delete them first, then remove it again.",
+  "sentence.problem.conflict.fix.removeFirst": () => "Remove them first, then remove it again.",
   "sentence.problem.conflict.fix.alreadyExists": () =>
     "Delete them first, or deploy into another project.",
   "sentence.problem.conflict.fix.waitForContainer": () =>
@@ -3799,11 +3811,20 @@ export const en = {
     p.name ? `${p.name} doesn't exist.` : "It doesn't exist.",
   "sentence.problem.summary.log-unavailable": () => "This log can't be read.",
   "sentence.problem.summary.conflict": (p: P) =>
+    p.name
+      ? `The request about ${p.name} conflicts with how things are now.`
+      : "This conflicts with how things are now.",
+  "sentence.problem.summary.changed": (p: P) =>
     p.name ? `${p.name} changed after you reviewed it.` : "It changed after you reviewed it.",
   "sentence.problem.summary.inUse": (p: P) =>
     p.more === "0" ? `${p.users} still use it.` : `${p.users} and ${p.more} more still use it.`,
   "sentence.problem.summary.already-exists": (p: P) =>
-    `${p.objects} already exist in project ${p.namespace}.`,
+    p.objects
+      ? `${p.objects} already exist in project ${p.namespace}.`
+      : p.name
+        ? `${p.name} already exists.`
+        : "It already exists.",
+  "sentence.problem.summary.expired": () => "What was asked for has expired.",
   "sentence.problem.summary.managed": (p: P) =>
     p.name ? `Another tool manages ${p.name}.` : "Another tool manages this.",
   "sentence.problem.summary.plan-expired": () => "These changes expired.",

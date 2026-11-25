@@ -77,6 +77,9 @@ pub(crate) async fn refine(
         | Kind::NotFound
         | Kind::LogUnavailable
         | Kind::Conflict
+        | Kind::AlreadyExists
+        | Kind::Expired
+        | Kind::Changed
         | Kind::Managed
         | Kind::PlanExpired
         | Kind::SystemNamespace

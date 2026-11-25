@@ -1264,7 +1264,7 @@ pub(crate) async fn apply(
     } = compute(cluster.as_ref(), &claims.request).await?;
     if versions != claims.versions {
         return Err(ApiError::from(Problem::new(
-            Kind::Conflict,
+            Kind::Changed,
             "The destination or a copy of its keys changed after the plan was made.",
         )));
     }

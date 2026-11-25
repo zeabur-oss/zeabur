@@ -441,20 +441,25 @@ group("failureOf", () => {
     ...extra,
   })
 
-  test("a conflict says what changed and what to do, and asks to review again", () => {
+  test("a failed plan precondition says what changed and asks to review again", () => {
     const f = failureOf(
       english,
       "en",
-      problem("conflict", {
-        summary: { key: "problem.summary.conflict", params: { name: "web" } },
-        fixKey: { key: "problem.conflict.fix.review" },
-      }),
+      problem("changed", { summary: { key: "problem.summary.changed", params: { name: "web" } } }),
     )
     expect(f).toStrictEqual({
       title: "web changed after you reviewed it.",
       description: "Review again to start from its current state.",
       review: true,
     })
+  })
+
+  test("a conflict or a taken name does not say it changed, nor asks to review again", () => {
+    for (const kind of ["conflict", "already-exists", "expired"] as const) {
+      const f = failureOf(english, "en", problem(kind, { detail: "From kube-apiserver." }))
+      expect(f.title).not.toMatch(/changed/)
+      expect(f.review).toBe(false)
+    }
   })
 
   test("an expired plan asks to review again, by its kind; another bad request does not", () => {
@@ -520,7 +525,7 @@ group("failureOf", () => {
     const f = failureOf(
       translator(zhTW),
       "zh-TW",
-      problem("conflict", { detail: "Already written: x" }),
+      problem("changed", { detail: "Already written: x" }),
     )
     expect(f.title).toBe("這個物件在你檢查之後又有變更。")
   })
@@ -543,7 +548,7 @@ group("failureOf", () => {
         "en",
         problem("conflict", { detail: "Deployment api is managed by Flux." }),
       ).title,
-    ).toBe("It changed after you reviewed it.")
+    ).toBe("This conflicts with how things are now.")
   })
 })
 

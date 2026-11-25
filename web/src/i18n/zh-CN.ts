@@ -93,7 +93,10 @@ export const zhCN: Messages = {
   "problem.title.policy-denied": "集群里的策略拒绝了这项更改",
   "problem.title.not-found": "找不到这个对象",
   "problem.title.log-unavailable": "无法获取日志",
-  "problem.title.conflict": "在此期间已有其他更改",
+  "problem.title.conflict": "与当前状态冲突",
+  "problem.title.already-exists": "已经存在",
+  "problem.title.expired": "请求的内容已过期",
+  "problem.title.changed": "你检查之后又有了改动",
   "problem.title.managed": "由其他工具管理",
   "problem.title.plan-expired": "这份变更已过期",
   "problem.title.system-namespace": "这个名称是 Kubernetes 自用的",
@@ -110,7 +113,10 @@ export const zhCN: Messages = {
   "problem.fix.policy-denied": "按策略指出的地方修改，或向集群管理员询问这项策略。",
   "problem.fix.not-found": "刷新页面，查看集群当前有什么。",
   "problem.fix.log-unavailable": "改看本次运行的日志，或稍后再刷新。",
-  "problem.fix.conflict": "刷新页面查看最新版本，再做一次更改。",
+  "problem.fix.conflict": "查看详细信息指出的地方，改好后再试一次。",
+  "problem.fix.already-exists": "换个名称，或删掉已经存在的那个。",
+  "problem.fix.expired": "刷新页面，再请求一次。",
+  "problem.fix.changed": "重新检查，以对象当前的状态为准。",
   "problem.fix.managed":
     "到管理这个对象的工具修改，例如 Helm values 或 Git 仓库。重启仍然可以在这里做。",
   "problem.fix.plan-expired": "重新检查变更。",
@@ -141,6 +147,12 @@ export const zhCN: Messages = {
   "problemPage.rule.log-unavailable":
     "集群只保留容器这一次与上一次运行的日志，而且只在副本还存在时保留。从未写出的日志，或副本已经不在的日志，都无法读取。",
   "problemPage.rule.conflict":
+    "请求与当前状态冲突时，集群或 Zeabur 会拒绝，例如移除还有其他组件在用的组件。详细信息会说明冲突在哪里。",
+  "problemPage.rule.already-exists":
+    "创建对象不会替换已经存在的东西。同名对象已经存在时，集群会拒绝创建，什么都不会写入。",
+  "problemPage.rule.expired":
+    "集群只保留一段时间的变更记录，供监视或分页列出使用。请求的内容超过这段时间就会过期，重新请求一次会从现在开始。",
+  "problemPage.rule.changed":
     "对象和你检查时的版本相同，Zeabur 才会写入更改。如果之后有人或其他程序（例如部署工具、自动扩缩）改过这个对象，Zeabur 就不会写入，以免覆盖别人的更改。",
   "problemPage.rule.managed":
     "这个对象由其他工具（Helm、Argo CD、Flux）管理。那个工具下一次同步或升级时，会换回自己的版本，覆盖在这里做的更改，所以 Zeabur 不接受。",
@@ -3406,8 +3418,8 @@ export const zhCN: Messages = {
     `检查过的变更只在 ${p.minutes} 分钟内有效。重新检查一次。`,
   "sentence.problem.badRequest.fix.planToken": () =>
     "重新检查变更。只有做这次检查的那台服务器能应用，而且令牌不能改动。",
-  "sentence.problem.conflict.fix.review": () => "重新检查，以对象当前的状态为准。",
   "sentence.problem.conflict.fix.inUse": () => "先把这些删掉，再移除一次。",
+  "sentence.problem.conflict.fix.removeFirst": () => "先移除这些，再移除一次。",
   "sentence.problem.conflict.fix.alreadyExists": () => "先删掉这些对象，或部署到其他项目。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等容器开始运行。如果一直没有运行，容器的日志和事件会说明原因。",
@@ -3456,10 +3468,18 @@ export const zhCN: Messages = {
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "这个对象不存在。"),
   "sentence.problem.summary.log-unavailable": () => "无法读取这份日志。",
   "sentence.problem.summary.conflict": (p) =>
+    p.name ? `这项请求与 ${p.name} 当前的状态冲突。` : "这项请求与当前状态冲突。",
+  "sentence.problem.summary.changed": (p) =>
     p.name ? `${p.name} 在你检查之后又有了改动。` : "这个对象在你检查之后又有了改动。",
   "sentence.problem.summary.inUse": (p) =>
     p.more === "0" ? `${p.users} 还在用它。` : `${p.users} 等 ${p.more} 个还在用它。`,
-  "sentence.problem.summary.already-exists": (p) => `项目 ${p.namespace} 里已经有 ${p.objects}。`,
+  "sentence.problem.summary.already-exists": (p) =>
+    p.objects
+      ? `项目 ${p.namespace} 里已经有 ${p.objects}。`
+      : p.name
+        ? `${p.name} 已经存在。`
+        : "这个对象已经存在。",
+  "sentence.problem.summary.expired": () => "请求的内容已过期。",
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "这由其他工具管理。",
   "sentence.problem.summary.plan-expired": () => "这份变更已过期。",

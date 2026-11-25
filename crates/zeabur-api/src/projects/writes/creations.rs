@@ -128,10 +128,11 @@ pub(super) async fn refuse_existing(
 /// The `409` for `objects` that already exist in project `project`: a create never updates.
 pub(super) fn already_exist(objects: &str, project: &str) -> Problem {
     let mut problem = Problem::new(
-        Kind::Conflict,
+        Kind::AlreadyExists,
         format!("{objects} already exist in project {project}."),
     );
-    problem.summary = Message::new("problem.summary.already-exists")
+    problem.summary = problem
+        .summary
         .with("objects", objects)
         .with("namespace", project);
     problem.fix_for_occasion(

@@ -542,7 +542,7 @@ pub(crate) async fn apply(
     };
     if zeabur_plan::versions(&plan) != claims.versions {
         let changed = ApiError::from(Problem::new(
-            Kind::Conflict,
+            Kind::Changed,
             "Someone changed an object in this plan after the plan was made.",
         ));
         submitted(Err(&changed));

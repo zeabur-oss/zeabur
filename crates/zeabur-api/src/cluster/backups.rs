@@ -1767,7 +1767,7 @@ pub(crate) async fn apply(
     }
     if computed.versions != claims.versions {
         return Err(ApiError::from(Problem::new(
-            Kind::Conflict,
+            Kind::Changed,
             "Velero's location, schedule, keys or backup, or a namespace or route of the plan, \
              changed after the plan was made.",
         )));

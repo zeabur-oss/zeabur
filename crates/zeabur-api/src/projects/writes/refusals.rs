@@ -104,19 +104,15 @@ pub(super) fn tests_hold(operations: &serde_json::Value, object: &serde_json::Va
     })
 }
 
-/// The `409` for an object that changed after its plan was made.
+/// The `409` for an object that changed after its plan was made: one of the plan's
+/// preconditions failed.
 pub(super) fn moved_on(target: &zeabur_plan::Target) -> Problem {
+    let what = format!("{} {}", target.kind, target.name);
     let mut problem = Problem::new(
-        Kind::Conflict,
-        format!(
-            "{} {} changed after the plan was made.",
-            target.kind, target.name
-        ),
+        Kind::Changed,
+        format!("{what} changed after the plan was made."),
     );
-    problem.fix_for_occasion(
-        "Make the plan again: it will start from the object as it is now.",
-        zeabur_core::message::Message::new("problem.conflict.fix.review"),
-    );
+    problem.summary = problem.summary.with("name", &what);
     problem
 }
 
@@ -126,7 +122,7 @@ pub(super) fn moved_on(target: &zeabur_plan::Target) -> Problem {
 /// whoever made it, since a plan made again would create it again. A plan's other preconditions
 /// failing means the object moved on since the plan: `409 Conflict`, or a `422` that names no
 /// invalid field, which is how a JSON Patch that does not apply is answered [k8s-patch]. Both are
-/// `409` here, with the fix to plan again. A `422` that
+/// `changed` here, with the fix to plan again. A `422` that
 /// names a field stays as kube-apiserver gave it, as do `429` (with its `Retry-After`) and other
 /// refusals. A `403` also names the request that was refused ([`denied`]).
 ///
@@ -251,8 +247,8 @@ mod tests {
             answer(409, "Conflict", "the object has been modified"),
         ] {
             let problem = write_problem(error, &target());
-            assert_eq!(problem.kind, Kind::Conflict, "{problem:?}");
-            assert!(problem.fix.contains("plan again"), "{problem:?}");
+            assert_eq!(problem.kind, Kind::Changed, "{problem:?}");
+            assert_eq!(problem.summary.params["name"], "Deployment web");
         }
     }
 
@@ -269,7 +265,7 @@ mod tests {
             &target(),
             &create,
         );
-        assert_eq!(problem.kind, Kind::Conflict);
+        assert_eq!(problem.kind, Kind::AlreadyExists);
         assert_eq!(problem.summary.key, "problem.summary.already-exists");
         assert_eq!(problem.summary.params["objects"], "Deployment web");
         assert_eq!(problem.summary.params["namespace"], "shop");
@@ -279,7 +275,7 @@ mod tests {
     #[test]
     fn other_refusals_keep_kube_apiservers_answer() {
         let invalid = write_problem(invalid_field("spec.replicas: Invalid value"), &target());
-        assert_ne!(invalid.kind, Kind::Conflict);
+        assert_ne!(invalid.kind, Kind::Changed);
         let busy = write_problem(
             answer(429, "TooManyRequests", "too many requests"),
             &target(),

@@ -11657,6 +11657,9 @@ components:
       - not-found
       - log-unavailable
       - conflict
+      - already-exists
+      - expired
+      - changed
       - managed
       - plan-expired
       - system-namespace

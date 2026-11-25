@@ -930,6 +930,11 @@ mod tests {
                 .unwrap()
                 .contains("cloudnative-pg needs cert-manager")
         );
+        // Not a change after the review: the summary names what needs it.
+        assert_eq!(problem["kind"], "conflict");
+        assert_eq!(problem["summary"]["key"], "problem.summary.inUse");
+        assert_eq!(problem["summary"]["params"]["users"], "cloudnative-pg");
+        assert_eq!(problem["fixKey"]["key"], "problem.conflict.fix.removeFirst");
     }
 
     #[tokio::test]
