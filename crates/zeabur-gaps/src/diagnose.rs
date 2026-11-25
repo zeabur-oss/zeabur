@@ -10,9 +10,8 @@
 //! 10 minutes without any problems" [k8s-restart-policy]; Zeabur uses the same window
 //! ([`RECENT`]): a failure counts while the container is not ready, waits in
 //! `CrashLoopBackOff`, or ended within the window. An event about a pod from before its `Ready`
-//! condition last turned `True` ([`before_ready`]) is its start-up and is not diagnosed. A
-//! container that has run ready for a minute is no crash loop any more, and a pod that is being
-//! deleted is a replica a release replaces: neither is diagnosed.
+//! condition last turned `True` ([`before_ready`]) is its start-up and is not diagnosed. A pod
+//! that is being deleted is a replica a release replaces and is not diagnosed.
 //!
 //! **Exit codes.** 126 and 127 are the shell's "not executable" and "command not found"
 //! [bash-exit-status]; 128 + n is death by signal n, so 137 is `SIGKILL` and 143 `SIGTERM`.

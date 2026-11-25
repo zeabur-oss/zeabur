@@ -45,11 +45,6 @@ const FAILING_REASONS: [&str; 9] = [
 /// <https://github.com/kubernetes/kubernetes/blob/master/pkg/kubelet/kubelet.go> (`crashLoopBackOff.HasExpiredFunc`).
 const BACKOFF_RESET: SignedDuration = SignedDuration::from_secs(600);
 
-/// How long a container must run ready to count as running again. A loop's runs last seconds, so
-/// a ready container that has run this long is not crashing now, whatever the kubelet's
-/// back-off still remembers.
-const STABLE_RUN: SignedDuration = SignedDuration::from_secs(60);
-
 /// Whether `pod` keeps failing (rule 1). `now` is when the pod was read; without it a ready pod
 /// never fails.
 #[must_use]
@@ -82,8 +77,7 @@ pub fn failing(pod: &PodSummary, now: Option<Timestamp>) -> bool {
 /// started less than ten minutes before `now`. The exit code and readiness do not count,
 /// as they do not in the kubelet. Missing times count as short runs. A container that has
 /// completed successfully, such as an init container that succeeded after failed attempts, is
-/// not restarted again. A container that has run ready for a minute is no crash loop any
-/// more, although the kubelet's back-off lasts until ten minutes of running.
+/// not restarted again.
 #[must_use]
 pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) -> bool {
     if status
@@ -94,13 +88,6 @@ pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) ->
         return true;
     }
     if status.terminated.as_ref().is_some_and(|t| t.exit_code == 0) {
-        return false;
-    }
-    let ran_stable = match (status.started_at, now) {
-        (Some(since), Some(now)) => now.duration_since(since) >= STABLE_RUN,
-        _ => false,
-    };
-    if status.ready && ran_stable {
         return false;
     }
     let Some(last) = &status.last_termination else {
@@ -404,10 +391,9 @@ mod tests {
             pod_health(&pod, Some(now)) == Health::Fail
         };
         assert!(fails(4, secs(5), secs(35)));
-        assert!(fails(2, secs(5), secs(59)));
-        // A ready container that has run for a minute is no crash loop now.
-        assert!(!fails(4, secs(5), secs(60)));
-        assert!(!fails(2, secs(5), secs(599)));
+        assert!(fails(2, secs(5), secs(599)));
+        // The back-off resets after 600 seconds without a restart.
+        assert!(!fails(4, secs(5), secs(601)));
         // The first restart is immediate, so it is no back-off.
         assert!(!fails(1, secs(5), secs(35)));
         // A previous run of 600 seconds or more reset the back-off, however many restarts before.
