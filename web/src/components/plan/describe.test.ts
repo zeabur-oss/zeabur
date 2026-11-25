@@ -24,6 +24,7 @@ const english = translator(en)
 
 type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings"> & {
   risk?: Schemas.Risk
+  preview?: Schemas.Preview
 }
 const api = { kind: "Deployment", name: "api" } as const
 const web = { kind: "Deployment", name: "web" } as const
