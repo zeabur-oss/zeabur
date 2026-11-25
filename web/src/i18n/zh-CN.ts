@@ -2894,6 +2894,8 @@ export const zhCN: Messages = {
   "db.commands": "命令",
   "db.command.describe": "数据库对象",
   "db.command.shell": "进入数据库的 Shell",
+  "db.backup.shownOnly":
+    "这个数据库由 MongoDB Controllers for Kubernetes 运行，而它不提供 MongoDBCommunity 数据库的备份。Zeabur 无法备份或还原这个数据库，这里只显示它的状态。",
   "db.backup.none": "没有备份",
   "db.backup.last": "上次备份",
   "db.backup.noRun": "还没有备份",

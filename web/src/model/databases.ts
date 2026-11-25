@@ -47,6 +47,13 @@ const ENGINE_NAMES: Record<Engine, string> = {
 
 export const engineName = (engine: Engine) => ENGINE_NAMES[engine]
 
+/** The provider of MongoDB Controllers for Kubernetes, whose databases Zeabur only shows. */
+const MCK = "mongodb-kubernetes"
+
+/** The operator's name where the engine's alone would be ambiguous. */
+export const operatorName = (operator: Schemas.DatabaseOperator) =>
+  operator.module === MCK ? "MongoDB Controllers for Kubernetes" : engineName(operator.engine)
+
 /** The server's licence, when it is not an open-source one. */
 export const engineLicence: Partial<Record<Engine, string>> = {
   dragonfly: "Apache-2.0 AND BUSL-1.1",
@@ -216,7 +223,8 @@ export function perThreadCaches(spec: Manifest, version?: string | null) {
 
 /** The note a MongoDB 8 gets: the setting is there, or missing. */
 export function rseqNote(database: Database): "set" | "missing" | undefined {
-  if (database.engine !== "mongodb" || !mongo8OrLater(database.version ?? database.image)) return
+  if (database.engine !== "mongodb" || database.readOnly) return
+  if (!mongo8OrLater(database.version ?? database.image)) return
   const spec = (database.object as Manifest & { spec?: Manifest }).spec ?? {}
   const replsets = (spec.replsets as Manifest[] | undefined) ?? []
   return replsets.every(hasPerThreadCaches) ? "set" : "missing"
@@ -1480,7 +1488,7 @@ export function shellPod(database: Database): string {
     case "postgresql":
       return database.primary ?? `${database.name}-1`
     case "mongodb":
-      return `${database.name}-rs0-0`
+      return database.provider === MCK ? `${database.name}-0` : `${database.name}-rs0-0`
     case "mysql":
       return database.primary ?? `moco-${database.name}-0`
     case "mariadb":
@@ -1500,7 +1508,8 @@ export function shellCommand(database: Database): string[] {
     case "postgresql":
       return ["psql", database.connection.database ?? "app"]
     case "mongodb":
-      return ["bash", "-c", mongoLogin]
+      // MCK mounts no user's password in its members: `mongosh` signs in with `db.auth()`.
+      return database.provider === MCK ? ["mongosh"] : ["bash", "-c", mongoLogin]
     case "mysql":
       return ["mysql", "-h", "127.0.0.1", "-u", "moco-writable", "-p"]
     case "mariadb":

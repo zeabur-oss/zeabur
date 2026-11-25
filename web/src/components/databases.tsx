@@ -30,6 +30,7 @@ import {
   memberChoices,
   nameProblem,
   newDatabase,
+  operatorName,
   presetResources,
   sizePresets,
   stateHealth,
@@ -43,9 +44,9 @@ import { Select } from "@zeabur-oss/design-system/components/select"
 
 export const useDatabases = (project: string) => useQuery(databasesQuery(project))
 
-/** Engines whose operator is installed and readable. */
+/** Engines whose operator is installed and readable, and which Zeabur creates databases of. */
 export const installedEngines = (data: Schemas.ProjectDatabases) =>
-  data.operators.filter((o) => o.state === "installed").map((o) => o.engine)
+  data.operators.filter((o) => o.state === "installed" && !o.readOnly).map((o) => o.engine)
 
 export function DatabaseState({
   database,
@@ -110,7 +111,7 @@ export function DatabaseRow({ project, database }: { project: string; database: 
 /** What keeps databases from being listed or created: no operator, or no right to read one. */
 export function OperatorNotes({ data }: { data: Schemas.ProjectDatabases }) {
   const t = useT()
-  const installed = data.operators.filter((o) => o.state === "installed")
+  const installed = installedEngines(data)
   const refused = data.operators.filter((o) => o.state === "refused")
   return (
     <>
@@ -124,8 +125,8 @@ export function OperatorNotes({ data }: { data: Schemas.ProjectDatabases }) {
         </p>
       ) : null}
       {refused.map((o) => (
-        <p key={o.engine} className="border-t border-rule py-2.5 type-meta text-muted-foreground">
-          {t("db.refused", engineName(o.engine))}
+        <p key={o.module} className="border-t border-rule py-2.5 type-meta text-muted-foreground">
+          {t("db.refused", operatorName(o))}
         </p>
       ))}
     </>

@@ -153,7 +153,7 @@ export function useStorePage<Tab extends DatabaseTab | ObjectStorageTab>(
   }
 }
 
-/** The ⋯ menu: copy the object's name, other items, then delete. */
+/** The ⋯ menu: copy the object's name, other items, then delete when `onDelete` is given. */
 export function StoreMenu({
   copy,
   deleteGate,
@@ -162,9 +162,9 @@ export function StoreMenu({
   children,
 }: {
   copy: string
-  deleteGate: Gate
-  deleteLabel: string
-  onDelete: () => void
+  deleteGate?: Gate
+  deleteLabel?: string
+  onDelete?: () => void
   children?: ReactNode
 }) {
   const t = useT()
@@ -186,11 +186,15 @@ export function StoreMenu({
           {t("service.copyName")}
         </MenuItem>
         {children}
-        <MenuSeparator />
-        <GatedMenuItem gate={deleteGate} onClick={onDelete}>
-          <TrashIcon aria-hidden="true" />
-          {deleteLabel}
-        </GatedMenuItem>
+        {deleteGate && onDelete ? (
+          <>
+            <MenuSeparator />
+            <GatedMenuItem gate={deleteGate} onClick={onDelete}>
+              <TrashIcon aria-hidden="true" />
+              {deleteLabel}
+            </GatedMenuItem>
+          </>
+        ) : null}
       </MenuContent>
     </Menu>
   )

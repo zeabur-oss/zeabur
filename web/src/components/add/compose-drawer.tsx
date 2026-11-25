@@ -62,7 +62,7 @@ function useComposeContext(project: string) {
   const mayCreate = (engine: Managed) => (engine === "objectStorage" ? objectStorage : databases)
   const taken = useTakenNames(project)
   const states: Partial<Record<Managed, (typeof operators)[number]["state"]>> = {}
-  for (const o of operators) states[o.engine] = o.state
+  for (const o of operators) if (!o.readOnly) states[o.engine] = o.state
   if (store) states.objectStorage = store
   return { domains, options, nodes, states, mayCreate, taken }
 }

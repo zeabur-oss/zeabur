@@ -38,8 +38,10 @@ import {
   presetResources,
   reshapeDatabase,
   sizePresets,
+  operatorName,
   rseqNote,
   shellCommand,
+  shellPod,
   storageProblem,
   targetProblems,
   type Database,
@@ -115,6 +117,34 @@ const mongo: Database = {
     kind: "PerconaServerMongoDB",
     metadata: { name: "mongo" },
     spec: { replsets: [{ name: "rs0", size: 1 }], backup: { enabled: false, image: "pbm:1" } },
+  } as unknown as Database["object"],
+}
+
+/** A `MongoDBCommunity` of MongoDB Controllers for Kubernetes, which Zeabur only shows. */
+const community: Database = {
+  ...mongo,
+  apiVersion: "mongodbcommunity.mongodb.com/v1",
+  apiGroup: "mongodbcommunity.mongodb.com",
+  kind: "MongoDBCommunity",
+  resource: "mongodbcommunity",
+  provider: "mongodb-kubernetes",
+  version: "8.0.4",
+  readOnly: true,
+  connection: {
+    host: "mongo-svc.shop.svc",
+    port: 27017,
+    database: "admin",
+    username: "app",
+    secret: "mongo-admin-app",
+    usernameKey: "username",
+    passwordKey: "password",
+    options: "replicaSet=mongo",
+  },
+  object: {
+    apiVersion: "mongodbcommunity.mongodb.com/v1",
+    kind: "MongoDBCommunity",
+    metadata: { name: "mongo" },
+    spec: { members: 3, type: "ReplicaSet", version: "8.0.4" },
   } as unknown as Database["object"],
 }
 
@@ -239,6 +269,10 @@ describe("MongoDB 8 memory setting", () => {
     const spec = merged((eight.object as { spec: unknown }).spec, patch)
     const fixed = { ...eight, object: { spec } as unknown as Database["object"] }
     expect(rseqNote(fixed)).toBe("set")
+  })
+
+  test("a MongoDB 8 that Zeabur only shows gets no note", () => {
+    expect(rseqNote(community)).toBeUndefined()
   })
 
   test("the fix keeps other glibc tunables", () => {
@@ -420,6 +454,23 @@ describe("a terminal in the database", () => {
     expect(shellCommand(postgres)).toEqual(["psql", "app"])
     expect(shellCommand(mongo).slice(0, 2)).toEqual(["bash", "-c"])
     expect(shellCommand(mongo)[2]).toStartWith("mongosh -u")
+  })
+
+  test("opens mongosh in the first member of a MongoDBCommunity, which holds no password", () => {
+    expect(shellPod(community)).toBe("mongo-0")
+    expect(shellCommand(community)).toEqual(["mongosh"])
+    expect(connectionUri(community)).toBe(
+      "mongodb://app:<password>@mongo-svc.shop.svc:27017/admin?replicaSet=mongo",
+    )
+  })
+})
+
+describe("operator names", () => {
+  test("name MongoDB Controllers for Kubernetes apart from the Percona Operator", () => {
+    const operator = (module: string) =>
+      ({ engine: "mongodb", module, state: "refused" }) as Schemas.DatabaseOperator
+    expect(operatorName(operator("percona-server-mongodb"))).toBe("MongoDB")
+    expect(operatorName(operator("mongodb-kubernetes"))).toBe("MongoDB Controllers for Kubernetes")
   })
 })
 

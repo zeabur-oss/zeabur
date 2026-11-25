@@ -112,9 +112,13 @@ import { TabsContent } from "@zeabur-oss/design-system/components/tabs"
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
 
-/** Dragonfly has no Backups tab. */
+/** Dragonfly has no Backups tab; a database Zeabur only shows has no Settings. */
 const tabsOf = (database: Database) =>
-  backsUp(database.engine) ? databaseTabs : databaseTabs.filter((value) => value !== "backups")
+  databaseTabs.filter(
+    (value) =>
+      (value !== "backups" || backsUp(database.engine)) &&
+      (value !== "settings" || !database.readOnly),
+  )
 
 const tabIcons: Record<DatabaseTab, Icon> = {
   overview: InfoIcon,
@@ -161,7 +165,7 @@ export function DatabasePage() {
         </Link>
       </Column>
     )
-  const operator = query.data.operators.find((o) => o.engine === database.engine)
+  const operator = query.data.operators.find((o) => o.module === database.provider)
   return (
     <Body
       project={project}
@@ -270,14 +274,18 @@ function Body({
               <TerminalWindowIcon aria-hidden="true" />
             </Button>
           </GateTip>
-          <StoreMenu
-            copy={`${database.resource}/${database.name}`}
-            deleteGate={gates("changeDatabases")}
-            deleteLabel={t("db.delete")}
-            onDelete={() => void planDelete()}
-          >
-            <ExportItem project={project} database={database} />
-          </StoreMenu>
+          {database.readOnly ? (
+            <StoreMenu copy={`${database.resource}/${database.name}`} />
+          ) : (
+            <StoreMenu
+              copy={`${database.resource}/${database.name}`}
+              deleteGate={gates("changeDatabases")}
+              deleteLabel={t("db.delete")}
+              onDelete={() => void planDelete()}
+            >
+              <ExportItem project={project} database={database} />
+            </StoreMenu>
+          )}
         </>
       }
     >
@@ -516,7 +524,9 @@ function Cautions({ project, database }: { project: string; database: Database }
           <AlertDescription>
             {t(
               "db.noRedundancy",
-              !backsUp(database.engine) || Boolean(database.backups.store?.inUse),
+              !backsUp(database.engine) ||
+                Boolean(database.readOnly) ||
+                Boolean(database.backups.store?.inUse),
             )}
           </AlertDescription>
         </Alert>
@@ -660,6 +670,13 @@ function Backups({
   const store = database.backups.store
   const on = backupsOn(database)
   const pluginMissing = database.engine === "postgresql" && !readable && operator
+  if (database.readOnly)
+    return (
+      <Alert>
+        <InfoIcon aria-hidden="true" />
+        <AlertDescription>{t("db.backup.shownOnly")}</AlertDescription>
+      </Alert>
+    )
   return (
     <div className="flex flex-col gap-7">
       {pluginMissing ? (

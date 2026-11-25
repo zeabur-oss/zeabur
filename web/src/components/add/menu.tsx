@@ -57,7 +57,7 @@ type Component = Schemas.ComponentRef
  * read is left out. */
 function knownEngines(operators: Schemas.DatabaseOperator[] = []) {
   return engines.flatMap((engine) => {
-    const operator = operators.find((o) => o.engine === engine)
+    const operator = operators.find((o) => o.engine === engine && !o.readOnly)
     return operator?.state === "installed" || operator?.state === "not-installed"
       ? [
           {
