@@ -27,7 +27,7 @@ use serde_json::Value;
 use zeabur_kube::DynamicObject;
 use zeabur_model::readiness::{self, Reason, Status};
 
-use crate::backups::{Schedule, Target, TargetKind, newest};
+use crate::backups::{Run, Schedule, Target, TargetKind, newest};
 use crate::databases::{self, AppUser, Backups, Connection, Database, Engine, State, Store};
 use crate::{Module, Read, text};
 
@@ -143,6 +143,7 @@ fn backups_of(
         .filter_map(|b| b.metadata.name.clone())
         .collect();
     let mut runs = databases::job_runs(MODULE.id, name, jobs, &owners);
+    let stored = runs.iter().any(Run::stored);
     newest(&mut runs, 20);
     Backups {
         ready: store.as_ref().is_some_and(|s| s.in_use) && state == State::Ready,
@@ -150,6 +151,7 @@ fn backups_of(
         store,
         schedules,
         runs,
+        stored,
         recovery_window: None,
         archive_failure: None,
     }

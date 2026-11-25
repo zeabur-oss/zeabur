@@ -10,7 +10,7 @@ mod tests {
     use axum::http::StatusCode;
     use serde_json::{Value, json};
     use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
-    use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
+    use zeabur_kube::k8s_openapi::api::core::v1::{Namespace, Service};
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, NamespaceObjects, ServedResource};
 
@@ -199,11 +199,16 @@ mod tests {
         assert!(cluster.inspect(|s| s.writes.is_empty()).unwrap());
     }
 
+    fn k8up_snapshots() -> ServedResource {
+        ServedResource::readable("k8up.io", "v1", "snapshots", "Snapshot", true)
+    }
+
     #[tokio::test]
     async fn a_refused_backup_read_leaves_the_backups_out_and_names_the_right() {
         let cluster = cluster(namespace("shop", &json!({})));
         cluster.update(|s| {
-            s.forbidden_in_namespaces = BTreeSet::from(["persistentvolumeclaims".to_owned()]);
+            s.served.push(k8up_snapshots());
+            s.forbidden_in_namespaces = BTreeSet::from(["snapshots.k8up.io".to_owned()]);
         });
         let app = app(&cluster);
         let (status, plan) = send(
@@ -226,8 +231,54 @@ mod tests {
                 .as_array()
                 .unwrap()
                 .iter()
-                .any(|r| r["verb"] == "list" && r["resource"] == "persistentvolumeclaims"),
+                .any(|r| r["verb"] == "list"
+                    && r["group"] == "k8up.io"
+                    && r["resource"] == "snapshots"
+                    && r["namespace"] == "shop"),
             "{rights}"
+        );
+    }
+
+    #[tokio::test]
+    async fn a_volume_backup_whose_schedule_was_stopped_is_told_from_its_snapshots() {
+        let cluster = cluster(namespace("shop", &json!({})));
+        let s3: Service = serde_json::from_value(json!({
+            "metadata": {"name": "files-s3", "namespace": "shop"},
+            "spec": {"ports": [{"port": 9000}]}}))
+        .unwrap();
+        let snapshot = |id: &str, repository: &str| -> DynamicObject {
+            serde_json::from_value(json!({
+                "apiVersion": "k8up.io/v1", "kind": "Snapshot",
+                "metadata": {"name": id, "namespace": "shop"},
+                "spec": {"id": id, "date": "2026-09-01T03:00:00Z", "repository": repository,
+                         "paths": ["/data/uploads"]}}))
+            .unwrap()
+        };
+        cluster.update(|s| {
+            s.served.push(k8up_snapshots());
+            s.dynamic
+                .push(snapshot("aaaaaaaa", "s3:http://files-s3:9000/backups"));
+            s.dynamic
+                .push(snapshot("bbbbbbbb", "s3:https://s3.example.com/shop"));
+            if let Some(shop) = s.objects.get_mut("shop") {
+                shop.services.push(s3);
+            }
+        });
+        let app = app(&cluster);
+        let (status, plan) = send(
+            &app,
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&json!({"changes": [{"op": "deleteProject"}]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        assert_eq!(
+            deletes_project(&plan)["backups"],
+            json!([
+                {"kind": "volume", "name": "uploads", "fate": "goes", "keptIn": "files-s3"},
+                {"kind": "volume", "name": "uploads", "fate": "stays"},
+            ])
         );
     }
 

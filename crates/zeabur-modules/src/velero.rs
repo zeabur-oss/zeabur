@@ -23,6 +23,7 @@
 //! [velero-schedule]: https://velero.io/docs/v1.17/api-types/schedule/
 //! [velero-backup]: https://velero.io/docs/v1.17/api-types/backup/
 //! [velero-fsb]: https://velero.io/docs/v1.17/file-system-backup/
+//! [velero-works]: https://velero.io/docs/v1.17/how-velero-works/
 //! [velero-labels]: https://github.com/vmware-tanzu/velero/blob/v1.17.0/pkg/apis/velero/v1/labels_annotations.go
 
 use zeabur_kube::DynamicObject;
@@ -92,6 +93,36 @@ fn targets(
     out
 }
 
+fn outcome(backup: &DynamicObject) -> Outcome {
+    match text(backup, "/status/phase").as_deref() {
+        Some("Completed") => Outcome::Succeeded,
+        Some("PartiallyFailed") => Outcome::PartiallyFailed,
+        Some("Failed" | "FailedValidation") => Outcome::Failed,
+        Some(
+            "New"
+            | "InProgress"
+            | "WaitingForPluginOperations"
+            | "WaitingForPluginOperationsPartiallyFailed"
+            | "Finalizing"
+            | "FinalizingPartiallyFailed",
+        ) => Outcome::Running,
+        _ => Outcome::Unknown,
+    }
+}
+
+/// Whether one of `backups` covers `namespace` and left a backup in its store.
+///
+/// Velero keeps the
+/// `Backup`s in step with its object storage and deletes one with its files when it expires
+/// [velero-works], so all of them count, not only the newest runs.
+#[must_use]
+pub fn stored(namespace: &str, backups: &[DynamicObject]) -> bool {
+    backups.iter().any(|b| {
+        covers(b, "/spec", namespace)
+            && matches!(outcome(b), Outcome::Succeeded | Outcome::PartiallyFailed)
+    })
+}
+
 /// What Velero's objects say about `namespace` and its claims (`volumes`). Runs are the newest
 /// ten.
 #[must_use]
@@ -131,20 +162,7 @@ pub fn findings(
     }
     out.schedules.sort_by(|a, b| a.name.cmp(&b.name));
     for backup in backups.iter().filter(|b| covers(b, "/spec", namespace)) {
-        let outcome = match text(backup, "/status/phase").as_deref() {
-            Some("Completed") => Outcome::Succeeded,
-            Some("PartiallyFailed") => Outcome::PartiallyFailed,
-            Some("Failed" | "FailedValidation") => Outcome::Failed,
-            Some(
-                "New"
-                | "InProgress"
-                | "WaitingForPluginOperations"
-                | "WaitingForPluginOperationsPartiallyFailed"
-                | "Finalizing"
-                | "FinalizingPartiallyFailed",
-            ) => Outcome::Running,
-            _ => Outcome::Unknown,
-        };
+        let outcome = outcome(backup);
         let errors = backup
             .data
             .pointer("/status/errors")
@@ -217,5 +235,27 @@ mod tests {
         let found = findings("shop", &[], &[backup], &[]);
         assert_eq!(found.runs[0].outcome, Outcome::PartiallyFailed);
         assert_eq!(found.runs[0].message.as_deref(), Some("2 errors"));
+    }
+
+    #[test]
+    fn every_completed_backup_of_the_namespace_is_stored_not_only_the_newest() {
+        let backup = |n: u32, phase: &str, included: serde_json::Value| {
+            object(serde_json::json!({
+                "apiVersion": "velero.io/v1", "kind": "Backup",
+                "metadata": {"name": format!("daily-{n}"), "namespace": "velero"},
+                "spec": {"includedNamespaces": included},
+                "status": {"phase": phase,
+                           "completionTimestamp": format!("2026-10-{:02}T03:00:00Z", n)}
+            }))
+        };
+        let mut backups: Vec<DynamicObject> = (2..=15)
+            .map(|n| backup(n, "Failed", serde_json::json!(["*"])))
+            .collect();
+        assert!(!stored("shop", &backups));
+        backups.push(backup(1, "Completed", serde_json::json!(["other"])));
+        assert!(!stored("shop", &backups));
+        backups.push(backup(1, "Completed", serde_json::json!(["shop"])));
+        assert_eq!(findings("shop", &[], &backups, &[]).runs.len(), 10);
+        assert!(stored("shop", &backups));
     }
 }
