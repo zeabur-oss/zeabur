@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest"
+import { describe, expect, it } from "bun:test"
 import { rules } from "@/api/rules"
 import { isWholeNumber } from "@/model/rules"
 
