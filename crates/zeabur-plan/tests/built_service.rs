@@ -1114,7 +1114,7 @@ mod tests {
     }
 
     /// The same settings change nothing for the container that runs the `Build`'s image, but move
-    /// another container to it and leave the `Build` as it is.
+    /// another container to the image it made last and leave the `Build` as it is.
     #[test]
     fn the_same_build_moves_another_container() {
         let input = repository("https://github.com/acme/site", GitAccess::Public);
@@ -1139,7 +1139,7 @@ mod tests {
         let deployment = after(&plan, "Deployment", "site").unwrap();
         assert_eq!(
             deployment["spec"]["template"]["spec"]["containers"][1]["image"],
-            "zot:5000/shop/site:pending"
+            LATEST
         );
         assert_eq!(after(&plan, "Build", "site").unwrap()["spec"], site_spec);
     }

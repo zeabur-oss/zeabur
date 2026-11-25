@@ -896,7 +896,13 @@ impl Planner<'_> {
             .and_then(|a| a.get(KEEL_POLICY))
             .is_some_and(|p| p == KEEL_FORCE);
         let (source, credentials) = change.build.source(name)?;
-        let existing = self.builds_read()?.into_iter().any(|(n, _)| n == name);
+        let current = self
+            .builds_read()?
+            .into_iter()
+            .find_map(|(n, read)| (n == name).then_some(read));
+        let existing = current.is_some();
+        // The image it made last, which the container runs until the next build.
+        let latest = current.and_then(|read| read.status.latest_image);
         let (pushes_to, build_changed) = if existing {
             self.update_build(name, &change.build, source, credentials, index)?
         } else {
@@ -915,7 +921,9 @@ impl Planner<'_> {
             .as_deref()
             .is_some_and(|i| runs_from(i, &pushes_to));
         if moves {
-            let image = format!("{pushes_to}:{PENDING_TAG}");
+            let image = latest
+                .filter(|i| runs_from(i, &pushes_to))
+                .unwrap_or_else(|| format!("{pushes_to}:{PENDING_TAG}"));
             self.image(reference, Some(&container.name), &image)?;
         }
         match (keel, existing) {
