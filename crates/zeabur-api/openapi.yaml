@@ -11462,6 +11462,13 @@ components:
           - string
           - "null"
           description: The chart version the catalogue tested, when it pins one.
+        unstarted:
+          type: array
+          items:
+            type: string
+          description: |-
+            The steps Zeabur has not started, by release name: until none is left, the component is
+            not installed.
         upgrade:
           oneOf:
           - $ref: "#/components/schemas/ComponentUpgrade"

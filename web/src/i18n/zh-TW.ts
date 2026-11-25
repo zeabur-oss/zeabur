@@ -1123,6 +1123,8 @@ export const zhTW: Messages = {
   "components.gitopsHow":
     "叢集用 Flux 或 Argo CD 管理的話，改用下面的指令印出元件的 manifest，再提交到叢集讀取的儲存庫。",
   "components.manage": "管理",
+  "components.incomplete": "還沒裝完",
+  "components.unstarted": (steps) => `${steps} 還沒開始，按「管理」把它裝完。`,
   "components.installing": "安裝中…",
   "components.removing": "移除中…",
   "components.installed": "已安裝，健康檢查都通過了。",

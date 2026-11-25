@@ -1120,6 +1120,8 @@ export const zhCN: Messages = {
   "components.gitopsHow":
     "集群用 Flux 或 Argo CD 管理的话，改用下面的命令输出组件的 manifest，再提交到集群读取的仓库。",
   "components.manage": "管理",
+  "components.incomplete": "还没装完",
+  "components.unstarted": (steps) => `${steps} 还没开始，点“管理”把它装完。`,
   "components.installing": "安装中…",
   "components.removing": "移除中…",
   "components.installed": "已安装，健康检查都通过了。",

@@ -353,7 +353,14 @@ function ComponentCard({
   const installation = installationOf(capability, component)
   const installed = installation !== undefined
   const down = installed && isDown(capability.name, component.id)
-  const state = down ? "down" : installed ? "installed" : (capability.suggestion ?? "optional")
+  const unstarted = installation?.unstarted ?? []
+  const state = down
+    ? "down"
+    : unstarted.length > 0
+      ? "incomplete"
+      : installed
+        ? "installed"
+        : (capability.suggestion ?? "optional")
   return (
     <article className="flex w-full flex-col gap-3 rounded-xl border border-v2-border bg-card p-4 transition-colors hover:border-foreground/20">
       <div className="flex items-start gap-3">
@@ -369,6 +376,11 @@ function ComponentCard({
       <p className="line-clamp-3 type-body leading-normal text-muted-foreground">
         {summaryOf(component, locale)}
       </p>
+      {unstarted.length > 0 ? (
+        <p className="type-meta text-warn-strong">
+          {t("components.unstarted", t("common.list", unstarted))}
+        </p>
+      ) : null}
       {installation?.packagedChart ? (
         <PackagedNote by={t(sourceKey[installation.source])} chart={installation.packagedChart} />
       ) : null}
@@ -465,6 +477,12 @@ function StateChip({ state, evidence }: { state: string; evidence: string[] }) {
     return (
       <StatusPill health="fail" size="sm" className="shrink-0">
         {t("status.failing")}
+      </StatusPill>
+    )
+  if (state === "incomplete")
+    return (
+      <StatusPill health="warn" size="sm" className="shrink-0">
+        {t("components.incomplete")}
       </StatusPill>
     )
   if (state === "installed")
@@ -605,6 +623,10 @@ function InstalledSection() {
                   {isDown(capability, i.component) ? (
                     <StatusPill health="fail" size="sm">
                       {t("status.failing")}
+                    </StatusPill>
+                  ) : i.unstarted?.length ? (
+                    <StatusPill health="warn" size="sm">
+                      {t("components.incomplete")}
                     </StatusPill>
                   ) : null}
                   <UpgradeTag installation={i} />
