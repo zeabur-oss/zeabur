@@ -53,4 +53,28 @@ mod tests {
         let (status, _) = send(&app, "HEAD", MEMBERS, None).await;
         assert_eq!(status, StatusCode::OK);
     }
+
+    #[tokio::test]
+    async fn members_opens_for_api_tokens_without_identity_rights() {
+        let identity = [
+            "list users",
+            "list credentials",
+            "list invitations",
+            "list grants",
+        ];
+        let server = app(&refusing(&identity));
+        let (status, _) = send(&server, "HEAD", MEMBERS, None).await;
+        assert_eq!(status, StatusCode::OK);
+        let (status, body) = send(&server, "GET", MEMBERS, None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(body["installed"], false);
+
+        let tokens = [
+            &identity[..],
+            &["list rolebindings", "list serviceaccounts"],
+        ]
+        .concat();
+        let (status, _) = send(&app(&refusing(&tokens)), "HEAD", MEMBERS, None).await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+    }
 }

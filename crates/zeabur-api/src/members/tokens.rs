@@ -148,6 +148,11 @@ pub(crate) async fn can_manage(cluster: &dyn Cluster) -> Permission {
     }
 }
 
+/// The read of the API tokens: the ServiceAccounts in the token namespace.
+pub(crate) fn read() -> Denied {
+    crate::error::list_read("", "serviceaccounts", Some(NAMESPACE))
+}
+
 /// The refusal key of the token read, as `unreadable` names it.
 pub(crate) fn key() -> String {
     "serviceaccounts".to_owned()

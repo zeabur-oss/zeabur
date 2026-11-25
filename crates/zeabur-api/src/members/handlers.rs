@@ -15,7 +15,7 @@ use super::writes::{
     user_object,
 };
 use super::{USER_PREFIX, access, tokens};
-use crate::error::{ApiError, list_read, read_problem};
+use crate::error::{ApiError, list_read, list_read_of_key, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
@@ -66,7 +66,8 @@ fn no_member(username: &str) -> ApiError {
     ))
 }
 
-/// The reads of `GET /members` that decide whether the page opens: any of Identity's kinds.
+/// The reads of `GET /members` that decide whether the page opens: any of Identity's kinds, or
+/// the bindings and ServiceAccounts that API tokens are, which work without Zeabur Identity.
 fn reads(namespace: &str) -> Vec<Denied> {
     use super::directory::IdentityKind;
     [
@@ -76,7 +77,9 @@ fn reads(namespace: &str) -> Vec<Denied> {
         IdentityKind::Grant,
     ]
     .map(|kind| list_read(super::GROUP, kind.plural(), Some(namespace)))
-    .to_vec()
+    .into_iter()
+    .chain([list_read_of_key(&access::key()), tokens::read()])
+    .collect()
 }
 
 /// Whether the person may open Members: see [`crate::head`].
