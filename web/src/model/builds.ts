@@ -150,8 +150,15 @@ function pinnedImage(image: string, build: Build): string {
 export function stopBuilding(service: Service, build: Build, data: Builds): Schemas.Change[] {
   const workload = { kind: service.kind, name: service.name }
   const built = builtContainers(service, data.builds)
+  // The image op changes regular containers; an init container keeps the tag it names.
+  const init = new Set(service.containers.filter((c) => c.init).map((c) => c.name))
   const pins: Schemas.Change[] = built
-    .filter((b) => b.build.name === build.name && pinnedImage(b.image, build) !== b.image)
+    .filter(
+      (b) =>
+        b.build.name === build.name &&
+        !init.has(b.container) &&
+        pinnedImage(b.image, build) !== b.image,
+    )
     .map((b) => ({
       op: "image",
       workload,

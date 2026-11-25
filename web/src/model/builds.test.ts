@@ -205,4 +205,14 @@ describe("stopBuilding", () => {
     )
     expect(changes.map((c) => c.op)).toEqual(["delete"])
   })
+
+  test("an init container keeps its tag, since the image op changes regular containers", () => {
+    const tagged = "zot.zot.svc:5000/shop/web:main-2-bbbbbbb"
+    const withInit = {
+      ...service([tagged]),
+      containers: [{ name: "migrate", image: tagged, init: true }],
+    } as unknown as Service
+    const changes = stopBuilding(withInit, build(), data([build()], "force"))
+    expect(changes.map((c) => c.op)).toEqual(["delete", "autoUpdate"])
+  })
 })
