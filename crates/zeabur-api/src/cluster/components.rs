@@ -11,7 +11,8 @@
 //! never forced, so a field someone else owns fails the write and names them. A release often needs
 //! the one before it (cert-manager's `ClusterIssuers` need its CRDs), so `apply` writes one step at
 //! a time, with a dry run first, and the page calls it again until every step and health check is
-//! ready. The server keeps nothing between calls, and calling `apply` again writes the same
+//! ready. A component's health checks run once its steps are ready, and the next component's steps
+//! wait for them. The server keeps nothing between calls, and calling `apply` again writes the same
 //! objects, which changes nothing. A release with `skipIfPresent` is left out when every CRD it
 //! lists exists and Zeabur did not write it.
 //!
@@ -199,7 +200,8 @@ pub struct ComponentStep {
     pub writes: Vec<ObjectWrite>,
 }
 
-/// One health check of the catalog, run once every step is ready.
+/// One health check of the catalog, run once the component's steps are ready. The steps of the
+/// components after it wait for it.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ComponentCheck {
@@ -323,6 +325,9 @@ struct Planned {
     zeaburs: bool,
     /// The first required input without a value.
     missing: Option<Refusal>,
+    /// The next step waits for the health checks of a component before it, so apply writes
+    /// nothing yet.
+    held: bool,
 }
 
 /// What installing or removing component `id` writes, and how far each step has come; writes
@@ -386,6 +391,7 @@ pub(crate) async fn apply(
         plan,
         objects,
         missing,
+        held,
         ..
     } = world.plan(cluster.as_ref(), &id, &request).await?;
     if let Some(missing) = missing {
@@ -405,7 +411,7 @@ pub(crate) async fn apply(
     let Some((first, step)) = next else {
         return Ok(unwritten(plan));
     };
-    if first.state == StepState::Failed {
+    if first.state == StepState::Failed || held {
         return Ok(unwritten(plan));
     }
     // A dry run of an object in a namespace that does not exist yet fails, so namespaces go
@@ -694,12 +700,8 @@ impl World {
         }
     }
 
-    async fn install(
-        &self,
-        cluster: &dyn Cluster,
-        id: &str,
-        given: &Values,
-    ) -> Result<Planned, ApiError> {
+    /// Refuses a component that is installed and that Zeabur did not install.
+    fn refuse_installed_elsewhere(&self, id: &str) -> Result<(), ApiError> {
         if self
             .sources
             .get(id)
@@ -713,6 +715,16 @@ impl World {
                 ),
             )));
         }
+        Ok(())
+    }
+
+    async fn install(
+        &self,
+        cluster: &dyn Cluster,
+        id: &str,
+        given: &Values,
+    ) -> Result<Planned, ApiError> {
+        self.refuse_installed_elsewhere(id)?;
         let install = self.engine_install(cluster, id, given).await?;
         let missing = install.missing();
         let mut steps = Vec::new();
@@ -723,13 +735,18 @@ impl World {
             .into_iter()
             .map(ComponentWarning::from)
             .collect();
+        let mut checks: Vec<ComponentCheck> = Vec::new();
+        let mut checked = BTreeSet::new();
+        let mut held = false;
         for (i, step) in install.steps.iter().enumerate() {
-            let earlier_ready = steps
+            let steps_ready = steps
                 .iter()
                 .all(|s: &ComponentStep| s.state == StepState::Ready);
+            let checks_ready = checks.iter().all(|c| c.state == StepState::Ready);
+            held |= steps_ready && !checks_ready;
             let later = install.steps.get(i + 1..).unwrap_or_default();
             let planned = self
-                .install_step(cluster, step, later, earlier_ready)
+                .install_step(cluster, step, later, steps_ready && checks_ready)
                 .await?;
             if planned.foreign.is_some()
                 && let Some(values) = config_values(step)
@@ -755,15 +772,28 @@ impl World {
             }
             steps.push(planned.view);
             placed_steps.push(planned.placed);
+            // A component's health checks run once its steps are ready, and the next component's
+            // steps wait for them: a chart can need the webhook of an operator installed before
+            // it. A target written again after its contributor is not waited for twice.
+            let next_other = later.first().is_none_or(|s| s.component != step.component);
+            if next_other
+                && install.components.contains(&step.component)
+                && let Some(file) = self.snapshot.components.get(&step.component)
+                && checked.insert(step.component.clone())
+            {
+                let ready = steps.iter().all(|s| s.state == StepState::Ready);
+                checks.extend(self.checks(cluster, file, ready).await?);
+            }
         }
         self.refuse_releases_elsewhere(&install.steps, &managed)?;
         let ready = steps.iter().all(|s| s.state == StepState::Ready);
-        let mut checks = Vec::new();
         for component in &install.components {
             let Some(file) = self.snapshot.components.get(component) else {
                 continue;
             };
-            checks.extend(self.checks(cluster, file, ready).await?);
+            if checked.insert(component.clone()) {
+                checks.extend(self.checks(cluster, file, ready).await?);
+            }
         }
         let done = ready && checks.iter().all(|c| c.state == StepState::Ready);
         let inputs = install.inputs.iter().map(input_view).collect();
@@ -782,6 +812,7 @@ impl World {
             objects: placed_steps,
             zeaburs: !managed.is_empty(),
             missing,
+            held,
         })
     }
 
@@ -1033,6 +1064,7 @@ impl World {
             objects: placed_steps,
             zeaburs,
             missing: None,
+            held: false,
         })
     }
 

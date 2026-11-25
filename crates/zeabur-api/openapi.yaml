@@ -7467,7 +7467,9 @@ components:
           description: Each object written, in order; empty when no step was due.
     ComponentCheck:
       type: object
-      description: One health check of the catalog, run once every step is ready.
+      description: |-
+        One health check of the catalog, run once the component's steps are ready. The steps of the
+        components after it wait for it.
       required:
       - component
       - name

@@ -1,6 +1,7 @@
 //! Installing and removing a catalog component through a plan: cert-manager's chart, then its
 //! `ClusterIssuers` once its CRDs are served, each step written as the person with server-side
-//! apply, readiness from helm-controller's Job and the health checks, and removal in reverse;
+//! apply, readiness from helm-controller's Job and the health checks, a component that waits for
+//! the health checks of the one it needs, and removal in reverse;
 //! and the refusals: someone who is not a cluster administrator, a plan of an older catalog
 //! release, a release someone else installed, a component another one needs (not its leftover
 //! CRDs), a cluster without
@@ -1261,6 +1262,67 @@ mod tests {
             Some("cert-manager ready"),
             "{now:?}"
         );
+    }
+
+    #[tokio::test]
+    async fn a_component_waits_for_the_health_checks_of_the_one_it_needs() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        call_for(&app, "cloudnative-pg", "apply", "install", "0.6.1").await;
+        chart_installed(&cluster);
+        // helm-controller is done, but cert-manager's webhook does not serve yet.
+        cluster.update(|s| {
+            let ns = s.objects.get_mut("cert-manager").unwrap();
+            let webhook = ns
+                .deployments
+                .iter_mut()
+                .find(|d| d.metadata.name.as_deref() == Some("cert-manager-webhook"))
+                .unwrap();
+            webhook.status = serde_json::from_value(json!({
+                "observedGeneration": 1, "replicas": 1, "updatedReplicas": 1,
+                "readyReplicas": 0, "availableReplicas": 0,
+                "conditions": [{"type": "Available", "status": "False"}],
+            }))
+            .unwrap();
+        });
+
+        // cert-manager's own issuers are written; cloudnative-pg's chart waits.
+        call_for(&app, "cloudnative-pg", "apply", "install", "0.6.1").await;
+        let (_, applied) = call_for(&app, "cloudnative-pg", "apply", "install", "0.6.1").await;
+        let plan = &applied["plan"];
+        assert_eq!(
+            states(plan)[..3],
+            [
+                "cert-manager ready",
+                "issuers ready",
+                "cloudnative-pg pending"
+            ]
+        );
+        let webhook = plan["checks"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|c| c["name"] == "webhook")
+            .unwrap();
+        assert_eq!(webhook["state"], "waiting", "{plan}");
+        assert_eq!(applied["written"], json!([]));
+        assert!(dynamic(&cluster, "HelmChart", "cnpg").is_none());
+
+        // Once the webhook serves, the chart is written.
+        cluster.update(|s| {
+            let ns = s.objects.get_mut("cert-manager").unwrap();
+            for d in &mut ns.deployments {
+                if let Some(status) = d.status.as_mut() {
+                    status.ready_replicas = Some(1);
+                    status.available_replicas = Some(1);
+                    for c in status.conditions.iter_mut().flatten() {
+                        c.status = "True".to_owned();
+                    }
+                }
+            }
+        });
+        call_for(&app, "cloudnative-pg", "apply", "install", "0.6.1").await;
+        assert!(dynamic(&cluster, "HelmChart", "cnpg").is_some());
     }
 
     #[tokio::test]

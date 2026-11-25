@@ -155,7 +155,7 @@ function PlanDialog({
   const t = useT()
   const [values, setValues] = useState<Values>({})
   const plan = useQuery(planQuery(id, action, values))
-  const { shown, running, readySince, start, apply } = useApplying(id, action, values, plan.data)
+  const { shown, running, start, apply } = useApplying(id, action, values, plan.data)
   const form = useInputs(shown, running, editing, setValues)
   return (
     <Frame
@@ -190,7 +190,6 @@ function PlanDialog({
         pending={plan.isPending}
         error={plan.isError ? plan.error : undefined}
         plan={form.asking ? undefined : shown}
-        readySince={readySince}
       />
       {apply.isError ? <Problem error={apply.error} /> : null}
       <GitOpsExport id={id} action={action} plan={shown} />
@@ -260,17 +259,15 @@ function PlanContent({
   pending,
   error,
   plan,
-  readySince,
 }: {
   pending: boolean
   error: Error | undefined
   plan: Schemas.ComponentPlan | undefined
-  readySince: number | undefined
 }) {
   const t = useT()
   if (pending) return <LoadingRows label={t("plan.planning")} rows={3} />
   if (error) return <Problem error={error} />
-  return plan ? <PlanBody plan={plan} readySince={readySince} /> : null
+  return plan ? <PlanBody plan={plan} /> : null
 }
 
 /** Applies the plan's next step, then asks again every few seconds until the plan is done or a
@@ -283,7 +280,6 @@ function useApplying(
 ) {
   const [running, setRunning] = useState(false)
   const [latest, setLatest] = useState<{ plan: Schemas.ComponentPlan; values: Values }>()
-  const [readySince, setReadySince] = useState<number>()
   const apply = useMutation({
     mutationFn: (version: string) =>
       applyComponent(id, { action, catalogVersion: version, values }),
@@ -297,12 +293,6 @@ function useApplying(
     onError: () => setRunning(false),
   })
   const shown = latest?.values === values ? latest.plan : planned
-  const stepsReady = shown?.steps.every((s) => s.state === "ready") ?? false
-
-  useEffect(() => {
-    if (stepsReady && readySince === undefined) setReadySince(Date.now())
-  }, [stepsReady, readySince])
-
   useEffect(() => {
     if (!running || apply.isPending || !shown || shown.done) return
     const timer = setTimeout(() => apply.mutate(shown.catalogVersion), POLL_MS)
@@ -313,7 +303,7 @@ function useApplying(
     setRunning(true)
     apply.mutate(version)
   }
-  return { shown, running, readySince, start, apply }
+  return { shown, running, start, apply }
 }
 
 /** The footer button of each action: before it starts, and while it runs. */
@@ -431,7 +421,7 @@ function GitOpsExport({
   )
 }
 
-function PlanBody({ plan, readySince }: { plan: Schemas.ComponentPlan; readySince?: number }) {
+function PlanBody({ plan }: { plan: Schemas.ComponentPlan }) {
   const t = useT()
   return (
     <div className="flex flex-col gap-5">
@@ -472,11 +462,7 @@ function PlanBody({ plan, readySince }: { plan: Schemas.ComponentPlan; readySinc
           <h3 className="type-meta font-medium text-muted-foreground">{t("components.checks")}</h3>
           <ul className="flex flex-col gap-2">
             {plan.checks.map((check) => (
-              <Check
-                key={`${check.component}/${check.name}`}
-                check={check}
-                readySince={readySince}
-              />
+              <Check key={`${check.component}/${check.name}`} check={check} />
             ))}
           </ul>
         </section>
@@ -555,11 +541,18 @@ function Written({ write }: { write: Schemas.ObjectWrite }) {
   )
 }
 
-function Check({ check, readySince }: { check: Schemas.ComponentCheck; readySince?: number }) {
+/** A check's timeout counts from when it starts to wait: a component's checks start once its own
+ * steps are ready, while the steps after it still wait. */
+function Check({ check }: { check: Schemas.ComponentCheck }) {
   const t = useT()
   const waiting = check.state === "waiting"
+  const [waitingSince, setWaitingSince] = useState<number>()
+  useEffect(() => {
+    if (waiting && waitingSince === undefined) setWaitingSince(Date.now())
+  }, [waiting, waitingSince])
   const now = useNow(5_000, waiting)
-  const late = waiting && readySince !== undefined && now - readySince > check.timeoutSeconds * 1000
+  const late =
+    waiting && waitingSince !== undefined && now - waitingSince > check.timeoutSeconds * 1000
   return (
     <li className="flex flex-col gap-1">
       <div className="flex items-center gap-3">
