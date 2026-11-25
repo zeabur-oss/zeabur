@@ -2,6 +2,34 @@
 
 All notable changes to Zeabur. Versions follow [Semantic Versioning](https://semver.org/); before 1.0.0, a minor or patch release may break the API. Each section comes from the change files in `.changeset/` (CONTRIBUTING.md, "Releases").
 
+## 0.3.1 (2026-11-25)
+
+### Features
+
+#### Helm installs join the experience program by default
+
+The chart now sets `telemetry.enabled: true` and makes the installation ID itself: a random UUID, kept in the ConfigMap `zeabur-installation-id` so upgrades keep it. Set `telemetry.installationId` to use your own, which you need when a tool such as Argo CD renders the chart with `helm template`. A release that never set `telemetry.enabled` joins on its next upgrade, and the upgrade's notes say so. To stay out, set `telemetry.enabled=false` or `DO_NOT_TRACK=1`. What is sent and how to turn it off: https://oss.zeabur.com/docs/zeabur/reference/telemetry/
+
+### Fixes
+
+#### The Flux export pins the chart, orders releases and keeps what Zeabur keeps
+
+`zeaburctl components export --format flux` now writes the catalog's chart digest on each `OCIRepository`, a `dependsOn` between a component's chart releases, and `kustomize.toolkit.fluxcd.io/prune: disabled` on its namespaces and input Secrets. Flux then installs releases in order, installs the chart the catalog pinned, and keeps the volumes and inputs when it prunes the export.
+
+#### `zeabur components install --timeout` takes more forms
+
+`--timeout` still takes `90s`, `10m` and `1h`. It now also takes `1h30m`, `1.5h` and `2 hours`. A number too large for a time limit now fails with an error where it used to stop at the largest value.
+
+#### Built images are read with the CA the catalog publishes
+
+Zeabur OSS now reads the build registry's CA from the Secret that the installed registry component, such as Zeabur Builder, names in the catalog (`provides.registry.ca`), as the person. The image form and folder uploads use it, so a project that never uploaded a folder can also read its built images. Zeabur OSS no longer reads `ca.crt` from upload Secrets.
+
+Folder uploads need the Secret that Zeabur Builder 0.3.0 makes, so upgrade Zeabur Builder to 0.3.0 right after Zeabur OSS. How: https://oss.zeabur.com/docs/zeabur/upgrade/notes/
+
+#### Usage events survive errors and shutdown, and Zeabur Desktop sends them
+
+Zeabur OSS, `zeaburctl ui` and Zeabur Desktop now queue the experience program's events in memory and send them in batches. A request that gets no answer, a rate limit or a server error is tried up to three more times, and each one waits a few seconds for the queue when it stops. Before, a failed request lost its event, any answer from the endpoint counted as sent, and events on their way when Zeabur OSS stopped were lost. Zeabur Desktop now sends `cluster_connected` as `zeaburctl ui` does, under the same setting: `zeaburctl telemetry disable`, `ZEABUR_TELEMETRY=off` or `DO_NOT_TRACK=1` turns it off. What is sent: https://oss.zeabur.com/docs/zeabur/reference/telemetry/
+
 ## 0.3.0 (2026-11-22)
 
 ### Breaking Changes

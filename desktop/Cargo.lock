@@ -6323,7 +6323,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-api"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "axum",
  "base64 0.23.1",
@@ -6367,7 +6367,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-catalog"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -6400,7 +6400,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-core"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "aws-lc-rs",
  "base64 0.23.1",
@@ -6415,7 +6415,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-desktop"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "gtk",
  "k8s-openapi",
@@ -6439,7 +6439,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-embed"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -6447,7 +6447,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-gaps"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "k8s-openapi",
  "serde",
@@ -6458,7 +6458,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-graph"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "k8s-openapi",
  "serde",
@@ -6469,7 +6469,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-http"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "http",
@@ -6486,7 +6486,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-kube"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.23.1",
  "futures-util",
@@ -6512,7 +6512,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-local"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "axum",
  "kube",
@@ -6529,7 +6529,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-model"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "k8s-openapi",
  "serde",
@@ -6540,7 +6540,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-modules"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "k8s-openapi",
  "serde",
@@ -6552,7 +6552,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-plan"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "base64 0.23.1",
  "bcrypt",
@@ -6570,7 +6570,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-telemetry"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "bytes",
  "http",
@@ -6584,7 +6584,7 @@ dependencies = [
 
 [[package]]
 name = "zeabur-ui"
-version = "0.3.0"
+version = "0.3.1"
 dependencies = [
  "axum",
  "brotli-decompressor",
