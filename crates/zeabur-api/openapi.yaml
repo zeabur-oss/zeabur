@@ -796,8 +796,7 @@ paths:
       summary: |-
         Works out what opening a shell on a node, or removing a shell pod, writes, and a token to
         apply it; writes nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do
-        everything everywhere; without a token while `exposed` lists bindings that let others into
-        node shells.
+        everything everywhere.
       operationId: planNodeShell
       requestBody:
         content:
@@ -1270,8 +1269,7 @@ paths:
       summary: |-
         Works out what starting the person's cluster tools pod writes, and a token to apply it; writes
         nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do everything
-        everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over;
-        without a token while `exposed` lists bindings that let others into the pod.
+        everywhere; `400` on the person's own computer, where Zeabur holds no token to hand over.
       operationId: planClusterTools
       responses:
         "200":
@@ -7296,24 +7294,17 @@ components:
         A plan that starts the person's cluster tools pod, or uses the one that still
         runs.
       required:
+      - token
       - expiresAt
       - namespace
       - pod
       - writes
       - warnings
-      - exposed
       properties:
         expiresAt:
           type: string
           format: date-time
           description: When the token stops working.
-        exposed:
-          type: array
-          items:
-            $ref: "#/components/schemas/ShellExposure"
-          description: |-
-            Bindings that let others into the pod, and so to the credential in it; the plan cannot be
-            applied while there is one.
         namespace:
           type: string
           description: The namespace of the pod.
@@ -7321,12 +7312,8 @@ components:
           type: string
           description: The pod it starts, or the one it uses.
         token:
-          type:
-          - string
-          - "null"
-          description: |-
-            Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
-            bindings.
+          type: string
+          description: Send this to `apply` to carry out exactly this plan.
         warnings:
           type: array
           items:
@@ -13068,6 +13055,7 @@ components:
       type: object
       description: A plan that opens a shell on a node or removes a shell pod.
       required:
+      - token
       - expiresAt
       - op
       - node
@@ -13077,7 +13065,6 @@ components:
       - deadlineSeconds
       - firstSessionSeconds
       - writes
-      - exposed
       properties:
         deadlineSeconds:
           type: integer
@@ -13087,13 +13074,6 @@ components:
           type: string
           format: date-time
           description: When the token stops working.
-        exposed:
-          type: array
-          items:
-            $ref: "#/components/schemas/ShellExposure"
-          description: >-
-            Bindings that let others into node shells; the plan cannot be applied while
-            there is one.
         firstSessionSeconds:
           type: integer
           format: int32
@@ -13125,12 +13105,8 @@ components:
           type: string
           description: The pod.
         token:
-          type:
-          - string
-          - "null"
-          description: |-
-            Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
-            bindings.
+          type: string
+          description: Send this to `apply` to carry out exactly this plan.
         writes:
           type: array
           items:
@@ -18486,39 +18462,6 @@ components:
           description: |-
             The address links open at; `None` when neither the server's configuration nor the
             Identity Deployment (where it can be read) names it.
-    ShellExposure:
-      type: object
-      description: |-
-        A binding that lets someone other than cluster administrators create pods in the node shell
-        namespace or run commands in them.
-      required:
-      - kind
-      - name
-      - role
-      - rights
-      - subjects
-      properties:
-        kind:
-          type: string
-          description: "`RoleBinding` or `ClusterRoleBinding`."
-        name:
-          type: string
-          description: Its name.
-        rights:
-          type: array
-          items:
-            type: string
-          description: |-
-            What the role grants: `create pods` (bound in the namespace), `create` or `get` on
-            `pods/exec` and `pods/attach`.
-        role:
-          type: string
-          description: The role it binds, `Role/name` or `ClusterRole/name`.
-        subjects:
-          type: array
-          items:
-            $ref: "#/components/schemas/ShellSubject"
-          description: Who it lets in.
     ShellPhase:
       type: string
       description: How a node shell pod is doing.
@@ -18526,24 +18469,6 @@ components:
       - starting
       - running
       - ended
-    ShellSubject:
-      type: object
-      description: Someone a binding lets into node shells.
-      required:
-      - kind
-      - name
-      properties:
-        kind:
-          type: string
-          description: "`User`, `Group` or `ServiceAccount`."
-        name:
-          type: string
-          description: Its name.
-        namespace:
-          type:
-          - string
-          - "null"
-          description: A service account's namespace.
     ShellWrite:
       type: object
       description: One object a plan writes.

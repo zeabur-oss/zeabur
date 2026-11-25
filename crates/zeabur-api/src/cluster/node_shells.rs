@@ -12,9 +12,7 @@
 //! kube-apiserver first whether the person may do everything everywhere (a
 //! `SelfSubjectAccessReview` of `*` on `*`): anyone else is refused. Opening writes the namespace
 //! (created, or labelled to let privileged pods in, when it has to be), the pod, and an Event about
-//! the node that names who opened it. A plan is refused while an RBAC binding lets anyone but
-//! cluster administrators create pods in the namespace or run commands in them
-//! ([`zeabur_plan::node_shell::exposures`]), and lists those bindings.
+//! the node that names who opened it.
 //!
 //! The terminal opens only for the person who opened the shell (the pod's person label), after a
 //! review of `create` on `pods/exec`. When it closes, Zeabur deletes the pod at once (grace period
@@ -44,7 +42,6 @@ use crate::projects::writes::token_problem;
 
 /// Sealed plans of this module start with this, so no other plan's token opens as one.
 const PREFIX: &str = "s1.";
-const RBAC_GROUP: &str = "rbac.authorization.k8s.io";
 
 /// How a node shell pod is doing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
@@ -141,45 +138,12 @@ pub struct ShellWrite {
     pub yaml: Option<String>,
 }
 
-/// Someone a binding lets into node shells.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ShellSubject {
-    /// `User`, `Group` or `ServiceAccount`.
-    pub kind: String,
-    /// Its name.
-    pub name: String,
-    /// A service account's namespace.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub namespace: Option<String>,
-}
-
-/// A binding that lets someone other than cluster administrators create pods in the node shell
-/// namespace or run commands in them.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
-#[serde(rename_all = "camelCase")]
-pub struct ShellExposure {
-    /// `RoleBinding` or `ClusterRoleBinding`.
-    pub kind: String,
-    /// Its name.
-    pub name: String,
-    /// The role it binds, `Role/name` or `ClusterRole/name`.
-    pub role: String,
-    /// What the role grants: `create pods` (bound in the namespace), `create` or `get` on
-    /// `pods/exec` and `pods/attach`.
-    pub rights: Vec<String>,
-    /// Who it lets in.
-    pub subjects: Vec<ShellSubject>,
-}
-
 /// A plan that opens a shell on a node or removes a shell pod.
 #[derive(Debug, Clone, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct NodeShellPlan {
-    /// Send this to `apply` to carry out exactly this plan; absent while `exposed` lists
-    /// bindings.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub token: Option<String>,
+    /// Send this to `apply` to carry out exactly this plan.
+    pub token: String,
     /// When the token stops working.
     pub expires_at: Timestamp,
     /// `open` or `remove`.
@@ -204,8 +168,6 @@ pub struct NodeShellPlan {
     /// The `kubectl` command that opens the same shell.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub kubectl: Option<String>,
-    /// Bindings that let others into node shells; the plan cannot be applied while there is one.
-    pub exposed: Vec<ShellExposure>,
 }
 
 /// The token of a plan to apply.
@@ -354,7 +316,6 @@ pub(crate) async fn list(Person(cluster): Person) -> Result<Json<NodeShells>, Ap
 struct Opening {
     node_uid: Option<String>,
     namespace: Option<Value>,
-    exposed: Vec<shell::Exposure>,
 }
 
 async fn read_node(cluster: &dyn Cluster, node: &str) -> Result<Value, ApiError> {
@@ -378,67 +339,6 @@ async fn read_node(cluster: &dyn Cluster, node: &str) -> Result<Value, ApiError>
         })
 }
 
-async fn rbac(
-    cluster: &dyn Cluster,
-    resource: &str,
-    kind: &str,
-    namespace: Option<&str>,
-) -> Result<Vec<Value>, ApiError> {
-    let reference = ResourceRef::new(RBAC_GROUP, "v1", resource, kind);
-    let listed = cluster
-        .list_objects(&reference, namespace)
-        .await
-        .map_err(|e| {
-            read_problem(
-                e,
-                &format!("the {resource}"),
-                list_read(RBAC_GROUP, resource, namespace),
-            )
-        })?
-        .unwrap_or_default();
-    Ok(listed
-        .into_iter()
-        .map(|o| {
-            let mut data = value(o);
-            if let Some(object) = data.as_object_mut() {
-                object.insert("kind".to_owned(), Value::from(kind));
-            }
-            data
-        })
-        .collect())
-}
-
-/// The bindings that let others into the pods of `namespace`: node shells.
-pub(crate) async fn exposed(
-    cluster: &dyn Cluster,
-    namespace: &str,
-    namespace_exists: bool,
-) -> Result<Vec<shell::Exposure>, ApiError> {
-    if namespace_exists {
-        exposed_except(cluster, namespace, None).await
-    } else {
-        let bindings = rbac(cluster, "clusterrolebindings", "ClusterRoleBinding", None).await?;
-        let roles = rbac(cluster, "clusterroles", "ClusterRole", None).await?;
-        Ok(shell::exposures(namespace, &bindings, &roles))
-    }
-}
-
-/// [`exposed`] in a namespace that exists, leaving out the user `trusted`: tools pods, with
-/// Zeabur's own service account.
-pub(crate) async fn exposed_except(
-    cluster: &dyn Cluster,
-    namespace: &str,
-    trusted: Option<&str>,
-) -> Result<Vec<shell::Exposure>, ApiError> {
-    let mut bindings = rbac(cluster, "clusterrolebindings", "ClusterRoleBinding", None).await?;
-    let mut roles = rbac(cluster, "clusterroles", "ClusterRole", None).await?;
-    bindings.extend(rbac(cluster, "rolebindings", "RoleBinding", Some(namespace)).await?);
-    roles.extend(rbac(cluster, "roles", "Role", Some(namespace)).await?);
-    Ok(shell::exposures_except(
-        namespace, &bindings, &roles, trusted,
-    ))
-}
-
 async fn opening(cluster: &dyn Cluster, node: &str) -> Result<Opening, ApiError> {
     let found = read_node(cluster, node).await?;
     let namespaces = ResourceRef::new("", "v1", "namespaces", "Namespace");
@@ -453,11 +353,9 @@ async fn opening(cluster: &dyn Cluster, node: &str) -> Result<Opening, ApiError>
             )
         })?
         .map(value);
-    let exposed = exposed(cluster, NAMESPACE, namespace.is_some()).await?;
     Ok(Opening {
         node_uid: text(&found, "/metadata/uid"),
         namespace,
-        exposed,
     })
 }
 
@@ -514,27 +412,6 @@ fn namespace_write(namespace: Option<&Value>) -> Option<(WriteBody, ShellWriteAc
     )
 }
 
-pub(crate) fn exposure_views(exposed: Vec<shell::Exposure>) -> Vec<ShellExposure> {
-    exposed
-        .into_iter()
-        .map(|e| ShellExposure {
-            kind: e.kind,
-            name: e.name,
-            role: e.role,
-            rights: e.rights,
-            subjects: e
-                .subjects
-                .into_iter()
-                .map(|s| ShellSubject {
-                    kind: s.kind,
-                    name: s.name,
-                    namespace: s.namespace,
-                })
-                .collect(),
-        })
-        .collect()
-}
-
 pub(crate) fn plan_key(state: &AppState) -> Result<std::sync::Arc<token::PlanKey>, ApiError> {
     state.plan_key.clone().ok_or_else(|| {
         ApiError::from(Problem::new(
@@ -581,6 +458,7 @@ async fn read_shell(cluster: &dyn Cluster, pod: &str) -> Result<Value, ApiError>
 
 /// What every plan is made with.
 struct Planning<'a> {
+    sealing: &'a token::PlanKey,
     identity: &'a Identity,
     image: &'a str,
     made_at: &'a str,
@@ -591,7 +469,7 @@ async fn plan_open(
     cluster: &dyn Cluster,
     planning: &Planning<'_>,
     node: String,
-) -> Result<(Claims, NodeShellPlan), ApiError> {
+) -> Result<NodeShellPlan, ApiError> {
     let opening = opening(cluster, &node).await?;
     let request = NodeShell {
         node: &node,
@@ -637,8 +515,8 @@ async fn plan_open(
         namespace_version: opening.namespace.as_ref().map(namespace_version),
         expires_at: planning.expires_at.as_second(),
     };
-    let plan = NodeShellPlan {
-        token: None,
+    Ok(NodeShellPlan {
+        token: seal(planning.sealing, PREFIX, &claims)?,
         expires_at: planning.expires_at,
         op: claims.op.clone(),
         kubectl: Some(shell::kubectl_command(&node, planning.image)),
@@ -650,16 +528,14 @@ async fn plan_open(
         deadline_seconds: shell::DEADLINE_SECONDS,
         first_session_seconds: shell::FIRST_SESSION_SECONDS,
         writes,
-        exposed: exposure_views(opening.exposed),
-    };
-    Ok((claims, plan))
+    })
 }
 
 async fn plan_remove(
     cluster: &dyn Cluster,
     planning: &Planning<'_>,
     pod: String,
-) -> Result<(Claims, NodeShellPlan), ApiError> {
+) -> Result<NodeShellPlan, ApiError> {
     let found = read_shell(cluster, &pod).await?;
     let node = text(&found, "/spec/nodeName").unwrap_or_default();
     let claims = Claims {
@@ -674,8 +550,8 @@ async fn plan_remove(
         namespace_version: None,
         expires_at: planning.expires_at.as_second(),
     };
-    let plan = NodeShellPlan {
-        token: None,
+    Ok(NodeShellPlan {
+        token: seal(planning.sealing, PREFIX, &claims)?,
         expires_at: planning.expires_at,
         op: claims.op.clone(),
         node,
@@ -697,15 +573,12 @@ async fn plan_remove(
         deadline_seconds: shell::DEADLINE_SECONDS,
         first_session_seconds: shell::FIRST_SESSION_SECONDS,
         kubectl: None,
-        exposed: Vec::new(),
-    };
-    Ok((claims, plan))
+    })
 }
 
 /// Works out what opening a shell on a node, or removing a shell pod, writes, and a token to
 /// apply it; writes nothing. Refused (`403`, `denied` naming `*` on `*`) unless the person may do
-/// everything everywhere; without a token while `exposed` lists bindings that let others into
-/// node shells.
+/// everything everywhere.
 #[utoipa::path(post, path = "/api/v1/cluster/node-shells/plan", tag = "cluster",
     operation_id = "planNodeShell", request_body = NodeShellPlanRequest,
     responses((status = 200, body = NodeShellPlan),
@@ -724,20 +597,18 @@ pub(crate) async fn plan(
         .map_err(|e| ApiError::from(e.into_problem("your identity")))?;
     let now = (state.clock)();
     let planning = Planning {
+        sealing: &sealing,
         identity: &identity,
         image: &state.settings.terminal.debug_image,
         made_at: &now.to_string(),
         expires_at: token::expiry(now)?,
     };
-    let (claims, mut plan) = match request {
+    let plan = match request {
         NodeShellPlanRequest::Open { node } => plan_open(cluster.as_ref(), &planning, node).await?,
         NodeShellPlanRequest::Remove { pod } => {
             plan_remove(cluster.as_ref(), &planning, pod).await?
         }
     };
-    if plan.exposed.is_empty() {
-        plan.token = Some(seal(&sealing, PREFIX, &claims)?);
-    }
     Ok(Json(plan))
 }
 
@@ -860,20 +731,6 @@ async fn apply_open(
     }
     if opening.namespace.as_ref().map(namespace_version) != claims.namespace_version {
         return Err(moved(&format!("Namespace {NAMESPACE}")));
-    }
-    if !opening.exposed.is_empty() {
-        let names: Vec<String> = opening
-            .exposed
-            .iter()
-            .map(|e| format!("{} {}", e.kind, e.name))
-            .collect();
-        return Err(ApiError::from(Problem::new(
-            Kind::Conflict,
-            format!(
-                "Since the plan was made, {} let others into node shells.",
-                names.join(", ")
-            ),
-        )));
     }
     if claims.image != image {
         return Err(moved("The shell image"));

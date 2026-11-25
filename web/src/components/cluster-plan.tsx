@@ -1,8 +1,7 @@
-// The pieces of a plan dialog: its writes, the bindings that stop it, and a footer that applies
-// the plan until its token runs out.
+// The pieces of a plan dialog: its writes, and a footer that applies the plan until its token
+// runs out.
 import type { UseMutationResult, UseQueryResult } from "@tanstack/react-query"
 import type { ReactNode } from "react"
-import WarningCircleIcon from "~icons/ph/warning-circle"
 
 import type { Schemas } from "@/api/client"
 import { DescribeYaml } from "@/components/describe-yaml"
@@ -13,8 +12,6 @@ import { Problem } from "@/components/problem"
 import { YamlBlock, YamlDiff } from "@/components/yaml"
 import { useT } from "@/i18n"
 import { kindName } from "@/i18n/kind-name"
-import { subjectName } from "@/model/node-shell"
-import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 
 /** A plan dialog: planning, then what the plan does, and a footer that applies it. */
@@ -258,43 +255,5 @@ function WriteSection({
       </span>
       {children}
     </section>
-  )
-}
-
-/** Someone besides cluster administrators could get into the pod: the plan stops here. */
-export function Exposed({
-  namespace,
-  exposed,
-}: {
-  namespace: string
-  exposed: Schemas.ShellExposure[]
-}) {
-  const t = useT()
-  return (
-    <Alert variant="destructive" role="alert">
-      <WarningCircleIcon aria-hidden="true" />
-      <AlertTitle>{t("nodeShell.exposedTitle")}</AlertTitle>
-      <AlertDescription>
-        <p>{t("nodeShell.exposed", namespace)}</p>
-        <ul className="mt-2 flex flex-col gap-2">
-          {exposed.map((binding) => (
-            <li key={`${binding.kind}/${binding.name}`} className="flex flex-col gap-0.5">
-              <span className="font-mono text-xs break-all" translate="no">
-                {`${binding.kind}/${binding.name} → ${binding.role}`}
-              </span>
-              <span className="type-meta">
-                <span translate="no">{binding.rights.join(", ")}</span>
-                {t("common.sep")}
-                <span translate="no">
-                  {binding.subjects
-                    .map((subject) => `${subject.kind} ${subjectName(subject)}`)
-                    .join(", ")}
-                </span>
-              </span>
-            </li>
-          ))}
-        </ul>
-      </AlertDescription>
-    </Alert>
   )
 }

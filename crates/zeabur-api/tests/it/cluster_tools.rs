@@ -18,7 +18,7 @@ mod tests {
     use zeabur_api::Settings;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{DynamicObject, Identity, ServedResource};
+    use zeabur_kube::{Identity, ServedResource};
 
     use crate::common::{app, send};
     use crate::support::TestApi;
@@ -206,19 +206,9 @@ mod tests {
         assert_eq!(tools["available"], false);
     }
 
-    fn rbac(kind: &str, namespace: Option<&str>, body: &Value) -> DynamicObject {
-        let mut object = body.clone();
-        object["apiVersion"] = json!("rbac.authorization.k8s.io/v1");
-        object["kind"] = json!(kind);
-        if let Some(namespace) = namespace {
-            object["metadata"]["namespace"] = json!(namespace);
-        }
-        serde_json::from_value(object).unwrap()
-    }
-
-    /// RBAC served, a Role in the terminal namespace and in `shop` that lets in `pods/exec`, and
-    /// Zeabur's own binding.
-    fn with_exec_roles(cluster: &MemoryCluster) {
+    /// RBAC served, and an operator's service account that may exec into pods in every namespace,
+    /// as CloudNativePG's `cnpg-cloudnative-pg` ClusterRole grants.
+    fn with_operator_exec(cluster: &MemoryCluster) {
         cluster.update(|s| {
             for (plural, kind, namespaced) in [
                 ("clusterroles", "ClusterRole", false),
@@ -234,75 +224,40 @@ mod tests {
                     namespaced,
                 ));
             }
-            s.dynamic.push(rbac(
-                "RoleBinding",
-                Some(NAMESPACE),
-                &json!({"metadata": {"name": "zeabur-terminals"},
-                    "roleRef": {"kind": "Role", "name": "exec"},
-                    "subjects": [{"kind": "ServiceAccount", "name": "zeabur",
-                                  "namespace": "zeabur"}]}),
-            ));
-            for namespace in [NAMESPACE, "shop"] {
-                s.dynamic.push(rbac(
-                    "Role",
-                    Some(namespace),
-                    &json!({"metadata": {"name": "exec"}, "rules": [
-                        {"apiGroups": [""], "resources": ["pods/exec"], "verbs": ["create"]}]}),
-                ));
-                s.dynamic.push(rbac(
-                    "RoleBinding",
-                    Some(namespace),
-                    &json!({"metadata": {"name": "ops-exec"},
-                        "roleRef": {"kind": "Role", "name": "exec"},
-                        "subjects": [{"kind": "Group", "name": "ops"}]}),
-                ));
+            for (kind, body) in [
+                (
+                    "ClusterRole",
+                    json!({"metadata": {"name": "cnpg-cloudnative-pg"}, "rules": [
+                        {"apiGroups": [""], "resources": ["pods/exec"],
+                         "verbs": ["create", "get"]}]}),
+                ),
+                (
+                    "ClusterRoleBinding",
+                    json!({"metadata": {"name": "cnpg-cloudnative-pg"},
+                        "roleRef": {"kind": "ClusterRole", "name": "cnpg-cloudnative-pg"},
+                        "subjects": [{"kind": "ServiceAccount", "name": "cnpg-cloudnative-pg",
+                                      "namespace": "cnpg-system"}]}),
+                ),
+            ] {
+                let mut object = body;
+                object["apiVersion"] = json!("rbac.authorization.k8s.io/v1");
+                object["kind"] = json!(kind);
+                s.dynamic.push(serde_json::from_value(object).unwrap());
             }
         });
     }
 
     #[tokio::test]
-    async fn a_binding_that_lets_others_into_its_namespace_blocks_the_plan() {
+    async fn an_operator_that_may_exec_everywhere_does_not_keep_the_terminal_closed() {
         let cluster = cluster();
-        with_exec_roles(&cluster);
+        with_operator_exec(&cluster);
         let zeabur = zeabur();
         let app = signed(&cluster, &zeabur);
         let (status, planned) = plan(&app).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
-        assert_eq!(planned.get("token"), None);
-        assert_eq!(
-            planned["exposed"],
-            json!([{"kind": "RoleBinding", "name": "ops-exec", "role": "Role/exec",
-                    "rights": ["create pods/exec"],
-                    "subjects": [{"kind": "Group", "name": "ops"}]}])
-        );
-
-        cluster.update(|s| {
-            s.dynamic.retain(|o| {
-                !(o.metadata.name.as_deref() == Some("ops-exec")
-                    && o.metadata.namespace.as_deref() == Some(NAMESPACE))
-            });
-        });
-        let (_, planned) = plan(&app).await;
-        assert_eq!(
-            planned["exposed"],
-            json!([]),
-            "a binding in shop does not count"
-        );
-        assert!(planned["token"].is_string(), "{planned}");
-
-        cluster.update(|s| {
-            s.dynamic.push(rbac(
-                "RoleBinding",
-                Some(NAMESPACE),
-                &json!({"metadata": {"name": "late"},
-                    "roleRef": {"kind": "Role", "name": "exec"},
-                    "subjects": [{"kind": "User", "name": "zeabur:bob"}]}),
-            ));
-        });
-        let (status, refused) = apply(&app, &planned).await;
-        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
-        assert_eq!(refused["kind"], "conflict", "{refused}");
-        assert_eq!(stored(&zeabur, NAMESPACE), Vec::<Value>::new());
+        let (status, applied) = apply(&app, &planned).await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        assert_eq!(stored(&zeabur, NAMESPACE).len(), 1);
     }
 
     #[tokio::test]

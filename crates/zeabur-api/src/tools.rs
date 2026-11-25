@@ -47,10 +47,10 @@
 //!
 //! # Who else can use the token
 //!
-//! Whoever may run commands in pods of the terminal namespace: Zeabur's service account and
-//! cluster administrators; and a node's administrator, who can read its memory. They could act as
-//! the person until the token expires. A plan for a cluster tools pod has no token while a
-//! binding lets anyone else into the namespace (see `cluster::tools`).
+//! Whoever may run commands in pods of the terminal namespace: Zeabur's service account, cluster
+//! administrators, and any other subject a binding lets do so there or in every namespace; and a
+//! node's administrator, who can read its memory. They could act as the person until the token
+//! expires.
 
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

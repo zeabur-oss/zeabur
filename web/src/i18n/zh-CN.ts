@@ -919,9 +919,6 @@ export const zhCN: Messages = {
   "nodeShell.lasts": (minutes) => `关闭终端时会移除终端副本，最多保留 ${minutes} 分钟。`,
   "nodeShell.firstSession": (minutes) => `${minutes} 分钟内没有终端连上，副本会自行结束。`,
   "nodeShell.recorded": "节点会记下一条事件，写明是谁在什么时候打开的。",
-  "nodeShell.exposedTitle": "其他人也能进入这个终端",
-  "nodeShell.exposed": (namespace) =>
-    `下列角色绑定让集群管理员以外的人也能在 ${namespace} 创建副本或打开终端。移除之后再重新检查。`,
   "nodeShell.kubectl": "用 kubectl 做同样的事",
   "nodeShell.write.create": "新增",
   "nodeShell.write.patch": "修改",

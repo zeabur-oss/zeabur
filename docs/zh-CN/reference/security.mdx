@@ -221,7 +221,7 @@ Zeabur 开源版在临时的 tools 副本中提供 `kubectl` 和 `helm`，使用
 所有 tools 副本都位于 chart 创建的 `zeabur-terminals` Namespace（`terminal.namespace`），kubectl 默认使用打开终端时所在的项目。Zeabur 开源版先请求 kube-apiserver 确认你有权在项目的容器中运行命令（整个集群的终端则要求你是集群管理员），再用 Zeabur 开源版自身的 ServiceAccount 创建副本并打开终端。
 
 <Callout type="warn">
-在令牌到期前，只有 Zeabur 开源版本身、集群管理员，以及副本所在节点的管理员能读取这份 kubeconfig。不要把 `zeabur-terminals` 的权限授予其他人。
+在令牌到期前，Zeabur 开源版本身、集群管理员、副本所在节点的管理员，以及角色绑定允许在所有 Namespace 的副本中运行命令的账号（例如部分 operator 的 ServiceAccount）都能读取这份 kubeconfig。不要把 `zeabur-terminals` 的权限授予其他人。
 </Callout>
 
 tools 副本默认最多运行 30 分钟。最后一个终端关闭时，Zeabur 开源版立即删除 kubeconfig，60 秒后删除副本。
@@ -230,7 +230,7 @@ tools 副本默认最多运行 30 分钟。最后一个终端关闭时，Zeabur 
 
 **节点终端**使用 privileged 副本、host PID／network／IPC 和 `nsenter` 进入主机，获得完整的 root 权限。在其中执行的操作不会经过**检查变更**。
 
-节点终端仅供集群管理员使用，副本位于专用的 privileged Namespace。只要有 RBAC binding 允许管理员和 Kubernetes 组件以外的身份在那里创建副本或运行命令，Zeabur 开源版就会拒绝打开。每次打开都会在节点上记录一条事件，通过 `kubectl describe node` 可以看到谁在什么时间打开过。终端关闭时，Zeabur 开源版会删除副本。
+节点终端仅供集群管理员使用，副本位于专用的 privileged Namespace。角色绑定允许在所有 Namespace 的副本中运行命令的账号（例如 CloudNativePG 的 operator）也能进入。Zeabur 开源版仍会打开终端：这类账号本来就能在集群中的每个副本运行命令，拒绝打开也起不了多少保护作用。每次打开都会在节点上记录一条事件，通过 `kubectl describe node` 可以看到谁在什么时间打开过。终端关闭时，Zeabur 开源版会删除副本。
 
 ## 指标与历史日志
 

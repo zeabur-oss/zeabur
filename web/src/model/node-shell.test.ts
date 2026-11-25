@@ -1,14 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import {
-  enters,
-  nodeShellUrl,
-  shellHealth,
-  shellsOn,
-  shellWord,
-  subjectName,
-} from "@/model/node-shell"
+import { enters, nodeShellUrl, shellHealth, shellsOn, shellWord } from "@/model/node-shell"
 
 const shell = (patch: Partial<Schemas.NodeShellView>): Schemas.NodeShellView => ({
   name: "zeabur-node-shell-vps-1-a1b2c3",
@@ -44,10 +37,8 @@ describe("node shells", () => {
     expect(enters(shell({ phase: "ended" }))).toBe(false)
   })
 
-  test("a node's shells, and subjects by namespace", () => {
+  test("a node's shells", () => {
     const list = [shell({}), shell({ name: "other", node: "vps-2" })]
     expect(shellsOn(list, "vps-2").map((s) => s.name)).toStrictEqual(["other"])
-    expect(subjectName({ kind: "ServiceAccount", name: "ci", namespace: "build" })).toBe("build/ci")
-    expect(subjectName({ kind: "User", name: "alice" })).toBe("alice")
   })
 })

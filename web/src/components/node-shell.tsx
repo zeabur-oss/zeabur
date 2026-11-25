@@ -15,7 +15,7 @@ import {
   type NodeShellRequest,
 } from "@/api/node-shells"
 import { Ago, CopyButton } from "@/components/bits"
-import { Exposed, PlanFrame, PlanWrites } from "@/components/cluster-plan"
+import { PlanFrame, PlanWrites } from "@/components/cluster-plan"
 import { useClusterAdmin } from "@/components/gate"
 import { Consequence } from "@/components/members/frame"
 import { StatusDot } from "@/components/status"
@@ -189,9 +189,6 @@ function OpenPlan({ plan }: { plan: NodeShellPlan }) {
         <li>{t("nodeShell.firstSession", minutes(plan.firstSessionSeconds))}</li>
         <li>{t("nodeShell.recorded")}</li>
       </ul>
-      {plan.exposed.length > 0 ? (
-        <Exposed namespace={plan.namespace} exposed={plan.exposed} />
-      ) : null}
       <PlanWrites writes={plan.writes} />
       {plan.kubectl ? (
         <Collapsible>

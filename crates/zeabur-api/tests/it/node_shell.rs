@@ -17,7 +17,7 @@ mod tests {
     use tokio_tungstenite::tungstenite::client::IntoClientRequest as _;
     use tokio_tungstenite::{MaybeTlsStream, WebSocketStream};
     use zeabur_kube::memory::{MemoryCluster, State};
-    use zeabur_kube::{DynamicObject, Identity, ServedResource, WriteBody};
+    use zeabur_kube::{Identity, ServedResource, WriteBody};
 
     use crate::common::{app, send};
 
@@ -120,7 +120,6 @@ mod tests {
         assert_eq!(planned["deadlineSeconds"], 1800);
         assert_eq!(planned["firstSessionSeconds"], 120);
         assert_eq!(planned["person"], PERSON);
-        assert_eq!(planned["exposed"], json!([]));
         assert!(
             planned["kubectl"]
                 .as_str()
@@ -199,19 +198,9 @@ mod tests {
         assert_eq!(status, StatusCode::NOT_FOUND);
     }
 
-    fn rbac(kind: &str, namespace: Option<&str>, body: &Value) -> DynamicObject {
-        let mut object = body.clone();
-        object["apiVersion"] = json!("rbac.authorization.k8s.io/v1");
-        object["kind"] = json!(kind);
-        if let Some(namespace) = namespace {
-            object["metadata"]["namespace"] = json!(namespace);
-        }
-        serde_json::from_value(object).unwrap()
-    }
-
-    #[tokio::test]
-    async fn a_binding_that_lets_others_create_or_enter_pods_there_blocks_the_plan() {
-        let cluster = cluster();
+    /// RBAC served, and an operator's service account that may exec into pods in every namespace,
+    /// as CloudNativePG's `cnpg-cloudnative-pg` ClusterRole grants.
+    fn with_operator_exec(cluster: &MemoryCluster) {
         cluster.update(|s| {
             for (plural, kind, namespaced) in [
                 ("clusterroles", "ClusterRole", false),
@@ -227,53 +216,36 @@ mod tests {
                     namespaced,
                 ));
             }
-            s.dynamic = vec![
-                rbac(
+            for (kind, body) in [
+                (
                     "ClusterRole",
-                    None,
-                    &json!({"metadata": {"name": "edit"}, "rules": [
-                    {"apiGroups": [""], "resources": ["pods", "pods/exec"],
-                     "verbs": ["create"]}]}),
+                    json!({"metadata": {"name": "cnpg-cloudnative-pg"}, "rules": [
+                        {"apiGroups": [""], "resources": ["pods/exec"],
+                         "verbs": ["create", "get"]}]}),
                 ),
-                rbac(
+                (
                     "ClusterRoleBinding",
-                    None,
-                    &json!({"metadata": {"name": "ops-edit"},
-                    "roleRef": {"kind": "ClusterRole", "name": "edit"},
-                    "subjects": [{"kind": "Group", "name": "ops"}]}),
+                    json!({"metadata": {"name": "cnpg-cloudnative-pg"},
+                        "roleRef": {"kind": "ClusterRole", "name": "cnpg-cloudnative-pg"},
+                        "subjects": [{"kind": "ServiceAccount", "name": "cnpg-cloudnative-pg",
+                                      "namespace": "cnpg-system"}]}),
                 ),
-            ];
+            ] {
+                let mut object = body;
+                object["apiVersion"] = json!("rbac.authorization.k8s.io/v1");
+                object["kind"] = json!(kind);
+                s.dynamic.push(serde_json::from_value(object).unwrap());
+            }
         });
-        let app = app(&cluster);
-        let (status, planned) = plan(&app, &json!({"op": "open", "node": "vps-1"})).await;
-        assert_eq!(status, StatusCode::OK, "{planned}");
-        assert_eq!(planned.get("token"), None);
-        assert_eq!(
-            planned["exposed"],
-            json!([{"kind": "ClusterRoleBinding", "name": "ops-edit",
-                    "role": "ClusterRole/edit",
-                    "rights": ["create pods/exec"],
-                    "subjects": [{"kind": "Group", "name": "ops"}]}])
-        );
+    }
 
-        cluster.update(|s| {
-            s.dynamic
-                .retain(|o| o.metadata.name.as_deref() != Some("ops-edit"));
-        });
-        let (_, planned) = plan(&app, &json!({"op": "open", "node": "vps-1"})).await;
-        assert!(planned["token"].is_string(), "{planned}");
-        cluster.update(|s| {
-            s.dynamic.push(rbac(
-                "ClusterRoleBinding",
-                None,
-                &json!({"metadata": {"name": "late"},
-                "roleRef": {"kind": "ClusterRole", "name": "edit"},
-                "subjects": [{"kind": "User", "name": "zeabur:bob"}]}),
-            ));
-        });
-        let (status, refused) = apply(&app, &planned).await;
-        assert_eq!(status, StatusCode::CONFLICT, "{refused}");
-        assert!(cluster.inspect(|s| s.writes.is_empty()).unwrap());
+    #[tokio::test]
+    async fn an_operator_that_may_exec_everywhere_does_not_keep_the_shell_closed() {
+        let cluster = cluster();
+        with_operator_exec(&cluster);
+        let app = app(&cluster);
+        let (_, applied) = opened(&app).await;
+        assert!(pod_of(&cluster, applied["pod"].as_str().unwrap()).is_some());
     }
 
     #[tokio::test]
