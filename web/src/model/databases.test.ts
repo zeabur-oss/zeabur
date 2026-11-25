@@ -39,6 +39,8 @@ import {
   reshapeDatabase,
   sizePresets,
   operatorName,
+  creatable,
+  asksForBackups,
   rseqNote,
   shellCommand,
   shellPod,
@@ -471,6 +473,21 @@ describe("operator names", () => {
       ({ engine: "mongodb", module, state: "refused" }) as Schemas.DatabaseOperator
     expect(operatorName(operator("percona-server-mongodb"))).toBe("MongoDB")
     expect(operatorName(operator("mongodb-kubernetes"))).toBe("MongoDB Controllers for Kubernetes")
+  })
+
+  test("leave an operator whose databases Zeabur only shows out of creating", () => {
+    const operators = [
+      { engine: "mongodb", module: "mongodb-kubernetes", state: "installed", readOnly: true },
+      { engine: "mongodb", module: "percona-server-mongodb", state: "not-installed" },
+    ] as Schemas.DatabaseOperator[]
+    expect(creatable(operators).map((o) => o.module)).toEqual(["percona-server-mongodb"])
+  })
+})
+
+describe("asking for backups", () => {
+  test("happens only for a database Zeabur can back up", () => {
+    expect(asksForBackups(mongo)).toBe(true)
+    expect(asksForBackups(community)).toBe(false)
   })
 })
 

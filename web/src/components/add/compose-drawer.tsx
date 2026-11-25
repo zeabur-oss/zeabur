@@ -31,7 +31,7 @@ import {
   type KeptReason,
   type Managed,
 } from "@/model/compose"
-import { engineName } from "@/model/databases"
+import { creatable, engineName } from "@/model/databases"
 import {
   hostProblem,
   imageOptions,
@@ -62,7 +62,7 @@ function useComposeContext(project: string) {
   const mayCreate = (engine: Managed) => (engine === "objectStorage" ? objectStorage : databases)
   const taken = useTakenNames(project)
   const states: Partial<Record<Managed, (typeof operators)[number]["state"]>> = {}
-  for (const o of operators) if (!o.readOnly) states[o.engine] = o.state
+  for (const o of creatable(operators)) states[o.engine] = o.state
   if (store) states.objectStorage = store
   return { domains, options, nodes, states, mayCreate, taken }
 }

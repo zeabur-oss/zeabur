@@ -702,6 +702,15 @@ export type BackupEngine = Exclude<Engine, "dragonfly">
 
 export const backsUp = (engine: Engine): engine is BackupEngine => engine !== "dragonfly"
 
+/** Whether the page asks to set up backups: Zeabur backs up the engine, the database is not one
+ * Zeabur only shows, and no backup store is in use yet. */
+export const asksForBackups = (database: Database) =>
+  backsUp(database.engine) && !database.readOnly && !database.backups.store?.inUse
+
+/** The operators Zeabur creates databases with: not those whose databases it only shows. */
+export const creatable = (operators: Schemas.DatabaseOperator[]) =>
+  operators.filter((o) => !o.readOnly)
+
 /** The database's engine, for a database that `backsUp`. */
 export const backupEngine = (database: Database) => database.engine as BackupEngine
 

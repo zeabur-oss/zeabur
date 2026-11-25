@@ -30,6 +30,7 @@ import {
   memberChoices,
   nameProblem,
   newDatabase,
+  creatable,
   operatorName,
   presetResources,
   sizePresets,
@@ -46,7 +47,9 @@ export const useDatabases = (project: string) => useQuery(databasesQuery(project
 
 /** Engines whose operator is installed and readable, and which Zeabur creates databases of. */
 export const installedEngines = (data: Schemas.ProjectDatabases) =>
-  data.operators.filter((o) => o.state === "installed" && !o.readOnly).map((o) => o.engine)
+  creatable(data.operators)
+    .filter((o) => o.state === "installed")
+    .map((o) => o.engine)
 
 export function DatabaseState({
   database,

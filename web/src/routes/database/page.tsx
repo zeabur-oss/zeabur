@@ -67,6 +67,7 @@ import {
   daysOf,
   engineName,
   eventsOf,
+  asksForBackups,
   backupNames,
   exportTool,
   exportUrl,
@@ -87,6 +88,7 @@ import {
   type BackupTarget,
   type Database,
 } from "@/model/databases"
+import type { Gate } from "@/model/rights"
 import type { Event, Health } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
 import { FormButtons } from "@/routes/cluster/section"
@@ -274,18 +276,12 @@ function Body({
               <TerminalWindowIcon aria-hidden="true" />
             </Button>
           </GateTip>
-          {database.readOnly ? (
-            <StoreMenu copy={`${database.resource}/${database.name}`} />
-          ) : (
-            <StoreMenu
-              copy={`${database.resource}/${database.name}`}
-              deleteGate={gates("changeDatabases")}
-              deleteLabel={t("db.delete")}
-              onDelete={() => void planDelete()}
-            >
-              <ExportItem project={project} database={database} />
-            </StoreMenu>
-          )}
+          <DatabaseMenu
+            project={project}
+            database={database}
+            deleteGate={gates("changeDatabases")}
+            onDelete={() => void planDelete()}
+          />
         </>
       }
     >
@@ -511,6 +507,28 @@ function Overview({
   )
 }
 
+/** The page's menu. A database Zeabur only shows can be copied, but not deleted or exported. */
+function DatabaseMenu({
+  project,
+  database,
+  deleteGate,
+  onDelete,
+}: {
+  project: string
+  database: Database
+  deleteGate: Gate
+  onDelete: () => void
+}) {
+  const t = useT()
+  const copy = `${database.resource}/${database.name}`
+  if (database.readOnly) return <StoreMenu copy={copy} />
+  return (
+    <StoreMenu copy={copy} deleteGate={deleteGate} deleteLabel={t("db.delete")} onDelete={onDelete}>
+      <ExportItem project={project} database={database} />
+    </StoreMenu>
+  )
+}
+
 /** Warnings about this database and the services under it. */
 function Cautions({ project, database }: { project: string; database: Database }) {
   const t = useT()
@@ -521,14 +539,7 @@ function Cautions({ project, database }: { project: string; database: Database }
       {database.members === 1 ? (
         <Alert variant="warn">
           <WarningIcon aria-hidden="true" />
-          <AlertDescription>
-            {t(
-              "db.noRedundancy",
-              !backsUp(database.engine) ||
-                Boolean(database.readOnly) ||
-                Boolean(database.backups.store?.inUse),
-            )}
-          </AlertDescription>
+          <AlertDescription>{t("db.noRedundancy", !asksForBackups(database))}</AlertDescription>
         </Alert>
       ) : null}
       {troubled ? (
