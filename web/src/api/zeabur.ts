@@ -4093,7 +4093,8 @@ export const StepState = {
 } as const
 
 /**
- * One health check of the catalog, run once every step is ready.
+ * One health check of the catalog, run once the component's steps are ready. The steps of the
+ * components after it wait for it.
  */
 export type ComponentCheck = {
   /** What to do when it does not pass in time. */
