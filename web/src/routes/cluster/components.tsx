@@ -251,6 +251,17 @@ const summaryOf = (component: Schemas.Component, locale: Locale) =>
 const installationOf = (capability: Schemas.Capability, component: Schemas.Component) =>
   capability.installations.find((i) => i.component === component.id)
 
+/** Installed only once Zeabur has started every step; otherwise the catalogue's suggestion. */
+const stateOf = (
+  installation: Schemas.Installation | undefined,
+  suggestion: Schemas.Capability["suggestion"],
+) =>
+  installation?.unstarted?.length
+    ? "incomplete"
+    : installation
+      ? "installed"
+      : (suggestion ?? "optional")
+
 /** Install when nothing is installed, manage what Zeabur may have installed; nothing for a
  * component K3s, RKE2 or Helm manages. The dialog's plan decides between installing and removing. */
 const buttonOf = (installation: Schemas.Installation | undefined) =>
@@ -351,9 +362,8 @@ function ComponentCard({
   const CapIcon = icons[capability.name] ?? HardDrivesIcon
   const isDown = useDown()
   const installation = installationOf(capability, component)
-  const installed = installation !== undefined
-  const down = installed && isDown(capability.name, component.id)
-  const state = down ? "down" : installed ? "installed" : (capability.suggestion ?? "optional")
+  const down = installation !== undefined && isDown(capability.name, component.id)
+  const state = down ? "down" : stateOf(installation, capability.suggestion)
   return (
     <article className="flex w-full flex-col gap-3 rounded-xl border border-v2-border bg-card p-4 transition-colors hover:border-foreground/20">
       <div className="flex items-start gap-3">
@@ -369,6 +379,7 @@ function ComponentCard({
       <p className="line-clamp-3 type-body leading-normal text-muted-foreground">
         {summaryOf(component, locale)}
       </p>
+      <UnstartedNote installation={installation} />
       {installation?.packagedChart ? (
         <PackagedNote by={t(sourceKey[installation.source])} chart={installation.packagedChart} />
       ) : null}
@@ -394,6 +405,17 @@ function ComponentCard({
         />
       </div>
     </article>
+  )
+}
+
+/** The steps Zeabur has not started, when there are any. */
+function UnstartedNote({ installation }: { installation: Schemas.Installation | undefined }) {
+  const t = useT()
+  if (!installation?.unstarted?.length) return null
+  return (
+    <p className="type-meta text-warn-strong">
+      {t("components.unstarted", t("common.list", installation.unstarted))}
+    </p>
   )
 }
 
@@ -465,6 +487,12 @@ function StateChip({ state, evidence }: { state: string; evidence: string[] }) {
     return (
       <StatusPill health="fail" size="sm" className="shrink-0">
         {t("status.failing")}
+      </StatusPill>
+    )
+  if (state === "incomplete")
+    return (
+      <StatusPill health="warn" size="sm" className="shrink-0">
+        {t("components.incomplete")}
       </StatusPill>
     )
   if (state === "installed")
@@ -605,6 +633,10 @@ function InstalledSection() {
                   {isDown(capability, i.component) ? (
                     <StatusPill health="fail" size="sm">
                       {t("status.failing")}
+                    </StatusPill>
+                  ) : i.unstarted?.length ? (
+                    <StatusPill health="warn" size="sm">
+                      {t("components.incomplete")}
                     </StatusPill>
                   ) : null}
                   <UpgradeTag installation={i} />

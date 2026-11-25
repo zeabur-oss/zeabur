@@ -110,6 +110,10 @@ pub struct Installation {
     /// the version is not known.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub upgrade: Option<ComponentUpgrade>,
+    /// The steps Zeabur has not started, by release name: until none is left, the component is
+    /// not installed.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub unstarted: Vec<String>,
 }
 
 /// Charts k3s packages and upgrades itself, by catalogue id.
@@ -169,6 +173,7 @@ pub fn installation(
         packaged_chart: None,
         tested: component.tested_version.clone(),
         upgrade: None,
+        unstarted: Vec::new(),
     };
     if let Some(key) = crate::engine::written(facts)
         .into_iter()

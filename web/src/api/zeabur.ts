@@ -1266,6 +1266,11 @@ export type Installation = {
    * @nullable
    */
   tested?: string | null
+  /**
+   * The steps Zeabur has not started, by release name: until none is left, the component is
+   * not installed.
+   */
+  unstarted?: string[]
   upgrade?: ComponentUpgrade | null
   /**
    * The installed chart version, when it can be read.

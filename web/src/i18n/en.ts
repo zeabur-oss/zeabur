@@ -1205,6 +1205,8 @@ export const en = {
   "components.gitopsHow":
     "Managing the cluster with Flux or Argo CD? Print the component's manifests instead, and commit them to the repository the cluster reads.",
   "components.manage": "Manage",
+  "components.incomplete": "Incomplete",
+  "components.unstarted": (steps: string) => `${steps} has not started. Manage installs it.`,
   "components.installing": "Installing…",
   "components.removing": "Removing…",
   "components.installed": "Installed, and every health check passes.",

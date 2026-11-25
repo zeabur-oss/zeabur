@@ -1416,6 +1416,37 @@ pub fn written(facts: &ClusterFacts) -> BTreeMap<String, String> {
         .collect()
 }
 
+/// The steps of the component that have not started: its chart releases with no `HelmChart`
+/// Zeabur wrote for them.
+///
+/// A release whose `skipIfPresent` CRDs all exist is left out, as the install leaves it out.
+#[must_use]
+pub fn unstarted(file: &ComponentFile, facts: &ClusterFacts) -> Vec<String> {
+    let started: BTreeSet<&str> = facts
+        .k3s_helm_chart_labels
+        .values()
+        .filter(|labels| {
+            labels
+                .get(MANAGED_BY)
+                .is_some_and(|m| m == MANAGED_BY_ZEABUR)
+                && labels.get(COMPONENT).is_some_and(|c| *c == file.id)
+        })
+        .filter_map(|labels| labels.get(RELEASE).map(String::as_str))
+        .collect();
+    file.declaration
+        .releases
+        .iter()
+        .filter(|r| r.helm().is_some())
+        .filter(|r| {
+            let skip = r.skip_if_present();
+            skip.is_empty() || !skip.iter().all(|crd| facts.crds.contains(crd))
+        })
+        .filter_map(Release::name)
+        .filter(|name| !started.contains(name))
+        .map(str::to_owned)
+        .collect()
+}
+
 /// The installed components that need `id`, which keep it from being removed. An installed
 /// component whose file does not read may need it too, so it also keeps `id`.
 #[must_use]

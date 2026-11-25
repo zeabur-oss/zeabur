@@ -1474,4 +1474,52 @@ mod tests {
         let (_, plan) = call(&app, "plan", "remove", "").await;
         assert_eq!(states(&plan), ["issuers pending", "cert-manager pending"]);
     }
+
+    /// A HelmChart Zeabur wrote for `release` of cloudnative-pg.
+    fn cnpg_chart(cluster: &MemoryCluster, name: &str, release: &str) {
+        cluster.update(|s| {
+            s.facts.k3s_helm_chart_labels.insert(
+                format!("kube-system/{name}"),
+                [
+                    ("app.kubernetes.io/managed-by", "zeabur"),
+                    ("catalog.zeabur.com/component", "cloudnative-pg"),
+                    ("catalog.zeabur.com/release", release),
+                ]
+                .map(|(k, v)| (k.to_owned(), v.to_owned()))
+                .into(),
+            );
+        });
+    }
+
+    async fn cnpg_installation(app: &Router) -> Value {
+        let (status, list) = send(app, "GET", "/api/v1/cluster/capabilities", None).await;
+        assert_eq!(status, StatusCode::OK, "{list}");
+        list["items"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .flat_map(|c| c["installations"].as_array().unwrap())
+            .find(|i| i["component"] == "cloudnative-pg")
+            .cloned()
+            .unwrap()
+    }
+
+    #[tokio::test]
+    async fn a_component_with_a_step_not_started_is_not_installed() {
+        let cluster = cluster();
+        let app = app(&cluster, false);
+        cluster.update(|s| {
+            s.facts
+                .crds
+                .insert("clusters.postgresql.cnpg.io".to_owned());
+        });
+        cnpg_chart(&cluster, "cnpg", "cloudnative-pg");
+        let installation = cnpg_installation(&app).await;
+        assert_eq!(installation["source"], "zeabur");
+        assert_eq!(installation["unstarted"], json!(["plugin-barman-cloud"]));
+
+        cnpg_chart(&cluster, "plugin-barman-cloud", "plugin-barman-cloud");
+        let installation = cnpg_installation(&app).await;
+        assert_eq!(installation.get("unstarted"), None, "{installation}");
+    }
 }

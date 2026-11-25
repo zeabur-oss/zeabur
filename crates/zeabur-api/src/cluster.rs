@@ -232,6 +232,13 @@ pub(crate) async fn capabilities(
             component.unsupported =
                 zeabur_catalog::engine::unsupported_in(&snapshot, &component.id);
         }
+        for installation in capabilities.iter_mut().flat_map(|c| &mut c.installations) {
+            if installation.source == zeabur_catalog::InstallSource::Zeabur
+                && let Some(file) = snapshot.components.get(&installation.component)
+            {
+                installation.unstarted = zeabur_catalog::engine::unstarted(file, &facts);
+            }
+        }
     }
     let installed = capabilities.iter().filter(|c| c.existing).count();
     let recommended = capabilities
