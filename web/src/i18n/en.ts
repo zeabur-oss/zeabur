@@ -3969,6 +3969,7 @@ export const en = {
     "Zeabur Builder then builds the repository instead of an uploaded folder, and each new build goes live.",
   "gitSource.open": "Connect Git",
   "gitSource.container": "Container",
+  "gitSource.done": "Done",
   "stopBuilding.action": "Stop building from source",
   "stopBuilding.note": (service: string) =>
     `${service} keeps running its current image and stops updating when you push. Images already in the registry stay.`,

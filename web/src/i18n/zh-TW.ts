@@ -3622,6 +3622,7 @@ export const zhTW: Messages = {
     "連結後，Zeabur Builder 會改用儲存庫建置，不再用上傳的資料夾，每次建置完成就會上線。",
   "gitSource.open": "連結 Git",
   "gitSource.container": "容器",
+  "gitSource.done": "完成",
   "stopBuilding.action": "停止從原始程式碼建置",
   "stopBuilding.note": (service) =>
     `${service} 會繼續執行目前的映像檔，推送後不再自動更新。映像檔倉庫裡已有的映像檔會留著。`,

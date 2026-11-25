@@ -35,15 +35,18 @@ export function GitSourceForm({
   service,
   upload,
   secrets,
+  open,
+  onOpenChange: setOpen,
 }: {
   project: string
   service: Service
   upload?: Build
   secrets: boolean
+  open: boolean
+  onOpenChange: (open: boolean) => void
 }) {
   const t = useT()
   const choice = useGitChoice(project)
-  const [open, setOpen] = useState(false)
   const why = choice.gate.open && !choice.open ? gitEntry(choice, "git", t).why : undefined
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-5">
@@ -137,12 +140,19 @@ function Connect({
 
   if (applied)
     return (
-      <AddDeployKey
-        applying={false}
-        reveal={reveal}
-        host={git.keyHost}
-        page={git.repo && deployKeyPage(git.repo)}
-      />
+      <>
+        <AddDeployKey
+          applying={false}
+          reveal={reveal}
+          host={git.keyHost}
+          page={git.repo && deployKeyPage(git.repo)}
+        />
+        <div className="flex justify-end">
+          <Button type="button" size="sm" onClick={onClose}>
+            {t("gitSource.done")}
+          </Button>
+        </div>
+      </>
     )
 
   return (

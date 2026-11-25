@@ -3612,6 +3612,7 @@ export const zhCN: Messages = {
     "连接后，Zeabur Builder 会改用仓库构建，不再用上传的文件夹，每次构建完成就会上线。",
   "gitSource.open": "连接 Git",
   "gitSource.container": "容器",
+  "gitSource.done": "完成",
   "stopBuilding.action": "停止从源代码构建",
   "stopBuilding.note": (service) =>
     `${service} 会继续运行当前的镜像，推送后不再自动更新。镜像仓库里已有的镜像会保留。`,

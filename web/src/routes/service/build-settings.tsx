@@ -42,6 +42,8 @@ export function BuildSection({
   // An uploaded folder's Build can read a repository instead; a Build from Git already does.
   const fromGit = builds.some((b) => !b.archive)
   const upload = builds.find((b) => b.archive)
+  // Stays open after the apply turns the service into a Git one, to show its deploy key.
+  const [connecting, setConnecting] = useState(false)
   return (
     <section aria-labelledby="build-title" className="flex flex-col gap-3">
       <SectionHeader
@@ -70,9 +72,16 @@ export function BuildSection({
           }
         />
       ))}
-      {fromGit || builds.length > 1 ? null : (
-        <GitSourceForm project={project} service={service} upload={upload} secrets={secrets} />
-      )}
+      {connecting || (!fromGit && builds.length <= 1) ? (
+        <GitSourceForm
+          project={project}
+          service={service}
+          upload={upload}
+          secrets={secrets}
+          open={connecting}
+          onOpenChange={setConnecting}
+        />
+      ) : null}
     </section>
   )
 }
