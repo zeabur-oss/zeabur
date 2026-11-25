@@ -54,13 +54,6 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
         "values.json",
         &values(install.zeabur_image, install.proxy_image).to_string(),
     )?;
-    if needs_dependency_build(install.chart) {
-        dev.cmd("helm")
-            .args(["dependency", "build"])
-            .arg(install.chart)
-            .quiet()
-            .map_err(|e| format!("fetching Zeabur Identity's chart: {e}"))?;
-    }
     dev.cmd("helm")
         .args(["upgrade", "--install", "zeabur"])
         .arg(install.chart)
@@ -81,6 +74,18 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
     }
     dev.write("profile", &format!("{}\n", install.profile.name()))?;
     summary(dev)
+}
+
+/// Fetches the chart's dependency, Zeabur Identity's chart, when `chart` needs it.
+pub(crate) fn dependencies(dev: &DevCluster, chart: &Path) -> Result<(), String> {
+    if !needs_dependency_build(chart) {
+        return Ok(());
+    }
+    dev.cmd("helm")
+        .args(["dependency", "build"])
+        .arg(chart)
+        .quiet()
+        .map_err(|e| format!("fetching Zeabur Identity's chart: {e}"))
 }
 
 /// Whether `helm dependency build` must fetch Zeabur Identity's chart: only for an unpacked chart

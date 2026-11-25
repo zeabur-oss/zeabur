@@ -1,7 +1,7 @@
 //! The full profile: the components Zeabur works with, and Zeabur Builder from source.
 
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::time::Duration;
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
@@ -13,9 +13,53 @@ use crate::process::wait_for;
 
 const BUILDER_IMAGES: [&str; 3] = ["builder", "builder-job", "builder-railpack"];
 
-/// Installs the full profile's components; `builder_src` is a working tree of Zeabur Builder,
-/// or `None` for the pinned commit.
-pub(crate) fn install(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
+/// The full profile's components, downloaded and built.
+#[derive(Debug)]
+pub(crate) struct Prepared {
+    operators: Vec<catalog::Script>,
+    zot: catalog::Script,
+    builder: Builder,
+}
+
+/// Zeabur Builder's images, tagged for the cluster's registry, and its chart.
+#[derive(Debug)]
+struct Builder {
+    images: Vec<String>,
+    tag: String,
+    chart: PathBuf,
+}
+
+/// Downloads the full profile's charts and builds Zeabur Builder; `builder_src` is a working tree
+/// of Zeabur Builder, or `None` for the pinned commit.
+pub(crate) fn prepare(dev: &DevCluster, builder_src: Option<&Path>) -> Result<Prepared, String> {
+    let stop_at = catalog::stop_at_from_env();
+    let operators = [
+        ("cloudnative-pg", "cnpg-system"),
+        ("percona-mongodb", "psmdb-operator"),
+        ("keel", "keel"),
+    ]
+    .into_iter()
+    .map(|(component, namespace)| {
+        catalog::prepare(dev, component, namespace, &[], stop_at.as_deref())
+    })
+    .collect::<Result<_, _>>()?;
+    // zot from Zeabur Builder's component, with the fixed ClusterIP the node's mirror points at.
+    let zot = catalog::prepare(
+        dev,
+        "zeabur-builder",
+        "zot",
+        &[&format!("clusterIp={ZOT_IP}")],
+        Some("builder"),
+    )?;
+    Ok(Prepared {
+        operators,
+        zot,
+        builder: build_builder(dev, builder_src)?,
+    })
+}
+
+/// Installs the full profile's components.
+pub(crate) fn install(dev: &DevCluster, prepared: &Prepared) -> Result<(), String> {
     // The ClusterIssuer local access names, signing with this cluster's CA.
     let tls = dev.tls();
     dev.apply_created(
@@ -41,17 +85,12 @@ pub(crate) fn install(dev: &DevCluster, builder_src: Option<&Path>) -> Result<()
             },
         },
     })?;
-    let stop_at = catalog::stop_at_from_env();
-    for (component, namespace) in [
-        ("cloudnative-pg", "cnpg-system"),
-        ("percona-mongodb", "psmdb-operator"),
-        ("keel", "keel"),
-    ] {
-        catalog::install(dev, component, namespace, &[], stop_at.as_deref())?;
+    for operator in &prepared.operators {
+        catalog::install(dev, operator)?;
     }
     test_s3(dev)?;
-    zot(dev)?;
-    builder(dev, builder_src)
+    zot(dev, &prepared.zot)?;
+    builder(dev, &prepared.builder)
 }
 
 /// The test S3 the database backup test writes to, with its bucket.
@@ -81,16 +120,9 @@ fn test_s3(dev: &DevCluster) -> Result<(), String> {
     .inspect_err(|_| dev.diagnose("s3-test"))
 }
 
-/// zot from Zeabur Builder's component, with the fixed ClusterIP the node's mirror points at.
-/// zot's CA goes where the mirror reads it; containerd reads it on each pull.
-fn zot(dev: &DevCluster) -> Result<(), String> {
-    catalog::install(
-        dev,
-        "zeabur-builder",
-        "zot",
-        &[&format!("clusterIp={ZOT_IP}")],
-        Some("builder"),
-    )?;
+/// zot, whose CA goes where the node's mirror reads it; containerd reads it on each pull.
+fn zot(dev: &DevCluster, script: &catalog::Script) -> Result<(), String> {
+    catalog::install(dev, script)?;
     dev.kubectl()
         .args([
             "-n",
@@ -119,8 +151,8 @@ fn zot(dev: &DevCluster) -> Result<(), String> {
         .quiet()
 }
 
-/// Zeabur Builder, built from source and installed from its chart.
-fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
+/// Zeabur Builder's images, built from source.
+fn build_builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<Builder, String> {
     let src = if let Some(src) = builder_src {
         src.to_path_buf()
     } else {
@@ -163,9 +195,21 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
         images::tag(dev, image, &image_tag)?;
         tagged.push(image_tag);
     }
-    images::push(dev, &tagged)?;
+    Ok(Builder {
+        images: tagged,
+        tag,
+        chart: src.join("deploy/chart"),
+    })
+}
 
-    let chart = src.join("deploy/chart");
+/// Zeabur Builder, installed from its chart.
+fn builder(dev: &DevCluster, builder: &Builder) -> Result<(), String> {
+    let Builder {
+        images: built,
+        tag,
+        chart,
+    } = builder;
+    images::push(dev, built)?;
     // Helm installs the CRDs only on the first install.
     if dev
         .cmd("helm")
@@ -182,7 +226,7 @@ fn builder(dev: &DevCluster, builder_src: Option<&Path>) -> Result<(), String> {
     let mut helm = dev
         .cmd("helm")
         .args(["upgrade", "--install", "builder"])
-        .arg(&chart)
+        .arg(chart)
         .args(["-n", "builder-system", "--create-namespace"]);
     for (value, image) in [
         ("image", "builder"),
