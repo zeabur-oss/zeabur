@@ -192,6 +192,16 @@ group("describe", () => {
     expect(d.lines).toStrictEqual(["confirm.scale(api, 1, 3)", "confirm.rolling(api, 3)"])
   })
 
+  test("a scale-up of a service with no ready replica promises no replica that serves", () => {
+    const d = describe(
+      t,
+      { changes: [{ op: "scale", workload: api, replicas: 3 }] },
+      plan({ objects: [templated("api")] }),
+      pods({ api: { desired: 2, ready: 0 } }),
+    )
+    expect(d.lines).toStrictEqual(["confirm.scale(api, 2, 3)", "confirm.rollingNone(api)"])
+  })
+
   test("a scale-up that recreates the replicas still warns of the one it stops", () => {
     const rollout = {
       workload: api,
