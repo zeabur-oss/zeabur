@@ -3290,7 +3290,7 @@ export const zhTW: Messages = {
   "members.password": "密碼",
   "members.passwordWithCode": "密碼加驗證碼",
   "members.noSignIn": "無法登入",
-  "members.noSignInHint": "打開設定連結之後才能登入。",
+  "members.noSignInHint": "開啟設定連結之後才能登入。",
   "members.oneSignInHint": "這個方式不能用了就無法登入。多一種登入方式可以當備用。",
   "members.actions": (name) => `${name} 的動作`,
   "members.newLink": "新的設定連結",
