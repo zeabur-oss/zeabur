@@ -14,7 +14,7 @@ const client = () => new QueryClient({ defaultOptions: { queries: { retry: false
 test("a refusal is no", async () => {
   const fetched = answering(403)
   try {
-    expect(await client().fetchQuery(pageQuery("members"))).toBe(false)
+    expect(await client().query(pageQuery("members"))).toBe(false)
   } finally {
     fetched.mockRestore()
   }
@@ -25,7 +25,7 @@ test("an answer the server could not give is an error, asked again later", async
   try {
     const c = client()
     const page = pageQuery("members")
-    await expect(c.fetchQuery(page)).rejects.toBeInstanceOf(ApiError)
+    await expect(c.query(page)).rejects.toBeInstanceOf(ApiError)
     const every = page.refetchInterval
     if (typeof every !== "function") throw new Error("refetchInterval is not a function")
     const query = c.getQueryCache().find({ queryKey: page.queryKey })
