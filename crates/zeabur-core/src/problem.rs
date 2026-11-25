@@ -105,7 +105,8 @@ pub enum Kind {
     LogUnavailable,
     /// The request conflicts with the object or the cluster as it is now: kube-apiserver's
     /// `Conflict` [k8s-status-reason], or a refusal of Zeabur's own, such as removing something
-    /// others still use. Why travels in `detail` and `kubernetes`, since this kind does not know it.
+    /// others still use. Why travels in `detail` and `kubernetes`, since this kind does not know
+    /// it.
     ///
     /// [k8s-status-reason]: https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go
     Conflict,
