@@ -24,6 +24,7 @@ const english = translator(en)
 
 type Plan = Pick<Schemas.PlanResponse, "objects" | "impact" | "warnings"> & {
   risk?: Schemas.Risk
+  preview?: Schemas.Preview
 }
 const api = { kind: "Deployment", name: "api" } as const
 const web = { kind: "Deployment", name: "web" } as const
@@ -179,6 +180,43 @@ group("describe", () => {
       "confirm.rolling(api, 2)",
     ])
     expect(d.action).toBe("action.saveVariables")
+  })
+
+  test("a review that scales up does not warn of the one replica it replaces", () => {
+    const d = describe(
+      t,
+      { changes: [{ op: "scale", workload: api, replicas: 3 }] },
+      plan({ objects: [templated("api")] }),
+      pods({ api: { desired: 1, ready: 1 } }),
+    )
+    expect(d.lines).toStrictEqual(["confirm.scale(api, 1, 3)", "confirm.rolling(api, 3)"])
+  })
+
+  test("a scale-up of a service with no ready replica promises no replica that serves", () => {
+    const d = describe(
+      t,
+      { changes: [{ op: "scale", workload: api, replicas: 3 }] },
+      plan({ objects: [templated("api")] }),
+      pods({ api: { desired: 2, ready: 0 } }),
+    )
+    expect(d.lines).toStrictEqual(["confirm.scale(api, 2, 3)", "confirm.rollingNone(api)"])
+  })
+
+  test("a scale-up that recreates the replicas still warns of the one it stops", () => {
+    const rollout = {
+      workload: api,
+      strategy: "Recreate",
+    } as unknown as Schemas.Preview["rollouts"][number]
+    const d = describe(
+      t,
+      { changes: [{ op: "scale", workload: api, replicas: 3 }] },
+      plan({
+        objects: [templated("api")],
+        preview: { rollouts: [rollout] } as Schemas.Preview,
+      }),
+      pods({ api: { desired: 1, ready: 1 } }),
+    )
+    expect(d.lines).toStrictEqual(["confirm.scale(api, 1, 3)", "confirm.rollingSingle(api)"])
   })
 
   test("a rollback says what is not rolled back, and its button names the revision", () => {

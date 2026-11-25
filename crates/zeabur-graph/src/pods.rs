@@ -91,6 +91,7 @@ pub fn summary(namespace: &str, pod: &Pod, now: Option<Timestamp>) -> PodSummary
         cause: None,
         created_at: pod.metadata.creation_timestamp.as_ref().map(|time| time.0),
         node: pod.spec.as_ref().and_then(|spec| spec.node_name.clone()),
+        terminating: pod.metadata.deletion_timestamp.is_some(),
         container_statuses: status
             .and_then(|s| s.init_container_statuses.as_deref())
             .unwrap_or_default()

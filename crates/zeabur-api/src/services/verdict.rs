@@ -213,6 +213,7 @@ mod tests {
             cause: None,
             created_at: Some(created.parse().unwrap()),
             node: None,
+            terminating: false,
             container_statuses: Vec::new(),
             origin: Origin::object("Pod", name),
         }

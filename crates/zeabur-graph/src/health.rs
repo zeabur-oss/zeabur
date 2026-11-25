@@ -17,6 +17,8 @@
 //! 3. A `Running` workload is idle when it is a CronJob or scaled to zero, fails when no replica is
 //!    ready, warns when fewer replicas are ready than wanted, and is ok otherwise.
 //!
+//! A pod that is being deleted is a replica a release replaces and does not make its service fail.
+//!
 //! A pod fails by rule 1, is idle once it succeeded, ok when ready, and warns otherwise.
 
 use k8s_openapi::jiff::{SignedDuration, Timestamp};
@@ -134,7 +136,10 @@ pub fn status(
     let serving = workload.kind == WorkloadKind::Deployment
         && matches!(workload.phase, Phase::Progressing | Phase::Failed)
         && workload.replicas.is_some_and(|r| r.ready > 0);
-    if let Some(pod) = pods.iter().find(|pod| failing(pod, now)) {
+    if let Some(pod) = pods
+        .iter()
+        .find(|pod| !pod.terminating && failing(pod, now))
+    {
         let word = if serving {
             StatusWord::RolloutStuck
         } else {
@@ -237,6 +242,7 @@ mod tests {
             cause: None,
             created_at: None,
             node: None,
+            terminating: false,
             container_statuses: Vec::new(),
             origin: Origin::object("Pod", "y-1"),
         }

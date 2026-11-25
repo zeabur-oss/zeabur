@@ -39,6 +39,9 @@ pub struct PodSummary {
     /// The node it runs on, once scheduled.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub node: Option<String>,
+    /// It is being deleted (`metadata.deletionTimestamp` is set): a replica a release replaces.
+    #[serde(default, skip_serializing_if = "crate::is_false")]
+    pub terminating: bool,
     /// Each container's state as the kubelet reports it, init containers first; empty before
     /// the kubelet reports any.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]

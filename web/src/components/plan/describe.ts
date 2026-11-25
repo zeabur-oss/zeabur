@@ -77,6 +77,20 @@ export function restartRuleApplies(plan: Plan): boolean {
 
 const same = (a: WorkloadRef, b: WorkloadRef) => a.kind === b.kind && a.name === b.name
 
+/** The pods as they are once the review's own scaling is done: it sets how many replicas run.
+ * A workload with no ready replica, or a strategy that stops the old replicas first (`Recreate`,
+ * `OnDelete`), keeps the pods as they are: the new count promises no replica that serves. */
+const afterScaling =
+  (podsOf: PodsOf, changes: readonly Change[], plan: Plan): PodsOf =>
+  (workload) => {
+    const pods = podsOf(workload)
+    const scale = changes.find((c) => c.op === "scale" && same(c.workload, workload))
+    const strategy = plan.preview?.rollouts.find((r) => same(r.workload, workload))?.strategy
+    const stops = strategy === "Recreate" || strategy === "OnDelete"
+    if (scale?.op !== "scale" || stops || !pods || pods.ready < 1) return pods
+    return { desired: scale.replicas, ready: Math.max(pods.ready, scale.replicas) }
+  }
+
 function rolling(t: Translate, workload: WorkloadRef, podsOf: PodsOf, restart: boolean): string {
   const pods = podsOf(workload)
   const ready = pods?.ready ?? 0
@@ -567,7 +581,7 @@ export function describe(
     lines.push(t("confirm.notRolledBack"))
   for (const workload of replaced(plan))
     if (!said.some((w) => same(w, workload))) {
-      lines.push(rolling(t, workload, podsOf, false))
+      lines.push(rolling(t, workload, afterScaling(podsOf, ask.changes, plan), false))
       said.push(workload)
     }
   for (const change of ask.changes) if (change.op === "scale") said.push(change.workload)
