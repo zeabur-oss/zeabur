@@ -12452,6 +12452,7 @@ components:
       - assignableRoles
       - defaultRole
       - unreadable
+      - undecoded
       properties:
         apiTokens:
           type: array
@@ -12498,6 +12499,13 @@ components:
         setupLinks:
           $ref: "#/components/schemas/SetupLinks"
           description: Whether setup links can be made and redeemed.
+        undecoded:
+          type: array
+          items:
+            $ref: "#/components/schemas/UndecodedView"
+          description: |-
+            Zeabur Identity's objects whose shape Zeabur does not know, which are left out of the
+            members and invitations above.
         unreadable:
           type: array
           items:
@@ -19531,6 +19539,19 @@ components:
       - no-previous-run
       - not-started
       - removed
+    UndecodedView:
+      type: object
+      description: An object of another product that Zeabur read but does not know the shape of.
+      required:
+      - origin
+      - error
+      properties:
+        error:
+          type: string
+          description: Why it does not decode.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The object.
     Unlimited:
       type: object
       description: How many pods set no limit, for each resource.
