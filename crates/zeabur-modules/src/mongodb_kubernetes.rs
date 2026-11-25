@@ -205,7 +205,7 @@ fn first_user(view: &View, name: &str) -> Option<AppUser> {
     })
 }
 
-/// One `MongoDBCommunity` as a database, shown only.
+/// One `MongoDBCommunity` as an unmanaged database.
 #[must_use]
 pub fn database(namespace: &str, cluster: &DynamicObject) -> Database {
     let name = cluster.metadata.name.clone().unwrap_or_default();

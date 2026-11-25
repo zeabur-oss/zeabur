@@ -1,7 +1,7 @@
 //! A project's databases of MOCO, mariadb-operator and the Dragonfly Operator: their backup Jobs,
 //! Dragonfly's master, and exporting a dump: refused without `pods/exec`, a failed dump as a
 //! problem, and MOCO's password kept out of the command. A `MongoDBCommunity` of MongoDB
-//! Controllers for Kubernetes is shown only, and a refused read of it is named.
+//! Controllers for Kubernetes is unmanaged, and a refused read of it is named.
 
 #[cfg(test)]
 mod tests {
@@ -231,7 +231,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_mongodb_community_is_shown_only_with_its_members_and_first_user() {
+    async fn a_mongodb_community_is_unmanaged_with_its_members_and_first_user() {
         let app = app(&cluster());
         let (_, answer) = send(&app, "GET", "/api/v1/projects/shop/databases", None).await;
         let operator = answer["operators"]

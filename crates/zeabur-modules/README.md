@@ -54,7 +54,7 @@ OSS (`zeabur-api` and the binaries) may depend on it, never the core crates;
 | `reloader` | config-reload | `apps/v1` deployments labelled `app.kubernetes.io/name: reloader`, cluster-wide |
 | `barman-cloud` | postgres | `barmancloud.cnpg.io/v1` objectstores |
 | `percona-server-mongodb` | mongodb | `psmdb.percona.com/v1` perconaservermongodbs, perconaservermongodbbackups |
-| `mongodb-kubernetes` | mongodb | `mongodbcommunity.mongodb.com/v1` mongodbcommunity (shown only) |
+| `mongodb-kubernetes` | mongodb | `mongodbcommunity.mongodb.com/v1` mongodbcommunity (unmanaged: YAML edits only) |
 | `moco` | mysql | `moco.cybozu.com/v1beta2` mysqlclusters, backuppolicies |
 | `mariadb-operator` | mariadb | `k8s.mariadb.com/v1alpha1` mariadbs, backups |
 | `dragonfly-operator` | redis | `dragonflydb.io/v1alpha1` dragonflies |
