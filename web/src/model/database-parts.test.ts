@@ -12,6 +12,7 @@ import type { Database } from "@/model/databases"
 import type { Claim, Project, Service } from "@/model/service"
 
 const mongo = {
+  kind: "PerconaServerMongoDB",
   engine: "mongodb",
   name: "mongo",
   state: "ready",
@@ -21,6 +22,7 @@ const mongo = {
 } as Database
 
 const pg = {
+  kind: "Cluster",
   engine: "postgresql",
   name: "pg",
   state: "ready",
@@ -101,6 +103,36 @@ describe("the map's databases", () => {
       "Deployment/editor database:mongodb/mongo",
     ])
     expect(edges.find((e) => e.to === "database:mongodb/mongo")?.inferred).toBe(true)
+  })
+
+  test("send a connection to the database whose kind runs the workload", () => {
+    const community = {
+      ...mongo,
+      kind: "MongoDBCommunity",
+      provider: "mongodb-kubernetes",
+      unmanaged: true,
+      app: undefined,
+    } as Database
+    const members = service("mongo-svc", {
+      kind: "StatefulSet",
+      managedBy: { kind: "MongoDBCommunity", name: "mongo", engine: "MongoDB" },
+    } as Partial<Service>)
+    const both = {
+      ...project,
+      services: [editor, members],
+      connections: [
+        {
+          from: { kind: "Deployment", name: "editor" },
+          to: { kind: "StatefulSet", name: "mongo-svc" },
+          inferred: true,
+          evidence: [],
+        },
+      ],
+    } as unknown as Project
+    const edges = databaseEdges(both, [{ ...mongo, app: undefined } as Database, community])
+    expect(edges.map((e) => `${e.from} ${e.to}`)).toStrictEqual([
+      "Deployment/editor database:mongodb-kubernetes/mongo",
+    ])
   })
 
   test("show each member's volume with the claim's size when the database names none", () => {
