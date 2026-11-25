@@ -1,6 +1,6 @@
 import { useState } from "react"
 
-import { Note, type Shown } from "@/components/add/built-service"
+import { Note, PathFields, type Shown } from "@/components/add/built-service"
 import {
   AccessFields,
   AddDeployKey,
@@ -25,7 +25,6 @@ import {
 } from "@/model/git-service"
 import type { Service } from "@/model/service"
 import { Button } from "@zeabur-oss/design-system/components/button"
-import { Input } from "@zeabur-oss/design-system/components/input"
 import { Select } from "@zeabur-oss/design-system/components/select"
 
 /** Settings → Build of a service that builds from no repository: the repository form of "Deploy
@@ -178,40 +177,13 @@ function Connect({
           </FormField>
         }
       />
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField
-          label={t("add.field.directory")}
-          hint={t("add.directoryHint")}
-          errors={shown(problems.directory, () => t("add.problem.directory"))}
-        >
-          <Input
-            size="sm"
-            mono
-            value={form.directory}
-            placeholder="apps/web"
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => set({ directory: event.target.value })}
-          />
-        </FormField>
-        {form.method === "dockerfile" ? (
-          <FormField
-            label={t("add.field.dockerfile")}
-            hint={t("add.dockerfileHint")}
-            errors={shown(problems.dockerfile, () => t("add.problem.dockerfile"))}
-          >
-            <Input
-              size="sm"
-              mono
-              value={form.dockerfile}
-              placeholder="Dockerfile"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => set({ dockerfile: event.target.value })}
-            />
-          </FormField>
-        ) : null}
-      </div>
+      <PathFields
+        form={form}
+        onDirectory={(directory) => set({ directory })}
+        onDockerfile={(dockerfile) => set({ dockerfile })}
+        problems={problems}
+        shown={shown}
+      />
       {main.length > 1 ? (
         <FormField label={t("gitSource.container")}>
           <Select
