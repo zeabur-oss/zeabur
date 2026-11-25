@@ -415,7 +415,7 @@ mod tests {
             s.forbidden_namespaces.insert("builder-system".to_owned());
         });
         let (status, found) = send(&app, "GET", BASE, None).await;
-        assert_eq!(status, StatusCode::OK, "{found}");
+        assert_eq!(status, StatusCode::FORBIDDEN, "{found}");
         assert!(found.get("app").is_none(), "{found}");
         let body = json!({"installationId": INSTALLATION, "namespaces": ["shop"]});
         let (status, refused) = send(&app, "POST", &format!("{BASE}/plan"), Some(&body)).await;

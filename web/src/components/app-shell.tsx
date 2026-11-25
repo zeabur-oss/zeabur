@@ -4,6 +4,7 @@ import ListIcon from "~icons/ph/list"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import XIcon from "~icons/ph/x"
 
+import { GatedPage } from "@/components/shell/admin-only"
 import { RouteProgress } from "@/components/shell/route-progress"
 import { PlanFallback } from "@/components/plan/fallback"
 import { CommandPalette } from "@/components/shell/command-palette"
@@ -67,7 +68,9 @@ export function AppShell() {
             tabIndex={-1}
             className="relative flex min-h-0 flex-1 flex-col overflow-x-hidden overflow-y-auto overscroll-contain outline-none page-transition"
           >
-            <Outlet />
+            <GatedPage route={place.route}>
+              <Outlet />
+            </GatedPage>
           </main>
           <DockSlot />
         </FramePanel>

@@ -24,6 +24,7 @@ mod exec;
 mod feature_used;
 mod files;
 mod github_app;
+mod head;
 mod images;
 mod incidents;
 mod log_history;

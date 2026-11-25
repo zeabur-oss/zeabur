@@ -47,10 +47,10 @@ const INPUT_EVENTS = [
 
 let lastInput = Date.now()
 
-/** Only a read made after a minute without input is background work. A change is always the
- * person's own. */
+/** Only a read (GET or HEAD) made after a minute without input is background work. A change is
+ * always the person's own. */
 export function isBackground(method: string, lastInputAt: number, now: number): boolean {
-  return method === "GET" && now - lastInputAt >= IDLE_AFTER_MS
+  return (method === "GET" || method === "HEAD") && now - lastInputAt >= IDLE_AFTER_MS
 }
 
 export function backgroundNow(method: string): boolean {

@@ -50,8 +50,10 @@ describe("background requests", () => {
   const input = 1_000_000
 
   test("a read becomes background work once the page has had no input for a minute", () => {
-    expect(isBackground("GET", input, input + IDLE_AFTER_MS - 1)).toBe(false)
-    expect(isBackground("GET", input, input + IDLE_AFTER_MS)).toBe(true)
+    for (const method of ["GET", "HEAD"]) {
+      expect(isBackground(method, input, input + IDLE_AFTER_MS - 1), method).toBe(false)
+      expect(isBackground(method, input, input + IDLE_AFTER_MS), method).toBe(true)
+    }
   })
 
   test("a change is never background work, however long the page was left alone", () => {

@@ -380,6 +380,22 @@ pub(crate) async fn project_get(
         .map(Json)
 }
 
+/// The read of `GET /cluster/notifications` that decides whether the page opens.
+fn cluster_reads() -> Vec<Denied> {
+    vec![list_read(
+        am::CONFIGS.group,
+        am::CONFIGS.resource,
+        Some(am::CLUSTER_NAMESPACE),
+    )]
+}
+
+/// Whether the person may open Notifications: see [`crate::head`].
+#[utoipa::path(head, path = "/api/v1/cluster/notifications", tag = "cluster",
+    operation_id = "checkClusterNotifications", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+pub(crate) async fn cluster_head(Person(cluster): Person) -> axum::http::StatusCode {
+    crate::head::status(cluster.as_ref(), &cluster_reads()).await
+}
+
 /// The cluster's channels, in `observability`, and whether Zeabur's alert rules are installed.
 #[utoipa::path(get, path = "/api/v1/cluster/notifications", tag = "cluster",
     operation_id = "getClusterNotifications",
@@ -388,6 +404,12 @@ pub(crate) async fn cluster_get(
     State(state): State<AppState>,
     Person(cluster): Person,
 ) -> Result<Json<Notifications>, ApiError> {
+    crate::head::require(
+        cluster.as_ref(),
+        &cluster_reads(),
+        "the cluster's notifications",
+    )
+    .await?;
     answer(
         cluster.as_ref(),
         &state.catalogue,

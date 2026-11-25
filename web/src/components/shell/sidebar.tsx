@@ -5,6 +5,8 @@ import HardDrivesIcon from "~icons/ph/hard-drives"
 import HouseIcon from "~icons/ph/house"
 import UsersThreeIcon from "~icons/ph/users-three"
 
+import { usePages } from "@/components/gate"
+import { clusterPages } from "@/model/pages"
 import { SearchRow } from "@/components/shell/search-row"
 import { DockToggle } from "@/components/shell/dock-slot"
 import { ContextMenu } from "@/components/shell/user-menu"
@@ -34,6 +36,8 @@ interface Item {
 export function Sidebar() {
   const t = useT()
   const { route } = usePlace()
+  const mayCluster = usePages(clusterPages).open
+  const mayMembers = usePages(["members"]).open
 
   const everyday: Item[] = [
     { to: "/", icon: HouseIcon, label: t("shell.home"), active: route === "/" },
@@ -44,26 +48,27 @@ export function Sidebar() {
       active: route === "/projects",
     },
   ]
-  const manage: Item[] = [
-    {
-      to: "/cluster",
-      icon: HardDrivesIcon,
-      label: t("shell.cluster"),
-      active: route.startsWith("/cluster"),
-    },
-    {
-      to: "/members",
-      icon: UsersThreeIcon,
-      label: t("shell.members"),
-      active: route === "/members",
-    },
-    {
-      to: "/settings",
-      icon: GearSixIcon,
-      label: t("shell.settings"),
-      active: route === "/settings",
-    },
-  ]
+  const settings: Item = {
+    to: "/settings",
+    icon: GearSixIcon,
+    label: t("shell.settings"),
+    active: route === "/settings",
+  }
+  const cluster: Item = {
+    to: "/cluster",
+    icon: HardDrivesIcon,
+    label: t("shell.cluster"),
+    active: route.startsWith("/cluster"),
+  }
+  const members: Item = {
+    to: "/members",
+    icon: UsersThreeIcon,
+    label: t("shell.members"),
+    active: route === "/members",
+  }
+  const admin: Item[] = []
+  if (mayCluster) admin.push(cluster)
+  if (mayMembers) admin.push(members)
 
   return (
     <SidebarRoot aria-label={t("shell.nav")}>
@@ -79,8 +84,14 @@ export function Sidebar() {
       </SidebarHeader>
       <SearchRow />
       <SidebarContent>
-        <SidebarGroup>{everyday.map(navItem)}</SidebarGroup>
-        <SidebarSection title={t("shell.manage")}>{manage.map(navItem)}</SidebarSection>
+        <SidebarGroup>
+          {(admin.length ? everyday : [...everyday, settings]).map(navItem)}
+        </SidebarGroup>
+        {admin.length ? (
+          <SidebarSection title={t("shell.manage")}>
+            {[...admin, settings].map(navItem)}
+          </SidebarSection>
+        ) : null}
       </SidebarContent>
       <SidebarFooter>
         <DockToggle />

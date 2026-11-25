@@ -3,7 +3,7 @@
 use axum::extract::State;
 use axum::http::StatusCode;
 use zeabur_core::message::Message;
-use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
+use zeabur_core::problem::{Denied, Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_kube::{Cluster, Preconditions, WriteBody, WriteRequest};
 
 use super::directory::{
@@ -15,7 +15,7 @@ use super::writes::{
     user_object,
 };
 use super::{USER_PREFIX, access, tokens};
-use crate::error::{ApiError, read_problem};
+use crate::error::{ApiError, list_read, list_read_of_key, read_problem};
 use crate::extract::{Json, Path};
 use crate::handlers::{AppState, Person};
 
@@ -66,6 +66,28 @@ fn no_member(username: &str) -> ApiError {
     ))
 }
 
+/// The reads of `GET /members` that decide whether the page opens: any of Identity's kinds, or
+/// the bindings and ServiceAccounts that API tokens are, which work without Zeabur Identity.
+fn reads(namespace: &str) -> Vec<Denied> {
+    use super::directory::IdentityKind;
+    [
+        IdentityKind::User,
+        IdentityKind::Credential,
+        IdentityKind::Invitation,
+        IdentityKind::Grant,
+    ]
+    .map(|kind| list_read(super::GROUP, kind.plural(), Some(namespace)))
+    .into_iter()
+    .chain([list_read_of_key(&access::key()), tokens::read()])
+    .collect()
+}
+
+/// Whether the person may open Members: see [`crate::head`].
+#[utoipa::path(head, path = "/api/v1/members", tag = "members", operation_id = "checkMembers", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+pub(crate) async fn head(State(state): State<AppState>, Person(cluster): Person) -> StatusCode {
+    crate::head::status(cluster.as_ref(), &reads(&state.settings.identity.namespace)).await
+}
+
 /// Everyone who can sign in, and the setup links waiting to be used.
 #[utoipa::path(get, path = "/api/v1/members", tag = "members", operation_id = "listMembers",
     responses((status = 200, body = MembersView),
@@ -77,6 +99,7 @@ pub(crate) async fn list(
 ) -> Result<Json<MembersView>, ApiError> {
     let identity = &state.settings.identity;
     let namespace = identity.namespace.as_str();
+    crate::head::require(cluster.as_ref(), &reads(namespace), "the members").await?;
     let (directory, you, links, can, can_tokens, bindings) = futures_util::join!(
         Directory::load(cluster.as_ref(), namespace),
         you(cluster.as_ref()),

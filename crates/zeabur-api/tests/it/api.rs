@@ -1762,7 +1762,7 @@ mod tests {
         // `list`) must never become one, and two handlers sharing an id would type one path's
         // answer as the other's.
         const VERBS: &[&str] = &[
-            "apply", "convert", "create", "delete", "download", "export", "follow", "get",
+            "apply", "check", "convert", "create", "delete", "download", "export", "follow", "get",
             "inspect", "list", "make", "open", "plan", "preview", "remove", "rename", "reveal",
             "revoke", "set", "start", "trace", "upload",
         ];

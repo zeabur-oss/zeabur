@@ -17,6 +17,8 @@ export const core = {
   "shell.jumpTo": "Jump to…",
   "shell.menu": "Menu",
   "shell.manage": "Manage",
+  "shell.adminOnly": "Only cluster administrators can open this page",
+  "shell.adminOnlyHint": "Ask an administrator if something here needs to change.",
   "shell.whoamiUnknown": "Unknown user",
   "shell.signOut": "Sign out",
   "shell.theme": "Theme",

@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQueries, useQuery } from "@tanstack/react-query"
 import { useParams } from "@tanstack/react-router"
 import { MenuItem } from "@zeabur-oss/design-system/components/menu"
 import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
@@ -7,6 +7,7 @@ import LockSimpleIcon from "~icons/ph/lock-simple"
 
 import type { Schemas } from "@/api/client"
 import { accountQuery } from "@/api/members"
+import { pageQuery } from "@/api/pages"
 import { clusterQuery, namespaceQuery, rightsQuery, whoamiQuery } from "@/api/queries"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
@@ -20,6 +21,7 @@ import {
   type ProjectRight,
   type Right,
 } from "@/model/rights"
+import { anyOpen, type Answers, type Page } from "@/model/pages"
 
 type Permission = Schemas.Permission
 
@@ -151,4 +153,14 @@ export function GateNote({ gate: g }: { gate: Gate }) {
       {reason}
     </p>
   )
+}
+
+/** Whether any of `pages` is open, and whether that is still being asked. An answer not yet known, or that the server could not give, counts as no. */
+export function usePages(pages: Page[]): { open: boolean; pending: boolean } {
+  const queries = useQueries({ queries: pages.map(pageQuery) })
+  const answers: Answers = {}
+  pages.forEach((page, i) => {
+    answers[page] = queries[i]?.data
+  })
+  return { open: anyOpen(answers, pages), pending: queries.some((query) => query.isPending) }
 }

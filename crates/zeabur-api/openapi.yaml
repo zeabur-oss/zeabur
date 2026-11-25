@@ -94,6 +94,18 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+    head:
+      tags:
+      - cluster
+      summary: "Whether the person may open Backups: see [`crate::head`]."
+      operationId: checkClusterBackups
+      responses:
+        "200":
+          description: The person may open the page.
+        "403":
+          description: None of its reads is allowed.
+        "503":
+          description: Whether it is allowed could not be checked.
   /api/v1/cluster/backups/apply:
     post:
       tags:
@@ -275,6 +287,18 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+    head:
+      tags:
+      - cluster
+      summary: "Whether the person may open Components: see [`crate::head`]."
+      operationId: checkCapabilities
+      responses:
+        "200":
+          description: The person may open the page.
+        "403":
+          description: None of its reads is allowed.
+        "503":
+          description: Whether it is allowed could not be checked.
   /api/v1/cluster/catalog:
     get:
       tags:
@@ -510,6 +534,18 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+    head:
+      tags:
+      - cluster
+      summary: "Whether the person may open GitHub App: see [`crate::head`]."
+      operationId: checkGitHubApp
+      responses:
+        "200":
+          description: The person may open the page.
+        "403":
+          description: None of its reads is allowed.
+        "503":
+          description: Whether it is allowed could not be checked.
   /api/v1/cluster/github-app/apply:
     post:
       tags:
@@ -878,6 +914,18 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+    head:
+      tags:
+      - cluster
+      summary: "Whether the person may open the Cluster overview: see [`crate::head`]."
+      operationId: checkClusterNodes
+      responses:
+        "200":
+          description: The person may open the page.
+        "403":
+          description: None of its reads is allowed.
+        "503":
+          description: Whether it is allowed could not be checked.
   "/api/v1/cluster/nodes/{node}/maintenance/apply":
     post:
       tags:
@@ -974,6 +1022,18 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+    head:
+      tags:
+      - cluster
+      summary: "Whether the person may open Notifications: see [`crate::head`]."
+      operationId: checkClusterNotifications
+      responses:
+        "200":
+          description: The person may open the page.
+        "403":
+          description: None of its reads is allowed.
+        "503":
+          description: Whether it is allowed could not be checked.
   /api/v1/cluster/notifications/apply:
     post:
       tags:
@@ -1460,6 +1520,18 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+    head:
+      tags:
+      - members
+      summary: "Whether the person may open Members: see [`crate::head`]."
+      operationId: checkMembers
+      responses:
+        "200":
+          description: The person may open the page.
+        "403":
+          description: None of its reads is allowed.
+        "503":
+          description: Whether it is allowed could not be checked.
   /api/v1/members/apply:
     post:
       tags:

@@ -196,6 +196,23 @@ pub(crate) async fn health(
     Ok(Json(health::read(cluster.as_ref(), (state.clock)()).await?))
 }
 
+/// The reads of `GET /cluster/capabilities` that decide whether the page opens: the first of the
+/// cluster-wide reads that detecting the installed components makes.
+fn capabilities_reads() -> Vec<Denied> {
+    vec![list_read(
+        "apiextensions.k8s.io",
+        "customresourcedefinitions",
+        None,
+    )]
+}
+
+/// Whether the person may open Components: see [`crate::head`].
+#[utoipa::path(head, path = "/api/v1/cluster/capabilities", tag = "cluster",
+    operation_id = "checkCapabilities", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+pub(crate) async fn capabilities_head(Person(cluster): Person) -> axum::http::StatusCode {
+    crate::head::status(cluster.as_ref(), &capabilities_reads()).await
+}
+
 /// Which capabilities the cluster has, by Zeabur Catalog, with the version of
 /// each installed component.
 ///
@@ -429,6 +446,18 @@ fn node_usage(objects: &[DynamicObject]) -> Vec<(String, String, String)> {
         .into_iter()
         .map(|u| (u.node, u.cpu, u.memory))
         .collect()
+}
+
+/// The read of `GET /cluster/nodes` that decides whether the Cluster overview opens.
+fn nodes_reads() -> Vec<Denied> {
+    vec![list_read("", "nodes", None)]
+}
+
+/// Whether the person may open the Cluster overview: see [`crate::head`].
+#[utoipa::path(head, path = "/api/v1/cluster/nodes", tag = "cluster",
+    operation_id = "checkClusterNodes", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+pub(crate) async fn nodes_head(Person(cluster): Person) -> axum::http::StatusCode {
+    crate::head::status(cluster.as_ref(), &nodes_reads()).await
 }
 
 /// The nodes: roles, health, versions, and what their pods request against what is allocatable.
