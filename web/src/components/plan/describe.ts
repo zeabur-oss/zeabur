@@ -78,8 +78,10 @@ export function restartRuleApplies(plan: Plan): boolean {
 const same = (a: WorkloadRef, b: WorkloadRef) => a.kind === b.kind && a.name === b.name
 
 /** The replicas the review itself sets for `workload`, when it scales it. */
-const scaledTo = (changes: readonly Change[], workload: WorkloadRef): number | undefined =>
-  changes.find((c) => c.op === "scale" && same(c.workload, workload))?.replicas
+function scaledTo(changes: readonly Change[], workload: WorkloadRef): number | undefined {
+  const scale = changes.find((c) => c.op === "scale" && same(c.workload, workload))
+  return scale?.op === "scale" ? scale.replicas : undefined
+}
 
 function rolling(
   t: Translate,

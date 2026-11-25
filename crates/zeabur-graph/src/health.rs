@@ -82,7 +82,7 @@ pub fn failing(pod: &PodSummary, now: Option<Timestamp>) -> bool {
 /// started less than ten minutes before `now`. The exit code and readiness do not count,
 /// as they do not in the kubelet. Missing times count as short runs. A container that has
 /// completed successfully, such as an init container that succeeded after failed attempts, is
-/// not restarted again. A container that has run ready for [`STABLE_RUN`] is no crash loop any
+/// not restarted again. A container that has run ready for a minute is no crash loop any
 /// more, although the kubelet's back-off lasts until ten minutes of running.
 #[must_use]
 pub fn crash_looping(status: &ContainerStatusSummary, now: Option<Timestamp>) -> bool {
