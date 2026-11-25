@@ -307,7 +307,11 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::CREATED);
-        assert_eq!(writes(&cluster).len(), 1);
+        assert!(
+            !writes(&cluster)
+                .iter()
+                .any(|w| w.starts_with("delete Credential"))
+        );
         let (status, body) = call(
             &cluster,
             "POST",
@@ -318,6 +322,39 @@ mod tests {
         assert_eq!(status, StatusCode::CONFLICT, "{body}");
         assert_eq!(body["summary"]["key"], "members.resetSelf");
         assert_eq!(body["fixKey"]["key"], "members.resetSelf.fix");
+    }
+
+    /// The names of `username`'s invitations that exist.
+    fn invitations_of(cluster: &MemoryCluster, username: &str) -> Vec<String> {
+        cluster
+            .inspect(|s| s.dynamic.clone())
+            .unwrap()
+            .into_iter()
+            .filter(|o| o.types.as_ref().is_some_and(|t| t.kind == "Invitation"))
+            .filter(|o| o.data["spec"]["user"] == username)
+            .filter_map(|o| o.metadata.name)
+            .collect()
+    }
+
+    #[tokio::test]
+    async fn a_new_link_ends_the_earlier_ones_and_leaves_one() {
+        let cluster = signed_in("zeabur:ada");
+        let path = "/api/v1/members/bob/setup-links";
+        let (status, first) = call(&cluster, "POST", path, Some(&json!({}))).await;
+        assert_eq!(status, StatusCode::CREATED, "{first}");
+        let (status, second) = call(&cluster, "POST", path, Some(&json!({}))).await;
+        assert_eq!(status, StatusCode::CREATED, "{second}");
+        assert_ne!(first["url"], second["url"]);
+        assert_ne!(first["name"], second["name"]);
+        let name = second["name"].as_str().unwrap();
+        assert_eq!(invitations_of(&cluster, "bob"), [name]);
+        let made = writes(&cluster);
+        assert_eq!(made.len(), 4, "{made:?}");
+        assert_eq!(made[1], "delete Invitation/inv-bob");
+        assert_eq!(
+            made[3],
+            format!("delete Invitation/{}", first["name"].as_str().unwrap())
+        );
     }
 
     #[tokio::test]
@@ -538,15 +575,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn inviting_an_existing_member_adds_a_link_and_a_bad_name_is_refused() {
+    async fn inviting_an_existing_member_replaces_their_link_and_a_bad_name_is_refused() {
         let cluster = signed_in("zeabur:ada");
         let (status, applied, plan) =
             change(&cluster, json!({"op": "invite", "username": "bob"})).await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert_eq!(plan["newMember"], false);
-        assert_eq!(planned(&plan), ["create Invitation/inv-"]);
+        assert_eq!(
+            planned(&plan),
+            ["delete Invitation/inv-bob", "create Invitation/inv-"]
+        );
+        let made = writes(&cluster);
+        assert!(made[0].starts_with("create Invitation/inv-"), "{made:?}");
         assert_eq!(applied["link"]["createdMember"], false);
-        assert_eq!(writes(&cluster).len(), 1);
+        assert_eq!(writes(&cluster).len(), 2);
         let (status, ..) = change(&cluster, json!({"op": "invite", "username": "Bob Smith"})).await;
         assert_eq!(status, StatusCode::BAD_REQUEST);
     }
