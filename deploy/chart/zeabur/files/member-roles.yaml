@@ -91,7 +91,6 @@ zeabur-project-viewer:
   - apiGroups: [psmdb.percona.com]
     resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
     verbs: [get, list, watch]
-  # Zeabur only shows these databases, so no member role changes them.
   - apiGroups: [mongodbcommunity.mongodb.com]
     resources: [mongodbcommunity]
     verbs: [get, list, watch]
@@ -211,9 +210,10 @@ zeabur-project-developer:
   - apiGroups: [psmdb.percona.com]
     resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
     verbs: [get, list, watch, create, update, patch, delete]
+  # Zeabur does not create or delete these databases; members only edit their YAML.
   - apiGroups: [mongodbcommunity.mongodb.com]
     resources: [mongodbcommunity]
-    verbs: [get, list, watch]
+    verbs: [get, list, watch, update, patch]
   - apiGroups: [moco.cybozu.com]
     resources: [mysqlclusters, backuppolicies]
     verbs: [get, list, watch, create, update, patch, delete]

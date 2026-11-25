@@ -32,7 +32,8 @@ import { Select } from "@zeabur-oss/design-system/components/select"
 
 const parts = ["compute", "storage"] as const
 
-/** Instances, size and storage; or, in its YAML view, the operator's object and kubectl. */
+/** Instances, size and storage; or, in its YAML view, the operator's object and kubectl. A
+ * database Zeabur does not create shows only its object's YAML. */
 export function DatabaseSettings({
   project,
   database,
@@ -45,6 +46,7 @@ export function DatabaseSettings({
   onMode: (mode?: ServiceMode) => void
 }) {
   const t = useT()
+  if (database.unmanaged) return <DatabaseYaml project={project} database={database} />
   return (
     <div className="flex flex-col gap-6">
       <ModeSwitch tab="settings" mode={mode} onMode={onMode}>

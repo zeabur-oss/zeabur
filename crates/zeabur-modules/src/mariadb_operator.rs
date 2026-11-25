@@ -253,7 +253,7 @@ pub fn database(
         object: databases::written(server),
         pods: Vec::new(),
         restored: databases::restored(server),
-        read_only: false,
+        unmanaged: false,
         name,
     }
 }

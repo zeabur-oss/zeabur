@@ -4,7 +4,7 @@
 //! the Percona Operator for MongoDB and MongoDB Controllers for Kubernetes for MongoDB, MOCO for
 //! MySQL, mariadb-operator for MariaDB, the Dragonfly Operator for Dragonfly; see
 //! `zeabur_modules::databases`), with their state, where to connect and their backups. Zeabur
-//! only shows the databases of MongoDB Controllers for Kubernetes.
+//! does not create the databases of MongoDB Controllers for Kubernetes and edits only their YAML.
 //!
 //! MOCO and mariadb-operator take each backup in a Job. The project's Jobs are read once, and only
 //! when one of their databases is there.
@@ -54,9 +54,10 @@ pub struct DatabaseOperator {
     pub backups: ProviderState,
     /// The catalogue component that installs the operator.
     pub component: Option<zeabur_catalog::ComponentRef>,
-    /// Zeabur only shows its databases and does not create them.
+    /// Zeabur shows its databases and edits their YAML, but does not create, delete, back up,
+    /// restore or export them.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub read_only: bool,
+    pub unmanaged: bool,
 }
 
 /// A project's databases.
@@ -106,7 +107,7 @@ fn operator(
         state,
         backups: state,
         component: crate::cluster::modules::component(catalogue, module),
-        read_only: false,
+        unmanaged: false,
     }
 }
 
@@ -164,7 +165,7 @@ pub(crate) async fn read(
         state,
         backups: store_state,
         component: crate::cluster::modules::component(catalogue, &cloudnative_pg::MODULE),
-        read_only: false,
+        unmanaged: false,
     });
 
     read_mongodb(
@@ -235,7 +236,7 @@ fn add_members(project: &str, items: &mut [Database], pods: &[Pod], now: Timesta
 }
 
 /// The MongoDB databases of the Percona Operator, with their backups, and of MongoDB Controllers
-/// for Kubernetes, which Zeabur only shows.
+/// for Kubernetes, which Zeabur does not create.
 async fn read_mongodb(
     cluster: &dyn Cluster,
     catalogue: &[zeabur_catalog::Component],
@@ -287,7 +288,7 @@ async fn read_mongodb(
         Err(state) => state,
     };
     operators.push(DatabaseOperator {
-        read_only: true,
+        unmanaged: true,
         ..operator(
             catalogue,
             Engine::Mongodb,

@@ -47,7 +47,7 @@ const ENGINE_NAMES: Record<Engine, string> = {
 
 export const engineName = (engine: Engine) => ENGINE_NAMES[engine]
 
-/** The provider of MongoDB Controllers for Kubernetes, whose databases Zeabur only shows. */
+/** The provider of MongoDB Controllers for Kubernetes, whose databases Zeabur does not create. */
 const MCK = "mongodb-kubernetes"
 
 /** The operator's name where the engine's alone would be ambiguous. */
@@ -223,7 +223,7 @@ export function perThreadCaches(spec: Manifest, version?: string | null) {
 
 /** The note a MongoDB 8 gets: the setting is there, or missing. */
 export function rseqNote(database: Database): "set" | "missing" | undefined {
-  if (database.engine !== "mongodb" || database.readOnly) return
+  if (database.engine !== "mongodb" || database.unmanaged) return
   if (!mongo8OrLater(database.version ?? database.image)) return
   const spec = (database.object as Manifest & { spec?: Manifest }).spec ?? {}
   const replsets = (spec.replsets as Manifest[] | undefined) ?? []
@@ -703,13 +703,14 @@ export type BackupEngine = Exclude<Engine, "dragonfly">
 export const backsUp = (engine: Engine): engine is BackupEngine => engine !== "dragonfly"
 
 /** Whether the page asks to set up backups: Zeabur backs up the engine, the database is not one
- * Zeabur only shows, and no backup store is in use yet. */
+ * Zeabur did not create, and no backup store is in use yet. */
 export const asksForBackups = (database: Database) =>
-  backsUp(database.engine) && !database.readOnly && !database.backups.store?.inUse
+  backsUp(database.engine) && !database.unmanaged && !database.backups.store?.inUse
 
-/** The operators Zeabur creates databases with: not those whose databases it only shows. */
+/** The operators Zeabur creates databases with: not those whose databases it
+ * does not create. */
 export const creatable = (operators: Schemas.DatabaseOperator[]) =>
-  operators.filter((o) => !o.readOnly)
+  operators.filter((o) => !o.unmanaged)
 
 /** The database's engine, for a database that `backsUp`. */
 export const backupEngine = (database: Database) => database.engine as BackupEngine

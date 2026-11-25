@@ -290,10 +290,10 @@ pub struct Database {
     /// The backup it was restored from, when Zeabur made it from one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub restored: Option<Restored>,
-    /// Zeabur only shows it: it cannot change, back up, restore or export it, since its operator
-    /// has no backup Zeabur can run (MongoDB Controllers for Kubernetes).
+    /// Zeabur shows it and edits its YAML, but does not create, delete, back up, restore or
+    /// export it.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
-    pub read_only: bool,
+    pub unmanaged: bool,
 }
 
 impl Database {

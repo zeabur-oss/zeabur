@@ -3164,8 +3164,8 @@ export const en = {
   "db.commands": "Commands",
   "db.command.describe": "The database object",
   "db.command.shell": "A shell in the database",
-  "db.backup.shownOnly":
-    "This database runs on MongoDB Controllers for Kubernetes, which has no backups for a MongoDBCommunity database. Zeabur can't back it up or restore it, and only shows it here.",
+  "db.backup.unmanaged":
+    "This database runs on MongoDB Controllers for Kubernetes, which has no backups for a MongoDBCommunity database. Zeabur can't back it up or restore it.",
   "db.backup.none": "Not backed up",
   "db.backup.last": "Last backup",
   "db.backup.noRun": "No backup yet",

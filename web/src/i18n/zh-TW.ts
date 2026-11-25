@@ -2901,8 +2901,8 @@ export const zhTW: Messages = {
   "db.commands": "指令",
   "db.command.describe": "資料庫物件",
   "db.command.shell": "進入資料庫的 Shell",
-  "db.backup.shownOnly":
-    "這個資料庫由 MongoDB Controllers for Kubernetes 執行，而它不提供 MongoDBCommunity 資料庫的備份。Zeabur 無法備份或還原這個資料庫，這裡只顯示它的狀態。",
+  "db.backup.unmanaged":
+    "這個資料庫由 MongoDB Controllers for Kubernetes 執行，而它不提供 MongoDBCommunity 資料庫的備份。Zeabur 無法備份或還原這個資料庫。",
   "db.backup.none": "沒有備份",
   "db.backup.last": "上次備份",
   "db.backup.noRun": "還沒有備份",

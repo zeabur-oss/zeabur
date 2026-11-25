@@ -427,7 +427,7 @@ pub fn database(
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),
-        read_only: false,
+        unmanaged: false,
         name,
     }
 }

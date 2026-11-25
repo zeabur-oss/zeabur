@@ -9,7 +9,7 @@ export interface ServiceRef {
 }
 
 export interface DatabaseRef {
-  /** `databaseKind`: the engine, or the provider of a database Zeabur only shows. */
+  /** `databaseKind`: the engine, or the provider of a database Zeabur did not create. */
   engine: string
   name: string
 }
@@ -106,7 +106,7 @@ export function openShell(
 /** Opens a terminal in the database's server, or shows the one already open. */
 export const openDatabaseShell = (
   project: string,
-  database: DatabaseRef & { kind: string; provider?: string; readOnly?: boolean },
+  database: DatabaseRef & { kind: string; provider?: string; unmanaged?: boolean },
   pod?: string,
 ) =>
   openShell(project, { kind: database.kind, name: database.name }, pod, {

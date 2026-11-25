@@ -1,7 +1,7 @@
 //! MongoDB Controllers for Kubernetes (MCK): MongoDB replica sets from `MongoDBCommunity` objects.
 //!
-//! Zeabur shows them and does not change them: MCK Community has no backup of its own, so Zeabur
-//! cannot back one up or restore it [mck-crd].
+//! Zeabur shows them and edits only their YAML. It does not create or delete them, and MCK
+//! Community has no backup of its own, so Zeabur cannot back one up or restore it [mck-crd].
 //!
 //! # As a database
 //!
@@ -294,7 +294,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject) -> Database {
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: None,
-        read_only: true,
+        unmanaged: true,
         name,
     }
 }
@@ -335,7 +335,7 @@ mod tests {
                     "currentMongoDBMembers": 3, "currentStatefulSetReplicas": 3}
             })),
         );
-        assert!(db.read_only);
+        assert!(db.unmanaged);
         assert_eq!((db.state, db.members, db.ready), (State::Ready, 3, 3));
         assert_eq!(db.version.as_deref(), Some("8.0.4"));
         assert_eq!(

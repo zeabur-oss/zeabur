@@ -8537,11 +8537,6 @@ components:
         provider:
           type: string
           description: The provider (module id).
-        readOnly:
-          type: boolean
-          description: |-
-            Zeabur only shows it: it cannot change, back up, restore or export it, since its operator
-            has no backup Zeabur can run (MongoDB Controllers for Kubernetes).
         ready:
           type: integer
           format: int64
@@ -8574,6 +8569,11 @@ components:
           description: |-
             The `StorageClass` of each member's volume, as asked for; absent for the cluster's
             default.
+        unmanaged:
+          type: boolean
+          description: |-
+            Zeabur shows it and edits its YAML, but does not create, delete, back up, restore or
+            export it.
         version:
           type:
           - string
@@ -8793,12 +8793,14 @@ components:
         module:
           type: string
           description: The operator's module (`cloudnative-pg`).
-        readOnly:
-          type: boolean
-          description: Zeabur only shows its databases and does not create them.
         state:
           $ref: "#/components/schemas/ProviderState"
           description: Whether its objects could be read.
+        unmanaged:
+          type: boolean
+          description: |-
+            Zeabur shows its databases and edits their YAML, but does not create, delete, back up,
+            restore or export them.
     DatabaseRecoveryWindow:
       type: object
       description: The times a new database can recover to.

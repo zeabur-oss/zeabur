@@ -693,8 +693,14 @@ pub(crate) mod tests {
         for verb in ["create", "update", "patch", "delete"] {
             for role in [developer, viewer] {
                 assert!(!allows(role, verb, restores), "{verb} {restores}");
-                assert!(!allows(role, verb, shown), "{verb} {shown}");
             }
+            let edits = matches!(verb, "update" | "patch");
+            assert_eq!(
+                allows(developer, verb, shown),
+                edits,
+                "developer {verb} {shown}"
+            );
+            assert!(!allows(viewer, verb, shown), "viewer {verb} {shown}");
         }
     }
 

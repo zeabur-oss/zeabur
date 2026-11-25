@@ -5495,11 +5495,6 @@ export type Database = {
   primary?: string | null
   /** The provider (module id). */
   provider: string
-  /**
-   * Zeabur only shows it: it cannot change, back up, restore or export it, since its operator
-   * has no backup Zeabur can run (MongoDB Controllers for Kubernetes).
-   */
-  readOnly?: boolean
   /** Members ready. */
   ready: number
   /** The object's plural resource name. */
@@ -5523,6 +5518,11 @@ export type Database = {
    * @nullable
    */
   storageClass?: string | null
+  /**
+   * Zeabur shows it and edits its YAML, but does not create, delete, back up, restore or
+   * export it.
+   */
+  unmanaged?: boolean
   /**
    * The server version, as reported, else from the image tag.
    * @nullable
@@ -5551,10 +5551,13 @@ export type DatabaseOperator = {
   engine: DatabaseEngine
   /** The operator's module (`cloudnative-pg`). */
   module: string
-  /** Zeabur only shows its databases and does not create them. */
-  readOnly?: boolean
   /** Whether its objects could be read. */
   state: ProviderState
+  /**
+   * Zeabur shows its databases and edits their YAML, but does not create, delete, back up,
+   * restore or export them.
+   */
+  unmanaged?: boolean
 }
 
 /**

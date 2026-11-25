@@ -65,8 +65,8 @@ OSS (`zeabur-api` and the binaries) may depend on it, never the core crates;
 The databases capability (`databases`) has six providers: CloudNativePG, the Percona Operator
 for MongoDB, MongoDB Controllers for Kubernetes, MOCO, mariadb-operator and the Dragonfly
 Operator. Like backups, they share only what a person asks of any database: whether it is up, its
-members, version, where to connect, and its backups. Zeabur only shows the databases of MongoDB
-Controllers for Kubernetes: it has no backup Zeabur can run.
+members, version, where to connect, and its backups. Zeabur does not create the databases of
+MongoDB Controllers for Kubernetes and edits only their YAML: it has no backup Zeabur can run.
 
 [inventory]: https://github.com/dtolnay/inventory
 [bevy-plugins]: https://docs.rs/bevy/latest/bevy/app/trait.Plugin.html

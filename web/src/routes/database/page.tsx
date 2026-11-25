@@ -115,13 +115,9 @@ import { databaseKind } from "@/lib/place"
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
 
-/** Dragonfly has no Backups tab; a database Zeabur only shows has no Settings. */
+/** Dragonfly has no Backups tab. */
 const tabsOf = (database: Database) =>
-  databaseTabs.filter(
-    (value) =>
-      (value !== "backups" || backsUp(database.engine)) &&
-      (value !== "settings" || !database.readOnly),
-  )
+  backsUp(database.engine) ? databaseTabs : databaseTabs.filter((value) => value !== "backups")
 
 const tabIcons: Record<DatabaseTab, Icon> = {
   overview: InfoIcon,
@@ -508,7 +504,8 @@ function Overview({
   )
 }
 
-/** The page's menu. A database Zeabur only shows can be copied, but not deleted or exported. */
+/** The page's menu. A database Zeabur did not create can be copied, but not deleted or
+ * exported. */
 function DatabaseMenu({
   project,
   database,
@@ -522,7 +519,7 @@ function DatabaseMenu({
 }) {
   const t = useT()
   const copy = `${database.resource}/${database.name}`
-  if (database.readOnly) return <StoreMenu copy={copy} />
+  if (database.unmanaged) return <StoreMenu copy={copy} />
   return (
     <StoreMenu copy={copy} deleteGate={deleteGate} deleteLabel={t("db.delete")} onDelete={onDelete}>
       <ExportItem project={project} database={database} />
@@ -682,11 +679,11 @@ function Backups({
   const store = database.backups.store
   const on = backupsOn(database)
   const pluginMissing = database.engine === "postgresql" && !readable && operator
-  if (database.readOnly)
+  if (database.unmanaged)
     return (
       <Alert>
         <InfoIcon aria-hidden="true" />
-        <AlertDescription>{t("db.backup.shownOnly")}</AlertDescription>
+        <AlertDescription>{t("db.backup.unmanaged")}</AlertDescription>
       </Alert>
     )
   return (

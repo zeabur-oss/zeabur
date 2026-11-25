@@ -447,7 +447,7 @@ fn wrong_port() -> Option<String> {
     std::env::var("ZEABUR_DEMO_WRONG_PORT").ok()
 }
 
-/// Lab's MongoDB made with MongoDB Controllers for Kubernetes, which Zeabur only shows.
+/// Lab's MongoDB made with MongoDB Controllers for Kubernetes, which Zeabur does not create.
 fn mongodb_community() -> DynamicObject {
     from(json!({
         "apiVersion": "mongodbcommunity.mongodb.com/v1", "kind": "MongoDBCommunity",

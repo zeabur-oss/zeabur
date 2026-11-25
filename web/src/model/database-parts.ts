@@ -61,7 +61,7 @@ export interface DatabaseNode {
   volumes: { name: string; size?: string | null }[]
 }
 
-const databaseNodeId = (database: Pick<Database, "engine" | "name" | "provider" | "readOnly">) =>
+const databaseNodeId = (database: Pick<Database, "engine" | "name" | "provider" | "unmanaged">) =>
   `database:${databaseKind(database)}/${database.name}`
 
 /** `claims` from the whole project give a volume its size when the database has none. */

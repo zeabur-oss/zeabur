@@ -240,15 +240,15 @@ mod tests {
             .iter()
             .find(|o| o["module"] == "mongodb-kubernetes")
             .unwrap();
-        assert_eq!(operator["readOnly"], true);
+        assert_eq!(operator["unmanaged"], true);
         let events = named(&answer, "events");
         assert_eq!(events["engine"], "mongodb");
-        assert_eq!(events["readOnly"], true);
+        assert_eq!(events["unmanaged"], true);
         assert_eq!(events["state"], "ready");
         assert_eq!(events["pods"][0]["name"], "events-0");
         assert_eq!(events["connection"]["host"], "events-svc.shop.svc");
         assert_eq!(events["connection"]["secret"], "events-admin-app");
-        assert!(named(&answer, "mysql").get("readOnly").is_none());
+        assert!(named(&answer, "mysql").get("unmanaged").is_none());
     }
 
     #[tokio::test]

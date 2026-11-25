@@ -124,7 +124,7 @@ const mongo: Database = {
   } as unknown as Database["object"],
 }
 
-/** A `MongoDBCommunity` of MongoDB Controllers for Kubernetes, which Zeabur only shows. */
+/** A `MongoDBCommunity` of MongoDB Controllers for Kubernetes, which Zeabur does not create. */
 const community: Database = {
   ...mongo,
   apiVersion: "mongodbcommunity.mongodb.com/v1",
@@ -133,7 +133,7 @@ const community: Database = {
   resource: "mongodbcommunity",
   provider: "mongodb-kubernetes",
   version: "8.0.4",
-  readOnly: true,
+  unmanaged: true,
   connection: {
     host: "mongo-svc.shop.svc",
     port: 27017,
@@ -275,7 +275,7 @@ describe("MongoDB 8 memory setting", () => {
     expect(rseqNote(fixed)).toBe("set")
   })
 
-  test("a MongoDB 8 that Zeabur only shows gets no note", () => {
+  test("a MongoDB 8 that Zeabur did not create gets no note", () => {
     expect(rseqNote(community)).toBeUndefined()
   })
 
@@ -477,16 +477,16 @@ describe("operator names", () => {
     expect(operatorName(operator("mongodb-kubernetes"))).toBe("MongoDB Controllers for Kubernetes")
   })
 
-  test("leave an operator whose databases Zeabur only shows out of creating", () => {
+  test("leave an operator whose databases Zeabur does not create out of creating", () => {
     const operators = [
-      { engine: "mongodb", module: "mongodb-kubernetes", state: "installed", readOnly: true },
+      { engine: "mongodb", module: "mongodb-kubernetes", state: "installed", unmanaged: true },
       { engine: "mongodb", module: "percona-server-mongodb", state: "not-installed" },
     ] as Schemas.DatabaseOperator[]
     expect(creatable(operators).map((o) => o.module)).toEqual(["percona-server-mongodb"])
   })
 })
 
-describe("a shown-only database beside a managed one of the same name", () => {
+describe("a database Zeabur did not create beside one of the same engine and name", () => {
   test("has its own address and graph node", () => {
     expect(databaseLink("shop", mongo).params.engine).toBe("mongodb")
     expect(databaseLink("shop", community).params.engine).toBe("mongodb-kubernetes")
