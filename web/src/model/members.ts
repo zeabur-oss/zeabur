@@ -47,6 +47,20 @@ export function filterMembers(members: readonly Member[], query: string): Member
   })
 }
 
+/** How many ways a member can sign in: each passkey, each linked account and a password. */
+export function signInMethods(member: Pick<Member, "passkeys" | "linked" | "password">): number {
+  return member.passkeys.length + member.linked.length + (member.password ? 1 : 0)
+}
+
+/** Whether a member cannot sign in yet, or is one lost sign-in method away from that. */
+export function signInWarning(
+  member: Pick<Member, "passkeys" | "linked" | "password">,
+): "cannot" | "single" | undefined {
+  const count = signInMethods(member)
+  if (count === 0) return "cannot"
+  return count === 1 ? "single" : undefined
+}
+
 /** One passkey is one lost device away from being locked out. */
 export function needsBackup(member: Pick<Member, "passkeys">): boolean {
   return member.passkeys.length === 1

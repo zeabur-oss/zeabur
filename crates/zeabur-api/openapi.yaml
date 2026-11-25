@@ -12279,6 +12279,11 @@ components:
             items:
               $ref: "#/components/schemas/PasskeyView"
             description: Passkeys, oldest first.
+          password:
+            oneOf:
+            - $ref: "#/components/schemas/PasswordView"
+              description: Their password, if they set one.
+            - type: "null"
           projects:
             type:
             - array
@@ -14017,6 +14022,35 @@ components:
           description: >-
             Whether it may be synced to the owner's other devices (the authenticator's BE
             flag).
+    PasswordView:
+      type: object
+      description: A password, with or without a second factor. A member has at most one.
+      required:
+      - id
+      - secondFactor
+      - origin
+      properties:
+        createdAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: When it was set.
+        id:
+          type: string
+          description: The `Credential` object's name.
+        lastUsedAt:
+          type:
+          - string
+          - "null"
+          format: date-time
+          description: When it last signed in, where recorded.
+        origin:
+          $ref: "#/components/schemas/Origin"
+          description: The `Credential`.
+        secondFactor:
+          type: boolean
+          description: Whether sign-in asks for an authenticator code after the password.
     PendingRestart:
       type: object
       description: |-

@@ -40,6 +40,8 @@ import {
   membersLayout,
   needsBackup,
   pendingInvitations,
+  signInMethods,
+  signInWarning,
   sortMembers,
   type Invitation,
   type Member,
@@ -197,7 +199,7 @@ function MemberList({ items, onOpen }: { items: Member[]; onOpen: (open: Open) =
         >
           <span>{t("members.column.name")}</span>
           <span>{t("members.column.role")}</span>
-          <span>{t("members.column.passkeys")}</span>
+          <span>{t("members.column.signIn")}</span>
           <span>{t("members.column.lastSignIn")}</span>
           <span />
         </div>
@@ -215,17 +217,50 @@ function MemberList({ items, onOpen }: { items: Member[]; onOpen: (open: Open) =
   )
 }
 
-function PasskeyCount({ member }: { member: Member }) {
+function SignInMethods({ member }: { member: Member }) {
   const t = useT()
-  const count = member.passkeys.length
-  const words = count === 0 ? t("members.noPasskey") : t("members.passkeys", count)
-  if (count > 1) return <span className="text-muted-foreground">{words}</span>
+  const warning = signInWarning(member)
+  if (warning === "cannot")
+    return (
+      <Tooltip content={t("members.noSignInHint")}>
+        <span className="inline-flex items-center gap-1 text-warn-strong">
+          <ShieldWarningIcon aria-hidden="true" className="size-3.5" />
+          {t("members.noSignIn")}
+        </span>
+      </Tooltip>
+    )
+  const methods = [
+    ...(member.passkeys.length > 0 ? [t("members.passkeys", member.passkeys.length)] : []),
+    ...member.linked.map((l) => l.provider),
+    ...(member.password
+      ? [t(member.password.secondFactor ? "members.passwordWithCode" : "members.password")]
+      : []),
+  ]
+  const listed = t("common.list", methods)
   return (
-    <Tooltip content={count === 0 ? t("members.noPasskeyHint") : t("members.onePasskeyHint")}>
-      <span className="inline-flex items-center gap-1 text-warn-strong">
-        <ShieldWarningIcon aria-hidden="true" className="size-3.5" />
-        {words}
-      </span>
+    <Tooltip
+      content={
+        warning === "single" ? (
+          <>
+            {listed}
+            <br />
+            {t("members.oneSignInHint")}
+          </>
+        ) : (
+          listed
+        )
+      }
+    >
+      {warning === "single" ? (
+        <span className="inline-flex items-center gap-1 text-warn-strong">
+          <ShieldWarningIcon aria-hidden="true" className="size-3.5" />
+          {t("members.signInMethods", 1)}
+        </span>
+      ) : (
+        <span className="text-muted-foreground">
+          {t("members.signInMethods", signInMethods(member))}
+        </span>
+      )}
     </Tooltip>
   )
 }
@@ -274,7 +309,7 @@ function MemberRow({ member, onOpen }: { member: Member; onOpen: (open: Open) =>
         ))}
       </span>
       <span className="whitespace-nowrap">
-        <PasskeyCount member={member} />
+        <SignInMethods member={member} />
       </span>
       <span className="max-md:hidden">
         {member.lastSignInAt ? <Ago iso={member.lastSignInAt} /> : <span>—</span>}

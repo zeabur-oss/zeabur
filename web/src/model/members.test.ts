@@ -22,6 +22,7 @@ import {
   pickerHasFilter,
   pickerProjects,
   projectPeople,
+  signInWarning,
   sortMembers,
   writeCounts,
   writtenName,
@@ -86,6 +87,16 @@ describe("members", () => {
     expect(needsBackup(member("a"))).toBe(true)
     expect(needsBackup(member("a", { passkeys: [] }))).toBe(false)
     expect(needsBackup(member("a", { passkeys: [passkey("1"), passkey("2")] }))).toBe(false)
+  })
+
+  it("counts a password and linked accounts as ways to sign in", () => {
+    const linked = { id: "c-g", provider: "GitHub", origin }
+    const password = { id: "c-p", secondFactor: false, origin }
+    expect(signInWarning(member("a", { passkeys: [] }))).toBe("cannot")
+    expect(signInWarning(member("a", { passkeys: [], password }))).toBe("single")
+    expect(signInWarning(member("a", { passkeys: [], linked: [linked] }))).toBe("single")
+    expect(signInWarning(member("a", { linked: [linked] }))).toBe(undefined)
+    expect(signInWarning(member("a", { linked: [linked], password }))).toBe(undefined)
   })
 
   it("keeps your own last passkey, never someone else's", () => {

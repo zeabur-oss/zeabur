@@ -50,7 +50,8 @@ mod tokens;
 mod writes;
 
 pub use directory::{
-    InvitationView, LinkedAccountView, MemberRole, MemberView, MembersView, PasskeyView, SetupLinks,
+    InvitationView, LinkedAccountView, MemberRole, MemberView, MembersView, PasskeyView,
+    PasswordView, SetupLinks,
 };
 pub use plan::{
     MemberApplied, MemberApplyRequest, MemberChange, MemberPlan, MemberWrite, MemberWriteAction,
