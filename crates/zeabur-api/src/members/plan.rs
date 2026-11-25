@@ -617,6 +617,18 @@ async fn invite(
         computed
             .versions
             .insert(key(&user_target), version.to_owned());
+        let directory = directory(cluster, namespace).await?;
+        for invitation in directory
+            .invitations
+            .iter()
+            .filter(|i| i.spec.user == username)
+        {
+            computed.delete(
+                super::writes::target(IdentityKind::Invitation, namespace, invitation.name()),
+                invitation.metadata.uid.clone(),
+                None,
+            );
+        }
     } else {
         computed.new_member = true;
         computed.create(

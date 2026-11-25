@@ -342,22 +342,18 @@ mod tests {
         let path = "/api/v1/members/bob/setup-links";
         let (status, first) = call(&cluster, "POST", path, Some(&json!({}))).await;
         assert_eq!(status, StatusCode::CREATED, "{first}");
-        let name = first["name"].as_str().unwrap();
-        assert_eq!(invitations_of(&cluster, "bob"), [name]);
         let (status, second) = call(&cluster, "POST", path, Some(&json!({}))).await;
         assert_eq!(status, StatusCode::CREATED, "{second}");
         assert_ne!(first["url"], second["url"]);
-        // One name per member: a second link made at the same moment is refused at creation.
-        assert_eq!(second["name"], first["name"]);
+        assert_ne!(first["name"], second["name"]);
+        let name = second["name"].as_str().unwrap();
         assert_eq!(invitations_of(&cluster, "bob"), [name]);
+        let made = writes(&cluster);
+        assert_eq!(made.len(), 4, "{made:?}");
+        assert_eq!(made[1], "delete Invitation/inv-bob");
         assert_eq!(
-            writes(&cluster),
-            [
-                "delete Invitation/inv-bob".to_owned(),
-                format!("create Invitation/{name}"),
-                format!("delete Invitation/{name}"),
-                format!("create Invitation/{name}"),
-            ]
+            made[3],
+            format!("delete Invitation/{}", first["name"].as_str().unwrap())
         );
     }
 
@@ -585,7 +581,10 @@ mod tests {
             change(&cluster, json!({"op": "invite", "username": "bob"})).await;
         assert_eq!(status, StatusCode::OK, "{applied}");
         assert_eq!(plan["newMember"], false);
-        assert_eq!(planned(&plan), ["create Invitation/inv-"]);
+        assert_eq!(
+            planned(&plan),
+            ["delete Invitation/inv-bob", "create Invitation/inv-"]
+        );
         assert_eq!(applied["link"]["createdMember"], false);
         assert_eq!(writes(&cluster).len(), 2);
         let (status, ..) = change(&cluster, json!({"op": "invite", "username": "Bob Smith"})).await;

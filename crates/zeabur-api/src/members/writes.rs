@@ -316,18 +316,10 @@ pub(crate) fn invitation(
     }
 }
 
-/// The name of `username`'s one invitation: a hash, since a token ends its name at the first dot
-/// and a user name may hold dots. One name per member is what lets the server refuse a second
-/// link made at the same moment.
-fn invitation_name(username: &str) -> String {
-    let digest: Vec<u8> = sha256(username.as_bytes()).into_iter().take(8).collect();
-    format!("inv-{}", hex(&digest))
-}
-
-/// Makes the one invitation for the `User` `user` (as read, with its `uid`) lasting `seconds`
-/// from `now`, and returns its link. The member's earlier invitations are deleted first, so an
-/// older link stops working. Two links made at once cannot both survive: they share a name, so
-/// the second creation is refused.
+/// Makes an invitation for the `User` `user` (as read, with its `uid`) lasting `seconds` from
+/// `now`, and returns its link. Then it deletes the member's other invitations, so an older link
+/// stops working. Every request deletes the others only after its own invitation exists, so of
+/// two made at once the later sweep removes the other: never two links stay valid.
 pub(crate) async fn issue(
     cluster: &dyn Cluster,
     namespace: &str,
@@ -336,21 +328,18 @@ pub(crate) async fn issue(
     now: Timestamp,
     seconds: i64,
 ) -> Result<(String, String, Timestamp), ApiError> {
+    let suffix = random::<8>().map_err(|_random| {
+        ApiError::from(Problem::new(
+            Kind::Internal,
+            "Zeabur could not make a random name.",
+        ))
+    })?;
+    let name = format!("inv-{}", hex(&suffix));
+    let token = token(&name)?;
     let user = user
         .get("metadata")
         .and_then(|m| ObjectMeta::deserialize(m).ok())
         .unwrap_or_default();
-    let username = user.name.clone().unwrap_or_default();
-    let earlier = read::<Object<InvitationSpec>>(cluster, namespace, IdentityKind::Invitation)
-        .await
-        .map_err(|e| read_error(e, namespace, IdentityKind::Invitation))?;
-    if let Read::Objects(earlier) = earlier {
-        for invitation in earlier.iter().filter(|i| i.spec.user == username) {
-            delete(cluster, IdentityKind::Invitation, namespace, invitation).await?;
-        }
-    }
-    let name = invitation_name(&username);
-    let token = token(&name)?;
     let expires_at = now
         .checked_add(SignedDuration::from_secs(seconds))
         .map_err(|_overflow| {
@@ -374,6 +363,18 @@ pub(crate) async fn issue(
         WriteBody::Create(object),
     )
     .await?;
+    let username = user.name.clone().unwrap_or_default();
+    let all = read::<Object<InvitationSpec>>(cluster, namespace, IdentityKind::Invitation)
+        .await
+        .map_err(|e| read_error(e, namespace, IdentityKind::Invitation))?;
+    if let Read::Objects(all) = all {
+        for earlier in all
+            .iter()
+            .filter(|i| i.spec.user == username && i.name() != name)
+        {
+            delete(cluster, IdentityKind::Invitation, namespace, earlier).await?;
+        }
+    }
     Ok((link(issuer, &token), name, expires_at))
 }
 
