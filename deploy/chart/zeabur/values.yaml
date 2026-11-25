@@ -285,6 +285,33 @@ components:
 templateFetch:
   enabled: true
 
+# The pod's and the container's security context for Zeabur, Zeabur Proxy and the install-time Job
+# (the Job's container keeps its own, which does not set runAsNonRoot). Map values merge with these
+# defaults: set a key to null to drop it.
+podSecurityContext:
+  runAsUser: 65532
+  runAsGroup: 65532
+  runAsNonRoot: true
+  # Secret volume files belong to root with mode 0440; the kubelet gives them this group.
+  fsGroup: 65532
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  readOnlyRootFilesystem: true
+  runAsNonRoot: true
+  capabilities:
+    drop: [ALL]
+
+serviceAccount:
+  # Annotations on Zeabur's ServiceAccount, such as the cloud identity a managed cluster's
+  # workload identity maps it to.
+  annotations: {}
+
+# The PriorityClass of the pods of Zeabur, Zeabur Proxy and the install-time Job. Empty: the
+# cluster's default.
+priorityClassName: ""
+
 podAnnotations: {}
 podLabels: {}
 nodeSelector: {}

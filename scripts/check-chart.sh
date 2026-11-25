@@ -413,6 +413,31 @@ for args in "-f $chart/ci/minimal-values.yaml" \
   done
 done
 
+# The security contexts, the ServiceAccount's annotations and the priority class: the defaults
+# are the locked-down contexts the checks above assert, and each value reaches every pod it names.
+sec_args=(-f "$chart/ci/minimal-values.yaml" --set proxy.enabled=true
+  --set podSecurityContext.runAsUser=1000 --set podSecurityContext.runAsGroup=null
+  --set securityContext.readOnlyRootFilesystem=false
+  --set-string 'serviceAccount.annotations.example\.test/role=zeabur'
+  --set priorityClassName=system-cluster-critical)
+rendered=$(render_all "${sec_args[@]}")
+for workload in 'Deployment" and .metadata.name == "zeabur' 'Deployment" and .metadata.name == "zeabur-proxy' 'Job" and .metadata.name == "zeabur-components'; do
+  pod_spec="select(.kind == \"$workload\") | .spec.template.spec"
+  expect "pod security context" "$rendered" "$pod_spec | .securityContext | [.runAsUser, .runAsGroup, .runAsNonRoot, .fsGroup] | join(\",\")" "1000,,true,65532"
+  expect "priorityClassName" "$rendered" "$pod_spec | .priorityClassName" system-cluster-critical
+done
+for workload in 'Deployment" and .metadata.name == "zeabur' 'Deployment" and .metadata.name == "zeabur-proxy'; do
+  expect "container security context" "$rendered" \
+    "select(.kind == \"$workload\") | .spec.template.spec.containers[0].securityContext | [.readOnlyRootFilesystem, .allowPrivilegeEscalation, .runAsNonRoot] | join(\",\")" "false,false,true"
+done
+expect "serviceAccount.annotations" "$rendered" \
+  'select(.kind == "ServiceAccount" and .metadata.name == "zeabur") | .metadata.annotations["example.test/role"]' zeabur
+expect "serviceAccount.annotations" "$rendered" \
+  '[select(.kind == "ServiceAccount" and .metadata.name != "zeabur") | .metadata.annotations["example.test/role"]] | map(select(. != null)) | length' 0
+rendered=$(render_all -f "$chart/ci/minimal-values.yaml" --set proxy.enabled=true)
+expect "priorityClassName unset" "$rendered" '[select(.kind == "Deployment" or .kind == "Job") | .spec.template.spec.priorityClassName] | map(select(. != null)) | length' 0
+expect "serviceAccount.annotations unset" "$rendered" '[select(.kind == "ServiceAccount" and (.metadata.name | test("^zeabur(-proxy)?$"))) | .metadata.annotations] | map(select(. != null)) | length' 0
+
 if ((failures > 0)); then
   echo "$failures chart check(s) failed" >&2
   exit 1
