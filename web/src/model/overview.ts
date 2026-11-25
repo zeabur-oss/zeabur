@@ -1,7 +1,7 @@
 // What a service's Overview says, each cause once: the diagnoses that are causes, what they also
 // take down, whether a rollout gets a card of its own, and the warnings no diagnosis explains.
 import type { Schemas } from "@/api/client"
-import { isWarning, type Event, type Pod } from "@/model/service"
+import { isWarning, type Event } from "@/model/service"
 
 type Diagnosis = Schemas.Diagnosis
 type Rollout = Schemas.RolloutProgress
@@ -25,28 +25,6 @@ const explains: Record<Diagnosis["kind"], readonly string[]> = {
   unreachable: [],
   unexplained: [],
 }
-
-const initContainerOf = (fieldPath?: string | null) =>
-  /^spec\.initContainers\{(.+)\}$/.exec(fieldPath ?? "")?.[1]
-
-/**
- * Whether a warning still says something about its pod. An event stays in the cluster for an
- * hour, so the pod's state decides: a pod that is gone or being replaced, a pod that is ready,
- * and an init container that has since completed are all past what the event says.
- */
-function isCurrent(event: Event, pods: readonly Pod[]): boolean {
-  const about = event.regarding
-  if (about?.kind !== "Pod") return true
-  const pod = pods.find((p) => p.name === about.name)
-  if (!pod || pod.terminating || pod.ready) return false
-  const init = initContainerOf(about.fieldPath)
-  const status = init ? pod.containerStatuses?.find((c) => c.init && c.name === init) : undefined
-  return status?.terminated?.exitCode !== 0
-}
-
-/** The events that still say something, given the pods now: see [`isCurrent`]. */
-export const currentEvents = (events: Event[], pods: readonly Pod[]) =>
-  events.filter((event) => isCurrent(event, pods))
 
 export function explainedBy(event: Event, diagnoses: Diagnosis[]): boolean {
   return diagnoses.some((d) => {

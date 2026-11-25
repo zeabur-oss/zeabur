@@ -56,7 +56,7 @@ import { alertsFor, folded } from "@/model/alerts"
 import { failureText, runsOf, type Build, type BuildRun } from "@/model/builds"
 import { neighboursOf, type Edge } from "@/model/connections"
 import { edgeText } from "@/model/evidence"
-import { currentEvents, overviewOf, type Overview } from "@/model/overview"
+import { overviewOf, type Overview } from "@/model/overview"
 import { verdictOf, type Verdict } from "@/model/verdict"
 import {
   imageTag,
@@ -108,7 +108,7 @@ export function OverviewTab({
     },
     task ? undefined : rollout.data,
     trace.data?.routes ?? [],
-    currentEvents(events, service.pods),
+    events,
   )
   const diagnosed = said.causes.length > 0
   const wrong = useWrongPort(project, service)

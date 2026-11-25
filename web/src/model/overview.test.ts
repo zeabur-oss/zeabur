@@ -2,8 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import { en } from "@/i18n/en"
-import { currentEvents, eventWord, explainedBy, overviewOf, suggestionsOf } from "@/model/overview"
-import type { Event, Pod } from "@/model/service"
+import { eventWord, explainedBy, overviewOf, suggestionsOf } from "@/model/overview"
+import type { Event } from "@/model/service"
 
 type Diagnosis = Schemas.Diagnosis
 type Rollout = Schemas.RolloutProgress
@@ -61,18 +61,6 @@ const event = (name: string, reason: string, pod: string, type = "Warning"): Eve
   note: "",
   count: 1,
   type,
-})
-
-const pod = (name: string, more: Partial<Pod> = {}): Pod => ({
-  id: `projects/blog/pods/${name}`,
-  name,
-  phase: "Running",
-  ready: false,
-  restarts: 0,
-  health: "warn",
-  containers: ["web"],
-  origin: { kind: "Pod", name },
-  ...more,
 })
 
 const rollout = (more: Partial<Rollout>): Rollout => ({
@@ -190,34 +178,6 @@ describe("warnings on the overview", () => {
       [backOff, failed, other, normal],
     )
     expect(o.warnings).toStrictEqual([other])
-  })
-
-  test("leave out what is past: a pod that is gone, being replaced or ready, a finished init container", () => {
-    const old = event("a", "Unhealthy", "web-old")
-    const replaced = event("b", "Unhealthy", "web-1")
-    const ready = event("c", "Unhealthy", "web-2")
-    const retried: Event = {
-      ...event("d", "BackOff", "web-3"),
-      regarding: { kind: "Pod", name: "web-3", fieldPath: "spec.initContainers{setup}" },
-    }
-    const starting = event("e", "Unhealthy", "web-4")
-    const status = (exitCode: number) => ({
-      name: "setup",
-      init: true,
-      ready: false,
-      restarts: 2,
-      terminated: { exitCode },
-    })
-    const pods = [
-      pod("web-1", { terminating: true }),
-      pod("web-2", { ready: true, health: "ok" }),
-      pod("web-3", { containerStatuses: [status(0)] }),
-      pod("web-4"),
-    ]
-    expect(currentEvents([old, replaced, ready, retried, starting], pods)).toStrictEqual([starting])
-    expect(
-      currentEvents([retried], [pod("web-3", { containerStatuses: [status(2)] })]),
-    ).toStrictEqual([retried])
   })
 
   test("leave out what a failed run explains on its Job", () => {
