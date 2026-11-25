@@ -8602,6 +8602,13 @@ components:
       type: object
       description: Why a database cannot archive its write-ahead log.
       properties:
+        destination:
+          type:
+          - string
+          - "null"
+          description: |-
+            The bucket and path the database archives to (`s3://bucket/path`), so a wrong bucket name
+            shows. The S3 error itself is not in any Kubernetes object.
         message:
           type:
           - string

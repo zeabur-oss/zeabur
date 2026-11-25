@@ -2999,6 +2999,8 @@ export const zhCN: Messages = {
   "db.backup.archiveFailed":
     "数据库无法把预写日志（WAL）归档到备份目的地，所以备份没有作用。operator 返回如下。",
   "db.backup.archiveSince": "失败开始于",
+  "db.backup.archiveHint":
+    "S3 返回的错误只写在备份插件的日志里。请先确认存储桶名称和密钥有没有填对。",
   "db.backup.planNow": (name) => `立即备份 ${name}`,
   "db.backup.destination": "目的地",
   "db.backup.endpointFact": "端点",

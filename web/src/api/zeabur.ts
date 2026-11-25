@@ -5204,6 +5204,12 @@ export type DatabaseAppUser = {
  */
 export type DatabaseArchiveFailure = {
   /**
+   * The bucket and path the database archives to (`s3://bucket/path`), so a wrong bucket name
+   * shows. The S3 error itself is not in any Kubernetes object.
+   * @nullable
+   */
+  destination?: string | null
+  /**
    * What the operator says, as the last archive attempt reported it.
    * @nullable
    */

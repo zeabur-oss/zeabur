@@ -699,6 +699,15 @@ function ArchiveFailure({ failure }: { failure: Database["backups"]["archiveFail
             {failure.message}
           </p>
         ) : null}
+        {failure.destination ? (
+          <p className="wrap-anywhere">
+            <span className="type-meta">{t("db.backup.destination")}</span>{" "}
+            <span className="type-mono" translate="no">
+              {failure.destination}
+            </span>
+          </p>
+        ) : null}
+        <p className="type-meta">{t("db.backup.archiveHint")}</p>
         {failure.since ? (
           <p className="type-meta">
             {t("db.backup.archiveSince")} <Ago iso={failure.since} />

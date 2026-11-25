@@ -3007,6 +3007,8 @@ export const zhTW: Messages = {
   "db.backup.archiveFailed":
     "資料庫無法把交易日誌（WAL）封存到備份目的地，所以備份沒有作用。operator 回報如下。",
   "db.backup.archiveSince": "失敗開始於",
+  "db.backup.archiveHint":
+    "要看 S3 的錯誤，得去備份外掛的日誌。先檢查儲存貯體名稱和金鑰有沒有填對。",
   "db.backup.planNow": (name) => `立即備份 ${name}`,
   "db.backup.destination": "目的地",
   "db.backup.endpointFact": "端點",

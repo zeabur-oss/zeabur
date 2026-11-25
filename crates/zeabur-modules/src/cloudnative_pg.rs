@@ -241,8 +241,10 @@ fn true_since(cluster: &DynamicObject, kind: &str) -> Option<Timestamp> {
         .and_then(|t| t.parse().ok())
 }
 
-/// Archiving fails: `ContinuousArchiving` is `False`, with the operator's message.
-fn archive_failure(cluster: &DynamicObject) -> Option<ArchiveFailure> {
+/// Archiving fails: `ContinuousArchiving` is `False`, with the operator's message and the
+/// destination the `Cluster` archives to. The message is the archiver's exit status; the S3 error
+/// itself is only in the plugin's log, which no Kubernetes object carries.
+fn archive_failure(cluster: &DynamicObject, store: Option<&Store>) -> Option<ArchiveFailure> {
     let failing = cluster
         .data
         .pointer("/status/conditions")?
@@ -251,6 +253,7 @@ fn archive_failure(cluster: &DynamicObject) -> Option<ArchiveFailure> {
         .find(|c| c["type"] == "ContinuousArchiving" && c["status"] == "False")?;
     Some(ArchiveFailure {
         message: databases::condition_message(cluster, "ContinuousArchiving"),
+        destination: store.and_then(|s| s.destination.clone()),
         since: failing["lastTransitionTime"]
             .as_str()
             .and_then(|t| t.parse().ok()),
@@ -371,6 +374,7 @@ pub fn database(
         .and_then(|s| s.metadata.creation_timestamp.as_ref())
         .map(|t| t.0);
     let recovery_window = recovery_window(cluster, in_use);
+    let archive_failure = archive_failure(cluster, store.as_ref());
     Database {
         origin: zeabur_model::Origin::complete(
             "postgresql.cnpg.io/v1",
@@ -421,7 +425,7 @@ pub fn database(
             schedules: found.schedules,
             runs: found.runs,
             recovery_window,
-            archive_failure: archive_failure(cluster),
+            archive_failure,
         },
         created_at: cluster.metadata.creation_timestamp.as_ref().map(|t| t.0),
         object: databases::written(cluster),
@@ -730,6 +734,7 @@ mod tests {
         let store = object(serde_json::json!({
             "apiVersion": "barmancloud.cnpg.io/v1", "kind": "ObjectStore",
             "metadata": {"name": "pg-backups", "namespace": "shop"},
+            "spec": {"configuration": {"destinationPath": "s3://bucket/shop"}},
         }));
         let backups = |condition| {
             database(
@@ -752,6 +757,7 @@ mod tests {
             failing.archive_failure,
             Some(ArchiveFailure {
                 message: Some(message.to_owned()),
+                destination: Some("s3://bucket/shop".to_owned()),
                 since: Some("2026-10-22T16:02:32Z".parse().unwrap()),
             })
         );
