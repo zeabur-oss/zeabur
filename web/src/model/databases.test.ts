@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
 import { actionOf, describe as describePlan } from "@/components/plan/describe"
+import { databaseLink } from "@/lib/place"
+import { databaseNodes } from "@/model/database-parts"
 import type { Translate } from "@/i18n"
 
 import {
@@ -481,6 +483,15 @@ describe("operator names", () => {
       { engine: "mongodb", module: "percona-server-mongodb", state: "not-installed" },
     ] as Schemas.DatabaseOperator[]
     expect(creatable(operators).map((o) => o.module)).toEqual(["percona-server-mongodb"])
+  })
+})
+
+describe("a shown-only database beside a managed one of the same name", () => {
+  test("has its own address and graph node", () => {
+    expect(databaseLink("shop", mongo).params.engine).toBe("mongodb")
+    expect(databaseLink("shop", community).params.engine).toBe("mongodb-kubernetes")
+    const ids = databaseNodes([mongo, community]).map((n) => n.id)
+    expect(new Set(ids).size).toBe(2)
   })
 })
 

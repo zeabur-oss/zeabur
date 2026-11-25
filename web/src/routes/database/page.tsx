@@ -111,6 +111,7 @@ import {
   SummaryCardWord,
 } from "@zeabur-oss/design-system/components/summary-card"
 import { TabsContent } from "@zeabur-oss/design-system/components/tabs"
+import { databaseKind } from "@/lib/place"
 
 const route = getRouteApi("/projects/$project/databases/$engine/$name")
 
@@ -157,7 +158,7 @@ export function DatabasePage() {
       </Column>
     )
   if (!query.data) return null
-  const database = query.data.items.find((d) => d.engine === engine && d.name === name)
+  const database = query.data.items.find((d) => databaseKind(d) === engine && d.name === name)
   if (!database)
     return (
       <Column>

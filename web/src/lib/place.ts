@@ -78,14 +78,23 @@ export function serviceLink(
   }
 }
 
+/** The kind part of a database's address in the interface: its engine, or the provider for a
+ * database Zeabur only shows, so it stays apart from a database of the same engine and name. */
+export const databaseKind = (database: { engine: string; provider?: string; readOnly?: boolean }) =>
+  database.readOnly && database.provider ? database.provider : database.engine
+
 export function databaseLink(
   project: string,
-  database: { engine: string; name: string },
+  database: { engine: string; name: string; provider?: string; readOnly?: boolean },
   tab?: "backups",
 ) {
   return {
     to: "/projects/$project/databases/$engine/$name" as const,
-    params: { project, engine: database.engine, name: database.name },
+    params: {
+      project,
+      engine: databaseKind(database),
+      name: database.name,
+    },
     search: { tab },
   }
 }

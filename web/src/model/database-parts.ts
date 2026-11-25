@@ -7,6 +7,7 @@ import { connected } from "@/model/connect"
 import { engineName, stateHealth, type Database } from "@/model/databases"
 import { serviceId, type Claim, type Health, type Project, type Service } from "@/model/service"
 import { bytesOf } from "@/model/volume-edit"
+import { databaseKind } from "@/lib/place"
 
 /** Whether a database's operator runs this workload for the database. */
 const isDatabasePart = (service: Pick<Service, "managedBy">) => Boolean(service.managedBy?.engine)
@@ -52,7 +53,7 @@ export const partsOf = (database: Database, services: Service[]) =>
 
 /** A database on the project map. */
 export interface DatabaseNode {
-  /** `database:<engine>/<name>`. */
+  /** `database:<kind>/<name>`, `databaseKind`. */
   id: string
   database: Database
   health: Health
@@ -60,8 +61,8 @@ export interface DatabaseNode {
   volumes: { name: string; size?: string | null }[]
 }
 
-const databaseNodeId = (database: Pick<Database, "engine" | "name">) =>
-  `database:${database.engine}/${database.name}`
+const databaseNodeId = (database: Pick<Database, "engine" | "name" | "provider" | "readOnly">) =>
+  `database:${databaseKind(database)}/${database.name}`
 
 /** `claims` from the whole project give a volume its size when the database has none. */
 export function databaseNodes(databases: Database[], claims: Claim[] = []): DatabaseNode[] {
