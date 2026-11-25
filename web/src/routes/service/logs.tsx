@@ -53,16 +53,22 @@ interface Line {
   raw: string
   text: string
   time?: number
-  stamp?: string
   source?: string
   severity: Severity
 }
 
 // oxlint-disable-next-line no-control-regex -- stripping escape sequences for matching
 const ansi = /\u001b\[[0-?]*[ -/]*[@-~]/g
-const stampRe = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?Z)\s/
+const stampRe = /^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2}))\s/
 
-function parseLine(raw: string, source?: string): Line {
+const clock = new Intl.DateTimeFormat(undefined, {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit",
+  hour12: false,
+})
+
+export function parseLine(raw: string, source?: string): Line {
   const match = raw.match(stampRe)
   const body = match ? raw.slice(match[0].length) : raw
   const plain = body.replace(ansi, "")
@@ -77,7 +83,6 @@ function parseLine(raw: string, source?: string): Line {
     raw: body,
     text: plain,
     time: match?.[1] ? Date.parse(match[1]) : undefined,
-    stamp: match?.[1],
     source,
     severity,
   }
@@ -734,9 +739,9 @@ function LogView({
                     className={cn("w-0.75 shrink-0 self-stretch", severityBar(line.severity))}
                     aria-hidden="true"
                   />
-                  {timestamps && line.stamp ? (
+                  {timestamps && line.time !== undefined ? (
                     <span className="shrink-0 text-muted-foreground select-none">
-                      {line.stamp.slice(11, 19)}
+                      {clock.format(line.time)}
                     </span>
                   ) : null}
                   {line.source ? (
