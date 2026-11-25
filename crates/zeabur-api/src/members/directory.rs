@@ -14,7 +14,7 @@ use super::{API_VERSION, DEPLOYMENT, GROUP, USER_PREFIX, VERSION};
 use crate::error::{ApiError, list_read, read_problem};
 use crate::projects::namespace::Permission;
 use crate::settings::IdentitySettings;
-use crate::views::UnreadableView;
+use crate::views::{UndecodedView, UnreadableView};
 
 /// One of Zeabur Identity's kinds.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -191,24 +191,45 @@ pub(crate) struct Directory {
     pub(crate) invitations: Vec<Object<InvitationSpec>>,
     pub(crate) grants: Vec<Object<GrantSpec>>,
     pub(crate) unreadable: Vec<UnreadableView>,
+    /// Objects of a shape Zeabur does not know.
+    pub(crate) undecoded: Vec<UndecodedView>,
     /// Each member's projects, by user name; `None` when the bindings were not read.
     pub(crate) projects: Option<std::collections::BTreeMap<String, Vec<ProjectGrant>>>,
 }
 
-/// Objects that do not decode (made by hand, from another version) are left out: one bad object
-/// must not hide everyone else.
-fn decode<O: for<'de> Deserialize<'de>>(objects: Vec<DynamicObject>) -> Vec<O> {
-    objects
-        .into_iter()
-        .filter_map(|object| serde_json::to_value(object).ok())
-        .filter_map(|value| serde_json::from_value(value).ok())
-        .collect()
+/// The objects of a kind that decode, and those that do not with why. One object of a shape
+/// Zeabur does not know must not hide everyone else, nor be left out unsaid.
+pub(crate) struct Decoded<O> {
+    pub(crate) objects: Vec<O>,
+    pub(crate) undecoded: Vec<UndecodedView>,
+}
+
+fn decode<O: for<'de> Deserialize<'de>>(
+    objects: Vec<DynamicObject>,
+    namespace: &str,
+    kind: IdentityKind,
+) -> Decoded<O> {
+    let mut decoded = Decoded {
+        objects: Vec::new(),
+        undecoded: Vec::new(),
+    };
+    for object in objects {
+        let name = object.metadata.name.clone().unwrap_or_default();
+        match serde_json::to_value(object).and_then(serde_json::from_value) {
+            Ok(object) => decoded.objects.push(object),
+            Err(error) => decoded.undecoded.push(UndecodedView {
+                origin: Origin::complete(API_VERSION, kind.kind(), Some(namespace), &name),
+                error: error.to_string(),
+            }),
+        }
+    }
+    decoded
 }
 
 /// What reading one kind gave: its objects, nothing because the API is not installed, or a
 /// refusal.
 pub(crate) enum Read<O> {
-    Objects(Vec<O>),
+    Objects(Decoded<O>),
     NotInstalled,
 }
 
@@ -220,7 +241,9 @@ pub(crate) async fn read<O: for<'de> Deserialize<'de>>(
     Ok(cluster
         .list_objects(&kind.resource(), Some(namespace))
         .await?
-        .map_or(Read::NotInstalled, |objects| Read::Objects(decode(objects))))
+        .map_or(Read::NotInstalled, |objects| {
+            Read::Objects(decode(objects, namespace, kind))
+        }))
 }
 
 /// The problem for a refused or failed read of `kind`.
@@ -237,9 +260,13 @@ fn optional<O>(
     read: Result<Read<O>, ClusterError>,
     kind: IdentityKind,
     unreadable: &mut Vec<UnreadableView>,
+    undecoded: &mut Vec<UndecodedView>,
 ) -> Vec<O> {
     match read {
-        Ok(Read::Objects(objects)) => objects,
+        Ok(Read::Objects(decoded)) => {
+            undecoded.extend(decoded.undecoded);
+            decoded.objects
+        }
         Ok(Read::NotInstalled) => Vec::new(),
         Err(error) => {
             if let Ok(refused) = error.into_unreadable(&kind.key()) {
@@ -264,24 +291,35 @@ impl Directory {
             read::<Object<InvitationSpec>>(cluster, namespace, IdentityKind::Invitation),
             read::<Object<GrantSpec>>(cluster, namespace, IdentityKind::Grant),
         );
-        let users = match users.map_err(|e| read_error(e, namespace, IdentityKind::User))? {
-            Read::Objects(users) => users,
-            Read::NotInstalled => return Ok(None),
+        let Read::Objects(users) =
+            users.map_err(|e| read_error(e, namespace, IdentityKind::User))?
+        else {
+            return Ok(None);
         };
+        let mut undecoded = users.undecoded;
         let credentials =
             match credentials.map_err(|e| read_error(e, namespace, IdentityKind::Credential))? {
-                Read::Objects(credentials) => credentials,
+                Read::Objects(credentials) => {
+                    undecoded.extend(credentials.undecoded);
+                    credentials.objects
+                }
                 Read::NotInstalled => Vec::new(),
             };
         let mut unreadable = Vec::new();
-        let invitations = optional(invitations, IdentityKind::Invitation, &mut unreadable);
-        let grants = optional(grants, IdentityKind::Grant, &mut unreadable);
+        let invitations = optional(
+            invitations,
+            IdentityKind::Invitation,
+            &mut unreadable,
+            &mut undecoded,
+        );
+        let grants = optional(grants, IdentityKind::Grant, &mut unreadable, &mut undecoded);
         Ok(Some(Self {
-            users,
+            users: users.objects,
             credentials,
             invitations,
             grants,
             unreadable,
+            undecoded,
             projects: None,
         }))
     }
@@ -483,6 +521,7 @@ impl Directory {
             api_tokens: Vec::new(),
             can_manage_tokens: Permission::Unknown,
             unreadable: self.unreadable.clone(),
+            undecoded: self.undecoded.clone(),
         })
     }
 }
@@ -768,6 +807,9 @@ pub struct MembersView {
     /// Kinds the person may not read (invitations, grants, role bindings), whose parts are left
     /// out.
     pub unreadable: Vec<UnreadableView>,
+    /// Zeabur Identity's objects whose shape Zeabur does not know, which are left out of the
+    /// members and invitations above.
+    pub undecoded: Vec<UndecodedView>,
 }
 
 #[cfg(test)]
@@ -823,6 +865,7 @@ mod tests {
             grants: vec![object(json!({"metadata": {"name": "g-1"},
                 "spec": {"user": "ada", "authTime": 1_760_947_200, "expiresAt": 2_000_000_000}}))],
             unreadable: Vec::new(),
+            undecoded: Vec::new(),
             projects: None,
         }
     }
@@ -985,5 +1028,33 @@ mod tests {
             (None, Some(true))
         );
         assert_eq!(from_deployment(&json!({})), (None, None));
+    }
+
+    #[test]
+    fn a_credential_of_a_shape_zeabur_does_not_know_is_named_with_why() {
+        let objects: Vec<DynamicObject> = object(json!([
+            {"apiVersion": API_VERSION, "kind": "Credential",
+             "metadata": {"name": "c-1"},
+             "spec": {"user": "ada", "passkey": {"credentialId": "abc", "record": "{}"}}},
+            {"apiVersion": API_VERSION, "kind": "Credential",
+             "metadata": {"name": "c-2"},
+             "spec": {"user": "ada", "securityKey": {"credentialId": "abc"}}},
+        ]));
+        let decoded =
+            decode::<CredentialObject>(objects, "zeabur-identity", IdentityKind::Credential);
+        let names: Vec<_> = decoded.objects.iter().map(Object::name).collect();
+        assert_eq!(names, ["c-1"]);
+        let [undecoded] = decoded.undecoded.as_slice() else {
+            panic!("one undecoded object, got {:?}", decoded.undecoded);
+        };
+        assert_eq!(
+            undecoded.origin,
+            Origin::complete(API_VERSION, "Credential", Some("zeabur-identity"), "c-2")
+        );
+        assert!(
+            undecoded.error.contains("CredentialKind"),
+            "{}",
+            undecoded.error
+        );
     }
 }

@@ -322,6 +322,7 @@ impl MembersView {
             api_tokens: Vec::new(),
             can_manage_tokens: crate::projects::namespace::Permission::Unknown,
             unreadable: Vec::new(),
+            undecoded: Vec::new(),
         }
     }
 }

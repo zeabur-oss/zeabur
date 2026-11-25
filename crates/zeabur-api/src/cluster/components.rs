@@ -1373,11 +1373,18 @@ impl World {
         };
         if target.kind == HelmChartConfig::KIND {
             let resource = ResourceRef::of::<HelmChart>();
+            let what = format!("HelmChart {}", target.name);
             let chart = cluster
                 .find_object(&resource, Some(CHART_NAMESPACE), &target.name)
                 .await
-                .map_err(|e| ApiError::from(e.into_problem(&format!("HelmChart {}", target.name))))?
-                .and_then(|o| o.try_parse::<HelmChart>().ok())
+                .map_err(|e| ApiError::from(e.into_problem(&what)))?
+                .map(DynamicObject::try_parse::<HelmChart>)
+                .transpose()
+                .map_err(|e| {
+                    ApiError::from(
+                        zeabur_kube::ClusterError::Decode(e.to_string()).into_problem(&what),
+                    )
+                })?
                 .unwrap_or_default();
             let job = self.job(cluster, &chart).await?;
             return Ok(engine::config_progress(
