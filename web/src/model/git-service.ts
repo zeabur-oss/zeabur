@@ -176,7 +176,7 @@ export function branchProblem(branch: string): "invalid" | undefined {
 }
 
 /** A path inside the repository as the Build takes it: no `./` in front, no `/` behind. */
-export const cleanPath = (path: string) =>
+const cleanPath = (path: string) =>
   path
     .trim()
     .replace(/^\.?\/+/, "")
@@ -282,7 +282,7 @@ export function buildPaths(form: Pick<BuiltService, "method" | "directory" | "do
 }
 
 /** The Build the form asks for, reading the repository. */
-export function gitBuild(form: GitSource): Schemas.BuildInput {
+function gitBuild(form: GitSource): Schemas.BuildInput {
   const branch = form.branch.trim()
   return {
     source: {
