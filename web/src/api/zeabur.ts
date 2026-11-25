@@ -5495,6 +5495,11 @@ export type Database = {
   primary?: string | null
   /** The provider (module id). */
   provider: string
+  /**
+   * Zeabur only shows it: it cannot change, back up, restore or export it, since its operator
+   * has no backup Zeabur can run (MongoDB Controllers for Kubernetes).
+   */
+  readOnly?: boolean
   /** Members ready. */
   ready: number
   /** The object's plural resource name. */
@@ -5546,6 +5551,8 @@ export type DatabaseOperator = {
   engine: DatabaseEngine
   /** The operator's module (`cloudnative-pg`). */
   module: string
+  /** Zeabur only shows its databases and does not create them. */
+  readOnly?: boolean
   /** Whether its objects could be read. */
   state: ProviderState
 }
@@ -9640,7 +9647,7 @@ export type ProjectBuilds = {
 export type ProjectDatabases = {
   /** The databases, by engine, then name. */
   items: Database[]
-  /** One per engine this build knows. */
+  /** One per operator this build knows. */
   operators: DatabaseOperator[]
   /** What could not be read. */
   unreadable: UnreadableView[]
@@ -13054,8 +13061,8 @@ export const getGetProjectDatabasesUrl = (project: ProjectName) => {
 
 /**
  * @summary The databases of a project, read as the person, from every database operator this build
-knows (CloudNativePG, the Percona Operator for MongoDB, MOCO, mariadb-operator, the Dragonfly
-Operator).
+knows (CloudNativePG, the Percona Operator for MongoDB, MongoDB Controllers for Kubernetes,
+MOCO, mariadb-operator, the Dragonfly Operator).
  */
 export const getProjectDatabases = async (
   project: ProjectName,

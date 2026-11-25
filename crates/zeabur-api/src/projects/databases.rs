@@ -1,9 +1,10 @@
 //! The databases capability in the API: `GET /projects/{p}/databases`.
 //!
 //! It lists the database clusters an operator runs in the project (CloudNativePG for PostgreSQL,
-//! the Percona Operator for MongoDB, MOCO for MySQL, mariadb-operator for MariaDB, the Dragonfly
-//! Operator for Dragonfly; see `zeabur_modules::databases`), with their state, where to connect
-//! and their backups.
+//! the Percona Operator for MongoDB and MongoDB Controllers for Kubernetes for MongoDB, MOCO for
+//! MySQL, mariadb-operator for MariaDB, the Dragonfly Operator for Dragonfly; see
+//! `zeabur_modules::databases`), with their state, where to connect and their backups. Zeabur
+//! only shows the databases of MongoDB Controllers for Kubernetes.
 //!
 //! MOCO and mariadb-operator take each backup in a Job. The project's Jobs are read once, and only
 //! when one of their databases is there.
@@ -28,7 +29,9 @@ use zeabur_kube::k8s_openapi::api::core::v1::Pod;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt, DynamicObject};
 use zeabur_modules::databases::{self, Database, Engine};
-use zeabur_modules::{Module, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb};
+use zeabur_modules::{
+    Module, cloudnative_pg, dragonfly, mariadb_operator, moco, mongodb_kubernetes, percona_mongodb,
+};
 
 use crate::error::ApiError;
 use crate::extract::{Json, Path};
@@ -51,13 +54,16 @@ pub struct DatabaseOperator {
     pub backups: ProviderState,
     /// The catalogue component that installs the operator.
     pub component: Option<zeabur_catalog::ComponentRef>,
+    /// Zeabur only shows its databases and does not create them.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub read_only: bool,
 }
 
 /// A project's databases.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ProjectDatabases {
-    /// One per engine this build knows.
+    /// One per operator this build knows.
     pub operators: Vec<DatabaseOperator>,
     /// The databases, by engine, then name.
     pub items: Vec<Database>,
@@ -66,8 +72,8 @@ pub struct ProjectDatabases {
 }
 
 /// The databases of a project, read as the person, from every database operator this build
-/// knows (CloudNativePG, the Percona Operator for MongoDB, MOCO, mariadb-operator, the Dragonfly
-/// Operator).
+/// knows (CloudNativePG, the Percona Operator for MongoDB, MongoDB Controllers for Kubernetes,
+/// MOCO, mariadb-operator, the Dragonfly Operator).
 #[utoipa::path(get, path = "/api/v1/projects/{project}/databases", tag = "projects",
     operation_id = "getProjectDatabases",
     params(("project" = crate::rules::ProjectName, Path, description = "The project's namespace")),
@@ -100,6 +106,7 @@ fn operator(
         state,
         backups: state,
         component: crate::cluster::modules::component(catalogue, module),
+        read_only: false,
     }
 }
 
@@ -157,34 +164,19 @@ pub(crate) async fn read(
         state,
         backups: store_state,
         component: crate::cluster::modules::component(catalogue, &cloudnative_pg::MODULE),
+        read_only: false,
     });
 
-    let mongo = read_all(
+    read_mongodb(
         cluster,
-        [&percona_mongodb::CLUSTERS, &percona_mongodb::BACKUPS],
-        Some(project),
+        catalogue,
+        project,
+        &mut items,
+        &mut operators,
         &mut unreadable,
     )
     .await
     .map_err(failed)?;
-    let state = match mongo {
-        Ok([clusters, backups]) => {
-            items.extend(
-                clusters
-                    .iter()
-                    .map(|c| percona_mongodb::database(project, c, &backups)),
-            );
-            ProviderState::Installed
-        }
-        Err(state) => state,
-    };
-    operators.push(operator(
-        catalogue,
-        Engine::Mongodb,
-        &percona_mongodb::MODULE,
-        state,
-    ));
-
     read_moco_mariadb_dragonfly(
         cluster,
         catalogue,
@@ -240,6 +232,70 @@ fn add_members(project: &str, items: &mut [Database], pods: &[Pod], now: Timesta
             .collect();
         database.pods.sort_by(|a, b| a.name.cmp(&b.name));
     }
+}
+
+/// The MongoDB databases of the Percona Operator, with their backups, and of MongoDB Controllers
+/// for Kubernetes, which Zeabur only shows.
+async fn read_mongodb(
+    cluster: &dyn Cluster,
+    catalogue: &[zeabur_catalog::Component],
+    project: &str,
+    items: &mut Vec<Database>,
+    operators: &mut Vec<DatabaseOperator>,
+    unreadable: &mut Vec<UnreadableView>,
+) -> Result<(), zeabur_kube::ClusterError> {
+    let percona = read_all(
+        cluster,
+        [&percona_mongodb::CLUSTERS, &percona_mongodb::BACKUPS],
+        Some(project),
+        unreadable,
+    )
+    .await?;
+    let state = match percona {
+        Ok([clusters, backups]) => {
+            items.extend(
+                clusters
+                    .iter()
+                    .map(|c| percona_mongodb::database(project, c, &backups)),
+            );
+            ProviderState::Installed
+        }
+        Err(state) => state,
+    };
+    operators.push(operator(
+        catalogue,
+        Engine::Mongodb,
+        &percona_mongodb::MODULE,
+        state,
+    ));
+    let state = match read_all(
+        cluster,
+        [&mongodb_kubernetes::CLUSTERS],
+        Some(project),
+        unreadable,
+    )
+    .await?
+    {
+        Ok([clusters]) => {
+            items.extend(
+                clusters
+                    .iter()
+                    .map(|c| mongodb_kubernetes::database(project, c)),
+            );
+            ProviderState::Installed
+        }
+        Err(state) => state,
+    };
+    operators.push(DatabaseOperator {
+        read_only: true,
+        ..operator(
+            catalogue,
+            Engine::Mongodb,
+            &mongodb_kubernetes::MODULE,
+            state,
+        )
+    });
+    Ok(())
 }
 
 /// The databases of MOCO, mariadb-operator and the Dragonfly Operator. The project's Jobs are

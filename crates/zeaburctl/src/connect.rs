@@ -408,6 +408,7 @@ mod tests {
             object: json!({}),
             pods: Vec::new(),
             restored: None,
+            read_only: false,
         }
     }
 

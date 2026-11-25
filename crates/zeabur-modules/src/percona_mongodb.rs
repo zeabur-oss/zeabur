@@ -444,6 +444,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject, backups: &[DynamicObje
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),
+        read_only: false,
         name,
     }
 }

@@ -79,9 +79,9 @@ zeabur-project-viewer:
   - apiGroups: [metrics.k8s.io]
     resources: [pods]
     verbs: [get, list]
-  # Databases: CloudNativePG, its Barman Cloud plugin, the Percona Operator for MongoDB, MOCO,
-  # mariadb-operator and the Dragonfly Operator. Granted whether or not they are installed; RBAC
-  # rules may name resources not yet served.
+  # Databases: CloudNativePG, its Barman Cloud plugin, the Percona Operator for MongoDB, MongoDB
+  # Controllers for Kubernetes, MOCO, mariadb-operator and the Dragonfly Operator. Granted whether
+  # or not they are installed; RBAC rules may name resources not yet served.
   - apiGroups: [postgresql.cnpg.io]
     resources: [clusters, backups, scheduledbackups]
     verbs: [get, list, watch]
@@ -90,6 +90,10 @@ zeabur-project-viewer:
     verbs: [get, list, watch]
   - apiGroups: [psmdb.percona.com]
     resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
+    verbs: [get, list, watch]
+  # Zeabur only shows these databases, so no member role changes them.
+  - apiGroups: [mongodbcommunity.mongodb.com]
+    resources: [mongodbcommunity]
     verbs: [get, list, watch]
   - apiGroups: [moco.cybozu.com]
     resources: [mysqlclusters, backuppolicies]
@@ -207,6 +211,9 @@ zeabur-project-developer:
   - apiGroups: [psmdb.percona.com]
     resources: [perconaservermongodbs, perconaservermongodbbackups, perconaservermongodbrestores]
     verbs: [get, list, watch, create, update, patch, delete]
+  - apiGroups: [mongodbcommunity.mongodb.com]
+    resources: [mongodbcommunity]
+    verbs: [get, list, watch]
   - apiGroups: [moco.cybozu.com]
     resources: [mysqlclusters, backuppolicies]
     verbs: [get, list, watch, create, update, patch, delete]
