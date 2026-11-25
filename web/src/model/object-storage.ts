@@ -90,7 +90,7 @@ const bucketObject = (store: string, bucket: string) => ({
   metadata: { name: `${store}-${bucket}` },
   spec: {
     name: bucket,
-    clusterRef: { name: store },
+    seaweedRef: { name: store },
     reclaimPolicy: "Delete",
     access: [{ user: userOf(store), actions: ["Read", "Write", "List", "Tagging"] }],
   },

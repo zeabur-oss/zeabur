@@ -209,6 +209,12 @@ fn store_of(object: &DynamicObject, field: &str) -> Option<String> {
     text(object, &format!("/spec/{field}/name"))
 }
 
+/// The `Seaweed` a `Bucket` is in: `seaweedRef`, or `clusterRef`, its deprecated alias that
+/// buckets made before the rename keep, since both fields are immutable.
+fn bucket_store(bucket: &DynamicObject) -> Option<String> {
+    store_of(bucket, "seaweedRef").or_else(|| store_of(bucket, "clusterRef"))
+}
+
 /// The message of the first condition that is not true.
 fn trouble(object: &DynamicObject) -> Option<String> {
     object
@@ -341,7 +347,7 @@ pub fn object_storage(
     });
     let mut buckets: Vec<Bucket> = buckets
         .iter()
-        .filter(|b| store_of(b, "clusterRef").as_deref() == Some(name.as_str()))
+        .filter(|b| bucket_store(b).as_deref() == Some(name.as_str()))
         .map(|b| bucket(namespace, b))
         .collect();
     buckets.sort_by(|a, b| a.s3_name.cmp(&b.s3_name));
@@ -437,8 +443,19 @@ mod tests {
             })),
             object(serde_json::json!({
                 "apiVersion": API_VERSION, "kind": "Bucket",
+                "metadata": {"name": "media", "namespace": "shop"},
+                "spec": {"seaweedRef": {"name": "files"}},
+                "status": {"phase": "Ready", "bucketName": "media"}
+            })),
+            object(serde_json::json!({
+                "apiVersion": API_VERSION, "kind": "Bucket",
                 "metadata": {"name": "theirs", "namespace": "shop"},
                 "spec": {"clusterRef": {"name": "files", "namespace": "other"}}
+            })),
+            object(serde_json::json!({
+                "apiVersion": API_VERSION, "kind": "Bucket",
+                "metadata": {"name": "elsewhere", "namespace": "shop"},
+                "spec": {"seaweedRef": {"name": "files", "namespace": "other"}}
             })),
         ];
         let store = object_storage(
@@ -473,8 +490,9 @@ mod tests {
         assert_eq!(connection.username_key.as_deref(), Some("accessKey"));
         assert_eq!(connection.password_key, "secretKey");
         assert_eq!(store.access_key.unwrap().id.as_deref(), Some("AKIA1"));
-        assert_eq!(store.buckets.len(), 1);
-        let uploads = &store.buckets[0];
+        let names: Vec<_> = store.buckets.iter().map(|b| b.s3_name.as_str()).collect();
+        assert_eq!(names, ["media", "uploads"]);
+        let uploads = &store.buckets[1];
         assert!(uploads.deletes_contents);
         assert_eq!((uploads.used_bytes, uploads.objects), (Some(2048), Some(3)));
         let iam: Vec<_> = store
