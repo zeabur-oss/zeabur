@@ -77,13 +77,15 @@ export function restartRuleApplies(plan: Plan): boolean {
 
 const same = (a: WorkloadRef, b: WorkloadRef) => a.kind === b.kind && a.name === b.name
 
-/** The pods as they are once the review's own scaling is done: it sets how many replicas run. */
+/** The pods as they are once the review's own scaling is done: it sets how many replicas run.
+ * A strategy that stops the old replicas first (`Recreate`, `OnDelete`) keeps the pods as they are. */
 const afterScaling =
-  (podsOf: PodsOf, changes: readonly Change[]): PodsOf =>
+  (podsOf: PodsOf, changes: readonly Change[], plan: Plan): PodsOf =>
   (workload) => {
     const pods = podsOf(workload)
     const scale = changes.find((c) => c.op === "scale" && same(c.workload, workload))
-    if (scale?.op !== "scale") return pods
+    const strategy = plan.preview?.rollouts.find((r) => same(r.workload, workload))?.strategy
+    if (scale?.op !== "scale" || strategy === "Recreate" || strategy === "OnDelete") return pods
     return { desired: scale.replicas, ready: Math.max(pods?.ready ?? 0, scale.replicas) }
   }
 
@@ -577,7 +579,7 @@ export function describe(
     lines.push(t("confirm.notRolledBack"))
   for (const workload of replaced(plan))
     if (!said.some((w) => same(w, workload))) {
-      lines.push(rolling(t, workload, afterScaling(podsOf, ask.changes), false))
+      lines.push(rolling(t, workload, afterScaling(podsOf, ask.changes, plan), false))
       said.push(workload)
     }
   for (const change of ask.changes) if (change.op === "scale") said.push(change.workload)
