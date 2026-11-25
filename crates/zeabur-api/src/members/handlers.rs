@@ -80,7 +80,7 @@ fn reads(namespace: &str) -> Vec<Denied> {
 }
 
 /// Whether the person may open Members: see [`crate::head`].
-#[utoipa::path(head, path = "/api/v1/members", tag = "members", operation_id = "headMembers", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+#[utoipa::path(head, path = "/api/v1/members", tag = "members", operation_id = "checkMembers", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
 pub(crate) async fn head(State(state): State<AppState>, Person(cluster): Person) -> StatusCode {
     crate::head::status(cluster.as_ref(), &reads(&state.settings.identity.namespace)).await
 }

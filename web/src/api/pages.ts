@@ -9,12 +9,12 @@ import * as zeabur from "@/api/zeabur"
 export type Page = "overview" | "backups" | "notifications" | "githubApp" | "components" | "members"
 
 const heads: Record<Page, () => Promise<void>> = {
-  overview: () => zeabur.headClusterNodes(),
-  backups: () => zeabur.headClusterBackups(),
-  notifications: () => zeabur.headClusterNotifications(),
-  githubApp: () => zeabur.headGitHubApp(),
-  components: () => zeabur.headCapabilities(),
-  members: () => zeabur.headMembers(),
+  overview: () => zeabur.checkClusterNodes(),
+  backups: () => zeabur.checkClusterBackups(),
+  notifications: () => zeabur.checkClusterNotifications(),
+  githubApp: () => zeabur.checkGitHubApp(),
+  components: () => zeabur.checkCapabilities(),
+  members: () => zeabur.checkMembers(),
 }
 
 /** Yes on 200; a refusal or an unchecked answer is no, and anything else is an error. */

@@ -98,7 +98,7 @@ paths:
       tags:
       - cluster
       summary: "Whether the person may open Backups: see [`crate::head`]."
-      operationId: headClusterBackups
+      operationId: checkClusterBackups
       responses:
         "200":
           description: The person may open the page.
@@ -291,7 +291,7 @@ paths:
       tags:
       - cluster
       summary: "Whether the person may open Components: see [`crate::head`]."
-      operationId: headCapabilities
+      operationId: checkCapabilities
       responses:
         "200":
           description: The person may open the page.
@@ -538,7 +538,7 @@ paths:
       tags:
       - cluster
       summary: "Whether the person may open GitHub App: see [`crate::head`]."
-      operationId: headGitHubApp
+      operationId: checkGitHubApp
       responses:
         "200":
           description: The person may open the page.
@@ -919,7 +919,7 @@ paths:
       tags:
       - cluster
       summary: "Whether the person may open the Cluster overview: see [`crate::head`]."
-      operationId: headClusterNodes
+      operationId: checkClusterNodes
       responses:
         "200":
           description: The person may open the page.
@@ -1027,7 +1027,7 @@ paths:
       tags:
       - cluster
       summary: "Whether the person may open Notifications: see [`crate::head`]."
-      operationId: headClusterNotifications
+      operationId: checkClusterNotifications
       responses:
         "200":
           description: The person may open the page.
@@ -1526,7 +1526,7 @@ paths:
       tags:
       - members
       summary: "Whether the person may open Members: see [`crate::head`]."
-      operationId: headMembers
+      operationId: checkMembers
       responses:
         "200":
           description: The person may open the page.

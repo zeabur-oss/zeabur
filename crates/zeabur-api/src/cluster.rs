@@ -208,7 +208,7 @@ fn capabilities_reads() -> Vec<Denied> {
 
 /// Whether the person may open Components: see [`crate::head`].
 #[utoipa::path(head, path = "/api/v1/cluster/capabilities", tag = "cluster",
-    operation_id = "headCapabilities", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+    operation_id = "checkCapabilities", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
 pub(crate) async fn capabilities_head(Person(cluster): Person) -> axum::http::StatusCode {
     crate::head::status(cluster.as_ref(), &capabilities_reads()).await
 }
@@ -455,7 +455,7 @@ fn nodes_reads() -> Vec<Denied> {
 
 /// Whether the person may open the Cluster overview: see [`crate::head`].
 #[utoipa::path(head, path = "/api/v1/cluster/nodes", tag = "cluster",
-    operation_id = "headClusterNodes", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+    operation_id = "checkClusterNodes", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
 pub(crate) async fn nodes_head(Person(cluster): Person) -> axum::http::StatusCode {
     crate::head::status(cluster.as_ref(), &nodes_reads()).await
 }

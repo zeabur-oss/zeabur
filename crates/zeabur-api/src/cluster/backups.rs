@@ -575,7 +575,7 @@ pub(crate) fn reads() -> Vec<Denied> {
 
 /// Whether the person may open Backups: see [`crate::head`].
 #[utoipa::path(head, path = "/api/v1/cluster/backups", tag = "cluster",
-    operation_id = "headClusterBackups", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
+    operation_id = "checkClusterBackups", responses((status = 200, description = "The person may open the page."), (status = 403, description = "None of its reads is allowed."), (status = 503, description = "Whether it is allowed could not be checked.")))]
 pub(crate) async fn head(Person(cluster): Person) -> axum::http::StatusCode {
     crate::head::status(cluster.as_ref(), &reads()).await
 }
