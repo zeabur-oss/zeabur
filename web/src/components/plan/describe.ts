@@ -88,10 +88,10 @@ function rolling(
   workload: WorkloadRef,
   podsOf: PodsOf,
   restart: boolean,
-  scaled?: number,
+  asked: readonly Change[] = [],
 ): string {
   const pods = podsOf(workload)
-  const ready = Math.max(pods?.ready ?? 0, scaled ?? 0)
+  const ready = Math.max(pods?.ready ?? 0, scaledTo(asked, workload) ?? 0)
   if (ready >= 2) return t("confirm.rolling", workload.name, ready)
   if (ready === 1 || pods?.desired === 1)
     return restart
@@ -579,7 +579,7 @@ export function describe(
     lines.push(t("confirm.notRolledBack"))
   for (const workload of replaced(plan))
     if (!said.some((w) => same(w, workload))) {
-      lines.push(rolling(t, workload, podsOf, false, scaledTo(ask.changes, workload)))
+      lines.push(rolling(t, workload, podsOf, false, ask.changes))
       said.push(workload)
     }
   for (const change of ask.changes) if (change.op === "scale") said.push(change.workload)
