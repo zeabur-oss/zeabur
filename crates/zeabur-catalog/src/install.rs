@@ -1252,6 +1252,7 @@ mod tests {
                     profiles: std::collections::BTreeMap::new(),
                 },
                 measurements: Vec::new(),
+                readmes: Vec::new(),
             };
             // The files of manifest releases hold neither kind.
             let manifests: engine::Manifests = engine::downloads(&component)
