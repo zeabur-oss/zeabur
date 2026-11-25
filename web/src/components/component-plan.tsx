@@ -187,6 +187,7 @@ function PlanDialog({
         />
       ) : null}
       <PlanContent
+        name={name}
         pending={plan.isPending}
         error={plan.isError ? plan.error : undefined}
         plan={form.asking ? undefined : shown}
@@ -256,10 +257,12 @@ function useLastInputs(shown: Schemas.ComponentPlan | undefined) {
 }
 
 function PlanContent({
+  name,
   pending,
   error,
   plan,
 }: {
+  name: string
   pending: boolean
   error: Error | undefined
   plan: Schemas.ComponentPlan | undefined
@@ -267,7 +270,7 @@ function PlanContent({
   const t = useT()
   if (pending) return <LoadingRows label={t("plan.planning")} rows={3} />
   if (error) return <Problem error={error} />
-  return plan ? <PlanBody plan={plan} /> : null
+  return plan ? <PlanBody name={name} plan={plan} /> : null
 }
 
 /** Applies the plan's next step, then asks again every few seconds until the plan is done or a
@@ -421,7 +424,7 @@ function GitOpsExport({
   )
 }
 
-function PlanBody({ plan }: { plan: Schemas.ComponentPlan }) {
+function PlanBody({ name, plan }: { name: string; plan: Schemas.ComponentPlan }) {
   const t = useT()
   return (
     <div className="flex flex-col gap-5">
@@ -452,8 +455,13 @@ function PlanBody({ plan }: { plan: Schemas.ComponentPlan }) {
       <section className="flex flex-col gap-2">
         <h3 className="type-meta font-medium text-muted-foreground">{t("components.steps")}</h3>
         <ol className="flex flex-col">
-          {plan.steps.map((step) => (
-            <Step key={`${step.component}/${step.release}`} step={step} />
+          {plan.steps.map((step, i) => (
+            <Step
+              // A removal can write a release again first and delete it last.
+              key={`${i}/${step.component}/${step.release}`}
+              step={step}
+              removing={plan.action === "remove" ? name : undefined}
+            />
           ))}
         </ol>
       </section>
@@ -484,8 +492,11 @@ function PlanBody({ plan }: { plan: Schemas.ComponentPlan }) {
   )
 }
 
-function Step({ step }: { step: Schemas.ComponentStep }) {
+/** In a removal, a step that applies writes another component again without the values of the
+ * one removed. */
+function Step({ step, removing }: { step: Schemas.ComponentStep; removing?: string }) {
   const t = useT()
+  const rewrite = removing !== undefined && step.writes.some((w) => w.op === "apply")
   return (
     <li className="flex flex-col gap-2 border-t border-rule py-3 first:border-t-0">
       <div className="flex items-center gap-3">
@@ -498,6 +509,9 @@ function Step({ step }: { step: Schemas.ComponentStep }) {
           {t(`components.state.${step.state}`)}
         </StatusPill>
       </div>
+      {rewrite ? (
+        <p className="text-pretty text-muted-foreground">{t("components.rewrite", removing)}</p>
+      ) : null}
       {step.message ? <p className="text-pretty text-destructive">{step.message}</p> : null}
       <ul className="flex flex-col gap-1">
         {step.writes.map((write) => {
@@ -507,13 +521,13 @@ function Step({ step }: { step: Schemas.ComponentStep }) {
               {write.yaml ? (
                 <details>
                   <summary className="cursor-pointer text-sm">
-                    <Written write={write} />
+                    <Written write={write} removal={removing !== undefined} />
                   </summary>
                   <YamlBlock yaml={write.yaml} label={label} className="mt-2" />
                 </details>
               ) : (
                 <span className="text-sm">
-                  <Written write={write} />
+                  <Written write={write} removal={removing !== undefined} />
                 </span>
               )}
             </li>
@@ -524,10 +538,15 @@ function Step({ step }: { step: Schemas.ComponentStep }) {
   )
 }
 
-function Written({ write }: { write: Schemas.ObjectWrite }) {
+function Written({ write, removal }: { write: Schemas.ObjectWrite; removal: boolean }) {
   const t = useT()
   return (
     <>
+      {removal ? (
+        <span className="mr-2 type-meta text-muted-foreground">
+          {t(`components.op.${write.op}`)}
+        </span>
+      ) : null}
       <span>{kindName(t, write.kind)}</span>{" "}
       <span className="font-mono break-all" translate="no">
         {write.name}

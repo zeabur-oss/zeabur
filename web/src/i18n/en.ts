@@ -1230,6 +1230,9 @@ export const en = {
   "components.unchanged": (name: string) =>
     `Zeabur didn't install or configure ${name}, so it leaves ${name} as it is. To use the two together, add these lines to the Helm values of ${name} yourself.`,
   "components.steps": "Steps",
+  "components.rewrite": (name: string) => `Keeps running, without the settings ${name} added.`,
+  "components.op.apply": "Update",
+  "components.op.delete": "Delete",
   "components.checks": "Health checks",
   "components.leftovers": "Stays on the cluster",
   "components.leftoversWhy":

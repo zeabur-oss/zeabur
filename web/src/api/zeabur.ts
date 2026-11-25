@@ -4173,6 +4173,16 @@ export type ComponentInput = {
 }
 
 /**
+ * What a write does to its object.
+ */
+export type WriteOp = (typeof WriteOp)[keyof typeof WriteOp]
+
+export const WriteOp = {
+  apply: "apply",
+  delete: "delete",
+} as const
+
+/**
  * One write of a step.
  */
 export type ObjectWrite = {
@@ -4185,6 +4195,8 @@ export type ObjectWrite = {
    * @nullable
    */
   namespace?: string | null
+  /** What the write does. */
+  op: WriteOp
   /**
    * The object as it is written, YAML; absent for a deletion.
    * @nullable

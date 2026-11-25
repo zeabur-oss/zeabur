@@ -135,10 +135,22 @@ pub enum StepState {
     Failed,
 }
 
+/// What a write does to its object.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub enum WriteOp {
+    /// Server-side apply: creates the object or writes it again.
+    Apply,
+    /// Deletes the object.
+    Delete,
+}
+
 /// One write of a step.
 #[derive(Debug, Clone, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct ObjectWrite {
+    /// What the write does.
+    pub op: WriteOp,
     /// The object's kind.
     pub kind: String,
     /// Its name.
@@ -1015,6 +1027,7 @@ impl World {
                 zeaburs |= found.is_some();
                 progress.push(gone(found.as_ref()));
                 let mut write = view(&desired.object, Some(&target), None);
+                write.op = WriteOp::Delete;
                 write.yaml = None;
                 writes.push(write);
                 // An object already being deleted needs no second delete.
@@ -1632,6 +1645,7 @@ fn view(
     }
     let object = &shown;
     ObjectWrite {
+        op: WriteOp::Apply,
         kind: kind(object).to_owned(),
         name: object.metadata.name.clone().unwrap_or_default(),
         namespace: target

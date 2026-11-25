@@ -13851,6 +13851,7 @@ components:
       type: object
       description: One write of a step.
       required:
+      - op
       - kind
       - name
       properties:
@@ -13865,6 +13866,9 @@ components:
           - string
           - "null"
           description: Its namespace, for a namespaced object.
+        op:
+          $ref: "#/components/schemas/WriteOp"
+          description: What the write does.
         yaml:
           type:
           - string
@@ -20603,6 +20607,12 @@ components:
               description: A CronJob's schedule; absent for other kinds.
             - type: "null"
       description: A workload as lists show it.
+    WriteOp:
+      type: string
+      description: What a write does to its object.
+      enum:
+      - apply
+      - delete
     Writer:
       type: object
       description: Who wrote, as far as `managedFields` say.

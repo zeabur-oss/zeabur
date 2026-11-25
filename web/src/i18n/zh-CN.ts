@@ -1143,6 +1143,9 @@ export const zhCN: Messages = {
   "components.unchanged": (name) =>
     `${name} 不是 Zeabur 安装或配置的，所以 Zeabur 不会改动它。要让两者一起工作，请自己把下面这几行加到 ${name} 的 Helm values。`,
   "components.steps": "步骤",
+  "components.rewrite": (name) => `会继续运行，只去掉 ${name} 加上的设置。`,
+  "components.op.apply": "更新",
+  "components.op.delete": "删除",
   "components.checks": "健康检查",
   "components.leftovers": "会留在集群上",
   "components.leftoversWhy": "移除时不会删掉这些。确定没有东西用到时，再自己删除。",
