@@ -34,7 +34,7 @@ const references: Partial<Record<Schemas.Kind, { title: string; href: string }[]
   "log-unavailable": [
     { title: "Logging Architecture", href: `${docs}/concepts/cluster-administration/logging/` },
   ],
-  conflict: [
+  changed: [
     {
       title: "Resource versions",
       href: `${docs}/reference/using-api/api-concepts/#resource-versions`,

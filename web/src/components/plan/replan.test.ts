@@ -12,7 +12,7 @@ const object = (kind: string, name: string, type: "patch" | "delete" = "delete")
   }) as unknown as Schemas.PlannedObject
 
 const problem = (over: Partial<Problem>): Problem =>
-  ({ kind: "conflict", title: "", status: 409, detail: "", ...over }) as Problem
+  ({ kind: "changed", title: "", status: 409, detail: "", ...over }) as Problem
 
 describe("an apply refused because the project moved on", () => {
   test("plans again when nothing was written", () => {
@@ -24,8 +24,10 @@ describe("an apply refused because the project moved on", () => {
     expect(replansOn(problem({ applied } as Partial<Problem>))).toBe(false)
   })
 
-  test("does not plan again when a tool would undo the change", () => {
-    expect(replansOn(problem({ managedBy: "Helm" }))).toBe(false)
+  test("does not plan again for a conflict, a taken name or a tool's refusal", () => {
+    expect(replansOn(problem({ kind: "conflict" }))).toBe(false)
+    expect(replansOn(problem({ kind: "already-exists" }))).toBe(false)
+    expect(replansOn(problem({ kind: "managed", managedBy: "Helm" }))).toBe(false)
   })
 
   test("does not plan again for other refusals", () => {

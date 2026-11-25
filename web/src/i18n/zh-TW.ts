@@ -93,7 +93,10 @@ export const zhTW: Messages = {
   "problem.title.policy-denied": "叢集裡的政策拒絕了這項變更",
   "problem.title.not-found": "找不到這個物件",
   "problem.title.log-unavailable": "無法取得日誌",
-  "problem.title.conflict": "這段期間已有其他變更",
+  "problem.title.conflict": "和目前的狀態衝突",
+  "problem.title.already-exists": "已經存在",
+  "problem.title.expired": "要求的內容已過期",
+  "problem.title.changed": "你檢查之後又有變更",
   "problem.title.managed": "由其他工具管理",
   "problem.title.plan-expired": "這份變更已過期",
   "problem.title.system-namespace": "這個名稱是 Kubernetes 自用的",
@@ -109,7 +112,10 @@ export const zhTW: Messages = {
   "problem.fix.policy-denied": "依政策指出的地方修改，或向叢集管理員詢問這項政策。",
   "problem.fix.not-found": "重新載入頁面，看看叢集目前有什麼。",
   "problem.fix.log-unavailable": "改看這次執行的日誌，或稍候再重新整理。",
-  "problem.fix.conflict": "重新載入看最新版本，再做一次變更。",
+  "problem.fix.conflict": "看詳細資訊指出的地方，改好後再試一次。",
+  "problem.fix.already-exists": "換個名稱，或刪掉已經存在的那個。",
+  "problem.fix.expired": "重新載入頁面，再要求一次。",
+  "problem.fix.changed": "重新檢查，以物件目前的狀態為準。",
   "problem.fix.managed":
     "到管理這個物件的工具修改，例如 Helm values 或 Git 儲存庫。重新啟動仍然可以在這裡做。",
   "problem.fix.plan-expired": "重新檢查變更。",
@@ -140,6 +146,12 @@ export const zhTW: Messages = {
   "problemPage.rule.log-unavailable":
     "叢集只保留容器這一次與上一次執行的日誌，而且只在副本還存在時保留。從未寫出的日誌，或副本已經不在的日誌，都無法讀取。",
   "problemPage.rule.conflict":
+    "要求和目前的狀態衝突時，叢集或 Zeabur 會拒絕，例如移除還有其他元件在用的元件。詳細資訊會說明衝突在哪裡。",
+  "problemPage.rule.already-exists":
+    "建立物件不會取代已經存在的東西。同名的物件已經存在時，叢集會拒絕建立，什麼都不會寫入。",
+  "problemPage.rule.expired":
+    "叢集只會保留一段時間的變更紀錄，供監看或分段列出使用。要求的內容超過這段時間就會過期，重新要求一次會從現在開始。",
+  "problemPage.rule.changed":
     "物件和你檢查時的版本相同，Zeabur 才會寫入變更。如果之後有人或其他程式（例如部署工具、自動擴縮）改過這個物件，Zeabur 就不會寫入，以免蓋掉別人的變更。",
   "problemPage.rule.managed":
     "這個物件由其他工具（Helm、Argo CD、Flux）管理。那個工具下一次同步或升級時，會換回自己的版本，蓋掉在這裡做的變更，所以 Zeabur 不接受。",
@@ -3417,8 +3429,8 @@ export const zhTW: Messages = {
     `檢查過的變更只在 ${p.minutes} 分鐘內有效。重新檢查一次。`,
   "sentence.problem.badRequest.fix.planToken": () =>
     "重新檢查變更。只有做這次檢查的那台伺服器能套用，而且權杖不能改動。",
-  "sentence.problem.conflict.fix.review": () => "重新檢查，以物件目前的狀態為準。",
   "sentence.problem.conflict.fix.inUse": () => "先把這些刪掉，再移除一次。",
+  "sentence.problem.conflict.fix.removeFirst": () => "先移除這些，再移除一次。",
   "sentence.problem.conflict.fix.alreadyExists": () => "先刪掉這些物件，或部署到別的專案。",
   "sentence.problem.conflict.fix.waitForContainer": () =>
     "等容器開始執行。如果一直沒有執行，容器的日誌和事件會說明原因。",
@@ -3468,10 +3480,18 @@ export const zhTW: Messages = {
   "sentence.problem.summary.not-found": (p) => (p.name ? `${p.name} 不存在。` : "這個物件不存在。"),
   "sentence.problem.summary.log-unavailable": () => "無法讀取這份日誌。",
   "sentence.problem.summary.conflict": (p) =>
+    p.name ? `這項要求和 ${p.name} 目前的狀態衝突。` : "這項要求和目前的狀態衝突。",
+  "sentence.problem.summary.changed": (p) =>
     p.name ? `${p.name} 在你檢查之後又有變更。` : "這個物件在你檢查之後又有變更。",
   "sentence.problem.summary.inUse": (p) =>
     p.more === "0" ? `${p.users} 還在用它。` : `${p.users} 等 ${p.more} 個還在用它。`,
-  "sentence.problem.summary.already-exists": (p) => `專案 ${p.namespace} 裡已經有 ${p.objects}。`,
+  "sentence.problem.summary.already-exists": (p) =>
+    p.objects
+      ? `專案 ${p.namespace} 裡已經有 ${p.objects}。`
+      : p.name
+        ? `${p.name} 已經存在。`
+        : "這個物件已經存在。",
+  "sentence.problem.summary.expired": () => "要求的內容已過期。",
   "sentence.problem.summary.managed": (p) =>
     p.name ? `${p.name} 由其他工具管理。` : "這由其他工具管理。",
   "sentence.problem.summary.plan-expired": () => "這份變更已過期。",

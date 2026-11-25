@@ -383,7 +383,7 @@ pub(crate) async fn apply(
     let version = &world.snapshot.index.catalog.version;
     if request.catalog_version.as_deref() != Some(version.as_str()) {
         return Err(ApiError::from(Problem::new(
-            Kind::Conflict,
+            Kind::Changed,
             format!("Zeabur now reads Zeabur Catalog {version}. Review the plan again."),
         )));
     }
@@ -978,10 +978,7 @@ impl World {
         let needing: BTreeSet<String> = self.running.union(&self.written).cloned().collect();
         let needing = engine::needed_by(&self.snapshot, id, &needing);
         if !needing.is_empty() {
-            return Err(ApiError::from(Problem::new(
-                Kind::Conflict,
-                format!("{} needs {id}. Remove it first.", needing.join(", ")),
-            )));
+            return Err(needed(&needing.join(", "), id));
         }
         let version = &self.snapshot.index.catalog.version;
         let own = self.removed_steps(file).await?;
@@ -1689,6 +1686,22 @@ async fn our_secret(
 
 /// A refusal of the engine, with what to do about it in place of the kind's "correct the
 /// fields".
+/// The `409` for removing `id` while the components `needing` it are installed.
+fn needed(needing: &str, id: &str) -> ApiError {
+    let mut problem = Problem::new(
+        Kind::Conflict,
+        format!("{needing} needs {id}. Remove it first."),
+    );
+    problem.summary = Message::new("problem.summary.inUse")
+        .with("users", needing)
+        .with("more", "0");
+    problem.fix_for_occasion(
+        "Remove them first, then remove it again.",
+        Message::new("problem.conflict.fix.removeFirst"),
+    );
+    ApiError::from(problem)
+}
+
 fn refusal(refusal: &Refusal) -> ApiError {
     let mut problem = Problem::new(Kind::Invalid, refusal.to_string());
     let (fix, key) = match refusal {

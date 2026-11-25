@@ -1036,7 +1036,7 @@ export function failureOf(t: Translate, locale: Locale, problem: Schemas.Problem
   return {
     title: text.headline,
     description: t("common.sentences", [text.why, text.fix]),
-    review: problem.kind === "conflict" || problem.kind === "plan-expired",
+    review: problem.kind === "changed" || problem.kind === "plan-expired",
   }
 }
 

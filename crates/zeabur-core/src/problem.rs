@@ -103,8 +103,30 @@ pub enum Kind {
     ///
     /// [rfc9110]: https://www.rfc-editor.org/rfc/rfc9110
     LogUnavailable,
-    /// The object changed, or someone else owns the field.
+    /// The request conflicts with the object or the cluster as it is now: kube-apiserver's
+    /// `Conflict` [k8s-status-reason], or a refusal of Zeabur's own, such as removing something
+    /// others still use. Why travels in `detail` and `kubernetes`, since this kind does not know
+    /// it.
+    ///
+    /// [k8s-status-reason]: https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go
     Conflict,
+    /// The object a create names already exists: kube-apiserver's `AlreadyExists`, "the resource
+    /// you are creating already exists" [k8s-status-reason]. A refinement of [`Kind::Conflict`],
+    /// with the same `409`.
+    ///
+    /// [k8s-status-reason]: https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go
+    AlreadyExists,
+    /// What was asked for has expired: kube-apiserver's `Expired`, "the content you are requesting
+    /// has expired and is no longer available", typically a watch it cannot serve
+    /// [k8s-status-reason]. `410`, which a client that does not know this kind reads as
+    /// [`Kind::NotFound`].
+    ///
+    /// [k8s-status-reason]: https://github.com/kubernetes/apimachinery/blob/master/pkg/apis/meta/v1/types.go
+    Expired,
+    /// An object of a plan changed after the plan was made: a precondition Zeabur checked when it
+    /// applied the plan failed, so nothing more was written. Zeabur's own refinement of
+    /// [`Kind::Conflict`], with the same `409`; the only kind that says the object changed.
+    Changed,
     /// Helm, Argo CD or Flux manages the object or owns the field, and would undo the change (named
     /// in [`Problem::managed_by`]). Zeabur's own refinement of [`Kind::Conflict`], with the same
     /// `409` (RFC 9110, §15.5.10) [rfc9110]. It has a type and title of its own, as RFC 9457 keeps
@@ -140,7 +162,7 @@ pub enum Kind {
 
 impl Kind {
     /// Every kind, in the order they were added.
-    pub const ALL: [Self; 16] = [
+    pub const ALL: [Self; 19] = [
         Self::BadRequest,
         Self::Unauthenticated,
         Self::Forbidden,
@@ -157,6 +179,9 @@ impl Kind {
         Self::LogUnavailable,
         Self::QuotaExceeded,
         Self::PolicyDenied,
+        Self::AlreadyExists,
+        Self::Expired,
+        Self::Changed,
     ];
 
     /// The HTTP status code for this kind.
@@ -167,7 +192,8 @@ impl Kind {
             Self::Unauthenticated | Self::SignedOut => 401,
             Self::Forbidden | Self::QuotaExceeded | Self::PolicyDenied => 403,
             Self::NotFound | Self::LogUnavailable => 404,
-            Self::Conflict | Self::Managed => 409,
+            Self::Conflict | Self::Managed | Self::AlreadyExists | Self::Changed => 409,
+            Self::Expired => 410,
             Self::Invalid | Self::SystemNamespace => 422,
             Self::TooManyRequests => 429,
             Self::Unavailable => 503,
@@ -196,6 +222,9 @@ impl Kind {
             Self::NotFound => "/problems/not-found",
             Self::LogUnavailable => "/problems/log-unavailable",
             Self::Conflict => "/problems/conflict",
+            Self::AlreadyExists => "/problems/already-exists",
+            Self::Expired => "/problems/expired",
+            Self::Changed => "/problems/changed",
             Self::Managed => "/problems/managed",
             Self::PlanExpired => "/problems/plan-expired",
             Self::SystemNamespace => "/problems/system-namespace",
@@ -219,7 +248,10 @@ impl Kind {
             Self::PolicyDenied => "A policy in the cluster refused this",
             Self::NotFound => "It does not exist",
             Self::LogUnavailable => "The log is not available",
-            Self::Conflict => "It changed in the meantime",
+            Self::Conflict => "It conflicts with how things are now",
+            Self::AlreadyExists => "It already exists",
+            Self::Expired => "What was asked for has expired",
+            Self::Changed => "It changed after you reviewed it",
             Self::Managed => "Another tool manages it",
             Self::PlanExpired => "The plan expired",
             Self::SystemNamespace => "Kubernetes keeps this namespace for itself",
@@ -249,7 +281,10 @@ impl Kind {
             }
             Self::NotFound => "Reload the page to see what the cluster has now.",
             Self::LogUnavailable => "Read the current run's log, or wait a moment and refresh.",
-            Self::Conflict => "Reload to see the latest version, then make the change again.",
+            Self::Conflict => "Read the details, change what they name, then try again.",
+            Self::AlreadyExists => "Choose another name, or delete the one that exists.",
+            Self::Expired => "Reload the page to ask again.",
+            Self::Changed => "Review again to start from its current state.",
             Self::Managed => {
                 "Change it where the managing tool reads it, such as Helm values or a Git \
                  repository. Restarting still works here."
@@ -273,7 +308,9 @@ impl Kind {
             "Unauthorized" => Self::Unauthenticated,
             "Forbidden" => Self::Forbidden,
             "NotFound" | "Gone" => Self::NotFound,
-            "AlreadyExists" | "Conflict" | "Expired" => Self::Conflict,
+            "AlreadyExists" => Self::AlreadyExists,
+            "Conflict" => Self::Conflict,
+            "Expired" => Self::Expired,
             "Invalid" | "NotAcceptable" | "UnsupportedMediaType" | "RequestEntityTooLarge" => {
                 Self::Invalid
             }
@@ -595,8 +632,13 @@ impl Problem {
                 "The cluster did not accept your credentials. They may have expired.".to_owned()
             }
             Kind::NotFound => format!("{what} could not be found."),
-            // kube-apiserver never answers with Zeabur's own kind.
-            Kind::Conflict | Kind::Managed => format!("{what} changed after you loaded it."),
+            Kind::AlreadyExists => format!("{what} already exists."),
+            Kind::Expired => format!("What Zeabur asked the cluster for about {what} has expired."),
+            // Nor with Zeabur's own `managed` or `changed`: the answer alone does not say why.
+            Kind::Conflict | Kind::Managed | Kind::Changed => format!(
+                "The cluster refused the request about {what}: {}",
+                status.message
+            ),
             Kind::Invalid => format!("The cluster rejected the change to {what}."),
             Kind::TooManyRequests => "The cluster asked Zeabur to slow down.".to_owned(),
             Kind::Unavailable => "The cluster did not answer in time.".to_owned(),
@@ -753,6 +795,47 @@ mod tests {
         assert!(json.get("reason").is_none());
     }
 
+    /// kube-apiserver's reason reaches the client: a taken name and an expired watch are not
+    /// told as a change after the review.
+    #[test]
+    fn already_exists_and_expired_keep_their_own_kind() {
+        for (code, reason, kind, wire) in [
+            (409, "AlreadyExists", Kind::AlreadyExists, "already-exists"),
+            (410, "Expired", Kind::Expired, "expired"),
+        ] {
+            let problem = Problem::from_kubernetes(status(code, reason), "Deployment web");
+            assert_eq!(problem.kind, kind);
+            let json = serde_json::to_value(&problem).unwrap();
+            assert_eq!(json["kind"], wire);
+            assert_eq!(json["status"], code);
+            assert_eq!(json["summary"]["key"], format!("problem.summary.{wire}"));
+            assert_eq!(json["kubernetes"]["reason"], reason);
+            assert!(!problem.detail.contains("changed"), "{problem:?}");
+        }
+    }
+
+    /// A `Conflict` from kube-apiserver says what was refused and passes its message on.
+    #[test]
+    fn a_conflict_quotes_kube_apiserver_instead_of_guessing() {
+        let answer = KubernetesStatus::new(409, "Conflict", "Operation cannot be fulfilled");
+        let problem = Problem::from_kubernetes(answer, "Deployment web");
+        assert_eq!(problem.kind, Kind::Conflict);
+        assert!(
+            problem.detail.contains("Operation cannot be fulfilled"),
+            "{problem:?}"
+        );
+        assert!(!problem.title.contains("changed"), "{problem:?}");
+    }
+
+    /// Only `changed` names a change; every other kind's title and fix hold for any request of it.
+    #[test]
+    fn only_changed_says_it_changed() {
+        for kind in Kind::ALL {
+            let said = format!("{} {}", kind.title(), kind.fix()).to_lowercase();
+            assert_eq!(said.contains("changed"), kind == Kind::Changed, "{kind:?}");
+        }
+    }
+
     #[test]
     fn an_unknown_reason_falls_back_to_the_code() {
         assert_eq!(Kind::from_status("", 429), Kind::TooManyRequests);
@@ -780,6 +863,9 @@ mod tests {
             Kind::LogUnavailable => 13,
             Kind::QuotaExceeded => 14,
             Kind::PolicyDenied => 15,
+            Kind::AlreadyExists => 16,
+            Kind::Expired => 17,
+            Kind::Changed => 18,
             // Read only, never sent, so not in `Kind::ALL`.
             Kind::Unknown => usize::MAX,
         }
@@ -799,12 +885,12 @@ mod tests {
         for (index, kind) in Kind::ALL.into_iter().enumerate() {
             assert_eq!(position(kind), index, "{kind:?}");
             let expected = match kind {
-                Kind::Managed => Kind::Conflict,
+                Kind::Managed | Kind::AlreadyExists | Kind::Changed => Kind::Conflict,
                 Kind::PlanExpired => Kind::BadRequest,
                 Kind::SystemNamespace => Kind::Invalid,
                 Kind::SignedOut => Kind::Unauthenticated,
                 Kind::QuotaExceeded | Kind::PolicyDenied => Kind::Forbidden,
-                Kind::LogUnavailable => Kind::NotFound,
+                Kind::LogUnavailable | Kind::Expired => Kind::NotFound,
                 Kind::BadRequest
                 | Kind::Unauthenticated
                 | Kind::Forbidden

@@ -1,4 +1,4 @@
-// An apply refused because the project moved on after the review (a `409` before anything was
+// An apply refused because the project moved on after the review (`changed`, before anything was
 // written) plans the same change again and shows it; nothing more is written than was reviewed.
 import type { Problem, Schemas } from "@/api/client"
 
@@ -6,7 +6,7 @@ import type { Problem, Schemas } from "@/api/client"
 export type Reviewed = Pick<Schemas.PlanResponse, "objects">
 
 export const replansOn = (problem: Problem): boolean =>
-  problem.kind === "conflict" && !problem.managedBy && !problem.applied?.length
+  problem.kind === "changed" && !problem.applied?.length
 
 const named = (object: Schemas.PlannedObject) => `${object.target.kind} ${object.target.name}`
 

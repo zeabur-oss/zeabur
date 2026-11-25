@@ -258,8 +258,8 @@ fn invalid(detail: String) -> ApiError {
     ApiError::from(Problem::new(Kind::Invalid, detail))
 }
 
-fn conflict(detail: String) -> ApiError {
-    ApiError::from(Problem::new(Kind::Conflict, detail))
+fn exists(detail: String) -> ApiError {
+    ApiError::from(Problem::new(Kind::AlreadyExists, detail))
 }
 
 fn right(verb: &str, resource: &str, namespace: &str, name: Option<&str>) -> Denied {
@@ -607,10 +607,10 @@ impl Add<'_> {
             .iter()
             .any(|c| c.metadata.name.as_deref() == Some(object_name.as_str()))
         {
-            return Err(conflict(format!("A channel named {name} exists.")));
+            return Err(exists(format!("A channel named {name} exists.")));
         }
         if secret_exists {
-            return Err(conflict(format!(
+            return Err(exists(format!(
                 "Secret {object_name} exists; remove it or choose another name."
             )));
         }
@@ -1020,9 +1020,10 @@ async fn apply_in(
     )
     .await?;
     if computed.versions != claims.versions {
-        return Err(conflict(
-            "The channel or its Secret changed after the plan was made.".to_owned(),
-        ));
+        return Err(ApiError::from(Problem::new(
+            Kind::Changed,
+            "The channel or its Secret changed after the plan was made.",
+        )));
     }
     for write in &computed.writes {
         send(cluster, write, true).await?;

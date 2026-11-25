@@ -197,7 +197,7 @@ pub(crate) fn open_as_planned(
     let opened = open(catalog, namespace, cluster_issuer, request)?;
     if opened.digest.as_deref() != planned {
         return Err(ApiError::from(Problem::new(
-            Kind::Conflict,
+            Kind::Changed,
             "A template in this plan changed after the plan was made.",
         )));
     }
