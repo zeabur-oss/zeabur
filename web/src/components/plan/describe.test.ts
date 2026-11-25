@@ -346,19 +346,24 @@ group("deletion", () => {
     expect(d.action).toBe("action.delete")
   })
 
-  test("deleting a database says its data goes for good and its backups stay", () => {
-    for (const resource of [
-      { group: "postgresql.cnpg.io", version: "v1", resource: "clusters" },
-      { group: "psmdb.percona.com", version: "v1", resource: "perconaservermongodbs" },
-    ]) {
-      const d = describe(
-        t,
-        { changes: [{ op: "delete", resource, name: "db" }] },
-        plan({}),
-        pods({}),
-      )
-      expect(d.lines).toStrictEqual(["confirm.deleteDatabase(db)"])
+  test("deleting a database the preview names says its data goes for good", () => {
+    const preview = {
+      rollouts: [],
+      databases: [],
+      deletedDatabases: ["db"],
+      domains: [],
+      dataLoss: [],
+      removals: [],
     }
+    const withPreview = plan({ preview })
+    const resource = { group: "moco.cybozu.com", version: "v1beta2", resource: "mysqlclusters" }
+    const ask = (name: string) => ({ changes: [{ op: "delete" as const, resource, name }] })
+    expect(describe(t, ask("db"), withPreview, pods({})).lines).toStrictEqual([
+      "confirm.deleteDatabase(db)",
+    ])
+    expect(describe(t, ask("other"), withPreview, pods({})).lines).toStrictEqual([
+      "confirm.delete(other)",
+    ])
   })
 })
 

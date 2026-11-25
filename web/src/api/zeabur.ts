@@ -5532,14 +5532,14 @@ export type DatabaseOperator = {
 }
 
 /**
- * A CloudNativePG `Cluster` a plan creates: its operator starts its instances.
+ * A database object a plan creates: its operator starts its members.
  */
 export type DatabaseStart = {
-  /** The engine, as people write it (`PostgreSQL`). */
-  engine: string
-  /** Its instances (`spec.instances`). */
+  /** The engine. */
+  engine: DatabaseEngine
+  /** The members it asks for. */
   instances: number
-  /** The `Cluster`'s name. */
+  /** The object's name. */
   name: string
 }
 
@@ -8794,6 +8794,8 @@ export type Preview = {
   dataLoss: DataLoss[]
   /** The databases it creates, by name. */
   databases: DatabaseStart[]
+  /** The names of the databases it deletes. */
+  deletedDatabases: string[]
   /** The public domains its new Ingresses and `HTTPRoutes` route, sorted. */
   domains: string[]
   /** The fields it removes, by object then path. */

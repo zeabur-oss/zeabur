@@ -3,6 +3,7 @@ import type { ReactNode } from "react"
 import type { Schemas } from "@/api/client"
 import { StatusDot } from "@/components/status"
 import { useT, type Translate } from "@/i18n"
+import { engineName } from "@/model/databases"
 import type { Health } from "@/model/service"
 
 type Preview = Schemas.Preview
@@ -78,7 +79,11 @@ export function PlanPreview({
   const startsToo: (readonly [string, string])[] = showRollouts
     ? [
         ...preview.databases.map(
-          (d) => [`db/${d.name}`, t("preview.database", d.name, d.engine, d.instances)] as const,
+          (d) =>
+            [
+              `db/${d.name}`,
+              t("preview.database", d.name, engineName(d.engine), d.instances),
+            ] as const,
         ),
         ...preview.domains.map((host) => [`domain/${host}`, t("preview.domain", host)] as const),
       ]

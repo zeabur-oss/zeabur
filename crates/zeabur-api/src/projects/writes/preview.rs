@@ -48,6 +48,7 @@ use serde_json::Value;
 use utoipa::ToSchema;
 use zeabur_kube::{Cluster, NamespaceObjects};
 use zeabur_model::{WorkloadKind, WorkloadRef};
+use zeabur_modules::databases::{Engine, Operator};
 use zeabur_plan::{Change, ObjectName, Plan, PlanRequest, PlannedObject, Warning, Write};
 
 /// What happens to a workload's pods.
@@ -138,15 +139,15 @@ pub struct Removal {
     pub left_out_of_edit: bool,
 }
 
-/// A CloudNativePG `Cluster` a plan creates: its operator starts its instances.
+/// A database object a plan creates: its operator starts its members.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct DatabaseStart {
-    /// The `Cluster`'s name.
+    /// The object's name.
     pub name: String,
-    /// The engine, as people write it (`PostgreSQL`).
-    pub engine: String,
-    /// Its instances (`spec.instances`).
+    /// The engine.
+    pub engine: Engine,
+    /// The members it asks for.
     pub instances: i32,
 }
 
@@ -158,6 +159,8 @@ pub struct Preview {
     pub rollouts: Vec<Rollout>,
     /// The databases it creates, by name.
     pub databases: Vec<DatabaseStart>,
+    /// The names of the databases it deletes.
+    pub deleted_databases: Vec<String>,
     /// The public domains its new Ingresses and `HTTPRoutes` route, sorted.
     pub domains: Vec<String>,
     /// The data it loses.
@@ -349,31 +352,25 @@ fn rollouts(plan: &Plan) -> Vec<Rollout> {
     out.into_values().collect()
 }
 
-/// The CloudNativePG `Clusters` `plan` creates.
-fn databases(plan: &Plan) -> Vec<DatabaseStart> {
-    let mut out = Vec::new();
+/// The databases `plan` creates, and the names of those it deletes.
+fn databases(plan: &Plan) -> (Vec<DatabaseStart>, Vec<String>) {
+    let mut starts = Vec::new();
+    let mut deletes = Vec::new();
     for object in &plan.objects {
-        let Some(after) = after_of(object) else {
+        let Some(operator) = Operator::of(&object.target.api_version, &object.target.kind) else {
             continue;
         };
-        if object.before.is_some()
-            || object.target.kind != "Cluster"
-            || !object.target.api_version.starts_with("postgresql.cnpg.io/")
-        {
-            continue;
+        if matches!(object.write, Write::Delete { .. }) {
+            deletes.push(object.target.name.clone());
+        } else if let (None, Some(after)) = (&object.before, after_of(object)) {
+            starts.push(DatabaseStart {
+                name: object.target.name.clone(),
+                engine: operator.engine,
+                instances: i32::try_from(operator.members(after)).unwrap_or(1),
+            });
         }
-        let instances = after
-            .pointer("/spec/instances")
-            .and_then(Value::as_i64)
-            .and_then(|n| i32::try_from(n).ok())
-            .unwrap_or(1);
-        out.push(DatabaseStart {
-            name: object.target.name.clone(),
-            engine: "PostgreSQL".to_owned(),
-            instances,
-        });
     }
-    out
+    (starts, deletes)
 }
 
 /// The hosts the Ingresses and `HTTPRoutes` of the namespace serve now.
@@ -568,10 +565,12 @@ fn removals(plan: &Plan, request: &PlanRequest) -> Vec<Removal> {
 /// What `plan`, made for `request`, does once applied.
 pub(crate) fn preview(plan: &Plan, request: &PlanRequest, serving: &BTreeSet<String>) -> Preview {
     let rollouts = rollouts(plan);
+    let (databases, deleted_databases) = databases(plan);
     Preview {
         data_loss: data_loss(plan, &rollouts),
         removals: removals(plan, request),
-        databases: databases(plan),
+        databases,
+        deleted_databases,
         domains: domains(plan, serving),
         rollouts,
     }
@@ -602,8 +601,92 @@ pub(crate) async fn read(
 #[cfg(test)]
 mod tests {
     use serde_json::json;
+    use zeabur_plan::Target;
 
     use super::*;
+
+    fn object(api_version: &str, kind: &str, name: &str, write: Write) -> PlannedObject {
+        let creates = matches!(write, Write::Create { .. });
+        let deletes = matches!(write, Write::Delete { .. });
+        let body = json!({ "spec": { "replicas": 2, "instances": 2 } });
+        PlannedObject {
+            target: Target {
+                api_version: api_version.to_owned(),
+                kind: kind.to_owned(),
+                plural: String::new(),
+                name: name.to_owned(),
+            },
+            before: (!creates).then(|| body.clone()),
+            after: (!deletes).then(|| body.clone()),
+            before_yaml: None,
+            after_yaml: None,
+            changes: Vec::new(),
+            owners: Vec::new(),
+            resource_version: None,
+            write,
+            change: None,
+            raw_after: if deletes { Value::Null } else { body },
+        }
+    }
+
+    fn create() -> Write {
+        Write::Create { body: json!({}) }
+    }
+
+    fn plan_of(objects: Vec<PlannedObject>) -> Plan {
+        Plan {
+            objects,
+            impact: Vec::new(),
+            warnings: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn a_database_of_each_engine_starts_with_its_members() {
+        let kinds = [
+            ("postgresql.cnpg.io/v1", "Cluster", Engine::Postgresql, 2),
+            (
+                "psmdb.percona.com/v1",
+                "PerconaServerMongoDB",
+                Engine::Mongodb,
+                3,
+            ),
+            ("moco.cybozu.com/v1beta2", "MySQLCluster", Engine::Mysql, 2),
+            ("k8s.mariadb.com/v1alpha1", "MariaDB", Engine::Mariadb, 2),
+            ("dragonflydb.io/v1alpha1", "Dragonfly", Engine::Dragonfly, 2),
+        ];
+        let objects = kinds
+            .iter()
+            .map(|(api, kind, ..)| object(api, kind, "db", create()))
+            .collect();
+        let (starts, deletes) = databases(&plan_of(objects));
+        let expected: Vec<_> = kinds
+            .iter()
+            .map(|(_, _, engine, instances)| (*engine, *instances))
+            .collect();
+        let found: Vec<_> = starts.iter().map(|d| (d.engine, d.instances)).collect();
+        assert_eq!(found, expected);
+        assert_eq!(deletes, Vec::<String>::new());
+    }
+
+    #[test]
+    fn only_a_new_database_starts_and_a_deleted_one_is_named() {
+        let delete = Write::Delete {
+            uid: None,
+            resource_version: "1".to_owned(),
+            foreground: false,
+        };
+        let patch = Write::Patch {
+            operations: Vec::new(),
+        };
+        let (starts, deletes) = databases(&plan_of(vec![
+            object("postgresql.cnpg.io/v1", "Cluster", "edited", patch),
+            object("moco.cybozu.com/v1beta2", "MySQLCluster", "gone", delete),
+            object("apps/v1", "Deployment", "web", create()),
+        ]));
+        assert_eq!(starts, Vec::new());
+        assert_eq!(deletes, ["gone"]);
+    }
 
     #[test]
     fn surge_and_unavailable_resolve_as_kubernetes_rounds_them() {

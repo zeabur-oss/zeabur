@@ -8833,22 +8833,22 @@ components:
           description: When the backup was taken.
     DatabaseStart:
       type: object
-      description: "A CloudNativePG `Cluster` a plan creates: its operator starts its instances."
+      description: "A database object a plan creates: its operator starts its members."
       required:
       - name
       - engine
       - instances
       properties:
         engine:
-          type: string
-          description: The engine, as people write it (`PostgreSQL`).
+          $ref: "#/components/schemas/DatabaseEngine"
+          description: The engine.
         instances:
           type: integer
           format: int32
-          description: Its instances (`spec.instances`).
+          description: The members it asks for.
         name:
           type: string
-          description: The `Cluster`'s name.
+          description: The object's name.
     DatabaseState:
       type: string
       description: How a database is, from its operator's status.
@@ -15272,6 +15272,7 @@ components:
       required:
       - rollouts
       - databases
+      - deletedDatabases
       - domains
       - dataLoss
       - removals
@@ -15286,6 +15287,11 @@ components:
           items:
             $ref: "#/components/schemas/DatabaseStart"
           description: The databases it creates, by name.
+        deletedDatabases:
+          type: array
+          items:
+            type: string
+          description: The names of the databases it deletes.
         domains:
           type: array
           items:
