@@ -14,7 +14,10 @@ use zeabur_kube::k8s_openapi::apimachinery::pkg::apis::meta::v1::{ObjectMeta, Ow
 use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_kube::{Cluster, ObjectTarget, Preconditions, WriteBody, WriteRequest};
 
-use super::directory::{AccountType, Directory, IdentityKind, Object, UserSpec, request};
+use super::directory::{
+    AccountType, Directory, IdentityKind, InvitationSpec, Object, Read, UserSpec, read, read_error,
+    request,
+};
 use super::{API_VERSION, EXPIRES_AT_ANNOTATION, EXPIRY_BUCKET_LABEL, USER_LABEL};
 use crate::error::{ApiError, read_problem, to_json};
 
@@ -313,8 +316,18 @@ pub(crate) fn invitation(
     }
 }
 
-/// Makes an invitation for the `User` `user` (as read, with its `uid`) lasting `seconds` from
-/// `now`, and returns its link.
+/// The name of `username`'s one invitation: a hash, since a token ends its name at the first dot
+/// and a user name may hold dots. One name per member is what lets the server refuse a second
+/// link made at the same moment.
+fn invitation_name(username: &str) -> String {
+    let digest: Vec<u8> = sha256(username.as_bytes()).into_iter().take(8).collect();
+    format!("inv-{}", hex(&digest))
+}
+
+/// Makes the one invitation for the `User` `user` (as read, with its `uid`) lasting `seconds`
+/// from `now`, and returns its link. The member's earlier invitations are deleted first, so an
+/// older link stops working. Two links made at once cannot both survive: they share a name, so
+/// the second creation is refused.
 pub(crate) async fn issue(
     cluster: &dyn Cluster,
     namespace: &str,
@@ -323,13 +336,20 @@ pub(crate) async fn issue(
     now: Timestamp,
     seconds: i64,
 ) -> Result<(String, String, Timestamp), ApiError> {
-    let suffix = random::<8>().map_err(|_random| {
-        ApiError::from(Problem::new(
-            Kind::Internal,
-            "Zeabur could not make a random name.",
-        ))
-    })?;
-    let name = format!("inv-{}", hex(&suffix));
+    let user = user
+        .get("metadata")
+        .and_then(|m| ObjectMeta::deserialize(m).ok())
+        .unwrap_or_default();
+    let username = user.name.clone().unwrap_or_default();
+    let earlier = read::<Object<InvitationSpec>>(cluster, namespace, IdentityKind::Invitation)
+        .await
+        .map_err(|e| read_error(e, namespace, IdentityKind::Invitation))?;
+    if let Read::Objects(earlier) = earlier {
+        for invitation in earlier.iter().filter(|i| i.spec.user == username) {
+            delete(cluster, IdentityKind::Invitation, namespace, invitation).await?;
+        }
+    }
+    let name = invitation_name(&username);
     let token = token(&name)?;
     let expires_at = now
         .checked_add(SignedDuration::from_secs(seconds))
@@ -339,10 +359,6 @@ pub(crate) async fn issue(
                 "The link would expire past the last time Zeabur can represent.",
             ))
         })?;
-    let user = user
-        .get("metadata")
-        .and_then(|m| ObjectMeta::deserialize(m).ok())
-        .unwrap_or_default();
     let object = to_json(&invitation(
         namespace,
         &name,
