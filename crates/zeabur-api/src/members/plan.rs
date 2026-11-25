@@ -1023,6 +1023,8 @@ pub(crate) async fn apply(
     let namespace = state.settings.identity.namespace.as_str();
     let mut link = None;
     let mut token = None;
+    let mut ended = Vec::new();
+    let inviting = computed.ops.iter().any(|op| matches!(op, Op::Invite));
     for op in &computed.ops {
         if let Op::IssueToken {
             name,
@@ -1035,7 +1037,14 @@ pub(crate) async fn apply(
             continue;
         }
         if !matches!(op, Op::Invite) {
-            send(cluster.as_ref(), op, false).await?;
+            // The earlier links end only once the new one exists.
+            let ends_link =
+                inviting && matches!(op, Op::Delete { target, .. } if target.kind == "Invitation");
+            if ends_link {
+                ended.push(op);
+            } else {
+                send(cluster.as_ref(), op, false).await?;
+            }
             continue;
         }
         let username = username_of(&claims.change);
@@ -1061,6 +1070,9 @@ pub(crate) async fn apply(
             computed.new_member,
             false,
         ));
+    }
+    for op in ended {
+        send(cluster.as_ref(), op, false).await?;
     }
     if let Some(used) = &state.used
         && link.is_some()

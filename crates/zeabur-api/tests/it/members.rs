@@ -585,6 +585,8 @@ mod tests {
             planned(&plan),
             ["delete Invitation/inv-bob", "create Invitation/inv-"]
         );
+        let made = writes(&cluster);
+        assert!(made[0].starts_with("create Invitation/inv-"), "{made:?}");
         assert_eq!(applied["link"]["createdMember"], false);
         assert_eq!(writes(&cluster).len(), 2);
         let (status, ..) = change(&cluster, json!({"op": "invite", "username": "Bob Smith"})).await;
