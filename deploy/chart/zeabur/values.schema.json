@@ -386,6 +386,16 @@
       "then": { "properties": { "parentRefs": { "minItems": 1 } } }
     },
     "resources": { "type": "object" },
+    "podSecurityContext": { "type": "object" },
+    "securityContext": { "type": "object" },
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+    "priorityClassName": { "type": "string" },
     "podAnnotations": { "type": "object", "additionalProperties": { "type": "string" } },
     "podLabels": { "type": "object", "additionalProperties": { "type": "string" } },
     "nodeSelector": { "type": "object", "additionalProperties": { "type": "string" } },
