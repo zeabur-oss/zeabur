@@ -20,7 +20,7 @@
     # output builds there, and a release build checks that bundle against the signed release at
     # that commit (scripts/release-pins.sh).
     catalog = {
-      url = "github:zeabur-oss/catalog/v0.6.1";
+      url = "github:zeabur-oss/catalog/v0.6.2";
       inputs.nixpkgs.follows = "nixpkgs";
       inputs.oss.follows = "oss";
     };

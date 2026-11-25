@@ -12,16 +12,16 @@
         "rust-overlay": "rust-overlay"
       },
       "locked": {
-        "lastModified": 1795323847,
-        "narHash": "sha256-3A/aGuZ6hFyXIZVV71Wzb6i/9nm1B6pHOA4U3EUOTP4=",
+        "lastModified": 1795575259,
+        "narHash": "sha256-sJOxfDDw06AdKpRBikDaE17nSYrcFIHnq7QxKN1Wgcs=",
         "owner": "zeabur-oss",
         "repo": "catalog",
-        "rev": "bcc7d3c21ffde0f4c13257bc28e1f5de4f3b7872",
+        "rev": "ef46d0dd87e85ce0da87c773b197677796024106",
         "type": "github"
       },
       "original": {
         "owner": "zeabur-oss",
-        "ref": "v0.6.1",
+        "ref": "v0.6.2",
         "repo": "catalog",
         "type": "github"
       }
