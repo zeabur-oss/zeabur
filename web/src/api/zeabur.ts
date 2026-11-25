@@ -7611,6 +7611,28 @@ export type PasskeyView = {
 }
 
 /**
+ * A password, with or without a second factor. A member has at most one.
+ */
+export type PasswordView = {
+  /**
+   * When it was set.
+   * @nullable
+   */
+  createdAt?: string | null
+  /** The `Credential` object's name. */
+  id: string
+  /**
+   * When it last signed in, where recorded.
+   * @nullable
+   */
+  lastUsedAt?: string | null
+  /** The `Credential`. */
+  origin: Origin
+  /** Whether sign-in asks for an authenticator code after the password. */
+  secondFactor: boolean
+}
+
+/**
  * A person who can sign in.
  */
 export type MemberView = MemberActions & {
@@ -7641,6 +7663,7 @@ export type MemberView = MemberActions & {
   origin: Origin
   /** Passkeys, oldest first. */
   passkeys: PasskeyView[]
+  password?: PasswordView | null
   /**
    * A member's roles in projects, by project; `None` when Zeabur could not read them. An
    * admin's are left out: their rights cover every project.

@@ -90,7 +90,7 @@ pub(crate) struct CredentialSpec {
 pub(crate) enum CredentialKind {
     Passkey(PasskeySpec),
     External(ExternalSpec),
-    Password(serde::de::IgnoredAny),
+    Password(PasswordSpec),
 }
 
 impl CredentialKind {
@@ -115,6 +115,14 @@ impl ExternalSpec {
             issuer => issuer.to_owned(),
         }
     }
+}
+
+/// A password. Its hash and second-factor secret stay unread.
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub(crate) struct PasswordSpec {
+    #[serde(default)]
+    pub(crate) totp: Option<serde::de::IgnoredAny>,
 }
 
 /// What Zeabur Identity changes after enrolment.
@@ -306,6 +314,7 @@ impl Directory {
         let mine = |owner: &str| owner == username;
         let mut passkeys = Vec::new();
         let mut linked = Vec::new();
+        let mut password = None;
         for credential in self.credentials.iter().filter(|c| mine(&c.spec.user)) {
             let origin = Origin::complete(
                 API_VERSION,
@@ -346,7 +355,15 @@ impl Directory {
                         origin,
                     });
                 }
-                CredentialKind::Password(_) => {}
+                CredentialKind::Password(spec) => {
+                    password = Some(PasswordView {
+                        id: credential.name().to_owned(),
+                        created_at: credential.created(),
+                        last_used_at,
+                        second_factor: spec.totp.is_some(),
+                        origin,
+                    });
+                }
             }
         }
         passkeys.sort_by(|a, b| a.created_at.cmp(&b.created_at).then(a.id.cmp(&b.id)));
@@ -356,6 +373,7 @@ impl Directory {
             .filter_map(|g| Timestamp::from_second(g.spec.auth_time).ok())
             .chain(passkeys.iter().filter_map(|p| p.last_used_at))
             .chain(linked.iter().filter_map(|l| l.last_used_at))
+            .chain(password.as_ref().and_then(|p| p.last_used_at))
             .max();
         let spec = &user.spec;
         let admin = spec.account_type == AccountType::Admin;
@@ -376,6 +394,7 @@ impl Directory {
             disabled: spec.disabled,
             passkeys,
             linked,
+            password,
             last_sign_in_at,
             sessions: grants.len(),
             invitations: self
@@ -613,6 +632,24 @@ pub struct LinkedAccountView {
     pub origin: Origin,
 }
 
+/// A password, with or without a second factor. A member has at most one.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct PasswordView {
+    /// The `Credential` object's name.
+    pub id: String,
+    /// When it was set.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub created_at: Option<Timestamp>,
+    /// When it last signed in, where recorded.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub last_used_at: Option<Timestamp>,
+    /// Whether sign-in asks for an authenticator code after the password.
+    pub second_factor: bool,
+    /// The `Credential`.
+    pub origin: Origin,
+}
+
 /// What a member may do in the cluster, as far as Zeabur Identity grants it.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
@@ -648,6 +685,9 @@ pub struct MemberView {
     pub passkeys: Vec<PasskeyView>,
     /// Linked GitHub or Google accounts.
     pub linked: Vec<LinkedAccountView>,
+    /// Their password, if they set one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub password: Option<PasswordView>,
     /// The latest sign-in Zeabur Identity knows of: from live sessions and recorded last use.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub last_sign_in_at: Option<Timestamp>,
@@ -865,6 +905,56 @@ mod tests {
             true,
         );
         assert!(refused.is_err());
+    }
+
+    #[test]
+    fn a_member_with_only_a_password_has_it_with_its_second_factor_and_last_use() {
+        let mut directory = directory();
+        directory.users.push(user("cy", false));
+        directory.credentials.push(object(json!({
+            "metadata": {"name": "password-cy", "creationTimestamp": "2026-10-04T00:00:00Z"},
+            "status": {"lastUsedAt": 1_792_483_200},
+            "spec": {"user": "cy", "password": {"hash": "$p$i=1$s$h",
+                     "totp": {"secret": "sealed", "recovery": [], "enrolledStep": 1}}}
+        })));
+        let view = directory
+            .view(
+                "zeabur-identity",
+                None,
+                Timestamp::from_second(1_000_000_000).unwrap(),
+                SetupLinks {
+                    issuer: None,
+                    accepted: None,
+                },
+                Permission::Allowed,
+                true,
+            )
+            .unwrap();
+        let cy = view.items.iter().find(|m| m.username == "cy").unwrap();
+        let password = cy.password.as_ref().unwrap();
+        assert!(password.second_factor);
+        assert!(cy.passkeys.is_empty() && cy.linked.is_empty());
+        assert_eq!(
+            cy.last_sign_in_at,
+            Some("2026-10-20T08:00:00Z".parse().unwrap())
+        );
+        // Ada and Bob have no password.
+        assert!(
+            view.items
+                .iter()
+                .filter(|m| m.username != "cy")
+                .all(|m| m.password.is_none())
+        );
+    }
+
+    #[test]
+    fn a_password_without_a_second_factor_says_so() {
+        let spec: CredentialSpec =
+            object(json!({"user": "cy", "password": {"hash": "$p$i=1$s$h"}}));
+        assert!(matches!(
+            spec.kind,
+            CredentialKind::Password(PasswordSpec { totp: None })
+        ));
     }
 
     #[test]
