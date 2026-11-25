@@ -700,12 +700,8 @@ impl World {
         }
     }
 
-    async fn install(
-        &self,
-        cluster: &dyn Cluster,
-        id: &str,
-        given: &Values,
-    ) -> Result<Planned, ApiError> {
+    /// Refuses a component that is installed and that Zeabur did not install.
+    fn refuse_installed_elsewhere(&self, id: &str) -> Result<(), ApiError> {
         if self
             .sources
             .get(id)
@@ -719,6 +715,16 @@ impl World {
                 ),
             )));
         }
+        Ok(())
+    }
+
+    async fn install(
+        &self,
+        cluster: &dyn Cluster,
+        id: &str,
+        given: &Values,
+    ) -> Result<Planned, ApiError> {
+        self.refuse_installed_elsewhere(id)?;
         let install = self.engine_install(cluster, id, given).await?;
         let missing = install.missing();
         let mut steps = Vec::new();
