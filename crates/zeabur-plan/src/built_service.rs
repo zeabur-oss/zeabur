@@ -897,7 +897,7 @@ impl Planner<'_> {
             .is_some_and(|p| p == KEEL_FORCE);
         let (source, credentials) = change.build.source(name)?;
         let existing = self.builds_read()?.into_iter().any(|(n, _)| n == name);
-        let pushes_to = if existing {
+        let (pushes_to, build_changed) = if existing {
             self.update_build(name, &change.build, source, credentials, index)?
         } else {
             let pushes_to = self.repository(name)?;
@@ -907,26 +907,34 @@ impl Planner<'_> {
             self.build_variables(name, &change.build.build_variables, index)?;
             let build = change.build.build(name, pushes_to.clone(), source);
             self.create_object(&to_json(&build)?, index)?;
-            pushes_to
+            (pushes_to, true)
         };
-        if !container
+        let moves = !container
             .spec
             .image
             .as_deref()
-            .is_some_and(|i| runs_from(i, &pushes_to))
-        {
+            .is_some_and(|i| runs_from(i, &pushes_to));
+        if moves {
             let image = format!("{pushes_to}:{PENDING_TAG}");
             self.image(reference, Some(&container.name), &image)?;
         }
         match (keel, existing) {
-            (true, _) => Ok(()),
-            (false, true) => self.auto_update(reference, true, Some(name), Some(KEEL_WEBHOOK)),
-            (false, false) => self.auto_update(reference, true, None, None),
+            (true, _) => {}
+            (false, true) => self.auto_update(reference, true, Some(name), Some(KEEL_WEBHOOK))?,
+            (false, false) => self.auto_update(reference, true, None, None)?,
         }
+        if !build_changed && !moves && keel {
+            return Err(error(
+                ErrorKind::BadRequest,
+                "unchanged",
+                format!("{name} already builds this way."),
+            ));
+        }
+        Ok(())
     }
 
     /// Gives the `Build` `name` that exists `build`'s source, method and paths, writing the
-    /// credentials it reads; returns the repository it pushes to.
+    /// credentials it reads; returns the repository it pushes to and whether it changes anything.
     fn update_build(
         &mut self,
         name: &str,
@@ -934,7 +942,7 @@ impl Planner<'_> {
         mut source: SourceSpec,
         credentials: Option<Secret>,
         index: usize,
-    ) -> Result<String, PlanError> {
+    ) -> Result<(String, bool), PlanError> {
         let at = self.build(name)?;
         let before = self.current(at);
         let read: BuildRead = serde_json::from_value(before.clone())
@@ -996,14 +1004,9 @@ impl Planner<'_> {
                 self.build_env(at, name, &edit)?;
             }
         }
-        if !wrote_credentials && build.build_variables.is_empty() && self.current(at) == before {
-            return Err(error(
-                ErrorKind::BadRequest,
-                "unchanged",
-                format!("Build {name} already builds this way."),
-            ));
-        }
-        Ok(pushes_to)
+        let changed =
+            wrote_credentials || !build.build_variables.is_empty() || self.current(at) != before;
+        Ok((pushes_to, changed))
     }
 
     /// Writes the credentials Secret `<name>-git` the `Build` reads from now on, or deletes it when

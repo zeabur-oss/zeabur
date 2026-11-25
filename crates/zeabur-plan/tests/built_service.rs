@@ -1113,6 +1113,37 @@ mod tests {
         assert_eq!(body["data"]["NPM_TOKEN"], "bnBtXzI=");
     }
 
+    /// The same settings change nothing for the container that runs the `Build`'s image, but move
+    /// another container to it and leave the `Build` as it is.
+    #[test]
+    fn the_same_build_moves_another_container() {
+        let input = repository("https://github.com/acme/site", GitAccess::Public);
+        let site = served(build_of(input.clone()), "site", Some(LATEST));
+        let workload = running_all(
+            &[("site", LATEST), ("worker", "nginx:1.27")],
+            &[],
+            Some("force"),
+        );
+        let on = |container: &str| {
+            Change::SetBuild(SetBuildChange {
+                workload: deployment(),
+                container: Some(container.to_owned()),
+                build: input.clone(),
+            })
+        };
+        let unchanged =
+            on_cluster(on("site"), workload.clone(), vec![site.clone()], &[]).unwrap_err();
+        assert_eq!(unchanged.code, "unchanged");
+        let site_spec = site["spec"].clone();
+        let plan = on_cluster(on("worker"), workload, vec![site], &[]).unwrap();
+        let deployment = after(&plan, "Deployment", "site").unwrap();
+        assert_eq!(
+            deployment["spec"]["template"]["spec"]["containers"][1]["image"],
+            "zot:5000/shop/site:pending"
+        );
+        assert_eq!(after(&plan, "Build", "site").unwrap()["spec"], site_spec);
+    }
+
     /// A Job or CronJob runs to completion, so it is not given a `Build`.
     #[test]
     fn a_cron_job_is_not_given_a_build() {
