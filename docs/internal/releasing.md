@@ -265,9 +265,12 @@ Never move a published tag and never replace a published asset or image tag:
 the `publish` job refuses when the release is already published, or an image tag or the chart
 version already exists.
 
-- **Before `publish`** (CI, a build, a smoke test): nothing was published. Fix it on `main`; if
-  the fix changes the release commit, delete the tag (`git push git@github.com:zeabur-oss/zeabur.git :refs/tags/v0.1.1`) and tag
-  the new commit.
+- **Before `publish`** (CI, a build, a smoke test): nothing was published, but the tag stays: the
+  ruleset "release tags" refuses to delete or move a `v*` tag. Fix it on `main`, rehearse
+  (a dispatch on `main` signs as a tag build does), then release the next patch version. In one
+  pull request, restore the `.changeset/` files that the release commit removed and delete its
+  `CHANGELOG.md` section, so the next release lists those changes and the failed version never
+  appears. Rename the milestones up one version, starting with the highest.
 - **In `verify`**, after `publish` succeeded: keep the draft, the tag and the registry
   artifacts. Fix the cause (a package that is still private, or the check itself on `main`),
   then verify again as below.
