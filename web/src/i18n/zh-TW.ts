@@ -1132,6 +1132,9 @@ export const zhTW: Messages = {
   "components.unchanged": (name) =>
     `${name} 不是 Zeabur 安裝或設定的，所以 Zeabur 不會改動它。要讓兩者一起運作，請自己把下面這幾行加進 ${name} 的 Helm values。`,
   "components.steps": "步驟",
+  "components.rewrite": (name) => `會繼續執行，只拿掉 ${name} 加上的設定。`,
+  "components.op.apply": "更新",
+  "components.op.delete": "刪除",
   "components.checks": "健康檢查",
   "components.leftovers": "會留在叢集上",
   "components.leftoversWhy": "移除時不會刪掉這些。確定沒有東西用到時，再自己刪除。",

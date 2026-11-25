@@ -1419,6 +1419,36 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_removal_plan_tells_a_rewrite_of_another_component_from_a_delete() {
+        let (cluster, app) = packaged();
+        call(&app, "apply", "install", "0.6.1").await;
+        chart_installed(&cluster);
+        call(&app, "apply", "install", "0.6.1").await;
+        call(&app, "apply", "install", "0.6.1").await;
+
+        let (status, plan) = call(&app, "plan", "remove", "").await;
+        assert_eq!(status, StatusCode::OK, "{plan}");
+        let ops: Vec<String> = plan["steps"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|s| {
+                let ops: Vec<&str> = s["writes"]
+                    .as_array()
+                    .unwrap()
+                    .iter()
+                    .map(|w| w["op"].as_str().unwrap())
+                    .collect();
+                format!("{} {}", s["release"].as_str().unwrap(), ops.join(","))
+            })
+            .collect();
+        // Traefik is written again without cert-manager's values, and its empty config goes last.
+        assert_eq!(ops.first().map(String::as_str), Some("traefik apply"));
+        assert!(ops[1..].iter().all(|o| !o.contains("apply")), "{ops:?}");
+        assert_eq!(ops.last().map(String::as_str), Some("traefik delete"));
+    }
+
+    #[tokio::test]
     async fn an_installed_config_with_other_values_is_written_again() {
         let (cluster, app) = packaged();
         call(&app, "apply", "install", "0.6.1").await;
