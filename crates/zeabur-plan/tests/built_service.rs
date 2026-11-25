@@ -1063,6 +1063,56 @@ mod tests {
         assert_eq!(again.code, "unchanged");
     }
 
+    /// A `<name>-git` Secret the `Build` does not read is someone else's: connecting a public
+    /// repository leaves it alone, and credentials that would go in it are refused.
+    #[test]
+    fn a_secret_the_build_does_not_read_is_left_alone() {
+        let site = served(build_of(upload("up-1")), "site", Some(LATEST));
+        let theirs = [secret("site-git", "Opaque")];
+        let public = repository("https://github.com/acme/site", GitAccess::Public);
+        let plan = on_cluster(
+            set_build(public),
+            running(LATEST, true),
+            vec![site.clone()],
+            &theirs,
+        )
+        .unwrap();
+        assert!(write(&plan, "Secret", "site-git").is_none());
+        let refused = on_cluster(
+            set_build(repository("https://github.com/acme/site", token("ghp_1"))),
+            running(LATEST, true),
+            vec![site],
+            &theirs,
+        )
+        .unwrap_err();
+        assert_eq!(refused.code, "credentials_taken");
+    }
+
+    /// New values of build variables the `Build` already reads change only their Secret.
+    #[test]
+    fn new_values_of_build_variables_are_a_change() {
+        let variables = vec![NameValue {
+            name: "NPM_TOKEN".to_owned(),
+            value: "npm_1".to_owned(),
+        }];
+        let mut input = repository("https://github.com/acme/site", GitAccess::Public);
+        input.build_variables = variables;
+        let site = served(build_of(input.clone()), "site", Some(LATEST));
+        input.build_variables[0].value = "npm_2".to_owned();
+        let plan = on_cluster(
+            set_build(input),
+            running(LATEST, true),
+            vec![site],
+            &[secret("site-build-env", "Opaque")],
+        )
+        .unwrap();
+        let Some(Write::MergePatch { body }) = write(&plan, "Secret", "site-build-env") else {
+            panic!("the variables Secret is merged");
+        };
+        // "npm_2", base64.
+        assert_eq!(body["data"]["NPM_TOKEN"], "bnBtXzI=");
+    }
+
     /// A Job or CronJob runs to completion, so it is not given a `Build`.
     #[test]
     fn a_cron_job_is_not_given_a_build() {

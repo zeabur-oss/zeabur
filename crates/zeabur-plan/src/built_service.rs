@@ -935,11 +935,12 @@ impl Planner<'_> {
         credentials: Option<Secret>,
         index: usize,
     ) -> Result<String, PlanError> {
-        let wrote_credentials = self.write_credentials(name, credentials, index)?;
         let at = self.build(name)?;
         let before = self.current(at);
         let read: BuildRead = serde_json::from_value(before.clone())
             .map_err(|e| error(ErrorKind::Invalid, "unreadable_object", e.to_string()))?;
+        let reads = read.credentials() == Some(credentials_name(name).as_str());
+        let wrote_credentials = self.write_credentials(name, credentials, reads, index)?;
         let Some(pushes_to) = read.spec.output.image.clone().filter(|i| !i.is_empty()) else {
             return Err(error(
                 ErrorKind::Invalid,
@@ -995,7 +996,7 @@ impl Planner<'_> {
                 self.build_env(at, name, &edit)?;
             }
         }
-        if !wrote_credentials && self.current(at) == before {
+        if !wrote_credentials && build.build_variables.is_empty() && self.current(at) == before {
             return Err(error(
                 ErrorKind::BadRequest,
                 "unchanged",
@@ -1007,11 +1008,14 @@ impl Planner<'_> {
 
     /// Writes the credentials Secret `<name>-git` the `Build` reads from now on, or deletes it when
     /// it reads none and no other `Build` reads it. A deploy key stays, so the key the person added
-    /// to the Git host keeps working. Returns whether it writes the Secret.
+    /// to the Git host keeps working. A Secret of that name the `Build` does not read (`reads`) is
+    /// not its own: it is left alone, and credentials are refused. Returns whether it writes the
+    /// Secret.
     fn write_credentials(
         &mut self,
         name: &str,
         wanted: Option<Secret>,
+        reads: bool,
         index: usize,
     ) -> Result<bool, PlanError> {
         let secret_name = credentials_name(name);
@@ -1025,6 +1029,14 @@ impl Planner<'_> {
                 self.create_object(&to_json(&secret)?, index)?;
                 Ok(true)
             }
+            (Some(_), Some(_)) if !reads => Err(refused(
+                "credentials_taken",
+                &format!(
+                    "Secret {secret_name} exists and Build {name} does not read it. Rename or delete the Secret, then connect the repository again."
+                ),
+                "build.source.access",
+            )),
+            (None, Some(_)) if !reads => Ok(false),
             (Some(secret), Some(kind)) if secret.type_.as_deref() == Some(kind.as_str()) => {
                 let edits: Vec<DataEdit> = secret
                     .string_data
