@@ -25,7 +25,7 @@ use std::collections::BTreeMap;
 use k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, Secret, SecretKeySelector};
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
-use serde_json::json;
+use serde_json::{Value, json};
 use zeabur_model::{PodSecurityLevel, WorkloadKind, WorkloadRef};
 
 use crate::builds::{
@@ -831,7 +831,7 @@ impl Planner<'_> {
         if let Some(secret) = credentials {
             self.create_object(&to_json(&secret)?, index)?;
         }
-        self.build_variables(name, &change.build.build_variables, index)?;
+        self.build_variables(name, &change.build.build_variables, false, index)?;
         let mut variables = change.variables.clone();
         if let Some(port) = change.port
             && !variables.iter().any(|v| v.name == "PORT")
@@ -910,7 +910,7 @@ impl Planner<'_> {
             if let Some(secret) = credentials {
                 self.create_object(&to_json(&secret)?, index)?;
             }
-            self.build_variables(name, &change.build.build_variables, index)?;
+            self.build_variables(name, &change.build.build_variables, false, index)?;
             let build = change.build.build(name, pushes_to.clone(), source);
             self.create_object(&to_json(&build)?, index)?;
             (pushes_to, true)
@@ -995,8 +995,18 @@ impl Planner<'_> {
             self.upload_token(name, request)?;
         }
         if !build.build_variables.is_empty() {
-            self.build_variables(name, &build.build_variables, index)?;
             let secret = variables_name(name);
+            let reads = before
+                .pointer("/spec/env")
+                .and_then(Value::as_array)
+                .is_some_and(|env| {
+                    env.iter().any(|e| {
+                        e.pointer("/valueFrom/secretKeyRef/name")
+                            .and_then(Value::as_str)
+                            == Some(secret.as_str())
+                    })
+                });
+            self.build_variables(name, &build.build_variables, reads, index)?;
             for variable in &build.build_variables {
                 let edit = EnvEdit {
                     op: "set".to_owned(),
@@ -1085,18 +1095,21 @@ impl Planner<'_> {
         }
     }
 
-    /// Sets `variables` in the Secret `<name>-build-env`, made when it is not there.
+    /// Sets `variables` in the Secret `<name>-build-env` when the `Build` already reads it
+    /// (`reads`), else creates it: a Secret of that name the `Build` does not read is not its own,
+    /// and the create fails on it rather than change it.
     fn build_variables(
         &mut self,
         name: &str,
         variables: &[NameValue],
+        reads: bool,
         index: usize,
     ) -> Result<(), PlanError> {
         if variables.is_empty() {
             return Ok(());
         }
         let secret = variables_name(name);
-        if self.input.snapshot.secret(&secret).is_some() {
+        if reads {
             let edits: Vec<DataEdit> = variables
                 .iter()
                 .map(|v| DataEdit {

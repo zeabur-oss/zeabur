@@ -1144,6 +1144,28 @@ mod tests {
         assert_eq!(after(&plan, "Build", "site").unwrap()["spec"], site_spec);
     }
 
+    /// A `<name>-build-env` Secret no `Build` reads is someone else's: a new `Build` creates its
+    /// own, which the cluster refuses, rather than change it.
+    #[test]
+    fn a_variables_secret_the_build_does_not_read_is_not_changed() {
+        let mut input = repository("https://github.com/acme/site", GitAccess::Public);
+        input.build_variables = vec![NameValue {
+            name: "NPM_TOKEN".to_owned(),
+            value: "npm_1".to_owned(),
+        }];
+        let plan = on_cluster(
+            set_build(input),
+            running("nginx:1.27", false),
+            Vec::new(),
+            &[secret("site-build-env", "Opaque")],
+        )
+        .unwrap();
+        assert!(matches!(
+            write(&plan, "Secret", "site-build-env"),
+            Some(Write::Create { .. })
+        ));
+    }
+
     /// A Job or CronJob runs to completion, so it is not given a `Build`.
     #[test]
     fn a_cron_job_is_not_given_a_build() {
