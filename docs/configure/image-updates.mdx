@@ -87,8 +87,8 @@ To use automatic updates, change the image back to a tag such as `redis:7.2.4`. 
 
 Keel does not wait for the service to become healthy after an update, and does not roll back on its own yet ([#1014](https://github.com/zeabur-oss/zeabur/issues/1014)).
 
-- **Keep the old version serving.** Open **Settings** → **Health checks** and set a **Traffic check**, such as **TCP** on port `6379` for Redis. A Deployment replaces replicas one at a time: when the new replica fails the check, the old replica keeps serving and the service shows **Rollout stuck**. A StatefulSet with one replica has no old replica left to serve.
-- **Go back.** First set automatic updates to **Off**, then click **Roll back** in **Deployments**. If you leave updates on, Keel moves to the same new version again at its next check.
+- **Keep the old version serving.** Open **Settings** → **Health checks** and set a **Traffic check**, such as **TCP** on port `6379` for Redis. A Deployment without a volume replaces replicas one at a time: when the new replica fails the check, the old replica keeps serving and the service shows **Rollout stuck**. A Deployment with a volume and a StatefulSet with one replica stop the old replica first, so the service is down until the new image passes the check.
+- **Go back.** First set automatic updates to **Off**, then click **Roll back** in **Deployments**. If you leave updates on, Keel moves to the same new version again at its next check. For a StatefulSet, also delete the pod that is stuck on the new image, such as `kubectl -n demo delete pod db-0`, so Kubernetes starts it again from the old image.
 - **Get a message.** Open the project's **Settings** → **Notifications**, click **Add channel**, choose a destination such as **Webhook** or Slack, and select **Deploy failed**. This works for Deployments. The same events for StatefulSets and DaemonSets are [#1015](https://github.com/zeabur-oss/zeabur/issues/1015).
 
 ## Do the same with kubectl
