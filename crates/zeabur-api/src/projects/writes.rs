@@ -107,6 +107,8 @@ pub struct ApplyRequest {
 pub enum Via {
     /// Docker Compose import.
     Compose,
+    /// The fix of a suggestion.
+    Suggestion,
 }
 
 /// One object an apply wrote.
@@ -604,8 +606,10 @@ async fn report_used(
 ) {
     let Some(used) = &state.used else { return };
     crate::used::report(used, cluster, &state.settings, changes).await;
-    if via == Some(Via::Compose) {
-        used(zeabur_telemetry::Feature::Compose);
+    match via {
+        Some(Via::Compose) => used(zeabur_telemetry::Feature::Compose),
+        Some(Via::Suggestion) => used(zeabur_telemetry::Feature::SuggestionApplied),
+        None => {}
     }
 }
 

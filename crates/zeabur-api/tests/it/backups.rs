@@ -1138,4 +1138,29 @@ mod tests {
             ]
         );
     }
+
+    #[tokio::test]
+    async fn a_project_restore_is_sent_after_it_is_written() {
+        let cluster = velero(vec![
+            location(),
+            schedule(),
+            backup("zeabur-1", "Completed"),
+        ]);
+        let _velero = backup_store(&cluster).await;
+        let (used, seen) = crate::support::recorder();
+        let app = crate::support::TestApi::new(&cluster)
+            .with_used(used)
+            .router();
+        applied(
+            &app,
+            &json!({"op": "restore", "backup": "zeabur-1", "namespace": "blog"}),
+        )
+        .await;
+        assert_eq!(
+            crate::support::taken(&seen),
+            [zeabur_telemetry::Feature::DataRestored(
+                zeabur_telemetry::RestoreKind::Project
+            )]
+        );
+    }
 }

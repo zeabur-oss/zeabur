@@ -453,6 +453,7 @@ export type Via = (typeof Via)[keyof typeof Via]
 
 export const Via = {
   compose: "compose",
+  suggestion: "suggestion",
 } as const
 
 /**

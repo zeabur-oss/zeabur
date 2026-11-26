@@ -45,7 +45,7 @@ export function GapList({
             <GapRow
               key={gapKey(row.gap)}
               gap={row.gap}
-              onPlan={ask ? () => planner.plan(ask) : undefined}
+              onPlan={ask ? () => planner.plan({ ...ask, via: "suggestion" }) : undefined}
               form={form}
             />
           )
