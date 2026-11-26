@@ -214,13 +214,16 @@ function ContainerField({
 function MethodSelect({
   value,
   onChange,
+  source = "add",
 }: {
   value: BuildMethod
   onChange: (method: BuildMethod) => void
+  /** `upload` says "folder" where `add` says "repository". */
+  source?: "add" | "upload"
 }) {
   const t = useT()
   return (
-    <FormField label={t("add.field.method")} hint={t(`add.methodHint.${value}`)}>
+    <FormField label={t("add.field.method")} hint={t(`${source}.methodHint.${value}`)}>
       <Select
         size="sm"
         value={value}
@@ -369,7 +372,7 @@ function UploadSource({
     >
       <ReviewForm onReview={review}>
         <FolderDrop folder={folder} missing={tried && !ready} />
-        <MethodSelect value={method} onChange={setChosen} />
+        <MethodSelect value={method} onChange={setChosen} source="upload" />
         <Note>{t("upload.after")}</Note>
       </ReviewForm>
     </PlanDrawer>
