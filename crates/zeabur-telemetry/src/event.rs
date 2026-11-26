@@ -111,15 +111,13 @@ pub enum Client {
     Zeaburctl,
 }
 
-/// Someone used Zeabur for the first time in a UTC day. It names nobody.
+/// Someone signed in to Zeabur. It names nobody.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ZeaburActive {
+pub struct SignedIn {
     /// The version of Zeabur.
     pub zeabur_version: &'static str,
-    /// The UTC day.
-    pub day: Day,
-    /// Tells people apart within this installation and day, and nowhere else: 32 hexadecimal
-    /// digits under a key that never leaves the installation.
+    /// Tells people apart within this installation and UTC day, and nowhere else: 32
+    /// hexadecimal digits under a key that never leaves the installation.
     pub person: String,
     /// How Zeabur runs.
     pub mode: Mode,
@@ -230,7 +228,7 @@ impl Serialize for Feature {
     }
 }
 
-/// A feature was used, for the first time that day with these values.
+/// A feature was used, for the first time that day with these values. It names nobody.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct FeatureUsed {
     /// The version of Zeabur.
@@ -302,7 +300,7 @@ pub struct AppChangeSubmitted {
     pub zeabur_version: &'static str,
     /// How Zeabur runs.
     pub mode: Mode,
-    /// The person, as `zeabur_active` hashes them for the UTC day of the save.
+    /// The person, as `signed_in` hashes them for the UTC day of the save.
     pub person: String,
     /// The answer.
     pub result: Submitted,
@@ -311,8 +309,8 @@ pub struct AppChangeSubmitted {
 /// Everything that can be sent.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Event {
-    /// Someone used Zeabur for the first time in a day.
-    ZeaburActive(ZeaburActive),
+    /// Someone signed in.
+    SignedIn(SignedIn),
     /// A feature was used.
     FeatureUsed(FeatureUsed),
     /// Someone connected to a cluster with a kubeconfig, or tried to.
@@ -326,7 +324,7 @@ impl Event {
     #[must_use]
     pub const fn name(&self) -> &'static str {
         match self {
-            Self::ZeaburActive(_) => "zeabur_active",
+            Self::SignedIn(_) => "signed_in",
             Self::FeatureUsed(_) => "feature_used",
             Self::ClusterConnected(_) => "cluster_connected",
             Self::AppChangeSubmitted(_) => "app_change_submitted",
@@ -336,7 +334,7 @@ impl Event {
     /// The event's own properties.
     fn properties(&self) -> Value {
         let value = match self {
-            Self::ZeaburActive(active) => serde_json::to_value(active),
+            Self::SignedIn(signed_in) => serde_json::to_value(signed_in),
             Self::FeatureUsed(used) => serde_json::to_value(used),
             Self::ClusterConnected(connected) => serde_json::to_value(connected),
             Self::AppChangeSubmitted(submitted) => serde_json::to_value(submitted),

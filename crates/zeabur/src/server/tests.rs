@@ -83,6 +83,10 @@ struct Rig {
 
 impl Rig {
     async fn new() -> Self {
+        Self::with(crate::telemetry::Telemetry::off()).await
+    }
+
+    async fn with(telemetry: crate::telemetry::Telemetry) -> Self {
         let issuer = FakeIssuer::start().await;
         let public = BaseUrl::parse_root(PUBLIC).unwrap();
         let oauth = Arc::new(
@@ -128,7 +132,7 @@ impl Rig {
             connect,
             flow_key: FlowKey::random().unwrap(),
             clock,
-            telemetry: Arc::new(crate::telemetry::Telemetry::off()),
+            telemetry: Arc::new(telemetry),
         });
         Self {
             issuer,
@@ -306,6 +310,25 @@ async fn the_health_check_needs_no_host_or_session() {
         .send(Method::GET, "/api/healthz", &[("host", "10.42.0.7:8080")])
         .await;
     assert_eq!(response.status(), StatusCode::OK);
+}
+
+#[tokio::test]
+async fn a_sign_in_is_sent_once_and_later_requests_send_nothing() {
+    let names = Arc::new(std::sync::Mutex::new(Vec::new()));
+    let log = Arc::clone(&names);
+    let show: zeabur_telemetry::Show = Arc::new(move |body| {
+        let body: Value = serde_json::from_str(body).unwrap();
+        log.lock()
+            .unwrap()
+            .push(body["batch"][0]["event"].as_str().unwrap().to_owned());
+    });
+    let rig = Rig::with(crate::telemetry::Telemetry::debug(show)).await;
+    let cookie = rig.sign_in("alice").await;
+    for _ in 0..2 {
+        let (status, _) = rig.get_json("/api/v1/whoami", &cookie).await;
+        assert_eq!(status, StatusCode::OK);
+    }
+    assert_eq!(*names.lock().unwrap(), ["signed_in"]);
 }
 
 #[tokio::test]
