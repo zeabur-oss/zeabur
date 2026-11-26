@@ -18,7 +18,7 @@ is expired, altered or malformed names no person, so it sends nothing. Zeabur OS
 after it answers.
 
 Every event also carries `zeabur_version` and `mode`; `app_change_submitted` carries the per-day
-`person` hash of `zeabur_active`, so nothing links a person across days.
+`person` hash of `signed_in`, so nothing links a person across days.
 
 What these events add up to (weekly installations with an accepted save, where saves are
 refused) is computed in PostHog, not here.

@@ -1,6 +1,6 @@
-//! The experience program (docs/reference/telemetry.mdx): one event the first time each person
-//! uses Zeabur's web interface in a UTC day, one the first time each feature with its values
-//! is used, and one event for each save.
+//! The experience program (docs/reference/telemetry.mdx): one event each time someone signs in
+//! to Zeabur or saves changes, and one the first time each feature with its values is used in a
+//! UTC day.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
@@ -9,97 +9,41 @@ use std::time::Duration;
 use zeabur_api::measure::Report;
 use zeabur_core::crypto;
 use zeabur_telemetry::{
-    AppChangeSubmitted, Day, Event, Feature, FeatureUsed, Id, InstallationId, Mode, Sender, Switch,
-    ZeaburActive,
+    AppChangeSubmitted, Day, Event, Feature, FeatureUsed, Id, InstallationId, Mode, Sender,
+    SignedIn, Switch,
 };
 
-/// The people seen in the current UTC day, in memory only. A restart forgets them, but the
-/// hash sent for a person stays the same all day, so they are counted once.
-#[derive(Debug)]
-struct Daily {
-    state: Mutex<State>,
+/// `person`'s hash for the UTC day of `now` (Unix seconds) under `key`, which is derived from
+/// the plan key and never sent. A restart keeps it; the next day changes it.
+fn person(key: &[u8; 32], person: &str, now: i64) -> String {
+    let mut input = Day::from_unix(now).since_epoch().to_be_bytes().to_vec();
+    input.extend_from_slice(person.as_bytes());
+    crypto::hex(&crypto::hmac_sha256(key, &input)[..16])
 }
 
-#[derive(Debug)]
-struct State {
-    /// Derived from the plan key, so it survives restarts; never sent.
-    key: [u8; 32],
-    day: Day,
-    seen: HashSet<[u8; 16]>,
+/// The features used in the current UTC day, in memory only. A restart forgets them.
+#[derive(Debug, Default)]
+struct Used {
+    day: Option<Day>,
     features: HashSet<Feature>,
 }
 
-impl Daily {
-    fn new(key: [u8; 32]) -> Self {
-        Self {
-            state: Mutex::new(State {
-                key,
-                day: Day::from_unix(0),
-                seen: HashSet::new(),
-                features: HashSet::new(),
-            }),
-        }
-    }
-
-    /// The day of `now` (Unix seconds) and `person`'s hash for it, when it is the first time
-    /// `person` is seen in that day.
-    fn first(&self, person: &str, now: i64) -> Option<(Day, [u8; 16])> {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        let day = state.today(now);
-        let hash = hash(&state.key, day, person);
-        state.seen.insert(hash).then_some((day, hash))
-    }
-
-    /// `person`'s hash for the day of `now`, as [`Daily::first`] gives it.
-    fn person(&self, person: &str, now: i64) -> [u8; 16] {
-        let state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        hash(&state.key, Day::from_unix(now), person)
-    }
-
+impl Used {
     /// The day of `now`, when it is the first time `feature` is used in that day.
-    fn first_use(&self, feature: Feature, now: i64) -> Option<Day> {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        let day = state.today(now);
-        state.features.insert(feature).then_some(day)
-    }
-
-    /// Forgets that the person of `hash` was seen, so the next use sends again.
-    fn unsee(&self, hash: &[u8; 16]) {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        state.seen.remove(hash);
-    }
-
-    /// Forgets that `feature` was used, so the next use sends again.
-    fn unuse(&self, feature: &Feature) {
-        let mut state = self.state.lock().unwrap_or_else(PoisonError::into_inner);
-        state.features.remove(feature);
-    }
-}
-
-fn hash(key: &[u8; 32], day: Day, person: &str) -> [u8; 16] {
-    let mut input = day.since_epoch().to_be_bytes().to_vec();
-    input.extend_from_slice(person.as_bytes());
-    let mut hash = [0_u8; 16];
-    hash.copy_from_slice(&crypto::hmac_sha256(key, &input)[..16]);
-    hash
-}
-
-impl State {
-    /// The day of `now`; a new day forgets what was seen in the last.
-    fn today(&mut self, now: i64) -> Day {
+    fn first(&mut self, feature: &Feature, now: i64) -> Option<Day> {
         let day = Day::from_unix(now);
-        if day != self.day {
-            self.day = day;
-            self.seen.clear();
+        if self.day != Some(day) {
+            self.day = Some(day);
             self.features.clear();
         }
-        day
+        self.features.insert(*feature).then_some(day)
     }
 }
 
 /// The program as the server runs it.
 pub(crate) struct Telemetry {
-    on: Option<(Daily, Sender)>,
+    on: Option<([u8; 32], Sender)>,
+    used: Mutex<Used>,
 }
 
 impl Telemetry {
@@ -122,8 +66,11 @@ impl Telemetry {
         let on = id
             .map(|id| Sender::new(switch, Id::Installation(id), show))
             .filter(Sender::active)
-            .map(|sender| (Daily::new(key), sender));
-        Self { on }
+            .map(|sender| (key, sender));
+        Self {
+            on,
+            used: Mutex::default(),
+        }
     }
 
     /// Whether anything is sent.
@@ -132,8 +79,22 @@ impl Telemetry {
     }
 
     #[cfg(test)]
-    pub(crate) const fn off() -> Self {
-        Self { on: None }
+    pub(crate) fn off() -> Self {
+        Self {
+            on: None,
+            used: Mutex::default(),
+        }
+    }
+
+    /// A program that hands each event's body to `show` instead of sending it.
+    #[cfg(test)]
+    pub(crate) fn debug(show: zeabur_telemetry::Show) -> Self {
+        let id = Id::Installation(InstallationId::from_random([7; 16]));
+        let sender = Sender::new(Switch::Debug, id, show);
+        Self {
+            on: Some(([7; 32], sender)),
+            used: Mutex::default(),
+        }
     }
 
     /// Waits up to `wait` for the queued events to be sent.
@@ -143,35 +104,30 @@ impl Telemetry {
         }
     }
 
-    /// Notes that `person` used Zeabur at `now` (Unix seconds), and sends an event in the
-    /// background the first time in a day.
-    pub(crate) fn saw(&self, person: &str, now: i64) {
-        let Some((daily, sender)) = &self.on else {
+    /// Sends in the background that `name` signed in at `now` (Unix seconds).
+    pub(crate) fn signed_in(&self, name: &str, now: i64) {
+        let Some((key, sender)) = &self.on else {
             return;
         };
-        let Some((day, hash)) = daily.first(person, now) else {
-            return;
-        };
-        let event = Event::ZeaburActive(ZeaburActive {
+        sender.send(Event::SignedIn(SignedIn {
             zeabur_version: env!("CARGO_PKG_VERSION"),
-            day,
-            person: crypto::hex(&hash),
+            person: person(key, name, now),
             mode: Mode::InCluster,
-        });
-        if !sender.send(event) {
-            daily.unsee(&hash);
-        }
+        }));
     }
 
-    /// Sends `feature` in the background the first time in a UTC day that it is used, with
-    /// these values. Called after the API call that used it succeeded.
+    /// Sends `feature` in the background the first time it is used with these values in the
+    /// UTC day of `now`. Called after the API call that used it succeeded.
     pub(crate) fn used(&self, feature: Feature, now: i64) {
-        let Some((daily, sender)) = &self.on else {
+        let Some((_, sender)) = &self.on else {
             return;
         };
-        let Some(day) = daily.first_use(feature, now) else {
-            return;
-        };
+        let first = self
+            .used
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner)
+            .first(&feature, now);
+        let Some(day) = first else { return };
         let event = Event::FeatureUsed(FeatureUsed {
             zeabur_version: env!("CARGO_PKG_VERSION"),
             day,
@@ -180,19 +136,20 @@ impl Telemetry {
             feature,
         });
         if !sender.send(event) {
-            daily.unuse(&feature);
+            let mut used = self.used.lock().unwrap_or_else(PoisonError::into_inner);
+            used.features.remove(&feature);
         }
     }
 
     /// Sends the answer to a save in the background.
     pub(crate) fn changed(&self, report: &Report) {
-        let Some((daily, sender)) = &self.on else {
+        let Some((key, sender)) = &self.on else {
             return;
         };
         sender.send(Event::AppChangeSubmitted(AppChangeSubmitted {
             zeabur_version: env!("CARGO_PKG_VERSION"),
             mode: Mode::InCluster,
-            person: crypto::hex(&daily.person(&report.user, report.at)),
+            person: person(key, &report.user, report.at),
             result: report.result,
         }));
     }
@@ -202,85 +159,89 @@ impl std::fmt::Debug for Telemetry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Telemetry")
             .field("on", &self.on.is_some())
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
 #[cfg(test)]
 mod tests {
-    use zeabur_telemetry::Source;
+    use std::sync::Mutex;
+
+    use serde_json::Value;
 
     use super::*;
 
     const DAY: i64 = 86_400;
     const NOW: i64 = 1_800_000_000;
+    const KEY: [u8; 32] = [7; 32];
 
-    fn daily() -> Daily {
-        Daily::new([7; 32])
+    #[test]
+    fn a_person_keeps_one_hash_all_day_and_across_a_restart() {
+        let alice = person(&KEY, "alice", NOW);
+        assert_eq!(person(&KEY, "alice", NOW + 60), alice);
+        assert_eq!(alice.len(), 32);
+        assert_ne!(person(&KEY, "bob", NOW), alice);
+        assert_ne!(person(&[8; 32], "alice", NOW), alice);
     }
 
     #[test]
-    fn a_person_is_reported_once_a_day() {
-        let daily = daily();
-        let alice = daily.first("alice", NOW).unwrap();
-        assert_eq!(alice.0, Day::from_unix(NOW));
-        assert_eq!(daily.first("alice", NOW + 5), None);
-        let bob = daily.first("bob", NOW + 10).unwrap();
-        assert_ne!(alice.1, bob.1);
-    }
-
-    #[test]
-    fn a_restart_sends_the_same_hash_that_day() {
-        let before = daily().first("alice", NOW).unwrap();
-        let after = daily().first("alice", NOW + 60).unwrap();
-        assert_eq!(before, after);
-        assert_ne!(Daily::new([8; 32]).first("alice", NOW).unwrap().1, before.1);
-    }
-
-    #[test]
-    fn a_new_utc_day_starts_again_with_another_hash() {
-        let daily = daily();
+    fn a_new_utc_day_gives_another_hash() {
         let midnight = NOW - NOW.rem_euclid(DAY) + DAY;
-        let late = daily.first("alice", midnight - 1).unwrap();
-        let next = daily.first("alice", midnight).unwrap();
-        assert_eq!(next.0, Day::from_unix(midnight));
-        assert_ne!(late.1, next.1);
+        assert_ne!(
+            person(&KEY, "alice", midnight - 1),
+            person(&KEY, "alice", midnight)
+        );
+    }
+
+    /// The events shown, as `(event, person)`.
+    type Shown = Arc<Mutex<Vec<(String, Option<String>)>>>;
+
+    /// A program in debug mode and the events it shows.
+    fn shown() -> (Telemetry, Shown) {
+        let shown = Arc::new(Mutex::new(Vec::new()));
+        let log = Arc::clone(&shown);
+        let show: zeabur_telemetry::Show = Arc::new(move |body| {
+            let body: Value = serde_json::from_str(body).unwrap();
+            let event = &body["batch"][0];
+            log.lock().unwrap().push((
+                event["event"].as_str().unwrap().to_owned(),
+                event["properties"]["person"].as_str().map(str::to_owned),
+            ));
+        });
+        (Telemetry::debug(show), shown)
     }
 
     #[test]
-    fn a_feature_is_reported_once_a_day_for_each_of_its_values() {
-        let daily = daily();
-        let wordpress = Feature::ServiceCreated(Source::Template("wordpress"));
-        let ghost = Feature::ServiceCreated(Source::Template("ghost"));
-        assert_eq!(daily.first_use(wordpress, NOW), Some(Day::from_unix(NOW)));
-        assert_eq!(daily.first_use(wordpress, NOW + 5), None);
-        assert!(daily.first_use(ghost, NOW + 6).is_some());
+    fn a_feature_is_sent_once_a_day_and_names_nobody() {
+        let (telemetry, shown) = shown();
         let tomorrow = NOW - NOW.rem_euclid(DAY) + DAY;
+        telemetry.used(Feature::LogsViewed, NOW);
+        telemetry.used(Feature::LogsViewed, NOW + 5);
+        telemetry.used(Feature::TerminalOpened, NOW + 5);
+        telemetry.used(Feature::LogsViewed, tomorrow);
+        let used = ("feature_used".to_owned(), None);
+        assert_eq!(*shown.lock().unwrap(), [used.clone(), used.clone(), used]);
+    }
+
+    #[test]
+    fn each_sign_in_is_sent() {
+        let (telemetry, shown) = shown();
+        telemetry.signed_in("alice", NOW);
+        telemetry.signed_in("alice", NOW + 60);
+        let alice = Some(person(&KEY, "alice", NOW));
         assert_eq!(
-            daily.first_use(wordpress, tomorrow),
-            Some(Day::from_unix(tomorrow))
+            *shown.lock().unwrap(),
+            [
+                ("signed_in".to_owned(), alice.clone()),
+                ("signed_in".to_owned(), alice),
+            ]
         );
     }
 
     #[test]
-    fn a_use_whose_event_was_not_queued_counts_again() {
-        let id = InstallationId::parse("8f14e45f-ceea-467a-9575-0123456789ab").unwrap();
-        let show: zeabur_telemetry::Show = Arc::new(|_| {});
-        // Without a key or a runtime, nothing is queued.
-        let telemetry = Telemetry {
-            on: Some((daily(), Sender::new(Switch::On, Id::Installation(id), show))),
-        };
-        telemetry.saw("alice", NOW);
-        telemetry.used(Feature::LogsViewed, NOW);
-        let (daily, _) = telemetry.on.as_ref().unwrap();
-        assert!(daily.first("alice", NOW + 1).is_some());
-        assert!(daily.first_use(Feature::LogsViewed, NOW + 1).is_some());
-    }
-
-    #[test]
-    fn nothing_is_counted_when_the_program_is_off() {
+    fn nothing_is_sent_when_the_program_is_off() {
         let id = "8f14e45f-ceea-467a-9575-0123456789ab";
-        assert!(Telemetry::new(false, id, [7; 32]).on.is_none());
-        assert!(Telemetry::new(true, "not-a-uuid", [7; 32]).on.is_none());
+        assert!(Telemetry::new(false, id, KEY).on.is_none());
+        assert!(Telemetry::new(true, "not-a-uuid", KEY).on.is_none());
     }
 }

@@ -6,7 +6,7 @@ mod send;
 
 pub use event::{
     AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day, DomainKind, Event,
-    Feature, FeatureUsed, InstallationId, Mode, Source, Submitted, ZeaburActive,
+    Feature, FeatureUsed, InstallationId, Mode, SignedIn, Source, Submitted,
 };
 pub use local::{LocalId, Platform, Random, standard_dir, standard_dir_on};
 pub use send::{ENDPOINT, Id, PROJECT_KEY, Sender, Show, Switch, do_not_track, do_not_track_in};

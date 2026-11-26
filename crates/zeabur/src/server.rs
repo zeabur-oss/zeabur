@@ -271,7 +271,6 @@ fn navigation(headers: &HeaderMap) -> bool {
 /// Finds the session of an API request (renewing its token when due) and hands it to
 /// [`SessionAccess`] through the request's extensions.
 async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next) -> Response {
-    let mut person = None;
     let signed = if let Some(id) = cookie::get(request.headers(), cookie::SESSION) {
         let activity = if request.headers().contains_key(BACKGROUND) {
             Activity::Background
@@ -279,12 +278,7 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
             Activity::Person
         };
         match auth.sessions.current(id, activity).await {
-            Lookup::Active(credentials) => {
-                if activity == Activity::Person {
-                    person = Some(credentials.username.clone());
-                }
-                Some(Signed::In(credentials))
-            }
+            Lookup::Active(credentials) => Some(Signed::In(credentials)),
             Lookup::IssuerUnavailable => Some(Signed::IssuerDown),
             Lookup::SignedOut => None,
         }
@@ -293,9 +287,6 @@ async fn session(State(auth): State<Arc<Auth>>, mut request: Request, next: Next
             .filter(|token| zeabur_kube::issued_by(token.expose_secret(), auth.issuer.as_str()))
             .and_then(|token| (auth.connect)(token).ok().map(Signed::Token))
     };
-    if let Some(person) = person {
-        auth.telemetry.saw(&person, (auth.clock)());
-    }
     if let Some(signed) = signed {
         request.extensions_mut().insert(signed);
     }
@@ -541,6 +532,7 @@ async fn sign_in(
     ) {
         Ok(id) => {
             tracing::info!(event = "auth.sign_in", outcome = "success", user = %username, "signed in");
+            auth.telemetry.signed_in(&username, (auth.clock)());
             redirect(
                 pending.return_to(),
                 &[cookie::set(cookie::SESSION, &id, None)],

@@ -7,23 +7,23 @@ The experience program sends the version, how many people use Zeabur OSS each da
 
 ## What is sent
 
-Zeabur OSS sends one event the first time each person uses it in a UTC day, and one the first time each feature below is used with the same values in a UTC day. Each event carries a random installation ID, the properties below and nothing else. With Helm, the chart makes the ID once with `uuidv4` and keeps it in the ConfigMap `zeabur-installation-id`, so upgrades keep it; you can set your own with `telemetry.installationId`. Nothing about your machine goes into it. The data is kept for 13 months.
+Zeabur OSS sends one event each time someone signs in or saves changes, and one the first time each feature below is used with the same values in a UTC day. Each event carries a random installation ID, the properties below and nothing else. With Helm, the chart makes the ID once with `uuidv4` and keeps it in the ConfigMap `zeabur-installation-id`, so upgrades keep it; you can set your own with `telemetry.installationId`. Nothing about your machine goes into it. The data is kept for 13 months.
 
 | Event | Sent by | When |
 |---|---|---|
-| `zeabur_active` | Zeabur OSS | The first time each person uses Zeabur OSS's web interface in a UTC day |
+| `signed_in` | Zeabur OSS | Each time someone signs in to Zeabur OSS's web interface |
 | `feature_used` | Zeabur OSS, `zeaburctl ui`, Zeabur Desktop | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import. Zeabur OSS sends it once per UTC day for each feature and set of values; `zeaburctl ui` and Zeabur Desktop send it each time |
 | `cluster_connected` | `zeaburctl ui`, Zeabur Desktop | It connected to a cluster with your kubeconfig, or could not |
 | `app_change_submitted` | Zeabur OSS | Someone saved changes in Zeabur OSS's web interface or API and got an answer; one event for each save, whatever it changes |
 
 | Property | Events | Values |
 |---|---|---|
-| `zeabur_version` | `zeabur_active`, `feature_used` | Zeabur OSS's version, such as `0.1.1` |
-| `day` | `zeabur_active`, `feature_used` | The UTC date, such as `2026-10-30` |
-| `person` | `zeabur_active`, `app_change_submitted` | 32 hexadecimal digits that tell people apart within one installation and one day |
+| `zeabur_version` | `signed_in`, `feature_used` | Zeabur OSS's version, such as `0.1.1` |
+| `day` | `feature_used` | The UTC date, such as `2026-10-30` |
+| `person` | `signed_in`, `app_change_submitted` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `zeabur_version` | `cluster_connected` | The version of `zeaburctl` or Zeabur Desktop, such as `0.1.1` |
 | `zeabur_version` | `app_change_submitted` | Zeabur OSS's version |
-| `mode` | `zeabur_active`, `feature_used`, `cluster_connected`, `app_change_submitted` | `in-cluster` for Zeabur OSS in a cluster, `local` for `zeaburctl ui` and Zeabur Desktop |
+| `mode` | `signed_in`, `feature_used`, `cluster_connected`, `app_change_submitted` | `in-cluster` for Zeabur OSS in a cluster, `local` for `zeaburctl ui` and Zeabur Desktop |
 | `client` | `cluster_connected`, and `feature_used` when `mode` is `local` | The program that sent it: `desktop` for Zeabur Desktop, `zeaburctl` for `zeaburctl ui`. It lets us count how many people use Zeabur Desktop. |
 | `result` | `cluster_connected` | `connected`, `unreachable`, `credential_refused`, `no_read_right` or `other` |
 | `result` | `app_change_submitted` | `accepted`, or why not, by the HTTP status you got: `forbidden` (403), `invalid` (422), `conflict` (409), `unreachable` (502, 503 or 504) or `other` |

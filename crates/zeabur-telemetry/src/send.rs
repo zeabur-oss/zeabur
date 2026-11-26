@@ -355,8 +355,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day, DomainKind,
-        Feature, FeatureUsed, Mode, Source, Submitted, ZeaburActive,
+        AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day, DomainKind, Feature,
+        FeatureUsed, Mode, SignedIn, Source, Submitted,
     };
 
     /// How the receiver answers one connection.
@@ -471,9 +471,8 @@ mod tests {
 
     fn events() -> Vec<Event> {
         vec![
-            Event::ZeaburActive(ZeaburActive {
+            Event::SignedIn(SignedIn {
                 zeabur_version: "0.1.0",
-                day: Day::from_unix(1_800_000_000),
                 person: "0123456789abcdef0123456789abcdef".to_owned(),
                 mode: Mode::InCluster,
             }),

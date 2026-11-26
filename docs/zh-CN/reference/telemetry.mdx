@@ -7,23 +7,23 @@ description: 加入体验计划后，Zeabur 开源版、`zeaburctl ui` 和 Zeabu
 
 ## 会发送什么
 
-每个人每天（UTC）第一次使用 Zeabur 开源版时，Zeabur 开源版会发送一条事件；同一项功能、同一组值每天（UTC）第一次出现时，Zeabur 开源版也会发送一条。每条事件只带随机的安装代码和下表的属性，没有别的。用 Helm 安装时，chart 用 `uuidv4` 生成一次安装代码，保存在 ConfigMap `zeabur-installation-id`，升级时沿用；也可以用 `telemetry.installationId` 指定自己的代码。安装代码不含任何机器的信息。数据保留 13 个月。
+每次有人登录或保存变更，Zeabur 开源版都会发送一条事件；同一项功能、同一组值每天（UTC）第一次出现时，Zeabur 开源版也会发送一条。每条事件只带随机的安装代码和下表的属性，没有别的。用 Helm 安装时，chart 用 `uuidv4` 生成一次安装代码，保存在 ConfigMap `zeabur-installation-id`，升级时沿用；也可以用 `telemetry.installationId` 指定自己的代码。安装代码不含任何机器的信息。数据保留 13 个月。
 
 | 事件 | 由谁发送 | 时机 |
 |---|---|---|
-| `zeabur_active` | Zeabur 开源版 | 每个人每天（UTC）第一次使用 Zeabur 开源版网页界面时 |
+| `signed_in` | Zeabur 开源版 | 每次有人登录 Zeabur 开源版网页界面时 |
 | `feature_used` | Zeabur 开源版、`zeaburctl ui`、Zeabur Desktop | 成功创建服务、数据库或域名，打开日志流或终端，邀请成员，或应用 Docker Compose 导入之后。Zeabur 开源版对同一项功能、同一组值每天（UTC）只发送一次；`zeaburctl ui` 和 Zeabur Desktop 每次都发送 |
 | `cluster_connected` | `zeaburctl ui`、Zeabur Desktop | 用你的 kubeconfig 连上集群，或连不上时 |
 | `app_change_submitted` | Zeabur 开源版 | 有人在 Zeabur 开源版的网页界面或 API 保存变更并收到回应；每次保存发一条，不管改了什么 |
 
 | 属性 | 事件 | 值 |
 |---|---|---|
-| `zeabur_version` | `zeabur_active`、`feature_used` | Zeabur 开源版的版本，例如 `0.1.1` |
-| `day` | `zeabur_active`、`feature_used` | UTC 日期，例如 `2026-10-30` |
-| `person` | `zeabur_active`、`app_change_submitted` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
+| `zeabur_version` | `signed_in`、`feature_used` | Zeabur 开源版的版本，例如 `0.1.1` |
+| `day` | `feature_used` | UTC 日期，例如 `2026-10-30` |
+| `person` | `signed_in`、`app_change_submitted` | 32 位十六进制数字，只在同一个安装、同一天里区分不同的人 |
 | `zeabur_version` | `cluster_connected` | `zeaburctl` 或 Zeabur Desktop 的版本，例如 `0.1.1` |
 | `zeabur_version` | `app_change_submitted` | Zeabur 开源版的版本 |
-| `mode` | `zeabur_active`、`feature_used`、`cluster_connected`、`app_change_submitted` | 集群里的 Zeabur 开源版是 `in-cluster`，`zeaburctl ui` 和 Zeabur Desktop 是 `local` |
+| `mode` | `signed_in`、`feature_used`、`cluster_connected`、`app_change_submitted` | 集群里的 Zeabur 开源版是 `in-cluster`，`zeaburctl ui` 和 Zeabur Desktop 是 `local` |
 | `client` | `cluster_connected`，以及 `mode` 为 `local` 的 `feature_used` | 发送事件的程序：Zeabur Desktop 是 `desktop`，`zeaburctl ui` 是 `zeaburctl`。用来统计有多少人在用 Zeabur Desktop。 |
 | `result` | `cluster_connected` | `connected`、`unreachable`、`credential_refused`、`no_read_right` 或 `other` |
 | `result` | `app_change_submitted` | `accepted`；没被接受时按你收到的 HTTP 状态码：`forbidden`（403）、`invalid`（422）、`conflict`（409）、`unreachable`（502、503 或 504）或 `other` |
