@@ -741,7 +741,7 @@ export const zhTW: Messages = {
   "imageUpdates.policyHint.minor": "例如 7.2.4 → 7.3.0。新的主要版本會等你決定。",
   "imageUpdates.policyHint.major":
     "例如 7.2.4 → 8.0.0。主要版本可能要搬移資料，像 PostgreSQL 就需要。",
-  "imageUpdates.policyHint.sameTag": "它用的標籤（例如 latest）有新的映像檔時就更新。",
+  "imageUpdates.policyHint.sameTag": "同一個標籤（例如 latest）一有新的映像檔就換上。",
   "imageUpdates.tagOnly": (tag) => `要依版本更新，標籤得像 7.2.4 這樣。這個映像檔用的是 ${tag}。`,
   "imageUpdates.pinned": "這個映像檔固定在某個摘要（digest），內容不會變。要自動更新，請改用標籤。",
   "imageUpdates.other": (policy) =>

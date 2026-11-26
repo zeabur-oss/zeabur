@@ -740,7 +740,7 @@ export const zhCN: Messages = {
   "imageUpdates.policyHint.minor": "例如 7.2.4 → 7.3.0。新的主要版本会等你决定。",
   "imageUpdates.policyHint.major":
     "例如 7.2.4 → 8.0.0。主要版本可能要迁移数据，像 PostgreSQL 就需要。",
-  "imageUpdates.policyHint.sameTag": "它用的标签（例如 latest）有新的镜像时就更新。",
+  "imageUpdates.policyHint.sameTag": "同一个标签（例如 latest）一有新的镜像就换上。",
   "imageUpdates.tagOnly": (tag) => `要按版本更新，标签得像 7.2.4 这样。这个镜像用的是 ${tag}。`,
   "imageUpdates.pinned": "这个镜像固定在某个摘要（digest），内容不会变。要自动更新，请改用标签。",
   "imageUpdates.other": (policy) =>
