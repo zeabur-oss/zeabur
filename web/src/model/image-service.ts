@@ -134,6 +134,18 @@ export function hostProblem(host: string): "empty" | "invalid" | undefined {
 export const suggestedHost = (service: string, project: string, suffix?: string | null) =>
   suffix && service ? `${service}-${project}.${dashedSuffix(suffix)}` : ""
 
+/** What Add domain starts with for an existing service: its `suggestedHost`, unless one of
+ * `taken` already is. */
+export function generatedHost(
+  service: string,
+  project: string,
+  suffix: string | null | undefined,
+  taken: readonly string[],
+) {
+  const host = suggestedHost(service, project, suffix)
+  return taken.includes(host) ? "" : host
+}
+
 /** The name a built service gets before the person types one: from the repository or folder,
  * else `web`. */
 export const builtName = (source: string, taken: readonly string[]) =>

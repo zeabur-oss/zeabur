@@ -87,7 +87,7 @@ import {
   privateAddress,
   privateService,
 } from "@/model/private-address"
-import { rightsOf } from "@/model/image-service"
+import { generatedHost, rightsOf } from "@/model/image-service"
 import { refusedPlaces } from "@/routes/project/data"
 import { IpLimits } from "@/routes/service/ip-limits"
 import { PublicPorts } from "@/routes/service/public-ports"
@@ -174,6 +174,10 @@ export function NetworkingTab({
     enabled: routes.length > 0 || adding !== undefined,
   })
   const suffixes = useQuery(clusterQuery).data?.domains?.suffixes
+  const generated = generatedHost(service.name, project, suffixes?.[0], [
+    ...routes.flatMap((r) => (r.host ? [r.host] : [])),
+    ...staged.added.map((c) => c.hostname),
+  ])
   const checkOf = (host?: string) =>
     host
       ? (trace.data?.routes.find((r) => r.kind === "domain" && r.address === host)?.domain ??
@@ -211,7 +215,7 @@ export function NetworkingTab({
                 service={service}
                 managed={managed}
                 offerDomain
-                onDomain={() => setAdding("")}
+                onDomain={() => setAdding(generated)}
               />
             )}
           </EmptyHeader>
@@ -242,7 +246,7 @@ export function NetworkingTab({
                       variant="outline"
                       size="sm"
                       disabled={!canWrite || adding !== undefined}
-                      onClick={() => setAdding("")}
+                      onClick={() => setAdding(generated)}
                     >
                       <PlusIcon aria-hidden="true" data-icon="inline-start" />
                       {t("net.addDomain")}
@@ -288,7 +292,7 @@ export function NetworkingTab({
                           variant="outline"
                           size="sm"
                           disabled={!canWrite}
-                          onClick={() => setAdding("")}
+                          onClick={() => setAdding(generated)}
                         >
                           <PlusIcon aria-hidden="true" data-icon="inline-start" />
                           {t("net.addDomain")}
@@ -569,7 +573,7 @@ export function NetworkingTab({
                       service={service}
                       managed={managed}
                       offerDomain={nothingYet(listed, adding)}
-                      onDomain={() => setAdding("")}
+                      onDomain={() => setAdding(generated)}
                     />
                   </EmptyHeader>
                 </Empty>
@@ -1126,6 +1130,7 @@ function HostForm({
               value={f.state.value}
               // oxlint-disable-next-line jsx-a11y/no-autofocus -- the field opens on request, to be typed in
               autoFocus
+              onFocus={(event) => event.currentTarget.select()}
               onChange={(event) => f.handleChange(event.target.value)}
               onBlur={f.handleBlur}
             />
