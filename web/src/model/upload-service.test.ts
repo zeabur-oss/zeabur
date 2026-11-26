@@ -1,9 +1,12 @@
 import { describe, expect, test } from "bun:test"
 
+import type { Build } from "@/model/builds"
 import {
   createUploadService,
   newUploadService,
   uploadProblems,
+  uploadSourceChange,
+  folderMethod,
   type UploadService,
 } from "@/model/upload-service"
 
@@ -56,5 +59,54 @@ describe("a service from an uploaded folder", () => {
     })
     expect(uploadProblems(form(), { ...rules, hasFolder: false }).folder).toBe(true)
     expect(uploadProblems(form({ name: "api" }), { ...rules, hasFolder: true }).name).toBeDefined()
+  })
+})
+
+describe("building a running service from a folder", () => {
+  const workload = { kind: "Deployment", name: "site" } as const
+  const git = {
+    name: "site",
+    builder: "dockerfile",
+    gitUrl: "https://github.com/acme/site",
+    contextDir: "apps/web",
+    dockerfile: "Dockerfile.prod",
+  } as Build
+
+  test("an image service gets a Build that waits for the folder", () => {
+    expect(
+      uploadSourceChange(undefined, {
+        workload,
+        container: "site",
+        request: "u1",
+        method: "railpack",
+      }),
+    ).toEqual({
+      op: "setBuild",
+      workload,
+      container: "site",
+      build: { source: { type: "upload", request: "u1" }, method: "railpack" },
+    })
+  })
+
+  test("the method starts as the Build's, else Dockerfile when the folder has one", () => {
+    expect(folderMethod(undefined, (path) => path === "Dockerfile")).toBe("dockerfile")
+    expect(folderMethod(undefined, () => false)).toBe("railpack")
+    expect(folderMethod(git, () => false)).toBe("dockerfile")
+  })
+
+  test("a Git service's Build reads the folder instead, with its paths and the method chosen", () => {
+    expect(uploadSourceChange(git, { workload, request: "u2", method: "dockerfile" })).toEqual({
+      op: "setBuild",
+      workload,
+      build: {
+        source: { type: "upload", request: "u2" },
+        method: "dockerfile",
+        directory: "apps/web",
+        dockerfile: "Dockerfile.prod",
+      },
+    })
+    expect(
+      uploadSourceChange(git, { workload, request: "u2", method: "railpack" }),
+    ).not.toHaveProperty("build.dockerfile")
   })
 })

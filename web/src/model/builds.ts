@@ -53,6 +53,15 @@ export function builtContainers(service: Service, builds: readonly Build[]): Bui
   return out
 }
 
+/** The regular container a source change builds for: the one that runs the Build's image, or the
+ * first when there is no Build yet. None when only init containers run the Build's image. */
+export function sourceContainer(service: Service, build: Build | undefined): string | undefined {
+  const main = service.containers.filter((c) => !c.init)
+  if (!build) return main[0]?.name
+  const built = builtContainers(service, [build]).map((b) => b.container)
+  return main.find((c) => built.includes(c.name))?.name
+}
+
 /** The Builds that make any of the service's images, each once. */
 export function buildsOf(service: Service, builds: readonly Build[] | undefined): Build[] {
   const found = builtContainers(service, builds ?? []).map((b) => b.build)
@@ -106,7 +115,11 @@ export function keelPolicy(builds: Builds, service: Service): string | undefined
 export const shortSha = (sha?: string | null) =>
   sha ? sha.replace(/^sha256:/, "").slice(0, 7) : undefined
 
-const BUILD_RESOURCE = { group: "builder.zeabur.com", version: "v1alpha1", resource: "builds" }
+const BUILD_RESOURCE = {
+  group: "builder.zeabur.com",
+  version: "v1alpha1",
+  resource: "builds",
+}
 const SECRET_RESOURCE = { version: "v1", resource: "secrets" }
 
 /**
@@ -131,7 +144,13 @@ export function buildDeletions(
 const buildDeletion = (build: Build, kept: readonly Build[]): Schemas.Change[] => [
   { op: "delete", resource: BUILD_RESOURCE, name: build.name },
   ...(build.credentials?.own && kept.every((b) => b.credentials?.name !== build.credentials?.name)
-    ? [{ op: "delete" as const, resource: SECRET_RESOURCE, name: build.credentials.name }]
+    ? [
+        {
+          op: "delete" as const,
+          resource: SECRET_RESOURCE,
+          name: build.credentials.name,
+        },
+      ]
     : []),
 ]
 

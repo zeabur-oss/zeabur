@@ -36,14 +36,18 @@ export interface GitHubSource {
   setPicked: (picked: GitHubRepository | null) => void
 }
 
-/** GitHub is the first choice when the project may build from an installation. */
-export function useGitHubSource(project: string): GitHubSource {
+/** GitHub is the first choice when the project may build from an installation; with `current`,
+ * the repository a Build reads, when an installation reads it, else its URL. */
+export function useGitHubSource(project: string, current = ""): GitHubSource {
   const grants = useQuery(projectGitHubAppQuery(project))
   const granted = grants.data
   const [chosen, setSource] = useState<Source>()
-  const [picked, setPicked] = useState<GitHubRepository | null>(null)
+  const [pickedOne, setPicked] = useState<GitHubRepository | null>()
   const repositories = repositoriesOf(granted)
-  const source: Source = repositories.length > 0 ? (chosen ?? "github") : "url"
+  const known = current ? grantedRepository(repositories, current) : undefined
+  const picked = pickedOne === undefined ? (known ?? null) : pickedOne
+  const fallback: Source = current && !known ? "url" : "github"
+  const source: Source = repositories.length > 0 ? (chosen ?? fallback) : "url"
   return {
     project,
     checked: !grants.isPending,

@@ -1815,6 +1815,7 @@ export const zhTW: Messages = {
   "title.deployBuild": (service) => `把最新的建置部署到 ${service}`,
   "title.rebuild": (build) => `重新建置 ${build}`,
   "title.gitSource": (service) => `從 Git 建置 ${service}`,
+  "title.uploadSource": (service) => `從資料夾建置 ${service}`,
   "title.stopBuilding": (build) => `停止從原始程式碼建置 ${build}`,
   "title.buildOptions": (build) => `變更 ${build} 的建置方式`,
   "title.autoUpdateOn": (service) => `自動部署 ${service}`,
@@ -3623,12 +3624,17 @@ export const zhTW: Messages = {
   "part.networking": "網路",
   "part.storage": "儲存空間",
   "part.compute": "運算資源",
-  "gitSource.hint": "連結 Git 儲存庫後，Zeabur Builder 會用它建置這個服務。",
-  "gitSource.title": "從 Git 儲存庫建置",
-  "gitSource.imageHint":
-    "連結後，服務會改為執行 Zeabur Builder 用儲存庫建置的映像檔，每次建置完成就會上線。",
-  "gitSource.uploadHint":
-    "連結後，Zeabur Builder 會改用儲存庫建置，不再用上傳的資料夾，每次建置完成就會上線。",
+  "buildSource.hint": "Zeabur Builder 可以用 Git 儲存庫或你電腦上的資料夾建置這個服務。",
+  "buildSource.title": "來源",
+  "buildSource.image": "服務目前執行映像檔。改用 Git 或資料夾建置後，每次建置完成就會上線。",
+  "buildSource.git":
+    "Zeabur Builder 會建置這個儲存庫，每次建置完成就會上線。可以改用其他儲存庫或分支，或改成上傳資料夾。",
+  "buildSource.upload":
+    "Zeabur Builder 會建置你上傳的資料夾，每次建置完成就會上線。可以上傳新版本，或改用 Git 建置。",
+  "buildSource.changeGit": "變更儲存庫",
+  "buildSource.uploadBody": (service) =>
+    `之後 ${service} 會執行 Zeabur Builder 用這個資料夾建置的映像檔，每次建置完成就會上線。`,
+  "gitSource.tokenAgain": "Zeabur 不會顯示已儲存的權杖。請再輸入一次，才能繼續用權杖讀取儲存庫。",
   "gitSource.open": "連結 Git",
   "gitSource.container": "容器",
   "gitSource.done": "完成",

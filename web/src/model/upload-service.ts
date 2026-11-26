@@ -3,11 +3,16 @@
 // created with a token request, which Zeabur Builder answers; the folder goes up after that
 // (upload.ts).
 import type { Schemas } from "@/api/client"
+import type { Build } from "@/model/builds"
 import {
   buildPaths,
+  derivedMethod,
+  dockerfileAt,
+  methodOf,
   builtProblems,
   builtServiceChange,
   DEFAULT_BUILT_PORT,
+  type BuildMethod,
   type BuiltService,
 } from "@/model/git-service"
 
@@ -48,3 +53,42 @@ export const createUploadService = (form: UploadService, request: string): Chang
   op: "createBuiltService",
   ...builtServiceChange(form, { source: { type: "upload", request }, ...buildPaths(form) }),
 })
+
+/** The method a folder builds with until the person picks one: the Build's, else Dockerfile when
+ * the folder has one where the Build looks. */
+export function folderMethod(
+  build: Build | undefined,
+  hasDockerfile: (path: string) => boolean,
+): BuildMethod {
+  if (build) return methodOf(build)
+  return derivedMethod(false, "railpack", hasDockerfile(dockerfileAt("", "")))
+}
+
+/** The change that builds `container` of `workload` from a folder uploaded after the apply, with
+ * `method`: its Build reads the folder instead, with the same paths, or a new Build builds it. */
+export function uploadSourceChange(
+  build: Build | undefined,
+  {
+    workload,
+    container,
+    request,
+    method,
+  }: {
+    workload: Schemas.WorkloadRef
+    container?: string
+    request: string
+    method: BuildMethod
+  },
+): Change {
+  const directory = build?.contextDir ?? ""
+  const dockerfile = build?.dockerfile ?? ""
+  return {
+    op: "setBuild",
+    workload,
+    ...(container ? { container } : {}),
+    build: {
+      source: { type: "upload", request },
+      ...buildPaths({ method, directory, dockerfile }),
+    },
+  }
+}
