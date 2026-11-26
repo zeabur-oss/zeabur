@@ -630,10 +630,10 @@ async function pickImageUpdates(page: Page) {
   await expect(selects.first()).toBeEnabled()
   // Off, Patch releases only, Patch and minor releases, …
   await selects.nth(0).click()
-  await page.locator('[role="option"]').nth(2).click()
+  await page.locator('[role="option"]:visible').nth(2).click()
   // As soon as found, Every day, Once a week.
   await selects.nth(1).click()
-  await page.locator('[role="option"]').nth(2).click()
+  await page.locator('[role="option"]:visible').nth(2).click()
 }
 async function reviewDraft(page: Page) {
   await page.locator('[data-slot="draft-bar"] button:last-child').click()
@@ -662,7 +662,7 @@ test.describe(() => {
     const policy = page.locator('section#updates [data-slot="select-trigger"]').first()
     await expect(policy).toBeEnabled()
     await policy.click()
-    await page.locator('[role="option"]').nth(0).click()
+    await page.locator('[role="option"]:visible').nth(0).click()
     await reviewDraft(page)
     await shot({ clip: '[data-slot="dialog-content"]' })
   })

@@ -10,7 +10,7 @@ A service that runs an image from a registry, such as PostgreSQL or Redis, can m
 - You need permission to modify services in the project.
 - The cluster needs the Keel component. When it's missing, the section says so and offers to install it.
 - The section is on Deployments, StatefulSets and DaemonSets. Jobs and scheduled jobs don't have it. A service built from Git or an uploaded folder uses **Auto-deploy new builds** in its **Builds** tab instead (see [Restart, roll back, and pause services](./restart-rollback.mdx#auto-deploy-new-builds)).
-- Databases you create from the project's **Add** → **Database** don't have the section. Their operator runs the database and its image.
+- Databases you create from the project's **New** → **Database** don't have the section. Their operator runs the database and its image.
 - Services managed by Helm, Argo CD, or Flux show the section but can't change it here. Set the annotations in that tool instead.
 
 ## Turn on automatic updates
@@ -74,7 +74,7 @@ When Keel was set up outside Zeabur OSS, for example with kubectl, the list show
 
 ## Images pinned to a digest
 
-An image named by digest, such as `redis@sha256:…`, never changes, so the section shows only a note and no choices. To update it automatically, open **Settings**, switch to **YAML**, change the container's `image` to a tag, and apply it. Then turn updates on.
+An image named by digest, such as `redis@sha256:…`, never changes, so the section shows only a note and no choices. To update it automatically, open **Settings**, switch from **Set up** to **YAML** at the top, and select **Edit**. Change the container's `image` to a tag, then review and apply. Then turn updates on.
 
 A service that already had automatic updates on and then moved to a digest still shows the form, so you can turn them off.
 
@@ -114,7 +114,7 @@ kubectl -n demo get statefulset db -o jsonpath='{.metadata.annotations}'
 
 | What you see | What to do next |
 | --- | --- |
-| No **Automatic updates** section | The service is built from source, is a Job or scheduled job, or is a database from **Add** → **Database**. |
+| No **Automatic updates** section | The service is built from source, is a Job or scheduled job, or is a database from **New** → **Database**. |
 | Only **New image under the same tag** | The tag isn't a version, such as `1.30-alpine`. Change it to a version tag such as `1.30`. |
 | A note says the image is pinned to a digest | Change the image to a tag. |
 | The section says Keel is missing | Install the Keel component from the section or from **Cluster** → **Components**. |
