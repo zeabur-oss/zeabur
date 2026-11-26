@@ -180,45 +180,46 @@ function WhenFields({
   const { t, locale } = useI18n()
   const window = toUtc(form, now)
   return (
-    <div className="flex flex-col gap-4 sm:flex-row">
-      <FormField
-        label={t("imageUpdates.when")}
-        hint={window ? t("imageUpdates.utc", windowText(t, window)) : t("imageUpdates.hourlyHint")}
-        className="sm:flex-1"
-      >
-        <Select
-          size="sm"
-          value={form.when}
-          disabled={disabled}
-          onValueChange={(when) => set({ when: when as When })}
-          items={whens.map((w) => ({ value: w, label: t(`imageUpdates.when.${w}`) }))}
-        />
-      </FormField>
-      {form.when === "weekly" ? (
-        <FormField label={t("imageUpdates.day")}>
+    <div className="flex flex-col gap-2">
+      <div className="flex flex-col gap-4 sm:flex-row">
+        <FormField label={t("imageUpdates.when")}>
           <Select
             size="sm"
-            value={String(form.day)}
+            value={form.when}
             disabled={disabled}
-            onValueChange={(day) => set({ day: Number(day) })}
-            items={days.map((d) => ({ value: String(d), label: dayName(d, locale) }))}
+            onValueChange={(when) => set({ when: when as When })}
+            items={whens.map((w) => ({ value: w, label: t(`imageUpdates.when.${w}`) }))}
           />
         </FormField>
-      ) : null}
-      {form.when === "hourly" ? null : (
-        <FormField label={t("imageUpdates.hour")}>
-          <Select
-            size="sm"
-            value={String(form.hour)}
-            disabled={disabled}
-            onValueChange={(hour) => set({ hour: Number(hour) })}
-            items={hours.map((h) => ({
-              value: String(h),
-              label: `${String(h).padStart(2, "0")}:00`,
-            }))}
-          />
-        </FormField>
-      )}
+        {form.when === "weekly" ? (
+          <FormField label={t("imageUpdates.day")}>
+            <Select
+              size="sm"
+              value={String(form.day)}
+              disabled={disabled}
+              onValueChange={(day) => set({ day: Number(day) })}
+              items={days.map((d) => ({ value: String(d), label: dayName(d, locale) }))}
+            />
+          </FormField>
+        ) : null}
+        {form.when === "hourly" ? null : (
+          <FormField label={t("imageUpdates.hour")}>
+            <Select
+              size="sm"
+              value={String(form.hour)}
+              disabled={disabled}
+              onValueChange={(hour) => set({ hour: Number(hour) })}
+              items={hours.map((h) => ({
+                value: String(h),
+                label: `${String(h).padStart(2, "0")}:00`,
+              }))}
+            />
+          </FormField>
+        )}
+      </div>
+      <p className="type-body text-secondary">
+        {window ? t("imageUpdates.utc", windowText(t, window)) : t("imageUpdates.hourlyHint")}
+      </p>
     </div>
   )
 }
