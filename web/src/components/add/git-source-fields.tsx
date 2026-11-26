@@ -140,13 +140,13 @@ export function AccessFields({
   git,
   shown,
   tried,
-  tokenHint,
+  savedToken = false,
 }: {
   git: GitSourceState
   shown: Shown
   tried: boolean
-  /** Under the token, such as why it must be typed again. */
-  tokenHint?: string
+  /** The Build reads with a token already, which Zeabur does not show. */
+  savedToken?: boolean
 }) {
   const t = useT()
   const { access, keyHost, form, set } = git
@@ -177,7 +177,7 @@ export function AccessFields({
           onUsername={git.typeUsername}
           token={form.token}
           onToken={(token) => set({ token })}
-          hint={tokenHint}
+          hint={savedToken ? t("gitSource.tokenAgain") : undefined}
           errors={shown(git.problems.token, () => t("add.problem.token"))}
         />
       ) : null}

@@ -7,6 +7,8 @@ import { FolderDrop, useFolder } from "@/components/add/folder-drop"
 import {
   AccessFields,
   AddDeployKey,
+  type DeployKeyReveal,
+  type GitSourceState,
   RepositoryFields,
   useDeployKeyReveal,
   useGitSource,
@@ -55,57 +57,12 @@ export function BuildSource({
   const why = choice.gate.open && !choice.open ? gitEntry(choice, "git", t).why : undefined
   // Stays open after the apply turns the service into a Git one, to show its deploy key.
   const [open, setOpen] = useState<Choice>()
-  const git = !!build?.gitUrl
-  const branch = build ? branchOf(build) : undefined
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-5">
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex min-w-0 flex-col gap-0.5">
-          <h3 className="text-sm font-medium">{t("buildSource.title")}</h3>
-          {git ? (
-            <p className="truncate font-mono text-sm" translate="no">
-              {build?.gitUrl}
-              {branch ? ` · ${branch}` : null}
-            </p>
-          ) : null}
-          <p className="type-meta text-muted-foreground">
-            {why ||
-              t(
-                git
-                  ? "buildSource.git"
-                  : build?.archive
-                    ? "buildSource.upload"
-                    : "buildSource.image",
-              )}
-          </p>
-        </div>
+        <SourceSummary build={build} why={why} />
         {open === "git" ? null : (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={!choice.open}
-              onClick={() => setOpen("git")}
-            >
-              <GitBranchIcon aria-hidden="true" data-icon="inline-start" />
-              {t(git ? "buildSource.changeGit" : "gitSource.open")}
-            </Button>
-            {build?.archive ? (
-              <UploadAction project={project} build={build.name} primary={false} />
-            ) : (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                disabled={!choice.open}
-                onClick={() => setOpen("folder")}
-              >
-                <FolderSimpleIcon aria-hidden="true" data-icon="inline-start" />
-                {t("builds.upload")}
-              </Button>
-            )}
-          </div>
+          <SourceActions project={project} build={build} disabled={!choice.open} onOpen={setOpen} />
         )}
       </div>
       {open === "git" ? (
@@ -126,6 +83,129 @@ export function BuildSource({
         />
       ) : null}
     </div>
+  )
+}
+
+/** The card's sentence for each source. */
+const sourceHint = (build: Build | undefined) =>
+  build?.gitUrl ? "buildSource.git" : build?.archive ? "buildSource.upload" : "buildSource.image"
+
+/** What the Build reads now: its repository and branch, and what a change does. */
+function SourceSummary({ build, why }: { build?: Build; why?: string }) {
+  const t = useT()
+  const branch = build ? branchOf(build) : undefined
+  return (
+    <div className="flex min-w-0 flex-col gap-0.5">
+      <h3 className="text-sm font-medium">{t("buildSource.title")}</h3>
+      {build?.gitUrl ? (
+        <p className="flex min-w-0 items-center gap-3 font-mono text-sm" translate="no">
+          <span className="truncate">{build.gitUrl}</span>
+          {branch ? (
+            <span className="inline-flex shrink-0 items-center gap-1">
+              <GitBranchIcon aria-hidden="true" className="size-3.5" />
+              {branch}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
+      <p className="type-meta text-muted-foreground">{why || t(sourceHint(build))}</p>
+    </div>
+  )
+}
+
+/** Git, and a folder: a new one for an uploaded folder's Build, else a switch to one. */
+function SourceActions({
+  project,
+  build,
+  disabled,
+  onOpen,
+}: {
+  project: string
+  build?: Build
+  disabled: boolean
+  onOpen: (choice: Choice) => void
+}) {
+  const t = useT()
+  return (
+    <div className="flex flex-wrap gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="sm"
+        disabled={disabled}
+        onClick={() => onOpen("git")}
+      >
+        <GitBranchIcon aria-hidden="true" data-icon="inline-start" />
+        {t(build?.gitUrl ? "buildSource.changeGit" : "gitSource.open")}
+      </Button>
+      {build?.archive ? (
+        <UploadAction project={project} build={build.name} primary={false} />
+      ) : (
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={disabled}
+          onClick={() => onOpen("folder")}
+        >
+          <FolderSimpleIcon aria-hidden="true" data-icon="inline-start" />
+          {t("builds.upload")}
+        </Button>
+      )}
+    </div>
+  )
+}
+
+/** After a deploy key's apply: its public key to add on the host. */
+function KeyAdded({
+  reveal,
+  git,
+  onClose,
+}: {
+  reveal: DeployKeyReveal
+  git: GitSourceState
+  onClose: () => void
+}) {
+  const t = useT()
+  return (
+    <>
+      <AddDeployKey
+        applying={false}
+        reveal={reveal}
+        host={git.keyHost}
+        page={git.repo && deployKeyPage(git.repo)}
+      />
+      <div className="flex justify-end">
+        <Button type="button" size="sm" onClick={onClose}>
+          {t("gitSource.done")}
+        </Button>
+      </div>
+    </>
+  )
+}
+
+/** Which container runs the build, when the service has several. */
+function ContainerField({
+  service,
+  value,
+  onChange,
+}: {
+  service: Service
+  value: string
+  onChange: (container: string) => void
+}) {
+  const t = useT()
+  const main = service.containers.filter((c) => !c.init)
+  if (main.length < 2) return null
+  return (
+    <FormField label={t("gitSource.container")}>
+      <Select
+        size="sm"
+        value={value}
+        onValueChange={(next) => onChange(next as string)}
+        items={main.map((c) => ({ value: c.name, label: c.name }))}
+      />
+    </FormField>
   )
 }
 
@@ -150,7 +230,6 @@ function Connect({
   const git = useGitSource(github, form, set, secrets)
   const [tried, setTried] = useState(false)
   const shown: Shown = (problem, text) => (tried && problem ? [text()] : [])
-  const main = service.containers.filter((c) => !c.init)
   const [container, setContainer] = useState(sourceContainer(service, build) ?? "")
   const problems = {
     ...git.problems,
@@ -184,22 +263,7 @@ function Connect({
     })
   }
 
-  if (applied)
-    return (
-      <>
-        <AddDeployKey
-          applying={false}
-          reveal={reveal}
-          host={git.keyHost}
-          page={git.repo && deployKeyPage(git.repo)}
-        />
-        <div className="flex justify-end">
-          <Button type="button" size="sm" onClick={onClose}>
-            {t("gitSource.done")}
-          </Button>
-        </div>
-      </>
-    )
+  if (applied) return <KeyAdded reveal={reveal} git={git} onClose={onClose} />
 
   return (
     <form
@@ -234,22 +298,8 @@ function Connect({
           shown={shown}
         />
       )}
-      {main.length > 1 ? (
-        <FormField label={t("gitSource.container")}>
-          <Select
-            size="sm"
-            value={container}
-            onValueChange={(value) => setContainer(value as string)}
-            items={main.map((c) => ({ value: c.name, label: c.name }))}
-          />
-        </FormField>
-      ) : null}
-      <AccessFields
-        git={git}
-        shown={shown}
-        tried={tried}
-        tokenHint={current.access === "token" ? t("gitSource.tokenAgain") : undefined}
-      />
+      <ContainerField service={service} value={container} onChange={setContainer} />
+      <AccessFields git={git} shown={shown} tried={tried} savedToken={current.access === "token"} />
       <Note>{t("add.gitAfter")}</Note>
       <div className="flex justify-end gap-2">
         <Button type="button" variant="ghost" size="sm" onClick={onClose}>
