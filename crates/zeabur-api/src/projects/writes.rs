@@ -540,8 +540,7 @@ async fn apply_claims(
         &state.settings,
     )
     .await?;
-    let (namespace, target_cluster) =
-        planner.writer(&claims.request, project, cluster.as_ref())?;
+    let (namespace, target_cluster) = planner.writer(&claims.request, project, cluster.as_ref())?;
     if zeabur_plan::versions(&plan) != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Changed,
