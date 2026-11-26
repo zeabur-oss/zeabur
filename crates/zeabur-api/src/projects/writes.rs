@@ -481,6 +481,20 @@ pub(crate) async fn apply(
     let key = key(&state)?;
     let claims =
         token::verify(&key, &request.token, (state.clock)().as_second()).map_err(token_problem)?;
+    let answer = apply_claims(&state, cluster, handoff, &project, &claims, request.via).await;
+    crate::measure::submitted(&state, &claims.person, answer.as_ref().map(|_| ()));
+    answer.map(|applied| Json(ApplyResponse { applied }))
+}
+
+/// Carries out the plan of verified `claims`, as [`apply`] does once the token checks out.
+async fn apply_claims(
+    state: &AppState,
+    cluster: Arc<dyn Cluster>,
+    handoff: Option<crate::access::Handoff>,
+    project: &str,
+    claims: &Claims,
+    via: Option<Via>,
+) -> Result<Vec<Applied>, ApiError> {
     if claims.project != project {
         return Err(ApiError::from(Problem::new(
             Kind::BadRequest,
@@ -528,16 +542,11 @@ pub(crate) async fn apply(
     .await?;
     let (namespace, target_cluster) =
         planner.writer(&claims.request, &project, cluster.as_ref())?;
-    let submitted = |answer: Result<(), &ApiError>| {
-        crate::measure::submitted(&state, &identity.username, answer);
-    };
     if zeabur_plan::versions(&plan) != claims.versions {
-        let changed = ApiError::from(Problem::new(
+        return Err(ApiError::from(Problem::new(
             Kind::Changed,
             "Someone changed an object in this plan after the plan was made.",
-        ));
-        submitted(Err(&changed));
-        return Err(changed);
+        )));
     }
     if claims
         .request
@@ -545,21 +554,11 @@ pub(crate) async fn apply(
         .iter()
         .any(Change::is_project_deletion)
     {
-        let applied = project_deletion::apply(&planner, cluster.as_ref(), &project, &plan).await;
-        submitted(applied.as_ref().map(|_| ()));
-        return Ok(Json(ApplyResponse { applied: applied? }));
+        return project_deletion::apply(&planner, cluster.as_ref(), project, &plan).await;
     }
-    let written = write_plan(target_cluster, namespace, &plan).await;
-    submitted(written.as_ref().map(|_| ()));
-    let applied = written?;
-    report_used(
-        &state,
-        cluster.as_ref(),
-        &claims.request.changes,
-        request.via,
-    )
-    .await;
-    Ok(Json(ApplyResponse { applied }))
+    let applied = write_plan(target_cluster, namespace, &plan).await?;
+    report_used(state, cluster.as_ref(), &claims.request.changes, via).await;
+    Ok(applied)
 }
 
 /// Dry-runs and then writes every object of `plan`, in order.

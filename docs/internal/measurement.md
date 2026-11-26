@@ -12,8 +12,10 @@ two events. Each one is a moment that happened, named after it, with no verdict 
 One apply is one event, whatever it changes and however many objects it writes. What the change
 was does not matter to the question, so the event does not say.
 
-`result` is the class of the HTTP status the person got. A plan that someone else's change made
-stale is `conflict`. Zeabur OSS reads nothing after it answers.
+`result` is the class of the HTTP status the person got, whether the apply stopped before or
+during the writes. A plan that someone else's change made stale is `conflict`. A plan token that
+is expired, altered or malformed names no person, so it sends nothing. Zeabur OSS reads nothing
+after it answers.
 
 Every event also carries `zeabur_version` and `mode`; `app_change_submitted` carries the per-day
 `person` hash of `zeabur_active`, so nothing links a person across days.

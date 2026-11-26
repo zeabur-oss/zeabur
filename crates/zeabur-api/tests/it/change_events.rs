@@ -124,6 +124,18 @@ mod tests {
         assert_eq!(results(&reports), [Submitted::Conflict]);
     }
 
+    #[tokio::test]
+    async fn a_save_refused_before_any_write_is_reported() {
+        let cluster = cluster();
+        let (app, reports) = api(&cluster);
+        let planned = plan(&app, &scale(2)).await;
+        let token = json!({"token": planned["token"]});
+        let (status, _) = send(&app, "POST", "/api/v1/projects/other/apply", Some(&token)).await;
+        assert_eq!(status, StatusCode::BAD_REQUEST);
+        assert_eq!(results(&reports), [Submitted::Other]);
+        assert!(cluster.inspect(|state| state.writes.is_empty()).unwrap());
+    }
+
     #[tokio::test(start_paused = true)]
     async fn nothing_is_read_after_the_save() {
         let cluster = cluster();
