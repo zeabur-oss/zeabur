@@ -1,0 +1,128 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "after": {
+        "apiVersion": "apps/v1",
+        "kind": "StatefulSet",
+        "metadata": {
+          "annotations": {
+            "keel.sh/policy": "patch",
+            "keel.sh/pollSchedule": "0 0 3 * * 0",
+            "keel.sh/trigger": "poll",
+            "zeabur.com/icon": "redis"
+          },
+          "name": "redis",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "redis"
+            }
+          },
+          "serviceName": "redis",
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "redis"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "redis:7.2.4",
+                  "name": "redis"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "afterYaml": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: redis\n  namespace: demo\n  annotations:\n    keel.sh/policy: patch\n    keel.sh/pollSchedule: 0 0 3 * * 0\n    keel.sh/trigger: poll\n    zeabur.com/icon: redis\nspec:\n  selector:\n    matchLabels:\n      app: redis\n  serviceName: redis\n  template:\n    metadata:\n      labels:\n        app: redis\n    spec:\n      containers:\n      - image: redis:7.2.4\n        name: redis\n",
+      "before": {
+        "apiVersion": "apps/v1",
+        "kind": "StatefulSet",
+        "metadata": {
+          "annotations": {
+            "zeabur.com/icon": "redis"
+          },
+          "name": "redis",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "redis"
+            }
+          },
+          "serviceName": "redis",
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "redis"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "redis:7.2.4",
+                  "name": "redis"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: redis\n  namespace: demo\n  annotations:\n    zeabur.com/icon: redis\nspec:\n  selector:\n    matchLabels:\n      app: redis\n  serviceName: redis\n  template:\n    metadata:\n      labels:\n        app: redis\n    spec:\n      containers:\n      - image: redis:7.2.4\n        name: redis\n",
+      "changes": [
+        {
+          "after": "patch",
+          "path": "metadata.annotations.keel.sh/policy"
+        },
+        {
+          "after": "0 0 3 * * 0",
+          "path": "metadata.annotations.keel.sh/pollSchedule"
+        },
+        {
+          "after": "poll",
+          "path": "metadata.annotations.keel.sh/trigger"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "52",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "StatefulSet",
+        "name": "redis",
+        "plural": "statefulsets"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/generation",
+            "value": 4
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations/keel.sh~1policy",
+            "value": "patch"
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations/keel.sh~1trigger",
+            "value": "poll"
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations/keel.sh~1pollSchedule",
+            "value": "0 0 3 * * 0"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

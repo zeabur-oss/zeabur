@@ -1,0 +1,154 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "after": {
+        "apiVersion": "apps/v1",
+        "kind": "StatefulSet",
+        "metadata": {
+          "annotations": {
+            "zeabur.com/icon": "redis"
+          },
+          "name": "redis",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "redis"
+            }
+          },
+          "serviceName": "redis",
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "redis"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "redis:latest",
+                  "name": "redis"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "afterYaml": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: redis\n  namespace: demo\n  annotations:\n    zeabur.com/icon: redis\nspec:\n  selector:\n    matchLabels:\n      app: redis\n  serviceName: redis\n  template:\n    metadata:\n      labels:\n        app: redis\n    spec:\n      containers:\n      - image: redis:latest\n        name: redis\n",
+      "before": {
+        "apiVersion": "apps/v1",
+        "kind": "StatefulSet",
+        "metadata": {
+          "annotations": {
+            "keel.sh/match-tag": "true",
+            "keel.sh/policy": "force",
+            "keel.sh/pollSchedule": "0 0 3 * * 0",
+            "keel.sh/trigger": "poll",
+            "zeabur.com/icon": "redis"
+          },
+          "name": "redis",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "redis"
+            }
+          },
+          "serviceName": "redis",
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "redis"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "redis:latest",
+                  "name": "redis"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: apps/v1\nkind: StatefulSet\nmetadata:\n  name: redis\n  namespace: demo\n  annotations:\n    keel.sh/match-tag: \"true\"\n    keel.sh/policy: force\n    keel.sh/pollSchedule: 0 0 3 * * 0\n    keel.sh/trigger: poll\n    zeabur.com/icon: redis\nspec:\n  selector:\n    matchLabels:\n      app: redis\n  serviceName: redis\n  template:\n    metadata:\n      labels:\n        app: redis\n    spec:\n      containers:\n      - image: redis:latest\n        name: redis\n",
+      "changes": [
+        {
+          "before": "true",
+          "path": "metadata.annotations.keel.sh/match-tag"
+        },
+        {
+          "before": "force",
+          "path": "metadata.annotations.keel.sh/policy"
+        },
+        {
+          "before": "0 0 3 * * 0",
+          "path": "metadata.annotations.keel.sh/pollSchedule"
+        },
+        {
+          "before": "poll",
+          "path": "metadata.annotations.keel.sh/trigger"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "52",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "StatefulSet",
+        "name": "redis",
+        "plural": "statefulsets"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/resourceVersion",
+            "value": "52"
+          },
+          {
+            "op": "test",
+            "path": "/metadata/annotations/keel.sh~1policy",
+            "value": "force"
+          },
+          {
+            "op": "remove",
+            "path": "/metadata/annotations/keel.sh~1policy"
+          },
+          {
+            "op": "test",
+            "path": "/metadata/annotations/keel.sh~1trigger",
+            "value": "poll"
+          },
+          {
+            "op": "remove",
+            "path": "/metadata/annotations/keel.sh~1trigger"
+          },
+          {
+            "op": "test",
+            "path": "/metadata/annotations/keel.sh~1pollSchedule",
+            "value": "0 0 3 * * 0"
+          },
+          {
+            "op": "remove",
+            "path": "/metadata/annotations/keel.sh~1pollSchedule"
+          },
+          {
+            "op": "test",
+            "path": "/metadata/annotations/keel.sh~1match-tag",
+            "value": "true"
+          },
+          {
+            "op": "remove",
+            "path": "/metadata/annotations/keel.sh~1match-tag"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

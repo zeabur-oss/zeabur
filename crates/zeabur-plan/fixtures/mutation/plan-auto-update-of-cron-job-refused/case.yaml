@@ -1,0 +1,6 @@
+description: "A CronJob runs to completion, so Keel does not update it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: autoUpdate, workload: {kind: CronJob, name: report}, update: {kind: image, policy: patch}}

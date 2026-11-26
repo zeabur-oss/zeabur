@@ -168,6 +168,10 @@ pub struct Service {
     /// annotations; absent when they ask for none. Whether Reloader runs is the cluster's.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub config_reload: Option<crate::ConfigReload>,
+    /// Whether Keel moves it to new images, and which policies its images allow; absent for a
+    /// Job or CronJob. Whether Keel runs is the cluster's.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_updates: Option<crate::ImageUpdates>,
     /// The strictest Pod Security Standards level its pod template meets; absent when it has
     /// none. Whether the namespace enforces a level is the namespace's.
     #[serde(default, skip_serializing_if = "Option::is_none")]

@@ -33,7 +33,7 @@ use crate::builds::{
     BUILDER_GROUP, BUILDER_VERSION, GIT_CREDENTIALS_LABEL, KEEL_FORCE, KEEL_POLICY,
     UPLOAD_TOKEN_REQUEST, build_path, builds,
 };
-use crate::change::{BuildMethod, DataEdit, DataKind, NameValue, ServiceSize};
+use crate::change::{BuildMethod, DataEdit, DataKind, NameValue, ServiceSize, Update};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::image_service::{
@@ -917,10 +917,17 @@ impl<'a> Planner<'a> {
                 .unwrap_or_else(|| format!("{pushes_to}:{PENDING_TAG}"));
             self.image(reference, Some(&container.name), &image)?;
         }
+        let new_builds = Update::NewBuilds {
+            build: name.to_owned(),
+            webhook: KEEL_WEBHOOK.to_owned(),
+        };
         match (keel, existing) {
             (true, _) => {}
-            (false, true) => self.auto_update(reference, true, Some(name), Some(KEEL_WEBHOOK))?,
-            (false, false) => self.auto_update(reference, true, None, None)?,
+            (false, true) => self.auto_update(reference, &new_builds)?,
+            // The new `Build` already tells Keel of its images.
+            (false, false) => {
+                self.write_keel(reference, &new_builds)?;
+            }
         }
         if !build_changed && !moves && keel {
             return Err(error(
@@ -1201,7 +1208,7 @@ impl<'a> Planner<'a> {
             .and_then(|a| a.get(KEEL_POLICY))
             .is_some_and(|p| p != KEEL_NEVER);
         if keel && !others.iter().any(|(_, other)| other.feeds(spec)) {
-            self.auto_update(reference, false, None, None)?;
+            self.auto_update(reference, &Update::Off)?;
         }
         Ok(())
     }

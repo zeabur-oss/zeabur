@@ -1,0 +1,6 @@
+description: "An image tagged latest is not a version, so Keel cannot pick patch releases of it."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: autoUpdate, workload: {kind: Deployment, name: web}, update: {kind: image, policy: patch}}

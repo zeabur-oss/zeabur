@@ -1,0 +1,6 @@
+description: "A new image under the same tag has Keel force-update on a matching tag only, polling every hour when no window is set."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: autoUpdate, workload: {kind: Deployment, name: web}, update: {kind: image, policy: sameTag}}

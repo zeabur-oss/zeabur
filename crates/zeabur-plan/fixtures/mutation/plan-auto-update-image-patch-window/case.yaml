@@ -1,0 +1,6 @@
+description: "Patch updates on Sundays at 03:00 UTC have Keel poll the registry on that schedule and take only patch releases; the pods are not replaced."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: autoUpdate, workload: {kind: StatefulSet, name: redis}, update: {kind: image, policy: patch, window: {day: sunday, hour: 3}}}

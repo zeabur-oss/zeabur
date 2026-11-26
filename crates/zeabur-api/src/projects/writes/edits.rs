@@ -28,8 +28,7 @@ pub(super) async fn edited_objects(
             | Change::ArchiveDigest { build, .. }
             | Change::BuildOptions(zeabur_plan::BuildOptionsChange { build, .. })
             | Change::AutoUpdate {
-                build: Some(build),
-                enabled: true,
+                update: zeabur_plan::Update::NewBuilds { build, .. },
                 ..
             } = change
             {

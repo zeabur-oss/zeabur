@@ -471,12 +471,7 @@ impl<'a> Planner<'a> {
             Change::UploadToken { build, request } => self.upload_token(build, request),
             Change::ArchiveDigest { build, digest } => self.archive_digest(build, digest),
             Change::BuildOptions(change) => self.build_options(change),
-            Change::AutoUpdate {
-                workload,
-                enabled,
-                build,
-                webhook,
-            } => self.auto_update(workload, *enabled, build.as_deref(), webhook.as_deref()),
+            Change::AutoUpdate { workload, update } => self.auto_update(workload, update),
             Change::Scale { workload, replicas } => self.scale(workload, *replicas),
             Change::ConfigReload { workload, enabled } => self.config_reload(workload, *enabled),
             Change::SecurityProfile { workload, profile } => {

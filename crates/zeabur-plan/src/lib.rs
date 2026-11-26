@@ -46,7 +46,7 @@ pub use change::{
     EgressLimitChange, EnvImportChange, ErrorPageHtml, FieldOwners, GatewayParent, HttpOnlyReason,
     IpAllowChange, KeptReason, LabelVolumeChange, NameValue, ObjectName, Plan, PlanRequest,
     PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, ServiceSize, Target,
-    TemplateChange, Warning, Write,
+    TemplateChange, Update, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};
