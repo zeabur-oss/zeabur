@@ -52,6 +52,16 @@ impl From<Unreadable> for UnreadableView {
     }
 }
 
+/// An object of another product that Zeabur read but does not know the shape of.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
+#[serde(rename_all = "camelCase")]
+pub struct UndecodedView {
+    /// The object.
+    pub origin: Origin,
+    /// Why it does not decode.
+    pub error: String,
+}
+
 /// Who the cluster says the person is.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]

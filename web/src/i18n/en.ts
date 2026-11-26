@@ -173,6 +173,7 @@ export const en = {
   "refused.terminal": "Opening a terminal",
   "refused.reveal": "Showing secret values",
   "refused.listThese": "Listing these",
+  "undecoded.line": "Some objects are not shown: this version of Zeabur cannot read them.",
   // Status words
   "status.ready": "Ready",
   "status.rollingOut": "Rolling out",

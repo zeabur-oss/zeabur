@@ -7697,6 +7697,16 @@ export type SetupLinks = {
 }
 
 /**
+ * An object of another product that Zeabur read but does not know the shape of.
+ */
+export type UndecodedView = {
+  /** Why it does not decode. */
+  error: string
+  /** The object. */
+  origin: Origin
+}
+
+/**
  * Everyone who can sign in, and the links waiting to be used.
  */
 export type MembersView = {
@@ -7728,6 +7738,11 @@ export type MembersView = {
   projectRoles: boolean
   /** Whether setup links can be made and redeemed. */
   setupLinks: SetupLinks
+  /**
+   * Zeabur Identity's objects whose shape Zeabur does not know, which are left out of the
+   * members and invitations above.
+   */
+  undecoded: UndecodedView[]
   /**
    * Kinds the person may not read (invitations, grants, role bindings), whose parts are left
    * out.

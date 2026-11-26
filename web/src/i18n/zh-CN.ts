@@ -179,6 +179,7 @@ export const zhCN: Messages = {
   "refused.terminal": "打开终端",
   "refused.reveal": "显示机密变量的值",
   "refused.listThese": "列出这些对象",
+  "undecoded.line": "有些对象没有显示：这个版本的 Zeabur 读不懂它们。",
   "status.ready": "就绪",
   "status.rollingOut": "部署中",
   "status.failing": "异常",

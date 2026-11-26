@@ -31,6 +31,7 @@ import {
 import { Problem } from "@/components/problem"
 import { GatedMenuItem, GateTip, useHintGate } from "@/components/gate"
 import { RefusedSome } from "@/components/refused"
+import { Undecoded } from "@/components/undecoded"
 import { useI18n, useT } from "@/i18n"
 import { formatAgo, formatTime } from "@/lib/format"
 import {
@@ -159,6 +160,7 @@ function MembersBody({
         </Empty>
       )}
       <RefusedSome unreadable={data.unreadable} />
+      <Undecoded undecoded={data.undecoded} />
       <Pending invitations={data.invitations} />
       <ApiTokenList
         tokens={data.apiTokens}

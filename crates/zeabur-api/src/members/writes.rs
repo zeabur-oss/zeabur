@@ -369,6 +369,7 @@ pub(crate) async fn issue(
         .map_err(|e| read_error(e, namespace, IdentityKind::Invitation))?;
     if let Read::Objects(all) = all {
         for earlier in all
+            .objects
             .iter()
             .filter(|i| i.spec.user == username && i.name() != name)
         {

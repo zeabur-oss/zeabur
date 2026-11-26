@@ -178,6 +178,7 @@ export const zhTW: Messages = {
   "refused.terminal": "開啟終端機",
   "refused.reveal": "顯示機密變數的值",
   "refused.listThese": "列出這些物件",
+  "undecoded.line": "有些物件沒有顯示：這個版本的 Zeabur 讀不懂它們。",
   "status.ready": "就緒",
   "status.rollingOut": "部署中",
   "status.failing": "異常",
