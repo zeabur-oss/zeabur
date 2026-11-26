@@ -348,6 +348,22 @@ describe("backups", () => {
     ])
   })
 
+  test("PostgreSQL: a backup's sidecar has a CPU limit and compresses with snappy", () => {
+    const [, store] = writeBackups(postgres, target) as never as [
+      unknown,
+      { object: { spec: Record<string, any> } },
+    ]
+    const { resources } = store.object.spec.instanceSidecarConfiguration
+    expect(resources.requests.cpu).toBeString()
+    expect(resources.requests.memory).toBeString()
+    expect(resources.limits.cpu).toBeString()
+    expect(resources.limits.memory).toBeString()
+    expect(store.object.spec.configuration).toMatchObject({
+      wal: { compression: "snappy" },
+      data: { compression: "snappy" },
+    })
+  })
+
   test("MongoDB: keys, and the storage and a weekly task in the cluster's own spec", () => {
     const changes = writeBackups(mongo, { ...target, frequency: "weekly", keepDays: 30 })
     expect(changes.map((c) => c.op)).toEqual(["create", "edit"])

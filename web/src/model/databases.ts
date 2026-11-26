@@ -941,6 +941,16 @@ function editObject(database: Database, change: (spec: Manifest) => void): Chang
   return specEdit(databaseAddress(database), database.kind, database.name, spec)
 }
 
+/** What the Barman Cloud sidecar in each PostgreSQL Pod asks for. It runs the backups and the WAL
+ * archiving, so the CPU limit keeps a backup from taking the node's CPU. Snappy is the fastest
+ * compression in the plugin's benchmark; gzip takes about 14 times as long.
+ * https://github.com/cloudnative-pg/plugin-barman-cloud/blob/v0.15.1/web/docs/compression.md */
+const BARMAN_SIDECAR_RESOURCES = {
+  requests: { cpu: "50m", memory: "128Mi" },
+  limits: { cpu: "500m", memory: "512Mi" },
+}
+const BARMAN_COMPRESSION = "snappy"
+
 function postgresStore(database: Database, target: BackupTarget, region: boolean): Manifest {
   const names = backupNames(database.name)
   const key = (key: string) => ({ name: names.secret, key })
@@ -958,9 +968,10 @@ function postgresStore(database: Database, target: BackupTarget, region: boolean
           secretAccessKey: key("ACCESS_SECRET_KEY"),
           ...(region ? { region: key("REGION") } : {}),
         },
-        wal: { compression: "gzip" },
-        data: { compression: "gzip" },
+        wal: { compression: BARMAN_COMPRESSION },
+        data: { compression: BARMAN_COMPRESSION },
       },
+      instanceSidecarConfiguration: { resources: BARMAN_SIDECAR_RESOURCES },
     },
   }
 }
