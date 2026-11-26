@@ -29,9 +29,9 @@ Go to the service's **Settings** â†’ **Automatic updates**. Under **Which versio
 | **All new versions** | Every newer version, including `8.0.0` | Every newer version, including `17.0` |
 | **New image under the same tag** | A new image pushed as `7.2.4` | A new image pushed as `16.4` |
 
-The hint under the list names the versions this service moves to. A major version can need a data migration: PostgreSQL needs a backup and an upgrade step for one. For a database, pick **Patch and minor releases**, which keeps the major version. Don't pick **Patch releases only** for a PostgreSQL tag with two numbers such as `16.4`: it never updates.
+The hint under the list names the versions this service moves to. A new major version can need a data migration: moving PostgreSQL to a new major version needs a backup and `pg_upgrade` or a dump and restore. For a database, pick **Patch and minor releases**, which keeps the major version. Don't pick **Patch releases only** for a PostgreSQL tag with two numbers such as `16.4`: it never updates.
 
-The version choices need a version tag: one to three numbers, such as `8`, `1.27` or `7.2.4`, or `latest`. Keel reads `8` as `8.0.0`, and after an update the tag names the full version, such as `8.0.2`. `latest` moves to the newest version tag first. A tag with other text, such as `1.30-alpine`, offers only **New image under the same tag**. A service with several containers needs a version tag on each one.
+The version choices need a version tag: one to three numbers with an optional leading `v`, such as `8`, `1.27` or `v7.2.4`, or `latest`. Keel reads `8` as `8.0.0`, and after an update the tag names the full version, such as `8.0.2`. `latest` moves to the newest version tag first. A tag with other text, such as `1.30-alpine`, offers only **New image under the same tag**. A service with several containers needs a version tag on each one.
 
 </Step>
 <Step>
@@ -57,20 +57,20 @@ You pick the time in your browser's time zone, and the line below shows it in UT
 
 ### Save and check the review
 
-Click **Save**. The review says what the service will take and when Keel checks, and lists the annotations it adds to the workload: `keel.sh/policy`, `keel.sh/trigger: poll` and `keel.sh/pollSchedule`. **New image under the same tag** also adds `keel.sh/match-tag`. Click **Save** in the review to apply it.
+Click **Save**. The review says what the service will take and when Keel checks. Its **YAML** tab shows the annotations added to the workload: `keel.sh/policy`, `keel.sh/trigger: poll` and `keel.sh/pollSchedule`. **New image under the same tag** also adds `keel.sh/match-tag`. Click **Save** in the review to apply it.
 
-![Review for db: it will take patch and minor releases, checked Sundays at 03:00 UTC, with the Keel annotations it adds](../images/shots/image-updates-review.avif)
+![Review for db: it will take new patch and minor releases, checked Sundays at 03:00 UTC](../images/shots/image-updates-review.avif)
 
 </Step>
 </Steps>
 
 ## Turn off automatic updates
 
-In **Automatic updates**, set **Which versions** to **Off** and click **Save**. The review says the service no longer updates on its own and removes `keel.sh/policy`, `keel.sh/trigger`, `keel.sh/pollSchedule` and `keel.sh/match-tag`. Click **Turn off** to apply it. The service keeps the image it runs now.
+In **Automatic updates**, set **Which versions** to **Off** and click **Save**. The review says the service no longer updates on its own and lists the Keel annotations it removes: `keel.sh/policy`, `keel.sh/trigger` and `keel.sh/pollSchedule`, and `keel.sh/match-tag` when the service has it. Click **Turn off** to apply it. The service keeps the image it runs now.
 
-![Review for db: it no longer updates on its own, and the four Keel annotations are removed](../images/shots/image-updates-off-review.avif)
+![Review for db: it no longer updates on its own, and its three Keel annotations are removed](../images/shots/image-updates-off-review.avif)
 
-When Keel was set up outside Zeabur OSS, for example with kubectl, the list shows **Set outside Zeabur** and its policy. Pick **Off** or another choice to replace it.
+When the workload has Keel annotations the form doesn't write, such as a `glob:` policy or a schedule that isn't on a whole hour, the list shows **Set outside Zeabur** and the policy. Pick **Off** or another choice to replace it.
 
 ## Images pinned to a digest
 
@@ -95,7 +95,7 @@ To hear about a failed update, add a channel under the project's **Settings** â†
 
 ## Do the same with kubectl
 
-The examples use the project `demo` and the StatefulSet `db`. The schedule has seconds first and is in UTC: `0 0 3 * * 0` is Sundays at 03:00 UTC.
+The examples use the project `demo` and the StatefulSet `db`. `keel.sh/pollSchedule` has seconds first and is in UTC: `0 0 3 * * 0` is Sundays at 03:00 UTC.
 
 | Zeabur OSS action | kubectl |
 | --- | --- |

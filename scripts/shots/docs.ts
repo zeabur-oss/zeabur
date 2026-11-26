@@ -4,7 +4,7 @@
 // docs/zh-TW/images/shots/<id>.avif for a translation. A page links its locale's image by a
 // relative path, such as ../images/shots/<id>.avif.
 // Selectors never use visible text: it changes with the locale.
-import type { Page } from "@playwright/test"
+import type { Locator, Page } from "@playwright/test"
 import { expect, test } from "./fixtures.ts"
 
 // Zeabur pages, from the demo.
@@ -622,6 +622,11 @@ test.describe(() => {
   })
 })
 // Automatic image updates (docs/zh-TW/configure/image-updates.mdx): db runs postgres:18.
+async function pickOption(page: Page, select: Locator, index: number) {
+  await select.click()
+  await page.locator('[role="option"]:visible').nth(index).click()
+  await expect(page.locator('[role="option"]:visible')).toHaveCount(0)
+}
 async function pickImageUpdates(page: Page) {
   await page.goto("/projects/shop/services/StatefulSet/db?tab=settings", {
     waitUntil: "networkidle",
@@ -629,11 +634,9 @@ async function pickImageUpdates(page: Page) {
   const selects = page.locator('section#updates [data-slot="select-trigger"]')
   await expect(selects.first()).toBeEnabled()
   // Off, Patch releases only, Patch and minor releases, …
-  await selects.nth(0).click()
-  await page.locator('[role="option"]:visible').nth(2).click()
+  await pickOption(page, selects.nth(0), 2)
   // As soon as found, Every day, Once a week.
-  await selects.nth(1).click()
-  await page.locator('[role="option"]:visible').nth(2).click()
+  await pickOption(page, selects.nth(1), 2)
 }
 async function reviewDraft(page: Page) {
   await page.locator('[data-slot="draft-bar"] button:last-child').click()
@@ -661,8 +664,7 @@ test.describe(() => {
     await page.reload({ waitUntil: "networkidle" })
     const policy = page.locator('section#updates [data-slot="select-trigger"]').first()
     await expect(policy).toBeEnabled()
-    await policy.click()
-    await page.locator('[role="option"]:visible').nth(0).click()
+    await pickOption(page, policy, 0)
     await reviewDraft(page)
     await shot({ clip: '[data-slot="dialog-content"]' })
   })
