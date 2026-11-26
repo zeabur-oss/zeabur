@@ -130,6 +130,14 @@ test("a setting written outside Zeabur stays until another option replaces it", 
   expect(updateOf(updates, { ...form, policy: "off" }, now)).toEqual({ kind: "off" })
 })
 
+test("new builds left on a service no longer built from source can be turned off", () => {
+  const updates = { allowed: ["patch" as const], setting: { kind: "newBuilds" as const } }
+  const form = formOf(updates, now)
+  expect(form.policy).toBe("other")
+  expect(updateOf(updates, form, now)).toBeUndefined()
+  expect(updateOf(updates, { ...form, policy: "off" }, now)).toEqual({ kind: "off" })
+})
+
 test("an image's tag, with a registry port and a digest", () => {
   expect(tagOf("localhost:5000/redis:7.2.4@sha256:abc")).toBe("7.2.4")
   expect(tagOf("redis")).toBe("latest")

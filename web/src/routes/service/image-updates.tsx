@@ -15,6 +15,7 @@ import { missingKeel } from "@/model/git-service"
 import {
   dayName,
   formOf,
+  keptPolicy,
   policyChoices,
   policyHint,
   localMinute,
@@ -129,7 +130,7 @@ function PolicyField({
 }) {
   const t = useT()
   const tag = tagOf(service.containers.find((c) => !c.init)?.image ?? "")
-  const foreign = updates.setting?.kind === "other" ? updates.setting.policy : undefined
+  const foreign = keptPolicy(updates)
   return (
     <FormField label={t("imageUpdates.versions")} hint={policyHint(t, updates, form, tag)}>
       <Select

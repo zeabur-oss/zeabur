@@ -80,7 +80,8 @@ export function useServiceBuilds(project: string, service: Service) {
 export function BuildsTab({ project, service }: { project: string; service: Service }) {
   const t = useT()
   const { builds, built } = useServiceBuilds(project, service)
-  const planner = usePlanner(project)
+  // The Builds tab is not part of the service draft, so its switch plans at once.
+  const planner = usePlanner(project, undefined, true)
   if (builds.isPending) return <LoadingRows label={t("common.loading")} rows={4} />
   if (builds.isError) return <Problem error={builds.error} />
   if (built.length === 0)

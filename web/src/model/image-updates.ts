@@ -66,12 +66,22 @@ function toLocal(
   }
 }
 
+/**
+ * The Keel policy of a setting the form does not write and keeps until another choice replaces it:
+ * one set outside Zeabur, or new builds on a service no longer built from source.
+ */
+export function keptPolicy(updates: Schemas.ImageUpdates | null | undefined): string | undefined {
+  const setting = updates?.setting
+  if (setting?.kind === "other") return setting.policy
+  return setting?.kind === "newBuilds" ? "force" : undefined
+}
+
 /** The form for what the service does now. */
 export function formOf(updates: Schemas.ImageUpdates | null | undefined, now: Date): UpdateForm {
   const setting = updates?.setting
   if (setting?.kind !== "image") {
     return {
-      policy: setting?.kind === "other" ? "other" : "off",
+      policy: keptPolicy(updates) ? "other" : "off",
       when: "hourly",
       day: DEFAULT_DAY,
       hour: DEFAULT_HOUR,
