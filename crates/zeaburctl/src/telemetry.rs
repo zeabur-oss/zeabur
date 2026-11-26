@@ -5,7 +5,7 @@ use std::path::Path;
 use std::sync::Arc;
 
 use clap::Subcommand;
-use zeabur_local::telemetry::{CONFIG, Local, Show, parse, random, read_config};
+use zeabur_local::telemetry::{CONFIG, Client, Local, Show, parse, random, read_config};
 use zeabur_telemetry::{LocalId, PROJECT_KEY, Switch, standard_dir};
 
 use crate::output;
@@ -167,7 +167,7 @@ fn reset(directory: &Path) -> Result<(), String> {
 /// The program for `zeaburctl ui`. When it is on, says so and how to turn it off.
 pub(crate) fn local() -> Local {
     let show: Show = Arc::new(|body| output::info(&format!("telemetry: {body}")));
-    let local = Local::from_env(show).unwrap_or_else(|error| {
+    let local = Local::from_env(Client::Zeaburctl, show).unwrap_or_else(|error| {
         output::error(&format!(
             "{error}. zeaburctl ui sends nothing until it is fixed."
         ));
@@ -175,7 +175,8 @@ pub(crate) fn local() -> Local {
     });
     if local.is_on() {
         output::info(
-            "zeaburctl ui sends its version and whether it could connect to the cluster, to help \
+            "zeaburctl ui sends its version, whether it could connect to the cluster and which \
+             features you use, to help \
              improve Zeabur. `zeaburctl telemetry status` shows the setting; `zeaburctl telemetry \
              disable` or DO_NOT_TRACK=1 turns it off.\n\
              What is sent: https://oss.zeabur.com/docs/zeabur/reference/telemetry/",

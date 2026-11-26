@@ -12,7 +12,7 @@ Zeabur OSS sends one event the first time each person uses it in a UTC day, and 
 | Event | Sent by | When |
 |---|---|---|
 | `zeabur_active` | Zeabur OSS | The first time each person uses Zeabur OSS's web interface in a UTC day |
-| `feature_used` | Zeabur OSS | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import; once per UTC day for each feature and set of values |
+| `feature_used` | Zeabur OSS, `zeaburctl ui`, Zeabur Desktop | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import. Zeabur OSS sends it once per UTC day for each feature and set of values; `zeaburctl ui` and Zeabur Desktop send it each time |
 | `cluster_connected` | `zeaburctl ui`, Zeabur Desktop | It connected to a cluster with your kubeconfig, or could not |
 | `app_change_submitted` | Zeabur OSS | Someone saved changes in Zeabur OSS's web interface or API and got an answer; one event for each save, whatever it changes |
 
@@ -23,7 +23,8 @@ Zeabur OSS sends one event the first time each person uses it in a UTC day, and 
 | `person` | `zeabur_active`, `app_change_submitted` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `zeabur_version` | `cluster_connected` | The version of `zeaburctl` or Zeabur Desktop, such as `0.1.1` |
 | `zeabur_version` | `app_change_submitted` | Zeabur OSS's version |
-| `mode` | `zeabur_active`, `cluster_connected`, `app_change_submitted` | `in-cluster` for Zeabur OSS in a cluster, `local` for `zeaburctl ui` and Zeabur Desktop |
+| `mode` | `zeabur_active`, `feature_used`, `cluster_connected`, `app_change_submitted` | `in-cluster` for Zeabur OSS in a cluster, `local` for `zeaburctl ui` and Zeabur Desktop |
+| `client` | `cluster_connected`, and `feature_used` when `mode` is `local` | The program that sent it: `desktop` for Zeabur Desktop, `zeaburctl` for `zeaburctl ui`. It lets us count how many people use Zeabur Desktop. |
 | `result` | `cluster_connected` | `connected`, `unreachable`, `credential_refused`, `no_read_right` or `other` |
 | `result` | `app_change_submitted` | `accepted`, or why not, by the HTTP status you got: `forbidden` (403), `invalid` (422), `conflict` (409), `unreachable` (502, 503 or 504) or `other` |
 | `feature` | `feature_used` | `service_created`, `database_created`, `domain_added`, `logs_viewed`, `terminal_opened`, `member_invited` or `compose` |
@@ -35,7 +36,7 @@ Zeabur OSS sends one event the first time each person uses it in a UTC day, and 
 
 The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur OSS's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur OSS restarts, and a different one the next day, so their days can't be linked.
 
-`feature_used` has no `person`. It says that something was used today, not by whom or how often. Nothing is sent from your browser: Zeabur OSS's server sends it after the call succeeds.
+`feature_used` has no `person`. From Zeabur OSS it says that something was used today, not by whom or how often. From `zeaburctl ui` and Zeabur Desktop it is sent each time, under the random ID of that computer, so the events show how often it is used there. Nothing is sent from your browser: Zeabur OSS's server, or the local service of `zeaburctl ui` or Zeabur Desktop on your computer, sends it after the call succeeds.
 
 `zeaburctl ui` and Zeabur Desktop have no installation ID, so they share a random one, made the first time one of them is about to send an event, never when the program is off. The ID is kept in a file named `local-id` in the `zeabur` folder of the configuration directory: `$XDG_CONFIG_HOME` or `~/.config` on Linux, `~/Library/Application Support` on macOS, `%APPDATA%` on Windows. Only you can read it, and nothing about your machine, kubeconfig, token or user name goes into it.
 

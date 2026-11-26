@@ -5,7 +5,7 @@ mod local;
 mod send;
 
 pub use event::{
-    AppChangeSubmitted, ClusterConnected, Connection, DatabaseKind, Day, DomainKind, Event,
+    AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day, DomainKind, Event,
     Feature, FeatureUsed, InstallationId, Mode, Source, Submitted, ZeaburActive,
 };
 pub use local::{LocalId, Platform, Random, standard_dir, standard_dir_on};

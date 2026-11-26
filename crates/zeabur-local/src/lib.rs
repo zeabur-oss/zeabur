@@ -19,6 +19,8 @@ use zeabur_api::local::{Access, guard};
 use zeabur_core::crypto::RandomError;
 use zeabur_kube::{Cluster, ClusterError, ConnectError, UserClient};
 
+use crate::telemetry::Local;
+
 /// Why the local service did not start, or stopped with an error.
 #[derive(Debug, thiserror::Error)]
 pub enum ServiceError {
@@ -87,9 +89,13 @@ impl Running {
 ///
 /// When the kubeconfig is not usable, the cluster does not answer who the person is, or no
 /// loopback port is available.
-pub async fn start(context: Option<&str>, settings: Settings) -> Result<Running, ServiceError> {
+pub async fn start(
+    context: Option<&str>,
+    settings: Settings,
+    telemetry: &Local,
+) -> Result<Running, ServiceError> {
     let cluster = UserClient::from_kubeconfig(context).await?;
-    start_with(Arc::new(cluster), settings).await
+    start_with(Arc::new(cluster), settings, telemetry).await
 }
 
 /// Starts the local service for the context `context` of `kubeconfig`, a file the caller has
@@ -104,9 +110,10 @@ pub async fn start_from(
     kubeconfig: Kubeconfig,
     context: &str,
     settings: Settings,
+    telemetry: &Local,
 ) -> Result<Running, ServiceError> {
     let cluster = UserClient::from_kubeconfig_with(kubeconfig, context).await?;
-    start_with(Arc::new(cluster), settings).await
+    start_with(Arc::new(cluster), settings, telemetry).await
 }
 
 /// Starts the local service that acts as the person `cluster` signs in as.
@@ -119,6 +126,7 @@ pub async fn start_from(
 pub async fn start_with(
     cluster: Arc<dyn Cluster>,
     settings: Settings,
+    telemetry: &Local,
 ) -> Result<Running, ServiceError> {
     let identity = cluster.whoami().await.map_err(ServiceError::Identity)?;
 
@@ -128,7 +136,8 @@ pub async fn start_with(
     let port = listener.local_addr().map_err(ServiceError::Listen)?.port();
     let access = Access::new(port)?;
     let url = access.launch_url();
-    let app = app(cluster, settings).layer(axum::middleware::from_fn_with_state(access, guard));
+    let app = app(cluster, settings, telemetry)
+        .layer(axum::middleware::from_fn_with_state(access, guard));
 
     let (shutdown, stopped) = oneshot::channel::<()>();
     let server = axum::serve(listener, app).with_graceful_shutdown(async move {
@@ -145,13 +154,14 @@ pub async fn start_with(
 }
 
 /// The API, acting as the person `cluster` signs in as, and the web interface.
-fn app(cluster: Arc<dyn Cluster>, settings: Settings) -> Router {
+fn app(cluster: Arc<dyn Cluster>, settings: Settings, telemetry: &Local) -> Router {
     #[cfg(feature = "ui")]
     let origin = settings.github.web_origin();
     let router = zeabur_api::router_with(
         Arc::new(SingleCluster(cluster)),
         zeabur_api::Options {
             settings,
+            used: telemetry.used(),
             ..zeabur_api::Options::default()
         },
     );
@@ -211,7 +221,7 @@ mod tests {
             },
             ..State::default()
         });
-        let running = start_with(Arc::new(cluster), Settings::default())
+        let running = start_with(Arc::new(cluster), Settings::default(), &Local::default())
             .await
             .unwrap();
         assert_eq!(running.username(), "zeabur:alice");
@@ -244,7 +254,7 @@ mod tests {
             "apiVersion: v1\nkind: Config\ncontexts:\n- name: lab\n  context:\n    cluster: lab\n",
         )
         .unwrap();
-        let error = start_from(kubeconfig, "prod", Settings::default())
+        let error = start_from(kubeconfig, "prod", Settings::default(), &Local::default())
             .await
             .unwrap_err();
         assert!(matches!(error, ServiceError::Kubeconfig(_)), "{error}");

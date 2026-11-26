@@ -16,7 +16,8 @@ runtime and its own output.
 
 [`telemetry`] is the experience program of a local run, shared by `zeaburctl ui` and the desktop
 app: whether it is joined (`config.yaml`, `DO_NOT_TRACK`, `ZEABUR_TELEMETRY`), and the
-`cluster_connected` event with [`ServiceError::connection`].
+`cluster_connected` event with [`ServiceError::connection`] and the `feature_used` events of the
+service. Each event names its `client`, `desktop` or `zeaburctl`.
 
 ## Place in the workspace
 

@@ -12,7 +12,7 @@ description: 加入體驗計畫後，Zeabur 開源版、`zeaburctl ui` 和 Zeabu
 | 事件 | 由誰傳送 | 時機 |
 |---|---|---|
 | `zeabur_active` | Zeabur 開源版 | 每個人每天（UTC）第一次使用 Zeabur 開源版網頁介面時 |
-| `feature_used` | Zeabur 開源版 | 成功建立服務、資料庫或網域，開啟日誌串流或終端機，邀請成員，或套用 Docker Compose 匯入之後；同一項功能、同一組值每天（UTC）只傳一次 |
+| `feature_used` | Zeabur 開源版、`zeaburctl ui`、Zeabur Desktop | 成功建立服務、資料庫或網域，開啟日誌串流或終端機，邀請成員，或套用 Docker Compose 匯入之後。Zeabur 開源版對同一項功能、同一組值每天（UTC）只傳一次；`zeaburctl ui` 和 Zeabur Desktop 每次都傳 |
 | `cluster_connected` | `zeaburctl ui`、Zeabur Desktop | 用你的 kubeconfig 連上叢集，或連不上時 |
 | `app_change_submitted` | Zeabur 開源版 | 有人在 Zeabur 開源版的網頁介面或 API 儲存變更並收到回應；每次儲存傳一筆，不管改了什麼 |
 
@@ -23,7 +23,8 @@ description: 加入體驗計畫後，Zeabur 開源版、`zeaburctl ui` 和 Zeabu
 | `person` | `zeabur_active`、`app_change_submitted` | 32 位十六進位數字，只在同一個安裝、同一天裡分辨不同的人 |
 | `zeabur_version` | `cluster_connected` | `zeaburctl` 或 Zeabur Desktop 的版本，例如 `0.1.1` |
 | `zeabur_version` | `app_change_submitted` | Zeabur 開源版的版本 |
-| `mode` | `zeabur_active`、`cluster_connected`、`app_change_submitted` | 叢集裡的 Zeabur 開源版是 `in-cluster`，`zeaburctl ui` 和 Zeabur Desktop 是 `local` |
+| `mode` | `zeabur_active`、`feature_used`、`cluster_connected`、`app_change_submitted` | 叢集裡的 Zeabur 開源版是 `in-cluster`，`zeaburctl ui` 和 Zeabur Desktop 是 `local` |
+| `client` | `cluster_connected`，以及 `mode` 是 `local` 的 `feature_used` | 傳送事件的程式：Zeabur Desktop 是 `desktop`，`zeaburctl ui` 是 `zeaburctl`。用來算有多少人在用 Zeabur Desktop。 |
 | `result` | `cluster_connected` | `connected`、`unreachable`、`credential_refused`、`no_read_right` 或 `other` |
 | `result` | `app_change_submitted` | `accepted`；沒被接受時依你收到的 HTTP 狀態碼：`forbidden`（403）、`invalid`（422）、`conflict`（409）、`unreachable`（502、503 或 504）或 `other` |
 | `feature` | `feature_used` | `service_created`、`database_created`、`domain_added`、`logs_viewed`、`terminal_opened`、`member_invited` 或 `compose` |
@@ -35,7 +36,7 @@ description: 加入體驗計畫後，Zeabur 開源版、`zeaburctl ui` 和 Zeabu
 
 事件不會說明是誰。`person` 是用金鑰算出的使用者名稱加日期的雜湊值。金鑰從 Zeabur 開源版的 plan key 衍生，留在叢集的 Secret 裡，從不送出，所以無法從雜湊值反推使用者名稱。同一個人一整天的 `person` 都一樣，Zeabur 開源版重新啟動也不變；隔天就換成另一個，所以不同天無法串在一起。
 
-`feature_used` 沒有 `person`，只表示今天用過某項功能，不說是誰、用了幾次。瀏覽器不會傳送任何東西，是 Zeabur 開源版的伺服器在操作成功之後傳送的。
+`feature_used` 沒有 `person`。Zeabur 開源版傳的只表示今天用過某項功能，不說是誰、用了幾次；`zeaburctl ui` 和 Zeabur Desktop 每次都傳，並帶著這台電腦的隨機代碼，所以看得出在這台電腦上用了幾次。瀏覽器不會傳送任何東西，是 Zeabur 開源版的伺服器，或你電腦上 `zeaburctl ui`、Zeabur Desktop 的本機服務，在操作成功之後傳送的。
 
 `zeaburctl ui` 和 Zeabur Desktop 沒有安裝代碼，所以共用一組隨機代碼，在第一次要傳事件時才產生，關閉時不會產生。這組代碼存在設定目錄裡 `zeabur` 資料夾中名為 `local-id` 的檔案：Linux 是 `$XDG_CONFIG_HOME` 或 `~/.config`，macOS 是 `~/Library/Application Support`，Windows 是 `%APPDATA%`。只有你能讀取它，裡面不含機器、kubeconfig、權杖或使用者名稱的任何資訊。
 
