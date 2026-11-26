@@ -6,6 +6,7 @@ import { translator } from "@/i18n"
 import { en } from "@/i18n/en"
 import {
   formChanged,
+  heldUpdate,
   formOf,
   localMinute,
   policyChoices,
@@ -101,14 +102,15 @@ test("checked every hour sends no window, and off turns it off", () => {
   })
 })
 
-test("a setting written outside Zeabur reads as off, and saving replaces it", () => {
+test("a setting written outside Zeabur reads as off, and only an edit replaces it", () => {
   const updates = {
     allowed: [],
     setting: { kind: "other" as const, policy: "glob:build-*" },
   }
   const form = formOf(updates, now)
   expect(form.policy).toBe("off")
-  expect(formChanged(updates, form, now)).toBe(true)
+  expect(heldUpdate(updates, form, false, now)).toBeUndefined()
+  expect(heldUpdate(updates, form, true, now)).toEqual({ kind: "off" })
 })
 
 test("an image's tag, with a registry port and a digest", () => {

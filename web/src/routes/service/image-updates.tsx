@@ -14,14 +14,13 @@ import { useI18n, useT } from "@/i18n"
 import { missingKeel } from "@/model/git-service"
 import {
   dayName,
-  formChanged,
   formOf,
+  heldUpdate,
   policyChoices,
   localMinute,
   reachText,
   tagOf,
   toUtc,
-  updateOf,
   windowText,
   type UpdateForm,
   type When,
@@ -90,13 +89,18 @@ function UpdatesForm({
 }) {
   const [now] = useState(() => new Date())
   const [form, setForm] = useState<UpdateForm>(() => formOf(updates, now))
-  const set = (patch: Partial<UpdateForm>) => setForm((f) => ({ ...f, ...patch }))
+  const [edited, setEdited] = useState(false)
+  const set = (patch: Partial<UpdateForm>) => {
+    setEdited(true)
+    setForm((f) => ({ ...f, ...patch }))
+  }
   const workload = { kind: service.kind, name: service.name }
+  const update = disabled ? undefined : heldUpdate(updates, form, edited, now)
   useHold(
     "updates",
-    !disabled && formChanged(updates, form, now)
+    update
       ? {
-          changes: [{ op: "autoUpdate", workload, update: updateOf(updates, form, now) }],
+          changes: [{ op: "autoUpdate", workload, update }],
           scope: { ops: ["autoUpdate"], workload },
         }
       : undefined,

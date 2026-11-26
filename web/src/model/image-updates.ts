@@ -130,6 +130,19 @@ export function formChanged(
 }
 
 /**
+ * The update the form adds to the page's draft. An untouched form adds none, so a setting written
+ * outside Zeabur, which reads as off, stays until someone edits the form.
+ */
+export function heldUpdate(
+  updates: Schemas.ImageUpdates | null | undefined,
+  form: UpdateForm,
+  edited: boolean,
+  now: Date,
+): Schemas.Update | undefined {
+  return edited && formChanged(updates, form, now) ? updateOf(updates, form, now) : undefined
+}
+
+/**
  * The policies the form offers besides off: the allowed ones, and the saved one when the image no
  * longer allows it, so the form shows it and can still turn it off.
  */
