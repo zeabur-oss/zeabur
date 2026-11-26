@@ -26,6 +26,7 @@ use k8s_openapi::api::core::v1::{EnvVar, EnvVarSource, Secret, SecretKeySelector
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
+use zeabur_graph::Workload;
 use zeabur_model::{PodSecurityLevel, WorkloadKind, WorkloadRef};
 
 use crate::builds::{
@@ -800,7 +801,7 @@ impl BuildInput {
     clippy::multiple_inherent_impl,
     reason = "the planner's change kinds are split across modules by area"
 )]
-impl Planner<'_> {
+impl<'a> Planner<'a> {
     /// The repository Zeabur Builder pushes the `Build` `name` to.
     fn repository(&self, name: &str) -> Result<String, PlanError> {
         let registry = self.input.build_registry.filter(|r| !r.is_empty()).ok_or_else(|| {
@@ -877,17 +878,7 @@ impl Planner<'_> {
         let reference = &change.workload;
         let name = reference.name.as_str();
         change.build.check()?;
-        let found = self.editable_workload(reference)?;
-        if matches!(found.kind(), WorkloadKind::Job | WorkloadKind::CronJob) {
-            return Err(error(
-                ErrorKind::Invalid,
-                "not_updatable",
-                format!(
-                    "{} {name} runs to completion; only a long-running service is built.",
-                    reference.kind.as_str(),
-                ),
-            ));
-        }
+        let found = self.built_workload(reference)?;
         let container = Self::container(found, reference, change.container.as_deref())?;
         let keel = found
             .meta()
@@ -1142,9 +1133,27 @@ impl Planner<'_> {
             .collect()
     }
 
+    /// The long-running service a `Build` feeds. A Job or CronJob runs to completion, so it has
+    /// none.
+    fn built_workload(&self, reference: &WorkloadRef) -> Result<Workload<'a>, PlanError> {
+        let found = self.editable_workload(reference)?;
+        if matches!(found.kind(), WorkloadKind::Job | WorkloadKind::CronJob) {
+            return Err(error(
+                ErrorKind::Invalid,
+                "not_updatable",
+                format!(
+                    "{} {} runs to completion; only a long-running service is built.",
+                    reference.kind.as_str(),
+                    reference.name,
+                ),
+            ));
+        }
+        Ok(found)
+    }
+
     pub(crate) fn remove_build(&mut self, reference: &WorkloadRef) -> Result<(), PlanError> {
         let name = reference.name.as_str();
-        let found = self.editable_workload(reference)?;
+        let found = self.built_workload(reference)?;
         let mut others = self.builds_read()?;
         let Some(at) = others.iter().position(|(n, _)| n == name) else {
             return Err(error(

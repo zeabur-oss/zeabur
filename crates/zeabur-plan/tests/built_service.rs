@@ -1166,25 +1166,47 @@ mod tests {
         ));
     }
 
-    /// A Job or CronJob runs to completion, so it is not given a `Build`.
-    #[test]
-    fn a_cron_job_is_not_given_a_build() {
-        let cron = json!({
+    fn cron_job() -> Value {
+        json!({
             "apiVersion": "batch/v1", "kind": "CronJob",
             "metadata": {"name": "site", "namespace": "shop", "resourceVersion": "3"},
             "spec": {"schedule": "0 * * * *", "jobTemplate": {"spec": {"template": {
                 "spec": {"containers": [{"name": "site", "image": "nginx:1.27"}],
                          "restartPolicy": "OnFailure"}}}}}
-        });
+        })
+    }
+
+    fn cron_ref() -> WorkloadRef {
+        WorkloadRef {
+            kind: WorkloadKind::CronJob,
+            name: "site".to_owned(),
+        }
+    }
+
+    /// A Job or CronJob runs to completion, so it is not given a `Build`.
+    #[test]
+    fn a_cron_job_is_not_given_a_build() {
         let change = Change::SetBuild(SetBuildChange {
-            workload: WorkloadRef {
-                kind: WorkloadKind::CronJob,
-                name: "site".to_owned(),
-            },
+            workload: cron_ref(),
             container: None,
             build: upload("up-1"),
         });
-        let refused = on_cluster(change, cron, Vec::new(), &[]).unwrap_err();
+        let refused = on_cluster(change, cron_job(), Vec::new(), &[]).unwrap_err();
+        assert_eq!(refused.code, "not_updatable");
+    }
+
+    /// A CronJob has no `Build` to stop, even when one shares its name.
+    #[test]
+    fn a_cron_job_has_no_build_to_stop() {
+        let build = served(
+            build_of(repository("https://github.com/acme/site", token("ghp_1"))),
+            "site",
+            Some(LATEST),
+        );
+        let change = Change::RemoveBuild {
+            workload: cron_ref(),
+        };
+        let refused = on_cluster(change, cron_job(), vec![build], &[]).unwrap_err();
         assert_eq!(refused.code, "not_updatable");
     }
 
