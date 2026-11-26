@@ -1,0 +1,122 @@
+---
+title: Update images automatically
+description: Have Keel move a service to new versions of its image, pick when it checks, turn it off, and recover from a failed update.
+---
+
+A service that runs an image from a registry, such as PostgreSQL or Redis, can move to new versions of that image on its own. Open the service's **Settings** → **Automatic updates**, pick which versions it takes and when Keel checks for them, and save. Each update restarts the service.
+
+## Before you start
+
+- You need permission to modify services in the project.
+- The cluster needs the Keel component. When it's missing, the section says so and offers to install it.
+- The section is on Deployments, StatefulSets and DaemonSets. Jobs and scheduled jobs don't have it. A service built from Git or an uploaded folder uses **Auto-deploy new builds** in its **Builds** tab instead (see [Restart, roll back, and pause services](./restart-rollback.mdx#auto-deploy-new-builds)).
+- Databases you create from the project's **Add** → **Database** don't have the section. Their operator runs the database and its image.
+- Services managed by Helm, Argo CD, or Flux show the section but can't change it here. Set the annotations in that tool instead.
+
+## Turn on automatic updates
+
+<Steps>
+<Step>
+
+### Pick which versions
+
+Go to the service's **Settings** → **Automatic updates**. Under **Which versions**, pick one:
+
+| Choice | `redis:7.2.4` moves to | `postgres:16.4` moves to |
+| --- | --- | --- |
+| **Patch releases only** | `7.2.5`, `7.2.6`, … but not `7.3.0` | Nothing. Keel reads `16.5` as a minor release. |
+| **Patch and minor releases** | `7.3.0`, `7.4.1`, … but not `8.0.0` | `16.5`, `16.6`, … but not `17.0` |
+| **All new versions** | Every newer version, including `8.0.0` | Every newer version, including `17.0` |
+| **New image under the same tag** | A new image pushed as `7.2.4` | A new image pushed as `16.4` |
+
+The hint under the list names the versions this service moves to. A major version can need a data migration: PostgreSQL needs a backup and an upgrade step for one. For a database, pick **Patch and minor releases**, which keeps the major version. Don't pick **Patch releases only** for a PostgreSQL tag with two numbers such as `16.4`: it never updates.
+
+The version choices need a version tag: one to three numbers, such as `8`, `1.27` or `7.2.4`, or `latest`. Keel reads `8` as `8.0.0`, and after an update the tag names the full version, such as `8.0.2`. `latest` moves to the newest version tag first. A tag with other text, such as `1.30-alpine`, offers only **New image under the same tag**. A service with several containers needs a version tag on each one.
+
+</Step>
+<Step>
+
+### Pick when
+
+Under **When**, pick one:
+
+- **As soon as found**: Keel checks every hour.
+- **Every day** and a time.
+- **Once a week**, a day and a time.
+
+![Automatic updates for db: Patch and minor releases for postgres:18, checked once a week on Sunday at 03:00, with the time in UTC below](../images/shots/image-updates.avif)
+
+You pick the time in your browser's time zone, and the line below shows it in UTC. Zeabur OSS stores the UTC time, so it stays the same all year:
+
+- When daylight saving time starts or ends where you are, Keel still checks at the same UTC time, which is an hour earlier or later on your clock. The form then shows the new local time.
+- Changing only **Which versions** keeps the stored UTC time. Changing **When**, the day or the time stores the UTC time from your clock as it is now.
+- In a time zone with a half-hour offset, such as India, the times end in `:30`, so each one is a whole hour in UTC.
+
+</Step>
+<Step>
+
+### Save and check the review
+
+Click **Save**. The review says what the service will take and when Keel checks, and lists the annotations it adds to the workload: `keel.sh/policy`, `keel.sh/trigger: poll` and `keel.sh/pollSchedule`. **New image under the same tag** also adds `keel.sh/match-tag`. Click **Save** in the review to apply it.
+
+![Review for db: it will take patch and minor releases, checked Sundays at 03:00 UTC, with the Keel annotations it adds](../images/shots/image-updates-review.avif)
+
+</Step>
+</Steps>
+
+## Turn off automatic updates
+
+In **Automatic updates**, set **Which versions** to **Off** and click **Save**. The review says the service no longer updates on its own and removes `keel.sh/policy`, `keel.sh/trigger`, `keel.sh/pollSchedule` and `keel.sh/match-tag`. Click **Turn off** to apply it. The service keeps the image it runs now.
+
+![Review for db: it no longer updates on its own, and the four Keel annotations are removed](../images/shots/image-updates-off-review.avif)
+
+When Keel was set up outside Zeabur OSS, for example with kubectl, the list shows **Set outside Zeabur** and its policy. Pick **Off** or another choice to replace it.
+
+## Images pinned to a digest
+
+An image named by digest, such as `redis@sha256:…`, never changes, so the section shows only a note and no choices. To update it automatically, open **Settings**, switch to **YAML**, change the container's `image` to a tag, and apply it. Then turn updates on.
+
+A service that already had automatic updates on and then moved to a digest still shows the form, so you can turn them off.
+
+## When an update fails
+
+Keel changes the image and stops there. It doesn't wait for the new replicas or roll back when they fail ([#1014](https://github.com/zeabur-oss/zeabur/issues/1014)).
+
+- A Deployment with a [traffic check](./service-settings.mdx) keeps its old replicas serving while the new ones fail the check. The service shows **Rollout stuck**.
+- A StatefulSet replaces its replicas one at a time, so a StatefulSet with one replica, such as Redis, stops serving until a new one is ready.
+
+To recover:
+
+1. Turn automatic updates off first. Otherwise Keel moves the service to the same version again at its next check.
+2. Roll back from **Rollout** in **Overview**, or from **Deployments** (see [Restart, roll back, and pause services](./restart-rollback.mdx#roll-back-to-an-earlier-version)).
+3. When the cause is fixed, turn updates on again.
+
+To hear about a failed update, add a channel under the project's **Settings** → **Notifications** with **Deploy failed** (see [Notifications](../cluster/notifications.mdx)). It covers Deployments only; StatefulSets and DaemonSets don't send it yet ([#1015](https://github.com/zeabur-oss/zeabur/issues/1015)).
+
+## Do the same with kubectl
+
+The examples use the project `demo` and the StatefulSet `db`. The schedule has seconds first and is in UTC: `0 0 3 * * 0` is Sundays at 03:00 UTC.
+
+| Zeabur OSS action | kubectl |
+| --- | --- |
+| **Patch and minor releases**, **Once a week** on Sunday at 03:00 UTC | `kubectl -n demo annotate statefulset db keel.sh/policy=minor keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"` |
+| **Patch releases only**, **As soon as found** | `kubectl -n demo annotate --overwrite statefulset db keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule=@hourly` |
+| **New image under the same tag**, **Every day** at 03:00 UTC | `kubectl -n demo annotate --overwrite statefulset db keel.sh/policy=force keel.sh/match-tag=true keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * *"` |
+| **Off** | `kubectl -n demo annotate statefulset db keel.sh/policy- keel.sh/trigger- keel.sh/pollSchedule- keel.sh/match-tag-` |
+
+To see what a service has now:
+
+```sh
+kubectl -n demo get statefulset db -o jsonpath='{.metadata.annotations}'
+```
+
+## Troubleshooting
+
+| What you see | What to do next |
+| --- | --- |
+| No **Automatic updates** section | The service is built from source, is a Job or scheduled job, or is a database from **Add** → **Database**. |
+| Only **New image under the same tag** | The tag isn't a version, such as `1.30-alpine`. Change it to a version tag such as `1.30`. |
+| A note says the image is pinned to a digest | Change the image to a tag. |
+| The section says Keel is missing | Install the Keel component from the section or from **Cluster** → **Components**. |
+| A PostgreSQL service never updates | Its tag has two numbers, such as `16.4`, and the choice is **Patch releases only**. Pick **Patch and minor releases**. |
+| The service shows **Rollout stuck** after an update | Turn updates off, then roll back. See [When an update fails](#when-an-update-fails). |
