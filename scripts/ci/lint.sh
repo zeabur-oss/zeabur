@@ -25,6 +25,8 @@ cargo_checks() {
   cargo lint
   RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --document-private-items --locked
   cargo deny --locked check
+  # The fuzz crate is its own workspace and only the nightly run builds it, so check its lock here.
+  cargo metadata --manifest-path crates/zeabur-proxy/fuzz/Cargo.toml --locked --format-version 1 >/dev/null
   # Writes target/unsafe-report.md, which the workflow uploads.
   node_modules/.bin/zeabur-oss-unsafe-report zeabur zeaburctl zeabur-proxy
   node_modules/.bin/zeabur-oss-levels
