@@ -1,7 +1,14 @@
 import { describe, expect, test } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { branchOf, buildProblem, builtContainers, type Build, type BuildRun } from "@/model/builds"
+import {
+  branchOf,
+  buildProblem,
+  builtContainers,
+  sourceContainer,
+  type Build,
+  type BuildRun,
+} from "@/model/builds"
 import {
   branchProblem,
   buildOptionsChanges,
@@ -18,10 +25,12 @@ import {
   gitChange,
   gitNeeds,
   gitSourceChange,
+  gitSourceOf,
   newGitService,
   newGitSource,
   parseRepository,
   pathProblem,
+  repositoryProblems,
   tokenUser,
   urlProblem,
   type GitService,
@@ -126,6 +135,84 @@ describe("a Git source for a running service", () => {
         directory: "web",
       },
     })
+  })
+})
+
+describe("changing a Git service's source", () => {
+  const build = (patch: Partial<Build>) =>
+    ({
+      name: "site",
+      archive: false,
+      builder: "railpack",
+      gitUrl: "https://github.com/acme/site.git",
+      gitRef: "HEAD",
+      env: [],
+      ...patch,
+    }) as Build
+  const workload = { kind: "Deployment", name: "site" } as const
+
+  test("the form starts from the Build, and sent unchanged reads the same repository", () => {
+    const current = build({
+      builder: "dockerfile",
+      gitRef: "release/1.2",
+      contextDir: "apps/web",
+      dockerfile: "docker/Dockerfile",
+    })
+    expect(gitSourceChange(gitSourceOf(current), workload, "site")).toEqual({
+      op: "setBuild",
+      workload,
+      container: "site",
+      build: {
+        source: {
+          type: "git",
+          url: "https://github.com/acme/site.git",
+          branch: "release/1.2",
+          access: { type: "public" },
+        },
+        method: "dockerfile",
+        directory: "apps/web",
+        dockerfile: "docker/Dockerfile",
+      },
+    })
+  })
+
+  test("the default branch stays the default", () => {
+    expect(gitSourceOf(build({ gitRef: "HEAD", resolvedRef: "refs/heads/main" })).branch).toBe("")
+    expect(gitSourceOf(build({ gitRef: "refs/heads/dev" })).branch).toBe("dev")
+  })
+
+  test("an SSH address keeps its deploy key; HTTPS credentials take a token typed again", () => {
+    const ssh = gitSourceOf(
+      build({
+        gitUrl: "git@github.com:acme/site.git",
+        credentials: { name: "site-git", own: true },
+      }),
+    )
+    expect(ssh.access).toBe("deployKey")
+    expect(gitSourceChange(ssh, workload)).toMatchObject({
+      build: { source: { url: "git@github.com:acme/site.git", access: { type: "deployKey" } } },
+    })
+    const token = gitSourceOf(build({ credentials: { name: "site-git", own: true } }))
+    expect(token).toMatchObject({ access: "token", token: "" })
+    expect(repositoryProblems(token, true).token).toBe(true)
+  })
+
+  test("an uploaded folder's Build starts an empty repository with its paths and method", () => {
+    expect(
+      gitSourceOf(build({ archive: true, gitUrl: null, builder: "dockerfile", contextDir: "web" })),
+    ).toMatchObject({ url: "", method: "dockerfile", directory: "web", access: "public" })
+  })
+
+  test("the change goes to the container that runs the Build's image", () => {
+    const service = {
+      containers: [
+        { name: "migrate", image: "zot:5000/shop/site:1", init: true },
+        { name: "proxy", image: "nginx:1" },
+        { name: "site", image: "zot:5000/shop/site:1" },
+      ],
+    } as Parameters<typeof sourceContainer>[0]
+    expect(sourceContainer(service, build({ repository: "zot:5000/shop/site" }))).toBe("site")
+    expect(sourceContainer(service, undefined)).toBe("proxy")
   })
 })
 

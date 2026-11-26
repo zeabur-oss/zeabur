@@ -1976,6 +1976,7 @@ export const en = {
   "title.deployBuild": (service: string) => `Deploy the newest build to ${service}`,
   "title.rebuild": (build: string) => `Build ${build} again`,
   "title.gitSource": (service: string) => `Build ${service} from Git`,
+  "title.uploadSource": (service: string) => `Build ${service} from a folder`,
   "title.stopBuilding": (build: string) => `Stop building ${build} from source`,
   "title.buildOptions": (build: string) => `Change how ${build} is built`,
   "title.autoUpdateOn": (service: string) => `Auto-deploy ${service}`,
@@ -3969,12 +3970,20 @@ export const en = {
   "part.networking": "Networking",
   "part.storage": "Storage",
   "part.compute": "Compute",
-  "gitSource.hint": "Connect a Git repository, and Zeabur Builder builds this service from it.",
-  "gitSource.title": "Build from a Git repository",
-  "gitSource.imageHint":
-    "The service then runs what Zeabur Builder builds from the repository, and each new build goes live.",
-  "gitSource.uploadHint":
-    "Zeabur Builder then builds the repository instead of an uploaded folder, and each new build goes live.",
+  "buildSource.hint":
+    "Zeabur Builder can build this service from a Git repository or from a folder on your computer.",
+  "buildSource.title": "Source",
+  "buildSource.image":
+    "The service runs an image now. Build it from Git or from a folder instead, and each new build goes live.",
+  "buildSource.git":
+    "Zeabur Builder builds this repository, and each new build goes live. Change the repository or branch, or upload a folder instead.",
+  "buildSource.upload":
+    "Zeabur Builder builds the folder you upload, and each new build goes live. Upload a new version, or build from Git instead.",
+  "buildSource.changeGit": "Change repository",
+  "buildSource.uploadBody": (service: string) =>
+    `${service} then runs what Zeabur Builder builds from this folder, and each new build goes live.`,
+  "gitSource.tokenAgain":
+    "Zeabur does not show the saved token. Type it again to keep reading the repository with a token.",
   "gitSource.open": "Connect Git",
   "gitSource.container": "Container",
   "gitSource.done": "Done",

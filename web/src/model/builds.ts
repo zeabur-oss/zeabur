@@ -53,6 +53,14 @@ export function builtContainers(service: Service, builds: readonly Build[]): Bui
   return out
 }
 
+/** The regular container a source change builds for: the one that runs the Build's image, else
+ * the first. */
+export function sourceContainer(service: Service, build: Build | undefined): string | undefined {
+  const main = service.containers.filter((c) => !c.init)
+  const built = build ? builtContainers(service, [build]).map((b) => b.container) : []
+  return (main.find((c) => built.includes(c.name)) ?? main[0])?.name
+}
+
 /** The Builds that make any of the service's images, each once. */
 export function buildsOf(service: Service, builds: readonly Build[] | undefined): Build[] {
   const found = builtContainers(service, builds ?? []).map((b) => b.build)

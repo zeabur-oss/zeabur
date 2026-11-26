@@ -2,7 +2,6 @@ import { useQuery } from "@tanstack/react-query"
 import { useState, type ReactNode } from "react"
 
 import { creatableQuery } from "@/api/queries"
-import { GitSourceForm } from "@/routes/service/git-source"
 import { FormField } from "@/components/form-field"
 import { GateNote, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
@@ -18,13 +17,14 @@ import {
 import { imageOptions, parseEnv, rightsOf } from "@/model/image-service"
 import type { Gate } from "@/model/rights"
 import type { Service } from "@/model/service"
+import { BuildSource } from "@/routes/service/build-source"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Input } from "@zeabur-oss/design-system/components/input"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 import { Textarea } from "@zeabur-oss/design-system/components/textarea"
 
 /** The directory, Dockerfile and build variables of each `Build` that makes the service's
- * images; a Git source for a service that builds from none; stopping the service's own Build. */
+ * images; the source of the service's own Build, Git or a folder; stopping that Build. */
 export function BuildSection({
   project,
   service,
@@ -37,17 +37,16 @@ export function BuildSection({
   const t = useT()
   const gate = useGate(project, "build")
   const secrets = imageOptions(rightsOf(useQuery(creatableQuery(project)).data)).secrets
-  // An uploaded folder's Build can read a repository instead; a Build from Git already does.
-  const fromGit = builds.some((b) => !b.archive)
-  const upload = builds.find((b) => b.archive)
-  // Stays open after the apply turns the service into a Git one, to show its deploy key.
-  const [connecting, setConnecting] = useState(false)
+  // `setBuild` writes the Build named after the service; a service built by another Build, or
+  // by several, keeps its sources.
+  const own = builds.find((b) => b.name === service.name)
+  const sourced = builds.length === 0 || (builds.length === 1 && own)
   return (
     <section aria-labelledby="build-title" className="flex flex-col gap-3">
       <SectionHeader
         id="build-title"
         title={t("part.build")}
-        description={t(builds.length > 0 ? "buildOptions.hint" : "gitSource.hint")}
+        description={t(builds.length > 0 ? "buildOptions.hint" : "buildSource.hint")}
       />
       <GateNote gate={gate} />
       {builds.map((build) => (
@@ -64,15 +63,8 @@ export function BuildSection({
           }
         />
       ))}
-      {connecting || (!fromGit && builds.length <= 1) ? (
-        <GitSourceForm
-          project={project}
-          service={service}
-          upload={upload}
-          secrets={secrets}
-          open={connecting}
-          onOpenChange={setConnecting}
-        />
+      {sourced ? (
+        <BuildSource project={project} service={service} build={own} secrets={secrets} />
       ) : null}
     </section>
   )

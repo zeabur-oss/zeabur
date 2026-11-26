@@ -1,9 +1,11 @@
 import { describe, expect, test } from "bun:test"
 
+import type { Build } from "@/model/builds"
 import {
   createUploadService,
   newUploadService,
   uploadProblems,
+  uploadSourceChange,
   type UploadService,
 } from "@/model/upload-service"
 
@@ -56,5 +58,45 @@ describe("a service from an uploaded folder", () => {
     })
     expect(uploadProblems(form(), { ...rules, hasFolder: false }).folder).toBe(true)
     expect(uploadProblems(form({ name: "api" }), { ...rules, hasFolder: true }).name).toBeDefined()
+  })
+})
+
+describe("building a running service from a folder", () => {
+  const workload = { kind: "Deployment", name: "site" } as const
+  const none = () => false
+
+  test("an image service gets a Build that waits for the folder, with a Dockerfile when it has one", () => {
+    expect(
+      uploadSourceChange(undefined, { workload, container: "site", request: "u1" }, none),
+    ).toEqual({
+      op: "setBuild",
+      workload,
+      container: "site",
+      build: { source: { type: "upload", request: "u1" }, method: "railpack" },
+    })
+    const found = (path: string) => path === "Dockerfile"
+    expect(uploadSourceChange(undefined, { workload, request: "u1" }, found)).toMatchObject({
+      build: { method: "dockerfile" },
+    })
+  })
+
+  test("a Git service's Build reads the folder instead, with its paths and method", () => {
+    const build = {
+      name: "site",
+      builder: "dockerfile",
+      gitUrl: "https://github.com/acme/site",
+      contextDir: "apps/web",
+      dockerfile: "Dockerfile.prod",
+    } as Build
+    expect(uploadSourceChange(build, { workload, request: "u2" }, none)).toEqual({
+      op: "setBuild",
+      workload,
+      build: {
+        source: { type: "upload", request: "u2" },
+        method: "dockerfile",
+        directory: "apps/web",
+        dockerfile: "Dockerfile.prod",
+      },
+    })
   })
 })

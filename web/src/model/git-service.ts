@@ -332,6 +332,32 @@ export const newGitSource = (method: BuildMethod = "railpack"): GitSource => ({
   knownHosts: "",
 })
 
+/** How a Build builds, by its builder. */
+export const methodOf = (build: Build): BuildMethod =>
+  build.builder === "dockerfile" ? "dockerfile" : "railpack"
+
+/** The branch a Build follows as the form takes it: empty for the repository's default. */
+const branchField = (ref: string | null | undefined) =>
+  !ref || ref === "HEAD" ? "" : ref.replace(/^refs\/(heads|tags)\//, "")
+
+/** The form for a Build as it is: its repository, branch, paths and method. Credentials stay in
+ * their Secret: an SSH address reads with its deploy key, credentials over HTTPS with a token typed
+ * again; a repository the GitHub App reads resolves to the App as in "Deploy from Git". */
+export function gitSourceOf(build: Build | undefined): GitSource {
+  if (!build) return newGitSource()
+  const url = build.gitUrl ?? ""
+  const access: Access =
+    url && !overHttps(url) ? "deployKey" : url && build.credentials ? "token" : "public"
+  return {
+    ...newGitSource(methodOf(build)),
+    url,
+    branch: branchField(build.gitRef),
+    directory: build.contextDir ?? "",
+    dockerfile: build.dockerfile ?? "",
+    access,
+  }
+}
+
 /** The change that builds `container` of `workload` from the repository: a new Build named after
  * the workload, or its Build reading the repository instead. */
 export const gitSourceChange = (

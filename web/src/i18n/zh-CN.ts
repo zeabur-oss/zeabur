@@ -1811,6 +1811,7 @@ export const zhCN: Messages = {
   "title.deployBuild": (service) => `把最新的构建部署到 ${service}`,
   "title.rebuild": (build) => `重新构建 ${build}`,
   "title.gitSource": (service) => `从 Git 构建 ${service}`,
+  "title.uploadSource": (service) => `从文件夹构建 ${service}`,
   "title.stopBuilding": (build) => `停止从源代码构建 ${build}`,
   "title.buildOptions": (build) => `变更 ${build} 的构建方式`,
   "title.autoUpdateOn": (service) => `自动部署 ${service}`,
@@ -3613,12 +3614,17 @@ export const zhCN: Messages = {
   "part.networking": "网络",
   "part.storage": "存储",
   "part.compute": "计算资源",
-  "gitSource.hint": "连接 Git 仓库后，Zeabur Builder 会用它构建这个服务。",
-  "gitSource.title": "从 Git 仓库构建",
-  "gitSource.imageHint":
-    "连接后，服务会改为运行 Zeabur Builder 用仓库构建的镜像，每次构建完成就会上线。",
-  "gitSource.uploadHint":
-    "连接后，Zeabur Builder 会改用仓库构建，不再用上传的文件夹，每次构建完成就会上线。",
+  "buildSource.hint": "Zeabur Builder 可以用 Git 仓库或你电脑上的文件夹构建这个服务。",
+  "buildSource.title": "来源",
+  "buildSource.image": "服务目前运行镜像。改用 Git 或文件夹构建后，每次构建完成就会上线。",
+  "buildSource.git":
+    "Zeabur Builder 会构建这个仓库，每次构建完成就会上线。可以改用其他仓库或分支，或改成上传文件夹。",
+  "buildSource.upload":
+    "Zeabur Builder 会构建你上传的文件夹，每次构建完成就会上线。可以上传新版本，或改用 Git 构建。",
+  "buildSource.changeGit": "更改仓库",
+  "buildSource.uploadBody": (service) =>
+    `之后 ${service} 会运行 Zeabur Builder 用这个文件夹构建的镜像，每次构建完成就会上线。`,
+  "gitSource.tokenAgain": "Zeabur 不会显示已保存的令牌。请再输入一次，才能继续用令牌读取仓库。",
   "gitSource.open": "连接 Git",
   "gitSource.container": "容器",
   "gitSource.done": "完成",

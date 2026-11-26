@@ -140,10 +140,13 @@ export function AccessFields({
   git,
   shown,
   tried,
+  tokenHint,
 }: {
   git: GitSourceState
   shown: Shown
   tried: boolean
+  /** Under the token, such as why it must be typed again. */
+  tokenHint?: string
 }) {
   const t = useT()
   const { access, keyHost, form, set } = git
@@ -174,6 +177,7 @@ export function AccessFields({
           onUsername={git.typeUsername}
           token={form.token}
           onToken={(token) => set({ token })}
+          hint={tokenHint}
           errors={shown(git.problems.token, () => t("add.problem.token"))}
         />
       ) : null}
@@ -233,12 +237,14 @@ function TokenFields({
   onUsername,
   token,
   onToken,
+  hint,
   errors,
 }: {
   username: string
   onUsername: (value: string) => void
   token: string
   onToken: (value: string) => void
+  hint?: string
   errors: string[]
 }) {
   const t = useT()
@@ -252,7 +258,7 @@ function TokenFields({
           onChange={(event) => onUsername(event.target.value)}
         />
       </FormField>
-      <FormField label={t("add.token")} errors={errors}>
+      <FormField label={t("add.token")} hint={hint} errors={errors}>
         <Input
           size="sm"
           type="password"
