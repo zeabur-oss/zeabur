@@ -217,6 +217,8 @@ pub enum RestoreKind {
 pub enum Feature {
     /// A service was created.
     ServiceCreated(Source),
+    /// A running service was given what Zeabur Builder builds it from: Git or an uploaded folder.
+    BuildSourceSet(Source),
     /// A database or object storage was created.
     DatabaseCreated(DatabaseKind),
     /// A domain was added.
@@ -265,6 +267,7 @@ impl Feature {
     const fn name(&self) -> &'static str {
         match self {
             Self::ServiceCreated(_) => "service_created",
+            Self::BuildSourceSet(_) => "build_source_set",
             Self::DatabaseCreated(_) => "database_created",
             Self::DomainAdded(_) => "domain_added",
             Self::LogsViewed => "logs_viewed",
@@ -301,6 +304,7 @@ impl Serialize for Feature {
                     map.serialize_entry("template", id)?;
                 }
             }
+            Self::BuildSourceSet(source) => map.serialize_entry("source", source.name())?,
             Self::DatabaseCreated(kind) => map.serialize_entry("kind", kind)?,
             Self::DomainAdded(kind) => map.serialize_entry("kind", kind)?,
             Self::ComponentInstalled(id) => map.serialize_entry("component", id)?,

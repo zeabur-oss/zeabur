@@ -28,7 +28,7 @@ description: 加入体验计划后，Zeabur 开源版、`zeaburctl ui` 和 Zeabu
 | `result` | `cluster_connected` | `connected`、`unreachable`、`credential_refused`、`no_read_right` 或 `other` |
 | `result` | `app_change_submitted` | `accepted`；没被接受时按你收到的 HTTP 状态码：`forbidden`（403）、`invalid`（422）、`conflict`（409）、`unreachable`（502、503 或 504）或 `other` |
 | `feature` | `feature_used` | 下方表格里的某一个功能 |
-| `source` | `service_created` 的 `feature_used` | 服务怎么创建：`git`、`upload`、`image` 或 `template` |
+| `source` | `service_created` 或 `build_source_set` 的 `feature_used` | 服务怎么创建：`git`、`upload`、`image` 或 `template`。Zeabur Builder 改从哪里构建：`git` 或 `upload` |
 | `template` | `source` 为 `template` 的 `feature_used` | 模板在 Zeabur Catalog 里的 ID，例如 `wordpress`；Catalog 里没有的 ID 不会发送 |
 | `component` | `component_installed` 的 `feature_used` | 组件在 Zeabur Catalog 里的 ID，例如 `logs/victoria-logs` |
 | `policy` | `auto_update_enabled` 的 `feature_used` | 更新到哪些新镜像：`same_tag`、`patch`、`minor` 或 `major` |
@@ -39,6 +39,7 @@ description: 加入体验计划后，Zeabur 开源版、`zeaburctl ui` 和 Zeabu
 | `feature` | 什么时候发送 |
 |---|---|
 | `service_created` | 创建服务之后 |
+| `build_source_set` | 现有服务改从 Git 仓库或上传的文件夹构建之后 |
 | `database_created` | 创建数据库或对象存储之后 |
 | `domain_added` | 添加域名之后 |
 | `logs_viewed` | 打开日志流之后 |

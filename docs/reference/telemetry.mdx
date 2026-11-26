@@ -28,7 +28,7 @@ Zeabur OSS sends one event each time someone signs in or saves changes, and one 
 | `result` | `cluster_connected` | `connected`, `unreachable`, `credential_refused`, `no_read_right` or `other` |
 | `result` | `app_change_submitted` | `accepted`, or why not, by the HTTP status you got: `forbidden` (403), `invalid` (422), `conflict` (409), `unreachable` (502, 503 or 504) or `other` |
 | `feature` | `feature_used` | One of the features below |
-| `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
+| `source` | `feature_used` with `service_created` or `build_source_set` | How the service was created: `git`, `upload`, `image` or `template`. What Zeabur Builder now builds it from: `git` or `upload` |
 | `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID not in the catalog is left out |
 | `component` | `feature_used` with `component_installed` | The component's ID in Zeabur Catalog, such as `logs/victoria-logs` |
 | `policy` | `feature_used` with `auto_update_enabled` | Which new images it takes: `same_tag`, `patch`, `minor` or `major` |
@@ -39,6 +39,7 @@ Zeabur OSS sends one event each time someone signs in or saves changes, and one 
 | `feature` | Sent after |
 |---|---|
 | `service_created` | A service is created |
+| `build_source_set` | A running service is set to build from a Git repository or an uploaded folder |
 | `database_created` | A database or object storage is created |
 | `domain_added` | A domain is added |
 | `logs_viewed` | A log stream is opened |
