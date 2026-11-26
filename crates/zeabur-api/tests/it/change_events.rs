@@ -65,7 +65,8 @@ mod tests {
     }
 
     async fn plan(app: &Router, changes: &Value) -> Value {
-        let (status, planned) = send(app, "POST", "/api/v1/projects/shop/plan", Some(changes)).await;
+        let (status, planned) =
+            send(app, "POST", "/api/v1/projects/shop/plan", Some(changes)).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
         planned
     }

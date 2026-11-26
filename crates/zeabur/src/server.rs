@@ -126,7 +126,6 @@ pub(crate) fn app(
 ) -> Router {
     let access = Arc::new(SessionAccess {
         origin: auth.public.origin(),
-        sessions: Arc::clone(&auth.sessions),
     });
     #[cfg(feature = "ui")]
     let interface = zeabur_ui::router_with_form_page(
@@ -150,7 +149,7 @@ pub(crate) fn app(
         changes: auth.telemetry.is_on().then(|| {
             let telemetry = Arc::clone(&auth.telemetry);
             let changes: zeabur_api::measure::Changes =
-                Arc::new(move |report| telemetry.changed(report));
+                Arc::new(move |report| telemetry.changed(&report));
             changes
         }),
         reach: zeabur_http::Reach::Public,
@@ -316,7 +315,6 @@ fn bearer(headers: &HeaderMap) -> Option<secrecy::SecretString> {
 struct SessionAccess {
     /// The public URL's origin, which a terminal's handshake must come from.
     origin: String,
-    sessions: Arc<Sessions<Connection>>,
 }
 
 fn signed_out() -> Box<Problem> {

@@ -183,7 +183,7 @@ impl Telemetry {
     }
 
     /// Sends the answer to a save in the background.
-    pub(crate) fn changed(&self, report: Report) {
+    pub(crate) fn changed(&self, report: &Report) {
         let Some((daily, sender)) = &self.on else {
             return;
         };
