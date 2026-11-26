@@ -174,8 +174,8 @@ export function NetworkingTab({
     enabled: routes.length > 0 || adding !== undefined,
   })
   const suffixes = useQuery(clusterQuery).data?.domains?.suffixes
-  const generated = generatedHost(service.name, project, suffixes?.[0], [
-    ...routes.flatMap((r) => (r.host ? [r.host] : [])),
+  const generated = generatedHost(service.name, project, suffixes, [
+    ...routes.map((r) => r.host),
     ...staged.added.map((c) => c.hostname),
   ])
   const checkOf = (host?: string) =>
