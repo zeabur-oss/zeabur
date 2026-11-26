@@ -12,7 +12,7 @@ Zeabur OSS sends one event each time someone signs in or saves changes, and one 
 | Event | Sent by | When |
 |---|---|---|
 | `signed_in` | Zeabur OSS | Each time someone signs in to Zeabur OSS's web interface |
-| `feature_used` | Zeabur OSS, `zeaburctl ui`, Zeabur Desktop | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import. Zeabur OSS sends it once per UTC day for each feature and set of values; `zeaburctl ui` and Zeabur Desktop send it each time |
+| `feature_used` | Zeabur OSS, `zeaburctl ui`, Zeabur Desktop | After a call that uses one of the features below succeeds. Zeabur OSS sends it once per UTC day for each feature and set of values; `zeaburctl ui` and Zeabur Desktop send it each time |
 | `cluster_connected` | `zeaburctl ui`, Zeabur Desktop | It connected to a cluster with your kubeconfig, or could not |
 | `app_change_submitted` | Zeabur OSS | Someone saved changes in Zeabur OSS's web interface or API and got an answer; one event for each save, whatever it changes |
 
@@ -27,12 +27,29 @@ Zeabur OSS sends one event each time someone signs in or saves changes, and one 
 | `client` | `cluster_connected`, and `feature_used` when `mode` is `local` | The program that sent it: `desktop` for Zeabur Desktop, `zeaburctl` for `zeaburctl ui`. It lets us count how many people use Zeabur Desktop. |
 | `result` | `cluster_connected` | `connected`, `unreachable`, `credential_refused`, `no_read_right` or `other` |
 | `result` | `app_change_submitted` | `accepted`, or why not, by the HTTP status you got: `forbidden` (403), `invalid` (422), `conflict` (409), `unreachable` (502, 503 or 504) or `other` |
-| `feature` | `feature_used` | `service_created`, `database_created`, `domain_added`, `logs_viewed`, `terminal_opened`, `member_invited` or `compose` |
+| `feature` | `feature_used` | One of the features below |
 | `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
 | `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID not in the catalog is left out |
+| `component` | `feature_used` with `component_installed` | The component's ID in Zeabur Catalog, such as `logs/victoria-logs` |
 | `kind` | `feature_used` with `database_created` or `domain_added` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` when the name ends in a suffix Zeabur OSS offers for new services, `custom` otherwise |
 | `$process_person_profile` | all | Always `false`: no person profile is made |
 | `$geoip_disable` | all | Always `true`: no location is looked up |
+
+| `feature` | Sent after |
+|---|---|
+| `service_created` | A service is created |
+| `database_created` | A database or object storage is created |
+| `domain_added` | A domain is added |
+| `logs_viewed` | A log stream is opened |
+| `terminal_opened` | A terminal is opened |
+| `member_invited` | Someone is invited |
+| `compose` | A Docker Compose import is applied |
+| `backup_enabled` | The backup schedule is set or resumed |
+| `notifications_configured` | A notification channel of the cluster or a project is added or changed |
+| `component_installed` | The last step of a component's install is written |
+| `github_app_connected` | The GitHub App is made, or the projects it may build from change |
+| `node_maintenance` | A node stops taking new pods for maintenance |
+| `sign_in_configured` | How admin accounts sign in is changed |
 
 The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur OSS's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur OSS restarts, and a different one the next day, so their days can't be linked.
 

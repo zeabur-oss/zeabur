@@ -1801,6 +1801,12 @@ pub(crate) async fn apply(
     if let (Some(modifier), Some(name)) = (&computed.modifier, &claims.made) {
         own_modifier(cluster, &objects.namespace, name, modifier).await?;
     }
+    if matches!(
+        claims.request,
+        BackupsPlanRequest::Schedule { .. } | BackupsPlanRequest::Pause { paused: false }
+    ) {
+        crate::used::tell(&state, zeabur_telemetry::Feature::BackupEnabled);
+    }
     Ok(Json(BackupsApplied {
         written: computed
             .writes

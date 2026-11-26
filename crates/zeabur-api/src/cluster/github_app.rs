@@ -1269,6 +1269,7 @@ pub(crate) async fn apply(
     for write in &writes {
         send(cluster.as_ref(), write, false).await?;
     }
+    crate::used::tell(&state, zeabur_telemetry::Feature::GithubAppConnected);
     Ok(Json(GitHubAppApplied {
         written: writes
             .iter()

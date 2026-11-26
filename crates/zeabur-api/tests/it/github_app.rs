@@ -21,12 +21,14 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_api::Settings;
     use zeabur_api::settings::GitHubSettings;
+    use zeabur_api::used::Used;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, WriteBody};
+    use zeabur_telemetry::Feature;
 
     use crate::common::send;
-    use crate::support::TestApi;
+    use crate::support::{TestApi, recorder, taken};
 
     const BASE: &str = "/api/v1/cluster/github-app";
     const CLIENT_ID: &str = "Iv23liexample";
@@ -195,6 +197,10 @@ mod tests {
     }
 
     async fn setup() -> (MemoryCluster, Router, Arc<Fake>) {
+        setup_with(None).await
+    }
+
+    async fn setup_with(used: Option<Used>) -> (MemoryCluster, Router, Arc<Fake>) {
         let (api, fake) = github().await;
         let cluster = cluster();
         let settings = Settings {
@@ -204,8 +210,11 @@ mod tests {
             },
             ..Settings::default()
         };
-        let app = TestApi::new(&cluster).with_settings(settings).router();
-        (cluster, app, fake)
+        let mut app = TestApi::new(&cluster).with_settings(settings);
+        if let Some(used) = used {
+            app = app.with_used(used);
+        }
+        (cluster, app.router(), fake)
     }
 
     async fn start(app: &Router) -> String {
@@ -456,5 +465,33 @@ mod tests {
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY, "{refused}");
         assert_eq!(refused["detail"], "`api-url` must be an https URL");
         assert_eq!(refused["summary"]["key"], "problem.summary.githubApiUrl");
+    }
+
+    #[tokio::test]
+    async fn making_the_app_is_sent_and_a_refused_grant_is_not() {
+        let (used, seen) = recorder();
+        let (cluster, app, fake) = setup_with(Some(used)).await;
+        made(&app, &fake).await;
+        assert_eq!(taken(&seen), [Feature::GithubAppConnected]);
+        let (status, planned) = send(
+            &app,
+            "POST",
+            &format!("{BASE}/plan"),
+            Some(&json!({"installationId": INSTALLATION, "namespaces": ["shop"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        cluster.update(|s| {
+            s.forbidden_namespaces.insert("builder-system".to_owned());
+        });
+        let (status, _) = send(
+            &app,
+            "POST",
+            &format!("{BASE}/apply"),
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_ne!(status, StatusCode::OK);
+        assert_eq!(taken(&seen), [Feature::GithubAppConnected]);
     }
 }

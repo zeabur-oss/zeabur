@@ -1053,6 +1053,14 @@ async fn apply_in(
     for write in &computed.writes {
         send(cluster, write, false).await?;
     }
+    if matches!(
+        claims.request,
+        NotificationsPlanRequest::Add { .. }
+            | NotificationsPlanRequest::Edit { .. }
+            | NotificationsPlanRequest::Events { .. }
+    ) {
+        crate::used::tell(state, zeabur_telemetry::Feature::NotificationsConfigured);
+    }
     Ok(NotificationsApplied {
         written: computed
             .writes

@@ -12,7 +12,7 @@ description: 加入體驗計畫後，Zeabur 開源版、`zeaburctl ui` 和 Zeabu
 | 事件 | 由誰傳送 | 時機 |
 |---|---|---|
 | `signed_in` | Zeabur 開源版 | 每次有人登入 Zeabur 開源版網頁介面時 |
-| `feature_used` | Zeabur 開源版、`zeaburctl ui`、Zeabur Desktop | 成功建立服務、資料庫或網域，開啟日誌串流或終端機，邀請成員，或套用 Docker Compose 匯入之後。Zeabur 開源版對同一項功能、同一組值每天（UTC）只傳一次；`zeaburctl ui` 和 Zeabur Desktop 每次都傳 |
+| `feature_used` | Zeabur 開源版、`zeaburctl ui`、Zeabur Desktop | 成功用了下方表格裡的功能之後。Zeabur 開源版對同一項功能、同一組值每天（UTC）只傳一次；`zeaburctl ui` 和 Zeabur Desktop 每次都傳 |
 | `cluster_connected` | `zeaburctl ui`、Zeabur Desktop | 用你的 kubeconfig 連上叢集，或連不上時 |
 | `app_change_submitted` | Zeabur 開源版 | 有人在 Zeabur 開源版的網頁介面或 API 儲存變更並收到回應；每次儲存傳一筆，不管改了什麼 |
 
@@ -27,12 +27,29 @@ description: 加入體驗計畫後，Zeabur 開源版、`zeaburctl ui` 和 Zeabu
 | `client` | `cluster_connected`，以及 `mode` 是 `local` 的 `feature_used` | 傳送事件的程式：Zeabur Desktop 是 `desktop`，`zeaburctl ui` 是 `zeaburctl`。用來算有多少人在用 Zeabur Desktop。 |
 | `result` | `cluster_connected` | `connected`、`unreachable`、`credential_refused`、`no_read_right` 或 `other` |
 | `result` | `app_change_submitted` | `accepted`；沒被接受時依你收到的 HTTP 狀態碼：`forbidden`（403）、`invalid`（422）、`conflict`（409）、`unreachable`（502、503 或 504）或 `other` |
-| `feature` | `feature_used` | `service_created`、`database_created`、`domain_added`、`logs_viewed`、`terminal_opened`、`member_invited` 或 `compose` |
+| `feature` | `feature_used` | 下方表格裡的其中一個功能 |
 | `source` | `service_created` 的 `feature_used` | 服務怎麼建立：`git`、`upload`、`image` 或 `template` |
 | `template` | `source` 為 `template` 的 `feature_used` | 範本在 Zeabur Catalog 裡的 ID，例如 `wordpress`；Catalog 沒有的 ID 不會傳送 |
+| `component` | `component_installed` 的 `feature_used` | 元件在 Zeabur Catalog 裡的 ID，例如 `logs/victoria-logs` |
 | `kind` | `database_created` 或 `domain_added` 的 `feature_used` | 資料庫或物件儲存：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。網域：名稱用的是 Zeabur 開源版提供給新服務的網域後綴時是 `generated`，其他是 `custom` |
 | `$process_person_profile` | 全部 | 固定為 `false`：不建立個人檔案 |
 | `$geoip_disable` | 全部 | 固定為 `true`：不查詢所在位置 |
+
+| `feature` | 什麼時候傳 |
+|---|---|
+| `service_created` | 建立服務之後 |
+| `database_created` | 建立資料庫或物件儲存之後 |
+| `domain_added` | 新增網域之後 |
+| `logs_viewed` | 開啟日誌串流之後 |
+| `terminal_opened` | 開啟終端機之後 |
+| `member_invited` | 邀請成員之後 |
+| `compose` | 套用 Docker Compose 匯入之後 |
+| `backup_enabled` | 設定或恢復備份排程之後 |
+| `notifications_configured` | 新增或修改叢集或專案的通知管道之後 |
+| `component_installed` | 寫入元件安裝的最後一步之後 |
+| `github_app_connected` | 建立 GitHub App，或改了它能替哪些專案建置之後 |
+| `node_maintenance` | 讓節點不再排入新的 Pod、準備維護之後 |
+| `sign_in_configured` | 修改管理員帳號的登入方式之後 |
 
 事件不會說明是誰。`person` 是用金鑰算出的使用者名稱加日期的雜湊值。金鑰從 Zeabur 開源版的 plan key 衍生，留在叢集的 Secret 裡，從不送出，所以無法從雜湊值反推使用者名稱。同一個人一整天的 `person` 都一樣，Zeabur 開源版重新啟動也不變；隔天就換成另一個，所以不同天無法串在一起。
 

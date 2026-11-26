@@ -25,9 +25,10 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::core::v1::Node;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{ClusterFacts, DynamicObject, Identity, ServedResource, WriteBody};
+    use zeabur_telemetry::Feature;
 
     use crate::common::send;
-    use crate::support::TestApi;
+    use crate::support::{TestApi, recorder, taken};
 
     const TOKEN: &str = "eyJhbGciOi.token-of-alice.sig";
     const FIXTURES: &[(&str, &[u8])] = &[
@@ -1556,5 +1557,48 @@ mod tests {
         cnpg_chart(&cluster, "plugin-barman-cloud", "plugin-barman-cloud");
         let installation = cnpg_installation(&app).await;
         assert_eq!(installation.get("unstarted"), None, "{installation}");
+    }
+
+    #[tokio::test]
+    async fn an_install_is_sent_with_its_catalog_id_when_its_last_step_is_written() {
+        let cluster = cluster();
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster)
+            .signed_in(TOKEN)
+            .with_catalog(Arc::new(Api::default()))
+            .with_used(used)
+            .router();
+        call(&app, "apply", "install", "0.6.1").await;
+        call(&app, "apply", "install", "0.6.1").await;
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
+        chart_installed(&cluster);
+        let (status, applied) = call(&app, "apply", "install", "0.6.1").await;
+        assert_eq!(status, StatusCode::OK, "{applied}");
+        let installed = [Feature::ComponentInstalled("cert-manager".to_owned())];
+        assert_eq!(taken(&seen), installed);
+        call(&app, "apply", "install", "0.6.1").await;
+        call(&app, "apply", "remove", "0.6.1").await;
+        call(&app, "apply", "remove", "0.6.1").await;
+        assert_eq!(taken(&seen), installed);
+    }
+
+    #[tokio::test]
+    async fn a_refused_last_step_is_not_sent() {
+        let cluster = cluster();
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster)
+            .signed_in(TOKEN)
+            .with_catalog(Arc::new(Api::default()))
+            .with_used(used)
+            .router();
+        call(&app, "apply", "install", "0.6.1").await;
+        chart_installed(&cluster);
+        cluster.update(|s| {
+            s.forbidden_writes
+                .insert("ClusterIssuer/letsencrypt".to_owned());
+        });
+        let (status, _) = call(&app, "apply", "install", "0.6.1").await;
+        assert_ne!(status, StatusCode::OK);
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
     }
 }

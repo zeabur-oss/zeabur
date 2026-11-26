@@ -334,6 +334,9 @@ pub(crate) async fn apply(
     if let Some(patch) = unschedulable_patch(&node, cordon) {
         patch_node(cluster.as_ref(), &name, patch).await?;
     }
+    if cordon {
+        crate::used::tell(&state, zeabur_telemetry::Feature::NodeMaintenance);
+    }
     Ok(Json(MaintenanceApplied { cordoned: cordon }))
 }
 
