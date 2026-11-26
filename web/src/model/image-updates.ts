@@ -59,22 +59,56 @@ function toLocal(
   const day = window.day ? weekdays.indexOf(window.day) : at.getUTCDay()
   at.setUTCHours(window.hour, 0, 0, 0)
   at.setUTCDate(at.getUTCDate() + day - at.getUTCDay())
-  return { when: window.day ? "weekly" : "daily", day: at.getDay(), hour: at.getHours() }
+  return {
+    when: window.day ? "weekly" : "daily",
+    day: at.getDay(),
+    hour: at.getHours(),
+  }
 }
 
 /** The form for what the service does now; Zeabur's own setting only, else off. */
 export function formOf(updates: Schemas.ImageUpdates | null | undefined, now: Date): UpdateForm {
   const setting = updates?.setting
   if (setting?.kind !== "image") {
-    return { policy: "off", when: "hourly", day: DEFAULT_DAY, hour: DEFAULT_HOUR }
+    return {
+      policy: "off",
+      when: "hourly",
+      day: DEFAULT_DAY,
+      hour: DEFAULT_HOUR,
+    }
   }
   return { policy: setting.policy, ...toLocal(setting.window, now) }
 }
 
+/**
+ * The UTC window `form` saves: the stored one while the form still shows the time it read, so a
+ * daylight-saving change inside the reference week does not move it.
+ */
+function windowOf(
+  updates: Schemas.ImageUpdates | null | undefined,
+  form: UpdateForm,
+  now: Date,
+): UpdateWindow | undefined {
+  const setting = updates?.setting
+  if (setting?.kind === "image") {
+    const read = toLocal(setting.window, now)
+    const same =
+      read.when === form.when &&
+      (form.when === "hourly" ||
+        (read.hour === form.hour && (form.when === "daily" || read.day === form.day)))
+    if (same) return setting.window ?? undefined
+  }
+  return toUtc(form, now)
+}
+
 /** The `update` of the `autoUpdate` change for `form`. */
-export function updateOf(form: UpdateForm, now: Date): Schemas.Update {
+export function updateOf(
+  updates: Schemas.ImageUpdates | null | undefined,
+  form: UpdateForm,
+  now: Date,
+): Schemas.Update {
   if (form.policy === "off") return { kind: "off" }
-  const window = toUtc(form, now)
+  const window = windowOf(updates, form, now)
   return window
     ? { kind: "image", policy: form.policy, window }
     : { kind: "image", policy: form.policy }
@@ -86,11 +120,22 @@ export function formChanged(
   form: UpdateForm,
   now: Date,
 ): boolean {
-  const before = formOf(updates, now)
-  if (updates?.setting && updates.setting.kind !== "image") return true
-  if (form.policy !== before.policy) return true
+  const setting = updates?.setting
+  if (setting && setting.kind !== "image") return true
+  if (form.policy !== (setting?.policy ?? "off")) return true
   if (form.policy === "off") return false
-  return JSON.stringify(toUtc(form, now)) !== JSON.stringify(toUtc(before, now))
+  const saved = windowOf(updates, form, now)
+  const stored = setting?.window ?? undefined
+  return (saved?.day ?? undefined) !== (stored?.day ?? undefined) || saved?.hour !== stored?.hour
+}
+
+/**
+ * The policies the form offers besides off: the allowed ones, and the saved one when the image no
+ * longer allows it, so the form shows it and can still turn it off.
+ */
+export function policyChoices(updates: Schemas.ImageUpdates): ImagePolicy[] {
+  const saved = updates.setting?.kind === "image" ? updates.setting.policy : undefined
+  return saved && !updates.allowed.includes(saved) ? [...updates.allowed, saved] : updates.allowed
 }
 
 /** The image's tag, `latest` when it names none. */

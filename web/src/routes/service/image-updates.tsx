@@ -17,6 +17,7 @@ import {
   dayName,
   formChanged,
   formOf,
+  policyChoices,
   localMinute,
   reachText,
   tagOf,
@@ -56,7 +57,8 @@ export function ImageUpdatesSection({ project, service }: { project: string; ser
       {missing ? <KeelMissing install={missing.install} /> : null}
       {updates.allowed.length === 0 ? (
         <p className="type-meta text-muted-foreground">{t("imageUpdates.pinned")}</p>
-      ) : (
+      ) : null}
+      {updates.allowed.length === 0 && !updates.setting ? null : (
         <UpdatesForm
           project={project}
           service={service}
@@ -99,7 +101,7 @@ function UpdatesForm({
   const save = () =>
     planner.plan({
       title: t("title.imageUpdates", service.name),
-      changes: [{ op: "autoUpdate", workload, update: updateOf(form, now) }],
+      changes: [{ op: "autoUpdate", workload, update: updateOf(updates, form, now) }],
       service: workload,
     })
   const unchanged = !formChanged(updates, form, now)
@@ -163,7 +165,10 @@ function PolicyField({
         onValueChange={(policy) => set({ policy: policy as UpdateForm["policy"] })}
         items={[
           { value: "off", label: t("imageUpdates.policy.off") },
-          ...updates.allowed.map((p) => ({ value: p, label: t(`imageUpdates.policy.${p}`) })),
+          ...policyChoices(updates).map((p) => ({
+            value: p,
+            label: t(`imageUpdates.policy.${p}`),
+          })),
         ]}
       />
     </FormField>
@@ -193,7 +198,10 @@ function WhenFields({
             value={form.when}
             disabled={disabled}
             onValueChange={(when) => set({ when: when as When })}
-            items={whens.map((w) => ({ value: w, label: t(`imageUpdates.when.${w}`) }))}
+            items={whens.map((w) => ({
+              value: w,
+              label: t(`imageUpdates.when.${w}`),
+            }))}
           />
         </FormField>
         {form.when === "weekly" ? (
@@ -203,7 +211,10 @@ function WhenFields({
               value={String(form.day)}
               disabled={disabled}
               onValueChange={(day) => set({ day: Number(day) })}
-              items={days.map((d) => ({ value: String(d), label: dayName(d, locale) }))}
+              items={days.map((d) => ({
+                value: String(d),
+                label: dayName(d, locale),
+              }))}
             />
           </FormField>
         ) : null}
