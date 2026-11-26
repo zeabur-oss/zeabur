@@ -54,6 +54,10 @@ const restrictedPod = {
 const restricted = { allowPrivilegeEscalation: false, capabilities: { drop: ["ALL"] } }
 const secured = { podSecurityContext: restrictedPod, containerSecurityContext: restricted }
 
+/** What each SeaweedFS server asks for, sized for a small node. The operator copies these to the
+ * container and keeps `storage` for the volume server's claim. */
+const sized = { requests: { cpu: "50m", memory: "128Mi" }, limits: { memory: "512Mi" } }
+
 /** SeaweedFS writes each bucket to volumes of its own and makes 7 at a time, each up to
  * `volumeSizeLimitMB` (30000 by default and at most). Without a count, a volume server takes as
  * many volumes as fit in the free space of the node's disk, not of its claim: a small store gets
@@ -114,17 +118,19 @@ export function createObjectStorage(form: NewObjectStorage): Change[] {
           replicas: 1,
           persistence: persisted(storageClass),
           ...limits.master,
+          ...sized,
           ...secured,
         },
         volume: {
           replicas: 1,
-          requests: { storage },
+          ...sized,
+          requests: { ...sized.requests, storage },
           ...limits.volume,
           ...(storageClass ? { storageClassName: storageClass } : {}),
           ...secured,
         },
-        filer: { replicas: 1, persistence: persisted(storageClass), ...secured },
-        s3: { replicas: 1, port: PORT, ...secured },
+        filer: { replicas: 1, persistence: persisted(storageClass), ...sized, ...secured },
+        s3: { replicas: 1, port: PORT, ...sized, ...secured },
       },
     }),
     create({ apiVersion: API_VERSION, kind: "S3Identity", metadata: { name: user }, spec: ref }),
