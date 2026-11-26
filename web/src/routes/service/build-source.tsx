@@ -32,7 +32,7 @@ import {
 } from "@/model/git-service"
 import type { Service } from "@/model/service"
 import { newRequest, startUpload } from "@/model/upload"
-import { uploadSourceChange } from "@/model/upload-service"
+import { folderMethod, uploadSourceChange } from "@/model/upload-service"
 import { UploadAction } from "@/routes/service/builds"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Select } from "@zeabur-oss/design-system/components/select"
@@ -210,6 +210,27 @@ function ContainerField({
   )
 }
 
+/** How the source is built: Railpack or its Dockerfile. */
+function MethodSelect({
+  value,
+  onChange,
+}: {
+  value: BuildMethod
+  onChange: (method: BuildMethod) => void
+}) {
+  const t = useT()
+  return (
+    <FormField label={t("add.field.method")} hint={t(`add.methodHint.${value}`)}>
+      <Select
+        size="sm"
+        value={value}
+        onValueChange={(method) => onChange(method as BuildMethod)}
+        items={buildMethods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
+      />
+    </FormField>
+  )
+}
+
 function Connect({
   project,
   service,
@@ -271,16 +292,7 @@ function Connect({
       <RepositoryFields
         git={git}
         shown={shown}
-        aside={
-          <FormField label={t("add.field.method")} hint={t(`add.methodHint.${form.method}`)}>
-            <Select
-              size="sm"
-              value={form.method}
-              onValueChange={(method) => set({ method: method as BuildMethod })}
-              items={buildMethods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
-            />
-          </FormField>
-        }
+        aside={<MethodSelect value={form.method} onChange={(method) => set({ method })} />}
       />
       {/* A Build's paths stay as its options above set them. */}
       {build ? null : (
@@ -326,6 +338,8 @@ function UploadSource({
   const [request] = useState(newRequest)
   const [tried, setTried] = useState(false)
   const ready = folder.state.phase === "ready" ? folder.state : undefined
+  const [chosen, setChosen] = useState<BuildMethod>()
+  const method = chosen ?? folderMethod(build, (path) => ready?.dockerfiles.has(path) ?? false)
   const planner = usePlanStep(project, onClose, () => {
     if (ready)
       void startUpload({ project, build: service.name, blob: ready.packed.blob, request, t })
@@ -336,15 +350,12 @@ function UploadSource({
     planner.plan({
       title: t("title.uploadSource", service.name),
       changes: [
-        uploadSourceChange(
-          build,
-          {
-            workload: { kind: service.kind, name: service.name },
-            container: sourceContainer(service, build),
-            request,
-          },
-          (path) => ready.dockerfiles.has(path),
-        ),
+        uploadSourceChange(build, {
+          workload: { kind: service.kind, name: service.name },
+          container: sourceContainer(service, build),
+          request,
+          method,
+        }),
       ],
     })
   }
@@ -358,6 +369,7 @@ function UploadSource({
     >
       <ReviewForm onReview={review}>
         <FolderDrop folder={folder} missing={tried && !ready} />
+        <MethodSelect value={method} onChange={setChosen} />
         <Note>{t("upload.after")}</Note>
       </ReviewForm>
     </PlanDrawer>

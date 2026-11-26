@@ -12,6 +12,7 @@ import {
   builtProblems,
   builtServiceChange,
   DEFAULT_BUILT_PORT,
+  type BuildMethod,
   type BuiltService,
 } from "@/model/git-service"
 
@@ -53,23 +54,34 @@ export const createUploadService = (form: UploadService, request: string): Chang
   ...builtServiceChange(form, { source: { type: "upload", request }, ...buildPaths(form) }),
 })
 
-/** The change that builds `container` of `workload` from a folder uploaded after the apply: its
- * Build reads the folder instead, with the same paths and method, or a new Build builds it, with a
- * Dockerfile when the folder has one. */
+/** The method a folder builds with until the person picks one: the Build's, else Dockerfile when
+ * the folder has one where the Build looks. */
+export function folderMethod(
+  build: Build | undefined,
+  hasDockerfile: (path: string) => boolean,
+): BuildMethod {
+  if (build) return methodOf(build)
+  return derivedMethod(false, "railpack", hasDockerfile(dockerfileAt("", "")))
+}
+
+/** The change that builds `container` of `workload` from a folder uploaded after the apply, with
+ * `method`: its Build reads the folder instead, with the same paths, or a new Build builds it. */
 export function uploadSourceChange(
   build: Build | undefined,
   {
     workload,
     container,
     request,
-  }: { workload: Schemas.WorkloadRef; container?: string; request: string },
-  hasDockerfile: (path: string) => boolean,
+    method,
+  }: {
+    workload: Schemas.WorkloadRef
+    container?: string
+    request: string
+    method: BuildMethod
+  },
 ): Change {
   const directory = build?.contextDir ?? ""
   const dockerfile = build?.dockerfile ?? ""
-  const method = build
-    ? methodOf(build)
-    : derivedMethod(false, "railpack", hasDockerfile(dockerfileAt(directory, dockerfile)))
   return {
     op: "setBuild",
     workload,
