@@ -25,6 +25,7 @@ import {
   deployKeyPage,
   gitSourceChange,
   gitSourceOf,
+  withPathsOf,
   pathProblem,
   type BuildMethod,
   type GitSource,
@@ -255,7 +256,7 @@ function Connect({
       title: t("title.gitSource", service.name),
       changes: [
         gitSourceChange(
-          { ...form, ...git.resolved },
+          withPathsOf({ ...form, ...git.resolved }, build),
           { kind: service.kind, name: service.name },
           container,
         ),

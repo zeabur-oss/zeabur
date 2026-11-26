@@ -358,6 +358,11 @@ export function gitSourceOf(build: Build | undefined): GitSource {
   }
 }
 
+/** The form with the Build's paths as they are now: its options form edits them, and a change of
+ * source keeps them. */
+export const withPathsOf = (form: GitSource, build: Build | undefined): GitSource =>
+  build ? { ...form, directory: build.contextDir ?? "", dockerfile: build.dockerfile ?? "" } : form
+
 /** The change that builds `container` of `workload` from the repository: a new Build named after
  * the workload, or its Build reading the repository instead. */
 export const gitSourceChange = (

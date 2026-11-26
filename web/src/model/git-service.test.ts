@@ -33,6 +33,7 @@ import {
   repositoryProblems,
   tokenUser,
   urlProblem,
+  withPathsOf,
   type GitService,
 } from "@/model/git-service"
 
@@ -174,6 +175,21 @@ describe("changing a Git service's source", () => {
         dockerfile: "docker/Dockerfile",
       },
     })
+  })
+
+  test("the paths sent are the Build's as they are now, not as the form found them", () => {
+    const form = { ...gitSourceOf(build({ contextDir: "old" })), branch: "dev" }
+    const now = build({
+      builder: "dockerfile",
+      contextDir: "apps/web",
+      dockerfile: "Dockerfile.prod",
+    })
+    expect(
+      gitSourceChange(withPathsOf({ ...form, method: "dockerfile" }, now), workload),
+    ).toMatchObject({
+      build: { source: { branch: "dev" }, directory: "apps/web", dockerfile: "Dockerfile.prod" },
+    })
+    expect(withPathsOf(form, undefined)).toBe(form)
   })
 
   test("the default branch stays the default", () => {
