@@ -396,6 +396,7 @@ pub(crate) async fn evidence(
     let trace = of_service(&state, cluster, &read, service).await?;
     let generated_at = crate::plan_token::whole_second((state.clock)())?;
     let markdown = bundle(cluster, &read, service, &trace, generated_at).await;
+    crate::used::tell(&state, zeabur_telemetry::Feature::TraceViewed);
     Ok(Json(EvidenceBundle {
         id: format!("{}/evidence", id::service(&project, workload_kind, &name)),
         generated_at,

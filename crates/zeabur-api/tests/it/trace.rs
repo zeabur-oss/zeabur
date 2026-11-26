@@ -13,9 +13,10 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::networking::v1::Ingress;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, NamespaceObjects, SecretSummary, ServedResource};
+    use zeabur_telemetry::Feature;
 
     use crate::common::send;
-    use crate::support::TestApi;
+    use crate::support::{TestApi, recorder, taken};
 
     const TRACE: &str = "/api/v1/projects/shop/services/deployment/web/trace";
 
@@ -280,5 +281,24 @@ mod tests {
             "Waiting for HTTP-01 challenge propagation: connection refused"
         );
         assert!(trace["routes"][1].get("domain").is_none());
+    }
+
+    #[tokio::test]
+    async fn a_trace_is_sent_once_read_and_a_missing_service_is_not() {
+        let cluster = cluster(1);
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster).with_used(used).router();
+        let (status, _) = send(
+            &app,
+            "GET",
+            "/api/v1/projects/shop/services/deployment/gone/trace",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::NOT_FOUND);
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
+        let (status, body) = send(&app, "GET", TRACE, None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(taken(&seen), [Feature::TraceViewed]);
     }
 }

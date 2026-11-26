@@ -58,6 +58,8 @@ description: 加入體驗計畫後，Zeabur 開源版、`zeaburctl ui` 和 Zeabu
 | `rollback_used` | 把服務回滾到之前的版本之後 |
 | `suggestion_applied` | 套用建議的修正之後；不會傳是哪一條建議 |
 | `data_restored` | 從備份還原磁碟區，或從叢集備份還原專案之後 |
+| `trace_viewed` | 讀取服務的連線路徑，或要複製的服務排查資料之後 |
+| `database_exported` | 資料庫匯出完成之後 |
 
 事件不會說明是誰。`person` 是用金鑰算出的使用者名稱加日期的雜湊值。金鑰從 Zeabur 開源版的 plan key 衍生，留在叢集的 Secret 裡，從不送出，所以無法從雜湊值反推使用者名稱。同一個人一整天的 `person` 都一樣，Zeabur 開源版重新啟動也不變；隔天就換成另一個，所以不同天無法串在一起。
 

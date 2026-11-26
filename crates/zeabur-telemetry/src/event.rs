@@ -255,6 +255,10 @@ pub enum Feature {
     SuggestionApplied,
     /// Data was restored from a backup.
     DataRestored(RestoreKind),
+    /// The way to a service, or the evidence about it, was read.
+    TraceViewed,
+    /// A database dump started.
+    DatabaseExported,
 }
 
 impl Feature {
@@ -280,6 +284,8 @@ impl Feature {
             Self::RollbackUsed => "rollback_used",
             Self::SuggestionApplied => "suggestion_applied",
             Self::DataRestored(_) => "data_restored",
+            Self::TraceViewed => "trace_viewed",
+            Self::DatabaseExported => "database_exported",
         }
     }
 }
@@ -313,7 +319,9 @@ impl Serialize for Feature {
             | Self::PublicPortOpened
             | Self::CronJobCreated
             | Self::RollbackUsed
-            | Self::SuggestionApplied => {}
+            | Self::SuggestionApplied
+            | Self::TraceViewed
+            | Self::DatabaseExported => {}
         }
         map.end()
     }
