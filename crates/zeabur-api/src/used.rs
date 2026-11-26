@@ -73,6 +73,11 @@ fn read(changes: &[Change]) -> Found {
                 BuildSource::Git { .. } => Source::Git,
             }));
             found.hosts.extend(service.host.clone());
+        } else if let Change::SetBuild(set) = change {
+            found.feature(Feature::BuildSourceSet(match set.build.source {
+                BuildSource::Upload { .. } => Source::Upload,
+                BuildSource::Git { .. } => Source::Git,
+            }));
         } else if let Change::CreateImageService(image) = change {
             found.feature(Feature::ServiceCreated(Source::Image));
             found.hosts.extend(image.host.clone());
@@ -299,6 +304,25 @@ mod tests {
         ])));
         assert_eq!(found.features, [Feature::ServiceCreated(Source::Upload)]);
         assert_eq!(found.hosts, ["site.example.com"]);
+    }
+
+    #[test]
+    fn a_running_service_given_git_or_a_folder_is_found_by_its_source() {
+        let set = |source: Value| {
+            json!({"op": "setBuild", "workload": {"kind": "Deployment", "name": "web"},
+                "build": {"source": source, "method": "railpack"}})
+        };
+        let git = json!({"type": "git", "url": "https://github.com/acme/site.git",
+            "access": {"type": "public"}});
+        let folder = json!({"type": "upload", "request": "r1"});
+        assert_eq!(
+            features(json!([set(git)])),
+            [Feature::BuildSourceSet(Source::Git)]
+        );
+        assert_eq!(
+            features(json!([set(folder)])),
+            [Feature::BuildSourceSet(Source::Upload)]
+        );
     }
 
     #[test]
