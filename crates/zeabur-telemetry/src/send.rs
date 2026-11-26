@@ -355,9 +355,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        AppChangeSubmitted, Change, ChangeId, ClusterConnected, Connection, DatabaseKind, Day,
-        DomainKind, Feature, FeatureUsed, Mode, Operation, Rollout, RolloutFinished, Source,
-        Submitted, ZeaburActive,
+        AppChangeSubmitted, ClusterConnected, Connection, DatabaseKind, Day, DomainKind, Feature,
+        FeatureUsed, Mode, Source, Submitted, ZeaburActive,
     };
 
     /// How the receiver answers one connection.
@@ -487,24 +486,12 @@ mod tests {
                 result: Connection::NoReadRight,
             }),
             Event::AppChangeSubmitted(AppChangeSubmitted {
-                change: change(),
+                zeabur_version: "0.1.0",
+                mode: Mode::InCluster,
+                person: "0123456789abcdef0123456789abcdef".to_owned(),
                 result: Submitted::Conflict,
             }),
-            Event::RolloutFinished(RolloutFinished {
-                change: change(),
-                result: Rollout::Available,
-            }),
         ]
-    }
-
-    fn change() -> Change {
-        Change {
-            zeabur_version: "0.1.0",
-            mode: Mode::InCluster,
-            person: "0123456789abcdef0123456789abcdef".to_owned(),
-            id: ChangeId::from_random([5; 16]),
-            operation: Operation::DeployImage,
-        }
     }
 
     fn nobody() -> Show {
@@ -721,8 +708,6 @@ mod tests {
             "template",
             "kind",
             "result",
-            "change_id",
-            "operation",
             "$process_person_profile",
             "$geoip_disable",
         ];

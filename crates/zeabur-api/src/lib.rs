@@ -512,8 +512,8 @@ pub struct Options {
     /// Receives each feature a successful write used, for the experience program; `None` when
     /// the program is off, so nothing is classified.
     pub used: Option<used::Used>,
-    /// Receives what happens to each change of one Deployment, for the experience program;
-    /// `None` when the program is off, so nothing is read for a change.
+    /// Receives the answer to each save, for the experience program; `None` when the program is
+    /// off.
     pub changes: Option<measure::Changes>,
     /// Reads Zeabur Catalog's API; `None` reads it over HTTPS at `settings.catalog_url`.
     pub catalog: Option<Arc<dyn cluster::catalog::Fetch>>,

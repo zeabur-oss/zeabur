@@ -60,7 +60,7 @@ pub struct AppState {
     pub terminals: Option<Arc<dyn Cluster>>,
     /// Receives each feature a successful write used (see [`crate::used`]).
     pub used: Option<crate::used::Used>,
-    /// Receives what happens to each change of one Deployment (see [`crate::measure`]).
+    /// Receives the answer to each save (see [`crate::measure`]).
     pub changes: Option<crate::measure::Changes>,
 }
 
@@ -107,25 +107,6 @@ where
     ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
         let state = AppState::from_ref(state);
         std::future::ready(Ok(Self(state.access.handoff(parts))))
-    }
-}
-
-/// How to reach the cluster as the person after the request (see [`ClusterAccess::later`]).
-pub(crate) struct Later(pub(crate) Option<crate::access::Later>);
-
-impl<S> FromRequestParts<S> for Later
-where
-    S: Send + Sync,
-    AppState: FromRef<S>,
-{
-    type Rejection = std::convert::Infallible;
-
-    fn from_request_parts(
-        parts: &mut Parts,
-        state: &S,
-    ) -> impl Future<Output = Result<Self, Self::Rejection>> + Send {
-        let state = AppState::from_ref(state);
-        std::future::ready(Ok(Self(state.access.later(parts))))
     }
 }
 

@@ -65,7 +65,7 @@ use zeabur_plan::{Change, ErrorKind, Input, Plan, PlanError, PlanRequest, Write}
 use crate::cluster::s3_destinations;
 use crate::error::{ApiError, project_read, read_problem};
 use crate::extract::{Json, Path};
-use crate::handlers::{AppState, Credential, Later, Person};
+use crate::handlers::{AppState, Credential, Person};
 use crate::plan_token::{self as token, Claims, LIFETIME_SECONDS, PlanKey, TokenError};
 use crate::projects::{deploy_keys, snapshot, templates};
 use crate::settings::Settings;
@@ -475,13 +475,26 @@ pub(crate) async fn apply(
     State(state): State<AppState>,
     Person(cluster): Person,
     Credential(handoff): Credential,
-    Later(later): Later,
     Path(project): Path<String>,
     Json(request): Json<ApplyRequest>,
 ) -> Result<Json<ApplyResponse>, ApiError> {
     let key = key(&state)?;
     let claims =
         token::verify(&key, &request.token, (state.clock)().as_second()).map_err(token_problem)?;
+    let answer = apply_claims(&state, cluster, handoff, &project, &claims, request.via).await;
+    crate::measure::submitted(&state, &claims.person, answer.as_ref().map(|_| ()));
+    answer.map(|applied| Json(ApplyResponse { applied }))
+}
+
+/// Carries out the plan of verified `claims`, as [`apply`] does once the token checks out.
+async fn apply_claims(
+    state: &AppState,
+    cluster: Arc<dyn Cluster>,
+    handoff: Option<crate::access::Handoff>,
+    project: &str,
+    claims: &Claims,
+    via: Option<Via>,
+) -> Result<Vec<Applied>, ApiError> {
     if claims.project != project {
         return Err(ApiError::from(Problem::new(
             Kind::BadRequest,
@@ -508,11 +521,11 @@ pub(crate) async fn apply(
         handoff: handoff.as_ref(),
         zeabur: state.terminals.as_deref(),
     };
-    let opened = deploy_keys::open(&project, &claims.request, deploy_keys::KeyPair::New)?;
-    let opened = s3_destinations::open(cluster.as_ref(), &project, opened).await?;
+    let opened = deploy_keys::open(project, &claims.request, deploy_keys::KeyPair::New)?;
+    let opened = s3_destinations::open(cluster.as_ref(), project, opened).await?;
     let opened = templates::open_as_planned(
         &state.templates.current(),
-        &project,
+        project,
         state.settings.domains.cluster_issuer.as_deref(),
         opened,
         claims.templates.as_deref(),
@@ -520,33 +533,19 @@ pub(crate) async fn apply(
     let (plan, _) = compute_any(
         &planner,
         cluster.as_ref(),
-        &project,
+        project,
         &opened,
         &claims.made_at,
         (state.clock)(),
         &state.settings,
     )
     .await?;
-    let (namespace, target_cluster) =
-        planner.writer(&claims.request, &project, cluster.as_ref())?;
-    let measured = crate::measure::measured(&claims.request.changes, &plan);
-    let submitted = |answer: Result<Option<&crate::measure::Version>, &ApiError>| {
-        if let Some(measured) = measured.clone() {
-            let person = crate::measure::Person {
-                user: &identity.username,
-                now: Arc::clone(&cluster),
-                later: later.clone(),
-            };
-            crate::measure::submitted(&state, person, namespace, measured, answer);
-        }
-    };
+    let (namespace, target_cluster) = planner.writer(&claims.request, project, cluster.as_ref())?;
     if zeabur_plan::versions(&plan) != claims.versions {
-        let changed = ApiError::from(Problem::new(
+        return Err(ApiError::from(Problem::new(
             Kind::Changed,
             "Someone changed an object in this plan after the plan was made.",
-        ));
-        submitted(Err(&changed));
-        return Err(changed);
+        )));
     }
     if claims
         .request
@@ -554,29 +553,19 @@ pub(crate) async fn apply(
         .iter()
         .any(Change::is_project_deletion)
     {
-        let applied = project_deletion::apply(&planner, cluster.as_ref(), &project, &plan).await?;
-        return Ok(Json(ApplyResponse { applied }));
+        return project_deletion::apply(&planner, cluster.as_ref(), project, &plan).await;
     }
-    let written = write_plan(target_cluster, namespace, &plan).await;
-    submitted(written.as_ref().map(|(_, version)| version.as_ref()));
-    let (applied, _) = written?;
-    report_used(
-        &state,
-        cluster.as_ref(),
-        &claims.request.changes,
-        request.via,
-    )
-    .await;
-    Ok(Json(ApplyResponse { applied }))
+    let applied = write_plan(target_cluster, namespace, &plan).await?;
+    report_used(state, cluster.as_ref(), &claims.request.changes, via).await;
+    Ok(applied)
 }
 
-/// Dry-runs and then writes every object of `plan`, in order. Also gives the `metadata.uid` and
-/// `metadata.generation` the last write left.
+/// Dry-runs and then writes every object of `plan`, in order.
 async fn write_plan(
     cluster: &dyn Cluster,
     namespace: &str,
     plan: &Plan,
-) -> Result<(Vec<Applied>, Option<crate::measure::Version>), ApiError> {
+) -> Result<Vec<Applied>, ApiError> {
     let writes: Vec<(zeabur_plan::Target, WriteRequest)> = plan
         .objects
         .iter()
@@ -589,14 +578,9 @@ async fn write_plan(
         .collect();
     dry_run(cluster, namespace, plan, &writes).await?;
     let mut applied = Vec::new();
-    let mut version = None;
     for (target, write) in writes {
         match write_once(cluster, &target, &write).await {
             Ok(written) => {
-                version = written
-                    .uid
-                    .zip(written.generation)
-                    .map(|(uid, generation)| crate::measure::Version { uid, generation });
                 applied.push(Applied {
                     target,
                     resource_version: written.resource_version,
@@ -608,7 +592,7 @@ async fn write_plan(
             }
         }
     }
-    Ok((applied, version))
+    Ok(applied)
 }
 
 /// Tells the experience program what a finished apply used; nothing runs when it is off.

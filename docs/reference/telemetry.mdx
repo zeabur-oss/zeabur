@@ -3,7 +3,7 @@ title: Experience program
 description: What Zeabur OSS, `zeaburctl ui` and Zeabur Desktop send when you join the experience program, what they never send, how Zeabur OSS and zeaburctl check for a newer version, how Zeabur OSS fetches newer templates, and how to turn each off.
 ---
 
-The experience program sends the version, how many people use Zeabur OSS each day, which features they use, whether `zeaburctl ui` could connect to a cluster, and whether changes of a Deployment rolled out, so we know how many installations are in use and what to fix first. Zeabur OSS installed with Helm and `zeaburctl ui` join by default. Each says so, with how to turn it off: `helm install` and `helm upgrade` when they finish, `zeaburctl ui` each time it starts. Zeabur Desktop follows the setting of `zeaburctl ui`.
+The experience program sends the version, how many people use Zeabur OSS each day, which features they use, whether `zeaburctl ui` could connect to a cluster, and whether saving changes worked, so we know how many installations are in use and what to fix first. Zeabur OSS installed with Helm and `zeaburctl ui` join by default. Each says so, with how to turn it off: `helm install` and `helm upgrade` when they finish, `zeaburctl ui` each time it starts. Zeabur Desktop follows the setting of `zeaburctl ui`.
 
 ## What is sent
 
@@ -14,22 +14,18 @@ Zeabur OSS sends one event the first time each person uses it in a UTC day, and 
 | `zeabur_active` | Zeabur OSS | The first time each person uses Zeabur OSS's web interface in a UTC day |
 | `feature_used` | Zeabur OSS | After a call succeeds that creates a service, a database or a domain, opens a log stream or a terminal, invites someone, or applies a Docker Compose import; once per UTC day for each feature and set of values |
 | `cluster_connected` | `zeaburctl ui`, Zeabur Desktop | It connected to a cluster with your kubeconfig, or could not |
-| `app_change_submitted` | Zeabur OSS | The cluster answered a change of one Deployment: a new image, a new replica count or new environment variables |
-| `rollout_finished` | Zeabur OSS | The rollout of an accepted change ended, as `kubectl rollout status` would say |
+| `app_change_submitted` | Zeabur OSS | Someone saved changes in Zeabur OSS's web interface or API and got an answer; one event for each save, whatever it changes |
 
 | Property | Events | Values |
 |---|---|---|
 | `zeabur_version` | `zeabur_active`, `feature_used` | Zeabur OSS's version, such as `0.1.1` |
 | `day` | `zeabur_active`, `feature_used` | The UTC date, such as `2026-10-30` |
-| `person` | `zeabur_active`, `app_change_submitted`, `rollout_finished` | 32 hexadecimal digits that tell people apart within one installation and one day |
+| `person` | `zeabur_active`, `app_change_submitted` | 32 hexadecimal digits that tell people apart within one installation and one day |
 | `zeabur_version` | `cluster_connected` | The version of `zeaburctl` or Zeabur Desktop, such as `0.1.1` |
-| `zeabur_version` | `app_change_submitted`, `rollout_finished` | Zeabur OSS's version |
-| `mode` | `zeabur_active`, `cluster_connected`, `app_change_submitted`, `rollout_finished` | `in-cluster` for Zeabur OSS in a cluster, `local` for `zeaburctl ui` and Zeabur Desktop |
+| `zeabur_version` | `app_change_submitted` | Zeabur OSS's version |
+| `mode` | `zeabur_active`, `cluster_connected`, `app_change_submitted` | `in-cluster` for Zeabur OSS in a cluster, `local` for `zeaburctl ui` and Zeabur Desktop |
 | `result` | `cluster_connected` | `connected`, `unreachable`, `credential_refused`, `no_read_right` or `other` |
-| `change_id` | `app_change_submitted`, `rollout_finished` | A random UUID that ties the two events of one change together |
-| `operation` | `app_change_submitted`, `rollout_finished` | `deploy_image`, `scale_replicas` or `change_env` |
 | `result` | `app_change_submitted` | `accepted`, or why not, by the HTTP status you got: `forbidden` (403), `invalid` (422), `conflict` (409), `unreachable` (502, 503 or 504) or `other` |
-| `result` | `rollout_finished` | `available` (every replica runs the change) or `progress_deadline_exceeded` (the Deployment's progress deadline passed) |
 | `feature` | `feature_used` | `service_created`, `database_created`, `domain_added`, `logs_viewed`, `terminal_opened`, `member_invited` or `compose` |
 | `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
 | `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID not in the catalog is left out |
@@ -38,8 +34,6 @@ Zeabur OSS sends one event the first time each person uses it in a UTC day, and 
 | `$geoip_disable` | all | Always `true`: no location is looked up |
 
 The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur OSS's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur OSS restarts, and a different one the next day, so their days can't be linked.
-
-After an accepted change, Zeabur OSS reads the Deployment with your own credential until the rollout ends, for at most a minute past its progress deadline (10 minutes unless the Deployment says otherwise) and never more than 30 minutes. Zeabur OSS renews your credential for it as your session allows, without keeping the session alive. A newer change, a Deployment deleted and made again with the same name, signing out or a restart ends the reading, and then `rollout_finished` is not sent.
 
 `feature_used` has no `person`. It says that something was used today, not by whom or how often. Nothing is sent from your browser: Zeabur OSS's server sends it after the call succeeds.
 
