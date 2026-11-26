@@ -101,6 +101,16 @@ pub enum Mode {
     Local,
 }
 
+/// The program a local run belongs to.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum Client {
+    /// Zeabur Desktop.
+    Desktop,
+    /// `zeaburctl ui`.
+    Zeaburctl,
+}
+
 /// Someone used Zeabur for the first time in a UTC day. It names nobody.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct ZeaburActive {
@@ -227,6 +237,11 @@ pub struct FeatureUsed {
     pub zeabur_version: &'static str,
     /// The UTC day.
     pub day: Day,
+    /// How Zeabur runs.
+    pub mode: Mode,
+    /// Which program ran; only a local run names one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub client: Option<Client>,
     /// What was used.
     #[serde(flatten)]
     pub feature: Feature,
@@ -256,6 +271,8 @@ pub struct ClusterConnected {
     pub zeabur_version: &'static str,
     /// How Zeabur runs.
     pub mode: Mode,
+    /// Which program ran.
+    pub client: Client,
     /// How it ended.
     pub result: Connection,
 }

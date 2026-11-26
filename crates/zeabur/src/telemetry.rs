@@ -175,6 +175,8 @@ impl Telemetry {
         let event = Event::FeatureUsed(FeatureUsed {
             zeabur_version: env!("CARGO_PKG_VERSION"),
             day,
+            mode: Mode::InCluster,
+            client: None,
             feature,
         });
         if !sender.send(event) {

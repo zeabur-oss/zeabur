@@ -355,8 +355,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        AppChangeSubmitted, ClusterConnected, Connection, DatabaseKind, Day, DomainKind, Feature,
-        FeatureUsed, Mode, Source, Submitted, ZeaburActive,
+        AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day, DomainKind,
+        Feature, FeatureUsed, Mode, Source, Submitted, ZeaburActive,
     };
 
     /// How the receiver answers one connection.
@@ -463,6 +463,8 @@ mod tests {
         FeatureUsed {
             zeabur_version: "0.1.0",
             day: Day::from_unix(1_800_000_000),
+            mode: Mode::InCluster,
+            client: None,
             feature,
         }
     }
@@ -480,9 +482,15 @@ mod tests {
             Event::FeatureUsed(used(Feature::DatabaseCreated(DatabaseKind::ObjectStorage))),
             Event::FeatureUsed(used(Feature::DomainAdded(DomainKind::Custom))),
             Event::FeatureUsed(used(Feature::LogsViewed)),
+            Event::FeatureUsed(FeatureUsed {
+                mode: Mode::Local,
+                client: Some(Client::Desktop),
+                ..used(Feature::LogsViewed)
+            }),
             Event::ClusterConnected(ClusterConnected {
                 zeabur_version: "0.1.0",
                 mode: Mode::Local,
+                client: Client::Zeaburctl,
                 result: Connection::NoReadRight,
             }),
             Event::AppChangeSubmitted(AppChangeSubmitted {
@@ -703,6 +711,7 @@ mod tests {
             "day",
             "person",
             "mode",
+            "client",
             "feature",
             "source",
             "template",

@@ -45,7 +45,7 @@ pub(crate) async fn run(args: &UiArgs) -> ExitCode {
 }
 
 async fn serve(args: &UiArgs, settings: Settings, telemetry: &Local) -> Result<(), String> {
-    let started = zeabur_local::start(args.context.as_deref(), settings).await;
+    let started = zeabur_local::start(args.context.as_deref(), settings, telemetry).await;
     telemetry.connected(
         started
             .as_ref()

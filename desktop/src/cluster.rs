@@ -65,7 +65,13 @@ impl Clusters {
             self.telemetry.connected(Connection::Other);
         })?;
         let started =
-            zeabur_local::start_from(kubeconfig, &target.context, Settings::default()).await;
+            zeabur_local::start_from(
+            kubeconfig,
+            &target.context,
+            Settings::default(),
+            &self.telemetry,
+        )
+        .await;
         self.telemetry.connected(
             started
                 .as_ref()
@@ -163,7 +169,7 @@ fn read(target: &Target, vars: &[(String, String)]) -> Result<Kubeconfig, String
 mod tests {
     use std::sync::Arc;
 
-    use zeabur_local::telemetry::{Show, Switch};
+    use zeabur_local::telemetry::{Client, Show, Switch};
 
     use super::*;
 
@@ -189,7 +195,12 @@ mod tests {
         let shown = Arc::new(Mutex::new(Vec::new()));
         let log = Arc::clone(&shown);
         let show: Show = Arc::new(move |body| log.lock().unwrap().push(body.to_owned()));
-        let telemetry = Local::with(Switch::Debug, &PathBuf::from("/nonexistent"), show);
+        let telemetry = Local::with(
+            Switch::Debug,
+            &PathBuf::from("/nonexistent"),
+            Client::Desktop,
+            show,
+        );
         let clusters = Clusters::new(telemetry);
         clusters.set_target(
             "cluster-a",
@@ -204,6 +215,7 @@ mod tests {
         let body = shown.lock().unwrap().remove(0);
         let body: serde_json::Value = serde_json::from_str(&body).unwrap();
         assert_eq!(body["batch"][0]["event"], "cluster_connected");
+        assert_eq!(body["batch"][0]["properties"]["client"], "desktop");
         assert_eq!(body["batch"][0]["properties"]["result"], "other");
     }
 
