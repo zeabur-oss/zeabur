@@ -16,6 +16,7 @@ import {
   rightsOf,
   serviceNameProblem,
   suggestedHost,
+  generatedHost,
   type ImageService,
 } from "@/model/image-service"
 
@@ -141,5 +142,19 @@ describe("rights", () => {
       secrets: true,
       volume: true,
     })
+  })
+})
+
+describe("generatedHost", () => {
+  test("offers the generated address an existing service does not have yet", () => {
+    expect(
+      generatedHost("web", "shop", ["apps.example.com"], ["shop.example.com", undefined]),
+    ).toBe("web-shop.apps.example.com")
+  })
+  test("offers nothing once the service has it, or without an application domain", () => {
+    expect(generatedHost("web", "shop", ["apps.example.com"], ["web-shop.apps.example.com"])).toBe(
+      "",
+    )
+    expect(generatedHost("web", "shop", undefined, [])).toBe("")
   })
 })
