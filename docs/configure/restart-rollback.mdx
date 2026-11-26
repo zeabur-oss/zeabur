@@ -86,7 +86,7 @@ A service that runs an image from a registry, such as PostgreSQL or Redis, can h
 3. Under **When**, pick **As soon as found** (Keel checks every hour), or **Every day** or **Once a week** and a time. You pick the time in your time zone, and the hint below shows it in UTC.
 4. Click **Save**, check the changes and apply them.
 
-Each update restarts the service. A major version can need a data migration: PostgreSQL needs a backup and an upgrade step for one. For a database, pick **Patch releases only**.
+Each update restarts the service. A major version can need a data migration: PostgreSQL needs a backup and an upgrade step for one. For a database, pick **Patch and minor releases**, which keeps the major version. PostgreSQL tags such as `16.4` have no patch number, so Keel reads `16.5` as a minor release, and **Patch releases only** would never update them.
 
 ## Pause or restart an entire project
 

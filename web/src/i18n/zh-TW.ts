@@ -741,14 +741,14 @@ export const zhTW: Messages = {
     `${tag} 會升到較新的 ${range} 版本，${stop} 以後的版本會等你決定。`,
   "imageUpdates.reach.major": (tag) =>
     `${tag} 會升到任何較新的版本。主要版本可能要搬移資料，像 PostgreSQL 就需要。`,
-  "imageUpdates.reach.latest.patch": "latest 會先換成最新的版本號標籤，之後只更新修補版本。",
-  "imageUpdates.reach.latest.minor": "latest 會先換成最新的版本號標籤，之後更新修補和次要版本。",
-  "imageUpdates.reach.latest.major": "latest 會先換成最新的版本號標籤，之後所有新版本都會更新。",
+  "imageUpdates.reach.latest.patch": "latest 會先換成最新的版本號碼標籤，之後只更新修補版本。",
+  "imageUpdates.reach.latest.minor": "latest 會先換成最新的版本號碼標籤，之後更新修補和次要版本。",
+  "imageUpdates.reach.latest.major": "latest 會先換成最新的版本號碼標籤，之後所有新版本都會更新。",
   "imageUpdates.reach.fullTag": (reach, tag) =>
-    `${reach}更新後，標籤會變成完整的版本號，不再是 ${tag}。`,
+    `${reach}更新後，標籤會變成完整的版本號碼，不再是 ${tag}。`,
   "imageUpdates.policyHint.sameTag": "同一個標籤（例如 latest）一有新的映像檔就換上。",
   "imageUpdates.tagOnly": (tag) =>
-    `要依版本更新，標籤得是版本號，例如 8、1.27 或 7.2.4。這個映像檔用的是 ${tag}。`,
+    `要依版本更新，標籤得是版本號碼，例如 8、1.27 或 7.2.4。這個映像檔用的是 ${tag}。`,
   "imageUpdates.pinned": "這個映像檔固定在某個摘要（digest），內容不會變。要自動更新，請改用標籤。",
   "imageUpdates.other": (policy) =>
     `Keel 依 ${policy} 規則更新這個服務，這個規則是在 Zeabur 以外設定的。在這裡儲存會取代它。`,
@@ -1864,7 +1864,6 @@ export const zhTW: Messages = {
   "title.buildOptions": (build) => `變更 ${build} 的建置方式`,
   "title.autoUpdateOn": (service) => `自動部署 ${service}`,
   "title.autoUpdateOff": (service) => `停止自動部署 ${service}`,
-  "title.imageUpdates": (service) => `${service} 的自動更新`,
   "title.addDomain": (host: string) => `新增 ${host}`,
   "title.addPrivate": (name: string) => `為 ${name} 新增私有位址`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,

@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
-import { Button } from "@zeabur-oss/design-system/components/button"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
 import { Select } from "@zeabur-oss/design-system/components/select"
 import { useState } from "react"
@@ -10,7 +9,7 @@ import { capabilitiesQuery } from "@/api/queries"
 import { FormField } from "@/components/form-field"
 import { GateNote, useGate } from "@/components/gate"
 import { InstallAlert } from "@/components/lazy-installer-sheet"
-import { usePlanner } from "@/components/plan/planner"
+import { useHold } from "@/components/plan/draft"
 import { useI18n, useT } from "@/i18n"
 import { missingKeel } from "@/model/git-service"
 import {
@@ -60,7 +59,6 @@ export function ImageUpdatesSection({ project, service }: { project: string; ser
       ) : null}
       {updates.allowed.length === 0 && !updates.setting ? null : (
         <UpdatesForm
-          project={project}
           service={service}
           updates={updates}
           disabled={!!managed || !gate.open || (!!missing && !updates.setting)}
@@ -82,29 +80,27 @@ function KeelMissing({ install }: { install?: Schemas.ComponentRef }) {
 }
 
 function UpdatesForm({
-  project,
   service,
   updates,
   disabled,
 }: {
-  project: string
   service: Service
   updates: Schemas.ImageUpdates
   disabled: boolean
 }) {
-  const t = useT()
-  const planner = usePlanner(project)
   const [now] = useState(() => new Date())
   const [form, setForm] = useState<UpdateForm>(() => formOf(updates, now))
   const set = (patch: Partial<UpdateForm>) => setForm((f) => ({ ...f, ...patch }))
   const workload = { kind: service.kind, name: service.name }
-  const save = () =>
-    planner.plan({
-      title: t("title.imageUpdates", service.name),
-      changes: [{ op: "autoUpdate", workload, update: updateOf(updates, form, now) }],
-      service: workload,
-    })
-  const unchanged = !formChanged(updates, form, now)
+  useHold(
+    "updates",
+    !disabled && formChanged(updates, form, now)
+      ? {
+          changes: [{ op: "autoUpdate", workload, update: updateOf(updates, form, now) }],
+          scope: { ops: ["autoUpdate"], workload },
+        }
+      : undefined,
+  )
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-5">
       <ForeignNote setting={updates.setting} />
@@ -112,12 +108,6 @@ function UpdatesForm({
       {form.policy === "off" ? null : (
         <WhenFields form={form} now={now} disabled={disabled} set={set} />
       )}
-      <div>
-        <Button type="button" size="sm" disabled={disabled || unchanged} onClick={save}>
-          {t("action.save")}
-        </Button>
-      </div>
-      {planner.dialog}
     </div>
   )
 }

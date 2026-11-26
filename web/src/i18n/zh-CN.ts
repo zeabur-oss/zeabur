@@ -1860,7 +1860,6 @@ export const zhCN: Messages = {
   "title.buildOptions": (build) => `变更 ${build} 的构建方式`,
   "title.autoUpdateOn": (service) => `自动部署 ${service}`,
   "title.autoUpdateOff": (service) => `停止自动部署 ${service}`,
-  "title.imageUpdates": (service) => `${service} 的自动更新`,
   "title.addDomain": (host: string) => `添加 ${host}`,
   "title.addPrivate": (name: string) => `为 ${name} 添加私有地址`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,

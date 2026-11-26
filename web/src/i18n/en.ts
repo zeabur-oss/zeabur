@@ -2033,7 +2033,6 @@ export const en = {
   "title.buildOptions": (build: string) => `Change how ${build} is built`,
   "title.autoUpdateOn": (service: string) => `Auto-deploy ${service}`,
   "title.autoUpdateOff": (service: string) => `Stop auto-deploying ${service}`,
-  "title.imageUpdates": (service: string) => `Automatic updates for ${service}`,
   "title.addDomain": (host: string) => `Add ${host}`,
   "title.addPrivate": (name: string) => `Add a private address to ${name}`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
