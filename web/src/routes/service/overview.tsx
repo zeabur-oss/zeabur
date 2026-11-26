@@ -59,7 +59,7 @@ import { edgeText } from "@/model/evidence"
 import { overviewOf, type Overview } from "@/model/overview"
 import { verdictOf, type Verdict } from "@/model/verdict"
 import {
-  imageTag,
+  imageParts,
   isHealthy,
   isTask,
   podHealth,
@@ -506,10 +506,7 @@ function Summary({
           {service.image ? (
             <SummaryCardFact label={t("overview.source")}>
               <CubeIcon aria-hidden="true" />
-              <span className="flex min-w-0 font-mono" title={service.image} translate="no">
-                <span className="truncate">{service.image.replace(/[:@][^:/@]+$/, "")}</span>
-                <span className="shrink-0">:{imageTag(service.image)}</span>
-              </span>
+              <ImageRef image={service.image} />
               <CopyButton value={service.image} />
             </SummaryCardFact>
           ) : null}
@@ -531,6 +528,18 @@ function Summary({
         />
       )}
     </SummaryCard>
+  )
+}
+
+/** Repository and tag each truncate in proportion to their length, so both stay in view. */
+function ImageRef({ image }: { image: string }) {
+  const { repository, tag, digest } = imageParts(image)
+  const version = tag ? `:${tag}` : digest ? `@${digest.slice(0, 12)}` : ""
+  return (
+    <span className="flex min-w-0 font-mono" title={image} translate="no">
+      <span className="truncate">{repository}</span>
+      {version ? <span className="truncate">{version}</span> : null}
+    </span>
   )
 }
 

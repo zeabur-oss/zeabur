@@ -26,13 +26,27 @@ const workloadKinds: Schemas.WorkloadKind[] = [
 export const canonicalKind = (kind: string): string =>
   workloadKinds.find((known) => known.toLowerCase() === kind.toLowerCase()) ?? kind
 
+/** An image reference read for display: the repository without its registry host, the tag, and the digest's hex. */
+export function imageParts(image: string): { repository: string; tag?: string; digest?: string } {
+  const [named = "", digest] = image.split("@")
+  const segments = named.split("/")
+  const first = segments[0] ?? ""
+  if (segments.length > 1 && (first.includes(".") || first.includes(":") || first === "localhost"))
+    segments.shift()
+  const path = segments.join("/")
+  const colon = path.lastIndexOf(":")
+  return {
+    repository: colon >= 0 ? path.slice(0, colon) : path,
+    tag: colon >= 0 ? path.slice(colon + 1) : undefined,
+    digest: digest?.replace(/^[^:]+:/, ""),
+  }
+}
+
+/** The tag, else the digest's first 12 hex digits, else `latest`. */
 export function imageTag(image?: string | null): string {
   if (!image) return ""
-  const last = image.split("/").at(-1) ?? image
-  const at = last.indexOf("@")
-  if (at >= 0) return last.slice(at + 1, at + 13)
-  const colon = last.indexOf(":")
-  return colon >= 0 ? last.slice(colon + 1) : "latest"
+  const { tag, digest } = imageParts(image)
+  return tag ?? digest?.slice(0, 12) ?? "latest"
 }
 
 export function volumesOf(service: Service): Schemas.Mount[] {
