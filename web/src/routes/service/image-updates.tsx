@@ -17,6 +17,7 @@ import {
   dayName,
   formChanged,
   formOf,
+  localMinute,
   tagOf,
   toUtc,
   updateOf,
@@ -211,7 +212,7 @@ function WhenFields({
               onValueChange={(hour) => set({ hour: Number(hour) })}
               items={hours.map((h) => ({
                 value: String(h),
-                label: `${String(h).padStart(2, "0")}:00`,
+                label: `${String(h).padStart(2, "0")}:${String(localMinute(now)).padStart(2, "0")}`,
               }))}
             />
           </FormField>

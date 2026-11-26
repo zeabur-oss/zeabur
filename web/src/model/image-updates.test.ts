@@ -1,8 +1,17 @@
 import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 
+import type { Schemas } from "@/api/client"
+
 import { translator } from "@/i18n"
 import { en } from "@/i18n/en"
-import { formChanged, formOf, tagOf, updateOf, windowText } from "@/model/image-updates"
+import {
+  formChanged,
+  formOf,
+  localMinute,
+  tagOf,
+  updateOf,
+  windowText,
+} from "@/model/image-updates"
 
 const now = new Date("2026-11-26T12:00:00Z")
 const t = translator(en)
@@ -45,6 +54,30 @@ describe("in Taipei, UTC+8", () => {
       policy: "minor",
       window: { day: undefined, hour: 1 },
     })
+  })
+})
+
+describe("in India, UTC+5:30", () => {
+  const zone = process.env.TZ
+  beforeAll(() => {
+    process.env.TZ = "Asia/Kolkata"
+  })
+  afterAll(() => {
+    process.env.TZ = zone
+  })
+
+  test("hours start at :30 and land on a whole UTC hour, and read back the same", () => {
+    expect(localMinute(now)).toBe(30)
+    const form = { policy: "patch" as const, when: "weekly" as const, day: 0, hour: 2 }
+    const update = updateOf(form, now)
+    expect(update).toEqual({
+      kind: "image",
+      policy: "patch",
+      window: { day: "saturday", hour: 21 },
+    })
+    const updates = { allowed: ["patch" as const], setting: update as Schemas.UpdateSetting }
+    expect(formOf(updates, now)).toEqual(form)
+    expect(formChanged(updates, form, now)).toBe(false)
   })
 })
 

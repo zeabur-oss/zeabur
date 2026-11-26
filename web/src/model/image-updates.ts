@@ -29,12 +29,20 @@ export interface UpdateForm {
 const DEFAULT_DAY = 0
 const DEFAULT_HOUR = 3
 
+/**
+ * The local minute at which a UTC hour starts on `at`'s date: 0 in most zones, 30 in India, 45 in
+ * Nepal. The form's hour `h` means local `h:minute`, so it always lands on a whole UTC hour.
+ */
+export function localMinute(at: Date): number {
+  return ((-at.getTimezoneOffset() % 60) + 60) % 60
+}
+
 /** The UTC window of a local day and hour, in the week of `now`. */
 export function toUtc(form: UpdateForm, now: Date): UpdateWindow | undefined {
   if (form.when === "hourly") return undefined
   const at = new Date(now)
-  at.setHours(form.hour, 0, 0, 0)
   at.setDate(at.getDate() + form.day - at.getDay())
+  at.setHours(form.hour, localMinute(at), 0, 0)
   return {
     day: form.when === "weekly" ? weekdays[at.getUTCDay()] : undefined,
     hour: at.getUTCHours(),
