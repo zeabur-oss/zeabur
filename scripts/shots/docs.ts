@@ -4,6 +4,7 @@
 // docs/zh-TW/images/shots/<id>.avif for a translation. A page links its locale's image by a
 // relative path, such as ../images/shots/<id>.avif.
 // Selectors never use visible text: it changes with the locale.
+import type { Page } from "@playwright/test"
 import { expect, test } from "./fixtures.ts"
 
 // Zeabur pages, from the demo.
@@ -617,6 +618,52 @@ test.describe(() => {
     await page.locator('[data-testid="add"]').click()
     await page.locator('[data-testid="add-upload"]').click()
     await expect(page.locator('[data-slot="dialog-content"] button').first()).toBeVisible()
+    await shot({ clip: '[data-slot="dialog-content"]' })
+  })
+})
+// Automatic image updates (docs/zh-TW/configure/image-updates.mdx): db runs postgres:18.
+async function pickImageUpdates(page: Page) {
+  await page.goto("/projects/shop/services/StatefulSet/db?tab=settings", {
+    waitUntil: "networkidle",
+  })
+  const selects = page.locator('section#updates [data-slot="select-trigger"]')
+  await expect(selects.first()).toBeEnabled()
+  // Off, Patch releases only, Patch and minor releases, …
+  await selects.nth(0).click()
+  await page.locator('[role="option"]').nth(2).click()
+  // As soon as found, Every day, Once a week.
+  await selects.nth(1).click()
+  await page.locator('[role="option"]').nth(2).click()
+}
+async function reviewDraft(page: Page) {
+  await page.locator('[data-slot="draft-bar"] button:last-child').click()
+  await expect(page.locator('[data-slot="dialog-content"] button:text-is("YAML")')).toBeVisible()
+}
+test.describe(() => {
+  test.use({ demo: { ZEABUR_DEMO_KEEL: "1" } })
+  test("image-updates", async ({ page, shot }) => {
+    await pickImageUpdates(page)
+    await shot({ clip: "section#updates" })
+  })
+  test("image-updates-review", async ({ page, shot }) => {
+    await pickImageUpdates(page)
+    await reviewDraft(page)
+    await shot({ clip: '[data-slot="dialog-content"]' })
+  })
+})
+test.describe(() => {
+  test.use({ demo: { ZEABUR_DEMO_KEEL: "1" }, fresh: true })
+  test("image-updates-off-review", async ({ page, shot }) => {
+    await pickImageUpdates(page)
+    await reviewDraft(page)
+    await page.locator('[data-slot="dialog-content"] > div:last-child button:last-child').click()
+    await expect(page.locator('[data-slot="dialog-content"]')).toHaveCount(0)
+    await page.reload({ waitUntil: "networkidle" })
+    const policy = page.locator('section#updates [data-slot="select-trigger"]').first()
+    await expect(policy).toBeEnabled()
+    await policy.click()
+    await page.locator('[role="option"]').nth(0).click()
+    await reviewDraft(page)
     await shot({ clip: '[data-slot="dialog-content"]' })
   })
 })
