@@ -136,7 +136,10 @@ describe("an image reference", () => {
   })
 
   test("keeps a Docker Hub path, which has no host", () => {
-    expect(imageParts("library/nginx:1.27")).toMatchObject({ repository: "library/nginx", tag: "1.27" })
+    expect(imageParts("library/nginx:1.27")).toMatchObject({
+      repository: "library/nginx",
+      tag: "1.27",
+    })
     expect(imageParts("nginx")).toMatchObject({ repository: "nginx", tag: undefined })
   })
 

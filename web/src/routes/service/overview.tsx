@@ -531,14 +531,14 @@ function Summary({
   )
 }
 
-/** The repository truncates before the tag, which keeps at most 70% of the row. */
+/** The repository truncates before the tag, which keeps at most two thirds of the row. */
 function ImageRef({ image }: { image: string }) {
   const { repository, tag, digest } = imageParts(image)
   const version = tag ? `:${tag}` : digest ? `@${digest.slice(0, 12)}` : ""
   return (
     <span className="flex min-w-0 font-mono" title={image} translate="no">
       <span className="min-w-0 truncate">{repository}</span>
-      {version ? <span className="max-w-[70%] shrink-0 truncate">{version}</span> : null}
+      {version ? <span className="max-w-2/3 shrink-0 truncate">{version}</span> : null}
     </span>
   )
 }
