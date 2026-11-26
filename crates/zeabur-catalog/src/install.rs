@@ -506,7 +506,10 @@ impl<'a> Rendered<'a> {
             .filter(|ns| !is_system_namespace(ns))
             .collect();
         let mut namespaces: Vec<&str> = Vec::new();
-        let wanted = exempt.iter().map(|(ns, _)| *ns).chain(releases.iter().copied());
+        let wanted = exempt
+            .iter()
+            .map(|(ns, _)| *ns)
+            .chain(releases.iter().copied());
         for ns in wanted.chain(secrets.iter().map(|((ns, _), _)| *ns)) {
             if !namespaces.contains(&ns) {
                 namespaces.push(ns);
