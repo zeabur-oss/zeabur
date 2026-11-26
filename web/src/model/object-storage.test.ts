@@ -31,6 +31,17 @@ describe("object storage", () => {
     expect(objects[5]!.spec).toMatchObject({ name: "uploads", seaweedRef: { name: "files" } })
   })
 
+  test("every SeaweedFS server asks for CPU and memory and has a memory limit", () => {
+    const [seaweed] = made(createObjectStorage({ ...newObjectStorage(), storage: "20Gi" }))
+    for (const part of ["master", "volume", "filer", "s3"]) {
+      const { requests, limits } = seaweed!.spec[part]
+      expect(requests.cpu).toBeString()
+      expect(requests.memory).toBeString()
+      expect(limits.memory).toBeString()
+    }
+    expect(seaweed!.spec.volume.requests.storage).toBe("20Gi")
+  })
+
   test.each([
     ["3Gi", 3 * 1024],
     ["10Gi", 10 * 1024],
