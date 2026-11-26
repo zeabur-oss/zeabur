@@ -521,11 +521,11 @@ async fn apply_claims(
         handoff: handoff.as_ref(),
         zeabur: state.terminals.as_deref(),
     };
-    let opened = deploy_keys::open(&project, &claims.request, deploy_keys::KeyPair::New)?;
-    let opened = s3_destinations::open(cluster.as_ref(), &project, opened).await?;
+    let opened = deploy_keys::open(project, &claims.request, deploy_keys::KeyPair::New)?;
+    let opened = s3_destinations::open(cluster.as_ref(), project, opened).await?;
     let opened = templates::open_as_planned(
         &state.templates.current(),
-        &project,
+        project,
         state.settings.domains.cluster_issuer.as_deref(),
         opened,
         claims.templates.as_deref(),
@@ -533,7 +533,7 @@ async fn apply_claims(
     let (plan, _) = compute_any(
         &planner,
         cluster.as_ref(),
-        &project,
+        project,
         &opened,
         &claims.made_at,
         (state.clock)(),
@@ -541,7 +541,7 @@ async fn apply_claims(
     )
     .await?;
     let (namespace, target_cluster) =
-        planner.writer(&claims.request, &project, cluster.as_ref())?;
+        planner.writer(&claims.request, project, cluster.as_ref())?;
     if zeabur_plan::versions(&plan) != claims.versions {
         return Err(ApiError::from(Problem::new(
             Kind::Changed,
