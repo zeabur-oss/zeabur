@@ -266,14 +266,7 @@ function Connect({
   if (applied) return <KeyAdded reveal={reveal} git={git} onClose={onClose} />
 
   return (
-    <form
-      aria-label={t("buildSource.title")}
-      className="flex flex-col gap-4"
-      onSubmit={(event) => {
-        event.preventDefault()
-        review()
-      }}
-    >
+    <ReviewForm onReview={review}>
       <RepositoryFields
         git={git}
         shown={shown}
@@ -310,7 +303,7 @@ function Connect({
         </Button>
       </div>
       {planner.dialog}
-    </form>
+    </ReviewForm>
   )
 }
 
