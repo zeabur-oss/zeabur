@@ -426,6 +426,7 @@ pub(crate) async fn apply(
     if first.state == StepState::Failed || held {
         return Ok(unwritten(plan));
     }
+    let installs = completes_install(&request, &plan, first);
     // A dry run of an object in a namespace that does not exist yet fails, so namespaces go
     // first.
     let (namespaces, rest): (Vec<&Placed>, Vec<&Placed>) =
@@ -475,8 +476,29 @@ pub(crate) async fn apply(
             }
         }
     }
+    if installs && let Some((listed, _)) = world.snapshot.components.get_key_value(&id) {
+        let installed = zeabur_telemetry::Feature::ComponentInstalled(listed.clone());
+        crate::used::tell(&state, installed);
+    }
     let plan = world.plan(cluster.as_ref(), &id, &request).await?.plan;
     Ok(Json(ComponentApplied { plan, written }))
+}
+
+/// Whether writing `step` completes an install: it is the last step not ready, written for the
+/// first time.
+fn completes_install(
+    request: &ComponentRequest,
+    plan: &ComponentPlan,
+    step: &ComponentStep,
+) -> bool {
+    request.action == ComponentAction::Install
+        && step.state == StepState::Pending
+        && plan
+            .steps
+            .iter()
+            .filter(|s| s.state != StepState::Ready)
+            .count()
+            == 1
 }
 
 fn right(verb: &str, target: &ObjectTarget) -> Denied {

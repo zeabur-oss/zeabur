@@ -1099,4 +1099,43 @@ mod tests {
             json!({"state": "refused", "health": "idle"})
         );
     }
+
+    #[tokio::test]
+    async fn setting_or_resuming_the_schedule_is_sent_and_a_pause_or_refused_apply_is_not() {
+        let cluster = velero(vec![location()]);
+        let (used, seen) = crate::support::recorder();
+        let app = crate::support::TestApi::new(&cluster)
+            .with_used(used)
+            .router();
+        applied(
+            &app,
+            &json!({"op": "schedule", "cron": "0 3 * * *", "keepDays": 7, "namespaces": []}),
+        )
+        .await;
+        applied(&app, &json!({"op": "pause", "paused": true})).await;
+        applied(&app, &json!({"op": "backupNow"})).await;
+        let (status, planned) = plan(&app, &json!({"op": "pause", "paused": false})).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        cluster.update(|s| {
+            let schedule = s
+                .dynamic
+                .iter_mut()
+                .find(|o| o.metadata.name.as_deref() == Some("zeabur"))
+                .unwrap();
+            schedule.metadata.resource_version = Some("99".to_owned());
+        });
+        assert_eq!(apply(&app, &planned).await.0, StatusCode::CONFLICT);
+        assert_eq!(
+            crate::support::taken(&seen),
+            [zeabur_telemetry::Feature::BackupEnabled]
+        );
+        applied(&app, &json!({"op": "pause", "paused": false})).await;
+        assert_eq!(
+            crate::support::taken(&seen),
+            [
+                zeabur_telemetry::Feature::BackupEnabled,
+                zeabur_telemetry::Feature::BackupEnabled
+            ]
+        );
+    }
 }

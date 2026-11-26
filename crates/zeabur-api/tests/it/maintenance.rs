@@ -10,8 +10,10 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::core::v1::{Node, Pod};
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, Identity, NamespaceObjects, ServedResource};
+    use zeabur_telemetry::Feature;
 
     use crate::common::{app, send};
+    use crate::support::{TestApi, recorder, taken};
 
     fn node(name: &str) -> Node {
         serde_json::from_value(json!({
@@ -194,5 +196,46 @@ mod tests {
         .await;
         assert_eq!(status, StatusCode::FORBIDDEN, "{body}");
         assert!(!unschedulable(&cluster));
+    }
+
+    #[tokio::test]
+    async fn only_a_cordon_that_succeeds_is_sent() {
+        let cluster = cluster();
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster).with_used(used).router();
+        let apply = |planned: Value| {
+            let app = app.clone();
+            async move {
+                send(
+                    &app,
+                    "POST",
+                    "/api/v1/cluster/nodes/vps-3/maintenance/apply",
+                    Some(&json!({"token": planned["token"]})),
+                )
+                .await
+                .0
+            }
+        };
+        assert_eq!(apply(plan(&app, "cordon").await).await, StatusCode::OK);
+        assert_eq!(taken(&seen), [Feature::NodeMaintenance]);
+        assert_eq!(apply(plan(&app, "uncordon").await).await, StatusCode::OK);
+        assert_eq!(taken(&seen), [Feature::NodeMaintenance]);
+
+        let refused = self::cluster();
+        refused.update(|s| {
+            s.forbidden_writes.insert("Node/vps-3".to_owned());
+        });
+        let (used, seen) = recorder();
+        let app = TestApi::new(&refused).with_used(used).router();
+        let planned = plan(&app, "cordon").await;
+        let (status, _) = send(
+            &app,
+            "POST",
+            "/api/v1/cluster/nodes/vps-3/maintenance/apply",
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::FORBIDDEN);
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
     }
 }

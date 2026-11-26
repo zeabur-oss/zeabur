@@ -9,8 +9,10 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_kube::ServedResource;
     use zeabur_kube::memory::{MemoryCluster, State};
+    use zeabur_telemetry::Feature;
 
     use crate::common::{app, send};
+    use crate::support::{TestApi, recorder, taken};
 
     const HOOK: &str = "https://hooks.slack.com/services/T0/B0/very-secret";
     const BASE: &str = "/api/v1/projects/shop/notifications";
@@ -270,5 +272,54 @@ mod tests {
         )
         .await;
         assert_eq!(status, StatusCode::UNPROCESSABLE_ENTITY);
+    }
+
+    #[tokio::test]
+    async fn adding_or_changing_a_channel_is_sent_and_a_test_a_removal_or_a_refused_apply_is_not() {
+        let cluster = alerting();
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster).with_used(used).router();
+        applied(&app, BASE, &add()).await;
+        assert_eq!(taken(&seen), [Feature::NotificationsConfigured]);
+        applied(
+            &app,
+            BASE,
+            &json!({"op": "events", "name": "ops", "events": ["build-failed"]}),
+        )
+        .await;
+        let (_, stale) = send(
+            &app,
+            "POST",
+            &format!("{BASE}/plan"),
+            Some(&json!({"op": "events", "name": "ops", "events": ["crash-loop"]})),
+        )
+        .await;
+        applied(&app, BASE, &json!({"op": "test", "name": "ops"})).await;
+        applied(&app, BASE, &json!({"op": "remove", "name": "ops"})).await;
+        let (status, _) = send(
+            &app,
+            "POST",
+            &format!("{BASE}/apply"),
+            Some(&json!({"token": stale["token"]})),
+        )
+        .await;
+        assert_ne!(status, StatusCode::OK);
+        assert_eq!(
+            taken(&seen),
+            [
+                Feature::NotificationsConfigured,
+                Feature::NotificationsConfigured
+            ]
+        );
+
+        let cluster_base = "/api/v1/cluster/notifications";
+        applied(
+            &app,
+            cluster_base,
+            &json!({"op": "add", "name": "ops", "events": ["node-not-ready"],
+                    "settings": {"kind": "slack", "webhookUrl": HOOK}}),
+        )
+        .await;
+        assert_eq!(taken(&seen).last(), Some(&Feature::NotificationsConfigured));
     }
 }

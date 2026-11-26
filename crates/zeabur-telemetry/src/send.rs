@@ -486,6 +486,10 @@ mod tests {
                 client: Some(Client::Desktop),
                 ..used(Feature::LogsViewed)
             }),
+            Event::FeatureUsed(used(Feature::BackupEnabled)),
+            Event::FeatureUsed(used(Feature::ComponentInstalled(
+                "logs/victoria-logs".to_owned(),
+            ))),
             Event::ClusterConnected(ClusterConnected {
                 zeabur_version: "0.1.0",
                 mode: Mode::Local,
@@ -715,6 +719,7 @@ mod tests {
             "source",
             "template",
             "kind",
+            "component",
             "result",
             "$process_person_profile",
             "$geoip_disable",

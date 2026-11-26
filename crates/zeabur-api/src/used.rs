@@ -12,11 +12,19 @@ use zeabur_modules::{
 use zeabur_plan::{BuildSource, Change, created_object};
 use zeabur_telemetry::{DatabaseKind, DomainKind, Feature, Source};
 
+use crate::handlers::AppState;
 use crate::projects::templates::PAGE_SERVER_TEMPLATE;
 use crate::settings::{Settings, domains};
 
 /// What receives a feature after the call that used it succeeded; it decides whether to send.
 pub type Used = Arc<dyn Fn(Feature) + Send + Sync>;
+
+/// Hands `feature` to the program; nothing when the program is off.
+pub(crate) fn tell(state: &AppState, feature: Feature) {
+    if let Some(used) = &state.used {
+        used(feature);
+    }
+}
 
 const DATABASES: [(&Read, DatabaseKind); 6] = [
     (&cloudnative_pg::CLUSTERS, DatabaseKind::Postgresql),
@@ -167,8 +175,8 @@ pub(crate) async fn report(
     changes: &[Change],
 ) {
     let found = read(changes);
-    for feature in &found.features {
-        used(*feature);
+    for feature in found.features {
+        used(feature);
     }
     if found.hosts.is_empty() {
         return;

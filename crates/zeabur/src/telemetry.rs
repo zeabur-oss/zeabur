@@ -36,7 +36,7 @@ impl Used {
             self.day = Some(day);
             self.features.clear();
         }
-        self.features.insert(*feature).then_some(day)
+        self.features.insert(feature.clone()).then_some(day)
     }
 }
 
@@ -128,6 +128,7 @@ impl Telemetry {
             .unwrap_or_else(PoisonError::into_inner)
             .first(&feature, now);
         let Some(day) = first else { return };
+        let mark = feature.clone();
         let event = Event::FeatureUsed(FeatureUsed {
             zeabur_version: env!("CARGO_PKG_VERSION"),
             day,
@@ -137,7 +138,7 @@ impl Telemetry {
         });
         if !sender.send(event) {
             let mut used = self.used.lock().unwrap_or_else(PoisonError::into_inner);
-            used.features.remove(&feature);
+            used.features.remove(&mark);
         }
     }
 

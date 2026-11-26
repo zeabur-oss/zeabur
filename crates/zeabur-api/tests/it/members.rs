@@ -899,4 +899,21 @@ mod tests {
         assert_eq!(after["storedIn"]["name"], "zeabur-identity-settings");
         assert_eq!(after["storedIn"]["namespace"], NS);
     }
+
+    #[tokio::test]
+    async fn a_sign_in_change_is_sent_and_a_refused_one_is_not() {
+        let uri = "/api/v1/settings/sign-in";
+        let cluster = signed_in("zeabur:bob");
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster)
+            .with_settings(settings())
+            .with_used(used)
+            .router();
+        let (status, _) = send(&app, "PUT", uri, Some(&json!({"adminAal3": true}))).await;
+        assert_eq!(status, StatusCode::CONFLICT);
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
+        let (status, body) = send(&app, "PUT", uri, Some(&json!({"teams": "multiple"}))).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(taken(&seen), [Feature::SignInConfigured]);
+    }
 }

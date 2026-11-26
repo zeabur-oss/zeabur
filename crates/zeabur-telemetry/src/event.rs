@@ -177,7 +177,7 @@ pub enum DomainKind {
 }
 
 /// A feature someone used, with the one enum value that tells uses of it apart.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Feature {
     /// A service was created.
     ServiceCreated(Source),
@@ -193,10 +193,22 @@ pub enum Feature {
     MemberInvited,
     /// Services were created from a Docker Compose file.
     Compose,
+    /// Zeabur's backup schedule was set or resumed.
+    BackupEnabled,
+    /// A notification channel was added or changed.
+    NotificationsConfigured,
+    /// The last step of a component's install was written. The ID is one the catalog lists.
+    ComponentInstalled(String),
+    /// The GitHub App was connected or its grants changed.
+    GithubAppConnected,
+    /// A node was cordoned or uncordoned.
+    NodeMaintenance,
+    /// How admin accounts sign in was changed.
+    SignInConfigured,
 }
 
 impl Feature {
-    const fn name(self) -> &'static str {
+    const fn name(&self) -> &'static str {
         match self {
             Self::ServiceCreated(_) => "service_created",
             Self::DatabaseCreated(_) => "database_created",
@@ -205,6 +217,12 @@ impl Feature {
             Self::TerminalOpened => "terminal_opened",
             Self::MemberInvited => "member_invited",
             Self::Compose => "compose",
+            Self::BackupEnabled => "backup_enabled",
+            Self::NotificationsConfigured => "notifications_configured",
+            Self::ComponentInstalled(_) => "component_installed",
+            Self::GithubAppConnected => "github_app_connected",
+            Self::NodeMaintenance => "node_maintenance",
+            Self::SignInConfigured => "sign_in_configured",
         }
     }
 }
@@ -222,7 +240,16 @@ impl Serialize for Feature {
             }
             Self::DatabaseCreated(kind) => map.serialize_entry("kind", kind)?,
             Self::DomainAdded(kind) => map.serialize_entry("kind", kind)?,
-            Self::LogsViewed | Self::TerminalOpened | Self::MemberInvited | Self::Compose => {}
+            Self::ComponentInstalled(id) => map.serialize_entry("component", id)?,
+            Self::LogsViewed
+            | Self::TerminalOpened
+            | Self::MemberInvited
+            | Self::Compose
+            | Self::BackupEnabled
+            | Self::NotificationsConfigured
+            | Self::GithubAppConnected
+            | Self::NodeMaintenance
+            | Self::SignInConfigured => {}
         }
         map.end()
     }

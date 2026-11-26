@@ -188,6 +188,7 @@ pub(crate) async fn set(
         )
         .await?;
     }
+    crate::used::tell(&state, zeabur_telemetry::Feature::SignInConfigured);
     Ok(Json(view(cluster, namespace).await))
 }
 
