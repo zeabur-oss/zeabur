@@ -27,7 +27,7 @@ use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 use zeabur_graph::Workload;
-use zeabur_model::{PodSecurityLevel, WorkloadKind, WorkloadRef};
+use zeabur_model::{ImageUpdates, PodSecurityLevel, UpdateSetting, WorkloadKind, WorkloadRef};
 
 use crate::builds::{
     BUILDER_GROUP, BUILDER_VERSION, GIT_CREDENTIALS_LABEL, KEEL_FORCE, KEEL_POLICY,
@@ -880,12 +880,12 @@ impl<'a> Planner<'a> {
         change.build.check()?;
         let found = self.built_workload(reference)?;
         let container = Self::container(found, reference, change.container.as_deref())?;
-        let keel = found
-            .meta()
-            .annotations
-            .as_ref()
-            .and_then(|a| a.get(KEEL_POLICY))
-            .is_some_and(|p| p == KEEL_FORCE);
+        // Keel takes new builds only with `force` alone: a same-tag policy or a poll schedule
+        // would keep the pending tag.
+        let keel =
+            found.meta().annotations.as_ref().is_some_and(|a| {
+                ImageUpdates::read(a, []).setting == Some(UpdateSetting::NewBuilds)
+            });
         let (source, credentials) = change.build.source(name)?;
         let current = self
             .builds_read()?

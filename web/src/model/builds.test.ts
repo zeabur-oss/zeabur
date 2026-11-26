@@ -1,5 +1,7 @@
 import { describe, expect, test } from "bun:test"
 
+import type { Schemas } from "@/api/client"
+
 import {
   buildDeletions,
   builtContainers,
@@ -9,6 +11,7 @@ import {
   repositoryOf,
   runsLatest,
   shortSha,
+  takesNewBuilds,
   type Build,
   type BuildRun,
 } from "@/model/builds"
@@ -161,4 +164,13 @@ describe("reasonKey", () => {
     expect(reasonKey("SomethingNew")).toBe("builds.reason.other")
     expect(reasonKey(undefined)).toBe("builds.reason.other")
   })
+})
+
+test("the build switch is on only when Keel takes every new build", () => {
+  const updating = (setting: Schemas.UpdateSetting | null) =>
+    ({ imageUpdates: { allowed: [], setting } }) as unknown as Service
+  expect(takesNewBuilds(updating({ kind: "newBuilds" }))).toBe(true)
+  expect(takesNewBuilds(updating({ kind: "other", policy: "force" }))).toBe(true)
+  expect(takesNewBuilds(updating({ kind: "image", policy: "sameTag" }))).toBe(false)
+  expect(takesNewBuilds(updating(null))).toBe(false)
 })

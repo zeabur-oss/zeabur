@@ -112,6 +112,12 @@ export const newBuildsUpdate = (build: Build, on: boolean): Schemas.Update =>
     : { kind: "off" }
 
 /** A Keel policy set outside Zeabur, to name beside the switch. */
+/** Whether Keel deploys `service`'s new builds: an image policy Zeabur set keeps the old tag. */
+export const takesNewBuilds = (service: Service) => {
+  const kind = service.imageUpdates?.setting?.kind
+  return kind === "newBuilds" || kind === "other"
+}
+
 export const foreignPolicy = (service: Service) => {
   const setting = service.imageUpdates?.setting
   return setting?.kind === "other" ? setting.policy : undefined

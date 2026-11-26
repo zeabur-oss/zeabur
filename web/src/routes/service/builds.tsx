@@ -53,6 +53,7 @@ import {
   builtContainers,
   durationOf,
   foreignPolicy,
+  takesNewBuilds,
   newBuildsUpdate,
   reasonKey,
   runsLatest,
@@ -590,7 +591,7 @@ function AutoUpdate({
   const toggleGate = useHereGate("changeServices")
   const capabilities = useQuery({ ...capabilitiesQuery, retry: false })
   const missing = missingKeel(capabilities.data?.items)
-  const on = !!service.imageUpdates?.setting
+  const on = takesNewBuilds(service)
   const policy = foreignPolicy(service)
   const toggle = (enabled: boolean) =>
     plan({
