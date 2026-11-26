@@ -77,6 +77,17 @@ How far back you can roll back depends on the workload's `revisionHistoryLimit`,
 
 For services built from Git or an uploaded folder, turn on **Auto-deploy new builds** in the **Builds** tab to deploy each build as soon as it finishes. When it's off, click **Deploy newest** after a successful build to deploy it manually. This requires Keel in the cluster. For the steps and their kubectl equivalents, see [Build and deploy a service from Git](../deploy/git.mdx).
 
+## Update images automatically
+
+A service that runs an image from a registry, such as PostgreSQL or Redis, can have Keel move it to new versions on its own:
+
+1. Go to the service's **Settings** → **Automatic updates**.
+2. Under **Which versions**, pick **Patch releases only**, **Patch and minor releases**, **All new versions** or **New image under the same tag**. The version choices show only when the tag looks like `7.2.4`.
+3. Under **When**, pick **As soon as found** (Keel checks every hour), or **Every day** or **Once a week** and a time. You pick the time in your time zone, and the hint below shows it in UTC.
+4. Click **Save**, check the changes and apply them.
+
+Each update restarts the service. A major version can need a data migration: PostgreSQL needs a backup and an upgrade step for one. For a database, pick **Patch releases only**.
+
 ## Pause or restart an entire project
 
 Go to **Settings** → **Batch actions** in the project:
@@ -97,6 +108,7 @@ These actions write to the same fields as kubectl's built-in commands. They don'
 | **Pause all services** | `kubectl -n demo scale deployment,statefulset --all --replicas=0` |
 | **Restart all services** | `kubectl -n demo rollout restart deployment,statefulset,daemonset` |
 | Turn on **Auto-deploy new builds** | `kubectl -n demo annotate deployment web keel.sh/policy=force` |
+| **Automatic updates** with **Patch releases only**, **Once a week** on Sunday at 03:00 UTC | `kubectl -n demo annotate deployment web keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"` |
 
 **Restart** sets the pod template annotation `kubectl.kubernetes.io/restartedAt` to the current time, just like `kubectl rollout restart`. **Roll back** replaces `spec.template` with the contents of that revision.
 

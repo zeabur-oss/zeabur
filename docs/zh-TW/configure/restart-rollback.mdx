@@ -77,6 +77,17 @@ Job 和排程工作沒有**重新啟動**。要再執行一次排程工作，用
 
 從 Git 或上傳資料夾建置的服務，在**建置**分頁開啟**新建置完成後自動部署**，每次建置完成就立刻上線。關閉時，建置成功後按**部署最新版**手動上線。這需要叢集裡的 Keel，做法和 kubectl 的對照見[從 Git 建置並部署服務](../deploy/git.mdx)。
 
+## 自動更新映像檔
+
+用登錄檔映像檔的服務（例如 PostgreSQL 或 Redis），可以讓 Keel 在有新版本時自動換上去：
+
+1. 到服務的**設定** → **自動更新**。
+2. 在**更新哪些版本**選**只更新修補版本**、**修補版本和次要版本**、**所有新版本**或**同一個標籤的新映像檔**。依版本更新的選項，只有標籤像 `7.2.4` 這樣時才會出現。
+3. 在**什麼時候更新**選**一有新版就更新**（每小時檢查一次），或選**每天**、**每週一次**再選時間。時間依你的時區選，下方會寫出換算後的 UTC 時間。
+4. 按**儲存**，檢查變更後套用。
+
+每次更新都會重新啟動服務。主要版本可能要搬移資料，像 PostgreSQL 換主要版本就要先備份再升級，所以資料庫建議選**只更新修補版本**。
+
 ## 暫停或重新啟動整個專案
 
 到專案**設定**的**批次操作**：
@@ -97,6 +108,7 @@ Job 和排程工作沒有**重新啟動**。要再執行一次排程工作，用
 | **暫停所有服務** | `kubectl -n demo scale deployment,statefulset --all --replicas=0` |
 | **重新啟動所有服務** | `kubectl -n demo rollout restart deployment,statefulset,daemonset` |
 | 開啟**新建置完成後自動部署** | `kubectl -n demo annotate deployment web keel.sh/policy=force` |
+| **自動更新**選**只更新修補版本**、**每週一次**週日 03:00 UTC | `kubectl -n demo annotate deployment web keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"` |
 
 **重新啟動**寫的是 Pod template 的 annotation `kubectl.kubernetes.io/restartedAt`，值是當下的時間，和 `kubectl rollout restart` 相同。**回滾**把 `spec.template` 換成那個修訂版本的內容。
 
