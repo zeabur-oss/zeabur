@@ -730,6 +730,7 @@ export const zhCN: Messages = {
   "builds.history": "记录",
   "imageUpdates.hint": "让服务自动换上镜像的新版本。每次更新都会重启服务。",
   "imageUpdates.versions": "更新哪些版本",
+  "imageUpdates.policy.other": (policy) => `Zeabur 之外的设置：${policy}`,
   "imageUpdates.policy.off": "关闭",
   "imageUpdates.policy.patch": "只更新补丁版本",
   "imageUpdates.policy.minor": "补丁版本和次要版本",
@@ -750,7 +751,7 @@ export const zhCN: Messages = {
     `要按版本更新，标签得是版本号，例如 8、1.27 或 7.2.4。这个镜像用的是 ${tag}。`,
   "imageUpdates.pinned": "这个镜像固定在某个摘要（digest），内容不会变。要自动更新，请改用标签。",
   "imageUpdates.other": (policy) =>
-    `Keel 按 ${policy} 规则更新这个服务，这个规则是在 Zeabur 之外设置的。在这里保存会替换它。`,
+    `Keel 按 ${policy} 规则更新这个服务，这个规则是在 Zeabur 之外设置的。选其他选项就会替换它。`,
   "imageUpdates.when": "什么时候更新",
   "imageUpdates.when.hourly": "一有新版就更新",
   "imageUpdates.when.daily": "每天",

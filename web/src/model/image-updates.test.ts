@@ -5,8 +5,6 @@ import type { Schemas } from "@/api/client"
 import { translator } from "@/i18n"
 import { en } from "@/i18n/en"
 import {
-  formChanged,
-  heldUpdate,
   formOf,
   localMinute,
   policyChoices,
@@ -47,8 +45,11 @@ describe("in Taipei, UTC+8", () => {
     }
     const form = formOf(updates, now)
     expect(form).toEqual({ policy: "patch", when: "weekly", day: 0, hour: 3 })
-    expect(formChanged(updates, form, now)).toBe(false)
-    expect(formChanged(updates, { ...form, hour: 4 }, now)).toBe(true)
+    expect(updateOf(updates, { ...form, hour: 4 }, now)).toEqual({
+      kind: "image",
+      policy: "patch",
+      window: { day: "saturday", hour: 20 },
+    })
   })
 
   test("a daily window has no day", () => {
@@ -88,7 +89,6 @@ describe("in India, UTC+5:30", () => {
       setting: update as Schemas.UpdateSetting,
     }
     expect(formOf(updates, now)).toEqual(form)
-    expect(formChanged(updates, form, now)).toBe(false)
   })
 })
 
@@ -102,15 +102,28 @@ test("checked every hour sends no window, and off turns it off", () => {
   })
 })
 
-test("a setting written outside Zeabur reads as off, and only an edit replaces it", () => {
+test("every stored setting reads into the form and saves back unchanged", () => {
+  expect(updateOf(undefined, formOf(undefined, now), now)).toEqual({ kind: "off" })
+  const settings: Extract<Schemas.UpdateSetting, { kind: "image" }>[] = [
+    { kind: "image", policy: "sameTag" },
+    { kind: "image", policy: "minor", window: { hour: 21 } },
+    { kind: "image", policy: "patch", window: { day: "wednesday", hour: 0 } },
+  ]
+  for (const setting of settings) {
+    const updates = { allowed: ["patch" as const], setting }
+    expect(updateOf(updates, formOf(updates, now), now)).toEqual(setting)
+  }
+})
+
+test("a setting written outside Zeabur stays until another option replaces it", () => {
   const updates = {
     allowed: [],
     setting: { kind: "other" as const, policy: "glob:build-*" },
   }
   const form = formOf(updates, now)
-  expect(form.policy).toBe("off")
-  expect(heldUpdate(updates, form, false, now)).toBeUndefined()
-  expect(heldUpdate(updates, form, true, now)).toEqual({ kind: "off" })
+  expect(form.policy).toBe("other")
+  expect(updateOf(updates, form, now)).toBeUndefined()
+  expect(updateOf(updates, { ...form, policy: "off" }, now)).toEqual({ kind: "off" })
 })
 
 test("an image's tag, with a registry port and a digest", () => {
@@ -156,7 +169,7 @@ describe("in Los Angeles, the week daylight saving ends", () => {
       },
     }
     const form = formOf(updates, week)
-    expect(formChanged(updates, form, week)).toBe(false)
+    expect(updateOf(updates, form, week)).toEqual(updates.setting)
     expect(updateOf(updates, { ...form, policy: "minor" }, week)).toEqual({
       kind: "image",
       policy: "minor",
@@ -172,8 +185,6 @@ test("a digest-pinned image with updates on can still turn them off", () => {
   }
   expect(policyChoices(updates)).toEqual(["minor"])
   const form = formOf(updates, now)
-  expect(formChanged(updates, form, now)).toBe(false)
-  expect(formChanged(updates, { ...form, policy: "off" }, now)).toBe(true)
   expect(updateOf(updates, { ...form, policy: "off" }, now)).toEqual({
     kind: "off",
   })

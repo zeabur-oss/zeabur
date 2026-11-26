@@ -18,9 +18,9 @@ const weekdays: readonly Schemas.Weekday[] = [
   "saturday",
 ]
 
-/** What the form holds: the day and hour are the browser's. */
+/** What the form holds: the day and hour are the browser's. `other` is a setting written outside Zeabur. */
 export interface UpdateForm {
-  policy: ImagePolicy | "off"
+  policy: ImagePolicy | "off" | "other"
   when: When
   day: number
   hour: number
@@ -66,12 +66,12 @@ function toLocal(
   }
 }
 
-/** The form for what the service does now; Zeabur's own setting only, else off. */
+/** The form for what the service does now. */
 export function formOf(updates: Schemas.ImageUpdates | null | undefined, now: Date): UpdateForm {
   const setting = updates?.setting
   if (setting?.kind !== "image") {
     return {
-      policy: "off",
+      policy: setting?.kind === "other" ? "other" : "off",
       when: "hourly",
       day: DEFAULT_DAY,
       hour: DEFAULT_HOUR,
@@ -101,45 +101,18 @@ function windowOf(
   return kept ? (setting.window ?? undefined) : toUtc(form, now)
 }
 
-/** The `update` of the `autoUpdate` change for `form`. */
+/** The `update` of the `autoUpdate` change for `form`, none while it keeps a setting written outside Zeabur. */
 export function updateOf(
   updates: Schemas.ImageUpdates | null | undefined,
   form: UpdateForm,
   now: Date,
-): Schemas.Update {
+): Schemas.Update | undefined {
+  if (form.policy === "other") return undefined
   if (form.policy === "off") return { kind: "off" }
   const window = windowOf(updates, form, now)
   return window
     ? { kind: "image", policy: form.policy, window }
     : { kind: "image", policy: form.policy }
-}
-
-/** Whether saving `form` changes what `updates` say. */
-export function formChanged(
-  updates: Schemas.ImageUpdates | null | undefined,
-  form: UpdateForm,
-  now: Date,
-): boolean {
-  const setting = updates?.setting
-  if (setting && setting.kind !== "image") return true
-  if (form.policy !== (setting?.policy ?? "off")) return true
-  if (form.policy === "off") return false
-  const saved = windowOf(updates, form, now)
-  const stored = setting?.window ?? undefined
-  return (saved?.day ?? undefined) !== (stored?.day ?? undefined) || saved?.hour !== stored?.hour
-}
-
-/**
- * The update the form adds to the page's draft. An untouched form adds none, so a setting written
- * outside Zeabur, which reads as off, stays until someone edits the form.
- */
-export function heldUpdate(
-  updates: Schemas.ImageUpdates | null | undefined,
-  form: UpdateForm,
-  edited: boolean,
-  now: Date,
-): Schemas.Update | undefined {
-  return edited && formChanged(updates, form, now) ? updateOf(updates, form, now) : undefined
 }
 
 /**

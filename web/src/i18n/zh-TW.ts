@@ -731,6 +731,7 @@ export const zhTW: Messages = {
   "builds.history": "紀錄",
   "imageUpdates.hint": "讓服務自動換上映像檔的新版本。每次更新都會重新啟動服務。",
   "imageUpdates.versions": "更新哪些版本",
+  "imageUpdates.policy.other": (policy) => `Zeabur 以外的設定：${policy}`,
   "imageUpdates.policy.off": "關閉",
   "imageUpdates.policy.patch": "只更新修補版本",
   "imageUpdates.policy.minor": "修補版本和次要版本",
@@ -751,7 +752,7 @@ export const zhTW: Messages = {
     `要依版本更新，標籤得是版本號碼，例如 8、1.27 或 7.2.4。這個映像檔用的是 ${tag}。`,
   "imageUpdates.pinned": "這個映像檔固定在某個摘要（digest），內容不會變。要自動更新，請改用標籤。",
   "imageUpdates.other": (policy) =>
-    `Keel 依 ${policy} 規則更新這個服務，這個規則是在 Zeabur 以外設定的。在這裡儲存會取代它。`,
+    `Keel 依 ${policy} 規則更新這個服務，這個規則是在 Zeabur 以外設定的。選其他選項就會取代它。`,
   "imageUpdates.when": "什麼時候更新",
   "imageUpdates.when.hourly": "一有新版就更新",
   "imageUpdates.when.daily": "每天",

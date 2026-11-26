@@ -778,6 +778,7 @@ export const en = {
   "imageUpdates.hint":
     "Move this service to new versions of its image on its own. Each update restarts the service.",
   "imageUpdates.versions": "Which versions",
+  "imageUpdates.policy.other": (policy: string) => `Set outside Zeabur: ${policy}`,
   "imageUpdates.policy.off": "Off",
   "imageUpdates.policy.patch": "Patch releases only",
   "imageUpdates.policy.minor": "Patch and minor releases",
@@ -803,7 +804,7 @@ export const en = {
   "imageUpdates.pinned":
     "The image is pinned to a digest, so it never changes. Use a tag to update it automatically.",
   "imageUpdates.other": (policy: string) =>
-    `Keel updates this service with its ${policy} policy, set outside Zeabur. Saving here replaces it.`,
+    `Keel updates this service with its ${policy} policy, set outside Zeabur. Pick another option to replace it.`,
   "imageUpdates.when": "When",
   "imageUpdates.when.hourly": "As soon as found",
   "imageUpdates.when.daily": "Every day",

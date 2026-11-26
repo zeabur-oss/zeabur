@@ -15,12 +15,12 @@ import { missingKeel } from "@/model/git-service"
 import {
   dayName,
   formOf,
-  heldUpdate,
   policyChoices,
   localMinute,
   reachText,
   tagOf,
   toUtc,
+  updateOf,
   windowText,
   type UpdateForm,
   type When,
@@ -88,17 +88,16 @@ function UpdatesForm({
   disabled: boolean
 }) {
   const [now] = useState(() => new Date())
-  const [form, setForm] = useState<UpdateForm>(() => formOf(updates, now))
-  const [edited, setEdited] = useState(false)
-  const set = (patch: Partial<UpdateForm>) => {
-    setEdited(true)
-    setForm((f) => ({ ...f, ...patch }))
-  }
+  const [initial] = useState(() => formOf(updates, now))
+  const [form, setForm] = useState(initial)
+  const set = (patch: Partial<UpdateForm>) => setForm((f) => ({ ...f, ...patch }))
   const workload = { kind: service.kind, name: service.name }
-  const update = disabled ? undefined : heldUpdate(updates, form, edited, now)
+  const update = updateOf(updates, form, now)
+  const edited =
+    !disabled && JSON.stringify(update) !== JSON.stringify(updateOf(updates, initial, now))
   useHold(
     "updates",
-    update
+    edited && update
       ? {
           changes: [{ op: "autoUpdate", workload, update }],
           scope: { ops: ["autoUpdate"], workload },
@@ -107,21 +106,11 @@ function UpdatesForm({
   )
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-5">
-      <ForeignNote setting={updates.setting} />
       <PolicyField service={service} updates={updates} form={form} disabled={disabled} set={set} />
-      {form.policy === "off" ? null : (
+      {form.policy === "off" || form.policy === "other" ? null : (
         <WhenFields form={form} now={now} disabled={disabled} set={set} />
       )}
     </div>
-  )
-}
-
-/** Keel annotations Zeabur does not write, which saving replaces. */
-function ForeignNote({ setting }: { setting?: Schemas.UpdateSetting | null }) {
-  const t = useT()
-  if (setting?.kind !== "other") return null
-  return (
-    <p className="type-meta text-muted-foreground">{t("imageUpdates.other", setting.policy)}</p>
   )
 }
 
@@ -140,16 +129,19 @@ function PolicyField({
 }) {
   const t = useT()
   const tag = tagOf(service.containers.find((c) => !c.init)?.image ?? "")
+  const foreign = updates.setting?.kind === "other" ? updates.setting.policy : undefined
   const tagOnly = form.policy === "off" && !updates.allowed.includes("patch")
   return (
     <FormField
       label={t("imageUpdates.versions")}
       hint={
-        tagOnly
-          ? t("imageUpdates.tagOnly", tag)
-          : form.policy === "off" || form.policy === "sameTag"
-            ? t(`imageUpdates.policyHint.${form.policy}`)
-            : reachText(t, tag, form.policy)
+        form.policy === "other"
+          ? t("imageUpdates.other", foreign ?? "")
+          : tagOnly
+            ? t("imageUpdates.tagOnly", tag)
+            : form.policy === "off" || form.policy === "sameTag"
+              ? t(`imageUpdates.policyHint.${form.policy}`)
+              : reachText(t, tag, form.policy)
       }
     >
       <Select
@@ -158,6 +150,7 @@ function PolicyField({
         disabled={disabled}
         onValueChange={(policy) => set({ policy: policy as UpdateForm["policy"] })}
         items={[
+          ...(foreign ? [{ value: "other", label: t("imageUpdates.policy.other", foreign) }] : []),
           { value: "off", label: t("imageUpdates.policy.off") },
           ...policyChoices(updates).map((p) => ({
             value: p,
