@@ -5,6 +5,8 @@ import {
   canonicalKind,
   domainsOf,
   envSecretsOf,
+  imageParts,
+  imageTag,
   serviceOfPod,
   type Network,
   type Pod,
@@ -119,5 +121,36 @@ describe("the service of a pod", () => {
     expect(serviceOfPod(services, "migrate-x7k2p")).toBe(undefined)
     expect(serviceOfPod(services, "nightly-29012-abcde")).toBe(undefined)
     expect(serviceOfPod(services, "agent-q8w9e")?.name).toBe("agent")
+  })
+})
+
+describe("an image reference", () => {
+  const DIGEST = `sha256:${"0123456789abcdef".repeat(4)}`
+
+  test("drops the registry host and keeps the path and tag", () => {
+    expect(imageParts("registry.example.com:5000/team-a/web:main-1795667530-a2e57e2")).toEqual({
+      repository: "team-a/web",
+      tag: "main-1795667530-a2e57e2",
+      digest: undefined,
+    })
+  })
+
+  test("keeps a Docker Hub path, which has no host", () => {
+    expect(imageParts("library/nginx:1.27")).toMatchObject({ repository: "library/nginx", tag: "1.27" })
+    expect(imageParts("nginx")).toMatchObject({ repository: "nginx", tag: undefined })
+  })
+
+  test("reads a tag and a digest together", () => {
+    expect(imageParts(`localhost/team-a/web:main-1@${DIGEST}`)).toEqual({
+      repository: "team-a/web",
+      tag: "main-1",
+      digest: "0123456789abcdef".repeat(4),
+    })
+  })
+
+  test("prefers the tag, then a short digest, then latest", () => {
+    expect(imageTag(`r.example.com/web:main-1@${DIGEST}`)).toBe("main-1")
+    expect(imageTag(`r.example.com/web@${DIGEST}`)).toBe("0123456789ab")
+    expect(imageTag("r.example.com:5000/web")).toBe("latest")
   })
 })
