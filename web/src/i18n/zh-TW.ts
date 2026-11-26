@@ -744,7 +744,8 @@ export const zhTW: Messages = {
   "imageUpdates.reach.latest.patch": "latest 會先換成最新的版本號標籤，之後只更新修補版本。",
   "imageUpdates.reach.latest.minor": "latest 會先換成最新的版本號標籤，之後更新修補和次要版本。",
   "imageUpdates.reach.latest.major": "latest 會先換成最新的版本號標籤，之後所有新版本都會更新。",
-  "imageUpdates.reach.fullTag": (tag) => `更新後，標籤會變成完整的版本號，不再是 ${tag}。`,
+  "imageUpdates.reach.fullTag": (reach, tag) =>
+    `${reach}更新後，標籤會變成完整的版本號，不再是 ${tag}。`,
   "imageUpdates.policyHint.sameTag": "同一個標籤（例如 latest）一有新的映像檔就換上。",
   "imageUpdates.tagOnly": (tag) =>
     `要依版本更新，標籤得是版本號，例如 8、1.27 或 7.2.4。這個映像檔用的是 ${tag}。`,

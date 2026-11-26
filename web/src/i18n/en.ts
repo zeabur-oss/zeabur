@@ -794,8 +794,8 @@ export const en = {
     "latest moves to the newest version tag first, then takes its patch and minor releases.",
   "imageUpdates.reach.latest.major":
     "latest moves to the newest version tag first, then to every newer version.",
-  "imageUpdates.reach.fullTag": (tag: string) =>
-    `After an update, the tag names the full version instead of ${tag}.`,
+  "imageUpdates.reach.fullTag": (reach: string, tag: string) =>
+    `${reach} After an update, the tag names the full version instead of ${tag}.`,
   "imageUpdates.policyHint.sameTag":
     "When someone pushes a new image under the tag it runs, such as latest.",
   "imageUpdates.tagOnly": (tag: string) =>

@@ -743,7 +743,8 @@ export const zhCN: Messages = {
   "imageUpdates.reach.latest.patch": "latest 会先换成最新的版本号标签，之后只更新补丁版本。",
   "imageUpdates.reach.latest.minor": "latest 会先换成最新的版本号标签，之后更新补丁和次要版本。",
   "imageUpdates.reach.latest.major": "latest 会先换成最新的版本号标签，之后所有新版本都会更新。",
-  "imageUpdates.reach.fullTag": (tag) => `更新后，标签会变成完整的版本号，不再是 ${tag}。`,
+  "imageUpdates.reach.fullTag": (reach, tag) =>
+    `${reach}更新后，标签会变成完整的版本号，不再是 ${tag}。`,
   "imageUpdates.policyHint.sameTag": "同一个标签（例如 latest）一有新的镜像就换上。",
   "imageUpdates.tagOnly": (tag) =>
     `要按版本更新，标签得是版本号，例如 8、1.27 或 7.2.4。这个镜像用的是 ${tag}。`,

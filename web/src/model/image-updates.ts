@@ -114,7 +114,7 @@ export function reachText(
       : policy === "minor"
         ? t("imageUpdates.reach.within", tag, `${major}.x`, `${major + 1}.0`)
         : t("imageUpdates.reach.major", tag)
-  return parts.length < 3 ? `${reach} ${t("imageUpdates.reach.fullTag", tag)}` : reach
+  return parts.length < 3 ? t("imageUpdates.reach.fullTag", reach, tag) : reach
 }
 
 /** A window in words, such as "Sundays at 03:00 UTC". */
