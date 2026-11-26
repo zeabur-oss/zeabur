@@ -355,8 +355,8 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day, DomainKind, Feature,
-        FeatureUsed, Mode, SignedIn, Source, Submitted,
+        AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day, DomainKind,
+        Feature, FeatureUsed, Mode, SignedIn, Source, Submitted,
     };
 
     /// How the receiver answers one connection.
