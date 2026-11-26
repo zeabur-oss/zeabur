@@ -1,122 +1,107 @@
 ---
 title: 自动更新镜像
-description: 让 Keel 把服务换成镜像的新版本、选择检查时间、关闭自动更新，以及更新失败时如何处理。
+description: 让 Keel 把用镜像部署的服务（例如 Redis 或 PostgreSQL）自动换成新版本。
 ---
 
-使用镜像仓库中镜像的服务（例如 PostgreSQL 或 Redis），可以在镜像有新版本时自动换成新版本。到服务的**设置** → **自动更新**，选好要更新哪些版本、Keel 什么时候检查，然后保存。每次更新都会重启服务。
+用镜像仓库中的镜像部署的服务，可以让 Keel 自动换上新版本：你设置允许更新的版本范围，以及每小时、每天或每周什么时候检查。每次更新都会重启服务。
 
-## 开始前
+## 开始之前
 
-- 你需要项目中修改服务的权限。
-- 集群需要有 Keel 组件。缺少时，这一部分会给出提示并提供安装。
-- 只有 Deployment、StatefulSet 和 DaemonSet 有这一部分，Job 和定时任务没有。从 Git 或上传文件夹构建的服务，改用**构建**选项卡中的**新构建完成后自动部署**（见[重启、回滚与暂停服务](./restart-rollback.mdx#自动部署新构建)）。
-- 从项目的**新建** → **数据库**创建的数据库没有这一部分，数据库和镜像都由各自的 operator 管理。
-- Helm、Argo CD 或 Flux 管理的服务会显示这一部分，但不能在这里修改，请到对应的工具中设置 annotation。
-
-## 开启自动更新
+- 集群已安装 Keel 组件。还没安装时，**自动更新**部分会显示安装按钮，安装完成后再回到服务的**设置**。
+- 服务是 Deployment、StatefulSet 或 DaemonSet，镜像使用标签，例如 `7.2.4`、`8`、`1.27` 或 `latest`，而不是摘要（digest）。从 Git 或上传文件夹构建的服务，改用**构建**选项卡中的**新构建完成后自动部署**。
+- 从**新建** → **数据库**创建的数据库由各自的 operator 管理（PostgreSQL 是 CloudNativePG），没有**自动更新**部分。要自动更新 PostgreSQL，请用镜像部署，例如 `postgres:16.4`。
 
 <Steps>
 <Step>
 
+### 打开自动更新
+
+到服务的**设置**，向下滚动到**自动更新**，或点击顶部的**自动更新**直接跳转。
+
+</Step>
+<Step>
+
 ### 选择更新哪些版本
 
-到服务的**设置** → **自动更新**，在**更新哪些版本**中选择一项：
+展开**更新哪些版本**菜单，选择一项：
 
-| 选项 | `redis:7.2.4` 会换成 | `postgres:16.4` 会换成 |
-| --- | --- | --- |
-| **只更新补丁版本** | `7.2.5`、`7.2.6`……，不会到 `7.3.0` | 不会更新，Keel 把 `16.5` 视为次要版本 |
-| **补丁版本和次要版本** | `7.3.0`、`7.4.1`……，不会到 `8.0.0` | `16.5`、`16.6`……，不会到 `17.0` |
-| **所有新版本** | 所有更新的版本，包括 `8.0.0` | 所有更新的版本，包括 `17.0` |
-| **同一个标签的新镜像** | 以 `7.2.4` 重新推送的镜像 | 以 `16.4` 重新推送的镜像 |
+| 选项 | `7.2.4` 会升级到 |
+| --- | --- |
+| **只更新补丁版本** | `7.2.5`、`7.2.6`……，不会自动升级到 `7.3` |
+| **补丁版本和次要版本** | `7.3`、`7.4`……，不会自动升级到 `8` |
+| **所有新版本** | 任何更新的版本，包括 `8` |
+| **同一个标签的新镜像** | 版本号不变，同一个标签推送了新镜像就换上 |
 
-列表下方会写出这个服务会换到哪些版本。升级主要版本可能需要迁移数据，例如 PostgreSQL 升级主要版本，需要先备份，再用 `pg_upgrade` 或导出再导入，所以数据库建议选择**补丁版本和次要版本**，主要版本不会改变。PostgreSQL 的标签如果只有两段数字（例如 `16.4`），不要选择**只更新补丁版本**，否则永远不会更新。
+选好后，菜单下方会写出这个服务会升级到哪里。
 
-按版本更新的选项需要版本号标签：一到三段数字，前面可以加 `v`，例如 `8`、`1.27`、`v7.2.4`，或者 `latest`。Keel 把 `8` 视为 `8.0.0`，更新后标签会变成完整的版本号，例如 `8.0.2`。`latest` 会先换成最新的版本号标签。标签含有其他文字时（例如 `1.30-alpine`），只能选择**同一个标签的新镜像**。服务有多个容器时，每个容器都要使用版本号标签。
+Redis 建议选择**只更新补丁版本**。PostgreSQL 的版本号只有两段，`16.4` 到 `16.5` 在 Keel 看来是次要版本，所以 `postgres:16.4` 要选择**补丁版本和次要版本**，才会升级到 `16.x` 的新版本，`17` 仍会等你决定。PostgreSQL 升级主要版本要先备份，再用 `pg_upgrade` 或导出导入迁移数据，Keel 不会替你完成这一步。
+
+标签写成 `8` 时，Keel 会把它视为 `8.0.0`，第一次更新后标签会变成完整的版本号，例如 `8.0.5`。
 
 </Step>
 <Step>
 
 ### 选择什么时候更新
 
-在**什么时候更新**中选择一项：
+在**什么时候更新**中选择：
 
 - **一有新版就更新**：Keel 每小时检查一次。
-- **每天**，再选择时间。
-- **每周一次**，再选择星期和时间。
+- **每天**：再选择**时间**。
+- **每周一次**：再选择**星期**和**时间**。
 
-![db 的自动更新：postgres:18 选择补丁版本和次要版本，每周日 03:00 检查，下方写出换算后的 UTC 时间](../images/shots/image-updates.avif)
+星期和时间按浏览器的时区选择，下方会写出换算后的 UTC 时间。例如在冬季的 Europe/Amsterdam 时区选择星期日 03:00，就是星期日 02:00（UTC）。
 
-时间按浏览器的时区选择，下方会写出换算后的 UTC 时间。Zeabur 开源版保存的是 UTC 时间，所以全年都不会改变：
+![postgres:18 服务的自动更新：补丁版本和次要版本、每周一次、星期日、03:00，下方写出换算后的 UTC 时间](../images/shots/image-updates.avif)
 
-- 你所在地区开始或结束夏令时后，Keel 仍在同一个 UTC 时间检查，换算成当地时间就会提前或推后一小时，表单也会改为显示新的当地时间。
-- 只修改**更新哪些版本**，已保存的 UTC 时间不会改变。修改了**什么时候更新**、星期或时间，就会按你现在的时钟重新换算 UTC 时间。
-- 在相差半小时的时区（例如印度），时间以 `:30` 结尾，换成 UTC 正好是整点。
+Zeabur 开源版保存的是 UTC 时间，不会随夏令时调整。上面的例子到了夏季，Keel 会在阿姆斯特丹时间 04:00 检查。之后只修改**更新哪些版本**，时间会保持原来保存的 UTC 时间。要随换季调整，重新选择一次时间再保存。
 
 </Step>
 <Step>
 
-### 保存并检查变更
+### 保存并应用
 
-点击**保存**。检查页面会写出服务要换到哪些版本、Keel 什么时候检查，切换到 **YAML** 可以看到添加到工作负载上的 annotation：`keel.sh/policy`、`keel.sh/trigger: poll` 和 `keel.sh/pollSchedule`。选择**同一个标签的新镜像**时，还会添加 `keel.sh/match-tag`。在检查页面点击**保存**应用。
+点击**保存**，会打开变更检查页面。确认内容后，再点击一次**保存**应用。
 
-![db 的检查页面：会更新到补丁版本和次要版本，每周日 03:00（UTC）检查](../images/shots/image-updates-review.avif)
+![检查页面写着 db 会自动更新到新的补丁版本和次要版本，每周日 03:00（UTC）检查，每次更新都会重启服务](../images/shots/image-updates-review.avif)
+
+应用后，**自动更新**部分显示当前的设置，再次修改之前，**保存**按钮会是灰色。
+
+Keel 到了时间就检查镜像仓库，有符合条件的新版本就换上，服务会重启。更新过的版本会出现在服务的**部署记录**中。
 
 </Step>
 </Steps>
 
 ## 关闭自动更新
 
-在**自动更新**中把**更新哪些版本**改为**关闭**，点击**保存**。检查页面会写出服务不再自动更新，并列出要移除的 Keel annotation：`keel.sh/policy`、`keel.sh/trigger`、`keel.sh/pollSchedule`，服务有 `keel.sh/match-tag` 时也会一起移除。点击**关闭**应用。服务会继续使用当前的镜像。
+在**更新哪些版本**中选择**关闭**，点击**保存**。变更检查页面会列出 Zeabur 开源版要从服务移除的 Keel 设置：`keel.sh/policy`、`keel.sh/trigger` 和 `keel.sh/pollSchedule`，选择了**同一个标签的新镜像**的服务还有 `keel.sh/match-tag`。点击**关闭**应用，服务会继续使用当前的镜像。
 
-![db 的检查页面：不再自动更新，并移除三个 Keel annotation](../images/shots/image-updates-off-review.avif)
-
-工作负载上的 Keel annotation 不是这个表单会写入的（例如 `glob:` 规则，或不在整点的定时）时，列表会显示**Zeabur 之外的设置**和使用的规则，选择**关闭**或其他选项就会替换。
+![检查页面写着 db 不再自动更新，并列出会移除的 keel.sh/policy、keel.sh/pollSchedule 和 keel.sh/trigger](../images/shots/image-updates-off-review.avif)
 
 ## 固定到摘要（digest）的镜像
 
-用摘要指定的镜像（例如 `redis@sha256:…`）内容永远不会改变，所以这一部分只显示说明，没有选项。要自动更新，到**设置**，将顶部的切换项从**设置**切换到 **YAML**，点击**编辑**，把容器的 `image` 改成标签，检查并应用后，再开启自动更新。
+镜像写成 `redis@sha256:…` 时，服务固定使用这个摘要对应的镜像，Keel 不会换成其他版本。**自动更新**部分只会显示提示，没有表单。
 
-原本已开启自动更新、之后才改用摘要的服务，仍会显示表单，可以关闭自动更新。
+要自动更新，先把镜像改回标签，例如 `redis:7.2.4`。已经开启自动更新的服务改用摘要后，这一部分仍会显示表单，你仍然可以关闭。
 
 ## 更新失败时
 
-Keel 换好镜像就结束，不会等待新副本就绪，失败时也不会回滚（[#1014](https://github.com/zeabur-oss/zeabur/issues/1014)）。
+Keel 更新后不会等待服务恢复健康，也还不会自动回滚（[#1014](https://github.com/zeabur-oss/zeabur/issues/1014)）。
 
-- 设置了[就绪检查](./service-settings.mdx)的 Deployment，新副本没有通过检查时，旧副本会继续接收流量，服务显示**部署卡住**。
-- StatefulSet 一次替换一个副本，所以只有一个副本的 StatefulSet（例如 Redis）要等新副本就绪才会恢复服务。
-
-处理步骤：
-
-1. 先关闭自动更新。不关闭的话，Keel 下次检查又会换成同一个版本。
-2. 在**概览**的**部署进度**或**部署记录**中回滚（见[重启、回滚与暂停服务](./restart-rollback.mdx#回滚到之前的版本)）。
-3. 修复问题后，再开启自动更新。
-
-要收到更新失败的通知，到项目的**设置** → **通知**添加渠道，选择**部署失败**事件（见[通知](../cluster/notifications.mdx)）。这个事件目前只覆盖 Deployment，StatefulSet 和 DaemonSet 还不会发出（[#1015](https://github.com/zeabur-oss/zeabur/issues/1015)）。
+- **让旧版本继续服务**：到**设置** → **健康检查**设置**就绪检查**，例如 Redis 设为 **TCP**、端口 `6379`。Deployment 会逐个替换副本：新副本没有通过就绪检查时，旧副本会继续服务，服务显示**部署卡住**。只有一个副本的 StatefulSet 没有旧副本可以继续服务。
+- **回到旧版本**：先把自动更新**关闭**，再到**部署记录**点击**回滚**。如果不关闭，Keel 下次检查又会换上同一个新版本。
+- **失败时通知**：到项目的**设置** → **通知**点击**添加渠道**，选择 **Webhook**、Slack 或其他接收位置，事件勾选**部署失败**。这对 Deployment 有效；StatefulSet 和 DaemonSet 的部署通知在 [#1015](https://github.com/zeabur-oss/zeabur/issues/1015) 中跟进。
 
 ## 用 kubectl 执行相同操作
 
-下面的示例使用项目 `demo` 和 StatefulSet `db`。`keel.sh/pollSchedule` 的第一个字段是秒，时间为 UTC：`0 0 3 * * 0` 表示每周日 03:00（UTC）。
-
-| Zeabur 开源版操作 | kubectl |
-| --- | --- |
-| **补丁版本和次要版本**、**每周一次**周日 03:00 UTC | `kubectl -n demo annotate statefulset db keel.sh/policy=minor keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"` |
-| **只更新补丁版本**、**一有新版就更新** | `kubectl -n demo annotate --overwrite statefulset db keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule=@hourly` |
-| **同一个标签的新镜像**、**每天** 03:00 UTC | `kubectl -n demo annotate --overwrite statefulset db keel.sh/policy=force keel.sh/match-tag=true keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * *"` |
-| **关闭** | `kubectl -n demo annotate statefulset db keel.sh/policy- keel.sh/trigger- keel.sh/pollSchedule- keel.sh/match-tag-` |
-
-查看服务当前的设置：
+Keel 只读取工作负载上的 annotation。以下以项目 `demo`、Deployment `redis` 为例，每周日 03:00 UTC 只更新补丁版本：
 
 ```sh
-kubectl -n demo get statefulset db -o jsonpath='{.metadata.annotations}'
+kubectl -n demo annotate deployment redis \
+  keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"
 ```
 
-## 遇到问题
+`pollSchedule` 有 6 个字段，第一个是秒。**自动更新**部分会读取这些设置，显示为**只更新补丁版本**、**每周一次**。关闭时移除这些 annotation：
 
-| 页面或结果 | 后续处理 |
-| --- | --- |
-| 没有**自动更新**这一部分 | 服务是从源代码构建的、是 Job 或定时任务，或者是从**新建** → **数据库**创建的数据库。 |
-| 只能选择**同一个标签的新镜像** | 标签不是版本号，例如 `1.30-alpine`。改成 `1.30` 这类版本号标签。 |
-| 显示镜像固定到某个摘要 | 把镜像改成标签。 |
-| 这一部分提示缺少 Keel | 在这一部分或**集群** → **组件**中安装 Keel 组件。 |
-| PostgreSQL 服务一直没有更新 | 标签只有两段数字（例如 `16.4`），又选择了**只更新补丁版本**。改选**补丁版本和次要版本**。 |
-| 更新后服务显示**部署卡住** | 先关闭自动更新再回滚，见[更新失败时](#更新失败时)。 |
+```sh
+kubectl -n demo annotate deployment redis keel.sh/policy- keel.sh/trigger- keel.sh/pollSchedule-
+```

@@ -1,122 +1,107 @@
 ---
 title: 自動更新映像檔
-description: 讓 Keel 把服務換成映像檔的新版本、選擇檢查時間、關閉自動更新，以及更新失敗時怎麼處理。
+description: 讓 Keel 把用映像檔部署的服務（例如 Redis 或 PostgreSQL）自動換成新版本。
 ---
 
-用映像檔倉庫映像檔的服務（例如 PostgreSQL 或 Redis），可以在映像檔有新版本時自動換上去。到服務的**設定** → **自動更新**，選好要更新哪些版本、Keel 什麼時候檢查，再儲存。每次更新都會重新啟動服務。
+從映像檔部署的服務，可以讓 Keel 自動換上新版本：你設定允許更新的版本範圍，以及每小時、每天或每週什麼時候檢查。每次更新都會重新啟動服務。
 
-## 開始前
+## 開始之前
 
-- 你需要專案裡修改服務的權限。
-- 叢集要有 Keel 元件。缺少時，這一區會提示並提供安裝。
-- Deployment、StatefulSet 和 DaemonSet 才有這一區，Job 和排程工作沒有。從 Git 或上傳資料夾建置的服務，改用**建置**分頁的**新建置完成後自動部署**（見[重新啟動、回滾與暫停服務](./restart-rollback.mdx#自動部署新的建置)）。
-- 從專案的**新增** → **資料庫**建立的資料庫沒有這一區，資料庫和映像檔都由各自的 operator 管理。
-- Helm、Argo CD 或 Flux 管理的服務會顯示這一區，但不能在這裡修改，請到那個工具設定 annotation。
-
-## 開啟自動更新
+- 叢集裝了 Keel 元件。還沒安裝時，**自動更新**區段會顯示安裝按鈕，裝好後再回到服務的**設定**。
+- 服務是 Deployment、StatefulSet 或 DaemonSet，映像檔用標籤，例如 `7.2.4`、`8`、`1.27` 或 `latest`，不是摘要（digest）。從 Git 或上傳資料夾建置的服務，改用**建置**分頁的**新建置完成後自動部署**。
+- 從**新增** → **資料庫**建立的資料庫由各自的 operator 管理（PostgreSQL 是 CloudNativePG），沒有**自動更新**區段。要自動更新的 PostgreSQL，請用映像檔部署，例如 `postgres:16.4`。
 
 <Steps>
 <Step>
 
-### 選擇更新哪些版本
+### 打開自動更新
 
-到服務的**設定** → **自動更新**，在**更新哪些版本**選一項：
+到服務的**設定**，往下捲到**自動更新**，或按上方的**自動更新**直接跳過去。
 
-| 選項 | `redis:7.2.4` 會換成 | `postgres:16.4` 會換成 |
-| --- | --- | --- |
-| **只更新修補版本** | `7.2.5`、`7.2.6`……，不會到 `7.3.0` | 不會更新，Keel 把 `16.5` 當成次要版本 |
-| **修補版本和次要版本** | `7.3.0`、`7.4.1`……，不會到 `8.0.0` | `16.5`、`16.6`……，不會到 `17.0` |
-| **所有新版本** | 所有更新的版本，包括 `8.0.0` | 所有更新的版本，包括 `17.0` |
-| **同一個標籤的新映像檔** | 以 `7.2.4` 重新推送的映像檔 | 以 `16.4` 重新推送的映像檔 |
+</Step>
+<Step>
 
-清單下方會寫出這個服務會換到哪些版本。換主要版本可能要搬移資料，像 PostgreSQL 換主要版本，就要先備份，再用 `pg_upgrade` 或匯出再匯入，所以資料庫建議選**修補版本和次要版本**，主要版本不會改變。PostgreSQL 的標籤如果只有兩段數字（例如 `16.4`），不要選**只更新修補版本**，否則永遠不會更新。
+### 選擇要更新哪些版本
 
-依版本更新的選項需要版本號碼標籤：一到三段數字，前面可以加 `v`，例如 `8`、`1.27`、`v7.2.4`，或是 `latest`。Keel 把 `8` 當成 `8.0.0`，更新後標籤會變成完整的版本號碼，例如 `8.0.2`。`latest` 會先換成最新的版本號碼標籤。標籤含有其他文字時（例如 `1.30-alpine`），只能選**同一個標籤的新映像檔**。服務有多個容器時，每個容器都要用版本號碼標籤。
+展開**更新哪些版本**選單，選一項：
+
+| 選項 | `7.2.4` 會升到 |
+| --- | --- |
+| **只更新修補版本** | `7.2.5`、`7.2.6`……，不會自動升到 `7.3` |
+| **修補版本和次要版本** | `7.3`、`7.4`……，不會自動升到 `8` |
+| **所有新版本** | 任何較新的版本，包括 `8` |
+| **同一個標籤的新映像檔** | 版本號碼不變，同一個標籤推送了新映像檔就換上 |
+
+選好後，選單下方會寫出這個服務會升到哪裡。
+
+Redis 建議選**只更新修補版本**。PostgreSQL 的版本號碼只有兩段，`16.4` 到 `16.5` 在 Keel 看來是次要版本，所以 `postgres:16.4` 要選**修補版本和次要版本**，才會升到 `16.x` 的新版，`17` 仍會等你決定。PostgreSQL 換主要版本要先備份，再用 `pg_upgrade` 或匯出匯入搬資料，Keel 不會替你做這件事。
+
+標籤寫成 `8` 時，Keel 把它當成 `8.0.0`，第一次更新後標籤會變成完整的版本號碼，例如 `8.0.5`。
 
 </Step>
 <Step>
 
 ### 選擇什麼時候更新
 
-在**什麼時候更新**選一項：
+在**什麼時候更新**選：
 
 - **一有新版就更新**：Keel 每小時檢查一次。
-- **每天**，再選時間。
-- **每週一次**，再選星期和時間。
+- **每天**：再選**時間**。
+- **每週一次**：再選**星期**和**時間**。
 
-![db 的自動更新：postgres:18 選修補版本和次要版本，每週日 03:00 檢查，下方寫出換算後的 UTC 時間](../images/shots/image-updates.avif)
+星期和時間依你瀏覽器的時區選，下方會寫出換算後的 UTC 時間。例如在冬季的 Europe/Amsterdam 時區選星期日 03:00，就是星期日 02:00（UTC）。
 
-時間依瀏覽器的時區選，下方會寫出換算後的 UTC 時間。Zeabur 開源版存的是 UTC 時間，所以整年都不會改變：
+![postgres:18 服務的自動更新：修補版本和次要版本、每週一次、星期日、03:00，下方寫出換算後的 UTC 時間](../images/shots/image-updates.avif)
 
-- 你所在的地方開始或結束日光節約時間後，Keel 仍在同一個 UTC 時間檢查，換算成當地時間就會提早或延後一小時，表單也會改顯示新的當地時間。
-- 只改**更新哪些版本**，存好的 UTC 時間不會改變。改了**什麼時候更新**、星期或時間，就會依你現在的時鐘重新換算 UTC 時間。
-- 在差半小時的時區（例如印度），時間會是 `:30` 結尾，換成 UTC 剛好是整點。
+Zeabur 開源版存的是 UTC 時間，不會跟著夏令時間調整。上面的例子到了夏季，Keel 會在阿姆斯特丹時間 04:00 檢查。之後只改**更新哪些版本**，時間會維持原本存的 UTC 時間。要跟著換季調整，重新選一次時間再儲存。
 
 </Step>
 <Step>
 
-### 儲存並檢查變更
+### 儲存並套用
 
-按**儲存**。檢查畫面會寫出服務要換到哪些版本、Keel 什麼時候檢查，切到 **YAML** 可以看到加在工作負載上的 annotation：`keel.sh/policy`、`keel.sh/trigger: poll` 和 `keel.sh/pollSchedule`。選**同一個標籤的新映像檔**時，還會加上 `keel.sh/match-tag`。在檢查畫面按**儲存**套用。
+按**儲存**，會出現變更確認畫面。確認內容後，再按一次**儲存**套用。
 
-![db 的檢查畫面：會更新到修補版本和次要版本，每週日 03:00（UTC）檢查](../images/shots/image-updates-review.avif)
+![檢查畫面寫著 db 會自動更新到新的修補版本和次要版本，每週日 03:00（UTC）檢查，每次更新都會重新啟動服務](../images/shots/image-updates-review.avif)
+
+套用後，**自動更新**區段顯示目前的設定，你再修改之前，**儲存**按鈕會是灰色。
+
+Keel 到了時間就檢查有沒有符合的新版本，有就換上，服務會重新啟動。更新過的版本會出現在服務的**部署紀錄**。
 
 </Step>
 </Steps>
 
 ## 關閉自動更新
 
-在**自動更新**把**更新哪些版本**改成**關閉**，按**儲存**。檢查畫面會寫出服務不再自動更新，並列出要移除的 Keel annotation：`keel.sh/policy`、`keel.sh/trigger`、`keel.sh/pollSchedule`，服務有 `keel.sh/match-tag` 時也會一起移除。按**關閉**套用。服務會繼續使用現在的映像檔。
+在**更新哪些版本**選**關閉**，按**儲存**。變更確認畫面會列出 Zeabur 開源版要從服務移除的 Keel 設定：`keel.sh/policy`、`keel.sh/trigger` 和 `keel.sh/pollSchedule`，選了**同一個標籤的新映像檔**的服務還有 `keel.sh/match-tag`。按**關閉**套用，服務會繼續使用目前的映像檔。
 
-![db 的檢查畫面：不再自動更新，並移除三個 Keel annotation](../images/shots/image-updates-off-review.avif)
-
-工作負載上的 Keel annotation 不是這個表單會寫的（例如 `glob:` 規則，或不在整點的排程）時，清單會顯示**Zeabur 以外的設定**和使用的規則，選**關閉**或其他選項就會取代。
+![檢查畫面寫著 db 不再自動更新，並列出會移除的 keel.sh/policy、keel.sh/pollSchedule 和 keel.sh/trigger](../images/shots/image-updates-off-review.avif)
 
 ## 固定在摘要（digest）的映像檔
 
-用摘要指定的映像檔（例如 `redis@sha256:…`）內容永遠不會改變，所以這一區只顯示說明，沒有選項。要自動更新，到**設定**把上方的切換從**設定**換到 **YAML**，按**編輯**，把容器的 `image` 改成標籤，檢查並套用後，再開啟自動更新。
+映像檔寫成 `redis@sha256:…` 時，服務固定使用這個摘要對應的映像檔，Keel 不會換成其他版本。**自動更新**區段只會顯示提示，沒有表單。
 
-原本已開啟自動更新、之後才改成摘要的服務，仍會顯示表單，可以關閉自動更新。
+要自動更新，先把映像檔改回標籤，例如 `redis:7.2.4`。已經開了自動更新的服務改用摘要後，區段仍會顯示表單，你還是可以關閉。
 
 ## 更新失敗時
 
-Keel 換好映像檔就結束，不會等新副本就緒，失敗時也不會回滾（[#1014](https://github.com/zeabur-oss/zeabur/issues/1014)）。
+Keel 更新後不會等服務恢復健康，也還不會自動回滾（[#1014](https://github.com/zeabur-oss/zeabur/issues/1014)）。
 
-- 設定了[就緒檢查](./service-settings.mdx)的 Deployment，新副本沒通過檢查時，舊副本會繼續接收流量，服務顯示**部署卡住**。
-- StatefulSet 一次替換一個副本，所以只有一個副本的 StatefulSet（例如 Redis）要等新副本就緒才會恢復服務。
-
-處理步驟：
-
-1. 先關閉自動更新。不關的話，Keel 下次檢查又會換成同一個版本。
-2. 在**概覽**的**部署進度**或**部署紀錄**回滾（見[重新啟動、回滾與暫停服務](./restart-rollback.mdx#回滾到之前的版本)）。
-3. 修好問題後，再開啟自動更新。
-
-要收到更新失敗的通知，到專案的**設定** → **通知**新增管道，選**部署失敗**事件（見[通知](../cluster/notifications.mdx)）。這個事件目前只涵蓋 Deployment，StatefulSet 和 DaemonSet 還不會發出（[#1015](https://github.com/zeabur-oss/zeabur/issues/1015)）。
+- **讓舊版本繼續服務**：到**設定** → **健康檢查**設定**就緒檢查**，例如 Redis 設成 **TCP**、連接埠 `6379`。Deployment 會逐步替換副本：新副本沒通過就緒檢查時，舊副本會繼續服務，服務顯示**部署卡住**。只有一個副本的 StatefulSet 沒有舊副本可以繼續服務。
+- **回到舊版本**：先把自動更新**關閉**，再到**部署紀錄**按**回滾**。沒有關閉時，Keel 下次檢查又會換上同一個新版本。
+- **失敗時通知**：到專案的**設定** → **通知**按**新增管道**，送到選 **Webhook**、Slack 或其他位置，事件勾**部署失敗**。這對 Deployment 有效；StatefulSet 和 DaemonSet 的部署通知排在 [#1015](https://github.com/zeabur-oss/zeabur/issues/1015)。
 
 ## 用 kubectl 做同樣的事
 
-下面的範例用專案 `demo` 和 StatefulSet `db`。`keel.sh/pollSchedule` 的第一欄是秒，時間是 UTC：`0 0 3 * * 0` 是每週日 03:00（UTC）。
-
-| Zeabur 開源版操作 | kubectl |
-| --- | --- |
-| **修補版本和次要版本**、**每週一次**週日 03:00 UTC | `kubectl -n demo annotate statefulset db keel.sh/policy=minor keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"` |
-| **只更新修補版本**、**一有新版就更新** | `kubectl -n demo annotate --overwrite statefulset db keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule=@hourly` |
-| **同一個標籤的新映像檔**、**每天** 03:00 UTC | `kubectl -n demo annotate --overwrite statefulset db keel.sh/policy=force keel.sh/match-tag=true keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * *"` |
-| **關閉** | `kubectl -n demo annotate statefulset db keel.sh/policy- keel.sh/trigger- keel.sh/pollSchedule- keel.sh/match-tag-` |
-
-檢視服務現在的設定：
+Keel 只看工作負載上的 annotation。以下以專案 `demo`、Deployment `redis` 為例，每週日 03:00 UTC 只更新修補版本：
 
 ```sh
-kubectl -n demo get statefulset db -o jsonpath='{.metadata.annotations}'
+kubectl -n demo annotate deployment redis \
+  keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"
 ```
 
-## 遇到問題
+`pollSchedule` 有 6 個欄位，第一個是秒。**自動更新**區段會讀出這些設定，顯示成**只更新修補版本**、**每週一次**。關閉時移除這些 annotation：
 
-| 畫面或結果 | 接著處理 |
-| --- | --- |
-| 沒有**自動更新**這一區 | 服務是從原始碼建置的、是 Job 或排程工作，或是從**新增** → **資料庫**建立的資料庫。 |
-| 只能選**同一個標籤的新映像檔** | 標籤不是版本號碼，例如 `1.30-alpine`。改成 `1.30` 這類版本號碼標籤。 |
-| 顯示映像檔固定在某個摘要 | 把映像檔改成標籤。 |
-| 這一區提示缺少 Keel | 在這一區或**叢集** → **元件**安裝 Keel 元件。 |
-| PostgreSQL 服務一直沒有更新 | 標籤只有兩段數字（例如 `16.4`），又選了**只更新修補版本**。改選**修補版本和次要版本**。 |
-| 更新後服務顯示**部署卡住** | 先關閉自動更新再回滾，見[更新失敗時](#更新失敗時)。 |
+```sh
+kubectl -n demo annotate deployment redis keel.sh/policy- keel.sh/trigger- keel.sh/pollSchedule-
+```
