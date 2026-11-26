@@ -3,21 +3,17 @@
 import { Autocomplete } from "@base-ui/react/autocomplete"
 import { useQueries, useQuery } from "@tanstack/react-query"
 import { useRouter } from "@tanstack/react-router"
-import { useState, type ReactNode } from "react"
+import { useState } from "react"
 import ArrowRightIcon from "~icons/ph/arrow-right"
 import ClockCounterClockwiseIcon from "~icons/ph/clock-counter-clockwise"
-import CubeIcon from "~icons/ph/cube"
 import DatabaseIcon from "~icons/ph/database"
-import FileTextIcon from "~icons/ph/file-text"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GitBranchIcon from "~icons/ph/git-branch"
 import UploadSimpleIcon from "~icons/ph/upload-simple"
-import GlobeIcon from "~icons/ph/globe"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 import MoonIcon from "~icons/ph/moon"
 import PackageIcon from "~icons/ph/package"
 import PlusIcon from "~icons/ph/plus"
-import PuzzlePieceIcon from "~icons/ph/puzzle-piece"
 import SlidersHorizontalIcon from "~icons/ph/sliders-horizontal"
 import TerminalWindowIcon from "~icons/ph/terminal-window"
 import TextAlignLeftIcon from "~icons/ph/text-align-left"
@@ -26,42 +22,30 @@ import TranslateIcon from "~icons/ph/translate"
 import { logsReadable } from "@/api/logs-access"
 import { namespaceQuery, projectQuery, projectsQuery, toolsQuery } from "@/api/queries"
 import { useAddChoices } from "@/components/add/menu"
-import { ServiceIcon } from "@/components/service-icon"
-import { StatusDot } from "@/components/status"
+import { usePages } from "@/components/gate"
+import {
+  entryItems,
+  groupItems,
+  pageActions,
+  shownItems,
+  type Group,
+  type Item,
+} from "@/components/shell/palette-items"
 import { localeNames, locales, useI18n, useT } from "@/i18n"
-import type { Icon } from "@/lib/icon"
-import { addressOf, objectKey } from "@/lib/objects"
 import { openAdd } from "@/lib/adding"
 import { dock, openKubectl, openShell, toggleDock } from "@/lib/dock"
 import { serviceLink, usePlace } from "@/lib/place"
 import { palette, recent, remember } from "@/lib/stores"
 import { cn } from "@/lib/utils"
 import { engineName } from "@/model/databases"
-import { domainsOf, isTask, serviceId, statusOf, type Service } from "@/model/service"
+import { isTask, serviceId, type Service } from "@/model/service"
 import { cycleTheme } from "@/theme"
-
-interface Item {
-  id: string
-  group: string
-  label: string
-  hint?: string
-  /** Words it also answers to in any language, such as a verb's English name. */
-  keywords?: string
-  icon?: Icon
-  node?: ReactNode
-  href?: string
-  run?: () => void
-}
-
-interface Group {
-  label: string
-  items: Item[]
-}
 
 export function PaletteBody() {
   const t = useT()
   const router = useRouter()
   const place = usePlace()
+  const mayComponents = usePages(["components"]).open
   const href = (...link: Parameters<typeof serviceLink>) =>
     router.buildLocation(serviceLink(...link)).href
   const { locale, setLocale } = useI18n()
@@ -226,82 +210,25 @@ export function PaletteBody() {
       href: router.buildLocation({ to: "/projects/$project", params: { project: p.name } }).href,
     })
 
-  for (const [i, summary] of adopted.entries()) {
-    const data = views[i]?.data
-    if (!data) {
-      for (const s of summary.services ?? [])
-        items.push({
-          id: `service:${summary.name}/${serviceId(s)}`,
-          group: g.services,
-          label: s.name,
-          hint: t("palette.in", s.kind, summary.name),
-          node: (
-            <span className="flex items-center gap-2">
-              <span translate="no">{s.name}</span>
-              <StatusDot health={s.health} />
-            </span>
-          ),
-          href: href(summary.name, s),
-        })
-      continue
-    }
-    for (const s of data.services) {
-      const serviceHref = href(data.namespace, s)
-      items.push({
-        id: `service:${data.namespace}/${serviceId(s)}`,
-        group: g.services,
-        label: s.name,
-        hint: t("palette.in", s.kind, data.namespace),
-        node: (
-          <span className="flex items-center gap-2">
-            <ServiceIcon service={s} size="sm" />
-            <span translate="no">{s.name}</span>
-            <StatusDot health={statusOf(s).health} />
-          </span>
-        ),
-        href: serviceHref,
-      })
-      if (query && s !== current)
-        items.push(...verbs(data.namespace, s, `verb:${data.namespace}/${serviceId(s)}`))
-      for (const pod of s.pods)
-        items.push({
-          id: `pod:${data.namespace}/${pod.name}`,
-          group: g.pods,
-          label: pod.name,
-          hint: `${t("palette.in", s.name, data.namespace)}${pod.ready ? "" : `${t("common.sep")}${pod.reason ?? t("pod.notReady")}`}`,
-          icon: CubeIcon,
-          href: href(data.namespace, s, {
-            tab: logs(data.namespace) ? "logs" : "events",
-            pod: pod.name,
-          }),
-        })
-      for (const { host } of domainsOf(data, s))
-        items.push({
-          id: `domain:${host}`,
-          group: g.domains,
-          label: host,
-          hint: t("palette.in", s.name, data.namespace),
-          icon: GlobeIcon,
-          href: href(data.namespace, s, { tab: "networking" }),
-        })
-    }
-    for (const r of data.resources) {
-      const address = addressOf(r.kind, r.name)
-      if (!address) continue
-      items.push({
-        id: `object:${data.namespace}/${r.kind}/${r.name}`,
-        group: g.objects,
-        label: r.name,
-        hint: t("palette.in", r.kind, data.namespace),
-        icon: FileTextIcon,
-        href: router.buildLocation({
+  items.push(
+    ...entryItems({
+      t,
+      href,
+      adopted,
+      views: views.map((v) => v.data),
+      current,
+      query,
+      logs,
+      verbs,
+      groups: g,
+      objectHref: (namespace, object) =>
+        router.buildLocation({
           to: "/projects/$project/objects",
-          params: { project: data.namespace },
-          search: { object: objectKey(address) },
+          params: { project: namespace },
+          search: { object },
         }).href,
-      })
-    }
-  }
+    }),
+  )
 
   items.push({
     id: "action:dock",
@@ -318,13 +245,7 @@ export function PaletteBody() {
     icon: MoonIcon,
     run: cycleTheme,
   })
-  items.push({
-    id: "action:components",
-    group: g.actions,
-    label: t("palette.components"),
-    icon: PuzzlePieceIcon,
-    href: "/cluster/components",
-  })
+  items.push(...pageActions(t, g, { components: mayComponents }))
   for (const value of locales)
     if (value !== locale)
       items.push({
@@ -335,19 +256,7 @@ export function PaletteBody() {
         run: () => setLocale(value),
       })
 
-  const needle = query.trim().toLowerCase()
-  const shown = needle
-    ? items
-        .filter((item) => {
-          const text = `${item.label} ${item.hint ?? ""} ${item.keywords ?? ""}`.toLowerCase()
-          return needle.split(/\s+/).every((word) => text.includes(word))
-        })
-        .slice(0, 40)
-    : items
-        .filter(
-          (item) => item.group !== g.pods && item.group !== g.domains && item.group !== g.objects,
-        )
-        .slice(0, 30)
+  const shown = shownItems(items, query, g)
 
   const choose = (item: Item | undefined) => {
     if (!item) return
@@ -365,12 +274,7 @@ export function PaletteBody() {
     item.run?.()
   }
 
-  const groups: Group[] = []
-  for (const item of shown) {
-    const group = groups.find((g) => g.label === item.group)
-    if (group) group.items.push(item)
-    else groups.push({ label: item.group, items: [item] })
-  }
+  const groups = groupItems(shown)
 
   return (
     <Autocomplete.Root
