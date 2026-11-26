@@ -16,8 +16,8 @@ import {
   dayName,
   formOf,
   policyChoices,
+  policyHint,
   localMinute,
-  reachText,
   tagOf,
   toUtc,
   updateOf,
@@ -130,20 +130,8 @@ function PolicyField({
   const t = useT()
   const tag = tagOf(service.containers.find((c) => !c.init)?.image ?? "")
   const foreign = updates.setting?.kind === "other" ? updates.setting.policy : undefined
-  const tagOnly = form.policy === "off" && !updates.allowed.includes("patch")
   return (
-    <FormField
-      label={t("imageUpdates.versions")}
-      hint={
-        form.policy === "other"
-          ? t("imageUpdates.other", foreign ?? "")
-          : tagOnly
-            ? t("imageUpdates.tagOnly", tag)
-            : form.policy === "off" || form.policy === "sameTag"
-              ? t(`imageUpdates.policyHint.${form.policy}`)
-              : reachText(t, tag, form.policy)
-      }
-    >
+    <FormField label={t("imageUpdates.versions")} hint={policyHint(t, updates, form, tag)}>
       <Select
         size="sm"
         value={form.policy}

@@ -8,6 +8,7 @@ import {
   formOf,
   localMinute,
   policyChoices,
+  policyHint,
   reachText,
   tagOf,
   updateOf,
@@ -122,6 +123,9 @@ test("a setting written outside Zeabur stays until another option replaces it", 
   }
   const form = formOf(updates, now)
   expect(form.policy).toBe("other")
+  expect(policyHint(t, updates, form, "7.2.4")).toBe(
+    "Keel updates this service with its glob:build-* policy, set outside Zeabur. Pick another option to replace it.",
+  )
   expect(updateOf(updates, form, now)).toBeUndefined()
   expect(updateOf(updates, { ...form, policy: "off" }, now)).toEqual({ kind: "off" })
 })

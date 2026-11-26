@@ -148,6 +148,23 @@ export function reachText(
   return parts.length < 3 ? t("imageUpdates.reach.fullTag", reach, tag) : reach
 }
 
+/** The hint under the policy select for what the form shows. */
+export function policyHint(
+  t: Translate,
+  updates: Schemas.ImageUpdates,
+  form: UpdateForm,
+  tag: string,
+): string {
+  const { setting } = updates
+  if (form.policy === "other")
+    return t("imageUpdates.other", setting?.kind === "other" ? setting.policy : "")
+  if (form.policy === "off" && !updates.allowed.includes("patch"))
+    return t("imageUpdates.tagOnly", tag)
+  if (form.policy === "off" || form.policy === "sameTag")
+    return t(`imageUpdates.policyHint.${form.policy}`)
+  return reachText(t, tag, form.policy)
+}
+
 /** A window in words, such as "Sundays at 03:00 UTC". */
 export function windowText(t: Translate, window: UpdateWindow): string {
   const time = `${String(window.hour).padStart(2, "0")}:00`
