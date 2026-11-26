@@ -80,6 +80,12 @@ export function formOf(updates: Schemas.ImageUpdates | null | undefined, now: Da
   return { policy: setting.policy, ...toLocal(setting.window, now) }
 }
 
+/** The fields of a form's time that matter for its `when`. */
+function timeKey({ when, day, hour }: Pick<UpdateForm, "when" | "day" | "hour">): string {
+  if (when === "hourly") return when
+  return when === "daily" ? `${when} ${hour}` : `${when} ${day} ${hour}`
+}
+
 /**
  * The UTC window `form` saves: the stored one while the form still shows the time it read, so a
  * daylight-saving change inside the reference week does not move it.
@@ -90,15 +96,9 @@ function windowOf(
   now: Date,
 ): UpdateWindow | undefined {
   const setting = updates?.setting
-  if (setting?.kind === "image") {
-    const read = toLocal(setting.window, now)
-    const same =
-      read.when === form.when &&
-      (form.when === "hourly" ||
-        (read.hour === form.hour && (form.when === "daily" || read.day === form.day)))
-    if (same) return setting.window ?? undefined
-  }
-  return toUtc(form, now)
+  if (setting?.kind !== "image") return toUtc(form, now)
+  const kept = timeKey(toLocal(setting.window, now)) === timeKey(form)
+  return kept ? (setting.window ?? undefined) : toUtc(form, now)
 }
 
 /** The `update` of the `autoUpdate` change for `form`. */
