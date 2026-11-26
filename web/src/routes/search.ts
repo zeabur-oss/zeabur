@@ -24,6 +24,7 @@ const modes = Object.keys(serviceModes) as ServiceMode[]
 /** The parts of Settings, each an anchor. */
 const settingsParts = [
   "build",
+  "updates",
   "schedule",
   "storage",
   "compute",
@@ -53,6 +54,7 @@ export function servicePlace(place?: ServicePlace): {
     case "yaml":
       return { tab: serviceModes[place], mode: place }
     case "build":
+    case "updates":
     case "schedule":
     case "storage":
     case "compute":

@@ -52,8 +52,8 @@ import {
   buildProblem,
   builtContainers,
   durationOf,
-  KEEL_WEBHOOK,
-  keelPolicy,
+  foreignPolicy,
+  newBuildsUpdate,
   reasonKey,
   runsLatest,
   runsOf,
@@ -158,7 +158,7 @@ function BuildView({
         onRebuild={rebuild}
       />
       {isTask(service.kind) ? null : (
-        <AutoUpdate service={service} build={build} data={data} managed={managed} plan={plan} />
+        <AutoUpdate service={service} build={build} managed={managed} plan={plan} />
       )}
       <History project={project} runs={runs} />
     </>
@@ -578,13 +578,11 @@ function SourceFact({ build, branch }: { build: Build; branch: string | undefine
 function AutoUpdate({
   service,
   build,
-  data,
   managed,
   plan,
 }: {
   service: Service
   build: Build
-  data: Builds
   managed?: string
   plan: Plan
 }) {
@@ -592,8 +590,8 @@ function AutoUpdate({
   const toggleGate = useHereGate("changeServices")
   const capabilities = useQuery({ ...capabilitiesQuery, retry: false })
   const missing = missingKeel(capabilities.data?.items)
-  const policy = keelPolicy(data, service)
-  const on = policy !== undefined
+  const on = !!service.imageUpdates?.setting
+  const policy = foreignPolicy(service)
   const toggle = (enabled: boolean) =>
     plan({
       title: t(enabled ? "title.autoUpdateOn" : "title.autoUpdateOff", service.name),
@@ -601,9 +599,7 @@ function AutoUpdate({
         {
           op: "autoUpdate",
           workload: { kind: service.kind, name: service.name },
-          enabled,
-          build: enabled ? build.name : undefined,
-          webhook: enabled ? (build.keelWebhooks[0] ?? KEEL_WEBHOOK) : undefined,
+          update: newBuildsUpdate(build, enabled),
         },
       ],
     })
@@ -623,9 +619,7 @@ function AutoUpdate({
             {t("builds.autoUpdate")}
           </h2>
           <p className="text-sm text-secondary">
-            {policy && policy !== "force"
-              ? t("builds.autoUpdatePolicy", policy)
-              : t("builds.autoUpdateHint")}
+            {policy ? t("builds.autoUpdatePolicy", policy) : t("builds.autoUpdateHint")}
           </p>
         </div>
         {managed ? (

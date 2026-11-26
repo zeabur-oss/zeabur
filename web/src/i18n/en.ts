@@ -7,6 +7,13 @@ import { serverEn } from "@/i18n/server/en"
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`
 const listEn = (items: string[]) => new Intl.ListFormat("en").format(items)
 const weekdayEn = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]
+type ImagePolicyKey = "patch" | "minor" | "major" | "sameTag"
+const imageTakeEn: Record<ImagePolicyKey, string> = {
+  patch: "new patch releases",
+  minor: "new patch and minor releases",
+  major: "every new version",
+  sameTag: "each new image pushed under its tag",
+}
 const sentenceCase = (text: string) => text.charAt(0).toUpperCase() + text.slice(1)
 
 /** What a refused verb does, in a phrase: `patch` changes, `create` adds. */
@@ -768,6 +775,42 @@ export const en = {
     "Auto-deploy needs the Keel component, which this cluster doesn't have and can't install on its Kubernetes version.",
   "builds.keelMissing": "Auto-deploy needs the Keel component, which this cluster doesn't have.",
   "builds.history": "History",
+  "imageUpdates.hint":
+    "Move this service to new versions of its image on its own. Each update restarts the service.",
+  "imageUpdates.versions": "Which versions",
+  "imageUpdates.policy.off": "Off",
+  "imageUpdates.policy.patch": "Patch releases only",
+  "imageUpdates.policy.minor": "Patch and minor releases",
+  "imageUpdates.policy.major": "All new versions",
+  "imageUpdates.policy.sameTag": "New image under the same tag",
+  "imageUpdates.policyHint.off": "The service keeps its image until you change it.",
+  "imageUpdates.policyHint.patch":
+    "Such as 7.2.4 to 7.2.5. A new minor or major version waits for you.",
+  "imageUpdates.policyHint.minor": "Such as 7.2.4 to 7.3.0. A new major version waits for you.",
+  "imageUpdates.policyHint.major":
+    "Such as 7.2.4 to 8.0.0. A major version can need a data migration, as PostgreSQL does.",
+  "imageUpdates.policyHint.sameTag":
+    "When someone pushes a new image under the tag it runs, such as latest.",
+  "imageUpdates.tagOnly": (tag: string) =>
+    `Version choices need a tag like 7.2.4. This image uses ${tag}.`,
+  "imageUpdates.pinned":
+    "The image is pinned to a digest, so it never changes. Use a tag to update it automatically.",
+  "imageUpdates.other": (policy: string) =>
+    `Keel updates this service with its ${policy} policy, set outside Zeabur. Saving here replaces it.`,
+  "imageUpdates.when": "When",
+  "imageUpdates.when.hourly": "As soon as found",
+  "imageUpdates.when.daily": "Every day",
+  "imageUpdates.when.weekly": "Once a week",
+  "imageUpdates.day": "Day",
+  "imageUpdates.hour": "Time",
+  "imageUpdates.hourlyHint": "Keel checks every hour.",
+  "imageUpdates.utc": (when: string) => `Pick it in your time zone. Keel checks ${when}.`,
+  "imageUpdates.window.weekly": (day: number, time: string) => `${weekdayEn[day]}s at ${time} UTC`,
+  "imageUpdates.window.daily": (time: string) => `every day at ${time} UTC`,
+  "imageUpdates.keelMissing":
+    "Automatic updates need the Keel component, which this cluster doesn't have.",
+  "imageUpdates.keelUnavailable":
+    "Automatic updates need the Keel component, which this cluster doesn't have and can't install on its Kubernetes version.",
   "builds.trigger.webhook": "Pushed",
   "builds.trigger.poll": "New commit",
   "builds.trigger.manual": "Started by hand",
@@ -1803,7 +1846,9 @@ export const en = {
   "confirm.autoUpdateOn": (service: string) =>
     `Each new build of ${service} will go live as soon as it finishes.`,
   "confirm.autoUpdateOff": (service: string) =>
-    `New builds of ${service} will wait for you to deploy them.`,
+    `${service} no longer updates on its own. You deploy each new version yourself.`,
+  "confirm.imageUpdates": (service: string, policy: ImagePolicyKey, when?: string) =>
+    `${service} will take ${imageTakeEn[policy]}, checked ${when ?? "every hour"}. Each update restarts it.`,
   "confirm.renameDomain": (from: string) => `Links to ${from} stop working.`,
   "confirm.removeDomain": (host: string) => `Requests to ${host} no longer reach this project.`,
   "confirm.rollback": (revision: number) =>
@@ -1981,6 +2026,7 @@ export const en = {
   "title.buildOptions": (build: string) => `Change how ${build} is built`,
   "title.autoUpdateOn": (service: string) => `Auto-deploy ${service}`,
   "title.autoUpdateOff": (service: string) => `Stop auto-deploying ${service}`,
+  "title.imageUpdates": (service: string) => `Automatic updates for ${service}`,
   "title.addDomain": (host: string) => `Add ${host}`,
   "title.addPrivate": (name: string) => `Add a private address to ${name}`,
   "title.renameDomain": (from: string, to: string) => `${from} → ${to}`,
@@ -4002,6 +4048,7 @@ export const en = {
   "part.build": "Build",
   "part.health-checks": "Health checks",
   "part.security": "Security",
+  "part.updates": "Automatic updates",
   "part.tasks": "Scheduled tasks",
   "part.schedule": "Schedule",
   "tasks.hint":

@@ -1,0 +1,107 @@
+// A service's automatic image updates through Keel: which versions and when. The server says which
+// policies the image's tags allow; the window is stored in UTC and picked in the browser's zone.
+import type { Schemas } from "@/api/client"
+import type { Translate } from "@/i18n"
+
+export type ImagePolicy = Schemas.ImagePolicy
+export type UpdateWindow = Schemas.UpdateWindow
+export type When = "hourly" | "daily" | "weekly"
+
+/** Days as `Date.getDay` numbers them, Sunday 0. */
+const weekdays: readonly Schemas.Weekday[] = [
+  "sunday",
+  "monday",
+  "tuesday",
+  "wednesday",
+  "thursday",
+  "friday",
+  "saturday",
+]
+
+/** What the form holds: the day and hour are the browser's. */
+export interface UpdateForm {
+  policy: ImagePolicy | "off"
+  when: When
+  day: number
+  hour: number
+}
+
+const DEFAULT_DAY = 0
+const DEFAULT_HOUR = 3
+
+/** The UTC window of a local day and hour, in the week of `now`. */
+export function toUtc(form: UpdateForm, now: Date): UpdateWindow | undefined {
+  if (form.when === "hourly") return undefined
+  const at = new Date(now)
+  at.setHours(form.hour, 0, 0, 0)
+  at.setDate(at.getDate() + form.day - at.getDay())
+  return {
+    day: form.when === "weekly" ? weekdays[at.getUTCDay()] : undefined,
+    hour: at.getUTCHours(),
+  }
+}
+
+/** The local `when`, day and hour of a UTC window, in the week of `now`. */
+function toLocal(
+  window: UpdateWindow | null | undefined,
+  now: Date,
+): Pick<UpdateForm, "when" | "day" | "hour"> {
+  if (!window) return { when: "hourly", day: DEFAULT_DAY, hour: DEFAULT_HOUR }
+  const at = new Date(now)
+  const day = window.day ? weekdays.indexOf(window.day) : at.getUTCDay()
+  at.setUTCHours(window.hour, 0, 0, 0)
+  at.setUTCDate(at.getUTCDate() + day - at.getUTCDay())
+  return { when: window.day ? "weekly" : "daily", day: at.getDay(), hour: at.getHours() }
+}
+
+/** The form for what the service does now; Zeabur's own setting only, else off. */
+export function formOf(updates: Schemas.ImageUpdates | null | undefined, now: Date): UpdateForm {
+  const setting = updates?.setting
+  if (setting?.kind !== "image") {
+    return { policy: "off", when: "hourly", day: DEFAULT_DAY, hour: DEFAULT_HOUR }
+  }
+  return { policy: setting.policy, ...toLocal(setting.window, now) }
+}
+
+/** The `update` of the `autoUpdate` change for `form`. */
+export function updateOf(form: UpdateForm, now: Date): Schemas.Update {
+  if (form.policy === "off") return { kind: "off" }
+  const window = toUtc(form, now)
+  return window
+    ? { kind: "image", policy: form.policy, window }
+    : { kind: "image", policy: form.policy }
+}
+
+/** Whether saving `form` changes what `updates` say. */
+export function formChanged(
+  updates: Schemas.ImageUpdates | null | undefined,
+  form: UpdateForm,
+  now: Date,
+): boolean {
+  const before = formOf(updates, now)
+  if (updates?.setting && updates.setting.kind !== "image") return true
+  if (form.policy !== before.policy) return true
+  if (form.policy === "off") return false
+  return JSON.stringify(toUtc(form, now)) !== JSON.stringify(toUtc(before, now))
+}
+
+/** The image's tag, `latest` when it names none. */
+export function tagOf(image: string): string {
+  const last = image.split("@")[0]?.split("/").pop() ?? ""
+  return last.includes(":") ? last.slice(last.indexOf(":") + 1) : "latest"
+}
+
+/** A window in words, such as "Sundays at 03:00 UTC". */
+export function windowText(t: Translate, window: UpdateWindow): string {
+  const time = `${String(window.hour).padStart(2, "0")}:00`
+  return window.day
+    ? t("imageUpdates.window.weekly", weekdays.indexOf(window.day), time)
+    : t("imageUpdates.window.daily", time)
+}
+
+/** The name of day `day` (Sunday 0) in `locale`. */
+export function dayName(day: number, locale: string, timeZone?: string): string {
+  // 4 January 2026 was a Sunday.
+  const date = timeZone ? new Date(Date.UTC(2026, 0, 4 + day, 12)) : new Date(2026, 0, 4 + day, 12)
+  return new Intl.DateTimeFormat(locale, { weekday: "long", timeZone }).format(date)
+}

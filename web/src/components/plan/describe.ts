@@ -17,6 +17,7 @@ import { editCount, partOf } from "@/model/draft"
 import { problemText } from "@/model/problem"
 import { limitSentence } from "@/model/ip-limits"
 import { undoOf, type PodsOf } from "@/model/undo"
+import { windowText } from "@/model/image-updates"
 import { imageTag } from "@/model/service"
 
 type Change = Schemas.Change
@@ -239,10 +240,7 @@ function sentenceOf(
     case "rebuild":
       return t("confirm.rebuild", change.build)
     case "autoUpdate":
-      return t(
-        change.enabled ? "confirm.autoUpdateOn" : "confirm.autoUpdateOff",
-        change.workload.name,
-      )
+      return autoUpdateSentence(t, change.workload.name, change.update)
     case "scale": {
       if (change.replicas === 0) return t("confirm.scaleZero", change.workload.name)
       const from = podsOf(change.workload)?.desired
@@ -941,11 +939,34 @@ function oneAction(
   }
 }
 
+function autoUpdateSentence(t: Translate, service: string, update: Schemas.Update): string {
+  switch (update.kind) {
+    case "off":
+      return t("confirm.autoUpdateOff", service)
+    case "newBuilds":
+      return t("confirm.autoUpdateOn", service)
+    default:
+      return t(
+        "confirm.imageUpdates",
+        service,
+        update.policy,
+        update.window ? windowText(t, update.window) : undefined,
+      )
+  }
+}
+
 /** The button of a change that turns a setting on or off, or makes it strict. */
 function switchAction(t: Translate, change: Change): string {
   switch (change.op) {
     case "autoUpdate":
-      return t(change.enabled ? "action.autoUpdateOn" : "action.autoUpdateOff")
+      switch (change.update.kind) {
+        case "off":
+          return t("action.autoUpdateOff")
+        case "newBuilds":
+          return t("action.autoUpdateOn")
+        default:
+          return t("action.save")
+      }
     case "securityProfile":
       return change.profile === "restricted" ? t("action.makeStrict") : t("action.makeCompatible")
     default:
