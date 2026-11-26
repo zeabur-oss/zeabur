@@ -31,7 +31,8 @@ Zeabur OSS sends one event each time someone signs in or saves changes, and one 
 | `source` | `feature_used` with `service_created` | How the service was created: `git`, `upload`, `image` or `template` |
 | `template` | `feature_used` with `source` `template` | The template's ID in Zeabur Catalog, such as `wordpress`; an ID not in the catalog is left out |
 | `component` | `feature_used` with `component_installed` | The component's ID in Zeabur Catalog, such as `logs/victoria-logs` |
-| `kind` | `feature_used` with `database_created` or `domain_added` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` when the name ends in a suffix Zeabur OSS offers for new services, `custom` otherwise |
+| `policy` | `feature_used` with `auto_update_enabled` | Which new images it takes: `same_tag`, `patch`, `minor` or `major` |
+| `kind` | `feature_used` with `database_created`, `domain_added`, `access_limited` or `data_restored` | The database or object storage: `postgresql`, `mongodb`, `mysql`, `mariadb`, `dragonfly` or `object-storage`. The domain: `generated` when the name ends in a suffix Zeabur OSS offers for new services, `custom` otherwise. The limit: `ip_allow`, `basic_auth` or `maintenance`. The restore: `volume` or `project` |
 | `$process_person_profile` | all | Always `false`: no person profile is made |
 | `$geoip_disable` | all | Always `true`: no location is looked up |
 
@@ -50,6 +51,13 @@ Zeabur OSS sends one event each time someone signs in or saves changes, and one 
 | `github_app_connected` | The GitHub App is made, or the projects it may build from change |
 | `node_maintenance` | A node stops taking new pods for maintenance |
 | `sign_in_configured` | How admin accounts sign in is changed |
+| `public_port_opened` | A port of a service is opened to the internet |
+| `access_limited` | An IP allow list, a password or the maintenance page is turned on for a service |
+| `auto_update_enabled` | A service is set to update to new image versions |
+| `cron_job_created` | A scheduled task is made |
+| `rollback_used` | A service goes back to an earlier release |
+| `suggestion_applied` | The fix of a suggestion is applied; which suggestion is not sent |
+| `data_restored` | A volume is restored from its backups, or a project from a cluster backup |
 
 The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur OSS's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur OSS restarts, and a different one the next day, so their days can't be linked.
 

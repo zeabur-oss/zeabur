@@ -176,6 +176,42 @@ pub enum DomainKind {
     Custom,
 }
 
+/// What limits who reaches a service.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum AccessLimit {
+    /// Only some client addresses.
+    IpAllow,
+    /// A user name and password.
+    BasicAuth,
+    /// The maintenance page in place of the service.
+    Maintenance,
+}
+
+/// Which new image versions an automatic update takes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum UpdatePolicy {
+    /// A new image under the same tag.
+    SameTag,
+    /// Patch versions.
+    Patch,
+    /// Minor and patch versions.
+    Minor,
+    /// Any newer version.
+    Major,
+}
+
+/// What a restore got back.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize)]
+#[serde(rename_all = "snake_case")]
+pub enum RestoreKind {
+    /// One volume, from its own backups.
+    Volume,
+    /// A project, from a cluster backup.
+    Project,
+}
+
 /// A feature someone used, with the one enum value that tells uses of it apart.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum Feature {
@@ -205,6 +241,20 @@ pub enum Feature {
     NodeMaintenance,
     /// How admin accounts sign in was changed.
     SignInConfigured,
+    /// A port was opened to the internet.
+    PublicPortOpened,
+    /// A limit on who reaches a service was turned on.
+    AccessLimited(AccessLimit),
+    /// Automatic updates to new image versions were turned on.
+    AutoUpdateEnabled(UpdatePolicy),
+    /// A scheduled task was made.
+    CronJobCreated,
+    /// A workload went back to an earlier release.
+    RollbackUsed,
+    /// A plan that a suggestion's fix made was applied.
+    SuggestionApplied,
+    /// Data was restored from a backup.
+    DataRestored(RestoreKind),
 }
 
 impl Feature {
@@ -223,6 +273,13 @@ impl Feature {
             Self::GithubAppConnected => "github_app_connected",
             Self::NodeMaintenance => "node_maintenance",
             Self::SignInConfigured => "sign_in_configured",
+            Self::PublicPortOpened => "public_port_opened",
+            Self::AccessLimited(_) => "access_limited",
+            Self::AutoUpdateEnabled(_) => "auto_update_enabled",
+            Self::CronJobCreated => "cron_job_created",
+            Self::RollbackUsed => "rollback_used",
+            Self::SuggestionApplied => "suggestion_applied",
+            Self::DataRestored(_) => "data_restored",
         }
     }
 }
@@ -241,6 +298,9 @@ impl Serialize for Feature {
             Self::DatabaseCreated(kind) => map.serialize_entry("kind", kind)?,
             Self::DomainAdded(kind) => map.serialize_entry("kind", kind)?,
             Self::ComponentInstalled(id) => map.serialize_entry("component", id)?,
+            Self::AccessLimited(kind) => map.serialize_entry("kind", kind)?,
+            Self::AutoUpdateEnabled(policy) => map.serialize_entry("policy", policy)?,
+            Self::DataRestored(kind) => map.serialize_entry("kind", kind)?,
             Self::LogsViewed
             | Self::TerminalOpened
             | Self::MemberInvited
@@ -249,7 +309,11 @@ impl Serialize for Feature {
             | Self::NotificationsConfigured
             | Self::GithubAppConnected
             | Self::NodeMaintenance
-            | Self::SignInConfigured => {}
+            | Self::SignInConfigured
+            | Self::PublicPortOpened
+            | Self::CronJobCreated
+            | Self::RollbackUsed
+            | Self::SuggestionApplied => {}
         }
         map.end()
     }

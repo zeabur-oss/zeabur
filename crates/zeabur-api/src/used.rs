@@ -6,11 +6,14 @@ use std::sync::Arc;
 
 use serde_json::Value;
 use zeabur_kube::Cluster;
+use zeabur_model::ImagePolicy;
 use zeabur_modules::{
-    Read, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb, seaweedfs,
+    Read, cloudnative_pg, dragonfly, k8up, mariadb_operator, moco, percona_mongodb, seaweedfs,
 };
-use zeabur_plan::{BuildSource, Change, created_object};
-use zeabur_telemetry::{DatabaseKind, DomainKind, Feature, Source};
+use zeabur_plan::{BuildSource, Change, Update, created_object};
+use zeabur_telemetry::{
+    AccessLimit, DatabaseKind, DomainKind, Feature, RestoreKind, Source, UpdatePolicy,
+};
 
 use crate::handlers::AppState;
 use crate::projects::templates::PAGE_SERVER_TEMPLATE;
@@ -75,6 +78,8 @@ fn read(changes: &[Change]) -> Found {
             found.hosts.extend(image.host.clone());
         } else if let Change::AddDomain(add) = change {
             found.hosts.push(add.hostname.clone());
+        } else if let Some(feature) = turned_on(change) {
+            found.feature(feature);
         } else if let Some(Ok(object)) = created_object(change) {
             created(&object, &mut found, &mut workloads, &mut builds);
         }
@@ -86,7 +91,38 @@ fn read(changes: &[Change]) -> Found {
     found
 }
 
-/// What one created object shows: a database, a build, a workload, or host names.
+/// The feature a change that turns something on or acts on a workload uses.
+fn turned_on(change: &Change) -> Option<Feature> {
+    if let Change::PublicPort(port) = change {
+        (!port.remove).then_some(Feature::PublicPortOpened)
+    } else if let Change::IpAllow(allow) = change {
+        allow
+            .enabled
+            .then_some(Feature::AccessLimited(AccessLimit::IpAllow))
+    } else if let Change::BasicAuth(auth) = change {
+        auth.user
+            .is_some()
+            .then_some(Feature::AccessLimited(AccessLimit::BasicAuth))
+    } else if let Change::Maintenance(page) = change {
+        page.enabled
+            .then_some(Feature::AccessLimited(AccessLimit::Maintenance))
+    } else if let Change::AutoUpdate {
+        update: Update::Image { policy, .. },
+        ..
+    } = change
+    {
+        Some(Feature::AutoUpdateEnabled(update_policy(*policy)))
+    } else if let Change::ScheduleTask { .. } = change {
+        Some(Feature::CronJobCreated)
+    } else if let Change::Rollback { .. } = change {
+        Some(Feature::RollbackUsed)
+    } else {
+        None
+    }
+}
+
+/// What one created object shows: a database, a volume restore, a build, a workload, or host
+/// names.
 fn created(object: &Value, found: &mut Found, workloads: &mut usize, builds: &mut usize) {
     let api_version = text(object, "/apiVersion");
     let kind = text(object, "/kind");
@@ -95,6 +131,9 @@ fn created(object: &Value, found: &mut Found, workloads: &mut usize, builds: &mu
         if read.group == group && read.kind == kind {
             found.feature(Feature::DatabaseCreated(database));
         }
+    }
+    if group == k8up::RESTORES.group && kind == k8up::RESTORES.kind {
+        found.feature(Feature::DataRestored(RestoreKind::Volume));
     }
     match (group, kind) {
         ("apps", "Deployment" | "StatefulSet") => *workloads += 1,
@@ -127,6 +166,15 @@ fn created(object: &Value, found: &mut Found, workloads: &mut usize, builds: &mu
             );
         }
         _ => {}
+    }
+}
+
+const fn update_policy(policy: ImagePolicy) -> UpdatePolicy {
+    match policy {
+        ImagePolicy::SameTag => UpdatePolicy::SameTag,
+        ImagePolicy::Patch => UpdatePolicy::Patch,
+        ImagePolicy::Minor => UpdatePolicy::Minor,
+        ImagePolicy::Major => UpdatePolicy::Major,
     }
 }
 
@@ -312,6 +360,91 @@ mod tests {
         assert_eq!(
             domain_kinds(&hosts, &strings(&["apps.example.com"])),
             [DomainKind::Generated, DomainKind::Custom]
+        );
+    }
+
+    fn web() -> Value {
+        json!({"kind": "Deployment", "name": "web"})
+    }
+
+    fn route() -> Value {
+        json!({"kind": "Ingress", "name": "web"})
+    }
+
+    #[test]
+    fn opening_a_port_is_found_and_closing_one_is_not() {
+        let port = |remove| {
+            json!([{"op": "publicPort", "workload": web(), "service": "web", "port": 25565,
+                    "remove": remove}])
+        };
+        assert_eq!(features(port(false)), [Feature::PublicPortOpened]);
+        assert_eq!(features(port(true)), Vec::<Feature>::new());
+    }
+
+    #[test]
+    fn each_limit_turned_on_is_found_by_its_kind_and_one_turned_off_is_not() {
+        let on = json!([
+            {"op": "ipAllow", "route": route(), "enabled": true, "cidrs": ["10.0.0.0/8"]},
+            {"op": "basicAuth", "route": route(),
+             "user": {"username": "ada", "password": "correct horse"}},
+            {"op": "maintenance", "route": route(), "hostname": "web.example.com", "enabled": true},
+        ]);
+        assert_eq!(
+            features(on),
+            [
+                Feature::AccessLimited(AccessLimit::IpAllow),
+                Feature::AccessLimited(AccessLimit::BasicAuth),
+                Feature::AccessLimited(AccessLimit::Maintenance),
+            ]
+        );
+        let off = json!([
+            {"op": "ipAllow", "route": route(), "enabled": false},
+            {"op": "basicAuth", "route": route()},
+            {"op": "maintenance", "route": route(), "hostname": "web.example.com", "enabled": false},
+        ]);
+        assert_eq!(features(off), Vec::<Feature>::new());
+    }
+
+    #[test]
+    fn automatic_image_updates_are_found_by_policy_and_other_updates_are_not() {
+        let update =
+            |update: Value| json!([{"op": "autoUpdate", "workload": web(), "update": update}]);
+        assert_eq!(
+            features(update(json!({"kind": "image", "policy": "sameTag"}))),
+            [Feature::AutoUpdateEnabled(UpdatePolicy::SameTag)]
+        );
+        assert_eq!(
+            features(update(json!({"kind": "image", "policy": "minor"}))),
+            [Feature::AutoUpdateEnabled(UpdatePolicy::Minor)]
+        );
+        assert_eq!(
+            features(update(json!({"kind": "off"}))),
+            Vec::<Feature>::new()
+        );
+    }
+
+    #[test]
+    fn a_scheduled_task_and_a_rollback_are_found() {
+        assert_eq!(
+            features(
+                json!([{"op": "scheduleTask", "from": web(), "name": "nightly",
+                             "schedule": "0 3 * * *", "command": "./cleanup"}])
+            ),
+            [Feature::CronJobCreated]
+        );
+        assert_eq!(
+            features(json!([{"op": "rollback", "workload": web(), "revision": 2}])),
+            [Feature::RollbackUsed]
+        );
+    }
+
+    #[test]
+    fn a_volume_restore_is_found() {
+        let restore = json!([{"op": "create", "object": {"apiVersion": "k8up.io/v1",
+            "kind": "Restore", "metadata": {"name": "data-restore"}}}]);
+        assert_eq!(
+            features(restore),
+            [Feature::DataRestored(RestoreKind::Volume)]
         );
     }
 }

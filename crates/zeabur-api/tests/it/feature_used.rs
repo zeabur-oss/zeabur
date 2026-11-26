@@ -183,4 +183,16 @@ mod tests {
         let used: zeabur_api::used::Used = std::sync::Arc::new(|_| {});
         assert!(reads(Some(used)).await > reads(None).await);
     }
+
+    #[tokio::test]
+    async fn a_suggestion_fix_is_sent_with_what_its_changes_used() {
+        let (app, seen) = api(&cluster());
+        let open = json!([{"op": "publicPort",
+            "workload": {"kind": "Deployment", "name": "web"}, "service": "web", "port": 8080}]);
+        applied_via(&app, &open, Some("suggestion")).await;
+        assert_eq!(
+            taken(&seen),
+            [Feature::PublicPortOpened, Feature::SuggestionApplied]
+        );
+    }
 }

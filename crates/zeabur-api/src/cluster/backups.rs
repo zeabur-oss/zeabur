@@ -1807,6 +1807,11 @@ pub(crate) async fn apply(
     ) {
         crate::used::tell(&state, zeabur_telemetry::Feature::BackupEnabled);
     }
+    if matches!(claims.request, BackupsPlanRequest::Restore { .. }) {
+        let restored =
+            zeabur_telemetry::Feature::DataRestored(zeabur_telemetry::RestoreKind::Project);
+        crate::used::tell(&state, restored);
+    }
     Ok(Json(BackupsApplied {
         written: computed
             .writes

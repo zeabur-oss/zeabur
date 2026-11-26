@@ -355,8 +355,9 @@ mod tests {
 
     use super::*;
     use crate::event::{
-        AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day, DomainKind,
-        Feature, FeatureUsed, Mode, SignedIn, Source, Submitted,
+        AccessLimit, AppChangeSubmitted, Client, ClusterConnected, Connection, DatabaseKind, Day,
+        DomainKind, Feature, FeatureUsed, Mode, RestoreKind, SignedIn, Source, Submitted,
+        UpdatePolicy,
     };
 
     /// How the receiver answers one connection.
@@ -487,6 +488,9 @@ mod tests {
                 ..used(Feature::LogsViewed)
             }),
             Event::FeatureUsed(used(Feature::BackupEnabled)),
+            Event::FeatureUsed(used(Feature::AccessLimited(AccessLimit::BasicAuth))),
+            Event::FeatureUsed(used(Feature::AutoUpdateEnabled(UpdatePolicy::SameTag))),
+            Event::FeatureUsed(used(Feature::DataRestored(RestoreKind::Project))),
             Event::FeatureUsed(used(Feature::ComponentInstalled(
                 "logs/victoria-logs".to_owned(),
             ))),
@@ -720,6 +724,7 @@ mod tests {
             "template",
             "kind",
             "component",
+            "policy",
             "result",
             "$process_person_profile",
             "$geoip_disable",

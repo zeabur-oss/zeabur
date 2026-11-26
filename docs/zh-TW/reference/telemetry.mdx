@@ -31,7 +31,8 @@ description: 加入體驗計畫後，Zeabur 開源版、`zeaburctl ui` 和 Zeabu
 | `source` | `service_created` 的 `feature_used` | 服務怎麼建立：`git`、`upload`、`image` 或 `template` |
 | `template` | `source` 為 `template` 的 `feature_used` | 範本在 Zeabur Catalog 裡的 ID，例如 `wordpress`；Catalog 沒有的 ID 不會傳送 |
 | `component` | `component_installed` 的 `feature_used` | 元件在 Zeabur Catalog 裡的 ID，例如 `logs/victoria-logs` |
-| `kind` | `database_created` 或 `domain_added` 的 `feature_used` | 資料庫或物件儲存：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。網域：名稱用的是 Zeabur 開源版提供給新服務的網域後綴時是 `generated`，其他是 `custom` |
+| `policy` | `auto_update_enabled` 的 `feature_used` | 更新到哪些新映像檔：`same_tag`、`patch`、`minor` 或 `major` |
+| `kind` | `database_created`、`domain_added`、`access_limited` 或 `data_restored` 的 `feature_used` | 資料庫或物件儲存：`postgresql`、`mongodb`、`mysql`、`mariadb`、`dragonfly` 或 `object-storage`。網域：名稱用的是 Zeabur 開源版提供給新服務的網域後綴時是 `generated`，其他是 `custom`。存取限制：`ip_allow`、`basic_auth` 或 `maintenance`。還原：`volume` 或 `project` |
 | `$process_person_profile` | 全部 | 固定為 `false`：不建立個人檔案 |
 | `$geoip_disable` | 全部 | 固定為 `true`：不查詢所在位置 |
 
@@ -50,6 +51,13 @@ description: 加入體驗計畫後，Zeabur 開源版、`zeaburctl ui` 和 Zeabu
 | `github_app_connected` | 建立 GitHub App，或改了它能替哪些專案建置之後 |
 | `node_maintenance` | 讓節點不再排入新的 Pod、準備維護之後 |
 | `sign_in_configured` | 修改管理員帳號的登入方式之後 |
+| `public_port_opened` | 把服務的連接埠開放到網際網路之後 |
+| `access_limited` | 替服務開啟 IP 允許清單、密碼或維護頁面之後 |
+| `auto_update_enabled` | 設定服務自動更新到新版映像檔之後 |
+| `cron_job_created` | 建立排程工作之後 |
+| `rollback_used` | 把服務回滾到之前的版本之後 |
+| `suggestion_applied` | 套用建議的修正之後；不會傳是哪一條建議 |
+| `data_restored` | 從備份還原磁碟區，或從叢集備份還原專案之後 |
 
 事件不會說明是誰。`person` 是用金鑰算出的使用者名稱加日期的雜湊值。金鑰從 Zeabur 開源版的 plan key 衍生，留在叢集的 Secret 裡，從不送出，所以無法從雜湊值反推使用者名稱。同一個人一整天的 `person` 都一樣，Zeabur 開源版重新啟動也不變；隔天就換成另一個，所以不同天無法串在一起。
 

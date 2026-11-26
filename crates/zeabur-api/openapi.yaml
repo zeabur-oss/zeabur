@@ -20331,6 +20331,7 @@ components:
       description: The form that made a plan.
       enum:
       - compose
+      - suggestion
     VolumeDeletion:
       type: object
       description: A volume that goes with the project.
