@@ -6,7 +6,7 @@ export type BuildRun = Schemas.ProjectBuildRun
 export type Builds = Schemas.ProjectBuilds
 
 /** Where Zeabur tells Keel of new images: the catalog's Keel, by its Service. */
-export const KEEL_WEBHOOK = "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"
+const KEEL_WEBHOOK = "http://keel.keel.svc.cluster.local:9300/v1/webhooks/native"
 
 /**
  * An image's repository as a registry names it: no tag or digest, Docker Hub's host and
@@ -105,10 +105,22 @@ export function durationOf(run: BuildRun, now: number): number | undefined {
   return Number.isFinite(ms) && ms >= 0 ? ms : undefined
 }
 
-/** Whether Keel updates the workload: any `keel.sh/policy` but `never`. */
-export function keelPolicy(builds: Builds, service: Service): string | undefined {
-  const policy = builds.keel.find((k) => k.kind === service.kind && k.name === service.name)?.policy
-  return policy && policy !== "never" ? policy : undefined
+/** The update of the "Auto-deploy new builds" switch, on or off. */
+export const newBuildsUpdate = (build: Build, on: boolean): Schemas.Update =>
+  on
+    ? { kind: "newBuilds", build: build.name, webhook: build.keelWebhooks[0] ?? KEEL_WEBHOOK }
+    : { kind: "off" }
+
+/** A Keel policy set outside Zeabur, to name beside the switch. */
+/** Whether Keel deploys `service`'s new builds: an image policy Zeabur set keeps the old tag. */
+export const takesNewBuilds = (service: Service) => {
+  const kind = service.imageUpdates?.setting?.kind
+  return kind === "newBuilds" || kind === "other"
+}
+
+export const foreignPolicy = (service: Service) => {
+  const setting = service.imageUpdates?.setting
+  return setting?.kind === "other" ? setting.policy : undefined
 }
 
 /** A commit's or an uploaded folder's short form. */

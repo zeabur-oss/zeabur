@@ -1,0 +1,6 @@
+description: "Turning image updates off removes every Keel annotation Zeabur writes and keeps the others."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - {op: autoUpdate, workload: {kind: StatefulSet, name: redis}, update: {kind: 'off'}}

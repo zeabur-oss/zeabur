@@ -77,6 +77,17 @@ Job 和定时任务没有**重启**操作。要再次运行定时任务，使用
 
 从 Git 或上传文件夹构建的服务，在**构建**选项卡中开启**新构建完成后自动部署**，每次构建完成就会立即上线。关闭后，构建成功时点击**部署最新版**手动上线。这需要集群中有 Keel，具体做法及对应的 kubectl 操作见[从 Git 构建并部署服务](../deploy/git.mdx)。
 
+## 自动更新镜像
+
+使用镜像仓库镜像的服务（例如 PostgreSQL 或 Redis），可以让 Keel 在有新版本时自动换上：
+
+1. 打开服务的**设置** → **自动更新**。
+2. 在**更新哪些版本**选**只更新补丁版本**、**补丁版本和次要版本**、**所有新版本**或**同一个标签的新镜像**。列表下方会写出这个服务会升到哪些版本，例如 `7.2.4` 选补丁版本会升到 `7.2.x`。按版本更新的选项需要版本号标签，例如 `8`、`1.27`、`7.2.4` 或 `latest`。Keel 把 `8` 当成 `8.0.0`，更新后标签会变成完整的版本号。
+3. 在**什么时候更新**选**一有新版就更新**（每小时检查一次），或选**每天**、**每周一次**再选时间。时间按你的时区选，下方会写出换算后的 UTC 时间。
+4. 点击**保存**，检查变更后应用。
+
+每次更新都会重启服务。主要版本可能要迁移数据，像 PostgreSQL 换主要版本就要先备份再升级，所以数据库建议选**补丁版本和次要版本**，主要版本不会变。PostgreSQL 的 `16.4` 这类标签没有补丁号，Keel 会把 `16.5` 当成次要版本，选**只更新补丁版本**就永远不会更新。
+
 ## 暂停或重启整个项目
 
 到项目**设置**的**批量操作**：
@@ -97,6 +108,7 @@ Job 和定时任务没有**重启**操作。要再次运行定时任务，使用
 | **暂停所有服务** | `kubectl -n demo scale deployment,statefulset --all --replicas=0` |
 | **重启所有服务** | `kubectl -n demo rollout restart deployment,statefulset,daemonset` |
 | 开启**新构建完成后自动部署** | `kubectl -n demo annotate deployment web keel.sh/policy=force` |
+| **自动更新**选**只更新补丁版本**、**每周一次**周日 03:00 UTC | `kubectl -n demo annotate deployment web keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"` |
 
 **重启**会写入 Pod template 的 annotation `kubectl.kubernetes.io/restartedAt`，值为当前时间，与 `kubectl rollout restart` 相同。**回滚**会将 `spec.template` 替换为该修订版本的内容。
 

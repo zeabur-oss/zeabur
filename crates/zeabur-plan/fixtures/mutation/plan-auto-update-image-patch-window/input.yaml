@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis
+  namespace: demo
+  resourceVersion: "52"
+  generation: 4
+  annotations: {zeabur.com/icon: redis}
+spec:
+  serviceName: redis
+  selector:
+    matchLabels: {app: redis}
+  template:
+    metadata:
+      labels: {app: redis}
+    spec:
+      containers:
+        - name: redis
+          image: redis:7.2.4

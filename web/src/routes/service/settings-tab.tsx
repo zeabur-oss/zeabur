@@ -29,6 +29,11 @@ const BuildSection = lazy(() =>
     default: m.BuildSection,
   })),
 )
+const ImageUpdates = lazy(() =>
+  import("@/routes/service/image-updates").then((m) => ({
+    default: m.ImageUpdatesSection,
+  })),
+)
 const Security = lazy(() =>
   import("@/routes/service/security").then((m) => ({
     default: m.SecuritySection,
@@ -50,7 +55,7 @@ const HealthChecks = lazy(() =>
   })),
 )
 
-/** Build, schedule, compute, health checks, storage, security and scheduled tasks, one under the other;
+/** Build, automatic updates, schedule, compute, health checks, storage, security and scheduled tasks, one under the other;
  * edits other than the build's wait in the draft. */
 export function SettingsTab({
   project,
@@ -100,6 +105,11 @@ export function SettingsTab({
               <BuildSection project={project} service={service} builds={builds} />
             </Part>
           ) : null}
+          {parts.includes("updates") ? (
+            <Part id="updates">
+              <ImageUpdates project={project} service={service} />
+            </Part>
+          ) : null}
           {parts.includes("schedule") ? (
             <Part id="schedule">
               <ScheduleSection project={project} service={service} />
@@ -139,6 +149,8 @@ function partsOf(service: Service, built: boolean): SettingsPart[] {
   // A long-running service without a Build may connect a repository there.
   return [
     ...(built || !isTask(service.kind) ? (["build"] as const) : []),
+    // A built service deploys its new builds, which the Build tab turns on.
+    ...(!built && service.imageUpdates ? (["updates"] as const) : []),
     ...(service.schedule ? (["schedule"] as const) : []),
     "compute",
     ...(isTask(service.kind) ? [] : (["health-checks"] as const)),

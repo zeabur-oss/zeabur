@@ -10,11 +10,14 @@
 //!   client chooses; the controller answers in `status.uploadToken` and writes the token to a
 //!   Secret. After the client has pushed the folder, naming its digest sets
 //!   `spec.source.archive.digest`, which builds it.
-//! - **Updating automatically** adds `keel.sh/policy: force` to the workload's own metadata, so
-//!   Keel moves it to whatever tag it is told of, and adds a `keel` target to the `Build`'s
-//!   `spec.notify`, so the controller tells Keel of each image it pushes. Turning it off removes
-//!   the annotation and leaves the target: Keel ignores images no workload opts in for, and another
-//!   service may still use it.
+//! - **Updating automatically** writes Keel's annotations on the workload's own metadata. For new
+//!   builds, `keel.sh/policy: force`, so Keel moves it to whatever tag it is told of, and a `keel`
+//!   target in the `Build`'s `spec.notify`, so the controller tells Keel of each image it pushes.
+//!   For an image from a registry, a version policy (`patch`, `minor`, `major`, or `force` with
+//!   `keel.sh/match-tag` for a new image under the same tag), `keel.sh/trigger: poll` and a
+//!   `keel.sh/pollSchedule`, hourly or once a day or week. Turning it off removes the annotations
+//!   and leaves the target: Keel ignores images no workload opts in for, and another service may
+//!   still use it.
 //! - **Build options** set the `Build`'s directory and Dockerfile, and edit `spec.env`. Zeabur
 //!   Builder passes each variable to the build as a `BuildKit` secret, never as a build argument,
 //!   so a value does not stay in the image. A value from a Secret names the Secret and the key.
@@ -23,9 +26,12 @@
 //! [keel]: https://keel.sh/docs/#policies
 
 use serde_json::{Value, json};
-use zeabur_model::{WorkloadKind, WorkloadRef};
+use zeabur_model::{
+    ImagePolicy, KEEL_ANNOTATIONS, KEEL_POLL, UpdateWindow, WorkloadKind, WorkloadRef,
+};
+pub use zeabur_model::{KEEL_FORCE, KEEL_POLICY};
 
-use crate::change::{BuildOptionsChange, Target};
+use crate::change::{BuildOptionsChange, Target, Update};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
@@ -43,11 +49,6 @@ pub const REBUILD: &str = "builder.zeabur.com/rebuild";
 pub const UPLOAD_TOKEN_REQUEST: &str = "builder.zeabur.com/upload-token-request";
 /// The label Zeabur Builder reads credentials by.
 pub const GIT_CREDENTIALS_LABEL: &str = "builder.zeabur.com/git-credentials";
-/// The workload annotation that has Keel update it, and to which tags.
-pub const KEEL_POLICY: &str = "keel.sh/policy";
-/// The policy Zeabur sets: any new tag of the image, since the builder's tags are not
-/// versions.
-pub const KEEL_FORCE: &str = "force";
 
 /// Longest upload token request the controller answers.
 const MAX_UPLOAD_REQUEST: usize = 63;
@@ -57,6 +58,35 @@ fn archive_digest_valid(digest: &str) -> bool {
     digest.strip_prefix("sha256:").is_some_and(|hex| {
         hex.len() == 64 && hex.bytes().all(|b| matches!(b, b'0'..=b'9' | b'a'..=b'f'))
     })
+}
+
+/// The values of [`KEEL_ANNOTATIONS`] that `update` writes, in that order; `None` removes one.
+fn keel_annotations(update: &Update) -> [Option<String>; 4] {
+    match update {
+        Update::Off => [None, None, None, None],
+        Update::NewBuilds { .. } => [Some(KEEL_FORCE.to_owned()), None, None, None],
+        Update::Image { policy, window } => {
+            let (policy, match_tag) = policy.annotation();
+            [
+                Some(policy.to_owned()),
+                Some(KEEL_POLL.to_owned()),
+                Some(UpdateWindow::schedule(*window)),
+                match_tag.then(|| "true".to_owned()),
+            ]
+        }
+    }
+}
+
+fn unchanged_update(reference: &WorkloadRef) -> PlanError {
+    error(
+        ErrorKind::BadRequest,
+        "unchanged",
+        format!(
+            "{} {} is already updated this way.",
+            reference.kind.as_str(),
+            reference.name
+        ),
+    )
 }
 
 /// Most build variables a `Build` takes.
@@ -283,10 +313,25 @@ impl Planner<'_> {
     pub(crate) fn auto_update(
         &mut self,
         reference: &WorkloadRef,
-        enabled: bool,
-        build: Option<&str>,
-        webhook: Option<&str>,
+        update: &Update,
     ) -> Result<(), PlanError> {
+        let changed = self.write_keel(reference, update)?;
+        if let Update::NewBuilds { build, webhook } = update {
+            return self.notify_keel(build, webhook, changed, reference);
+        }
+        if !changed {
+            return Err(unchanged_update(reference));
+        }
+        Ok(())
+    }
+
+    /// Writes the Keel annotations `update` asks for on the workload; returns whether any
+    /// changed. A `Build`'s notify target is the caller's.
+    pub(crate) fn write_keel(
+        &mut self,
+        reference: &WorkloadRef,
+        update: &Update,
+    ) -> Result<bool, PlanError> {
         let found = self.workload(reference)?;
         if matches!(found.kind(), WorkloadKind::Job | WorkloadKind::CronJob) {
             return Err(error(
@@ -300,54 +345,74 @@ impl Planner<'_> {
             ));
         }
         Self::refuse_managed(found.meta(), reference.kind.as_str(), &reference.name)?;
+        if let Update::Image { policy, window } = update {
+            if window.is_some_and(|w| w.hour > 23) {
+                return Err(error(
+                    ErrorKind::BadRequest,
+                    "invalid_window",
+                    "The hour of the update window must be 0 to 23.",
+                ));
+            }
+            let images = found
+                .pod_spec()
+                .into_iter()
+                .flat_map(|spec| &spec.containers)
+                .filter_map(|c| c.image.as_deref());
+            if !ImagePolicy::allowed(images).contains(policy) {
+                return Err(error(
+                    ErrorKind::BadRequest,
+                    "policy_not_allowed",
+                    format!(
+                        "The image tags of {} {} do not allow this update policy.",
+                        reference.kind.as_str(),
+                        reference.name
+                    ),
+                ));
+            }
+        }
         let index = self.working(workload_target(found), workload_json(found)?);
-        let current = self.current(index);
-        let path = pointer(&["metadata", "annotations", KEEL_POLICY]);
-        let before = current.pointer(&path).cloned();
-        let on = before.as_ref().and_then(Value::as_str) == Some(KEEL_FORCE);
-        if on == enabled && (enabled || before.is_none()) {
-            return Err(error(
-                ErrorKind::BadRequest,
-                "unchanged",
-                format!(
-                    "{} {} is already {}.",
-                    reference.kind.as_str(),
-                    reference.name,
-                    if enabled {
-                        "updated automatically"
-                    } else {
-                        "updated by hand"
-                    }
-                ),
-            ));
+        let wanted = keel_annotations(update);
+        let mut changed = false;
+        for (key, value) in KEEL_ANNOTATIONS.into_iter().zip(wanted) {
+            let current = self.current(index);
+            let path = pointer(&["metadata", "annotations", key]);
+            let before = current.pointer(&path).cloned();
+            let operations = match (before, value) {
+                (Some(before), Some(value)) if before.as_str() == Some(value.as_str()) => continue,
+                (Some(before), Some(value)) => {
+                    vec![test(&path, before), replace(&path, json!(value))]
+                }
+                (None, Some(value)) => set_key(&current, "annotations", key, &value),
+                (Some(before), None) => vec![test(&path, before), remove(&path)],
+                (None, None) => continue,
+            };
+            self.claim(
+                index,
+                &steps("annotations", key),
+                &shown("annotations", key),
+            )?;
+            self.patch(index, operations)?;
+            changed = true;
         }
-        self.claim(
-            index,
-            &steps("annotations", KEEL_POLICY),
-            &shown("annotations", KEEL_POLICY),
-        )?;
-        let operations = match (before, enabled) {
-            (Some(before), true) => vec![test(&path, before), replace(&path, json!(KEEL_FORCE))],
-            (None, true) => set_key(&current, "annotations", KEEL_POLICY, KEEL_FORCE),
-            (Some(before), false) => vec![test(&path, before), remove(&path)],
-            (None, false) => Vec::new(),
-        };
-        self.patch(index, operations)?;
-        match (enabled, build) {
-            (true, Some(build)) => self.notify_keel(build, webhook),
-            _ => Ok(()),
-        }
+        Ok(changed)
     }
 
     /// Adds a `keel` target for `webhook` to the `Build`'s `spec.notify`, unless one is there.
-    fn notify_keel(&mut self, name: &str, webhook: Option<&str>) -> Result<(), PlanError> {
-        let Some(url) = webhook.map(str::trim).filter(|u| !u.is_empty()) else {
+    fn notify_keel(
+        &mut self,
+        name: &str,
+        webhook: &str,
+        changed: bool,
+        reference: &WorkloadRef,
+    ) -> Result<(), PlanError> {
+        let url = webhook.trim();
+        if url.is_empty() {
             return Err(error(
                 ErrorKind::BadRequest,
                 "webhook_required",
                 "Name Keel's webhook to tell it of new images.",
             ));
-        };
+        }
         if !(url.starts_with("http://") || url.starts_with("https://")) {
             return Err(error(
                 ErrorKind::BadRequest,
@@ -367,7 +432,11 @@ impl Planner<'_> {
                 .any(|t| t["type"] == "keel" && t["url"].as_str() == Some(url))
         });
         if known {
-            return Ok(());
+            return if changed {
+                Ok(())
+            } else {
+                Err(unchanged_update(reference))
+            };
         }
         self.claim(
             index,

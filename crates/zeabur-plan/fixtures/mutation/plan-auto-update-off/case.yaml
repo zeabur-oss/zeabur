@@ -3,4 +3,4 @@ operation: mutation.plan
 params:
   request:
     changes:
-      - {op: autoUpdate, workload: {kind: Deployment, name: web}, enabled: false}
+      - {op: autoUpdate, workload: {kind: Deployment, name: web}, update: {kind: 'off'}}

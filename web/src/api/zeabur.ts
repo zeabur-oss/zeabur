@@ -1880,6 +1880,66 @@ export type ProbeRequest = {
 }
 
 /**
+ * Which new versions of an image Keel moves a workload to.
+ */
+export type ImagePolicy = (typeof ImagePolicy)[keyof typeof ImagePolicy]
+
+export const ImagePolicy = {
+  patch: "patch",
+  minor: "minor",
+  major: "major",
+  sameTag: "sameTag",
+} as const
+
+/**
+ * A day of the week.
+ */
+export type Weekday = (typeof Weekday)[keyof typeof Weekday]
+
+export const Weekday = {
+  monday: "monday",
+  tuesday: "tuesday",
+  wednesday: "wednesday",
+  thursday: "thursday",
+  friday: "friday",
+  saturday: "saturday",
+  sunday: "sunday",
+} as const
+
+/**
+ * When Keel looks for a new image: once a day or once a week, at the start of an hour, in UTC.
+ */
+export type UpdateWindow = {
+  day?: Weekday | null
+  /**
+   * The hour, 0 to 23, UTC.
+   * @minimum 0
+   */
+  hour: number
+}
+
+/**
+ * Which new images Keel moves a workload to.
+ */
+export type Update =
+  | {
+      kind: "off"
+    }
+  | {
+      /** The `Build` whose new images Keel is told of. */
+      build: string
+      kind: "newBuilds"
+      /** Keel's native webhook, `…/v1/webhooks/native`. */
+      webhook: string
+    }
+  | {
+      kind: "image"
+      /** Which versions. */
+      policy: ImagePolicy
+      window?: UpdateWindow | null
+    }
+
+/**
  * A namespaced resource, as a request path names it.
  */
 export type ResourceRef = {
@@ -2323,19 +2383,9 @@ export type Change =
       op: "buildOptions"
     })
   | {
-      /**
-       * The `Build` whose new images Keel is told of, when turning it on.
-       * @nullable
-       */
-      build?: string | null
-      /** On or off. */
-      enabled: boolean
       op: "autoUpdate"
-      /**
-       * Keel's native webhook, `…/v1/webhooks/native`.
-       * @nullable
-       */
-      webhook?: string | null
+      /** Which updates, if any. */
+      update: Update
       /** The workload: a Deployment, StatefulSet or DaemonSet. */
       workload: WorkloadRef
     }
@@ -7064,6 +7114,39 @@ export type ImageInspection = {
 }
 
 /**
+ * What Keel does with a workload now, by its annotations.
+ */
+export type UpdateSetting =
+  | {
+      kind: "image"
+      /** Which versions. */
+      policy: ImagePolicy
+      window?: UpdateWindow | null
+    }
+  | {
+      kind: "newBuilds"
+    }
+  | {
+      kind: "other"
+      /** `keel.sh/policy`. */
+      policy: string
+      /**
+       * `keel.sh/pollSchedule`, when set.
+       * @nullable
+       */
+      schedule?: string | null
+    }
+
+/**
+ * A long-running workload's automatic image updates.
+ */
+export type ImageUpdates = {
+  /** The policies its images' tags allow (see [`ImagePolicy::allowed`]). */
+  allowed: ImagePolicy[]
+  setting?: UpdateSetting | null
+}
+
+/**
  * What kind of cluster-side cause an incident is.
  */
 export type IncidentKind = (typeof IncidentKind)[keyof typeof IncidentKind]
@@ -7200,18 +7283,6 @@ export type IssuedTokenView = {
   recorded: boolean
   /** The bearer token. */
   token: string
-}
-
-/**
- * A workload's Keel policy.
- */
-export type KeelPolicy = {
-  /** `Deployment`, `StatefulSet` or `DaemonSet`. */
-  kind: string
-  /** Its name. */
-  name: string
-  /** The `keel.sh/policy` annotation: `force`, `major`, `minor`, `patch`, `all`, `glob:…`. */
-  policy: string
 }
 
 /**
@@ -9249,6 +9320,7 @@ export type Service = WorkloadSummary & {
   endpointNames: string[]
   /** Its resource name, `projects/<project>/services/<kind>/<name>`; see [`crate::id`]. */
   id: string
+  imageUpdates?: ImageUpdates | null
   podSecurity?: PodSecurityLevel | null
   /** Its pods, sorted by name. */
   pods: PodSummary[]
@@ -9607,8 +9679,6 @@ export type ProjectBuilds = {
   /** The `Build`s, by name. */
   builds: ProjectBuild[]
   component?: ComponentRef | null
-  /** The workloads Keel updates; read only when there is a `Build`. */
-  keel: KeelPolicy[]
   /** Their runs, newest first. */
   runs: ProjectBuildRun[]
   /** Whether Zeabur Builder could be read. */

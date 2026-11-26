@@ -1,0 +1,134 @@
+{
+  "impact": [],
+  "objects": [
+    {
+      "after": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "annotations": {
+            "keel.sh/match-tag": "true",
+            "keel.sh/policy": "force",
+            "keel.sh/pollSchedule": "@hourly",
+            "keel.sh/trigger": "poll"
+          },
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "ghcr.io/acme/web:latest",
+                  "name": "app"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "afterYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\n  annotations:\n    keel.sh/match-tag: \"true\"\n    keel.sh/policy: force\n    keel.sh/pollSchedule: \"@hourly\"\n    keel.sh/trigger: poll\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: ghcr.io/acme/web:latest\n        name: app\n",
+      "before": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "metadata": {
+          "name": "web",
+          "namespace": "demo"
+        },
+        "spec": {
+          "selector": {
+            "matchLabels": {
+              "app": "web"
+            }
+          },
+          "template": {
+            "metadata": {
+              "labels": {
+                "app": "web"
+              }
+            },
+            "spec": {
+              "containers": [
+                {
+                  "image": "ghcr.io/acme/web:latest",
+                  "name": "app"
+                }
+              ]
+            }
+          }
+        }
+      },
+      "beforeYaml": "apiVersion: apps/v1\nkind: Deployment\nmetadata:\n  name: web\n  namespace: demo\nspec:\n  selector:\n    matchLabels:\n      app: web\n  template:\n    metadata:\n      labels:\n        app: web\n    spec:\n      containers:\n      - image: ghcr.io/acme/web:latest\n        name: app\n",
+      "changes": [
+        {
+          "after": "true",
+          "path": "metadata.annotations.keel.sh/match-tag"
+        },
+        {
+          "after": "force",
+          "path": "metadata.annotations.keel.sh/policy"
+        },
+        {
+          "after": "@hourly",
+          "path": "metadata.annotations.keel.sh/pollSchedule"
+        },
+        {
+          "after": "poll",
+          "path": "metadata.annotations.keel.sh/trigger"
+        }
+      ],
+      "owners": [],
+      "resourceVersion": "41",
+      "target": {
+        "apiVersion": "apps/v1",
+        "kind": "Deployment",
+        "name": "web",
+        "plural": "deployments"
+      },
+      "write": {
+        "operations": [
+          {
+            "op": "test",
+            "path": "/metadata/generation",
+            "value": 3
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations",
+            "value": {
+              "keel.sh/policy": "force"
+            }
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations/keel.sh~1trigger",
+            "value": "poll"
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations/keel.sh~1pollSchedule",
+            "value": "@hourly"
+          },
+          {
+            "op": "add",
+            "path": "/metadata/annotations/keel.sh~1match-tag",
+            "value": "true"
+          }
+        ],
+        "type": "patch"
+      }
+    }
+  ],
+  "warnings": []
+}

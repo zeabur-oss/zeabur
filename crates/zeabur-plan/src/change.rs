@@ -12,12 +12,40 @@ use std::collections::BTreeMap;
 use k8s_openapi::jiff::Timestamp;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use zeabur_model::{PodSecurityLevel, ProjectIcon, TaskConcurrency, WorkloadRef};
+use zeabur_model::{
+    ImagePolicy, PodSecurityLevel, ProjectIcon, TaskConcurrency, UpdateWindow, WorkloadRef,
+};
 
 use crate::built_service::{BuiltServiceChange, SetBuildChange};
 use crate::checks::{ProbeRequest, ResourceRef, VolumeRequest};
 use crate::image_service::ImageServiceChange;
 use crate::rules::{EnvEdit, FieldChange};
+
+/// Which new images Keel moves a workload to.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(tag = "kind", rename_all = "camelCase")]
+pub enum Update {
+    /// None: the person deploys each image.
+    Off,
+    /// Each image a Zeabur Builder `Build` pushes.
+    #[serde(rename_all = "camelCase")]
+    NewBuilds {
+        /// The `Build` whose new images Keel is told of.
+        build: String,
+        /// Keel's native webhook, `…/v1/webhooks/native`.
+        webhook: String,
+    },
+    /// New tags of the image in its registry, which Keel looks for itself.
+    #[serde(rename_all = "camelCase")]
+    Image {
+        /// Which versions.
+        policy: ImagePolicy,
+        /// When Keel looks; every hour when left out.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        window: Option<UpdateWindow>,
+    },
+}
 
 // `zeabur-api` resolves `PageServer`, `Template` and `CopyS3Keys` into other changes, and makes
 // the deploy key of a `CreateBuiltService` or `SetBuild` from Git, before the planner sees them.
@@ -259,19 +287,13 @@ pub enum Change {
     /// Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
     /// variables (see the `builds` module).
     BuildOptions(BuildOptionsChange),
-    /// Have Keel move a workload to each new image, or stop it (see the `builds` module).
+    /// Have Keel move a workload to new images, or stop it (see the `builds` module).
     #[serde(rename_all = "camelCase")]
     AutoUpdate {
         /// The workload: a Deployment, StatefulSet or DaemonSet.
         workload: WorkloadRef,
-        /// On or off.
-        enabled: bool,
-        /// The `Build` whose new images Keel is told of, when turning it on.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        build: Option<String>,
-        /// Keel's native webhook, `…/v1/webhooks/native`.
-        #[serde(default, skip_serializing_if = "Option::is_none")]
-        webhook: Option<String>,
+        /// Which updates, if any.
+        update: Update,
     },
     /// Run this many pods of a Deployment or StatefulSet.
     #[serde(rename_all = "camelCase")]

@@ -885,6 +885,22 @@ mod tests {
         );
     }
 
+    /// An image service that took new images under the same tag takes new builds once it gets a
+    /// `Build`: the builder pushes a new tag for each build, which `keel.sh/match-tag` would skip.
+    #[test]
+    fn a_same_tag_service_takes_new_builds_once_it_gets_a_build() {
+        let mut workload = running("nginx:1.27", true);
+        workload["metadata"]["annotations"] = json!({
+            "keel.sh/policy": "force", "keel.sh/match-tag": "true",
+            "keel.sh/trigger": "poll", "keel.sh/pollSchedule": "@hourly"});
+        let plan = on_cluster(set_build(upload("up-1")), workload, Vec::new(), &[]).unwrap();
+        let deployment = after(&plan, "Deployment", "site").unwrap();
+        assert_eq!(
+            deployment["metadata"]["annotations"],
+            json!({"keel.sh/policy": "force"})
+        );
+    }
+
     /// An image service can be given an uploaded folder too: its `Build` asks for an upload token.
     #[test]
     fn an_image_service_gets_a_build_of_an_uploaded_folder() {

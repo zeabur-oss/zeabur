@@ -94,6 +94,7 @@ const tabOfPart: Record<DraftPart, Page> = {
   networking: "networking",
   variables: "variables",
   build: "settings",
+  updates: "settings",
   schedule: "settings",
   compute: "settings",
   "health-checks": "settings",

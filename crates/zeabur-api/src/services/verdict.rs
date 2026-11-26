@@ -173,6 +173,7 @@ mod tests {
             route_names: Vec::new(),
             data_store: None,
             config_reload: None,
+            image_updates: None,
             pod_security: None,
             run_as: None,
             selector: None,

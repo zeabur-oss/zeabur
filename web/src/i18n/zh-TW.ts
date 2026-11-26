@@ -4,6 +4,12 @@ import { serverZhTw } from "@/i18n/server/zh-TW"
 
 // A space where Han text meets a Latin word ("檢視 Secrets 需要…").
 
+const imageTakeZhTW = {
+  patch: "新的修補版本",
+  minor: "新的修補版本和次要版本",
+  major: "所有新版本",
+  sameTag: "同一個標籤下推送的新映像檔",
+} as const
 const weekdayZhTW = ["週日", "週一", "週二", "週三", "週四", "週五", "週六"]
 const latinStart = (text: string) => (/^[A-Za-z0-9]/.test(text) ? " " : "")
 const latinEnd = (text: string) => (/[A-Za-z0-9]$/.test(text) ? " " : "")
@@ -723,6 +729,43 @@ export const zhTW: Messages = {
     "自動部署需要 Keel 元件，但這個叢集沒有，它的 Kubernetes 版本也裝不了。",
   "builds.keelMissing": "自動部署需要叢集裡的 Keel 元件，目前還沒有安裝。",
   "builds.history": "紀錄",
+  "imageUpdates.hint": "讓服務自動換上映像檔的新版本。每次更新都會重新啟動服務。",
+  "imageUpdates.versions": "更新哪些版本",
+  "imageUpdates.policy.other": (policy) => `Zeabur 以外的設定：${policy}`,
+  "imageUpdates.policy.off": "關閉",
+  "imageUpdates.policy.patch": "只更新修補版本",
+  "imageUpdates.policy.minor": "修補版本和次要版本",
+  "imageUpdates.policy.major": "所有新版本",
+  "imageUpdates.policy.sameTag": "同一個標籤的新映像檔",
+  "imageUpdates.policyHint.off": "服務會一直用目前的映像檔，直到你自己更換。",
+  "imageUpdates.reach.within": (tag, range, stop) =>
+    `${tag} 會升到較新的 ${range} 版本，${stop} 以後的版本會等你決定。`,
+  "imageUpdates.reach.major": (tag) =>
+    `${tag} 會升到任何較新的版本。主要版本可能要搬移資料，像 PostgreSQL 就需要。`,
+  "imageUpdates.reach.latest.patch": "latest 會先換成最新的版本號碼標籤，之後只更新修補版本。",
+  "imageUpdates.reach.latest.minor": "latest 會先換成最新的版本號碼標籤，之後更新修補和次要版本。",
+  "imageUpdates.reach.latest.major": "latest 會先換成最新的版本號碼標籤，之後所有新版本都會更新。",
+  "imageUpdates.reach.fullTag": (reach, tag) =>
+    `${reach}更新後，標籤會變成完整的版本號碼，不再是 ${tag}。`,
+  "imageUpdates.policyHint.sameTag": "同一個標籤（例如 latest）一有新的映像檔就換上。",
+  "imageUpdates.tagOnly": (tag) =>
+    `要依版本更新，標籤得是版本號碼，例如 8、1.27 或 7.2.4。這個映像檔用的是 ${tag}。`,
+  "imageUpdates.pinned": "這個映像檔固定在某個摘要（digest），內容不會變。要自動更新，請改用標籤。",
+  "imageUpdates.other": (policy) =>
+    `Keel 依 ${policy} 規則更新這個服務，這個規則是在 Zeabur 以外設定的。選其他選項就會取代它。`,
+  "imageUpdates.when": "什麼時候更新",
+  "imageUpdates.when.hourly": "一有新版就更新",
+  "imageUpdates.when.daily": "每天",
+  "imageUpdates.when.weekly": "每週一次",
+  "imageUpdates.day": "星期",
+  "imageUpdates.hour": "時間",
+  "imageUpdates.hourlyHint": "Keel 每小時檢查一次。",
+  "imageUpdates.utc": (when) => `依你的時區選擇。Keel 會在${when}檢查。`,
+  "imageUpdates.window.weekly": (day, time) => `每${weekdayZhTW[day]} ${time}（UTC）`,
+  "imageUpdates.window.daily": (time) => `每天 ${time}（UTC）`,
+  "imageUpdates.keelMissing": "自動更新需要叢集裡的 Keel 元件，目前還沒有安裝。",
+  "imageUpdates.keelUnavailable":
+    "自動更新需要 Keel 元件，但這個叢集沒有，它的 Kubernetes 版本也裝不了。",
   "builds.trigger.webhook": "推送觸發",
   "builds.trigger.poll": "新的提交",
   "builds.trigger.manual": "手動開始",
@@ -1655,7 +1698,9 @@ export const zhTW: Messages = {
   "confirm.uploadToken": (build) => `Zeabur Builder 會讓你在 15 分鐘內上傳資料夾到 ${build}。`,
   "confirm.archiveDigest": (build) => `Zeabur Builder 會用你上傳的資料夾建置 ${build}。`,
   "confirm.autoUpdateOn": (service) => `${service} 每次建置完成就會立刻上線。`,
-  "confirm.autoUpdateOff": (service) => `${service} 的新建置會等你手動部署。`,
+  "confirm.autoUpdateOff": (service) => `${service} 不再自動更新，新版本要你自己部署。`,
+  "confirm.imageUpdates": (service, policy, when) =>
+    `${service} 會自動更新到${imageTakeZhTW[policy]}，${when ? `${when}檢查` : "每小時檢查一次"}。每次更新都會重新啟動服務。`,
   "confirm.renameDomain": (from) => `連到 ${from} 的連結會失效。`,
   "confirm.removeDomain": (host) => `送到 ${host} 的請求不會再到達這個專案。`,
   "confirm.rollback": (revision) =>
@@ -3652,6 +3697,7 @@ export const zhTW: Messages = {
   "part.build": "建置",
   "part.health-checks": "健康檢查",
   "part.security": "安全性",
+  "part.updates": "自動更新",
   "part.tasks": "排程工作",
   "part.schedule": "排程",
   "tasks.hint": "依排程執行這個服務的指令，例如每晚清理資料或產生報表。",

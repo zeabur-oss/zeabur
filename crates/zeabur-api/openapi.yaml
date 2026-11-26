@@ -6473,31 +6473,19 @@ components:
           Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
           variables (see the `builds` module).
       - type: object
-        description: >-
-          Have Keel move a workload to each new image, or stop it (see the `builds`
-          module).
+        description: Have Keel move a workload to new images, or stop it (see the `builds` module).
         required:
         - workload
-        - enabled
+        - update
         - op
         properties:
-          build:
-            type:
-            - string
-            - "null"
-            description: The `Build` whose new images Keel is told of, when turning it on.
-          enabled:
-            type: boolean
-            description: On or off.
           op:
             type: string
             enum:
             - autoUpdate
-          webhook:
-            type:
-            - string
-            - "null"
-            description: Keel's native webhook, `…/v1/webhooks/native`.
+          update:
+            $ref: "#/components/schemas/Update"
+            description: Which updates, if any.
           workload:
             $ref: "#/components/schemas/WorkloadRef"
             description: "The workload: a Deployment, StatefulSet or DaemonSet."
@@ -11248,6 +11236,14 @@ components:
           description: |-
             `config.User` as written (`nginx`, `1000:1000`); empty when the image sets none and runs
             as root. Kubernetes' `runAsNonRoot` cannot check a name, only a number.
+    ImagePolicy:
+      type: string
+      description: Which new versions of an image Keel moves a workload to.
+      enum:
+      - patch
+      - minor
+      - major
+      - sameTag
     ImageServiceChange:
       type: object
       description: A [`crate::Change::CreateImageService`].
@@ -11337,6 +11333,22 @@ components:
           oneOf:
           - $ref: "#/components/schemas/WaitFor"
             description: Hosts and ports an init container waits for before the app starts.
+          - type: "null"
+    ImageUpdates:
+      type: object
+      description: A long-running workload's automatic image updates.
+      required:
+      - allowed
+      properties:
+        allowed:
+          type: array
+          items:
+            $ref: "#/components/schemas/ImagePolicy"
+          description: The policies its images' tags allow (see [`ImagePolicy::allowed`]).
+        setting:
+          oneOf:
+          - $ref: "#/components/schemas/UpdateSetting"
+            description: What Keel does now; absent when it leaves the workload alone.
           - type: "null"
     ImportedEnv:
       type: object
@@ -11742,23 +11754,6 @@ components:
         wildcards:
           type: boolean
           description: It can issue wildcard certificates.
-    KeelPolicy:
-      type: object
-      description: A workload's Keel policy.
-      required:
-      - kind
-      - name
-      - policy
-      properties:
-        kind:
-          type: string
-          description: "`Deployment`, `StatefulSet` or `DaemonSet`."
-        name:
-          type: string
-          description: Its name.
-        policy:
-          type: string
-          description: "The `keel.sh/policy` annotation: `force`, `major`, `minor`, `patch`, `all`, `glob:…`."
     KeptCopy:
       type: object
       description: A copy of a destination's keys that a plan does not update.
@@ -15900,7 +15895,6 @@ components:
       - builds
       - runs
       - building
-      - keel
       - unreadable
       properties:
         building:
@@ -15916,11 +15910,6 @@ components:
           - $ref: "#/components/schemas/ComponentRef"
             description: The catalogue component that installs Zeabur Builder.
           - type: "null"
-        keel:
-          type: array
-          items:
-            $ref: "#/components/schemas/KeelPolicy"
-          description: The workloads Keel updates; read only when there is a `Build`.
         runs:
           type: array
           items:
@@ -18224,6 +18213,13 @@ components:
             description: >-
               Its resource name, `projects/<project>/services/<kind>/<name>`; see
               [`crate::id`].
+          imageUpdates:
+            oneOf:
+            - $ref: "#/components/schemas/ImageUpdates"
+              description: |-
+                Whether Keel moves it to new images, and which policies its images allow; absent for a
+                Job or CronJob. Whether Keel runs is the cluster's.
+            - type: "null"
           podSecurity:
             oneOf:
             - $ref: "#/components/schemas/PodSecurityLevel"
@@ -19679,6 +19675,119 @@ components:
       - contributesWithoutChart
       - newerRelease
       - unreadable
+    Update:
+      oneOf:
+      - type: object
+        description: "None: the person deploys each image."
+        required:
+        - kind
+        properties:
+          kind:
+            type: string
+            enum:
+            - "off"
+      - type: object
+        description: Each image a Zeabur Builder `Build` pushes.
+        required:
+        - build
+        - webhook
+        - kind
+        properties:
+          build:
+            type: string
+            description: The `Build` whose new images Keel is told of.
+          kind:
+            type: string
+            enum:
+            - newBuilds
+          webhook:
+            type: string
+            description: Keel's native webhook, `…/v1/webhooks/native`.
+      - type: object
+        description: New tags of the image in its registry, which Keel looks for itself.
+        required:
+        - policy
+        - kind
+        properties:
+          kind:
+            type: string
+            enum:
+            - image
+          policy:
+            $ref: "#/components/schemas/ImagePolicy"
+            description: Which versions.
+          window:
+            oneOf:
+            - $ref: "#/components/schemas/UpdateWindow"
+              description: When Keel looks; every hour when left out.
+            - type: "null"
+      description: Which new images Keel moves a workload to.
+    UpdateSetting:
+      oneOf:
+      - type: object
+        description: Keel looks for new image tags itself, as Zeabur's setting writes it.
+        required:
+        - policy
+        - kind
+        properties:
+          kind:
+            type: string
+            enum:
+            - image
+          policy:
+            $ref: "#/components/schemas/ImagePolicy"
+            description: Which versions.
+          window:
+            oneOf:
+            - $ref: "#/components/schemas/UpdateWindow"
+              description: When; hourly when left out.
+            - type: "null"
+      - type: object
+        description: |-
+          Keel moves it to each image it is told of (`force`, without polling): Zeabur's setting
+          for a service built from source.
+        required:
+        - kind
+        properties:
+          kind:
+            type: string
+            enum:
+            - newBuilds
+      - type: object
+        description: Annotations Zeabur does not write, shown as they are.
+        required:
+        - policy
+        - kind
+        properties:
+          kind:
+            type: string
+            enum:
+            - other
+          policy:
+            type: string
+            description: "`keel.sh/policy`."
+          schedule:
+            type:
+            - string
+            - "null"
+            description: "`keel.sh/pollSchedule`, when set."
+      description: What Keel does with a workload now, by its annotations.
+    UpdateWindow:
+      type: object
+      description: "When Keel looks for a new image: once a day or once a week, at the start of an hour, in UTC."
+      required:
+      - hour
+      properties:
+        day:
+          oneOf:
+          - $ref: "#/components/schemas/Weekday"
+            description: The day; every day when left out.
+          - type: "null"
+        hour:
+          type: integer
+          format: int32
+          description: The hour, 0 to 23, UTC.
+          minimum: 0
     UpgradeExtensions:
       type: object
       description: What integrations add to the cluster's upgrades, one member per module.
@@ -20466,6 +20575,17 @@ components:
       - imagePull
       - unschedulable
       - other
+    Weekday:
+      type: string
+      description: A day of the week.
+      enum:
+      - monday
+      - tuesday
+      - wednesday
+      - thursday
+      - friday
+      - saturday
+      - sunday
     WhoAmI:
       type: object
       description: Who the cluster says the person is.

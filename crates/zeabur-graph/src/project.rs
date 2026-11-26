@@ -544,6 +544,7 @@ fn service(
             .annotations
             .as_ref()
             .and_then(zeabur_model::ConfigReload::from_annotations),
+        image_updates: None,
         pod_security: workload.pod_spec().map(crate::pod_security::level),
         run_as: workload.pod_spec().and_then(crate::pod_security::run_as),
         selector: workload.selector().map(|selector| WorkloadSelector {
@@ -557,9 +558,30 @@ fn service(
         role: ServiceRole::default(),
         verdict: None,
     };
+    service.image_updates = image_updates(workload, &service.containers);
     service.data_store = data_store(&service);
     service.role = service.role_now();
     service
+}
+
+/// A long-running workload's Keel setting, and the policies its regular containers' images allow.
+fn image_updates(
+    workload: Workload<'_>,
+    containers: &[Container],
+) -> Option<zeabur_model::ImageUpdates> {
+    if matches!(
+        workload.kind(),
+        zeabur_model::WorkloadKind::Job | zeabur_model::WorkloadKind::CronJob
+    ) {
+        return None;
+    }
+    Some(zeabur_model::ImageUpdates::read(
+        workload.meta().annotations.iter().flatten(),
+        containers
+            .iter()
+            .filter(|c| !c.init)
+            .filter_map(|c| c.image.as_deref()),
+    ))
 }
 
 /// A declared port, without the default protocol.
