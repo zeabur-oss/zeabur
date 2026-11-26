@@ -64,8 +64,7 @@ impl Clusters {
         let kubeconfig = read(&target, &env.changed_from(&own)).inspect_err(|_| {
             self.telemetry.connected(Connection::Other);
         })?;
-        let started =
-            zeabur_local::start_from(
+        let started = zeabur_local::start_from(
             kubeconfig,
             &target.context,
             Settings::default(),

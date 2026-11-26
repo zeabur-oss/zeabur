@@ -309,10 +309,11 @@ fn setup(tauri_app: &mut tauri::App) -> Result<(), Box<dyn std::error::Error>> {
 fn telemetry() -> zeabur_local::telemetry::Local {
     let show: zeabur_local::telemetry::Show =
         std::sync::Arc::new(|body| output::warn(&format!("telemetry: {body}")));
-    zeabur_local::telemetry::Local::from_env(zeabur_local::telemetry::Client::Desktop, show).unwrap_or_else(|error| {
-        output::warn(&format!("{error}; no usage data is sent until it is fixed"));
-        zeabur_local::telemetry::Local::default()
-    })
+    zeabur_local::telemetry::Local::from_env(zeabur_local::telemetry::Client::Desktop, show)
+        .unwrap_or_else(|error| {
+            output::warn(&format!("{error}; no usage data is sent until it is fixed"));
+            zeabur_local::telemetry::Local::default()
+        })
 }
 
 fn main() -> ExitCode {
