@@ -18,6 +18,7 @@ import {
   formChanged,
   formOf,
   localMinute,
+  reachText,
   tagOf,
   toUtc,
   updateOf,
@@ -142,14 +143,17 @@ function PolicyField({
   set: (patch: Partial<UpdateForm>) => void
 }) {
   const t = useT()
+  const tag = tagOf(service.containers.find((c) => !c.init)?.image ?? "")
   const tagOnly = form.policy === "off" && !updates.allowed.includes("patch")
   return (
     <FormField
       label={t("imageUpdates.versions")}
       hint={
         tagOnly
-          ? t("imageUpdates.tagOnly", tagOf(service.containers.find((c) => !c.init)?.image ?? ""))
-          : t(`imageUpdates.policyHint.${form.policy}`)
+          ? t("imageUpdates.tagOnly", tag)
+          : form.policy === "off" || form.policy === "sameTag"
+            ? t(`imageUpdates.policyHint.${form.policy}`)
+            : reachText(t, tag, form.policy)
       }
     >
       <Select

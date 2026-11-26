@@ -737,12 +737,17 @@ export const zhTW: Messages = {
   "imageUpdates.policy.major": "所有新版本",
   "imageUpdates.policy.sameTag": "同一個標籤的新映像檔",
   "imageUpdates.policyHint.off": "服務會一直用目前的映像檔，直到你自己更換。",
-  "imageUpdates.policyHint.patch": "例如 7.2.4 → 7.2.5。新的次要版本或主要版本會等你決定。",
-  "imageUpdates.policyHint.minor": "例如 7.2.4 → 7.3.0。新的主要版本會等你決定。",
-  "imageUpdates.policyHint.major":
-    "例如 7.2.4 → 8.0.0。主要版本可能要搬移資料，像 PostgreSQL 就需要。",
+  "imageUpdates.reach.within": (tag, range, stop) =>
+    `${tag} 會升到較新的 ${range} 版本，${stop} 以後的版本會等你決定。`,
+  "imageUpdates.reach.major": (tag) =>
+    `${tag} 會升到任何較新的版本。主要版本可能要搬移資料，像 PostgreSQL 就需要。`,
+  "imageUpdates.reach.latest.patch": "latest 會先換成最新的版本號標籤，之後只更新修補版本。",
+  "imageUpdates.reach.latest.minor": "latest 會先換成最新的版本號標籤，之後更新修補和次要版本。",
+  "imageUpdates.reach.latest.major": "latest 會先換成最新的版本號標籤，之後所有新版本都會更新。",
+  "imageUpdates.reach.fullTag": (tag) => `更新後，標籤會變成完整的版本號，不再是 ${tag}。`,
   "imageUpdates.policyHint.sameTag": "同一個標籤（例如 latest）一有新的映像檔就換上。",
-  "imageUpdates.tagOnly": (tag) => `要依版本更新，標籤得像 7.2.4 這樣。這個映像檔用的是 ${tag}。`,
+  "imageUpdates.tagOnly": (tag) =>
+    `要依版本更新，標籤得是版本號，例如 8、1.27 或 7.2.4。這個映像檔用的是 ${tag}。`,
   "imageUpdates.pinned": "這個映像檔固定在某個摘要（digest），內容不會變。要自動更新，請改用標籤。",
   "imageUpdates.other": (policy) =>
     `Keel 依 ${policy} 規則更新這個服務，這個規則是在 Zeabur 以外設定的。在這裡儲存會取代它。`,

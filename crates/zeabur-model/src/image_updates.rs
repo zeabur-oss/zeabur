@@ -56,8 +56,7 @@ impl ImagePolicy {
     }
 
     /// The policies `images`, the tags of a workload's containers, allow: a version policy only
-    /// when every tag is `MAJOR.MINOR.PATCH` (an optional leading `v`), `SameTag` unless an
-    /// image is pinned by digest.
+    /// when Keel reads every tag as a version, `SameTag` unless an image is pinned by digest.
     #[must_use]
     pub fn allowed<'a>(images: impl IntoIterator<Item = &'a str>) -> Vec<Self> {
         let images: Vec<&str> = images.into_iter().collect();
@@ -78,11 +77,16 @@ fn image_tag(image: &str) -> Option<&str> {
     last.split_once(':').map(|(_, tag)| tag)
 }
 
-/// Whether `tag` is `MAJOR.MINOR.PATCH`, with an optional leading `v`.
+/// Whether Keel's semver policies read `tag` as a version: `latest`, which moves to the newest
+/// version tag, or one to three numbers with an optional leading `v`, where `8` reads as `8.0.0`.
+/// See `shouldUpdate` in Keel's `internal/policy/semver.go`.
 fn is_version(tag: &str) -> bool {
+    if tag == "latest" {
+        return true;
+    }
     let tag = tag.strip_prefix('v').unwrap_or(tag);
     let parts: Vec<&str> = tag.split('.').collect();
-    parts.len() == 3
+    (1..=3).contains(&parts.len())
         && parts
             .iter()
             .all(|p| !p.is_empty() && p.bytes().all(|b| b.is_ascii_digit()))
@@ -294,7 +298,7 @@ mod tests {
     }
 
     #[test]
-    fn version_policies_need_a_full_version_tag() {
+    fn version_policies_need_a_version_tag() {
         let all = vec![
             ImagePolicy::Patch,
             ImagePolicy::Minor,
@@ -303,18 +307,15 @@ mod tests {
         ];
         assert_eq!(ImagePolicy::allowed(["redis:7.2.4"]), all);
         assert_eq!(ImagePolicy::allowed(["ghcr.io/acme/app:v1.0.12"]), all);
+        assert_eq!(ImagePolicy::allowed(["nginx:1.27"]), all);
+        assert_eq!(ImagePolicy::allowed(["postgres:16"]), all);
+        assert_eq!(ImagePolicy::allowed(["app:latest"]), all);
         assert_eq!(
             ImagePolicy::allowed(["localhost:5000/app:1.2.3"]),
             all,
             "a registry port is not a tag"
         );
-        for image in [
-            "postgres:16",
-            "redis:7.2",
-            "redis:7.2.4-alpine",
-            "app:latest",
-            "app",
-        ] {
+        for image in ["redis:7.2.4-alpine", "redis:alpine", "app:1.2.3.4", "app"] {
             assert_eq!(
                 ImagePolicy::allowed([image]),
                 [ImagePolicy::SameTag],
@@ -326,7 +327,7 @@ mod tests {
     #[test]
     fn every_container_must_allow_a_policy() {
         assert_eq!(
-            ImagePolicy::allowed(["redis:7.2.4", "exporter:latest"]),
+            ImagePolicy::allowed(["redis:7.2.4", "exporter:main"]),
             [ImagePolicy::SameTag]
         );
     }

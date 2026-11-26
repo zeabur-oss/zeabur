@@ -82,7 +82,7 @@ For services built from Git or an uploaded folder, turn on **Auto-deploy new bui
 A service that runs an image from a registry, such as PostgreSQL or Redis, can have Keel move it to new versions on its own:
 
 1. Go to the service's **Settings** → **Automatic updates**.
-2. Under **Which versions**, pick **Patch releases only**, **Patch and minor releases**, **All new versions** or **New image under the same tag**. The version choices show only when the tag looks like `7.2.4`.
+2. Under **Which versions**, pick **Patch releases only**, **Patch and minor releases**, **All new versions** or **New image under the same tag**. The hint under the list names the versions the service will move to, such as `7.2.x` for `7.2.4` with patch releases. The version choices need a version tag, such as `8`, `1.27`, `7.2.4` or `latest`. Keel reads `8` as `8.0.0`, and after an update the tag names the full version.
 3. Under **When**, pick **As soon as found** (Keel checks every hour), or **Every day** or **Once a week** and a time. You pick the time in your time zone, and the hint below shows it in UTC.
 4. Click **Save**, check the changes and apply them.
 

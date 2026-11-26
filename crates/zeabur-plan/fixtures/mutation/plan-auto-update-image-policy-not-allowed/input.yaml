@@ -14,4 +14,4 @@ spec:
     spec:
       containers:
         - name: app
-          image: ghcr.io/acme/web:latest
+          image: ghcr.io/acme/web:main

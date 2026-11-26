@@ -99,6 +99,24 @@ export function tagOf(image: string): string {
   return last.includes(":") ? last.slice(last.indexOf(":") + 1) : "latest"
 }
 
+/** The tags a version policy moves an image tagged `tag` to, in words. Keel reads `8` as `8.0.0`. */
+export function reachText(
+  t: Translate,
+  tag: string,
+  policy: Exclude<ImagePolicy, "sameTag">,
+): string {
+  if (tag === "latest") return t(`imageUpdates.reach.latest.${policy}`)
+  const parts = tag.replace(/^v/, "").split(".").map(Number)
+  const [major = 0, minor = 0] = parts
+  const reach =
+    policy === "patch"
+      ? t("imageUpdates.reach.within", tag, `${major}.${minor}.x`, `${major}.${minor + 1}`)
+      : policy === "minor"
+        ? t("imageUpdates.reach.within", tag, `${major}.x`, `${major + 1}.0`)
+        : t("imageUpdates.reach.major", tag)
+  return parts.length < 3 ? `${reach} ${t("imageUpdates.reach.fullTag", tag)}` : reach
+}
+
 /** A window in words, such as "Sundays at 03:00 UTC". */
 export function windowText(t: Translate, window: UpdateWindow): string {
   const time = `${String(window.hour).padStart(2, "0")}:00`

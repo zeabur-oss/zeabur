@@ -784,15 +784,22 @@ export const en = {
   "imageUpdates.policy.major": "All new versions",
   "imageUpdates.policy.sameTag": "New image under the same tag",
   "imageUpdates.policyHint.off": "The service keeps its image until you change it.",
-  "imageUpdates.policyHint.patch":
-    "Such as 7.2.4 to 7.2.5. A new minor or major version waits for you.",
-  "imageUpdates.policyHint.minor": "Such as 7.2.4 to 7.3.0. A new major version waits for you.",
-  "imageUpdates.policyHint.major":
-    "Such as 7.2.4 to 8.0.0. A major version can need a data migration, as PostgreSQL does.",
+  "imageUpdates.reach.within": (tag: string, range: string, stop: string) =>
+    `${tag} moves to newer ${range} versions. ${stop} and later wait for you.`,
+  "imageUpdates.reach.major": (tag: string) =>
+    `${tag} moves to every newer version. A major version can need a data migration, as PostgreSQL does.`,
+  "imageUpdates.reach.latest.patch":
+    "latest moves to the newest version tag first, then takes only its patch releases.",
+  "imageUpdates.reach.latest.minor":
+    "latest moves to the newest version tag first, then takes its patch and minor releases.",
+  "imageUpdates.reach.latest.major":
+    "latest moves to the newest version tag first, then to every newer version.",
+  "imageUpdates.reach.fullTag": (tag: string) =>
+    `After an update, the tag names the full version instead of ${tag}.`,
   "imageUpdates.policyHint.sameTag":
     "When someone pushes a new image under the tag it runs, such as latest.",
   "imageUpdates.tagOnly": (tag: string) =>
-    `Version choices need a tag like 7.2.4. This image uses ${tag}.`,
+    `Version choices need a version tag, such as 8, 1.27 or 7.2.4. This image uses ${tag}.`,
   "imageUpdates.pinned":
     "The image is pinned to a digest, so it never changes. Use a tag to update it automatically.",
   "imageUpdates.other": (policy: string) =>

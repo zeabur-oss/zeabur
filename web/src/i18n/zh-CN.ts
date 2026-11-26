@@ -736,12 +736,17 @@ export const zhCN: Messages = {
   "imageUpdates.policy.major": "所有新版本",
   "imageUpdates.policy.sameTag": "同一个标签的新镜像",
   "imageUpdates.policyHint.off": "服务会一直用当前的镜像，直到你自己更换。",
-  "imageUpdates.policyHint.patch": "例如 7.2.4 → 7.2.5。新的次要版本或主要版本会等你决定。",
-  "imageUpdates.policyHint.minor": "例如 7.2.4 → 7.3.0。新的主要版本会等你决定。",
-  "imageUpdates.policyHint.major":
-    "例如 7.2.4 → 8.0.0。主要版本可能要迁移数据，像 PostgreSQL 就需要。",
+  "imageUpdates.reach.within": (tag, range, stop) =>
+    `${tag} 会升到较新的 ${range} 版本，${stop} 以后的版本会等你决定。`,
+  "imageUpdates.reach.major": (tag) =>
+    `${tag} 会升到任何较新的版本。主要版本可能要迁移数据，像 PostgreSQL 就需要。`,
+  "imageUpdates.reach.latest.patch": "latest 会先换成最新的版本号标签，之后只更新补丁版本。",
+  "imageUpdates.reach.latest.minor": "latest 会先换成最新的版本号标签，之后更新补丁和次要版本。",
+  "imageUpdates.reach.latest.major": "latest 会先换成最新的版本号标签，之后所有新版本都会更新。",
+  "imageUpdates.reach.fullTag": (tag) => `更新后，标签会变成完整的版本号，不再是 ${tag}。`,
   "imageUpdates.policyHint.sameTag": "同一个标签（例如 latest）一有新的镜像就换上。",
-  "imageUpdates.tagOnly": (tag) => `要按版本更新，标签得像 7.2.4 这样。这个镜像用的是 ${tag}。`,
+  "imageUpdates.tagOnly": (tag) =>
+    `要按版本更新，标签得是版本号，例如 8、1.27 或 7.2.4。这个镜像用的是 ${tag}。`,
   "imageUpdates.pinned": "这个镜像固定在某个摘要（digest），内容不会变。要自动更新，请改用标签。",
   "imageUpdates.other": (policy) =>
     `Keel 按 ${policy} 规则更新这个服务，这个规则是在 Zeabur 之外设置的。在这里保存会替换它。`,

@@ -1,4 +1,4 @@
-description: "An image tagged latest is not a version, so Keel cannot pick patch releases of it."
+description: "An image tagged main is not a version, so Keel cannot pick patch releases of it."
 operation: mutation.plan
 params:
   request:

@@ -8,6 +8,7 @@ import {
   formChanged,
   formOf,
   localMinute,
+  reachText,
   tagOf,
   updateOf,
   windowText,
@@ -106,4 +107,17 @@ test("an image's tag, with a registry port and a digest", () => {
 test("the hint names the UTC day and time", () => {
   expect(windowText(t, { day: "sunday", hour: 3 })).toBe("Sundays at 03:00 UTC")
   expect(windowText(t, { hour: 21 })).toBe("every day at 21:00 UTC")
+})
+
+test("the hint names the versions a policy takes from the running tag", () => {
+  expect(reachText(t, "7.2.4", "patch")).toBe(
+    "7.2.4 moves to newer 7.2.x versions. 7.3 and later wait for you.",
+  )
+  expect(reachText(t, "v1.27", "minor")).toBe(
+    "v1.27 moves to newer 1.x versions. 2.0 and later wait for you. After an update, the tag names the full version instead of v1.27.",
+  )
+  expect(reachText(t, "8", "patch")).toContain("8 moves to newer 8.0.x versions. 8.1 and later")
+  expect(reachText(t, "latest", "major")).toBe(
+    "latest moves to the newest version tag first, then to every newer version.",
+  )
 })
