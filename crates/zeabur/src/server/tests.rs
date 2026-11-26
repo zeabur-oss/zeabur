@@ -640,7 +640,6 @@ fn a_bearer_token_is_never_handed_on() {
     }));
     assert!(access.for_request(&parts).is_ok());
     assert!(access.handoff(&parts).is_none());
-    assert!(access.later(&parts).is_none());
 }
 
 #[tokio::test]

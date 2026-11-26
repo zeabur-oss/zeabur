@@ -5,9 +5,8 @@ mod local;
 mod send;
 
 pub use event::{
-    AppChangeSubmitted, Change, ChangeId, ClusterConnected, Connection, DatabaseKind, Day,
-    DomainKind, Event, Feature, FeatureUsed, InstallationId, Mode, Operation, Rollout,
-    RolloutFinished, Source, Submitted, ZeaburActive,
+    AppChangeSubmitted, ClusterConnected, Connection, DatabaseKind, Day, DomainKind, Event,
+    Feature, FeatureUsed, InstallationId, Mode, Source, Submitted, ZeaburActive,
 };
 pub use local::{LocalId, Platform, Random, standard_dir, standard_dir_on};
 pub use send::{ENDPOINT, Id, PROJECT_KEY, Sender, Show, Switch, do_not_track, do_not_track_in};

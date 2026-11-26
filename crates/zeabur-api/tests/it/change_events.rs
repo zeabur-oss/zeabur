@@ -1,5 +1,4 @@
-//! A change of one Deployment is reported when the cluster answers it, and an accepted one again
-//! when its rollout ends.
+//! Every save is reported once, with the answer the person got.
 
 #[cfg(test)]
 mod tests {
@@ -9,15 +8,13 @@ mod tests {
 
     use axum::Router;
     use axum::http::StatusCode;
-    use serde_json::json;
-    use zeabur_api::measure::{Fact, Report};
-    use zeabur_kube::k8s_openapi::api::apps::v1::{
-        Deployment, DeploymentCondition, DeploymentStatus,
-    };
+    use serde_json::{Value, json};
+    use zeabur_api::measure::Report;
+    use zeabur_kube::k8s_openapi::api::apps::v1::Deployment;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects};
-    use zeabur_telemetry::{Operation, Rollout, Submitted};
+    use zeabur_telemetry::Submitted;
 
     use crate::common::send;
     use crate::support::TestApi;
@@ -62,151 +59,79 @@ mod tests {
         (router, reports)
     }
 
-    async fn scale(app: &Router, replicas: u32) -> StatusCode {
-        let (status, planned) = send(
-            app,
-            "POST",
-            "/api/v1/projects/shop/plan",
-            Some(&json!({"changes": [{"op": "scale",
-                "workload": {"kind": "Deployment", "name": "web"}, "replicas": replicas}]})),
-        )
-        .await;
+    fn scale(replicas: u32) -> Value {
+        json!({"changes": [{"op": "scale",
+            "workload": {"kind": "Deployment", "name": "web"}, "replicas": replicas}]})
+    }
+
+    async fn plan(app: &Router, changes: &Value) -> Value {
+        let (status, planned) = send(app, "POST", "/api/v1/projects/shop/plan", Some(changes)).await;
         assert_eq!(status, StatusCode::OK, "{planned}");
-        let (status, _) = send(
-            app,
-            "POST",
-            "/api/v1/projects/shop/apply",
-            Some(&json!({"token": planned["token"]})),
-        )
-        .await;
-        status
+        planned
     }
 
-    fn rolled_out(cluster: &MemoryCluster, replicas: i32) {
-        cluster.update(|state| {
-            let web = &mut state.objects.get_mut("shop").unwrap().deployments[0];
-            web.status = Some(DeploymentStatus {
-                observed_generation: web.metadata.generation,
-                replicas: Some(replicas),
-                updated_replicas: Some(replicas),
-                ready_replicas: Some(replicas),
-                available_replicas: Some(replicas),
-                conditions: Some(vec![DeploymentCondition {
-                    type_: "Available".into(),
-                    status: "True".into(),
-                    ..DeploymentCondition::default()
-                }]),
-                ..DeploymentStatus::default()
-            });
-        });
+    async fn apply(app: &Router, planned: &Value) -> StatusCode {
+        let token = json!({"token": planned["token"]});
+        send(app, "POST", "/api/v1/projects/shop/apply", Some(&token))
+            .await
+            .0
     }
 
-    fn facts(reports: &Reports) -> Vec<Fact> {
-        reports
-            .lock()
-            .unwrap()
-            .iter()
-            .map(|report| report.fact.clone())
-            .collect()
+    fn results(reports: &Reports) -> Vec<Submitted> {
+        reports.lock().unwrap().iter().map(|r| r.result).collect()
     }
 
-    async fn wait(seconds: u64) {
-        tokio::time::sleep(Duration::from_secs(seconds)).await;
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn a_scale_is_reported_when_accepted_and_when_its_replicas_are_available() {
+    #[tokio::test]
+    async fn a_save_of_several_changes_to_several_objects_is_one_report() {
         let cluster = cluster();
         let (app, reports) = api(&cluster);
-        assert_eq!(scale(&app, 3).await, StatusCode::OK);
-        assert_eq!(facts(&reports), [Fact::Submitted(Submitted::Accepted)]);
-
-        wait(30).await;
-        assert_eq!(facts(&reports).len(), 1, "the rollout goes on");
-
-        rolled_out(&cluster, 3);
-        wait(6).await;
-        assert_eq!(
-            facts(&reports),
-            [
-                Fact::Submitted(Submitted::Accepted),
-                Fact::Finished(Rollout::Available)
-            ]
-        );
-        let reports = reports.lock().unwrap();
-        assert_eq!(reports[0].id, reports[1].id);
-        assert_eq!(reports[1].operation, Operation::ScaleReplicas);
-        assert_eq!(reports[1].user, "alice");
+        let changes = json!({"changes": [
+            {"op": "scale", "workload": {"kind": "Deployment", "name": "web"}, "replicas": 2},
+            {"op": "env", "workload": {"kind": "Deployment", "name": "web"},
+             "changes": [{"op": "set", "name": "MODE", "value": "maintenance"}]},
+            {"op": "create", "object": {"apiVersion": "v1", "kind": "ConfigMap",
+             "metadata": {"name": "settings"}}},
+        ]});
+        let planned = plan(&app, &changes).await;
+        assert_eq!(apply(&app, &planned).await, StatusCode::OK);
+        assert_eq!(results(&reports), [Submitted::Accepted]);
+        assert_eq!(reports.lock().unwrap()[0].user, "alice");
     }
 
-    #[tokio::test(start_paused = true)]
-    async fn a_refused_write_is_reported_with_its_status_and_not_followed() {
+    #[tokio::test]
+    async fn a_refused_write_is_reported_with_its_status() {
         let cluster = cluster();
         let (app, reports) = api(&cluster);
         cluster.update(|s| {
             s.forbidden_writes.insert("Deployment/web".to_owned());
         });
-        assert_eq!(scale(&app, 2).await, StatusCode::FORBIDDEN);
-        let reads = cluster.inspect(|state| state.object_reads).unwrap();
-        wait(60).await;
-        assert_eq!(facts(&reports), [Fact::Submitted(Submitted::Forbidden)]);
-        assert_eq!(cluster.inspect(|state| state.object_reads).unwrap(), reads);
+        let planned = plan(&app, &scale(2)).await;
+        assert_eq!(apply(&app, &planned).await, StatusCode::FORBIDDEN);
+        assert_eq!(results(&reports), [Submitted::Forbidden]);
     }
 
-    #[tokio::test(start_paused = true)]
+    #[tokio::test]
     async fn a_plan_made_before_someone_else_changed_the_deployment_is_a_conflict() {
         let cluster = cluster();
         let (app, reports) = api(&cluster);
-        let (status, planned) = send(
-            &app,
-            "POST",
-            "/api/v1/projects/shop/plan",
-            Some(&json!({"changes": [{"op": "scale",
-                "workload": {"kind": "Deployment", "name": "web"}, "replicas": 2}]})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::OK, "{planned}");
+        let planned = plan(&app, &scale(2)).await;
         cluster.update(|state| {
             let web = &mut state.objects.get_mut("shop").unwrap().deployments[0];
             web.metadata.generation = Some(2);
         });
-        let (status, _) = send(
-            &app,
-            "POST",
-            "/api/v1/projects/shop/apply",
-            Some(&json!({"token": planned["token"]})),
-        )
-        .await;
-        assert_eq!(status, StatusCode::CONFLICT);
-        assert_eq!(facts(&reports), [Fact::Submitted(Submitted::Conflict)]);
+        assert_eq!(apply(&app, &planned).await, StatusCode::CONFLICT);
+        assert_eq!(results(&reports), [Submitted::Conflict]);
     }
 
     #[tokio::test(start_paused = true)]
-    async fn a_newer_change_ends_the_wait_without_a_result() {
+    async fn nothing_is_read_after_the_save() {
         let cluster = cluster();
-        let (app, reports) = api(&cluster);
-        assert_eq!(scale(&app, 2).await, StatusCode::OK);
-        assert_eq!(scale(&app, 3).await, StatusCode::OK);
-        rolled_out(&cluster, 3);
-        wait(60).await;
-        let finished: Vec<_> = reports
-            .lock()
-            .unwrap()
-            .iter()
-            .filter(|report| matches!(report.fact, Fact::Finished(_)))
-            .map(|report| report.id.clone())
-            .collect();
-        assert_eq!(finished, [reports.lock().unwrap()[1].id.clone()]);
-    }
-
-    #[tokio::test(start_paused = true)]
-    async fn nothing_is_read_without_the_program() {
-        let cluster = cluster();
-        let app = TestApi::new(&cluster).router();
-        assert_eq!(scale(&app, 2).await, StatusCode::OK);
+        let (app, _) = api(&cluster);
+        let planned = plan(&app, &scale(2)).await;
+        assert_eq!(apply(&app, &planned).await, StatusCode::OK);
         let reads = || cluster.inspect(|state| state.object_reads).unwrap();
         let after_apply = reads();
-        wait(60).await;
+        tokio::time::sleep(Duration::from_mins(5)).await;
         assert_eq!(reads(), after_apply);
     }
 }

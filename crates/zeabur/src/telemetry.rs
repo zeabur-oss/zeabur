@@ -1,16 +1,16 @@
 //! The experience program (docs/reference/telemetry.mdx): one event the first time each person
 //! uses Zeabur's web interface in a UTC day, one the first time each feature with its values
-//! is used, and the two events of each change of one Deployment.
+//! is used, and one event for each save.
 
 use std::collections::HashSet;
 use std::sync::{Arc, Mutex, PoisonError};
 use std::time::Duration;
 
-use zeabur_api::measure::{Fact, Report};
+use zeabur_api::measure::Report;
 use zeabur_core::crypto;
 use zeabur_telemetry::{
-    AppChangeSubmitted, Change, Day, Event, Feature, FeatureUsed, Id, InstallationId, Mode,
-    RolloutFinished, Sender, Switch, ZeaburActive,
+    AppChangeSubmitted, Day, Event, Feature, FeatureUsed, Id, InstallationId, Mode, Sender, Switch,
+    ZeaburActive,
 };
 
 /// The people seen in the current UTC day, in memory only. A restart forgets them, but the
@@ -182,26 +182,17 @@ impl Telemetry {
         }
     }
 
-    /// Sends what happened to a change in the background. `person` is of the day the change
-    /// was submitted.
+    /// Sends the answer to a save in the background.
     pub(crate) fn changed(&self, report: Report) {
         let Some((daily, sender)) = &self.on else {
             return;
         };
-        let change = Change {
+        sender.send(Event::AppChangeSubmitted(AppChangeSubmitted {
             zeabur_version: env!("CARGO_PKG_VERSION"),
             mode: Mode::InCluster,
-            person: crypto::hex(&daily.person(&report.user, report.submitted_at)),
-            id: report.id,
-            operation: report.operation,
-        };
-        let event = match report.fact {
-            Fact::Submitted(result) => {
-                Event::AppChangeSubmitted(AppChangeSubmitted { change, result })
-            }
-            Fact::Finished(result) => Event::RolloutFinished(RolloutFinished { change, result }),
-        };
-        sender.send(event);
+            person: crypto::hex(&daily.person(&report.user, report.at)),
+            result: report.result,
+        }));
     }
 }
 

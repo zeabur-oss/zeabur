@@ -260,49 +260,7 @@ pub struct ClusterConnected {
     pub result: Connection,
 }
 
-/// The random identifier of one change, shared by its two events. It means nothing else.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct ChangeId(String);
-
-impl ChangeId {
-    /// A version 4 UUID made from 16 random bytes (RFC 9562 §5.4), which should come from a CSPRNG.
-    #[must_use]
-    pub fn from_random(bytes: [u8; 16]) -> Self {
-        Self(uuid_v4(bytes))
-    }
-}
-
-/// What a change does to one Deployment.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Operation {
-    /// A new image, or a new Deployment.
-    DeployImage,
-    /// A new replica count.
-    ScaleReplicas,
-    /// A change of environment variables.
-    ChangeEnv,
-}
-
-/// One change someone made, on both of its events.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct Change {
-    /// The version of Zeabur.
-    pub zeabur_version: &'static str,
-    /// How Zeabur runs.
-    pub mode: Mode,
-    /// The person, as `zeabur_active` hashes them for the UTC day the change was submitted. Both
-    /// events of a change carry the same hash, also when the rollout ends on the next day, so a
-    /// change never links two days of one person.
-    pub person: String,
-    /// Ties the change's two events together.
-    #[serde(rename = "change_id")]
-    pub id: ChangeId,
-    /// What it does.
-    pub operation: Operation,
-}
-
-/// The answer Zeabur gave the person for a change, by HTTP status class.
+/// The answer Zeabur gave the person for a save, by HTTP status class.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum Submitted {
@@ -320,35 +278,17 @@ pub enum Submitted {
     Other,
 }
 
-/// A change was sent to the cluster and answered.
+/// Someone saved changes, and Zeabur answered.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize)]
 pub struct AppChangeSubmitted {
-    /// The change.
-    #[serde(flatten)]
-    pub change: Change,
+    /// The version of Zeabur.
+    pub zeabur_version: &'static str,
+    /// How Zeabur runs.
+    pub mode: Mode,
+    /// The person, as `zeabur_active` hashes them for the UTC day of the save.
+    pub person: String,
     /// The answer.
     pub result: Submitted,
-}
-
-/// How the rollout of an accepted change ended, in the terms `kubectl rollout status` uses
-/// (<https://kubernetes.io/docs/concepts/workloads/controllers/deployment/#deployment-status>).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum Rollout {
-    /// Every replica runs the change and is available.
-    Available,
-    /// The `Progressing` condition turned `False` with the reason `ProgressDeadlineExceeded`.
-    ProgressDeadlineExceeded,
-}
-
-/// The rollout of an accepted change ended.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize)]
-pub struct RolloutFinished {
-    /// The change.
-    #[serde(flatten)]
-    pub change: Change,
-    /// How it ended.
-    pub result: Rollout,
 }
 
 /// Everything that can be sent.
@@ -360,10 +300,8 @@ pub enum Event {
     FeatureUsed(FeatureUsed),
     /// Someone connected to a cluster with a kubeconfig, or tried to.
     ClusterConnected(ClusterConnected),
-    /// A change was sent to the cluster and answered.
+    /// Someone saved changes, and Zeabur answered.
     AppChangeSubmitted(AppChangeSubmitted),
-    /// The rollout of an accepted change ended.
-    RolloutFinished(RolloutFinished),
 }
 
 impl Event {
@@ -375,7 +313,6 @@ impl Event {
             Self::FeatureUsed(_) => "feature_used",
             Self::ClusterConnected(_) => "cluster_connected",
             Self::AppChangeSubmitted(_) => "app_change_submitted",
-            Self::RolloutFinished(_) => "rollout_finished",
         }
     }
 
@@ -386,7 +323,6 @@ impl Event {
             Self::FeatureUsed(used) => serde_json::to_value(used),
             Self::ClusterConnected(connected) => serde_json::to_value(connected),
             Self::AppChangeSubmitted(submitted) => serde_json::to_value(submitted),
-            Self::RolloutFinished(finished) => serde_json::to_value(finished),
         };
         value.unwrap_or_else(|_| json!({}))
     }
@@ -448,29 +384,6 @@ mod tests {
         assert_eq!(serialized(Day::from_unix(1_782_863_999)), "2026-06-30");
         assert_eq!(serialized(Day::from_unix(951_782_400)), "2000-02-29");
         assert_eq!(serialized(Day::from_unix(-1)), "1969-12-31");
-    }
-
-    #[test]
-    fn a_change_is_sent_as_flat_properties() {
-        let change = Change {
-            zeabur_version: "1.0.0",
-            mode: Mode::InCluster,
-            person: "ab".to_owned(),
-            id: ChangeId::from_random([1; 16]),
-            operation: Operation::ScaleReplicas,
-        };
-        let event = Event::RolloutFinished(RolloutFinished {
-            change,
-            result: Rollout::ProgressDeadlineExceeded,
-        });
-        let properties = event.properties();
-        assert_eq!(properties["operation"], "scale_replicas");
-        assert_eq!(
-            properties["change_id"],
-            "01010101-0101-4101-8101-010101010101"
-        );
-        assert_eq!(properties["result"], "progress_deadline_exceeded");
-        assert!(properties.get("change").is_none());
     }
 
     #[test]

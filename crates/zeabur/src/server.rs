@@ -41,7 +41,7 @@ use secrecy::ExposeSecret as _;
 use tower_http::compression::CompressionLayer;
 use tower_http::compression::predicate::{Predicate, SizeAbove};
 use zeabur_api::ApiError;
-use zeabur_api::access::{ClusterAccess, Handoff, Later};
+use zeabur_api::access::{ClusterAccess, Handoff};
 use zeabur_api::account::SignInPage;
 use zeabur_api::plan_token::PlanKey;
 use zeabur_api::services::proxy::ZeaburProxy;
@@ -368,23 +368,6 @@ impl ClusterAccess for SessionAccess {
 
     fn signed_out(&self, parts: &Parts) -> Option<tokio::sync::watch::Receiver<bool>> {
         Some(credentials(parts)?.signed_out.clone())
-    }
-
-    fn later(&self, parts: &Parts) -> Option<Later> {
-        credentials(parts)?;
-        let id = cookie::get(&parts.headers, cookie::SESSION)?.to_owned();
-        let sessions = Arc::clone(&self.sessions);
-        Some(Arc::new(move || {
-            let (sessions, id) = (Arc::clone(&sessions), id.clone());
-            Box::pin(async move {
-                match sessions.current(&id, Activity::Background).await {
-                    Lookup::Active(credentials) => {
-                        Some(Arc::clone(&credentials.base.value.cluster))
-                    }
-                    Lookup::SignedOut | Lookup::IssuerUnavailable => None,
-                }
-            })
-        }))
     }
 
     fn signs_in(&self) -> bool {
