@@ -50,6 +50,7 @@ use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::k8s_openapi::{ByteString, Metadata, NamespaceResourceScope, Resource};
 use zeabur_kube::{ClusterFacts, DynamicObject, ServedResource};
 use zeabur_model::PodSecurityLevel;
+use zeabur_model::kernel::isolation::PLATFORM_LABEL;
 use zeabur_model::kernel::names::is_system_namespace;
 use zeabur_model::readiness::{self, Explained, GenericStatus, Reason, Status};
 
@@ -1271,8 +1272,10 @@ pub(crate) const POD_SECURITY_MODES: [&str; 3] = [
     PodSecurityLevel::WARN,
 ];
 
-/// A namespace with its Pod Security level in every mode [pss]. `audit` and `warn` also check
-/// workload objects, so a cluster default stricter than the level would flag each one.
+/// A namespace with its Pod Security level in every mode [pss], labelled as the platform's. `audit`
+/// and `warn` also check workload objects, so a cluster default stricter than the level would flag
+/// each one. A project's policy admits the platform's namespaces, so an operator reaches the
+/// databases it runs in a project.
 ///
 /// `None` for a namespace Kubernetes keeps for itself, such as `kube-system`: it exists, and its
 /// pods need more than a component's level.
@@ -1289,6 +1292,7 @@ pub(crate) fn namespace(name: &str, level: PodSecurityLevel) -> Option<Namespace
                 POD_SECURITY_MODES
                     .into_iter()
                     .map(|mode| (mode.to_owned(), level.as_str().to_owned()))
+                    .chain([(PLATFORM_LABEL.to_owned(), "true".to_owned())])
                     .collect(),
             ),
             ..ObjectMeta::default()

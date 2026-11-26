@@ -2,6 +2,7 @@
 
 kubectl create namespace observability --dry-run=client -o yaml | kubectl apply -f -
 kubectl label namespace observability --overwrite \
+  zeabur.com/platform=true \
   pod-security.kubernetes.io/enforce=privileged \
   pod-security.kubernetes.io/audit=privileged \
   pod-security.kubernetes.io/warn=privileged

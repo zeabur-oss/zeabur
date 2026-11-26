@@ -7,6 +7,7 @@ metadata:
     pod-security.kubernetes.io/audit: privileged
     pod-security.kubernetes.io/enforce: privileged
     pod-security.kubernetes.io/warn: privileged
+    zeabur.com/platform: "true"
   name: observability
 ---
 # logs (namespace observability)

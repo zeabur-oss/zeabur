@@ -1,5 +1,9 @@
 # Profile: multi-node
 
+kubectl create namespace cert-manager --dry-run=client -o yaml | kubectl apply -f -
+kubectl label namespace cert-manager --overwrite \
+  zeabur.com/platform=true
+
 # cert-manager
 cat > cert-manager-values.yaml <<'ZEABUR_VALUES'
 # Pinned by digest; a tag alone can move.

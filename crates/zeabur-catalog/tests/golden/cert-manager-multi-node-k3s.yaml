@@ -7,6 +7,7 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/warn: restricted
+    zeabur.com/platform: "true"
   name: cert-manager
 ---
 apiVersion: helm.cattle.io/v1

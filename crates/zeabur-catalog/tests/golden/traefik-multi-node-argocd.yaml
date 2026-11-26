@@ -14,6 +14,7 @@ metadata:
     pod-security.kubernetes.io/audit: restricted
     pod-security.kubernetes.io/enforce: restricted
     pod-security.kubernetes.io/warn: restricted
+    zeabur.com/platform: "true"
   name: traefik
 ---
 # gateway-api-crds: apply with `kubectl apply --server-side -f`, or vendor into your repository:
