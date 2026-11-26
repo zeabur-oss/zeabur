@@ -58,6 +58,8 @@ description: 加入体验计划后，Zeabur 开源版、`zeaburctl ui` 和 Zeabu
 | `rollback_used` | 把服务回滚到之前的版本之后 |
 | `suggestion_applied` | 应用建议的修复之后；不会发送是哪一条建议 |
 | `data_restored` | 从备份恢复卷，或从集群备份恢复项目之后 |
+| `trace_viewed` | 读取服务的连接路径，或要复制的服务排查资料之后 |
+| `database_exported` | 数据库导出完成之后 |
 
 事件不会说明是谁。`person` 是用密钥算出的用户名加日期的哈希值。密钥从 Zeabur 开源版的 plan key 派生，保存在集群的 Secret 里，从不发送，所以无法从哈希值反推用户名。同一个人一整天的 `person` 都一样，Zeabur 开源版重启也不变；第二天就换成另一个，所以不同天无法关联起来。
 

@@ -15,8 +15,10 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::core::v1::Pod;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{DynamicObject, NamespaceObjects, ServedResource};
+    use zeabur_telemetry::Feature;
 
     use crate::common::{app, send};
+    use crate::support::{TestApi, recorder, taken};
 
     const PASSWORD: &str = "writable-password-3f9a";
 
@@ -337,5 +339,22 @@ mod tests {
             StatusCode::NOT_FOUND
         );
         assert_eq!(export(&app, "mysql/missing").await.0, StatusCode::NOT_FOUND);
+    }
+
+    #[tokio::test]
+    async fn a_dump_that_finishes_is_sent_and_one_that_fails_is_not() {
+        let cluster = cluster();
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster).with_used(used).router();
+        assert_eq!(export(&app, "mysql/mysql").await.0, StatusCode::CONFLICT);
+        assert_eq!(taken(&seen), Vec::<Feature>::new());
+        cluster.update(|s| {
+            s.stream_output
+                .insert("shop/maria-0".to_owned(), b"-- dump".to_vec());
+        });
+        let (status, body, _) = export(&app, "mariadb/maria").await;
+        assert_eq!(status, StatusCode::OK);
+        assert_eq!(body, b"-- dump");
+        assert_eq!(taken(&seen), [Feature::DatabaseExported]);
     }
 }

@@ -121,6 +121,9 @@ pub struct State {
     /// The files of each pod, by `namespace/pod`, which [`Cluster::stream`] reads and writes. A
     /// pod of `without_shell` has no `tar` either, but in its ephemeral containers.
     pub files: BTreeMap<String, MemoryFiles>,
+    /// What every command [`Cluster::stream`] runs in a pod, by `namespace/pod`, writes before it
+    /// exits with 0, in place of the pod's `files`.
+    pub stream_output: BTreeMap<String, Vec<u8>>,
     /// Every command [`Cluster::stream`] ran, as `namespace/pod/container` and its arguments.
     pub streams: Vec<(String, Vec<String>)>,
     /// Every terminal size a [`Cluster::exec`] session was given, in order.
@@ -934,7 +937,14 @@ impl Cluster for MemoryCluster {
             tokio::spawn(async move {
                 let mut stdin = Vec::new();
                 let _read = process_input.read_to_end(&mut stdin).await;
-                let status = if found {
+                let fixed = state
+                    .lock()
+                    .ok()
+                    .and_then(|s| s.stream_output.get(&key).cloned());
+                let status = if let Some(out) = fixed {
+                    let _out = process_output.write_all(&out).await;
+                    ExitStatus::Exited(0)
+                } else if found {
                     let mut files = state.lock().map_or_else(
                         |_| MemoryFiles::default(),
                         |s| s.files.get(&key).cloned().unwrap_or_default(),

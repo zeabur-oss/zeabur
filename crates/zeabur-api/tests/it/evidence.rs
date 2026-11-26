@@ -10,8 +10,10 @@ mod tests {
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, SecretSummary};
+    use zeabur_telemetry::Feature;
 
     use crate::common::{app, send};
+    use crate::support::{TestApi, recorder, taken};
 
     fn cluster() -> MemoryCluster {
         let namespace: Namespace = from_value(json!({"metadata": {"name": "shop"}})).unwrap();
@@ -114,5 +116,15 @@ mod tests {
         for unwanted in ["hunter2", "s3cr3t-token", "managedFields"] {
             assert!(!text.contains(unwanted), "{unwanted:?} in:\n{text}");
         }
+    }
+
+    #[tokio::test]
+    async fn evidence_is_sent_as_a_trace_once_read() {
+        let (used, seen) = recorder();
+        let app = TestApi::new(&cluster()).with_used(used).router();
+        let uri = "/api/v1/projects/shop/services/deployment/web/evidence";
+        let (status, body) = send(&app, "GET", uri, None).await;
+        assert_eq!(status, StatusCode::OK, "{body}");
+        assert_eq!(taken(&seen), [Feature::TraceViewed]);
     }
 }

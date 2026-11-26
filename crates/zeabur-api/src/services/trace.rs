@@ -95,7 +95,9 @@ pub(crate) async fn trace(
         .iter()
         .find(|s| s.workload.kind == workload_kind && s.workload.name == name)
         .ok_or_else(|| not_found(&project, workload_kind.as_str(), &name))?;
-    Ok(Json(of_service(&state, cluster, &read, service).await?))
+    let trace = of_service(&state, cluster, &read, service).await?;
+    crate::used::tell(&state, zeabur_telemetry::Feature::TraceViewed);
+    Ok(Json(trace))
 }
 
 /// The trace of `service`, read from `read` and the reads only a trace makes.

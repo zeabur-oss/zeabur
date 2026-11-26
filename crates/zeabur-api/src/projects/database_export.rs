@@ -21,7 +21,10 @@
 //! [mongodump]: https://www.mongodb.com/docs/database-tools/mongodump/
 //! [mysqldump]: https://dev.mysql.com/doc/refman/8.4/en/mysqldump.html
 
+use std::sync::Arc;
+
 use axum::body::Body;
+use axum::extract::State;
 use axum::http::{HeaderValue, header};
 use axum::response::{IntoResponse as _, Response};
 use tokio::io::{AsyncReadExt as _, AsyncWriteExt as _};
@@ -34,7 +37,7 @@ use zeabur_modules::{mariadb_operator, moco, percona_mongodb};
 
 use crate::error::{ApiError, get_read, read_problem};
 use crate::extract::Path;
-use crate::handlers::Person;
+use crate::handlers::{AppState, Person};
 use crate::pods::exec::{exec_refusal, exec_right};
 
 /// The most of a failed dump's standard error kept for the problem.
@@ -257,6 +260,7 @@ async fn drain(mut error: std::pin::Pin<Box<dyn tokio::io::AsyncRead + Send>>) -
               (status = 404, body = Problem, content_type = PROBLEM),
               (status = 409, body = Problem, content_type = PROBLEM)))]
 pub(crate) async fn export(
+    State(state): State<AppState>,
     Person(cluster): Person,
     Path((project, engine, name)): Path<(String, String, String)>,
 ) -> Result<Response, ApiError> {
@@ -299,28 +303,37 @@ pub(crate) async fn export(
         });
     }
     first.truncate(n);
-    let state = (output, Some(first), Some(exit));
-    let body = futures_util::stream::unfold(state, |(mut output, first, exit)| async move {
-        if let Some(chunk) = first {
-            return Some((Ok(chunk), (output, None, exit)));
-        }
-        let exit = exit?;
-        let mut buffer = vec![0_u8; CHUNK];
-        match output.read(&mut buffer).await {
-            Ok(0) => match exit.await {
-                ExitStatus::Exited(0) => None,
-                ExitStatus::Exited(_) | ExitStatus::CommandNotFound | ExitStatus::Failed(_) => {
-                    Some((
-                        Err(std::io::Error::other("the dump failed")),
-                        (output, None, None),
-                    ))
-                }
-            },
-            Ok(n) => {
-                buffer.truncate(n);
-                Some((Ok(buffer), (output, None, Some(exit))))
+    let exported: Arc<dyn Fn() + Send + Sync> = Arc::new(move || {
+        crate::used::tell(&state, zeabur_telemetry::Feature::DatabaseExported);
+    });
+    let stream = (output, Some(first), Some(exit));
+    let body = futures_util::stream::unfold(stream, move |(mut output, first, exit)| {
+        let exported = Arc::clone(&exported);
+        async move {
+            if let Some(chunk) = first {
+                return Some((Ok(chunk), (output, None, exit)));
             }
-            Err(e) => Some((Err(e), (output, None, None))),
+            let exit = exit?;
+            let mut buffer = vec![0_u8; CHUNK];
+            match output.read(&mut buffer).await {
+                Ok(0) => match exit.await {
+                    ExitStatus::Exited(0) => {
+                        exported();
+                        None
+                    }
+                    ExitStatus::Exited(_) | ExitStatus::CommandNotFound | ExitStatus::Failed(_) => {
+                        Some((
+                            Err(std::io::Error::other("the dump failed")),
+                            (output, None, None),
+                        ))
+                    }
+                },
+                Ok(n) => {
+                    buffer.truncate(n);
+                    Some((Ok(buffer), (output, None, Some(exit))))
+                }
+                Err(e) => Some((Err(e), (output, None, None))),
+            }
         }
     });
     let stamp = Timestamp::now().strftime("%Y%m%d-%H%M%S").to_string();

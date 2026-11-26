@@ -58,6 +58,8 @@ Zeabur OSS sends one event each time someone signs in or saves changes, and one 
 | `rollback_used` | A service goes back to an earlier release |
 | `suggestion_applied` | The fix of a suggestion is applied; which suggestion is not sent |
 | `data_restored` | A volume is restored from its backups, or a project from a cluster backup |
+| `trace_viewed` | The way to a service, or the evidence to copy about it, is read |
+| `database_exported` | A database dump finishes |
 
 The event doesn't say who the person is. `person` is a keyed hash of the user name and the day. The key is derived from Zeabur OSS's plan key, which stays in the cluster's Secret and is never sent, so we can't work out the user name from it. The same person gets the same `person` all day, even after Zeabur OSS restarts, and a different one the next day, so their days can't be linked.
 
