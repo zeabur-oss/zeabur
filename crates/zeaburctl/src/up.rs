@@ -23,7 +23,7 @@ use zeabur_api::projects::backups::ProviderState;
 use zeabur_api::projects::writes::ApplyRequest;
 use zeabur_core::problem::Problem;
 use zeabur_kube::{Cluster, UserClient, UserToken, ZeaburInfo};
-use zeabur_plan::{BuildMethod, Change, PlanRequest, UploadServiceChange};
+use zeabur_plan::{BuildInput, BuildMethod, BuildSource, BuiltServiceChange, Change, PlanRequest};
 
 use crate::forward::{self, ServiceAddress};
 use crate::in_process::InProcess;
@@ -464,20 +464,24 @@ async fn create_service(
     target: &Target,
     request: &str,
 ) -> Result<(), String> {
-    let change = UploadServiceChange {
+    let change = BuiltServiceChange {
         name: name.to_owned(),
-        request: request.to_owned(),
-        method: target.method.upload(),
-        directory: None,
-        dockerfile: None,
         port: target.port,
         host: None,
         variables: Vec::new(),
-        build_variables: Vec::new(),
         size: None,
         security: None,
+        build: BuildInput {
+            source: BuildSource::Upload {
+                request: request.to_owned(),
+            },
+            method: target.method.upload(),
+            directory: None,
+            dockerfile: None,
+            build_variables: Vec::new(),
+        },
     };
-    plan_and_apply(api, project, vec![Change::CreateUploadService(change)]).await
+    plan_and_apply(api, project, vec![Change::CreateBuiltService(change)]).await
 }
 
 /// Chooses the project and the service, makes the service when it is missing, then pushes the

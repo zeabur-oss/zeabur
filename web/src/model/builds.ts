@@ -123,13 +123,17 @@ export function buildDeletions(
     others.every((s) => builtContainers(s, [build]).length === 0),
   )
   const kept = builds.filter((b) => !gone.includes(b))
-  return gone.flatMap((build) => [
-    { op: "delete" as const, resource: BUILD_RESOURCE, name: build.name },
-    ...(build.credentials?.own && kept.every((b) => b.credentials?.name !== build.credentials?.name)
-      ? [{ op: "delete" as const, resource: SECRET_RESOURCE, name: build.credentials.name }]
-      : []),
-  ])
+  return gone.flatMap((build) => buildDeletion(build, kept))
 }
+
+/** Deleting `build`, with the `<build>-git` Secret "Deploy from Git" made for it when no Build in
+ * `kept` reads it. */
+const buildDeletion = (build: Build, kept: readonly Build[]): Schemas.Change[] => [
+  { op: "delete", resource: BUILD_RESOURCE, name: build.name },
+  ...(build.credentials?.own && kept.every((b) => b.credentials?.name !== build.credentials?.name)
+    ? [{ op: "delete" as const, resource: SECRET_RESOURCE, name: build.credentials.name }]
+    : []),
+]
 
 /** The first words that say why a build failed: its own message, then the run's, then the
  * resource's. */

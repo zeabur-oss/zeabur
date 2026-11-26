@@ -1,4 +1,4 @@
-// A service from a Git repository: the form, sent as one `createGitService` change. The server
+// A service from a Git repository: the form, sent as one `createBuiltService` change. The server
 // makes Zeabur Builder's Build and the objects of the service that runs what it builds.
 import type { Schemas } from "@/api/client"
 import { rules } from "@/api/rules"
@@ -98,7 +98,7 @@ export const buildProfile = (method: BuildMethod): Profile =>
   method === "railpack" ? "restricted" : "baseline"
 
 const SEGMENT = /^[A-Za-z0-9._-]+$/
-const BRANCH = new RegExp(rules["GitServiceChange.branch"].pattern)
+const BRANCH = new RegExp(rules["BuildSource.git.branch"].pattern)
 const HOST = /^[a-z0-9]([-a-z0-9.]*[a-z0-9])?(:\d{1,5})?$/
 
 /** The host and path of `https://host/owner/repo(.git)`, `git@host:owner/repo.git` or
@@ -176,7 +176,7 @@ export function branchProblem(branch: string): "invalid" | undefined {
 }
 
 /** A path inside the repository as the Build takes it: no `./` in front, no `/` behind. */
-export const cleanPath = (path: string) =>
+const cleanPath = (path: string) =>
   path
     .trim()
     .replace(/^\.?\/+/, "")
@@ -207,19 +207,9 @@ export function builtProblems(
   }
 }
 
-/** What is wrong with each field of a form whose name, port, host, access and user are already
- * resolved. */
-export function gitProblems(
-  form: GitService,
-  {
-    taken,
-    badEnv,
-    badBuildEnv,
-    hostChecked,
-  }: { taken: readonly string[]; badEnv: boolean; badBuildEnv: boolean; hostChecked: boolean },
-) {
+/** What is wrong with how the form reads the repository, its access and user resolved. */
+export function repositoryProblems(form: GitSource, hostChecked: boolean) {
   return {
-    ...builtProblems(form, { taken, badEnv, badBuildEnv }),
     url: urlProblem(form.url),
     branch: branchProblem(form.branch),
     hostKeys: form.access === "deployKey" && !hostChecked,
@@ -247,8 +237,24 @@ export type BuiltService = Pick<
   | "dockerfile"
 >
 
+/** The repository a Build reads and how it builds it: what a new Git service and a Git source
+ * share. */
+export type GitSource = Pick<
+  GitService,
+  | "url"
+  | "branch"
+  | "directory"
+  | "method"
+  | "dockerfile"
+  | "access"
+  | "username"
+  | "token"
+  | "knownHosts"
+  | "installationId"
+>
+
 /** How Zeabur Builder reads the repository, as the form chose. */
-function accessOf(form: GitService): Schemas.GitAccess {
+function accessOf(form: GitSource): Schemas.GitAccess {
   const host = deployKeyHost(form.url)
   switch (form.access) {
     case "public":
@@ -264,32 +270,80 @@ function accessOf(form: GitService): Schemas.GitAccess {
   }
 }
 
-/** The change the form sends. */
-export function gitChange(form: GitService): Schemas.GitServiceChange {
-  const port = form.port.trim()
-  const branch = form.branch.trim()
+/** The paths of a Build as the form gives them: the Dockerfile only for `dockerfile`. */
+export function buildPaths(form: Pick<BuiltService, "method" | "directory" | "dockerfile">) {
   const directory = cleanPath(form.directory)
   const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
   return {
-    name: form.name,
-    url: form.url.trim(),
-    ...(branch ? { branch } : {}),
     method: form.method,
     ...(directory ? { directory } : {}),
     ...(dockerfile ? { dockerfile } : {}),
-    ...(port ? { port: Number(port) } : {}),
-    ...(port && form.publicUrl ? { host: form.host.trim() } : {}),
-    variables: form.variables,
-    buildVariables: form.buildVariables,
-    size: form.size,
-    security: form.security,
-    access: accessOf(form),
   }
 }
 
+/** The Build the form asks for, reading the repository. */
+function gitBuild(form: GitSource): Schemas.BuildInput {
+  const branch = form.branch.trim()
+  return {
+    source: {
+      type: "git",
+      url: form.url.trim(),
+      ...(branch ? { branch } : {}),
+      access: accessOf(form),
+    },
+    ...buildPaths(form),
+  }
+}
+
+/** The service fields of a new built service, with its `build`. */
+export function builtServiceChange(
+  form: BuiltService,
+  build: Schemas.BuildInput,
+): Schemas.BuiltServiceChange {
+  const port = form.port.trim()
+  return {
+    name: form.name,
+    ...(port ? { port: Number(port) } : {}),
+    ...(port && form.publicUrl ? { host: form.host.trim() } : {}),
+    variables: form.variables,
+    size: form.size,
+    security: form.security,
+    build: { ...build, buildVariables: form.buildVariables },
+  }
+}
+
+/** The change the form sends. */
+export const gitChange = (form: GitService): Schemas.BuiltServiceChange =>
+  builtServiceChange(form, gitBuild(form))
+
 export const createGitService = (form: GitService): Change[] => [
-  { op: "createGitService", ...gitChange(form) },
+  { op: "createBuiltService", ...gitChange(form) },
 ]
+
+export const newGitSource = (method: BuildMethod = "railpack"): GitSource => ({
+  url: "",
+  branch: "",
+  directory: "",
+  method,
+  dockerfile: "",
+  access: "public",
+  username: "",
+  token: "",
+  knownHosts: "",
+})
+
+/** The change that builds `container` of `workload` from the repository: a new Build named after
+ * the workload, or its Build reading the repository instead. */
+export const gitSourceChange = (
+  form: GitSource,
+  workload: Schemas.WorkloadRef,
+  container?: string,
+): Change => ({
+  op: "setBuild",
+  workload,
+  ...(container ? { container } : {}),
+  build: gitBuild(form),
+})
 
 /** A Build's options as the service's settings edit them. */
 export interface BuildOptions {

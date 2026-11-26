@@ -4,8 +4,9 @@
 // (upload.ts).
 import type { Schemas } from "@/api/client"
 import {
+  buildPaths,
   builtProblems,
-  cleanPath,
+  builtServiceChange,
   DEFAULT_BUILT_PORT,
   type BuiltService,
 } from "@/model/git-service"
@@ -43,22 +44,7 @@ export function uploadProblems(
 }
 
 /** The change that makes the service; the server builds the Build and the objects that run it. */
-export function createUploadService(form: UploadService, request: string): Change {
-  const port = form.port.trim()
-  const directory = cleanPath(form.directory)
-  const dockerfile = form.method === "dockerfile" ? cleanPath(form.dockerfile) : ""
-  return {
-    op: "createUploadService",
-    name: form.name,
-    request,
-    method: form.method,
-    ...(directory ? { directory } : {}),
-    ...(dockerfile ? { dockerfile } : {}),
-    ...(port ? { port: Number(port) } : {}),
-    ...(port && form.publicUrl ? { host: form.host.trim() } : {}),
-    variables: form.variables,
-    buildVariables: form.buildVariables,
-    size: form.size,
-    security: form.security,
-  }
-}
+export const createUploadService = (form: UploadService, request: string): Change => ({
+  op: "createBuiltService",
+  ...builtServiceChange(form, { source: { type: "upload", request }, ...buildPaths(form) }),
+})

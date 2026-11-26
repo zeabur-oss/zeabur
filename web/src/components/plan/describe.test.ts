@@ -679,11 +679,12 @@ group("restartRuleApplies", () => {
 group("deploying from Git or an image", () => {
   const git: Schemas.Change[] = [
     {
-      op: "createGitService",
+      op: "createBuiltService",
       name: "site",
-      url: "git@github.com:acme/site.git",
-      method: "railpack",
-      access: { type: "deployKey" },
+      build: {
+        source: { type: "git", url: "git@github.com:acme/site.git", access: { type: "deployKey" } },
+        method: "railpack",
+      },
     },
   ]
   const image: Schemas.Change[] = [
@@ -700,7 +701,7 @@ group("deploying from Git or an image", () => {
 
   test("one sentence names the service, and the button creates", () => {
     expect(describe(t, { changes: git }, plan(), pods({})).lines).toContain(
-      "confirm.createGitService(site)",
+      "confirm.createBuiltServiceGit(site)",
     )
     expect(describe(t, { changes: image }, plan(), pods({})).lines).toContain(
       "confirm.createImageService(web)",
@@ -721,13 +722,35 @@ group("deploying from Git or an image", () => {
 
 group("deploying an uploaded folder", () => {
   const changes: Schemas.Change[] = [
-    { op: "createUploadService", name: "site", request: "u1", method: "railpack" },
+    {
+      op: "createBuiltService",
+      name: "site",
+      build: { source: { type: "upload", request: "u1" }, method: "railpack" },
+    },
   ]
 
   test("one sentence names the service, and the button creates", () => {
     const d = describe(t, { changes }, plan(), pods({}))
-    expect(d.lines).toContain("confirm.createUploadService(site)")
+    expect(d.lines).toContain("confirm.createBuiltServiceUpload(site)")
     expect(actionOf(t, { changes })).toBe("action.create")
+  })
+})
+
+group("changing or stopping a service's build", () => {
+  const workload = { kind: "Deployment", name: "site" } as const
+  const set = (source: Schemas.BuildSource): Schemas.Change[] => [
+    { op: "setBuild", workload, build: { source, method: "railpack" } },
+  ]
+  const stop: Schemas.Change[] = [{ op: "removeBuild", workload }]
+
+  test("the sentence names the source, and stopping says the Build goes", () => {
+    const lines = (changes: Schemas.Change[]) => describe(t, { changes }, plan(), pods({})).lines
+    expect(
+      lines(set({ type: "git", url: "https://github.com/acme/site", access: { type: "public" } })),
+    ).toContain("confirm.setBuild(site)")
+    expect(lines(set({ type: "upload", request: "u2" }))).toContain("confirm.setBuildUpload(site)")
+    expect(lines(stop)).toContain("confirm.removeBuild(site)")
+    expect(actionOf(t, { changes: stop })).toBe("action.stopBuilding")
   })
 })
 

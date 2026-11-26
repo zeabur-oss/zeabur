@@ -85,8 +85,9 @@ mod tests {
         if let Some(lines) = known_hosts {
             access["knownHosts"] = json!(lines);
         }
-        json!({"op": "createGitService", "name": "site", "url": url, "branch": "main",
-               "method": "dockerfile", "port": 8080, "access": access})
+        json!({"op": "createBuiltService", "name": "site", "port": 8080,
+               "build": {"source": {"type": "git", "url": url, "branch": "main", "access": access},
+                         "method": "dockerfile"}})
     }
 
     async fn plan_and_apply(app: &Router, changes: Value) -> (Value, Value) {
@@ -548,5 +549,42 @@ mod tests {
             let (status, _) = send(&app, "POST", &reveal(build), None).await;
             assert_eq!(status, StatusCode::BAD_REQUEST, "{build}");
         }
+    }
+
+    /// Stopping a service's build is one change: the plan reads the project's Builds, deletes the
+    /// service's and turns Keel off, since no other Build makes its images.
+    #[tokio::test]
+    async fn stopping_a_build_reads_every_build_and_turns_keel_off() {
+        let cluster = cluster();
+        waiting_service(&cluster, None);
+        cluster.update(|s| {
+            for object in &mut s.dynamic {
+                object.metadata.resource_version = Some("7".to_owned());
+            }
+        });
+        let request = json!({"changes": [
+            {"op": "removeBuild", "workload": {"kind": "Deployment", "name": "site"}}
+        ]});
+        let (status, planned) = send(
+            &git_app(&cluster),
+            "POST",
+            "/api/v1/projects/shop/plan",
+            Some(&request),
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let writes: Vec<(&str, &str)> = planned["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|o| {
+                (
+                    o["target"]["kind"].as_str().unwrap(),
+                    o["write"]["type"].as_str().unwrap(),
+                )
+            })
+            .collect();
+        assert!(writes.contains(&("Build", "delete")), "{writes:?}");
+        assert!(writes.contains(&("Deployment", "patch")), "{writes:?}");
     }
 }

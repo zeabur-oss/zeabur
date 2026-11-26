@@ -278,7 +278,7 @@ type ServiceChange =
   | Extract<
       Change,
       {
-        op: "envImport" | "publicPort" | "buildOptions" | "labelVolume"
+        op: "envImport" | "publicPort" | "buildOptions" | "setBuild" | "removeBuild" | "labelVolume"
       }
     >
   | UploadChange
@@ -288,12 +288,7 @@ type ServiceChange =
 type UploadChange = Extract<
   Change,
   {
-    op:
-      | "uploadToken"
-      | "createUploadService"
-      | "createGitService"
-      | "createImageService"
-      | "archiveDigest"
+    op: "uploadToken" | "createBuiltService" | "createImageService" | "archiveDigest"
   }
 >
 
@@ -353,6 +348,13 @@ function accessSentence(t: Translate, change: AccessChange | ServiceChange): str
   }
 }
 
+/** The sentence of a Build's change, by its source. */
+const SET_BUILD = { git: "confirm.setBuild", upload: "confirm.setBuildUpload" } as const
+const CREATE_BUILT = {
+  git: "confirm.createBuiltServiceGit",
+  upload: "confirm.createBuiltServiceUpload",
+} as const
+
 function serviceSentence(t: Translate, change: ServiceChange): string {
   switch (change.op) {
     case "envImport":
@@ -365,6 +367,10 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
         : t("confirm.publicPort", change.port, change.workload.name)
     case "buildOptions":
       return t("confirm.buildOptions", change.build)
+    case "setBuild":
+      return t(SET_BUILD[change.build.source.type], change.workload.name)
+    case "removeBuild":
+      return t("confirm.removeBuild", change.workload.name)
     case "labelVolume":
       return t("confirm.labelVolume", change.claim)
     default:
@@ -374,10 +380,8 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
 
 function uploadSentence(t: Translate, change: UploadChange | LimitChange | PagesChange): string {
   switch (change.op) {
-    case "createUploadService":
-      return t("confirm.createUploadService", change.name)
-    case "createGitService":
-      return t("confirm.createGitService", change.name)
+    case "createBuiltService":
+      return t(CREATE_BUILT[change.build.source.type], change.name)
     case "createImageService":
       return change.host
         ? t("confirm.createImageServicePublic", change.name, change.host)
@@ -846,8 +850,7 @@ const storageOps = new Set<Change["op"]>([
 // Copied S3 keys and a new service open into creates: a form that sends one still creates.
 const opOf = (change: Change): Change["op"] =>
   change.op === "copyS3Keys" ||
-  change.op === "createUploadService" ||
-  change.op === "createGitService" ||
+  change.op === "createBuiltService" ||
   change.op === "createImageService"
     ? "create"
     : change.op
@@ -987,6 +990,10 @@ function serviceAction(t: Translate, change: ServiceChange): string {
       return change.remove ? t("action.closePort") : t("action.openPort")
     case "buildOptions":
       return t("action.saveBuildOptions")
+    case "setBuild":
+      return t("action.connectGit")
+    case "removeBuild":
+      return t("action.stopBuilding")
     case "labelVolume":
       return t("action.save")
     default:
@@ -996,8 +1003,7 @@ function serviceAction(t: Translate, change: ServiceChange): string {
 
 function uploadAction(t: Translate, change: UploadChange | LimitChange | PagesChange): string {
   switch (change.op) {
-    case "createUploadService":
-    case "createGitService":
+    case "createBuiltService":
     case "createImageService":
       return t("action.create")
     case "uploadToken":

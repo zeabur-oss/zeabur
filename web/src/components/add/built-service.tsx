@@ -425,44 +425,14 @@ function MoreFields({
   const t = useT()
   return (
     <div className="flex flex-col gap-4 pt-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <FormField
-          label={t("add.field.directory")}
-          hint={t(source === "upload" ? "upload.directoryHint" : "add.directoryHint")}
-          errors={shown(problems.directory, () =>
-            t(source === "upload" ? "upload.problem.directory" : "add.problem.directory"),
-          )}
-        >
-          <Input
-            size="sm"
-            mono
-            value={form.directory}
-            placeholder="apps/web"
-            autoComplete="off"
-            spellCheck={false}
-            onChange={(event) => set({ directory: event.target.value })}
-          />
-        </FormField>
-        {form.method === "dockerfile" ? (
-          <FormField
-            label={t("add.field.dockerfile")}
-            hint={t("add.dockerfileHint")}
-            errors={shown(problems.dockerfile, () =>
-              t(source === "upload" ? "upload.problem.dockerfile" : "add.problem.dockerfile"),
-            )}
-          >
-            <Input
-              size="sm"
-              mono
-              value={form.dockerfile}
-              placeholder="Dockerfile"
-              autoComplete="off"
-              spellCheck={false}
-              onChange={(event) => onDockerfile(event.target.value)}
-            />
-          </FormField>
-        ) : null}
-      </div>
+      <PathFields
+        source={source}
+        form={form}
+        onDirectory={(directory) => set({ directory })}
+        onDockerfile={onDockerfile}
+        problems={problems}
+        shown={shown}
+      />
       <FormField
         label={t("add.variables")}
         hint={t("add.variablesHint")}
@@ -533,5 +503,65 @@ export function BuiltPublicUrl({ built, problems }: { built: BuiltFormState; pro
       domains={built.domains}
       error={built.shown(problems.host, () => t(`add.problem.host.${problems.host ?? "empty"}`))}
     />
+  )
+}
+
+/** The folder to build and, for a Dockerfile build, where its Dockerfile is. */
+export function PathFields({
+  source = "git",
+  form,
+  onDirectory,
+  onDockerfile,
+  problems,
+  shown,
+}: {
+  /** What the directory is inside: the repository or the uploaded folder. */
+  source?: "git" | "upload"
+  form: Pick<BuildFields, "directory" | "dockerfile" | "method">
+  onDirectory: (directory: string) => void
+  onDockerfile: (dockerfile: string) => void
+  problems: Pick<Problems, "directory" | "dockerfile">
+  shown: (problem: unknown, text: () => string) => string[]
+}) {
+  const t = useT()
+  return (
+    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <FormField
+        label={t("add.field.directory")}
+        hint={t(source === "upload" ? "upload.directoryHint" : "add.directoryHint")}
+        errors={shown(problems.directory, () =>
+          t(source === "upload" ? "upload.problem.directory" : "add.problem.directory"),
+        )}
+      >
+        <Input
+          size="sm"
+          mono
+          value={form.directory}
+          placeholder="apps/web"
+          autoComplete="off"
+          spellCheck={false}
+          onChange={(event) => onDirectory(event.target.value)}
+        />
+      </FormField>
+      {form.method === "dockerfile" ? (
+        <FormField
+          label={t("add.field.dockerfile")}
+          hint={t("add.dockerfileHint")}
+          errors={shown(problems.dockerfile, () =>
+            t(source === "upload" ? "upload.problem.dockerfile" : "add.problem.dockerfile"),
+          )}
+        >
+          <Input
+            size="sm"
+            mono
+            value={form.dockerfile}
+            placeholder="Dockerfile"
+            autoComplete="off"
+            spellCheck={false}
+            onChange={(event) => onDockerfile(event.target.value)}
+          />
+        </FormField>
+      ) : null}
+    </div>
   )
 }

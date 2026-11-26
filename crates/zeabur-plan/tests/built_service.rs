@@ -1,6 +1,7 @@
 //! A service from an uploaded folder or a Git repository is one change that makes the `Build` and
 //! the objects of the service that runs what it builds, the same for the web interface and
-//! `zeaburctl up`.
+//! `zeaburctl up`. A running service is given a `Build`, has its `Build` changed, or stops
+//! building with one change each.
 //!
 //! Every `Build` Zeabur writes fits the CRD of the Zeabur Builder release in
 //! `xtask/pins/zeabur-builder`. `scripts/builder-crds.sh` copies that CRD next to this file; a pin
@@ -14,12 +15,12 @@ mod tests {
     use serde_json::{Value, json};
     use zeabur_graph::Snapshot;
     use zeabur_graph::pod_security::level;
-    use zeabur_model::PodSecurityLevel;
+    use zeabur_model::{PodSecurityLevel, WorkloadKind, WorkloadRef};
     use zeabur_plan::builds::builds;
     use zeabur_plan::{
-        BuildMethod, BuildOptionsChange, Change, DeployKeySecret, Fetched, GitAccess,
-        GitServiceChange, Input, NameValue, Plan, PlanError, PlanRequest, ServedKind, ServiceSize,
-        UploadServiceChange, Write, plan,
+        BuildInput, BuildMethod, BuildOptionsChange, BuildSource, BuiltServiceChange, Change,
+        DeployKeySecret, Fetched, GitAccess, Input, NameValue, Plan, PlanError, PlanRequest,
+        ServedKind, ServiceSize, SetBuildChange, Write, plan,
     };
 
     /// The CRDs of the pinned Zeabur Builder, with the release they come from on the first line.
@@ -220,32 +221,72 @@ mod tests {
         }
     }
 
-    fn service() -> UploadServiceChange {
-        UploadServiceChange {
-            name: "site".to_owned(),
-            request: "up-1".to_owned(),
+    fn upload(request: &str) -> BuildInput {
+        BuildInput {
+            source: BuildSource::Upload {
+                request: request.to_owned(),
+            },
             method: BuildMethod::Railpack,
             directory: None,
             dockerfile: None,
+            build_variables: Vec::new(),
+        }
+    }
+
+    fn repository(url: &str, access: GitAccess) -> BuildInput {
+        BuildInput {
+            source: BuildSource::Git {
+                url: url.to_owned(),
+                branch: None,
+                access,
+                deploy_key: None,
+            },
+            ..upload("unused")
+        }
+    }
+
+    fn token(token: &str) -> GitAccess {
+        GitAccess::Token {
+            username: "x-access-token".to_owned(),
+            token: token.to_owned(),
+        }
+    }
+
+    /// The fields of a Git source, to change in a test.
+    fn git_fields(
+        build: &mut BuildInput,
+    ) -> (
+        &mut String,
+        &mut Option<String>,
+        &mut GitAccess,
+        &mut Option<DeployKeySecret>,
+    ) {
+        let BuildSource::Git {
+            url,
+            branch,
+            access,
+            deploy_key,
+        } = &mut build.source
+        else {
+            panic!("a Git source");
+        };
+        (url, branch, access, deploy_key)
+    }
+
+    fn service() -> BuiltServiceChange {
+        BuiltServiceChange {
+            name: "site".to_owned(),
             port: None,
             host: None,
             variables: Vec::new(),
-            build_variables: Vec::new(),
             size: None,
             security: None,
+            build: upload("up-1"),
         }
     }
 
     fn planned(
-        change: UploadServiceChange,
-        registry: Option<&str>,
-        issuer: Option<&str>,
-    ) -> Result<Plan, PlanError> {
-        planned_change(Change::CreateUploadService(change), registry, issuer)
-    }
-
-    fn planned_change(
-        change: Change,
+        change: BuiltServiceChange,
         registry: Option<&str>,
         issuer: Option<&str>,
     ) -> Result<Plan, PlanError> {
@@ -268,7 +309,7 @@ mod tests {
                 ..Input::new(&snapshot, "2026-10-23T00:00:00Z")
             },
             &PlanRequest {
-                changes: vec![change],
+                changes: vec![Change::CreateBuiltService(change)],
             },
         )
     }
@@ -368,7 +409,7 @@ mod tests {
     #[test]
     fn build_variables_are_read_from_a_secret() {
         let mut change = service();
-        change.build_variables = vec![NameValue {
+        change.build.build_variables = vec![NameValue {
             name: "NPM_TOKEN".to_owned(),
             value: "s3cret".to_owned(),
         }];
@@ -391,16 +432,16 @@ mod tests {
     /// as root, so baseline; a choice wins. The folder and Dockerfile go in the source.
     #[test]
     fn the_security_profile_follows_the_method_unless_chosen() {
-        let level_of = |change: UploadServiceChange| {
+        let level_of = |change: BuiltServiceChange| {
             let plan = planned(change, Some("zot:5000"), None).unwrap();
             let deployment = created(&plan, "Deployment").unwrap();
             level(&serde_json::from_value(deployment["spec"]["template"]["spec"].clone()).unwrap())
         };
         assert_eq!(level_of(service()), PodSecurityLevel::Restricted);
         let mut docker = service();
-        docker.method = BuildMethod::Dockerfile;
-        docker.directory = Some("./apps/web/".to_owned());
-        docker.dockerfile = Some("docker/Dockerfile.prod".to_owned());
+        docker.build.method = BuildMethod::Dockerfile;
+        docker.build.directory = Some("./apps/web/".to_owned());
+        docker.build.dockerfile = Some("docker/Dockerfile.prod".to_owned());
         assert_eq!(level_of(docker.clone()), PodSecurityLevel::Baseline);
         docker.security = Some(PodSecurityLevel::Restricted);
         docker.size = Some(ServiceSize::Large);
@@ -418,20 +459,20 @@ mod tests {
     /// Nothing is planned for a cluster without a registry, or for input the Build would refuse.
     #[test]
     fn a_request_the_build_would_refuse_plans_nothing() {
-        let code = |change: UploadServiceChange, registry: Option<&str>| {
+        let code = |change: BuiltServiceChange, registry: Option<&str>| {
             planned(change, registry, None).unwrap_err().code
         };
         assert_eq!(code(service(), None), "no_registry");
         assert_eq!(code(service(), Some("")), "no_registry");
-        let with = |edit: &dyn Fn(&mut UploadServiceChange)| {
+        let with = |edit: &dyn Fn(&mut BuiltServiceChange)| {
             let mut change = service();
             edit(&mut change);
             code(change, Some("zot:5000"))
         };
         assert_eq!(with(&|c| c.name = "Site".to_owned()), "invalid_name");
-        assert_eq!(with(&|c| c.request = String::new()), "invalid_request");
+        assert_eq!(with(&|c| c.build = upload("")), "invalid_request");
         assert_eq!(
-            with(&|c| c.directory = Some("../x".to_owned())),
+            with(&|c| c.build.directory = Some("../x".to_owned())),
             "invalid_path"
         );
         assert_eq!(
@@ -451,7 +492,7 @@ mod tests {
     #[test]
     fn a_privileged_choice_plans_no_privileged_pod() {
         let mut change = service();
-        change.method = BuildMethod::Dockerfile;
+        change.build.method = BuildMethod::Dockerfile;
         change.security = Some(PodSecurityLevel::Privileged);
         let plan = planned(change, Some("zot:5000"), None).unwrap();
         let deployment = created(&plan, "Deployment").unwrap();
@@ -471,9 +512,9 @@ mod tests {
     /// build variable name the shell cannot read are refused.
     #[test]
     fn unsafe_hosts_paths_and_build_variables_are_refused() {
-        let code = |edit: &dyn Fn(&mut UploadServiceChange)| {
+        let code = |edit: &dyn Fn(&mut BuiltServiceChange)| {
             let mut change = service();
-            change.method = BuildMethod::Dockerfile;
+            change.build.method = BuildMethod::Dockerfile;
             change.port = Some(80);
             edit(&mut change);
             planned(change, Some("zot:5000"), None).unwrap_err().code
@@ -487,13 +528,13 @@ mod tests {
         }
         for path in ["../Dockerfile", "docker/../../Dockerfile"] {
             assert_eq!(
-                code(&|c| c.dockerfile = Some(path.to_owned())),
+                code(&|c| c.build.dockerfile = Some(path.to_owned())),
                 "invalid_path",
                 "{path}"
             );
         }
         assert_eq!(
-            code(&|c| c.build_variables = vec![NameValue {
+            code(&|c| c.build.build_variables = vec![NameValue {
                 name: "NPM-TOKEN".to_owned(),
                 value: String::new()
             }]),
@@ -501,27 +542,16 @@ mod tests {
         );
     }
 
-    fn git() -> GitServiceChange {
-        GitServiceChange {
-            name: "site".to_owned(),
-            url: "https://github.com/acme/site".to_owned(),
-            branch: None,
-            method: BuildMethod::Railpack,
-            directory: None,
-            dockerfile: None,
+    fn git() -> BuiltServiceChange {
+        BuiltServiceChange {
             port: Some(8080),
-            host: None,
-            variables: Vec::new(),
-            build_variables: Vec::new(),
-            size: None,
-            security: None,
-            access: GitAccess::Public,
-            deploy_key: None,
+            build: repository("https://github.com/acme/site", GitAccess::Public),
+            ..service()
         }
     }
 
-    fn git_plan(change: GitServiceChange) -> Result<Plan, PlanError> {
-        planned_change(Change::CreateGitService(change), Some("zot:5000"), None)
+    fn git_plan(change: BuiltServiceChange) -> Result<Plan, PlanError> {
+        planned(change, Some("zot:5000"), None)
     }
 
     /// A public repository is read over HTTPS from its default branch, with no Secret; the
@@ -542,7 +572,7 @@ mod tests {
             "zot:5000/shop/site:pending"
         );
         let mut branch = git();
-        branch.branch = Some(" release/1.4 ".to_owned());
+        *git_fields(&mut branch.build).1 = Some(" release/1.4 ".to_owned());
         let build = created(&git_plan(branch).unwrap(), "Build").unwrap();
         assert_eq!(build["spec"]["source"]["git"]["ref"], "release/1.4");
         fits_the_crd(&build);
@@ -553,10 +583,7 @@ mod tests {
     #[test]
     fn a_token_goes_in_a_secret_the_build_names() {
         let mut change = git();
-        change.access = GitAccess::Token {
-            username: "x-access-token".to_owned(),
-            token: " ghp_1 ".to_owned(),
-        };
+        *git_fields(&mut change.build).2 = token(" ghp_1 ");
         let plan = git_plan(change).unwrap();
         let secret = plan
             .objects
@@ -584,12 +611,12 @@ mod tests {
     #[test]
     fn a_deploy_key_reads_over_ssh() {
         let mut change = git();
-        change.access = GitAccess::DeployKey { known_hosts: None };
+        *git_fields(&mut change.build).2 = GitAccess::DeployKey { known_hosts: None };
         assert_eq!(
             git_plan(change.clone()).unwrap_err().code,
             "unresolved_deploy_key"
         );
-        change.deploy_key = Some(DeployKeySecret {
+        *git_fields(&mut change.build).3 = Some(DeployKeySecret {
             private_key: "KEY".to_owned(),
             known_hosts: "github.com ssh-ed25519 AAAA\n".to_owned(),
         });
@@ -612,7 +639,7 @@ mod tests {
     #[test]
     fn the_github_app_names_its_installation() {
         let mut change = git();
-        change.access = GitAccess::GithubApp {
+        *git_fields(&mut change.build).2 = GitAccess::GithubApp {
             installation_id: 42,
         };
         let plan = git_plan(change).unwrap();
@@ -630,9 +657,9 @@ mod tests {
     #[test]
     fn build_options_keep_the_build_in_the_crd() {
         let mut docker = git();
-        docker.method = BuildMethod::Dockerfile;
+        docker.build.method = BuildMethod::Dockerfile;
         let mut upload = service();
-        upload.method = BuildMethod::Dockerfile;
+        upload.build.method = BuildMethod::Dockerfile;
         for build in [
             created(&git_plan(docker).unwrap(), "Build").unwrap(),
             created(&planned(upload, Some("zot:5000"), None).unwrap(), "Build").unwrap(),
@@ -666,28 +693,603 @@ mod tests {
     /// The form's rules for a repository and a branch are the server's.
     #[test]
     fn a_repository_or_branch_git_would_refuse_plans_nothing() {
-        let code = |edit: &dyn Fn(&mut GitServiceChange)| {
+        let code = |edit: &dyn Fn(&mut BuildInput)| {
             let mut change = git();
-            edit(&mut change);
+            edit(&mut change.build);
             git_plan(change).unwrap_err().code
         };
         assert_eq!(
-            code(&|c| c.url = "github.com/acme".to_owned()),
+            code(&|b| *git_fields(b).0 = "github.com/acme".to_owned()),
             "invalid_repository"
         );
         for branch in ["a..b", "main.lock", "/main"] {
             assert_eq!(
-                code(&|c| c.branch = Some(branch.to_owned())),
+                code(&|b| *git_fields(b).1 = Some(branch.to_owned())),
                 "invalid_branch",
                 "{branch}"
             );
         }
         assert_eq!(
-            code(&|c| c.access = GitAccess::Token {
+            code(&|b| *git_fields(b).2 = GitAccess::Token {
                 username: String::new(),
                 token: "t".to_owned()
             }),
             "invalid_token"
         );
+    }
+
+    const LATEST: &str = "zot:5000/shop/site:main-1@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
+
+    /// A Deployment `site` with `containers` (name, image) and Keel's policy when `keel` is one.
+    fn running_all(
+        containers: &[(&str, &str)],
+        init: &[(&str, &str)],
+        keel: Option<&str>,
+    ) -> Value {
+        let annotations = keel.map_or_else(|| json!({}), |p| json!({"keel.sh/policy": p}));
+        let list = |pairs: &[(&str, &str)]| -> Vec<Value> {
+            pairs
+                .iter()
+                .map(|(name, image)| json!({"name": name, "image": image}))
+                .collect()
+        };
+        json!({
+            "apiVersion": "apps/v1", "kind": "Deployment",
+            "metadata": {"name": "site", "namespace": "shop", "resourceVersion": "3",
+                "generation": 1, "annotations": annotations},
+            "spec": {"selector": {"matchLabels": {"app": "site"}}, "template": {
+                "metadata": {"labels": {"app": "site"}},
+                "spec": {"containers": list(containers), "initContainers": list(init)}}}
+        })
+    }
+
+    fn running(image: &str, keel: bool) -> Value {
+        running_all(&[("site", image)], &[], keel.then_some("force"))
+    }
+
+    /// A Secret in the namespace, as the snapshot holds it: metadata and type.
+    fn secret(name: &str, kind: &str) -> Value {
+        json!({"metadata": {"name": name, "namespace": "shop", "resourceVersion": "5"},
+               "type": kind})
+    }
+
+    /// `build`, made by a create, as Zeabur Builder serves it once it has built `latest`.
+    fn served(mut build: Value, name: &str, latest: Option<&str>) -> Value {
+        build["metadata"]["name"] = json!(name);
+        build["metadata"]["generation"] = json!(1);
+        build["metadata"]["resourceVersion"] = json!("7");
+        if let Some(latest) = latest {
+            build["status"] = json!({"latestImage": latest});
+        }
+        build
+    }
+
+    /// The `Build` a new service with `input` gets.
+    fn build_of(input: BuildInput) -> Value {
+        let change = BuiltServiceChange {
+            build: input,
+            ..git()
+        };
+        created(&git_plan(change).unwrap(), "Build").unwrap()
+    }
+
+    /// `change` on a cluster with `workload`, the `Build`s `builds` and the Secrets `secrets`.
+    fn on_cluster(
+        change: Change,
+        workload: Value,
+        builds_served: Vec<Value>,
+        secrets: &[Value],
+    ) -> Result<Plan, PlanError> {
+        let mut snapshot = Snapshot {
+            namespace: "shop".to_owned(),
+            secrets: secrets
+                .iter()
+                .map(|s| serde_json::from_value(s.clone()).unwrap())
+                .collect(),
+            ..Snapshot::default()
+        };
+        #[expect(clippy::unwrap_in_result, reason = "a test fixture")]
+        match workload["kind"].as_str() {
+            Some("CronJob") => snapshot.cron_jobs = vec![serde_json::from_value(workload).unwrap()],
+            _ => snapshot.deployments = vec![serde_json::from_value(workload).unwrap()],
+        }
+        let objects: Vec<Fetched> = builds_served
+            .into_iter()
+            .map(|object| Fetched {
+                resource: builds(),
+                name: object["metadata"]["name"]
+                    .as_str()
+                    .unwrap_or_default()
+                    .to_owned(),
+                object,
+            })
+            .collect();
+        let kinds = [
+            kind("", "Secret", "secrets"),
+            kind("apps", "Deployment", "deployments"),
+            kind("batch", "CronJob", "cronjobs"),
+            kind("builder.zeabur.com", "Build", "builds"),
+        ];
+        plan(
+            Input {
+                kinds: &kinds,
+                objects: &objects,
+                build_registry: Some("zot:5000"),
+                ..Input::new(&snapshot, "2026-11-26T00:00:00Z")
+            },
+            &PlanRequest {
+                changes: vec![change],
+            },
+        )
+    }
+
+    fn deployment() -> WorkloadRef {
+        WorkloadRef {
+            kind: WorkloadKind::Deployment,
+            name: "site".to_owned(),
+        }
+    }
+
+    fn set_build(build: BuildInput) -> Change {
+        Change::SetBuild(SetBuildChange {
+            workload: deployment(),
+            container: None,
+            build,
+        })
+    }
+
+    fn after<'a>(plan: &'a Plan, kind: &str, name: &str) -> Option<&'a Value> {
+        plan.objects
+            .iter()
+            .find(|o| o.target.kind == kind && o.target.name == name)
+            .map(|o| &o.raw_after)
+    }
+
+    fn write<'a>(plan: &'a Plan, kind: &str, name: &str) -> Option<&'a Write> {
+        plan.objects
+            .iter()
+            .find(|o| o.target.kind == kind && o.target.name == name)
+            .map(|o| &o.write)
+    }
+
+    /// An image service gets a `Build` of the repository, and its container moves to what the
+    /// `Build` pushes, which Keel updates, as for a new Git service.
+    #[test]
+    fn an_image_service_gets_a_build_and_runs_what_it_pushes() {
+        let mut input = repository("https://github.com/acme/site", GitAccess::Public);
+        input.directory = Some("web".to_owned());
+        let plan = on_cluster(
+            set_build(input),
+            running("nginx:1.27", false),
+            Vec::new(),
+            &[],
+        )
+        .unwrap();
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["spec"]["source"],
+            json!({"type": "git", "git": {"url": "https://github.com/acme/site.git", "ref": "HEAD"},
+                   "contextDir": "web"})
+        );
+        assert_eq!(build["spec"]["output"]["image"], "zot:5000/shop/site");
+        assert_eq!(build["spec"]["notify"][0]["type"], "keel");
+        fits_the_crd(&build);
+        let deployment = after(&plan, "Deployment", "site").unwrap();
+        assert_eq!(
+            deployment["spec"]["template"]["spec"]["containers"][0]["image"],
+            "zot:5000/shop/site:pending"
+        );
+        assert_eq!(
+            deployment["metadata"]["annotations"]["keel.sh/policy"],
+            "force"
+        );
+    }
+
+    /// An image service can be given an uploaded folder too: its `Build` asks for an upload token.
+    #[test]
+    fn an_image_service_gets_a_build_of_an_uploaded_folder() {
+        let plan = on_cluster(
+            set_build(upload("up-1")),
+            running("nginx:1.27", false),
+            Vec::new(),
+            &[],
+        )
+        .unwrap();
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["metadata"]["annotations"]["builder.zeabur.com/upload-token-request"],
+            "up-1"
+        );
+        fits_the_crd(&build);
+    }
+
+    /// An uploaded folder's `Build` builds the repository instead, with the credentials it is
+    /// given; the service already runs what that `Build` pushes, so it is left as it is.
+    #[test]
+    fn an_upload_service_builds_the_repository_instead() {
+        let mut old = upload("up-1");
+        old.directory = Some("old".to_owned());
+        let build = served(build_of(old), "site", None);
+        let mut input = repository("https://github.com/acme/site", token("ghp_1"));
+        input.method = BuildMethod::Dockerfile;
+        input.directory = Some("web".to_owned());
+        input.dockerfile = Some("Dockerfile.prod".to_owned());
+        let plan = on_cluster(set_build(input), running(LATEST, true), vec![build], &[]).unwrap();
+        assert!(matches!(
+            write(&plan, "Build", "site"),
+            Some(Write::Patch { .. })
+        ));
+        let build = after(&plan, "Build", "site").unwrap();
+        assert_eq!(
+            build["spec"]["source"],
+            json!({"type": "git",
+                   "git": {"url": "https://github.com/acme/site.git", "ref": "HEAD",
+                           "credentialsRef": {"name": "site-git"}},
+                   "contextDir": "web", "dockerfile": "Dockerfile.prod"})
+        );
+        assert_eq!(build["spec"]["builderRef"], "dockerfile");
+        fits_the_crd(build);
+        assert_eq!(
+            created(&plan, "Secret").unwrap()["metadata"]["name"],
+            "site-git"
+        );
+        assert!(after(&plan, "Deployment", "site").is_none());
+    }
+
+    /// A repository's `Build` builds an uploaded folder instead: it asks for an upload token, and
+    /// the credentials Secret goes unless another `Build` reads it.
+    #[test]
+    fn a_repository_build_builds_an_uploaded_folder_instead() {
+        let site = served(
+            build_of(repository("https://github.com/acme/site", token("ghp_1"))),
+            "site",
+            Some(LATEST),
+        );
+        let credentials = [secret("site-git", "kubernetes.io/basic-auth")];
+        let plan = on_cluster(
+            set_build(upload("up-2")),
+            running(LATEST, true),
+            vec![site.clone()],
+            &credentials,
+        )
+        .unwrap();
+        let build = after(&plan, "Build", "site").unwrap();
+        assert_eq!(
+            build["spec"]["source"],
+            json!({"type": "archive", "archive": {}})
+        );
+        assert_eq!(
+            build["metadata"]["annotations"]["builder.zeabur.com/upload-token-request"],
+            "up-2"
+        );
+        fits_the_crd(build);
+        assert!(matches!(
+            write(&plan, "Secret", "site-git"),
+            Some(Write::Delete { .. })
+        ));
+
+        let api = served(
+            build_of(repository("https://github.com/acme/site", token("ghp_1"))),
+            "api",
+            None,
+        );
+        let plan = on_cluster(
+            set_build(upload("up-2")),
+            running(LATEST, true),
+            vec![site, api],
+            &credentials,
+        )
+        .unwrap();
+        assert!(write(&plan, "Secret", "site-git").is_none());
+    }
+
+    /// Another repository or branch keeps the kind of credentials the Secret holds and sets the
+    /// new ones in it; another kind is refused, since a Secret's type cannot change.
+    #[test]
+    fn another_repository_sets_its_credentials_in_the_same_secret() {
+        let site = served(
+            build_of(repository("https://github.com/acme/site", token("ghp_1"))),
+            "site",
+            Some(LATEST),
+        );
+        let credentials = [secret("site-git", "kubernetes.io/basic-auth")];
+        let mut input = repository("https://gitlab.com/acme/shop", token("glpat_2"));
+        *git_fields(&mut input).1 = Some("dev".to_owned());
+        let plan = on_cluster(
+            set_build(input),
+            running(LATEST, true),
+            vec![site.clone()],
+            &credentials,
+        )
+        .unwrap();
+        let build = after(&plan, "Build", "site").unwrap();
+        assert_eq!(
+            build["spec"]["source"]["git"],
+            json!({"url": "https://gitlab.com/acme/shop.git", "ref": "dev",
+                   "credentialsRef": {"name": "site-git"}})
+        );
+        fits_the_crd(build);
+        let Some(Write::MergePatch { body }) = write(&plan, "Secret", "site-git") else {
+            panic!("the Secret is merged");
+        };
+        // "glpat_2", base64.
+        assert_eq!(body["data"]["password"], "Z2xwYXRfMg==");
+
+        let mut key = repository(
+            "https://github.com/acme/site",
+            GitAccess::DeployKey { known_hosts: None },
+        );
+        *git_fields(&mut key).3 = Some(DeployKeySecret {
+            private_key: "KEY".to_owned(),
+            known_hosts: "github.com ssh-ed25519 AAAA\n".to_owned(),
+        });
+        let refused = on_cluster(
+            set_build(key),
+            running(LATEST, true),
+            vec![site],
+            &credentials,
+        )
+        .unwrap_err();
+        assert_eq!(refused.code, "credentials_kind_changed");
+    }
+
+    /// A folder uploaded again asks for a new token and keeps building the folder it has until
+    /// the new one is uploaded; the same request again changes nothing.
+    #[test]
+    fn a_folder_uploaded_again_keeps_the_last_until_the_new_one() {
+        let digest = format!("sha256:{}", "b".repeat(64));
+        let mut site = served(build_of(upload("up-1")), "site", Some(LATEST));
+        site["spec"]["source"]["archive"]["digest"] = json!(digest);
+        let plan = on_cluster(
+            set_build(upload("up-2")),
+            running(LATEST, true),
+            vec![site.clone()],
+            &[],
+        )
+        .unwrap();
+        let build = after(&plan, "Build", "site").unwrap();
+        assert_eq!(build["spec"]["source"]["archive"]["digest"], json!(digest));
+        assert_eq!(
+            build["metadata"]["annotations"]["builder.zeabur.com/upload-token-request"],
+            "up-2"
+        );
+        let again = on_cluster(
+            set_build(upload("up-1")),
+            running(LATEST, true),
+            vec![site],
+            &[],
+        )
+        .unwrap_err();
+        assert_eq!(again.code, "unchanged");
+    }
+
+    /// A `<name>-git` Secret the `Build` does not read is someone else's: connecting a public
+    /// repository leaves it alone, and credentials that would go in it are refused.
+    #[test]
+    fn a_secret_the_build_does_not_read_is_left_alone() {
+        let site = served(build_of(upload("up-1")), "site", Some(LATEST));
+        let theirs = [secret("site-git", "Opaque")];
+        let public = repository("https://github.com/acme/site", GitAccess::Public);
+        let plan = on_cluster(
+            set_build(public),
+            running(LATEST, true),
+            vec![site.clone()],
+            &theirs,
+        )
+        .unwrap();
+        assert!(write(&plan, "Secret", "site-git").is_none());
+        let refused = on_cluster(
+            set_build(repository("https://github.com/acme/site", token("ghp_1"))),
+            running(LATEST, true),
+            vec![site],
+            &theirs,
+        )
+        .unwrap_err();
+        assert_eq!(refused.code, "credentials_taken");
+    }
+
+    /// New values of build variables the `Build` already reads change only their Secret.
+    #[test]
+    fn new_values_of_build_variables_are_a_change() {
+        let variables = vec![NameValue {
+            name: "NPM_TOKEN".to_owned(),
+            value: "npm_1".to_owned(),
+        }];
+        let mut input = repository("https://github.com/acme/site", GitAccess::Public);
+        input.build_variables = variables;
+        let site = served(build_of(input.clone()), "site", Some(LATEST));
+        input.build_variables[0].value = "npm_2".to_owned();
+        let plan = on_cluster(
+            set_build(input),
+            running(LATEST, true),
+            vec![site],
+            &[secret("site-build-env", "Opaque")],
+        )
+        .unwrap();
+        let Some(Write::MergePatch { body }) = write(&plan, "Secret", "site-build-env") else {
+            panic!("the variables Secret is merged");
+        };
+        // "npm_2", base64.
+        assert_eq!(body["data"]["NPM_TOKEN"], "bnBtXzI=");
+    }
+
+    /// The same settings change nothing for the container that runs the `Build`'s image, but move
+    /// another container to the image it made last and leave the `Build` as it is.
+    #[test]
+    fn the_same_build_moves_another_container() {
+        let input = repository("https://github.com/acme/site", GitAccess::Public);
+        let site = served(build_of(input.clone()), "site", Some(LATEST));
+        let workload = running_all(
+            &[("site", LATEST), ("worker", "nginx:1.27")],
+            &[],
+            Some("force"),
+        );
+        let on = |container: &str| {
+            Change::SetBuild(SetBuildChange {
+                workload: deployment(),
+                container: Some(container.to_owned()),
+                build: input.clone(),
+            })
+        };
+        let unchanged =
+            on_cluster(on("site"), workload.clone(), vec![site.clone()], &[]).unwrap_err();
+        assert_eq!(unchanged.code, "unchanged");
+        let site_spec = site["spec"].clone();
+        let plan = on_cluster(on("worker"), workload, vec![site], &[]).unwrap();
+        let deployment = after(&plan, "Deployment", "site").unwrap();
+        assert_eq!(
+            deployment["spec"]["template"]["spec"]["containers"][1]["image"],
+            LATEST
+        );
+        assert_eq!(after(&plan, "Build", "site").unwrap()["spec"], site_spec);
+    }
+
+    /// A `<name>-build-env` Secret no `Build` reads is someone else's: a new `Build` creates its
+    /// own, which the cluster refuses, rather than change it.
+    #[test]
+    fn a_variables_secret_the_build_does_not_read_is_not_changed() {
+        let mut input = repository("https://github.com/acme/site", GitAccess::Public);
+        input.build_variables = vec![NameValue {
+            name: "NPM_TOKEN".to_owned(),
+            value: "npm_1".to_owned(),
+        }];
+        let plan = on_cluster(
+            set_build(input),
+            running("nginx:1.27", false),
+            Vec::new(),
+            &[secret("site-build-env", "Opaque")],
+        )
+        .unwrap();
+        assert!(matches!(
+            write(&plan, "Secret", "site-build-env"),
+            Some(Write::Create { .. })
+        ));
+    }
+
+    fn cron_job() -> Value {
+        json!({
+            "apiVersion": "batch/v1", "kind": "CronJob",
+            "metadata": {"name": "site", "namespace": "shop", "resourceVersion": "3"},
+            "spec": {"schedule": "0 * * * *", "jobTemplate": {"spec": {"template": {
+                "spec": {"containers": [{"name": "site", "image": "nginx:1.27"}],
+                         "restartPolicy": "OnFailure"}}}}}
+        })
+    }
+
+    fn cron_ref() -> WorkloadRef {
+        WorkloadRef {
+            kind: WorkloadKind::CronJob,
+            name: "site".to_owned(),
+        }
+    }
+
+    /// A Job or CronJob runs to completion, so it is not given a `Build`.
+    #[test]
+    fn a_cron_job_is_not_given_a_build() {
+        let change = Change::SetBuild(SetBuildChange {
+            workload: cron_ref(),
+            container: None,
+            build: upload("up-1"),
+        });
+        let refused = on_cluster(change, cron_job(), Vec::new(), &[]).unwrap_err();
+        assert_eq!(refused.code, "not_updatable");
+    }
+
+    /// A CronJob has no `Build` to stop, even when one shares its name.
+    #[test]
+    fn a_cron_job_has_no_build_to_stop() {
+        let build = served(
+            build_of(repository("https://github.com/acme/site", token("ghp_1"))),
+            "site",
+            Some(LATEST),
+        );
+        let change = Change::RemoveBuild {
+            workload: cron_ref(),
+        };
+        let refused = on_cluster(change, cron_job(), vec![build], &[]).unwrap_err();
+        assert_eq!(refused.code, "not_updatable");
+    }
+
+    fn remove_build() -> Change {
+        Change::RemoveBuild {
+            workload: deployment(),
+        }
+    }
+
+    /// Stopping a build deletes the `Build` and the credentials only it reads, pins each
+    /// container that runs its newest tag to that image's digest, leaves init containers and
+    /// other images alone, and turns Keel off.
+    #[test]
+    fn stopping_a_build_pins_what_runs_and_turns_keel_off() {
+        let site = served(
+            build_of(repository("https://github.com/acme/site", token("ghp_1"))),
+            "site",
+            Some(LATEST),
+        );
+        let workload = running_all(
+            &[
+                ("site", "zot:5000/shop/site:main-1"),
+                ("proxy", "nginx:1.27"),
+            ],
+            &[("migrate", "zot:5000/shop/site:main-1")],
+            Some("force"),
+        );
+        let credentials = [secret("site-git", "kubernetes.io/basic-auth")];
+        let plan = on_cluster(remove_build(), workload, vec![site], &credentials).unwrap();
+        assert!(matches!(
+            write(&plan, "Build", "site"),
+            Some(Write::Delete { .. })
+        ));
+        assert!(matches!(
+            write(&plan, "Secret", "site-git"),
+            Some(Write::Delete { .. })
+        ));
+        let deployment = after(&plan, "Deployment", "site").unwrap();
+        let pod = &deployment["spec"]["template"]["spec"];
+        assert_eq!(pod["containers"][0]["image"], LATEST);
+        assert_eq!(pod["containers"][1]["image"], "nginx:1.27");
+        assert_eq!(
+            pod["initContainers"][0]["image"],
+            "zot:5000/shop/site:main-1"
+        );
+        assert!(deployment["metadata"]["annotations"]["keel.sh/policy"].is_null());
+    }
+
+    /// A container on a digest keeps it, and Keel and the credentials stay while another
+    /// `Build` makes an image of the service or reads the Secret.
+    #[test]
+    fn stopping_a_build_keeps_what_another_build_uses() {
+        let site = served(
+            build_of(repository("https://github.com/acme/site", token("ghp_1"))),
+            "site",
+            Some(LATEST),
+        );
+        let mut worker = served(
+            build_of(repository("https://github.com/acme/site", token("ghp_1"))),
+            "worker",
+            None,
+        );
+        worker["spec"]["output"]["image"] = json!("zot:5000/shop/worker");
+        let workload = running_all(
+            &[("site", LATEST), ("worker", "zot:5000/shop/worker:pending")],
+            &[],
+            Some("force"),
+        );
+        let credentials = [secret("site-git", "kubernetes.io/basic-auth")];
+        let plan = on_cluster(remove_build(), workload, vec![site, worker], &credentials).unwrap();
+        assert!(matches!(
+            write(&plan, "Build", "site"),
+            Some(Write::Delete { .. })
+        ));
+        assert!(write(&plan, "Secret", "site-git").is_none());
+        assert!(write(&plan, "Deployment", "site").is_none());
+    }
+
+    /// A service without a `Build` of its name has nothing to stop.
+    #[test]
+    fn stopping_a_service_without_a_build_plans_nothing() {
+        let refused =
+            on_cluster(remove_build(), running("nginx:1.27", true), Vec::new(), &[]).unwrap_err();
+        assert_eq!(refused.code, "unknown_build");
     }
 }

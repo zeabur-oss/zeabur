@@ -80,7 +80,7 @@ function useObjectStorageChoice(project: string | undefined) {
 }
 
 /** "Deploy from Git": open, or closed by the person's role or by what the cluster lacks. */
-function useGitChoice(project: string | undefined): AddChoices["git"] {
+export function useGitChoice(project: string | undefined): AddChoices["git"] {
   const builds = useQuery({
     ...buildsQuery(project ?? ""),
     enabled: !!project,
@@ -144,7 +144,7 @@ export interface AddEntry {
 export const entryTestid = (what: AddWhat) =>
   `add-${what === "objectStorage" ? "object-storage" : what}`
 
-function gitEntry(git: AddChoices["git"], what: "git" | "upload", t: Translate): AddEntry {
+export function gitEntry(git: AddChoices["git"], what: "git" | "upload", t: Translate): AddEntry {
   const entry: AddEntry = { what, group: "service", label: t(`add.${what}`), gate: git.gate }
   if (git.open || !git.gate.open) return entry
   if (git.keelUnavailable) return { ...entry, why: t("add.gitMissing.keel") }

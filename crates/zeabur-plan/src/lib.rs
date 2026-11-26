@@ -36,8 +36,8 @@ pub mod terminal;
 pub mod token;
 
 pub use built_service::{
-    BRANCH_PATTERN, DeployKeySecret, GitAccess, GitServiceChange, Repository, deploy_key_host,
-    parse_repository,
+    BRANCH_PATTERN, BuildInput, BuildSource, BuiltServiceChange, DeployKeySecret, GitAccess,
+    Repository, SetBuildChange, deploy_key_host, parse_repository,
 };
 pub use certificates::{CheckedCertificate, IssuerRead, own_secret_name};
 pub use change::{
@@ -46,7 +46,7 @@ pub use change::{
     EgressLimitChange, EnvImportChange, ErrorPageHtml, FieldOwners, GatewayParent, HttpOnlyReason,
     IpAllowChange, KeptReason, LabelVolumeChange, NameValue, ObjectName, Plan, PlanRequest,
     PlannedObject, ProbeKind, PublicPortChange, RouteKind, RouteRef, ServiceSize, Target,
-    TemplateChange, UploadServiceChange, Warning, Write,
+    TemplateChange, Warning, Write,
 };
 pub use checks::{AccessMode, ProbeHandler, ProbeRequest, ResourceRef, VolumeRequest};
 pub use create::{ServedKind, created_object, resolve};

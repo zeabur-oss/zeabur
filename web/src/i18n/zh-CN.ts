@@ -1642,6 +1642,11 @@ export const zhCN: Messages = {
   "confirm.port": (service, from, to) =>
     `${service} 从端口 ${from} 改用 ${to}：容器端口、健康检查和 PORT 都会跟着调整，私有地址也会把流量转发到 ${to}。`,
   "confirm.image": (service, tag) => `${service} 会改为运行 ${tag}。`,
+  "confirm.setBuild": (service) =>
+    `Zeabur Builder 会用你的仓库构建 ${service}，每次构建完成就会上线。`,
+  "confirm.setBuildUpload": (service) =>
+    `Zeabur Builder 会用你上传的文件夹构建 ${service}，每次构建完成就会上线。`,
+  "confirm.removeBuild": (service) => `Zeabur Builder 会停止构建 ${service}，并删除它的 Build。`,
   "confirm.rebuild": (build) => `Zeabur Builder 会用分支最新的提交重新构建 ${build}。`,
   "confirm.buildOptions": (build) => `从下一次构建起，Zeabur Builder 用这些选项构建 ${build}。`,
   "confirm.uploadToken": (build) => `Zeabur Builder 会让你在 15 分钟内上传文件夹到 ${build}。`,
@@ -1720,8 +1725,8 @@ export const zhCN: Messages = {
   "confirm.maintenanceOff": (host) => `${host} 的访客重新连到服务。`,
   "confirm.copyS3Keys": (name, destination) =>
     `创建机密变量 ${name}，复制 S3 目的地 ${destination} 的密钥。`,
-  "confirm.createUploadService": (name) => `创建服务 ${name}，并用你上传的文件夹构建。`,
-  "confirm.createGitService": (name) => `创建服务 ${name}，并用你的仓库构建。`,
+  "confirm.createBuiltServiceUpload": (name) => `创建服务 ${name}，并用你上传的文件夹构建。`,
+  "confirm.createBuiltServiceGit": (name) => `创建服务 ${name}，并用你的仓库构建。`,
   "confirm.createImageService": (name) => `用镜像创建服务 ${name}。`,
   "confirm.createImageServicePublic": (name, host) =>
     `用镜像创建服务 ${name}，并公开到 ${host}，网上的人都能访问。`,
@@ -1735,6 +1740,8 @@ export const zhCN: Messages = {
   "action.deploy": "部署",
   "action.rebuild": "重新构建",
   "action.upload": "上传",
+  "action.connectGit": "连接",
+  "action.stopBuilding": "停止构建",
   "action.saveBuildOptions": "保存构建选项",
   "action.autoUpdateOn": "开启",
   "action.autoUpdateOff": "关闭",
@@ -1803,6 +1810,8 @@ export const zhCN: Messages = {
   "title.configReload": (service: string) => `配置文件或机密变量变更时重启 ${service}`,
   "title.deployBuild": (service) => `把最新的构建部署到 ${service}`,
   "title.rebuild": (build) => `重新构建 ${build}`,
+  "title.gitSource": (service) => `从 Git 构建 ${service}`,
+  "title.stopBuilding": (build) => `停止从源代码构建 ${build}`,
   "title.buildOptions": (build) => `变更 ${build} 的构建方式`,
   "title.autoUpdateOn": (service) => `自动部署 ${service}`,
   "title.autoUpdateOff": (service) => `停止自动部署 ${service}`,
@@ -3604,6 +3613,18 @@ export const zhCN: Messages = {
   "part.networking": "网络",
   "part.storage": "存储",
   "part.compute": "计算资源",
+  "gitSource.hint": "连接 Git 仓库后，Zeabur Builder 会用它构建这个服务。",
+  "gitSource.title": "从 Git 仓库构建",
+  "gitSource.imageHint":
+    "连接后，服务会改为运行 Zeabur Builder 用仓库构建的镜像，每次构建完成就会上线。",
+  "gitSource.uploadHint":
+    "连接后，Zeabur Builder 会改用仓库构建，不再用上传的文件夹，每次构建完成就会上线。",
+  "gitSource.open": "连接 Git",
+  "gitSource.container": "容器",
+  "gitSource.done": "完成",
+  "stopBuilding.action": "停止从源代码构建",
+  "stopBuilding.note": (service) =>
+    `${service} 会继续运行当前的镜像，推送后不再自动更新。镜像仓库里已有的镜像会保留。`,
   "buildOptions.hint": "Zeabur Builder 从仓库的哪个位置构建，以及只在构建时能读到的变量。",
   "buildOptions.none": "还没有构建变量，可在下方加入 KEY=value。",
   "buildOptions.fromSecret": (secret) => `值在机密变量 ${secret}`,

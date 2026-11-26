@@ -1786,6 +1786,12 @@ export const en = {
   "confirm.port": (service: string, from: number, to: number) =>
     `${service} moves from port ${from} to ${to}: its container port, health checks and PORT change, and its private addresses send traffic to ${to}.`,
   "confirm.image": (service: string, tag: string) => `${service} will run ${tag}.`,
+  "confirm.setBuild": (service: string) =>
+    `Zeabur Builder builds ${service} from your repository, and each new build goes live.`,
+  "confirm.setBuildUpload": (service: string) =>
+    `Zeabur Builder builds ${service} from the folder you upload, and each new build goes live.`,
+  "confirm.removeBuild": (service: string) =>
+    `Zeabur Builder stops building ${service}, and its Build is deleted.`,
   "confirm.rebuild": (build: string) =>
     `Zeabur Builder builds ${build} again from the newest commit of its branch.`,
   "confirm.buildOptions": (build: string) =>
@@ -1882,9 +1888,9 @@ export const en = {
   "confirm.maintenanceOff": (host: string) => `Send visitors of ${host} to the service again.`,
   "confirm.copyS3Keys": (name: string, destination: string) =>
     `Copy the keys of ${destination} into secret ${name}.`,
-  "confirm.createUploadService": (name: string) =>
+  "confirm.createBuiltServiceUpload": (name: string) =>
     `Create service ${name} and the build that runs the folder you uploaded.`,
-  "confirm.createGitService": (name: string) =>
+  "confirm.createBuiltServiceGit": (name: string) =>
     `Create service ${name} and the build that runs your repository.`,
   "confirm.createImageService": (name: string) => `Create service ${name} from its image.`,
   "confirm.createImageServicePublic": (name: string, host: string) =>
@@ -1900,6 +1906,8 @@ export const en = {
   "action.deploy": "Deploy",
   "action.rebuild": "Build again",
   "action.upload": "Upload",
+  "action.connectGit": "Connect",
+  "action.stopBuilding": "Stop building",
   "action.saveBuildOptions": "Save build options",
   "action.autoUpdateOn": "Turn on",
   "action.autoUpdateOff": "Turn off",
@@ -1967,6 +1975,8 @@ export const en = {
   "title.configReload": (service: string) => `Auto-restart ${service}`,
   "title.deployBuild": (service: string) => `Deploy the newest build to ${service}`,
   "title.rebuild": (build: string) => `Build ${build} again`,
+  "title.gitSource": (service: string) => `Build ${service} from Git`,
+  "title.stopBuilding": (build: string) => `Stop building ${build} from source`,
   "title.buildOptions": (build: string) => `Change how ${build} is built`,
   "title.autoUpdateOn": (service: string) => `Auto-deploy ${service}`,
   "title.autoUpdateOff": (service: string) => `Stop auto-deploying ${service}`,
@@ -3959,6 +3969,18 @@ export const en = {
   "part.networking": "Networking",
   "part.storage": "Storage",
   "part.compute": "Compute",
+  "gitSource.hint": "Connect a Git repository, and Zeabur Builder builds this service from it.",
+  "gitSource.title": "Build from a Git repository",
+  "gitSource.imageHint":
+    "The service then runs what Zeabur Builder builds from the repository, and each new build goes live.",
+  "gitSource.uploadHint":
+    "Zeabur Builder then builds the repository instead of an uploaded folder, and each new build goes live.",
+  "gitSource.open": "Connect Git",
+  "gitSource.container": "Container",
+  "gitSource.done": "Done",
+  "stopBuilding.action": "Stop building from source",
+  "stopBuilding.note": (service: string) =>
+    `${service} keeps running its current image and stops updating when you push. Images already in the registry stay.`,
   "buildOptions.hint":
     "Where in the repository Zeabur Builder builds from, and the variables only the build can read.",
   "buildOptions.none": "No build variables yet. Add KEY=value lines below.",

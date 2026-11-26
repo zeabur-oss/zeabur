@@ -9,7 +9,7 @@ use zeabur_kube::Cluster;
 use zeabur_modules::{
     Read, cloudnative_pg, dragonfly, mariadb_operator, moco, percona_mongodb, seaweedfs,
 };
-use zeabur_plan::{Change, created_object};
+use zeabur_plan::{BuildSource, Change, created_object};
 use zeabur_telemetry::{DatabaseKind, DomainKind, Feature, Source};
 
 use crate::projects::templates::PAGE_SERVER_TEMPLATE;
@@ -56,12 +56,12 @@ fn read(changes: &[Change]) -> Found {
             if let Some(id) = zeabur_catalog::template_id(PAGE_SERVER_TEMPLATE) {
                 found.feature(Feature::ServiceCreated(Source::Template(id)));
             }
-        } else if let Change::CreateUploadService(upload) = change {
-            found.feature(Feature::ServiceCreated(Source::Upload));
-            found.hosts.extend(upload.host.clone());
-        } else if let Change::CreateGitService(git) = change {
-            found.feature(Feature::ServiceCreated(Source::Git));
-            found.hosts.extend(git.host.clone());
+        } else if let Change::CreateBuiltService(service) = change {
+            found.feature(Feature::ServiceCreated(match service.build.source {
+                BuildSource::Upload { .. } => Source::Upload,
+                BuildSource::Git { .. } => Source::Git,
+            }));
+            found.hosts.extend(service.host.clone());
         } else if let Change::CreateImageService(image) = change {
             found.feature(Feature::ServiceCreated(Source::Image));
             found.hosts.extend(image.host.clone());
@@ -238,8 +238,8 @@ mod tests {
     #[test]
     fn an_upload_service_brings_its_hostname() {
         let found = read(&changes(json!([
-            {"op": "createUploadService", "name": "site", "request": "r1",
-             "method": "railpack", "port": 8080, "host": "site.example.com"},
+            {"op": "createBuiltService", "name": "site", "port": 8080, "host": "site.example.com",
+             "build": {"source": {"type": "upload", "request": "r1"}, "method": "railpack"}},
         ])));
         assert_eq!(found.features, [Feature::ServiceCreated(Source::Upload)]);
         assert_eq!(found.hosts, ["site.example.com"]);

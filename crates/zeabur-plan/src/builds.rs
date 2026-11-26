@@ -140,7 +140,7 @@ impl Planner<'_> {
     }
 
     /// The working copy of `Build` `name`, read for the plan.
-    fn build(&mut self, name: &str) -> Result<usize, PlanError> {
+    pub(crate) fn build(&mut self, name: &str) -> Result<usize, PlanError> {
         let resource = builds();
         let Some(object) = self
             .input
@@ -482,7 +482,12 @@ impl Planner<'_> {
         self.patch(index, operations)
     }
 
-    fn build_env(&mut self, index: usize, build: &str, edit: &EnvEdit) -> Result<(), PlanError> {
+    pub(crate) fn build_env(
+        &mut self,
+        index: usize,
+        build: &str,
+        edit: &EnvEdit,
+    ) -> Result<(), PlanError> {
         let env = self
             .current(index)
             .pointer("/spec/env")
