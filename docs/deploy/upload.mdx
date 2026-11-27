@@ -62,13 +62,13 @@ In the service's **Builds** tab, click **Upload a folder** and choose the update
 
 ## Upload with zeaburctl
 
-Use [`zeaburctl up`](../reference/zeaburctl.mdx#up) from a terminal or script without knowing the registry or Zeabur OSS address. When you sign in with Zeabur Identity, the folder is sent to Zeabur OSS in the cluster. With other credentials, such as an admin kubeconfig, the command runs the same steps on your computer. The credentials never leave your computer.
+Use [`zeaburctl up`](../reference/zeaburctl.mdx#up) from a terminal or script without knowing the registry or Zeabur OSS address. The command acts with your kubeconfig through the Kubernetes API and pushes the folder from your computer. The credentials never leave your computer, and a **Developer** in the project is enough.
 
 ```sh
 zeaburctl up ./site --project shop --service site
 ```
 
-If the service doesn't exist, the command creates it. In scripts or CI, both `--project` and `--service` are required, and the project must already exist.
+If the service doesn't exist, the command creates it. In scripts or CI, `--service` is required, and so is `--project` unless the kubeconfig context sets a namespace. The project must already exist. To upload from GitHub Actions with an API token, see [Connect from your computer or CI](./from-outside.mdx#upload-a-folder-from-github-actions).
 
 ## Check the result
 

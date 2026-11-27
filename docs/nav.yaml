@@ -12,7 +12,7 @@
   pages: [steps, notes]
 - group: deploy
   label: Deploy
-  pages: [git, upload, image, compose, templates, databases, object-storage, cron-jobs]
+  pages: [git, upload, image, compose, templates, databases, object-storage, cron-jobs, from-outside]
 - group: configure
   label: Configure
   pages: [projects, service-settings, restart-rollback, image-updates, variables, domains, dns, networking, ip-limits, maintenance, volumes, logs-terminal, objects-yaml, delete-project]

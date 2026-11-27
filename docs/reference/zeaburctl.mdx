@@ -28,7 +28,7 @@ zeaburctl ui
 zeaburctl ui --context production --no-browser
 zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
-zeaburctl connect shop/orders
+zeaburctl connect orders --project shop
 zeaburctl connect shop/api:8080
 zeaburctl components export cert-manager
 ```
@@ -102,42 +102,21 @@ zeaburctl up [folder] [--project <project>] [--service <service>]
 
 Uploads a folder to the cluster and starts a build. If you omit the folder, the command uses the current folder. If the service doesn't exist, the command creates it. The project must already exist; the command doesn't create projects.
 
-The command reads the Zeabur OSS URL and Zeabur Identity address from the `zeabur-info` config file in the cluster's `kube-public` namespace. No separate configuration is needed. Anyone signed in to the cluster can read this config file; unauthenticated users can't. To use a different URL, add `--server` or set the `ZEABUR_SERVER` environment variable.
+The command acts with your kubeconfig through the Kubernetes API, the same way `zeaburctl ui` does. It uses the same API and change plans as the web interface, so you don't need to know the registry address. Your credentials go nowhere else, and the command can't do anything your kubeconfig can't. A kubeconfig made from an API token with **Developer** in the project is enough; see [Connect from your computer or CI](../deploy/from-outside.mdx).
 
-The command uses the same API and change plans as the web interface. You don't need to know the registry address.
+### What it needs
 
-### Server mode and local mode
-
-When the command starts, it prints a line showing which mode it's using.
-
-| Mode | When it's used | How it sends the folder |
-|---|---|---|
-| Server mode | kubeconfig uses a Zeabur Identity token to sign in, and the cluster has `zeabur-info` | Sends the folder to Zeabur OSS in the cluster, which pushes it to the registry |
-| Local mode | All other cases, such as an admin kubeconfig, a cloud provider token, a ServiceAccount token, or a cluster without a Zeabur OSS server | Runs the same steps on your computer, like `zeaburctl ui`, then pushes to the registry from that computer |
-
-Local mode connects directly to the Kubernetes API with the credentials in kubeconfig. It doesn't send those credentials anywhere else. With an admin kubeconfig, you can run `up` without any additional configuration.
-
-Local mode also requires:
-
-- Zeabur Builder installed in the cluster. If it's missing, the command stops before uploading. If it isn't installed, deploy an image instead.
-- Access to the registry. If the registry is inside the cluster, such as `zot.zot.svc:5000`, the command automatically forwards a port through the Kubernetes API, like `kubectl port-forward`. You need `get services`, `list endpointslices`, and `create pods/portforward` permissions in the registry's namespace, plus read access to the CA config file for the registry's certificate. Administrators have these permissions; a project's Developer role doesn't.
-- `zeabur-info` in the cluster. The command reads the registry location from it. Without a Zeabur OSS server in the cluster, the command can't create new services and doesn't automatically forward ports.
-
-### Sign-in and permissions
-
-The command signs in with the current context in kubeconfig. Use `--context` to specify another context. Both modes use your permissions for uploads and changes. They can't do anything you don't have permission to do.
-
-The command sends only tokens issued by Zeabur Identity to Zeabur OSS in the cluster. It doesn't send cloud provider tokens (such as GKE or EKS tokens), ServiceAccount tokens, static tokens, or client certificates to Zeabur OSS; it uses local mode instead. Zeabur OSS also accepts only tokens issued by Zeabur Identity and treats other tokens as unauthenticated.
-
-In server mode, the Zeabur OSS URL must use `https://`. You can use `http://` only when testing on your own computer (`localhost`, `127.0.0.1`, or `::1`).
+- Zeabur Builder installed in the cluster. If it's missing, the command stops before uploading. Deploy an image instead.
+- The `zeabur-info` config file in the `kube-public` namespace, which the Zeabur OSS chart creates. The command reads the registry's address from it. Anyone signed in to the cluster can read it. Without it, the command can't create new services and doesn't forward a port.
+- Access to the registry. If the registry is inside the cluster, such as `zot.zot.svc:5000`, the command forwards a port through the Kubernetes API, like `kubectl port-forward`. This needs `get services`, `list endpointslices`, and `create pods/portforward` in the registry's namespace. A Developer in any project has them; see [Images in the build registry](./permissions.mdx#images-in-the-build-registry). The command trusts the registry's certificate through the CA that Zeabur Builder publishes for everyone signed in.
 
 ### Choose a project and service
 
-When running in a terminal, the command prompts you to choose a project from a list if you omit `--project`. If you omit `--service`, it asks for a service name, defaulting to the folder name.
+If you omit `--project`, the command uses the namespace of the kubeconfig context and prints which project that is. An API token's kubeconfig sets one when the token has a role in only one project. When the context sets none, the command prompts you to choose a project from a list in a terminal. If you omit `--service`, it asks for a service name, defaulting to the folder name.
 
 If the service doesn't exist, the command asks for confirmation before creating it. Add `--yes` to skip this confirmation.
 
-In scripts or CI, the command doesn't prompt. You must specify the project and service with `--project` and `--service`. If the service doesn't exist, the command creates it without requiring `--yes`.
+In scripts or CI, the command doesn't prompt. You must name the service with `--service`, and the project with `--project` unless the context sets a namespace. If the service doesn't exist, the command creates it without requiring `--yes`.
 
 A new service has the same contents as one created with **Upload a folder** in the web interface, including a Build and Deployment. If you pass `--port`, the command also creates a Kubernetes Service and sets the `PORT` environment variable. Without a port, the service doesn't accept connections. The default build method is `railpack`; use `--method dockerfile` to use a Dockerfile instead.
 
@@ -152,7 +131,7 @@ The command sends a `tar.gz` archive. It keeps executable permissions, and symbo
 The upload has three steps, in order:
 
 1. Request an upload token from the Build. This is a change plan that the command applies directly.
-2. Push the archive to the registry. In server mode, Zeabur OSS pushes it; in local mode, your computer does.
+2. Push the archive to the registry from your computer.
 3. Write the digest to the Build to start the build. This is also a change plan that the command applies directly.
 
 These are the same change plans the web interface uses. Running the command confirms that you want to apply them; the command doesn't ask again. When creating a new service, the service creation plan already includes the upload token request.
@@ -161,8 +140,7 @@ These are the same change plans the web interface uses. Running the command conf
 
 | Option | Default and purpose |
 |---|---|
-| `--server <address>` | The URL for server mode. Defaults to the URL in `zeabur-info`. Specify a different URL, such as `https://zeabur.example.com`, or use the `ZEABUR_SERVER` environment variable |
-| `--project <project>` | The existing project for the service. If omitted in a terminal, prompts you to choose from a list. Required in scripts and CI |
+| `--project <project>` | The existing project for the service. Defaults to the namespace of the kubeconfig context. Without one, prompts you to choose from a list in a terminal, and is required in scripts and CI |
 | `--service <service>` | The service name. If omitted in a terminal, prompts for a name, defaulting to the folder name. Required in scripts and CI |
 | `--context <name>` | Defaults to the current context in kubeconfig |
 | `--method railpack\|dockerfile` | The build method for a new service. Defaults to `railpack` |
@@ -172,10 +150,12 @@ These are the same change plans the web interface uses. Running the command conf
 ## `connect`
 
 ```sh
-zeaburctl connect <project>/<name>[:<port>] [--port <port>] [--context <name>]
+zeaburctl connect [<project>/]<name>[:<port>] [--project <project>] [--port <port>] [--context <name>]
 ```
 
 Forwards a port on `127.0.0.1` to a database or service through kube-apiserver, like `kubectl port-forward`. The command keeps running until you press Ctrl-C.
+
+The project is the one before `/` in the target, else `--project`, else the namespace of the kubeconfig context. If the target and `--project` name different projects, the command stops. `zeaburctl connect orders --project shop` and `zeaburctl connect shop/orders` reach the same database.
 
 `<name>` is looked up among the project's databases first. For a database, the command prints a connection string; it works for every engine. Otherwise `<name>` is a service, and the command prints the local address, such as `127.0.0.1:52341`. A service is reached through the ports of its Kubernetes Services. If there is more than one, add the one you want, as in `shop/api:8080`; without it the command lists the ports and stops.
 
@@ -183,6 +163,7 @@ You need `create pods/portforward` in the project, and for a database also `list
 
 | Option | Default and purpose |
 |---|---|
+| `--project` | The namespace of the kubeconfig context |
 | `--port` | A free port. Set it to keep the same local port between runs |
 | `--context` | The current kubeconfig context |
 

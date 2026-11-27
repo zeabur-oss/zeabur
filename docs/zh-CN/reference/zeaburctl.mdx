@@ -28,7 +28,7 @@ zeaburctl ui
 zeaburctl ui --context production --no-browser
 zeaburctl doctor --context production --output json
 zeaburctl up ./site --project shop --service site
-zeaburctl connect shop/orders
+zeaburctl connect orders --project shop
 zeaburctl connect shop/api:8080
 zeaburctl components export cert-manager
 ```
@@ -102,42 +102,21 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 
 将文件夹上传到集群，开始构建。省略文件夹时使用当前文件夹。如果服务尚不存在，命令会创建服务。项目必须已存在，命令不会创建项目。
 
-命令从集群 `kube-public` Namespace 中的 `zeabur-info` 配置文件读取 Zeabur 开源版的网址和 Zeabur Identity 的地址，无需另行配置。已登录集群的用户都能读取这个配置文件，未登录的用户无法读取。要改用其他网址，添加 `--server`，或设置环境变量 `ZEABUR_SERVER`。
+命令与 `zeaburctl ui` 一样，用你的 kubeconfig 通过 Kubernetes API 操作，和网页使用同一组 API 和相同的变更方案，你无需知道 registry 的地址。你的凭证不会发送到其他地方，命令也无法执行超出 kubeconfig 权限的操作。用 API 令牌生成的 kubeconfig，只要令牌在项目中是**开发者**就够了，见[从自己的电脑或 CI 连接](../deploy/from-outside.mdx)。
 
-命令和网页使用同一组 API 和相同的变更方案，你无需知道 registry 的地址。
+### 需要什么
 
-### 服务器模式与本机模式
-
-命令启动时会输出一行，说明本次使用哪种模式。
-
-| 模式 | 何时使用 | 如何发送文件夹 |
-|---|---|---|
-| 服务器模式 | kubeconfig 使用 Zeabur Identity 的令牌登录，且集群中有 `zeabur-info` | 交给集群中的 Zeabur 开源版，由 Zeabur 开源版推送到 registry |
-| 本机模式 | 其他情况，例如管理员 kubeconfig、云服务令牌、ServiceAccount 令牌，或集群中没有 Zeabur 开源版服务器 | 与 `zeaburctl ui` 一样，在你的计算机上运行相同的步骤，再从这台计算机推送到 registry |
-
-本机模式使用 kubeconfig 中的证书直接连接 Kubernetes API，不会将证书发送到其他地方。使用管理员 kubeconfig，就能直接运行 `up`，无需另行配置。
-
-本机模式还需要满足以下条件：
-
-- 集群已安装 Zeabur Builder。如果尚未安装，命令会在上传前停止。未安装时改用镜像部署。
-- 能连接 registry。如果 registry 位于集群中（例如 `zot.zot.svc:5000`），命令会通过 Kubernetes API 自动转发端口，类似 `kubectl port-forward`。你需要在 registry 所在的 Namespace 中拥有 `get services`、`list endpointslices` 和 `create pods/portforward` 权限，还需要能读取 registry 证书的 CA 配置文件。管理员拥有这些权限，项目的开发者没有。
-- 集群中有 `zeabur-info`。命令从这里获取 registry 的地址。如果集群中没有 Zeabur 开源版服务器，命令无法创建新服务，也不会自动转发端口。
-
-### 登录与权限
-
-命令使用 kubeconfig 的当前 context 登录，也可以通过 `--context` 指定其他 context。两种模式都使用你的权限处理上传和变更，无法执行超出你权限的操作。
-
-命令只会将 Zeabur Identity 签发的令牌发送给集群中的 Zeabur 开源版。云服务令牌（例如 GKE、EKS）、ServiceAccount 令牌、固定令牌和客户端证书都不会发送，命令会改用本机模式。Zeabur 开源版也只接受 Zeabur Identity 签发的令牌，使用其他令牌会视为未登录。
-
-服务器模式下，Zeabur 开源版的网址必须使用 `https://`。只有在自己的计算机上测试时（`localhost`、`127.0.0.1`、`::1`），才能使用 `http://`。
+- 集群已安装 Zeabur Builder。未安装时，命令会在上传前停止，请改用镜像部署。
+- `kube-public` Namespace 中有 Zeabur 开源版 chart 创建的 `zeabur-info` 配置文件。命令从这里读取 registry 的地址，已登录集群的用户都能读取。没有这个配置文件时，命令无法创建新服务，也不会转发端口。
+- 能连接 registry。如果 registry 位于集群中（例如 `zot.zot.svc:5000`），命令会通过 Kubernetes API 转发端口，类似 `kubectl port-forward`。这需要 registry 所在 Namespace 的 `get services`、`list endpointslices` 和 `create pods/portforward` 权限，任何项目的开发者都有，见[构建用 registry 中的镜像](./permissions.mdx#构建用-registry-中的镜像)。命令使用 Zeabur Builder 向所有已登录用户公开的 CA 来验证 registry 的证书。
 
 ### 选择项目与服务
 
-在终端中运行时，如果未提供 `--project`，命令会让你从列表中选择项目。如果未提供 `--service`，命令会询问服务名称，默认使用文件夹名称。
+未提供 `--project` 时，命令使用 kubeconfig context 的 Namespace，并打印使用的是哪个项目；令牌只在一个项目中有角色时，API 令牌的 kubeconfig 就会设置它。context 没有设置 Namespace 时，命令会在终端中让你从列表中选择项目。如果未提供 `--service`，命令会询问服务名称，默认使用文件夹名称。
 
 如果服务不存在，命令会在创建前询问一次。添加 `--yes` 可以跳过这次确认。
 
-在脚本或 CI 中运行时，命令不会询问。你必须通过 `--project` 和 `--service` 指定项目与服务。如果服务不存在，命令会直接创建，无需添加 `--yes`。
+在脚本或 CI 中运行时，命令不会询问。你必须通过 `--service` 指定服务；context 没有设置 Namespace 时，还要通过 `--project` 指定项目。如果服务不存在，命令会直接创建，无需添加 `--yes`。
 
 新服务的内容与网页“上传文件夹”创建的服务相同，包含 Build 和 Deployment。如果提供了 `--port`，还会创建 Service，并设置 `PORT` 环境变量。如果未提供端口，服务就不接受连接。默认构建方式为 `railpack`，也可以通过 `--method dockerfile` 改用 Dockerfile。
 
@@ -152,7 +131,7 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 上传依次分为三步：
 
 1. 向 Build 请求上传令牌。这是一份变更方案，会直接应用。
-2. 将压缩包推送到 registry。服务器模式由 Zeabur 开源版推送，本机模式由这台计算机推送。
+2. 从这台计算机将压缩包推送到 registry。
 3. 将 digest 写入 Build，开始构建。这也是一份变更方案，会直接应用。
 
 这些变更方案与网页使用的相同。运行命令即表示你确认应用，命令不会再次询问。如果需要创建新服务，创建服务的变更方案中已包含上传令牌请求。
@@ -161,8 +140,7 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 
 | 选项 | 默认值与用途 |
 |---|---|
-| `--server <地址>` | 服务器模式使用的网址，默认读取 `zeabur-info` 中的网址。要使用其他网址，可在此指定，例如 `https://zeabur.example.com`，也可以使用环境变量 `ZEABUR_SERVER` |
-| `--project <项目>` | 服务所在的已有项目。省略时在终端中从列表选择，脚本与 CI 中必填 |
+| `--project <项目>` | 服务所在的已有项目，默认为 kubeconfig context 的 Namespace。context 没有设置时，在终端中从列表选择，脚本与 CI 中必填 |
 | `--service <服务>` | 服务名称。省略时在终端中询问，默认使用文件夹名称，脚本与 CI 中必填 |
 | `--context <名称>` | 默认使用 kubeconfig 的当前 context |
 | `--method railpack\|dockerfile` | 新服务的构建方式，默认为 `railpack` |
@@ -172,10 +150,12 @@ zeaburctl up [文件夹] [--project <项目>] [--service <服务>]
 ## `connect`
 
 ```sh
-zeaburctl connect <project>/<name>[:<port>] [--port <port>] [--context <name>]
+zeaburctl connect [<project>/]<name>[:<port>] [--project <project>] [--port <port>] [--context <name>]
 ```
 
 通过 kube-apiserver 把 `127.0.0.1` 上的一个端口转发到数据库或服务，类似 `kubectl port-forward`。命令会一直运行，按 Ctrl-C 才停止。
+
+项目依次取目标中 `/` 前面的名称、`--project`，最后是 kubeconfig context 的 Namespace。目标和 `--project` 写的项目不同时，命令会停止。`zeaburctl connect orders --project shop` 和 `zeaburctl connect shop/orders` 连接的是同一个数据库。
 
 命令先在项目的数据库中查找 `<name>`。找到数据库时，打印连接字符串，所有引擎都能用。找不到时，就把 `<name>` 当作服务，打印本机地址，例如 `127.0.0.1:52341`。服务通过它的 Kubernetes Service 的端口连接；端口不止一个时，在名称后加上要连的端口，例如 `shop/api:8080`。不加的话，命令会列出所有端口后停止。
 
@@ -183,6 +163,7 @@ zeaburctl connect <project>/<name>[:<port>] [--port <port>] [--context <name>]
 
 | 选项 | 默认值与用途 |
 |---|---|
+| `--project` | kubeconfig context 的 Namespace |
 | `--port` | 一个空闲端口。想每次使用同一个本机端口时再指定 |
 | `--context` | kubeconfig 的当前 context |
 

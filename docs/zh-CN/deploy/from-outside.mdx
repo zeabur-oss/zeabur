@@ -1,0 +1,104 @@
+---
+title: 从自己的电脑或 CI 连接
+description: 用 zeaburctl 和 API 令牌，在自己的电脑上用 psql 或 DBeaver 打开数据库，或从 GitHub Actions 上传文件夹。
+---
+
+`zeaburctl connect` 和 `zeaburctl up` 与 kubectl 一样用 kubeconfig 操作集群，只通过 TCP 6443 上的 kube-apiserver 连进去，因此数据库和构建用的 registry 都不需要公开地址。本页用 [API 令牌](../reference/api-tokens.mdx)生成 kubeconfig，在自己的电脑和 CI 中都能用，能做的事也只限于令牌的角色。
+
+示例使用项目 `shop`、PostgreSQL 数据库 `orders` 和服务 `web`。
+
+## 开始前
+
+- 电脑上已经安装 [zeaburctl](../reference/zeaburctl.mdx)。
+- 管理员已经创建 API 令牌，并让它在 `shop` 中是**开发者**。**查看者**令牌不能连接，也不能上传。见[创建令牌](../reference/api-tokens.mdx#创建令牌)。
+- 你的电脑或 CI runner 能访问 kube-apiserver 的 TCP 6443。
+- 如果要上传文件夹，集群中需要已安装 Zeabur Builder。
+
+## 把令牌做成 kubeconfig
+
+令牌窗口中的 kubeconfig，`server` 是空的。先保存为文件，再填写 kube-apiserver 在 6443 端口的地址。如何找到地址，见[把令牌做成 kubeconfig](../reference/api-tokens.mdx#把令牌做成-kubeconfig)。
+
+```sh
+chmod 600 deploy-shop.yaml
+kubectl config set-cluster zeabur --server=https://203.0.113.10:6443 --kubeconfig deploy-shop.yaml
+export KUBECONFIG=$PWD/deploy-shop.yaml
+kubectl auth whoami
+```
+
+令牌只在一个项目中有角色时，kubeconfig 默认就在那个项目，不加 `--project` 时 zeaburctl 也使用它。令牌在多个项目中有角色时，每条命令都要加上 `--project shop`。
+
+## 在自己的电脑上打开数据库
+
+```sh
+zeaburctl connect orders --project shop --port 15432
+```
+
+命令会把 `127.0.0.1:15432` 接到数据库，并打印连接字符串：
+
+```text
+Forwarding 127.0.0.1:15432 to orders in shop. Press Ctrl-C to stop.
+postgresql://app:<password>@127.0.0.1:15432/app
+```
+
+使用期间保持命令运行，用完按 Ctrl-C 结束，集群中不会有任何改动。加上 `--port` 后每次都使用同一个本机端口，客户端中保存的连接就能继续用；不加的话，命令会选一个空闲端口。
+
+- **psql**：把连接字符串加上引号传给 `psql`，例如 `psql 'postgresql://app:<password>@127.0.0.1:15432/app'`。
+- **DBeaver**：新建 PostgreSQL 连接，主机填 `127.0.0.1`，端口填 `15432`，数据库、用户名和密码按连接字符串填写。
+
+每种引擎都会打印连接字符串：MySQL 和 MariaDB 是 `mysql://`，MongoDB 是 `mongodb://`，Dragonfly 是 `redis://`。服务也能连接，`zeaburctl connect web:8080` 会打印 `127.0.0.1:52341` 这样的本机地址。详情见 [`connect`](../reference/zeaburctl.mdx#connect)。
+
+## 从 GitHub Actions 上传文件夹
+
+`zeaburctl up` 会打包文件夹，通过 kube-apiserver 发送到构建用的 registry，再开始构建服务。服务不存在时，命令会创建它。
+
+1. 把 kubeconfig 保存为仓库的 secret，不要放进代码仓库：
+
+   ```sh
+   gh secret set KUBECONFIG_DATA < deploy-shop.yaml
+   ```
+
+2. 添加一个 workflow，例如 `.github/workflows/deploy.yml`：
+
+   ```yaml
+   name: Deploy
+   on:
+     push:
+       branches: [main]
+   jobs:
+     deploy:
+       runs-on: ubuntu-latest
+       steps:
+         - uses: actions/checkout@v4
+         - name: Install zeaburctl
+           env:
+             GH_TOKEN: ${{ github.token }}
+           run: |
+             gh release download --repo zeabur-oss/zeabur \
+               --pattern 'zeaburctl-v*-linux-amd64.tar.gz' --pattern SHA256SUMS
+             sha256sum --check --ignore-missing SHA256SUMS
+             tar -xzf zeaburctl-v*-linux-amd64.tar.gz zeaburctl
+             sudo install zeaburctl /usr/local/bin/
+         - name: Upload
+           env:
+             KUBECONFIG_DATA: ${{ secrets.KUBECONFIG_DATA }}
+           run: |
+             export KUBECONFIG="$RUNNER_TEMP/kubeconfig"
+             (umask 077; printf '%s' "$KUBECONFIG_DATA" > "$KUBECONFIG")
+             zeaburctl up . --project shop --service web --port 8080
+   ```
+
+`gh release download` 不指定 tag 时会下载最新版本。要固定版本，就在 `download` 后面加上 tag，例如 `v0.3.3`。如果还要验证签名，见[发行文件与验证](../reference/releases.mdx)。
+
+在 CI 中命令不会提问，所以必须提供 `--service`；kubeconfig 默认不在某个项目时，还要提供 `--project`。`--port` 只对新服务有效，用来设置应用监听的端口；新服务没有设置的话，就不接受连接。服务已经存在时，命令不改它的构建设置。文件夹上传完、构建开始后，命令就结束，构建完成时服务会部署新的构建结果。
+
+## 连接失败时
+
+| 看到的情况 | 原因与处理 |
+|---|---|
+| 命令等了一会儿，然后说无法连接集群 | 这台机器访问不到 TCP 6443。请在服务器的防火墙或云服务商的安全组中开放这个端口。GitHub 托管的 runner 没有固定地址，可能需要改用自托管 runner，或通过 VPN 连接服务器。 |
+| 错误说证书对这个名称或地址无效 | API 证书没有覆盖 `server` 中的地址。把地址加到 K3s 或 RKE2 配置文件的 `tls-san`（Zeatend 是 `host.tlsSan`），再重启 K3s 或 RKE2。 |
+| `not allowed to forward a port to zot/zot:5000` | 令牌在任何项目中都不是**开发者**，或者构建用的 registry 是在上次保存令牌权限之后才安装的。请管理员在令牌旁边选择**更多** → **更改权限**，再保存一次。见[构建用 registry 中的镜像](../reference/permissions.mdx#构建用-registry-中的镜像)。 |
+| `not allowed to forward a port to shop/…` | 令牌在这个项目中是**查看者**。请管理员改为**开发者**。 |
+| `Name the project with --project` | 令牌在多个项目中有角色，kubeconfig 默认不在任何项目。请加上 `--project`。 |
+| `Zeabur Builder is not installed in this cluster` | 安装 Zeabur Builder，或者改为部署镜像，不上传文件夹。 |
+| `401 Unauthorized` | 令牌已过期或已被删除。续期令牌后，重新保存一次 kubeconfig。 |

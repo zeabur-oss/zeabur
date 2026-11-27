@@ -62,13 +62,13 @@ description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置。
 
 ## 用 zeaburctl 上傳
 
-終端機和腳本可以用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，不用知道 registry 或 Zeabur 開源版的位址。用 Zeabur Identity 登入時，資料夾交給叢集裡的 Zeabur 開源版。用管理員 kubeconfig 等其他憑證時，指令在你的電腦上執行同樣的步驟，憑證不會離開你的電腦。
+終端機和腳本可以用 [`zeaburctl up`](../reference/zeaburctl.mdx#up)，不用知道 registry 或 Zeabur 開源版的位址。指令用你的 kubeconfig 經由 Kubernetes API 操作，從你的電腦推送資料夾。憑證不會離開你的電腦，在專案是**開發者**就夠了。
 
 ```sh
 zeaburctl up ./site --project shop --service site
 ```
 
-服務不存在時，指令會替你建立。在腳本或 CI 裡，`--project` 和 `--service` 都要填，專案必須已存在。
+服務不存在時，指令會替你建立。在腳本或 CI 裡一定要填 `--service`；kubeconfig context 沒有設定 Namespace 時，也要填 `--project`。專案必須已存在。要用 API 權杖從 GitHub Actions 上傳，見[從自己的電腦或 CI 連線](./from-outside.mdx#從-github-actions-上傳資料夾)。
 
 ## 確認結果
 
