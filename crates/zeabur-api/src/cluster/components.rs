@@ -103,22 +103,8 @@ pub struct ComponentRequest {
     /// to `plan` and to every `apply`; an input left out keeps the value an earlier install
     /// wrote, and an empty text is no value.
     #[serde(default)]
-    #[schema(value_type = BTreeMap<String, BTreeMap<String, InputValueSchema>>)]
+    #[schema(value_type = BTreeMap<String, BTreeMap<String, InputValue>>)]
     pub values: Values,
-}
-
-/// An input's value: the catalog's `default`, or what a person gives.
-#[derive(ToSchema)]
-#[schema(as = InputValue)]
-#[serde(untagged)]
-#[expect(dead_code, reason = "only the schema of the catalog's InputValue")]
-enum InputValueSchema {
-    /// `true` or `false`.
-    Flag(bool),
-    /// A whole number.
-    Integer(i64),
-    /// Text.
-    Text(String),
 }
 
 /// How far a step or check has come.
@@ -291,7 +277,6 @@ pub struct ComponentInput {
     pub required: bool,
     /// The catalog's value when none is given.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<InputValueSchema>)]
     pub default: Option<InputValue>,
     /// Zeabur makes a random value when none is given or kept.
     pub generated: bool,
@@ -299,7 +284,6 @@ pub struct ComponentInput {
     pub state: InputState,
     /// The value the plan writes; never for a Secret.
     #[serde(skip_serializing_if = "Option::is_none")]
-    #[schema(value_type = Option<InputValueSchema>)]
     pub value: Option<InputValue>,
 }
 
