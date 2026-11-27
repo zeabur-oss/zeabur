@@ -3850,7 +3850,7 @@ export type PlanWarning =
       dataStore?: DataStore | null
       /** `fail` for a data store, `warn` for any other service. */
       health: Health
-      /** The port. */
+      /** The port on the internet. */
       port: number
       /** The workload. */
       workload: WorkloadRef

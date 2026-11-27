@@ -14979,7 +14979,7 @@ components:
           port:
             type: integer
             format: int32
-            description: The port.
+            description: The port on the internet.
           workload:
             $ref: "#/components/schemas/WorkloadRef"
             description: The workload.
