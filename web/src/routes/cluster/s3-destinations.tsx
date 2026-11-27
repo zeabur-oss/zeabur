@@ -224,7 +224,6 @@ function DestinationEditor({
             {input(f.key, f.placeholder)}
           </FormField>
         ))}
-        <CaField value={form.caCert} onChange={(caCert) => setForm((f) => ({ ...f, caCert }))} />
         <FormField
           label={t("clusterBackups.secretKey")}
           hint={editing ? t("clusterBackups.keepKeys") : undefined}
@@ -238,6 +237,7 @@ function DestinationEditor({
             onChange={(event) => setForm((f) => ({ ...f, secretAccessKey: event.target.value }))}
           />
         </FormField>
+        <CaField value={form.caCert} onChange={(caCert) => setForm((f) => ({ ...f, caCert }))} />
         {/* The footer's button is outside the form, so Enter needs one in it. */}
         <button type="submit" hidden />
       </ReviewForm>
