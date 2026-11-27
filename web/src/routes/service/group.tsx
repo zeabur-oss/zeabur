@@ -11,17 +11,26 @@ import { useT } from "@/i18n"
 import type { Service } from "@/model/service"
 import { groupChange, groupNames, validGroup } from "@/model/service-group"
 
+/**
+ * The group name in the field. It holds a change only after the person types, so a form that
+ * mounts before the project refresh does not stage the old group as an edit.
+ */
+function useGroupEdit(service: Service, disabled: boolean) {
+  const [edited, setEdited] = useState<string>()
+  const change = disabled || edited === undefined ? undefined : groupChange(service, edited)
+  const workload = { kind: service.kind, name: service.name }
+  useHold("group", change ? { changes: [change], scope: { ops: ["group"], workload } } : undefined)
+  return [edited ?? (service.grouped ? service.group : ""), setEdited] as const
+}
+
 /** The group the sidebar lists the service in, by the group label on the workload. */
 export function GroupSection({ project, service }: { project: string; service: Service }) {
   const t = useT()
   const gate = useGate(project, "changeServices")
   const managed = service.provenance.tool
   const groups = groupNames(useQuery(projectQuery(project)).data?.services ?? [])
-  const [typed, setTyped] = useState(service.grouped ? service.group : "")
   const disabled = !!managed || !gate.open
-  const change = disabled ? undefined : groupChange(service, typed)
-  const workload = { kind: service.kind, name: service.name }
-  useHold("group", change ? { changes: [change], scope: { ops: ["group"], workload } } : undefined)
+  const [typed, setEdited] = useGroupEdit(service, disabled)
   const list = useId()
   const name = typed.trim()
   return (
@@ -42,7 +51,7 @@ export function GroupSection({ project, service }: { project: string; service: S
             placeholder={t("group.placeholder")}
             spellCheck={false}
             autoComplete="off"
-            onChange={(event) => setTyped(event.target.value)}
+            onChange={(event) => setEdited(event.target.value)}
           />
           <datalist id={list}>
             {groups.map((group) => (
