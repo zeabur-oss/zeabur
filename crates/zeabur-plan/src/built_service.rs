@@ -37,7 +37,9 @@ use crate::builds::{
     BUILDER_GROUP, BUILDER_VERSION, DETAILS_URL, GIT_CREDENTIALS_LABEL, KEEL_FORCE, KEEL_POLICY,
     UPLOAD_TOKEN_REQUEST, build_path, builds,
 };
-use crate::change::{BuildMethod, DataEdit, DataKind, NameValue, ServiceSize, Update};
+use crate::change::{
+    AutoUpdateTarget, BuildMethod, DataEdit, DataKind, NameValue, ServiceSize, Update,
+};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::image_service::{
@@ -977,7 +979,9 @@ impl<'a> Planner<'a> {
         };
         match (keel, existing) {
             (true, _) => {}
-            (false, true) => self.auto_update(reference, &new_builds)?,
+            (false, true) => {
+                self.auto_update(&AutoUpdateTarget::Workload(reference.clone()), &new_builds)?;
+            }
             // The new `Build` already tells Keel of its images.
             (false, false) => {
                 self.write_keel(reference, &new_builds)?;
@@ -1267,7 +1271,7 @@ impl<'a> Planner<'a> {
             .and_then(|a| a.get(KEEL_POLICY))
             .is_some_and(|p| p != KEEL_NEVER);
         if keel && !others.iter().any(|(_, other)| other.feeds(spec)) {
-            self.auto_update(reference, &Update::Off)?;
+            self.auto_update(&AutoUpdateTarget::Workload(reference.clone()), &Update::Off)?;
         }
         Ok(())
     }

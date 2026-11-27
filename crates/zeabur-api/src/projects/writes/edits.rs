@@ -4,7 +4,7 @@
 //! service has one, and which others read its credentials or make its images.
 
 use zeabur_kube::{Cluster, ClusterError, ClusterExt as _};
-use zeabur_plan::{Change, Fetched, PlanRequest};
+use zeabur_plan::{AutoUpdateTarget, Change, Fetched, PlanRequest};
 
 use crate::error::{ApiError, get_read, list_read, read_problem};
 
@@ -21,6 +21,7 @@ pub(super) async fn edited_objects(
 ) -> Result<Vec<Fetched>, ApiError> {
     let mut out: Vec<Fetched> = Vec::new();
     let builds = zeabur_plan::builds::builds();
+    let clusters = zeabur_plan::builds::cloudnative_pg_clusters();
     for change in &request.changes {
         let (resource, name) =
             if let Change::Rebuild { build }
@@ -28,11 +29,18 @@ pub(super) async fn edited_objects(
             | Change::ArchiveDigest { build, .. }
             | Change::BuildOptions(zeabur_plan::BuildOptionsChange { build, .. })
             | Change::AutoUpdate {
+                workload: AutoUpdateTarget::Workload(_),
                 update: zeabur_plan::Update::NewBuilds { build, .. },
                 ..
             } = change
             {
                 (&builds, build)
+            } else if let Change::AutoUpdate {
+                workload: AutoUpdateTarget::Cluster { name, .. },
+                ..
+            } = change
+            {
+                (&clusters, name)
             } else if let Change::Edit { resource, name, .. } = change
                 && zeabur_plan::checks::resource_allowed(resource).allowed
             {

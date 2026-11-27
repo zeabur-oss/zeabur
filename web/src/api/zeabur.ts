@@ -498,6 +498,28 @@ export type Attribution = {
 }
 
 /**
+ * The database kind accepted by [`AutoUpdateTarget`].
+ */
+export type AutoUpdateClusterKind =
+  (typeof AutoUpdateClusterKind)[keyof typeof AutoUpdateClusterKind]
+
+export const AutoUpdateClusterKind = {
+  Cluster: "Cluster",
+} as const
+
+/**
+ * The existing service targets, or a CloudNativePG Cluster, whose Keel settings change.
+ */
+export type AutoUpdateTarget =
+  | WorkloadRef
+  | {
+      /** The CloudNativePG kind. */
+      kind: AutoUpdateClusterKind
+      /** The Cluster's name. */
+      name: string
+    }
+
+/**
  * How a backup run went.
  */
 export type BackupOutcome = (typeof BackupOutcome)[keyof typeof BackupOutcome]
@@ -2395,8 +2417,8 @@ export type Change =
       op: "autoUpdate"
       /** Which updates, if any. */
       update: Update
-      /** The workload: a Deployment, StatefulSet or DaemonSet. */
-      workload: WorkloadRef
+      /** A service's workload, or a CloudNativePG Cluster. */
+      workload: AutoUpdateTarget
     }
   | {
       op: "scale"

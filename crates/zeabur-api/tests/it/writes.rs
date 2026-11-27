@@ -277,6 +277,100 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn cluster_auto_updates_replan_after_status_churn_and_preserve_last_applied() {
+        let cluster = cluster();
+        let original = json!({
+            "apiVersion": "postgresql.cnpg.io/v1", "kind": "Cluster",
+            "metadata": {"name": "db", "namespace": "shop", "generation": 1,
+                "resourceVersion": "41", "annotations": {
+                    "kubectl.kubernetes.io/last-applied-configuration": "saved manifest"
+                }},
+            "spec": {"imageName": "ghcr.io/cloudnative-pg/postgresql:17-standard-trixie",
+                "instances": 3, "storage": {"size": "8Gi"}, "plugins": [{"name": "backup"}]}
+        });
+        cluster.update(|s| {
+            s.served.push(zeabur_kube::ServedResource::readable(
+                "postgresql.cnpg.io",
+                "v1",
+                "clusters",
+                "Cluster",
+                true,
+            ));
+            s.dynamic
+                .push(serde_json::from_value(original.clone()).unwrap());
+        });
+        let app = app(&cluster);
+        for update in [
+            json!({"kind": "image", "policy": "sameTag"}),
+            json!({"kind": "off"}),
+        ] {
+            let planned = plan(
+                &app,
+                &json!({"changes": [{"op": "autoUpdate",
+                "workload": {"kind": "Cluster", "name": "db"}, "update": update}]}),
+            )
+            .await;
+            assert_eq!(planned.pointer("/risk/level"), Some(&json!("normal")));
+            cluster.update(|s| {
+                let object = s
+                    .dynamic
+                    .iter_mut()
+                    .find(|o| o.metadata.name.as_deref() == Some("db"))
+                    .unwrap();
+                object.metadata.resource_version = Some("57".to_owned());
+                object
+                    .metadata
+                    .annotations
+                    .get_or_insert_default()
+                    .insert("cnpg.io/hibernation".to_owned(), "off".to_owned());
+                object.data.as_object_mut().unwrap().insert(
+                    "status".to_owned(),
+                    json!({"phaseReason": "Updating replicas"}),
+                );
+            });
+            let (status, applied) = post(
+                app.clone(),
+                "/api/v1/projects/shop/apply",
+                &json!({"token": planned.get("token").unwrap()}),
+            )
+            .await;
+            assert_eq!(status, StatusCode::OK, "{applied}");
+            let saved = cluster
+                .inspect(|s| {
+                    serde_json::to_value(
+                        s.dynamic
+                            .iter()
+                            .find(|o| o.metadata.name.as_deref() == Some("db"))
+                            .unwrap(),
+                    )
+                    .unwrap()
+                })
+                .unwrap();
+            assert_eq!(saved.get("spec"), original.get("spec"));
+            assert_eq!(
+                saved.pointer("/status/phaseReason"),
+                Some(&json!("Updating replicas"))
+            );
+            assert_eq!(
+                saved.pointer(
+                    "/metadata/annotations/kubectl.kubernetes.io~1last-applied-configuration"
+                ),
+                Some(&json!("saved manifest"))
+            );
+            assert_eq!(
+                saved.pointer("/metadata/annotations/cnpg.io~1hibernation"),
+                Some(&json!("off"))
+            );
+            assert_eq!(
+                saved
+                    .pointer("/metadata/annotations/keel.sh~1policy")
+                    .is_some(),
+                update.get("kind") == Some(&json!("image"))
+            );
+        }
+    }
+
+    #[tokio::test]
     async fn a_spec_change_after_the_plan_makes_it_stale() {
         let cluster = cluster();
         set_meta(&cluster, "web", 3, "41");

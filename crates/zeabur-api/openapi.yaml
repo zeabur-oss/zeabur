@@ -4894,6 +4894,30 @@ components:
         ownership:
           $ref: "#/components/schemas/Ownership"
           description: Owned, shared or orphan.
+    AutoUpdateClusterKind:
+      type: string
+      description: The database kind accepted by [`AutoUpdateTarget`].
+      enum:
+      - Cluster
+    AutoUpdateTarget:
+      oneOf:
+      - $ref: "#/components/schemas/WorkloadRef"
+        description: A service's workload.
+      - type: object
+        description: A `postgresql.cnpg.io/v1` Cluster.
+        required:
+        - kind
+        - name
+        properties:
+          kind:
+            $ref: "#/components/schemas/AutoUpdateClusterKind"
+            description: The CloudNativePG kind.
+          name:
+            type: string
+            description: The Cluster's name.
+      description: >-
+        The existing service targets, or a CloudNativePG Cluster, whose Keel settings
+        change.
     BackupCoverage:
       type: object
       description: One target's coverage across providers.
@@ -6473,7 +6497,7 @@ components:
           Set what a Zeabur Builder `Build` builds: its directory, its Dockerfile and its build
           variables (see the `builds` module).
       - type: object
-        description: Have Keel move a workload to new images, or stop it (see the `builds` module).
+        description: Have Keel move a workload or CloudNativePG Cluster to new images, or stop it.
         required:
         - workload
         - update
@@ -6487,8 +6511,8 @@ components:
             $ref: "#/components/schemas/Update"
             description: Which updates, if any.
           workload:
-            $ref: "#/components/schemas/WorkloadRef"
-            description: "The workload: a Deployment, StatefulSet or DaemonSet."
+            $ref: "#/components/schemas/AutoUpdateTarget"
+            description: A service's workload, or a CloudNativePG Cluster.
       - type: object
         description: Run this many pods of a Deployment or StatefulSet.
         required:
@@ -6568,8 +6592,7 @@ components:
 
           Fields the server sets (`status`, `resourceVersion`, `managedFields`, …) are kept whatever
           the copy says. A ConfigMap's or Secret's edit becomes key changes: a Secret value shown
-          masked and sent back unchanged is kept. A full edit carrying `metadata.resourceVersion`
-          must match the object as read; otherwise it is refused before planning.
+          masked and sent back unchanged is kept.
         required:
         - resource
         - name
