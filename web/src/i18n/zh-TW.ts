@@ -1269,6 +1269,7 @@ export const zhTW: Messages = {
   "action.openDebugTerminal": "開啟除錯終端機",
   "action.openToolsTerminal": "開啟 kubectl 終端機",
   "action.saveDetails": "儲存詳細資料",
+  "action.saveGroup": "儲存分組",
   "action.saveBuildLimits": "儲存建置上限",
   "title.adopt": (ns) => `使用既有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再顯示為專案`,

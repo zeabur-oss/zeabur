@@ -893,6 +893,7 @@ const plainAction: Partial<Record<Change["op"], PlainKey>> = {
   forceDeleteProject: "action.forceDeleteProject",
   details: "action.saveDetails",
   buildLimits: "action.saveBuildLimits",
+  group: "action.saveGroup",
   debugContainer: "action.openDebugTerminal",
   clusterTools: "action.openToolsTerminal",
 }

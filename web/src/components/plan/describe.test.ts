@@ -405,6 +405,20 @@ group("deletion", () => {
   })
 })
 
+group("a group change", () => {
+  test("says where the service moves and saves the group", () => {
+    const set = { changes: [{ op: "group", workload: web, group: "shop" }] } as const
+    const clear = { changes: [{ op: "group", workload: web }] } as const
+    expect(
+      describe(t, set, { objects: [], impact: [], warnings: [] }, pods({})).lines,
+    ).toStrictEqual(["confirm.group(web, shop)"])
+    expect(
+      describe(t, clear, { objects: [], impact: [], warnings: [] }, pods({})).lines,
+    ).toStrictEqual(["confirm.ungroup(web)"])
+    expect(actionOf(t, set)).toBe("action.saveGroup")
+  })
+})
+
 group("actionOf", () => {
   test("several kinds apply, counted, whether a draft or a form asked", () => {
     expect(

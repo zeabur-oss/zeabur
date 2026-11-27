@@ -1266,6 +1266,7 @@ export const zhCN: Messages = {
   "action.openDebugTerminal": "打开调试终端",
   "action.openToolsTerminal": "打开 kubectl 终端",
   "action.saveDetails": "保存详细信息",
+  "action.saveGroup": "保存分组",
   "action.saveBuildLimits": "保存构建上限",
   "title.adopt": (ns) => `使用已有的 Namespace ${ns}`,
   "title.unadopt": (ns) => `${ns} 不再显示为项目`,
