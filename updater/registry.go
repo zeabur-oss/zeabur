@@ -13,6 +13,7 @@ import (
 	"github.com/keel-hq/keel/registry"
 	"github.com/keel-hq/keel/registry/docker"
 	"github.com/keel-hq/keel/types"
+	drc "github.com/rusenask/docker-registry-client/registry"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -35,10 +36,21 @@ func newRegistry(ctx context.Context, ref *target, core coreclient.CoreV1Interfa
 	if plain[host] {
 		scheme = "http"
 	}
-	hub := docker.New(scheme+"://"+host, username, password)
-	hub.Client.Timeout = 15 * time.Second
-	hub.Client.Transport = &boundedTransport{ctx: ctx, next: hub.Client.Transport}
-	hub.Logf = func(string, ...interface{}) {}
+	url := scheme + "://" + host
+	// Assemble the upstream's exported authentication wrappers around the same bounded
+	// transport. TokenTransport creates its own requests, without the manifest's context;
+	// wrapping only the outer client would leave token endpoints able to block the scan.
+	transport := &boundedTransport{ctx: ctx, next: http.DefaultTransport}
+	tokens := &drc.TokenTransport{
+		Transport: transport, Username: username, Password: password,
+		Client: &http.Client{Transport: transport, Timeout: 15 * time.Second},
+	}
+	basic := &drc.BasicTransport{Transport: tokens, URL: url, Username: username, Password: password}
+	hub := &docker.Registry{
+		URL:    url,
+		Client: &http.Client{Transport: &drc.ErrorTransport{Transport: basic}, Timeout: 15 * time.Second},
+		Logf:   func(string, ...interface{}) {},
+	}
 	return &registryClient{hub: hub}, nil
 }
 

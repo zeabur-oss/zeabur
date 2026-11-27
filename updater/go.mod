@@ -7,6 +7,7 @@ require (
 	github.com/opencontainers/go-digest v1.0.0
 	github.com/prometheus/client_golang v1.20.5
 	github.com/rusenask/cron v1.1.0
+	github.com/rusenask/docker-registry-client v0.0.0-20200210164146-049272422097
 	github.com/sirupsen/logrus v1.9.3
 	k8s.io/api v0.31.3
 	k8s.io/apimachinery v0.31.3
@@ -48,7 +49,6 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.60.1 // indirect
 	github.com/prometheus/procfs v0.15.1 // indirect
-	github.com/rusenask/docker-registry-client v0.0.0-20200210164146-049272422097 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	golang.org/x/net v0.57.0 // indirect

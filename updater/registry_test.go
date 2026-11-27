@@ -55,6 +55,60 @@ func TestRegistryRequestsRespectBothDeadlines(t *testing.T) {
 	}
 }
 
+func TestBearerTokenEndpointsRespectCheckDeadline(t *testing.T) {
+	for _, mode := range []string{"headers", "body"} {
+		t.Run(mode, func(t *testing.T) {
+			reached := make(chan struct{}, 1)
+			tokens := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				reached <- struct{}{}
+				if mode == "body" {
+					w.WriteHeader(http.StatusOK)
+					w.(http.Flusher).Flush()
+				}
+				<-r.Context().Done()
+			}))
+			defer tokens.Close()
+			server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+				w.Header().Set("WWW-Authenticate", fmt.Sprintf(`Bearer realm=%q,service="fixture",scope="repository:postgresql:pull"`, tokens.URL))
+				w.WriteHeader(http.StatusUnauthorized)
+			}))
+			defer server.Close()
+			host := strings.TrimPrefix(server.URL, "http://")
+			object := database(t, "public", "@hourly")
+			_ = unstructured.SetNestedField(object.Object, host+"/postgresql:17-standard-trixie@"+oldDigest, "spec", "imageName")
+			target, err := selected(object)
+			if err != nil {
+				t.Fatal(err)
+			}
+			ctx, cancel := context.WithCancel(context.Background())
+			defer cancel()
+			client, err := newRegistry(ctx, target, kubefake.NewSimpleClientset().CoreV1(), map[string]bool{host: true})
+			if err != nil {
+				t.Fatal(err)
+			}
+			done := make(chan error, 1)
+			go func() {
+				_, err := client.Digest(registry.Opts{Name: "postgresql", Tag: "17-standard-trixie"})
+				done <- err
+			}()
+			select {
+			case <-reached:
+			case <-time.After(time.Second):
+				t.Fatal("the real Bearer challenge never reached the token endpoint")
+			}
+			cancel()
+			select {
+			case err := <-done:
+				if err == nil {
+					t.Fatal("hung token endpoint succeeded")
+				}
+			case <-time.After(time.Second):
+				t.Fatal("token endpoint ignored the registry check cancellation")
+			}
+		})
+	}
+}
+
 func TestUnmodifiedKeelReadsAuthenticatedMultiarchRegistry(t *testing.T) {
 	requests := 0
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
