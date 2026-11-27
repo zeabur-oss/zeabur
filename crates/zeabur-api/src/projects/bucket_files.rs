@@ -621,7 +621,7 @@ fn listing(prefix: &str, xml: &str) -> BucketListing {
     }
 }
 
-/// Counts what is under a prefix, up to [`MAX_COUNT`] objects.
+/// Counts what is under a prefix, up to `limits.count` objects.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/objects/count",
     tag = "projects", operation_id = "countBucketObjects",
     params(("project" = crate::rules::ProjectName, Path), ("store" = String, Path),
@@ -768,7 +768,7 @@ pub(crate) async fn download(
     Ok(response)
 }
 
-/// An object as text, up to [`MAX_PREVIEW`] bytes, or whether it is an image the page may show.
+/// An object as text, up to `limits.preview` bytes, or whether it is an image the page may show.
 #[utoipa::path(get, path = "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/object/preview",
     tag = "projects", operation_id = "previewBucketObject",
     params(("project" = crate::rules::ProjectName, Path), ("store" = String, Path),
@@ -837,7 +837,7 @@ pub(crate) async fn preview(
     }))
 }
 
-/// Uploads an object of at most [`MAX_PART`] bytes whole, replacing one with its key.
+/// Uploads an object of at most `limits.part` bytes whole, replacing one with its key.
 #[utoipa::path(put, path = "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/object",
     tag = "projects", operation_id = "uploadBucketObject",
     params(("project" = crate::rules::ProjectName, Path), ("store" = String, Path),
@@ -1085,7 +1085,7 @@ pub(crate) async fn start_upload(
     Ok(Json(BucketUpload { upload }))
 }
 
-/// Sends one part of an upload, of at most [`MAX_PART`] bytes.
+/// Sends one part of an upload, of at most `limits.part` bytes.
 #[utoipa::path(put, path = "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/uploads/{upload}/parts/{part}",
     tag = "projects", operation_id = "sendBucketUploadPart",
     params(("project" = crate::rules::ProjectName, Path), ("store" = String, Path),

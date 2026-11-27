@@ -3,6 +3,8 @@
 import { useQuery } from "@tanstack/react-query"
 import { getRouteApi, Link } from "@tanstack/react-router"
 import { useState, type ReactNode } from "react"
+import FolderIcon from "~icons/ph/folder"
+import FolderOpenIcon from "~icons/ph/folder-open"
 import GearSixIcon from "~icons/ph/gear-six"
 import HardDrivesIcon from "~icons/ph/hard-drives"
 import InfoIcon from "~icons/ph/info"
@@ -47,6 +49,7 @@ import {
 } from "@/model/object-storage"
 import type { Event } from "@/model/service"
 import { useProjectEvents } from "@/routes/project/data"
+import { BucketFilesTab } from "@/routes/object-storage/files"
 import { ObjectStorageSettings } from "@/routes/object-storage/settings"
 import { objectStorageTabs, type ObjectStorageTab } from "@/routes/search"
 import { StoreMenu, StoreShell, useStorePage } from "@/routes/store/shell"
@@ -64,11 +67,13 @@ import {
   SummaryCardWord,
 } from "@zeabur-oss/design-system/components/summary-card"
 import { TabsContent } from "@zeabur-oss/design-system/components/tabs"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 
 const route = getRouteApi("/projects/$project/object-storage/$name")
 
 const tabIcons: Record<ObjectStorageTab, Icon> = {
   overview: InfoIcon,
+  files: FolderIcon,
   logs: TextAlignLeftIcon,
   events: ListBulletsIcon,
   settings: GearSixIcon,
@@ -76,6 +81,7 @@ const tabIcons: Record<ObjectStorageTab, Icon> = {
 
 const tabLabel = {
   overview: "tab.overview",
+  files: "tab.files",
   logs: "tab.logs",
   events: "tab.events",
   settings: "tab.settings",
@@ -135,6 +141,9 @@ function Body({
 }) {
   const t = useT()
   const search = route.useSearch()
+  const navigate = route.useNavigate()
+  const openFiles = (bucket: string, prefix?: string) =>
+    void navigate({ search: { tab: "files", bucket, prefix }, hash: "" })
   const page = useStorePage(project, search.tab, objectStorageTabs)
   const { tab, shown, gates, unreadable, deleter, setTab, setPod } = page
   const events = storeEvents(useProjectEvents(project), store)
@@ -173,6 +182,19 @@ function Body({
             store={store}
             events={events}
             onEvents={() => setTab("events")}
+            onFiles={openFiles}
+          />
+        ) : null}
+      </TabsContent>
+      <TabsContent value="files">
+        {tab === "files" ? (
+          <BucketFilesTab
+            project={project}
+            store={store}
+            bucket={search.bucket}
+            prefix={search.prefix}
+            onOpen={openFiles}
+            onOverview={() => setTab("overview")}
           />
         ) : null}
       </TabsContent>
@@ -211,11 +233,13 @@ function Overview({
   store,
   events,
   onEvents,
+  onFiles,
 }: {
   project: string
   store: ObjectStorage
   events: Event[]
   onEvents: () => void
+  onFiles: (bucket: string) => void
 }) {
   const t = useT()
   const { amount } = useQuantityFormat()
@@ -254,7 +278,7 @@ function Overview({
       </Alert>
       <Warnings events={events} onEvents={onEvents} />
       <Connection project={project} store={store} />
-      <Buckets project={project} store={store} />
+      <Buckets project={project} store={store} onFiles={onFiles} />
     </div>
   )
 }
@@ -320,7 +344,15 @@ function Credentials({
 const phaseHealth = (phase?: string | null) =>
   phase === "Ready" ? "ok" : phase === "Failed" ? "fail" : phase ? "progress" : "idle"
 
-function Buckets({ project, store }: { project: string; store: ObjectStorage }) {
+function Buckets({
+  project,
+  store,
+  onFiles,
+}: {
+  project: string
+  store: ObjectStorage
+  onFiles: (bucket: string) => void
+}) {
   const t = useT()
   const gate = useGate(project, "changeObjectStorage")
   const planner = usePlanner(project)
@@ -371,6 +403,16 @@ function Buckets({ project, store }: { project: string; store: ObjectStorage }) 
                   {bucket.phase}
                 </StatusPill>
               ) : null}
+              <Tooltip content={t("bucketFiles.browse", bucket.s3Name)}>
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
+                  aria-label={t("bucketFiles.browse", bucket.s3Name)}
+                  onClick={() => onFiles(bucket.s3Name)}
+                >
+                  <FolderOpenIcon aria-hidden="true" />
+                </Button>
+              </Tooltip>
               <GateTip gate={gate}>
                 <Button
                   variant="ghost"

@@ -4708,6 +4708,25 @@ export const en = {
   "files.waiting": "Waiting",
   "files.failed": "Failed",
   "files.of": (done: string, total: string) => `${done} of ${total}`,
+  "bucketFiles.bucket": "Bucket",
+  "bucketFiles.noBuckets":
+    "This object store has no buckets. Make one on Overview, then upload files to it here.",
+  "bucketFiles.openOverview": "Open Overview",
+  "bucketFiles.emptyBucket": "This bucket has no files. Upload some or make a folder.",
+  "bucketFiles.more": "Show more",
+  "bucketFiles.refusedWhat": (bucket: string) => `browse the files in ${bucket}`,
+  "bucketFiles.browse": (bucket: string) => `Browse the files in ${bucket}`,
+  "bucketFiles.renameCopies": "The object is copied to its new name, then the old one is deleted.",
+  "bucketFiles.key": "Key",
+  "bucketFiles.prefix": "Prefix",
+  "bucketFiles.counting": "Counting the files in it",
+  "bucketFiles.deleteFolder": (name: string, n: number, size: string) =>
+    n === 1
+      ? `${name} and the 1 file in it (${size}) are deleted.`
+      : `${name} and the ${n.toLocaleString("en")} files in it (${size}) are deleted.`,
+  "bucketFiles.deleteFolderMore": (name: string, n: number) =>
+    `${name} and the more than ${n.toLocaleString("en")} files in it are deleted.`,
+  "bucketFiles.parts": (size: string) => `Files larger than ${size} are sent in parts of ${size}.`,
   "sentence.files.kernel": () => "/proc, /sys and /dev are kernel interfaces, not ordinary files.",
   "sentence.files.kernel.fix": () => "Read them in the terminal.",
   "sentence.files.imageUnreachable": (p: P) =>

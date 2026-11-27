@@ -13950,7 +13950,7 @@ export const getUploadBucketObjectUrl = (
 }
 
 /**
- * @summary Uploads an object of at most [`MAX_PART`] bytes whole, replacing one with its key.
+ * @summary Uploads an object of at most `limits.part` bytes whole, replacing one with its key.
  */
 export const uploadBucketObject = async (
   project: ProjectName,
@@ -13990,7 +13990,7 @@ export const getPreviewBucketObjectUrl = (
 }
 
 /**
- * @summary An object as text, up to [`MAX_PREVIEW`] bytes, or whether it is an image the page may show.
+ * @summary An object as text, up to `limits.preview` bytes, or whether it is an image the page may show.
  */
 export const previewBucketObject = async (
   project: ProjectName,
@@ -14101,7 +14101,7 @@ export const getCountBucketObjectsUrl = (
 }
 
 /**
- * @summary Counts what is under a prefix, up to [`MAX_COUNT`] objects.
+ * @summary Counts what is under a prefix, up to `limits.count` objects.
  */
 export const countBucketObjects = async (
   project: ProjectName,
@@ -14259,7 +14259,7 @@ export const getSendBucketUploadPartUrl = (
 }
 
 /**
- * @summary Sends one part of an upload, of at most [`MAX_PART`] bytes.
+ * @summary Sends one part of an upload, of at most `limits.part` bytes.
  */
 export const sendBucketUploadPart = async (
   project: ProjectName,

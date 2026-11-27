@@ -2811,7 +2811,7 @@ paths:
       tags:
       - projects
       summary: >-
-        Uploads an object of at most [`MAX_PART`] bytes whole, replacing one with its
+        Uploads an object of at most `limits.part` bytes whole, replacing one with its
         key.
       operationId: uploadBucketObject
       parameters:
@@ -2892,7 +2892,7 @@ paths:
       tags:
       - projects
       summary: >-
-        An object as text, up to [`MAX_PREVIEW`] bytes, or whether it is an image the
+        An object as text, up to `limits.preview` bytes, or whether it is an image the
         page may show.
       operationId: previewBucketObject
       parameters:
@@ -3098,7 +3098,7 @@ paths:
     get:
       tags:
       - projects
-      summary: Counts what is under a prefix, up to [`MAX_COUNT`] objects.
+      summary: Counts what is under a prefix, up to `limits.count` objects.
       operationId: countBucketObjects
       parameters:
       - name: project
@@ -3387,7 +3387,7 @@ paths:
     put:
       tags:
       - projects
-      summary: Sends one part of an upload, of at most [`MAX_PART`] bytes.
+      summary: Sends one part of an upload, of at most `limits.part` bytes.
       operationId: sendBucketUploadPart
       parameters:
       - name: project

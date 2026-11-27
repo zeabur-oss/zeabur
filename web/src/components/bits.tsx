@@ -117,7 +117,7 @@ export function Hint({ children, label }: { children: ReactNode; label: string }
   )
 }
 
-export interface Bucket {
+export interface HistogramBucket {
   error: number
   warning: number
   normal: number
@@ -129,7 +129,7 @@ export function Histogram({
   height = "h-12",
   labels,
 }: {
-  buckets: Bucket[]
+  buckets: HistogramBucket[]
   className?: string
   height?: string
   labels?: [string, string]
