@@ -1,7 +1,7 @@
-# Where Zeabur is, for zeaburctl: the public URL and the Zeabur Identity issuer in a ConfigMap in
-# kube-public, as kubeadm's cluster-info publishes the API server's address. zeaburctl sends a
-# token to Zeabur only when this issuer issued it. Every signed-in person may read this one
-# ConfigMap. registry lets zeaburctl up in local mode push to the registry through a port-forward.
+# Where Zeabur is, in a ConfigMap in kube-public, as kubeadm's cluster-info publishes the API
+# server's address. Every signed-in person may read this one ConfigMap. registry lets zeaburctl up
+# push to the registry through a port-forward. url and issuer are for older zeaburctl releases,
+# which sent a Zeabur Identity token to Zeabur.
 # https://kubernetes.io/docs/reference/setup-tools/kubeadm/implementation-details/#generate-the-cluster-info-configmap
 apiVersion: v1
 kind: ConfigMap

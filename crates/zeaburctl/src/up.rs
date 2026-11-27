@@ -6,28 +6,29 @@
 //! the folder to the registry with it, and a second plan names the pushed digest in the `Build`.
 //! The writes are plans, applied at once because this command is the confirmation.
 //!
-//! The API is the Zeabur server of the cluster ([`Server`]) when the kubeconfig signs in with a
-//! token from Zeabur Identity. Otherwise it runs in this process ([`InProcess`]), as in
-//! `zeaburctl ui`: the credentials stay on this computer, and the folder goes to the registry
-//! from here, through a port-forward when only the cluster reaches it ([`forward`]).
+//! The API runs in this process ([`InProcess`]), as in `zeaburctl ui`, and acts with the
+//! kubeconfig through kube-apiserver: the credentials stay on this computer, and the folder goes
+//! to the registry from here, through a port-forward when only the cluster reaches it
+//! ([`forward`]).
 
 use std::io::IsTerminal as _;
 use std::path::{Path, PathBuf};
 use std::process::ExitCode;
 use std::time::{Duration, SystemTime, UNIX_EPOCH};
 
-use secrecy::ExposeSecret as _;
-use serde::de::{DeserializeOwned, IgnoredAny};
-use serde::{Deserialize, Serialize};
+use serde::Serialize;
+use serde::de::DeserializeOwned;
 use zeabur_api::projects::backups::ProviderState;
-use zeabur_api::projects::writes::ApplyRequest;
+use zeabur_api::projects::builds::{ProjectBuild, ProjectBuilds};
+use zeabur_api::projects::source_upload::UploadedSource;
+use zeabur_api::projects::writes::{ApplyRequest, ApplyResponse, PlanResponse};
+use zeabur_api::views::ProjectList;
 use zeabur_core::problem::Problem;
-use zeabur_kube::{Cluster, UserClient, UserToken, ZeaburInfo};
+use zeabur_kube::{Cluster, UserClient, ZeaburInfo};
 use zeabur_plan::{BuildInput, BuildMethod, BuildSource, BuiltServiceChange, Change, PlanRequest};
 
 use crate::forward::{self, ServiceAddress};
 use crate::in_process::InProcess;
-use crate::server::Server;
 use crate::{output, pack};
 
 /// How long the controller may take to answer an upload token request.
@@ -60,10 +61,6 @@ pub(crate) struct UpArgs {
     /// The folder to upload (default: the current one).
     #[arg(default_value = ".")]
     folder: PathBuf,
-    /// The address of Zeabur, like `https://zeabur.example.com`. Default: the one Zeabur
-    /// publishes in the cluster (the ConfigMap `zeabur-info` in `kube-public`).
-    #[arg(long, env = "ZEABUR_SERVER")]
-    server: Option<String>,
     /// The project the service is in. Asked for in a terminal when left out.
     #[arg(long)]
     project: Option<String>,
@@ -129,30 +126,7 @@ async fn up(args: &UpArgs) -> Result<(), String> {
         .map_err(|e| e.to_string())?;
     // A cluster without Zeabur has no zeabur-info.
     let info = client.zeabur_info().await.unwrap_or_default();
-    let token = UserToken::from_kubeconfig(args.context.as_deref())
-        .await
-        .ok();
-    let api = match mode(token, info.issuer.as_deref()) {
-        Mode::Server(token) => {
-            let address = match (&args.server, &info.url) {
-                (Some(address), _) => address.clone(),
-                (None, Some(url)) => url.clone(),
-                (None, None) => {
-                    return Err("This cluster does not say where Zeabur is. Pass --server with the address you open Zeabur at.".to_owned());
-                }
-            };
-            output::info(&format!(
-                "Server mode: through Zeabur at {address}, signed in with Zeabur Identity."
-            ));
-            Zeabur::Server(Server::new(&address, token)?)
-        }
-        Mode::Local => {
-            output::info(
-                "Local mode: zeaburctl acts with your kubeconfig, and your credentials stay on this computer.",
-            );
-            local(client, &info).await?
-        }
-    };
+    let api = local(client, &info).await?;
     let target = Target {
         project: args.project.clone(),
         service: args.service.clone(),
@@ -183,29 +157,6 @@ async fn up(args: &UpArgs) -> Result<(), String> {
     Ok(())
 }
 
-/// Where the API runs.
-#[derive(Debug)]
-enum Mode {
-    /// On the Zeabur server, which gets the token.
-    Server(UserToken),
-    /// In this process.
-    Local,
-}
-
-/// The server gets the kubeconfig's token only when Zeabur Identity issued it, as `zeabur-info`
-/// names the issuer. Another credential (a client certificate, a cloud provider's token, a
-/// ServiceAccount's, a static one) is of no use to Zeabur, and Zeabur must not get it.
-fn mode(token: Option<UserToken>, issuer: Option<&str>) -> Mode {
-    match (token, issuer) {
-        (Some(token), Some(issuer))
-            if zeabur_kube::issued_by(token.secret().expose_secret(), issuer) =>
-        {
-            Mode::Server(token)
-        }
-        _ => Mode::Local,
-    }
-}
-
 /// The API in this process, acting with the kubeconfig. The registry Zeabur publishes is reached
 /// through a port-forward when it is a Service.
 async fn local(client: UserClient, info: &ZeaburInfo) -> Result<Zeabur, String> {
@@ -218,7 +169,7 @@ async fn local(client: UserClient, info: &ZeaburInfo) -> Result<Zeabur, String> 
             .map_err(|e| format!("{e} Uploading a folder from this computer needs it. A cluster administrator has it; otherwise upload from Zeabur's web interface."))?;
         settings.upload_address = Some(format!("https://127.0.0.1:{port}"));
     }
-    Ok(Zeabur::Local(InProcess::with_client(client, settings)))
+    Ok(Zeabur(InProcess::with_client(client, settings)))
 }
 
 async fn builder_installed(cluster: &dyn Cluster) -> Result<(), String> {
@@ -236,20 +187,13 @@ async fn builder_installed(cluster: &dyn Cluster) -> Result<(), String> {
     }
 }
 
-/// Zeabur's API, on the server or in this process.
+/// Zeabur's API in this process, with its problems as the terminal shows them.
 #[derive(Debug)]
-enum Zeabur {
-    Server(Server),
-    Local(InProcess),
-}
+struct Zeabur(InProcess);
 
 impl Zeabur {
     async fn get<T: DeserializeOwned>(&self, path_and_query: &str) -> Result<T, String> {
-        match self {
-            Self::Server(server) => server.get(path_and_query).await,
-            Self::Local(api) => api.get(path_and_query).await,
-        }
-        .map_err(said)
+        self.0.get(path_and_query).await.map_err(said)
     }
 
     async fn post<B: Serialize + Sync, T: DeserializeOwned>(
@@ -257,11 +201,7 @@ impl Zeabur {
         path_and_query: &str,
         body: &B,
     ) -> Result<T, String> {
-        match self {
-            Self::Server(server) => server.post(path_and_query, body).await,
-            Self::Local(api) => api.post(path_and_query, body).await,
-        }
-        .map_err(said)
+        self.0.post(path_and_query, body).await.map_err(said)
     }
 
     async fn post_bytes<T: DeserializeOwned>(
@@ -270,11 +210,10 @@ impl Zeabur {
         content_type: &str,
         bytes: Vec<u8>,
     ) -> Result<T, String> {
-        match self {
-            Self::Server(server) => server.post_bytes(path_and_query, content_type, bytes).await,
-            Self::Local(api) => api.post_bytes(path_and_query, content_type, bytes).await,
-        }
-        .map_err(said)
+        self.0
+            .post_bytes(path_and_query, content_type, bytes)
+            .await
+            .map_err(said)
     }
 }
 
@@ -323,57 +262,18 @@ fn said(problem: Box<Problem>) -> String {
     }
 }
 
-/// The parts of the API's answers that `up` reads. A server of another release may add fields
-/// and enum values, so `up` reads only these; serde skips the rest.
-#[derive(Deserialize)]
-struct Planned {
-    token: String,
-}
-
-#[derive(Deserialize)]
-struct Projects {
-    items: Vec<ProjectItem>,
-}
-
-#[derive(Deserialize)]
-struct ProjectItem {
-    name: String,
-    adopted: bool,
-    #[serde(default)]
-    deleting: bool,
-}
-
-#[derive(Deserialize)]
-struct Builds {
-    state: ProviderState,
-    builds: Vec<Build>,
-}
-
-#[derive(Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct Build {
-    name: String,
-    archive: bool,
-    upload_request: Option<String>,
-}
-
-#[derive(Deserialize)]
-struct Uploaded {
-    digest: String,
-}
-
-fn named<'a>(builds: &'a Builds, name: &str) -> Option<&'a Build> {
-    builds.builds.iter().find(|b| b.name == name)
+fn named<'a>(builds: &'a ProjectBuilds, name: &str) -> Option<&'a ProjectBuild> {
+    builds.builds.iter().find(|b| b.build.name == name)
 }
 
 async fn plan_and_apply(api: &Zeabur, project: &str, changes: Vec<Change>) -> Result<(), String> {
-    let planned: Planned = api
+    let planned: PlanResponse = api
         .post(
             &format!("/api/v1/projects/{project}/plan"),
             &PlanRequest { changes },
         )
         .await?;
-    api.post::<_, IgnoredAny>(
+    api.post::<_, ApplyResponse>(
         &format!("/api/v1/projects/{project}/apply"),
         &ApplyRequest {
             token: planned.token,
@@ -386,7 +286,7 @@ async fn plan_and_apply(api: &Zeabur, project: &str, changes: Vec<Change>) -> Re
 
 /// The projects the person may put a service in.
 async fn projects(api: &Zeabur) -> Result<Vec<String>, String> {
-    let list: Projects = api.get("/api/v1/projects").await?;
+    let list: ProjectList = api.get("/api/v1/projects").await?;
     Ok(list
         .items
         .into_iter()
@@ -496,7 +396,7 @@ async fn deploy(
 ) -> Result<String, String> {
     let project = choose_project(api, target.project.as_deref(), &mut ask).await?;
     let project = project.as_str();
-    let builds: Builds = api
+    let builds: ProjectBuilds = api
         .get(&format!("/api/v1/projects/{project}/builds"))
         .await?;
     if builds.state == ProviderState::NotInstalled {
@@ -505,7 +405,7 @@ async fn deploy(
     let service = choose_service(target, &mut ask)?;
     let service = service.as_str();
     match named(&builds, service) {
-        Some(build) if !build.archive => {
+        Some(build) if !build.build.archive => {
             return Err(format!(
                 "{service} builds from Git. Pick another name to make a service from a folder."
             ));
@@ -540,7 +440,7 @@ async fn deploy(
     }
     wait_for_token(api, project, service, request, timing).await?;
     output::info("Uploading.");
-    let uploaded: Uploaded = api
+    let uploaded: UploadedSource = api
         .post_bytes(
             &format!("/api/v1/projects/{project}/builds/{service}/source?request={request}"),
             "application/gzip",
@@ -568,11 +468,11 @@ async fn wait_for_token(
 ) -> Result<(), String> {
     let deadline = tokio::time::Instant::now() + timing.wait;
     loop {
-        let builds: Builds = api
+        let builds: ProjectBuilds = api
             .get(&format!("/api/v1/projects/{project}/builds"))
             .await?;
         let answered = named(&builds, service)
-            .and_then(|b| b.upload_request.as_deref())
+            .and_then(|b| b.build.upload_request.as_deref())
             .is_some_and(|asked| asked == request);
         if answered {
             return Ok(());
@@ -592,10 +492,8 @@ mod tests {
     use axum::Router;
     use axum::http::{StatusCode, header};
     use axum::response::IntoResponse as _;
-    use secrecy::SecretString;
     use serde_json::{Value, json};
     use zeabur_api::access::SingleCluster;
-    use zeabur_core::problem::Kind;
     use zeabur_kube::k8s_openapi::api::core::v1::Namespace;
     use zeabur_kube::memory::{MemoryCluster, State};
     use zeabur_kube::{Identity, NamespaceObjects, ServedResource, WriteBody};
@@ -730,50 +628,14 @@ mod tests {
         )
     }
 
-    /// The API of `cluster` on a loopback port, and a client for it.
-    async fn server(cluster: &MemoryCluster) -> Zeabur {
-        let router = router(cluster);
-        let listener = tokio::net::TcpListener::bind("127.0.0.1:0").await.unwrap();
-        let address = listener.local_addr().unwrap();
-        tokio::spawn(async move { axum::serve(listener, router).await });
-        let token = UserToken::new(SecretString::from("t".to_owned())).unwrap();
-        Zeabur::Server(Server::new(&format!("http://{address}"), token).unwrap())
-    }
-
-    /// The API of `cluster` in this process, as local mode runs it.
+    /// The API of `cluster` in this process, as `up` runs it.
     fn local(cluster: &MemoryCluster) -> Zeabur {
-        Zeabur::Local(InProcess::new(router(cluster)))
+        Zeabur(InProcess::new(router(cluster)))
     }
 
-    const ISSUER: &str = "https://identity.example.com";
-
-    fn token(value: &str) -> UserToken {
-        UserToken::new(SecretString::from(value.to_owned())).unwrap()
-    }
-
-    /// Only a token from the Zeabur Identity that `zeabur-info` names goes to the server. Any
-    /// other credential, or a cluster without `zeabur-info`, keeps it on this computer.
-    #[test]
-    fn only_a_zeabur_identity_token_goes_to_the_server() {
-        let identity = "e30.eyJpc3MiOiJodHRwczovL2lkZW50aXR5LmV4YW1wbGUuY29tIn0.sig";
-        let google = "e30.eyJpc3MiOiJodHRwczovL2FjY291bnRzLmdvb2dsZS5jb20ifQ.sig";
-        assert!(matches!(
-            mode(Some(token(identity)), Some(ISSUER)),
-            Mode::Server(_)
-        ));
-        for (credential, issuer) in [
-            (Some(token(google)), Some(ISSUER)),
-            (Some(token("static-token")), Some(ISSUER)),
-            (None, Some(ISSUER)),
-            (Some(token(identity)), None),
-        ] {
-            assert!(matches!(mode(credential, issuer), Mode::Local));
-        }
-    }
-
-    /// Local mode stops before it uploads anything when the cluster has no Zeabur Builder.
+    /// `up` stops before it uploads anything when the cluster has no Zeabur Builder.
     #[tokio::test]
-    async fn local_mode_stops_without_zeabur_builder() {
+    async fn up_stops_without_zeabur_builder() {
         let bare = MemoryCluster::new(State::default());
         let error = builder_installed(&bare).await.unwrap_err();
         assert!(error.contains("Zeabur Builder") && error.contains("Nothing was uploaded"));
@@ -782,9 +644,9 @@ mod tests {
         builder_installed(&cluster(&address)).await.unwrap();
     }
 
-    /// Local mode runs the same plans and the same upload as the server, in this process.
+    /// A missing service is made, and the folder goes up, all through the API in this process.
     #[tokio::test]
-    async fn local_mode_makes_the_service_and_uploads_in_this_process() {
+    async fn the_service_is_made_and_the_folder_uploaded_in_this_process() {
         let address = registry().await;
         let cluster = cluster(&address);
         controller(&cluster);
@@ -862,9 +724,9 @@ mod tests {
         let address = registry().await;
         let cluster = cluster(&address);
         with_build(&cluster, &json!({"type": "archive", "archive": {}}));
-        let server = server(&cluster).await;
+        let api = local(&cluster);
         let service = deploy(
-            &server,
+            &api,
             &target(Some("shop"), Some("site")),
             vec![7; 100],
             "up-1",
@@ -891,9 +753,9 @@ mod tests {
             &cluster,
             &json!({"type": "git", "git": {"url": "https://example.com/a/b"}}),
         );
-        let server = server(&cluster).await;
+        let api = local(&cluster);
         let error = deploy(
-            &server,
+            &api,
             &target(Some("shop"), Some("site")),
             vec![7; 10],
             "up-1",
@@ -913,10 +775,10 @@ mod tests {
         let address = registry().await;
         let cluster = cluster(&address);
         controller(&cluster);
-        let server = server(&cluster).await;
+        let api = local(&cluster);
         let mut wanted = target(Some("shop"), Some("site"));
         wanted.port = Some(8080);
-        deploy(&server, &wanted, vec![7; 100], "up-2", QUICK, None)
+        deploy(&api, &wanted, vec![7; 100], "up-2", QUICK, None)
             .await
             .unwrap();
         let builds = created(&cluster, "\"Build\"");
@@ -948,9 +810,9 @@ mod tests {
     async fn without_a_terminal_the_flags_name_the_project_and_the_service() {
         let address = registry().await;
         let cluster = cluster(&address);
-        let server = server(&cluster).await;
+        let api = local(&cluster);
         let error = deploy(
-            &server,
+            &api,
             &target(None, Some("site")),
             vec![7],
             "up-3",
@@ -964,7 +826,7 @@ mod tests {
             "{error}"
         );
         let error = deploy(
-            &server,
+            &api,
             &target(Some("shop"), None),
             vec![7],
             "up-3",
@@ -975,7 +837,7 @@ mod tests {
         .unwrap_err();
         assert!(error.contains("--service"), "{error}");
         let error = deploy(
-            &server,
+            &api,
             &target(Some("nowhere"), Some("site")),
             vec![7],
             "up-3",
@@ -997,7 +859,7 @@ mod tests {
     async fn in_a_terminal_the_person_picks_the_project_and_may_decline() {
         let address = registry().await;
         let cluster = cluster(&address);
-        let server = server(&cluster).await;
+        let api = local(&cluster);
         let mut questions = Vec::new();
         let mut answers = vec!["n", "", "2"]
             .into_iter()
@@ -1008,7 +870,7 @@ mod tests {
             answers.pop()
         };
         let error = deploy(
-            &server,
+            &api,
             &target(None, None),
             vec![7],
             "up-4",
@@ -1038,25 +900,5 @@ mod tests {
             let name = folder_name(&path);
             assert_eq!(name, expected, "{folder}");
         }
-    }
-
-    #[test]
-    fn answers_from_a_newer_server_with_new_values_still_read() {
-        let builds: Builds = serde_json::from_value(json!({
-            "state": "paused-by-a-newer-server",
-            "builds": [{"name": "web", "archive": true, "phase": "new-phase"}],
-            "runs": [{"state": "a-state-this-version-does-not-know"}]
-        }))
-        .unwrap();
-        assert_eq!(builds.state, ProviderState::Unknown);
-        assert_eq!(builds.builds[0].name, "web");
-
-        let mut problem = serde_json::to_value(Problem::new(Kind::Conflict, "Why.")).unwrap();
-        problem["kind"] = json!("a-kind-this-version-does-not-know");
-        let body = serde_json::to_vec(&problem).unwrap();
-        let refused =
-            crate::answer::read::<IgnoredAny>(StatusCode::CONFLICT, &body, "test").unwrap_err();
-        assert_eq!(refused.kind, Kind::Unknown);
-        assert_eq!(refused.detail, "Why.");
     }
 }
