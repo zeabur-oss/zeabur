@@ -11,11 +11,12 @@ use serde::Deserialize as _;
 use serde_json::Value;
 use zeabur_model::adapters::provenance::{detect_tool, managed_by};
 use zeabur_model::adapters::{Conventions, LABEL_SHARED_VARIABLES, error_pages, traefik};
+use zeabur_model::kernel::names::public_port_of;
 use zeabur_model::{
     Attribution, BackendRef, Container, ContainerResources, Endpoint, HttpRoute, HttpRouteRule,
-    NamespaceAttribution, Origin, PageServer, ProbeHandler, ProbeSummary, Probes, Project,
-    Provenance, Quantities, Resource, ResourceKind, Route, RouteMiddleware, RouteRule, RouteTls,
-    Service, ServiceRole, WorkloadRef, WorkloadSelector,
+    NamespaceAttribution, OpenedPort, Origin, PageServer, ProbeHandler, ProbeSummary, Probes,
+    Project, Provenance, Quantities, Resource, ResourceKind, Route, RouteMiddleware, RouteRule,
+    RouteTls, Service, ServiceRole, WorkloadRef, WorkloadSelector,
 };
 
 use crate::attribution::{attribution_of, ingress_backends, relations_of};
@@ -187,9 +188,16 @@ impl<'a> Index<'a> {
 #[must_use]
 pub fn endpoint(object: &KubeService) -> Endpoint {
     let name = name_of(&object.metadata);
+    let type_ = object.spec.as_ref().and_then(|spec| spec.type_.clone());
+    let opens = public_port_of(name)
+        .filter(|_| type_.as_deref() == Some("LoadBalancer"))
+        .map(|(service, port)| OpenedPort {
+            service: service.to_owned(),
+            port,
+        });
     Endpoint {
         name: name.to_owned(),
-        type_: object.spec.as_ref().and_then(|spec| spec.type_.clone()),
+        type_,
         cluster_ip: object
             .spec
             .as_ref()
@@ -202,6 +210,7 @@ pub fn endpoint(object: &KubeService) -> Endpoint {
             .flat_map(|lb| lb.ingress.iter().flatten())
             .filter_map(|i| i.ip.clone().or_else(|| i.hostname.clone()))
             .collect(),
+        opens,
         provenance: provenance(&object.metadata),
         origin: Origin::object("Service", name),
     }

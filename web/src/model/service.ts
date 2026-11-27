@@ -3,6 +3,7 @@ import type { Schemas } from "@/api/client"
 export type Pod = Schemas.PodSummary
 export type Service = Schemas.Service
 export type Endpoint = Schemas.Endpoint
+export type OpenedPort = Schemas.OpenedPort
 export type Route = Schemas.Route
 export type Network = Pick<Schemas.Project, "endpoints" | "routes">
 export type Event = Schemas.EventView

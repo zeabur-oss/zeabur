@@ -1,0 +1,10 @@
+description: "Opening service port 8080 on external port 12345 makes a LoadBalancer Service on port 12345 that targets 8080, named after the service port."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: publicPort
+        workload: {kind: Deployment, name: web}
+        service: web
+        port: 8080
+        external: 12345

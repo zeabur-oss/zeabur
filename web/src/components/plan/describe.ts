@@ -362,7 +362,9 @@ function serviceSentence(t: Translate, change: ServiceChange): string {
     case "publicPort":
       return change.remove
         ? t("confirm.publicPortOff", change.port, change.workload.name)
-        : t("confirm.publicPort", change.port, change.workload.name)
+        : change.external
+          ? t("confirm.publicPortExternal", change.port, change.workload.name, change.external)
+          : t("confirm.publicPort", change.port, change.workload.name)
     case "buildOptions":
       return t("confirm.buildOptions", change.build)
     case "setBuild":

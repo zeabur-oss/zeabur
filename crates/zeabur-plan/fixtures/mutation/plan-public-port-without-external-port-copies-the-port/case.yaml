@@ -1,0 +1,9 @@
+description: "Without an external port, the LoadBalancer Service opens the Service port and copies the port as it is, without a targetPort."
+operation: mutation.plan
+params:
+  request:
+    changes:
+      - op: publicPort
+        workload: {kind: Deployment, name: web}
+        service: web
+        port: 8080

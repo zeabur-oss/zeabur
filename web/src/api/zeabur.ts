@@ -1746,7 +1746,15 @@ export type EnvImportChange = {
  * A [`Change::PublicPort`].
  */
 export type PublicPortChange = {
-  /** The Service port. It is also the port on the internet. */
+  /**
+   * The port on the internet: the `port` of the `LoadBalancer` Service. Without it, the
+   * Service port. A close ignores it.
+   * @minimum 1
+   * @maximum 65535
+   * @nullable
+   */
+  external?: number | null
+  /** The Service port. */
   port: number
   /** Close the port instead: delete the `LoadBalancer` Service that opened it. */
   remove?: boolean
@@ -6078,6 +6086,16 @@ export const Encoding = {
 } as const
 
 /**
+ * The Service port that a public port opens.
+ */
+export type OpenedPort = {
+  /** Its port. */
+  port: number
+  /** The Service. */
+  service: string
+}
+
+/**
  * Which signal decided a [`PortProtocol`], so a client can tell a declared protocol from a
  * guessed one.
  */
@@ -6167,6 +6185,7 @@ export type Endpoint = {
   externalAddresses?: string[]
   /** The Service's name. */
   name: string
+  opens?: OpenedPort | null
   /** The Service object. */
   origin: Origin
   /** The ports. */
