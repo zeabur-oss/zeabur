@@ -5,7 +5,7 @@
 //! gateway as it arrives and is never held whole. Requests use path-style addresses
 //! (`<gateway>/<bucket>/<key>`) [s3-paths].
 //!
-//! The answers are S3's XML. Zeabur reads only the few elements it needs ([`raw_elements`]); S3
+//! The answers are S3's XML. Zeabur reads only the few elements it needs (`raw_elements`); S3
 //! escapes the five predefined entities and character references in text [xml-entities].
 //!
 //! [sigv4]: https://docs.aws.amazon.com/AmazonS3/latest/API/sig-v4-authenticating-requests.html

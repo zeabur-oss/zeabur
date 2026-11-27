@@ -7,7 +7,7 @@
 //! everything in the bucket, so the person's own right decides. No answer carries the key.
 //!
 //! S3 has no folders. A folder is a key prefix that ends in `/` [s3-folders]; a listing groups the
-//! keys under it ([`list`]), "make folder" writes the empty object `<prefix>/`, and deleting a
+//! keys under it (`list`), "make folder" writes the empty object `<prefix>/`, and deleting a
 //! folder deletes every key under the prefix, a thousand at a time [s3-delete]. S3 cannot rename
 //! either; a rename of one object copies it and deletes the old key [s3-copy]. Folders are not
 //! renamed.
