@@ -66,13 +66,17 @@ async fn signed_url(
     name: &str,
 ) -> Result<String, ApiError> {
     let resource = request.resource();
-    let mut states = cluster.watch_object(&resource, Some(namespace), name, SIGNING);
-    while let Some(state) = states.next().await {
+    let mut states = cluster
+        .watch_object(&resource, Some(namespace), name, SIGNING)
+        .enumerate();
+    while let Some((i, state)) = states.next().await {
+        // The first state comes from the LIST the watch starts with.
+        let verb = if i == 0 { "list" } else { "watch" };
         let state = state.map_err(|e| {
             read_problem(
                 e,
                 &format!("DownloadRequest {name} in {namespace}"),
-                super::backups::right("watch", "downloadrequests", namespace, None),
+                super::backups::right(verb, "downloadrequests", namespace, None),
             )
         })?;
         if let Some((url, _)) = state.as_ref().and_then(v::download_url) {
