@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { barShares, busiest } from "@/model/resource-bar"
+import { barShares, busiest, containerBar } from "@/model/resource-bar"
 import type { Service } from "@/model/service"
 
 const MiB = 2 ** 20
@@ -37,6 +37,33 @@ describe("a resource bar", () => {
 
   test("shows nothing without a node to scale to", () => {
     expect(barShares("cpu", "100m", "1", 0.1, undefined)).toBeUndefined()
+  })
+})
+
+describe("a container's bar", () => {
+  const largest = { cpuMillicores: 4000, memoryBytes: 8 * 1024 * MiB } as Schemas.Resources
+
+  test("takes the dimension's sample and the largest node's amount", () => {
+    const amounts = { cpuRequest: " 100m", cpuLimit: "1", memoryRequest: "", memoryLimit: "" }
+    const bar = containerBar("cpu", amounts, { cpu: 0.2, memory: 300 * MiB }, largest)
+    expect(bar).toMatchObject({ request: "100m", limit: "1", usage: 0.2, node: 4 })
+    const memory = containerBar("bytes", amounts, undefined, largest)
+    expect(memory).toMatchObject({ request: "", limit: "", node: 8 * 1024 * MiB })
+    expect(memory?.usage).toBeUndefined()
+  })
+
+  test("is absent before the nodes are read", () => {
+    expect(
+      containerBar("cpu", undefined, undefined, { cpuMillicores: 4000 } as never),
+    ).toBeUndefined()
+    expect(
+      containerBar(
+        "cpu",
+        { cpuRequest: "", cpuLimit: "", memoryRequest: "", memoryLimit: "" },
+        undefined,
+        undefined,
+      ),
+    ).toBeUndefined()
   })
 })
 

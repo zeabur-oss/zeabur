@@ -16,7 +16,7 @@ import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { AmountInput } from "@/components/amount-input"
 import { ResourceBar } from "@/components/resource-bar"
-import { barShares, busiest } from "@/model/resource-bar"
+import { busiest, containerBar, type TypedAmounts } from "@/model/resource-bar"
 import { FormField } from "@/components/form-field"
 import { aboveLimit, isAmount, type Dimension } from "@/lib/amount"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
@@ -95,19 +95,52 @@ export function HealthChecksSection({
 }
 
 type Change = Schemas.Change
-type Amounts = {
-  cpuRequest: string
-  memoryRequest: string
-  cpuLimit: string
-  memoryLimit: string
-}
 
 /** As kube-apiserver names a field it refused. */
-const paths: Record<keyof Amounts, string> = {
+const paths: Record<keyof TypedAmounts, string> = {
   cpuRequest: "requests.cpu",
   memoryRequest: "requests.memory",
   cpuLimit: "limits.cpu",
   memoryLimit: "limits.memory",
+}
+
+/** Each container's usage in its busiest replica, while metrics are available. */
+function useBusiest(project: string, service: Service) {
+  const usage = useQuery(usageQuery(project))
+  return busiest(service, usage.data?.state === "available" ? usage.data : undefined)
+}
+
+/** Under the CPU or the memory row: the bar for what is typed in it. */
+function AmountBar({
+  row,
+  amounts,
+  sample,
+  largest,
+}: {
+  row: "cpuRequest" | "memoryRequest"
+  amounts: TypedAmounts | undefined
+  sample: { cpu: number; memory: number } | undefined
+  largest: Schemas.Resources | undefined
+}) {
+  const t = useT()
+  const { millicores, memory } = useQuantityFormat()
+  const dimension: Dimension = row === "cpuRequest" ? "cpu" : "bytes"
+  const bar = containerBar(dimension, amounts, sample, largest)
+  if (!bar) return null
+  const show = dimension === "cpu" ? (cores: number) => millicores(cores * 1000) : memory
+  const usage = bar.usage === undefined ? undefined : t("form.barUsage", show(bar.usage))
+  const node = t("form.barNode", show(bar.node))
+  const span = t("form.barSpan", bar.request || "0", bar.limit || t("form.barNoMax"))
+  return (
+    <div className="sm:col-span-2">
+      <ResourceBar
+        shares={bar.shares}
+        usage={usage}
+        largest={node}
+        label={[span, usage, node].filter(Boolean).join(t("common.sep"))}
+      />
+    </div>
+  )
 }
 
 function Compute({
@@ -124,10 +157,8 @@ function Compute({
   refused: Schemas.FieldCause[]
 }) {
   const t = useT()
-  const { cores, cpu, memory } = useQuantityFormat()
   const nodes = useQuery(nodesQuery)
-  const usage = useQuery(usageQuery(project))
-  const used = busiest(service, usage.data?.state === "available" ? usage.data : undefined)
+  const used = useBusiest(project, service)
   const largest = nodes.data?.items.reduce<Schemas.Resources | undefined>(
     (best, node) =>
       !best || node.allocatable.memoryBytes > best.memoryBytes ? node.allocatable : best,
@@ -137,7 +168,7 @@ function Compute({
   const containers = service.containers.filter((c) => !c.init)
   const initial = {
     replicas: String(service.replicas?.desired ?? 1),
-    containers: containers.map((c): Amounts => ({
+    containers: containers.map((c): TypedAmounts => ({
       cpuRequest: c.resources?.requests?.cpu ?? "",
       memoryRequest: c.resources?.requests?.memory ?? "",
       cpuLimit: c.resources?.limits?.cpu ?? "",
@@ -180,36 +211,6 @@ function Compute({
         }
       : undefined,
   )
-  const bar = (dimension: Dimension, index: number, container: string) => {
-    const amounts = values.containers[index]
-    if (!amounts || !largest) return null
-    const cpuBar = dimension === "cpu"
-    const [request, limit] = cpuBar
-      ? [amounts.cpuRequest, amounts.cpuLimit]
-      : [amounts.memoryRequest, amounts.memoryLimit]
-    const sample = used.get(container)
-    const now = sample && (cpuBar ? sample.cpu : sample.memory)
-    const node = cpuBar ? largest.cpuMillicores / 1000 : largest.memoryBytes
-    const shares = barShares(dimension, request, limit, now, node)
-    if (!shares) return null
-    const show = (value: number) => (cpuBar ? cpu(value * 1000) : memory(value))
-    const nowText = now === undefined ? undefined : t("form.barUsage", show(now))
-    const nodeText = t(
-      "form.barNode",
-      cpuBar ? t("usage.cores", cores(largest.cpuMillicores)) : memory(largest.memoryBytes),
-    )
-    const span = t("form.barSpan", request.trim() || "0", limit.trim() || t("form.barNoMax"))
-    return (
-      <div className="sm:col-span-2">
-        <ResourceBar
-          shares={shares}
-          usage={nowText}
-          largest={nodeText}
-          label={[span, nowText, nodeText].filter(Boolean).join(t("common.sep"))}
-        />
-      </div>
-    )
-  }
   const amount =
     (dimension: Dimension) =>
     ({ value }: { value: string }) =>
@@ -321,7 +322,12 @@ function Compute({
                   </form.Field>
                 )
               })}
-              {bar(row[0][0].startsWith("cpu") ? "cpu" : "bytes", index, container.name)}
+              <AmountBar
+                row={row[0][0]}
+                amounts={values.containers[index]}
+                sample={used.get(container.name)}
+                largest={largest}
+              />
             </div>
           ))}
         </fieldset>

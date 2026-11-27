@@ -57,3 +57,39 @@ export function busiest(
   }
   return most
 }
+
+export interface ContainerBar {
+  shares: BarShares
+  /** As typed, trimmed; empty when not set. */
+  request: string
+  limit: string
+  /** In cores or bytes; absent without a sample. */
+  usage?: number
+  /** The largest node's allocatable amount, in cores or bytes. */
+  node: number
+}
+
+/** A container's four amounts as typed in the form. */
+export interface TypedAmounts {
+  cpuRequest: string
+  memoryRequest: string
+  cpuLimit: string
+  memoryLimit: string
+}
+
+/** One container's bar for `dimension`, from its typed amounts and busiest sample. */
+export function containerBar(
+  dimension: Dimension,
+  amounts: TypedAmounts | undefined,
+  sample: { cpu: number; memory: number } | undefined,
+  largest: Schemas.Resources | undefined,
+): ContainerBar | undefined {
+  if (!largest || !amounts) return undefined
+  const cpu = dimension === "cpu"
+  const request = cpu ? amounts.cpuRequest : amounts.memoryRequest
+  const limit = cpu ? amounts.cpuLimit : amounts.memoryLimit
+  const usage = sample && (cpu ? sample.cpu : sample.memory)
+  const node = cpu ? largest.cpuMillicores / 1000 : largest.memoryBytes
+  const shares = barShares(dimension, request, limit, usage, node)
+  return shares && { shares, request: request.trim(), limit: limit.trim(), usage, node }
+}
