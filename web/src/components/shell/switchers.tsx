@@ -15,7 +15,7 @@ import {
 } from "@zeabur-oss/design-system/components/popover"
 import { useT } from "@/i18n"
 import { cn } from "@/lib/utils"
-import { projectTitle } from "@/model/project"
+import { projectTitle, readable } from "@/model/project"
 
 const triggerClass = "inline-flex shrink-0 items-center justify-center"
 
@@ -28,7 +28,7 @@ export function ProjectSwitcher({ current }: { current: string }) {
   const [open, setOpen] = useState(false)
   const [filter, setFilter] = useState("")
   // Projects first, then namespaces, by name; system namespaces only when one is open.
-  const items = (projects.data?.items ?? [])
+  const items = readable(projects.data?.items ?? [])
     .filter((p) => !p.system || p.name === current)
     .filter((p) =>
       [p.name, p.displayName ?? ""].some((n) => n.toLowerCase().includes(filter.toLowerCase())),

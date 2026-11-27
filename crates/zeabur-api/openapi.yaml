@@ -16471,6 +16471,7 @@ components:
         - name
         - adopted
         - system
+        - readable
         properties:
           adopted:
             type: boolean
@@ -16496,6 +16497,11 @@ components:
           origin:
             $ref: "#/components/schemas/Origin"
             description: The namespace.
+          readable:
+            type: boolean
+            description: |-
+              `false` when kube-apiserver refused to list its workloads (`403`): the person may see
+              its name but not its contents. `true` otherwise, also when it was not read.
           services:
             type:
             - array

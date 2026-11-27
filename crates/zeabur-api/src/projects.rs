@@ -32,7 +32,9 @@
 //! and failing reason, read from its workloads and pods only (six LISTs per project, at most
 //! eight projects at a time), so a navigation list or a home page can say which service fails
 //! in which project without fetching every project's document, environment variables included.
-//! Namespaces that are not adopted get neither: there may be hundreds.
+//! Namespaces that are not adopted get neither: there may be hundreds. A project whose
+//! workloads kube-apiserver refuses (`403`) is marked `readable: false`, from the same read, so
+//! the interface can leave it out; any other failure leaves it readable without counts.
 //!
 //! [k8s-concepts]: https://kubernetes.io/docs/reference/using-api/api-concepts/
 
@@ -122,6 +124,7 @@ pub(crate) async fn list(
                 adopted,
                 health: None,
                 services: None,
+                readable: true,
                 deleting,
             })
         })
@@ -133,7 +136,7 @@ pub(crate) async fn list(
         .filter(|(_, p)| p.adopted)
         .map(|(i, p)| (i, p.name.clone()))
         .collect();
-    let healths: Vec<(usize, Option<Services>)> = futures_util::stream::iter(adopted)
+    let healths: Vec<(usize, Health)> = futures_util::stream::iter(adopted)
         .map(|(i, name)| {
             let cluster = Arc::clone(&cluster);
             async move { (i, health_of(cluster, name, now).await) }
@@ -142,9 +145,16 @@ pub(crate) async fn list(
         .collect()
         .await;
     for (i, health) in healths {
-        if let (Some(item), Some((counts, services))) = (items.get_mut(i), health) {
-            item.health = Some(counts);
-            item.services = Some(services);
+        let Some(item) = items.get_mut(i) else {
+            continue;
+        };
+        match health {
+            Health::Read(counts, services) => {
+                item.health = Some(counts);
+                item.services = Some(services);
+            }
+            Health::Refused => item.readable = false,
+            Health::Unread => {}
         }
     }
     let can_create = can_create(cluster.as_ref()).await;
@@ -167,19 +177,30 @@ async fn can_create(cluster: &dyn Cluster) -> namespace::Permission {
     }
 }
 
-/// A project's service health counts, and each service with its health.
-type Services = (ProjectHealth, Vec<ServiceSummary>);
+/// What reading a project's workloads for the list gave.
+enum Health {
+    /// Its service health counts, and each service with its health.
+    Read(ProjectHealth, Vec<ServiceSummary>),
+    /// kube-apiserver answered `403`: the person may not read the project.
+    Refused,
+    /// Any other error, such as a timeout or a `5xx`: not read this time.
+    Unread,
+}
 
 /// The service health counts of `project` and each service's health, from its workloads and
-/// pods; `None` when they cannot be read.
-async fn health_of(cluster: Arc<dyn Cluster>, project: String, now: Timestamp) -> Option<Services> {
-    let objects = cluster.namespace_workloads(&project).await.ok()?;
+/// pods.
+async fn health_of(cluster: Arc<dyn Cluster>, project: String, now: Timestamp) -> Health {
+    let objects = match cluster.namespace_workloads(&project).await {
+        Ok(objects) => objects,
+        Err(e) if e.code() == Some(403) => return Health::Refused,
+        Err(_) => return Health::Unread,
+    };
     let (snapshot, _) = snapshot(objects, now);
     let mut projection = zeabur_graph::project(&snapshot);
     builds::built_images(cluster.as_ref(), &project, &mut projection.services, now).await;
     let services: Vec<ServiceSummary> = projection.services.iter().map(service_summary).collect();
     let counts = ProjectHealth::count(services.iter().map(|s| s.health));
-    Some((counts, services))
+    Health::Read(counts, services)
 }
 
 /// A service as the project list shows it.

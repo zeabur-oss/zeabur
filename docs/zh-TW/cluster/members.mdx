@@ -5,7 +5,7 @@ description: 傳一個設定連結給成員，讓他用通行密鑰登入，只�
 
 照這一頁做完，你的同事會出現在**成員**頁，用自己的通行密鑰登入 Zeabur 開源版，只能用你分給他的專案。通行密鑰存在對方的手機或電腦裡，用指紋、臉部辨識或螢幕鎖解鎖，不用記密碼。
 
-<Figure label="成員用通行密鑰經 Zeabur Identity 登入，Zeabur 開源版只照你給的權限顯示：分給他的專案能用，其他專案只看得到名稱">
+<Figure label="成員用通行密鑰經 Zeabur Identity 登入，Zeabur 開源版只照你給的權限顯示：分給他的專案能用，其他專案只知道有幾個">
 <FigFlow>
 <FigCard title="成員" note="通行密鑰在他的手機或電腦裡" />
 <FigArrow label="登入" />
@@ -15,7 +15,7 @@ description: 傳一個設定連結給成員，讓他用通行密鑰登入，只�
 <FigArrow />
 <FigGroup label="你的叢集">
 <FigCard accent title="你分給他的專案" note="shop：開發者、blog：檢視者" />
-<FigCard title="其他專案" note="只看得到名稱" />
+<FigCard title="其他專案" note="只知道有幾個" />
 </FigGroup>
 </FigFlow>
 </Figure>
@@ -51,7 +51,9 @@ description: 傳一個設定連結給成員，讓他用通行密鑰登入，只�
 | **開發者** | 部署、修改變數、重新啟動、看日誌、開終端機，也能看機密變數的值。 |
 | **檢視者** | 看狀態和事件。不能看日誌、不能修改、不能開終端機，也不能看機密變數的值。 |
 
-同一個人可以在不同專案擔任不同角色。一個專案都沒勾的人也能登入，但只看得到節點和專案名稱。
+同一個人可以在不同專案擔任不同角色。一個專案都沒勾的人也能登入，但只看得到節點。他的專案列表不會列出他打不開的專案，只說還有幾個。
+
+這只是在 Zeabur 開源版裡藏起其他專案，名稱並不保密：`zeabur-member` 讓每個成員都能列出 Namespace，所以 `kubectl get namespaces` 還是看得到每個專案的名稱。
 
 ![邀請成員視窗，選了指定專案，blog 是檢視者、shop 是開發者](../images/shots/members-invite.avif)
 

@@ -18,6 +18,7 @@ import {
   newProjectProblem,
   mayChange,
   otherNamespaces,
+  readable,
   patchRole,
   projectIcons,
   projectTitle,
@@ -39,6 +40,7 @@ const summary = (
   name,
   adopted: false,
   system: false,
+  readable: true,
   ...more,
 })
 
@@ -59,6 +61,14 @@ describe("the list of namespaces to adopt", () => {
       ["blog", true],
       ["kube-system", false],
     ])
+  })
+
+  test("leaves out the projects the person may not read", () => {
+    const listed = [
+      summary("shop", { adopted: true }),
+      summary("hr", { adopted: true, readable: false }),
+    ]
+    expect(readable(listed).map((p) => p.name)).toStrictEqual(["shop"])
   })
 
   test("names a project by its display name, else its namespace", () => {
@@ -146,6 +156,7 @@ describe("the projects list", () => {
     name,
     adopted: true,
     system: false,
+    readable: true,
     origin: { apiVersion: "v1", kind: "Namespace", name },
     health: {
       services: 2,

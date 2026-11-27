@@ -487,6 +487,8 @@ export const zhCN: Messages = {
   "projects.namespaceOnly": "Namespace",
   "projects.other": "其他 Namespace",
   "projects.noOther": "每个 Namespace 都已是项目。",
+  "projects.hidden": (n) => `还有 ${n} 个项目你没有权限查看`,
+  "projects.notRead": "暂时读不到",
   "projects.filterOther": "筛选 Namespace",
   "projects.noOtherMatch": (query) => `没有匹配“${query}”的 Namespace。`,
   "projects.noneBody":

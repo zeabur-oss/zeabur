@@ -274,6 +274,9 @@ pub struct ProjectSummary {
     /// workloads cannot be read.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub services: Option<Vec<ServiceSummary>>,
+    /// `false` when kube-apiserver refused to list its workloads (`403`): the person may see
+    /// its name but not its contents. `true` otherwise, also when it was not read.
+    pub readable: bool,
     /// Its namespace is being deleted (`Terminating`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub deleting: bool,

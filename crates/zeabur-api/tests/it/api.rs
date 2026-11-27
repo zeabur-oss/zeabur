@@ -246,6 +246,31 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn projects_list_marks_a_refused_project_unreadable_and_a_failed_one_unread() {
+        let cluster = cluster();
+        let list = get(&cluster, "/api/v1/projects").await;
+        assert_eq!(list["items"][0]["readable"], true);
+
+        cluster.update(|s| {
+            s.forbidden_namespaces.insert("shop".to_owned());
+        });
+        let list = get(&cluster, "/api/v1/projects").await;
+        let shop = &list["items"][0];
+        assert_eq!(shop["name"], "shop");
+        assert_eq!(shop["readable"], false, "403: the person may not read it");
+        assert!(shop.get("health").is_none() && shop.get("services").is_none());
+
+        cluster.update(|s| {
+            s.forbidden_namespaces.clear();
+            s.failing_namespaces.insert("shop".to_owned());
+        });
+        let list = get(&cluster, "/api/v1/projects").await;
+        let shop = &list["items"][0];
+        assert_eq!(shop["readable"], true, "500: not read this time, not refused");
+        assert!(shop.get("health").is_none());
+    }
+
+    #[tokio::test]
     async fn projects_list_each_adopted_service_with_its_health_and_nothing_more() {
         let list = get(&cluster(), "/api/v1/projects").await;
         let items = &list["items"];

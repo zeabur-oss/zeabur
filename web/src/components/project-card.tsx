@@ -86,7 +86,8 @@ function ServicesState({ project }: { project: ProjectItem }) {
 function ServicesHealth({ project }: { project: ProjectItem }) {
   const t = useT()
   const h = project.health
-  if (!project.services || !h) return <span className="text-xs text-secondary">—</span>
+  if (!project.services || !h)
+    return <span className="text-xs text-secondary">{t("projects.notRead")}</span>
   if (h.services === 0)
     return <span className="text-xs text-secondary">{t("home.noServices")}</span>
   const dots: Health[] = []

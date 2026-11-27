@@ -5,7 +5,7 @@ description: 给成员发一个设置链接，让他用通行密钥登录，只�
 
 照这一页做完，你的同事会出现在**成员**页，用自己的通行密钥登录 Zeabur 开源版，只能使用你分给他的项目。通行密钥保存在对方的手机或电脑里，用指纹、面容或锁屏密码解锁，不用记密码。
 
-<Figure label="成员用通行密钥通过 Zeabur Identity 登录，Zeabur 开源版只按你给的权限显示：分给他的项目可以使用，其他项目只能看到名称">
+<Figure label="成员用通行密钥通过 Zeabur Identity 登录，Zeabur 开源版只按你给的权限显示：分给他的项目可以使用，其他项目只知道有几个">
 <FigFlow>
 <FigCard title="成员" note="通行密钥在他的手机或电脑里" />
 <FigArrow label="登录" />
@@ -15,7 +15,7 @@ description: 给成员发一个设置链接，让他用通行密钥登录，只�
 <FigArrow />
 <FigGroup label="你的集群">
 <FigCard accent title="你分给他的项目" note="shop：开发者、blog：查看者" />
-<FigCard title="其他项目" note="只能看到名称" />
+<FigCard title="其他项目" note="只知道有几个" />
 </FigGroup>
 </FigFlow>
 </Figure>
@@ -51,7 +51,9 @@ description: 给成员发一个设置链接，让他用通行密钥登录，只�
 | **开发者** | 部署、修改变量、重启、查看日志、打开终端，也能查看机密变量的值。 |
 | **查看者** | 查看状态和事件。不能查看日志、不能修改、不能打开终端，也不能查看机密变量的值。 |
 
-同一个人可以在不同项目担任不同角色。一个项目都没勾选的人也能登录，但只能看到节点和项目名称。
+同一个人可以在不同项目担任不同角色。一个项目都没勾选的人也能登录，但只能看到节点。他的项目列表不会列出他打不开的项目，只说还有几个。
+
+这只是在 Zeabur 开源版里隐藏其他项目，名称并不保密：`zeabur-member` 让每个成员都能列出 Namespace，所以 `kubectl get namespaces` 仍能看到每个项目的名称。
 
 ![邀请成员窗口，选择了指定项目，blog 的角色为查看者，shop 的角色为开发者](../images/shots/members-invite.avif)
 

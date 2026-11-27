@@ -38,6 +38,7 @@ import { serviceLink, usePlace } from "@/lib/place"
 import { palette, recent, remember } from "@/lib/stores"
 import { cn } from "@/lib/utils"
 import { engineName } from "@/model/databases"
+import { readable } from "@/model/project"
 import { isTask, serviceId, type Service } from "@/model/service"
 import { cycleTheme } from "@/theme"
 
@@ -51,7 +52,8 @@ export function PaletteBody() {
   const { locale, setLocale } = useI18n()
   const [query, setQuery] = useState("")
   const projects = useQuery(projectsQuery)
-  const adopted = (projects.data?.items ?? []).filter((p) => p.adopted)
+  const listed = readable(projects.data?.items ?? [])
+  const adopted = listed.filter((p) => p.adopted)
   // Services come from the list. A project's pods, domains and objects need its document: the
   // one on screen always, the others once a query of two letters or more could name them. Not
   // polled: polling every project would multiply the cluster reads.
@@ -200,7 +202,7 @@ export function PaletteBody() {
       href: router.buildLocation({ to: "/projects/$project/create", params: { project } }).href,
     })
 
-  for (const p of projects.data?.items ?? [])
+  for (const p of listed)
     items.push({
       id: `project:${p.name}`,
       group: g.projects,

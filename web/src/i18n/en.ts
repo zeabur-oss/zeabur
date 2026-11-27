@@ -519,6 +519,9 @@ export const en = {
   "projects.namespaceOnly": "Namespace",
   "projects.other": "Other namespaces",
   "projects.noOther": "Every namespace is a project.",
+  "projects.hidden": (n: number) =>
+    `You do not have permission to view ${plural(n, "more project", "more projects")}.`,
+  "projects.notRead": "Could not read",
   "projects.filterOther": "Filter namespaces",
   "projects.noOtherMatch": (query: string) => `No namespaces match “${query}”.`,
   "projects.noneBody":

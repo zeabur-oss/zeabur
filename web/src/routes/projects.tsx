@@ -13,7 +13,7 @@ import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { ProjectIcon } from "@/components/project-icon"
 import { useT } from "@/i18n"
 import { projectsAsList } from "@/lib/stores"
-import { otherNamespaces } from "@/model/project"
+import { otherNamespaces, readable } from "@/model/project"
 import { healthRank } from "@/model/service"
 import {
   Empty,
@@ -118,7 +118,10 @@ export function ProjectsPage() {
   const list = projectsAsList.useValue()
   const [showSystem, setShowSystem] = useState(false)
   const switchId = useId()
-  const items = projects.data?.items ?? []
+  const all = projects.data?.items ?? []
+  const items = readable(all)
+  const hidden = all.length - items.length
+  const mayCreate = projects.data?.canCreate !== "denied"
   const rank = (p: (typeof items)[number]) =>
     p.health ? healthRank[p.health.worst] : healthRank.ok
   const adopted = items
@@ -136,7 +139,7 @@ export function ProjectsPage() {
             {projects.data ? (
               <NewProjectButton
                 canCreate={projects.data.canCreate}
-                taken={items.map((p) => p.name)}
+                taken={all.map((p) => p.name)}
               />
             ) : null}
           </span>
@@ -189,16 +192,21 @@ export function ProjectsPage() {
               </EmptyHeader>
             </Empty>
           )}
-          <section className="flex flex-col gap-3">
-            <div className="flex flex-wrap items-end justify-between gap-2">
-              <h2 className="type-heading">{t("projects.other")}</h2>
-              <div className="flex items-center gap-2">
-                <Switch id={switchId} checked={showSystem} onCheckedChange={setShowSystem} />
-                <Label htmlFor={switchId}>{t("projects.showSystem")}</Label>
+          {hidden > 0 ? (
+            <p className="type-meta text-muted-foreground">{t("projects.hidden", hidden)}</p>
+          ) : null}
+          {mayCreate ? (
+            <section className="flex flex-col gap-3">
+              <div className="flex flex-wrap items-end justify-between gap-2">
+                <h2 className="type-heading">{t("projects.other")}</h2>
+                <div className="flex items-center gap-2">
+                  <Switch id={switchId} checked={showSystem} onCheckedChange={setShowSystem} />
+                  <Label htmlFor={switchId}>{t("projects.showSystem")}</Label>
+                </div>
               </div>
-            </div>
-            <OtherNamespaces namespaces={other} />
-          </section>
+              <OtherNamespaces namespaces={other} />
+            </section>
+          ) : null}
         </>
       )}
     </PageColumn>

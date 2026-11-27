@@ -486,6 +486,8 @@ export const zhTW: Messages = {
   "projects.namespaceOnly": "Namespace",
   "projects.other": "其他 Namespace",
   "projects.noOther": "每個 Namespace 都已是專案。",
+  "projects.hidden": (n) => `還有 ${n} 個專案你沒有權限檢視`,
+  "projects.notRead": "暫時讀不到",
   "projects.filterOther": "篩選 Namespace",
   "projects.noOtherMatch": (query) => `沒有符合「${query}」的 Namespace。`,
   "projects.noneBody":

@@ -33,7 +33,7 @@ import { kindName } from "@/i18n/kind-name"
 import { lastKnown, rememberKnown } from "@/lib/last-known"
 import { serviceLink } from "@/lib/place"
 import { originOf, originRank, type Origin } from "@/model/origin"
-import { otherNamespaces } from "@/model/project"
+import { otherNamespaces, readable } from "@/model/project"
 import {
   byHealth,
   healthRank,
@@ -65,13 +65,14 @@ export function HomePage() {
   const t = useT()
   const reach = useReachability()
   const projects = useQuery(projectsQuery)
-  const adopted = projects.data?.items.filter((p) => p.adopted) ?? []
+  const items = readable(projects.data?.items ?? [])
+  const adopted = items.filter((p) => p.adopted)
   const problems = useProblems(adopted)
   const shown = adopted.toSorted(byProjectHealth).slice(0, PROJECTS_SHOWN)
   useEffect(() => {
     if (projects.data)
       rememberKnown({
-        projects: projects.data.items
+        projects: readable(projects.data.items)
           .filter((p) => p.adopted)
           .toSorted(byProjectHealth)
           .slice(0, PROJECTS_SHOWN),
@@ -105,7 +106,9 @@ export function HomePage() {
         <>
           <ProblemsSection problems={problems} />
           {empty ? (
-            <Offered namespaces={otherNamespaces(projects.data?.items ?? [], false)} />
+            projects.data?.canCreate === "denied" ? null : (
+              <Offered namespaces={otherNamespaces(items, false)} />
+            )
           ) : (
             <ProjectsSection
               total={adopted.length}

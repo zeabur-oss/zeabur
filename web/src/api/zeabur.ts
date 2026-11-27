@@ -9961,6 +9961,11 @@ export type ProjectSummary = ProjectDetails & {
   /** The namespace. */
   origin: Origin
   /**
+   * `false` when kube-apiserver refused to list its workloads (`403`): the person may see
+   * its name but not its contents. `true` otherwise, also when it was not read.
+   */
+  readable: boolean
+  /**
    * Its services with their health, from the same read as `health`: sorted by kind, then
    * name, as in the project document. Only for adopted projects, and absent when their
    * workloads cannot be read.
