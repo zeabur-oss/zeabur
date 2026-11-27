@@ -193,7 +193,7 @@ subjects: [{kind: ServiceAccount, name: $token_name, namespace: zeabur-api-token
 YAML
   site=$(mktemp -d)
   echo "FROM docker.io/traefik/whoami:v1.10" >"$site/Dockerfile"
-  zc up "$site" --service token-up --port 80
+  zc up "$site" --service token-up --port 80 --method dockerfile
   rm -rf "$site"
   wait_for "$project" kubectl -n "$project" wait --for=create deployment/token-up --timeout=60s
   wait_for "$project" kubectl -n "$project" rollout status deployment/token-up --timeout=900s
