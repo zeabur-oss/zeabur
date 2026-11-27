@@ -1,4 +1,4 @@
-import { describe, expect, test } from "bun:test"
+import { afterAll, beforeAll, describe, expect, test } from "bun:test"
 
 import { DEFAULT_TIME } from "@/lib/backup-time"
 import type { Schemas } from "@/api/client"
@@ -911,14 +911,21 @@ describe("the review of a backup form", () => {
   const t = ((key: string, ...args: unknown[]) =>
     args.length > 0 ? `${key}(${args.join(", ")})` : key) as unknown as Translate
   const empty = { objects: [], impact: [], warnings: [] }
+  const zone = process.env.TZ
+  beforeAll(() => {
+    process.env.TZ = "Asia/Taipei"
+  })
+  afterAll(() => {
+    process.env.TZ = zone
+  })
 
-  test("says the schedule, the bucket, the keys and the restart instead of the objects", () => {
+  test("says the schedule in both zones, the bucket, the keys and the restart instead of the objects", () => {
     const ask = {
       changes: writeBackups(postgres, target),
       summary: backupsSummary(t, postgres, target),
     }
     expect(describePlan(t, ask, empty, () => undefined).lines).toEqual([
-      "db.backup.said(pg, backupTime.inUtc(backupTime.daily(03:00)), s3://backups/pg (http://s3.test:8333))",
+      "db.backup.said(pg, backupTime.both(backupTime.daily(11:00), backupTime.utc(, 03:00)), s3://backups/pg (http://s3.test:8333))",
       "db.backup.saidKeep(7)",
       "db.backup.saidKeys(pg-backups-s3)",
       "db.backup.saidRestart(pg)",
