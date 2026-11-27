@@ -267,3 +267,19 @@ zeabur-project-builds-write:
   - apiGroups: [builder.zeabur.com]
     resources: [builds]
     verbs: [create, patch, delete]
+
+# The build registry, for zeaburctl up from a Developer's computer: a port-forward to a registry
+# pod, as kubectl port-forward does. Zeabur binds it only in the registry's namespace, for a holder
+# who is a Developer in at least one project. Images are not separated by project: nodes pull
+# without credentials, and a Developer can already run another project's image. A push still needs
+# the token a Build issues for its own repository.
+zeabur-registry-client:
+  - apiGroups: [""]
+    resources: [services]
+    verbs: [get]
+  - apiGroups: [discovery.k8s.io]
+    resources: [endpointslices]
+    verbs: [list]
+  - apiGroups: [""]
+    resources: [pods/portforward]
+    verbs: [create]

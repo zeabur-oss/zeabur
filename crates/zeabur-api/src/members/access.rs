@@ -18,6 +18,12 @@
 //! `zeabur-api-token-<name>`, labelled [`TOKEN_LABEL`], for its ServiceAccount in
 //! [`API_TOKENS_NAMESPACE`]. A token is never an admin: admins sign in with passkeys only.
 //!
+//! A holder who is a Developer in at least one project also gets a `RoleBinding` named
+//! `zeabur-registry-<binding>` in the build registry's namespace to [`REGISTRY_ROLE`], so
+//! `zeaburctl up` can forward a port to the registry. Images are not separated by project:
+//! nodes pull without credentials, and a Developer can already run another project's image. A
+//! push still needs the token a `Build` issues for its own repository.
+//!
 //! [k8s-roleref]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#clusterrolebinding-example
 //! [k8s-escalation]: https://kubernetes.io/docs/reference/access-authn-authz/rbac/#restrictions-on-role-binding-creation-or-update
 
@@ -40,6 +46,9 @@ pub const MEMBER_LABEL: &str = "zeabur.com/member";
 pub const TOKEN_LABEL: &str = zeabur_plan::api_token::LABEL;
 /// The `ClusterRole` every member gets.
 pub const BASELINE_ROLE: &str = "zeabur-member";
+/// The `ClusterRole` that lets a Developer forward a port to the build registry, bound in its
+/// namespace only.
+pub const REGISTRY_ROLE: &str = "zeabur-registry-client";
 pub(crate) const RBAC_GROUP: &str = "rbac.authorization.k8s.io";
 const RBAC_VERSION: &str = "rbac.authorization.k8s.io/v1";
 const MANAGED_BY: &str = "app.kubernetes.io/managed-by";
@@ -118,13 +127,20 @@ impl Holder {
         }
     }
 
-    fn metadata(&self, namespace: Option<&str>) -> ObjectMeta {
+    /// The name of the holder's binding in the build registry's namespace. Its prefix is not one
+    /// of [`Self::binding_name`]'s, so it is never read as a project binding.
+    #[must_use]
+    pub fn registry_binding_name(&self) -> String {
+        format!("zeabur-registry-{}", self.binding_name())
+    }
+
+    fn metadata(&self, name: String, namespace: Option<&str>) -> ObjectMeta {
         let (label, value) = match self {
             Self::Member(username) => (MEMBER_LABEL, username),
             Self::Token(name) => (TOKEN_LABEL, name),
         };
         ObjectMeta {
-            name: Some(self.binding_name()),
+            name: Some(name),
             namespace: namespace.map(str::to_owned),
             labels: Some(BTreeMap::from([
                 (MANAGED_BY.to_owned(), "zeabur".to_owned()),
@@ -165,7 +181,7 @@ fn role_ref(name: &str) -> RoleRef {
 #[must_use]
 pub fn role_binding(project: &str, holder: &Holder, role: ProjectRole) -> RoleBinding {
     RoleBinding {
-        metadata: holder.metadata(Some(project)),
+        metadata: holder.metadata(holder.binding_name(), Some(project)),
         role_ref: role_ref(role.cluster_role()),
         subjects: Some(holder.subjects()),
     }
@@ -175,10 +191,27 @@ pub fn role_binding(project: &str, holder: &Holder, role: ProjectRole) -> RoleBi
 #[must_use]
 pub fn baseline_binding(holder: &Holder) -> ClusterRoleBinding {
     ClusterRoleBinding {
-        metadata: holder.metadata(None),
+        metadata: holder.metadata(holder.binding_name(), None),
         role_ref: role_ref(BASELINE_ROLE),
         subjects: Some(holder.subjects()),
     }
+}
+
+/// The `RoleBinding` that lets `holder` forward a port to the build registry in `namespace`.
+#[must_use]
+pub fn registry_binding(namespace: &str, holder: &Holder) -> RoleBinding {
+    RoleBinding {
+        metadata: holder.metadata(holder.registry_binding_name(), Some(namespace)),
+        role_ref: role_ref(REGISTRY_ROLE),
+        subjects: Some(holder.subjects()),
+    }
+}
+
+/// Whether a holder with `wanted` reaches the build registry: a Developer in any project.
+pub(crate) fn reaches_registry(wanted: &[ProjectGrant]) -> bool {
+    wanted
+        .iter()
+        .any(|grant| grant.role == ProjectRole::Developer)
 }
 
 /// A project binding Zeabur made, as read.
@@ -599,7 +632,8 @@ pub(crate) mod tests {
             [
                 BASELINE_ROLE,
                 ProjectRole::Developer.cluster_role(),
-                ProjectRole::Viewer.cluster_role()
+                ProjectRole::Viewer.cluster_role(),
+                REGISTRY_ROLE,
             ]
         );
         for (name, role) in &roles {
@@ -746,6 +780,32 @@ pub(crate) mod tests {
         }
     }
 
+    /// The registry role holds what a port-forward to a Service needs, as `zeaburctl up` does
+    /// it, and nothing that reads the namespace's objects.
+    #[test]
+    fn the_registry_role_forwards_a_port_and_reads_nothing_else() {
+        let role = &roles()[REGISTRY_ROLE];
+        for (verb, resource) in [
+            ("get", "services"),
+            ("list", "endpointslices.discovery.k8s.io"),
+            ("create", "pods/portforward"),
+        ] {
+            assert!(allows(role, verb, resource), "{verb} {resource}");
+        }
+        for (verb, resource) in [
+            ("list", "services"),
+            ("get", "pods"),
+            ("list", "pods"),
+            ("get", "secrets"),
+            ("get", "configmaps"),
+            ("create", "pods/exec"),
+            ("create", "pods"),
+            ("delete", "pods"),
+        ] {
+            assert!(!allows(role, verb, resource), "{verb} {resource}");
+        }
+    }
+
     #[test]
     fn no_member_role_reaches_velero() {
         for (name, role) in roles() {
@@ -799,9 +859,11 @@ pub(crate) mod tests {
         for (name, role) in &roles {
             let developer = name == ProjectRole::Developer.cluster_role();
             for (verb, resource) in sensitive {
+                // The registry role is bound in the registry's namespace only (see the module).
+                let registry = name == REGISTRY_ROLE && resource == "pods/portforward";
                 assert_eq!(
                     allows(role, verb, resource),
-                    developer,
+                    developer || registry,
                     "{name} {verb} {resource}"
                 );
             }

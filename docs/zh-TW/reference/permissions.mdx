@@ -24,6 +24,7 @@ description: 對照成員角色、管理員帳號與 Kubernetes RBAC，確認每
 | 從 Git 部署、重新建置 | 無 | 可 |
 | 開啟容器終端機、加入除錯容器 | 無 | 可 |
 | 用 `zeaburctl connect` 連線到資料庫或服務 | 無 | 可 |
+| 用 `zeaburctl up` 上傳資料夾來建置 | 無 | 可 |
 | 修改專案顯示名稱、描述與圖示 | 無 | 可 |
 | 建立／刪除 Namespace、把 Namespace 加入或移出 Zeabur 開源版 | 無 | 無 |
 | 修改角色與成員存取權、節點、叢集元件 | 無 | 無 |
@@ -49,6 +50,7 @@ Chart 的 `memberRoles.enabled` 預設是 `true`，會建立：
 - `zeabur-member`：讀取節點、Namespace、StorageClass，以及知道名稱的 PersistentVolume。每位成員都看得到所有 Namespace 的名稱和 annotations，所以專案描述裡不要放機密。
 - `zeabur-project-viewer`、`zeabur-project-developer`：專案角色，用 `zeabur.com/aggregate-to-<role>` 標籤聚合規則。
 - `zeabur-project-viewer-rules`、`zeabur-project-developer-rules`、`zeabur-project-builds-read`、`zeabur-project-builds-write`：上面兩個角色實際的 verb 和 resource。檢視者看得到建置，開發者還能從 Git 部署和重新建置。
+- `zeabur-registry-client`：讀取 Kubernetes Service、列出 EndpointSlice，以及轉送連接埠。Zeabur 開源版只在建置用 registry 所在的 Namespace 綁定這個角色，讓 `zeaburctl up` 經由 kube-apiserver 推送映像檔，見[建置用 registry 裡的映像檔](#建置用-registry-裡的映像檔)。
 - `zeabur-project-namespace` ValidatingAdmissionPolicy 和對應的 binding：限制開發者能改 Namespace 的哪些欄位，需要 Kubernetes 1.30 以上。
 
 Chart 本身不綁定任何人。管理員在 Zeabur 開源版邀請或變更成員時，Zeabur 開源版用管理員的權限建立：
@@ -57,6 +59,7 @@ Chart 本身不綁定任何人。管理員在 Zeabur 開源版邀請或變更成
 |---|---|
 | `ClusterRoleBinding zeabur-member-<username>` | 綁定 `zeabur-member` 給 `zeabur:<username>` |
 | 各專案中的 `RoleBinding zeabur-member-<username>` | 綁定該專案的 developer 或 viewer 角色給同一位使用者 |
+| 建置用 registry 的 Namespace（預設 `zot`）中的 `RoleBinding zeabur-registry-zeabur-member-<username>` | 這位使用者至少在一個專案是開發者時，綁定 `zeabur-registry-client` 給他 |
 
 這些 binding 帶 `zeabur.com/member: <username>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。用 `helm uninstall` 移除時要自己刪，見[移除後的權限](../leave/uninstall.mdx#成員權限與准入政策)。
 
@@ -86,6 +89,12 @@ zeabur.com/icon
 
 檢視者讀不到 Secret 和日誌，但讀得到 ConfigMap 和工作負載的設定。直接寫在這些地方的密碼，檢視者也看得到。
 
+## 建置用 registry 裡的映像檔
+
+建置用 registry 裡的映像檔沒有按專案分開。任何專案的開發者都能轉送連接埠到這個 registry，列出並拉取所有專案的映像檔。節點本來就不用認證資訊就能從 registry 拉取映像檔，開發者也本來就能讓服務使用其他專案的映像檔。推送映像檔則仍然需要權杖，每次建置只會拿到推送自己映像檔路徑的權杖。映像檔裡不要放機密資料。
+
+管理員儲存成員或 API 權杖的權限時，Zeabur 開源版才會建立 registry 的 binding，而且只在 registry 跑在叢集內時建立。之後才安裝 registry 的話，請重新儲存每位開發者的權限。開發者最後一個擔任開發者的專案被刪除後，這個 binding 會留到下次儲存他的權限為止。
+
 ## API 權杖與 RBAC
 
 [API 權杖](./api-tokens.mdx)拿到角色的方式跟成員一樣，只是綁定的對象是 `zeabur-api-tokens` Namespace 裡的 ServiceAccount，不是 `zeabur:<username>`：
@@ -94,6 +103,7 @@ zeabur.com/icon
 |---|---|
 | `ClusterRoleBinding zeabur-api-token-<name>` | 綁定 `zeabur-member` 給該 ServiceAccount |
 | 各專案中的 `RoleBinding zeabur-api-token-<name>` | 綁定該專案的 developer 或 viewer 角色給同一個 ServiceAccount |
+| 建置用 registry 的 Namespace 中的 `RoleBinding zeabur-registry-zeabur-api-token-<name>` | 權杖至少在一個專案是開發者時，綁定 `zeabur-registry-client` 給同一個 ServiceAccount |
 
 這些 binding 和 ServiceAccount 都帶有 `zeabur.com/api-token: <name>` 和 `app.kubernetes.io/managed-by: zeabur` 標籤。
 

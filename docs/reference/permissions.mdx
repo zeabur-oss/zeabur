@@ -24,6 +24,7 @@ For steps to assign member roles, see [Members](../cluster/members.mdx). When yo
 | Deploy from Git and rebuild | No | Yes |
 | Open container terminals and add debug containers | No | Yes |
 | Connect to databases and services with `zeaburctl connect` | No | Yes |
+| Upload a folder to build with `zeaburctl up` | No | Yes |
 | Edit a project's display name, description, and icon | No | Yes |
 | Create or delete namespaces and add namespaces to or remove them from Zeabur OSS | No | No |
 | Edit roles, member access, nodes, and cluster components | No | No |
@@ -49,6 +50,7 @@ The chart sets `memberRoles.enabled` to `true` by default and creates:
 - `zeabur-member`: Reads nodes, namespaces, storage classes, and PersistentVolumes whose names are known. Every member can see the names and annotations of all namespaces, so don't put secrets in project descriptions.
 - `zeabur-project-viewer`, `zeabur-project-developer`: Project roles that aggregate rules using the `zeabur.com/aggregate-to-<role>` label.
 - `zeabur-project-viewer-rules`, `zeabur-project-developer-rules`, `zeabur-project-builds-read`, `zeabur-project-builds-write`: The actual verbs and resources for the two roles above. Viewers can view builds. Developers can also deploy from Git and rebuild.
+- `zeabur-registry-client`: Gets Kubernetes Services, lists EndpointSlices, and forwards ports. Zeabur OSS binds it only in the build registry's namespace, so `zeaburctl up` can push through kube-apiserver. See [Images in the build registry](#images-in-the-build-registry).
 - The `zeabur-project-namespace` ValidatingAdmissionPolicy and its binding: Restricts which namespace fields developers can change. Requires Kubernetes 1.30 or later.
 
 The chart doesn't bind roles to anyone. When an admin invites or updates a member in Zeabur OSS, Zeabur OSS uses the admin's permissions to create:
@@ -57,6 +59,7 @@ The chart doesn't bind roles to anyone. When an admin invites or updates a membe
 |---|---|
 | `ClusterRoleBinding zeabur-member-<username>` | Binds `zeabur-member` to `zeabur:<username>` |
 | `RoleBinding zeabur-member-<username>` in each project | Binds the project's developer or viewer role to the same user |
+| `RoleBinding zeabur-registry-zeabur-member-<username>` in the build registry's namespace (`zot` by default) | Binds `zeabur-registry-client` to the same user while they are a Developer in at least one project |
 
 These bindings have the labels `zeabur.com/member: <username>` and `app.kubernetes.io/managed-by: zeabur`. If you remove Zeabur OSS with `helm uninstall`, you must delete them yourself. See [Permissions after uninstalling](../leave/uninstall.mdx#member-permissions-and-admission-policies).
 
@@ -86,6 +89,12 @@ The Developer role can't write RBAC objects or ServiceAccounts and has no `bind`
 
 Viewers can't read secrets or logs, but they can read config files and workload configurations. They can also see passwords written directly in those places.
 
+## Images in the build registry
+
+Images in the build registry aren't separated by project. A Developer in any project can forward a port to the registry and list or pull every project's images. Nodes already pull from the registry without credentials, and a Developer can already point a service at another project's image. Pushing still needs the token a build issues for its own repository. Don't put secrets in images.
+
+Zeabur OSS creates the registry binding when an admin saves a member's or API token's access, and only when the registry runs in the cluster. If you install the registry later, save each Developer's access again. When a Developer's last Developer project is deleted, the binding stays until their access is next saved.
+
 ## API tokens and RBAC
 
 An [API token](./api-tokens.mdx) gets roles the same way a member does. Its subject is a ServiceAccount in the `zeabur-api-tokens` namespace instead of `zeabur:<username>`:
@@ -94,6 +103,7 @@ An [API token](./api-tokens.mdx) gets roles the same way a member does. Its subj
 |---|---|
 | `ClusterRoleBinding zeabur-api-token-<name>` | Binds `zeabur-member` to the ServiceAccount |
 | `RoleBinding zeabur-api-token-<name>` in each project | Binds the project's developer or viewer role to the same ServiceAccount |
+| `RoleBinding zeabur-registry-zeabur-api-token-<name>` in the build registry's namespace | Binds `zeabur-registry-client` to the same ServiceAccount while the token is a Developer in at least one project |
 
 These bindings and the ServiceAccount have the labels `zeabur.com/api-token: <name>` and `app.kubernetes.io/managed-by: zeabur`.
 
