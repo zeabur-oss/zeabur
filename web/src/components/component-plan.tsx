@@ -10,6 +10,7 @@ import { Command } from "@/components/bits"
 import { InputsForm, InputsReview, isMissing, type Values } from "@/components/component-inputs"
 import { Frame } from "@/components/members/frame"
 import { LoadingRows } from "@/components/page"
+import { KubeWarnings } from "@/components/plan/kube-warnings"
 import { Problem } from "@/components/problem"
 import { StatusPill } from "@/components/status"
 import { YamlBlock } from "@/components/yaml"
@@ -530,6 +531,7 @@ function Step({ step, removing }: { step: Schemas.ComponentStep; removing?: stri
                   <Written write={write} removal={removing !== undefined} />
                 </span>
               )}
+              <KubeWarnings warnings={write.warnings} />
             </li>
           )
         })}

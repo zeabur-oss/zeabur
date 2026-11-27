@@ -30,6 +30,7 @@ import { ProjectDeletion } from "@/components/plan/project-deletion"
 import { changedSince, type Reviewed } from "@/components/plan/replan"
 import { Problem } from "@/components/problem"
 import { StatusDot } from "@/components/status"
+import { KubeWarnings, objectWarnings } from "@/components/plan/kube-warnings"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import {
@@ -469,6 +470,7 @@ function PlanBody({
       return text ? [{ text }] : []
     }),
     ...toolNotes(plan, skipped).map((note) => noteText(t, note)),
+    ...objectWarnings(t, plan.objects).map((text) => ({ text })),
   ]
   const grouped = !!description.facts
   const described = (
@@ -595,6 +597,7 @@ function PlannedObject({ object, named }: { object: Schemas.PlannedObject; named
           </span>
         </p>
       ) : null}
+      <KubeWarnings warnings={object.warnings} />
       <YamlDiff before={before} after={after} />
     </section>
   )
