@@ -332,26 +332,6 @@ fn info_of(map: k8s_openapi::api::core::v1::ConfigMap) -> ZeaburInfo {
     }
 }
 
-/// Whether `token` is a JWT whose `iss` is `issuer`. The signature is not checked here;
-/// kube-apiserver checks it.
-#[must_use]
-pub fn issued_by(token: &str, issuer: &str) -> bool {
-    use base64::Engine as _;
-    let mut parts = token.split('.');
-    let (Some(_header), Some(payload), Some(_signature), None) =
-        (parts.next(), parts.next(), parts.next(), parts.next())
-    else {
-        return false;
-    };
-    let Ok(payload) = base64::engine::general_purpose::URL_SAFE_NO_PAD.decode(payload) else {
-        return false;
-    };
-    serde_json::from_slice::<serde_json::Value>(&payload)
-        .ok()
-        .and_then(|claims| claims.get("iss")?.as_str().map(str::to_owned))
-        .is_some_and(|iss| iss.trim_end_matches('/') == issuer.trim_end_matches('/'))
-}
-
 /// The namespace every signed-in person may read, as kubeadm's cluster-info lives in.
 pub const INFO_NAMESPACE: &str = "kube-public";
 /// The ConfigMap whose `registry` is where Zeabur Builder pushes to.
