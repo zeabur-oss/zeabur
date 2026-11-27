@@ -102,7 +102,11 @@ func credentials(ctx context.Context, core coreclient.CoreV1Interface, selected 
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(value, &spec); err != nil {
 		return "", "", err
 	}
-	if name := selected.object.GetAnnotations()[types.KeelImagePullSecretAnnotation]; name != "" {
+	name := selected.object.GetLabels()[types.KeelImagePullSecretAnnotation]
+	if name == "" {
+		name = selected.object.GetAnnotations()[types.KeelImagePullSecretAnnotation]
+	}
+	if name != "" {
 		spec.ImagePullSecrets = append(spec.ImagePullSecrets, corev1.LocalObjectReference{Name: name})
 	}
 	for _, reference := range spec.ImagePullSecrets {

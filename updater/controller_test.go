@@ -92,7 +92,8 @@ func TestSchedulesAreIndependentAndSurviveRestartWithoutImmediateUpdates(t *test
 	off := database(t, "off", "@every 1m")
 	off.SetAnnotations(map[string]string{})
 	future := database(t, "future", "0 0 3 * * *")
-	c, api, _, checks := setup(t, active, off, future)
+	never := database(t, "never", "0 0 0 31 2 *")
+	c, api, _, checks := setup(t, active, off, future, never)
 	if err := c.scan(context.Background(), start); err != nil {
 		t.Fatal(err)
 	}
@@ -108,7 +109,7 @@ func TestSchedulesAreIndependentAndSurviveRestartWithoutImmediateUpdates(t *test
 	if got := imageName(t, api, "active"); got != taggedImage+"@"+newDigest {
 		t.Fatal(got)
 	}
-	for _, name := range []string{"off", "future"} {
+	for _, name := range []string{"off", "future", "never"} {
 		if got := imageName(t, api, name); got != taggedImage+"@"+oldDigest {
 			t.Fatalf("%s changed: %s", name, got)
 		}
@@ -205,6 +206,9 @@ func TestDisableOrChangedTargetDuringRegistryReadRefusesWrite(t *testing.T) {
 		},
 		"unready": func(o *unstructured.Unstructured) {
 			_ = unstructured.SetNestedField(o.Object, int64(2), "status", "readyInstances")
+		},
+		"approvals": func(o *unstructured.Unstructured) {
+			o.SetLabels(map[string]string{"keel.sh/approvals": "1"})
 		},
 	}
 	for name, mutate := range changes {

@@ -69,7 +69,7 @@ func (c *controller) scan(ctx context.Context, now time.Time) error {
 			c.jobs[uid] = scheduled{key: selected.key, next: selected.schedule.Next(now.UTC())}
 			continue
 		}
-		if now.Before(job.next) {
+		if job.next.IsZero() || now.Before(job.next) {
 			continue
 		}
 		c.jobs[uid] = scheduled{key: selected.key, next: selected.schedule.Next(now.UTC())}

@@ -112,6 +112,18 @@ describe("CloudNativePG automatic updates", () => {
     expect(db.object).toEqual(object)
   })
 
+  test("an existing approval requirement permits Off but not enabling", () => {
+    for (const field of ["annotations", "labels"]) {
+      const db = database()
+      db.object = {
+        ...object,
+        metadata: { ...object.metadata, [field]: { "keel.sh/approvals": "1" } },
+      } as unknown as Database["object"]
+      expect(databaseImageUpdates(db).allowed).toEqual([])
+      expect(updateDatabaseImages(db, { kind: "off" })[0]?.op).toBe("autoUpdate")
+    }
+  })
+
   test("Off uses the same operation for settings from valid legacy labels", () => {
     const db = database()
     const labelled = {

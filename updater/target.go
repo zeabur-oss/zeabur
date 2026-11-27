@@ -17,11 +17,12 @@ import (
 var clusters = schema.GroupVersionResource{Group: "postgresql.cnpg.io", Version: "v1", Resource: "clusters"}
 var majorTag = regexp.MustCompile(`^v?([1-9][0-9]+)([.-]|$)`)
 
-var settingKeys = []string{
+var controlKeys = []string{
 	types.KeelPolicyLabel, types.KeelTriggerLabel, types.KeelPollScheduleAnnotation,
 	types.KeelForceTagMatchLegacyLabel, types.KeelForceTagMatchLabel,
-	types.KeelMinimumApprovalsLabel, types.KeelImagePullSecretAnnotation,
 }
+
+var settingKeys = append(controlKeys, types.KeelMinimumApprovalsLabel, types.KeelImagePullSecretAnnotation)
 
 type target struct {
 	object   *unstructured.Unstructured
@@ -37,7 +38,7 @@ func selected(object *unstructured.Unstructured) (*target, error) {
 	if object.GetUID() == "" || object.GetDeletionTimestamp() != nil || managed(object) {
 		return nil, nil
 	}
-	for _, key := range settingKeys {
+	for _, key := range controlKeys {
 		if labels[key] != "" {
 			return nil, fmt.Errorf("legacy Keel labels must be removed before enabling database updates")
 		}
@@ -49,8 +50,13 @@ func selected(object *unstructured.Unstructured) (*target, error) {
 	if match == "" {
 		match = a[types.KeelForceTagMatchLegacyLabel]
 	}
-	if match != "true" || (a[types.KeelMinimumApprovalsLabel] != "" && a[types.KeelMinimumApprovalsLabel] != "0") {
+	if match != "true" {
 		return nil, fmt.Errorf("database updates require same-tag polling without approvals")
+	}
+	for _, values := range []map[string]string{a, labels} {
+		if approvals := values[types.KeelMinimumApprovalsLabel]; approvals != "" && approvals != "0" {
+			return nil, fmt.Errorf("database updates do not support approval requirements")
+		}
 	}
 	catalog, _, err := unstructured.NestedFieldNoCopy(object.Object, "spec", "imageCatalogRef")
 	if err != nil || catalog != nil {
@@ -81,6 +87,7 @@ func selected(object *unstructured.Unstructured) (*target, error) {
 	settings := map[string]string{"uid": string(object.GetUID()), "image": name}
 	for _, key := range settingKeys {
 		settings[key] = a[key]
+		settings["label:"+key] = labels[key]
 	}
 	// Credentials and placement are part of the reviewed target, too.
 	for _, key := range []string{"imagePullSecrets", "affinity"} {

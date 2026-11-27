@@ -210,6 +210,21 @@ mod tests {
     }
 
     #[test]
+    fn approval_requirements_refuse_enable_but_preserve_off() {
+        for field in ["labels", "annotations"] {
+            let mut current = applied(&cluster(), &update(cluster(), image_update()).unwrap());
+            current["metadata"][field]["keel.sh/approvals"] = json!("1");
+            assert_eq!(
+                update(current.clone(), image_update()).unwrap_err().code,
+                "policy_not_allowed"
+            );
+            let off = applied(&current, &update(current.clone(), Update::Off).unwrap());
+            assert_eq!(off["metadata"][field]["keel.sh/approvals"], "1");
+            assert_eq!(off.get("spec"), current.get("spec"));
+        }
+    }
+
+    #[test]
     fn legacy_label_settings_and_match_tag_alias_do_not_override_off() {
         let object = apply_patch(&cluster(), &[
             json!({"op": "add", "path": "/metadata/labels", "value": {"app": "db", "keel.sh/policy": "force", "keel.sh/trigger": "poll", "keel.sh/matchTag": "true"}}),

@@ -110,6 +110,17 @@ struct ImageCluster {
     spec: ImageClusterSpec,
 }
 
+impl ImageCluster {
+    fn requires_approvals(&self) -> bool {
+        self.metadata
+            .labels
+            .iter()
+            .chain(self.metadata.annotations.iter())
+            .filter_map(|values| values.get("keel.sh/approvals"))
+            .any(|value| !value.is_empty() && value != "0")
+    }
+}
+
 #[derive(Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 struct ImageClusterSpec {
@@ -422,6 +433,7 @@ impl Planner<'_> {
             validate_window(*window)?;
             if *policy != ImagePolicy::SameTag
                 || !cluster.spec.allows_updates()
+                || cluster.requires_approvals()
                 || cluster
                     .metadata
                     .owner_references
@@ -431,7 +443,7 @@ impl Planner<'_> {
                 return Err(error(
                     ErrorKind::BadRequest,
                     "policy_not_allowed",
-                    "CloudNativePG updates require an explicit PostgreSQL major tag, no image catalog or controlling owner, and the same-tag policy.",
+                    "CloudNativePG updates require an explicit PostgreSQL major tag, no image catalog, controlling owner or approval requirement, and the same-tag policy.",
                 ));
             }
         } else if !matches!(update, Update::Off) {

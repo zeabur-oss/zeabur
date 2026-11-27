@@ -1792,6 +1792,10 @@ export function databaseImageUpdates(database: Database): Schemas.ImageUpdates {
     database.apiGroup === "postgresql.cnpg.io" &&
     database.kind === "Cluster" &&
     !object.spec?.imageCatalogRef &&
+    ![object.metadata?.labels, object.metadata?.annotations].some((values) => {
+      const approvals = values?.["keel.sh/approvals"]
+      return approvals && approvals !== "0"
+    }) &&
     tagged.lastIndexOf(":") > tagged.lastIndexOf("/") &&
     /^v?([1-9][0-9]+)(?:[.-]|$)/.test(tag)
   return readKeelUpdates(
