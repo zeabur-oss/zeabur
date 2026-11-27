@@ -217,7 +217,8 @@ async fn send(
 
 /// The text of each `Warning` header [k8s-warnings]. kube-apiserver sends one header per warning,
 /// `299 - "<text>"`, the format of RFC 7234, section 5.5 [rfc7234-warning]; a value in another
-/// form is kept as it is.
+/// form is kept as it is. The text may hold any UTF-8, such as a webhook's message in another
+/// language; bytes that are not UTF-8 become U+FFFD.
 ///
 /// [k8s-warnings]: https://kubernetes.io/blog/2020/09/03/warnings/
 /// [rfc7234-warning]: https://www.rfc-editor.org/rfc/rfc7234#section-5.5
@@ -225,8 +226,8 @@ fn warnings(headers: &http::HeaderMap) -> Vec<String> {
     headers
         .get_all(http::header::WARNING)
         .iter()
-        .filter_map(|value| value.to_str().ok())
-        .flat_map(|value| warn_texts(value).unwrap_or_else(|| vec![value.trim().to_owned()]))
+        .map(|value| String::from_utf8_lossy(value.as_bytes()))
+        .flat_map(|value| warn_texts(&value).unwrap_or_else(|| vec![value.trim().to_owned()]))
         .collect()
 }
 
@@ -458,6 +459,11 @@ mod tests {
         ] {
             headers.append(http::header::WARNING, http::HeaderValue::from_static(value));
         }
+        let localized = r#"299 - "映像檔已過時""#.as_bytes();
+        headers.append(
+            http::header::WARNING,
+            http::HeaderValue::from_bytes(localized).unwrap(),
+        );
         assert_eq!(
             warnings(&headers),
             [
@@ -465,6 +471,7 @@ mod tests {
                 "first",
                 "second",
                 "not a warning",
+                "映像檔已過時",
             ]
         );
     }

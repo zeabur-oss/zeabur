@@ -183,6 +183,31 @@ stringData:
         );
     }
 
+    /// A warning that quotes a value of a Secret the plan writes, as written or in base64, shows
+    /// it hidden, as a refusal does.
+    #[tokio::test]
+    async fn a_warning_never_quotes_a_secret_value() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.write_warnings.insert(
+                "Deployment/api".to_owned(),
+                vec!["env TOKEN=s3cr3t-t0ken (czNjcjN0LXQwa2Vu) is plain text".to_owned()],
+            );
+        });
+        let (status, planned) = plan(&app(&cluster), &creates(&[DEPLOYMENT, SECRET])).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        let deployment = planned["objects"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|o| o["target"]["kind"] == "Deployment")
+            .unwrap();
+        assert_eq!(
+            deployment["warnings"],
+            json!(["env TOKEN=(hidden) ((hidden)) is plain text"])
+        );
+    }
+
     /// The "Docker image" form sends the service, and the server makes its objects: a Deployment,
     /// its Service, an Ingress asking the configured issuer for HTTPS, and a volume claim, planned
     /// without discovery and created claim first, Ingress last. Its YAML hand-off lists the same

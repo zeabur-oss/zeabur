@@ -183,6 +183,32 @@ pub(super) async fn dry_run(
 /// `problem` without any value a Secret in `plan` has once written, as written or base64: a
 /// message from kube-apiserver or a policy may quote the object, as a `422` to a patch does.
 pub(super) fn without_secret_values(problem: Problem, plan: &Plan) -> Problem {
+    let values = secret_values(plan);
+    if values.is_empty() {
+        return problem;
+    }
+    let Ok(mut json) = serde_json::to_value(&problem) else {
+        return problem;
+    };
+    scrub(&mut json, &values);
+    serde_json::from_value(json).unwrap_or(problem)
+}
+
+/// `plan` without any value a Secret in it has once written in the warnings of its objects, as
+/// [`without_secret_values`] for a problem: an admission webhook or policy may quote the object.
+pub(super) fn warnings_without_secret_values(plan: &mut Plan) {
+    let values = secret_values(plan);
+    if values.is_empty() {
+        return;
+    }
+    for warning in plan.objects.iter_mut().flat_map(|o| &mut o.warnings) {
+        scrub_text(warning, &values);
+    }
+}
+
+/// The values the Secrets of `plan` hold once written, as written and in or out of base64, the
+/// longest first.
+fn secret_values(plan: &Plan) -> Vec<String> {
     let mut values: Vec<String> = Vec::new();
     for object in &plan.objects {
         if !(object.target.api_version == "v1" && object.target.kind == "Secret") {
@@ -209,29 +235,24 @@ pub(super) fn without_secret_values(problem: Problem, plan: &Plan) -> Problem {
         }
     }
     values.retain(|v| !v.is_empty());
-    if values.is_empty() {
-        return problem;
-    }
     values.sort_by_key(|v| std::cmp::Reverse(v.len()));
-    let Ok(mut json) = serde_json::to_value(&problem) else {
-        return problem;
-    };
-    scrub(&mut json, &values);
-    serde_json::from_value(json).unwrap_or(problem)
+    values
 }
 
 fn scrub(value: &mut Value, secrets: &[String]) {
     match value {
-        Value::String(text) => {
-            for secret in secrets {
-                if text.contains(secret.as_str()) {
-                    *text = text.replace(secret.as_str(), zeabur_graph::manifest::HIDDEN);
-                }
-            }
-        }
+        Value::String(text) => scrub_text(text, secrets),
         Value::Array(items) => items.iter_mut().for_each(|v| scrub(v, secrets)),
         Value::Object(map) => map.values_mut().for_each(|v| scrub(v, secrets)),
         Value::Null | Value::Bool(_) | Value::Number(_) => {}
+    }
+}
+
+fn scrub_text(text: &mut String, secrets: &[String]) {
+    for secret in secrets {
+        if text.contains(secret.as_str()) {
+            *text = text.replace(secret.as_str(), zeabur_graph::manifest::HIDDEN);
+        }
     }
 }
 

@@ -396,6 +396,7 @@ pub(crate) async fn plan(
             object.warnings.extend(warnings);
         }
     }
+    creations::warnings_without_secret_values(&mut plan);
     let from_yaml = creations::from_yaml(&opened);
     let preview = preview::read(cluster.as_ref(), &project, &plan, &opened).await;
     let risk = risk::weigh(&request.changes, &ready);
