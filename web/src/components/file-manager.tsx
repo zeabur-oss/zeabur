@@ -28,10 +28,9 @@ export function useSize() {
   return (bytes: number) => formatSize(bytes, locale)
 }
 
-export const head =
-  "px-3 py-2 text-left type-meta font-medium text-muted-foreground whitespace-nowrap"
+const head = "px-3 py-2 text-left type-meta font-medium text-muted-foreground whitespace-nowrap"
 export const cell = "px-3 py-2 align-middle max-sm:p-0"
-export const thead = "border-b bg-muted/30 max-sm:hidden"
+const thead = "border-b bg-muted/30 max-sm:hidden"
 export const row =
   "max-sm:flex max-sm:flex-wrap max-sm:items-center max-sm:gap-x-3 max-sm:gap-y-1 max-sm:px-4 max-sm:py-3"
 export const opener =
@@ -256,6 +255,23 @@ export function putBytes(url: string, body: Blob, onProgress: (done: number) => 
 }
 
 /** The table's header: name, size, modified, and the actions column. */
+/** The head of a folder's listing: name, size, modified time and actions. */
+export function EntryTableHead() {
+  const t = useT()
+  return (
+    <thead className={thead}>
+      <tr>
+        <th className={`${head} sm:pl-4`}>{t("files.name")}</th>
+        <th className={`${head} w-28 text-right`}>{t("files.size")}</th>
+        <th className={`${head} w-36`}>{t("files.modified")}</th>
+        <th className={`${head} w-14 sm:pr-4`}>
+          <span className="sr-only">{t("files.actions")}</span>
+        </th>
+      </tr>
+    </thead>
+  )
+}
+
 export function FileTableHead() {
   const t = useT()
   return (

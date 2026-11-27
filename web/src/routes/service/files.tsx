@@ -27,13 +27,12 @@ import {
   ChosenFiles,
   Confirm,
   DialogBar,
+  EntryTableHead,
   FileTableHead,
-  head,
   opener,
   putBytes,
   row,
   sendAll,
-  thead,
   UploadProgress,
   useSize,
   useWrite,
@@ -700,16 +699,7 @@ function EntryTable({
     return <p className="px-4 py-6 text-sm text-muted-foreground">{t("files.empty")}</p>
   return (
     <table className="w-full text-sm max-sm:block sm:table-fixed" aria-label={path}>
-      <thead className={thead}>
-        <tr>
-          <th className={`${head} sm:pl-4`}>{t("files.name")}</th>
-          <th className={`${head} w-28 text-right`}>{t("files.size")}</th>
-          <th className={`${head} w-36`}>{t("files.modified")}</th>
-          <th className={`${head} w-14 sm:pr-4`}>
-            <span className="sr-only">{t("files.actions")}</span>
-          </th>
-        </tr>
-      </thead>
+      <EntryTableHead />
       <tbody className="divide-y max-sm:block">
         {entries.map((entry) => {
           const full = join(path, entry.name)

@@ -29,7 +29,7 @@ import {
   ChosenFiles,
   Confirm,
   DialogBar,
-  FileTableHead,
+  EntryTableHead,
   opener,
   putBytes,
   row,
@@ -90,7 +90,11 @@ export function BucketFilesTab({
   const t = useT()
   const bucket = store.buckets.find((b) => b.s3Name === asked) ?? store.buckets[0]
   if (!bucket) return <NoBuckets onOverview={onOverview} />
-  const place: BucketPlace = { project, store: store.name, bucket: bucket.s3Name }
+  const place: BucketPlace = {
+    project,
+    store: store.name,
+    bucket: bucket.s3Name,
+  }
   return (
     <div className="flex flex-col gap-4">
       {store.buckets.length > 1 ? (
@@ -98,7 +102,10 @@ export function BucketFilesTab({
           size="sm"
           className="self-start"
           value={bucket.s3Name}
-          items={store.buckets.map((b) => ({ value: b.s3Name, label: b.s3Name }))}
+          items={store.buckets.map((b) => ({
+            value: b.s3Name,
+            label: b.s3Name,
+          }))}
           onValueChange={(value) => onOpen(value)}
           aria-label={t("bucketFiles.bucket")}
           translate="no"
@@ -363,7 +370,7 @@ function ObjectTable({
       className="w-full text-sm max-sm:block sm:table-fixed"
       aria-label={prefix || place.bucket}
     >
-      <FileTableHead />
+      <EntryTableHead />
       <tbody className="divide-y max-sm:block">
         {folders.map((folder) => (
           <FolderRow
@@ -414,8 +421,8 @@ function FolderRow({
           <Name icon={<FolderIcon aria-hidden="true" className="size-4 shrink-0" />} name={name} />
         </button>
       </td>
-      <td className={`${cell} text-right text-muted-foreground`}>—</td>
-      <td className={`${cell} text-muted-foreground`}>—</td>
+      <td className={`${cell} text-right text-muted-foreground max-sm:hidden`}>—</td>
+      <td className={`${cell} text-muted-foreground max-sm:hidden`}>—</td>
       <td className={`${cell} sm:pr-4 text-right max-sm:ml-auto`}>
         {gate.open ? (
           <Menu>
@@ -758,14 +765,12 @@ function RenameDialog({
   )
 }
 
-function DeleteWarning({ children }: { children: ReactNode }) {
+function DeleteWarning({ what }: { what: string }) {
   const t = useT()
   return (
     <Alert variant="warn" role="note">
       <WarningFillIcon aria-hidden="true" />
-      <AlertDescription>
-        {children} {t("files.deleteForever")}
-      </AlertDescription>
+      <AlertDescription>{t("common.sentences", [what, t("files.deleteForever")])}</AlertDescription>
     </Alert>
   )
 }
@@ -800,7 +805,7 @@ function DeleteObjectDialog({
         )
       }
     >
-      <DeleteWarning>{t("files.deleteFile", name, size(object.size))}</DeleteWarning>
+      <DeleteWarning what={t("files.deleteFile", name, size(object.size))} />
       <dl className="grid grid-cols-pairs gap-x-4 gap-y-1">
         <dt className="text-muted-foreground">{t("bucketFiles.key")}</dt>
         <dd className="font-mono break-all" translate="no">
@@ -850,7 +855,7 @@ function DeleteFolderDialog({
       }
     >
       {what ? (
-        <DeleteWarning>{what}</DeleteWarning>
+        <DeleteWarning what={what} />
       ) : count.isPending ? (
         <LoadingRows label={t("bucketFiles.counting")} />
       ) : null}
@@ -881,7 +886,9 @@ async function uploadFile(
     )
     return
   }
-  const { upload } = await zeabur.startBucketUpload(project, store, bucket, { key })
+  const { upload } = await zeabur.startBucketUpload(project, store, bucket, {
+    key,
+  })
   try {
     const parts: Schemas.BucketPart[] = []
     for (let at = 0; at < file.size; at += part) {
