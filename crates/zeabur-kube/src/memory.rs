@@ -100,6 +100,9 @@ pub struct State {
     /// allowed them, as `kind/name`, with kube-apiserver's answer: a quota's `403` or a
     /// webhook's `400` or `403`.
     pub admission_refusals: BTreeMap<String, KubernetesStatus>,
+    /// The `Warning` headers kube-apiserver sends with each write of an object, dry runs
+    /// included, as `kind/name`.
+    pub write_warnings: BTreeMap<String, Vec<String>>,
     /// Objects whose dry run passes but whose write is refused, as `kind/name`, with
     /// kube-apiserver's answer: what changed in the cluster between the two.
     pub write_refusals: BTreeMap<String, KubernetesStatus>,
@@ -1249,6 +1252,7 @@ impl Cluster for MemoryCluster {
             if let Some(refusal) = state.refusal(&what, request.dry_run) {
                 return Err(ClusterError::Status(refusal));
             }
+            let warnings = state.write_warnings.get(&what).cloned().unwrap_or_default();
             let current = state.stored(target)?;
             let version = current
                 .as_ref()
@@ -1260,9 +1264,8 @@ impl Cluster for MemoryCluster {
                 drop(state);
                 return Ok(Written {
                     resource_version: version,
-                    generation: None,
-                    uid: None,
-                    object: None,
+                    warnings,
+                    ..Written::default()
                 });
             }
             let mut object = match (&request.body, &current) {
@@ -1311,9 +1314,9 @@ impl Cluster for MemoryCluster {
                 drop(state);
                 return Ok(Written {
                     resource_version: version,
-                    generation: None,
-                    uid: None,
                     object: Some(object),
+                    warnings,
+                    ..Written::default()
                 });
             }
             let next = version
@@ -1345,6 +1348,7 @@ impl Cluster for MemoryCluster {
                 generation,
                 uid,
                 object: Some(object),
+                warnings,
             })
         })
     }

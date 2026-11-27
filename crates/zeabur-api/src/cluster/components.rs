@@ -161,6 +161,14 @@ pub struct ObjectWrite {
     /// The object as it is written, YAML; absent for a deletion.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub yaml: Option<String>,
+    /// What kube-apiserver warned about when the plan dry-ran the write, as the text of its
+    /// `Warning` headers. The plan dry-runs the change of a Namespace that exists, so Pod
+    /// Security admission names the Pods in it that break a new `enforce` level
+    /// [k8s-psa-labels]; empty for other writes.
+    ///
+    /// [k8s-psa-labels]: https://kubernetes.io/docs/concepts/security/pod-security-admission/#pod-security-admission-labels-for-namespaces
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub warnings: Vec<String>,
 }
 
 /// What one write of `apply` left on the cluster.
@@ -964,7 +972,12 @@ impl World {
                 }
                 _ => self.progress(cluster, &target, found.as_ref()).await?,
             });
-            writes.push(view(&body, Some(&target), None));
+            let mut write = view(&body, Some(&target), None);
+            if target.kind == Namespace::KIND && found.as_ref().is_some_and(|f| relabels(&body, f))
+            {
+                write.warnings = warnings(cluster, &target, &body).await?;
+            }
+            writes.push(write);
             placed.push(Placed {
                 target,
                 body: Some(body),
@@ -1662,6 +1675,40 @@ fn input_view(r: &engine::Resolved) -> ComponentInput {
     }
 }
 
+/// Whether `desired` sets a label that `found` lacks or holds with another value.
+fn relabels(desired: &DynamicObject, found: &DynamicObject) -> bool {
+    let found = found.metadata.labels.as_ref();
+    desired
+        .metadata
+        .labels
+        .iter()
+        .flatten()
+        .any(|(key, value)| found.and_then(|l| l.get(key)) != Some(value))
+}
+
+/// What kube-apiserver warns about applying `body` to `target`, from a dry run; none when it
+/// refuses, which the apply's own dry run reports.
+async fn warnings(
+    cluster: &dyn Cluster,
+    target: &ObjectTarget,
+    body: &DynamicObject,
+) -> Result<Vec<String>, ApiError> {
+    let body = serde_json::to_value(body)
+        .map_err(|e| ApiError::from(Problem::new(Kind::Internal, e.to_string())))?;
+    let dry_run = send(
+        cluster,
+        target.clone(),
+        WriteBody::Apply(body),
+        true,
+        right("patch", target),
+    )
+    .await;
+    Ok(match dry_run {
+        Ok(written) => written.warnings,
+        Err(_refused) => Vec::new(),
+    })
+}
+
 /// What a step writes, as the review shows it: a Secret without its values.
 fn view(
     object: &DynamicObject,
@@ -1683,6 +1730,7 @@ fn view(
             .filter(|n| !n.is_empty())
             .map(str::to_owned),
         yaml: serde_json::to_value(object).ok().as_ref().and_then(yaml),
+        warnings: Vec::new(),
     }
 }
 

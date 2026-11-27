@@ -811,6 +811,7 @@ pub(crate) fn deletion(working: Working) -> Result<PlannedObject, PlanError> {
             foreground: working.foreground,
         },
         change: None,
+        warnings: Vec::new(),
         raw_after: Value::Null,
         target: working.target,
     })

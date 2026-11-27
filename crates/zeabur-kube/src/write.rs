@@ -1,6 +1,6 @@
-//! Writes as the person: one request per object. Patches go through kube's `Api::patch` with
-//! `PatchParams`; a creation is built by hand, because kube's `PostParams` cannot ask for strict
-//! field validation.
+//! Writes as the person: one request per object. Patches and deletions are built with kube's
+//! `Request` and `PatchParams`; a creation is built by hand, because kube's `PostParams` cannot ask
+//! for strict field validation. Each answer's `Warning` headers come back in [`Written::warnings`].
 //!
 //! - **A change** is a `PATCH` with `application/json-patch+json` [rfc6902] (kube's `Patch::Json`);
 //!   its `test` operations make it all-or-nothing against what the plan read.
@@ -9,7 +9,7 @@
 //! - **A new object** is a `POST` to its collection.
 //! - **An applied object** is a server-side apply `PATCH` [k8s-ssa] (kube's `Patch::Apply`), never
 //!   forced.
-//! - **A deletion** is kube's `Api::delete` with `DeleteOptions` in its body [k8s-delete-options]:
+//! - **A deletion** is a `DELETE` with `DeleteOptions` in its body [k8s-delete-options]:
 //!   `propagationPolicy: Background`, as `kubectl delete` does by default, so kube-apiserver
 //!   removes the object at once and the garbage collector removes what it owns (a Deployment's
 //!   ReplicaSets and their Pods) afterwards [k8s-gc], or `Foreground` when asked, so the object
@@ -31,8 +31,8 @@
 //! [k8s-ssa]: https://kubernetes.io/docs/reference/using-api/server-side-apply/
 //! [k8s-gc]: https://kubernetes.io/docs/concepts/architecture/garbage-collection/#background-deletion
 
-use kube::api::{Api, DeleteParams, DynamicObject, Patch, PatchParams};
-use kube::core::{ApiResource, GroupVersionKind};
+use kube::api::{DeleteParams, DynamicObject, Patch, PatchParams};
+use kube::core::{Request, Status};
 
 use crate::names;
 use crate::port::{
@@ -124,75 +124,141 @@ pub(crate) async fn write(
         &request.target,
         !matches!(request.body, WriteBody::Create(_)),
     )?;
-    let api = api(client, &request.target);
+    let path = Request::new(collection_path(&request.target));
     let name = request.target.name.as_str();
     let patch_params = patch_params(request);
-    let answer = match &request.body {
-        WriteBody::Create(object) => {
-            let http_request = http::Request::post(format!(
-                "{}?{}",
-                collection_path(&request.target),
-                query(request)
-            ))
-            .header(http::header::CONTENT_TYPE, "application/json")
-            .header(http::header::ACCEPT, "application/json")
-            .body(serde_json::to_vec(object).map_err(|e| ClusterError::Decode(e.to_string()))?)
-            .map_err(|e| ClusterError::Transport(e.to_string()))?;
-            client.request::<DynamicObject>(http_request).await?
-        }
-        WriteBody::JsonPatch(operations) => {
-            api.patch(name, &patch_params, &json_patch(operations)?)
-                .await?
-        }
-        WriteBody::MergePatch(body) => api.patch(name, &patch_params, &Patch::Merge(body)).await?,
-        WriteBody::Apply(object) => {
-            api.patch(name, &patch_params, &Patch::Apply(object))
-                .await?
-        }
-        WriteBody::EphemeralContainers(operations) => {
-            api.patch_subresource(
+    let built = match &request.body {
+        WriteBody::Create(object) => http::Request::post(format!(
+            "{}?{}",
+            collection_path(&request.target),
+            query(request)
+        ))
+        .header(http::header::CONTENT_TYPE, "application/json")
+        .header(http::header::ACCEPT, "application/json")
+        .body(serde_json::to_vec(object).map_err(|e| ClusterError::Decode(e.to_string()))?)
+        .map_err(|e| ClusterError::Transport(e.to_string())),
+        WriteBody::JsonPatch(operations) => path
+            .patch(name, &patch_params, &json_patch(operations)?)
+            .map_err(|e| built_wrong(&e)),
+        WriteBody::MergePatch(body) => path
+            .patch(name, &patch_params, &Patch::Merge(body))
+            .map_err(|e| built_wrong(&e)),
+        WriteBody::Apply(object) => path
+            .patch(name, &patch_params, &Patch::Apply(object))
+            .map_err(|e| built_wrong(&e)),
+        WriteBody::EphemeralContainers(operations) => path
+            .patch_subresource(
                 "ephemeralcontainers",
                 name,
                 &patch_params,
                 &json_patch(operations)?,
             )
-            .await?
-        }
-        WriteBody::Delete(preconditions) => {
-            let answer = api
-                .delete(name, &delete_params(preconditions, request.dry_run))
-                .await?;
+            .map_err(|e| built_wrong(&e)),
+        WriteBody::Delete(preconditions) => path
+            .delete(name, &delete_params(preconditions, request.dry_run))
+            .map_err(|e| built_wrong(&e)),
+    }?;
+    let (body, warnings) = send(client, built).await?;
+    let answer: DynamicObject = match serde_json::from_slice(&body) {
+        Ok(answer) => answer,
+        // A deletion that kube-apiserver finished at once answers with a `Status`.
+        Err(_status) if matches!(request.body, WriteBody::Delete(_)) => {
             return Ok(Written {
-                resource_version: answer.left().and_then(|o| o.metadata.resource_version),
-                generation: None,
-                uid: None,
-                object: None,
+                warnings,
+                ..Written::default()
             });
         }
+        Err(error) => return Err(ClusterError::Decode(error.to_string())),
     };
+    if matches!(request.body, WriteBody::Delete(_)) {
+        return Ok(Written {
+            resource_version: answer.metadata.resource_version,
+            warnings,
+            ..Written::default()
+        });
+    }
     let object = serde_json::to_value(&answer).ok();
     Ok(Written {
         resource_version: answer.metadata.resource_version,
         generation: answer.metadata.generation,
         uid: answer.metadata.uid,
         object,
+        warnings,
     })
 }
 
-/// The client of `target`'s kind, namespaced unless the object is cluster-scoped.
-fn api(client: &kube::Client, target: &ObjectTarget) -> Api<DynamicObject> {
-    let (group, version) = target
-        .api_version
-        .split_once('/')
-        .unwrap_or(("", target.api_version.as_str()));
-    let resource = ApiResource::from_gvk_with_plural(
-        &GroupVersionKind::gvk(group, version, &target.kind),
-        &target.plural,
-    );
-    if target.namespace.is_empty() {
-        Api::all_with(client.clone(), &resource)
-    } else {
-        Api::namespaced_with(client.clone(), &target.namespace, &resource)
+fn built_wrong(error: &kube::core::request::Error) -> ClusterError {
+    ClusterError::Transport(error.to_string())
+}
+
+/// Sends `request` and returns the body of the answer and the text of its `Warning` headers.
+/// kube's typed calls (`Api::patch`, `Client::request`) read only the body, so the request goes
+/// through `Client::send`, and an error status becomes the error kube would give.
+async fn send(
+    client: &kube::Client,
+    request: http::Request<Vec<u8>>,
+) -> Result<(Vec<u8>, Vec<String>), ClusterError> {
+    let answer = client.send(request.map(kube::client::Body::from)).await?;
+    let status = answer.status();
+    let warnings = warnings(answer.headers());
+    let body = answer.into_body().collect_bytes().await?.to_vec();
+    if status.is_client_error() || status.is_server_error() {
+        let refusal = serde_json::from_slice::<Status>(&body).unwrap_or_else(|_not_a_status| {
+            Status::failure(
+                String::from_utf8_lossy(&body).trim(),
+                "Failed to parse error data",
+            )
+            .with_code(status.as_u16())
+        });
+        return Err(kube::Error::Api(Box::new(refusal)).into());
+    }
+    Ok((body, warnings))
+}
+
+/// The text of each `Warning` header [k8s-warnings]. kube-apiserver sends one header per warning,
+/// `299 - "<text>"`, the format of RFC 7234, section 5.5 [rfc7234-warning]; a value in another
+/// form is kept as it is.
+///
+/// [k8s-warnings]: https://kubernetes.io/blog/2020/09/03/warnings/
+/// [rfc7234-warning]: https://www.rfc-editor.org/rfc/rfc7234#section-5.5
+fn warnings(headers: &http::HeaderMap) -> Vec<String> {
+    headers
+        .get_all(http::header::WARNING)
+        .iter()
+        .filter_map(|value| value.to_str().ok())
+        .flat_map(|value| warn_texts(value).unwrap_or_else(|| vec![value.trim().to_owned()]))
+        .collect()
+}
+
+/// The `warn-text` of each `warning-value` in `value`; `None` when it does not parse.
+fn warn_texts(value: &str) -> Option<Vec<String>> {
+    let mut texts = Vec::new();
+    let mut rest = value.trim_start();
+    loop {
+        let (code, after) = rest.split_once(' ')?;
+        if code.len() != 3 || !code.bytes().all(|b| b.is_ascii_digit()) {
+            return None;
+        }
+        let (_agent, after) = after.split_once(' ')?;
+        let mut chars = after.strip_prefix('"')?.char_indices();
+        let mut text = String::new();
+        let end = loop {
+            match chars.next()? {
+                (_, '\\') => text.push(chars.next()?.1),
+                (at, '"') => break at,
+                (_, other) => text.push(other),
+            }
+        };
+        texts.push(text);
+        // After the closing quote: an optional ` "<date>"`, then `,` and the next value.
+        let mut after = after.get(end.saturating_add(2)..)?.trim_start();
+        if let Some(date) = after.strip_prefix('"') {
+            after = date.split_once('"')?.1.trim_start();
+        }
+        if after.is_empty() {
+            return Some(texts);
+        }
+        rest = after.strip_prefix(',')?.trim_start();
     }
 }
 
@@ -380,5 +446,39 @@ mod tests {
                 "preconditions": { "uid": "u-1", "resourceVersion": "42" },
             })
         );
+    }
+
+    #[test]
+    fn each_warning_header_gives_its_text() {
+        let mut headers = http::HeaderMap::new();
+        for value in [
+            r#"299 - "would violate PodSecurity \"restricted:latest\": privileged""#,
+            r#"299 - "first", 299 - "second" "Sat, 28 Nov 2026 00:00:00 GMT""#,
+            "not a warning",
+        ] {
+            headers.append(http::header::WARNING, http::HeaderValue::from_static(value));
+        }
+        assert_eq!(
+            warnings(&headers),
+            [
+                r#"would violate PodSecurity "restricted:latest": privileged"#,
+                "first",
+                "second",
+                "not a warning",
+            ]
+        );
+    }
+
+    #[test]
+    fn a_warning_that_does_not_parse_gives_none() {
+        for value in [
+            "",
+            r#"29 - "short code""#,
+            "299 - unquoted",
+            r#"299 - "unclosed"#,
+            r#"299 - "one" trailing"#,
+        ] {
+            assert_eq!(warn_texts(value), None, "{value}");
+        }
     }
 }

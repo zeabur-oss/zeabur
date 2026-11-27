@@ -144,27 +144,37 @@ pub(super) fn already_exist(objects: &str, project: &str) -> Problem {
 
 /// Sends every write of a plan that creates objects as a dry run, as the person: what their
 /// rights, validation (an object's name too), quotas and admission policies would refuse is
-/// refused now, at the object it is about.
+/// refused now, at the object it is about. What kube-apiserver warns about goes on the object.
 pub(super) async fn dry_run(
     cluster: &dyn Cluster,
     project: &str,
-    plan: &Plan,
+    plan: &mut Plan,
 ) -> Result<(), ApiError> {
-    for object in &plan.objects {
+    for i in 0..plan.objects.len() {
+        let Some(object) = plan.objects.get(i) else {
+            break;
+        };
         let write = WriteRequest {
             dry_run: true,
             ..super::write_request(project, &object.target, &object.write)
         };
-        if let Err(error) = cluster.write(&write).await {
-            let mut problem = refused(cluster, project, &object.target, &write, error).await;
-            if let Some(change) = object.change {
-                problem.at = Some(ProblemAt {
-                    change,
-                    line: None,
-                    field: problem.fields.first().map(|f| f.field.clone()),
-                });
+        match cluster.write(&write).await {
+            Ok(written) => {
+                if let Some(object) = plan.objects.get_mut(i) {
+                    object.warnings = written.warnings;
+                }
             }
-            return Err(ApiError::from(without_secret_values(problem, plan)));
+            Err(error) => {
+                let mut problem = refused(cluster, project, &object.target, &write, error).await;
+                if let Some(change) = object.change {
+                    problem.at = Some(ProblemAt {
+                        change,
+                        line: None,
+                        field: problem.fields.first().map(|f| f.field.clone()),
+                    });
+                }
+                return Err(ApiError::from(without_secret_values(problem, plan)));
+            }
         }
     }
     Ok(())
