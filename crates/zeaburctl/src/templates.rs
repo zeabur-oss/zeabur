@@ -103,7 +103,7 @@ fn text(args: &ExportArgs) -> Result<String, RenderError> {
 }
 
 /// Says on stderr which components the template needs that the cluster does not serve, with the
-/// command that prints what installs each.
+/// command that prints what installs each, and which ones it could not check.
 async fn warn_missing(args: &ExportArgs) {
     let read = async {
         let api =
@@ -129,22 +129,29 @@ async fn warn_missing(args: &ExportArgs) {
 fn missing(requires: &[Requirement]) -> Vec<String> {
     requires
         .iter()
-        .filter(|r| r.state == RequirementState::Missing)
-        .map(|r| {
-            let install = r.component.as_ref().map_or_else(
-                || {
-                    format!(
-                        "a component of {} (zeaburctl doctor lists them)",
-                        r.capability
-                    )
-                },
-                |id| format!("zeaburctl components export {id}"),
-            );
-            format!(
-                "zeaburctl: this template needs {}, which the cluster does not have. Install it \
-                 first: {install}",
+        .filter_map(|r| match r.state {
+            RequirementState::Installed => None,
+            RequirementState::Missing => {
+                let install = r.component.as_ref().map_or_else(
+                    || {
+                        format!(
+                            "a component of {} (zeaburctl doctor lists them)",
+                            r.capability
+                        )
+                    },
+                    |id| format!("zeaburctl components export {id}"),
+                );
+                Some(format!(
+                    "zeaburctl: this template needs {}, which the cluster does not have. Install \
+                     it first: {install}",
+                    r.name
+                ))
+            }
+            RequirementState::Unknown => Some(format!(
+                "zeaburctl: could not check whether the cluster has {}, which this template \
+                 needs. zeaburctl doctor says why.",
                 r.name
-            )
+            )),
         })
         .collect()
 }
@@ -201,7 +208,7 @@ mod tests {
     }
 
     #[test]
-    fn a_missing_component_names_the_command_that_installs_it() {
+    fn a_missing_component_names_its_install_and_an_unchecked_one_says_so() {
         let requires = [
             Requirement {
                 capability: "certificates".to_owned(),
@@ -215,12 +222,22 @@ mod tests {
                 name: "Traefik".to_owned(),
                 state: RequirementState::Installed,
             },
+            Requirement {
+                capability: "postgres".to_owned(),
+                component: Some("cloudnative-pg".to_owned()),
+                name: "CloudNativePG".to_owned(),
+                state: RequirementState::Unknown,
+            },
         ];
         let lines = missing(&requires);
-        assert_eq!(lines.len(), 1, "{lines:?}");
         assert!(
             lines[0].contains("zeaburctl components export cert-manager"),
             "{lines:?}"
         );
+        assert!(
+            lines[1].contains("could not check whether the cluster has CloudNativePG"),
+            "{lines:?}"
+        );
+        assert!(!lines.iter().any(|l| l.contains("Traefik")), "{lines:?}");
     }
 }
