@@ -173,9 +173,8 @@ function TemplateRow({
               ),
             )}
           </span>
-        ) : tight ? (
-          <span className="type-meta text-warn-strong">{tight}</span>
         ) : null}
+        {tight ? <span className="type-meta text-warn-strong">{tight}</span> : null}
       </span>
       <CaretRightIcon className="size-4 shrink-0 text-muted-foreground" aria-hidden="true" />
     </button>
@@ -202,6 +201,7 @@ function DeployForm({
   const host = typedHost ?? suggestedHost(template.id, project, domains.suffixes?.[0])
   const problems = deployProblems(template, values, host, domains.clusterIssuer)
   const shown = tried ? problems : undefined
+  const { low } = useRoomWords(template)
 
   const review = () => {
     setTried(true)
@@ -210,6 +210,7 @@ function DeployForm({
       title: t("add.templateDeploy", template.name),
       changes: templateChanges(template, values, generated, host.trim()),
       notes: generatedNote(t, template),
+      warnings: low ? [low] : undefined,
     })
   }
 
@@ -413,22 +414,29 @@ function Risks({ template }: { template: AppTemplate }) {
   )
 }
 
-function RoomNote({ template }: { template: AppTemplate }) {
+/** What the room means for the template, in words: `low` only when a pod may not fit. */
+function useRoomWords(template: AppTemplate): { fits?: string; low?: string } {
   const t = useT()
   const q = useQuantityFormat()
   const room = useRoom(template)
-  if (!room) return null
+  if (!room) return {}
   const [use, free] =
     room.resource === "cpu"
       ? [q.cpu(room.need), q.cpu(room.free)]
       : [q.memory(room.need), q.memory(room.free)]
-  if (room.fit === "fits")
-    return <p className="type-meta text-muted-foreground">{t("add.templateRoom", use, free)}</p>
+  if (room.fit === "fits") return { fits: t("add.templateRoom", use, free) }
+  return {
+    low: t(room.resource === "cpu" ? "add.templateLowCpu" : "add.templateLowMemory", use, free),
+  }
+}
+
+function RoomNote({ template }: { template: AppTemplate }) {
+  const { fits, low } = useRoomWords(template)
+  if (fits) return <p className="type-meta text-muted-foreground">{fits}</p>
+  if (!low) return null
   return (
     <Alert variant="warn">
-      <AlertDescription>
-        {t(room.resource === "cpu" ? "add.templateLowCpu" : "add.templateLowMemory", use, free)}
-      </AlertDescription>
+      <AlertDescription>{low}</AlertDescription>
     </Alert>
   )
 }
