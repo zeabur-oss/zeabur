@@ -181,6 +181,7 @@ function Browser({
         prefix={prefix}
         dialog={dialog}
         objects={objects}
+        more={list.hasNextPage}
         limits={pages[0]?.limits}
         onClose={() => setDialog(undefined)}
         onProgress={setUploads}
@@ -533,6 +534,7 @@ function Dialogs({
   prefix,
   dialog,
   objects,
+  more,
   limits,
   onClose,
   onProgress,
@@ -541,6 +543,7 @@ function Dialogs({
   prefix: string
   dialog?: Dialogs
   objects: BucketObject[]
+  more: boolean
   limits?: Schemas.BucketLimits
   onClose: () => void
   onProgress: (uploads: Upload[]) => void
@@ -554,6 +557,7 @@ function Dialogs({
         prefix={prefix}
         chosen={dialog.files}
         objects={objects}
+        more={more}
         part={Math.min(PART, limits?.part ?? PART)}
         onClose={onClose}
         onProgress={onProgress}
@@ -917,6 +921,7 @@ function UploadDialog({
   prefix,
   chosen,
   objects,
+  more,
   part,
   onClose,
   onProgress,
@@ -925,6 +930,8 @@ function UploadDialog({
   prefix: string
   chosen: File[]
   objects: BucketObject[]
+  /** The folder has keys the listing has not loaded, so a name may be taken without showing. */
+  more: boolean
   part: number
   onClose: () => void
   onProgress: (uploads: Upload[]) => void
@@ -951,6 +958,12 @@ function UploadDialog({
     >
       <Where prefix={prefix} bucket={place.bucket} />
       <ChosenFiles chosen={chosen} existing={existing} />
+      {more ? (
+        <Alert variant="warn" role="note">
+          <WarningFillIcon aria-hidden="true" />
+          <AlertDescription>{t("bucketFiles.mayReplace")}</AlertDescription>
+        </Alert>
+      ) : null}
       <p className="type-meta text-muted-foreground">{t("bucketFiles.parts", size(part))}</p>
     </Confirm>
   )

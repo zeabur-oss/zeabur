@@ -4282,6 +4282,7 @@ export const zhCN: Messages = {
   "bucketFiles.openOverview": "打开概览",
   "bucketFiles.emptyBucket": "这个存储桶没有文件。上传文件或新建文件夹。",
   "bucketFiles.more": "显示更多",
+  "bucketFiles.mayReplace": "列表没有列出这个文件夹的所有文件。上传会替换这里同名的文件。",
   "bucketFiles.refusedWhat": (bucket) => `浏览 ${bucket} 的文件`,
   "bucketFiles.browse": (bucket) => `浏览 ${bucket} 的文件`,
   "bucketFiles.renameCopies": "对象会先复制到新名称，再删除旧的。",

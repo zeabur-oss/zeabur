@@ -4296,6 +4296,7 @@ export const zhTW: Messages = {
   "bucketFiles.openOverview": "開啟概覽",
   "bucketFiles.emptyBucket": "這個儲存貯體沒有檔案。上傳檔案或建立資料夾。",
   "bucketFiles.more": "顯示更多",
+  "bucketFiles.mayReplace": "清單沒有列出這個資料夾的所有檔案。上傳會取代這裡同名的檔案。",
   "bucketFiles.refusedWhat": (bucket) => `瀏覽 ${bucket} 的檔案`,
   "bucketFiles.browse": (bucket) => `瀏覽 ${bucket} 的檔案`,
   "bucketFiles.renameCopies": "物件會先複製到新名稱，再刪除舊的。",

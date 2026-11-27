@@ -4714,6 +4714,8 @@ export const en = {
   "bucketFiles.openOverview": "Open Overview",
   "bucketFiles.emptyBucket": "This bucket has no files. Upload some or make a folder.",
   "bucketFiles.more": "Show more",
+  "bucketFiles.mayReplace":
+    "The list does not show every file in this folder. An upload replaces a file here with the same name.",
   "bucketFiles.refusedWhat": (bucket: string) => `browse the files in ${bucket}`,
   "bucketFiles.browse": (bucket: string) => `Browse the files in ${bucket}`,
   "bucketFiles.renameCopies": "The object is copied to its new name, then the old one is deleted.",
