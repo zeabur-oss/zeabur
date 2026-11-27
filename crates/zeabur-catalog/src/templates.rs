@@ -1573,6 +1573,14 @@ mod tests {
     }
 
     #[test]
+    fn every_template_exports_with_nothing_given() {
+        for template in templates().unwrap() {
+            let objects = export(&template.id, &[]).unwrap();
+            assert!(!objects.is_empty(), "{}", template.id);
+        }
+    }
+
+    #[test]
     fn an_export_generates_the_secrets_of_generated_inputs() {
         let secrets = |objects: &[Value]| -> Vec<Value> {
             objects
