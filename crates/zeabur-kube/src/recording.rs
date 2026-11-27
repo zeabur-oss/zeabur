@@ -15,8 +15,8 @@ use zeabur_core::problem::Denied;
 use crate::objects::{AccessRules, ResourceRef, ServedResource};
 use crate::port::{
     Answer, Cluster, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest, ExecSession,
-    ExecStream, ExitStatus, Identity, IssuedToken, LogLines, LogOptions, NamespaceObjects, RawList,
-    ServicePort, WriteRequest, Written,
+    ExecStream, ExitStatus, Identity, IssuedToken, LogLines, LogOptions, NamespaceObjects,
+    ObjectStates, RawList, ServicePort, WriteRequest, Written,
 };
 
 /// Wraps a [`Cluster`] and logs each call made through it.
@@ -266,6 +266,20 @@ impl<C: Cluster> Cluster for Recording<C> {
             scoped("get_object", resource, namespace)
         ));
         self.inner.get_object(resource, namespace, name)
+    }
+
+    fn watch_object<'a>(
+        &'a self,
+        resource: &'a ResourceRef,
+        namespace: Option<&'a str>,
+        name: &'a str,
+        timeout: std::time::Duration,
+    ) -> ObjectStates<'a> {
+        self.note(format!(
+            "{} {name}",
+            scoped("watch_object", resource, namespace)
+        ));
+        self.inner.watch_object(resource, namespace, name, timeout)
     }
 
     fn write<'a>(&'a self, request: &'a WriteRequest) -> Answer<'a, Written> {

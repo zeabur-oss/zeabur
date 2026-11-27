@@ -29,8 +29,8 @@ use crate::objects::{self, AccessRules, ResourceRef, ServedResource};
 use crate::port::{
     Answer, Cluster, ClusterError, ClusterEvents, ClusterFacts, ClusterPods, ExecRequest,
     ExecSession, ExecStream, ExitStatus, Identity, IssuedToken, LogLines, LogOptions,
-    NamespaceObjects, RawList, SecretSummary, ServicePort, TerminalSize, Unreadable, WriteRequest,
-    Written,
+    NamespaceObjects, ObjectStates, RawList, SecretSummary, ServicePort, TerminalSize, Unreadable,
+    WriteRequest, Written,
 };
 use crate::{UserClient, names, wide};
 
@@ -862,6 +862,19 @@ impl Cluster for UserClient {
             names::name(name)?;
             objects::get_object(self.kube(), resource, namespace, name).await
         })
+    }
+
+    fn watch_object<'a>(
+        &'a self,
+        resource: &'a ResourceRef,
+        namespace: Option<&'a str>,
+        name: &'a str,
+        timeout: std::time::Duration,
+    ) -> ObjectStates<'a> {
+        if let Err(error) = names::optional_namespace(namespace).and_then(|()| names::name(name)) {
+            return Box::pin(futures_util::stream::once(async { Err(error) }));
+        }
+        crate::watch::object(self.kube(), resource, namespace, name, timeout)
     }
 
     // ── Writes ───────────────────────────────────────────────────────────────────────────────

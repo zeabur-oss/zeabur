@@ -37,7 +37,7 @@ mod tests {
     fn rules() -> serde_json::Value {
         json!([
             {"apiGroups": [""], "resources": ["configmaps"],
-             "verbs": ["get", "list", "create", "patch", "delete"]},
+             "verbs": ["get", "list", "watch", "create", "patch", "delete"]},
             {"apiGroups": [""], "resources": ["pods"], "verbs": ["get"]},
             {"apiGroups": ["apps"], "resources": ["deployments"],
              "verbs": ["get", "create", "patch"]}
@@ -752,6 +752,17 @@ mod tests {
     async fn contract_of_concurrent_patches_of_one_version_exactly_one_is_stored() {
         let sandbox = Sandbox::new("zeabur-contract", rules()).await;
         contract::of_concurrent_patches_of_one_version_exactly_one_is_stored(
+            sandbox.user(),
+            sandbox.namespace(),
+        )
+        .await;
+    }
+
+    #[tokio::test]
+    #[ignore = "needs a disposable cluster"]
+    async fn contract_a_watch_follows_an_object_until_it_is_deleted() {
+        let sandbox = Sandbox::new("zeabur-contract", rules()).await;
+        contract::a_watch_follows_an_object_until_it_is_deleted(
             sandbox.user(),
             sandbox.namespace(),
         )

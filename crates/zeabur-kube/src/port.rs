@@ -36,6 +36,11 @@ pub type Answer<'a, T> = BoxFuture<'a, Result<T, ClusterError>>;
 /// Lines of a followed log, as they arrive.
 pub type LogLines = Pin<Box<dyn Stream<Item = Result<String, ClusterError>> + Send>>;
 
+/// The states of one object, as [`Cluster::watch_object`] follows it: `None` while it does not
+/// exist.
+pub type ObjectStates<'a> =
+    Pin<Box<dyn Stream<Item = Result<Option<DynamicObject>, ClusterError>> + Send + 'a>>;
+
 /// A command run in a container ([`Cluster::exec`]).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExecRequest {
@@ -293,6 +298,21 @@ pub trait Cluster: Send + Sync {
         namespace: Option<&'a str>,
         name: &'a str,
     ) -> Answer<'a, Option<DynamicObject>>;
+
+    /// One object of `resource` (`None` while it does not exist): first as it is, then after
+    /// each change, until `timeout` passes. Lists it, then watches from the list's
+    /// `resourceVersion` with bookmarks, and lists again on `410 Gone` [k8s-watch]; the person
+    /// needs `list` and `watch`. The stream ends at the first error. A Secret's values are
+    /// hidden ([`crate::objects`]).
+    ///
+    /// [k8s-watch]: https://kubernetes.io/docs/reference/using-api/api-concepts/#efficient-detection-of-changes
+    fn watch_object<'a>(
+        &'a self,
+        resource: &'a ResourceRef,
+        namespace: Option<&'a str>,
+        name: &'a str,
+        timeout: std::time::Duration,
+    ) -> ObjectStates<'a>;
 
     // ── Writes ───────────────────────────────────────────────────────────────────────────────
     // Each write is one request as the person; kube-apiserver authorises it with their rights.

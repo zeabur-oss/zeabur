@@ -21,6 +21,7 @@
 use std::collections::BTreeMap;
 use std::time::Duration;
 
+use futures_util::StreamExt as _;
 use serde_json::Value;
 use zeabur_core::problem::{Denied, Kind, Problem};
 use zeabur_kube::k8s_openapi::api::core::v1::Pod;
@@ -45,7 +46,6 @@ use crate::settings::Settings;
 
 /// The longest the apply waits for the database objects to go before it deletes the Namespace.
 const DATABASE_WAIT: Duration = Duration::from_secs(60);
-const POLL: Duration = Duration::from_secs(1);
 
 /// The database objects a project can hold, one read per operator.
 const DATABASES: [&zeabur_modules::Read; 5] = [
@@ -542,32 +542,22 @@ async fn write_one(
     }
 }
 
-/// Waits until each of `deleted` is gone, or [`DATABASE_WAIT`] has passed.
+/// Waits until each of `deleted` is gone, or [`DATABASE_WAIT`] has passed. A failed watch ends
+/// the wait for that object.
 async fn wait_gone(
     cluster: &dyn Cluster,
     project: &str,
     deleted: &[&(zeabur_plan::Target, WriteRequest)],
 ) {
-    let deadline = tokio::time::Instant::now() + DATABASE_WAIT;
-    loop {
-        let mut left = false;
+    let gone = async {
         for (target, write) in deleted {
             let resource = write.target.resource();
-            if !matches!(
-                cluster
-                    .find_object(&resource, Some(project), &target.name)
-                    .await,
-                Ok(None)
-            ) {
-                left = true;
-                break;
-            }
+            let mut states =
+                cluster.watch_object(&resource, Some(project), &target.name, DATABASE_WAIT);
+            while let Some(Ok(Some(_))) = states.next().await {}
         }
-        if !left || tokio::time::Instant::now() >= deadline {
-            return;
-        }
-        tokio::time::sleep(POLL).await;
-    }
+    };
+    let _elapsed = tokio::time::timeout(DATABASE_WAIT, gone).await;
 }
 
 /// Deletes the person's tools pods for `project`; a pod that cannot be deleted stops at its
