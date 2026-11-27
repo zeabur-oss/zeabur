@@ -1,0 +1,107 @@
+---
+title: Update images automatically
+description: Let Keel move a service deployed from a registry image, such as Redis or PostgreSQL, to new versions on its own.
+---
+
+A service deployed from a registry image can let Keel move it to new versions on its own. You choose which new versions it may take (patch, minor or any) and when Keel checks: every hour, once a day or once a week. Each update restarts the service.
+
+## Before you start
+
+- The cluster has the Keel component. When it is missing, the **Automatic updates** section shows a button to install it; come back to the service's **Settings** afterwards.
+- The service is a Deployment, StatefulSet or DaemonSet, and its image uses a tag such as `7.2.4`, `8`, `1.27` or `latest`, not a digest. A service built from Git or an uploaded folder uses **Auto-deploy new builds** in its **Builds** tab instead.
+- Databases created from **New** → **Database** are managed by their operator, such as CloudNativePG for PostgreSQL, and have no **Automatic updates** section. To update PostgreSQL with Keel, deploy it from an image such as `postgres:16.4`.
+
+<Steps>
+<Step>
+
+### Open Automatic updates
+
+Open the service's **Settings** and scroll to **Automatic updates**, or click **Automatic updates** in the row of links at the top.
+
+</Step>
+<Step>
+
+### Choose which versions
+
+Open **Which versions** and pick an option:
+
+| Option | `7.2.4` moves to |
+| --- | --- |
+| **Patch releases only** | `7.2.5`, `7.2.6` and so on; `7.3` and later wait for you |
+| **Patch and minor releases** | `7.3`, `7.4` and so on; `8` and later wait for you |
+| **All new versions** | Any newer version, `8` included |
+| **New image under the same tag** | The same tag, whenever a new image is pushed to it |
+
+The line under the menu says where this service's tag can go.
+
+For Redis, pick **Patch releases only**. PostgreSQL versions have two parts, so Keel reads `16.4` → `16.5` as a minor release: for `postgres:16.4`, pick **Patch and minor releases** to get new `16.x` versions, and `17` still waits for you. A new PostgreSQL major version needs a backup and then `pg_upgrade` or a dump and restore, and Keel does not do that for you.
+
+Keel reads a tag such as `8` as `8.0.0`. After the first update the tag becomes a full version, such as `8.0.5`.
+
+</Step>
+<Step>
+
+### Choose when
+
+In **When**, pick:
+
+- **As soon as found**: Keel checks every hour.
+- **Every day**: then pick a **Time**.
+- **Once a week**: then pick a **Day** and a **Time**.
+
+You pick the day and time in your browser's time zone, and the line below shows the same time in UTC. For example, Sunday 03:00 in Europe/Amsterdam in winter is Sunday 02:00 UTC.
+
+![Automatic updates for a postgres:18 service: Patch and minor releases, Once a week, Sunday, 03:00, with the UTC time below](../images/shots/image-updates.avif)
+
+Zeabur OSS stores the time in UTC, so it does not follow daylight saving time. With the window above, Keel checks at 04:00 Amsterdam time in summer. Changing only **Which versions** later keeps the stored UTC time. To move the window with the clocks, pick the time again and save.
+
+</Step>
+<Step>
+
+### Save and apply
+
+Click **Save**. The review says what will change; click **Save** again to apply it.
+
+![The review reads: db will take new patch and minor releases, checked Sundays at 03:00 UTC. Each update restarts it.](../images/shots/image-updates-review.avif)
+
+After it is applied, the section shows the stored setting, and **Save** stays disabled until you change something.
+
+Keel checks the registry on the schedule you saved. When a matching version exists, Keel moves the service to it and the service restarts. Each update shows up in the service's **Deployments** history.
+
+</Step>
+</Steps>
+
+## Turn automatic updates off
+
+Set **Which versions** to **Off** and click **Save**. The review lists the Keel settings that Zeabur OSS removes from the service: `keel.sh/policy`, `keel.sh/trigger` and `keel.sh/pollSchedule`, and `keel.sh/match-tag` for **New image under the same tag**. Click **Turn off** to apply. The service keeps its current image.
+
+![The review says db no longer updates on its own and lists the keel.sh/policy, keel.sh/pollSchedule and keel.sh/trigger annotations it removes](../images/shots/image-updates-off-review.avif)
+
+## Images pinned to a digest
+
+An image such as `redis@sha256:…` is pinned to a digest. Its content never changes, so there is nothing to update. The section shows a note and no form.
+
+To use automatic updates, change the image back to a tag such as `redis:7.2.4`. If a service already had automatic updates on before you pinned it, the form stays, so you can still turn them off.
+
+## When an update fails
+
+Keel does not wait for the service to become healthy after an update, and does not roll back on its own yet ([#1014](https://github.com/zeabur-oss/zeabur/issues/1014)).
+
+- **Keep the old version serving.** Open **Settings** → **Health checks** and set a **Traffic check**, such as **TCP** on port `6379` for Redis. A Deployment without a volume replaces replicas one at a time: when the new replica fails the check, the old replica keeps serving and the service shows **Rollout stuck**. A Deployment with a volume and a StatefulSet with one replica stop the old replica first, so the service is down until the new image passes the check.
+- **Go back.** First set automatic updates to **Off**, then click **Roll back** in **Deployments**. If you leave updates on, Keel moves to the same new version again at its next check. For a StatefulSet, also delete the pod that is stuck on the new image, such as `kubectl -n demo delete pod db-0`, so Kubernetes starts it again from the old image.
+- **Get a message.** Open the project's **Settings** → **Notifications**, click **Add channel**, choose a destination such as **Webhook** or Slack, and select **Deploy failed**. This works for Deployments. The same events for StatefulSets and DaemonSets are [#1015](https://github.com/zeabur-oss/zeabur/issues/1015).
+
+## Do the same with kubectl
+
+Keel takes its settings from annotations on the workload. For project `demo` and Deployment `redis`, patch releases only, Sundays at 03:00 UTC:
+
+```sh
+kubectl -n demo annotate deployment redis \
+  keel.sh/policy=patch keel.sh/trigger=poll keel.sh/pollSchedule="0 0 3 * * 0"
+```
+
+`pollSchedule` has six fields; the first is seconds. The **Automatic updates** section reads these annotations and shows them as **Patch releases only**, **Once a week**. To turn updates off, remove the annotations:
+
+```sh
+kubectl -n demo annotate deployment redis keel.sh/policy- keel.sh/trigger- keel.sh/pollSchedule-
+```

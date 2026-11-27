@@ -33,6 +33,7 @@
     projects: 创建和管理项目
     service-settings: 调整副本、资源和健康检查
     restart-rollback: 重启、回滚与暂停服务
+    image-updates: 自动更新镜像
     variables: 配置环境变量
     domains: 添加公开域名与 HTTPS
     dns: 配置 DNS 记录
