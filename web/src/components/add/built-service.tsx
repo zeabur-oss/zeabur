@@ -5,18 +5,18 @@ import { useQuery } from "@tanstack/react-query"
 import { useId, useState, type ReactNode } from "react"
 import CaretRightIcon from "~icons/ph/caret-right"
 
-import { clusterQuery, creatableQuery } from "@/api/queries"
+import { buildsQuery, clusterQuery, creatableQuery } from "@/api/queries"
 import { ImageSizeField } from "@/components/add/image-size"
 import { SecurityProfileField } from "@/components/security-profile"
 import { useTakenNames } from "@/components/add/taken"
 import { FormField, TrimmedInput } from "@/components/form-field"
 import { useT } from "@/i18n"
 import {
-  buildMethods,
   buildProfile,
   defaultPort,
   derivedMethod,
   dockerfileAt,
+  offeredMethods,
   type BuildMethod,
   type BuiltService,
   type GitService,
@@ -205,6 +205,13 @@ export function ServiceNameField({
   )
 }
 
+/** The methods the project's builds may use: the agent's while the cluster's agent builder is
+ * ready. */
+export function useOfferedMethods(project: string, current?: BuildMethod) {
+  const builds = useQuery({ ...buildsQuery(project), enabled: !!project, refetchInterval: false })
+  return offeredMethods(!!builds.data?.agent?.ready, current)
+}
+
 export function MethodField({
   built,
   source,
@@ -214,6 +221,7 @@ export function MethodField({
 }) {
   const t = useT()
   const method = built.method
+  const methods = useOfferedMethods(built.project, method)
   return (
     <FormField
       label={t("add.field.method")}
@@ -229,7 +237,7 @@ export function MethodField({
         size="sm"
         value={built.method}
         onValueChange={(method) => built.chooseMethod(method as BuildMethod)}
-        items={buildMethods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
+        items={methods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
       />
     </FormField>
   )
@@ -482,7 +490,7 @@ export function BuiltPort({ built, problems }: { built: BuiltFormState; problems
     <PortField
       value={built.portText}
       onChange={built.typePort}
-      hint={t(built.method === "railpack" ? "add.railpackPortHint" : "add.dockerfilePortHint")}
+      hint={t(`add.${built.method}PortHint`)}
       error={built.shown(problems.port, () => t("add.problem.port.invalid"))}
     />
   )

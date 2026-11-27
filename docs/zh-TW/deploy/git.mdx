@@ -41,6 +41,7 @@ description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像�
 
 - **Railpack**：讓建置器判斷應用程式語言。
 - **Dockerfile**：使用儲存庫裡的 Dockerfile。
+- **Agent**：由模型讀取儲存庫並寫出 Dockerfile。叢集的 Zeabur Builder 設定好 Agent 後才會出現，見[用 Agent 建置](#用-agent-建置)。
 
 在**更多設定**的**根目錄**指定要建置的資料夾，例如 `apps/web`。選擇 Dockerfile 時，**Dockerfile** 欄位的路徑從這個根目錄算起，留空使用 `Dockerfile`。
 
@@ -60,7 +61,7 @@ description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像�
 - **環境變數**：容器執行時讀取，每行一個 `KEY=value`。
 - **建置變數**：只有建置階段使用，例如下載私有套件的權杖。值以 BuildKit secret 傳入，不會留在映像檔裡。Dockerfile 用 `RUN --mount=type=secret,id=KEY` 讀取。
 - **規格**：服務執行時的 CPU 和記憶體。
-- **安全性**：Railpack 映像檔以 UID 1000 執行，預設選**嚴格**；Dockerfile 預設選**相容**。建立前仍能切換。用 Dockerfile 建置並選擇嚴格時，以數字 UID 指定非 root 使用者，例如 `USER 1000`。
+- **安全性**：Railpack 映像檔以 UID 1000 執行，預設選**嚴格**；Dockerfile 和 Agent 預設選**相容**。建立前仍能切換。用 Dockerfile 建置並選擇嚴格時，以數字 UID 指定非 root 使用者，例如 `USER 1000`。
 
 </Step>
 <Step>
@@ -122,6 +123,18 @@ Zeabur Builder 每分鐘檢查一次分支。有新的提交時，Builder 會建
 要馬上建置一次，在**建置**按**重新建置**，檢查變更後套用。Zeabur Builder 會用分支最新的提交。想先確認建置結果再上線，就關閉**新建置完成後自動部署**，建置成功後按**部署最新版**，檢查並套用映像檔變更。
 
 要改建置資料夾、Dockerfile 或建置變數，到服務**設定**的**建置**修改，下一次建置開始生效。
+
+## 用 Agent 建置
+
+儲存庫沒有 Dockerfile、Railpack 也建置不了時，改用 **Agent**。第一次建置會請模型讀取儲存庫、寫出 Dockerfile，再用它建置。Zeabur Builder 會儲存這份 Dockerfile，之後的建置直接沿用，不再呼叫模型。儲存庫本身有 Dockerfile 時，建置會直接用它，也不呼叫模型。
+
+叢集管理員在 Zeabur Builder 設定好 Agent（用哪個模型、建置怎麼登入模型）後，**建置方式**才會出現 **Agent**。每個專案也需要這份登入資料，例如 Agent 設定中指定、存放模型金鑰的 Secret。缺少時建置會停下，**建置**分頁會說明缺了什麼。設定方式見 [Zeabur Builder 文件](https://oss.zeabur.com/docs/builder/)。
+
+**建置**分頁的 **Agent 規劃**顯示最新一次規劃：Dockerfile 是不是模型寫的、找到的語言和連接埠、應用程式讀取的變數，以及用掉的模型 token。Zeabur OSS 只顯示 token 數，不換算費用，費用請依模型供應商的價格計算。模型沒寫出 Dockerfile 時，這裡會說明原因和要改什麼，例如根目錄。
+
+想讓每次建置都請模型重寫 Dockerfile，例如應用程式的目錄結構改了，就開啟**每次建置都重新規劃**。開啟後每次建置都會用到 token；關閉則沿用已儲存的 Dockerfile。
+
+要讓現有服務改用 Agent，在服務**設定** → **建置**按**變更儲存庫**，在**建置方式**選 **Agent**。
 
 ## 用 kubectl 做同樣的事
 

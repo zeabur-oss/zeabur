@@ -1275,13 +1275,12 @@ export type BuildOptionsChange = {
    */
   env?: EnvEdit[]
   /**
-   * For [`BuildMethod::Agent`]: `true` has every run ask the model for a new Dockerfile
+   * For the `agent` method: `true` has every run ask the model for a new Dockerfile
    * instead of building the one it saved (the `builder.zeabur.com/plan: fresh` annotation),
    * `false` goes back to the saved one.
    * @nullable
    */
   freshPlan?: boolean | null
-  method?: BuildMethod | null
 }
 
 /**

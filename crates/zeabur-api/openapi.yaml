@@ -5589,14 +5589,9 @@ components:
           - boolean
           - "null"
           description: |-
-            For [`BuildMethod::Agent`]: `true` has every run ask the model for a new Dockerfile
+            For the `agent` method: `true` has every run ask the model for a new Dockerfile
             instead of building the one it saved (the `builder.zeabur.com/plan: fresh` annotation),
             `false` goes back to the saved one.
-        method:
-          oneOf:
-          - $ref: "#/components/schemas/BuildMethod"
-            description: How it builds, `spec.builderRef`.
-          - type: "null"
     BuildSettings:
       type: object
       description: |-

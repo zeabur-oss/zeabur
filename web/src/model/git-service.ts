@@ -18,6 +18,10 @@ type EnvEdit = Schemas.EnvEdit
 export type BuildMethod = Schemas.BuildMethod
 export const buildMethods: BuildMethod[] = ["railpack", "dockerfile"]
 
+/** The methods to offer: the agent's only while its builder is ready, or when `current` is it. */
+export const offeredMethods = (agentReady: boolean, current?: BuildMethod): BuildMethod[] =>
+  agentReady || current === "agent" ? [...buildMethods, "agent"] : buildMethods
+
 /** `githubApp`: the cluster's GitHub App, through an installation granted to the project. */
 export type Access = "public" | "deployKey" | "token" | "githubApp"
 
@@ -334,7 +338,7 @@ export const newGitSource = (method: BuildMethod = "railpack"): GitSource => ({
 
 /** How a Build builds, by its builder. */
 export const methodOf = (build: Build): BuildMethod =>
-  build.builder === "dockerfile" ? "dockerfile" : "railpack"
+  build.builder === "dockerfile" || build.builder === "agent" ? build.builder : "railpack"
 
 /** The branch a Build follows as the form takes it: empty for the repository's default. */
 const branchField = (ref: string | null | undefined) =>

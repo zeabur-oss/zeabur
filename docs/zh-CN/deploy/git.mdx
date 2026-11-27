@@ -41,6 +41,7 @@ description: 连接 Git 仓库、完成首次构建，并选择新镜像何时�
 
 - **Railpack**：由构建器识别应用使用的语言。
 - **Dockerfile**：使用仓库中的 Dockerfile。
+- **Agent**：由模型读取仓库并写出 Dockerfile。集群的 Zeabur Builder 配置好 Agent 后才会出现，见[用 Agent 构建](#用-agent-构建)。
 
 在**更多设置**的**根目录**中指定要构建的文件夹，例如 `apps/web`。选择 Dockerfile 时，**Dockerfile** 字段中的路径相对于此根目录，留空则使用 `Dockerfile`。
 
@@ -60,7 +61,7 @@ description: 连接 Git 仓库、完成首次构建，并选择新镜像何时�
 - **环境变量**：容器运行时读取，每行一个 `KEY=value`。
 - **构建变量**：仅在构建阶段使用，例如下载私有包的令牌。变量值通过 BuildKit secret 传入，不会留在镜像中。Dockerfile 使用 `RUN --mount=type=secret,id=KEY` 读取。
 - **规格**：服务运行时的 CPU 和内存。
-- **安全性**：Railpack 镜像以 UID 1000 运行，默认选择**严格**；Dockerfile 默认选择**兼容**。创建前仍可切换。使用 Dockerfile 构建并选择严格模式时，需要用数字 UID 指定非 root 用户，例如 `USER 1000`。
+- **安全性**：Railpack 镜像以 UID 1000 运行，默认选择**严格**；Dockerfile 和 Agent 默认选择**兼容**。创建前仍可切换。使用 Dockerfile 构建并选择严格模式时，需要用数字 UID 指定非 root 用户，例如 `USER 1000`。
 
 </Step>
 <Step>
@@ -122,6 +123,18 @@ Zeabur Builder 每分钟检查一次分支。有新提交时，Builder 会构建
 要立即构建一次，在**构建**中点击**重新构建**，检查变更后应用。Zeabur Builder 会使用分支的最新提交。如果想先确认构建结果再上线，关闭**新构建完成后自动部署**，构建成功后点击**部署最新版**，检查并应用镜像变更。
 
 要修改构建文件夹、Dockerfile 或构建变量，到服务**设置**的**构建**中修改，下次构建时生效。
+
+## 用 Agent 构建
+
+仓库没有 Dockerfile、Railpack 也无法构建时，改用 **Agent**。第一次构建会请模型读取仓库、写出 Dockerfile，再用它构建。Zeabur Builder 会保存这份 Dockerfile，之后的构建直接沿用，不再调用模型。仓库本身有 Dockerfile 时，构建会直接使用它，也不调用模型。
+
+集群管理员在 Zeabur Builder 配置好 Agent（用哪个模型、构建如何登录模型）后，**构建方式**中才会出现 **Agent**。每个项目也需要这份登录信息，例如 Agent 配置中指定、存放模型密钥的 Secret。缺少时构建会停止，**构建**标签页会说明缺少什么。配置方法见 [Zeabur Builder 文档](https://oss.zeabur.com/docs/builder/)。
+
+**构建**标签页的 **Agent 规划**显示最新一次规划：Dockerfile 是否由模型写出、找到的语言和端口、应用程序读取的变量，以及用掉的模型 token。Zeabur OSS 只显示 token 数，不换算费用，费用请按模型提供商的价格计算。模型没有写出 Dockerfile 时，这里会说明原因和需要修改的内容，例如根目录。
+
+想让每次构建都请模型重写 Dockerfile，例如应用程序的目录结构变了，就开启**每次构建都重新规划**。开启后每次构建都会用到 token；关闭则沿用已保存的 Dockerfile。
+
+要让现有服务改用 Agent，在服务**设置** → **构建**中点击**更改仓库**，在**构建方式**中选择 **Agent**。
 
 ## 用 kubectl 完成相同操作
 

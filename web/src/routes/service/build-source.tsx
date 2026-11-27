@@ -2,7 +2,7 @@ import { useState } from "react"
 import FolderSimpleIcon from "~icons/ph/folder-simple"
 import GitBranchIcon from "~icons/ph/git-branch"
 
-import { Note, PathFields, type Shown } from "@/components/add/built-service"
+import { Note, PathFields, useOfferedMethods, type Shown } from "@/components/add/built-service"
 import { FolderDrop, useFolder } from "@/components/add/folder-drop"
 import {
   AccessFields,
@@ -21,7 +21,6 @@ import { usePlanner, usePlanStep } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { branchOf, sourceContainer, type Build } from "@/model/builds"
 import {
-  buildMethods,
   deployKeyPage,
   gitSourceChange,
   gitSourceOf,
@@ -210,25 +209,28 @@ function ContainerField({
   )
 }
 
-/** How the source is built: Railpack or its Dockerfile. */
+/** How the source is built: Railpack, its Dockerfile or the agent. */
 function MethodSelect({
+  project,
   value,
   onChange,
   source = "add",
 }: {
+  project: string
   value: BuildMethod
   onChange: (method: BuildMethod) => void
   /** `upload` says "folder" where `add` says "repository". */
   source?: "add" | "upload"
 }) {
   const t = useT()
+  const methods = useOfferedMethods(project, value)
   return (
     <FormField label={t("add.field.method")} hint={t(`${source}.methodHint.${value}`)}>
       <Select
         size="sm"
         value={value}
         onValueChange={(method) => onChange(method as BuildMethod)}
-        items={buildMethods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
+        items={methods.map((m) => ({ value: m, label: t(`add.method.${m}`) }))}
       />
     </FormField>
   )
@@ -295,7 +297,13 @@ function Connect({
       <RepositoryFields
         git={git}
         shown={shown}
-        aside={<MethodSelect value={form.method} onChange={(method) => set({ method })} />}
+        aside={
+          <MethodSelect
+            project={project}
+            value={form.method}
+            onChange={(method) => set({ method })}
+          />
+        }
       />
       {/* A Build's paths stay as its options above set them. */}
       {build ? null : (
@@ -372,7 +380,7 @@ function UploadSource({
     >
       <ReviewForm onReview={review}>
         <FolderDrop folder={folder} missing={tried && !ready} />
-        <MethodSelect value={method} onChange={setChosen} source="upload" />
+        <MethodSelect project={project} value={method} onChange={setChosen} source="upload" />
         <Note>{t("upload.after")}</Note>
       </ReviewForm>
     </PlanDrawer>

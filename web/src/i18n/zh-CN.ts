@@ -711,6 +711,21 @@ export const zhCN: Messages = {
   "builds.image": "最新",
   "builds.container": "容器",
   "builds.builder": "构建器",
+  "builds.agent.title": "Agent 规划",
+  "builds.agent.none": "还没有构建做过规划。第一次构建会请模型写出 Dockerfile。",
+  "builds.agent.from.agent": "这次构建由模型写出 Dockerfile。",
+  "builds.agent.from.previous": "这次构建沿用之前保存的 Dockerfile，没有调用模型。",
+  "builds.agent.from.repository": "源代码里已有 Dockerfile，这次构建直接使用，没有调用模型。",
+  "builds.agent.stopped": "没有写出 Dockerfile",
+  "builds.agent.language": "语言",
+  "builds.agent.port": "端口",
+  "builds.agent.buildVariables": "构建变量",
+  "builds.agent.runtimeVariables": "运行时变量",
+  "builds.agent.tokens": "模型 token",
+  "builds.agent.tokenCount": (input, output) => `输入 ${input}，输出 ${output}`,
+  "builds.agent.fresh": "每次构建都重新规划",
+  "builds.agent.freshHint":
+    "每次构建都请模型重写 Dockerfile，每次都会用到 token。关闭时沿用已保存的 Dockerfile。",
   "builds.deploy": "部署最新版",
   "builds.rebuild": "重新构建",
   "builds.word.waitingUpload": "等待上传",
@@ -1853,6 +1868,8 @@ export const zhCN: Messages = {
   "title.configReload": (service: string) => `配置文件或机密变量变更时重启 ${service}`,
   "title.deployBuild": (service) => `把最新的构建部署到 ${service}`,
   "title.rebuild": (build) => `重新构建 ${build}`,
+  "title.freshPlanOn": (build) => `每次构建 ${build} 都重新规划`,
+  "title.freshPlanOff": (build) => `${build} 沿用已保存的 Dockerfile`,
   "title.gitSource": (service) => `从 Git 构建 ${service}`,
   "title.uploadSource": (service) => `从文件夹构建 ${service}`,
   "title.stopBuilding": (build) => `停止从源代码构建 ${build}`,
@@ -2654,10 +2671,15 @@ export const zhCN: Messages = {
   "add.field.method": "构建方式",
   "add.method.railpack": "Railpack",
   "add.method.dockerfile": "Dockerfile",
+  "add.method.agent": "Agent",
   "add.methodHint.railpack":
     "自动识别语言，不需要 Dockerfile。仓库里有 Dockerfile 时，请改选 Dockerfile。",
   "add.methodHint.dockerfile": "用根目录里的 Dockerfile 构建。其他文件可在“更多设置”指定。",
+  "add.methodHint.agent":
+    "由模型读取仓库并写出 Dockerfile。之后的构建沿用它，只有第一次构建会用到模型的 token。",
   "add.dockerfilePortHint": "应用程序监听的端口。留空表示不接受连接，例如后台服务。",
+  "add.agentPortHint":
+    "应用程序监听的端口，构建页会显示模型找到的端口。留空表示不接受连接，例如后台服务。",
   "add.railpackPortHint":
     "Railpack 构建的应用会监听 PORT，Zeabur 会把它设成这个端口。留空表示不接受连接，例如后台服务。",
   "add.access": "仓库访问",
@@ -2753,6 +2775,8 @@ export const zhCN: Messages = {
   "upload.methodHint.railpack":
     "自动识别语言，不需要 Dockerfile。文件夹里有 Dockerfile 时，请改选 Dockerfile。",
   "upload.methodHint.dockerfile": "用文件夹最上层的 Dockerfile 构建。其他文件可在“更多设置”指定。",
+  "upload.methodHint.agent":
+    "由模型读取文件夹并写出 Dockerfile。之后的构建沿用它，只有第一次构建会用到模型的 token。",
   "upload.problem.directory": "上传内容里的文件夹，像 apps/web。",
   "upload.problem.dockerfile": "上传内容里的文件，像 docker/Dockerfile.prod。",
   "upload.after":

@@ -701,7 +701,6 @@ mod tests {
                     context_dir: Some("apps/web".to_owned()),
                     dockerfile: Some("Dockerfile.prod".to_owned()),
                     env: Vec::new(),
-                    method: None,
                     fresh_plan: None,
                 },
             );
@@ -715,7 +714,6 @@ mod tests {
                     context_dir: Some(String::new()),
                     dockerfile: Some(String::new()),
                     env: Vec::new(),
-                    method: None,
                     fresh_plan: None,
                 },
             );
@@ -723,8 +721,8 @@ mod tests {
             fits_the_crd(&cleared);
         }
     }
-
-    /// A service built by the agent names the `agent` `ClusterBuilder`; build options move a
+    /// A service built by the agent names the `agent` `ClusterBuilder`; build options turn a
+    /// fresh plan on and off.
     /// Build to it and back, and turn a fresh plan on and off.
     #[test]
     fn the_agent_builder_and_a_fresh_plan() {
@@ -734,27 +732,24 @@ mod tests {
         assert_eq!(build["spec"]["builderRef"], "agent");
         assert_eq!(build["spec"]["source"].get("dockerfile"), None);
         fits_the_crd(&build);
-        let options = |method, fresh_plan| BuildOptionsChange {
+        let options = |fresh_plan| BuildOptionsChange {
             build: "site".to_owned(),
             context_dir: None,
             dockerfile: None,
             env: Vec::new(),
-            method,
             fresh_plan,
         };
-        let fresh = with_options(&build, options(None, Some(true)));
+        let fresh = with_options(&build, options(Some(true)));
         assert_eq!(
             fresh["metadata"]["annotations"]["builder.zeabur.com/plan"],
             "fresh"
         );
-        let saved = with_options(&fresh, options(None, Some(false)));
+        let saved = with_options(&fresh, options(Some(false)));
         assert_eq!(
             saved["metadata"]["annotations"].get("builder.zeabur.com/plan"),
             None
         );
-        let moved = with_options(&saved, options(Some(BuildMethod::Dockerfile), None));
-        assert_eq!(moved["spec"]["builderRef"], "dockerfile");
-        fits_the_crd(&moved);
+        fits_the_crd(&saved);
     }
 
     /// The form's rules for a repository and a branch are the server's.

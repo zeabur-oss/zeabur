@@ -159,6 +159,7 @@ function BuildView({
         onDeploy={deploy}
         onRebuild={rebuild}
       />
+      {build.builder === "agent" ? <AgentPlan build={build} runs={runs} plan={plan} /> : null}
       {isTask(service.kind) ? null : (
         <AutoUpdate service={service} build={build} managed={managed} plan={plan} />
       )}
@@ -645,6 +646,89 @@ function AutoUpdate({
           </Alert>
         )
       ) : null}
+    </section>
+  )
+}
+
+const dockerfileFrom = {
+  agent: "builds.agent.from.agent",
+  previous: "builds.agent.from.previous",
+  repository: "builds.agent.from.repository",
+} as const
+
+/** What the agent's newest plan did: where the Dockerfile came from, what the model found and the
+ * tokens it used; and whether every build plans again. */
+function AgentPlan({ build, runs, plan }: { build: Build; runs: BuildRun[]; plan: Plan }) {
+  const t = useT()
+  const { locale } = useI18n()
+  const gate = useHereGate("build")
+  const report = runs.find((r) => r.plan)?.plan
+  const count = (n: number | undefined) => (n ?? 0).toLocaleString(locale)
+  const from = report?.dockerfile
+  const toggle = (fresh: boolean) =>
+    plan({
+      title: t(fresh ? "title.freshPlanOn" : "title.freshPlanOff", build.name),
+      changes: [{ op: "buildOptions", build: build.name, freshPlan: fresh }],
+    })
+  const facts = (
+    report
+      ? [
+          [t("builds.agent.language"), [report.language, report.version].filter(Boolean).join(" ")],
+          [t("builds.agent.port"), report.port ? String(report.port) : ""],
+          [t("builds.agent.buildVariables"), (report.buildVariables ?? []).join(", ")],
+          [t("builds.agent.runtimeVariables"), (report.runtimeVariables ?? []).join(", ")],
+          [
+            t("builds.agent.tokens"),
+            report.modelCalled
+              ? t("builds.agent.tokenCount", count(report.inputTokens), count(report.outputTokens))
+              : "",
+          ],
+        ]
+      : []
+  ).filter(([, value]) => value)
+  return (
+    <section aria-labelledby={`agent-${build.name}`} className="flex flex-col gap-3">
+      <SectionHeader id={`agent-${build.name}`} title={t("builds.agent.title")} />
+      {!report ? (
+        <p className="text-sm text-secondary">{t("builds.agent.none")}</p>
+      ) : report.stopped ? (
+        <div className="flex flex-col gap-1">
+          <p className="text-sm font-medium">{t("builds.agent.stopped")}</p>
+          <p className="max-w-prose text-sm break-words text-fail-strong" lang="en" translate="no">
+            {report.detail ?? report.stopped}
+          </p>
+        </div>
+      ) : from && from in dockerfileFrom ? (
+        <p className="text-sm text-secondary">
+          {t(dockerfileFrom[from as keyof typeof dockerfileFrom])}
+        </p>
+      ) : null}
+      {facts.length > 0 ? (
+        <SummaryCardFacts>
+          {facts.map(([label, value]) => (
+            <SummaryCardFact key={label} label={label}>
+              <span className="truncate font-mono" translate="no">
+                {value}
+              </span>
+            </SummaryCardFact>
+          ))}
+        </SummaryCardFacts>
+      ) : null}
+      <div className="flex items-start gap-3">
+        <div className="flex min-w-0 flex-1 flex-col gap-0.5">
+          <h3 id={`fresh-${build.name}`} className="text-sm font-medium">
+            {t("builds.agent.fresh")}
+          </h3>
+          <p className="text-sm text-secondary">{t("builds.agent.freshHint")}</p>
+        </div>
+        <GateTip gate={gate}>
+          <Switch
+            checked={!!build.freshPlan}
+            onCheckedChange={toggle}
+            aria-labelledby={`fresh-${build.name}`}
+          />
+        </GateTip>
+      </div>
     </section>
   )
 }

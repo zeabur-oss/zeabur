@@ -696,10 +696,7 @@ pub struct BuildOptionsChange {
     /// `secretName` and `key`.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub env: Vec<EnvEdit>,
-    /// How it builds, `spec.builderRef`.
-    #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub method: Option<BuildMethod>,
-    /// For [`BuildMethod::Agent`]: `true` has every run ask the model for a new Dockerfile
+    /// For the `agent` method: `true` has every run ask the model for a new Dockerfile
     /// instead of building the one it saved (the `builder.zeabur.com/plan: fresh` annotation),
     /// `false` goes back to the saved one.
     #[serde(default, skip_serializing_if = "Option::is_none")]

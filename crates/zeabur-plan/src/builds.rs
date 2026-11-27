@@ -18,7 +18,7 @@
 //!   `keel.sh/pollSchedule`, hourly or once a day or week. Turning it off removes the annotations
 //!   and leaves the target: Keel ignores images no workload opts in for, and another service may
 //!   still use it.
-//! - **Build options** set the `Build`'s directory, Dockerfile and `ClusterBuilder`, and edit
+//! - **Build options** set the `Build`'s directory and Dockerfile, and edit
 //!   `spec.env`. Zeabur Builder passes each variable to the build as a `BuildKit` secret, never as
 //!   a build argument, so a value does not stay in the image. A value from a Secret names the
 //!   Secret and the key. For the `agent` builder, `builder.zeabur.com/plan: fresh` has every run
@@ -39,7 +39,7 @@ use zeabur_model::{
 };
 pub use zeabur_model::{KEEL_FORCE, KEEL_POLICY};
 
-use crate::change::{BuildMethod, BuildOptionsChange, Target, Update};
+use crate::change::{BuildOptionsChange, Target, Update};
 use crate::checks::ResourceRef;
 use crate::fields::Step;
 use crate::json::{add, pointer, remove, replace, test};
@@ -456,7 +456,6 @@ impl Planner<'_> {
         if change.context_dir.is_none()
             && change.dockerfile.is_none()
             && change.env.is_empty()
-            && change.method.is_none()
             && change.fresh_plan.is_none()
         {
             return Err(error(
@@ -508,9 +507,6 @@ impl Planner<'_> {
         for edit in &change.env {
             self.build_env(index, &change.build, edit)?;
         }
-        if let Some(method) = change.method {
-            self.builder_ref(index, method)?;
-        }
         if let Some(fresh) = change.fresh_plan {
             self.fresh_plan(index, fresh)?;
         }
@@ -529,23 +525,6 @@ impl Planner<'_> {
             ));
         }
         Ok(())
-    }
-
-    /// Sets `spec.builderRef` to `method`'s `ClusterBuilder`.
-    fn builder_ref(&mut self, index: usize, method: BuildMethod) -> Result<(), PlanError> {
-        let path = pointer(&["spec", "builderRef"]);
-        let value = method.builder_ref();
-        let operations = match self.current(index).pointer(&path).cloned() {
-            Some(before) if before.as_str() == Some(value) => return Ok(()),
-            Some(before) => vec![test(&path, before), replace(&path, json!(value))],
-            None => vec![add(&path, json!(value))],
-        };
-        self.claim(
-            index,
-            &[Step::field("spec"), Step::field("builderRef")],
-            "spec.builderRef",
-        )?;
-        self.patch(index, operations)
     }
 
     /// Sets [`PLAN`] to [`PLAN_FRESH`], which has every run of an `agent` `Build` ask the model
