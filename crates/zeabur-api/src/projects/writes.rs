@@ -172,9 +172,9 @@ async fn compute(
     request: &PlanRequest,
     now: &str,
     read_at: Timestamp,
-    cluster_issuer: Option<&str>,
-    build_registry: Option<&str>,
+    settings: &Settings,
 ) -> Result<(Plan, ReadyPods), ApiError> {
+    let cluster_issuer = settings.domains.cluster_issuer.as_deref();
     if request.changes.iter().any(Change::is_namespace_change) {
         let plan = compute_namespace(cluster, project, request, now).await?;
         return Ok((plan, ReadyPods::new()));
@@ -248,7 +248,8 @@ async fn compute(
             certificates: &certificates,
             platform_namespaces: false,
             node_capacity: None,
-            build_registry,
+            build_registry: settings.builds.registry.as_deref(),
+            public_url: settings.public_url.as_deref(),
         },
         request,
     )
@@ -330,16 +331,7 @@ async fn compute_any(
         .await
         .map(none)
     } else {
-        compute(
-            cluster,
-            project,
-            request,
-            now,
-            read_at,
-            settings.domains.cluster_issuer.as_deref(),
-            settings.builds.registry.as_deref(),
-        )
-        .await
+        compute(cluster, project, request, now, read_at, settings).await
     }
 }
 
