@@ -440,8 +440,14 @@ expect "priorityClassName unset" "$rendered" '[select(.kind == "Deployment" or .
 expect "serviceAccount.annotations unset" "$rendered" '[select(.kind == "ServiceAccount" and (.metadata.name | test("^zeabur(-proxy)?$"))) | .metadata.annotations] | map(select(. != null)) | length' 0
 
 out=$(render -f "$chart/ci/minimal-values.yaml" --set databaseUpdater.enabled=true \
-  --set databaseUpdater.image.repository=example.test/updater --set databaseUpdater.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
+  --set databaseUpdater.image.repository=example.test/updater --set databaseUpdater.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --set-json 'nodeSelector={"pool":"platform"}' \
+  --set-json 'tolerations=[{"key":"platform","operator":"Exists","effect":"NoSchedule"}]' \
+  --set-json 'affinity={"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"kubernetes.io/os","operator":"In","values":["linux"]}]}]}}}')
 updater='select(.kind == "Deployment" and .metadata.name == "zeabur-database-updater")'
+expect database-updater-placement "$out" "$updater | .spec.template.spec.nodeSelector.pool" platform
+expect database-updater-placement "$out" "$updater | .spec.template.spec.tolerations[0] | [.key, .operator, .effect] | join(\",\")" 'platform,Exists,NoSchedule'
+expect database-updater-placement "$out" "$updater | .spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0] | [.key, .operator, .values[0]] | join(\",\")" 'kubernetes.io/os,In,linux'
 expect database-updater "$out" "$updater | .spec.template.spec.containers[0].image" \
   example.test/updater@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 expect database-updater "$out" "$updater | [.spec.replicas, .spec.strategy.type, .spec.template.spec.serviceAccountName, .spec.template.spec.automountServiceAccountToken] | join(\",\")" \

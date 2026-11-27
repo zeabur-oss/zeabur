@@ -32,17 +32,16 @@ type scheduled struct {
 }
 
 type controller struct {
-	api       dynamic.Interface
-	core      coreclient.CoreV1Interface
-	namespace string
-	plain     map[string]bool
-	jobs      map[k8stypes.UID]scheduled
-	ready     atomic.Bool
-	registry  func(context.Context, *target) (registry.Client, error)
+	api      dynamic.Interface
+	core     coreclient.CoreV1Interface
+	plain    map[string]bool
+	jobs     map[k8stypes.UID]scheduled
+	ready    atomic.Bool
+	registry func(context.Context, *target) (registry.Client, error)
 }
 
 func (c *controller) scan(ctx context.Context, now time.Time) error {
-	objects, err := c.api.Resource(clusters).Namespace(c.namespace).List(ctx, metav1.ListOptions{})
+	objects, err := c.api.Resource(clusters).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		c.ready.Store(false)
 		if apierrors.IsNotFound(err) {

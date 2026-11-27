@@ -69,7 +69,7 @@ func setup(t *testing.T, objects ...runtime.Object) (*controller, *dynamicfake.F
 	core := kubefake.NewSimpleClientset(&corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: "node"}, Status: corev1.NodeStatus{NodeInfo: corev1.NodeSystemInfo{OperatingSystem: "linux", Architecture: "amd64"}}})
 	registryClient := &fakeRegistry{digest: newDigest, platforms: []types.Platform{{OS: "linux", Architecture: "amd64"}}}
 	checks := new(int)
-	c := &controller{api: api, core: core.CoreV1(), namespace: "test", jobs: map[k8stypes.UID]scheduled{}}
+	c := &controller{api: api, core: core.CoreV1(), jobs: map[k8stypes.UID]scheduled{}}
 	c.registry = func(context.Context, *target) (registry.Client, error) { *checks++; return registryClient, nil }
 	return c, api, registryClient, checks
 }

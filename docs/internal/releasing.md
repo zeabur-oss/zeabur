@@ -204,7 +204,7 @@ at 0.1.1.
 These are repository and organization settings, not files; a maintainer sets them once.
 
 - **Package visibility.** A public repository does not make its packages public. The first
-  release run that pushes a package (`zeabur`, `proxy`, `charts/zeabur`) creates it on ghcr.io,
+  release run that pushes a package (`zeabur`, `proxy`, `database-updater`, `charts/zeabur`) creates it on ghcr.io,
   private by default, so its `verify` jobs fail: they pull without a login on purpose. Make the package public
   (package settings → **Change visibility**) and confirm that the repository has write access
   under **Manage Actions access**, then verify again as below.

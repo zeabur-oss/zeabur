@@ -49,7 +49,7 @@ configured development registries. Existing chart proxy/extra-CA settings also a
 
 The candidate must keep the repository and tag, contain a valid digest, and support all
 eligible Linux node platforms. The Cluster must be healthy. Before writing, the controller
-re-reads UID, deletion, ownership, settings, image, catalog, credentials and placement. It
+re-reads UID, deletion, ownership, settings, image, catalog, pull-secret references and placement. It
 retries status conflicts with a fresh resourceVersion and patches only `spec.imageName`,
 Keel's digest/update-time annotations and the change-cause annotation. Unrelated fields survive.
 CloudNativePG performs the rolling restart. The controller does not verify database application

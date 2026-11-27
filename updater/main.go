@@ -15,13 +15,11 @@ import (
 	"time"
 
 	"github.com/keel-hq/keel/registry"
-	"github.com/prometheus/client_golang/prometheus/promhttp"
 	"github.com/sirupsen/logrus"
 	k8stypes "k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/dynamic"
 	coreclient "k8s.io/client-go/kubernetes/typed/core/v1"
 	"k8s.io/client-go/rest"
-	"k8s.io/client-go/tools/clientcmd"
 )
 
 func main() {
@@ -32,31 +30,15 @@ func main() {
 }
 
 func run() error {
-	var kubeconfig, kubecontext, namespace, listen, httpRegistries string
+	var httpRegistries string
 	var interval time.Duration
-	flag.StringVar(&kubeconfig, "kubeconfig", "", "kubeconfig file; empty uses the updater's in-cluster service account")
-	flag.StringVar(&kubecontext, "context", "", "explicit context, required with --kubeconfig")
-	flag.StringVar(&namespace, "namespace", "", "watch only this namespace; empty watches all")
-	flag.StringVar(&listen, "listen", ":9090", "health and metrics listener")
 	flag.StringVar(&httpRegistries, "http-registries", "", "comma-separated registry hosts explicitly allowed over HTTP (development only)")
 	flag.DurationVar(&interval, "scan-interval", 15*time.Second, "how often database settings and due schedules are read")
 	flag.Parse()
 	if interval < time.Second {
 		return fmt.Errorf("scan interval must be at least one second")
 	}
-	var config *rest.Config
-	var err error
-	if kubeconfig == "" {
-		config, err = rest.InClusterConfig()
-	} else {
-		if kubecontext == "" {
-			return fmt.Errorf("--kubeconfig requires an explicit --context")
-		}
-		config, err = clientcmd.NewNonInteractiveDeferredLoadingClientConfig(
-			&clientcmd.ClientConfigLoadingRules{ExplicitPath: kubeconfig},
-			&clientcmd.ConfigOverrides{CurrentContext: kubecontext},
-		).ClientConfig()
-	}
+	config, err := rest.InClusterConfig()
 	if err != nil {
 		return err
 	}
@@ -79,7 +61,7 @@ func run() error {
 			plain[host] = true
 		}
 	}
-	c := &controller{api: api, core: core, namespace: namespace, plain: plain, jobs: map[k8stypes.UID]scheduled{}}
+	c := &controller{api: api, core: core, plain: plain, jobs: map[k8stypes.UID]scheduled{}}
 	c.registry = func(ctx context.Context, selected *target) (registry.Client, error) {
 		return newRegistry(ctx, selected, c.core, c.plain)
 	}
@@ -95,8 +77,7 @@ func run() error {
 		}
 		w.WriteHeader(http.StatusOK)
 	})
-	mux.Handle("/metrics", promhttp.Handler())
-	server := &http.Server{Addr: listen, Handler: mux, ReadHeaderTimeout: 5 * time.Second}
+	server := &http.Server{Addr: ":9090", Handler: mux, ReadHeaderTimeout: 5 * time.Second}
 	failed := make(chan error, 1)
 	go func() { failed <- server.ListenAndServe() }()
 	defer func() {
@@ -106,7 +87,7 @@ func run() error {
 	}()
 	ticker := time.NewTicker(interval)
 	defer ticker.Stop()
-	slog.Info("database updater started", "namespace", namespace, "keel", "0.22.4 (bc640168f020)")
+	slog.Info("database updater started", "keel", "0.22.4 (bc640168f020)")
 	for {
 		if err := c.scan(ctx, time.Now()); err != nil && ctx.Err() == nil {
 			slog.Error("cannot read database update settings", "error", err)
