@@ -521,7 +521,10 @@ async fn a_bearer_token_without_a_session_is_signed_out() {
         .send(
             Method::GET,
             "/api/v1/whoami",
-            &[HOST, ("authorization", &format!("Bearer {}", rig.token("alice")))],
+            &[
+                HOST,
+                ("authorization", &format!("Bearer {}", rig.token("alice"))),
+            ],
         )
         .await;
     assert_eq!(response.status(), StatusCode::UNAUTHORIZED);
