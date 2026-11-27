@@ -7,8 +7,10 @@ mkdir -p "$destination"
 install -m 0444 "$root/LICENSE" "$destination/Zeabur-LICENSE"
 install -m 0444 "$root/updater/NOTICE.md" "$destination/NOTICE.md"
 goroot=$(go env GOROOT)
-license="$goroot/LICENSE"
-[[ -f "$license" ]] || license="$goroot/../LICENSE"
+license="${ZEABUR_GO_LICENSE:-$goroot/LICENSE}"
+if [[ -z "${ZEABUR_GO_LICENSE:-}" && ! -f "$license" ]]; then
+  license="$goroot/../LICENSE"
+fi
 install -m 0444 "$license" "$destination/Go-LICENSE"
 cd "$root/updater"
 modules=$(CGO_ENABLED=0 go list -mod=readonly -deps -f '{{with .Module}}{{.Path}}{{"\t"}}{{.Dir}}{{end}}' . | sort -u)
