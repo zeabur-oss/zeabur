@@ -249,7 +249,11 @@ mod tests {
     async fn projects_list_marks_a_refused_project_unreadable_and_a_failed_one_unread() {
         let cluster = cluster();
         let list = get(&cluster, "/api/v1/projects").await;
-        assert_eq!(list["items"][0]["readable"], true);
+        assert_eq!(list["items"][0]["read"], "read");
+        assert!(
+            list["items"][1].get("read").is_none(),
+            "not adopted: not read"
+        );
 
         cluster.update(|s| {
             s.forbidden_namespaces.insert("shop".to_owned());
@@ -257,7 +261,7 @@ mod tests {
         let list = get(&cluster, "/api/v1/projects").await;
         let shop = &list["items"][0];
         assert_eq!(shop["name"], "shop");
-        assert_eq!(shop["readable"], false, "403: the person may not read it");
+        assert_eq!(shop["read"], "refused");
         assert!(shop.get("health").is_none() && shop.get("services").is_none());
 
         cluster.update(|s| {
@@ -266,7 +270,7 @@ mod tests {
         });
         let list = get(&cluster, "/api/v1/projects").await;
         let shop = &list["items"][0];
-        assert_eq!(shop["readable"], true, "500: not read this time, not refused");
+        assert_eq!(shop["read"], "failed");
         assert!(shop.get("health").is_none());
     }
 

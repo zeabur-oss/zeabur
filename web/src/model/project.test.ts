@@ -40,7 +40,6 @@ const summary = (
   name,
   adopted: false,
   system: false,
-  readable: true,
   ...more,
 })
 
@@ -66,7 +65,7 @@ describe("the list of namespaces to adopt", () => {
   test("leaves out the projects the person may not read", () => {
     const listed = [
       summary("shop", { adopted: true }),
-      summary("hr", { adopted: true, readable: false }),
+      summary("hr", { adopted: true, read: "refused" }),
     ]
     expect(readable(listed).map((p) => p.name)).toStrictEqual(["shop"])
   })
@@ -156,7 +155,6 @@ describe("the projects list", () => {
     name,
     adopted: true,
     system: false,
-    readable: true,
     origin: { apiVersion: "v1", kind: "Namespace", name },
     health: {
       services: 2,

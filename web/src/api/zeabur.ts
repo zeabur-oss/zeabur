@@ -9910,6 +9910,17 @@ export type ProjectGitHubApp = {
 }
 
 /**
+ * How reading an adopted project's workloads for the list went.
+ */
+export type WorkloadsRead = (typeof WorkloadsRead)[keyof typeof WorkloadsRead]
+
+export const WorkloadsRead = {
+  read: "read",
+  refused: "refused",
+  failed: "failed",
+} as const
+
+/**
  * One service of a project in the list: which it is, how healthy and why, without its
  * containers, variables or configuration (those are in the project document).
  */
@@ -9960,11 +9971,7 @@ export type ProjectSummary = ProjectDetails & {
   name: string
   /** The namespace. */
   origin: Origin
-  /**
-   * `false` when kube-apiserver refused to list its workloads (`403`): the person may see
-   * its name but not its contents. `true` otherwise, also when it was not read.
-   */
-  readable: boolean
+  read?: WorkloadsRead | null
   /**
    * Its services with their health, from the same read as `health`: sorted by kind, then
    * name, as in the project document. Only for adopted projects, and absent when their

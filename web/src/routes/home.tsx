@@ -106,9 +106,7 @@ export function HomePage() {
         <>
           <ProblemsSection problems={problems} />
           {empty ? (
-            projects.data?.canCreate === "denied" ? null : (
-              <Offered namespaces={otherNamespaces(items, false)} />
-            )
+            <Offered items={items} canCreate={projects.data?.canCreate} />
           ) : (
             <ProjectsSection
               total={adopted.length}
@@ -474,8 +472,16 @@ function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
 }
 
 /** No project yet: the namespaces that could be one, each with Adopt. */
-function Offered({ namespaces }: { namespaces: ReturnType<typeof otherNamespaces> }) {
+/** Nothing for a person who may not create projects: adopting a namespace creates one. */
+function Offered({
+  items,
+  canCreate,
+}: {
+  items: ProjectItem[]
+  canCreate: Schemas.ProjectList["canCreate"] | undefined
+}) {
   const t = useT()
+  if (canCreate === "denied") return null
   return (
     <section aria-labelledby="home-offered" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">
@@ -484,7 +490,7 @@ function Offered({ namespaces }: { namespaces: ReturnType<typeof otherNamespaces
         </h2>
         <span className="type-meta text-muted-foreground">{t("cluster.noProjectsBody")}</span>
       </div>
-      <OtherNamespaces namespaces={namespaces} limit={OFFERED} />
+      <OtherNamespaces namespaces={otherNamespaces(items, false)} limit={OFFERED} />
     </section>
   )
 }

@@ -50,7 +50,7 @@ export function projectMention(
 
 /** Leaves out the projects whose contents kube-apiserver refused to the person. */
 export const readable = (items: readonly Schemas.ProjectSummary[]) =>
-  items.filter((p) => p.readable)
+  items.filter((p) => p.read !== "refused")
 
 export function otherNamespaces(
   items: readonly Schemas.ProjectSummary[],

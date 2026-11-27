@@ -4,7 +4,7 @@ import { useId, useState } from "react"
 import CaretDownIcon from "~icons/ph/caret-down"
 import MagnifyingGlassIcon from "~icons/ph/magnifying-glass"
 
-import { isStatus, toProblem } from "@/api/client"
+import { isStatus, toProblem, type Schemas } from "@/api/client"
 import { projectsQuery } from "@/api/queries"
 import { AdoptMenu } from "@/components/adopt"
 import { NewProjectButton } from "@/components/new-project"
@@ -110,24 +110,53 @@ export function OtherNamespaces({
   )
 }
 
+function HiddenProjects({ count }: { count: number }) {
+  const t = useT()
+  if (count === 0) return null
+  return <p className="type-meta text-muted-foreground">{t("projects.hidden", count)}</p>
+}
+
+/** Namespaces that are not projects yet. Nothing for a person who may not create projects:
+ * adopting a namespace creates one. */
+function OtherSection({
+  items,
+  canCreate,
+}: {
+  items: Schemas.ProjectSummary[]
+  canCreate: Schemas.ProjectList["canCreate"]
+}) {
+  const t = useT()
+  const [showSystem, setShowSystem] = useState(false)
+  const switchId = useId()
+  if (canCreate === "denied") return null
+  return (
+    <section className="flex flex-col gap-3">
+      <div className="flex flex-wrap items-end justify-between gap-2">
+        <h2 className="type-heading">{t("projects.other")}</h2>
+        <div className="flex items-center gap-2">
+          <Switch id={switchId} checked={showSystem} onCheckedChange={setShowSystem} />
+          <Label htmlFor={switchId}>{t("projects.showSystem")}</Label>
+        </div>
+      </div>
+      <OtherNamespaces namespaces={otherNamespaces(items, showSystem)} />
+    </section>
+  )
+}
+
 export function ProjectsPage() {
   const t = useT()
   const search = route.useSearch()
   const navigate = useNavigate({ from: "/projects" })
   const projects = useQuery(projectsQuery)
   const list = projectsAsList.useValue()
-  const [showSystem, setShowSystem] = useState(false)
-  const switchId = useId()
   const all = projects.data?.items ?? []
   const items = readable(all)
   const hidden = all.length - items.length
-  const mayCreate = projects.data?.canCreate !== "denied"
   const rank = (p: (typeof items)[number]) =>
     p.health ? healthRank[p.health.worst] : healthRank.ok
   const adopted = items
     .filter((p) => p.adopted)
     .toSorted((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
-  const other = otherNamespaces(items, showSystem)
 
   return (
     <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
@@ -192,21 +221,8 @@ export function ProjectsPage() {
               </EmptyHeader>
             </Empty>
           )}
-          {hidden > 0 ? (
-            <p className="type-meta text-muted-foreground">{t("projects.hidden", hidden)}</p>
-          ) : null}
-          {mayCreate ? (
-            <section className="flex flex-col gap-3">
-              <div className="flex flex-wrap items-end justify-between gap-2">
-                <h2 className="type-heading">{t("projects.other")}</h2>
-                <div className="flex items-center gap-2">
-                  <Switch id={switchId} checked={showSystem} onCheckedChange={setShowSystem} />
-                  <Label htmlFor={switchId}>{t("projects.showSystem")}</Label>
-                </div>
-              </div>
-              <OtherNamespaces namespaces={other} />
-            </section>
-          ) : null}
+          <HiddenProjects count={hidden} />
+          <OtherSection items={items} canCreate={projects.data.canCreate} />
         </>
       )}
     </PageColumn>

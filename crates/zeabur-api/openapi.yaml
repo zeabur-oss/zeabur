@@ -16471,7 +16471,6 @@ components:
         - name
         - adopted
         - system
-        - readable
         properties:
           adopted:
             type: boolean
@@ -16497,11 +16496,11 @@ components:
           origin:
             $ref: "#/components/schemas/Origin"
             description: The namespace.
-          readable:
-            type: boolean
-            description: |-
-              `false` when kube-apiserver refused to list its workloads (`403`): the person may see
-              its name but not its contents. `true` otherwise, also when it was not read.
+          read:
+            oneOf:
+            - $ref: "#/components/schemas/WorkloadsRead"
+              description: How reading its workloads for `health` went. Only for adopted projects.
+            - type: "null"
           services:
             type:
             - array
@@ -20846,6 +20845,13 @@ components:
               description: A CronJob's schedule; absent for other kinds.
             - type: "null"
       description: A workload as lists show it.
+    WorkloadsRead:
+      type: string
+      description: How reading an adopted project's workloads for the list went.
+      enum:
+      - read
+      - refused
+      - failed
     WriteOp:
       type: string
       description: What a write does to its object.
