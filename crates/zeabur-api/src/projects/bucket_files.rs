@@ -56,8 +56,10 @@ pub const MAX_PART: u64 = 64 * 1024 * 1024;
 pub const MAX_PREVIEW: u64 = 1_000_000;
 /// The most objects counted before a folder is deleted.
 pub const MAX_COUNT: u64 = 10_000;
-/// The most of an answer of the gateway's read to say what went wrong.
-const MAX_ANSWER: usize = 1024 * 1024;
+/// The most of a gateway's XML answer Zeabur reads. A full listing page holds [`MAX_KEYS`] keys
+/// of up to 1024 bytes, which escaping (`&` to `&amp;`) can make five times longer, plus about
+/// 500 bytes of size, time, tag and class each: under 6 MiB.
+const MAX_ANSWER: usize = 8 * 1024 * 1024;
 /// Image types shown in the page; any other object is downloaded as bytes, so the gateway's
 /// `Content-Type` cannot make the page run what a bucket holds. SVG can carry scripts and is not
 /// one.

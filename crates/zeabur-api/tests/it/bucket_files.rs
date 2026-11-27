@@ -604,6 +604,24 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_full_page_of_long_keys_is_listed() {
+        let (held, app) = filled().await;
+        {
+            let mut held = held.lock().unwrap();
+            for i in 0..1000 {
+                // 1024 bytes each, and five times that once `&` is escaped.
+                let key = format!("long/{i:04}{}", "&".repeat(1015));
+                held.objects
+                    .insert(key, (Vec::new(), "text/plain".to_owned()));
+            }
+        }
+        let (status, page) =
+            json_of(&app, "GET", &format!("{BASE}/objects?prefix=long/"), None).await;
+        assert_eq!(status, StatusCode::OK, "{page}");
+        assert_eq!(page["objects"].as_array().unwrap().len(), 1000);
+    }
+
+    #[tokio::test]
     async fn a_large_file_goes_in_parts() {
         let held = Held::default();
         let app = app(&store(), serve(Arc::clone(&held)).await);
