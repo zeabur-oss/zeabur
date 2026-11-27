@@ -2,6 +2,168 @@
 
 All notable changes to Zeabur. Versions follow [Semantic Versioning](https://semver.org/); before 1.0.0, a minor or patch release may break the API. Each section comes from the change files in `.changeset/` (CONTRIBUTING.md, "Releases").
 
+## 0.3.3 (2026-11-27)
+
+### Features
+
+#### A build's commit status on GitHub opens the service's Builds tab
+
+When Zeabur creates a service's Build, or gives a running service a Build, it sets `builder.zeabur.com/details-url` on the Build to the service's Builds tab under `--public-url`. From Zeabur Builder v0.3.1 (zeabur-oss/builder#273), the commit status of each build links to it, so **Details** on GitHub opens the service's builds in Zeabur. Zeabur Builder v0.3.0 ignores the annotation. A Build made before this change gets the link the next time its source is set.
+
+#### Choose the external port of a public port
+
+**Open a port** in the Networking tab has an **External port** field. A service that listens on 8080 can take connections from the internet on 12345, and other services in the project still connect to it on 8080. The `publicPort` change takes the same port as `external`.
+
+#### List each Kubernetes Service with its addresses by kind
+
+The Networking tab has one **Addresses** section in place of **Private network** and **Public ports**. Each Kubernetes Service shows its type and, under each port, its addresses: in this project, from another project in this cluster, on the nodes for a `NodePort` or `LoadBalancer` Service, and from the load balancer. A `NodePort` or `LoadBalancer` Service is marked **Open to the internet** and comes first. A `NodePort` Service made with YAML now shows its node addresses. Zeabur OSS reads the nodes as the person; when it can't, it says so and shows the node port alone.
+
+The API gives each `Port` its `addresses`, each with a `kind`. `Endpoint.externalAddresses` is removed: read the addresses of kind `loadBalancer` instead.
+
+### Fixes
+
+#### The experience program sends `signed_in` at each sign-in
+
+`signed_in` is sent each time someone signs in, in place of `zeabur_active`, and PostHog counts daily people from it. `feature_used` is still sent once a day for each feature and set of values, and names nobody.
+
+#### A PostgreSQL backup can no longer take all of a small server's CPU
+
+New PostgreSQL backups give the Barman Cloud sidecar a CPU limit of half a CPU and compress with snappy instead of gzip, so the API server keeps answering on a 1 vCPU server while a backup runs. Backups set up before keep their settings.
+
+#### Object storage lists buckets that point at their store with seaweedRef
+
+An object store now lists `Bucket` objects that name it in `spec.seaweedRef`, not only in `spec.clusterRef`. New buckets use `seaweedRef`, the field the SeaweedFS Operator documents. `clusterRef` is its deprecated alias.
+
+#### Choose a service's build source in Settings
+
+Settings → Build lets every long-running service build from a Git repository or from a folder on your computer. A service that already builds from Git opens the Git form with its current repository, branch and settings, so you can change any of them. Uploading a folder to an image or Git service switches its Build to that folder.
+
+#### The experience program counts services that start to build from Git or a folder
+
+`feature_used` with `build_source_set` is sent after a running service is set to build from a Git repository or an uploaded folder, with `source` `git` or `upload`. Like every `feature_used`, it is sent at most once a UTC day for each value and names nobody.
+
+#### Catalog components get the platform label, so isolated projects let operators in
+
+Every namespace the catalog creates for a component is now labelled `zeabur.com/platform: "true"`, in each install form. Isolated projects admit these namespaces, so operators such as CloudNativePG can reach the databases they run in a project, and new projects are isolated. A component installed before this release gets the label the next time Zeabur updates it. To label it now, run `kubectl label namespace <namespace> zeabur.com/platform=true`.
+
+#### The chart sets pod security, ServiceAccount annotations and priority class by value
+
+`podSecurityContext` and `securityContext` set the security contexts of Zeabur, Zeabur Proxy and the install-time Job, `serviceAccount.annotations` annotates Zeabur's ServiceAccount (for workload identity on a managed cluster), and `priorityClassName` sets the pods' priority class. The defaults render the same objects as before.
+
+#### A component with a step that has not started shows as incomplete
+
+When Zeabur OSS had written only some of a component's steps, as with CloudNativePG without its Barman Cloud plugin, the Components page showed the component as installed. Now its card says it is incomplete and names the step that has not started, and the overview marks it the same way. **Manage** installs the rest.
+
+#### The plan preview shows a database start for every engine
+
+A plan that adds a PostgreSQL, MongoDB, MySQL, MariaDB or Dragonfly database now says that a database starts, with the engine's name. Before, only PostgreSQL did.
+
+#### Delete project lists every stored backup of the project
+
+The Delete project review now finds a volume's backups from K8up's snapshot list, so backups of a stopped schedule are listed too. A database or a project backup is listed when any of its runs stored a backup, or when the database's store says it holds one, not only when one of its recent runs did. Each is told as going with the project, staying, or unknown, as before.
+
+#### The experience program sends which cluster features are set up
+
+`feature_used` is now also sent after backups are scheduled, a notification channel is added or changed, a Zeabur Catalog component is installed (with its catalog ID), the GitHub App is connected, a node is taken out for maintenance, and the sign-in setting changes.
+
+Like the other features, each one is sent at most once a UTC day for each set of values, and names nobody.
+
+#### The experience program sends traces viewed and database exports
+
+`feature_used` is now also sent after a service's trace or evidence is read and after a database dump finishes. Each one is sent at most once a UTC day and names nobody.
+
+#### The experience program sends which project features are used
+
+`feature_used` is now also sent after an apply opens a public port, turns on an access limit (with its kind), turns on automatic image updates (with the policy), makes a scheduled task, rolls back, or restores a volume, after the fix of a suggestion is applied, and after a project is restored from a cluster backup. The web interface tells the server when a plan comes from a suggestion's fix button; which suggestion it was is not sent.
+
+Each one is sent at most once a UTC day for each set of values, and names nobody.
+
+#### Connect Git to an existing service, and stop building from source
+
+Settings → Build now connects a Git repository to a service that runs an image or an uploaded folder, with the same choices as a new Git service. A service that builds from source can also stop building: Zeabur deletes its Build and the credentials only it reads, and pins the service to the image it runs, so it keeps running.
+
+API clients write every Build with one `build` object: `createBuiltService` replaces `createUploadService` and `createGitService`, `setBuild` gives a running service a Build or changes its source, and `removeBuild` stops building a service.
+
+#### Services update to new image versions on their own, when you turn it on
+
+A service that runs an image from a registry, such as PostgreSQL or Redis, has an **Automatic updates** section in Settings. Pick which new versions it takes (patch, minor, all versions, or a new image under the same tag) and when Keel looks for them: every hour, or in a weekly window. Zeabur offers only the choices the image's tag allows: version choices need a version tag, such as `8`, `1.27`, `7.2.4` or `latest`, and the hint names the versions the service will move to.
+
+#### kube moves to 5.2.0 for RUSTSEC-2026-0600
+
+The advisory covers kube's `openssl-tls` connector, which Zeabur OSS and Zeabur Desktop do not build, so they were not exposed. kube 5.2.0 has the fix, and with it the dependency audit passes again. Which certificates a kubeconfig with no `certificate-authority` trusts does not change.
+
+#### Zeabur Desktop and zeaburctl ui name themselves in the experience program
+
+`cluster_connected` now carries `client`, `desktop` or `zeaburctl`, and a local run sends `feature_used` each time a feature is used, with `mode: local` and its `client`. This shows how many people use Zeabur Desktop. The experience program page lists the new property, and it is still off with `DO_NOT_TRACK=1`.
+
+#### Logs tab hides time zone offset timestamps
+
+The Logs tab now removes timestamps that carry a time zone offset, such as `+08:00`, from the line text. It shows them in your time zone when you turn on Timestamps, and the histogram counts these lines by their time.
+
+#### Each page shows only to those who can use it
+
+Cluster, Components, Backups, Notifications, GitHub App and Members now appear in the navigation only when you may read what the page lists. The cluster name in the account menu follows the same answer, and opening a page you may not use shows one note that says to ask a cluster administrator.
+
+#### The members table counts every way a member can sign in
+
+The **Passkeys** column on **Members** is now **Sign-in methods**. It counts passkeys, linked GitHub or Google accounts and a password, and its tooltip lists them. A member who signs in with a password or a linked account no longer shows as unable to sign in. The warning marks members who cannot sign in yet and members with only one way to sign in.
+
+#### Members names Zeabur Identity objects it cannot read
+
+When a user, credential, invitation or sign-in session in Zeabur Identity has a shape this version of Zeabur does not know, Members now lists it with why, instead of leaving it out without a word. A member whose passkeys were missing for this reason now shows which credential is not shown.
+
+#### MongoDB Controllers for Kubernetes databases show in the project
+
+A `MongoDBCommunity` made with MongoDB Controllers for Kubernetes now shows in the database list, on the project map and on its own page, with its state, members and how to connect. Zeabur OSS does not create, back up, restore or delete these databases, and the page says why; members who may change databases can edit their YAML. A member who cannot read them sees a note instead of a missing database.
+
+#### Add domain on the Networking tab starts with the generated address
+
+When the cluster has an application domain, **Add domain** on a service's **Networking** tab now starts with the same generated address that the add-service forms use, such as `web-shop.apps.example.com`. The address is selected, so typing replaces it with your own domain. The field stays empty when the cluster has no application domain or the service already has that address.
+
+#### A new setup link ends the earlier ones
+
+Making a setup link for a member now removes the links they already had, so a link that was lost or sent to the wrong person stops working as soon as you make a new one. A member has one setup link at a time.
+
+#### The experience program sends one event for each save
+
+`app_change_submitted` is now sent once for every save, whatever it changes, with the answer you got. Before, only a save of exactly one change to one Deployment counted, so most saves sent nothing. `rollout_finished`, `change_id` and `operation` are gone, and Zeabur OSS no longer reads the Deployment with your credential after a save.
+
+#### The command palette offers only the pages you can open
+
+The command palette no longer lists Components to a member who cannot open it. It follows the same answers from the server as the navigation.
+
+#### A refused request says why the cluster refused it
+
+A refused change no longer says the object changed after you reviewed it unless it did. A name that is already taken now says it already exists, an expired watch or list says it expired, and other conflicts say what the cluster answered. Only a change whose objects moved on after the review says so and opens the review again. Removing a component that other components need now names them in your language and asks you to remove them first.
+
+#### The remove dialog tells a rewrite of another component from a delete
+
+When a component you remove added settings to another component, Zeabur first installs that other component again without those settings. The remove dialog listed that step like a delete, so it read as if the other component went away too. Each write in the dialog now says "Update" or "Delete", and a rewrite step says the component keeps running without the settings the removed component added. The plan API gives each write an `op`, `apply` or `delete`.
+
+#### New object storage sets CPU and memory for its SeaweedFS servers
+
+Zeabur now writes CPU and memory requests and a memory limit for the master, volume, filer and S3 servers of a new object store, so the store adds no missing-requests suggestion to the project. A store made before keeps its settings.
+
+#### A long image tag stays inside the service's Source row
+
+The Source row on a service's overview shows the image's path and tag, such as `lab/storefront:main-12-c81e4a0`, and shortens both when they do not fit. Before, a long tag from Zeabur Builder hid the image name and ran into the usage panel.
+
+#### Open the cluster kubectl terminal and node terminals when an operator may run commands everywhere
+
+The cluster kubectl terminal and the node terminal no longer refuse to open when a role binding lets someone besides cluster administrators run commands in their replicas. Operators such as CloudNativePG grant their ServiceAccount that right in every namespace, so on those clusters the terminals never opened. Such an account can already run commands in every replica, so the check protected little.
+
+#### A component installs after the one it needs passes its health checks
+
+Zeabur OSS used to install a component as soon as helm-controller finished the component it needs, and ran the health checks only at the end. A chart that calls an operator's webhook, such as VictoriaMetrics with its operator, then failed while the webhook was still starting, and the install stayed in progress. Now each component's health checks run once its own steps are ready, and the next component waits for them.
+
+#### A failed WAL archive shows the bucket it writes to
+
+When a database could not archive its write-ahead log to the backup destination, the database page showed only "exit status 4". It now also shows the bucket and path the database archives to, so a wrong bucket name is easy to spot, and says that the S3 error itself is only in the backup plugin's log. CloudNativePG reports no more than the exit status of the archive command, so Zeabur cannot show the S3 error code.
+
+#### Warnings go away with their cause
+
+Replicas that a release is replacing no longer raise warnings. A review that raises the replicas of a service no longer says the service has only one replica.
+
 ## 0.3.2 (2026-11-25)
 
 ### Features
