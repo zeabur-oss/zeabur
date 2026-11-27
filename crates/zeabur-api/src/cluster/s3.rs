@@ -17,13 +17,14 @@ use std::fmt::Write as _;
 use std::time::Duration;
 
 use aws_lc_rs::{digest, hmac};
-use axum::body::Body;
+use axum::body::{Body, HttpBody as _};
 use axum::http::{self, HeaderName, HeaderValue, Method, Request, Response};
 use hyper_util::client::legacy::Client;
 use zeabur_http::{self, Connector, IDLE, Tls, connector, describe, pooled, refuse_named};
 use zeabur_kube::k8s_openapi::jiff;
 
-/// How long the gateway may take to start answering.
+/// How long the gateway may take to start answering once the request is sent, and how long an
+/// upload may go without a byte.
 const FIRST_BYTE: Duration = Duration::from_secs(30);
 /// The region in the signature's scope. A `SeaweedFS` gateway takes any; `us-east-1` is S3's
 /// default.
@@ -177,16 +178,53 @@ impl Gateways {
         let mut authorization =
             HeaderValue::from_str(&authorization).map_err(|e| format!("{e}"))?;
         authorization.set_sensitive(true);
+        let (body, sent) = watched(request.body);
         let request = builder
             .header(http::header::AUTHORIZATION, authorization)
-            .body(request.body)
+            .body(body)
             .map_err(|e| e.to_string())?;
-        tokio::time::timeout(FIRST_BYTE, client.request(request))
-            .await
-            .map_err(|_elapsed| "the gateway did not answer in time".to_owned())?
-            .map(|response| response.map(Body::new))
-            .map_err(|e| describe(&e))
+        let answer = client.request(request);
+        // The gateway answers an upload only after its last byte, so the wait for the answer
+        // starts once the body is sent, however long the person's upload takes.
+        let late = async {
+            let _sent_or_dropped = sent.await;
+            tokio::time::sleep(FIRST_BYTE).await;
+        };
+        tokio::select! {
+            answer = answer => answer
+                .map(|response| response.map(Body::new))
+                .map_err(|e| describe(&e)),
+            () = late => Err("the gateway did not answer in time".to_owned()),
+        }
     }
+}
+
+/// `body`, failed when [`FIRST_BYTE`] passes without a byte, and a signal that resolves once it
+/// is sent. An empty body is sent at once.
+fn watched(body: Body) -> (Body, tokio::sync::oneshot::Receiver<()>) {
+    use futures_util::StreamExt as _;
+    let (done, sent) = tokio::sync::oneshot::channel();
+    if body.is_end_stream() {
+        let _receiver_gone = done.send(());
+        return (body, sent);
+    }
+    let stream =
+        futures_util::stream::unfold(Some((body.into_data_stream(), done)), |state| async move {
+            let (mut data, done) = state?;
+            match tokio::time::timeout(FIRST_BYTE, data.next()).await {
+                Ok(Some(Ok(bytes))) => Some((Ok(bytes), Some((data, done)))),
+                Ok(Some(Err(e))) => Some((Err(std::io::Error::other(e)), None)),
+                Ok(None) => {
+                    let _receiver_gone = done.send(());
+                    None
+                }
+                Err(_elapsed) => Some((
+                    Err(std::io::Error::other("the upload sent no bytes in time")),
+                    None,
+                )),
+            }
+        });
+    (Body::from_stream(stream), sent)
 }
 
 /// What the signature covers.
@@ -479,5 +517,46 @@ mod tests {
         assert_eq!(element(xml, "IsTruncated"), None);
         assert_eq!(unescape("x &bogus; &amp"), "x &bogus; &amp");
         assert_eq!(escape("<a & b>"), "&lt;a &amp; b&gt;");
+    }
+
+    /// A body of three chunks with `gap` between them.
+    fn slow(gap: Duration) -> Body {
+        use futures_util::StreamExt as _;
+        Body::from_stream(futures_util::stream::iter(0..3).then(move |i| async move {
+            if i > 0 {
+                tokio::time::sleep(gap).await;
+            }
+            Ok::<_, std::io::Error>(axum::body::Bytes::from_static(b"part"))
+        }))
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn a_slow_upload_is_not_cut_and_the_wait_for_the_answer_starts_after_it() {
+        use http_body_util::BodyExt as _;
+        let (body, mut sent) = watched(slow(Duration::from_secs(29)));
+        let reading = tokio::spawn(async move {
+            body.collect()
+                .await
+                .map(http_body_util::Collected::to_bytes)
+        });
+        tokio::time::sleep(FIRST_BYTE).await;
+        assert!(sent.try_recv().is_err(), "not sent while bytes still come");
+        let bytes = reading.await.unwrap().unwrap();
+        assert_eq!(&bytes[..], b"partpartpart");
+        assert!(sent.await.is_ok());
+    }
+
+    #[tokio::test(start_paused = true)]
+    async fn an_upload_that_stops_sending_fails() {
+        use http_body_util::BodyExt as _;
+        let (body, _sent) = watched(slow(FIRST_BYTE + Duration::from_secs(1)));
+        let error = body.collect().await.unwrap_err();
+        assert!(error.to_string().contains("no bytes in time"), "{error}");
+    }
+
+    #[tokio::test]
+    async fn an_empty_body_is_sent_at_once() {
+        let (_body, sent) = watched(Body::empty());
+        assert!(sent.await.is_ok());
     }
 }
