@@ -21,7 +21,7 @@ pub use connections::{connections, data_store, named_hosts, names_host};
 pub use env::{env, env_from};
 pub use health::{crash_looping, failing, pod_health, status};
 pub use mounts::mounts;
-pub use network::{port_protocol, ports};
+pub use network::{port_protocol, ports, with_node_addresses};
 pub use ownership::{ObjectKey, OwnerGraph};
 pub use pods::{pods_of, summary as pod_summary};
 pub use project::{endpoint, project, project_with, provenance, with_http_routes};

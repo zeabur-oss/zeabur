@@ -3,9 +3,9 @@ title: Service connections and public ports
 description: Use private addresses to connect to services in the same cluster, expose non-HTTP ports such as database ports to the internet, and use connection rules to control who can connect.
 ---
 
-The service's **Networking** tab covers three things: **Private network** lists the addresses other services in the cluster use to connect to it, **Public ports** lets clients outside the cluster connect directly without a domain, and **Connection rules** controls which services can connect to it and where it can connect. For public domains and HTTPS, see [Add a public domain and HTTPS](./domains.mdx).
+The service's **Networking** tab covers three things: **Addresses** lists the addresses clients use to connect to it, in the cluster and, for some Service types, from outside it; **Open a port** lets clients outside the cluster connect directly without a domain; and **Connection rules** controls which services can connect to it and where it can connect. For public domains and HTTPS, see [Add a public domain and HTTPS](./domains.mdx).
 
-![The web service's Networking tab, showing public domains and the private network](../images/shots/service-networking.avif)
+![The web service's Networking tab, showing public domains and its addresses](../images/shots/service-networking.avif)
 
 ## Before you start
 
@@ -15,11 +15,20 @@ The service's **Networking** tab covers three things: **Private network** lists 
 
 ## Connect to other services with private addresses
 
-Each row in **Private network** is a Kubernetes Service, such as `web:8080`. Services in the same project connect directly to this address, for example, `http://web:8080`.
+Each card in **Addresses** is one Kubernetes Service, with its type, such as `ClusterIP`. Under each port, **In this project** shows the short address, such as `web:8080`. Services in the same project connect directly to this address, for example, `http://web:8080`.
 
-To connect from another project, use the full address next to **From another project**, such as `web.demo.svc.cluster.local:8080`. If **Isolate** is enabled for the project, first add the other project to **Let a project in** under **Network** in the project's **Settings**. See [Isolate from other projects](./projects.mdx#isolate-the-project-from-other-projects).
+To connect from another project, use the full address next to **From another project in this cluster**, such as `web.demo.svc.cluster.local:8080`. If **Isolate** is enabled for the project, first add the other project to **Let a project in** under **Network** in the project's **Settings**. See [Isolate from other projects](./projects.mdx#isolate-the-project-from-other-projects).
 
 These addresses only work inside the cluster. They aren't reachable from the internet.
+
+### Node ports and load balancers
+
+A `NodePort` or `LoadBalancer` Service also opens its ports outside the cluster, and its card is marked **Open to the internet**, or **Database open to the internet** for a database. These cards come first. This includes Services that you or another tool created with YAML.
+
+- **On the nodes** shows each node's address with the node port, such as `198.51.100.5:31379`. The address is the node's external IP, or its internal IP if it has none. If Zeabur OSS can't read the nodes, it names them as unreadable and shows only **Node port 31379**. With `externalTrafficPolicy: Local`, only the nodes that run a ready replica are listed, since the other nodes drop the connection.
+- **Load balancer** shows each address the load balancer gives the Service, with the Service's port.
+
+Node ports are from 30000 to 32767 by default, and the cluster picks one when the Service doesn't name it. To connect through a node, its firewall must allow the port.
 
 ### When a service has no private address
 
@@ -44,7 +53,7 @@ Use public ports to let clients outside the cluster connect to non-HTTP services
 
 ### Choose a port
 
-Under **Public ports** in the service's **Networking** tab, click **Open a port**, then choose the port in **Port**. Only ports on private addresses are available.
+Under **Addresses** in the service's **Networking** tab, click **Open a port**, then choose the port in **Port**. Only ports of ClusterIP Services are available.
 
 To let clients connect on another number, type it in **External port**, such as 12345 for a service on 8080. Leave it empty to use the same number.
 
@@ -60,7 +69,7 @@ Click **Review changes**, confirm the changes, and apply them.
 
 ### Get the address
 
-The list shows each node's address and port, such as `203.0.113.7:5432`, with a copy button next to it, followed by the port it reaches, such as **to port 5432**. If it shows **Port 5432 is waiting for the load balancer to assign an address.**, the load balancer is still processing the request, or another service is already using that port on the node.
+The list shows a new `LoadBalancer` Service, such as `db-public-5432`, with **Opens db:5432 to the internet**. **Load balancer** shows the address and port, such as `203.0.113.7:5432`, with a copy button next to it. If it shows **Port 5432 waits for an address from the load balancer**, the load balancer is still processing the request, or another service is already using that port on the node.
 
 </Step>
 </Steps>
@@ -71,7 +80,7 @@ Public ports have no password or HTTPS protection in front of them. Anyone on th
 
 ServiceLB listens on the external port on every node, so an external port can only be exposed once across the cluster. Zeabur OSS rejects the change if another service in the same project already exposes that external port.
 
-To close a port, click **Close** in its row, review the change, and apply it.
+To close a port, click **Close** on its Service, review the change, and apply it.
 
 ## Restrict incoming and outgoing connections with connection rules
 
@@ -262,7 +271,7 @@ kubectl -n demo delete networkpolicy zeabur-isolate-api
 
 ## Verify the result
 
-**Private network** lists each Service and its ports. **Public ports** lists each node's address and labels databases **Database open to the internet**. **Connection rules** lists the names of rules applied to this service and which connections **Incoming** and **Outgoing** allow.
+**Addresses** lists each Service, its type and the addresses of each port, and labels databases **Database open to the internet**. **Connection rules** lists the names of rules applied to this service and which connections **Incoming** and **Outgoing** allow.
 
 ```sh
 kubectl -n demo get service
@@ -270,7 +279,7 @@ kubectl -n demo get networkpolicy -l app.kubernetes.io/managed-by=zeabur
 kubectl -n demo run probe --rm -it --restart=Never --image=busybox:1.37 -- wget -qO- -T 3 http://api:8080
 ```
 
-In the `TYPE` column of `get service`, private addresses use `ClusterIP`, and public ports use `LoadBalancer`. `EXTERNAL-IP` is the node's address. The last command connects to `api` from a temporary replica in the same project. If `api` is isolated and doesn't allow `probe`, the connection times out after 3 seconds. From outside the cluster, use `nc -vz 203.0.113.7 5432` to check that the public port is reachable.
+In the `TYPE` column of `get service`, a Service only for the cluster is `ClusterIP`, and a public port is `LoadBalancer`. `EXTERNAL-IP` is the load balancer's address, and `PORT(S)` shows the node port after the colon, such as `5432:31379/TCP`. The last command connects to `api` from a temporary replica in the same project. If `api` is isolated and doesn't allow `probe`, the connection times out after 3 seconds. From outside the cluster, use `nc -vz 203.0.113.7 5432` to check that the public port is reachable.
 
 ## Troubleshooting
 

@@ -6131,9 +6131,42 @@ export type ProtocolInference = {
 }
 
 /**
+ * Who can connect to a Service port's address.
+ *
+ * A Service type adds kinds to the ones before it: every Service has `project` and `cluster`, a
+ * `NodePort` Service adds `node`, and a `LoadBalancer` Service adds `loadBalancer`
+ * [k8s-service-type].
+ *
+ * [k8s-service-type]: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+ */
+export type PortAddressKind = (typeof PortAddressKind)[keyof typeof PortAddressKind]
+
+export const PortAddressKind = {
+  project: "project",
+  cluster: "cluster",
+  node: "node",
+  loadBalancer: "loadBalancer",
+} as const
+
+/**
+ * Where clients connect to a Service port: a host and a port, an IPv6 host in brackets.
+ */
+export type PortAddress = {
+  /** The host and the port, such as `api:8080` or `203.0.113.7:30080`. */
+  address: string
+  /** Who can connect to it. */
+  kind: PortAddressKind
+}
+
+/**
  * One port of a Kubernetes Service.
  */
 export type Port = ProtocolInference & {
+  /**
+   * Where clients connect to this port: in the project, in the cluster, on the nodes and from
+   * the load balancer, as far as the Service type gives each.
+   */
+  addresses?: PortAddress[]
   /**
    * The port's name.
    * @nullable
@@ -6178,11 +6211,6 @@ export type Endpoint = {
    * @nullable
    */
   clusterIP?: string | null
-  /**
-   * For a `LoadBalancer` Service, the addresses its load balancer reports in
-   * `status.loadBalancer.ingress`, an IP or a hostname each; empty while it has none.
-   */
-  externalAddresses?: string[]
   /** The Service's name. */
   name: string
   opens?: OpenedPort | null

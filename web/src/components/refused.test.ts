@@ -131,3 +131,10 @@ describe("Unreadable kinds on the service page", () => {
     expect(!header.includes("httproutes.gateway.networking.k8s.io")).toBeTruthy()
   })
 })
+
+test("a refused node read is not a refused Service read", () => {
+  const nodes = { resource: "nodes", kubernetes } as Schemas.UnreadableView
+  expect(refusedAmong([nodes], refusedPlaces.endpoints)).toEqual([])
+  expect(refusedAmong([nodes], refusedPlaces.nodes)).toEqual([nodes])
+  expect(inServiceTabs).toContain("nodes")
+})

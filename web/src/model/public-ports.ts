@@ -4,6 +4,9 @@ import type { Endpoint } from "@/model/service"
 
 const EXTERNAL = rules["PublicPortChange.external"]
 
+/** Whether the Service is one that a public port made, and so can be closed. */
+export const isOpened = (e: Endpoint): boolean => !!e.opens
+
 /** A Service port that a public port can open. */
 export interface PortChoice {
   value: string

@@ -86,8 +86,10 @@ export const refusedPlaces = {
   events: ["events.events.k8s.io"],
   /** Domains: the objects that route to a service. */
   routes: ["ingresses.networking.k8s.io", "httproutes.gateway.networking.k8s.io"],
-  /** Kubernetes Services: a service's private names. */
+  /** Kubernetes Services. */
   endpoints: ["services"],
+  /** The nodes a node port opens on; without them a node port has no node address. */
+  nodes: ["nodes"],
   policies: ["networkpolicies.networking.k8s.io"],
   /** Where variables come from. */
   config: ["secrets", "configmaps"],
@@ -100,6 +102,7 @@ export const inServiceTabs: readonly string[] = [
   ...refusedPlaces.config,
   ...refusedPlaces.routes,
   ...refusedPlaces.endpoints,
+  ...refusedPlaces.nodes,
   ...refusedPlaces.policies,
   ...refusedPlaces.claims,
   ...refusedPlaces.events,

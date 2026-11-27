@@ -120,6 +120,7 @@ const resourceNames: Record<string, string> = {
   configmaps: "ConfigMaps",
   persistentvolumeclaims: "PersistentVolumeClaims",
   services: "Services",
+  nodes: "Nodes",
   "ingresses.networking.k8s.io": "Ingresses",
   "httproutes.gateway.networking.k8s.io": "HTTPRoutes",
   "networkpolicies.networking.k8s.io": "NetworkPolicies",

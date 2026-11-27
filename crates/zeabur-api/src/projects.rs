@@ -63,6 +63,7 @@ use futures_util::StreamExt as _;
 use zeabur_core::names::{LABEL_PROJECT, is_system_namespace};
 use zeabur_core::problem::{Kind, MEDIA_TYPE as PROBLEM, Problem};
 use zeabur_graph::Snapshot;
+use zeabur_kube::k8s_openapi::api::core::v1::Node;
 use zeabur_kube::k8s_openapi::api::events::v1::Event;
 use zeabur_kube::k8s_openapi::jiff::Timestamp;
 use zeabur_kube::{Cluster, ClusterExt as _, NamespaceObjects};
@@ -272,6 +273,7 @@ pub(crate) async fn read(
     let (snapshot, mut unreadable) = snapshot(objects, now);
     let mut projection = zeabur_graph::project(&snapshot);
     zeabur_graph::with_http_routes(&mut projection, &http_routes);
+    node_addresses(cluster, &snapshot, &mut projection, &mut unreadable).await;
     // Diagnoses read the namespace's events too. Without them (refused, or the read failed) the
     // pods' status still tells most of it, so the document is served and the refusal is named.
     let events: Vec<zeabur_gaps::Event> = match events {
@@ -313,6 +315,33 @@ pub(crate) async fn read(
         http_routes,
         events,
     })
+}
+
+/// Adds the node addresses of every node port, read with the person's own credential. Members may
+/// list nodes (`zeabur-member`), so this asks for no new right. Without a node port nothing is
+/// read. A refused list is named, and the node ports stay without addresses.
+async fn node_addresses(
+    cluster: &dyn Cluster,
+    snapshot: &Snapshot,
+    projection: &mut zeabur_model::Project,
+    unreadable: &mut Vec<UnreadableView>,
+) {
+    let has_node_port = projection
+        .endpoints
+        .iter()
+        .flat_map(|e| &e.ports)
+        .any(|p| p.node_port.is_some());
+    if !has_node_port {
+        return;
+    }
+    match cluster.list::<Node>(None).await {
+        Ok(nodes) => zeabur_graph::with_node_addresses(&mut projection.endpoints, &nodes, snapshot),
+        Err(zeabur_kube::ClusterError::Status(status)) => unreadable.push(UnreadableView {
+            resource: "nodes".to_owned(),
+            kubernetes: status,
+        }),
+        Err(_) => {}
+    }
 }
 
 /// A project's services, the resources they use, and how they relate: the project document.
