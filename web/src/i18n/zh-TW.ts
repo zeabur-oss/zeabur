@@ -729,6 +729,12 @@ export const zhTW: Messages = {
     "自動部署需要 Keel 元件，但這個叢集沒有，它的 Kubernetes 版本也裝不了。",
   "builds.keelMissing": "自動部署需要叢集裡的 Keel 元件，目前還沒有安裝。",
   "builds.history": "紀錄",
+  "db.imageUpdates.hint":
+    "依排程更新此 PostgreSQL 標籤的映像檔摘要，由 CloudNativePG 逐一更新執行個體；標籤與 PostgreSQL 主版本維持不變。",
+  "db.imageUpdates.requiresKeel":
+    "需要支援 CloudNativePG 且有權修補 Cluster 的 Keel。目前固定使用的 Keel 0.22.4 尚不支援此功能。",
+  "db.imageUpdates.unavailable":
+    "請使用明確的 PostgreSQL 主版本標籤（例如 18-standard-trixie），且不要設定 imageCatalogRef。標籤即使附有摘要，也能更新。",
   "imageUpdates.hint": "讓服務自動換上映像檔的新版本。每次更新都會重新啟動服務。",
   "imageUpdates.versions": "更新哪些版本",
   "imageUpdates.policy.other": (policy) => `Zeabur 以外的設定：${policy}`,

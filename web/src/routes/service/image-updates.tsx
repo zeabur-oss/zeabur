@@ -68,7 +68,7 @@ export function ImageUpdatesSection({ project, service }: { project: string; ser
   )
 }
 
-function KeelMissing({ install }: { install?: Schemas.ComponentRef }) {
+export function KeelMissing({ install }: { install?: Schemas.ComponentRef }) {
   const t = useT()
   return install ? (
     <InstallAlert variant="info" text={t("imageUpdates.keelMissing")} components={[install]} />
@@ -107,7 +107,13 @@ function UpdatesForm({
   )
   return (
     <div className="flex flex-col gap-4 rounded-xl border border-v2-border bg-card p-5">
-      <PolicyField service={service} updates={updates} form={form} disabled={disabled} set={set} />
+      <PolicyField
+        image={service.containers.find((c) => !c.init)?.image ?? ""}
+        updates={updates}
+        form={form}
+        disabled={disabled}
+        set={set}
+      />
       {form.policy === "off" || form.policy === "other" ? null : (
         <WhenFields form={form} now={now} disabled={disabled} set={set} />
       )}
@@ -115,24 +121,26 @@ function UpdatesForm({
   )
 }
 
-function PolicyField({
-  service,
+export function PolicyField({
+  image,
+  hint,
   updates,
   form,
   disabled,
   set,
 }: {
-  service: Service
+  image: string
+  hint?: string
   updates: Schemas.ImageUpdates
   form: UpdateForm
   disabled: boolean
   set: (patch: Partial<UpdateForm>) => void
 }) {
   const t = useT()
-  const tag = tagOf(service.containers.find((c) => !c.init)?.image ?? "")
+  const tag = tagOf(image)
   const foreign = keptPolicy(updates)
   return (
-    <FormField label={t("imageUpdates.versions")} hint={policyHint(t, updates, form, tag)}>
+    <FormField label={t("imageUpdates.versions")} hint={hint ?? policyHint(t, updates, form, tag)}>
       <Select
         size="sm"
         value={form.policy}
@@ -152,7 +160,7 @@ function PolicyField({
 }
 
 /** When Keel looks: every hour, or a day and hour of the browser's, with the UTC time below. */
-function WhenFields({
+export function WhenFields({
   form,
   now,
   disabled,

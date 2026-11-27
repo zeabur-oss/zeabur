@@ -775,6 +775,12 @@ export const en = {
     "Auto-deploy needs the Keel component, which this cluster doesn't have and can't install on its Kubernetes version.",
   "builds.keelMissing": "Auto-deploy needs the Keel component, which this cluster doesn't have.",
   "builds.history": "History",
+  "db.imageUpdates.hint":
+    "Refresh this PostgreSQL tag on its schedule. CloudNativePG rolls out the new digest; the tag and PostgreSQL major version stay the same.",
+  "db.imageUpdates.requiresKeel":
+    "Requires a Keel build with CloudNativePG support and permission to patch Clusters. The currently pinned Keel 0.22.4 does not support this yet.",
+  "db.imageUpdates.unavailable":
+    "Use an explicit PostgreSQL major-version tag, such as 18-standard-trixie, without an imageCatalogRef. A tag with a digest can be refreshed.",
   "imageUpdates.hint":
     "Move this service to new versions of its image on its own. Each update restarts the service.",
   "imageUpdates.versions": "Which versions",

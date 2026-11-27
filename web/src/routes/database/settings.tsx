@@ -1,3 +1,9 @@
+import { useQuery } from "@tanstack/react-query"
+import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
+import { capabilitiesQuery } from "@/api/queries"
+import { missingKeel } from "@/model/git-service"
+import { formOf, updateOf, type UpdateForm } from "@/model/image-updates"
+import { KeelMissing, PolicyField, WhenFields } from "@/routes/service/image-updates"
 import { useState, type ReactNode } from "react"
 
 import { PartNav } from "@/components/part-nav"
@@ -7,12 +13,15 @@ import { FormField } from "@/components/form-field"
 import { ObjectYaml } from "@/components/store-detail"
 import { GateNote, GateTip, useGate } from "@/components/gate"
 import { kindWord, useGrowth } from "@/components/storage-class"
+import { autoUpdateSentence } from "@/components/plan/describe"
 import { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
 import { plainAmount } from "@/lib/quantity"
 import {
   commands,
   databaseAddress,
+  databaseImageUpdates,
+  updateDatabaseImages,
   memberChoices,
   presetOf,
   presetResources,
@@ -51,7 +60,11 @@ export function DatabaseSettings({
     <div className="flex flex-col gap-6">
       <ModeSwitch tab="settings" mode={mode} onMode={onMode}>
         {mode ? null : (
-          <PartNav label={t("db.settings")} parts={parts} name={(part) => t(`part.${part}`)} />
+          <PartNav
+            label={t("db.settings")}
+            parts={database.apiGroup === "postgresql.cnpg.io" ? [...parts, "updates"] : parts}
+            name={(part) => t(`part.${part}`)}
+          />
         )}
       </ModeSwitch>
       {mode === "yaml" ? (
@@ -60,7 +73,16 @@ export function DatabaseSettings({
           <Commands project={project} database={database} />
         </div>
       ) : (
-        <Shape key={shapeKey(database)} project={project} database={database} />
+        <>
+          <Shape key={shapeKey(database)} project={project} database={database} />
+          {database.apiGroup === "postgresql.cnpg.io" && database.kind === "Cluster" ? (
+            <DatabaseUpdates
+              key={JSON.stringify(databaseImageUpdates(database))}
+              project={project}
+              database={database}
+            />
+          ) : null}
+        </>
       )}
     </div>
   )
@@ -203,7 +225,7 @@ function Part({
   description,
   children,
 }: {
-  id: (typeof parts)[number]
+  id: (typeof parts)[number] | "updates"
   title: string
   description: string
   children: ReactNode
@@ -249,5 +271,92 @@ function Commands({ project, database }: { project: string; database: Database }
         ))}
       </ul>
     </section>
+  )
+}
+
+function DatabaseUpdates({ project, database }: { project: string; database: Database }) {
+  const t = useT()
+  const gate = useGate(project, "changeDatabases")
+  const capabilities = useQuery({ ...capabilitiesQuery, retry: false })
+  const missing = missingKeel(capabilities.data?.items)
+  const updates = databaseImageUpdates(database)
+  const disabled = !gate.open || (!!missing && !updates.setting)
+  return (
+    <Part id="updates" title={t("part.updates")} description={t("db.imageUpdates.hint")}>
+      <GateNote gate={gate} />
+      <Alert variant="info">
+        <AlertDescription>{t("db.imageUpdates.requiresKeel")}</AlertDescription>
+      </Alert>
+      {missing ? <KeelMissing install={missing.install} /> : null}
+      {updates.allowed.length ? null : (
+        <p className="type-meta text-muted-foreground">{t("db.imageUpdates.unavailable")}</p>
+      )}
+      {updates.allowed.length || updates.setting ? (
+        <DatabaseUpdatesForm
+          project={project}
+          database={database}
+          updates={updates}
+          disabled={disabled}
+        />
+      ) : null}
+    </Part>
+  )
+}
+
+function DatabaseUpdatesForm({
+  project,
+  database,
+  updates,
+  disabled,
+}: {
+  project: string
+  database: Database
+  updates: ReturnType<typeof databaseImageUpdates>
+  disabled: boolean
+}) {
+  const t = useT()
+  const planner = usePlanner(project)
+  const [now] = useState(() => new Date())
+  const [initial] = useState(() => formOf(updates, now))
+  const [form, setForm] = useState(initial)
+  const update = updateOf(updates, form, now)
+  const changed = JSON.stringify(update) !== JSON.stringify(updateOf(updates, initial, now))
+  const set = (patch: Partial<UpdateForm>) => setForm((f) => ({ ...f, ...patch }))
+  return (
+    <>
+      <form
+        className="flex flex-col gap-4"
+        onSubmit={(event) => {
+          event.preventDefault()
+          if (disabled || !update || !changed) return
+          planner.plan({
+            title: t("part.updates"),
+            changes: updateDatabaseImages(database, update),
+            summary: {
+              lines: [autoUpdateSentence(t, database.name, update), t("db.imageUpdates.hint")],
+              action: t(update.kind === "off" ? "action.autoUpdateOff" : "action.save"),
+            },
+          })
+        }}
+      >
+        <PolicyField
+          image={database.image ?? ""}
+          hint={form.policy === "off" ? t("imageUpdates.policyHint.off") : undefined}
+          updates={updates}
+          form={form}
+          disabled={disabled}
+          set={set}
+        />
+        {form.policy === "off" || form.policy === "other" ? null : (
+          <WhenFields form={form} now={now} disabled={disabled} set={set} />
+        )}
+        <div className="flex justify-end">
+          <Button size="sm" type="submit" disabled={disabled || !changed || !update}>
+            {t("edit.review")}
+          </Button>
+        </div>
+      </form>
+      {planner.dialog}
+    </>
   )
 }

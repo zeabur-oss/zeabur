@@ -6568,7 +6568,8 @@ components:
 
           Fields the server sets (`status`, `resourceVersion`, `managedFields`, …) are kept whatever
           the copy says. A ConfigMap's or Secret's edit becomes key changes: a Secret value shown
-          masked and sent back unchanged is kept.
+          masked and sent back unchanged is kept. A full edit carrying `metadata.resourceVersion`
+          must match the object as read; otherwise it is refused before planning.
         required:
         - resource
         - name

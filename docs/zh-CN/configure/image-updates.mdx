@@ -9,7 +9,7 @@ description: 让 Keel 把用镜像部署的服务（例如 Redis 或 PostgreSQL�
 
 - 集群已安装 Keel 组件。还没安装时，**自动更新**部分会显示安装按钮，安装完成后再回到服务的**设置**。
 - 服务是 Deployment、StatefulSet 或 DaemonSet，镜像使用标签，例如 `7.2.4`、`8`、`1.27` 或 `latest`，而不是摘要（digest）。从 Git 或上传文件夹构建的服务，改用**构建**选项卡中的**新构建完成后自动部署**。
-- 从**新建** → **数据库**创建的数据库由各自的 operator 管理（PostgreSQL 是 CloudNativePG），没有**自动更新**部分。要自动更新 PostgreSQL，请用镜像部署，例如 `postgres:16.4`。
+- 从**新建** → **数据库**创建的 PostgreSQL 数据库使用 CloudNativePG。请参阅下方的 [CloudNativePG 数据库](#cloudnativepg-数据库)，确认 Keel 要求。其他 operator 管理的数据库尚不支持自动更新。
 
 <Steps>
 <Step>
@@ -90,6 +90,16 @@ Keel 更新后不会等待服务恢复健康，也还不会自动回滚（[#1014
 - **让旧版本继续服务**：到**设置** → **健康检查**设置**就绪检查**，例如 Redis 设为 **TCP**、端口 `6379`。没有卷的 Deployment 会逐个替换副本：新副本没有通过就绪检查时，旧副本会继续服务，服务显示**部署卡住**。有卷的 Deployment 和只有一个副本的 StatefulSet 会先停止旧副本，新镜像通过检查之前，服务都无法使用。
 - **回到旧版本**：先把自动更新**关闭**，再到**部署记录**点击**回滚**。如果不关闭，Keel 下次检查又会换上同一个新版本。StatefulSet 还要删除卡在新镜像上的 Pod，例如 `kubectl -n demo delete pod db-0`，Kubernetes 才会用旧镜像重新启动它。
 - **失败时通知**：到项目的**设置** → **通知**点击**添加渠道**，选择 **Webhook**、Slack 或其他接收位置，事件勾选**部署失败**。这对 Deployment 有效；StatefulSet 和 DaemonSet 的部署通知在 [#1015](https://github.com/zeabur-oss/zeabur/issues/1015) 中跟进。
+
+## CloudNativePG 数据库
+
+数据库的**设置**沿用服务表单的版本与计划字段。选择同一标签的新镜像并设置计划，再检查并保存更改。关闭时会移除相同的四个 Keel 注解。保存计划不会更改数据库的镜像、存储空间或备份设置。
+
+需要支持 CloudNativePG 且有权限 get、list、watch、patch `clusters.postgresql.cnpg.io` 的 Keel。目前固定使用的 Keel 0.22.4 不支持 Cluster；只安装此组件仍无法更新，必须先发布 Keel 实现与目录中的镜像更新。若 Keel 比 CloudNativePG 先启动，安装 operator 后请重启 Keel。
+
+请使用明确的主版本标签，例如 `ghcr.io/cloudnative-pg/postgresql:18-standard-trixie`。Keel 按各数据库的计划检查此标签，将新摘要写入 `spec.imageName`，再由 CloudNativePG 逐一更新实例。`18-standard-trixie@sha256:…` 会保留标签并更新摘要。镜像仓库与标签保持不变，因此不会选择其他 PostgreSQL 主版本或镜像类型。固定日期的标签只有在发布者替换其内容时才会更新。
+
+只有摘要的引用、`latest` 与设置了 `spec.imageCatalogRef` 的 Cluster 不适用；镜像目录的更新由其所有者管理。Keel 尚不等待数据库恢复正常，也不会回滚；请在更新后检查数据库状态。上方服务的部署记录与失败通知行为不适用于 Cluster。
 
 ## 用 kubectl 执行相同操作
 

@@ -9,7 +9,7 @@ description: 讓 Keel 把用映像檔部署的服務（例如 Redis 或 PostgreS
 
 - 叢集裝了 Keel 元件。還沒安裝時，**自動更新**區段會顯示安裝按鈕，裝好後再回到服務的**設定**。
 - 服務是 Deployment、StatefulSet 或 DaemonSet，映像檔用標籤，例如 `7.2.4`、`8`、`1.27` 或 `latest`，不是摘要（digest）。從 Git 或上傳資料夾建置的服務，改用**建置**分頁的**新建置完成後自動部署**。
-- 從**新增** → **資料庫**建立的資料庫由各自的 operator 管理（PostgreSQL 是 CloudNativePG），沒有**自動更新**區段。要自動更新的 PostgreSQL，請用映像檔部署，例如 `postgres:16.4`。
+- 從**新增** → **資料庫**建立的 PostgreSQL 資料庫使用 CloudNativePG。請參閱下方的 [CloudNativePG 資料庫](#cloudnativepg-資料庫)，確認 Keel 需求。其他 operator 管理的資料庫尚不支援自動更新。
 
 <Steps>
 <Step>
@@ -90,6 +90,16 @@ Keel 更新後不會等服務恢復健康，也還不會自動回滾（[#1014](h
 - **讓舊版本繼續服務**：到**設定** → **健康檢查**設定**就緒檢查**，例如 Redis 設成 **TCP**、連接埠 `6379`。沒有磁碟區的 Deployment 會逐步替換副本：新副本沒通過就緒檢查時，舊副本會繼續服務，服務顯示**部署卡住**。有磁碟區的 Deployment 和只有一個副本的 StatefulSet 會先停掉舊副本，新映像檔通過檢查之前，服務都無法使用。
 - **回到舊版本**：先把自動更新**關閉**，再到**部署紀錄**按**回滾**。沒有關閉時，Keel 下次檢查又會換上同一個新版本。StatefulSet 還要刪除卡在新映像檔的 Pod，例如 `kubectl -n demo delete pod db-0`，Kubernetes 才會用舊映像檔重新啟動它。
 - **失敗時通知**：到專案的**設定** → **通知**按**新增管道**，送到選 **Webhook**、Slack 或其他位置，事件勾**部署失敗**。這對 Deployment 有效；StatefulSet 和 DaemonSet 的部署通知排在 [#1015](https://github.com/zeabur-oss/zeabur/issues/1015)。
+
+## CloudNativePG 資料庫
+
+資料庫的**設定**沿用服務表單的**更新哪些版本**與**什麼時候更新**欄位。選擇**同一個標籤的新映像檔**並設定排程，再按**檢查變更**與**儲存**。關閉時會移除相同的四個 Keel 註解。儲存排程不會變更資料庫的映像檔、儲存空間或備份設定。
+
+需要支援 CloudNativePG 且有權 get、list、watch、patch `clusters.postgresql.cnpg.io` 的 Keel。目前固定使用的 Keel 0.22.4 不支援 Cluster；只安裝此元件仍無法更新，必須先發布 Keel 實作與目錄中的映像檔更新。若 Keel 比 CloudNativePG 先啟動，安裝 operator 後請重新啟動 Keel。
+
+請使用明確的主版本標籤，例如 `ghcr.io/cloudnative-pg/postgresql:18-standard-trixie`。Keel 依各資料庫的排程檢查此標籤，將新摘要寫入 `spec.imageName`，再由 CloudNativePG 逐一更新執行個體。`18-standard-trixie@sha256:…` 會保留標籤並更新摘要。映像檔儲存庫與標籤維持不變，因此不會選取其他 PostgreSQL 主版本或映像檔類型。固定日期的標籤只有在發布者替換其內容時才會更新。
+
+只有摘要的參照、`latest` 與設定了 `spec.imageCatalogRef` 的 Cluster 不適用；映像檔目錄的更新由其擁有者管理。Keel 尚不等待資料庫恢復正常，也不會回滾；請在更新後檢查資料庫狀態。上方服務的部署紀錄與失敗通知行為不適用於 Cluster。
 
 ## 用 kubectl 做同樣的事
 

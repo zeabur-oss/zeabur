@@ -728,6 +728,12 @@ export const zhCN: Messages = {
     "自动部署需要 Keel 组件，但这个集群没有，它的 Kubernetes 版本也装不了。",
   "builds.keelMissing": "自动部署需要集群里的 Keel 组件，目前还没有安装。",
   "builds.history": "记录",
+  "db.imageUpdates.hint":
+    "按计划更新此 PostgreSQL 标签的镜像摘要，由 CloudNativePG 逐一更新实例；标签与 PostgreSQL 主版本保持不变。",
+  "db.imageUpdates.requiresKeel":
+    "需要支持 CloudNativePG 且有权限修补 Cluster 的 Keel。目前固定使用的 Keel 0.22.4 尚不支持此功能。",
+  "db.imageUpdates.unavailable":
+    "请使用明确的 PostgreSQL 主版本标签（例如 18-standard-trixie），且不要设置 imageCatalogRef。标签即使附有摘要，也能更新。",
   "imageUpdates.hint": "让服务自动换上镜像的新版本。每次更新都会重启服务。",
   "imageUpdates.versions": "更新哪些版本",
   "imageUpdates.policy.other": (policy) => `Zeabur 之外的设置：${policy}`,

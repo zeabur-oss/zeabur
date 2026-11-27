@@ -24,6 +24,8 @@ import {
   connectionUri,
   createDatabase,
   databaseAddress,
+  databaseImageUpdates,
+  updateDatabaseImages,
   DATABASE_LABEL,
   deleteDatabase,
   madeObjects,
@@ -50,6 +52,98 @@ import {
   targetProblems,
   type Database,
 } from "@/model/databases"
+
+describe("CloudNativePG automatic updates", () => {
+  const image = "ghcr.io/cloudnative-pg/postgresql:18-standard-trixie@sha256:pin"
+  const object = {
+    apiVersion: "postgresql.cnpg.io/v1",
+    kind: "Cluster",
+    metadata: {
+      name: "pg",
+      namespace: "shop",
+      resourceVersion: "42",
+      annotations: { unrelated: "keep" },
+    },
+    spec: {
+      imageName: image,
+      instances: 2,
+      storage: { size: "8Gi" },
+      plugins: [{ name: "backup" }],
+    },
+  }
+  const database = () => ({
+    ...postgres,
+    object: structuredClone(object) as unknown as Database["object"],
+  })
+
+  test("a tag plus digest can be refreshed, while catalogs and digest-only images stay out", () => {
+    const db = database()
+    expect(databaseImageUpdates(db)).toEqual({ allowed: ["sameTag"] })
+    for (const spec of [
+      { imageName: "ghcr.io/cloudnative-pg/postgresql@sha256:pin" },
+      { imageName: "ghcr.io/cloudnative-pg/postgresql:latest" },
+      { imageName: image, imageCatalogRef: { name: "external", major: 18 } },
+    ]) {
+      expect(
+        databaseImageUpdates({
+          ...db,
+          object: { ...object, spec } as unknown as Database["object"],
+        }).allowed,
+      ).toEqual([])
+    }
+    expect(databaseImageUpdates({ ...db, apiGroup: "another.operator" }).allowed).toEqual([])
+  })
+
+  test("the reviewed edit keeps the image pin, storage, backups and read version", () => {
+    const db = database()
+    const [change] = updateDatabaseImages(db, {
+      kind: "image",
+      policy: "sameTag",
+      window: { day: "sunday", hour: 3 },
+    })
+    expect(change?.op).toBe("edit")
+    if (change?.op !== "edit") throw new Error("expected reviewed edit")
+    const edited = JSON.parse(change.yaml)
+    expect(edited.spec).toEqual(object.spec)
+    expect(edited.metadata.resourceVersion).toBe("42")
+    expect(edited.metadata.annotations).toEqual({
+      unrelated: "keep",
+      "keel.sh/policy": "force",
+      "keel.sh/match-tag": "true",
+      "keel.sh/trigger": "poll",
+      "keel.sh/pollSchedule": "0 0 3 * * 0",
+    })
+    expect(databaseImageUpdates({ ...db, object: edited }).setting).toEqual({
+      kind: "image",
+      policy: "sameTag",
+      window: { day: "sunday", hour: 3 },
+    })
+    const [off] = updateDatabaseImages({ ...db, object: edited }, { kind: "off" })
+    if (off?.op !== "edit") throw new Error("expected reviewed edit")
+    expect(JSON.parse(off.yaml)).toEqual(object)
+    expect(db.object).toEqual(object)
+    const labelled = {
+      ...db,
+      object: {
+        ...object,
+        metadata: {
+          ...object.metadata,
+          labels: {
+            "keel.sh/policy": "force",
+            "keel.sh/matchTag": "true",
+            "keel.sh/trigger": "poll",
+            "keel.sh/pollSchedule": "@hourly",
+            team: "platform",
+          },
+        },
+      } as unknown as Database["object"],
+    }
+    expect(databaseImageUpdates(labelled).setting?.kind).toBe("other")
+    const [labelOff] = updateDatabaseImages(labelled, { kind: "off" })
+    if (labelOff?.op !== "edit") throw new Error("expected reviewed edit")
+    expect(JSON.parse(labelOff.yaml).metadata.labels).toEqual({ team: "platform" })
+  })
+})
 
 /** `live` with `patch` merged in as a JSON merge patch, as the server merges a spec-only edit. */
 function merged(live: unknown, patch: unknown): Record<string, unknown> {

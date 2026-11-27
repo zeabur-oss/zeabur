@@ -945,7 +945,7 @@ function oneAction(
   }
 }
 
-function autoUpdateSentence(t: Translate, service: string, update: Schemas.Update): string {
+export function autoUpdateSentence(t: Translate, service: string, update: Schemas.Update): string {
   switch (update.kind) {
     case "off":
       return t("confirm.autoUpdateOff", service)

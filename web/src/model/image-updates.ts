@@ -189,3 +189,49 @@ export function dayName(day: number, locale: string, timeZone?: string): string 
   const date = timeZone ? new Date(Date.UTC(2026, 0, 4 + day, 12)) : new Date(2026, 0, 4 + day, 12)
   return new Intl.DateTimeFormat(locale, { weekday: "long", timeZone }).format(date)
 }
+
+export const keelKeys = [
+  "keel.sh/policy",
+  "keel.sh/trigger",
+  "keel.sh/pollSchedule",
+  "keel.sh/match-tag",
+  "keel.sh/matchTag",
+] as const
+
+/** An operator object's Keel annotations, using the same settings as registry services. */
+export function readKeelUpdates(
+  annotations: Record<string, string>,
+  allowed: ImagePolicy[],
+): Schemas.ImageUpdates {
+  const policy = annotations["keel.sh/policy"]
+  const schedule = annotations["keel.sh/pollSchedule"] ?? ""
+  if (!policy) return { allowed }
+  const match = /^0 0 ([0-9]|1[0-9]|2[0-3]) \* \* ([0-6]|\*)$/.exec(schedule)
+  const window: UpdateWindow | undefined = match
+    ? {
+        hour: Number(match[1]),
+        day: match[2] === "*" ? undefined : weekdays[Number(match[2])],
+      }
+    : undefined
+  if (
+    policy === "force" &&
+    (annotations["keel.sh/matchTag"] ?? annotations["keel.sh/match-tag"]) === "true" &&
+    annotations["keel.sh/trigger"] === "poll" &&
+    (schedule === "@hourly" || match)
+  ) {
+    return { allowed, setting: { kind: "image", policy: "sameTag", ...(window ? { window } : {}) } }
+  }
+  return { allowed, setting: { kind: "other", policy, schedule } }
+}
+
+/** The settings shared with a registry service; off removes them. */
+export function keelAnnotations(update: Schemas.Update): Record<string, string> {
+  if (update.kind !== "image") return {}
+  const day = update.window?.day ? weekdays.indexOf(update.window.day) : "*"
+  return {
+    "keel.sh/policy": update.policy === "sameTag" ? "force" : update.policy,
+    "keel.sh/trigger": "poll",
+    "keel.sh/pollSchedule": update.window ? `0 0 ${update.window.hour} * * ${day}` : "@hourly",
+    ...(update.policy === "sameTag" ? { "keel.sh/match-tag": "true" } : {}),
+  }
+}

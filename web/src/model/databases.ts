@@ -28,6 +28,7 @@ import { getExportDatabaseUrl } from "@/api/zeabur"
 import type { Translate } from "@/i18n"
 import { fits, textProblem } from "@/model/rules"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
+import { keelAnnotations, keelKeys, readKeelUpdates } from "@/model/image-updates"
 import type { Event, Health } from "@/model/service"
 
 export type Database = Schemas.Database
@@ -1775,5 +1776,54 @@ export function deleteDatabase(database: Database, gone: Made[] = []): Change[] 
   return [
     { op: "delete", resource: { group, version, resource }, name: database.name },
     ...gone.map((m): Change => ({ op: "delete", resource: m.resource, name: m.name })),
+  ]
+}
+
+/** Only a Cluster's own major-version tag can be refreshed; a catalog owns its images. */
+export function databaseImageUpdates(database: Database): Schemas.ImageUpdates {
+  const object = database.object as {
+    metadata?: { annotations?: Record<string, string>; labels?: Record<string, string> }
+    spec?: { imageName?: string; imageCatalogRef?: unknown }
+  }
+  const image = object.spec?.imageName ?? ""
+  const tagged = image.split("@")[0] ?? ""
+  const tag = tagged.slice(tagged.lastIndexOf(":") + 1)
+  const eligible =
+    database.apiGroup === "postgresql.cnpg.io" &&
+    database.kind === "Cluster" &&
+    !object.spec?.imageCatalogRef &&
+    tagged.lastIndexOf(":") > tagged.lastIndexOf("/") &&
+    /^v?([1-9][0-9]+)(?:[.-]|$)/.test(tag)
+  return readKeelUpdates(
+    {
+      ...object.metadata?.annotations,
+      ...object.metadata?.labels,
+      "keel.sh/pollSchedule": object.metadata?.annotations?.["keel.sh/pollSchedule"] ?? "",
+    },
+    eligible ? ["sameTag"] : [],
+  )
+}
+
+/** A reviewed edit keeps the Cluster's image, storage and backups while changing Keel settings. */
+export function updateDatabaseImages(database: Database, update: Schemas.Update): Change[] {
+  const object = structuredClone(database.object) as {
+    metadata: { annotations?: Record<string, string>; labels?: Record<string, string> }
+  }
+  const annotations = { ...object.metadata.annotations }
+  for (const key of keelKeys) {
+    delete annotations[key]
+    if (object.metadata.labels) delete object.metadata.labels[key]
+  }
+  Object.assign(annotations, keelAnnotations(update))
+  if (Object.keys(annotations).length) object.metadata.annotations = annotations
+  else delete object.metadata.annotations
+  const { group, version, resource } = databaseAddress(database)
+  return [
+    {
+      op: "edit",
+      resource: { group, version, resource },
+      name: database.name,
+      yaml: JSON.stringify(object),
+    },
   ]
 }

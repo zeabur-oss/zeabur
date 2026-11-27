@@ -6,6 +6,7 @@ import { translator } from "@/i18n"
 import { en } from "@/i18n/en"
 import {
   formOf,
+  readKeelUpdates,
   localMinute,
   policyChoices,
   policyHint,
@@ -17,6 +18,29 @@ import {
 
 const now = new Date("2026-11-26T12:00:00Z")
 const t = translator(en)
+
+test("CloudNativePG keeps custom Keel settings until explicitly replaced", () => {
+  const cases: Record<string, string>[] = [
+    { "keel.sh/policy": "patch", "keel.sh/pollSchedule": "@hourly" },
+    {
+      "keel.sh/policy": "force",
+      "keel.sh/match-tag": "true",
+      "keel.sh/trigger": "poll",
+      "keel.sh/pollSchedule": "@every 5m",
+    },
+    {
+      "keel.sh/policy": "force",
+      "keel.sh/match-tag": "true",
+      "keel.sh/trigger": "poll",
+      "keel.sh/pollSchedule": "0 0 24 * * 0",
+    },
+  ]
+  for (const annotations of cases) {
+    const updates = readKeelUpdates(annotations, ["sameTag"])
+    expect(updates.setting?.kind).toBe("other")
+    expect(updateOf(updates, formOf(updates, now), now)).toBeUndefined()
+  }
+})
 
 describe("in Taipei, UTC+8", () => {
   const zone = process.env.TZ

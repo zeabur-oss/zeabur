@@ -1010,6 +1010,21 @@ impl<'a> Planner<'a> {
                 format!("There is no {} named {name}.", resource.resource),
             ));
         };
+        if !spec_only
+            && let Some(version) = edited
+                .pointer("/metadata/resourceVersion")
+                .and_then(Value::as_str)
+            && object
+                .pointer("/metadata/resourceVersion")
+                .and_then(Value::as_str)
+                != Some(version)
+        {
+            return Err(error(
+                ErrorKind::Conflict,
+                "object_changed",
+                "The object changed since it was read. Reload it and review the change again.",
+            ));
+        }
         let edited = if spec_only {
             let mut whole = object.clone();
             if let (Some(map), Some(spec)) = (whole.as_object_mut(), edited.get("spec")) {

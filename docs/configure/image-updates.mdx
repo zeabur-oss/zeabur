@@ -9,7 +9,7 @@ A service deployed from a registry image can let Keel move it to new versions on
 
 - The cluster has the Keel component. When it is missing, the **Automatic updates** section shows a button to install it; come back to the service's **Settings** afterwards.
 - The service is a Deployment, StatefulSet or DaemonSet, and its image uses a tag such as `7.2.4`, `8`, `1.27` or `latest`, not a digest. A service built from Git or an uploaded folder uses **Auto-deploy new builds** in its **Builds** tab instead.
-- Databases created from **New** → **Database** are managed by their operator, such as CloudNativePG for PostgreSQL, and have no **Automatic updates** section. To update PostgreSQL with Keel, deploy it from an image such as `postgres:16.4`.
+- PostgreSQL databases created from **New** → **Database** use CloudNativePG. See [CloudNativePG databases](#cloudnativepg-databases) below for the additional Keel requirement. Other operator-managed databases do not have automatic updates.
 
 <Steps>
 <Step>
@@ -90,6 +90,16 @@ Keel does not wait for the service to become healthy after an update, and does n
 - **Keep the old version serving.** Open **Settings** → **Health checks** and set a **Traffic check**, such as **TCP** on port `6379` for Redis. A Deployment without a volume replaces replicas one at a time: when the new replica fails the check, the old replica keeps serving and the service shows **Rollout stuck**. A Deployment with a volume and a StatefulSet with one replica stop the old replica first, so the service is down until the new image passes the check.
 - **Go back.** First set automatic updates to **Off**, then click **Roll back** in **Deployments**. If you leave updates on, Keel moves to the same new version again at its next check. For a StatefulSet, also delete the pod that is stuck on the new image, such as `kubectl -n demo delete pod db-0`, so Kubernetes starts it again from the old image.
 - **Get a message.** Open the project's **Settings** → **Notifications**, click **Add channel**, choose a destination such as **Webhook** or Slack, and select **Deploy failed**. This works for Deployments. The same events for StatefulSets and DaemonSets are [#1015](https://github.com/zeabur-oss/zeabur/issues/1015).
+
+## CloudNativePG databases
+
+The database's **Settings** reuses **Which versions** and **When** from the service form. Choose **New image under the same tag**, choose a schedule, then **Review changes** and **Save**. **Off** removes the same four Keel annotations. Saving a schedule does not change the database's image, storage or backups.
+
+This requires Keel with CloudNativePG support and permission to get, list, watch and patch `clusters.postgresql.cnpg.io`. The currently pinned Keel 0.22.4 does not support Clusters. Installing that component alone does not enable these updates; the Keel implementation and catalog image update must be released first. If Keel started before CloudNativePG was installed, restart Keel after installing the operator.
+
+Use a major-version tag such as `ghcr.io/cloudnative-pg/postgresql:18-standard-trixie`. Keel checks that tag on the database's own schedule and writes its new digest to `spec.imageName`; CloudNativePG performs the rolling update. A reference such as `18-standard-trixie@sha256:…` keeps its tag and refreshes its digest. Keel keeps the repository and tag unchanged, so it cannot select another PostgreSQL major version or image flavor. A fixed dated tag only changes if its publisher replaces it.
+
+Digest-only references, `latest` and Clusters with `spec.imageCatalogRef` are not eligible. The catalog's owner must manage catalog updates. Keel does not wait for database health or roll back; inspect the database's health after a rollout. The service deployment-history and failure-notification behavior described above does not extend to Clusters.
 
 ## Do the same with kubectl
 
