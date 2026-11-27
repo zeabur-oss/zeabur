@@ -43,6 +43,9 @@
 //!
 //! `ZEABUR_DEMO_IDENTITY=none` leaves Zeabur Identity uninstalled; the API tokens stay.
 //!
+//! `ZEABUR_DEMO_MEMBER=shop,blog` acts as a member with a role in those projects only: every other
+//! namespace's objects are refused, and so is creating a namespace.
+//!
 //! `storageclasses.storage.k8s.io` and `persistentvolumes` in `ZEABUR_DEMO_FORBID` refuse
 //! reading the storage classes (local-path, the default, and Longhorn) and the volumes behind
 //! claims.
@@ -3378,6 +3381,20 @@ fn github_app(s: &mut State, fake: &FakeGitHub) {
     }
 }
 
+/// A member with a role in `projects` (comma-separated) only: every other namespace's objects are
+/// refused, and so is creating a namespace.
+fn member(state: &mut State, projects: &str) {
+    let allowed: Vec<&str> = projects.split(',').collect();
+    let refused: Vec<String> = state
+        .namespaces
+        .iter()
+        .filter_map(|n| n.metadata.name.clone())
+        .filter(|n| !allowed.contains(&n.as_str()))
+        .collect();
+    state.forbidden_namespaces.extend(refused);
+    state.refused_rights.insert("create namespaces".to_owned());
+}
+
 #[tokio::main]
 #[expect(
     clippy::print_stdout,
@@ -3432,6 +3449,9 @@ async fn main() -> std::io::Result<()> {
         .is_ok_and(|list| list.split(',').any(|r| r == "namespaces"))
     {
         cluster.update(|s| s.cluster_wide_denied = true);
+    }
+    if let Ok(projects) = std::env::var("ZEABUR_DEMO_MEMBER") {
+        cluster.update(|s| member(s, &projects));
     }
     if std::env::var_os("ZEABUR_DEMO_RKE2").is_some() {
         cluster.update(rke2);
