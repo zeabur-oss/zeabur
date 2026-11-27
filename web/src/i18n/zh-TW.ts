@@ -2037,6 +2037,7 @@ export const zhTW: Messages = {
   "diagnosis.action.security": "安全性",
   "gap.title": "缺少的設定",
   "gap.warning": "警告",
+  "gap.nodeWarnings": (n) => `查看 ${n} 個警告`,
   "gap.advice": "建議",
   "gap.unchecked": (count) => `${count} 個服務沒有就緒檢查`,
   "gap.uncheckedWhy":

@@ -1,12 +1,18 @@
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
+import { useState } from "react"
 import ArrowSquareOutIcon from "~icons/ph/arrow-square-out"
 import CaretRightIcon from "~icons/ph/caret-right"
+import WarningIcon from "~icons/ph/warning"
 import WrenchIcon from "~icons/ph/wrench"
 
 import type { Schemas } from "@/api/client"
+import { projectGapsQuery, projectQuery } from "@/api/queries"
 import { usePlanner } from "@/components/plan/planner"
 import { StatusPill } from "@/components/status"
 import { Button, buttonVariants } from "@zeabur-oss/design-system/components/button"
+import { Drawer } from "@zeabur-oss/design-system/components/drawer"
+import { Tooltip } from "@zeabur-oss/design-system/components/tooltip"
 import {
   Collapsible,
   CollapsibleContent,
@@ -16,7 +22,7 @@ import { useSentence, useT } from "@/i18n"
 import { cn } from "@/lib/utils"
 import { serviceLink } from "@/lib/place"
 import { fixOf, type fixLink } from "@/model/fixes"
-import { suggestionsOf } from "@/model/overview"
+import { suggestionsOf, warningsAbout } from "@/model/overview"
 
 type Gap = Schemas.Gap
 
@@ -52,6 +58,46 @@ export function GapList({
         })}
       </ul>
       {planner.dialog}
+    </>
+  )
+}
+
+/** A warning mark on a map node's corner; it opens the node's warnings with their fixes. */
+export function NodeWarnings({
+  project,
+  object,
+}: {
+  project: string
+  object: { kind: string; name: string }
+}) {
+  const t = useT()
+  const [open, setOpen] = useState(false)
+  const gaps = useQuery(projectGapsQuery(project)).data?.items ?? []
+  const document = useQuery(projectQuery(project)).data
+  const warnings = warningsAbout(gaps, object)
+  if (warnings.length === 0) return null
+  const label = t("gap.nodeWarnings", warnings.length)
+  return (
+    <>
+      <Tooltip content={label}>
+        <button
+          type="button"
+          aria-label={label}
+          onClick={() => setOpen(true)}
+          className="absolute -top-2 -right-2 z-2 flex size-6 items-center justify-center rounded-full border border-warn/40 bg-card text-warn shadow-xs hover:bg-warn-soft"
+        >
+          <WarningIcon aria-hidden="true" className="size-3.5" />
+        </button>
+      </Tooltip>
+      <Drawer
+        open={open}
+        onOpenChange={setOpen}
+        title={t("gap.title")}
+        description={<span translate="no">{object.name}</span>}
+        closeLabel={t("common.close")}
+      >
+        <GapList gaps={warnings} project={project} document={document} />
+      </Drawer>
     </>
   )
 }

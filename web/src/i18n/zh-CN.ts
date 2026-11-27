@@ -2033,6 +2033,7 @@ export const zhCN: Messages = {
   "diagnosis.action.security": "安全性",
   "gap.title": "缺少的设置",
   "gap.warning": "警告",
+  "gap.nodeWarnings": (n) => `查看 ${n} 个警告`,
   "gap.advice": "建议",
   "gap.unchecked": (count) => `${count} 个服务没有就绪检查`,
   "gap.uncheckedWhy":
