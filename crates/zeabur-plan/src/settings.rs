@@ -432,14 +432,15 @@ impl<'a> Planner<'a> {
             (None, None) => vec![],
         };
         if operations.is_empty() {
+            let place = if group.is_some() {
+                "in this group already"
+            } else {
+                "in no group"
+            };
             return Err(error(
                 ErrorKind::BadRequest,
                 "unchanged",
-                format!(
-                    "{} {} is in this group already.",
-                    reference.kind.as_str(),
-                    reference.name
-                ),
+                format!("{} {} is {place}.", reference.kind.as_str(), reference.name),
             ));
         }
         self.claim(index, &steps("labels", &key), &shown("labels", &key))?;

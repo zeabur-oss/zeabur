@@ -1,0 +1,3 @@
+description: "Moving a workload to another group replaces the group label."
+operation: mutation.plan
+params: {"request": {"changes": [{"op": "group", "workload": {"kind": "Deployment", "name": "web"}, "group": "admin"}]}}
