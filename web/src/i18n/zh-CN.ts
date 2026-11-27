@@ -1749,7 +1749,7 @@ export const zhCN: Messages = {
     `${service} 把 ${kind} ${name} 的每个键都当作变量读取，副本会重启。`,
   "confirm.publicPort": (port, name) => `把 ${name} 的端口 ${port} 开放到互联网。`,
   "confirm.publicPortExternal": (port, name, external) =>
-    `把 ${name} 的端口 ${port} 开放到互联网，对外用端口 ${external}。`,
+    `把 ${name} 的端口 ${port} 开放到互联网，外部端口为 ${external}。`,
   "confirm.publicPortOff": (port, name) =>
     `关闭 ${name} 的端口 ${port}，集群外的客户端就连不到了。`,
   "confirm.envImportOff": (kind, name, service) =>
@@ -3905,9 +3905,8 @@ export const zhCN: Messages = {
   "ports.allOpen": "这个服务的端口都已经开放了。",
   "ports.port": "端口",
   "ports.external": "外部端口",
-  "ports.externalHint":
-    "互联网上的客户端连接用的端口，每个节点的地址都会开放它。留空就用同一个端口。",
-  "ports.reaches": (port) => `连到端口 ${port}`,
+  "ports.externalHint": "互联网上的客户端连接这个端口。留空则使用服务的端口。",
+  "ports.reaches": (port) => `转发到端口 ${port}`,
   "ip.title": "IP 限制",
   "ip.about": "决定哪些 IP 能打开这个服务的域名，以及这个服务能连到哪些 IP。",
   "ip.noLimit": "没有限制",

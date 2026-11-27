@@ -1018,7 +1018,7 @@ test("a port opened on another external port lists that port and the port it rea
   await ports.getByRole("button", { name: "Open a port" }).click()
   await page.getByRole("textbox", { name: "External port" }).fill("18045")
   await page.getByRole("button", { name: "Review changes", exact: true }).click()
-  await confirmPlan(page, /^Open port \d+ of /, "Open port", "on port 18045")
+  await confirmPlan(page, /^Open port \d+ of /, "Open port", "external port 18045")
   const row = ports.getByRole("listitem").filter({ hasText: /to port \d+/ })
   // Without a load balancer controller, the row waits for an address.
   await expect(row).toContainText(/:18045|Port 18045 waits/, { timeout: 15_000 })

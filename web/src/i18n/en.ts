@@ -1917,7 +1917,7 @@ export const en = {
   "confirm.publicPort": (port: number, name: string) =>
     `Open port ${port} of ${name} to the internet.`,
   "confirm.publicPortExternal": (port: number, name: string, external: number) =>
-    `Open port ${port} of ${name} to the internet on port ${external}.`,
+    `Open port ${port} of ${name} to the internet through external port ${external}.`,
   "confirm.publicPortOff": (port: number, name: string) =>
     `Close port ${port} of ${name}. Clients outside the cluster can no longer connect to it.`,
   "confirm.envImportOff": (kind: string, name: string, service: string) =>
@@ -4294,7 +4294,7 @@ export const en = {
   "ports.port": "Port",
   "ports.external": "External port",
   "ports.externalHint":
-    "The port that clients on the internet connect to, on every node's address. Leave it empty to use the same port.",
+    "Clients on the internet connect to this port. Leave it empty to use the service port.",
   "ports.reaches": (port: number) => `to port ${port}`,
   "ip.title": "IP limits",
   "ip.about":
