@@ -1,8 +1,10 @@
 // Cluster → Backups: which data is backed up by what, and whether that tool is there.
+import { useQuery } from "@tanstack/react-query"
 import { Link } from "@tanstack/react-router"
 import type { ReactNode } from "react"
 
 import type { Schemas } from "@/api/client"
+import { capabilitiesQuery } from "@/api/queries"
 import { StatusDot } from "@/components/status"
 import { useT } from "@/i18n"
 import { providerOf } from "@/model/cluster-backups"
@@ -11,7 +13,10 @@ import { Section } from "@/routes/cluster/section"
 
 export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
   const t = useT()
-  const velero = data && data.state !== "not-installed" ? data.verdict : undefined
+  const unfinished = useUnfinished()
+  const veleroProvider = providerOf(data?.providers, "velero")
+  const velero =
+    data && data.state !== "not-installed" && !unfinished(veleroProvider) ? data.verdict : undefined
   return (
     <Section id="backup-coverage" title={t("clusterBackups.coverage.title")}>
       <div className="overflow-hidden rounded-lg border border-main bg-card">
@@ -38,7 +43,9 @@ export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
             <Row
               data={t("clusterBackups.coverage.volumes")}
               method={t("clusterBackups.coverage.volumesMethod")}
-              status={<Tool provider={providerOf(data?.providers, "k8up")} />}
+              status={
+                <Tool provider={providerOf(data?.providers, "k8up")} unfinished={unfinished} />
+              }
             />
             <Row
               data={t("clusterBackups.coverage.project")}
@@ -49,7 +56,7 @@ export function BackupCoverage({ data }: { data?: Schemas.ClusterBackups }) {
                     {t(`clusterBackups.verdict.${velero.state as "ok"}`)}
                   </Dot>
                 ) : (
-                  <Tool provider={providerOf(data?.providers, "velero")} />
+                  <Tool provider={veleroProvider} unfinished={unfinished} />
                 )
               }
             />
@@ -85,10 +92,40 @@ function Dot({ health, children }: { health: Health; children: ReactNode }) {
   )
 }
 
-function Tool({ provider }: { provider?: Schemas.BackupProvider }) {
+type Unfinished = (provider?: Schemas.BackupProvider) => boolean
+
+/** Whether Zeabur has not started every step of the component that provides it: its API can be
+ * served while a later step is missing. Unknown when the person may not read the components. */
+function useUnfinished(): Unfinished {
+  const installations = useQuery(capabilitiesQuery).data?.items.flatMap((c) => c.installations)
+  return (provider) =>
+    installations?.some(
+      (i) => i.component === provider?.component?.id && (i.unstarted?.length ?? 0) > 0,
+    ) ?? false
+}
+
+function Tool({
+  provider,
+  unfinished,
+}: {
+  provider?: Schemas.BackupProvider
+  unfinished: Unfinished
+}) {
   const t = useT()
   const component = provider?.component
   if (!component || provider.state === "refused") return <Plain>—</Plain>
+  if (unfinished(provider))
+    return (
+      <Dot health="warn">
+        <Link
+          to="/cluster/components"
+          search={{ component: component.id }}
+          className="underline underline-offset-2"
+        >
+          {t("clusterBackups.coverage.unfinished", component.name)}
+        </Link>
+      </Dot>
+    )
   if (provider.state === "installed")
     return <Dot health="ok">{t("clusterBackups.coverage.installed", component.name)}</Dot>
   return (

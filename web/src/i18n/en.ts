@@ -1265,6 +1265,10 @@ export const en = {
   "components.unstarted": (steps: string) => `${steps} has not started. Manage installs it.`,
   "components.installing": "Installing…",
   "components.removing": "Removing…",
+  "components.hide": "Hide",
+  "components.progress": (step: number, steps: number) => `Step ${step} of ${steps}`,
+  "components.installDone": "Installed",
+  "components.installStopped": "Stopped. Open it to see why.",
   "components.installed": "Installed, and every health check passes.",
   "components.removed": "Removed.",
   "components.untested": (name: string) =>
@@ -2406,6 +2410,7 @@ export const en = {
   "clusterBackups.coverage.projectMethod": "Velero, to S3. Set up below.",
   "clusterBackups.coverage.installed": (name: string) => `${name} installed`,
   "clusterBackups.coverage.install": (name: string) => `Install ${name}`,
+  "clusterBackups.coverage.unfinished": (name: string) => `${name}: install not finished`,
   "clusterBackups.notInstalled": "Backups need Velero",
   "clusterBackups.notInstalledBody":
     "Velero copies the cluster's objects and the files in its volumes to S3-compatible storage on a schedule. Install it from Components, then come back here to set it up.",

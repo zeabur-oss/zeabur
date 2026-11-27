@@ -7,6 +7,7 @@ import XIcon from "~icons/ph/x"
 import { GatedPage } from "@/components/shell/admin-only"
 import { RouteProgress } from "@/components/shell/route-progress"
 import { PlanFallback } from "@/components/plan/fallback"
+import { InstallIndicator } from "@/components/install-indicator"
 import { CommandPalette } from "@/components/shell/command-palette"
 import { DockSlot } from "@/components/shell/dock-slot"
 import { Sidebar } from "@/components/shell/sidebar"
@@ -99,6 +100,7 @@ export function AppShell() {
       </Dialog>
       <CommandPalette />
       <PlanFallback />
+      <InstallIndicator />
       {add ? (
         <Suspense fallback={null}>
           <AddHost key={`${add.project}/${add.what}`} project={add.project} what={add.what} />
