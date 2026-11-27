@@ -1,24 +1,61 @@
 import { useState } from "react"
 import WarningFillIcon from "~icons/ph/warning-fill"
 
-import { rules } from "@/api/rules"
 import { FormField } from "@/components/form-field"
 import { PlanDrawer } from "@/components/plan/plan-drawer"
 import { usePlanStep } from "@/components/plan/planner"
 import { useT } from "@/i18n"
+import { externalOf, openPortChange, portChoices } from "@/model/public-ports"
 import type { Endpoint, Service } from "@/model/service"
 import { Alert, AlertDescription, AlertTitle } from "@zeabur-oss/design-system/components/alert"
 import { Button } from "@zeabur-oss/design-system/components/button"
 import { Input } from "@zeabur-oss/design-system/components/input"
 import { Select } from "@zeabur-oss/design-system/components/select"
 
-const EXTERNAL = rules["PublicPortChange.external"]
+/** Who can connect once the port is open, and what is at risk for a database. */
+function ExposureAlert({ name, database }: { name: string; database: boolean }) {
+  const t = useT()
+  return (
+    <Alert variant={database ? "destructive" : "warn"} role="note">
+      <WarningFillIcon aria-hidden="true" />
+      <AlertTitle>{database ? t("ports.databaseTitle", name) : t("ports.anyoneTitle")}</AlertTitle>
+      <AlertDescription>
+        {database ? t("ports.databaseBody") : t("ports.anyoneBody")}
+      </AlertDescription>
+    </Alert>
+  )
+}
 
-/** The external port typed in `text`: `undefined` when empty, `NaN` when it is not a port. */
-function externalOf(text: string): number | undefined {
-  if (text.trim() === "") return undefined
-  const port = /^\d+$/.test(text.trim()) ? Number(text) : Number.NaN
-  return port >= EXTERNAL.minimum && port <= EXTERNAL.maximum ? port : Number.NaN
+/** The optional external port, empty for the same port as `port`. */
+function ExternalPortField({
+  value,
+  onChange,
+  port,
+}: {
+  value: string
+  onChange: (value: string) => void
+  port: number | undefined
+}) {
+  const t = useT()
+  const invalid = Number.isNaN(externalOf(value))
+  return (
+    <FormField
+      label={t("ports.external")}
+      hint={t("ports.externalHint")}
+      errors={invalid ? [t("add.problem.port.invalid")] : []}
+    >
+      <Input
+        size="sm"
+        mono
+        inputMode="numeric"
+        autoComplete="off"
+        value={value}
+        placeholder={port === undefined ? undefined : String(port)}
+        onChange={(event) => onChange(event.target.value)}
+        className="w-32"
+      />
+    </FormField>
+  )
 }
 
 /** Open one port of a service's Service to the internet with a `LoadBalancer` Service. */
@@ -39,18 +76,7 @@ export default function OpenPortDrawer({
 }) {
   const t = useT()
   const step = usePlanStep(project, onClose)
-  const isOpen = (from: string, port: number) =>
-    open.some((e) => e.opens?.service === from && e.opens.port === port)
-  const choices = endpoints.flatMap((e) =>
-    e.ports
-      .filter((p) => !isOpen(e.name, p.port))
-      .map((p) => ({
-        value: `${e.name}/${p.port}`,
-        label: `${e.name}:${p.port} ${p.protocol}`,
-        from: e.name,
-        port: p.port,
-      })),
-  )
+  const choices = portChoices(endpoints, open)
   const [chosen, setChosen] = useState(choices[0]?.value ?? "")
   const choice = choices.find((c) => c.value === chosen)
   const [externalText, setExternalText] = useState("")
@@ -63,15 +89,7 @@ export default function OpenPortDrawer({
     step.plan({
       title: t("ports.openTitle", choice.port, service.name),
       service: workload,
-      changes: [
-        {
-          op: "publicPort",
-          workload,
-          service: choice.from,
-          port: choice.port,
-          ...(external === undefined || external === choice.port ? {} : { external }),
-        },
-      ],
+      changes: [openPortChange(workload, choice, external)],
     })
   }
   return (
@@ -103,15 +121,7 @@ export default function OpenPortDrawer({
           review()
         }}
       >
-        <Alert variant={database ? "destructive" : "warn"} role="note">
-          <WarningFillIcon aria-hidden="true" />
-          <AlertTitle>
-            {database ? t("ports.databaseTitle", service.name) : t("ports.anyoneTitle")}
-          </AlertTitle>
-          <AlertDescription>
-            {database ? t("ports.databaseBody") : t("ports.anyoneBody")}
-          </AlertDescription>
-        </Alert>
+        <ExposureAlert name={service.name} database={database} />
         {choices.length === 0 ? (
           <p className="type-meta text-muted-foreground">{t("ports.allOpen")}</p>
         ) : (
@@ -125,22 +135,11 @@ export default function OpenPortDrawer({
                 items={choices}
               />
             </FormField>
-            <FormField
-              label={t("ports.external")}
-              hint={t("ports.externalHint")}
-              errors={invalid ? [t("add.problem.port.invalid")] : []}
-            >
-              <Input
-                size="sm"
-                mono
-                inputMode="numeric"
-                autoComplete="off"
-                value={externalText}
-                placeholder={choice ? String(choice.port) : undefined}
-                onChange={(event) => setExternalText(event.target.value)}
-                className="w-32"
-              />
-            </FormField>
+            <ExternalPortField
+              value={externalText}
+              onChange={setExternalText}
+              port={choice?.port}
+            />
           </>
         )}
       </form>
