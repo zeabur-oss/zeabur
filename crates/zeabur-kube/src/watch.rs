@@ -85,17 +85,11 @@ impl Following {
             if self.done {
                 return None;
             }
-            let step = if self.version.is_none() {
-                self.list().await
-            } else if let Some(events) = self.events.as_mut() {
-                match tokio::time::timeout_at(self.deadline, events.next()).await {
-                    Err(_elapsed) => return None,
-                    Ok(None) => Step::Rewatch,
-                    Ok(Some(event)) => self.event(event),
-                }
-            } else {
-                self.watch().await?
-            };
+            // The deadline bounds every request, a LIST or a watch that stalls before it answers
+            // included: `timeoutSeconds` bounds only a watch that has started.
+            let step = tokio::time::timeout_at(self.deadline, self.step())
+                .await
+                .ok()??;
             match step {
                 Step::State(state) => {
                     self.done = state.is_err();
@@ -109,6 +103,18 @@ impl Following {
                 Step::Rewatch => self.events = None,
             }
         }
+    }
+
+    /// The next request or event; `None` once the deadline has passed.
+    async fn step(&mut self) -> Option<Step> {
+        if self.version.is_none() {
+            return Some(self.list().await);
+        }
+        if let Some(events) = self.events.as_mut() {
+            let event = events.next().await;
+            return Some(event.map_or(Step::Rewatch, |event| self.event(event)));
+        }
+        self.watch().await
     }
 
     async fn list(&mut self) -> Step {
