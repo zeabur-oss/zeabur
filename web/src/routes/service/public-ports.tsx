@@ -6,6 +6,7 @@ import { CopyButton } from "@/components/bits"
 import { GateTip, useGate } from "@/components/gate"
 import type { usePlanner } from "@/components/plan/planner"
 import { useT } from "@/i18n"
+import { isPublic } from "@/model/public-ports"
 import type { Endpoint, OpenedPort, Service } from "@/model/service"
 import { Badge } from "@zeabur-oss/design-system/components/badge"
 import { Button } from "@zeabur-oss/design-system/components/button"
@@ -29,8 +30,8 @@ export function PublicPorts({
   const t = useT()
   const gate = useGate(project, "changeDomains")
   const [opening, setOpening] = useState(false)
-  const open = endpoints.filter((e) => e.type === "LoadBalancer")
-  const closed = endpoints.filter((e) => e.type !== "LoadBalancer" && e.clusterIP !== "None")
+  const open = endpoints.filter(isPublic)
+  const closed = endpoints.filter((e) => !isPublic(e) && e.clusterIP !== "None")
   const workload = { kind: service.kind, name: service.name }
   const managed = !!service.provenance.tool
   const close = ({ service: from, port }: OpenedPort) =>

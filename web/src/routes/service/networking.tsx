@@ -66,6 +66,7 @@ import type { Gate } from "@/model/rights"
 import { canIssue } from "@/model/cluster-issuers"
 import { offered, parentOf } from "@/model/gateways"
 import { isLongList } from "@/model/lists"
+import { isPublic } from "@/model/public-ports"
 import {
   endpointsOf,
   hostUrl,
@@ -130,6 +131,7 @@ export function NetworkingTab({
   const t = useT()
   const routes = publicRoutesOf(network, service)
   const endpoints = endpointsOf(network, service)
+  const internal = endpoints.filter((e) => !isPublic(e))
   const ready = service.pods.filter((p) => p.ready).length
   const planner = usePlanner(project)
   const [adding, setAdding] = useState<string>()
@@ -559,7 +561,7 @@ export function NetworkingTab({
               description={t("net.privateAbout")}
             />
             <RefusedKinds unreadable={refusedEndpoints} />
-            {endpoints.length === 0 ? (
+            {internal.length === 0 ? (
               refusedEndpoints.length > 0 ? null : (
                 <Empty variant="outline" size="inline">
                   <EmptyMedia variant="glyph">
@@ -580,7 +582,7 @@ export function NetworkingTab({
               )
             ) : (
               <ul className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
-                {endpoints.map((e) => (
+                {internal.map((e) => (
                   <PrivateAddress key={e.name} endpoint={e} namespace={service.namespace} />
                 ))}
               </ul>
