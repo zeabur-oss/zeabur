@@ -30,7 +30,7 @@ pub(crate) struct Args {
     /// Interval between reads of Cluster settings. Each database has its own update schedule.
     #[arg(long, default_value = "15s", value_parser = crate::components::duration)]
     scan_interval: Duration,
-    /// Development registries (exact host[:port]) that serve plain HTTP.
+    /// Development registries that serve plain HTTP, by exact hostname and optional port.
     #[arg(long, value_delimiter = ',')]
     http_registries: Vec<String>,
     /// Extra trusted CA for registry connections.
