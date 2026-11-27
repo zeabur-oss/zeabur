@@ -3112,11 +3112,19 @@ export const en = {
   "db.connect": "Connect",
   "db.inCluster": "These work only inside the cluster.",
   "db.outside.title": "Connect from outside the cluster",
-  "db.outside.commandHint":
-    "Run it on your computer. It connects a local port to the database through the cluster and prints a connection string on 127.0.0.1. It keeps running until you press Ctrl-C.",
+  "db.outside.install":
+    "Install zeaburctl with Homebrew on macOS or Linux, or download it for Windows.",
+  "db.outside.kubeconfig":
+    "Get a kubeconfig for this cluster. If you opened Zeabur with zeaburctl ui, you have one. Otherwise an admin creates an API token for you, which comes with a kubeconfig.",
+  "db.outside.tokens": "API tokens",
+  "db.outside.run":
+    "Run the command above on your computer. If your kubeconfig's current context is another cluster, add --context and this cluster's context name.",
+  "db.outside.client":
+    "Paste the connection string it prints into your database client, such as TablePlus or DBeaver. It connects to 127.0.0.1 and works until you press Ctrl-C.",
+  "db.outside.reference": "How zeaburctl connect works",
   "db.outside.refused": (reason: string) =>
     `The cluster will refuse this command for you. ${reason}.`,
-  "db.outside.docs": "Install zeaburctl",
+  "db.outside.docs": "Installation steps",
   "db.noDatabase":
     "This cluster has no app database. Services connect as moco-writable, which can create one.",
   "db.noAuth": (engine: string) =>

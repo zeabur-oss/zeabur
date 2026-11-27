@@ -2853,10 +2853,17 @@ export const zhTW: Messages = {
   "db.connect": "連線",
   "db.inCluster": "這些資訊只能在叢集內部使用。",
   "db.outside.title": "從叢集外連線",
-  "db.outside.commandHint":
-    "在你的電腦上執行。它會經由叢集把本機的一個連接埠接到資料庫，並印出 127.0.0.1 的連線字串。按 Ctrl-C 才會停止。",
+  "db.outside.install": "安裝 zeaburctl：macOS 和 Linux 可用 Homebrew，Windows 請下載執行檔。",
+  "db.outside.kubeconfig":
+    "取得這個叢集的 kubeconfig。如果你是用 zeaburctl ui 開啟 Zeabur，就已經有了；否則請管理員幫你建立 API 權杖，權杖會附上 kubeconfig。",
+  "db.outside.tokens": "API 權杖",
+  "db.outside.run":
+    "在你的電腦上執行上面的指令。如果 kubeconfig 目前的 context 是別的叢集，請加上 --context 和這個叢集的 context 名稱。",
+  "db.outside.client":
+    "把它印出的連線字串貼到資料庫用戶端，例如 TablePlus 或 DBeaver。它連到 127.0.0.1，按 Ctrl-C 前都能使用。",
+  "db.outside.reference": "zeaburctl connect 的用法",
   "db.outside.refused": (reason) => `叢集會拒絕你執行這個指令。${reason}。`,
-  "db.outside.docs": "安裝 zeaburctl",
+  "db.outside.docs": "安裝步驟",
   "db.noDatabase":
     "這個叢集沒有應用程式資料庫。服務以 moco-writable 連線，這個使用者可以建立資料庫。",
   "db.noAuth": (engine) => `這個 ${engine} 沒有設定密碼，叢集裡的任何程式都能連線。`,
