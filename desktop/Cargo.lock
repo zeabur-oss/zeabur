@@ -6324,6 +6324,7 @@ dependencies = [
 name = "zeabur-api"
 version = "0.3.3"
 dependencies = [
+ "aws-lc-rs",
  "axum",
  "base64 0.23.1",
  "bytes",

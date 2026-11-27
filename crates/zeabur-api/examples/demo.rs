@@ -3511,83 +3511,6 @@ async fn main() -> std::io::Result<()> {
     axum::serve(listener, app).await
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn at_noon() -> Timestamp {
-        "2026-10-26T12:00:00Z".parse().expect("a time")
-    }
-
-    #[test]
-    fn relative_times_count_from_the_clock() {
-        let now = at_noon();
-        assert_eq!(
-            relative_time("now", now).as_deref(),
-            Some("2026-10-26T12:00:00Z")
-        );
-        assert_eq!(
-            relative_time("now-2d4h30m", now).as_deref(),
-            Some("2026-10-24T07:30:00Z")
-        );
-        assert_eq!(
-            relative_time("now+90s", now).as_deref(),
-            Some("2026-10-26T12:01:30Z")
-        );
-        assert_eq!(relative_time("nowhere", now), None);
-        assert_eq!(relative_time("now-3w", now), None);
-        assert_eq!(relative_time("2026-10-26T12:00:00Z", now), None);
-    }
-
-    #[test]
-    fn manifests_parse_into_kubernetes_types() {
-        let data = DemoData::parse(&DEMO_DATA, at_noon());
-        let shop = data
-            .objects
-            .iter()
-            .find(|objects| objects.namespace == "shop")
-            .expect("shop's objects");
-        assert!(
-            shop.deployments
-                .iter()
-                .any(|d| d.metadata.name.as_deref() == Some("web"))
-        );
-        assert!(shop.secrets.iter().any(|s| s.key_count > 0));
-        assert!(data.nodes.iter().any(|node| node.metadata.name.is_some()));
-        assert!(data.events.contains_key("shop"));
-        assert!(data.replica_sets.contains_key("shop"));
-    }
-
-    #[test]
-    fn times_follow_the_clock() {
-        let load = |now: &str| DemoData::parse(&DEMO_DATA, now.parse().expect("a time"));
-        let earlier = load("2026-10-26T12:00:00Z");
-        let later = load("2026-10-27T12:00:00Z");
-        let created = |data: &DemoData| {
-            data.nodes
-                .iter()
-                .find_map(|node| node.metadata.creation_timestamp.clone())
-                .expect("a node's creation time")
-                .0
-        };
-        assert_eq!(
-            created(&later).duration_since(created(&earlier)),
-            SignedDuration::from_hours(24)
-        );
-        let event_time = |data: &DemoData| {
-            data.events["shop"]
-                .iter()
-                .find_map(|event| event.event_time.clone())
-                .expect("an event's time")
-                .0
-        };
-        assert_eq!(
-            event_time(&later).duration_since(event_time(&earlier)),
-            SignedDuration::from_hours(24)
-        );
-    }
-}
-
 /// The keys of lab's `files` store, which Zeabur reads to reach the gateway [`fake_s3`] plays.
 fn object_storage_keys(s: &mut State) {
     s.secret_values.insert(
@@ -3792,4 +3715,81 @@ async fn fake_s3() -> std::io::Result<String> {
     let url = format!("http://{}", listener.local_addr()?);
     tokio::spawn(async move { axum::serve(listener, router).await });
     Ok(url)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn at_noon() -> Timestamp {
+        "2026-10-26T12:00:00Z".parse().expect("a time")
+    }
+
+    #[test]
+    fn relative_times_count_from_the_clock() {
+        let now = at_noon();
+        assert_eq!(
+            relative_time("now", now).as_deref(),
+            Some("2026-10-26T12:00:00Z")
+        );
+        assert_eq!(
+            relative_time("now-2d4h30m", now).as_deref(),
+            Some("2026-10-24T07:30:00Z")
+        );
+        assert_eq!(
+            relative_time("now+90s", now).as_deref(),
+            Some("2026-10-26T12:01:30Z")
+        );
+        assert_eq!(relative_time("nowhere", now), None);
+        assert_eq!(relative_time("now-3w", now), None);
+        assert_eq!(relative_time("2026-10-26T12:00:00Z", now), None);
+    }
+
+    #[test]
+    fn manifests_parse_into_kubernetes_types() {
+        let data = DemoData::parse(&DEMO_DATA, at_noon());
+        let shop = data
+            .objects
+            .iter()
+            .find(|objects| objects.namespace == "shop")
+            .expect("shop's objects");
+        assert!(
+            shop.deployments
+                .iter()
+                .any(|d| d.metadata.name.as_deref() == Some("web"))
+        );
+        assert!(shop.secrets.iter().any(|s| s.key_count > 0));
+        assert!(data.nodes.iter().any(|node| node.metadata.name.is_some()));
+        assert!(data.events.contains_key("shop"));
+        assert!(data.replica_sets.contains_key("shop"));
+    }
+
+    #[test]
+    fn times_follow_the_clock() {
+        let load = |now: &str| DemoData::parse(&DEMO_DATA, now.parse().expect("a time"));
+        let earlier = load("2026-10-26T12:00:00Z");
+        let later = load("2026-10-27T12:00:00Z");
+        let created = |data: &DemoData| {
+            data.nodes
+                .iter()
+                .find_map(|node| node.metadata.creation_timestamp.clone())
+                .expect("a node's creation time")
+                .0
+        };
+        assert_eq!(
+            created(&later).duration_since(created(&earlier)),
+            SignedDuration::from_hours(24)
+        );
+        let event_time = |data: &DemoData| {
+            data.events["shop"]
+                .iter()
+                .find_map(|event| event.event_time.clone())
+                .expect("an event's time")
+                .0
+        };
+        assert_eq!(
+            event_time(&later).duration_since(event_time(&earlier)),
+            SignedDuration::from_hours(24)
+        );
+    }
 }
