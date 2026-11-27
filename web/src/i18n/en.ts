@@ -1109,16 +1109,11 @@ export const en = {
   "net.publicNeedsPrivate":
     "A domain sends requests to the service's private address, so it needs one first.",
   "net.sendsTo": "Sends to",
-  "net.privateTitle": "Private network",
-  "net.privateAbout":
-    "Other services in the cluster connect to it at these addresses. The internet can't reach them.",
   "net.privateEmpty": (name: string) => `${name} has no private address`,
   "net.privateEmptyBody":
     "Other services and its public domains can send it traffic only once it has one.",
   "net.port": (port: string) => `Port ${port}`,
   "net.anyPort": "The only port",
-  "net.fullForm": "From another project",
-  "net.forwardsTo": (port: string) => `Forwarded to the container's port ${port}`,
   "net.addPrivate": "Add a private address",
   "net.privatePort": "Port",
   "net.privatePortHint": "The port your app listens on.",
@@ -4271,11 +4266,9 @@ export const en = {
   "domainPages.default.gatewayTimeout": (project: string) => `${project} took too long to respond`,
   "domainPages.default.later": "We'll be back soon.",
   "domainPages.default.retry": "Try again in a few minutes.",
-  "ports.title": "Public ports",
   "ports.about":
     "Clients outside the cluster connect straight to a port, without a domain. For services that don't speak HTTP, such as a database.",
   "ports.open": "Open a port",
-  "ports.none": "No port of this service is open to the internet.",
   "ports.waiting": (port: number) => `Port ${port} waits for an address from the load balancer.`,
   "ports.databaseOpen": "Database open to the internet",
   "ports.close": (port: number) => `Close port ${port}`,
@@ -4295,7 +4288,18 @@ export const en = {
   "ports.external": "External port",
   "ports.externalHint":
     "Clients on the internet connect to this port. Leave it empty to use the service port.",
-  "ports.reaches": (port: number) => `to port ${port}`,
+  "addr.title": "Kubernetes Services",
+  "addr.about":
+    "The addresses of this service's Kubernetes Services. Every type has an address in the cluster. A NodePort Service also opens its ports on the nodes. A LoadBalancer Service also gets an address from a load balancer, if the cluster has one.",
+  "addr.outside": "Open outside the cluster",
+  "addr.opens": (from: string) => `Opens ${from} to the internet`,
+  "addr.project": "In this project",
+  "addr.cluster": "From another project in this cluster",
+  "addr.node": "On the nodes",
+  "addr.loadBalancer": "Load balancer",
+  "addr.nodePortOnly": (port: number) => `Node port ${port}`,
+  "addr.nodeHint":
+    "Node ports are from 30000 to 32767 by default. To connect through a node, its firewall must allow the port.",
   "ip.title": "IP limits",
   "ip.about":
     "Choose which addresses can open this service's domains, and which addresses its replicas can connect to.",

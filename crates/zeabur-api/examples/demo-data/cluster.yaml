@@ -11,6 +11,13 @@ spec:
   taints: []
   unschedulable: false
 status:
+  addresses:
+    - type: InternalIP
+      address: 10.0.0.5
+    - type: ExternalIP
+      address: 198.51.100.5
+    - type: Hostname
+      address: vps-1
   allocatable:
     cpu: "2"
     memory: 1900Mi
@@ -54,6 +61,13 @@ spec:
       key: node.kubernetes.io/unschedulable
   unschedulable: true
 status:
+  addresses:
+    - type: InternalIP
+      address: 10.0.0.6
+    - type: ExternalIP
+      address: 198.51.100.6
+    - type: Hostname
+      address: vps-2
   allocatable:
     cpu: "4"
     memory: 7800Mi
@@ -95,6 +109,13 @@ spec:
   taints: []
   unschedulable: false
 status:
+  addresses:
+    - type: InternalIP
+      address: 10.0.0.7
+    - type: ExternalIP
+      address: 198.51.100.7
+    - type: Hostname
+      address: vps-3
   allocatable:
     cpu: "4"
     memory: 7800Mi

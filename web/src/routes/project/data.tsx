@@ -86,8 +86,8 @@ export const refusedPlaces = {
   events: ["events.events.k8s.io"],
   /** Domains: the objects that route to a service. */
   routes: ["ingresses.networking.k8s.io", "httproutes.gateway.networking.k8s.io"],
-  /** Kubernetes Services: a service's private names. */
-  endpoints: ["services"],
+  /** Kubernetes Services, and the nodes their node ports open on. */
+  endpoints: ["services", "nodes"],
   policies: ["networkpolicies.networking.k8s.io"],
   /** Where variables come from. */
   config: ["secrets", "configmaps"],

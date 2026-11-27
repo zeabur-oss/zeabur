@@ -90,7 +90,7 @@ import {
 import { generatedHost, rightsOf } from "@/model/image-service"
 import { refusedPlaces } from "@/routes/project/data"
 import { IpLimits } from "@/routes/service/ip-limits"
-import { PublicPorts } from "@/routes/service/public-ports"
+import { ServiceAddresses } from "@/routes/service/service-addresses"
 import { Reachability } from "@/routes/service/reachability"
 
 const DomainAccess = lazy(() => import("@/routes/service/domain-access"))
@@ -545,21 +545,13 @@ export function NetworkingTab({
             )}
           </section>
 
-          <PublicPorts
+          <ServiceAddresses
             project={project}
             service={service}
             endpoints={endpoints}
             plan={planner.plan}
-          />
-
-          <section className="flex min-w-0 flex-col gap-3" aria-labelledby="net-private">
-            <SectionHeader
-              id="net-private"
-              title={t("net.privateTitle")}
-              description={t("net.privateAbout")}
-            />
-            <RefusedKinds unreadable={refusedEndpoints} />
-            {endpoints.length === 0 ? (
+            refused={<RefusedKinds unreadable={refusedEndpoints} />}
+            empty={
               refusedEndpoints.length > 0 ? null : (
                 <Empty variant="outline" size="inline">
                   <EmptyMedia variant="glyph">
@@ -578,14 +570,8 @@ export function NetworkingTab({
                   </EmptyHeader>
                 </Empty>
               )
-            ) : (
-              <ul className="flex flex-col divide-y divide-v2-border overflow-hidden rounded-xl border border-v2-border bg-card">
-                {endpoints.map((e) => (
-                  <PrivateAddress key={e.name} endpoint={e} namespace={service.namespace} />
-                ))}
-              </ul>
-            )}
-          </section>
+            }
+          />
         </>
       )}
       <IpLimits
@@ -607,58 +593,6 @@ export function NetworkingTab({
       <RefusedKinds unreadable={refusedAmong(unreadable, refusedPlaces.policies)} />
       {planner.dialog}
     </div>
-  )
-}
-
-function PrivateAddress({ endpoint: e, namespace }: { endpoint: Endpoint; namespace: string }) {
-  const t = useT()
-  const fqdn = `${e.name}.${namespace}.svc.cluster.local`
-  const ports = e.ports.length > 0 ? e.ports : [undefined]
-  const only = e.ports.length === 1 ? e.ports[0]?.port : undefined
-  const full = only === undefined ? fqdn : `${fqdn}:${only}`
-  return (
-    <li className="flex flex-col gap-1.5 px-4 py-3">
-      <ul className="flex flex-col gap-1">
-        {ports.map((p) => {
-          const address = p ? `${e.name}:${p.port}` : e.name
-          return (
-            <li
-              key={p ? `${p.port}/${p.protocol}` : "none"}
-              className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5"
-            >
-              <span className="flex min-w-0 items-center gap-1">
-                <span className="truncate font-mono text-sm font-medium" translate="no">
-                  {address}
-                </span>
-                <CopyButton value={address} />
-              </span>
-              {p ? (
-                <span
-                  className="flex items-center gap-1.5 type-meta text-muted-foreground"
-                  translate="no"
-                >
-                  {p.targetPort && /^\d+$/.test(p.targetPort) && p.targetPort !== String(p.port) ? (
-                    <Tooltip content={t("net.forwardsTo", p.targetPort)}>
-                      <span className="font-mono">→ {p.targetPort}</span>
-                    </Tooltip>
-                  ) : null}
-                  <span>{p.protocol}</span>
-                </span>
-              ) : null}
-            </li>
-          )
-        })}
-      </ul>
-      <p className="flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-1 type-meta text-muted-foreground">
-        {t("net.fullForm")}
-        <span className="flex min-w-0 items-center gap-1">
-          <code className="truncate font-mono text-foreground" translate="no" title={full}>
-            {full}
-          </code>
-          <CopyButton value={full} />
-        </span>
-      </p>
-    </li>
   )
 }
 

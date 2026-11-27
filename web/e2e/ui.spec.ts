@@ -977,7 +977,7 @@ test("a service without a shell opens a debug terminal through a plan", async ({
 test("Networking shows the short address and the full one", async ({ page }) => {
   await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
   const panel = page.getByRole("tabpanel", { name: "Networking" })
-  const network = panel.getByRole("region", { name: "Private network" })
+  const network = panel.getByRole("region", { name: "Kubernetes Services" })
   await expect(network.getByText(`${healthy}:80`, { exact: true })).toBeVisible()
   await expect(network).toContainText(`${healthy}.${namespace}.svc.cluster.local:80`)
 })
@@ -1008,25 +1008,27 @@ test("a domain waiting in the draft shows in the list, in the review, and goes w
   await expect(page.getByText("1 change pending")).toHaveCount(0)
 })
 
-test("a port opened on another external port lists that port and the port it reaches", async ({
+test("a port opened on another external port lists its Service with the load balancer and node addresses", async ({
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
-  const ports = page
+  const services = page
     .getByRole("tabpanel", { name: "Networking" })
-    .getByRole("region", { name: "Public ports" })
-  await ports.getByRole("button", { name: "Open a port" }).click()
+    .getByRole("region", { name: "Kubernetes Services" })
+  await services.getByRole("button", { name: "Open a port" }).click()
   await page.getByRole("textbox", { name: "External port" }).fill("18045")
   await page.getByRole("button", { name: "Review changes", exact: true }).click()
   await confirmPlan(page, /^Open port \d+ of /, "Open port", "external port 18045")
-  const row = ports.getByRole("listitem").filter({ hasText: /to port \d+/ })
-  // Without a load balancer controller, the row waits for an address.
-  await expect(row).toContainText(/:18045|Port 18045 waits/, { timeout: 15_000 })
-  await row.getByRole("button", { name: "Close port 18045" }).click()
+  const card = services.getByRole("listitem").filter({ hasText: `${healthy}-public-` })
+  await expect(card).toContainText("LoadBalancer", { timeout: 15_000 })
+  await expect(card).toContainText(/Opens \S+ to the internet/)
+  // Without a load balancer controller, the port waits for an address.
+  await expect(card).toContainText(/:18045|Port 18045 waits/)
+  // The cluster gives the Service a node port, open on every node.
+  await expect(card).toContainText("On the nodes")
+  await card.getByRole("button", { name: "Close port 18045" }).click()
   await confirmPlan(page, /^Close port \d+ of /, "Close port")
-  await expect(ports).toContainText("No port of this service is open to the internet.", {
-    timeout: 15_000,
-  })
+  await expect(card).toHaveCount(0, { timeout: 15_000 })
 })
 
 test("Networking shows who may reach a service, and a ready-made policy isolates it", async ({
