@@ -1012,8 +1012,9 @@ test("a port opened on another external port lists that port and the port it rea
   page,
 }) => {
   await page.goto(`${project}/services/Deployment/${healthy}?tab=networking`)
-  const panel = page.getByRole("tabpanel", { name: "Networking" })
-  const ports = panel.getByRole("region", { name: "Public ports" })
+  const ports = page
+    .getByRole("tabpanel", { name: "Networking" })
+    .getByRole("region", { name: "Public ports" })
   await ports.getByRole("button", { name: "Open a port" }).click()
   await page.getByRole("textbox", { name: "External port" }).fill("18045")
   await page.getByRole("button", { name: "Review changes", exact: true }).click()
@@ -1021,10 +1022,6 @@ test("a port opened on another external port lists that port and the port it rea
   const row = ports.getByRole("listitem").filter({ hasText: /to port \d+/ })
   // Without a load balancer controller, the row waits for an address.
   await expect(row).toContainText(/:18045|Port 18045 waits/, { timeout: 15_000 })
-  // The public port's Service is listed once, under Public ports.
-  await expect(panel.getByRole("region", { name: "Private network" })).not.toContainText(
-    `${healthy}-public-`,
-  )
   await row.getByRole("button", { name: "Close port 18045" }).click()
   await confirmPlan(page, /^Close port \d+ of /, "Close port")
   await expect(ports).toContainText("No port of this service is open to the internet.", {

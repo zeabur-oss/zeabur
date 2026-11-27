@@ -4,9 +4,6 @@ import type { Endpoint } from "@/model/service"
 
 const EXTERNAL = rules["PublicPortChange.external"]
 
-/** A Service the internet reaches: it shows under Public ports, not under Private network. */
-export const isPublic = (e: Endpoint): boolean => e.type === "LoadBalancer"
-
 /** A Service port that a public port can open. */
 export interface PortChoice {
   value: string
