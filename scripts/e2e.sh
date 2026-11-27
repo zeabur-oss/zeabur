@@ -163,11 +163,48 @@ for case in "${refused_token[@]}"; do
   fi
   [[ "$out" == *Forbidden* || "$out" == *forbidden* ]] || { echo "error: unexpected refusal of $case: $out" >&2; exit 1; }
 done
-kubectl -n "$project" delete deployment/token-probe secret/token-probe --wait >/dev/null
+# zeaburctl with the token's kubeconfig only (docs/deploy/from-outside.mdx). Neither command names
+# the project: the context's namespace is the default.
+cargo build -q --locked --no-default-features -p zeaburctl --manifest-path "$root/Cargo.toml"
+zc() { KUBECONFIG="$token_config" "$root/target/debug/zeaburctl" "$@"; }
+kt create deployment token-web --image=docker.io/traefik/whoami:v1.10 --port=80 >/dev/null
+kt expose deployment token-web --port=80 >/dev/null
+wait_for "$project" kubectl -n "$project" rollout status deployment/token-web --timeout=180s
+zc connect token-web:80 --port 18080 >"$state/connect.log" 2>&1 &
+connect=$!
+answered=
+for _ in $(seq 30); do
+  if curl -fsS http://127.0.0.1:18080/ 2>/dev/null | rg -q '^Hostname: token-web-'; then answered=1; break; fi
+  sleep 1
+done
+kill "$connect"
+[[ -n "$answered" ]] || { cat "$state/connect.log" >&2; echo "error: zeaburctl connect did not reach token-web" >&2; exit 1; }
+if kubectl get crd builds.builder.zeabur.com >/dev/null 2>&1; then
+  # As saving the token's access makes it (crates/zeabur-api/src/members/access.rs).
+  kubectl apply -f - >/dev/null <<YAML
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: zeabur-registry-zeabur-api-token-$token_name
+  namespace: zot
+  labels: {app.kubernetes.io/managed-by: zeabur, zeabur.com/api-token: $token_name}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: zeabur-registry-client}
+subjects: [{kind: ServiceAccount, name: $token_name, namespace: zeabur-api-tokens}]
+YAML
+  site=$(mktemp -d)
+  echo "FROM docker.io/traefik/whoami:v1.10" >"$site/Dockerfile"
+  zc up "$site" --service token-up --port 80
+  rm -rf "$site"
+  wait_for "$project" kubectl -n "$project" wait --for=create deployment/token-up --timeout=60s
+  wait_for "$project" kubectl -n "$project" rollout status deployment/token-up --timeout=900s
+  kubectl -n "$project" delete deployment/token-up service/token-up builds.builder.zeabur.com/token-up \
+    --ignore-not-found --wait >/dev/null
+fi
+kubectl -n "$project" delete deployment/token-probe secret/token-probe deployment/token-web service/token-web --wait >/dev/null
 kubectl delete rolebindings,clusterrolebindings -A -l "zeabur.com/api-token=$token_name" --wait >/dev/null
 kubectl -n zeabur-api-tokens delete serviceaccount "$token_name" --wait >/dev/null
 rm -f "$token_config"
-echo "API token: Developer work in its project, refused elsewhere"
+echo "API token: Developer work and zeaburctl in its project, refused elsewhere"
 
 # --- Domains of the system namespaces (the chart's templates/system-hosts.yaml) -------------------
 # A project cannot take Zeabur's or Zeabur Identity's domain, or every domain; it can use its own.
