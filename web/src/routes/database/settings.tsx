@@ -1,9 +1,9 @@
-import { useQuery } from "@tanstack/react-query"
+import { useQuery, type UseQueryResult } from "@tanstack/react-query"
 import { Alert, AlertDescription } from "@zeabur-oss/design-system/components/alert"
-import { capabilitiesQuery } from "@/api/queries"
-import { missingKeel } from "@/model/git-service"
+import type { Schemas } from "@/api/client"
+import { databaseUpdaterQuery } from "@/api/queries"
 import { formOf, updateOf, type UpdateForm } from "@/model/image-updates"
-import { KeelMissing, PolicyField, WhenFields } from "@/routes/service/image-updates"
+import { PolicyField, WhenFields } from "@/routes/service/image-updates"
 import { useState, type ReactNode } from "react"
 
 import { PartNav } from "@/components/part-nav"
@@ -277,17 +277,14 @@ function Commands({ project, database }: { project: string; database: Database }
 function DatabaseUpdates({ project, database }: { project: string; database: Database }) {
   const t = useT()
   const gate = useGate(project, "changeDatabases")
-  const capabilities = useQuery({ ...capabilitiesQuery, retry: false })
-  const missing = missingKeel(capabilities.data?.items)
+  const updater = useQuery(databaseUpdaterQuery)
+  const ready = updater.isSuccess && updater.data.status === "ready"
   const updates = databaseImageUpdates(database)
-  const disabled = !gate.open || (!!missing && !updates.setting)
+  const disabled = !gate.open
   return (
     <Part id="updates" title={t("part.updates")} description={t("db.imageUpdates.hint")}>
       <GateNote gate={gate} />
-      <Alert variant="info">
-        <AlertDescription>{t("db.imageUpdates.requiresKeel")}</AlertDescription>
-      </Alert>
-      {missing ? <KeelMissing install={missing.install} /> : null}
+      <DatabaseUpdaterNotice query={updater} />
       {updates.allowed.length ? null : (
         <p className="type-meta text-muted-foreground">{t("db.imageUpdates.unavailable")}</p>
       )}
@@ -297,10 +294,44 @@ function DatabaseUpdates({ project, database }: { project: string; database: Dat
           database={database}
           updates={updates}
           disabled={disabled}
+          canEnable={gate.open && ready && updates.allowed.includes("sameTag")}
         />
       ) : null}
     </Part>
   )
+}
+
+function DatabaseUpdaterNotice({ query }: { query: UseQueryResult<Schemas.DatabaseUpdater> }) {
+  const t = useT()
+  const status = query.isError ? "unknown" : (query.data?.status ?? "checking")
+  const notice = !query.isError && query.data?.problem?.kind === "forbidden" ? "forbidden" : status
+  if (status === "ready")
+    return <p className="type-meta text-muted-foreground">{t("db.imageUpdates.updater.ready")}</p>
+  return (
+    <Alert variant="info">
+      <AlertDescription>
+        <p>{t(`db.imageUpdates.updater.${notice}`)}</p>
+        {status === "checking" ? null : (
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            disabled={query.isFetching}
+            onClick={() => void query.refetch()}
+          >
+            {t("common.retry")}
+          </Button>
+        )}
+      </AlertDescription>
+    </Alert>
+  )
+}
+
+function canSaveDatabaseUpdate(
+  update: Schemas.Update | undefined,
+  canEnable: boolean,
+): update is Schemas.Update {
+  return update !== undefined && (update.kind === "off" || canEnable)
 }
 
 function DatabaseUpdatesForm({
@@ -308,11 +339,13 @@ function DatabaseUpdatesForm({
   database,
   updates,
   disabled,
+  canEnable,
 }: {
   project: string
   database: Database
   updates: ReturnType<typeof databaseImageUpdates>
   disabled: boolean
+  canEnable: boolean
 }) {
   const t = useT()
   const planner = usePlanner(project)
@@ -321,6 +354,7 @@ function DatabaseUpdatesForm({
   const [form, setForm] = useState(initial)
   const update = updateOf(updates, form, now)
   const changed = JSON.stringify(update) !== JSON.stringify(updateOf(updates, initial, now))
+  const canSave = !disabled && changed && canSaveDatabaseUpdate(update, canEnable)
   const set = (patch: Partial<UpdateForm>) => setForm((f) => ({ ...f, ...patch }))
   return (
     <>
@@ -328,7 +362,7 @@ function DatabaseUpdatesForm({
         className="flex flex-col gap-4"
         onSubmit={(event) => {
           event.preventDefault()
-          if (disabled || !update || !changed) return
+          if (!canSave) return
           planner.plan({
             title: t("part.updates"),
             changes: updateDatabaseImages(database, update),
@@ -342,16 +376,16 @@ function DatabaseUpdatesForm({
         <PolicyField
           image={database.image ?? ""}
           hint={form.policy === "off" ? t("imageUpdates.policyHint.off") : undefined}
-          updates={updates}
+          updates={canEnable ? updates : { ...updates, allowed: [] }}
           form={form}
-          disabled={disabled}
+          disabled={disabled || (!canEnable && !updates.setting)}
           set={set}
         />
-        {form.policy === "off" || form.policy === "other" ? null : (
-          <WhenFields form={form} now={now} disabled={disabled} set={set} />
-        )}
+        {form.policy === "sameTag" ? (
+          <WhenFields form={form} now={now} disabled={!canEnable} set={set} />
+        ) : null}
         <div className="flex justify-end">
-          <Button size="sm" type="submit" disabled={disabled || !changed || !update}>
+          <Button size="sm" type="submit" disabled={!canSave}>
             {t("edit.review")}
           </Button>
         </div>

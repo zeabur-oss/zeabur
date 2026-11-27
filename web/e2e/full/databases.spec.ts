@@ -9,7 +9,7 @@ import { invite, member, planAndApply, signInAdmin, toast } from "./members.ts"
 
 // Databases by role: a Developer creates and backs up databases and configures PostgreSQL image
 // updates; a Viewer sees them but cannot back them up, change updates or read passwords.
-// Image-update settings need Keel installed, as in the full dev-cluster profile.
+// Image-update settings need the chart's database updater enabled.
 // scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL and ZEABUR_E2E_NAMESPACE:
 //
 //   ZEABUR_E2E_DB_ADMIN_LINK   an invitation for `e2e-db-admin`, an admin account (`invite --admin`;
@@ -268,6 +268,9 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
   }
 
   await test.step("the Developer saves and disables PostgreSQL image updates without changing its spec", async () => {
+    const readiness = await developer.request.get("/api/v1/cluster/database-updater")
+    expect(readiness.status()).toBe(200)
+    expect(await readiness.json()).toMatchObject({ status: "ready" })
     const existing = await postgresObject(developer)
     const lastApplied = JSON.stringify({
       apiVersion: "postgresql.cnpg.io/v1",
@@ -307,6 +310,7 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
     await developer.goto(databasePage("postgresql", postgres))
     await developer.getByRole("tab", { name: "Settings" }).click()
     const updates = developer.getByRole("region", { name: "Automatic updates", exact: true })
+    await expect(updates).toContainText("Automatic database updates are ready.")
     const policy = updates.getByRole("combobox", { name: "Which versions" })
     await expect(policy).toHaveText("Off")
     await policy.click()
@@ -412,8 +416,12 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       const refused = await planAndApply(viewer, project, [{ op: "create", object: db.backup }])
       expect(refused.status, JSON.stringify(refused.body)).toBe(403)
       if (db.path === "postgresql") {
+        const readiness = await viewer.request.get("/api/v1/cluster/database-updater")
+        expect(readiness.status()).toBe(200)
+        expect(await readiness.json()).toMatchObject({ status: "ready" })
         await viewer.getByRole("tab", { name: "Settings" }).click()
         const updates = viewer.getByRole("region", { name: "Automatic updates", exact: true })
+        await expect(updates).toContainText("Automatic database updates are ready.")
         await expect(updates.getByRole("combobox", { name: "Which versions" })).toBeDisabled()
         await expect(
           updates.getByRole("button", { name: "Review changes", exact: true }),

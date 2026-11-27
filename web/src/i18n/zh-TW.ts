@@ -731,8 +731,13 @@ export const zhTW: Messages = {
   "builds.history": "紀錄",
   "db.imageUpdates.hint":
     "依排程更新此 PostgreSQL 標籤的映像檔摘要，由 CloudNativePG 逐一更新執行個體；標籤與 PostgreSQL 主版本維持不變。",
-  "db.imageUpdates.requiresKeel":
-    "需要支援 CloudNativePG 且有權修補 Cluster 的 Keel。目前固定使用的 Keel 0.22.4 尚不支援此功能。",
+  "db.imageUpdates.updater.checking": "正在檢查資料庫自動更新…",
+  "db.imageUpdates.updater.ready": "資料庫自動更新已就緒。",
+  "db.imageUpdates.updater.missing": "尚未安裝資料庫自動更新。請叢集管理員啟用資料庫更新程式。",
+  "db.imageUpdates.updater.notReady": "資料庫更新程式尚未就緒。請叢集管理員檢查。",
+  "db.imageUpdates.updater.unknown": "無法確認資料庫更新程式的狀態，請重試。",
+  "db.imageUpdates.updater.forbidden":
+    "你的帳號無法檢視資料庫更新程式。請向叢集管理員申請存取權限。",
   "db.imageUpdates.unavailable":
     "請使用明確的 PostgreSQL 主版本標籤（例如 18-standard-trixie），且不要設定 imageCatalogRef。標籤即使附有摘要，也能更新。",
   "imageUpdates.hint": "讓服務自動換上映像檔的新版本。每次更新都會重新啟動服務。",

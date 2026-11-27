@@ -241,6 +241,7 @@ macro_rules! handlers {
             identity::get,
             cluster::get,
             cluster::zeabur::get,
+            cluster::database_updater::get,
             cluster::update::get,
             cluster::capabilities,
             cluster::capabilities_head,

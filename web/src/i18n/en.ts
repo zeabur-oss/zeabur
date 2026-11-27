@@ -777,8 +777,15 @@ export const en = {
   "builds.history": "History",
   "db.imageUpdates.hint":
     "Refresh this PostgreSQL tag on its schedule. CloudNativePG rolls out the new digest; the tag and PostgreSQL major version stay the same.",
-  "db.imageUpdates.requiresKeel":
-    "Requires a Keel build with CloudNativePG support and permission to patch Clusters. The currently pinned Keel 0.22.4 does not support this yet.",
+  "db.imageUpdates.updater.checking": "Checking automatic database updates…",
+  "db.imageUpdates.updater.ready": "Automatic database updates are ready.",
+  "db.imageUpdates.updater.missing":
+    "Automatic database updates aren't installed. Ask a cluster administrator to enable the database updater.",
+  "db.imageUpdates.updater.notReady":
+    "The database updater isn't ready. Ask a cluster administrator to check it.",
+  "db.imageUpdates.updater.unknown": "The database updater couldn't be checked. Try again.",
+  "db.imageUpdates.updater.forbidden":
+    "Your account can't check the database updater. Ask a cluster administrator for access.",
   "db.imageUpdates.unavailable":
     "Use an explicit PostgreSQL major-version tag, such as 18-standard-trixie, without an imageCatalogRef. A tag with a digest can be refreshed.",
   "imageUpdates.hint":

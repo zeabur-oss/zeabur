@@ -15,6 +15,7 @@ mod cluster_tools;
 mod common;
 mod components;
 mod creations;
+mod database_updater;
 mod databases;
 mod deploy_from_git;
 mod domains;

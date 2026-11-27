@@ -301,6 +301,14 @@ export const capabilitiesQuery = queryOptions({
   retryOnMount: false,
 })
 
+export const databaseUpdaterQuery = queryOptions({
+  queryKey: ["cluster", "database-updater"],
+  queryFn: ({ signal }) => zeabur.getDatabaseUpdater({ signal }),
+  staleTime: 5_000,
+  refetchInterval: 15_000,
+  retry: false,
+})
+
 /** The Zeabur Catalog release Zeabur reads its components from. */
 export const catalogQuery = queryOptions({
   queryKey: ["cluster", "catalog"],

@@ -57,6 +57,7 @@ pub mod capacity;
 pub mod catalog;
 pub mod components;
 pub mod config_reload;
+pub mod database_updater;
 pub(crate) mod disks;
 pub mod github_app;
 pub(crate) mod health;

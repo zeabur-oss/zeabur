@@ -434,6 +434,25 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  /api/v1/cluster/database-updater:
+    get:
+      tags:
+      - cluster
+      summary: |-
+        The updater's live Deployment state. Reads only the public locator and its named Deployment,
+        with the person's credential; an unreadable object is unknown, not missing.
+      operationId: getDatabaseUpdater
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DatabaseUpdater"
+        "401":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   /api/v1/cluster/events:
     get:
       tags:
@@ -9087,6 +9106,34 @@ components:
       - degraded
       - failed
       - paused
+      - unknown
+    DatabaseUpdater:
+      type: object
+      description: The native state of the chart-owned database updater.
+      required:
+      - status
+      - message
+      properties:
+        message:
+          type: string
+          description: >-
+            A safe explanation without the cluster's connection details or Deployment
+            contents.
+        problem:
+          oneOf:
+          - $ref: "#/components/schemas/Problem"
+            description: Why the state could not be checked, including permission refusals.
+          - type: "null"
+        status:
+          $ref: "#/components/schemas/DatabaseUpdaterStatus"
+          description: Whether it is installed and ready.
+    DatabaseUpdaterStatus:
+      type: string
+      description: Whether automatic database updates can be enabled.
+      enum:
+      - missing
+      - notReady
+      - ready
       - unknown
     DebugContainerStatus:
       type: object

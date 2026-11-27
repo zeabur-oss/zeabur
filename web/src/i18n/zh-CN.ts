@@ -730,8 +730,13 @@ export const zhCN: Messages = {
   "builds.history": "记录",
   "db.imageUpdates.hint":
     "按计划更新此 PostgreSQL 标签的镜像摘要，由 CloudNativePG 逐一更新实例；标签与 PostgreSQL 主版本保持不变。",
-  "db.imageUpdates.requiresKeel":
-    "需要支持 CloudNativePG 且有权限修补 Cluster 的 Keel。目前固定使用的 Keel 0.22.4 尚不支持此功能。",
+  "db.imageUpdates.updater.checking": "正在检查数据库自动更新…",
+  "db.imageUpdates.updater.ready": "数据库自动更新已就绪。",
+  "db.imageUpdates.updater.missing": "尚未安装数据库自动更新。请集群管理员启用数据库更新程序。",
+  "db.imageUpdates.updater.notReady": "数据库更新程序尚未就绪。请集群管理员检查。",
+  "db.imageUpdates.updater.unknown": "无法确认数据库更新程序的状态，请重试。",
+  "db.imageUpdates.updater.forbidden":
+    "你的账号无法查看数据库更新程序。请向集群管理员申请访问权限。",
   "db.imageUpdates.unavailable":
     "请使用明确的 PostgreSQL 主版本标签（例如 18-standard-trixie），且不要设置 imageCatalogRef。标签即使附有摘要，也能更新。",
   "imageUpdates.hint": "让服务自动换上镜像的新版本。每次更新都会重启服务。",
