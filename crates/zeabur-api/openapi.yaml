@@ -2634,6 +2634,849 @@ paths:
             application/problem+json:
               schema:
                 $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/folders":
+    post:
+      tags:
+      - projects
+      summary: "Makes a folder: the empty object `<prefix>`."
+      operationId: makeBucketFolder
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BucketNewFolder"
+        required: true
+      responses:
+        "204":
+          description: Made
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/moves":
+    post:
+      tags:
+      - projects
+      summary: "Renames one object: copies it to the new key, then deletes the old one."
+      operationId: renameBucketObject
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BucketMove"
+        required: true
+      responses:
+        "204":
+          description: Renamed
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "409":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/object":
+    get:
+      tags:
+      - projects
+      summary: Downloads an object, or shows an image in the page with `inline`.
+      operationId: downloadBucketObject
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          description: The object's bytes
+          content:
+            application/octet-stream: {}
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    put:
+      tags:
+      - projects
+      summary: >-
+        Uploads an object of at most [`MAX_PART`] bytes whole, replacing one with its
+        key.
+      operationId: uploadBucketObject
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              type: array
+              items:
+                type: integer
+                format: int32
+                minimum: 0
+        required: true
+      responses:
+        "204":
+          description: Written
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/object/preview":
+    get:
+      tags:
+      - projects
+      summary: >-
+        An object as text, up to [`MAX_PREVIEW`] bytes, or whether it is an image the
+        page may show.
+      operationId: previewBucketObject
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BucketPreview"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/objects":
+    get:
+      tags:
+      - projects
+      summary: Lists one level of a bucket.
+      operationId: listBucketObjects
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BucketListing"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+    delete:
+      tags:
+      - projects
+      summary: Deletes an object (`key`) or a folder and everything under it (`prefix`).
+      operationId: deleteBucketObjects
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BucketDeleted"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/objects/count":
+    get:
+      tags:
+      - projects
+      summary: Counts what is under a prefix, up to [`MAX_COUNT`] objects.
+      operationId: countBucketObjects
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BucketCount"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/uploads":
+    post:
+      tags:
+      - projects
+      summary: Starts an upload in parts.
+      operationId: startBucketUpload
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BucketUpload"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/uploads/{upload}":
+    delete:
+      tags:
+      - projects
+      summary: Aborts an upload and drops the parts sent.
+      operationId: abortBucketUpload
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: upload
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      responses:
+        "204":
+          description: Aborted
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/uploads/{upload}/complete":
+    post:
+      tags:
+      - projects
+      summary: Completes an upload from its parts [s3-complete].
+      description: "[s3-complete]: https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html"
+      operationId: completeBucketUpload
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: upload
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BucketParts"
+        required: true
+      responses:
+        "204":
+          description: Written
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+  "/api/v1/projects/{project}/object-storage/{store}/buckets/{bucket}/uploads/{upload}/parts/{part}":
+    put:
+      tags:
+      - projects
+      summary: Sends one part of an upload, of at most [`MAX_PART`] bytes.
+      operationId: sendBucketUploadPart
+      parameters:
+      - name: project
+        in: path
+        required: true
+        schema:
+          $ref: "#/components/schemas/ProjectName"
+      - name: store
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: bucket
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: upload
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: part
+        in: path
+        required: true
+        schema:
+          type: integer
+          format: int32
+          minimum: 0
+      - name: key
+        in: query
+        description: An object's key.
+        required: false
+        schema:
+          type: string
+      - name: prefix
+        in: query
+        description: A prefix, empty or ending in `/`.
+        required: false
+        schema:
+          type: string
+      - name: after
+        in: query
+        description: A listing's `next`.
+        required: false
+        schema:
+          type: string
+      - name: inline
+        in: query
+        description: Shows an image in the page instead of downloading it.
+        required: false
+        schema:
+          type: boolean
+      requestBody:
+        content:
+          application/octet-stream:
+            schema:
+              type: array
+              items:
+                type: integer
+                format: int32
+                minimum: 0
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BucketPart"
+        "400":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "403":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "404":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
+        "503":
+          content:
+            application/problem+json:
+              schema:
+                $ref: "#/components/schemas/Problem"
   "/api/v1/projects/{project}/objects":
     get:
       tags:
@@ -5439,6 +6282,206 @@ components:
         username:
           type: string
           description: The user name; no colon.
+    BucketCount:
+      type: object
+      description: What is under a prefix.
+      required:
+      - objects
+      - bytes
+      - more
+      properties:
+        bytes:
+          type: integer
+          format: int64
+          description: Their bytes.
+          minimum: 0
+        more:
+          type: boolean
+          description: There are more than `limits.count`.
+        objects:
+          type: integer
+          format: int64
+          description: The objects, up to `limits.count`.
+          minimum: 0
+    BucketDeleted:
+      type: object
+      description: What a delete removed.
+      required:
+      - objects
+      properties:
+        objects:
+          type: integer
+          format: int64
+          description: The objects deleted.
+          minimum: 0
+    BucketLimits:
+      type: object
+      description: The limits of a bucket's files.
+      required:
+      - keys
+      - part
+      - preview
+      - count
+      properties:
+        count:
+          type: integer
+          format: int64
+          description: The most objects counted before a folder is deleted.
+          minimum: 0
+        keys:
+          type: integer
+          description: The most keys a page lists.
+          minimum: 0
+        part:
+          type: integer
+          format: int64
+          description: The largest part of an upload, and the largest object uploaded whole.
+          minimum: 0
+        preview:
+          type: integer
+          format: int64
+          description: The largest object previewed.
+          minimum: 0
+    BucketListing:
+      type: object
+      description: One level of a bucket.
+      required:
+      - prefix
+      - folders
+      - objects
+      - limits
+      properties:
+        folders:
+          type: array
+          items:
+            type: string
+          description: The folders in it, as full prefixes ending in `/`.
+        limits:
+          $ref: "#/components/schemas/BucketLimits"
+          description: The limits the server keeps.
+        next:
+          type:
+          - string
+          - "null"
+          description: Pass as `after` for the next page; absent on the last.
+        objects:
+          type: array
+          items:
+            $ref: "#/components/schemas/BucketObject"
+          description: The objects in it, by key. The folder's own empty object is left out.
+        prefix:
+          type: string
+          description: "The prefix listed: empty for the bucket's top, else ending in `/`."
+    BucketMove:
+      type: object
+      description: A rename of one object.
+      required:
+      - from
+      - to
+      properties:
+        from:
+          type: string
+          description: The object's key.
+        to:
+          type: string
+          description: Its new key; no object may have it.
+    BucketNewFolder:
+      type: object
+      description: A folder to make.
+      required:
+      - prefix
+      properties:
+        prefix:
+          type: string
+          description: Its prefix, ending in `/`.
+    BucketObject:
+      type: object
+      description: One object.
+      required:
+      - key
+      - size
+      properties:
+        key:
+          type: string
+          description: Its key.
+        lastModified:
+          type:
+          - string
+          - "null"
+          description: When it was last written, as the gateway says it.
+        size:
+          type: integer
+          format: int64
+          description: Its size in bytes.
+          minimum: 0
+    BucketPart:
+      type: object
+      description: One part sent.
+      required:
+      - number
+      - etag
+      properties:
+        etag:
+          type: string
+          description: The gateway's tag of it.
+        number:
+          type: integer
+          format: int32
+          description: Its number, from 1.
+          minimum: 0
+    BucketParts:
+      type: object
+      description: The parts of an upload, to complete it.
+      required:
+      - parts
+      properties:
+        parts:
+          type: array
+          items:
+            $ref: "#/components/schemas/BucketPart"
+          description: Every part, by number.
+    BucketPreview:
+      type: object
+      description: An object's preview.
+      required:
+      - key
+      - size
+      - image
+      - tooLarge
+      properties:
+        contentType:
+          type:
+          - string
+          - "null"
+          description: Its `Content-Type`, as it was uploaded.
+        image:
+          type: boolean
+          description: An image the page may show from `…/object?inline=true`.
+        key:
+          type: string
+          description: Its key.
+        size:
+          type: integer
+          format: int64
+          description: Its size in bytes.
+          minimum: 0
+        text:
+          type:
+          - string
+          - "null"
+          description: Its text; absent when it is not UTF-8 text or larger than `limits.preview`.
+        tooLarge:
+          type: boolean
+          description: Larger than `limits.preview`.
+    BucketUpload:
+      type: object
+      description: A started upload in parts.
+      required:
+      - upload
+      properties:
+        upload:
+          type: string
+          description: The upload's ID, for its parts.
     BuildCredentials:
       type: object
       description: The Secret a `Build` reads its repository's credentials from.

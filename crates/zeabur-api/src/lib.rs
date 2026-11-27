@@ -56,6 +56,13 @@
 //! | `GET /api/v1/projects/{p}/configmaps` | the ConfigMaps, in full |
 //! | `POST /api/v1/projects/{p}/secrets/{name}/reveal` | a Secret's values |
 //! | `GET /api/v1/projects/{p}/databases/{engine}/{name}/export` | a database's dump, streamed from its own dump tool through your `pods/exec` |
+//! | `GET`, `DELETE /api/v1/projects/{p}/object-storage/{store}/buckets/{bucket}/objects` | one level of a bucket, 1,000 keys a page; deletes an object or a folder (see the `projects::bucket_files` module) |
+//! | `GET /api/v1/projects/{p}/object-storage/{store}/buckets/{bucket}/objects/count` | the objects under a folder, up to 10,000 |
+//! | `GET`, `PUT /api/v1/projects/{p}/object-storage/{store}/buckets/{bucket}/object` | downloads an object; uploads one of up to 64 MiB |
+//! | `GET /api/v1/projects/{p}/object-storage/{store}/buckets/{bucket}/object/preview` | an object as text, up to 1 MB, or whether it is an image |
+//! | `POST /api/v1/projects/{p}/object-storage/{store}/buckets/{bucket}/folders` | makes a folder |
+//! | `POST /api/v1/projects/{p}/object-storage/{store}/buckets/{bucket}/moves` | renames an object |
+//! | `POST /api/v1/projects/{p}/object-storage/{store}/buckets/{bucket}/uploads` | starts an upload in parts; `…/uploads/{id}/parts/{n}` sends one of up to 64 MiB, `…/complete` ends it, `DELETE …/uploads/{id}` aborts it |
 //! | `GET /api/v1/projects/{p}/events` | events, newest first, `limit` of them |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs` | a log snapshot |
 //! | `GET /api/v1/projects/{p}/pods/{pod}/logs/follow` | a log as Server-Sent Events |
@@ -337,6 +344,18 @@ macro_rules! handlers {
             alerts::project,
             projects::databases::get,
             projects::object_storage::get,
+            projects::bucket_files::list,
+            projects::bucket_files::count,
+            projects::bucket_files::delete,
+            projects::bucket_files::download,
+            projects::bucket_files::preview,
+            projects::bucket_files::upload,
+            projects::bucket_files::make_folder,
+            projects::bucket_files::rename,
+            projects::bucket_files::start_upload,
+            projects::bucket_files::upload_part,
+            projects::bucket_files::complete_upload,
+            projects::bucket_files::abort_upload,
             projects::database_export::export,
             projects::volume_restores::get,
             projects::builds::get,
@@ -517,6 +536,9 @@ pub struct Options {
     pub changes: Option<measure::Changes>,
     /// Reads Zeabur Catalog's API; `None` reads it over HTTPS at `settings.catalog_url`.
     pub catalog: Option<Arc<dyn cluster::catalog::Fetch>>,
+    /// Where every object store's S3 gateway is reached instead of its Service; for tests and the
+    /// demo.
+    pub s3_endpoint: Option<String>,
 }
 
 impl Default for Options {
@@ -537,6 +559,7 @@ impl Default for Options {
             used: None,
             changes: None,
             catalog: None,
+            s3_endpoint: None,
         }
     }
 }
@@ -572,6 +595,7 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         used,
         changes,
         catalog,
+        s3_endpoint,
     } = options;
     let catalogue = Arc::new(zeabur_catalog::catalogue().unwrap_or_default());
     let tls = zeabur_http::tls(settings.trusted_ca.as_deref());
@@ -631,6 +655,11 @@ pub fn router_with(access: Arc<dyn ClusterAccess>, options: Options) -> Router {
         zeabur_proxy,
         pusher: Arc::new(projects::oci_push::Pusher::new(reach, &tls, trusted_ca)),
         store: Arc::new(cluster::object_store::Fetcher::new(images.reach(), &tls)),
+        gateways: Arc::new(cluster::s3::Gateways::new(
+            images.reach(),
+            &tls,
+            s3_endpoint,
+        )),
         images,
         github,
         releases: Arc::new(cluster::update::Releases::default()),

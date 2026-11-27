@@ -37,6 +37,7 @@
 //! [k8s-concepts]: https://kubernetes.io/docs/reference/using-api/api-concepts/
 
 pub mod backups;
+pub mod bucket_files;
 pub mod builds;
 pub mod compose;
 pub mod database_export;

@@ -88,7 +88,8 @@ pub struct State {
     pub forbidden_resources: BTreeSet<String>,
     /// Reads refused with `403 Forbidden` in every namespace, by resource as
     /// [`ResourceRef::key`] names it (`secrets`, `httproutes.gateway.networking.k8s.io`): a
-    /// namespace's objects leave them out and name them in `unreadable`.
+    /// namespace's objects leave them out and name them in `unreadable`. `secrets` also refuses
+    /// a Secret's values.
     pub forbidden_in_namespaces: BTreeSet<String>,
     /// Every write that was persisted (not dry runs), in order.
     pub writes: Vec<WriteRequest>,
@@ -984,6 +985,9 @@ impl Cluster for MemoryCluster {
         Box::pin(async move {
             let key = format!("{namespace}/{name}");
             let mut state = self.allowed(Some(namespace))?;
+            if state.forbidden_in_namespaces.contains("secrets") {
+                return Err(forbidden(&key));
+            }
             state.secret_reads += 1;
             state
                 .secret_values

@@ -55,6 +55,8 @@ pub struct AppState {
     pub pusher: Arc<crate::projects::oci_push::Pusher>,
     /// Reads backups from their buckets (see [`crate::cluster::object_store`]).
     pub store: Arc<crate::cluster::object_store::Fetcher>,
+    /// Reaches object stores' S3 gateways (see [`crate::cluster::s3`]).
+    pub gateways: Arc<crate::cluster::s3::Gateways>,
     /// Zeabur's own service account, which may use pods in the terminal namespace only (see
     /// [`crate::tools`]); `None` where there is none (local mode).
     pub terminals: Option<Arc<dyn Cluster>>,

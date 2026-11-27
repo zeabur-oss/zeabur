@@ -6,6 +6,7 @@ mod account;
 mod api;
 mod api_tokens;
 mod backups;
+mod bucket_files;
 mod certificates;
 mod change_events;
 mod cluster_name;

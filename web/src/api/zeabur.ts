@@ -1050,6 +1050,172 @@ export type BasicAuthChange = {
 }
 
 /**
+ * What is under a prefix.
+ */
+export type BucketCount = {
+  /**
+   * Their bytes.
+   * @minimum 0
+   */
+  bytes: number
+  /** There are more than `limits.count`. */
+  more: boolean
+  /**
+   * The objects, up to `limits.count`.
+   * @minimum 0
+   */
+  objects: number
+}
+
+/**
+ * What a delete removed.
+ */
+export type BucketDeleted = {
+  /**
+   * The objects deleted.
+   * @minimum 0
+   */
+  objects: number
+}
+
+/**
+ * The limits of a bucket's files.
+ */
+export type BucketLimits = {
+  /**
+   * The most objects counted before a folder is deleted.
+   * @minimum 0
+   */
+  count: number
+  /**
+   * The most keys a page lists.
+   * @minimum 0
+   */
+  keys: number
+  /**
+   * The largest part of an upload, and the largest object uploaded whole.
+   * @minimum 0
+   */
+  part: number
+  /**
+   * The largest object previewed.
+   * @minimum 0
+   */
+  preview: number
+}
+
+/**
+ * One object.
+ */
+export type BucketObject = {
+  /** Its key. */
+  key: string
+  /**
+   * When it was last written, as the gateway says it.
+   * @nullable
+   */
+  lastModified?: string | null
+  /**
+   * Its size in bytes.
+   * @minimum 0
+   */
+  size: number
+}
+
+/**
+ * One level of a bucket.
+ */
+export type BucketListing = {
+  /** The folders in it, as full prefixes ending in `/`. */
+  folders: string[]
+  /** The limits the server keeps. */
+  limits: BucketLimits
+  /**
+   * Pass as `after` for the next page; absent on the last.
+   * @nullable
+   */
+  next?: string | null
+  /** The objects in it, by key. The folder's own empty object is left out. */
+  objects: BucketObject[]
+  /** The prefix listed: empty for the bucket's top, else ending in `/`. */
+  prefix: string
+}
+
+/**
+ * A rename of one object.
+ */
+export type BucketMove = {
+  /** The object's key. */
+  from: string
+  /** Its new key; no object may have it. */
+  to: string
+}
+
+/**
+ * A folder to make.
+ */
+export type BucketNewFolder = {
+  /** Its prefix, ending in `/`. */
+  prefix: string
+}
+
+/**
+ * One part sent.
+ */
+export type BucketPart = {
+  /** The gateway's tag of it. */
+  etag: string
+  /**
+   * Its number, from 1.
+   * @minimum 0
+   */
+  number: number
+}
+
+/**
+ * The parts of an upload, to complete it.
+ */
+export type BucketParts = {
+  /** Every part, by number. */
+  parts: BucketPart[]
+}
+
+/**
+ * An object's preview.
+ */
+export type BucketPreview = {
+  /**
+   * Its `Content-Type`, as it was uploaded.
+   * @nullable
+   */
+  contentType?: string | null
+  /** An image the page may show from `…/object?inline=true`. */
+  image: boolean
+  /** Its key. */
+  key: string
+  /**
+   * Its size in bytes.
+   * @minimum 0
+   */
+  size: number
+  /**
+   * Its text; absent when it is not UTF-8 text or larger than `limits.preview`.
+   * @nullable
+   */
+  text?: string | null
+  /** Larger than `limits.preview`. */
+  tooLarge: boolean
+}
+
+/**
+ * A started upload in parts.
+ */
+export type BucketUpload = {
+  /** The upload's ID, for its parts. */
+  upload: string
+}
+
+/**
  * The Secret a `Build` reads its repository's credentials from.
  */
 export type BuildCredentials = {
@@ -11668,6 +11834,116 @@ export type ListNetworkPolicyPresetsParams = {
   service: string
 }
 
+export type DownloadBucketObjectParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type UploadBucketObjectParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type PreviewBucketObjectParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type ListBucketObjectsParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type DeleteBucketObjectsParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type CountBucketObjectsParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type StartBucketUploadParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type AbortBucketUploadParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type CompleteBucketUploadParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
+export type SendBucketUploadPartParams = {
+  /** An object's key. */
+  key?: string
+  /** A prefix, empty or ending in `/`. */
+  prefix?: string
+  /** A listing's `next`. */
+  after?: string
+  /** Shows an image in the page instead of downloading it. */
+  inline?: boolean
+}
+
 export type ListObjectsParams = {
   /**
    * Kinds to read instead of the usual ones, as `<group>/<resource>` (`core` for the core
@@ -13569,6 +13845,441 @@ export const getProjectObjectStorage = async (
     ...options,
     method: "GET",
   })
+}
+
+export const getMakeBucketFolderUrl = (project: ProjectName, store: string, bucket: string) => {
+  return `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/folders`
+}
+
+/**
+ * @summary Makes a folder: the empty object `<prefix>`.
+ */
+export const makeBucketFolder = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  bucketNewFolder: BucketNewFolder,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getMakeBucketFolderUrl(project, store, bucket), {
+    ...options,
+    method: "POST",
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
+    body: JSON.stringify(bucketNewFolder),
+  })
+}
+
+export const getRenameBucketObjectUrl = (project: ProjectName, store: string, bucket: string) => {
+  return `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/moves`
+}
+
+/**
+ * @summary Renames one object: copies it to the new key, then deletes the old one.
+ */
+export const renameBucketObject = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  bucketMove: BucketMove,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getRenameBucketObjectUrl(project, store, bucket), {
+    ...options,
+    method: "POST",
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
+    body: JSON.stringify(bucketMove),
+  })
+}
+
+export const getDownloadBucketObjectUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: DownloadBucketObjectParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/object?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/object`
+}
+
+/**
+ * @summary Downloads an object, or shows an image in the page with `inline`.
+ */
+export const downloadBucketObject = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: DownloadBucketObjectParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<Blob> => {
+  return zeaburFetch<Blob>(getDownloadBucketObjectUrl(project, store, bucket, params), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getUploadBucketObjectUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: UploadBucketObjectParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/object?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/object`
+}
+
+/**
+ * @summary Uploads an object of at most [`MAX_PART`] bytes whole, replacing one with its key.
+ */
+export const uploadBucketObject = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  uploadBucketObjectBody: Blob,
+  params?: UploadBucketObjectParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getUploadBucketObjectUrl(project, store, bucket, params), {
+    ...options,
+    method: "PUT",
+    headers: getHeaders({ "Content-Type": "application/octet-stream" }, options?.headers),
+    body: uploadBucketObjectBody,
+  })
+}
+
+export const getPreviewBucketObjectUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: PreviewBucketObjectParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/object/preview?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/object/preview`
+}
+
+/**
+ * @summary An object as text, up to [`MAX_PREVIEW`] bytes, or whether it is an image the page may show.
+ */
+export const previewBucketObject = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: PreviewBucketObjectParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<BucketPreview> => {
+  return zeaburFetch<BucketPreview>(getPreviewBucketObjectUrl(project, store, bucket, params), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getListBucketObjectsUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: ListBucketObjectsParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/objects?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/objects`
+}
+
+/**
+ * @summary Lists one level of a bucket.
+ */
+export const listBucketObjects = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: ListBucketObjectsParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<BucketListing> => {
+  return zeaburFetch<BucketListing>(getListBucketObjectsUrl(project, store, bucket, params), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getDeleteBucketObjectsUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: DeleteBucketObjectsParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/objects?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/objects`
+}
+
+/**
+ * @summary Deletes an object (`key`) or a folder and everything under it (`prefix`).
+ */
+export const deleteBucketObjects = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: DeleteBucketObjectsParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<BucketDeleted> => {
+  return zeaburFetch<BucketDeleted>(getDeleteBucketObjectsUrl(project, store, bucket, params), {
+    ...options,
+    method: "DELETE",
+  })
+}
+
+export const getCountBucketObjectsUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: CountBucketObjectsParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/objects/count?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/objects/count`
+}
+
+/**
+ * @summary Counts what is under a prefix, up to [`MAX_COUNT`] objects.
+ */
+export const countBucketObjects = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: CountBucketObjectsParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<BucketCount> => {
+  return zeaburFetch<BucketCount>(getCountBucketObjectsUrl(project, store, bucket, params), {
+    ...options,
+    method: "GET",
+  })
+}
+
+export const getStartBucketUploadUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: StartBucketUploadParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/uploads?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/uploads`
+}
+
+/**
+ * @summary Starts an upload in parts.
+ */
+export const startBucketUpload = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  params?: StartBucketUploadParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<BucketUpload> => {
+  return zeaburFetch<BucketUpload>(getStartBucketUploadUrl(project, store, bucket, params), {
+    ...options,
+    method: "POST",
+  })
+}
+
+export const getAbortBucketUploadUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  upload: string,
+  params?: AbortBucketUploadParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/uploads/${encodeURIComponent(String(upload))}?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/uploads/${encodeURIComponent(String(upload))}`
+}
+
+/**
+ * @summary Aborts an upload and drops the parts sent.
+ */
+export const abortBucketUpload = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  upload: string,
+  params?: AbortBucketUploadParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getAbortBucketUploadUrl(project, store, bucket, upload, params), {
+    ...options,
+    method: "DELETE",
+  })
+}
+
+export const getCompleteBucketUploadUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  upload: string,
+  params?: CompleteBucketUploadParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/uploads/${encodeURIComponent(String(upload))}/complete?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/uploads/${encodeURIComponent(String(upload))}/complete`
+}
+
+/**
+ * [s3-complete]: https://docs.aws.amazon.com/AmazonS3/latest/API/API_CompleteMultipartUpload.html
+ * @summary Completes an upload from its parts [s3-complete].
+ */
+export const completeBucketUpload = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  upload: string,
+  bucketParts: BucketParts,
+  params?: CompleteBucketUploadParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<void> => {
+  return zeaburFetch<void>(getCompleteBucketUploadUrl(project, store, bucket, upload, params), {
+    ...options,
+    method: "POST",
+    headers: getHeaders({ "Content-Type": "application/json" }, options?.headers),
+    body: JSON.stringify(bucketParts),
+  })
+}
+
+export const getSendBucketUploadPartUrl = (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  upload: string,
+  part: number,
+  params?: SendBucketUploadPartParams,
+) => {
+  const normalizedParams = new URLSearchParams()
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : String(value))
+    }
+  })
+
+  const stringifiedParams = normalizedParams.toString()
+
+  return stringifiedParams.length > 0
+    ? `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/uploads/${encodeURIComponent(String(upload))}/parts/${encodeURIComponent(String(part))}?${stringifiedParams}`
+    : `/api/v1/projects/${encodeURIComponent(String(project))}/object-storage/${encodeURIComponent(String(store))}/buckets/${encodeURIComponent(String(bucket))}/uploads/${encodeURIComponent(String(upload))}/parts/${encodeURIComponent(String(part))}`
+}
+
+/**
+ * @summary Sends one part of an upload, of at most [`MAX_PART`] bytes.
+ */
+export const sendBucketUploadPart = async (
+  project: ProjectName,
+  store: string,
+  bucket: string,
+  upload: string,
+  part: number,
+  sendBucketUploadPartBody: Blob,
+  params?: SendBucketUploadPartParams,
+  options?: Parameters<typeof zeaburFetch>[1],
+): Promise<BucketPart> => {
+  return zeaburFetch<BucketPart>(
+    getSendBucketUploadPartUrl(project, store, bucket, upload, part, params),
+    {
+      ...options,
+      method: "PUT",
+      headers: getHeaders({ "Content-Type": "application/octet-stream" }, options?.headers),
+      body: sendBucketUploadPartBody,
+    },
+  )
 }
 
 export const getListObjectsUrl = (project: ProjectName, params?: ListObjectsParams) => {
