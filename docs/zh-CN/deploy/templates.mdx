@@ -64,26 +64,38 @@ description: 从 Zeabur Catalog 的模板中选择应用，填写域名和必要
 - 字段格式不符：字段下方会说明要求的格式，按要求修改后重新检查。
 - 检查变更提示集群不支持某种对象：模板需要的组件尚未安装完成，或仍在启动。到**组件**页面确认状态。
 
+## 交给 Agent 部署
+
+Claude Code 或 Codex 这类 Coding Agent 可以用 `zeaburctl templates export` 替你部署模板。把模板 ID 和项目填进这段提示再粘贴：
+
+```text
+把 Zeabur Catalog 的模板 <模板> 部署到我集群的项目 <项目>，按照 https://oss.zeabur.com/zh-CN/docs/zeabur/deploy/templates.md 操作。
+只部署 `zeaburctl templates export <模板> --project <项目>` 输出的内容。不要自己选择版本或值，也不要自己写 manifest、Compose 文件或 Helm 命令。
+输出中每个 <名称> 占位符的值都要问我。拿到值后加上 --domain、--cluster-issuer 和 --set <名称>=<值> 再导出一次，保存为一个文件，之后只用这个文件。
+如果 zeaburctl 提示集群缺少组件，先问我集群适合哪种 --format，再用 `zeaburctl components export <组件> --format <格式>` 输出的内容安装。
+每次写入集群前，先给我看 `kubectl diff --server-side -f <文件>` 的结果，等我同意后，再对同一个文件运行 `kubectl apply --server-side -f <文件>`。
+完成后运行 `zeaburctl doctor --output json`，告诉我结果。
+```
+
+Agent 需要 zeaburctl、kubectl，以及能连接集群的 kubeconfig。它用你的权限写入，在你同意 diff 之前，集群不会有任何改动。
+
 ## 用 kubectl 完成相同操作
 
-### 自己生成 YAML 再应用
+### 导出 YAML 再应用
 
-Zeabur 开源版使用内置的 Zeabur Catalog 将模板转换为 Kubernetes 的 YAML。转换在 Zeabur 开源版内部完成，没有对应的集群对象，但你可以用 Catalog 的 `catalog` 命令生成相同的 YAML，再用 kubectl 应用。
-
-先查看 Zeabur 开源版使用的 Catalog 版本：打开**设置**中的**关于**，**Zeabur Catalog** 一行显示的就是 Catalog 的提交。在 Catalog 源码中切换到该提交，进入 `nix develop` 后运行：
+`zeaburctl templates export` 会输出将模板部署到项目时写入的对象，与网页界面写入的相同，标签也一样。它使用这个 zeaburctl 内置的模板，因此 zeaburctl 的版本要与 Zeabur 开源版相同：
 
 ```sh
 umask 077
-go run ./tools/cmd/catalog template inputs -namespace shop miniflux > secrets.json
-go run ./tools/cmd/catalog template render -namespace shop \
-  -domain miniflux.example.com -cluster-issuer letsencrypt miniflux > plan.yaml
-kubectl -n shop apply -f secrets.json
-kubectl -n shop apply -f plan.yaml
+zeaburctl templates export miniflux --project shop \
+  --domain miniflux.example.com --cluster-issuer letsencrypt > miniflux.yaml
+kubectl diff --server-side -f miniflux.yaml
+kubectl apply --server-side -f miniflux.yaml
 ```
 
-- `template inputs` 生成模板所需的密码和密钥，每次运行都会生成新值，因此只运行一次，后续升级沿用同一份机密变量。不要将 `secrets.json` 纳入版本控制。
-- 如果模板有需要填写的字段，将值写成 JSON 对象，例如 Dify 的 `{"storageRegion":"us-east-1", ...}`，通过 `-values inputs.json` 传入。字段名称位于模板 `template.yaml` 的 `inputs` 中。
-- 必须先安装模板 `requires` 中列出的组件。
+- 输出最前面是存放模板密码和密钥的机密变量。每次运行都会生成新值，因此只导出一次，应用那一份文件。之后再导出一次并应用，会替换运行中应用的密码。不要将这份文件纳入版本控制。
+- 模板需要填写的字段用 `--set <名称>=<值>` 传入，例如 `--set adminEmail=me@example.com`。字段名称位于模板 `template.yaml` 的 `inputs` 中。没有提供的必填字段，以及没有提供的 `--domain` 和 `--cluster-issuer`，会以 `<名称>` 占位符出现，应用前要替换为实际值。`--cluster-issuer` 是集群管理员为 Zeabur 开源版设置的签发者（`domains.clusterIssuer`）。
+- 集群缺少模板需要的组件时，命令会指出来，并给出安装它的 `zeaburctl components export` 命令。详见 [zeaburctl](../reference/zeaburctl.mdx#templates-export)。
 
 删除整个模板：
 

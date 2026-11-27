@@ -1,6 +1,6 @@
 ---
 title: zeaburctl
-description: Open Zeabur OSS with the current kubeconfig, upload a folder, check a cluster, or export component installation manifests and commands.
+description: Open Zeabur OSS with the current kubeconfig, upload a folder, check a cluster, or export what installs a component or deploys a template.
 ---
 
 If you have a kubeconfig that can connect to the cluster, run `zeaburctl ui` to open Zeabur OSS locally. Reads, **Review changes**, and confirmed changes all use that context's permissions. You don't need to install a Zeabur OSS server in the cluster first.
@@ -31,9 +31,10 @@ zeaburctl up ./site --project shop --service site
 zeaburctl connect shop/orders
 zeaburctl connect shop/api:8080
 zeaburctl components export cert-manager
+zeaburctl templates export miniflux --project shop --domain rss.example.com
 ```
 
-`ui`, `doctor`, `up`, and `connect` each accept `--context`. If omitted, they use the current context in kubeconfig. The commands don't modify kubeconfig.
+`ui`, `doctor`, `up`, `connect`, and `templates export` each accept `--context`. If omitted, they use the current context in kubeconfig. The commands don't modify kubeconfig.
 
 | Command | Result | What it changes |
 |---|---|---|
@@ -42,6 +43,7 @@ zeaburctl components export cert-manager
 | `up` | Uploads a folder to a service created from a folder and starts a build | Updates the service's Build and pushes the folder to the registry |
 | `connect` | Forwards a local port to a database or service and prints how to reach it | Changes nothing in the cluster |
 | `components export` | Prints manifests or Helm commands to install Zeabur Catalog components | Doesn't connect to the cluster or change anything |
+| `templates export` | Prints the objects that deploying a Zeabur Catalog template into a project writes | Reads the cluster only to check the components the template needs; changes nothing |
 | `telemetry status` | Shows whether `zeaburctl ui` sends events, and which setting decides it | Doesn't connect to the cluster or change anything |
 | `telemetry disable`, `telemetry enable` | Leaves or joins the experience program | Writes `telemetry: false` or `true` to `config.yaml` on this computer |
 | `telemetry reset` | Deletes the random ID that `zeaburctl ui` keeps for the experience program | Doesn't connect to the cluster or change anything |
@@ -207,6 +209,29 @@ kubectl apply -f velero.yaml
 ```
 
 You can also commit the file to a GitOps repository for Flux or Argo CD to apply. Make later changes and removals in this file.
+
+## `templates export`
+
+```sh
+zeaburctl templates export <id> --project <project> [--domain <domain>] [--cluster-issuer <issuer>] [--set <name>=<value>]... [--context <name>]
+```
+
+Prints, as YAML for `kubectl diff --server-side` and `kubectl apply --server-side`, the objects that deploying a template into the project writes. They are the same objects the web interface writes, with the same labels and `metadata.namespace` set to the project. The templates come from zeaburctl's built-in Catalog.
+
+| Option | Purpose |
+|---|---|
+| `--project` | The project to deploy into. Required |
+| `--domain` | The domain, for a template that routes one |
+| `--cluster-issuer` | The `ClusterIssuer` set for Zeabur OSS (`domains.clusterIssuer`), for a template that asks for certificates |
+| `--set <name>=<value>` | The value of one field. Repeat it for each field |
+| `--context` | The kubeconfig context for the component check. Defaults to the current one |
+
+- The output starts with a secret for the template's passwords and keys. Each run generates new values, so save one export and apply that file.
+- A required field you don't give, a missing domain, and a missing issuer appear as `<name>` placeholders. Replace them before you apply.
+- An unknown template ID, a value that doesn't match its field's format, and a value for a generated field stop the command.
+- If the cluster lacks a component the template needs, the command says so on stderr and names the `zeaburctl components export` command that installs it. If the cluster can't be reached, it says the components weren't checked and prints the objects anyway.
+
+To have a coding agent deploy a template this way, use the prompt in [Deploy with an agent](../deploy/templates.mdx#deploy-with-an-agent).
 
 ## `telemetry status`
 

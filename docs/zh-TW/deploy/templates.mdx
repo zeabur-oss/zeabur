@@ -64,26 +64,38 @@ description: 從 Zeabur Catalog 的範本挑一個應用程式，填好網域和
 - 欄位格式不符：欄位下方會寫出需要的格式，照格式修改後再檢查。
 - 檢查變更說叢集不支援某種物件：範本需要的元件還沒裝好，或還在啟動。到**元件**頁面確認狀態。
 
+## 交給 Agent 部署
+
+Claude Code 或 Codex 這類 Coding Agent 可以用 `zeaburctl templates export` 替你部署範本。把範本 ID 和專案填進這段提示再貼上：
+
+```text
+把 Zeabur Catalog 的範本 <範本> 部署到我叢集的專案 <專案>，照著 https://oss.zeabur.com/zh-TW/docs/zeabur/deploy/templates.md 做。
+只部署 `zeaburctl templates export <範本> --project <專案>` 印出的內容。不要自己挑版本或值，也不要自己寫 manifest、Compose 檔或 Helm 指令。
+輸出裡每個 <名稱> 佔位符的值都要問我。拿到值後加上 --domain、--cluster-issuer 和 --set <名稱>=<值> 再匯出一次，存成一個檔案，之後只用這個檔案。
+如果 zeaburctl 說叢集缺少元件，先問我叢集適合哪種 --format，再用 `zeaburctl components export <元件> --format <格式>` 印出的內容安裝。
+每次寫入叢集前，先給我看 `kubectl diff --server-side -f <檔案>` 的結果，等我同意後，再對同一個檔案執行 `kubectl apply --server-side -f <檔案>`。
+做完後執行 `zeaburctl doctor --output json`，告訴我結果。
+```
+
+Agent 需要 zeaburctl、kubectl，以及能連到叢集的 kubeconfig。它用你的權限寫入，你同意 diff 之前，叢集不會有任何改動。
+
 ## 用 kubectl 做同樣的事
 
-### 自己產生 YAML 再套用
+### 匯出 YAML 再套用
 
-Zeabur 開源版用內建的 Zeabur Catalog 把範本轉成 Kubernetes 的 YAML。轉換在 Zeabur 開源版裡做，沒有對應的叢集物件，但你可以用 Catalog 的 `catalog` 指令得到同樣的 YAML，再用 kubectl 套用。
-
-先查 Zeabur 開源版用的 Catalog 版本：到**設定**的**關於**，**Zeabur Catalog** 那一列是 Catalog 的提交。在 Catalog 的原始碼切到這個提交，進入 `nix develop` 後執行：
+`zeaburctl templates export` 會印出把範本部署到專案時寫入的物件，和網頁介面寫入的一樣，標籤也相同。它用的是這支 zeaburctl 內建的範本，所以 zeaburctl 的版本要和 Zeabur 開源版相同：
 
 ```sh
 umask 077
-go run ./tools/cmd/catalog template inputs -namespace shop miniflux > secrets.json
-go run ./tools/cmd/catalog template render -namespace shop \
-  -domain miniflux.example.com -cluster-issuer letsencrypt miniflux > plan.yaml
-kubectl -n shop apply -f secrets.json
-kubectl -n shop apply -f plan.yaml
+zeaburctl templates export miniflux --project shop \
+  --domain miniflux.example.com --cluster-issuer letsencrypt > miniflux.yaml
+kubectl diff --server-side -f miniflux.yaml
+kubectl apply --server-side -f miniflux.yaml
 ```
 
-- `template inputs` 產生範本要的密碼和金鑰，每次執行都是新的值，只執行一次，之後升級沿用同一份機密變數。`secrets.json` 不要放進版本控制。
-- 範本有要你填的欄位時，把值寫成 JSON 物件，例如 Dify 的 `{"storageRegion":"us-east-1", ...}`，用 `-values inputs.json` 傳入。欄位名稱在範本的 `template.yaml` 的 `inputs`。
-- 範本 `requires` 列出的元件要先裝好。
+- 輸出最前面是存放範本密碼和金鑰的機密變數。每次執行都會產生新的值，所以只匯出一次，套用那一份檔案。之後再匯出一次並套用，會換掉運作中應用程式的密碼。這份檔案不要放進版本控制。
+- 範本要你填的欄位用 `--set <名稱>=<值>` 傳入，例如 `--set adminEmail=me@example.com`。欄位名稱在範本 `template.yaml` 的 `inputs`。沒給的必填欄位，以及沒給的 `--domain` 和 `--cluster-issuer`，會以 `<名稱>` 佔位符出現，套用前要換成實際的值。`--cluster-issuer` 是叢集管理員替 Zeabur 開源版設定的簽發者（`domains.clusterIssuer`）。
+- 叢集缺少範本需要的元件時，指令會說出來，並寫出安裝它的 `zeaburctl components export` 指令。詳見 [zeaburctl](../reference/zeaburctl.mdx#templates-export)。
 
 刪掉整個範本：
 

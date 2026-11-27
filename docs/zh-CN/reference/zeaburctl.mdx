@@ -1,6 +1,6 @@
 ---
 title: zeaburctl
-description: 使用当前 kubeconfig 打开 Zeabur 开源版、上传文件夹、检查集群，或导出组件的安装内容。
+description: 使用当前 kubeconfig 打开 Zeabur 开源版、上传文件夹、检查集群，或导出组件的安装内容和模板的部署内容。
 ---
 
 如果已有能连接集群的 kubeconfig，运行 `zeaburctl ui` 就会在本机打开 Zeabur 开源版。读取、**检查变更**和确认后的应用操作都使用该 context 的权限，无需先在集群中安装 Zeabur 开源版服务器。
@@ -31,9 +31,10 @@ zeaburctl up ./site --project shop --service site
 zeaburctl connect shop/orders
 zeaburctl connect shop/api:8080
 zeaburctl components export cert-manager
+zeaburctl templates export miniflux --project shop --domain rss.example.com
 ```
 
-`ui`、`doctor`、`up`、`connect` 都接受 `--context`。省略时使用 kubeconfig 的当前 context，命令不会修改 kubeconfig。
+`ui`、`doctor`、`up`、`connect`、`templates export` 都接受 `--context`。省略时使用 kubeconfig 的当前 context，命令不会修改 kubeconfig。
 
 | 命令 | 结果 | 会修改什么 |
 |---|---|---|
@@ -42,6 +43,7 @@ zeaburctl components export cert-manager
 | `up` | 将文件夹上传到通过文件夹创建的服务，并开始构建 | 修改该服务的 Build，将文件夹推送到 registry |
 | `connect` | 把本机端口转发到数据库或服务，并打印连接方式 | 不修改集群中的任何内容 |
 | `components export` | 输出安装 Zeabur Catalog 组件的 manifest 或 Helm 命令 | 不连接集群，不做任何修改 |
+| `templates export` | 输出将 Zeabur Catalog 模板部署到项目时写入的对象 | 只读取集群来检查模板需要的组件，不做任何修改 |
 | `telemetry status` | 显示 `zeaburctl ui` 是否发送事件，以及由哪个设置决定 | 不连接集群，不做任何修改 |
 | `telemetry disable`、`telemetry enable` | 退出或加入体验计划 | 在这台电脑的 `config.yaml` 中写入 `telemetry: false` 或 `true` |
 | `telemetry reset` | 删除 `zeaburctl ui` 为体验计划保存的随机代码 | 不连接集群，不做任何修改 |
@@ -207,6 +209,29 @@ kubectl apply -f velero.yaml
 ```
 
 也可以将文件提交到 GitOps 仓库，让 Flux 或 Argo CD 应用。后续调整和移除都通过这个文件完成。
+
+## `templates export`
+
+```sh
+zeaburctl templates export <id> --project <项目> [--domain <域名>] [--cluster-issuer <签发者>] [--set <名称>=<值>]... [--context <名称>]
+```
+
+以 YAML 输出将模板部署到项目时写入的对象，可以直接交给 `kubectl diff --server-side` 和 `kubectl apply --server-side`。这些对象与网页界面写入的相同，标签一样，`metadata.namespace` 为该项目。模板来自 zeaburctl 内置的 Catalog。
+
+| 选项 | 用途 |
+|---|---|
+| `--project` | 要部署到的项目，必填 |
+| `--domain` | 模板需要公开域名时的域名 |
+| `--cluster-issuer` | 为 Zeabur 开源版设置的 `ClusterIssuer`（`domains.clusterIssuer`），模板申请证书时使用 |
+| `--set <名称>=<值>` | 一个字段的值，每个字段各写一次 |
+| `--context` | 检查组件使用的 kubeconfig context，默认为当前 context |
+
+- 输出最前面是存放模板密码和密钥的机密变量。每次运行都会生成新值，因此保存一份输出，应用那个文件。
+- 没有提供的必填字段、域名和签发者会以 `<名称>` 占位符出现，应用前要替换。
+- 模板 ID 不存在、值不符合字段格式，或为自动生成的字段提供了值，命令都会停止。
+- 集群缺少模板需要的组件时，命令会在 stderr 中说明，并给出安装它的 `zeaburctl components export` 命令。无法连接集群时，会说明没有检查组件，仍然输出对象。
+
+要让 Coding Agent 这样部署模板，使用[交给 Agent 部署](../deploy/templates.mdx#交给-agent-部署)中的提示。
 
 ## `telemetry status`
 

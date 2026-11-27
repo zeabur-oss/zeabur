@@ -64,26 +64,38 @@ After you apply the changes, the template's services and databases appear in the
 - Field format doesn't match: The required format appears below the field. Update the value to match, then review changes again.
 - Review changes says the cluster doesn't support an object type: A required component isn't installed or is still starting. Check its status on the **Components** page.
 
+## Deploy with an agent
+
+A coding agent such as Claude Code or Codex can deploy a template for you with `zeaburctl templates export`. Paste this prompt, with the template ID and the project:
+
+```text
+Deploy the Zeabur Catalog template <template> into the project <project> on my cluster. Follow https://oss.zeabur.com/docs/zeabur/deploy/templates.md.
+Deploy only what `zeaburctl templates export <template> --project <project>` prints. Don't choose versions or values, and don't write your own manifests, Compose files or Helm commands.
+Ask me for the value of every <name> placeholder in the output. Then export again with --domain, --cluster-issuer and --set <name>=<value>, save that output to one file, and use only that file.
+If zeaburctl says the cluster lacks a component, ask me which --format fits my cluster, and install the component with what `zeaburctl components export <component> --format <format>` prints.
+Before each write to the cluster, show me the output of `kubectl diff --server-side -f <file>` and wait for my go-ahead. Then run `kubectl apply --server-side -f <file>` on the same file.
+When you finish, run `zeaburctl doctor --output json` and report what it says.
+```
+
+The agent needs zeaburctl and kubectl with a kubeconfig for the cluster. It writes with your permissions, and nothing reaches the cluster until you approve the diff.
+
 ## Do the same with kubectl
 
-### Generate the YAML yourself and apply it
+### Export the YAML and apply it
 
-Zeabur OSS uses its bundled Zeabur Catalog to render templates as Kubernetes YAML. This happens inside Zeabur OSS and has no corresponding cluster object, but you can use Catalog's `catalog` command to generate the same YAML and apply it with kubectl.
-
-First, find the Catalog version Zeabur OSS uses: open **About** in **Settings**. The **Zeabur Catalog** row shows its commit. Check out that commit in the Catalog source, enter `nix develop`, then run:
+`zeaburctl templates export` prints the objects that deploying a template into a project writes, the same ones the web interface writes, with the same labels. It uses the templates in that zeaburctl, so use a zeaburctl of the same version as Zeabur OSS:
 
 ```sh
 umask 077
-go run ./tools/cmd/catalog template inputs -namespace shop miniflux > secrets.json
-go run ./tools/cmd/catalog template render -namespace shop \
-  -domain miniflux.example.com -cluster-issuer letsencrypt miniflux > plan.yaml
-kubectl -n shop apply -f secrets.json
-kubectl -n shop apply -f plan.yaml
+zeaburctl templates export miniflux --project shop \
+  --domain miniflux.example.com --cluster-issuer letsencrypt > miniflux.yaml
+kubectl diff --server-side -f miniflux.yaml
+kubectl apply --server-side -f miniflux.yaml
 ```
 
-- `template inputs` generates the passwords and keys the template needs. Each run generates new values, so run it only once and reuse the same secrets for upgrades. Don't put `secrets.json` in version control.
-- If the template has fields to fill in, write the values as a JSON object, such as `{"storageRegion":"us-east-1", ...}` for Dify, and pass it with `-values inputs.json`. Field names are listed under `inputs` in the template's `template.yaml`.
-- Install the components listed in the template's `requires` first.
+- The output starts with the secrets that hold the template's passwords and keys. Each run generates new values, so export once and apply that file. Applying a later export again replaces the passwords of a running application. Don't put the file in version control.
+- Give each field the template asks for with `--set <name>=<value>`, such as `--set adminEmail=me@example.com`. Field names are under `inputs` in the template's `template.yaml`. A required field you don't give, a missing `--domain`, and a missing `--cluster-issuer` appear as `<name>` placeholders. Replace them before you apply. `--cluster-issuer` is the issuer the cluster administrator set for Zeabur OSS (`domains.clusterIssuer`).
+- If the cluster lacks a component the template needs, the command says so and names the `zeaburctl components export` command that installs it. See [zeaburctl](../reference/zeaburctl.mdx#templates-export).
 
 Delete the entire template:
 
