@@ -81,7 +81,7 @@ Dragonfly 的许可证为 `Apache-2.0 AND BUSL-1.1`。选用前阅读表单显�
 
 ## 自动更新 PostgreSQL 镜像
 
-管理员须先在 Zeabur Helm chart 设置 `databaseUpdater.enabled: true`，安装 Zeabur 的数据库更新组件。此组件复用 Keel 的镜像仓库检查功能；普通 Keel 组件继续负责服务更新，无须修改。数据库设置会显示更新组件是否就绪。
+管理员须在 Zeabur Helm chart 中设置 `databaseUpdater.enabled: true`。数据库设置会显示更新程序是否就绪。
 
 直接管理的 CloudNativePG 数据库可在**设置** → **自动更新镜像**选择**相同标签**与定时，再检查并应用。使用 `17-standard-trixie` 这类固定主版本的滚动标签。更新组件保留镜像仓库与标签，只在仓库内容变更时换成新的摘要，不会选择其他 PostgreSQL 主版本、镜像变体或镜像目录条目。
 

@@ -116,6 +116,8 @@ allocation-counter = "0.8"
 rcgen = { version = "0.14", default-features = false, features = ["aws_lc_rs", "pem"] }
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12", "aws_lc_rs"] }
 rustls-platform-verifier = "0.7"
+# Evaluate the database update annotations in UTC with the jiff already used by Kubernetes.
+croner = { version = "4.0", default-features = false, features = ["jiff"] }
 time = { version = "0.3", default-features = false, features = ["std"] }
 # The TLS listener of zeabur-proxy; already under hyper-rustls.
 tokio-rustls = { version = "0.26", default-features = false, features = ["tls12", "aws_lc_rs"] }

@@ -81,7 +81,7 @@ The database's **Connections** section shows an address inside the cluster. To c
 
 ## Automatically refresh a PostgreSQL image
 
-An administrator must enable `databaseUpdater.enabled: true` in the Zeabur Helm chart. This installs Zeabur's database updater, which reuses Keel's registry checks. The ordinary Keel component continues to update services; it does not need a patch. The database settings show whether the database updater is ready.
+An administrator enables `databaseUpdater.enabled: true` in the Zeabur Helm chart. The database settings show when the updater is ready.
 
 For a directly managed CloudNativePG database, open **Settings** → **Automatic updates**, choose **New image under the same tag** and a schedule, then review and apply. Use a major-version rolling tag such as `17-standard-trixie`. The updater keeps that repository and tag and replaces its digest when the registry changes it. It does not select another PostgreSQL major, image flavor or catalog entry.
 

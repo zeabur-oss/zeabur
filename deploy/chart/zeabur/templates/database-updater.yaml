@@ -118,11 +118,10 @@ spec:
       {{- end }}
       containers:
         - name: updater
-          {{- with .Values.databaseUpdater.image }}
-          image: {{ printf "%s%s%s" .repository (ternary "@" ":" (not (empty .digest))) (default (default $.Chart.Version .tag) .digest) | quote }}
-          imagePullPolicy: {{ .pullPolicy }}
-          {{- end }}
+          image: {{ include "zeabur.image" . | quote }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
           args:
+            - database-updater
             - {{ printf "--scan-interval=%s" .Values.databaseUpdater.scanInterval | quote }}
             {{- with .Values.databaseUpdater.httpRegistries }}
             - {{ printf "--http-registries=%s" (join "," .) | quote }}
@@ -133,11 +132,6 @@ spec:
           {{- if $outbound }}
           env:
             {{- $outbound | nindent 12 }}
-            {{- if or .Values.extraTrustedCA.configMap .Values.extraTrustedCA.secret }}
-            # Go adds this directory to the image's public certificate roots.
-            - name: SSL_CERT_DIR
-              value: /etc/zeabur/extra-ca
-            {{- end }}
           {{- end }}
           ports:
             - name: health

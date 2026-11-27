@@ -8727,6 +8727,13 @@ components:
           - string
           - "null"
           description: The server image.
+        imageUpdates:
+          oneOf:
+          - $ref: "#/components/schemas/ImageUpdates"
+            description: >-
+              The image settings that can be managed here, when supported by the database and
+              its owner.
+          - type: "null"
         kind:
           type: string
           description: The object's kind.

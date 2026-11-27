@@ -86,8 +86,6 @@
             inputsFrom = [ inputs.oss.devShells.${system}.base ];
             packages = with pkgs; [
               rustToolchain
-              # The separate CloudNativePG adapter imports Keel's Go packages.
-              go
 
               # Quality and supply chain
               cargo-deny
@@ -123,10 +121,6 @@
               # Mozilla's CA bundle (MPL-2.0), copied into the image for outgoing TLS (Zeabur Identity's
               # discovery and token endpoints); pinned with nixpkgs.
               ZEABUR_CA_BUNDLE = "${pkgs.cacert}/etc/ssl/certs/ca-bundle.crt";
-              # Nix's Go output omits the license; package it from the pinned compiler source.
-              ZEABUR_GO_LICENSE = pkgs.runCommand "go-${pkgs.go.version}-LICENSE" { } ''
-                tar -xOf ${pkgs.go.src} go/LICENSE > "$out"
-              '';
               # Zeabur Catalog at the commit in flake.lock: its source (scripts/render-chart-corpus.sh)
               # and its release file, bundle.tar.gz (zeabur-catalog).
               ZEABUR_CATALOG = "${inputs.catalog}";

@@ -15,6 +15,7 @@ const database: Database = {
   kind: "Cluster",
   resource: "clusters",
   engine: "postgresql",
+  imageUpdates: { allowed: ["sameTag"] },
   provider: "cloudnative-pg",
   name: "orders",
   state: "ready",
@@ -105,6 +106,13 @@ describe("Database updater readiness", () => {
     expect(policyDisabled(pending)).toBe(true)
   })
 
+  test("a Cluster whose server response omits image settings offers no update action", () => {
+    const db = { ...database, imageUpdates: undefined }
+    const html = settings(client(updater("ready")), db)
+    expect(html).not.toContain('id="updates"')
+    expect(html).not.toContain("Automatic database updates are ready.")
+  })
+
   test("a Viewer can see readiness without acquiring update permission", () => {
     const html = settings(client(updater("ready"), true))
     expect(html).toContain("Automatic database updates are ready.")
@@ -139,16 +147,9 @@ describe("Database updater readiness", () => {
   })
 
   test("existing unsupported settings remain editable to Off without a ready updater", () => {
-    const existing = {
+    const existing: Database = {
       ...database,
-      object: {
-        ...database.object,
-        metadata: {
-          name: database.name,
-          annotations: { "keel.sh/policy": "glob:legacy-*" },
-        },
-        spec: { imageCatalogRef: { name: "catalog", major: 17 } },
-      } as unknown as Database["object"],
+      imageUpdates: { allowed: [], setting: { kind: "other", policy: "glob:legacy-*" } },
     }
     for (const status of ["missing", "notReady", "unknown"] as const) {
       const html = settings(client(updater(status)), existing)

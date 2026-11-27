@@ -5,6 +5,7 @@ pub mod adapters;
 mod attribution;
 mod build_limits;
 mod container;
+mod database_updates;
 mod details;
 mod diagnosis;
 mod gap;
@@ -32,6 +33,7 @@ pub use container::{
     Container, ContainerPort, ContainerResources, EnvVar, ImportedEnv, Mount, MountCategory,
     PendingRestart, ProbeHandler, ProbeSummary, Probes, Quantities, ReadOnlyReason,
 };
+pub use database_updates::{database_image_updates, database_poll_schedule};
 pub use details::{DESCRIPTION_MAX, DISPLAY_NAME_MAX, ProjectDetails, ProjectIcon};
 pub use diagnosis::{
     AffectedService, Diagnosis, DiagnosisGroup, DiagnosisKind, Fault, FaultOrigin, Fixer, Incident,

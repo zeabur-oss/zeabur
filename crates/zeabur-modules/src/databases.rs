@@ -295,6 +295,9 @@ pub struct Restored {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, ToSchema)]
 #[serde(rename_all = "camelCase")]
 pub struct Database {
+    /// The image settings that can be managed here, when supported by the database and its owner.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub image_updates: Option<zeabur_model::ImageUpdates>,
     /// The object it is read from.
     pub origin: zeabur_model::Origin,
     /// The engine.

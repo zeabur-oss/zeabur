@@ -26,7 +26,6 @@
 //! [keel]: https://keel.sh/docs/#policies
 
 use k8s_openapi::apimachinery::pkg::apis::meta::v1::ObjectMeta;
-use serde::Deserialize;
 use serde_json::{Value, json};
 use zeabur_model::{
     ImagePolicy, KEEL_ANNOTATIONS, KEEL_POLL, UpdateWindow, WorkloadKind, WorkloadRef,
@@ -103,58 +102,7 @@ fn validate_window(window: Option<UpdateWindow>) -> Result<(), PlanError> {
     Ok(())
 }
 
-#[derive(Deserialize)]
-struct ImageCluster {
-    metadata: ObjectMeta,
-    #[serde(default)]
-    spec: ImageClusterSpec,
-}
-
-impl ImageCluster {
-    fn requires_approvals(&self) -> bool {
-        self.metadata
-            .labels
-            .iter()
-            .chain(self.metadata.annotations.iter())
-            .filter_map(|values| values.get("keel.sh/approvals"))
-            .any(|value| !value.is_empty() && value != "0")
-    }
-}
-
-#[derive(Default, Deserialize)]
-#[serde(rename_all = "camelCase")]
-struct ImageClusterSpec {
-    image_name: Option<String>,
-    image_catalog_ref: Option<Value>,
-}
-
-impl ImageClusterSpec {
-    fn allows_updates(&self) -> bool {
-        if self.image_catalog_ref.is_some() {
-            return false;
-        }
-        let Some(tag) = self
-            .image_name
-            .as_deref()
-            .and_then(|image| image.split('@').next())
-            .and_then(|image| image.rsplit('/').next())
-            .and_then(|image| image.rsplit_once(':').map(|(_, tag)| tag))
-        else {
-            return false;
-        };
-        let major = tag
-            .strip_prefix('v')
-            .unwrap_or(tag)
-            .split(['.', '-'])
-            .next()
-            .unwrap_or_default();
-        !major.starts_with('0')
-            && major.bytes().all(|b| b.is_ascii_digit())
-            && major.parse::<u32>().is_ok_and(|major| major >= 10)
-    }
-}
-
-/// The CloudNativePG resource whose image updates Keel handles.
+/// The CloudNativePG resource whose image updates the database updater handles.
 #[must_use]
 pub fn cloudnative_pg_clusters() -> ResourceRef {
     ResourceRef {
@@ -421,25 +369,31 @@ impl Planner<'_> {
                     format!("There is no Cluster named {name}."),
                 )
             })?;
-        let cluster: ImageCluster = serde_json::from_value(object.clone()).map_err(|e| {
+        let metadata: ObjectMeta = serde_json::from_value(
+            object.get("metadata").cloned().unwrap_or_default(),
+        )
+        .map_err(|e| {
             error(
                 ErrorKind::Invalid,
                 "invalid_object",
                 format!("Cannot read Cluster {name}: {e}"),
             )
         })?;
-        Self::refuse_managed(&cluster.metadata, "Cluster", name)?;
+        Self::refuse_managed(&metadata, "Cluster", name)?;
+        let choices = zeabur_model::database_image_updates(
+            &metadata,
+            object.get("spec").unwrap_or(&Value::Null),
+        )
+        .ok_or_else(|| {
+            error(
+                ErrorKind::Conflict,
+                "database_updates_read_only",
+                "The Cluster is being deleted or its update settings are managed by another tool.",
+            )
+        })?;
         if let Update::Image { policy, window } = update {
             validate_window(*window)?;
-            if *policy != ImagePolicy::SameTag
-                || !cluster.spec.allows_updates()
-                || cluster.requires_approvals()
-                || cluster
-                    .metadata
-                    .owner_references
-                    .as_ref()
-                    .is_some_and(|owners| !owners.is_empty())
-            {
+            if !choices.allowed.contains(policy) {
                 return Err(error(
                     ErrorKind::BadRequest,
                     "policy_not_allowed",

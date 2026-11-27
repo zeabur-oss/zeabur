@@ -20,7 +20,6 @@ import { plainAmount } from "@/lib/quantity"
 import {
   commands,
   databaseAddress,
-  databaseImageUpdates,
   updateDatabaseImages,
   memberChoices,
   presetOf,
@@ -62,7 +61,7 @@ export function DatabaseSettings({
         {mode ? null : (
           <PartNav
             label={t("db.settings")}
-            parts={database.apiGroup === "postgresql.cnpg.io" ? [...parts, "updates"] : parts}
+            parts={database.imageUpdates ? [...parts, "updates"] : parts}
             name={(part) => t(`part.${part}`)}
           />
         )}
@@ -75,9 +74,10 @@ export function DatabaseSettings({
       ) : (
         <>
           <Shape key={shapeKey(database)} project={project} database={database} />
-          {database.apiGroup === "postgresql.cnpg.io" && database.kind === "Cluster" ? (
+          {database.imageUpdates ? (
             <DatabaseUpdates
-              key={JSON.stringify(databaseImageUpdates(database))}
+              key={JSON.stringify(database.imageUpdates)}
+              updates={database.imageUpdates}
               project={project}
               database={database}
             />
@@ -274,12 +274,19 @@ function Commands({ project, database }: { project: string; database: Database }
   )
 }
 
-function DatabaseUpdates({ project, database }: { project: string; database: Database }) {
+function DatabaseUpdates({
+  project,
+  database,
+  updates,
+}: {
+  project: string
+  database: Database
+  updates: Schemas.ImageUpdates
+}) {
   const t = useT()
   const gate = useGate(project, "changeDatabases")
   const updater = useQuery(databaseUpdaterQuery)
   const ready = updater.isSuccess && updater.data.status === "ready"
-  const updates = databaseImageUpdates(database)
   const disabled = !gate.open
   return (
     <Part id="updates" title={t("part.updates")} description={t("db.imageUpdates.hint")}>
@@ -343,7 +350,7 @@ function DatabaseUpdatesForm({
 }: {
   project: string
   database: Database
-  updates: ReturnType<typeof databaseImageUpdates>
+  updates: Schemas.ImageUpdates
   disabled: boolean
   canEnable: boolean
 }) {

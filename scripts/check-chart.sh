@@ -180,12 +180,10 @@ expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/
 digest="sha256:$(printf '%064d' 0)"
 expect digest "$(render -f "$chart/ci/minimal-values.yaml" --set image.tag=ignored --set image.digest="$digest")" \
   "$image" "ghcr.io/zeabur-oss/zeabur@$digest"
-# Include the independently permissioned updater even though it is opt-in.
-expected_images="ghcr.io/zeabur-oss/database-updater:$chart_version
-ghcr.io/zeabur-oss/proxy:$chart_version
+expected_images="ghcr.io/zeabur-oss/proxy:$chart_version
 ghcr.io/zeabur-oss/zeabur:$chart_version"
 images=$("$root/scripts/chart-images.sh" "$chart")
-[[ "$images" == "$expected_images" ]] || fail "the chart runs $images, not the three images built by the release"
+[[ "$images" == "$expected_images" ]] || fail "the chart runs $images, not only Zeabur and Zeabur Proxy"
 
 # Everyone signed in reads the settings unless that is turned off.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
@@ -440,16 +438,17 @@ expect "priorityClassName unset" "$rendered" '[select(.kind == "Deployment" or .
 expect "serviceAccount.annotations unset" "$rendered" '[select(.kind == "ServiceAccount" and (.metadata.name | test("^zeabur(-proxy)?$"))) | .metadata.annotations] | map(select(. != null)) | length' 0
 
 out=$(render -f "$chart/ci/minimal-values.yaml" --set databaseUpdater.enabled=true \
-  --set databaseUpdater.image.repository=example.test/updater --set databaseUpdater.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
+  --set image.repository=example.test/zeabur --set image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa \
   --set-json 'nodeSelector={"pool":"platform"}' \
   --set-json 'tolerations=[{"key":"platform","operator":"Exists","effect":"NoSchedule"}]' \
   --set-json 'affinity={"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"kubernetes.io/os","operator":"In","values":["linux"]}]}]}}}')
 updater='select(.kind == "Deployment" and .metadata.name == "zeabur-database-updater")'
+expect database-updater "$out" "$updater | .spec.template.spec.containers[0].args[0]" database-updater
 expect database-updater-placement "$out" "$updater | .spec.template.spec.nodeSelector.pool" platform
 expect database-updater-placement "$out" "$updater | .spec.template.spec.tolerations[0] | [.key, .operator, .effect] | join(\",\")" 'platform,Exists,NoSchedule'
 expect database-updater-placement "$out" "$updater | .spec.template.spec.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms[0].matchExpressions[0] | [.key, .operator, .values[0]] | join(\",\")" 'kubernetes.io/os,In,linux'
 expect database-updater "$out" "$updater | .spec.template.spec.containers[0].image" \
-  example.test/updater@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+  example.test/zeabur@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 expect database-updater "$out" "$updater | [.spec.replicas, .spec.strategy.type, .spec.template.spec.serviceAccountName, .spec.template.spec.automountServiceAccountToken] | join(\",\")" \
   '1,Recreate,zeabur-database-updater,false'
 expect database-updater "$out" 'select(.kind == "ConfigMap" and .metadata.name == "zeabur-info") | [.data.databaseUpdaterNamespace, .data.databaseUpdaterDeployment] | join(",")' \

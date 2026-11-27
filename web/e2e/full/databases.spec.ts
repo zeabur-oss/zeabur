@@ -389,6 +389,38 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
     await expect(policy).toHaveText("Off")
   })
 
+  await test.step("Helm owns the schedule of a Helm-managed database", async () => {
+    const resource = "clusters.postgresql.cnpg.io"
+    const label = "app.kubernetes.io/managed-by"
+    const before = await postgresObject(developer)
+    kubectl("label", resource, postgres, `${label}=Helm`)
+    try {
+      await developer.reload()
+      await expect(developer.locator("section#compute")).toBeVisible()
+      await expect(
+        developer.getByRole("region", { name: "Automatic updates", exact: true }),
+      ).toHaveCount(0)
+      const response = await developer.request.post(
+        `/api/v1/projects/${encodeURIComponent(project)}/plan`,
+        {
+          data: {
+            changes: [
+              {
+                op: "autoUpdate",
+                workload: { kind: "Cluster", name: postgres },
+                update: { kind: "image", policy: "sameTag" },
+              },
+            ],
+          },
+        },
+      )
+      expect(response.status()).toBe(409)
+      expect((await postgresObject(developer)).spec).toEqual(before.spec)
+    } finally {
+      kubectl("label", resource, postgres, `${label}-`)
+    }
+  })
+
   await test.step("the Viewer sees the databases but cannot back them up or read passwords", async () => {
     const viewer = await member(browser, viewerLink, "e2e-db-viewer", zeabur)
     for (const db of engines) {

@@ -5376,6 +5376,39 @@ export const DatabaseEngine = {
 } as const
 
 /**
+ * What Keel does with a workload now, by its annotations.
+ */
+export type UpdateSetting =
+  | {
+      kind: "image"
+      /** Which versions. */
+      policy: ImagePolicy
+      window?: UpdateWindow | null
+    }
+  | {
+      kind: "newBuilds"
+    }
+  | {
+      kind: "other"
+      /** `keel.sh/policy`. */
+      policy: string
+      /**
+       * `keel.sh/pollSchedule`, when set.
+       * @nullable
+       */
+      schedule?: string | null
+    }
+
+/**
+ * A long-running workload's automatic image updates.
+ */
+export type ImageUpdates = {
+  /** The policies its images' tags allow (see [`ImagePolicy::allowed`]). */
+  allowed: ImagePolicy[]
+  setting?: UpdateSetting | null
+}
+
+/**
  * What a failing pod's reason means for a person. An open set.
  */
 export type StatusCause = (typeof StatusCause)[keyof typeof StatusCause]
@@ -5506,6 +5539,7 @@ export type Database = {
    * @nullable
    */
   image?: string | null
+  imageUpdates?: ImageUpdates | null
   /** The object's kind. */
   kind: string
   /** Members asked for. */
@@ -7205,39 +7239,6 @@ export type ImageInspection = {
    * @nullable
    */
   user?: string | null
-}
-
-/**
- * What Keel does with a workload now, by its annotations.
- */
-export type UpdateSetting =
-  | {
-      kind: "image"
-      /** Which versions. */
-      policy: ImagePolicy
-      window?: UpdateWindow | null
-    }
-  | {
-      kind: "newBuilds"
-    }
-  | {
-      kind: "other"
-      /** `keel.sh/policy`. */
-      policy: string
-      /**
-       * `keel.sh/pollSchedule`, when set.
-       * @nullable
-       */
-      schedule?: string | null
-    }
-
-/**
- * A long-running workload's automatic image updates.
- */
-export type ImageUpdates = {
-  /** The policies its images' tags allow (see [`ImagePolicy::allowed`]). */
-  allowed: ImagePolicy[]
-  setting?: UpdateSetting | null
 }
 
 /**

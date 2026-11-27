@@ -294,6 +294,7 @@ pub fn database(namespace: &str, cluster: &DynamicObject) -> Database {
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: None,
+        image_updates: None,
         unmanaged: true,
         name,
     }

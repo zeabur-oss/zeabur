@@ -21,12 +21,16 @@ zeabur-catalog.workspace = true
 zeabur-core.workspace = true
 zeabur-http.workspace = true
 zeabur-kube.workspace = true
+zeabur-model.workspace = true
+zeabur-modules.workspace = true
 zeabur-plan.workspace = true
 zeabur-telemetry.workspace = true
 zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
 bytes.workspace = true
 clap.workspace = true
+croner.workspace = true
+futures-util.workspace = true
 form_urlencoded.workspace = true
 http-body-util.workspace = true
 hyper-rustls.workspace = true

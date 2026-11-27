@@ -993,6 +993,38 @@ impl Cluster for MemoryCluster {
         })
     }
 
+    fn pull_secret<'a>(
+        &'a self,
+        namespace: &'a str,
+        name: &'a str,
+    ) -> Answer<'a, BTreeMap<String, Vec<u8>>> {
+        Box::pin(async move {
+            let mut state = self.allowed(Some(namespace))?;
+            state.secret_reads += 1;
+            let secret = state
+                .objects
+                .get(namespace)
+                .and_then(|objects| {
+                    objects
+                        .secrets
+                        .iter()
+                        .find(|s| s.secret.metadata.name.as_deref() == Some(name))
+                })
+                .ok_or_else(|| not_found(name))?;
+            let mut values = BTreeMap::new();
+            if let Some(key) = crate::secrets::docker_key(secret.secret.type_.as_deref())
+                && let Some(value) = state
+                    .secret_values
+                    .get(&format!("{namespace}/{name}"))
+                    .and_then(|v| v.get(key))
+            {
+                values.insert(key.to_owned(), value.clone());
+            }
+            drop(state);
+            Ok(values)
+        })
+    }
+
     fn cluster_facts(&self) -> Answer<'_, ClusterFacts> {
         Box::pin(async move { Ok(self.allowed(None)?.facts.clone()) })
     }

@@ -15,6 +15,14 @@ use serde::de::{IgnoredAny, MapAccess, Visitor};
 use crate::objects::hide_last_applied;
 use crate::port::ClusterError;
 
+pub(crate) fn docker_key(secret_type: Option<&str>) -> Option<&'static str> {
+    match secret_type? {
+        "kubernetes.io/dockerconfigjson" => Some(".dockerconfigjson"),
+        "kubernetes.io/dockercfg" => Some(".dockercfg"),
+        _ => None,
+    }
+}
+
 /// The keys of a `data` or `stringData` map. Their values are skipped.
 #[derive(Default)]
 struct Keys(Vec<String>);

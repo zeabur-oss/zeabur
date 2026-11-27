@@ -25,7 +25,6 @@ import {
   connectionUri,
   createDatabase,
   databaseAddress,
-  databaseImageUpdates,
   updateDatabaseImages,
   DATABASE_LABEL,
   deleteDatabase,
@@ -77,26 +76,6 @@ describe("CloudNativePG automatic updates", () => {
     object: structuredClone(object) as unknown as Database["object"],
   })
 
-  test("a tag plus digest can be refreshed, while catalogs and digest-only images stay out", () => {
-    const db = database()
-    expect(databaseImageUpdates(db)).toEqual({ allowed: ["sameTag"] })
-    for (const spec of [
-      { imageName: "ghcr.io/cloudnative-pg/postgresql@sha256:pin" },
-      { imageName: "ghcr.io/cloudnative-pg/postgresql:latest" },
-      { imageName: image, imageCatalogRef: { name: "external", major: 18 } },
-    ]) {
-      const changed = {
-        ...db,
-        object: { ...object, spec } as unknown as Database["object"],
-      }
-      expect(databaseImageUpdates(changed).allowed).toEqual([])
-      expect(updateDatabaseImages(changed, { kind: "off" })).toEqual([
-        { op: "autoUpdate", workload: { kind: "Cluster", name: db.name }, update: { kind: "off" } },
-      ])
-    }
-    expect(databaseImageUpdates({ ...db, apiGroup: "another.operator" }).allowed).toEqual([])
-  })
-
   test("settings requests never replay the Cluster snapshot, including its last-applied annotation", () => {
     const db = database()
     const update = {
@@ -110,42 +89,6 @@ describe("CloudNativePG automatic updates", () => {
       { op: "autoUpdate", workload, update: { kind: "off" } },
     ])
     expect(db.object).toEqual(object)
-  })
-
-  test("an existing approval requirement permits Off but not enabling", () => {
-    for (const field of ["annotations", "labels"]) {
-      const db = database()
-      db.object = {
-        ...object,
-        metadata: { ...object.metadata, [field]: { "keel.sh/approvals": "1" } },
-      } as unknown as Database["object"]
-      expect(databaseImageUpdates(db).allowed).toEqual([])
-      expect(updateDatabaseImages(db, { kind: "off" })[0]?.op).toBe("autoUpdate")
-    }
-  })
-
-  test("Off uses the same operation for settings from valid legacy labels", () => {
-    const db = database()
-    const labelled = {
-      ...db,
-      object: {
-        ...object,
-        metadata: {
-          ...object.metadata,
-          annotations: { ...object.metadata.annotations, "keel.sh/pollSchedule": "@every 1h" },
-          labels: {
-            "keel.sh/policy": "force",
-            "keel.sh/matchTag": "true",
-            "keel.sh/trigger": "poll",
-            team: "platform",
-          },
-        },
-      } as unknown as Database["object"],
-    }
-    expect(databaseImageUpdates(labelled).setting?.kind).toBe("other")
-    expect(updateDatabaseImages(labelled, { kind: "off" })).toEqual([
-      { op: "autoUpdate", workload: { kind: "Cluster", name: db.name }, update: { kind: "off" } },
-    ])
   })
 
   test("a later database update replaces only that Cluster's draft settings", () => {

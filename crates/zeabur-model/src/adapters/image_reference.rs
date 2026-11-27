@@ -1,28 +1,30 @@
-//! An image reference as a container runtime reads it [distribution-reference]: a registry host
-//! when the first segment has a dot, a port or is `localhost`, else Docker Hub, where a bare name
-//! is under `library/`; then `:tag` or `@digest`, `latest` without either.
+//! A container image reference [distribution-reference].
+//!
+//! A first segment with a dot, port or the name `localhost` identifies a registry. Other names
+//! use Docker Hub, under `library/` for bare names. The default tag is `latest`.
 //!
 //! [distribution-reference]: https://github.com/distribution/reference/blob/main/reference.go
 
 /// Docker Hub, as credentials name it.
-pub(crate) const DOCKER_HUB: &str = "docker.io";
+pub const DOCKER_HUB: &str = "docker.io";
 /// Where Docker Hub's registry API answers.
 const DOCKER_HUB_API: &str = "registry-1.docker.io";
 
 /// A parsed image reference.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) struct Reference {
+pub struct Reference {
     /// The registry as credentials name it: `docker.io`, `ghcr.io`, `registry.local:5000`.
-    pub(crate) registry: String,
+    pub registry: String,
     /// The repository: `library/nginx`.
-    pub(crate) repository: String,
+    pub repository: String,
     /// A tag or a `sha256:…` digest.
-    pub(crate) tag: String,
+    pub tag: String,
 }
 
 impl Reference {
     /// `image`, or `None` when a container runtime would not accept it.
-    pub(crate) fn parse(image: &str) -> Option<Self> {
+    #[must_use]
+    pub fn parse(image: &str) -> Option<Self> {
         let image = image.trim();
         let (rest, digest) = match image.split_once('@') {
             Some((rest, digest)) => (rest, Some(digest)),
@@ -61,7 +63,8 @@ impl Reference {
     }
 
     /// The host the registry API answers on.
-    pub(crate) fn api_host(&self) -> &str {
+    #[must_use]
+    pub fn api_host(&self) -> &str {
         if self.registry == DOCKER_HUB {
             DOCKER_HUB_API
         } else {
@@ -72,7 +75,8 @@ impl Reference {
 
 /// A registry named in a reference or a credential (`https://index.docker.io/v1/`,
 /// `ghcr.io/acme`), as [`Reference::registry`] names it.
-pub(crate) fn registry_name(server: &str) -> String {
+#[must_use]
+pub fn registry_name(server: &str) -> String {
     let server = server.trim().to_ascii_lowercase();
     let server = server
         .strip_prefix("https://")
@@ -119,7 +123,9 @@ fn valid_tag(tag: &str) -> bool {
             .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
 }
 
-fn valid_digest(digest: &str) -> bool {
+/// Whether this is a SHA-256 digest as used by the registry.
+#[must_use]
+pub fn valid_digest(digest: &str) -> bool {
     digest.strip_prefix("sha256:").is_some_and(|hex| {
         hex.len() == 64
             && hex

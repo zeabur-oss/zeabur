@@ -5,9 +5,8 @@ How the code is split, built and packaged. What Zeabur OSS does for the people w
 
 ## Crates
 
-The optional CloudNativePG updater is a separate Go module in `updater/`, outside this Rust
-workspace. It reuses unmodified Keel modules and runs with its own chart-managed ServiceAccount;
-the dashboard and local client still use the person's credentials. See
+The optional `zeabur database-updater` command runs with its own ServiceAccount. Its registry
+and Kubernetes clients are the ones used by the server. See
 [CloudNativePG image updates](cloudnative-pg-image-updates.md).
 
 The code is split into small crates in one flat `crates/` directory:

@@ -141,6 +141,14 @@ pub fn databases(clusters: &[DynamicObject]) -> Vec<Target> {
 
 const HIBERNATION: &str = "cnpg.io/hibernation";
 
+/// Whether CloudNativePG reports a healthy, fully ready Cluster for an image change.
+#[must_use]
+pub fn ready_for_image_update(cluster: &DynamicObject) -> bool {
+    let instances = databases::int(cluster, "/spec/instances").unwrap_or(1);
+    let ready = databases::int(cluster, "/status/readyInstances").unwrap_or(0);
+    instances > 0 && instances == ready && state(cluster, instances, ready) == State::Ready
+}
+
 /// The state of a `Cluster` by the kstatus generic rule and its ready instances. A hibernated
 /// `Cluster` is paused, and one with a phase but no `Ready` condition yet is progressing.
 fn state(cluster: &DynamicObject, members: i64, ready: i64) -> State {
@@ -453,6 +461,10 @@ pub fn database(
         object: databases::written(cluster),
         pods: Vec::new(),
         restored: databases::restored(cluster),
+        image_updates: zeabur_model::database_image_updates(
+            &cluster.metadata,
+            cluster.data.get("spec").unwrap_or(&serde_json::Value::Null),
+        ),
         unmanaged: false,
         name,
     }

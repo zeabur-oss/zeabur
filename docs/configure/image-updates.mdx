@@ -95,7 +95,7 @@ Keel does not wait for the service to become healthy after an update, and does n
 
 The database's **Settings** reuses **Which versions** and **When** from the service form. Choose **New image under the same tag**, choose a schedule, then **Review changes** and **Save**. **Off** removes the same four Keel annotations. Saving a schedule does not change the database's image, storage or backups.
 
-An administrator must enable `databaseUpdater.enabled` in the Zeabur Helm chart. The chart installs the Zeabur database updater with its own permissions and an image pinned by the Zeabur release. It reuses unmodified Keel libraries; no patched Keel installation or catalog change is needed. **Settings** shows whether this updater is ready. You can enable or change a schedule only when it is ready; you can still turn existing updates **Off** when it is unavailable.
+An administrator must enable `databaseUpdater.enabled` in the Zeabur Helm chart. The updater runs from the same image as Zeabur, with its own permissions. **Settings** shows when it is ready to accept a schedule. You can turn existing updates **Off** even while the updater is unavailable.
 
 Use a major-version tag such as `ghcr.io/cloudnative-pg/postgresql:18-standard-trixie`. The updater checks that tag on the database's own schedule and writes its new digest to `spec.imageName`; CloudNativePG performs the rolling update. A reference such as `18-standard-trixie@sha256:…` keeps its tag and refreshes its digest. The repository and tag stay unchanged, so the updater cannot select another PostgreSQL major version or image flavor. This relies on the publisher keeping that tag within the stated major version. A fixed dated tag only changes if its publisher replaces it.
 

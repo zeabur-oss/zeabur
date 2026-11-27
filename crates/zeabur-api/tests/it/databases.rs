@@ -176,6 +176,62 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn the_database_api_owns_the_available_image_actions() {
+        let cluster = cluster();
+        cluster.update(|state| {
+            state.served.push(ServedResource::readable(
+                "postgresql.cnpg.io",
+                "v1",
+                "clusters",
+                "Cluster",
+                true,
+            ));
+            for (name, labels, image) in [
+                ("direct", json!({}), "postgres:17-standard"),
+                (
+                    "helm",
+                    json!({"app.kubernetes.io/managed-by":"Helm"}),
+                    "postgres:17-standard",
+                ),
+                (
+                    "flux",
+                    json!({"kustomize.toolkit.fluxcd.io/name":"git"}),
+                    "postgres:17-standard",
+                ),
+                ("untagged", json!({}), "postgres:latest"),
+            ] {
+                state.dynamic.push(object(json!({
+                    "apiVersion":"postgresql.cnpg.io/v1", "kind":"Cluster",
+                    "metadata":{"namespace":"shop", "name":name, "labels":labels,
+                        "annotations":{"keel.sh/policy":"force","keel.sh/trigger":"poll",
+                            "keel.sh/match-tag":"true","keel.sh/pollSchedule":"0 0 3 * * 0"}},
+                    "spec":{"imageName":image,"instances":1}
+                })));
+            }
+        });
+        let (status, answer) = send(
+            &app(&cluster),
+            "GET",
+            "/api/v1/projects/shop/databases",
+            None,
+        )
+        .await;
+        assert_eq!(status, StatusCode::OK);
+        let setting = json!({"kind":"image","policy":"sameTag","window":{"day":"sunday","hour":3}});
+        assert_eq!(
+            named(&answer, "direct")["imageUpdates"],
+            json!({"allowed":["sameTag"],"setting":setting})
+        );
+        assert_eq!(
+            named(&answer, "untagged")["imageUpdates"],
+            json!({"allowed":[],"setting":setting})
+        );
+        for name in ["helm", "flux", "mysql"] {
+            assert!(named(&answer, name).get("imageUpdates").is_none(), "{name}");
+        }
+    }
+
+    #[tokio::test]
     async fn the_new_engines_with_their_backup_jobs_and_members() {
         let app = app(&cluster());
         let (status, answer) = send(&app, "GET", "/api/v1/projects/shop/databases", None).await;
