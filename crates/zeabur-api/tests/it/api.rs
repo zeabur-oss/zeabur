@@ -1034,6 +1034,64 @@ mod tests {
         assert_eq!(kind_of(&list, "ConfigMap").unwrap()["listed"], true);
     }
 
+    fn ports_of<'a>(project: &'a Value, service: &str) -> &'a Value {
+        let endpoints = project["endpoints"].as_array().unwrap();
+        &endpoints.iter().find(|e| e["name"] == service).unwrap()["ports"]
+    }
+
+    #[tokio::test]
+    async fn a_node_port_lists_each_node_address_and_a_refused_node_read_is_named() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.objects.get_mut("shop").unwrap().services.push(
+                serde_json::from_value(json!({
+                    "metadata": {"name": "legacy", "namespace": "shop"},
+                    "spec": {"type": "NodePort", "selector": {"app": "web"},
+                        "ports": [{"port": 80, "nodePort": 30080}]},
+                }))
+                .unwrap(),
+            );
+            s.nodes = vec![
+                serde_json::from_value(json!({"metadata": {"name": "vps-1"},
+                    "status": {"addresses": [{"type": "InternalIP", "address": "10.0.0.5"}]}}))
+                .unwrap(),
+            ];
+        });
+        let project = get(&cluster, "/api/v1/projects/shop").await;
+        assert_eq!(
+            ports_of(&project, "legacy")[0]["addresses"],
+            json!([
+                {"kind": "project", "address": "legacy:80"},
+                {"kind": "cluster", "address": "legacy.shop.svc.cluster.local:80"},
+                {"kind": "node", "address": "10.0.0.5:30080"},
+            ])
+        );
+
+        cluster.update(|s| {
+            s.forbidden_resources.insert("nodes".to_owned());
+        });
+        let refused = get(&cluster, "/api/v1/projects/shop").await;
+        assert_eq!(refused["unreadable"][0]["resource"], "nodes");
+        assert_eq!(ports_of(&refused, "legacy")[0]["nodePort"], 30080);
+        assert_eq!(
+            ports_of(&refused, "legacy")[0]["addresses"]
+                .as_array()
+                .unwrap()
+                .len(),
+            2
+        );
+    }
+
+    #[tokio::test]
+    async fn without_a_node_port_the_nodes_are_not_read() {
+        let cluster = cluster();
+        cluster.update(|s| {
+            s.forbidden_resources.insert("nodes".to_owned());
+        });
+        let project = get(&cluster, "/api/v1/projects/shop").await;
+        assert_eq!(project["unreadable"], json!([]));
+    }
+
     #[tokio::test]
     async fn every_object_of_a_project_is_readable_as_yaml() {
         let cluster = cluster_with_a_certificate();

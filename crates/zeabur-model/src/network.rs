@@ -74,8 +74,42 @@ pub struct Port {
     /// The application protocol and how it was inferred.
     #[serde(flatten)]
     pub protocol: ProtocolInference,
+    /// Where clients connect to this port: in the project, in the cluster, on the nodes and from
+    /// the load balancer, as far as the Service type gives each.
+    #[serde(default)]
+    pub addresses: Vec<PortAddress>,
     /// The port in its Service.
     pub origin: Origin,
+}
+
+/// Where clients connect to a Service port: a host and a port, an IPv6 host in brackets.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub struct PortAddress {
+    /// Who can connect to it.
+    pub kind: PortAddressKind,
+    /// The host and the port, such as `api:8080` or `203.0.113.7:30080`.
+    pub address: String,
+}
+
+/// Who can connect to a Service port's address. A Service type adds kinds to the ones before
+/// it: every Service has `project` and `cluster`, a `NodePort` Service adds `node`, and a
+/// `LoadBalancer` Service adds `loadBalancer` [k8s-service-type].
+///
+/// [k8s-service-type]: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[cfg_attr(feature = "openapi", derive(utoipa::ToSchema))]
+#[serde(rename_all = "camelCase")]
+pub enum PortAddressKind {
+    /// The Service name, for pods in the same namespace.
+    Project,
+    /// The Service's DNS name, for pods in any namespace.
+    Cluster,
+    /// A node's address and the node port. The node's firewall decides who reaches it.
+    Node,
+    /// An address from the load balancer and the Service port.
+    LoadBalancer,
 }
 
 /// A Kubernetes Service selecting workloads' pods: how they are reached inside the cluster.
@@ -93,10 +127,6 @@ pub struct Endpoint {
     pub cluster_ip: Option<String>,
     /// The ports.
     pub ports: Vec<Port>,
-    /// For a `LoadBalancer` Service, the addresses its load balancer reports in
-    /// `status.loadBalancer.ingress`, an IP or a hostname each; empty while it has none.
-    #[serde(default, skip_serializing_if = "Vec::is_empty")]
-    pub external_addresses: Vec<String>,
     /// For a `LoadBalancer` Service with the name Zeabur gives a public port
     /// (`<service>-public-<port>`): the Service port it opens.
     #[serde(default, skip_serializing_if = "Option::is_none")]

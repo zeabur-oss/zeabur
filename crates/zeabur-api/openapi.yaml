@@ -9511,13 +9511,6 @@ components:
           - string
           - "null"
           description: The cluster IP.
-        externalAddresses:
-          type: array
-          items:
-            type: string
-          description: |-
-            For a `LoadBalancer` Service, the addresses its load balancer reports in
-            `status.loadBalancer.ingress`, an IP or a hostname each; empty while it has none.
         name:
           type: string
           description: The Service's name.
@@ -15388,6 +15381,13 @@ components:
         - port
         - origin
         properties:
+          addresses:
+            type: array
+            items:
+              $ref: "#/components/schemas/PortAddress"
+            description: |-
+              Where clients connect to this port: in the project, in the cluster, on the nodes and from
+              the load balancer, as far as the Service type gives each.
           name:
             type:
             - string
@@ -15412,6 +15412,32 @@ components:
             - "null"
             description: The target port, a number or a container port name.
       description: One port of a Kubernetes Service.
+    PortAddress:
+      type: object
+      description: "Where clients connect to a Service port: a host and a port, an IPv6 host in brackets."
+      required:
+      - kind
+      - address
+      properties:
+        address:
+          type: string
+          description: The host and the port, such as `api:8080` or `203.0.113.7:30080`.
+        kind:
+          $ref: "#/components/schemas/PortAddressKind"
+          description: Who can connect to it.
+    PortAddressKind:
+      type: string
+      description: |-
+        Who can connect to a Service port's address. A Service type adds kinds to the ones before
+        it: every Service has `project` and `cluster`, a `NodePort` Service adds `node`, and a
+        `LoadBalancer` Service adds `loadBalancer` [k8s-service-type].
+
+        [k8s-service-type]: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
+      enum:
+      - project
+      - cluster
+      - node
+      - loadBalancer
     PortProtocol:
       type: string
       description: The application protocol a Service port speaks.

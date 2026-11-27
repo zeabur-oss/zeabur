@@ -1,9 +1,12 @@
 //! Service ports and their application protocols; Ingress rules.
 
-use k8s_openapi::api::core::v1::{Service as KubeService, ServicePort};
+use k8s_openapi::api::core::v1::{Node, Service as KubeService, ServicePort};
 use k8s_openapi::api::networking::v1::{Ingress, IngressServiceBackend};
 use k8s_openapi::apimachinery::pkg::util::intstr::IntOrString;
-use zeabur_model::{InferredFrom, Origin, Port, PortProtocol, ProtocolInference, RouteRule};
+use zeabur_model::{
+    Endpoint, InferredFrom, Origin, Port, PortAddress, PortAddressKind, PortProtocol,
+    ProtocolInference, RouteRule,
+};
 
 use crate::snapshot::name_of;
 
@@ -83,6 +86,7 @@ pub fn ports(service: &KubeService) -> Vec<Port> {
             }),
             node_port: port.node_port,
             protocol: port_protocol(port),
+            addresses: addresses(service, port.port),
             origin: Origin::field(
                 "Service",
                 service_name,
@@ -94,6 +98,80 @@ pub fn ports(service: &KubeService) -> Vec<Port> {
             ),
         })
         .collect()
+}
+
+/// A host and a port as a client writes them: an IPv6 host in brackets [rfc3986-host].
+///
+/// [rfc3986-host]: https://www.rfc-editor.org/rfc/rfc3986#section-3.2.2
+fn host_port(host: &str, port: i32) -> String {
+    if host.contains(':') {
+        format!("[{host}]:{port}")
+    } else {
+        format!("{host}:{port}")
+    }
+}
+
+/// The addresses of one Service port that the Service alone gives: its name, its DNS name and,
+/// for a `LoadBalancer` Service, each address in `status.loadBalancer.ingress`. Node addresses
+/// need the nodes: [`with_node_addresses`].
+fn addresses(service: &KubeService, port: i32) -> Vec<PortAddress> {
+    let name = name_of(&service.metadata);
+    let address = |kind, host: &str| PortAddress {
+        kind,
+        address: host_port(host, port),
+    };
+    let mut out = vec![address(PortAddressKind::Project, name)];
+    if let Some(namespace) = service.metadata.namespace.as_deref() {
+        out.push(address(
+            PortAddressKind::Cluster,
+            &format!("{name}.{namespace}.svc.cluster.local"),
+        ));
+    }
+    let load_balancer =
+        service.spec.as_ref().and_then(|s| s.type_.as_deref()) == Some("LoadBalancer");
+    out.extend(
+        service
+            .status
+            .iter()
+            .filter(|_| load_balancer)
+            .filter_map(|status| status.load_balancer.as_ref())
+            .flat_map(|lb| lb.ingress.iter().flatten())
+            .filter_map(|i| i.ip.as_deref().or(i.hostname.as_deref()))
+            .map(|host| address(PortAddressKind::LoadBalancer, host)),
+    );
+    out
+}
+
+/// The address clients use for a node: its `ExternalIP`, else its `InternalIP`
+/// [k8s-node-addresses].
+///
+/// [k8s-node-addresses]: https://kubernetes.io/docs/reference/node/node-status/#addresses
+fn node_address(node: &Node) -> Option<&str> {
+    let addresses = node.status.as_ref()?.addresses.as_ref()?;
+    let of = |kind: &str| {
+        addresses
+            .iter()
+            .find(|a| a.type_ == kind)
+            .map(|a| a.address.as_str())
+    };
+    of("ExternalIP").or_else(|| of("InternalIP"))
+}
+
+/// Adds `<node address>:<node port>` to every port with a node port, one per node, in the
+/// nodes' order. kube-proxy opens a node port on every node [k8s-nodeport].
+///
+/// [k8s-nodeport]: https://kubernetes.io/docs/concepts/services-networking/service/#type-nodeport
+pub fn with_node_addresses(endpoints: &mut [Endpoint], nodes: &[Node]) {
+    let hosts: Vec<&str> = nodes.iter().filter_map(node_address).collect();
+    for port in endpoints.iter_mut().flat_map(|e| e.ports.iter_mut()) {
+        let Some(node_port) = port.node_port else {
+            continue;
+        };
+        port.addresses.extend(hosts.iter().map(|host| PortAddress {
+            kind: PortAddressKind::Node,
+            address: host_port(host, node_port),
+        }));
+    }
 }
 
 /// The Service backends of an Ingress: the default backend first, then each rule's paths in order.
@@ -150,4 +228,108 @@ pub(crate) fn route_rules(ingress: &Ingress) -> Vec<RouteRule> {
                 })
         });
     default.into_iter().chain(rules).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use serde_json::json;
+
+    use super::*;
+    use crate::project::endpoint;
+
+    fn service(value: serde_json::Value) -> KubeService {
+        serde_json::from_value(value).expect("a Service")
+    }
+
+    fn node(addresses: &[(&str, &str)]) -> Node {
+        let addresses: Vec<_> = addresses
+            .iter()
+            .map(|(kind, address)| json!({"type": kind, "address": address}))
+            .collect();
+        serde_json::from_value(
+            json!({"metadata": {"name": "n"}, "status": {"addresses": addresses}}),
+        )
+        .expect("a Node")
+    }
+
+    fn kinds(port: &Port) -> Vec<(PortAddressKind, &str)> {
+        port.addresses
+            .iter()
+            .map(|a| (a.kind, a.address.as_str()))
+            .collect()
+    }
+
+    #[test]
+    fn a_cluster_ip_service_is_reached_by_its_name_and_its_dns_name() {
+        let api = service(json!({
+            "metadata": {"name": "api", "namespace": "shop"},
+            "spec": {"type": "ClusterIP", "ports": [{"port": 8080}]},
+        }));
+        assert_eq!(
+            kinds(&ports(&api)[0]),
+            [
+                (PortAddressKind::Project, "api:8080"),
+                (PortAddressKind::Cluster, "api.shop.svc.cluster.local:8080"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_load_balancer_adds_each_ingress_address_with_the_service_port() {
+        let api = service(json!({
+            "metadata": {"name": "api-public-8080", "namespace": "shop"},
+            "spec": {"type": "LoadBalancer", "ports": [{"port": 12345, "targetPort": 8080}]},
+            "status": {"loadBalancer": {"ingress": [
+                {"ip": "203.0.113.7"}, {"ip": "2001:db8::7"}, {"hostname": "lb.example.com"},
+            ]}},
+        }));
+        let ports = ports(&api);
+        let addresses = kinds(&ports[0]);
+        assert_eq!(
+            addresses[2..],
+            [
+                (PortAddressKind::LoadBalancer, "203.0.113.7:12345"),
+                (PortAddressKind::LoadBalancer, "[2001:db8::7]:12345"),
+                (PortAddressKind::LoadBalancer, "lb.example.com:12345"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_node_port_is_on_each_node_by_its_external_ip_else_its_internal_ip() {
+        let legacy = service(json!({
+            "metadata": {"name": "legacy", "namespace": "shop"},
+            "spec": {"type": "NodePort", "ports": [{"port": 80, "nodePort": 30080}]},
+        }));
+        let nodes = [
+            node(&[("InternalIP", "10.0.0.5"), ("ExternalIP", "198.51.100.5")]),
+            node(&[("Hostname", "n2"), ("InternalIP", "10.0.0.6")]),
+            node(&[("Hostname", "n3")]),
+        ];
+        let mut endpoints = [endpoint(&legacy)];
+        with_node_addresses(&mut endpoints, &nodes);
+        assert_eq!(
+            kinds(&endpoints[0].ports[0])[2..],
+            [
+                (PortAddressKind::Node, "198.51.100.5:30080"),
+                (PortAddressKind::Node, "10.0.0.6:30080"),
+            ]
+        );
+    }
+
+    #[test]
+    fn a_port_without_a_node_port_gets_no_node_address() {
+        let api = service(json!({
+            "metadata": {"name": "api", "namespace": "shop"},
+            "spec": {"type": "ClusterIP", "ports": [{"port": 8080}]},
+        }));
+        let mut endpoints = [endpoint(&api)];
+        with_node_addresses(&mut endpoints, &[node(&[("InternalIP", "10.0.0.5")])]);
+        assert!(
+            endpoints[0].ports[0]
+                .addresses
+                .iter()
+                .all(|a| a.kind != PortAddressKind::Node)
+        );
+    }
 }
