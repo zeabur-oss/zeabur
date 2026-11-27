@@ -2,7 +2,7 @@ import { useForm, useSelector } from "@tanstack/react-form"
 import { useQuery } from "@tanstack/react-query"
 
 import type { Schemas } from "@/api/client"
-import { nodesQuery, releasesQuery } from "@/api/queries"
+import { nodesQuery, releasesQuery, usageQuery } from "@/api/queries"
 import { Hint } from "@/components/bits"
 import { GateNote, useGate } from "@/components/gate"
 import { usePlanner } from "@/components/plan/planner"
@@ -15,6 +15,8 @@ import { serviceSettingsSections } from "@/modules/service-settings"
 import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { AmountInput } from "@/components/amount-input"
+import { ResourceBar } from "@/components/resource-bar"
+import { barShares, busiest } from "@/model/resource-bar"
 import { FormField } from "@/components/form-field"
 import { aboveLimit, isAmount, type Dimension } from "@/lib/amount"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
@@ -44,6 +46,7 @@ export function ComputeSection({ project, service }: { project: string; service:
         <p className="text-sm text-muted-foreground">{t("form.jobs")}</p>
       ) : (
         <Compute
+          project={project}
           service={service}
           disabled={!!managed || !gate.open}
           workload={{ kind: service.kind, name: service.name }}
@@ -108,19 +111,23 @@ const paths: Record<keyof Amounts, string> = {
 }
 
 function Compute({
+  project,
   service,
   workload,
   disabled,
   refused,
 }: {
+  project: string
   service: Service
   workload: Schemas.WorkloadRef
   disabled: boolean
   refused: Schemas.FieldCause[]
 }) {
   const t = useT()
-  const { cores, memory } = useQuantityFormat()
+  const { cores, cpu, memory } = useQuantityFormat()
   const nodes = useQuery(nodesQuery)
+  const usage = useQuery(usageQuery(project))
+  const used = busiest(service, usage.data?.state === "available" ? usage.data : undefined)
   const largest = nodes.data?.items.reduce<Schemas.Resources | undefined>(
     (best, node) =>
       !best || node.allocatable.memoryBytes > best.memoryBytes ? node.allocatable : best,
@@ -173,6 +180,36 @@ function Compute({
         }
       : undefined,
   )
+  const bar = (dimension: Dimension, index: number, container: string) => {
+    const amounts = values.containers[index]
+    if (!amounts || !largest) return null
+    const cpuBar = dimension === "cpu"
+    const [request, limit] = cpuBar
+      ? [amounts.cpuRequest, amounts.cpuLimit]
+      : [amounts.memoryRequest, amounts.memoryLimit]
+    const sample = used.get(container)
+    const now = sample && (cpuBar ? sample.cpu : sample.memory)
+    const node = cpuBar ? largest.cpuMillicores / 1000 : largest.memoryBytes
+    const shares = barShares(dimension, request, limit, now, node)
+    if (!shares) return null
+    const show = (value: number) => (cpuBar ? cpu(value * 1000) : memory(value))
+    const nowText = now === undefined ? undefined : t("form.barUsage", show(now))
+    const nodeText = t(
+      "form.barNode",
+      cpuBar ? t("usage.cores", cores(largest.cpuMillicores)) : memory(largest.memoryBytes),
+    )
+    const span = t("form.barSpan", request.trim() || "0", limit.trim() || t("form.barNoMax"))
+    return (
+      <div className="sm:col-span-2">
+        <ResourceBar
+          shares={shares}
+          usage={nowText}
+          largest={nodeText}
+          label={[span, nowText, nodeText].filter(Boolean).join(t("common.sep"))}
+        />
+      </div>
+    )
+  }
   const amount =
     (dimension: Dimension) =>
     ({ value }: { value: string }) =>
@@ -284,15 +321,11 @@ function Compute({
                   </form.Field>
                 )
               })}
+              {bar(row[0][0].startsWith("cpu") ? "cpu" : "bytes", index, container.name)}
             </div>
           ))}
         </fieldset>
       ))}
-      {largest ? (
-        <p className="type-meta text-muted-foreground">
-          {t("form.largestNode", cores(largest.cpuMillicores), memory(largest.memoryBytes))}
-        </p>
-      ) : null}
     </form>
   )
 }

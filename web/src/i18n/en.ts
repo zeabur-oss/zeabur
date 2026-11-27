@@ -2065,7 +2065,10 @@ export const en = {
   "form.memoryLimit": "Maximum memory",
   "form.computeHint":
     "The node sets the reserved amount aside for each replica. When a replica uses more memory than its maximum, its container restarts; CPU above the maximum is slowed down.",
-  "form.largestNode": (cores: string, memory: string) => `Largest node: ${cores} cores, ${memory}`,
+  "form.barUsage": (amount: string) => `Using ${amount}`,
+  "form.barNode": (amount: string) => `Largest node ${amount}`,
+  "form.barSpan": (request: string, limit: string) => `Reserved ${request}, maximum ${limit}`,
+  "form.barNoMax": "no maximum",
   "form.badQuantity": "Enter an amount such as 0.25 cores or 512 MiB.",
   "form.badReplicas": "Enter a whole number from 0 to 1000.",
   "form.badNumber": "Enter a whole number above 0.",
