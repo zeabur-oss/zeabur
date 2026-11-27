@@ -10,7 +10,7 @@ description: 连接 Git 仓库、完成首次构建，并选择新镜像何时�
 - 已有项目，并具备在项目中创建服务、Kubernetes Service 和 Build 的权限。使用私有仓库或构建变量时，还需要创建机密变量的权限。
 - 集群已安装 Zeabur Builder 和 Keel。从组件目录安装 Zeabur Builder 时，zot 会一并安装。缺少组件时，**新建**菜单会在**从 Git 部署**下方写出缺少哪些，点击后会在**集群** → **组件**打开第一个组件的安装对话框，见[查看与安装集群组件](../cluster/components.mdx)。
 - 构建完成的镜像会推送到 Zeabur 开源版 chart 的 `builds.registry`，默认是和 Zeabur Builder 一起安装的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 时，管理员需要在 chart 中配置 `builds.registry`，并确保 Builder 和节点能访问这个 registry。
-- 构建要有空闲内存。Zeabur Builder 运行一次构建时约用 600 MiB 内存：Zeabur Catalog 测得的 Pod 空闲用量，加上 catalog 给一次构建的内存。**集群** → **组件**的 Zeabur Builder 卡片显示同一个数字。Next.js 这类大型构建会用得更多，最多到一次构建默认的上限 1 GiB，见[构建节点](https://oss.zeabur.com/zh-CN/docs/builder/builds/build-nodes/)。实测 2 GiB 内存的服务器运行着 Zeabur 开源版、Zeabur Builder 和一次小型构建时，还剩约 600 到 700 MiB。这么小的服务器上，构建量大的应用请改用[现成镜像](./image.mdx)部署。
+- 构建要有空闲内存。Zeabur Builder 运行一次构建时约用 600 MiB 内存：Zeabur Catalog 测得的 Pod 空闲用量，加上 catalog 给一次构建的内存。**集群** → **组件**的 Zeabur Builder 卡片显示你这个版本的 Zeabur 开源版所带 catalog 的数字，没有取整。Next.js 这类大型构建会用得更多，最多到一次构建默认的上限 1 GiB，见[构建节点](https://oss.zeabur.com/zh-CN/docs/builder/builds/build-nodes/)。实测 2 GiB 内存的服务器运行着 Zeabur 开源版、Zeabur Builder 和一次小型构建时，还剩约 600 到 700 MiB。这么小的服务器上，构建量大的应用请改用[现成镜像](./image.mdx)部署。
 - 随 Zeabur Builder 安装的 Zot 只允许 Builder、构建用的副本和节点连接。项目中的其他副本无法连接 Zot，因此遭入侵的应用无法拉取其他项目的镜像。
 - 准备好应用实际监听的端口。要公开网站，还需准备能指向集群入口的域名。
 

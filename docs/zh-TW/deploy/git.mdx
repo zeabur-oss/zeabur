@@ -10,7 +10,7 @@ description: 連接 Git 儲存庫、完成第一次建置，並選擇新映像�
 - 已有專案，以及在專案建立服務、Kubernetes Service 和 Build 的權限。使用私有儲存庫或建置變數時，也需要建立機密變數的權限。
 - 叢集已安裝 Zeabur Builder 和 Keel。從元件目錄安裝 Zeabur Builder 時，zot 會一起安裝。缺少元件時，**新增**選單會在**從 Git 部署**下方寫出缺哪些，點下去會在**叢集** → **元件**打開第一個元件的安裝對話框，見[檢視與安裝叢集元件](../cluster/components.mdx)。
 - 建置好的映像檔推到 Zeabur 開源版 chart 的 `builds.registry`，預設是和 Zeabur Builder 一起裝的 Zot（`zot.zot.svc:5000`）。改用 Harbor 或外部 registry 時，管理員在 chart 設定 `builds.registry`，並讓 Builder 與節點能存取這個 registry。
-- 建置要有空閒記憶體。Zeabur Builder 跑一次建置時約用 600 MiB 記憶體：Zeabur Catalog 量到的 Pod 閒置用量，加上 catalog 給一次建置的記憶體。**叢集** → **元件**的 Zeabur Builder 卡片顯示同一個數字。Next.js 這類大型建置會用得更多，最多到一次建置預設的上限 1 GiB，見[建置節點](https://oss.zeabur.com/zh-TW/docs/builder/builds/build-nodes/)。實測 2 GiB 記憶體的伺服器跑著 Zeabur 開源版、Zeabur Builder 和一次小型建置時，還剩約 600 到 700 MiB。這麼小的伺服器上，建置量大的應用程式請改用[現成映像檔](./image.mdx)部署。
+- 建置要有空閒記憶體。Zeabur Builder 跑一次建置時約用 600 MiB 記憶體：Zeabur Catalog 量到的 Pod 閒置用量，加上 catalog 給一次建置的記憶體。**叢集** → **元件**的 Zeabur Builder 卡片顯示你這個版本的 Zeabur 開源版所帶 catalog 的數字，沒有進位。Next.js 這類大型建置會用得更多，最多到一次建置預設的上限 1 GiB，見[建置節點](https://oss.zeabur.com/zh-TW/docs/builder/builds/build-nodes/)。實測 2 GiB 記憶體的伺服器跑著 Zeabur 開源版、Zeabur Builder 和一次小型建置時，還剩約 600 到 700 MiB。這麼小的伺服器上，建置量大的應用程式請改用[現成映像檔](./image.mdx)部署。
 - 隨 Zeabur Builder 裝的 Zot 只讓 Builder、建置用的副本和節點連進來。專案裡其他的副本連不到 Zot，所以被入侵的應用程式拉不到別的專案的映像檔。
 - 準備應用程式實際監聽的連接埠。要公開網站，另備可指向叢集入口的網域。
 
