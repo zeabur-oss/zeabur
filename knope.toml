@@ -22,6 +22,7 @@ versioned_files = [
   { path = "Cargo.lock", dependency = "zeabur-test-support" },
   { path = "Cargo.lock", dependency = "zeabur-ui" },
   { path = "Cargo.lock", dependency = "zeaburctl" },
+  { path = "crates/zeabur-proxy/fuzz/Cargo.lock", dependency = "zeabur-proxy" },
   "desktop/Cargo.toml",
   { path = "desktop/Cargo.lock", dependency = "zeabur-api" },
   { path = "desktop/Cargo.lock", dependency = "zeabur-catalog" },
