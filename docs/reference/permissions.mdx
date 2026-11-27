@@ -93,6 +93,8 @@ Viewers can't read secrets or logs, but they can read config files and workload 
 
 Images in the build registry aren't separated by project. A Developer in any project can forward a port to the registry and list or pull every project's images. Nodes already pull from the registry without credentials, and a Developer can already point a service at another project's image. Pushing still needs the token a build issues for its own repository. Don't put secrets in images.
 
+A Developer who can reach the registry can also list the name of every image repository, `<project>/<service>`, through the registry's `/v2/_catalog`. The folders that `zeaburctl up` and the web interface upload, `<project>/<service>/source`, can't be read or listed. The registry has no setting that turns the list off on its own.
+
 Zeabur OSS creates the registry binding when an admin saves a member's or API token's access, and only when the registry runs in the cluster. If you install the registry later, save each Developer's access again. When a Developer's last Developer project is deleted, the binding stays until their access is next saved.
 
 ## API tokens and RBAC
@@ -184,7 +186,7 @@ By default, kubelogin stores refresh tokens in `~/.kube/cache/oidc-login`. To av
 - `--token-cache-storage=keyring`: Store tokens in the operating system's keyring.
 - `--token-cache-storage=none`: Store nothing and open the sign-in page for every kubectl command.
 
-For steps to configure kubeconfig, see [Get started](https://oss.zeabur.com/docs/identity/get-started/quickstart#configure-kubectl-on-your-computer) in the Zeabur Identity docs.
+For steps to configure kubeconfig, see [Get started](https://oss.zeabur.com/docs/identity/get-started/quickstart#configure-kubectl-on-your-computer) in the Zeabur Identity docs. To use zeaburctl with the same kubeconfig, see [Connect from your computer or CI](../deploy/from-outside.mdx).
 
 ## Checking permissions with kubectl
 

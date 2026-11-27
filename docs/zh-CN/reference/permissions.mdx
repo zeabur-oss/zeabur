@@ -93,6 +93,8 @@ zeabur.com/icon
 
 构建用 registry 中的镜像没有按项目隔离。任何项目的开发者都能转发端口到这个 registry，列出并拉取所有项目的镜像。节点原本就无需凭证即可从 registry 拉取镜像，开发者原本也能让服务使用其他项目的镜像。推送镜像则仍然需要令牌，每次构建只会拿到推送自己镜像路径的令牌。不要在镜像中放入机密信息。
 
+能访问 registry 的开发者，还能通过 registry 的 `/v2/_catalog` 列出每个镜像仓库的名称，格式为 `<项目>/<服务>`。`zeaburctl up` 和网页界面上传的文件夹存放在 `<项目>/<服务>/source`，既无法读取，也不会被列出。registry 没有单独关闭这份列表的设置。
+
 管理员保存成员或 API 令牌的权限时，Zeabur 开源版才会创建 registry 的 binding，并且只在 registry 运行在集群内时创建。如果之后才安装 registry，请重新保存每位开发者的权限。开发者最后一个担任开发者的项目被删除后，这个 binding 会保留到下次保存其权限为止。
 
 ## API 令牌和 RBAC
@@ -184,7 +186,7 @@ kubelogin 默认将 refresh token 保存在 `~/.kube/cache/oidc-login`。如果�
 - `--token-cache-storage=keyring`：保存到操作系统的钥匙串中。
 - `--token-cache-storage=none`：不保存任何内容，每次运行 kubectl 命令都会打开登录页。
 
-配置 kubeconfig 的步骤见 Zeabur Identity 的[入门](https://oss.zeabur.com/zh-CN/docs/identity/get-started/quickstart#配置你电脑上的-kubectl)。
+配置 kubeconfig 的步骤见 Zeabur Identity 的[入门](https://oss.zeabur.com/zh-CN/docs/identity/get-started/quickstart#配置你电脑上的-kubectl)。要用同一个 kubeconfig 运行 zeaburctl，见[从自己的电脑或 CI 连接](../deploy/from-outside.mdx)。
 
 ## 使用 kubectl 确认权限
 

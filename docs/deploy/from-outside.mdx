@@ -1,36 +1,45 @@
 ---
 title: Connect from your computer or CI
-description: Open a database in psql or DBeaver from your computer, and upload a folder from GitHub Actions, with zeaburctl and an API token.
+description: Sign in with your own account to open a database in psql or DBeaver and upload a folder from your computer, and use an API token to upload from GitHub Actions.
 ---
 
-`zeaburctl connect` and `zeaburctl up` act with a kubeconfig, the same way kubectl does. They reach the cluster only through kube-apiserver on TCP 6443, so a database or the build registry doesn't need a public address. This page uses an [API token](../reference/api-tokens.mdx) for the kubeconfig: it works on your computer and in CI, and it can do only what its roles allow.
+`zeaburctl connect` and `zeaburctl up` act with a kubeconfig, the same way kubectl does. They reach the cluster only through kube-apiserver on TCP 6443, so a database or the build registry doesn't need a public address. They can do only what the kubeconfig's roles allow.
+
+- **From your computer**, you sign in with your own Zeabur OSS account through Zeabur Identity. You don't need an admin for this.
+- **From CI**, a job has no one to sign in, so it uses an [API token](../reference/api-tokens.mdx) that an admin creates.
 
 The examples use the project `shop`, the PostgreSQL database `orders`, and the service `web`.
 
 ## Before you begin
 
 - [zeaburctl](../reference/zeaburctl.mdx) is installed on your computer.
-- An admin has created an API token with **Developer** in `shop`. A **Viewer** token can't connect or upload. See [Create a token](../reference/api-tokens.mdx#create-a-token).
+- You, or the token, are a **Developer** in `shop`. A **Viewer** can't connect or upload.
 - Your computer, or the CI runner, can reach kube-apiserver on TCP 6443.
 - To upload a folder, Zeabur Builder is installed in the cluster.
 
-## Make a kubeconfig from the token
+## Connect from your computer
 
-The token's dialog shows a kubeconfig with an empty `server`. Save it, then fill in the address where kube-apiserver listens on port 6443. [Turn the token into a kubeconfig](../reference/api-tokens.mdx#turn-the-token-into-a-kubeconfig) explains how to find that address.
+### Sign in with kubectl
+
+1. Install kubelogin (`kubectl oidc-login`), and add a context for your Zeabur Identity account to your kubeconfig, as [Configure kubectl on your computer](https://oss.zeabur.com/docs/identity/get-started/quickstart#configure-kubectl-on-your-computer) in the Zeabur Identity docs shows. For the cluster's `server`, use the address where kube-apiserver listens on port 6443. [Find the API address](../reference/api-tokens.mdx#find-the-api-address) explains how to find it.
+2. Start in your project, so zeaburctl uses it when you leave out `--project`:
+
+   ```sh
+   kubectl config set-context --current --namespace shop
+   ```
+
+3. Check what you can do. The first command opens the Zeabur Identity sign-in page in your browser.
+
+   ```sh
+   kubectl auth can-i --list -n shop
+   ```
+
+   A Developer sees `pods/portforward` with `create` in the list. kubelogin keeps you signed in for a while, so later commands don't ask for your passkey each time. See [Using kubectl](../reference/permissions.mdx#using-kubectl).
+
+### Open a database
 
 ```sh
-chmod 600 deploy-shop.yaml
-kubectl config set-cluster zeabur --server=https://203.0.113.10:6443 --kubeconfig deploy-shop.yaml
-export KUBECONFIG=$PWD/deploy-shop.yaml
-kubectl auth whoami
-```
-
-When the token has a role in only one project, the kubeconfig starts in that project, and zeaburctl uses it when you leave out `--project`. When the token has roles in several projects, add `--project shop` to each command.
-
-## Open a database from your computer
-
-```sh
-zeaburctl connect orders --project shop --port 15432
+zeaburctl connect orders --port 15432
 ```
 
 The command forwards `127.0.0.1:15432` to the database and prints a connection string:
@@ -47,17 +56,24 @@ Leave the command running while you work, and press Ctrl-C when you're done. Not
 
 The string is the same for every engine: `mysql://` for MySQL and MariaDB, `mongodb://` for MongoDB, and `redis://` for Dragonfly. A service works too. `zeaburctl connect web:8080` prints a local address such as `127.0.0.1:52341`. See [`connect`](../reference/zeaburctl.mdx#connect) for the details.
 
-## Upload a folder from GitHub Actions
+### Upload a folder
 
-`zeaburctl up` packs the folder, sends it to the build registry through kube-apiserver, and starts a build of the service. If the service doesn't exist, the command creates it.
+```sh
+zeaburctl up --service web
+```
 
-1. Store the kubeconfig as a secret of the repository, not in the repository:
+`zeaburctl up` packs the current folder, sends it to the build registry through kube-apiserver, and starts a build of the service. If `web` doesn't exist, the command asks before it creates it. Add `--port 8080` to give a new service the port the app listens on. The command ends once the folder is uploaded and the build starts. The service deploys the new build when it finishes. See [`up`](../reference/zeaburctl.mdx#up) for the details.
+
+## Connect from CI
+
+1. Ask an admin for an API token with **Developer** in `shop`, and turn it into a kubeconfig as [Turn the token into a kubeconfig](../reference/api-tokens.mdx#turn-the-token-into-a-kubeconfig) shows. When the token has a role in only one project, the kubeconfig starts in that project. Otherwise, add `--project shop` to each command.
+2. Store the kubeconfig as a secret of the repository, not in the repository:
 
    ```sh
    gh secret set KUBECONFIG_DATA < deploy-shop.yaml
    ```
 
-2. Add a workflow, such as `.github/workflows/deploy.yml`:
+3. Add a workflow, such as `.github/workflows/deploy.yml`:
 
    ```yaml
    name: Deploy
@@ -89,7 +105,7 @@ The string is the same for every engine: `mysql://` for MySQL and MariaDB, `mong
 
 `gh release download` without a tag takes the latest release. To pin a version, put its tag after `download`, such as `v0.3.3`. To also check the signature, see [Releases and verification](../reference/releases.mdx).
 
-In CI, the command asks nothing. It needs `--service`, and `--project` when the kubeconfig doesn't start in a project. `--port` is only for a new service, and gives it the port the app listens on. Without it, the new service takes no connections. A service that already exists keeps its build settings. The command ends once the folder is uploaded and the build starts. The service deploys the new build when it finishes.
+In CI, the command asks nothing. It needs `--service`, and `--project` when the kubeconfig doesn't start in a project. `--port` is only for a new service. Without it, the new service takes no connections. A service that already exists keeps its build settings.
 
 ## If it doesn't work
 
@@ -97,8 +113,8 @@ In CI, the command asks nothing. It needs `--service`, and `--project` when the 
 |---|---|
 | The command waits, then says it can't connect to the cluster | The machine can't reach TCP 6443. Allow it in the server's firewall or the cloud provider's security group. GitHub-hosted runners don't have fixed addresses, so you may need a self-hosted runner or a VPN to the server. |
 | An error says the certificate isn't valid for the name or address | The API certificate doesn't cover the address in `server`. Add the address to `tls-san` in the K3s or RKE2 configuration file (`host.tlsSan` with Zeatend), and restart K3s or RKE2. |
-| `not allowed to forward a port to zot/zot:5000` | The token isn't a **Developer** in any project, or the build registry was installed after its access was last saved. Ask an admin to choose **More** → **Change access** on the token and save it again. See [Images in the build registry](../reference/permissions.mdx#images-in-the-build-registry). |
-| `not allowed to forward a port to shop/…` | The token is a **Viewer** in the project. Ask an admin for **Developer**. |
-| `Name the project with --project` | The token has roles in several projects, so the kubeconfig doesn't start in one. Add `--project`. |
+| `not allowed to forward a port to zot/zot:5000` | You, or the token, aren't a **Developer** in any project, or the build registry was installed after the access was last saved. Ask an admin to [change the access](../cluster/members.mdx#change-permissions) of your account or the token and save it again. See [Images in the build registry](../reference/permissions.mdx#images-in-the-build-registry). |
+| `not allowed to forward a port to shop/…` | You, or the token, are a **Viewer** in the project. Ask an admin for **Developer**. |
+| `Name the project with --project` | The kubeconfig doesn't start in a project. Add `--project`, or run `kubectl config set-context --current --namespace <project>`. |
 | `Zeabur Builder is not installed in this cluster` | Install Zeabur Builder, or deploy an image instead of a folder. |
-| `401 Unauthorized` | The token expired or was deleted. Renew it and store the new kubeconfig again. |
+| `401 Unauthorized` | Your sign-in or the token expired. On your computer, run the command again and sign in. In CI, renew the token and store the new kubeconfig again. |

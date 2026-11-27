@@ -1,36 +1,45 @@
 ---
 title: 从自己的电脑或 CI 连接
-description: 用 zeaburctl 和 API 令牌，在自己的电脑上用 psql 或 DBeaver 打开数据库，或从 GitHub Actions 上传文件夹。
+description: 用自己的账号登录，在电脑上用 psql 或 DBeaver 打开数据库、上传文件夹；用 API 令牌从 GitHub Actions 上传。
 ---
 
-`zeaburctl connect` 和 `zeaburctl up` 与 kubectl 一样用 kubeconfig 操作集群，只通过 TCP 6443 上的 kube-apiserver 连进去，因此数据库和构建用的 registry 都不需要公开地址。本页用 [API 令牌](../reference/api-tokens.mdx)生成 kubeconfig，在自己的电脑和 CI 中都能用，能做的事也只限于令牌的角色。
+`zeaburctl connect` 和 `zeaburctl up` 与 kubectl 一样用 kubeconfig 操作集群，只通过 TCP 6443 上的 kube-apiserver 连进去，因此数据库和构建用的 registry 都不需要公开地址。能做的事也只限于 kubeconfig 的角色。
+
+- **在自己的电脑上**，用自己的 Zeabur 开源版账号通过 Zeabur Identity 登录，不需要找管理员。
+- **在 CI 中**没有人能登录，因此改用管理员创建的 [API 令牌](../reference/api-tokens.mdx)。
 
 示例使用项目 `shop`、PostgreSQL 数据库 `orders` 和服务 `web`。
 
 ## 开始前
 
 - 电脑上已经安装 [zeaburctl](../reference/zeaburctl.mdx)。
-- 管理员已经创建 API 令牌，并让它在 `shop` 中是**开发者**。**查看者**令牌不能连接，也不能上传。见[创建令牌](../reference/api-tokens.mdx#创建令牌)。
+- 你或令牌在 `shop` 中是**开发者**。**查看者**不能连接，也不能上传。
 - 你的电脑或 CI runner 能访问 kube-apiserver 的 TCP 6443。
 - 如果要上传文件夹，集群中需要已安装 Zeabur Builder。
 
-## 把令牌做成 kubeconfig
+## 从自己的电脑连接
 
-令牌窗口中的 kubeconfig，`server` 是空的。先保存为文件，再填写 kube-apiserver 在 6443 端口的地址。如何找到地址，见[把令牌做成 kubeconfig](../reference/api-tokens.mdx#把令牌做成-kubeconfig)。
+### 用 kubectl 登录
+
+1. 按照 Zeabur Identity 文档中的[配置你电脑上的 kubectl](https://oss.zeabur.com/zh-CN/docs/identity/get-started/quickstart#配置你电脑上的-kubectl)，安装 kubelogin（`kubectl oidc-login`），并在 kubeconfig 中添加你 Zeabur Identity 账号的 context。集群的 `server` 要填写 kube-apiserver 在 6443 端口的地址，如何找到地址见[找到 API 地址](../reference/api-tokens.mdx#找到-api-地址)。
+2. 让 kubeconfig 默认就在你的项目中，之后不加 `--project` 时 zeaburctl 也使用它：
+
+   ```sh
+   kubectl config set-context --current --namespace shop
+   ```
+
+3. 确认自己能做什么。第一次运行时，浏览器会打开 Zeabur Identity 的登录页。
+
+   ```sh
+   kubectl auth can-i --list -n shop
+   ```
+
+   开发者会在列表中看到 `pods/portforward` 和 `create`。kubelogin 会让你保持登录一段时间，之后的命令不会每次都要用通行密钥。见[使用 kubectl 操作](../reference/permissions.mdx#使用-kubectl-操作)。
+
+### 打开数据库
 
 ```sh
-chmod 600 deploy-shop.yaml
-kubectl config set-cluster zeabur --server=https://203.0.113.10:6443 --kubeconfig deploy-shop.yaml
-export KUBECONFIG=$PWD/deploy-shop.yaml
-kubectl auth whoami
-```
-
-令牌只在一个项目中有角色时，kubeconfig 默认就在那个项目，不加 `--project` 时 zeaburctl 也使用它。令牌在多个项目中有角色时，每条命令都要加上 `--project shop`。
-
-## 在自己的电脑上打开数据库
-
-```sh
-zeaburctl connect orders --project shop --port 15432
+zeaburctl connect orders --port 15432
 ```
 
 命令会把 `127.0.0.1:15432` 接到数据库，并打印连接字符串：
@@ -47,17 +56,24 @@ postgresql://app:<password>@127.0.0.1:15432/app
 
 每种引擎都会打印连接字符串：MySQL 和 MariaDB 是 `mysql://`，MongoDB 是 `mongodb://`，Dragonfly 是 `redis://`。服务也能连接，`zeaburctl connect web:8080` 会打印 `127.0.0.1:52341` 这样的本机地址。详情见 [`connect`](../reference/zeaburctl.mdx#connect)。
 
-## 从 GitHub Actions 上传文件夹
+### 上传文件夹
 
-`zeaburctl up` 会打包文件夹，通过 kube-apiserver 发送到构建用的 registry，再开始构建服务。服务不存在时，命令会创建它。
+```sh
+zeaburctl up --service web
+```
 
-1. 把 kubeconfig 保存为仓库的 secret，不要放进代码仓库：
+`zeaburctl up` 会打包当前文件夹，通过 kube-apiserver 发送到构建用的 registry，再开始构建服务。`web` 不存在时，命令会先询问你，再创建它。新服务要加上 `--port 8080`，告诉它应用监听的端口。文件夹上传完、构建开始后，命令就结束，构建完成时服务会部署新的构建结果。详情见 [`up`](../reference/zeaburctl.mdx#up)。
+
+## 从 CI 连接
+
+1. 请管理员创建在 `shop` 中是**开发者**的 API 令牌，再按照[把令牌做成 kubeconfig](../reference/api-tokens.mdx#把令牌做成-kubeconfig) 生成 kubeconfig。令牌只在一个项目中有角色时，kubeconfig 默认就在那个项目；否则每条命令都要加上 `--project shop`。
+2. 把 kubeconfig 保存为仓库的 secret，不要放进代码仓库：
 
    ```sh
    gh secret set KUBECONFIG_DATA < deploy-shop.yaml
    ```
 
-2. 添加一个 workflow，例如 `.github/workflows/deploy.yml`：
+3. 添加一个 workflow，例如 `.github/workflows/deploy.yml`：
 
    ```yaml
    name: Deploy
@@ -89,7 +105,7 @@ postgresql://app:<password>@127.0.0.1:15432/app
 
 `gh release download` 不指定 tag 时会下载最新版本。要固定版本，就在 `download` 后面加上 tag，例如 `v0.3.3`。如果还要验证签名，见[发行文件与验证](../reference/releases.mdx)。
 
-在 CI 中命令不会提问，所以必须提供 `--service`；kubeconfig 默认不在某个项目时，还要提供 `--project`。`--port` 只对新服务有效，用来设置应用监听的端口；新服务没有设置的话，就不接受连接。服务已经存在时，命令不改它的构建设置。文件夹上传完、构建开始后，命令就结束，构建完成时服务会部署新的构建结果。
+在 CI 中命令不会提问，所以必须提供 `--service`；kubeconfig 默认不在某个项目时，还要提供 `--project`。`--port` 只对新服务有效，新服务没有设置的话，就不接受连接。服务已经存在时，命令不改它的构建设置。
 
 ## 连接失败时
 
@@ -97,8 +113,8 @@ postgresql://app:<password>@127.0.0.1:15432/app
 |---|---|
 | 命令等了一会儿，然后说无法连接集群 | 这台机器访问不到 TCP 6443。请在服务器的防火墙或云服务商的安全组中开放这个端口。GitHub 托管的 runner 没有固定地址，可能需要改用自托管 runner，或通过 VPN 连接服务器。 |
 | 错误说证书对这个名称或地址无效 | API 证书没有覆盖 `server` 中的地址。把地址加到 K3s 或 RKE2 配置文件的 `tls-san`（Zeatend 是 `host.tlsSan`），再重启 K3s 或 RKE2。 |
-| `not allowed to forward a port to zot/zot:5000` | 令牌在任何项目中都不是**开发者**，或者构建用的 registry 是在上次保存令牌权限之后才安装的。请管理员在令牌旁边选择**更多** → **更改权限**，再保存一次。见[构建用 registry 中的镜像](../reference/permissions.mdx#构建用-registry-中的镜像)。 |
-| `not allowed to forward a port to shop/…` | 令牌在这个项目中是**查看者**。请管理员改为**开发者**。 |
-| `Name the project with --project` | 令牌在多个项目中有角色，kubeconfig 默认不在任何项目。请加上 `--project`。 |
+| `not allowed to forward a port to zot/zot:5000` | 你或令牌在任何项目中都不是**开发者**，或者构建用的 registry 是在上次保存权限之后才安装的。请管理员[更改权限](../cluster/members.mdx#更改权限)，把你的账号或令牌的权限再保存一次。见[构建用 registry 中的镜像](../reference/permissions.mdx#构建用-registry-中的镜像)。 |
+| `not allowed to forward a port to shop/…` | 你或令牌在这个项目中是**查看者**。请管理员改为**开发者**。 |
+| `Name the project with --project` | kubeconfig 默认不在任何项目中。请加上 `--project`，或者运行 `kubectl config set-context --current --namespace <项目>`。 |
 | `Zeabur Builder is not installed in this cluster` | 安装 Zeabur Builder，或者改为部署镜像，不上传文件夹。 |
-| `401 Unauthorized` | 令牌已过期或已被删除。续期令牌后，重新保存一次 kubeconfig。 |
+| `401 Unauthorized` | 登录或令牌已过期。在自己的电脑上，再运行一次命令并重新登录；在 CI 中，续期令牌后重新保存一次 kubeconfig。 |

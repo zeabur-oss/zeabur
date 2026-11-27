@@ -93,6 +93,8 @@ zeabur.com/icon
 
 建置用 registry 裡的映像檔沒有按專案分開。任何專案的開發者都能轉送連接埠到這個 registry，列出並拉取所有專案的映像檔。節點本來就不用認證資訊就能從 registry 拉取映像檔，開發者也本來就能讓服務使用其他專案的映像檔。推送映像檔則仍然需要權杖，每次建置只會拿到推送自己映像檔路徑的權杖。映像檔裡不要放機密資料。
 
+連得到 registry 的開發者，也能從 registry 的 `/v2/_catalog` 列出每個映像檔儲存庫的名稱，格式是 `<專案>/<服務>`。`zeaburctl up` 和網頁介面上傳的資料夾放在 `<專案>/<服務>/source`，讀不到也列不出來。registry 沒有能單獨關掉這份清單的設定。
+
 管理員儲存成員或 API 權杖的權限時，Zeabur 開源版才會建立 registry 的 binding，而且只在 registry 跑在叢集內時建立。之後才安裝 registry 的話，請重新儲存每位開發者的權限。開發者最後一個擔任開發者的專案被刪除後，這個 binding 會留到下次儲存他的權限為止。
 
 ## API 權杖與 RBAC
@@ -184,7 +186,7 @@ kubelogin 預設把 refresh token 存在 `~/.kube/cache/oidc-login`。不想把 
 - `--token-cache-storage=keyring`：存進作業系統的鑰匙圈。
 - `--token-cache-storage=none`：什麼都不存，每個 kubectl 指令都會開登入頁。
 
-設定 kubeconfig 的步驟見 Zeabur Identity 的[入門](https://oss.zeabur.com/zh-TW/docs/identity/get-started/quickstart#設定你電腦上的-kubectl)。
+設定 kubeconfig 的步驟見 Zeabur Identity 的[入門](https://oss.zeabur.com/zh-TW/docs/identity/get-started/quickstart#設定你電腦上的-kubectl)。用同一個 kubeconfig 執行 zeaburctl，見[從自己的電腦或 CI 連線](../deploy/from-outside.mdx)。
 
 ## 用 kubectl 確認權限
 
