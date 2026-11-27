@@ -95,8 +95,9 @@ pub struct PortAddress {
 
 /// Who can connect to a Service port's address.
 ///
-/// A Service type adds kinds to the ones before it: every Service has `project` and `cluster`, a `NodePort` Service adds `node`, and a
-/// `LoadBalancer` Service adds `loadBalancer` [k8s-service-type].
+/// A Service type adds kinds to the ones before it: every Service has `project` and `cluster`, a
+/// `NodePort` Service adds `node`, and a `LoadBalancer` Service adds `loadBalancer`
+/// [k8s-service-type].
 ///
 /// [k8s-service-type]: https://kubernetes.io/docs/concepts/services-networking/service/#publishing-services-service-types
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
