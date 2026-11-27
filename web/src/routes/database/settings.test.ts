@@ -127,7 +127,7 @@ describe("Database updater readiness", () => {
   test("a failed refresh cannot leave enabling allowed by a cached ready answer", async () => {
     const query = client(updater("ready"))
     await expect(
-      query.fetchQuery({
+      query.query({
         ...databaseUpdaterQuery,
         staleTime: 0,
         queryFn: () => Promise.reject(new Error("connection lost")),
