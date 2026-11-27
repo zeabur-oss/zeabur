@@ -77,6 +77,15 @@ export interface TypedAmounts {
   memoryLimit: string
 }
 
+/** The most CPU and the most memory any one node can give, each from its own node. */
+export function largestNode(nodes: readonly Schemas.Resources[]): Schemas.Resources | undefined {
+  if (nodes.length === 0) return undefined
+  return {
+    cpuMillicores: Math.max(...nodes.map((n) => n.cpuMillicores)),
+    memoryBytes: Math.max(...nodes.map((n) => n.memoryBytes)),
+  }
+}
+
 /** One container's bar for `dimension`, from its typed amounts and busiest sample. */
 export function containerBar(
   dimension: Dimension,

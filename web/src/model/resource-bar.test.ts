@@ -1,7 +1,7 @@
 import { describe, test, expect } from "bun:test"
 
 import type { Schemas } from "@/api/client"
-import { barShares, busiest, containerBar } from "@/model/resource-bar"
+import { barShares, busiest, containerBar, largestNode } from "@/model/resource-bar"
 import type { Service } from "@/model/service"
 
 const MiB = 2 ** 20
@@ -82,5 +82,17 @@ describe("a container's usage", () => {
     } as unknown as Schemas.ProjectUsage
     expect(busiest(service, usage).get("web")).toStrictEqual({ cpu: 0.08, memory: 200 * MiB })
     expect(busiest(service, undefined).size).toBe(0)
+  })
+})
+
+describe("the largest node", () => {
+  test("takes CPU and memory each from the node with the most", () => {
+    const small = { cpuMillicores: 2000, memoryBytes: 32 * 2 ** 30 }
+    const wide = { cpuMillicores: 16000, memoryBytes: 8 * 2 ** 30 }
+    expect(largestNode([small, wide])).toStrictEqual({
+      cpuMillicores: 16000,
+      memoryBytes: 32 * 2 ** 30,
+    })
+    expect(largestNode([])).toBeUndefined()
   })
 })

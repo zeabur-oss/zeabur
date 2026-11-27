@@ -16,7 +16,7 @@ import { refusedField } from "@/model/problem"
 import { endpointsOf, type Endpoint, type Network, type Service } from "@/model/service"
 import { AmountInput } from "@/components/amount-input"
 import { ResourceBar } from "@/components/resource-bar"
-import { busiest, containerBar, type TypedAmounts } from "@/model/resource-bar"
+import { busiest, containerBar, largestNode, type TypedAmounts } from "@/model/resource-bar"
 import { FormField } from "@/components/form-field"
 import { aboveLimit, isAmount, type Dimension } from "@/lib/amount"
 import { SectionHeader } from "@zeabur-oss/design-system/components/section-header"
@@ -105,6 +105,12 @@ const paths: Record<keyof TypedAmounts, string> = {
 }
 
 /** Each container's usage in its busiest replica, while metrics are available. */
+/** The most CPU and memory one node can give, or none while the nodes load. */
+function useLargestNode() {
+  const nodes = useQuery(nodesQuery).data?.items ?? []
+  return largestNode(nodes.map((n) => n.allocatable))
+}
+
 function useBusiest(project: string, service: Service) {
   const usage = useQuery(usageQuery(project))
   return busiest(service, usage.data?.state === "available" ? usage.data : undefined)
@@ -157,13 +163,8 @@ function Compute({
   refused: Schemas.FieldCause[]
 }) {
   const t = useT()
-  const nodes = useQuery(nodesQuery)
   const used = useBusiest(project, service)
-  const largest = nodes.data?.items.reduce<Schemas.Resources | undefined>(
-    (best, node) =>
-      !best || node.allocatable.memoryBytes > best.memoryBytes ? node.allocatable : best,
-    undefined,
-  )
+  const largest = useLargestNode()
   const scalable = service.kind === "Deployment" || service.kind === "StatefulSet"
   const containers = service.containers.filter((c) => !c.init)
   const initial = {
