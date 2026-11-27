@@ -13,7 +13,7 @@ pack() {
   : "${SOURCE_DATE_EPOCH:?set SOURCE_DATE_EPOCH to the commit time}"
   case "$archive" in
     *.tar.gz)
-      if tar --version | grep -q 'GNU tar'; then
+      if [[ "$(tar --version)" == *'GNU tar'* ]]; then
         tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
           --owner=0 --group=0 --numeric-owner -C "$dir" -cf - "$@" | gzip -n -9 >"$archive"
       else

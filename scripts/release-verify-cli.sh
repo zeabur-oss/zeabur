@@ -45,10 +45,10 @@ if [[ "$os" == windows ]]; then
     NotSigned) echo "::warning::zeaburctl.exe is not signed" ;;
     *) fail "zeaburctl.exe's signature is $status" ;;
   esac
-elif /usr/bin/codesign -dvv "$zeaburctl" 2>&1 | grep -q '^Authority=Developer ID Application: '; then
+elif [[ "$(/usr/bin/codesign -dvv "$zeaburctl" 2>&1)" == *$'\nAuthority=Developer ID Application: '* ]]; then
   assessment=$(/usr/sbin/spctl --assess -vvv --type open --context context:primary-signature \
     "$zeaburctl" 2>&1) || fail "zeaburctl is not notarized: $assessment"
-  grep -q 'source=Notarized Developer ID' <<<"$assessment" ||
+  [[ "$assessment" == *'source=Notarized Developer ID'* ]] ||
     fail "zeaburctl is not notarized: $assessment"
 else
   echo "::warning::zeaburctl is not signed with a Developer ID"

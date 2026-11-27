@@ -64,9 +64,13 @@ import_certificate() {
     -k "$password" "$keychain" >/dev/null
 }
 
+# Bash's own match: this runs outside the Nix shell too, without rg.
 developer_id() {
-  /usr/bin/security find-identity -v -p codesigning "$keychain" |
-    sed -nE 's/.*\) ([0-9A-F]{40}) "Developer ID Application: .*/\1/p' | head -n 1
+  local identities pattern='\) ([0-9A-F]{40}) "Developer ID Application: '
+  identities=$(/usr/bin/security find-identity -v -p codesigning "$keychain")
+  if [[ "$identities" =~ $pattern ]]; then
+    echo "${BASH_REMATCH[1]}"
+  fi
 }
 
 # A bare executable cannot hold the notarization ticket; Gatekeeper looks it up online.
