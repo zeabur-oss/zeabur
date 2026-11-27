@@ -522,6 +522,7 @@ impl FixtureOp for Plan {
                 certificates: &certificates,
                 platform_namespaces: false,
                 build_registry: params.build_registry.as_deref(),
+                public_url: None,
                 node_capacity: None,
             },
             &params.request.0,

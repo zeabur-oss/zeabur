@@ -219,6 +219,7 @@ impl Args {
         (settings.domains, settings.builds) = (domains(self)?, builds(self)?);
         settings.trusted_ca = bundle(&[(&self.extra_ca_file, "--extra-ca-file")])?;
         settings.public_host = Some(host(public_url.authority()).to_owned());
+        settings.public_url = Some(public_url.as_str().to_owned());
         settings.identity.issuer = Some(issuer.to_string());
         settings.identity.project_roles = self.member_roles;
         settings.update_check = self.update_check && !zeabur_telemetry::do_not_track();
@@ -601,6 +602,7 @@ mod tests {
             config.settings,
             zeabur_api::Settings {
                 public_host: Some("zeabur.example.com".to_owned()),
+                public_url: Some("https://zeabur.example.com".to_owned()),
                 identity: zeabur_api::settings::IdentitySettings {
                     issuer: Some("https://identity.example.com".to_owned()),
                     ..zeabur_api::settings::IdentitySettings::default()

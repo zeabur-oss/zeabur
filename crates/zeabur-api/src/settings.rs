@@ -66,6 +66,9 @@ pub struct Settings {
     pub cluster_name: Option<String>,
     /// The host of the URL people open Zeabur at, when the server was started with one.
     pub public_host: Option<String>,
+    /// The URL people open Zeabur at (`--public-url`), without a trailing slash, when the server
+    /// was started with one: the base of the links Zeabur writes into objects.
+    pub public_url: Option<String>,
     /// Where Zeabur Identity keeps its people (see [`crate::members`]).
     pub identity: IdentitySettings,
     /// The issuer's page where people manage how they sign in, as the server was started with it
@@ -195,6 +198,7 @@ impl Default for Settings {
             terminal: TerminalSettings::default(),
             cluster_name: None,
             public_host: None,
+            public_url: None,
             identity: IdentitySettings::default(),
             account_url: None,
             domains: DomainSettings::default(),

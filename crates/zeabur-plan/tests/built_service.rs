@@ -290,6 +290,16 @@ mod tests {
         registry: Option<&str>,
         issuer: Option<&str>,
     ) -> Result<Plan, PlanError> {
+        planned_at(change, registry, issuer, None)
+    }
+
+    /// [`planned`] by a Zeabur opened at `public_url`.
+    fn planned_at(
+        change: BuiltServiceChange,
+        registry: Option<&str>,
+        issuer: Option<&str>,
+        public_url: Option<&str>,
+    ) -> Result<Plan, PlanError> {
         let snapshot = Snapshot {
             namespace: "shop".to_owned(),
             ..Snapshot::default()
@@ -306,6 +316,7 @@ mod tests {
                 kinds: &kinds,
                 build_registry: registry,
                 cluster_issuer: issuer,
+                public_url,
                 ..Input::new(&snapshot, "2026-10-23T00:00:00Z")
             },
             &PlanRequest {
@@ -780,6 +791,17 @@ mod tests {
         builds_served: Vec<Value>,
         secrets: &[Value],
     ) -> Result<Plan, PlanError> {
+        on_cluster_at(change, workload, builds_served, secrets, None)
+    }
+
+    /// [`on_cluster`] by a Zeabur opened at `public_url`.
+    fn on_cluster_at(
+        change: Change,
+        workload: Value,
+        builds_served: Vec<Value>,
+        secrets: &[Value],
+        public_url: Option<&str>,
+    ) -> Result<Plan, PlanError> {
         let mut snapshot = Snapshot {
             namespace: "shop".to_owned(),
             secrets: secrets
@@ -815,6 +837,7 @@ mod tests {
                 kinds: &kinds,
                 objects: &objects,
                 build_registry: Some("zot:5000"),
+                public_url,
                 ..Input::new(&snapshot, "2026-11-26T00:00:00Z")
             },
             &PlanRequest {
@@ -1307,5 +1330,100 @@ mod tests {
         let refused =
             on_cluster(remove_build(), running("nginx:1.27", true), Vec::new(), &[]).unwrap_err();
         assert_eq!(refused.code, "unknown_build");
+    }
+
+    const PUBLIC_URL: &str = "https://zeabur.example.com";
+    const BUILDS_TAB: &str =
+        "https://zeabur.example.com/projects/shop/services/Deployment/site?tab=builds";
+
+    /// With a public URL, a new service's `Build` links its commit statuses to the service's
+    /// Builds tab, beside the annotation that asks for an upload token.
+    #[test]
+    fn a_new_build_links_to_the_builds_tab() {
+        let plan = planned_at(git(), Some("zot:5000"), None, Some(PUBLIC_URL)).unwrap();
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["metadata"]["annotations"],
+            json!({"builder.zeabur.com/details-url": BUILDS_TAB})
+        );
+        let plan = planned_at(service(), Some("zot:5000"), None, Some(PUBLIC_URL)).unwrap();
+        let build = created(&plan, "Build").unwrap();
+        assert_eq!(
+            build["metadata"]["annotations"],
+            json!({"builder.zeabur.com/details-url": BUILDS_TAB,
+                   "builder.zeabur.com/upload-token-request": "up-1"})
+        );
+    }
+
+    /// Without a public URL, a new service's `Build` has no link: a Git `Build` has no
+    /// annotations at all.
+    #[test]
+    fn without_a_public_url_a_new_build_has_no_link() {
+        let build = created(&git_plan(git()).unwrap(), "Build").unwrap();
+        assert!(build["metadata"].get("annotations").is_none());
+        let build = created(
+            &planned(service(), Some("zot:5000"), None).unwrap(),
+            "Build",
+        )
+        .unwrap();
+        assert_eq!(
+            build["metadata"]["annotations"],
+            json!({"builder.zeabur.com/upload-token-request": "up-1"})
+        );
+    }
+
+    /// A running service given a `Build` gets the link, and so does a `Build` made before
+    /// Zeabur set it, the next time its source is set; once linked, setting the same source
+    /// again changes nothing.
+    #[test]
+    fn setting_a_build_links_it_to_the_builds_tab() {
+        let input = repository("https://github.com/acme/site", GitAccess::Public);
+        let plan = on_cluster_at(
+            set_build(input.clone()),
+            running("nginx:1.27", false),
+            Vec::new(),
+            &[],
+            Some(PUBLIC_URL),
+        )
+        .unwrap();
+        assert_eq!(
+            created(&plan, "Build").unwrap()["metadata"]["annotations"],
+            json!({"builder.zeabur.com/details-url": BUILDS_TAB})
+        );
+        let unlinked = served(build_of(input.clone()), "site", None);
+        let plan = on_cluster_at(
+            set_build(input.clone()),
+            running(LATEST, true),
+            vec![unlinked.clone()],
+            &[],
+            Some(PUBLIC_URL),
+        )
+        .unwrap();
+        let build = after(&plan, "Build", "site").unwrap();
+        assert_eq!(
+            build["metadata"]["annotations"],
+            json!({"builder.zeabur.com/details-url": BUILDS_TAB})
+        );
+        let mut linked = unlinked;
+        linked["metadata"]["annotations"] = json!({"builder.zeabur.com/details-url": BUILDS_TAB});
+        let again = on_cluster_at(
+            set_build(input),
+            running(LATEST, true),
+            vec![linked],
+            &[],
+            Some(PUBLIC_URL),
+        )
+        .unwrap_err();
+        assert_eq!(again.code, "unchanged");
+    }
+
+    /// Without a public URL, setting the source of a `Build` that exists writes no link.
+    #[test]
+    fn without_a_public_url_setting_a_build_writes_no_link() {
+        let input = repository("https://github.com/acme/site", GitAccess::Public);
+        let build = served(build_of(input.clone()), "site", None);
+        let refused =
+            on_cluster(set_build(input), running(LATEST, true), vec![build], &[]).unwrap_err();
+        assert_eq!(refused.code, "unchanged");
     }
 }
