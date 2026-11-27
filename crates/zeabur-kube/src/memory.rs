@@ -1299,7 +1299,7 @@ impl Cluster for MemoryCluster {
                 }
                 (WriteBody::MergePatch(body) | WriteBody::Apply(body), Some(current)) => {
                     let mut object = current.clone();
-                    merge(&mut object, body);
+                    json_patch::merge(&mut object, body);
                     object
                 }
                 (WriteBody::EphemeralContainers(operations), Some(current)) => {
@@ -1653,28 +1653,6 @@ fn apply_patch(document: &Value, operations: &[Value]) -> Result<Value, ClusterE
     let mut out = document.clone();
     json_patch::patch(&mut out, &patch).map_err(|_dropped_by_kube_apiserver| not_applied())?;
     Ok(out)
-}
-
-/// `patch` merged into `target` as RFC 7386 says: an object merges field by field, `null`
-/// removes a field, anything else replaces it.
-fn merge(target: &mut Value, patch: &Value) {
-    let Some(fields) = patch.as_object() else {
-        *target = patch.clone();
-        return;
-    };
-    if !target.is_object() {
-        *target = Value::Object(serde_json::Map::new());
-    }
-    let Some(object) = target.as_object_mut() else {
-        return;
-    };
-    for (name, value) in fields {
-        if value.is_null() {
-            object.remove(name);
-        } else {
-            merge(object.entry(name.clone()).or_insert(Value::Null), value);
-        }
-    }
 }
 
 /// `current` with the ephemeral containers the JSON Patch `operations` make, as the
