@@ -108,5 +108,23 @@ if [[ "$os" == linux ]]; then
     --file "$root/Containerfile.proxy" --tag "$image" "$context"
   docker image save --output "$output/proxy-image.tar" "$image"
   echo "built $image (not published)"
+
+  context="$work/database-updater-image"
+  mkdir -p "$context"
+  (cd "$root/updater" && CGO_ENABLED=0 GOOS=linux GOARCH="$arch" \
+    go build -mod=readonly -trimpath -buildvcs=false -ldflags='-s -w' \
+      -o "$context/zeabur-database-updater" .)
+  chmod 0555 "$context/zeabur-database-updater"
+  install -d -m 0755 "$context/etc/ssl/certs"
+  install -m 0444 "$ZEABUR_CA_BUNDLE" "$context/etc/ssl/certs/ca-certificates.crt"
+  touch -d "@$SOURCE_DATE_EPOCH" "$context/zeabur-database-updater" "$context/etc" \
+    "$context/etc/ssl" "$context/etc/ssl/certs" "$context/etc/ssl/certs/ca-certificates.crt"
+  "$root/scripts/database-updater-licenses.sh" "$context/licenses"
+  find "$context/licenses" -exec touch -d "@$SOURCE_DATE_EPOCH" {} +
+  image="zeabur-database-updater:release-$arch"
+  docker build --platform "linux/$arch" --network none --build-arg "SOURCE_DATE_EPOCH=$SOURCE_DATE_EPOCH" \
+    --file "$root/Containerfile.database-updater" --tag "$image" "$context"
+  docker image save --output "$output/database-updater-image.tar" "$image"
+  echo "built $image (not published)"
 fi
 ls -l "$output"

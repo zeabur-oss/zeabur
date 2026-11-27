@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Builds Zeabur's container image, or Zeabur Proxy's, for this machine's architecture: a static
-# musl binary in an otherwise empty image (Containerfile, Containerfile.proxy), for the development
+# Builds Zeabur, Proxy or database updater for this machine's architecture: a static
+# binary in an otherwise empty image, for the development
 # cluster and its CI jobs. It compiles with the `ci` profile (Cargo.toml), which is faster than
 # `release`; scripts/release-build.sh builds the images that ship. Run on Linux inside
 # `nix develop`; needs docker.
@@ -8,7 +8,7 @@
 #   scripts/build-image.sh zeabur-proxy:dev zeabur-proxy
 set -euo pipefail
 
-tag="${1:?usage: build-image.sh <tag> [zeabur|zeabur-proxy]}"
+tag="${1:?usage: build-image.sh <tag> [zeabur|zeabur-proxy|zeabur-database-updater]}"
 binary="${2:-zeabur}"
 root="$(cd "$(dirname "$0")/.." && pwd)"
 machine=$(uname -m)
@@ -33,6 +33,15 @@ case "$binary" in
     cargo build --profile ci --locked --target "$target" -p zeabur-proxy --manifest-path "$root/Cargo.toml"
     install -m 0555 "$root/target/$target/ci/zeabur-proxy" "$context/zeabur-proxy"
     containerfile="$root/Containerfile.proxy"
+    ;;
+  zeabur-database-updater)
+    (cd "$root/updater" && CGO_ENABLED=0 go build -mod=readonly -trimpath -buildvcs=false \
+      -ldflags='-s -w' -o "$context/zeabur-database-updater" .)
+    chmod 0555 "$context/zeabur-database-updater"
+    install -d -m 0755 "$context/etc/ssl/certs"
+    install -m 0444 "${ZEABUR_CA_BUNDLE:?run inside nix develop}" "$context/etc/ssl/certs/ca-certificates.crt"
+    "$root/scripts/database-updater-licenses.sh" "$context/licenses"
+    containerfile="$root/Containerfile.database-updater"
     ;;
   *) echo "error: no image for $binary" >&2; exit 2 ;;
 esac

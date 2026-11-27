@@ -1,0 +1,160 @@
+{{- if .Values.databaseUpdater.enabled }}
+{{- $name := include "zeabur.databaseUpdaterName" . }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [postgresql.cnpg.io]
+    resources: [clusters]
+    verbs: [get, list, patch]
+  - apiGroups: [""]
+    resources: [nodes, pods]
+    verbs: [get, list]
+  # Only the pull Secrets explicitly named by an opted-in database are read; never listed.
+  - apiGroups: [""]
+    resources: [secrets]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ $name }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ $name }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ $name }}
+    namespace: {{ .Release.Namespace }}
+---
+# People can see whether the installed updater is ready without listing platform workloads.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ $name }}-reader
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [{{ $name | quote }}]
+    verbs: [get]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ $name }}-reader
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ $name }}-reader
+subjects:
+  - apiGroup: rbac.authorization.k8s.io
+    kind: Group
+    name: system:authenticated
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "zeabur.labels" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: zeabur-database-updater
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: zeabur-database-updater
+        app.kubernetes.io/instance: {{ .Release.Name }}
+    spec:
+      serviceAccountName: {{ $name }}
+      automountServiceAccountToken: false
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      {{- with .Values.priorityClassName }}
+      priorityClassName: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: updater
+          {{- with .Values.databaseUpdater.image }}
+          image: {{ printf "%s%s%s" .repository (ternary "@" ":" (not (empty .digest))) (default (default $.Chart.Version .tag) .digest) | quote }}
+          imagePullPolicy: {{ .pullPolicy }}
+          {{- end }}
+          args:
+            - {{ printf "--scan-interval=%s" .Values.databaseUpdater.scanInterval | quote }}
+            {{- with .Values.databaseUpdater.httpRegistries }}
+            - {{ printf "--http-registries=%s" (join "," .) | quote }}
+            {{- end }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          {{- $outbound := include "zeabur.outboundEnv" . }}
+          {{- if $outbound }}
+          env:
+            {{- $outbound | nindent 12 }}
+            {{- if or .Values.extraTrustedCA.configMap .Values.extraTrustedCA.secret }}
+            # Go adds this directory to the image's public certificate roots.
+            - name: SSL_CERT_DIR
+              value: /etc/zeabur/extra-ca
+            {{- end }}
+          {{- end }}
+          ports:
+            - name: health
+              containerPort: 9090
+          readinessProbe:
+            httpGet: {path: /readyz, port: health}
+            periodSeconds: 5
+          livenessProbe:
+            httpGet: {path: /healthz, port: health}
+            periodSeconds: 10
+          resources:
+            {{- toYaml .Values.databaseUpdater.resources | nindent 12 }}
+          volumeMounts:
+            {{- include "zeabur.extraCaMount" . | nindent 12 }}
+            - name: api-access
+              mountPath: /var/run/secrets/kubernetes.io/serviceaccount
+              readOnly: true
+      volumes:
+        {{- include "zeabur.extraCaVolume" . | nindent 8 }}
+        - name: api-access
+          projected:
+            defaultMode: 0444
+            sources:
+              - serviceAccountToken:
+                  path: token
+                  expirationSeconds: 3600
+              - configMap:
+                  name: kube-root-ca.crt
+                  items: [{key: ca.crt, path: ca.crt}]
+              - downwardAPI:
+                  items: [{path: namespace, fieldRef: {fieldPath: metadata.namespace}}]
+{{- end }}

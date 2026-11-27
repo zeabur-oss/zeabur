@@ -15,6 +15,7 @@ pub(crate) const BUSYBOX: &str = "busybox:1.37";
 const IDENTITY_DEV: &str = "docker.io/library/zeabur-identity:dev";
 const ZEABUR_DEV: &str = "docker.io/library/zeabur:dev";
 const PROXY_DEV: &str = "docker.io/library/zeabur-proxy:dev";
+const DATABASE_UPDATER_DEV: &str = "docker.io/library/zeabur-database-updater:dev";
 
 /// One plain busybox image: Docker's containerd store keeps busybox as a multi-platform index.
 pub(crate) fn busybox(dev: &DevCluster) -> Result<(), String> {
@@ -32,6 +33,8 @@ pub(crate) struct Built {
     pub(crate) zeabur: String,
     /// Zeabur Proxy's image, when Zeabur's was built here.
     pub(crate) proxy: Option<String>,
+    /// The full profile's CloudNativePG updater, built from this checkout.
+    pub(crate) database_updater: Option<String>,
     /// The local images to push to the registry.
     pub(crate) push: Vec<String>,
 }
@@ -43,6 +46,7 @@ pub(crate) fn build(
     dev: &DevCluster,
     identity_src: Option<&Path>,
     zeabur_image: Option<&str>,
+    include_updater: bool,
 ) -> Result<Built, String> {
     let mut push = Vec::new();
     let identity = if let Some(src) = identity_src {
@@ -89,10 +93,21 @@ pub(crate) fn build(
         }
         Some(image) => (image.to_owned(), None),
     };
+    let database_updater = if include_updater {
+        dev.cmd(dev.root.join("scripts/build-image.sh"))
+            .args([DATABASE_UPDATER_DEV, "zeabur-database-updater"])
+            .run()?;
+        let image = content_tag(dev, DATABASE_UPDATER_DEV)?;
+        push.push(image.clone());
+        Some(image)
+    } else {
+        None
+    };
     Ok(Built {
         identity,
         zeabur,
         proxy,
+        database_updater,
         push,
     })
 }

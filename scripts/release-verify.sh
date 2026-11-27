@@ -109,11 +109,13 @@ check_asset_list
 zeabur_image=$(release verify-image --digests "$digests" linux/amd64 linux/arm64 | tail -n 1)
 proxy_image=$(release verify-image --digests "$digests" --label proxy linux/amd64 linux/arm64 |
   tail -n 1)
+database_updater_image=$(release verify-image --digests "$digests" --label database-updater linux/amd64 linux/arm64 |
+  tail -n 1)
 check_default_images
 chart_ref=$(release verify-chart --digests "$digests" "$chart" | tail -n 1)
 
-# The chart must run the two published images and nothing else.
-expected_images=$(printf '%s\n' "$zeabur_image" "$proxy_image" | sort)
+# Include optional workloads when verifying the published image pins.
+expected_images=$(printf '%s\n' "$zeabur_image" "$proxy_image" "$database_updater_image" | sort)
 chart_images=$("$root/scripts/chart-images.sh" "$chart")
 if [[ "$chart_images" != "$expected_images" ]]; then
   fail "the chart runs:"$'\n'"$chart_images"$'\n'"not the images in digests.txt:"$'\n'"$expected_images"

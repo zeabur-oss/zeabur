@@ -275,6 +275,30 @@
         }
       }
     },
+    "databaseUpdater": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "image": {
+          "type": "object",
+          "additionalProperties": false,
+          "required": ["repository"],
+          "properties": {
+            "repository": { "type": "string", "minLength": 1 },
+            "tag": { "type": "string" },
+            "digest": { "type": "string", "pattern": "^(sha256:[0-9a-f]{64})?$" },
+            "pullPolicy": { "enum": ["Always", "IfNotPresent", "Never"] }
+          }
+        },
+        "scanInterval": { "type": "string", "pattern": "^[1-9][0-9]*(s|m)$" },
+        "httpRegistries": {
+          "type": "array",
+          "items": { "type": "string", "pattern": "^[a-zA-Z0-9.-]+(:[0-9]+)?$" }
+        },
+        "resources": { "type": "object" }
+      }
+    },
     "proxy": {
       "type": "object",
       "additionalProperties": false,

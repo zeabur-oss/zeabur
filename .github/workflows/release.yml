@@ -324,8 +324,15 @@ jobs:
             [[ "$artifact" != candidate-* || -f "artifacts/$artifact/$file" ]] ||
               { echo "::error::missing the build of $file"; exit 1; }
           done <<<"$assets"
+          for arch in amd64 arm64; do
+            for archive in image.tar proxy-image.tar database-updater-image.tar; do
+              [[ -f "artifacts/candidate-linux-$arch/$archive" ]] ||
+                { echo "::error::missing $arch/$archive"; exit 1; }
+            done
+          done
           crane auth login ghcr.io --username "$GITHUB_ACTOR" --password-stdin <<<"$GH_TOKEN"
           release absent "ghcr.io/$owner/zeabur:$plain" "ghcr.io/$owner/proxy:$plain" \
+            "ghcr.io/$owner/database-updater:$plain" \
             "ghcr.io/$owner/charts/zeabur:$plain"
           scripts/release-default-images.sh >"$RUNNER_TEMP/default-images.txt"
 
@@ -333,9 +340,10 @@ jobs:
           helm dependency build chart
           zeabur=$(image zeabur "" image image.tar | tail -n 1)
           proxy=$(image proxy proxy proxy.image proxy-image.tar | tail -n 1)
+          database_updater=$(image database-updater database-updater databaseUpdater.image database-updater-image.tar | tail -n 1)
           cat "$RUNNER_TEMP/default-images.txt" >>published/digests.txt
           # The chart runs each image pinned to its index, and no other.
-          [[ "$(scripts/chart-images.sh chart)" == "$(printf '%s\n' "$zeabur" "$proxy" | sort)" ]] ||
+          [[ "$(scripts/chart-images.sh chart)" == "$(printf '%s\n' "$zeabur" "$proxy" "$database_updater" | sort)" ]] ||
             { echo "::error::the chart does not run the images just pushed"; exit 1; }
           helm lint --strict chart --set global.domain=example.com
           helm package chart --destination published

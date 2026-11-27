@@ -14,6 +14,7 @@ values=(
   --set issuer.url=https://identity.example.com
   --set issuer.clientSecret.existingSecret=zeabur-oidc
   --set proxy.enabled=true
+  --set databaseUpdater.enabled=true
 )
 
 helm template zeabur "$chart" "${values[@]}" |

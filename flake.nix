@@ -86,6 +86,8 @@
             inputsFrom = [ inputs.oss.devShells.${system}.base ];
             packages = with pkgs; [
               rustToolchain
+              # The separate CloudNativePG adapter imports Keel's Go packages.
+              go
 
               # Quality and supply chain
               cargo-deny

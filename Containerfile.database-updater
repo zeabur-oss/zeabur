@@ -1,0 +1,7 @@
+# Static Go binary plus public certificate roots; built from updater/go.mod without a Keel fork.
+FROM scratch
+COPY zeabur-database-updater /zeabur-database-updater
+COPY etc /etc
+COPY licenses /licenses
+USER 65532:65532
+ENTRYPOINT ["/zeabur-database-updater"]

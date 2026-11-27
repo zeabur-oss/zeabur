@@ -25,6 +25,8 @@ pub(crate) struct Install<'a> {
     pub(crate) zeabur_image: &'a str,
     /// Zeabur Proxy's image, when it was built here; otherwise Zeabur Proxy stays off.
     pub(crate) proxy_image: Option<&'a str>,
+    /// The full profile's database updater.
+    pub(crate) database_updater_image: Option<&'a str>,
     pub(crate) chart: &'a Path,
 }
 
@@ -52,7 +54,12 @@ pub(crate) fn install(dev: &DevCluster, install: &Install<'_>) -> Result<(), Str
 
     let values = dev.write(
         "values.json",
-        &values(install.zeabur_image, install.proxy_image).to_string(),
+        &values(
+            install.zeabur_image,
+            install.proxy_image,
+            install.database_updater_image,
+        )
+        .to_string(),
     )?;
     dev.cmd("helm")
         .args(["upgrade", "--install", "zeabur"])
@@ -215,7 +222,7 @@ fn identity_ingress() -> Ingress {
 
 /// The chart's values for this cluster, with Zeabur Proxy when its image is built here. Zeabur
 /// Identity is at xtask/pins/zeabur-identity, and the cluster's components are installed already.
-fn values(image: &str, proxy_image: Option<&str>) -> Value {
+fn values(image: &str, proxy_image: Option<&str>, database_updater_image: Option<&str>) -> Value {
     let (repository, tag) = split_tag(image);
     // The templates prefer a digest: an empty one clears the one a released chart pins.
     let digest = image.split_once('@').map_or("", |(_, digest)| digest);
@@ -250,6 +257,17 @@ fn values(image: &str, proxy_image: Option<&str>) -> Value {
     });
     if let (Some(map), Some(proxy)) = (values.as_object_mut(), proxy) {
         map.insert("proxy".to_owned(), proxy);
+    }
+    if let (Some(map), Some(image)) = (values.as_object_mut(), database_updater_image) {
+        let (repository, tag) = split_tag(image);
+        map.insert(
+            "databaseUpdater".to_owned(),
+            json!({
+                "enabled": true,
+                "image": {"repository": repository, "tag": tag.unwrap_or("latest"), "digest": ""},
+                "httpRegistries": ["zeabur-dev-registry:5000"],
+            }),
+        );
     }
     values
 }
@@ -346,7 +364,7 @@ mod tests {
 
     #[test]
     fn the_default_profile_sets_neither_builds_nor_the_proxy() {
-        let values = values("zeabur:dev-0123456789ab", None);
+        let values = values("zeabur:dev-0123456789ab", None, None);
         assert_eq!(
             values["image"],
             json!({"repository": "zeabur", "tag": "dev-0123456789ab", "digest": "",
@@ -359,7 +377,7 @@ mod tests {
 
     #[test]
     fn a_digest_reference_keeps_its_digest() {
-        let values = values("ghcr.io/zeabur-oss/zeabur@sha256:0123", None);
+        let values = values("ghcr.io/zeabur-oss/zeabur@sha256:0123", None, None);
         assert_eq!(values["image"]["repository"], "ghcr.io/zeabur-oss/zeabur");
         assert_eq!(values["image"]["digest"], "sha256:0123");
     }
@@ -369,12 +387,26 @@ mod tests {
         let values = values(
             "zeabur:dev-1",
             Some("docker.io/library/zeabur-proxy:dev-0123456789ab"),
+            None,
         );
         assert_eq!(
             values["proxy"],
             json!({
                 "enabled": true,
                 "image": {"repository": "docker.io/library/zeabur-proxy", "tag": "dev-0123456789ab"},
+            })
+        );
+    }
+
+    #[test]
+    fn full_profile_uses_the_database_updater_built_here() {
+        let values = values("zeabur:dev-1", None, Some("example.test/updater:dev-2"));
+        assert_eq!(
+            values["databaseUpdater"],
+            json!({
+                "enabled": true,
+                "image": {"repository": "example.test/updater", "tag": "dev-2", "digest": ""},
+                "httpRegistries": ["zeabur-dev-registry:5000"],
             })
         );
     }

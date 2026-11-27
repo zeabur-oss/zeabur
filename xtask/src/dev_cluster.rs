@@ -278,6 +278,7 @@ pub(crate) fn up(options: &Up) -> Result<(), String> {
             profile: options.profile,
             zeabur_image: &prepared.built.zeabur,
             proxy_image: prepared.built.proxy.as_deref(),
+            database_updater_image: prepared.built.database_updater.as_deref(),
             chart: &prepared.chart,
         },
     )
@@ -297,6 +298,7 @@ fn prepare(dev: &DevCluster, options: &Up) -> Result<Prepared, String> {
         dev,
         options.identity_src.as_deref(),
         options.zeabur_image.as_deref(),
+        options.profile == Profile::Full,
     )?;
     let chart = resolve_chart(dev, options.zeabur_chart.as_deref())?;
     zeabur::dependencies(dev, &chart)?;

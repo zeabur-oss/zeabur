@@ -220,6 +220,23 @@ proxy:
     limits:
       memory: 64Mi
 
+# An independently permissioned CloudNativePG updater, powered by unmodified Keel packages.
+# Install CloudNativePG first. Enabling this does not opt any database into updates.
+databaseUpdater:
+  enabled: false
+  image:
+    repository: ghcr.io/zeabur-oss/database-updater
+    # A release pins the multi-platform digest; source builds may select a local tag.
+    digest: ""
+    tag: ""
+    pullPolicy: IfNotPresent
+  scanInterval: 15s
+  # Development registries only; TLS verification is never disabled.
+  httpRegistries: []
+  resources:
+    requests: {cpu: 10m, memory: 32Mi}
+    limits: {memory: 256Mi}
+
 service:
   type: ClusterIP
   port: 80

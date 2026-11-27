@@ -180,11 +180,12 @@ expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" "$image" "ghcr.io/
 digest="sha256:$(printf '%064d' 0)"
 expect digest "$(render -f "$chart/ci/minimal-values.yaml" --set image.tag=ignored --set image.digest="$digest")" \
   "$image" "ghcr.io/zeabur-oss/zeabur@$digest"
-# The release publishes only these two images, so a chart that runs any other cannot install.
-expected_images="ghcr.io/zeabur-oss/proxy:$chart_version
+# Include the independently permissioned updater even though it is opt-in.
+expected_images="ghcr.io/zeabur-oss/database-updater:$chart_version
+ghcr.io/zeabur-oss/proxy:$chart_version
 ghcr.io/zeabur-oss/zeabur:$chart_version"
 images=$("$root/scripts/chart-images.sh" "$chart")
-[[ "$images" == "$expected_images" ]] || fail "the chart runs $images, not only Zeabur and Zeabur Proxy"
+[[ "$images" == "$expected_images" ]] || fail "the chart runs $images, not the three images built by the release"
 
 # Everyone signed in reads the settings unless that is turned off.
 expect minimal "$(render -f "$chart/ci/minimal-values.yaml")" \
@@ -437,6 +438,23 @@ expect "serviceAccount.annotations" "$rendered" \
 rendered=$(render_all -f "$chart/ci/minimal-values.yaml" --set proxy.enabled=true)
 expect "priorityClassName unset" "$rendered" '[select(.kind == "Deployment" or .kind == "Job") | .spec.template.spec.priorityClassName] | map(select(. != null)) | length' 0
 expect "serviceAccount.annotations unset" "$rendered" '[select(.kind == "ServiceAccount" and (.metadata.name | test("^zeabur(-proxy)?$"))) | .metadata.annotations] | map(select(. != null)) | length' 0
+
+out=$(render -f "$chart/ci/minimal-values.yaml" --set databaseUpdater.enabled=true \
+  --set databaseUpdater.image.repository=example.test/updater --set databaseUpdater.image.digest=sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa)
+updater='select(.kind == "Deployment" and .metadata.name == "zeabur-database-updater")'
+expect database-updater "$out" "$updater | .spec.template.spec.containers[0].image" \
+  example.test/updater@sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+expect database-updater "$out" "$updater | [.spec.replicas, .spec.strategy.type, .spec.template.spec.serviceAccountName, .spec.template.spec.automountServiceAccountToken] | join(\",\")" \
+  '1,Recreate,zeabur-database-updater,false'
+expect database-updater "$out" 'select(.kind == "ConfigMap" and .metadata.name == "zeabur-info") | [.data.databaseUpdaterNamespace, .data.databaseUpdaterDeployment] | join(",")' \
+  zeabur,zeabur-database-updater
+expect database-updater "$out" 'select(.kind == "ClusterRoleBinding" and .metadata.name == "zeabur-database-updater") | .subjects[].name' zeabur-database-updater
+expect database-updater "$out" 'select(.kind == "Role" and .metadata.name == "zeabur-database-updater-reader") | .rules[] | [.apiGroups[], .resources[], .resourceNames[], .verbs[]] | join(",")' \
+  apps,deployments,zeabur-database-updater,get
+expect database-updater "$out" '[select(.kind == "ClusterRole" and .metadata.name == "zeabur-database-updater") | .rules[] | select(.verbs[] == "patch") | .resources[]] | join(",")' clusters
+expect database-updater "$out" '[select(.kind == "ClusterRoleBinding") | .subjects[] | select(.kind == "ServiceAccount" and .name == "zeabur")] | length' 0
+expect database-updater-disabled "$(render -f "$chart/ci/minimal-values.yaml")" \
+  '[select(.metadata.name == "zeabur-database-updater" or .metadata.name == "zeabur-database-updater-reader")] | length' 0
 
 if ((failures > 0)); then
   echo "$failures chart check(s) failed" >&2
