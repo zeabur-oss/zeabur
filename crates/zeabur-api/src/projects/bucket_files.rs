@@ -946,6 +946,11 @@ pub(crate) async fn rename(
         )
         .into());
     }
+    // Only a definite "not found" frees the name; any other answer could hide an object the
+    // copy would overwrite.
+    if taken.status() != StatusCode::NOT_FOUND {
+        return Err(refused(taken, &bucket, &format!("object {}", request.to)).await);
+    }
     let source = format!(
         "/{}/{}",
         s3::encode(&bucket, false),

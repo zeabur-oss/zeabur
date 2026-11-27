@@ -33,6 +33,8 @@ mod tests {
         unsigned: usize,
         /// Copies, then breaks off the answer to `CopyObject` halfway.
         broken_copy: bool,
+        /// Answers `HeadObject` with a 503.
+        broken_head: bool,
     }
 
     type Held = Arc<Mutex<Gateway>>;
@@ -139,6 +141,9 @@ mod tests {
                     .to_owned();
                 held.objects.insert(key.to_owned(), (body.to_vec(), kind));
                 ([("etag", "\"x\"")], "").into_response()
+            }
+            (Method::HEAD, _) if held.broken_head => {
+                StatusCode::SERVICE_UNAVAILABLE.into_response()
             }
             (Method::GET | Method::HEAD, key) => match held.objects.get(key) {
                 Some((bytes, kind)) => {
@@ -568,8 +573,20 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn a_rename_keeps_the_source_when_the_copy_answer_breaks_off() {
+    async fn a_rename_keeps_the_source_when_the_gateway_is_unsure() {
         let (held, app) = filled().await;
+        held.lock().unwrap().broken_head = true;
+        let (status, moved) = json_of(
+            &app,
+            "POST",
+            &format!("{BASE}/moves"),
+            Some(json!({"from": "docs/readme.txt", "to": "docs/img/a.png"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{moved}");
+        assert_eq!(held.lock().unwrap().objects["docs/img/a.png"].0, b"\x89PNG");
+        held.lock().unwrap().broken_head = false;
+
         held.lock().unwrap().broken_copy = true;
         let (status, moved) = json_of(
             &app,
