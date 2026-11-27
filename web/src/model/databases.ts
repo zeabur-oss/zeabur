@@ -26,6 +26,13 @@ import type { ObjectAddress } from "@/api/queries"
 import { rules } from "@/api/rules"
 import { getExportDatabaseUrl } from "@/api/zeabur"
 import type { Translate } from "@/i18n"
+import {
+  type BackupTime,
+  backupCron,
+  backupTimeOf,
+  DEFAULT_TIME,
+  timeWords,
+} from "@/lib/backup-time"
 import { fits, textProblem } from "@/model/rules"
 import { AWS_KEYS, keysSecret, needsKeys, type S3Target } from "@/model/s3-destinations"
 import type { Event, Health } from "@/model/service"
@@ -553,10 +560,8 @@ export const createDatabase = (form: NewDatabase, password = newPassword): Chang
     ...(form.engine === "mysql" ? [create(appSetup(form, imageOf("mysql", form.version)))] : []),
   ])
 
-export type Frequency = "daily" | "weekly"
-
 export interface BackupTarget extends S3Target {
-  frequency: Frequency
+  time: BackupTime
   /** How many days of backups to keep. */
   keepDays: number
 }
@@ -572,7 +577,7 @@ export const newBackupTarget = (): BackupTarget => ({
   region: "",
   accessKey: "",
   secretKey: "",
-  frequency: "daily",
+  time: DEFAULT_TIME,
   keepDays: KEEP_DAYS.default,
 })
 
@@ -604,10 +609,6 @@ export const backupNames = (name: string) => ({
 
 const folder = (target: BackupTarget, name: string) =>
   target.path.trim().replace(/^\/+|\/+$/g, "") || name
-
-/** CloudNativePG's cron has a seconds field first; Percona's has five fields. 03:00 UTC. */
-const cron = (frequency: Frequency, seconds: boolean) =>
-  `${seconds ? "0 " : ""}0 3 * * ${frequency === "weekly" ? "0" : "*"}`
 
 const PLUGIN = "barman-cloud.cloudnative-pg.io"
 
@@ -779,8 +780,8 @@ export function daysOf(duration: string) {
 
 /** The days MongoDB's `runs` backups cover. The form's most days, weekly, round up to one more
  * week, which reads back as those days. */
-function mongoDays(runs: number, frequency: Frequency) {
-  if (frequency === "daily") return runs
+function mongoDays(runs: number, weekly: boolean) {
+  if (!weekly) return runs
   const days = runs * 7
   return days - 7 < MAX_KEEP_DAYS ? Math.min(days, MAX_KEEP_DAYS) : days
 }
@@ -792,16 +793,16 @@ export function currentTarget(database: Database): BackupTarget {
   // MongoDB's schedule and retention are the scheduled task's, which the form writes.
   const task = database.engine === "mongodb" ? scheduledTask(mongoBackup(database)) : undefined
   const cron = String(task?.schedule ?? ownSchedule(database)?.cron ?? "")
-  const frequency: Frequency = cron.trim().split(/\s+/).at(-1) === "0" ? "weekly" : "daily"
+  const time = backupTimeOf(cron) ?? DEFAULT_TIME
   const count = (task?.retention as Manifest | undefined)?.count
-  const days = task ? mongoDays(Number(count), frequency) : daysOf(store?.retention ?? "")
+  const days = task ? mongoDays(Number(count), time.weekly) : daysOf(store?.retention ?? "")
   return {
     ...newBackupTarget(),
     endpoint: store?.endpoint ?? "",
     bucket,
     path: fixedFolder(database.engine) ? "" : folder,
     region: store?.region ?? "",
-    frequency,
+    time,
     keepDays: days || 7,
   }
 }
@@ -982,7 +983,7 @@ function postgresSchedule(database: Database, target: BackupTarget, suspend: boo
     kind: "ScheduledBackup",
     metadata: { name: backupNames(database.name).schedule },
     spec: {
-      schedule: cron(target.frequency, true),
+      schedule: backupCron(target.time, true),
       backupOwnerReference: "self",
       cluster: { name: database.name },
       method: "plugin",
@@ -1051,11 +1052,11 @@ const mongoStorage = (database: Database, target: BackupTarget): Manifest => ({
 })
 
 function mongoTask(target: BackupTarget): Manifest {
-  const runs = target.frequency === "weekly" ? Math.ceil(target.keepDays / 7) : target.keepDays
+  const runs = target.time.weekly ? Math.ceil(target.keepDays / 7) : target.keepDays
   return {
     name: "scheduled",
     enabled: true,
-    schedule: cron(target.frequency, false),
+    schedule: backupCron(target.time),
     storageName: "backups",
     type: "logical",
     retention: { type: "count", count: runs, deleteFromStorage: true },
@@ -1104,7 +1105,7 @@ function mysqlPolicy(database: Database, target: BackupTarget): Manifest {
     kind: "BackupPolicy",
     metadata: { name: names.store },
     spec: {
-      schedule: cron(target.frequency, false),
+      schedule: backupCron(target.time),
       concurrencyPolicy: "Forbid",
       jobConfig: mocoJobConfig(
         database,
@@ -1143,7 +1144,7 @@ function mariaBackup(database: Database, target: BackupTarget, suspend: boolean)
     metadata: { name: names.schedule },
     spec: {
       mariaDbRef: { name: database.name },
-      schedule: { cron: cron(target.frequency, false), ...(suspend ? { suspend: true } : {}) },
+      schedule: { cron: backupCron(target.time), ...(suspend ? { suspend: true } : {}) },
       maxRetention: `${target.keepDays * 24}h`,
       compression: "gzip",
       storage: mariaStorage(
@@ -1284,7 +1285,7 @@ export function backupsSummary(
   const restarts = !on && restartsForBackups(database.engine)
   return {
     lines: [
-      t("db.backup.said", database.name, target.frequency === "weekly", where(database, target)),
+      t("db.backup.said", database.name, timeWords(t, target.time), where(database, target)),
       keepsEverything(database.engine)
         ? t("db.backup.keepsEverything")
         : t("db.backup.saidKeep", target.keepDays),

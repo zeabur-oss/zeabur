@@ -1,5 +1,6 @@
 // The cluster's Velero backups as the Backups tab tells them: one verdict first, then where
 // backups go, when they run, and how each went.
+import { type BackupTime, backupCron, backupTimeOf } from "@/lib/backup-time"
 import type { Schemas } from "@/api/client"
 import { rules } from "@/api/rules"
 import { getDownloadClusterBackupUrl } from "@/api/zeabur"
@@ -28,18 +29,6 @@ export const outcomeHealth: Record<Schemas.BackupOutcome, Health> = {
   failed: "fail",
   running: "progress",
   unknown: "idle",
-}
-
-/** `0 <hour> * * *`: daily at a whole hour, the one shape the form writes. */
-function dailyCron(hour: number): string {
-  return `0 ${hour} * * *`
-}
-
-export function hourOf(cron: string): number | undefined {
-  const match = /^0 (\d{1,2}) \* \* \*$/.exec(cron.trim())
-  if (!match) return undefined
-  const hour = Number(match[1])
-  return hour <= 23 ? hour : undefined
 }
 
 export interface LocationForm {
@@ -130,8 +119,8 @@ export function insideCluster(endpoint: string): boolean {
 type Scope = "cluster" | "projects"
 
 export interface ScheduleForm {
-  /** A whole hour in UTC, or `undefined` to keep a schedule written another way. */
-  hour: number | undefined
+  /** When it runs, or `undefined` to keep a schedule written another way. */
+  time: BackupTime | undefined
   keepDays: number
   scope: Scope
   namespaces: string[]
@@ -143,13 +132,13 @@ const KEEP_DAYS = rules["BackupsPlanRequest.schedule.keepDays"]
 export function scheduleForm(schedule: Schedule | undefined): ScheduleForm {
   if (!schedule)
     return {
-      hour: hourOf(DEFAULT_CRON),
+      time: backupTimeOf(DEFAULT_CRON),
       keepDays: KEEP_DAYS.default,
       scope: "cluster",
       namespaces: [],
     }
   return {
-    hour: hourOf(schedule.cron),
+    time: backupTimeOf(schedule.cron),
     keepDays: schedule.keepDays ?? KEEP_DAYS.default,
     scope: schedule.namespaces.length === 0 ? "cluster" : "projects",
     namespaces: schedule.namespaces,
@@ -173,7 +162,7 @@ export function scheduleRequest(
 ): Schemas.BackupsPlanRequest {
   return {
     op: "schedule",
-    cron: form.hour === undefined ? (current?.cron ?? DEFAULT_CRON) : dailyCron(form.hour),
+    cron: form.time === undefined ? (current?.cron ?? DEFAULT_CRON) : backupCron(form.time),
     keepDays: form.keepDays,
     namespaces: form.scope === "cluster" ? [] : [...form.namespaces].sort(),
   }

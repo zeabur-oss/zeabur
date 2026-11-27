@@ -56,7 +56,7 @@ Return to **Where backups go** and wait for **Status** to change from **Not chec
 
 ## Set a schedule and run a backup
 
-1. Under **Schedule**, choose the daily **Time** (on the hour, in UTC) and **Keep, in days**. New schedules default to 03:00 UTC daily with 7 days of retention. Retention can be 1 to 365 days.
+1. Under **Schedule**, choose **Every day** or **Every week**, the **Day** for weekly backups, the **Time**, and **Keep, in days**. You pick the day and time in your browser's time zone, and the line below shows the same time in UTC. Zeabur OSS stores the time in UTC, so it does not follow daylight saving time. New schedules default to 03:00 UTC daily with 7 days of retention. Retention can be 1 to 365 days.
 2. Under **Covers**, select **Whole cluster**, or select **Chosen projects** and choose at least one project. **Whole cluster** also includes projects and namespaces added later.
 
    ![Schedule form set to 03:00 UTC daily, 7 days of retention, and the entire cluster](../images/shots/backup-schedule-form.avif)

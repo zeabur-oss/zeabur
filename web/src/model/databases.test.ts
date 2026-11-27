@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
+import { DEFAULT_TIME } from "@/lib/backup-time"
 import type { Schemas } from "@/api/client"
 import { actionOf, describe as describePlan } from "@/components/plan/describe"
 import { databaseLink } from "@/lib/place"
@@ -365,7 +366,11 @@ describe("backups", () => {
   })
 
   test("MongoDB: keys, and the storage and a weekly task in the cluster's own spec", () => {
-    const changes = writeBackups(mongo, { ...target, frequency: "weekly", keepDays: 30 })
+    const changes = writeBackups(mongo, {
+      ...target,
+      time: { ...DEFAULT_TIME, weekly: true },
+      keepDays: 30,
+    })
     expect(changes.map((c) => c.op)).toEqual(["create", "edit"])
     const patch = JSON.parse((changes[1] as { yaml: string }).yaml).spec
     const edited = merged((mongo.object as { spec: unknown }).spec, patch)
@@ -913,7 +918,7 @@ describe("the review of a backup form", () => {
       summary: backupsSummary(t, postgres, target),
     }
     expect(describePlan(t, ask, empty, () => undefined).lines).toEqual([
-      "db.backup.said(pg, false, s3://backups/pg (http://s3.test:8333))",
+      "db.backup.said(pg, backupTime.inUtc(backupTime.daily(03:00)), s3://backups/pg (http://s3.test:8333))",
       "db.backup.saidKeep(7)",
       "db.backup.saidKeys(pg-backups-s3)",
       "db.backup.saidRestart(pg)",
@@ -1016,7 +1021,7 @@ describe("changing backups", () => {
       endpoint: "http://s3.test:8333",
       bucket: "backups",
       path: "db",
-      frequency: "daily",
+      time: DEFAULT_TIME,
       keepDays: 7,
       accessKey: "",
       secretKey: "",
@@ -1025,7 +1030,9 @@ describe("changing backups", () => {
   })
 
   test("PostgreSQL: a new schedule and retention edit the ObjectStore and the schedule only", () => {
-    const changed = edits(writeBackups(pg, { ...kept, frequency: "weekly", keepDays: 30 }, true))
+    const changed = edits(
+      writeBackups(pg, { ...kept, time: { ...DEFAULT_TIME, weekly: true }, keepDays: 30 }, true),
+    )
     expect(changed["db-backups"].spec.retentionPolicy).toBe("30d")
     expect(changed["db-scheduled"].spec.schedule).toBe("0 0 3 * * 0")
     expect(changed).not.toHaveProperty("db")
@@ -1063,7 +1070,11 @@ describe("changing backups", () => {
         spec: { plugins: [] },
       },
     } as unknown as Database
-    const changes = writeBackups(operated, { ...kept, frequency: "weekly" }, true)
+    const changes = writeBackups(
+      operated,
+      { ...kept, time: { ...DEFAULT_TIME, weekly: true } },
+      true,
+    )
     const db = changes.find((c) => c.op === "edit" && c.name === "db")
     expect(db).toMatchObject({ specOnly: true })
     expect(db?.op === "edit" && JSON.parse(db.yaml).metadata).toEqual({ name: "db" })
@@ -1302,7 +1313,7 @@ describe("changing backups", () => {
 
   test("MongoDB: weekly backups kept 365 days open in the form as 365 days", () => {
     const fresh = on("mongodb", "perconaservermongodbs", {}, {})
-    const year = { ...kept, frequency: "weekly" as const, keepDays: 365 }
+    const year = { ...kept, time: { ...DEFAULT_TIME, weekly: true }, keepDays: 365 }
     const backup = edits(writeBackups(fresh, year, true)).db.spec.backup
     const count = String(backup.tasks[0].retention.count)
     const mongoOn = on(
@@ -1383,7 +1394,9 @@ describe("changing backups", () => {
         schedules: [schedule("db-backups", "0 3 * * *")],
       },
     )
-    const changed = edits(writeBackups(mysqlOn, { ...kept, frequency: "weekly" }, true))
+    const changed = edits(
+      writeBackups(mysqlOn, { ...kept, time: { ...DEFAULT_TIME, weekly: true } }, true),
+    )
     expect(changed["db-backups"].spec.schedule).toBe("0 3 * * 0")
     expect(changed).not.toHaveProperty("db")
     const off = turnOffBackups(mysqlOn)
@@ -1407,7 +1420,9 @@ describe("changing backups", () => {
       concurrencyPolicy: "Forbid",
       jobConfig: { memory: "4Gi", cpu: "2", threads: 4, bucketConfig: { bucketName: "backups" } },
     }
-    const patch = edits(writeBackups(mysqlOn, { ...kept, frequency: "weekly" }, true))["db-backups"]
+    const patch = edits(
+      writeBackups(mysqlOn, { ...kept, time: { ...DEFAULT_TIME, weekly: true } }, true),
+    )["db-backups"]
     expect(merged(live, patch.spec)).toEqual({ ...live, schedule: "0 3 * * 0" })
   })
 
@@ -1421,8 +1436,12 @@ describe("changing backups", () => {
         schedules: [schedule("db-backups", "0 3 * * *", true)],
       },
     )
-    expect(currentTarget(mysqlOff).frequency).toBe("daily")
-    const changes = writeBackups(mysqlOff, { ...kept, frequency: "weekly" }, true)
+    expect(currentTarget(mysqlOff).time).toEqual(DEFAULT_TIME)
+    const changes = writeBackups(
+      mysqlOff,
+      { ...kept, time: { ...DEFAULT_TIME, weekly: true } },
+      true,
+    )
     expect(changes.filter((c) => c.op === "create")).toEqual([])
     const changed = edits(changes)
     expect(changed["db-backups"].spec.schedule).toBe("0 3 * * 0")

@@ -37,7 +37,7 @@ import { usePlanner } from "@/components/plan/planner"
 import { cn } from "@/lib/utils"
 import { useNow } from "@/lib/page-visible"
 import { Problem } from "@/components/problem"
-import { FrequencyField, S3Fields } from "@/components/s3-fields"
+import { BackupTimeField, S3Fields } from "@/components/s3-fields"
 import { Schedule } from "@/components/schedule"
 import { StatusPill } from "@/components/status"
 import { useT } from "@/i18n"
@@ -1009,7 +1009,7 @@ function BackupForm({
             regionSaved && regionInSecret(database.engine) ? t("db.backup.keepRegion") : undefined
           }
         >
-          <FrequencyField value={target.frequency} onChange={(frequency) => set({ frequency })} />
+          <BackupTimeField value={target.time} onChange={(time) => set({ time })} />
           {keepsEverything(database.engine) ? null : (
             <FormField label={t("db.backup.keep")} errors={error("keep")}>
               <NumberInput
