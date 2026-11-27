@@ -58,3 +58,7 @@ export const outside = (e: Endpoint): boolean =>
  * headless. */
 export const typeLabel = (e: Endpoint): string =>
   e.clusterIP === "None" ? "Headless" : (e.type ?? "ClusterIP")
+
+/** Whether any port of `endpoints` has a node port, and so needs the nodes for its addresses. */
+export const hasNodePort = (endpoints: Endpoint[]): boolean =>
+  endpoints.some((e) => e.ports.some((p) => p.nodePort))

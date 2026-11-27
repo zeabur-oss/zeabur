@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 
-import { addressRows, outside, typeLabel } from "@/model/port-addresses"
+import { addressRows, hasNodePort, outside, typeLabel } from "@/model/port-addresses"
 import type { Endpoint } from "@/model/service"
 
 type Port = Endpoint["ports"][number]
@@ -52,4 +52,11 @@ describe("the address rows of a port", () => {
       { kind: "loadBalancer", addresses: [], pending: { message: "ports.waiting", port: 80 } },
     ])
   })
+})
+
+test("only a port with a node port needs the nodes", () => {
+  expect(hasNodePort([service({})])).toBe(false)
+  expect(hasNodePort([service({}), service({ type: "NodePort" }, port({ nodePort: 30080 }))])).toBe(
+    true,
+  )
 })

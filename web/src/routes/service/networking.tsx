@@ -89,6 +89,7 @@ import {
 } from "@/model/private-address"
 import { generatedHost, rightsOf } from "@/model/image-service"
 import { refusedPlaces } from "@/routes/project/data"
+import { hasNodePort } from "@/model/port-addresses"
 import { IpLimits } from "@/routes/service/ip-limits"
 import { ServiceAddresses } from "@/routes/service/service-addresses"
 import { Reachability } from "@/routes/service/reachability"
@@ -169,6 +170,8 @@ export function NetworkingTab({
   const domainGate = useGate(project, "changeDomains")
   const refusedRoutes = refusedAmong(unreadable, refusedPlaces.routes)
   const refusedEndpoints = refusedAmong(unreadable, refusedPlaces.endpoints)
+  // A refused node read only matters to a service with a node port.
+  const refusedNodes = hasNodePort(endpoints) ? refusedAmong(unreadable, refusedPlaces.nodes) : []
   const trace = useQuery({
     ...traceQuery(project, service.kind, service.name),
     enabled: routes.length > 0 || adding !== undefined,
@@ -550,7 +553,7 @@ export function NetworkingTab({
             service={service}
             endpoints={endpoints}
             plan={planner.plan}
-            refused={<RefusedKinds unreadable={refusedEndpoints} />}
+            refused={<RefusedKinds unreadable={[...refusedEndpoints, ...refusedNodes]} />}
             empty={
               refusedEndpoints.length > 0 ? null : (
                 <Empty variant="outline" size="inline">
