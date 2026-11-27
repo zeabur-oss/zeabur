@@ -293,6 +293,10 @@ pub struct ProjectSummary {
     /// Its namespace is being deleted (`Terminating`).
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub deleting: bool,
+    /// Whether the person may adopt it, as `canAdopt` of the namespace. Only for namespaces that
+    /// are not projects yet, not deleted and not kept by Kubernetes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub can_adopt: Option<Permission>,
 }
 
 /// One service of a project in the list: which it is, how healthy and why, without its

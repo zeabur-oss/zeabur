@@ -17,6 +17,7 @@ import {
   mayAdopt,
   newProjectProblem,
   mayChange,
+  mayAdoptNone,
   otherNamespaces,
   projectRank,
   readable,
@@ -61,6 +62,14 @@ describe("the list of namespaces to adopt", () => {
       ["blog", true],
       ["kube-system", false],
     ])
+  })
+
+  test("leaves out the namespaces the person may not adopt", () => {
+    const refused = [summary("shop", { adopted: true }), summary("blog", { canAdopt: "denied" })]
+    expect(otherNamespaces(refused, false)).toStrictEqual([])
+    expect(mayAdoptNone(refused)).toBe(true)
+    expect(mayAdoptNone([...refused, summary("legacy", { canAdopt: "unknown" })])).toBe(false)
+    expect(mayAdoptNone([summary("shop", { adopted: true })])).toBe(false)
   })
 
   test("leaves out the projects the person may not read", () => {

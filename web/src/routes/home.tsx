@@ -33,7 +33,7 @@ import { kindName } from "@/i18n/kind-name"
 import { lastKnown, rememberKnown } from "@/lib/last-known"
 import { serviceLink } from "@/lib/place"
 import { originOf, originRank, type Origin } from "@/model/origin"
-import { otherNamespaces, projectRank, readable } from "@/model/project"
+import { mayAdoptNone, otherNamespaces, projectRank, readable } from "@/model/project"
 import {
   byHealth,
   needsAttention,
@@ -105,7 +105,7 @@ export function HomePage() {
         <>
           <ProblemsSection problems={problems} />
           {empty ? (
-            <Offered items={items} canCreate={projects.data?.canCreate} />
+            <Offered items={items} />
           ) : (
             <ProjectsSection
               total={adopted.length}
@@ -470,15 +470,9 @@ function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
 }
 
 /** No project yet: the namespaces that could be one, each with Adopt. Nothing for a person who may not create projects: adopting a namespace creates one. */
-function Offered({
-  items,
-  canCreate,
-}: {
-  items: ProjectItem[]
-  canCreate: Schemas.ProjectList["canCreate"] | undefined
-}) {
+function Offered({ items }: { items: ProjectItem[] }) {
   const t = useT()
-  if (canCreate === "denied") return null
+  if (mayAdoptNone(items)) return null
   return (
     <section aria-labelledby="home-offered" className="flex flex-col gap-3">
       <div className="flex flex-wrap items-baseline gap-x-2.5 gap-y-1">

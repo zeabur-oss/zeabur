@@ -16477,6 +16477,13 @@ components:
             description: |-
               Whether the namespace carries Zeabur's project label. Any namespace can be opened; adopting
               it only adds the label.
+          canAdopt:
+            oneOf:
+            - $ref: "#/components/schemas/Permission"
+              description: |-
+                Whether the person may adopt it, as `canAdopt` of the namespace. Only for namespaces that
+                are not projects yet, not deleted and not kept by Kubernetes.
+            - type: "null"
           deleting:
             type: boolean
             description: Its namespace is being deleted (`Terminating`).

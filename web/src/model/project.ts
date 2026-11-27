@@ -52,13 +52,20 @@ export function projectMention(
 export const readable = (items: readonly Schemas.ProjectSummary[]) =>
   items.filter((p) => p.read !== "refused")
 
+/** The namespaces that are not projects, without the ones kube-apiserver refuses to adopt. */
 export function otherNamespaces(
   items: readonly Schemas.ProjectSummary[],
   showSystem: boolean,
 ): { name: string; icon?: ProjectIconName | null; adoptable: boolean }[] {
   return items
-    .filter((p) => !p.adopted && (showSystem || !p.system))
+    .filter((p) => !p.adopted && p.canAdopt !== "denied" && (showSystem || !p.system))
     .map((p) => ({ name: p.name, icon: p.icon, adoptable: !p.system }))
+}
+
+/** Every namespace that is not a project, if there is one, is refused to adopt. */
+export function mayAdoptNone(items: readonly Schemas.ProjectSummary[]) {
+  const others = items.filter((p) => !p.adopted && !p.system)
+  return others.length > 0 && others.every((p) => p.canAdopt === "denied")
 }
 
 /** `unknown` offers it: the plan's dry run decides. */

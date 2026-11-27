@@ -45,7 +45,7 @@ use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 use zeabur_core::names::{LABEL_PROJECT, MANAGE_VERB, is_system_namespace};
 use zeabur_core::problem::{Denied, MEDIA_TYPE as PROBLEM, Problem};
-use zeabur_kube::{AccessRules, ClusterError, ResourceRef};
+use zeabur_kube::{AccessRules, Cluster, ClusterError, ResourceRef};
 use zeabur_model::{Origin, PodSecurityLevel, ProjectBuildLimits, ProjectDetails};
 
 use crate::account::{AccountRole, role};
@@ -174,14 +174,6 @@ pub(crate) async fn get(
     let metadata = namespace.metadata;
     let guarded = state.settings.identity.project_roles;
     let read_only = rules.as_ref().ok().and_then(AccessRules::read_only);
-    let review = |verb: &str| Denied {
-        verb: verb.to_owned(),
-        group: String::new(),
-        resource: "namespaces".to_owned(),
-        name: Some(project.clone()),
-        namespace: Some(project.clone()),
-    };
-    let patch = review("patch");
     let get = |resource: &str| Denied {
         verb: "get".to_owned(),
         group: String::new(),
@@ -190,21 +182,12 @@ pub(crate) async fn get(
         namespace: Some(project.clone()),
     };
     let (logs, secrets) = (get("pods/log"), get("secrets"));
-    let (patch, logs, secrets, manage, role) = futures_util::join!(
-        cluster.review_access(&patch),
+    let ((can_change, can_adopt), logs, secrets, role) = futures_util::join!(
+        rights(cluster.as_ref(), &project, guarded),
         cluster.review_access(&logs),
         cluster.review_access(&secrets),
-        async {
-            if guarded {
-                Permission::from(cluster.review_access(&review(MANAGE_VERB)).await)
-            } else {
-                Permission::Allowed
-            }
-        },
         role(cluster.as_ref(), &project, read_only),
     );
-    let can_change = Permission::from(patch);
-    let can_adopt = can_change.and(manage);
     Ok(Json(ProjectNamespace {
         origin: Origin::complete("v1", "Namespace", None, &project),
         adopted: metadata
@@ -231,4 +214,30 @@ pub(crate) async fn get(
         deleting,
         name: project,
     }))
+}
+
+/// Whether the person may patch the Namespace `project` (change its details), and whether they
+/// may adopt it or let it go: patch it, and where `guarded`, also [`MANAGE_VERB`] it.
+pub(crate) async fn rights(
+    cluster: &dyn Cluster,
+    project: &str,
+    guarded: bool,
+) -> (Permission, Permission) {
+    let review = |verb: &str| Denied {
+        verb: verb.to_owned(),
+        group: String::new(),
+        resource: "namespaces".to_owned(),
+        name: Some(project.to_owned()),
+        namespace: Some(project.to_owned()),
+    };
+    let patch = review("patch");
+    let (patch, manage) = futures_util::join!(cluster.review_access(&patch), async {
+        if guarded {
+            Permission::from(cluster.review_access(&review(MANAGE_VERB)).await)
+        } else {
+            Permission::Allowed
+        }
+    });
+    let can_change = Permission::from(patch);
+    (can_change, can_change.and(manage))
 }

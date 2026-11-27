@@ -13,7 +13,7 @@ import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { ProjectIcon } from "@/components/project-icon"
 import { useT } from "@/i18n"
 import { projectsAsList } from "@/lib/stores"
-import { otherNamespaces, projectRank, readable } from "@/model/project"
+import { mayAdoptNone, otherNamespaces, projectRank, readable } from "@/model/project"
 import {
   Empty,
   EmptyDescription,
@@ -135,17 +135,11 @@ function HiddenProjects({ count }: { count: number }) {
 
 /** Namespaces that are not projects yet. Nothing for a person who may not create projects:
  * adopting a namespace creates one. */
-function OtherSection({
-  items,
-  canCreate,
-}: {
-  items: Schemas.ProjectSummary[]
-  canCreate: Schemas.ProjectList["canCreate"]
-}) {
+function OtherSection({ items }: { items: Schemas.ProjectSummary[] }) {
   const t = useT()
   const [showSystem, setShowSystem] = useState(false)
   const switchId = useId()
-  if (canCreate === "denied") return null
+  if (mayAdoptNone(items)) return null
   return (
     <section className="flex flex-col gap-3">
       <div className="flex flex-wrap items-end justify-between gap-2">
@@ -229,7 +223,7 @@ export function ProjectsPage() {
             <NoProjects denied={projects.data.canCreate === "denied"} />
           )}
           <HiddenProjects count={hidden} />
-          <OtherSection items={items} canCreate={projects.data.canCreate} />
+          <OtherSection items={items} />
         </>
       )}
     </PageColumn>

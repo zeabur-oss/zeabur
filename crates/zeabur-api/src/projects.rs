@@ -79,7 +79,8 @@ use crate::views::{
     UnreadableView, WorkloadsRead,
 };
 
-/// How many adopted projects' workloads are read at the same time for their health.
+/// How many projects are read at the same time: adopted ones for their health, the others for
+/// whether the person may adopt them.
 const HEALTH_CONCURRENCY: usize = 8;
 
 /// The projects you may see, with the health of the adopted ones.
@@ -127,6 +128,7 @@ pub(crate) async fn list(
                 services: None,
                 read: None,
                 deleting,
+                can_adopt: None,
             })
         })
         .collect();
@@ -159,7 +161,33 @@ pub(crate) async fn list(
             Health::Failed => WorkloadsRead::Failed,
         });
     }
-    let can_create = can_create(cluster.as_ref()).await;
+    let guarded = state.settings.identity.project_roles;
+    let offered: Vec<(usize, String)> = items
+        .iter()
+        .enumerate()
+        .filter(|(_, p)| !p.adopted && !p.system && !p.deleting)
+        .map(|(i, p)| (i, p.name.clone()))
+        .collect();
+    let (rights, can_create) = futures_util::join!(
+        futures_util::stream::iter(offered)
+            .map(|(i, name)| {
+                let cluster = Arc::clone(&cluster);
+                async move {
+                    (
+                        i,
+                        namespace::rights(cluster.as_ref(), &name, guarded).await.1,
+                    )
+                }
+            })
+            .buffered(HEALTH_CONCURRENCY)
+            .collect::<Vec<_>>(),
+        can_create(cluster.as_ref()),
+    );
+    for (i, can_adopt) in rights {
+        if let Some(item) = items.get_mut(i) {
+            item.can_adopt = Some(can_adopt);
+        }
+    }
     Ok(Json(ProjectList { items, can_create }))
 }
 

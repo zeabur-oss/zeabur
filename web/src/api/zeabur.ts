@@ -9962,6 +9962,7 @@ export type ProjectSummary = ProjectDetails & {
    * it only adds the label.
    */
   adopted: boolean
+  canAdopt?: Permission | null
   /** Its namespace is being deleted (`Terminating`). */
   deleting?: boolean
   health?: ProjectHealth | null
