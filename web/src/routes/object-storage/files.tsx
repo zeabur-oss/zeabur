@@ -890,9 +890,13 @@ async function uploadFile(
     )
     return
   }
-  const { upload } = await zeabur.startBucketUpload(project, store, bucket, {
-    key,
-  })
+  const { upload } = await zeabur.startBucketUpload(
+    project,
+    store,
+    bucket,
+    { key },
+    file.type ? { headers: { "content-type": file.type } } : undefined,
+  )
   try {
     const parts: Schemas.BucketPart[] = []
     for (let at = 0; at < file.size; at += part) {
