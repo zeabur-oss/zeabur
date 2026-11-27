@@ -2,7 +2,7 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use croner::parser::{CronParser, Seconds};
+use croner::parser::{CronParser, Seconds, Year};
 use serde::Deserialize;
 use zeabur_kube::DynamicObject;
 use zeabur_kube::k8s_openapi::api::core::v1::{
@@ -79,15 +79,14 @@ impl Target {
     pub(super) fn next(&self, now: Timestamp) -> Option<Timestamp> {
         if let Some(interval) = self.schedule.strip_prefix("@every ") {
             let duration = interval.parse::<SignedDuration>().ok()?;
-            return (duration >= SignedDuration::from_secs(1))
-                .then(|| now.checked_add(duration).ok())
-                .flatten();
+            if !duration.is_positive() {
+                return None;
+            }
+            // Keel intervals start on whole seconds and have a minimum period of one second.
+            return Timestamp::from_second(now.as_second().checked_add(duration.as_secs().max(1))?)
+                .ok();
         }
-        let cron = CronParser::builder()
-            .seconds(Seconds::Required)
-            .build()
-            .parse(&self.schedule)
-            .ok()?;
+        let cron = calendar(&self.schedule)?;
         cron.find_next_occurrence(&now.to_zoned(TimeZone::UTC), false)
             .ok()
             .map(|t| t.timestamp())
@@ -148,7 +147,7 @@ impl Target {
         let mut ids = Vec::new();
         for pod in pods {
             if pod.metadata.deletion_timestamp.is_some()
-                || !controller_of(&pod.metadata).is_some_and(|owner| owner.uid == self.uid)
+                || controller_of(&pod.metadata).is_none_or(|owner| owner.uid != self.uid)
                 || pod
                     .metadata
                     .labels
@@ -180,6 +179,85 @@ impl Target {
         }
         Ok(ids)
     }
+}
+
+// Keel's five-field form omits the weekday, and wildcard-derived day fields (including
+// */2) intersect. Two explicitly restricted day fields instead match either day.
+fn calendar(schedule: &str) -> Option<croner::Cron> {
+    let parser = CronParser::builder()
+        .seconds(Seconds::Required)
+        .year(Year::Disallowed);
+    match schedule {
+        "@midnight" => return parser.build().parse("@daily").ok(),
+        "@hourly" | "@daily" | "@weekly" | "@monthly" | "@annually" | "@yearly" => {
+            return parser.build().parse(schedule).ok();
+        }
+        _ => {}
+    }
+    let mut fields: Vec<_> = schedule.split_whitespace().collect();
+    if fields.len() == 5 {
+        fields.push("*");
+    }
+    let [second, minute, hour, dom, month, dow] = fields.as_slice() else {
+        return None;
+    };
+    let wildcard_day = [dom, dow]
+        .iter()
+        .any(|day| day.split(',').any(|range| range.starts_with(['*', '?'])));
+    let months = [
+        "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+    ];
+    let weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+    let pattern = [
+        cron_field(second, 0, 59, &[])?,
+        cron_field(minute, 0, 59, &[])?,
+        cron_field(hour, 0, 23, &[])?,
+        cron_field(dom, 1, 31, &[])?,
+        cron_field(month, 1, 12, &months)?,
+        cron_field(dow, 0, 6, &weekdays)?,
+    ]
+    .join(" ");
+    parser
+        .dom_and_dow(wildcard_day)
+        .build()
+        .parse(&pattern)
+        .ok()
+}
+
+// Translate Keel ranges to explicit Croner ranges. In particular, "1/2" in the weekday
+// field stops at Saturday (6). Croner also accepts 7 for Sunday, which would add a check.
+fn cron_field(field: &str, min: u8, max: u8, names: &[&str]) -> Option<String> {
+    let value = |s: &str| {
+        let n = s.parse::<u8>().ok().or_else(|| {
+            let index = names.iter().position(|name| s.eq_ignore_ascii_case(name))?;
+            u8::try_from(index).ok()?.checked_add(min)
+        })?;
+        (min..=max).contains(&n).then_some(n)
+    };
+    let mut ranges = Vec::new();
+    for part in field.split(',').filter(|part| !part.is_empty()) {
+        let (range, step) = part
+            .split_once('/')
+            .map_or((part, None), |(r, s)| (r, Some(s)));
+        let (start, end) = if matches!(range, "*" | "?") {
+            (min, max)
+        } else if let Some((lo, hi)) = range.split_once('-') {
+            (value(lo)?, value(hi)?)
+        } else {
+            let start = value(range)?;
+            (start, if step.is_some() { max } else { start })
+        };
+        let step = step
+            .unwrap_or("1")
+            .parse::<u64>()
+            .ok()?
+            .min(u64::from(max) + 1);
+        if step == 0 || start > end {
+            return None;
+        }
+        ranges.push(format!("{start}-{end}/{step}"));
+    }
+    (!ranges.is_empty()).then(|| ranges.join(","))
 }
 
 // Kubernetes ORs nodeSelectorTerms and ANDs the requirements in each nonempty term.

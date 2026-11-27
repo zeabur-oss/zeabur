@@ -380,6 +380,7 @@ mod tests {
     /// A database as `getProjectDatabases` lists it.
     fn database(engine: Engine, name: &str, members: i64) -> Database {
         Database {
+            image_updates: None,
             origin: Origin::complete("postgresql.cnpg.io/v1", "Cluster", Some("shop"), name),
             engine,
             provider: "cloudnative-pg".to_owned(),

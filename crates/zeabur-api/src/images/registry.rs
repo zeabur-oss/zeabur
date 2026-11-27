@@ -158,6 +158,8 @@ struct Session<'a> {
     transport: &'a dyn Transport,
     reference: &'a Reference,
     base: String,
+    /// The scheduled updater allows plain HTTP only at the explicitly configured origin.
+    restrict_http: bool,
     credential: Option<&'a Credential>,
     authorization: Option<SecretString>,
 }
@@ -175,6 +177,7 @@ pub(crate) async fn inspect(
         transport,
         reference,
         base,
+        restrict_http: false,
         credential,
         authorization: None,
     };
@@ -263,6 +266,7 @@ pub async fn published(
         transport,
         reference: &reference,
         base: format!("{scheme}://{host}"),
+        restrict_http: true,
         credential: credential.as_ref(),
         authorization: None,
     }
@@ -418,7 +422,8 @@ impl Session<'_> {
                         Unreadable::Unexpected("a redirect without a location".to_owned())
                     })?;
                     url = join(&url, &location)?;
-                    if url.starts_with("http://") && origin(&url) != self.base {
+                    if self.restrict_http && url.starts_with("http://") && origin(&url) != self.base
+                    {
                         return Err(Unreadable::Unexpected(
                             "an insecure registry redirect".to_owned(),
                         ));
@@ -987,6 +992,7 @@ mod tests {
             transport: &registry,
             reference: &reference,
             base: REGISTRY.to_owned(),
+            restrict_http: true,
             credential: None,
             authorization: None,
         }
@@ -1002,6 +1008,10 @@ mod tests {
         // Both the per-platform manifest and its config are valid IDs for an unpinned pod.
         let index: Manifest = parse(&tag.body).unwrap();
         for member in index.manifests {
+            if member.platform.is_none_or(|p| p.os != "linux") {
+                assert!(!candidate.image_ids.contains(&member.digest));
+                continue;
+            }
             assert!(candidate.image_ids.contains(&member.digest));
             let url = format!("{REGISTRY}/v2/library/nginx/manifests/{}", member.digest);
             let manifest: Manifest = parse(&registry.routes[&url].body).unwrap();

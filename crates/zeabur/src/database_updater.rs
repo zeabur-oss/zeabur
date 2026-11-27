@@ -133,7 +133,17 @@ fn scheduled<'a>(
                     next
                 }
             }
-            _ => target.next(now),
+            _ => {
+                let next = target.next(now);
+                if next.is_none() {
+                    tracing::warn!(
+                        namespace = target.namespace,
+                        database = target.name,
+                        "database update schedule has no next occurrence"
+                    );
+                }
+                next
+            }
         };
         jobs.insert(target.uid.clone(), (target, next));
     }
