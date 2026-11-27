@@ -320,7 +320,7 @@ impl Place<'_> {
     /// [s3-copy]: https://docs.aws.amazon.com/AmazonS3/latest/API/API_CopyObject.html
     async fn text(&self, request: S3Request<'_>, what: &str) -> Result<String, ApiError> {
         let answer = self.ok(request, what).await?;
-        let text = read_text(answer.into_body()).await;
+        let text = answer_text(answer, what).await?;
         if text.contains("<Error>") {
             return Err(s3_problem(StatusCode::OK, &text, &self.bucket, what));
         }
@@ -481,19 +481,31 @@ async fn read_keys(
         })
 }
 
-/// The text of `body`, up to [`MAX_ANSWER`] bytes.
-async fn read_text(body: Body) -> String {
+/// The text of `body`, up to [`MAX_ANSWER`] bytes; `None` when the body breaks off or is longer.
+async fn read_text(body: Body) -> Option<String> {
     let limited = http_body_util::Limited::new(body, MAX_ANSWER);
-    limited.collect().await.map_or_else(
-        |_too_long| String::new(),
-        |collected| String::from_utf8_lossy(&collected.to_bytes()).into_owned(),
-    )
+    let collected = limited.collect().await.ok()?;
+    Some(String::from_utf8_lossy(&collected.to_bytes()).into_owned())
+}
+
+/// The whole text of a successful `answer` to `what`. A body that breaks off or is too long is a
+/// problem, never an empty answer: a `200` to `CopyObject` may still hold an `<Error>`, and an
+/// empty listing would look like the last page.
+async fn answer_text(answer: Response<Body>, what: &str) -> Result<String, ApiError> {
+    read_text(answer.into_body()).await.ok_or_else(|| {
+        ApiError::from(Problem::new(
+            Kind::Unavailable,
+            format!(
+                "The S3 gateway's answer to {what} broke off or was longer than {MAX_ANSWER} bytes."
+            ),
+        ))
+    })
 }
 
 /// The problem of a refused `answer` to `what` in `bucket`.
 async fn refused(answer: Response<Body>, bucket: &str, what: &str) -> ApiError {
     let status = answer.status();
-    let text = read_text(answer.into_body()).await;
+    let text = read_text(answer.into_body()).await.unwrap_or_default();
     s3_problem(status, &text, bucket, what)
 }
 
@@ -1027,7 +1039,7 @@ async fn delete_keys(place: &Place<'_>, keys: &[&str]) -> Result<u64, ApiError> 
         .header(header::CONTENT_LENGTH, HeaderValue::from(xml.len()))
         .body(Body::from(xml));
     let answer = place.ok(request, "the delete").await?;
-    let text = read_text(answer.into_body()).await;
+    let text = answer_text(answer, "the delete").await?;
     let failed = s3::raw_elements(&text, "Error");
     if let Some(first) = failed.first() {
         return Err(Problem::new(

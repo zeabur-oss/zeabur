@@ -31,6 +31,8 @@ mod tests {
         objects: BTreeMap<String, (Vec<u8>, String)>,
         uploads: BTreeMap<String, BTreeMap<u16, Vec<u8>>>,
         unsigned: usize,
+        /// Copies, then breaks off the answer to `CopyObject` halfway.
+        broken_copy: bool,
     }
 
     type Held = Arc<Mutex<Gateway>>;
@@ -116,6 +118,18 @@ mod tests {
                         .into_owned();
                     let object = held.objects[&source].clone();
                     held.objects.insert(key.to_owned(), object);
+                    if held.broken_copy {
+                        use futures_util::StreamExt as _;
+                        // The status and the first bytes go out before the connection drops.
+                        let half = futures_util::stream::once(async {
+                            Ok::<_, std::io::Error>(Bytes::from_static(b"<CopyObjectRes"))
+                        })
+                        .chain(futures_util::stream::once(async {
+                            tokio::time::sleep(std::time::Duration::from_millis(50)).await;
+                            Err(std::io::Error::other("the gateway went away"))
+                        }));
+                        return Body::from_stream(half).into_response();
+                    }
                     return xml("<CopyObjectResult/>".to_owned());
                 }
                 let kind = headers
@@ -551,6 +565,25 @@ mod tests {
         let keys: Vec<String> = held.lock().unwrap().objects.keys().cloned().collect();
         assert_eq!(keys, ["empty/"]);
         assert_eq!(held.lock().unwrap().unsigned, 0);
+    }
+
+    #[tokio::test]
+    async fn a_rename_keeps_the_source_when_the_copy_answer_breaks_off() {
+        let (held, app) = filled().await;
+        held.lock().unwrap().broken_copy = true;
+        let (status, moved) = json_of(
+            &app,
+            "POST",
+            &format!("{BASE}/moves"),
+            Some(json!({"from": "docs/readme.txt", "to": "docs/README.md"})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::SERVICE_UNAVAILABLE, "{moved}");
+        assert!(
+            moved["detail"].as_str().unwrap().contains("broke off"),
+            "{moved}"
+        );
+        assert!(held.lock().unwrap().objects.contains_key("docs/readme.txt"));
     }
 
     #[tokio::test]
