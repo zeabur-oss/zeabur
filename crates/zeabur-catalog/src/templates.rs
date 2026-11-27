@@ -435,7 +435,11 @@ impl Catalog {
             .cluster_issuer
             .filter(|i| !i.is_empty())
             .map(str::to_owned)
-            .or_else(|| template.needs_cluster_issuer.then(|| placeholder("clusterIssuer")));
+            .or_else(|| {
+                template
+                    .needs_cluster_issuer
+                    .then(|| placeholder("clusterIssuer"))
+            });
         let filled = RenderOptions {
             namespace: options.namespace,
             domain: domain.as_deref(),
@@ -812,7 +816,9 @@ fn check(
         Some(issuer) if !is_hostname(issuer) => {
             return Err(RenderError::ClusterIssuer(issuer.to_owned()));
         }
-        None if refuse && template.needs_cluster_issuer => return Err(RenderError::NoClusterIssuer),
+        None if refuse && template.needs_cluster_issuer => {
+            return Err(RenderError::NoClusterIssuer);
+        }
         Some(_) | None => {}
     }
     for input in &template.inputs {
@@ -824,7 +830,9 @@ fn check(
             continue;
         }
         match value {
-            None if refuse && input.required => return Err(RenderError::Missing(input.name.clone())),
+            None if refuse && input.required => {
+                return Err(RenderError::Missing(input.name.clone()));
+            }
             None => {}
             Some(value) => {
                 let pattern = Regex::new(&format!(r"\A(?:{})\z", input.pattern)).map_err(|e| {
@@ -1583,7 +1591,11 @@ mod tests {
         let password = secret["stringData"]["admin-password"].as_str().unwrap();
         assert_eq!(password.len(), 43, "32 bytes in unpadded base64url");
         let again = export("miniflux", &[]).unwrap();
-        assert_ne!(secrets(&again), secrets(&first), "each export makes new values");
+        assert_ne!(
+            secrets(&again),
+            secrets(&first),
+            "each export makes new values"
+        );
     }
 
     #[test]

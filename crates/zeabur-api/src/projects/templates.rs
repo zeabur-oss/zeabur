@@ -417,4 +417,86 @@ mod tests {
             assert_eq!(problem.at.map(|a| a.change), Some(1));
         }
     }
+
+    /// `zeaburctl templates export` prints what the web interface's plan writes: its Secrets and
+    /// the template's objects, opened and planned as a deploy from the form is.
+    #[test]
+    fn an_export_is_what_the_plan_of_the_form_writes() {
+        let catalog = Catalog::embedded();
+        let inputs: BTreeMap<String, String> =
+            [("adminEmail".to_owned(), "me@example.com".to_owned())].into();
+        let exported = catalog
+            .export(
+                "wordpress",
+                &RenderOptions {
+                    namespace: "shop",
+                    domain: Some("blog.example.com"),
+                    cluster_issuer: Some("letsencrypt"),
+                    inputs: &inputs,
+                },
+            )
+            .unwrap();
+        let mut changes: Vec<Change> = exported
+            .iter()
+            .filter(|o| o["kind"] == "Secret" && o["stringData"].is_object())
+            .map(|secret| {
+                let mut object = secret.clone();
+                object["metadata"]
+                    .as_object_mut()
+                    .unwrap()
+                    .remove("namespace");
+                Change::Create { object, yaml: None }
+            })
+            .collect();
+        changes.push(Change::Template(TemplateChange {
+            template: "wordpress".to_owned(),
+            revision: catalog.template("wordpress").unwrap().revision,
+            domain: Some("blog.example.com".to_owned()),
+            inputs,
+        }));
+        let request = PlanRequest { changes };
+        check_forms(&catalog, &request).unwrap();
+        let opened = open(&catalog, "shop", Some("letsencrypt"), request)
+            .unwrap()
+            .request;
+        let kinds: Vec<zeabur_plan::ServedKind> = exported
+            .iter()
+            .map(|o| {
+                let api_version = o["apiVersion"].as_str().unwrap();
+                let kind = o["kind"].as_str().unwrap();
+                zeabur_plan::ServedKind {
+                    group: api_version
+                        .rsplit_once('/')
+                        .map_or("", |(group, _)| group)
+                        .to_owned(),
+                    kind: kind.to_owned(),
+                    plural: format!("{}s", kind.to_lowercase()),
+                    namespaced: true,
+                }
+            })
+            .collect();
+        let snapshot = zeabur_graph::Snapshot {
+            namespace: "shop".to_owned(),
+            ..zeabur_graph::Snapshot::default()
+        };
+        let input = zeabur_plan::Input {
+            kinds: &kinds,
+            ..zeabur_plan::Input::new(&snapshot, "2026-11-27T00:00:00Z")
+        };
+        let plan = zeabur_plan::plan(input, &opened).unwrap();
+        let key = |o: &Value| format!("{}/{}", o["kind"], o["metadata"]["name"]);
+        let written: BTreeMap<String, Value> = plan
+            .objects
+            .into_iter()
+            .map(|o| {
+                let zeabur_plan::Write::Create { body } = o.write else {
+                    panic!("not a create: {:?}", o.target);
+                };
+                (key(&body), body)
+            })
+            .collect();
+        let exported: BTreeMap<String, Value> =
+            exported.into_iter().map(|o| (key(&o), o)).collect();
+        assert_eq!(exported, written);
+    }
 }

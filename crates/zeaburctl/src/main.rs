@@ -12,6 +12,7 @@ mod output;
 mod pack;
 mod server;
 mod telemetry;
+mod templates;
 mod ui;
 mod up;
 mod update;
@@ -56,6 +57,8 @@ enum Command {
     /// Print Zeabur Catalog components' manifests or Helm commands, to install them on a
     /// cluster.
     Components(components::ComponentsArgs),
+    /// Print what deploying a Zeabur Catalog template into a project writes.
+    Templates(templates::TemplatesArgs),
     /// Manage the ID that zeaburctl ui keeps for the experience program.
     Telemetry(telemetry::TelemetryArgs),
 }
@@ -74,6 +77,7 @@ async fn main() -> ExitCode {
         Command::Up(up_args) => up::run(&up_args).await,
         Command::Connect(connect_args) => connect::run(&connect_args).await,
         Command::Components(components_args) => components::run(&components_args),
+        Command::Templates(templates_args) => templates::run(&templates_args).await,
         Command::Telemetry(telemetry_args) => telemetry::run(&telemetry_args),
     };
     if let Some(check) = check {
