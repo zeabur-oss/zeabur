@@ -2365,6 +2365,7 @@ export const zhTW: Messages = {
   "clusterBackups.plan.nothing": "沒有需要變更的地方。",
   "clusterBackups.plan.keysHidden": "金鑰會寫進機密變數，這裡不顯示。",
   "clusterBackups.thing.Secret": "儲存金鑰",
+  "clusterBackups.thing.caSecret": "CA 憑證",
   "clusterBackups.thing.BackupStorageLocation": "備份存放位置",
   "clusterBackups.thing.Schedule": "排程",
   "clusterBackups.thing.Backup": (name) => `備份 ${name}，會立即開始`,

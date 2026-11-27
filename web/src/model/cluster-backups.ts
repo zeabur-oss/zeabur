@@ -22,6 +22,9 @@ export function mainSchedule(data: Data): Schedule | undefined {
   return data.schedules.find((s) => s.zeabur)
 }
 
+/** The Secret a location's CA certificate is written to. */
+export const CA_SECRET = "zeabur-backup-ca"
+
 export const outcomeHealth: Record<Schemas.BackupOutcome, Health> = {
   succeeded: "ok",
   partiallyFailed: "warn",

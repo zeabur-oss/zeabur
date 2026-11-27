@@ -2360,6 +2360,7 @@ export const zhCN: Messages = {
   "clusterBackups.plan.nothing": "没有需要变更的地方。",
   "clusterBackups.plan.keysHidden": "密钥会写进机密变量，这里不显示。",
   "clusterBackups.thing.Secret": "存储密钥",
+  "clusterBackups.thing.caSecret": "CA 证书",
   "clusterBackups.thing.BackupStorageLocation": "备份存放位置",
   "clusterBackups.thing.Schedule": "定时",
   "clusterBackups.thing.Backup": (name) => `备份 ${name}，会立即开始`,

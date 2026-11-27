@@ -2570,6 +2570,7 @@ export const en = {
   "clusterBackups.plan.nothing": "Nothing to change.",
   "clusterBackups.plan.keysHidden": "The keys go into a secret and aren't shown here.",
   "clusterBackups.thing.Secret": "the storage keys",
+  "clusterBackups.thing.caSecret": "the CA certificate",
   "clusterBackups.thing.BackupStorageLocation": "where backups go",
   "clusterBackups.thing.Schedule": "the schedule",
   "clusterBackups.thing.Backup": (name: string) => `backup ${name}, which starts now`,

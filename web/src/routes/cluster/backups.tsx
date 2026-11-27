@@ -28,6 +28,7 @@ import { formatDate } from "@/lib/format"
 import { useQuantityFormat } from "@/lib/quantity"
 import { cn } from "@/lib/utils"
 import {
+  CA_SECRET,
   hourOf,
   insideCluster,
   lastGood,
@@ -936,6 +937,12 @@ function Planned({ writes }: { writes: Schemas.BackupWrite[] }) {
       case "Ingress":
       case "HTTPRoute":
         return t("clusterBackups.thing.route", write.namespace ?? "", write.name)
+      case "Secret":
+        return t(
+          write.name === CA_SECRET
+            ? "clusterBackups.thing.caSecret"
+            : "clusterBackups.thing.Secret",
+        )
       default:
         return t(`clusterBackups.thing.${write.kind as "Secret"}`)
     }
