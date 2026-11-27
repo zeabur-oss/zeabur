@@ -13,6 +13,7 @@ fi
 version="$1"
 arch="$2"
 root="$(cd "$(dirname "$0")/.." && pwd)"
+source "$root/scripts/release-pack.sh"
 : "${IN_NIX_SHELL:?run inside nix develop}"
 [[ "$version" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.-]+)?$ ]] ||
   { echo "$version is not vX.Y.Z or vX.Y.Z-<pre-release>" >&2; exit 2; }
@@ -23,6 +24,7 @@ case "$(uname -s):$arch:$(uname -m)" in
   Linux:amd64:x86_64) os=linux target=x86_64-unknown-linux-musl ;;
   Linux:arm64:aarch64) os=linux target=aarch64-unknown-linux-musl ;;
   Darwin:arm64:arm64) os=darwin target=aarch64-apple-darwin ;;
+  # Windows and Intel Macs build outside the Nix shell: scripts/release-build-cli.sh.
   *) echo "cannot build $arch here: each build is native, and macOS is arm64 only" >&2; exit 2 ;;
 esac
 binaries=(zeaburctl)
@@ -80,10 +82,7 @@ for binary in "${binaries[@]}"; do
     "$file" --version
   fi
   install -m 0644 "$root/LICENSE" "$work/$binary/LICENSE"
-  # Reproducible: sorted entries, the commit's time, no owner names, no gzip timestamp.
-  tar --format=ustar --sort=name --mtime="@$SOURCE_DATE_EPOCH" \
-    --owner=0 --group=0 --numeric-owner -C "$work/$binary" -cf - LICENSE "$binary" |
-    gzip -n -9 >"$output/$binary-$version-$os-$arch.tar.gz"
+  pack "$work/$binary" "$output/$binary-$version-$os-$arch.tar.gz" LICENSE "$binary"
 done
 
 if [[ "$os" == linux ]]; then

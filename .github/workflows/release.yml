@@ -7,7 +7,8 @@ name: Release
 # every platform and publishes nothing.
 #
 # Zeabur's own steps are scripts/release-*.sh; the rest calls zeabur-oss-release directly. Zeabur
-# Desktop's packages build outside Nix with scripts/package-desktop.sh.
+# Desktop's packages, and zeaburctl for Windows and Intel Macs, build outside Nix with
+# scripts/package-desktop.sh and scripts/release-build-cli.sh.
 on:
   push:
     tags: ["v[0-9]*"]
@@ -56,7 +57,7 @@ jobs:
       fail-fast: false
       matrix:
         # zeaburctl for macOS on Apple silicon; the server and its image are Linux only. Each build
-        # is native.
+        # is native. cli-build builds zeaburctl for the other platforms.
         include:
           - { os: linux, arch: amd64, runner: ubuntu-26.04 }
           - { os: linux, arch: arm64, runner: ubuntu-26.04-arm }
@@ -133,6 +134,7 @@ jobs:
     outputs:
       toolchain: ${{ steps.versions.outputs.toolchain }}
       tauri-cli: ${{ steps.versions.outputs.tauri-cli }}
+      cargo-auditable: ${{ steps.versions.outputs.cargo-auditable }}
       catalog-commit: ${{ steps.versions.outputs.catalog-commit }}
       updater: ${{ steps.versions.outputs.updater }}
     steps:
@@ -235,6 +237,81 @@ jobs:
           if-no-files-found: error
           retention-days: 7
 
+  # zeaburctl for Windows and for Intel Macs, outside Nix like desktop-build: the dev shell has no
+  # Windows toolchain, and it builds for Apple silicon only. The Intel build is cross-compiled on
+  # Apple silicon with Apple's own compiler and linker.
+  cli-build:
+    name: cli-build (${{ matrix.os }}-${{ matrix.arch }})
+    needs: desktop-prepare
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows, arch: amd64, runner: windows-2025, target: x86_64-pc-windows-msvc, signing: windows-signing }
+          - { os: darwin, arch: amd64, runner: macos-26, target: x86_64-apple-darwin, signing: apple-signing }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    permissions:
+      contents: read
+      id-token: write # azure/login
+    # The environments' branch rules keep the credentials to main and tags.
+    environment: >-
+      ${{ (github.ref == 'refs/heads/main' || startsWith(github.ref, 'refs/tags/v')) &&
+          matrix.signing || '' }}
+    defaults:
+      run:
+        shell: bash
+    env:
+      OS: ${{ matrix.os }}
+      ARCH: ${{ matrix.arch }}
+      RUSTUP_TOOLCHAIN: ${{ needs.desktop-prepare.outputs.toolchain }}
+      ZEABUR_CATALOG_COMMIT: ${{ needs.desktop-prepare.outputs.catalog-commit }}
+      ZEABUR_CATALOG_RELEASE: ${{ github.workspace }}/target/desktop-inputs/catalog
+      ZEABUR_UI_DIST: ${{ github.workspace }}/web/dist
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: desktop-inputs
+      - name: Install the toolchain and cargo-auditable
+        env:
+          TARGET: ${{ matrix.target }}
+          CARGO_AUDITABLE: ${{ needs.desktop-prepare.outputs.cargo-auditable }}
+        run: |
+          rustup toolchain install "$RUSTUP_TOOLCHAIN" --profile minimal --target "$TARGET"
+          cargo install cargo-auditable --version "=$CARGO_AUDITABLE" --locked
+      - name: Build
+        env:
+          # The experience program's PostHog key, in tag builds only (docs/internal/releasing.md).
+          ZEABUR_TELEMETRY_KEY: ${{ startsWith(github.ref, 'refs/tags/v') && vars.POSTHOG_KEY || '' }}
+        run: scripts/release-build-cli.sh compile "$VERSION" "$OS" "$ARCH" dist
+      # Signing logs in right before packaging, so the short-lived token is still valid.
+      - if: matrix.os == 'windows' && vars.AZURE_CLIENT_ID != ''
+        uses: azure/login@a641126d1b8aa4d1fa005f4f92df94a3a4c4c906 # v3.1.0
+        with:
+          client-id: ${{ vars.AZURE_CLIENT_ID }}
+          tenant-id: ${{ vars.AZURE_TENANT_ID }}
+          subscription-id: ${{ vars.AZURE_SUBSCRIPTION_ID }}
+      - name: Package and sign
+        env:
+          APPLE_CERTIFICATE_P12: ${{ matrix.os == 'darwin' && secrets.APPLE_CERTIFICATE_P12 || '' }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ matrix.os == 'darwin' && secrets.APPLE_CERTIFICATE_PASSWORD || '' }}
+          APPLE_API_KEY_P8: ${{ matrix.os == 'darwin' && secrets.APPLE_API_KEY_P8 || '' }}
+          APPLE_API_KEY_ID: ${{ matrix.os == 'darwin' && secrets.APPLE_API_KEY_ID || '' }}
+          APPLE_API_ISSUER_ID: ${{ matrix.os == 'darwin' && secrets.APPLE_API_ISSUER_ID || '' }}
+          AZURE_SIGNING_ENDPOINT: ${{ matrix.os == 'windows' && vars.AZURE_CLIENT_ID != '' && vars.AZURE_SIGNING_ENDPOINT || '' }}
+          AZURE_SIGNING_ACCOUNT: ${{ vars.AZURE_SIGNING_ACCOUNT }}
+          AZURE_SIGNING_PROFILE: ${{ vars.AZURE_SIGNING_PROFILE }}
+        run: scripts/release-build-cli.sh package "$VERSION" "$OS" "$ARCH" dist
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: candidate-${{ matrix.os }}-${{ matrix.arch }}
+          path: dist/
+          if-no-files-found: error
+          retention-days: 7
+
   # Signs each file the updater installs and writes latest.json, once the app has an updater key
   # (desktop/tauri.conf.json), for main and tags. Only this job's environment holds the key.
   desktop-updater:
@@ -278,8 +355,9 @@ jobs:
   publish:
     if: >-
       ${{ !cancelled() && github.event_name == 'push' && needs.build.result == 'success' &&
-          needs.desktop-build.result == 'success' && needs.desktop-updater.result != 'failure' }}
-    needs: [build, desktop-build, desktop-updater]
+          needs.cli-build.result == 'success' && needs.desktop-build.result == 'success' &&
+          needs.desktop-updater.result != 'failure' }}
+    needs: [build, cli-build, desktop-build, desktop-updater]
     runs-on: instabox-small
     timeout-minutes: 30
     permissions:
@@ -428,3 +506,36 @@ jobs:
           RELEASE_SOURCE_REPOSITORY: ${{ github.repository }}
           RELEASE_SOURCE_REF: refs/tags/${{ env.VERSION }}
         run: scripts/release-verify.sh "$VERSION" downloaded
+
+  # zeaburctl on the platforms verify has no dev shell for, as a user gets it from the draft. The
+  # verify job checks every file's checksum and attestation.
+  verify-cli:
+    name: verify-cli (${{ matrix.os }}-${{ matrix.arch }})
+    needs: release
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: windows, arch: amd64, runner: windows-2025 }
+          - { os: darwin, arch: amd64, runner: macos-15-intel }
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    permissions:
+      # GitHub shows a draft release only to a token that can push.
+      contents: write
+    defaults:
+      run:
+        shell: bash
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Run zeaburctl from the draft and check its signature
+        env:
+          GH_TOKEN: ${{ github.token }}
+          OS: ${{ matrix.os }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          gh release download "$VERSION" --repo "$GITHUB_REPOSITORY" --dir downloaded \
+            --pattern "zeaburctl-$VERSION-$OS-$ARCH.*"
+          scripts/release-verify-cli.sh "$VERSION" "$OS" "$ARCH" downloaded

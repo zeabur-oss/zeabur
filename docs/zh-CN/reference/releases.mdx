@@ -9,7 +9,7 @@ description: 按操作系统选择 Zeabur 开源版发行文件，验证校验�
 
 | 产物 | 位置或文件名 | 平台 |
 |---|---|---|
-| `zeaburctl` | `zeaburctl-v<version>-<os>-<arch>.tar.gz` | Linux `amd64`、`arm64`，macOS `arm64` |
+| `zeaburctl` | `zeaburctl-v<version>-<os>-<arch>.tar.gz`，Windows 版是 `.zip` | Linux `amd64`、`arm64`，macOS `arm64`、`amd64`，Windows `amd64` |
 | `zeabur` 服务器 | `zeabur-v<version>-linux-<arch>.tar.gz` | Linux `amd64`、`arm64` |
 | 多平台容器镜像 | `ghcr.io/zeabur-oss/zeabur:<version>` | Linux `amd64`、`arm64` |
 | Zeabur Proxy 容器镜像 | `ghcr.io/zeabur-oss/proxy:<version>` | Linux `amd64`、`arm64` |
@@ -17,7 +17,7 @@ description: 按操作系统选择 Zeabur 开源版发行文件，验证校验�
 | 产物摘要 | `digests.txt` | 每个镜像的索引、各平台镜像和 chart |
 | 文件校验和与签名 | `SHA256SUMS`、`SHA256SUMS.sigstore.json` | 同一 release 的附件 |
 
-每个压缩包都包含可执行文件和 `LICENSE`。macOS 只有 Apple silicon（`arm64`）版本，没有 Intel Mac 版本。`zeabur` 只能在 Linux 上运行，macOS 上只需要 `zeaburctl`。Windows 请在 WSL 中使用 Linux 版的 `zeaburctl`。
+每个压缩包都包含可执行文件和 `LICENSE`。`zeabur` 只能在 Linux 上运行，macOS 和 Windows 上只需要 `zeaburctl`。v0.3.4 之前的版本没有 Intel Mac 和 Windows 版本，Windows 请在 WSL 中使用它们的 Linux 版 `zeaburctl`。
 
 发布时，chart 的 `image.digest` 和 `proxy.image.digest` 会固定为本次发布的镜像索引，用 chart 默认值安装就会得到同一批镜像。镜像 tag 和 chart 版本号不带开头的 `v`，GitHub release tag 和压缩包文件名带有 `v`。
 
@@ -38,7 +38,7 @@ gh release download "v$version" --repo zeabur-oss/zeabur \
   --pattern "$binary-v$version-$platform.tar.gz"
 ```
 
-`platform` 可以换成 `linux-amd64` 或 `linux-arm64`。
+Intel Mac 请把 `platform` 换成 `darwin-amd64`，也可以换成 `linux-amd64` 或 `linux-arm64`。Windows 请在 Git Bash 中运行这些步骤，设置 `platform=windows-amd64`，把 `.tar.gz` 改成 `.zip`，最后在文件资源管理器中解压。
 
 每个版本都由本仓库的 release workflow（`.github/workflows/release.yml`）构建并签名，所以签名者是该 workflow（下面的 `signer`）。v0.2.0 及之前的版本由 [zeabur-oss/.github](https://github.com/zeabur-oss/.github) 中共用的 release workflow 签名，`signer` 也接受它。证书上还记录了这次运行是为了哪个仓库、哪个 tag。进入下载目录，依次验证校验和清单的签名者、文件内容和构建来源：
 
@@ -147,7 +147,7 @@ awk '$(NF-1) == "index" { print $NF }' digests.txt
 
 ## 发布流程
 
-维护者推送 `v<version>` tag 后，release workflow（本仓库的 `release.yml`）会构建 Linux 和 macOS 版本与 Zeabur Desktop，运行冒烟测试，发布镜像和 chart，再通过 Sigstore keyless 为镜像、chart 和校验和清单签名，并为三者生成构建来源 attestation。
+维护者推送 `v<version>` tag 后，release workflow（本仓库的 `release.yml`）会构建 Linux、macOS 和 Windows 版本与 Zeabur Desktop，运行冒烟测试，发布镜像和 chart，再通过 Sigstore keyless 为镜像、chart 和校验和清单签名，并为三者生成构建来源 attestation。
 
 Workflow 最后把文件添加到 GitHub release 草稿，维护者检查后才公开。只有 Releases 页面上能看到的版本才有可下载的文件。
 

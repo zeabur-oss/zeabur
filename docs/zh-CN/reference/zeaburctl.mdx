@@ -5,7 +5,7 @@ description: 使用当前 kubeconfig 打开 Zeabur 开源版、上传文件夹�
 
 如果已有能连接集群的 kubeconfig，运行 `zeaburctl ui` 就会在本机打开 Zeabur 开源版。读取、**检查变更**和确认后的应用操作都使用该 context 的权限，无需先在集群中安装 Zeabur 开源版服务器。
 
-在装了 [Homebrew](https://brew.sh) 的 Apple 芯片 Mac 或 Linux 上，可以用它安装，之后用 `brew upgrade` 更新：
+在装了 [Homebrew](https://brew.sh) 的 Mac 或 Linux 上，可以用它安装，之后用 `brew upgrade` 更新：
 
 ```sh
 brew tap zeabur-oss/tap
@@ -18,7 +18,7 @@ brew install zeabur-oss/tap/zeaburctl
 brew install zeabur-oss/tap/zeaburctl-beta
 ```
 
-也可以按照[发行文件与验证](./releases.mdx)下载适合操作系统和处理器的可执行文件。有新版本时，`zeaburctl` 每天最多输出一行提醒。它会发送什么、如何关闭，见[检查更新](./telemetry.mdx#检查更新)。
+也可以按照[发行文件与验证](./releases.mdx)下载适合操作系统和处理器的可执行文件。Windows 请下载 `zeaburctl-v<version>-windows-amd64.zip`，解压出 `zeaburctl.exe`，在 PowerShell 或命令提示符中运行。有新版本时，`zeaburctl` 每天最多输出一行提醒。它会发送什么、如何关闭，见[检查更新](./telemetry.mdx#检查更新)。
 
 ## 命令
 

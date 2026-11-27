@@ -5,7 +5,7 @@ description: 用目前的 kubeconfig 開啟 Zeabur 開源版、上傳資料夾�
 
 已有能連線到叢集的 kubeconfig 時，執行 `zeaburctl ui` 就會在本機開啟 Zeabur 開源版。讀取、**檢查變更**與確認後的套用都使用該 context 的權限，叢集裡不需要先安裝 Zeabur 開源版伺服器。
 
-在裝了 [Homebrew](https://brew.sh) 的 Apple 晶片 Mac 或 Linux 上，可以用它安裝，之後用 `brew upgrade` 更新：
+在裝了 [Homebrew](https://brew.sh) 的 Mac 或 Linux 上，可以用它安裝，之後用 `brew upgrade` 更新：
 
 ```sh
 brew tap zeabur-oss/tap
@@ -18,7 +18,7 @@ brew install zeabur-oss/tap/zeaburctl
 brew install zeabur-oss/tap/zeaburctl-beta
 ```
 
-也可以依[發行檔與驗證](./releases.mdx)下載符合作業系統和處理器的執行檔。有新版時，`zeaburctl` 每天最多印出一行提醒。它會傳送什麼、怎麼關閉，見[檢查更新](./telemetry.mdx#檢查更新)。
+也可以依[發行檔與驗證](./releases.mdx)下載符合作業系統和處理器的執行檔。Windows 請下載 `zeaburctl-v<version>-windows-amd64.zip`，解壓出 `zeaburctl.exe`，在 PowerShell 或命令提示字元裡執行。有新版時，`zeaburctl` 每天最多印出一行提醒。它會傳送什麼、怎麼關閉，見[檢查更新](./telemetry.mdx#檢查更新)。
 
 ## 指令
 
