@@ -183,7 +183,7 @@ async fn can_create(cluster: &dyn Cluster) -> namespace::Permission {
 enum Health {
     /// Its service health counts, and each service with its health.
     Read(ProjectHealth, Vec<ServiceSummary>),
-    /// kube-apiserver answered `403`: the person may not read the project.
+    /// kube-apiserver answered `401` or `403`: the person may not read the project.
     Refused,
     /// Any other error, such as a timeout or a `5xx`: not read this time.
     Failed,
@@ -194,7 +194,7 @@ enum Health {
 async fn health_of(cluster: Arc<dyn Cluster>, project: String, now: Timestamp) -> Health {
     let objects = match cluster.namespace_workloads(&project).await {
         Ok(objects) => objects,
-        Err(e) if e.code() == Some(403) => return Health::Refused,
+        Err(e) if e.is_refused() => return Health::Refused,
         Err(_) => return Health::Failed,
     };
     let (snapshot, _) = snapshot(objects, now);

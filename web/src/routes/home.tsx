@@ -33,10 +33,9 @@ import { kindName } from "@/i18n/kind-name"
 import { lastKnown, rememberKnown } from "@/lib/last-known"
 import { serviceLink } from "@/lib/place"
 import { originOf, originRank, type Origin } from "@/model/origin"
-import { otherNamespaces, readable } from "@/model/project"
+import { otherNamespaces, projectRank, readable } from "@/model/project"
 import {
   byHealth,
-  healthRank,
   needsAttention,
   statusOf,
   type Event,
@@ -467,12 +466,10 @@ function Group({
 }
 
 function byProjectHealth(a: ProjectItem, b: ProjectItem): number {
-  const rank = (p: ProjectItem) => (p.health ? healthRank[p.health.worst] : healthRank.ok)
-  return rank(a) - rank(b) || a.name.localeCompare(b.name)
+  return projectRank(a) - projectRank(b) || a.name.localeCompare(b.name)
 }
 
-/** No project yet: the namespaces that could be one, each with Adopt. */
-/** Nothing for a person who may not create projects: adopting a namespace creates one. */
+/** No project yet: the namespaces that could be one, each with Adopt. Nothing for a person who may not create projects: adopting a namespace creates one. */
 function Offered({
   items,
   canCreate,

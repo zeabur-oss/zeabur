@@ -13,8 +13,7 @@ import { ProjectCollection, ProjectViewSwitch } from "@/components/project-card"
 import { ProjectIcon } from "@/components/project-icon"
 import { useT } from "@/i18n"
 import { projectsAsList } from "@/lib/stores"
-import { otherNamespaces, readable } from "@/model/project"
-import { healthRank } from "@/model/service"
+import { otherNamespaces, projectRank, readable } from "@/model/project"
 import {
   Empty,
   EmptyDescription,
@@ -110,6 +109,24 @@ export function OtherNamespaces({
   )
 }
 
+/** No project to show; one who may not create projects is sent to an admin. */
+function NoProjects({ denied }: { denied: boolean }) {
+  const t = useT()
+  return (
+    <Empty size="sm">
+      <EmptyHeader>
+        <EmptyMedia>
+          <Illustration kind="empty" seed="projects" />
+        </EmptyMedia>
+        <EmptyTitle>{t("cluster.noProjects")}</EmptyTitle>
+        <EmptyDescription>
+          {denied ? t("projects.noneDenied") : t("projects.noneBody")}
+        </EmptyDescription>
+      </EmptyHeader>
+    </Empty>
+  )
+}
+
 function HiddenProjects({ count }: { count: number }) {
   const t = useT()
   if (count === 0) return null
@@ -152,11 +169,9 @@ export function ProjectsPage() {
   const all = projects.data?.items ?? []
   const items = readable(all)
   const hidden = all.length - items.length
-  const rank = (p: (typeof items)[number]) =>
-    p.health ? healthRank[p.health.worst] : healthRank.ok
   const adopted = items
     .filter((p) => p.adopted)
-    .toSorted((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name))
+    .toSorted((a, b) => projectRank(a) - projectRank(b) || a.name.localeCompare(b.name))
 
   return (
     <PageColumn gap="lg" className="mt-6 mb-12 md:mt-10">
@@ -211,15 +226,7 @@ export function ProjectsPage() {
               }
             />
           ) : (
-            <Empty size="sm">
-              <EmptyHeader>
-                <EmptyMedia>
-                  <Illustration kind="empty" seed="projects" />
-                </EmptyMedia>
-                <EmptyTitle>{t("cluster.noProjects")}</EmptyTitle>
-                <EmptyDescription>{t("projects.noneBody")}</EmptyDescription>
-              </EmptyHeader>
-            </Empty>
+            <NoProjects denied={projects.data.canCreate === "denied"} />
           )}
           <HiddenProjects count={hidden} />
           <OtherSection items={items} canCreate={projects.data.canCreate} />

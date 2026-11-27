@@ -18,6 +18,7 @@ import {
   newProjectProblem,
   mayChange,
   otherNamespaces,
+  projectRank,
   readable,
   patchRole,
   projectIcons,
@@ -253,5 +254,15 @@ describe("a project's build limits", () => {
     )
     expect(said.lines.join(" ")).toMatch(/build memory and CPU/)
     expect(said.action).toBe("Save build limits")
+  })
+})
+
+describe("the order of projects", () => {
+  test("puts a project not read this time with the ones that need a look", () => {
+    const project = (name: string, fields: Partial<Schemas.ProjectSummary>) =>
+      ({ name, ...fields }) as Schemas.ProjectSummary
+    const ok = project("ok", { read: "read", health: { worst: "ok" } as Schemas.ProjectHealth })
+    const failed = project("failed", { read: "failed" })
+    expect(projectRank(failed)).toBeLessThan(projectRank(ok))
   })
 })

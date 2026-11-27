@@ -191,7 +191,10 @@ export function matchesProject(project: ProjectSummary, hosts: string[], needle:
     .includes(needle)
 }
 
-const healthOrder = (p: ProjectSummary) => (p.health ? healthRank[p.health.worst] : healthRank.ok)
+/** Its worst service's place in the health order; a project not read this time sorts with the
+ * ones that need a look. */
+export const projectRank = (p: ProjectSummary) =>
+  p.read === "failed" ? healthRank.warn : p.health ? healthRank[p.health.worst] : healthRank.ok
 const named = (p: ProjectSummary) => p.displayName ?? p.name
 
 /** Failing first, or by name; `descending` turns the order around, ties stay by name. */
@@ -203,7 +206,7 @@ export function compareProjects(
 ): number {
   const sign = descending ? -1 : 1
   if (sort === "health") {
-    return sign * (healthOrder(a) - healthOrder(b)) || named(a).localeCompare(named(b))
+    return sign * (projectRank(a) - projectRank(b)) || named(a).localeCompare(named(b))
   }
   return sign * named(a).localeCompare(named(b))
 }

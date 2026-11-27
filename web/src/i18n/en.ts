@@ -524,6 +524,7 @@ export const en = {
   "projects.notRead": "Could not read",
   "projects.filterOther": "Filter namespaces",
   "projects.noOtherMatch": (query: string) => `No namespaces match “${query}”.`,
+  "projects.noneDenied": "Ask an admin to create a project or give you access to one.",
   "projects.noneBody":
     "A project is a Kubernetes namespace shown in Zeabur. Create one, or use an existing namespace below.",
   "projects.new": "New project",

@@ -490,6 +490,7 @@ export const zhTW: Messages = {
   "projects.notRead": "暫時讀不到",
   "projects.filterOther": "篩選 Namespace",
   "projects.noOtherMatch": (query) => `沒有符合「${query}」的 Namespace。`,
+  "projects.noneDenied": "請管理員新增專案，或讓你存取現有的專案。",
   "projects.noneBody":
     "專案是 Zeabur 顯示的 Kubernetes Namespace。新增一個，或使用下方既有的 Namespace。",
   "projects.new": "新增專案",
