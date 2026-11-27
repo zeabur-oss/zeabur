@@ -42,7 +42,7 @@ description: 把電腦上的資料夾或 .zip 檔交給 Zeabur Builder 建置。
 
 **名稱**、**連接埠**、**公開網域**、**環境變數**、**建置變數**、**規格**和**安全性**的意義與[從 Git 部署](./git.mdx)相同。
 
-**建置方式**選 **Railpack** 時，由建置器判斷語言。選 **Dockerfile** 時，使用資料夾最上層的 Dockerfile。要建置資料夾裡的某個子資料夾，在**更多設定**的**根目錄**填入子資料夾路徑，例如 `apps/web`。
+**建置方式**選 **Railpack** 時，由建置器判斷語言。選 **Dockerfile** 時，使用資料夾最上層的 Dockerfile。叢集設定好 Agent 時，選 **Agent** 會由模型寫出 Dockerfile，見[用 Agent 建置](./git.mdx#用-agent-建置)。要建置資料夾裡的某個子資料夾，在**更多設定**的**根目錄**填入子資料夾路徑，例如 `apps/web`。
 
 </Step>
 <Step>

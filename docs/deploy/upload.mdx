@@ -42,7 +42,7 @@ The size limit is 256 MiB compressed and 1 GiB uncompressed. If you exceed eithe
 
 **Name**, **Port**, **Public domain**, **Environment variables**, **Build variables**, **Size**, and **Security** work the same as in [deploying from Git](./git.mdx).
 
-For **Build with**, choose **Railpack** to let the builder detect the language. Choose **Dockerfile** to use the Dockerfile at the top level of the folder. To build a subfolder, enter its path, such as `apps/web`, in **Root directory** under **More settings**.
+For **Build with**, choose **Railpack** to let the builder detect the language. Choose **Dockerfile** to use the Dockerfile at the top level of the folder. Choose **Agent**, when the cluster has it set up, to have a model write a Dockerfile; see [Build with the agent](./git.mdx#build-with-the-agent). To build a subfolder, enter its path, such as `apps/web`, in **Root directory** under **More settings**.
 
 </Step>
 <Step>
