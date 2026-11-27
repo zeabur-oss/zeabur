@@ -1479,7 +1479,15 @@ async fn compute(
                 None => None,
             };
             let ca_cert = match destination {
-                Some(name) => Some(s3_destinations::ca_cert(cluster, name).await?),
+                Some(name) => {
+                    let (pem, from) = s3_destinations::ca_cert(cluster, name).await?;
+                    // The trust root applied must be the one the plan showed.
+                    versions.insert(
+                        format!("ConfigMap/{}/{name}", s3_destinations::NAMESPACE),
+                        from,
+                    );
+                    Some(pem)
+                }
                 None => ca_cert.clone(),
             };
             if ca_cert

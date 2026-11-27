@@ -377,14 +377,17 @@ pub(crate) async fn keys(cluster: &dyn Cluster, name: &str) -> Result<(String, S
         })
 }
 
-/// The CA certificates of destination `name`, read as the person; empty when it trusts the
-/// system's.
+/// The CA certificates of destination `name`, read as the person, empty when it trusts the
+/// system's, and the resource version of the ConfigMap that holds them.
 ///
 /// # Errors
 ///
 /// `403` naming the read when the person may not read the destination, `404` when it does not
 /// exist.
-pub(crate) async fn ca_cert(cluster: &dyn Cluster, name: &str) -> Result<String, ApiError> {
+pub(crate) async fn ca_cert(
+    cluster: &dyn Cluster,
+    name: &str,
+) -> Result<(String, String), ApiError> {
     let found = cluster
         .find_object(&resource("ConfigMap"), Some(NAMESPACE), name)
         .await
@@ -401,7 +404,8 @@ pub(crate) async fn ca_cert(cluster: &dyn Cluster, name: &str) -> Result<String,
             format!("There is no S3 destination named {name}."),
         ))
     })?;
-    Ok(text(&object, CA_CERT))
+    let version = object.metadata.resource_version.clone().unwrap_or_default();
+    Ok((text(&object, CA_CERT), version))
 }
 
 /// The destination a Secret's keys were copied from, by its label.

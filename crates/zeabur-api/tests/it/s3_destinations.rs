@@ -253,6 +253,41 @@ mod tests {
     }
 
     #[tokio::test]
+    async fn a_velero_location_plan_is_refused_when_its_destination_ca_changed() {
+        const CA: &str =
+            "-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUQ\n-----END CERTIFICATE-----";
+        const OTHER: &str =
+            "-----BEGIN CERTIFICATE-----\nMIIBszCCAVmgAwIBAgIUR\n-----END CERTIFICATE-----";
+        let cluster = cluster();
+        let app = app(&cluster);
+        register(&app).await;
+        let save = |ca: &str| {
+            json!({"op": "save", "name": "r2", "endpoint": "https://minio.lan",
+                "bucket": "backups", "caCert": ca})
+        };
+        applied(&app, BASE, &save(CA)).await;
+        let location = json!({"op": "location", "bucket": "backups",
+            "endpoint": "https://minio.lan", "destination": "r2"});
+        let backups = "/api/v1/cluster/backups";
+        let (status, planned) =
+            send(&app, "POST", &format!("{backups}/plan"), Some(&location)).await;
+        assert_eq!(status, StatusCode::OK, "{planned}");
+        applied(&app, BASE, &save(OTHER)).await;
+
+        let (status, problem) = send(
+            &app,
+            "POST",
+            &format!("{backups}/apply"),
+            Some(&json!({"token": planned["token"]})),
+        )
+        .await;
+        assert_eq!(status, StatusCode::CONFLICT, "{problem}");
+        let ca = cluster.inspect(|s| s.secret_values.get("velero/zeabur-backup-ca").cloned());
+        let ca = ca.flatten();
+        assert!(ca.is_none(), "{ca:?}");
+    }
+
+    #[tokio::test]
     async fn a_velero_location_from_keys_refuses_what_is_not_a_certificate() {
         let cluster = cluster();
         let app = app(&cluster);
