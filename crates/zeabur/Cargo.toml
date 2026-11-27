@@ -29,7 +29,6 @@ zeabur-ui = { workspace = true, optional = true }
 axum.workspace = true
 bytes.workspace = true
 clap.workspace = true
-croner.workspace = true
 futures-util.workspace = true
 form_urlencoded.workspace = true
 http-body-util.workspace = true

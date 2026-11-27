@@ -75,6 +75,19 @@ fn calendar_checks_use_utc_and_skip_impossible_schedules() {
             "{schedule}"
         );
     }
+    let year_end = at("2027-12-31T23:59:59.900Z");
+    for (schedule, next) in [
+        ("* * * * * *", "2028-01-01T00:00:00Z"),
+        ("0 0 0 29 FEB *", "2028-02-29T00:00:00Z"),
+        ("@every 1500ms", "2028-01-01T00:00:00Z"),
+    ] {
+        assert_eq!(
+            Target::read(&database("db", schedule))
+                .unwrap()
+                .next(year_end),
+            Some(at(next))
+        );
+    }
     let saturday = at("2026-11-28T12:00:00Z");
     assert_eq!(
         Target::read(&database("db", "0 0 3 * * 1/2"))

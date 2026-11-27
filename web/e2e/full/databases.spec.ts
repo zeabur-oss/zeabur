@@ -400,21 +400,14 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
       await expect(
         developer.getByRole("region", { name: "Automatic updates", exact: true }),
       ).toHaveCount(0)
-      const response = await developer.request.post(
-        `/api/v1/projects/${encodeURIComponent(project)}/plan`,
+      const refused = await planAndApply(developer, project, [
         {
-          data: {
-            changes: [
-              {
-                op: "autoUpdate",
-                workload: { kind: "Cluster", name: postgres },
-                update: { kind: "image", policy: "sameTag" },
-              },
-            ],
-          },
+          op: "autoUpdate",
+          workload: { kind: "Cluster", name: postgres },
+          update: { kind: "image", policy: "sameTag" },
         },
-      )
-      expect(response.status()).toBe(409)
+      ])
+      expect(refused).toMatchObject({ stage: "plan", status: 409, body: { managedBy: "Helm" } })
       expect((await postgresObject(developer)).spec).toEqual(before.spec)
     } finally {
       kubectl("label", resource, postgres, `${label}-`)

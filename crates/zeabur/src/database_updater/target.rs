@@ -2,12 +2,12 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use croner::parser::{CronParser, Seconds, Year};
 use serde::Deserialize;
 use zeabur_kube::DynamicObject;
 use zeabur_kube::k8s_openapi::api::core::v1::{
     LocalObjectReference, Node, NodeAffinity, NodeSelectorRequirement, NodeSelectorTerm, Pod,
 };
+use zeabur_kube::k8s_openapi::jiff::civil::Time;
 use zeabur_kube::k8s_openapi::jiff::tz::TimeZone;
 use zeabur_kube::k8s_openapi::jiff::{SignedDuration, Timestamp};
 use zeabur_model::adapters::controller_of;
@@ -86,10 +86,7 @@ impl Target {
             return Timestamp::from_second(now.as_second().checked_add(duration.as_secs().max(1))?)
                 .ok();
         }
-        let cron = calendar(&self.schedule)?;
-        cron.find_next_occurrence(&now.to_zoned(TimeZone::UTC), false)
-            .ok()
-            .map(|t| t.timestamp())
+        calendar(&self.schedule, now)
     }
 
     pub(super) fn architectures(&self, nodes: &[Node]) -> Result<BTreeSet<String>, String> {
@@ -181,60 +178,102 @@ impl Target {
     }
 }
 
-// Keel's five-field form omits the weekday, and wildcard-derived day fields (including
-// */2) intersect. Two explicitly restricted day fields instead match either day.
-fn calendar(schedule: &str) -> Option<croner::Cron> {
-    let parser = CronParser::builder()
-        .seconds(Seconds::Required)
-        .year(Year::Disallowed);
-    match schedule {
-        "@midnight" => return parser.build().parse("@daily").ok(),
-        "@hourly" | "@daily" | "@weekly" | "@monthly" | "@annually" | "@yearly" => {
-            return parser.build().parse(schedule).ok();
-        }
-        _ => {}
-    }
-    let mut fields: Vec<_> = schedule.split_whitespace().collect();
-    if fields.len() == 5 {
-        fields.push("*");
-    }
-    let [second, minute, hour, dom, month, dow] = fields.as_slice() else {
-        return None;
+// Keel's five-field form omits the weekday. A wildcard-derived day field (including */2)
+// intersects with the other day field, while two explicitly restricted fields match either day.
+fn calendar(schedule: &str, now: Timestamp) -> Option<Timestamp> {
+    let pattern = match schedule {
+        "@yearly" | "@annually" => "0 0 0 1 1 *",
+        "@monthly" => "0 0 0 1 * *",
+        "@weekly" => "0 0 0 * * 0",
+        "@midnight" | "@daily" => "0 0 0 * * *",
+        "@hourly" => "0 0 * * * *",
+        other => other,
     };
-    let wildcard_day = [dom, dow]
+    let mut fields = pattern.split_whitespace();
+    let seconds = cron_field(fields.next()?, 0, 59, &[])?;
+    let minutes = cron_field(fields.next()?, 0, 59, &[])?;
+    let hours = cron_field(fields.next()?, 0, 23, &[])?;
+    let dom = fields.next()?;
+    let days = cron_field(dom, 1, 31, &[])?;
+    let months = cron_field(
+        fields.next()?,
+        1,
+        12,
+        &[
+            "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+        ],
+    )?;
+    let dow = fields.next().unwrap_or("*");
+    let weekdays = cron_field(
+        dow,
+        0,
+        6,
+        &["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"],
+    )?;
+    if fields.next().is_some() {
+        return None;
+    }
+    let intersect = [dom, dow]
         .iter()
-        .any(|day| day.split(',').any(|range| range.starts_with(['*', '?'])));
-    let months = [
-        "JAN", "FEB", "MAR", "APR", "MAY", "JUN", "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
-    ];
-    let weekdays = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
-    let pattern = [
-        cron_field(second, 0, 59, &[])?,
-        cron_field(minute, 0, 59, &[])?,
-        cron_field(hour, 0, 23, &[])?,
-        cron_field(dom, 1, 31, &[])?,
-        cron_field(month, 1, 12, &months)?,
-        cron_field(dow, 0, 6, &weekdays)?,
-    ]
-    .join(" ");
-    parser
-        .dom_and_dow(wildcard_day)
-        .build()
-        .parse(&pattern)
-        .ok()
+        .any(|day| day.split(',').any(|r| r.starts_with(['*', '?'])));
+    let first = Timestamp::from_second(now.as_second().checked_add(1)?)
+        .ok()?
+        .to_zoned(TimeZone::UTC);
+    let mut date = first.date();
+    // The existing scheduler gives up after five calendar years, including impossible dates.
+    while date.year() <= first.year() + 5 {
+        let day = days.contains(&date.day());
+        let weekday = weekdays.contains(&date.weekday().to_sunday_zero_offset());
+        let matches_day = if intersect {
+            day && weekday
+        } else {
+            day || weekday
+        };
+        if months.contains(&date.month()) && matches_day {
+            let earliest = if date == first.date() {
+                first.time()
+            } else {
+                Time::MIN
+            };
+            for &hour in hours.range(earliest.hour()..) {
+                let minute_start = if hour == earliest.hour() {
+                    earliest.minute()
+                } else {
+                    0
+                };
+                for &minute in minutes.range(minute_start..) {
+                    let second_start = if (hour, minute) == (earliest.hour(), earliest.minute()) {
+                        earliest.second()
+                    } else {
+                        0
+                    };
+                    if let Some(&second) = seconds.range(second_start..).next() {
+                        return Some(
+                            date.at(hour, minute, second, 0)
+                                .to_zoned(TimeZone::UTC)
+                                .ok()?
+                                .timestamp(),
+                        );
+                    }
+                }
+            }
+        }
+        date = date.tomorrow().ok()?;
+    }
+    None
 }
 
-// Translate Keel ranges to explicit Croner ranges. In particular, "1/2" in the weekday
-// field stops at Saturday (6). Croner also accepts 7 for Sunday, which would add a check.
-fn cron_field(field: &str, min: u8, max: u8, names: &[&str]) -> Option<String> {
+// A Keel field is a list of values or inclusive ranges with optional steps. N/step runs
+// from N to the field's maximum. Sunday is zero and the weekday range ends at Saturday.
+fn cron_field(field: &str, min: i8, max: i8, names: &[&str]) -> Option<BTreeSet<i8>> {
     let value = |s: &str| {
-        let n = s.parse::<u8>().ok().or_else(|| {
+        let n = s.parse::<i8>().ok().or_else(|| {
             let index = names.iter().position(|name| s.eq_ignore_ascii_case(name))?;
-            u8::try_from(index).ok()?.checked_add(min)
+            i8::try_from(index).ok()?.checked_add(min)
         })?;
         (min..=max).contains(&n).then_some(n)
     };
-    let mut ranges = Vec::new();
+    let mut values = BTreeSet::new();
     for part in field.split(',').filter(|part| !part.is_empty()) {
         let (range, step) = part
             .split_once('/')
@@ -247,17 +286,13 @@ fn cron_field(field: &str, min: u8, max: u8, names: &[&str]) -> Option<String> {
             let start = value(range)?;
             (start, if step.is_some() { max } else { start })
         };
-        let step = step
-            .unwrap_or("1")
-            .parse::<u64>()
-            .ok()?
-            .min(u64::from(max) + 1);
+        let step = step.unwrap_or("1").parse::<usize>().ok()?;
         if step == 0 || start > end {
             return None;
         }
-        ranges.push(format!("{start}-{end}/{step}"));
+        values.extend((start..=end).step_by(step));
     }
-    (!ranges.is_empty()).then(|| ranges.join(","))
+    (!values.is_empty()).then_some(values)
 }
 
 // Kubernetes ORs nodeSelectorTerms and ANDs the requirements in each nonempty term.
