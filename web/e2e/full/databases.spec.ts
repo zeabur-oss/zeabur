@@ -1,10 +1,12 @@
 import type { Page } from "@playwright/test"
+import type { ProjectDatabases } from "../../src/api/zeabur.ts"
 
 import { expect, test } from "../fixtures.ts"
 import { invite, member, planAndApply, signInAdmin, toast } from "./members.ts"
 
-// Databases by role: a Developer creates a database, backs it up to S3 and backs it up now; a
-// Viewer of the same project sees it but cannot back it up or read its password.
+// Databases by role: a Developer creates and backs up databases and configures PostgreSQL image
+// updates; a Viewer sees them but cannot back them up, change updates or read passwords.
+// Image-update settings need Keel installed, as in the full dev-cluster profile.
 // scripts/e2e-browser.sh sets, besides ZEABUR_E2E_URL and ZEABUR_E2E_NAMESPACE:
 //
 //   ZEABUR_E2E_DB_ADMIN_LINK   an invitation for `e2e-db-admin`, an admin account (`invite --admin`;
@@ -81,6 +83,20 @@ const engines = [
 ]
 const databasePage = (path: string, name: string) =>
   `/projects/${encodeURIComponent(project)}/databases/${path}/${name}`
+
+async function postgresObject(page: Page) {
+  const response = await page.request.get(
+    `/api/v1/projects/${encodeURIComponent(project)}/databases`,
+  )
+  expect(response.status()).toBe(200)
+  const body = (await response.json()) as ProjectDatabases
+  const database = body.items.find((db) => db.engine === "postgresql" && db.name === postgres)
+  expect(database).toBeDefined()
+  return database!.object as {
+    metadata: { annotations?: Record<string, string> }
+    spec: { imageName: string; storage: { size: string }; plugins: unknown[] }
+  }
+}
 
 /** The project's claims whose names start with `prefix`. */
 async function claimsOf(page: Page, prefix: string): Promise<string[]> {
@@ -230,6 +246,69 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
     })
   }
 
+  await test.step("the Developer saves and disables PostgreSQL image updates without changing its spec", async () => {
+    const before = await postgresObject(developer)
+    expect(before.spec.imageName).toBeTruthy()
+    expect(before.spec.storage.size).toBe("1Gi")
+    expect(before.spec.plugins.length).toBeGreaterThan(0)
+    // Keep registry checks outside this settings test's window.
+    const schedule = await developer.evaluate(() => {
+      const at = new Date(Date.now() + 12 * 60 * 60 * 1000)
+      at.setUTCMinutes(0, 0, 0)
+      return {
+        time: `${String(at.getHours()).padStart(2, "0")}:${String(at.getMinutes()).padStart(2, "0")}`,
+        cron: `0 0 ${at.getUTCHours()} * * *`,
+      }
+    })
+    await developer.goto(databasePage("postgresql", postgres))
+    await developer.getByRole("tab", { name: "Settings" }).click()
+    const updates = developer.getByRole("region", { name: "Automatic updates", exact: true })
+    const policy = updates.getByRole("combobox", { name: "Which versions" })
+    await expect(policy).toHaveText("Off")
+    await policy.click()
+    await developer.getByRole("option", { name: "New image under the same tag" }).click()
+    await updates.getByRole("combobox", { name: "When", exact: true }).click()
+    await developer.getByRole("option", { name: "Every day", exact: true }).click()
+    await updates.getByRole("combobox", { name: "Time", exact: true }).click()
+    await developer.getByRole("option", { name: schedule.time, exact: true }).click()
+    await updates.getByRole("button", { name: "Review changes", exact: true }).click()
+    await expect(developer.getByRole("dialog", { name: "Automatic updates" })).toContainText(
+      postgres,
+    )
+    await apply(developer, "Automatic updates")
+
+    const enabled = await postgresObject(developer)
+    expect(enabled.spec).toEqual(before.spec)
+    expect(enabled.metadata.annotations).toMatchObject({
+      "keel.sh/policy": "force",
+      "keel.sh/trigger": "poll",
+      "keel.sh/match-tag": "true",
+      "keel.sh/pollSchedule": schedule.cron,
+    })
+    await developer.reload()
+    await expect(policy).toHaveText("New image under the same tag")
+    await expect(updates.getByRole("combobox", { name: "When", exact: true })).toHaveText(
+      "Every day",
+    )
+    await expect(updates.getByRole("combobox", { name: "Time", exact: true })).toHaveText(
+      schedule.time,
+    )
+    await expect(
+      updates.getByRole("button", { name: "Review changes", exact: true }),
+    ).toBeDisabled()
+    await policy.click()
+    await developer.getByRole("option", { name: "Off", exact: true }).click()
+    await updates.getByRole("button", { name: "Review changes", exact: true }).click()
+    await apply(developer, "Automatic updates")
+    const disabled = await postgresObject(developer)
+    expect(disabled.spec).toEqual(before.spec)
+    for (const key of ["policy", "trigger", "match-tag", "matchTag", "pollSchedule"]) {
+      expect(disabled.metadata.annotations?.[`keel.sh/${key}`]).toBeUndefined()
+    }
+    await developer.reload()
+    await expect(policy).toHaveText("Off")
+  })
+
   await test.step("the Viewer sees the databases but cannot back them up or read passwords", async () => {
     const viewer = await member(browser, viewerLink, "e2e-db-viewer", zeabur)
     for (const db of engines) {
@@ -256,6 +335,37 @@ test("a Developer creates and backs up databases; a Viewer only sees them", asyn
 
       const refused = await planAndApply(viewer, project, [{ op: "create", object: db.backup }])
       expect(refused.status, JSON.stringify(refused.body)).toBe(403)
+      if (db.path === "postgresql") {
+        await viewer.getByRole("tab", { name: "Settings" }).click()
+        const updates = viewer.getByRole("region", { name: "Automatic updates", exact: true })
+        await expect(updates.getByRole("combobox", { name: "Which versions" })).toBeDisabled()
+        await expect(
+          updates.getByRole("button", { name: "Review changes", exact: true }),
+        ).toBeDisabled()
+        await expect(updates).toContainText("Needs Developer access")
+        const before = await postgresObject(viewer)
+        const edited = structuredClone(before)
+        edited.metadata.annotations = {
+          ...edited.metadata.annotations,
+          "keel.sh/policy": "force",
+          "keel.sh/trigger": "poll",
+          "keel.sh/match-tag": "true",
+          "keel.sh/pollSchedule": "@hourly",
+        }
+        const refused = await planAndApply(viewer, project, [
+          {
+            op: "edit",
+            resource: db.resource,
+            name: db.name,
+            yaml: JSON.stringify(edited),
+            specOnly: false,
+          },
+        ])
+        expect(refused.status, JSON.stringify(refused.body)).toBe(403)
+        const after = await postgresObject(developer)
+        expect(after.spec).toEqual(before.spec)
+        expect(after.metadata.annotations).toEqual(before.metadata.annotations)
+      }
     }
     await viewer.context().close()
   })
