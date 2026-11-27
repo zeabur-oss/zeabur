@@ -31,6 +31,9 @@
 //! `ZEABUR_DEMO_WRONG_PORT=1` adds `lab/checkout`, a built service whose app does not listen on
 //! its port 8080 while its image declares 3000; `no-expose` makes the image declare none.
 //!
+//! `ZEABUR_DEMO_BUILD_AGENT=1` builds `blog/docs` with the `agent` builder, whose newest run
+//! reports the Dockerfile the model wrote; `stopped` reports a plan that found no app.
+//!
 //! `ZEABUR_DEMO_DELETING=1` adds a project, `archive`, that a database's finalizer keeps from
 //! being deleted.
 //!
@@ -381,7 +384,6 @@ fn dns() -> zeabur_api::resolve::Fixed {
 fn docs_build() -> [DynamicObject; 2] {
     let oom = std::env::var_os("ZEABUR_DEMO_BUILD_OOM").is_some();
     let failed = oom || std::env::var_os("ZEABUR_DEMO_BUILD_FAILED").is_some();
-    // `ZEABUR_DEMO_BUILD_AGENT=1` builds docs with the agent; `=stopped` shows a plan that stopped.
     let agent = std::env::var("ZEABUR_DEMO_BUILD_AGENT").ok();
     let builder = if agent.is_some() { "agent" } else { "railpack" };
     let build = json!({
