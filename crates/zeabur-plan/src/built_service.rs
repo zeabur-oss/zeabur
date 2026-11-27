@@ -942,7 +942,14 @@ impl<'a> Planner<'a> {
         let latest = current.and_then(|read| read.status.latest_image);
         let details = self.builds_tab(reference.kind, name);
         let (pushes_to, build_changed) = if existing {
-            self.update_build(name, &change.build, source, credentials, details, index)?
+            self.update_build(
+                name,
+                &change.build,
+                source,
+                credentials,
+                details.as_deref(),
+                index,
+            )?
         } else {
             let pushes_to = self.repository(name)?;
             if let Some(secret) = credentials {
@@ -995,7 +1002,7 @@ impl<'a> Planner<'a> {
         build: &BuildInput,
         mut source: SourceSpec,
         credentials: Option<Secret>,
-        details: Option<String>,
+        details: Option<&str>,
         index: usize,
     ) -> Result<(String, bool), PlanError> {
         let at = self.build(name)?;
@@ -1038,7 +1045,7 @@ impl<'a> Planner<'a> {
             }
         }
         self.patch(at, operations)?;
-        if let Some(url) = &details {
+        if let Some(url) = details {
             self.link_build(at, url)?;
         }
         if let BuildSource::Upload { request } = &build.source {
