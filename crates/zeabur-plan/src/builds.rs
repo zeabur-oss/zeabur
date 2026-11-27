@@ -18,11 +18,11 @@
 //!   `keel.sh/pollSchedule`, hourly or once a day or week. Turning it off removes the annotations
 //!   and leaves the target: Keel ignores images no workload opts in for, and another service may
 //!   still use it.
-//! - **Build options** set the `Build`'s directory and Dockerfile, and edit
-//!   `spec.env`. Zeabur Builder passes each variable to the build as a `BuildKit` secret, never as
-//!   a build argument, so a value does not stay in the image. A value from a Secret names the
-//!   Secret and the key. For the `agent` builder, `builder.zeabur.com/plan: fresh` has every run
-//!   ask the model for a new Dockerfile; without it a run builds the one an earlier run saved.
+//! - **Build options** set the `Build`'s directory and Dockerfile, and edit `spec.env`. Zeabur
+//!   Builder passes each variable to the build as a `BuildKit` secret, never as a build argument,
+//!   so a value does not stay in the image. A value from a Secret names the Secret and the key. For
+//!   the `agent` builder, `builder.zeabur.com/plan: fresh` has every run ask the model for a new
+//!   Dockerfile; without it a run builds the one an earlier run saved.
 //!
 //! [builder]: https://github.com/zeabur-oss/builder
 //! [keel]: https://keel.sh/docs/#policies

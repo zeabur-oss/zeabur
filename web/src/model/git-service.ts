@@ -16,7 +16,7 @@ type Change = Schemas.Change
 type EnvEdit = Schemas.EnvEdit
 
 export type BuildMethod = Schemas.BuildMethod
-export const buildMethods: BuildMethod[] = ["railpack", "dockerfile"]
+const buildMethods: BuildMethod[] = ["railpack", "dockerfile"]
 
 /** The methods to offer: the agent's only while its builder is ready, or when `current` is it. */
 export const offeredMethods = (agentReady: boolean, current?: BuildMethod): BuildMethod[] =>
